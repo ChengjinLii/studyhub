@@ -1,0 +1,632 @@
+{
+  "seedVersion": "read-api-v1",
+  "stats": {
+    "users": 3,
+    "materials": 4
+  },
+  "users": {
+    "1": {
+      "id": 1,
+      "username": "alice",
+      "nickname": "Alice Chen",
+      "signature": "热衷整理通信课程资料，也会在集市淘点好物。",
+      "school": "电子科技大学",
+      "college": "信息与通信工程学院",
+      "major": "通信工程",
+      "gradeStages": ["大三"],
+      "avatar": null,
+      "email": "alice@example.com",
+      "emailPrivacy": false,
+      "payoutQrUrl": null,
+      "legendaryContributorUntil": "2026-12-31T00:00:00+08:00",
+      "roleMask": 1,
+      "freeDownloadQuota": 7,
+      "verified": true
+    },
+    "2": {
+      "id": 2,
+      "username": "baishan",
+      "nickname": "白山",
+      "signature": "### 分享优先\n\n资料、经验分享和校园集市都在维护。",
+      "school": "电子科技大学",
+      "college": "计算机科学与工程学院",
+      "major": "软件工程",
+      "gradeStages": ["大四"],
+      "avatar": "https://static.studyhub.local/avatar/baishan.png",
+      "email": "baishan@example.com",
+      "emailPrivacy": true,
+      "payoutQrUrl": "https://static.studyhub.local/payout/baishan.png",
+      "legendaryContributorUntil": "2026-11-30T00:00:00+08:00",
+      "roleMask": 2,
+      "freeDownloadQuota": 12,
+      "verified": true
+    },
+    "3": {
+      "id": 3,
+      "username": "admin",
+      "nickname": "超级管理员",
+      "signature": "维护站点稳定性与秩序。",
+      "school": "电子科技大学",
+      "college": "信息与软件工程学院",
+      "major": "软件工程",
+      "gradeStages": ["研一"],
+      "avatar": null,
+      "email": "admin@example.com",
+      "emailPrivacy": false,
+      "payoutQrUrl": null,
+      "legendaryContributorUntil": null,
+      "roleMask": 8,
+      "freeDownloadQuota": null,
+      "verified": true
+    }
+  },
+  "relationships": {
+    "follows": {
+      "1": [2],
+      "2": [1],
+      "3": [2]
+    },
+    "materialPurchases": {
+      "1": [102]
+    },
+    "materialLikes": {
+      "1": [101, 103],
+      "2": [101]
+    },
+    "materialFavorites": {
+      "1": [103]
+    },
+    "materialRatings": {
+      "1": {
+        "101": 5,
+        "102": 4
+      }
+    },
+    "commentLikes": {
+      "1": [9002],
+      "2": [9001]
+    },
+    "marketWanted": {
+      "1": [201],
+      "2": [202]
+    }
+  },
+  "profileSummary": {
+    "1": {
+      "purchases": [
+        {
+          "orderId": 7001,
+          "materialId": 102,
+          "title": "通信原理速成笔记",
+          "amount": 2.5,
+          "free": false,
+          "status": "PAID",
+          "createdAt": "2026-03-14T20:10:00+08:00",
+          "hasFile": false,
+          "hasNetdisk": true,
+          "netdiskUrl": "https://pan.example.com/s/txyl",
+          "netdiskPassword": "2026",
+          "netdiskExpiredAt": "2026-06-30",
+          "originalFilename": null
+        }
+      ],
+      "adminNotes": [
+        {
+          "id": 8801,
+          "adminId": 3,
+          "adminUsername": "admin",
+          "adminNickname": "超级管理员",
+          "message": "感谢持续分享资料，已为你补充投稿者权限。",
+          "createdAt": "2026-03-10T09:30:00+08:00"
+        }
+      ],
+      "hasNewAlerts": true,
+      "totals": {
+        "totalDownloads": 41,
+        "uniqueDownloaders": 13,
+        "totalEarnings": 18.5
+      }
+    }
+  },
+  "materials": [
+    {
+      "id": 101,
+      "uploaderId": 2,
+      "uploaderUsername": "baishan",
+      "uploaderNickname": "白山",
+      "copyrightOwner": "白山",
+      "title": "数据结构期末真题解析",
+      "description": "整理了近三年数据结构期末题型与高频考点，附自制解析。",
+      "originalFilename": "数据结构-期末真题解析.pdf",
+      "fileType": "PDF",
+      "hasFile": true,
+      "fileSize": 826368,
+      "price": 0,
+      "free": true,
+      "school": "电子科技大学",
+      "college": "计算机科学与工程学院",
+      "major": "软件工程",
+      "generalEducation": false,
+      "hasNetdisk": false,
+      "netdiskUrl": null,
+      "netdiskPassword": null,
+      "netdiskExpiredAt": null,
+      "netdiskReminderAt": null,
+      "netdiskAccessible": false,
+      "courseCategory": "MAJOR_CORE",
+      "gradeType": "STAGE",
+      "gradeValue": "大二",
+      "tags": ["期末真题", "期末答案（自制解析）"],
+      "previewWatermarkEnabled": true,
+      "previewSource": "AUTO",
+      "previewManifest": "materials/101/preview/manifest.json",
+      "customPreviewText": null,
+      "customPreviewImages": [],
+      "ratingAvg": 4.8,
+      "ratingCount": 16,
+      "likeCount": 31,
+      "commentCount": 2,
+      "viewCount": 245,
+      "downloadCount": 128,
+      "salesCount": 0,
+      "createdAt": "2026-03-18T18:00:00+08:00",
+      "versions": [
+        {
+          "id": 1,
+          "versionLabel": "v1.0",
+          "createdAt": "2026-03-18T18:00:00+08:00"
+        }
+      ],
+      "reviews": [
+        {
+          "id": 5001,
+          "reviewer": "Alice Chen",
+          "rating": 5,
+          "comment": "解析很完整，复习效率高很多。",
+          "createdAt": "2026-03-19T12:20:00+08:00"
+        }
+      ],
+      "status": "VISIBLE"
+    },
+    {
+      "id": 102,
+      "uploaderId": 2,
+      "uploaderUsername": "baishan",
+      "uploaderNickname": "白山",
+      "copyrightOwner": "白山",
+      "title": "通信原理速成笔记",
+      "description": "适合考前两周冲刺，按章节提炼公式、推导与常考题。",
+      "originalFilename": null,
+      "fileType": null,
+      "hasFile": false,
+      "fileSize": null,
+      "price": 2.5,
+      "free": false,
+      "school": "电子科技大学",
+      "college": "信息与通信工程学院",
+      "major": "通信工程",
+      "generalEducation": false,
+      "hasNetdisk": true,
+      "netdiskUrl": "https://pan.example.com/s/txyl",
+      "netdiskPassword": "2026",
+      "netdiskExpiredAt": "2026-06-30",
+      "netdiskReminderAt": "2026-06-25",
+      "netdiskAccessible": true,
+      "courseCategory": "MAJOR_CORE",
+      "gradeType": "STAGE",
+      "gradeValue": "大三",
+      "tags": ["期末速成", "一页纸"],
+      "previewWatermarkEnabled": true,
+      "previewSource": "MANUAL",
+      "previewManifest": null,
+      "customPreviewText": "## 通信原理速成提纲\n\n- 调制解调主线\n- 抽样定理与无码间串扰\n- 常见计算题套路",
+      "customPreviewImages": [
+        "https://static.studyhub.local/materials/102/preview-1.png"
+      ],
+      "ratingAvg": 4.6,
+      "ratingCount": 9,
+      "likeCount": 18,
+      "commentCount": 0,
+      "viewCount": 143,
+      "downloadCount": 74,
+      "salesCount": 11,
+      "createdAt": "2026-03-16T09:20:00+08:00",
+      "versions": [
+        {
+          "id": 2,
+          "versionLabel": "v2.1",
+          "createdAt": "2026-03-16T09:20:00+08:00"
+        }
+      ],
+      "reviews": [
+        {
+          "id": 5002,
+          "reviewer": "Alice Chen",
+          "rating": 4,
+          "comment": "适合冲刺阶段快速过一遍。",
+          "createdAt": "2026-03-17T14:00:00+08:00"
+        }
+      ],
+      "status": "VISIBLE"
+    },
+    {
+      "id": 103,
+      "uploaderId": 2,
+      "uploaderUsername": "baishan",
+      "uploaderNickname": "白山",
+      "copyrightOwner": "白山",
+      "title": "保研经验分享：电子科大通信方向",
+      "description": "记录夏令营、预推免准备清单以及联系导师的时间线。",
+      "originalFilename": null,
+      "fileType": null,
+      "hasFile": false,
+      "fileSize": null,
+      "price": 0,
+      "free": true,
+      "school": "电子科技大学",
+      "college": "信息与通信工程学院",
+      "major": "通信工程",
+      "generalEducation": false,
+      "hasNetdisk": false,
+      "netdiskUrl": null,
+      "netdiskPassword": null,
+      "netdiskExpiredAt": null,
+      "netdiskReminderAt": null,
+      "netdiskAccessible": false,
+      "courseCategory": "EXPERIENCE",
+      "gradeType": "STAGE",
+      "gradeValue": "大四",
+      "tags": ["经验分享", "保研面经"],
+      "previewWatermarkEnabled": false,
+      "previewSource": "MANUAL",
+      "previewManifest": null,
+      "customPreviewText": "## 时间线\n\n1. 3 月梳理成绩与科研\n2. 6 月开始联系导师\n3. 7 月准备夏令营材料",
+      "customPreviewImages": [
+        "https://static.studyhub.local/materials/103/preview-1.png",
+        "https://static.studyhub.local/materials/103/preview-2.png"
+      ],
+      "ratingAvg": 4.9,
+      "ratingCount": 6,
+      "likeCount": 24,
+      "commentCount": 1,
+      "viewCount": 189,
+      "downloadCount": 96,
+      "salesCount": 0,
+      "createdAt": "2026-03-20T21:00:00+08:00",
+      "versions": [],
+      "reviews": [],
+      "status": "VISIBLE"
+    },
+    {
+      "id": 104,
+      "uploaderId": 1,
+      "uploaderUsername": "alice",
+      "uploaderNickname": "Alice Chen",
+      "copyrightOwner": "Alice Chen",
+      "title": "信号与系统复习导图",
+      "description": "把连续系统、离散系统和常见变换整理到一张导图里。",
+      "originalFilename": "信号与系统复习导图.zip",
+      "fileType": "ZIP",
+      "hasFile": true,
+      "fileSize": 1249280,
+      "price": 1.0,
+      "free": false,
+      "school": "电子科技大学",
+      "college": "信息与通信工程学院",
+      "major": "通信工程",
+      "generalEducation": false,
+      "hasNetdisk": false,
+      "netdiskUrl": null,
+      "netdiskPassword": null,
+      "netdiskExpiredAt": null,
+      "netdiskReminderAt": null,
+      "netdiskAccessible": false,
+      "courseCategory": "MAJOR_CORE",
+      "gradeType": "STAGE",
+      "gradeValue": "大三",
+      "tags": ["一页纸", "期末速成"],
+      "previewWatermarkEnabled": true,
+      "previewSource": "AUTO",
+      "previewManifest": "materials/104/preview/manifest.json",
+      "customPreviewText": null,
+      "customPreviewImages": [],
+      "ratingAvg": 4.4,
+      "ratingCount": 4,
+      "likeCount": 9,
+      "commentCount": 0,
+      "viewCount": 58,
+      "downloadCount": 23,
+      "salesCount": 7,
+      "createdAt": "2026-03-12T11:00:00+08:00",
+      "versions": [],
+      "reviews": [],
+      "status": "VISIBLE"
+    }
+  ],
+  "marketItems": [
+    {
+      "id": 201,
+      "sellerId": 2,
+      "sellerName": "白山",
+      "title": "九成新机械键盘",
+      "description": "宿舍清库存，红轴，带原装数据线。",
+      "price": 129,
+      "category": "DIGITAL",
+      "thumbnail": "https://static.studyhub.local/market/201/thumb.jpg",
+      "thumbnailVariant": {
+        "src": "https://static.studyhub.local/market/201/thumb.jpg",
+        "srcSet": "https://static.studyhub.local/market/201/thumb.jpg 1x, https://static.studyhub.local/market/201/thumb@2x.jpg 2x",
+        "webpSrcSet": "https://static.studyhub.local/market/201/thumb.webp 1x, https://static.studyhub.local/market/201/thumb@2x.webp 2x",
+        "avifSrcSet": null,
+        "lqip": "data:image/jpeg;base64,market201"
+      },
+      "images": [
+        "https://static.studyhub.local/market/201/1.jpg",
+        "https://static.studyhub.local/market/201/2.jpg"
+      ],
+      "imageVariants": [
+        {
+          "src": "https://static.studyhub.local/market/201/1.jpg",
+          "srcSet": "https://static.studyhub.local/market/201/1.jpg 1x, https://static.studyhub.local/market/201/1@2x.jpg 2x",
+          "webpSrcSet": null,
+          "avifSrcSet": null,
+          "lqip": "data:image/jpeg;base64,market201-1"
+        },
+        {
+          "src": "https://static.studyhub.local/market/201/2.jpg",
+          "srcSet": "https://static.studyhub.local/market/201/2.jpg 1x, https://static.studyhub.local/market/201/2@2x.jpg 2x",
+          "webpSrcSet": null,
+          "avifSrcSet": null,
+          "lqip": "data:image/jpeg;base64,market201-2"
+        }
+      ],
+      "wantCount": 5,
+      "school": "电子科技大学",
+      "status": "SALE",
+      "contactType": "微信",
+      "contactValue": "wx-baishan-01",
+      "createdAt": "2026-03-21T16:30:00+08:00"
+    },
+    {
+      "id": 202,
+      "sellerId": 1,
+      "sellerName": "Alice Chen",
+      "title": "高等数学课本",
+      "description": "教材边角有轻微磨损，内页干净。",
+      "price": 25,
+      "category": "BOOK",
+      "thumbnail": "https://static.studyhub.local/market/202/thumb.jpg",
+      "thumbnailVariant": {
+        "src": "https://static.studyhub.local/market/202/thumb.jpg",
+        "srcSet": null,
+        "webpSrcSet": null,
+        "avifSrcSet": null,
+        "lqip": "data:image/jpeg;base64,market202"
+      },
+      "images": [
+        "https://static.studyhub.local/market/202/1.jpg"
+      ],
+      "imageVariants": [
+        {
+          "src": "https://static.studyhub.local/market/202/1.jpg",
+          "srcSet": null,
+          "webpSrcSet": null,
+          "avifSrcSet": null,
+          "lqip": "data:image/jpeg;base64,market202-1"
+        }
+      ],
+      "wantCount": 2,
+      "school": "电子科技大学",
+      "status": "SOLD",
+      "contactType": "QQ",
+      "contactValue": "2731938007",
+      "createdAt": "2026-03-11T12:00:00+08:00"
+    }
+  ],
+  "comments": [
+    {
+      "id": 9001,
+      "materialId": 101,
+      "parentId": null,
+      "content": "解析写得很清楚，期末前过一遍特别有用。",
+      "likeCount": 2,
+      "replyCount": 1,
+      "edited": false,
+      "status": "visible",
+      "createdAt": "2026-03-19T13:00:00+08:00",
+      "updatedAt": "2026-03-19T13:00:00+08:00",
+      "userId": 1,
+      "nickname": "Alice Chen",
+      "avatar": null,
+      "rating": 5
+    },
+    {
+      "id": 9002,
+      "materialId": 101,
+      "parentId": null,
+      "content": "如果再补一道图遍历大题会更完整。",
+      "likeCount": 1,
+      "replyCount": 0,
+      "edited": true,
+      "status": "visible",
+      "createdAt": "2026-03-20T09:30:00+08:00",
+      "updatedAt": "2026-03-20T10:00:00+08:00",
+      "userId": 2,
+      "nickname": "白山",
+      "avatar": "https://static.studyhub.local/avatar/baishan.png",
+      "rating": null
+    },
+    {
+      "id": 9101,
+      "materialId": 101,
+      "parentId": 9001,
+      "content": "谢谢反馈，我准备下个版本补上。",
+      "likeCount": 0,
+      "replyCount": 0,
+      "edited": false,
+      "status": "visible",
+      "createdAt": "2026-03-19T14:10:00+08:00",
+      "updatedAt": "2026-03-19T14:10:00+08:00",
+      "userId": 2,
+      "nickname": "白山",
+      "avatar": "https://static.studyhub.local/avatar/baishan.png",
+      "rating": null
+    }
+  ],
+  "requests": [
+    {
+      "id": 401,
+      "requesterId": 2,
+      "course": "概率论与数理统计",
+      "keyword": "期末真题",
+      "school": "电子科技大学",
+      "college": "计算机科学与工程学院",
+      "major": "软件工程",
+      "budget": 20,
+      "fundedAmount": 32,
+      "contributionCount": 3,
+      "deadline": "2026-04-05",
+      "urgencyTier": "HIGH",
+      "creatorFloor": 0,
+      "previewRequirement": "至少展示前 2 页",
+      "anonymous": false,
+      "requesterName": "白山",
+      "responseCount": 2,
+      "respondedUserIds": [1],
+      "acceptedResponseId": null,
+      "status": "OPEN",
+      "createdAt": "2026-03-22T10:00:00+08:00"
+    },
+    {
+      "id": 402,
+      "requesterId": 1,
+      "course": "数字信号处理",
+      "keyword": "实验报告模板",
+      "school": "电子科技大学",
+      "college": "信息与通信工程学院",
+      "major": "通信工程",
+      "budget": 0,
+      "fundedAmount": 0,
+      "contributionCount": 0,
+      "deadline": "2026-04-12",
+      "urgencyTier": "NORMAL",
+      "creatorFloor": 0,
+      "previewRequirement": "正文目录即可",
+      "anonymous": true,
+      "requesterName": "Alice Chen",
+      "responseCount": 0,
+      "respondedUserIds": [],
+      "acceptedResponseId": null,
+      "status": "OPEN",
+      "createdAt": "2026-03-17T08:00:00+08:00"
+    }
+  ],
+  "requestResponses": {
+    "401": [
+      {
+        "id": 6101,
+        "responderName": "Alice Chen",
+        "message": "我整理了一套带批注的真题，可以直接关联现有资料。",
+        "materialId": 102,
+        "revisionCount": 1,
+        "updatedAt": "2026-03-23T11:00:00+08:00",
+        "createdAt": "2026-03-23T11:00:00+08:00"
+      },
+      {
+        "id": 6102,
+        "responderName": "超级管理员",
+        "message": "若需要，我也可以协助补齐缺失题型。",
+        "materialId": null,
+        "revisionCount": 0,
+        "updatedAt": "2026-03-23T09:10:00+08:00",
+        "createdAt": "2026-03-23T09:10:00+08:00"
+      }
+    ]
+  },
+  "requestContributions": {
+    "401": [
+      {
+        "id": 6201,
+        "contributorId": 2,
+        "contributorName": "白山",
+        "type": "OWNER",
+        "amount": 20,
+        "status": "PAID",
+        "deadlineTier": "WEEK",
+        "deadlineAt": "2026-04-05T00:00:00+08:00",
+        "createdAt": "2026-03-22T10:00:00+08:00"
+      },
+      {
+        "id": 6202,
+        "contributorId": 1,
+        "contributorName": "Alice Chen",
+        "type": "FOLLOWER",
+        "amount": 12,
+        "status": "PAID",
+        "deadlineTier": "FLEX",
+        "deadlineAt": "2026-04-07T00:00:00+08:00",
+        "createdAt": "2026-03-22T10:30:00+08:00"
+      }
+    ]
+  },
+  "leaderboard": {
+    "all": [
+      {
+        "userId": 2,
+        "username": "baishan",
+        "downloads": 298,
+        "roleMask": 2
+      },
+      {
+        "userId": 1,
+        "username": "alice",
+        "downloads": 84,
+        "roleMask": 1
+      },
+      {
+        "userId": 3,
+        "username": "admin",
+        "downloads": 12,
+        "roleMask": 8
+      }
+    ],
+    "week": [
+      {
+        "userId": 2,
+        "username": "baishan",
+        "downloads": 41,
+        "roleMask": 2
+      },
+      {
+        "userId": 1,
+        "username": "alice",
+        "downloads": 12,
+        "roleMask": 1
+      }
+    ],
+    "month": [
+      {
+        "userId": 2,
+        "username": "baishan",
+        "downloads": 120,
+        "roleMask": 2
+      },
+      {
+        "userId": 1,
+        "username": "alice",
+        "downloads": 33,
+        "roleMask": 1
+      }
+    ]
+  },
+  "creatorMetrics": {
+    "2": {
+      "weekEnd": "2026-03-24T23:59:59+08:00",
+      "nextPayoutDate": "2026-03-31T18:00:00+08:00",
+      "weekSales": 3,
+      "weekGross": 49.9,
+      "weekNet": 42.41,
+      "commissionRate": 0.15
+    }
+  }
+}

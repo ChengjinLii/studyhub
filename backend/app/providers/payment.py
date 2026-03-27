@@ -1,0 +1,232 @@
+from __future__ import annotations
+
+from dataclasses import dataclass
+from datetime import UTC, datetime
+from decimal import Decimal, ROUND_HALF_UP
+import html
+from typing import Any, Mapping, Protocol
+
+from app.core.config import Settings
+from app.models.finance import OrderRecord, PaymentRecord
+from app.providers.alipay_support import build_alipay_client, gateway_url_for_env
+
+
+@dataclass(slots=True)
+class PaymentNotification:
+    out_trade_no: str
+    trade_no: str | None
+    amount_cents: int | None
+    sign_verified: bool = True
+
+
+class PaymentGatewayProvider(Protocol):
+    provider_name: str
+    channel_name: str
+
+    def build_checkout_payload(self, *, out_trade_no: str, order: OrderRecord) -> dict[str, Any]: ...
+
+    def build_force_check_notification(self, *, out_trade_no: str, order: OrderRecord) -> PaymentNotification | None: ...
+
+    def parse_notification(self, params: Mapping[str, str]) -> PaymentNotification: ...
+
+    def build_query_payload(self, *, payment: PaymentRecord, order: OrderRecord | None) -> dict[str, Any]: ...
+
+    def success_response_text(self) -> str: ...
+
+    def probe(self, *, deep: bool = False) -> dict[str, Any]: ...
+
+
+class LocalAlipayPaymentProvider:
+    provider_name = "local_alipay"
+    channel_name = "alipay_page"
+
+    def build_checkout_payload(self, *, out_trade_no: str, order: OrderRecord) -> dict[str, Any]:
+        return {
+            "status": "CREATED",
+            "orderId": order.id,
+            "materialId": order.material_id,
+            "orderNo": out_trade_no,
+            "form": self._build_pay_form(out_trade_no),
+        }
+
+    def build_force_check_notification(self, *, out_trade_no: str, order: OrderRecord) -> PaymentNotification:
+        return PaymentNotification(
+            out_trade_no=out_trade_no,
+            trade_no=self._build_trade_no(out_trade_no),
+            amount_cents=int(order.amount or 0),
+            sign_verified=True,
+        )
+
+    def parse_notification(self, params: Mapping[str, str]) -> PaymentNotification:
+        out_trade_no = str(params.get("out_trade_no") or "").strip()
+        raw_trade_no = str(params.get("trade_no") or "").strip()
+        total_amount = str(params.get("total_amount") or "").strip() or None
+        return PaymentNotification(
+            out_trade_no=out_trade_no,
+            trade_no=raw_trade_no or (self._build_trade_no(out_trade_no) if out_trade_no else None),
+            amount_cents=self._parse_amount_to_cents(total_amount),
+            sign_verified=bool(out_trade_no),
+        )
+
+    def build_query_payload(self, *, payment: PaymentRecord, order: OrderRecord | None) -> dict[str, Any]:
+        return {
+            "outTradeNo": payment.out_trade_no,
+            "tradeNo": payment.trade_no,
+            "status": payment.status,
+            "amount": payment.amount,
+            "channel": payment.channel,
+            "orderId": order.id if order else None,
+            "materialId": order.material_id if order else None,
+            "paidAt": payment.paid_at.isoformat() if payment.paid_at else None,
+        }
+
+    def success_response_text(self) -> str:
+        return "success"
+
+    def probe(self, *, deep: bool = False) -> dict[str, Any]:
+        del deep
+        return {
+            "status": "ok",
+            "provider": self.provider_name,
+            "channel": self.channel_name,
+            "mode": "local-simulated",
+        }
+
+    def _build_pay_form(self, out_trade_no: str) -> str:
+        escaped = html.escape(out_trade_no, quote=True)
+        return (
+            "<form id=\"studyhub-alipay-form\" method=\"GET\" action=\"/pay/result\">"
+            f"<input type=\"hidden\" name=\"orderNo\" value=\"{escaped}\"/>"
+            "</form>"
+        )
+
+    def _build_trade_no(self, out_trade_no: str) -> str:
+        suffix = out_trade_no[-8:] if out_trade_no else datetime.now(UTC).strftime("%H%M%S")
+        return f"ALI-LOCAL-{suffix}"
+
+    def _parse_amount_to_cents(self, raw: str | None) -> int | None:
+        if not raw:
+            return None
+        try:
+            value = Decimal(raw)
+        except Exception:  # noqa: BLE001
+            return None
+        return int((value * Decimal("100")).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
+
+
+class AlipayPagePaymentProvider:
+    provider_name = "alipay_page"
+    channel_name = "alipay_page"
+
+    def __init__(self, settings: Settings) -> None:
+        self.settings = settings
+
+    def build_checkout_payload(self, *, out_trade_no: str, order: OrderRecord) -> dict[str, Any]:
+        client = self._client()
+        total_amount = self._cents_to_amount(int(order.amount or 0))
+        order_string = client.api_alipay_trade_page_pay(
+            out_trade_no=out_trade_no,
+            total_amount=total_amount,
+            subject=order.material_title or f"StudyHub Order #{order.id}",
+            return_url=self.settings.alipay_return_url,
+            notify_url=self.settings.alipay_notify_url,
+        )
+        action = self._gateway_url()
+        escaped_query = html.escape(order_string, quote=True)
+        form = (
+            f"<form id=\"studyhub-alipay-form\" method=\"GET\" action=\"{html.escape(action, quote=True)}\">"
+            f"<input type=\"hidden\" name=\"query\" value=\"{escaped_query}\"/>"
+            "<script>location.href='" + html.escape(action, quote=True) + "?" + escaped_query + "';</script>"
+            "</form>"
+        )
+        return {
+            "status": "CREATED",
+            "orderId": order.id,
+            "materialId": order.material_id,
+            "orderNo": out_trade_no,
+            "gatewayUrl": f"{action}?{order_string}",
+            "form": form,
+        }
+
+    def build_force_check_notification(self, *, out_trade_no: str, order: OrderRecord) -> PaymentNotification | None:
+        result = self._trade_query(out_trade_no)
+        if not result:
+            return None
+        trade_status = str(result.get("trade_status") or "").upper()
+        if trade_status not in {"TRADE_SUCCESS", "TRADE_FINISHED"}:
+            return None
+        return PaymentNotification(
+            out_trade_no=out_trade_no,
+            trade_no=str(result.get("trade_no") or "") or None,
+            amount_cents=self._parse_amount_to_cents(str(result.get("total_amount") or "")),
+            sign_verified=True,
+        )
+
+    def parse_notification(self, params: Mapping[str, str]) -> PaymentNotification:
+        params_dict = {str(key): str(value) for key, value in params.items()}
+        sign = params_dict.get("sign")
+        payload = {key: value for key, value in params_dict.items() if key != "sign" and key != "sign_type"}
+        sign_verified = bool(sign) and bool(self._client().verify(payload, sign))
+        out_trade_no = str(params_dict.get("out_trade_no") or "").strip()
+        trade_no = str(params_dict.get("trade_no") or "").strip() or None
+        return PaymentNotification(
+            out_trade_no=out_trade_no,
+            trade_no=trade_no,
+            amount_cents=self._parse_amount_to_cents(str(params_dict.get("total_amount") or "")),
+            sign_verified=sign_verified,
+        )
+
+    def build_query_payload(self, *, payment: PaymentRecord, order: OrderRecord | None) -> dict[str, Any]:
+        remote = self._trade_query(str(payment.out_trade_no or ""))
+        return {
+            "outTradeNo": payment.out_trade_no,
+            "tradeNo": payment.trade_no,
+            "status": payment.status,
+            "amount": payment.amount,
+            "channel": payment.channel,
+            "orderId": order.id if order else None,
+            "materialId": order.material_id if order else None,
+            "paidAt": payment.paid_at.isoformat() if payment.paid_at else None,
+            "providerQuery": remote,
+        }
+
+    def success_response_text(self) -> str:
+        return "success"
+
+    def probe(self, *, deep: bool = False) -> dict[str, Any]:
+        payload: dict[str, Any] = {
+            "status": "ok",
+            "provider": self.provider_name,
+            "channel": self.channel_name,
+            "gateway": self._gateway_url(),
+            "appId": self.settings.alipay_app_id,
+            "environment": self.settings.alipay_env,
+        }
+        if deep:
+            payload["clientReady"] = True
+            self._client()
+        return payload
+
+    def _client(self):
+        return build_alipay_client(self.settings)
+
+    def _trade_query(self, out_trade_no: str) -> dict[str, Any] | None:
+        if not out_trade_no:
+            return None
+        result = self._client().api_alipay_trade_query(out_trade_no=out_trade_no)
+        return result if isinstance(result, dict) else None
+
+    def _gateway_url(self) -> str:
+        return gateway_url_for_env(self.settings.alipay_env)
+
+    def _cents_to_amount(self, amount_cents: int) -> str:
+        return str((Decimal(amount_cents) / Decimal("100")).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP))
+
+    def _parse_amount_to_cents(self, raw: str | None) -> int | None:
+        if not raw:
+            return None
+        try:
+            value = Decimal(raw)
+        except Exception:  # noqa: BLE001
+            return None
+        return int((value * Decimal("100")).quantize(Decimal("1"), rounding=ROUND_HALF_UP))

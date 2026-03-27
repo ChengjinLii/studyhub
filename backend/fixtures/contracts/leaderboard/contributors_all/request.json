@@ -1,0 +1,12 @@
+{
+  "sample_id": "contributors_all",
+  "bundle": "leaderboard",
+  "method": "GET",
+  "path": "/api/leaderboard/contributors",
+  "request_kind": "query",
+  "response_kind": "json",
+  "query": {
+    "limit": 2,
+    "period": "all"
+  }
+}

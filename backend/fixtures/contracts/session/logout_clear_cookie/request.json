@@ -1,0 +1,8 @@
+{
+  "sample_id": "logout_clear_cookie",
+  "bundle": "session",
+  "method": "POST",
+  "path": "/api/logout",
+  "request_kind": "none",
+  "response_kind": "json"
+}

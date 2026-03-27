@@ -1,0 +1,11 @@
+{
+  "content-type": {
+    "contains": "application/pdf"
+  },
+  "content-disposition": {
+    "equals": "attachment; filename=____.pdf; filename*=UTF-8''%E5%90%88%E5%90%8C%E6%A0%B7%E6%9C%AC.pdf"
+  },
+  "set-cookie": {
+    "count": 0
+  }
+}

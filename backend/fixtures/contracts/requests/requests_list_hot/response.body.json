@@ -1,0 +1,51 @@
+{
+  "ok": true,
+  "data": [
+    {
+      "id": 401,
+      "course": "概率论与数理统计",
+      "keyword": "期末真题",
+      "school": "电子科技大学",
+      "college": "计算机科学与工程学院",
+      "major": "软件工程",
+      "budget": 20,
+      "fundedAmount": 32,
+      "contributionCount": 3,
+      "deadline": "2026-04-05",
+      "urgencyTier": "HIGH",
+      "creatorFloor": 0,
+      "previewRequirement": "至少展示前 2 页",
+      "anonymous": false,
+      "requesterName": "白山",
+      "responseCount": 2,
+      "responded": false,
+      "owner": false,
+      "acceptedResponseId": null,
+      "status": "OPEN",
+      "createdAt": "2026-03-22T10:00:00+08:00"
+    },
+    {
+      "id": 402,
+      "course": "数字信号处理",
+      "keyword": "实验报告模板",
+      "school": "电子科技大学",
+      "college": "信息与通信工程学院",
+      "major": "通信工程",
+      "budget": 0,
+      "fundedAmount": 0,
+      "contributionCount": 0,
+      "deadline": "2026-04-12",
+      "urgencyTier": "NORMAL",
+      "creatorFloor": 0,
+      "previewRequirement": "正文目录即可",
+      "anonymous": true,
+      "requesterName": null,
+      "responseCount": 0,
+      "responded": false,
+      "owner": false,
+      "acceptedResponseId": null,
+      "status": "OPEN",
+      "createdAt": "2026-03-17T08:00:00+08:00"
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 400" role="img" aria-labelledby="title desc">
+  <title id="title">Generic Placeholder</title>
+  <desc id="desc">Local placeholder image for mock assets.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0%" x2="100%" y1="0%" y2="100%">
+      <stop offset="0%" stop-color="#fafaf9" />
+      <stop offset="100%" stop-color="#e7e5e4" />
+    </linearGradient>
+  </defs>
+  <rect width="640" height="400" rx="28" fill="url(#bg)" />
+  <rect x="74" y="84" width="492" height="232" rx="22" fill="#ffffff" stroke="#d6d3d1" stroke-width="6" />
+  <text x="100" y="346" fill="#1c1917" font-family="Arial, sans-serif" font-size="28" font-weight="700">StudyHub Local Dev</text>
+  <text x="100" y="378" fill="#57534e" font-family="Arial, sans-serif" font-size="22">Mock asset placeholder</text>
+</svg>

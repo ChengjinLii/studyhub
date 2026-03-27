@@ -1,0 +1,33 @@
+{
+  "ok": true,
+  "data": {
+    "items": [
+      {
+        "id": 9101,
+        "materialId": 101,
+        "parentId": 9001,
+        "content": "谢谢反馈，我准备下个版本补上。",
+        "likeCount": 0,
+        "replyCount": 0,
+        "edited": false,
+        "deleted": false,
+        "createdAt": "2026-03-19T14:10:00+08:00",
+        "updatedAt": "2026-03-19T14:10:00+08:00",
+        "user": {
+          "id": 2,
+          "nickname": "白山",
+          "avatar": "https://static.studyhub.local/avatar/baishan.png",
+          "isAuthor": true
+        },
+        "hasLiked": false,
+        "rating": null,
+        "replies": []
+      }
+    ],
+    "meta": {
+      "page": 0,
+      "size": 20,
+      "total": 1
+    }
+  }
+}

@@ -1,0 +1,80 @@
+services:
+  mysql:
+    image: mysql:8.4
+    restart: unless-stopped
+    command:
+      - --default-authentication-plugin=mysql_native_password
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+    environment:
+      MYSQL_DATABASE: studyhub
+      MYSQL_USER: studyhub
+      MYSQL_PASSWORD: studyhub
+      MYSQL_ROOT_PASSWORD: studyhub-root
+      MYSQL_INITDB_SKIP_TZINFO: "1"
+    ports:
+      - "3307:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$$MYSQL_ROOT_PASSWORD --silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 20s
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    working_dir: /app
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8011 --reload
+    environment:
+      STUDYHUB_ENVIRONMENT: local-dev
+      STUDYHUB_HOST: 0.0.0.0
+      STUDYHUB_PORT: 8011
+      STUDYHUB_DATABASE_URL: mysql+pymysql://studyhub:studyhub@mysql:3306/studyhub?charset=utf8mb4
+      STUDYHUB_LOCAL_DEV_ROOT_DIR: /workspace/.local-dev
+      STUDYHUB_LOCAL_DEV_BOOTSTRAP_USER: "true"
+      STUDYHUB_LOCAL_DEV_QUICK_LOGIN_ENABLED: "true"
+      STUDYHUB_MAIL_PROVIDER: local_outbox
+      STUDYHUB_STORAGE_PROVIDER: local_fs
+      STUDYHUB_PAYMENT_PROVIDER: local_alipay
+      STUDYHUB_JWT_SECRET: studyhub-fastapi-local-dev-secret-change-me-20260327
+    volumes:
+      - ./backend:/app
+      - ./.local-dev-docker:/workspace/.local-dev
+    ports:
+      - "8111:8011"
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    restart: unless-stopped
+    working_dir: /app
+    command: sh -c "if [ ! -d node_modules/next ]; then npm install; fi && npm run dev -- --hostname 0.0.0.0 --port 3000"
+    environment:
+      NODE_ENV: development
+      WATCHPACK_POLLING: "true"
+      CHOKIDAR_USEPOLLING: "true"
+      NEXT_PUBLIC_API_BASE: http://localhost:8111/api
+      NEXT_PUBLIC_DEV_API_BASE: http://localhost:8111/api
+      API_BASE_URL: http://backend:8011/api
+      API_BASE_INTERNAL: http://backend:8011/api
+    volumes:
+      - ./frontend:/app
+      - frontend-node-modules:/app/node_modules
+    ports:
+      - "3100:3000"
+    depends_on:
+      backend:
+        condition: service_started
+
+volumes:
+  mysql-data:
+  frontend-node-modules:

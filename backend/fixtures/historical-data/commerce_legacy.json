@@ -1,0 +1,105 @@
+{
+  "cases": [
+    {
+      "case_id": "legacy_paid_simulated_order_without_payment_row",
+      "tables": ["orders"],
+      "rows": {
+        "orders": {
+          "id": 301,
+          "user_id": 11,
+          "material_id": 101,
+          "amount": 300,
+          "status": "PAID",
+          "channel": "simulated",
+          "out_trade_no": null,
+          "trade_no": null,
+          "pay_channel": null,
+          "commission_rate": "0.2000",
+          "platform_fee_amount": 60,
+          "creator_payable_amount": 240,
+          "paid_at": null
+        }
+      },
+      "expectation": "Paid entitlement and creator metrics must still count this as paid even though no payment row exists."
+    },
+    {
+      "case_id": "settlement_legacy_missing_source_fields",
+      "tables": ["settlements"],
+      "rows": {
+        "settlements": {
+          "id": 302,
+          "order_id": 301,
+          "material_id": 101,
+          "uploader_id": 7,
+          "gross_amount": 300,
+          "platform_fee": 60,
+          "payout_amount": 240,
+          "status": "PENDING",
+          "scheduled_payout_at": "2026-03-28T00:00:00+08:00",
+          "processed_at": null,
+          "policy_version": "MARKET_V1",
+          "policy_id": null,
+          "source_type": null,
+          "source_id": null
+        }
+      },
+      "expectation": "Importer/query layer should derive ORDER source semantics from order_id and policy_version."
+    },
+    {
+      "case_id": "payout_application_pre_kyc_encryption",
+      "tables": ["creator_payout_applications"],
+      "rows": {
+        "creator_payout_applications": {
+          "id": 303,
+          "user_id": 7,
+          "status": "PENDING",
+          "contact_type": "WECHAT",
+          "contact_value": "studyhub_demo",
+          "alipay_account": "a***@mail.example",
+          "alipay_name": "张*",
+          "alipay_account_encrypted": null,
+          "alipay_name_encrypted": null,
+          "real_name_encrypted": null,
+          "id_hash": null,
+          "id_last4": null,
+          "kyc_status": null,
+          "kyc_verified_at": null,
+          "cycle_key": "2026-03-31",
+          "cycle_start_date": "2026-03-01",
+          "cycle_end_date": "2026-03-31"
+        }
+      },
+      "expectation": "Read path must tolerate pre-KYC rows and avoid assuming encrypted columns are populated."
+    },
+    {
+      "case_id": "transfer_waiting_for_gateway_refresh",
+      "tables": ["payout_transfers", "alipay_gateway_notifications"],
+      "rows": {
+        "payout_transfers": {
+          "id": 304,
+          "payout_application_id": 303,
+          "uploader_id": 7,
+          "out_biz_no": "T202603260001",
+          "amount": 12800,
+          "payee_account": "a***@mail.example",
+          "payee_name": "张*",
+          "status": "PENDING",
+          "failure_reason": null,
+          "paid_at": null
+        },
+        "alipay_gateway_notifications": {
+          "id": 305,
+          "event_id": "evt-demo-1",
+          "biz_type": "alipay.fund.trans.order.changed",
+          "out_biz_no": "T202603260001",
+          "status": "WAIT_PAY",
+          "notify_time": "2026-03-26T11:20:00+08:00",
+          "sign_verified": true,
+          "processed": true,
+          "process_result": "OK"
+        }
+      },
+      "expectation": "Gateway pending/unknown upstream states should not be collapsed into failure."
+    }
+  ]
+}

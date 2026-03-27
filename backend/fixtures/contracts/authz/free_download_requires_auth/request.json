@@ -1,0 +1,8 @@
+{
+  "sample_id": "free_download_requires_auth",
+  "bundle": "authz",
+  "method": "GET",
+  "path": "/api/free-download/status",
+  "request_kind": "none",
+  "response_kind": "json"
+}

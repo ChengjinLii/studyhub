@@ -1,0 +1,8 @@
+{
+  "sample_id": "material_detail_public",
+  "bundle": "materials",
+  "method": "GET",
+  "path": "/api/materials/101",
+  "request_kind": "none",
+  "response_kind": "json"
+}

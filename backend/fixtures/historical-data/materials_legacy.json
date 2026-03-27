@@ -1,0 +1,81 @@
+{
+  "cases": [
+    {
+      "case_id": "material_truncated_title_from_v23_window",
+      "table": "materials",
+      "row": {
+        "id": 101,
+        "title": "Signals and Systems Final Notes 2021 Archived Snapshot",
+        "status": "approved",
+        "review_status": "auto-approved",
+        "school": "电子科技大学",
+        "college": "信通",
+        "major": "通信,微电子",
+        "course_category": "MAJOR",
+        "file_key": "files/legacy-a1b2.pdf",
+        "original_filename": "signals-final-notes.pdf",
+        "delivery_method": "FILE",
+        "preview_source": "AUTO",
+        "preview_manifest": "{\"status\":\"failed\",\"renderVersion\":1,\"message\":\"old worker failed\"}",
+        "deleted_at": null
+      },
+      "expectation": "Title is valid even if historically truncated; malformed or stale preview state should schedule rebuild rather than crash."
+    },
+    {
+      "case_id": "material_netdisk_only_no_file_key",
+      "table": "materials",
+      "row": {
+        "id": 102,
+        "title": "Numerical Methods Shared via Cloud Disk",
+        "status": "approved",
+        "school": "电子科技大学",
+        "college": "格院",
+        "major": "电工",
+        "course_category": "MAJOR",
+        "file_key": null,
+        "original_filename": null,
+        "delivery_method": "NETDISK",
+        "netdisk_url": "https://pan.example.invalid/s/num-methods",
+        "netdisk_password": "1234",
+        "netdisk_expired_at": "2026-04-15",
+        "netdisk_reminder_at": "2026-04-12",
+        "preview_source": "AUTO",
+        "preview_manifest": null,
+        "deleted_at": null
+      },
+      "expectation": "Download/detail logic must allow valid NETDISK delivery with null file metadata."
+    },
+    {
+      "case_id": "material_soft_hidden_without_deleted_at",
+      "table": "materials",
+      "row": {
+        "id": 103,
+        "title": "Archived Material Still Hidden by Status",
+        "status": "hidden",
+        "review_status": "auto-approved",
+        "school": "电子科技大学",
+        "college": "信通",
+        "major": "通信",
+        "course_category": "MAJOR",
+        "file_key": "files/hidden-c3d4.zip",
+        "delivery_method": "FILE",
+        "preview_source": null,
+        "preview_manifest": "",
+        "deleted_at": null
+      },
+      "expectation": "Visibility must stay hidden even if deleted_at is null and preview_source is absent."
+    },
+    {
+      "case_id": "material_view_anonymous_token_mode",
+      "table": "material_views",
+      "row": {
+        "id": 201,
+        "material_id": 101,
+        "user_id": null,
+        "viewer_token_hash": "6f9d2d7f7bb1e3d4697ccf4a7a4f4e75f2d24891bfa3c7a6b98df4bb6c260001",
+        "viewed_at": "2026-03-20T09:15:11+08:00"
+      },
+      "expectation": "Anonymous-view uniqueness must key on viewer_token_hash when user_id is null."
+    }
+  ]
+}

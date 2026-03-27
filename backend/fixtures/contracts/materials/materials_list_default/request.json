@@ -1,0 +1,12 @@
+{
+  "sample_id": "materials_list_default",
+  "bundle": "materials",
+  "method": "GET",
+  "path": "/api/materials",
+  "request_kind": "query",
+  "response_kind": "json",
+  "query": {
+    "page": 1,
+    "size": 2
+  }
+}

@@ -1,0 +1,65 @@
+{
+  "ok": true,
+  "data": {
+    "id": 101,
+    "uploaderId": 2,
+    "uploaderUsername": "baishan",
+    "uploaderNickname": "白山",
+    "copyrightOwner": "白山",
+    "title": "数据结构期末真题解析",
+    "description": "整理了近三年数据结构期末题型与高频考点，附自制解析。",
+    "originalFilename": "数据结构-期末真题解析.pdf",
+    "fileType": "PDF",
+    "hasFile": true,
+    "fileSize": 826368,
+    "price": 0,
+    "free": true,
+    "school": "电子科技大学",
+    "college": "计算机科学与工程学院",
+    "major": "软件工程",
+    "generalEducation": false,
+    "hasNetdisk": false,
+    "netdiskUrl": null,
+    "netdiskPassword": null,
+    "netdiskExpiredAt": null,
+    "netdiskReminderAt": null,
+    "netdiskAccessible": false,
+    "courseCategory": "MAJOR_CORE",
+    "gradeType": "STAGE",
+    "gradeValue": "大二",
+    "tags": ["期末真题", "期末答案（自制解析）"],
+    "previewWatermarkEnabled": true,
+    "previewSource": "AUTO",
+    "previewManifest": "materials/101/preview/manifest.json",
+    "customPreviewText": null,
+    "customPreviewImages": [],
+    "ratingAvg": 4.8,
+    "ratingCount": 16,
+    "likeCount": 31,
+    "commentCount": 2,
+    "viewCount": 245,
+    "downloadCount": 128,
+    "salesCount": 0,
+    "createdAt": "2026-03-18T18:00:00+08:00",
+    "versions": [
+      {
+        "id": 1,
+        "versionLabel": "v1.0",
+        "createdAt": "2026-03-18T18:00:00+08:00"
+      }
+    ],
+    "reviews": [
+      {
+        "id": 5001,
+        "reviewer": "Alice Chen",
+        "rating": 5,
+        "comment": "解析很完整，复习效率高很多。",
+        "createdAt": "2026-03-19T12:20:00+08:00"
+      }
+    ],
+    "purchased": true,
+    "liked": false,
+    "favorited": false,
+    "myRating": null
+  }
+}

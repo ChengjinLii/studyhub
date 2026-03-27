@@ -1,0 +1,11 @@
+{
+  "etag": {
+    "equals": "W/\"materials-column:experience:1:2:demo-v1\""
+  },
+  "cache-control": {
+    "contains": "public"
+  },
+  "content-type": {
+    "absent": true
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "sample_id": "healthz_success",
+  "bundle": "health",
+  "method": "GET",
+  "path": "/healthz",
+  "request_kind": "none",
+  "response_kind": "json"
+}

@@ -1,0 +1,11 @@
+{
+  "parts": [
+    {
+      "name": "file",
+      "type": "file",
+      "filename": "step12-qr.png",
+      "content_type": "image/png",
+      "content": "studyhub-step12-qr"
+    }
+  ]
+}

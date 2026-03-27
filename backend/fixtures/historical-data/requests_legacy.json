@@ -1,0 +1,157 @@
+{
+  "cases": [
+    {
+      "case_id": "request_created_before_profile_fields",
+      "tables": ["material_requests"],
+      "rows": {
+        "material_requests": {
+          "id": 401,
+          "requester_id": 12,
+          "course": "线性代数期末资料",
+          "keyword": "需要往年题和解答",
+          "school": null,
+          "college": null,
+          "major": null,
+          "budget": 2000,
+          "deadline": "2026-04-30",
+          "urgency_tier": "FLEX",
+          "creator_floor": null,
+          "preview_requirement": null,
+          "anonymous": false,
+          "status": "OPEN",
+          "response_count": 1,
+          "funded_amount": 2000,
+          "contribution_count": 1,
+          "max_contribution_amount": 2000,
+          "accepted_response_id": null,
+          "accepted_at": null,
+          "settled_at": null
+        }
+      },
+      "expectation": "Null school/college/major must not exclude historical requests from listing or detail rendering."
+    },
+    {
+      "case_id": "request_pending_payment_owner_contribution_not_paid",
+      "tables": ["material_requests", "material_request_contributions"],
+      "rows": {
+        "material_requests": {
+          "id": 402,
+          "requester_id": 13,
+          "course": "通信原理实验报告模板",
+          "keyword": "越快越好",
+          "school": "电子科技大学",
+          "college": "信通",
+          "major": "通信",
+          "budget": 5000,
+          "deadline": "2026-03-31",
+          "urgency_tier": "24H",
+          "creator_floor": 3000,
+          "preview_requirement": "至少 2 张预览图",
+          "anonymous": false,
+          "status": "PENDING_PAYMENT",
+          "response_count": 0,
+          "funded_amount": 0,
+          "contribution_count": 0,
+          "max_contribution_amount": 0
+        },
+        "material_request_contributions": [
+          {
+            "id": 403,
+            "request_id": 402,
+            "contributor_id": 13,
+            "type": "OWNER",
+            "amount": 5000,
+            "status": "CREATED",
+            "deadline_tier": "24H",
+            "deadline_at": "2026-03-27T10:00:00+08:00",
+            "out_trade_no": "REQ202603260001",
+            "trade_no": null,
+            "pay_channel": null,
+            "paid_at": null
+          }
+        ]
+      },
+      "expectation": "Request remains hidden from normal OPEN list until owner contribution is marked PAID."
+    },
+    {
+      "case_id": "request_refunding_with_mixed_child_states",
+      "tables": ["material_requests", "material_request_contributions", "material_request_refunds", "material_request_arbitrations"],
+      "rows": {
+        "material_requests": {
+          "id": 404,
+          "requester_id": 14,
+          "course": "微电子面经合集",
+          "keyword": "需要保研/求职双向经验",
+          "school": "电子科技大学",
+          "college": "格院",
+          "major": "微电子",
+          "budget": 6000,
+          "status": "REFUNDING",
+          "response_count": 2,
+          "funded_amount": 6000,
+          "contribution_count": 2,
+          "max_contribution_amount": 4000,
+          "accepted_response_id": 999999,
+          "accepted_at": "2026-03-10T20:00:00+08:00",
+          "settled_at": null
+        },
+        "material_request_contributions": [
+          {
+            "id": 405,
+            "request_id": 404,
+            "contributor_id": 14,
+            "type": "OWNER",
+            "amount": 4000,
+            "status": "REFUNDING",
+            "out_trade_no": "REQ202603100001",
+            "trade_no": "ALI-REQ-1001",
+            "pay_channel": "alipay_page",
+            "paid_at": "2026-03-10T08:10:00+08:00"
+          },
+          {
+            "id": 406,
+            "request_id": 404,
+            "contributor_id": 21,
+            "type": "FOLLOWER",
+            "amount": 2000,
+            "status": "REFUNDED",
+            "out_trade_no": "REQ202603100002",
+            "trade_no": "ALI-REQ-1002",
+            "pay_channel": "alipay_page",
+            "paid_at": "2026-03-10T08:30:00+08:00"
+          }
+        ],
+        "material_request_refunds": [
+          {
+            "id": 407,
+            "request_id": 404,
+            "contribution_id": 405,
+            "out_request_no": "RFD202603260001",
+            "out_trade_no": "REQ202603100001",
+            "trade_no": "ALI-REQ-1001",
+            "refund_amount": 3880,
+            "refund_type": "ARBITRATION",
+            "refund_reason": "仲裁裁定退款",
+            "failure_reason": null,
+            "status": "CREATED",
+            "refund_time": null
+          }
+        ],
+        "material_request_arbitrations": {
+          "id": 408,
+          "request_id": 404,
+          "response_id": 501,
+          "requester_id": 14,
+          "responder_id": 31,
+          "reason": "交付不符合约定",
+          "status": "REFUNDING",
+          "admin_note": "等待退款网关完成",
+          "decided_by": 1,
+          "created_at": "2026-03-25T09:00:00+08:00",
+          "decided_at": "2026-03-26T09:30:00+08:00"
+        }
+      },
+      "expectation": "Parent request status, child contribution status, refund row status, and arbitration status must all be allowed to diverge temporarily."
+    }
+  ]
+}

@@ -1,0 +1,22 @@
+{
+  "legacy_tables": [
+    {
+      "table": "refund_requests",
+      "source": "V1__init.sql",
+      "current_java_mapping": "none",
+      "note": "Historical material refund schema from the earliest version; not actively used by current Java code."
+    },
+    {
+      "table": "suspicious_events",
+      "source": "V1__init.sql",
+      "current_java_mapping": "none",
+      "note": "Legacy anti-abuse event table; suspicious score logic moved elsewhere."
+    },
+    {
+      "table": "order_refunds",
+      "source": "V47__order_refunds_policy_id.sql",
+      "current_java_mapping": "migration only",
+      "note": "Schema exists but no active entity/service path was found in the current Java backend."
+    }
+  ]
+}

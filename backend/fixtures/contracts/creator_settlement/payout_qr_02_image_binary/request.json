@@ -1,0 +1,8 @@
+{
+  "sample_id": "payout_qr_image_binary",
+  "bundle": "creator_settlement",
+  "method": "GET",
+  "path": "/api/users/1/payout-qr/image",
+  "request_kind": "none",
+  "response_kind": "binary"
+}

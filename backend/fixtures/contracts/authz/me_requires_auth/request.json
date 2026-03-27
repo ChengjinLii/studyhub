@@ -1,0 +1,8 @@
+{
+  "sample_id": "me_requires_auth",
+  "bundle": "authz",
+  "method": "GET",
+  "path": "/api/me",
+  "request_kind": "none",
+  "response_kind": "json"
+}

@@ -1,0 +1,8 @@
+{
+  "sample_id": "pay_notify_success",
+  "bundle": "payment",
+  "method": "POST",
+  "path": "/api/pay/alipay/notify",
+  "request_kind": "form",
+  "response_kind": "text"
+}

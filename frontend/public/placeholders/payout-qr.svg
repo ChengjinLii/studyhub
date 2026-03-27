@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 420 420" role="img" aria-labelledby="title desc">
+  <title id="title">Payout QR Placeholder</title>
+  <desc id="desc">Local placeholder image for mock payout QR assets.</desc>
+  <rect width="420" height="420" rx="32" fill="#ffffff" stroke="#d4d4d8" stroke-width="12" />
+  <rect x="54" y="54" width="96" height="96" rx="10" fill="#111827" />
+  <rect x="78" y="78" width="48" height="48" rx="6" fill="#ffffff" />
+  <rect x="270" y="54" width="96" height="96" rx="10" fill="#111827" />
+  <rect x="294" y="78" width="48" height="48" rx="6" fill="#ffffff" />
+  <rect x="54" y="270" width="96" height="96" rx="10" fill="#111827" />
+  <rect x="78" y="294" width="48" height="48" rx="6" fill="#ffffff" />
+  <path d="M212 76h26v26h-26zM238 102h26v26h-26zM212 128h26v26h-26zM264 154h26v26h-26zM212 180h26v26h-26zM238 206h26v26h-26zM264 232h26v26h-26zM290 258h26v26h-26zM212 258h26v26h-26zM238 310h26v26h-26zM290 310h26v26h-26z" fill="#111827" />
+  <text x="210" y="390" text-anchor="middle" fill="#52525b" font-family="Arial, sans-serif" font-size="22">Local payout QR placeholder</text>
+</svg>

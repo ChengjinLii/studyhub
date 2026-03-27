@@ -1,0 +1,27 @@
+{
+  "samples": [
+    "ai/ai_chat_success",
+    "authz/free_download_requires_auth",
+    "authz/market_wanted_requires_auth",
+    "authz/me_requires_auth",
+    "comments/comment_replies_public",
+    "comments/comments_list_latest",
+    "creator_settlement/pay_gateway_success",
+    "creator_settlement/payout_qr_01_upload_success",
+    "creator_settlement/payout_qr_02_image_binary",
+    "health/healthz_success",
+    "leaderboard/contributors_all",
+    "market/market_detail_public",
+    "market/market_list_default",
+    "materials/material_detail_public",
+    "materials/materials_download_asset_binary",
+    "materials/materials_list_default",
+    "payment/pay_notify_success",
+    "requests/requests_list_hot",
+    "session/logout_clear_cookie",
+    "session/session_success",
+    "session/session_invalid_cookie",
+    "materials/materials_column_200",
+    "materials/materials_column_304"
+  ]
+}

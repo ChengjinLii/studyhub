@@ -1,0 +1,8 @@
+{
+  "sample_id": "pay_gateway_success",
+  "bundle": "creator_settlement",
+  "method": "POST",
+  "path": "/api/pay/alipay/gateway",
+  "request_kind": "form",
+  "response_kind": "text"
+}

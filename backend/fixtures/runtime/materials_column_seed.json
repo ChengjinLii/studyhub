@@ -1,0 +1,40 @@
+{
+  "seedVersion": "demo-v1",
+  "topics": {
+    "experience": [
+      {
+        "id": 1001,
+        "title": "经验分享 · 通信原理期末复习框架",
+        "summary": "一份只服务于 Step 4 的只读样本，用来验证分页、ETag 和缓存头基线。",
+        "school": "电子科技大学",
+        "tag": "经验分享",
+        "author": {
+          "id": 1,
+          "nickname": "Demo Contributor"
+        }
+      },
+      {
+        "id": 1002,
+        "title": "经验分享 · 格院大一选课避坑清单",
+        "summary": "同样是本地样本数据，不依赖旧仓库，也不假装覆盖真实业务库。",
+        "school": "电子科技大学",
+        "tag": "经验分享",
+        "author": {
+          "id": 2,
+          "nickname": "Sample Author"
+        }
+      },
+      {
+        "id": 1003,
+        "title": "经验分享 · 保研时间线速查表",
+        "summary": "第三条样本用于验证分页边界与稳定 ETag 计算。",
+        "school": "电子科技大学",
+        "tag": "经验分享",
+        "author": {
+          "id": 3,
+          "nickname": "Readonly Seed"
+        }
+      }
+    ]
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "sample_id": "payout_qr_upload_success",
+  "bundle": "creator_settlement",
+  "method": "POST",
+  "path": "/api/me/payout-qr",
+  "request_kind": "multipart",
+  "response_kind": "json"
+}

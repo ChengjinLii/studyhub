@@ -1,0 +1,36 @@
+{
+  "name": "studyhub-web",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "format": "prettier --write .",
+    "test:smoke": "playwright test tests/smoke.spec.ts",
+    "xmas:hat": "node scripts/vectorize-hat.mjs"
+  },
+  "dependencies": {
+    "imagetracerjs": "^1.2.6",
+    "jszip": "^3.10.1",
+    "next": "14.2.3",
+    "react": "18.2.0",
+    "react-dom": "18.2.0",
+    "react-markdown": "^9.1.0",
+    "react-snowfall": "^2.4.0",
+    "remark-gfm": "^4.0.1",
+    "svgo": "^4.0.0",
+    "swr": "^2.3.6"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.47.2",
+    "@types/node": "24.10.1",
+    "@types/react": "19.2.3",
+    "eslint": "8.57.0",
+    "eslint-config-next": "14.2.3",
+    "eslint-config-prettier": "9.1.0",
+    "prettier": "3.3.3",
+    "typescript": "5.4.5"
+  }
+}

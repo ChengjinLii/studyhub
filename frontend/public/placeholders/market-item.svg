@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 500" role="img" aria-labelledby="title desc">
+  <title id="title">Market Placeholder</title>
+  <desc id="desc">Local placeholder image for mock market assets.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0%" x2="100%" y1="0%" y2="100%">
+      <stop offset="0%" stop-color="#f8fafc" />
+      <stop offset="100%" stop-color="#dbeafe" />
+    </linearGradient>
+  </defs>
+  <rect width="800" height="500" rx="36" fill="url(#bg)" />
+  <rect x="88" y="92" width="624" height="316" rx="28" fill="#ffffff" fill-opacity="0.88" stroke="#cbd5e1" stroke-width="8" />
+  <circle cx="232" cy="206" r="42" fill="#bfdbfe" />
+  <path d="M154 332l108-84 94 72 98-126 120 138H154z" fill="#93c5fd" />
+  <text x="92" y="456" fill="#0f172a" font-family="Arial, sans-serif" font-size="34" font-weight="700">StudyHub Local Dev</text>
+  <text x="92" y="488" fill="#475569" font-family="Arial, sans-serif" font-size="24">Market asset placeholder</text>
+</svg>

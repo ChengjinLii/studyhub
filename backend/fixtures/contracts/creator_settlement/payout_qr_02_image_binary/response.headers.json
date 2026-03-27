@@ -1,0 +1,8 @@
+{
+  "content-type": {
+    "contains": "image/png"
+  },
+  "set-cookie": {
+    "count": 0
+  }
+}

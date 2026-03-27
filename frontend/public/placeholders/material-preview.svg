@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 1200" role="img" aria-labelledby="title desc">
+  <title id="title">Material Preview Placeholder</title>
+  <desc id="desc">Local placeholder image for mock material previews.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0%" x2="100%" y1="0%" y2="100%">
+      <stop offset="0%" stop-color="#f8fafc" />
+      <stop offset="100%" stop-color="#e2e8f0" />
+    </linearGradient>
+  </defs>
+  <rect width="900" height="1200" rx="40" fill="url(#bg)" />
+  <rect x="92" y="92" width="716" height="1016" rx="28" fill="#ffffff" stroke="#cbd5e1" stroke-width="8" />
+  <rect x="152" y="174" width="320" height="24" rx="12" fill="#cbd5e1" />
+  <rect x="152" y="228" width="580" height="18" rx="9" fill="#e2e8f0" />
+  <rect x="152" y="266" width="540" height="18" rx="9" fill="#e2e8f0" />
+  <rect x="152" y="304" width="492" height="18" rx="9" fill="#e2e8f0" />
+  <rect x="152" y="378" width="596" height="14" rx="7" fill="#e2e8f0" />
+  <rect x="152" y="418" width="596" height="14" rx="7" fill="#e2e8f0" />
+  <rect x="152" y="458" width="560" height="14" rx="7" fill="#e2e8f0" />
+  <rect x="152" y="558" width="596" height="14" rx="7" fill="#e2e8f0" />
+  <rect x="152" y="598" width="596" height="14" rx="7" fill="#e2e8f0" />
+  <rect x="152" y="638" width="444" height="14" rx="7" fill="#e2e8f0" />
+  <text x="152" y="1048" fill="#0f172a" font-family="Arial, sans-serif" font-size="42" font-weight="700">StudyHub Local Dev</text>
+  <text x="152" y="1096" fill="#475569" font-family="Arial, sans-serif" font-size="28">Material preview placeholder</text>
+</svg>

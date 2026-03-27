@@ -1,0 +1,8 @@
+{
+  "sample_id": "market_detail_public",
+  "bundle": "market",
+  "method": "GET",
+  "path": "/api/market/201",
+  "request_kind": "none",
+  "response_kind": "json"
+}

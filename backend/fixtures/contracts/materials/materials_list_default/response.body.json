@@ -1,0 +1,81 @@
+{
+  "ok": true,
+  "data": {
+    "items": [
+      {
+        "id": 101,
+        "uploaderId": 2,
+        "title": "数据结构期末真题解析",
+        "description": "整理了近三年数据结构期末题型与高频考点，附自制解析。",
+        "price": 0.0,
+        "free": true,
+        "school": "电子科技大学",
+        "college": "计算机科学与工程学院",
+        "major": "软件工程",
+        "generalEducation": false,
+        "hasFile": true,
+        "hasNetdisk": false,
+        "courseCategory": "MAJOR_CORE",
+        "gradeType": "STAGE",
+        "gradeValue": "大二",
+        "tags": ["期末真题", "期末答案（自制解析）"],
+        "previewWatermarkEnabled": true,
+        "previewSource": "AUTO",
+        "ratingAvg": 4.8,
+        "ratingCount": 16,
+        "likeCount": 31,
+        "commentCount": 2,
+        "viewCount": 245,
+        "downloadCount": 128,
+        "salesCount": 0,
+        "createdAt": "2026-03-18T18:00:00+08:00",
+        "uploaderUsername": "baishan",
+        "uploaderNickname": "白山",
+        "copyrightOwner": "白山"
+      },
+      {
+        "id": 103,
+        "uploaderId": 2,
+        "title": "保研经验分享：电子科大通信方向",
+        "description": "记录夏令营、预推免准备清单以及联系导师的时间线。",
+        "price": 0.0,
+        "free": true,
+        "school": "电子科技大学",
+        "college": "信息与通信工程学院",
+        "major": "通信工程",
+        "generalEducation": false,
+        "hasFile": false,
+        "hasNetdisk": false,
+        "courseCategory": "EXPERIENCE",
+        "gradeType": "STAGE",
+        "gradeValue": "大四",
+        "tags": ["经验分享", "保研面经"],
+        "previewWatermarkEnabled": false,
+        "previewSource": "MANUAL",
+        "ratingAvg": 4.9,
+        "ratingCount": 6,
+        "likeCount": 24,
+        "commentCount": 1,
+        "viewCount": 189,
+        "downloadCount": 96,
+        "salesCount": 0,
+        "createdAt": "2026-03-20T21:00:00+08:00",
+        "uploaderUsername": "baishan",
+        "uploaderNickname": "白山",
+        "copyrightOwner": "白山"
+      }
+    ],
+    "meta": {
+      "page": 1,
+      "size": 2,
+      "total": 4
+    },
+    "stats": {
+      "totalMaterials": 4,
+      "freeMaterials": 2,
+      "totalDownloads": 321,
+      "userCount": 3
+    },
+    "availableTags": ["一页纸", "保研面经", "期末真题", "期末答案（自制解析）", "期末速成", "经验分享"]
+  }
+}

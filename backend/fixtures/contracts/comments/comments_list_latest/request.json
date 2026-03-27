@@ -1,0 +1,14 @@
+{
+  "sample_id": "comments_list_latest",
+  "bundle": "comments",
+  "method": "GET",
+  "path": "/api/comments",
+  "request_kind": "query",
+  "response_kind": "json",
+  "query": {
+    "materialId": 101,
+    "sort": "latest",
+    "page": 0,
+    "size": 20
+  }
+}

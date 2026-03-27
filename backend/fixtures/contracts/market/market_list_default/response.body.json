@@ -1,0 +1,57 @@
+{
+  "ok": true,
+  "data": {
+    "items": [
+      {
+        "id": 201,
+        "sellerId": 2,
+        "title": "九成新机械键盘",
+        "price": 129.0,
+        "category": "DIGITAL",
+        "thumbnail": "https://static.studyhub.local/market/201/thumb.jpg",
+        "thumbnailVariant": {
+          "src": "https://static.studyhub.local/market/201/thumb.jpg",
+          "srcSet": "https://static.studyhub.local/market/201/thumb.jpg 1x, https://static.studyhub.local/market/201/thumb@2x.jpg 2x",
+          "webpSrcSet": "https://static.studyhub.local/market/201/thumb.webp 1x, https://static.studyhub.local/market/201/thumb@2x.webp 2x",
+          "avifSrcSet": null,
+          "lqip": "data:image/jpeg;base64,market201"
+        },
+        "wantCount": 5,
+        "wanted": false,
+        "school": "电子科技大学",
+        "createdAt": "2026-03-21T16:30:00+08:00",
+        "sellerName": "白山"
+      },
+      {
+        "id": 202,
+        "sellerId": 1,
+        "title": "高等数学课本",
+        "price": 25.0,
+        "category": "BOOK",
+        "thumbnail": "https://static.studyhub.local/market/202/thumb.jpg",
+        "thumbnailVariant": {
+          "src": "https://static.studyhub.local/market/202/thumb.jpg",
+          "srcSet": null,
+          "webpSrcSet": null,
+          "avifSrcSet": null,
+          "lqip": "data:image/jpeg;base64,market202"
+        },
+        "wantCount": 2,
+        "wanted": false,
+        "school": "电子科技大学",
+        "createdAt": "2026-03-11T12:00:00+08:00",
+        "sellerName": "Alice Chen"
+      }
+    ],
+    "meta": {
+      "page": 1,
+      "size": 20,
+      "total": 2
+    },
+    "stats": {
+      "active": 1,
+      "sold": 1,
+      "userCount": 3
+    }
+  }
+}

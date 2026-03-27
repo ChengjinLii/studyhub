@@ -1,0 +1,8 @@
+{
+  "sample_id": "materials_download_asset_binary",
+  "bundle": "materials",
+  "method": "GET",
+  "path": "/api/materials/990/download/file?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJtYXRlcmlhbC1kb3dubG9hZDo5OTAiLCJtYXRlcmlhbElkIjo5OTAsImtpbmQiOiJkb3dubG9hZCIsImtleSI6Ijk5MC9maWxlL2NvbnRyYWN0LXNhbXBsZS5wZGYiLCJmaWxlbmFtZSI6Ilx1NTQwOFx1NTQwY1x1NjgzN1x1NjcyYy5wZGYiLCJpYXQiOjE3MDAwMDAwMDAsImV4cCI6MjUyNDYwODAwMH0.PP9CKNCiYQZuUAeR-NA3_WMzXjf0CrXH108s28dSQIg",
+  "request_kind": "none",
+  "response_kind": "binary"
+}

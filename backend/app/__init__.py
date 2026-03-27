@@ -1,0 +1,1 @@
+"""StudyHub FastAPI application package."""

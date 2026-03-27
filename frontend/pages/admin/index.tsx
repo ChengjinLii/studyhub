@@ -1,0 +1,2253 @@
+import { GetServerSideProps } from 'next';
+import { FormEvent, useEffect, useMemo, useState } from 'react';
+import NavBar from '../../components/NavBar';
+import PaginationBar from '../../components/PaginationBar';
+import { readSession, hasRole } from '../../lib/auth';
+import { fetchBackend, getRequestOrigin, resolveApiBase } from '../../lib/apiBase';
+import { formatDateTime } from '../../lib/format';
+import { SessionUser, RoleMask } from '../../types/user';
+import {
+  UserSummary,
+  FeedbackEntry,
+  VolunteerApplicationEntry,
+  AdminMaterial,
+  AdminMarketItem,
+  AdminListMeta,
+  AdminReport,
+} from '../../types/admin';
+import {
+  PayoutApplication,
+  PayoutSchedule,
+  PayoutSettlementDetail,
+  AdminMonthlyPayoutOverview,
+  AdminMonthlyPayoutItem,
+  AdminPayoutQr,
+} from '../../types/payout';
+import {
+  SUPPORTED_COLLEGES,
+  SUPPORTED_MAJORS,
+  GRADE_STAGE_OPTIONS,
+  COURSE_CATEGORY_OPTIONS,
+  COURSE_CATEGORY_LABELS,
+} from '../../constants/metadata';
+import { formatMajorDisplay, parseMajorList, serializeMajorList } from '../../lib/major';
+
+interface AdminPageProps {
+  user: SessionUser;
+  users: UserSummary[];
+  token: string;
+  feedbacks: FeedbackEntry[];
+  volunteers: VolunteerApplicationEntry[];
+  materials: AdminMaterial[];
+  materialsMeta: AdminListMeta;
+  marketItems: AdminMarketItem[];
+  marketMeta: AdminListMeta;
+  reports: AdminReport[];
+  reportsMeta: AdminListMeta;
+}
+
+interface AdminUserNote {
+  id: number;
+  adminUsername?: string | null;
+  adminNickname?: string | null;
+  message: string;
+  createdAt: string;
+}
+
+type NoteAlert = { type: 'success' | 'error'; text: string };
+type MarketBatchField = 'status' | 'category' | 'school' | 'contactType' | 'contactValue';
+
+const FEEDBACK_TYPES = [
+  { value: 'BUG', label: 'Bug 反馈' },
+  { value: 'FEATURE', label: '功能建议' },
+  { value: 'UX', label: '体验问题' },
+  { value: 'OTHER', label: '其他' },
+];
+
+const FEEDBACK_STATUS_OPTIONS = [
+  { value: 'NEW', label: '待处理' },
+  { value: 'IN_PROGRESS', label: '处理中' },
+  { value: 'RESOLVED', label: '已解决' },
+  { value: 'IGNORED', label: '忽略' },
+];
+
+const VOLUNTEER_STATUS_OPTIONS = [
+  { value: 'NEW', label: '待确认' },
+  { value: 'CONTACTED', label: '已联系' },
+  { value: 'ACCEPTED', label: '已加入' },
+  { value: 'REJECTED', label: '已婉拒' },
+];
+
+const TIME_COMMITMENT_LABELS: Record<string, string> = {
+  '2-4H': '每周 2-4 小时',
+  '4-8H': '每周 4-8 小时',
+  '8H+': '每周 8 小时以上',
+};
+
+const MARKET_CATEGORY_OPTIONS = [
+  { value: 'BOOK', label: '书籍' },
+  { value: 'DIGITAL', label: '数码' },
+  { value: 'LIFE', label: '日用品' },
+  { value: 'SPORT', label: '运动' },
+  { value: 'OTHER', label: '其他' },
+];
+
+const MARKET_STATUS_OPTIONS = [
+  { value: 'SALE', label: '在售' },
+  { value: 'RESERVED', label: '已预定' },
+  { value: 'SOLD', label: '已售出' },
+  { value: 'REMOVED', label: '已下架' },
+  { value: 'HIDDEN', label: '隐藏（不展示）' },
+];
+
+const MARKET_CONTACT_OPTIONS = [
+  { value: 'QQ', label: 'QQ' },
+  { value: 'WECHAT', label: '微信' },
+  { value: 'PHONE', label: '手机号' },
+];
+
+const REPORT_STATUS_OPTIONS = [
+  { value: '', label: '全部状态' },
+  { value: 'PENDING', label: '待处理' },
+  { value: 'IN_PROGRESS', label: '处理中' },
+  { value: 'RESOLVED', label: '已处理' },
+  { value: 'REJECTED', label: '已驳回' },
+];
+
+const REPORT_TARGET_OPTIONS = [
+  { value: '', label: '全部类型' },
+  { value: 'MATERIAL', label: '资料' },
+  { value: 'COMMENT', label: '评论' },
+  { value: 'MARKET_ITEM', label: '集市' },
+  { value: 'USER', label: '用户' },
+];
+
+const ADMIN_QUICK_NAV_ITEMS = [
+  { id: 'admin-income', label: '收入总览', icon: '💹' },
+  { id: 'admin-broadcast', label: '广播通知', icon: '📣' },
+  { id: 'admin-materials', label: '资料管理', icon: '📄' },
+  { id: 'admin-market', label: '集市管理', icon: '🏪' },
+  { id: 'admin-reports', label: '举报工单', icon: '🚨' },
+  { id: 'admin-settlements', label: '结算管理', icon: '💰' },
+  { id: 'admin-monthly-payout', label: '月度打款', icon: '🧾' },
+  { id: 'admin-schedule', label: '结算日程', icon: '📅' },
+  { id: 'admin-admins', label: '管理员', icon: '🛡️' },
+  { id: 'admin-users', label: '用户列表', icon: '👥' },
+];
+
+const getCurrentMonthValue = () => {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+};
+
+export default function AdminPage({
+  user,
+  users: initialUsers,
+  feedbacks: initialFeedbacks,
+  volunteers: initialVolunteers,
+  materials: initialMaterials,
+  materialsMeta: initialMaterialsMeta,
+  marketItems: initialMarketItems,
+  marketMeta: initialMarketMeta,
+  reports: initialReports,
+  reportsMeta: initialReportsMeta,
+}: AdminPageProps) {
+  const [users, setUsers] = useState<UserSummary[]>(initialUsers);
+  const [feedbacks, setFeedbacks] = useState<FeedbackEntry[]>(initialFeedbacks);
+  const [volunteers, setVolunteers] = useState<VolunteerApplicationEntry[]>(initialVolunteers);
+  const [materials, setMaterials] = useState<AdminMaterial[]>(initialMaterials);
+  const [materialsMeta, setMaterialsMeta] = useState(initialMaterialsMeta);
+  const [materialView, setMaterialView] = useState<'active' | 'removed'>('active');
+  const [marketItems, setMarketItems] = useState<AdminMarketItem[]>(initialMarketItems);
+  const [marketMeta, setMarketMeta] = useState(initialMarketMeta);
+  const [reports, setReports] = useState<AdminReport[]>(initialReports);
+  const [reportsMeta, setReportsMeta] = useState(initialReportsMeta);
+  const [materialsLoading, setMaterialsLoading] = useState(false);
+  const [marketLoading, setMarketLoading] = useState(false);
+  const [reportsLoading, setReportsLoading] = useState(false);
+  const [reportUpdatingId, setReportUpdatingId] = useState<number | null>(null);
+  const [reportRestoringId, setReportRestoringId] = useState<number | null>(null);
+  const [selectedMaterialIds, setSelectedMaterialIds] = useState<number[]>([]);
+  const [selectedMarketIds, setSelectedMarketIds] = useState<number[]>([]);
+  const [batchForm, setBatchForm] = useState({
+    college: '',
+    major: '',
+    gradeValue: '',
+    courseCategory: '',
+    tags: '',
+    tagsMode: 'replace',
+  });
+  const batchMajorSelections = parseMajorList(batchForm.major);
+  const [batchMessage, setBatchMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [batchDeleting, setBatchDeleting] = useState(false);
+  const [batchRestoring, setBatchRestoring] = useState(false);
+  const [restoringMaterialId, setRestoringMaterialId] = useState<number | null>(null);
+  const [marketBatchForm, setMarketBatchForm] = useState({
+    status: '',
+    category: '',
+    school: '',
+    contactType: '',
+    contactValue: '',
+  });
+  const [reportFilters, setReportFilters] = useState({ status: '', targetType: '' });
+  const [reportNotice, setReportNotice] = useState<NoteAlert | null>(null);
+  const [marketBatchMessage, setMarketBatchMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [marketBatchDeleting, setMarketBatchDeleting] = useState(false);
+  const [form, setForm] = useState({ username: '', password: '', nickname: '', admin: true, developer: true });
+  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [feedbackMessage, setFeedbackMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [volunteerMessage, setVolunteerMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [userSearch, setUserSearch] = useState('');
+  const [noteDrafts, setNoteDrafts] = useState<Record<number, string>>({});
+  const [noteAlerts, setNoteAlerts] = useState<Record<number, NoteAlert>>({});
+  const [userNotes, setUserNotes] = useState<Record<number, AdminUserNote[]>>({});
+  const [notesLoading, setNotesLoading] = useState<Record<number, boolean>>({});
+  const [notePanelOpen, setNotePanelOpen] = useState<Record<number, boolean>>({});
+  const [broadcastText, setBroadcastText] = useState('');
+  const [broadcastStatus, setBroadcastStatus] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [broadcasting, setBroadcasting] = useState(false);
+  const [actualTotalRaw, setActualTotalRaw] = useState('');
+  const [actualTotalValue, setActualTotalValue] = useState<number | null>(null);
+  const [actualTotalNotice, setActualTotalNotice] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [payouts, setPayouts] = useState<PayoutApplication[]>([]);
+  const [payoutMessage, setPayoutMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [payoutLoading, setPayoutLoading] = useState(false);
+  const [payoutDetails, setPayoutDetails] = useState<Record<number, PayoutSettlementDetail[]>>({});
+  const [payoutDetailLoading, setPayoutDetailLoading] = useState<Record<number, boolean>>({});
+  const [payoutDetailOpen, setPayoutDetailOpen] = useState<Record<number, boolean>>({});
+  const [monthlyPayoutMonth, setMonthlyPayoutMonth] = useState(getCurrentMonthValue);
+  const [monthlyPayoutOverview, setMonthlyPayoutOverview] = useState<AdminMonthlyPayoutOverview | null>(null);
+  const [monthlyPayoutMessage, setMonthlyPayoutMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [monthlyPayoutLoading, setMonthlyPayoutLoading] = useState(false);
+  const [monthlyPayoutMarkingId, setMonthlyPayoutMarkingId] = useState<number | null>(null);
+  const [payoutQrModal, setPayoutQrModal] = useState<{
+    open: boolean;
+    title: string;
+    loading: boolean;
+    error: string | null;
+    url: string | null;
+  }>({
+    open: false,
+    title: '',
+    loading: false,
+    error: null,
+    url: null,
+  });
+  const [schedule, setSchedule] = useState<PayoutSchedule | null>(null);
+  const [scheduleForm, setScheduleForm] = useState({ launchDate: '', nextPayoutDate: '' });
+  const [scheduleMessage, setScheduleMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [scheduleLoading, setScheduleLoading] = useState(false);
+  const [activeAdminSection, setActiveAdminSection] = useState(ADMIN_QUICK_NAV_ITEMS[0]?.id ?? 'admin-income');
+  const adminNavItems = useMemo(() => ADMIN_QUICK_NAV_ITEMS, []);
+  const materialPageSize = materialsMeta?.size || 15;
+  const materialTotalItems = materialsMeta?.total || 0;
+  const currentMaterialPage = Math.max(1, (materialsMeta?.page ?? 0) + 1);
+  const marketPageSize = marketMeta?.size || 15;
+  const marketTotalItems = marketMeta?.total || 0;
+  const currentMarketPage = Math.max(1, marketMeta?.page || 1);
+  const reportPageSize = reportsMeta?.size || 15;
+  const reportTotalItems = reportsMeta?.total || 0;
+  const currentReportPage = Math.max(1, (reportsMeta?.page ?? 0) + 1);
+  const isRemovedMaterialView = materialView === 'removed';
+  const resolveCourseCategoryLabel = (value?: string | null) => {
+    if (!value) return '未分类';
+    return COURSE_CATEGORY_LABELS[value as keyof typeof COURSE_CATEGORY_LABELS] || value;
+  };
+  const isSuperAdmin = hasRole(user.roleMask, RoleMask.DEVELOPER);
+  const roleLabel = isSuperAdmin ? '超级管理员' : '管理员';
+  const totalEarnings = users.reduce((sum, item) => sum + Number(item.totalEarnings ?? 0), 0);
+  const scaleToActual = (amountCents: number) => {
+    const base = amountCents / 100;
+    if (actualTotalValue !== null && totalEarnings > 0) {
+      return base * (actualTotalValue / totalEarnings);
+    }
+    return base;
+  };
+
+  const reloadUsers = async (keywordParam?: string) => {
+    const qs = keywordParam ? `?keyword=${encodeURIComponent(keywordParam)}` : '';
+    const resp = await fetchBackend(`/admin/users${qs}`);
+    const json = await resp.json();
+    if (resp.ok && json.ok) {
+      setUsers(json.data);
+    }
+  };
+
+  const reloadFeedbacks = async () => {
+    const resp = await fetchBackend('/admin/feedbacks');
+    const json = await resp.json();
+    if (resp.ok && json.ok) {
+      setFeedbacks(json.data);
+    }
+  };
+
+  const reloadVolunteers = async () => {
+    const resp = await fetchBackend('/admin/volunteers');
+    const json = await resp.json();
+    if (resp.ok && json.ok) {
+      setVolunteers(json.data);
+    }
+  };
+
+  const loadMaterials = async (page = materialsMeta?.page ?? 0, view = materialView) => {
+    setMaterialsLoading(true);
+    try {
+      const params = new URLSearchParams();
+      params.set('page', String(Math.max(page, 0)));
+      params.set('size', String(materialsMeta?.size ?? 15));
+      if (view === 'removed') {
+        params.set('status', 'removed');
+      }
+      const resp = await fetchBackend(`/admin/materials?${params.toString()}`);
+      const json = await resp.json();
+      if (!resp.ok || !json.ok) {
+        throw new Error(json.msg || '加载资料失败');
+      }
+      setMaterials(json.data.items || []);
+      setMaterialsMeta(json.data.meta || { page: 0, size: materialsMeta?.size ?? 15, total: 0 });
+      setSelectedMaterialIds((prev) =>
+        prev.filter((id) => (json.data.items || []).some((entry: AdminMaterial) => entry.id === id))
+      );
+    } catch (err: any) {
+      setBatchMessage({ type: 'error', text: err.message || '加载资料失败' });
+    } finally {
+      setMaterialsLoading(false);
+    }
+  };
+
+  const handleMaterialPageChange = (targetPage: number) => {
+    const pageIndex = Math.max(targetPage - 1, 0);
+    void loadMaterials(pageIndex, materialView);
+  };
+
+  const handleMaterialViewChange = (nextView: 'active' | 'removed') => {
+    if (nextView === materialView) {
+      return;
+    }
+    setMaterialView(nextView);
+    setSelectedMaterialIds([]);
+    void loadMaterials(0, nextView);
+  };
+
+  const loadMarketItems = async (page = marketMeta?.page ?? 1) => {
+    setMarketLoading(true);
+    try {
+      const params = new URLSearchParams();
+      params.set('page', String(Math.max(page, 1)));
+      params.set('size', String(marketMeta?.size ?? 15));
+      const resp = await fetchBackend(`/admin/market?${params.toString()}`);
+      const json = await resp.json();
+      if (!resp.ok || !json.ok) {
+        throw new Error(json.msg || '加载校园集市商品失败');
+      }
+      const items: AdminMarketItem[] = json.data?.items || [];
+      setMarketItems(items);
+      setMarketMeta(json.data?.meta || { page, size: marketMeta?.size ?? 15, total: 0 });
+      setSelectedMarketIds((prev) => prev.filter((id) => items.some((entry) => entry.id === id)));
+    } catch (err: any) {
+      setMarketBatchMessage({ type: 'error', text: err.message || '加载校园集市商品失败' });
+    } finally {
+      setMarketLoading(false);
+    }
+  };
+
+  const handleMarketPageChange = (targetPage: number) => {
+    const safeTarget = Math.max(targetPage, 1);
+    void loadMarketItems(safeTarget);
+  };
+
+  const loadReports = async (page = reportsMeta?.page ?? 0, nextFilters = reportFilters) => {
+    setReportsLoading(true);
+    setReportNotice(null);
+    try {
+      const params = new URLSearchParams();
+      params.set('page', String(Math.max(page, 0)));
+      params.set('size', String(reportsMeta?.size ?? 15));
+      if (nextFilters.status) {
+        params.set('status', nextFilters.status);
+      }
+      if (nextFilters.targetType) {
+        params.set('targetType', nextFilters.targetType);
+      }
+      const resp = await fetchBackend(`/admin/reports?${params.toString()}`);
+      const json = await resp.json();
+      if (!resp.ok || !json.ok) {
+        throw new Error(json.msg || '加载举报列表失败');
+      }
+      setReports(json.data.items || []);
+      setReportsMeta(json.data.meta || { page: 0, size: reportsMeta?.size ?? 15, total: 0 });
+    } catch (err: any) {
+      setReportNotice({ type: 'error', text: err.message || '加载举报列表失败' });
+    } finally {
+      setReportsLoading(false);
+    }
+  };
+
+  const handleReportPageChange = (targetPage: number) => {
+    const pageIndex = Math.max(targetPage - 1, 0);
+    void loadReports(pageIndex);
+  };
+
+  const handleReportFilterChange = (field: 'status' | 'targetType', value: string) => {
+    const next = { ...reportFilters, [field]: value };
+    setReportFilters(next);
+    void loadReports(0, next);
+  };
+
+  const handleReportFieldUpdate = (id: number, field: 'status' | 'adminNote', value: string) => {
+    setReports((prev) =>
+      prev.map((report) => (report.id === id ? { ...report, [field]: value } : report))
+    );
+  };
+
+  const handleReportUpdate = async (id: number) => {
+    const target = reports.find((entry) => entry.id === id);
+    if (!target) return;
+    setReportUpdatingId(id);
+    setReportNotice(null);
+    try {
+      const resp = await fetchBackend(`/admin/reports/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: target.status, adminNote: target.adminNote ?? '' }),
+      });
+      const json = await resp.json();
+      if (!resp.ok || !json.ok) {
+        throw new Error(json.msg || '更新举报失败');
+      }
+      setReports((prev) => prev.map((item) => (item.id === id ? json.data : item)));
+      setReportNotice({ type: 'success', text: '举报工单已更新' });
+    } catch (err: any) {
+      setReportNotice({ type: 'error', text: err.message || '更新举报失败' });
+    } finally {
+      setReportUpdatingId(null);
+    }
+  };
+
+  const handleReportRestore = async (id: number) => {
+    setReportRestoringId(id);
+    setReportNotice(null);
+    try {
+      const resp = await fetchBackend(`/admin/reports/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ restoreTarget: true }),
+      });
+      const json = await resp.json();
+      if (!resp.ok || !json.ok) {
+        throw new Error(json.msg || '恢复展示失败');
+      }
+      setReports((prev) => prev.map((item) => (item.id === id ? json.data : item)));
+      setReportNotice({ type: 'success', text: '目标已恢复展示' });
+    } catch (err: any) {
+      setReportNotice({ type: 'error', text: err.message || '恢复展示失败' });
+    } finally {
+      setReportRestoringId(null);
+    }
+  };
+
+  const toggleMaterialSelection = (id: number) => {
+    setSelectedMaterialIds((prev) => (prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]));
+  };
+
+  const selectAllMaterials = () => {
+    setSelectedMaterialIds(materials.map((item) => item.id));
+  };
+
+  const clearMaterialSelection = () => {
+    setSelectedMaterialIds([]);
+  };
+
+  const toggleMarketSelection = (id: number) => {
+    setSelectedMarketIds((prev) => (prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]));
+  };
+
+  const selectAllMarketItems = () => {
+    setSelectedMarketIds(marketItems.map((item) => item.id));
+  };
+
+  const clearMarketSelection = () => {
+    setSelectedMarketIds([]);
+  };
+
+  const handleBatchInputChange = (field: string, value: string) => {
+    setBatchForm((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleBatchMajorToggle = (value: string, checked: boolean) => {
+    setBatchForm((prev) => {
+      const current = parseMajorList(prev.major);
+      let next: string[];
+      if (checked) {
+        next = current.includes(value) ? current : [...current, value];
+      } else {
+        next = current.filter((item) => item !== value);
+      }
+      return { ...prev, major: serializeMajorList(next) };
+    });
+  };
+
+  const handleMarketBatchInputChange = (field: MarketBatchField, value: string) => {
+    setMarketBatchForm((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleBatchSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (selectedMaterialIds.length === 0) {
+      setBatchMessage({ type: 'error', text: '请先选择至少一条资料' });
+      return;
+    }
+    const payload: Record<string, any> = { materialIds: selectedMaterialIds };
+    if (batchForm.college) payload.college = batchForm.college;
+    if (batchForm.major) payload.major = batchForm.major;
+    if (batchForm.gradeValue) payload.gradeValue = batchForm.gradeValue;
+    if (batchForm.courseCategory) payload.courseCategory = batchForm.courseCategory;
+    if (batchForm.tags) {
+      payload.tags = batchForm.tags;
+      payload.tagsMode = batchForm.tagsMode || 'replace';
+    }
+    setBatchMessage(null);
+    try {
+      const resp = await fetchBackend('/admin/materials/batch-update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const json = await resp.json();
+      if (!resp.ok || !json.ok) {
+        throw new Error(json.msg || '批量更新失败');
+      }
+      const updatedCount = json.data?.updated ?? selectedMaterialIds.length;
+      const missingCount = Array.isArray(json.data?.missingIds) ? json.data.missingIds.length : 0;
+      setBatchMessage({
+        type: 'success',
+        text: `已更新 ${updatedCount} 条资料${missingCount ? `，其中 ${missingCount} 条未找到` : ''}`,
+      });
+      setSelectedMaterialIds([]);
+      loadMaterials(materialsMeta?.page ?? 0, materialView);
+    } catch (err: any) {
+      setBatchMessage({ type: 'error', text: err.message || '批量更新失败' });
+    }
+  };
+
+  const handleBatchDelete = async () => {
+    if (selectedMaterialIds.length === 0) {
+      setBatchMessage({ type: 'error', text: '请先选择至少一条资料' });
+      return;
+    }
+    if (!window.confirm(`确定删除选中的 ${selectedMaterialIds.length} 条资料？管理员可在后台恢复。`)) {
+      return;
+    }
+    setBatchDeleting(true);
+    setBatchMessage(null);
+    try {
+      const resp = await fetchBackend('/admin/materials/batch-delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ materialIds: selectedMaterialIds }),
+      });
+      const json = await resp.json();
+      if (!resp.ok || !json.ok) {
+        throw new Error(json.msg || '批量删除失败');
+      }
+      const deleted = json.data?.deleted ?? 0;
+      const failedIds: number[] = Array.isArray(json.data?.failedIds) ? json.data.failedIds : [];
+      let text = `已删除 ${deleted} 条资料。`;
+      if (failedIds.length) {
+        text += ` ${failedIds.length} 条删除失败：${failedIds.join(', ')}`;
+      }
+      setBatchMessage({
+        type: failedIds.length ? 'error' : 'success',
+        text,
+      });
+      setSelectedMaterialIds(failedIds);
+      await loadMaterials(currentMaterialPage - 1, materialView);
+    } catch (err: any) {
+      setBatchMessage({ type: 'error', text: err.message || '批量删除失败' });
+    } finally {
+      setBatchDeleting(false);
+    }
+  };
+
+  const handleBatchRestore = async () => {
+    if (selectedMaterialIds.length === 0) {
+      setBatchMessage({ type: 'error', text: '请先选择至少一条资料' });
+      return;
+    }
+    if (!window.confirm(`确定恢复选中的 ${selectedMaterialIds.length} 条资料？`)) {
+      return;
+    }
+    setBatchRestoring(true);
+    setBatchMessage(null);
+    try {
+      const resp = await fetchBackend('/admin/materials/batch-restore', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ materialIds: selectedMaterialIds }),
+      });
+      const json = await resp.json();
+      if (!resp.ok || !json.ok) {
+        throw new Error(json.msg || '批量恢复失败');
+      }
+      const restored = json.data?.restored ?? 0;
+      const failedIds: number[] = Array.isArray(json.data?.failedIds) ? json.data.failedIds : [];
+      let text = `已恢复 ${restored} 条资料。`;
+      if (failedIds.length) {
+        text += ` ${failedIds.length} 条恢复失败：${failedIds.join(', ')}`;
+      }
+      setBatchMessage({
+        type: failedIds.length ? 'error' : 'success',
+        text,
+      });
+      setSelectedMaterialIds(failedIds);
+      await loadMaterials(currentMaterialPage - 1, 'removed');
+    } catch (err: any) {
+      setBatchMessage({ type: 'error', text: err.message || '批量恢复失败' });
+    } finally {
+      setBatchRestoring(false);
+    }
+  };
+
+  const handleRestoreMaterial = async (materialId: number) => {
+    if (!materialId) return;
+    if (!window.confirm('确定恢复该资料？')) return;
+    setRestoringMaterialId(materialId);
+    setBatchMessage(null);
+    try {
+      const resp = await fetchBackend(`/admin/materials/${materialId}/restore`, { method: 'POST' });
+      const json = await resp.json();
+      if (!resp.ok || !json.ok) {
+        throw new Error(json.msg || '恢复失败');
+      }
+      setBatchMessage({ type: 'success', text: '资料已恢复' });
+      await loadMaterials(currentMaterialPage - 1, 'removed');
+    } catch (err: any) {
+      setBatchMessage({ type: 'error', text: err.message || '恢复失败' });
+    } finally {
+      setRestoringMaterialId((prev) => (prev === materialId ? null : prev));
+    }
+  };
+
+  const handleMarketBatchSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const payload: Record<string, any> = { itemIds: selectedMarketIds };
+    if (marketBatchForm.status) payload.status = marketBatchForm.status;
+    if (marketBatchForm.category) payload.category = marketBatchForm.category;
+    if (marketBatchForm.school) payload.school = marketBatchForm.school.trim();
+    if (marketBatchForm.contactType) payload.contactType = marketBatchForm.contactType;
+    if (marketBatchForm.contactValue) payload.contactValue = marketBatchForm.contactValue.trim();
+    await applyMarketBatchUpdate(payload);
+  };
+
+  const applyMarketBatchUpdate = async (payload: Record<string, any>, actionLabel?: string) => {
+    if (selectedMarketIds.length === 0) {
+      setMarketBatchMessage({ type: 'error', text: '请先选择至少一条商品' });
+      return;
+    }
+    if (!payload || Object.keys(payload).length === 1) {
+      setMarketBatchMessage({ type: 'error', text: '请至少填写一个需要更新的字段' });
+      return;
+    }
+    setMarketBatchMessage(null);
+    try {
+      const resp = await fetchBackend('/admin/market/batch-update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const json = await resp.json();
+      if (!resp.ok || !json.ok) {
+        throw new Error(json.msg || '批量更新失败');
+      }
+      const updated = json.data?.updated ?? selectedMarketIds.length;
+      const missingIds: number[] = Array.isArray(json.data?.missingIds) ? json.data.missingIds : [];
+      const prefix = actionLabel ? `${actionLabel}：` : '';
+      setMarketBatchMessage({
+        type: missingIds.length ? 'error' : 'success',
+        text: `${prefix}已更新 ${updated} 条商品${missingIds.length ? `，${missingIds.length} 条未找到` : ''}`,
+      });
+      setSelectedMarketIds(missingIds);
+      await loadMarketItems(currentMarketPage);
+    } catch (err: any) {
+      setMarketBatchMessage({ type: 'error', text: err.message || '批量更新失败' });
+    }
+  };
+
+  const handleMarketBatchDelete = async () => {
+    if (selectedMarketIds.length === 0) {
+      setMarketBatchMessage({ type: 'error', text: '请先选择至少一条商品' });
+      return;
+    }
+    if (!window.confirm(`确定删除选中的 ${selectedMarketIds.length} 条商品？该操作不可恢复。`)) {
+      return;
+    }
+    setMarketBatchDeleting(true);
+    setMarketBatchMessage(null);
+    try {
+      const resp = await fetchBackend('/admin/market/batch-delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ itemIds: selectedMarketIds }),
+      });
+      const json = await resp.json();
+      if (!resp.ok || !json.ok) {
+        throw new Error(json.msg || '批量删除失败');
+      }
+      const deleted = json.data?.deleted ?? 0;
+      const failedIds: number[] = Array.isArray(json.data?.failedIds) ? json.data.failedIds : [];
+      let text = `已删除 ${deleted} 条商品。`;
+      if (failedIds.length) {
+        text += ` ${failedIds.length} 条删除失败：${failedIds.join(', ')}`;
+      }
+      setMarketBatchMessage({
+        type: failedIds.length ? 'error' : 'success',
+        text,
+      });
+      setSelectedMarketIds(failedIds);
+      await loadMarketItems(currentMarketPage);
+    } catch (err: any) {
+      setMarketBatchMessage({ type: 'error', text: err.message || '批量删除失败' });
+    } finally {
+      setMarketBatchDeleting(false);
+    }
+  };
+
+  const reloadPayouts = async () => {
+    setPayoutLoading(true);
+    try {
+      const resp = await fetchBackend('/admin/creator-payout-applications');
+      const json = await resp.json();
+      if (resp.ok && json.ok) {
+        setPayouts(json.data.items || []);
+      } else {
+        throw new Error(json.msg || '加载收益申请失败');
+      }
+    } catch (err: any) {
+      setPayoutMessage({ type: 'error', text: err.message || '加载收益申请失败' });
+    } finally {
+      setPayoutLoading(false);
+    }
+  };
+
+  const reloadMonthlyPayoutOverview = async (monthParam = monthlyPayoutMonth) => {
+    if (!monthParam) {
+      setMonthlyPayoutMessage({ type: 'error', text: '请选择月份' });
+      return;
+    }
+    setMonthlyPayoutLoading(true);
+    setMonthlyPayoutMessage(null);
+    try {
+      const resp = await fetchBackend(`/admin/monthly-payout-overview?month=${encodeURIComponent(monthParam)}`);
+      const json = await resp.json();
+      if (!resp.ok || !json.ok) {
+        throw new Error(json.msg || '加载月度打款数据失败');
+      }
+      setMonthlyPayoutOverview(json.data as AdminMonthlyPayoutOverview);
+    } catch (err: any) {
+      setMonthlyPayoutMessage({ type: 'error', text: err.message || '加载月度打款数据失败' });
+    } finally {
+      setMonthlyPayoutLoading(false);
+    }
+  };
+
+  const handleMonthlyMark = async (item: AdminMonthlyPayoutItem, markPaid: boolean) => {
+    if (!item?.uploaderId) {
+      return;
+    }
+    setMonthlyPayoutMarkingId(item.uploaderId);
+    setMonthlyPayoutMessage(null);
+    try {
+      const resp = await fetchBackend('/admin/monthly-payout-overview/marks', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          monthKey: monthlyPayoutMonth,
+          uploaderId: item.uploaderId,
+          markPaid,
+        }),
+      });
+      const json = await resp.json();
+      if (!resp.ok || !json.ok) {
+        throw new Error(json.msg || '更新打款标记失败');
+      }
+      setMonthlyPayoutMessage({ type: 'success', text: markPaid ? '已标记为已打款' : '已撤销打款标记' });
+      await reloadMonthlyPayoutOverview();
+    } catch (err: any) {
+      setMonthlyPayoutMessage({ type: 'error', text: err.message || '更新打款标记失败' });
+    } finally {
+      setMonthlyPayoutMarkingId(null);
+    }
+  };
+
+  const openPayoutQrModal = async (item: AdminMonthlyPayoutItem) => {
+    const name = item.uploaderNickname || item.uploaderUsername || `用户 #${item.uploaderId}`;
+    if (!item?.uploaderId) {
+      return;
+    }
+    setPayoutQrModal({
+      open: true,
+      title: `${name} 的收款码`,
+      loading: true,
+      error: null,
+      url: null,
+    });
+    try {
+      const resp = await fetchBackend(`/admin/monthly-payout-overview/users/${item.uploaderId}/payout-qr`);
+      const json = await resp.json();
+      if (!resp.ok || !json.ok) {
+        throw new Error(json.msg || '加载收款码失败');
+      }
+      const data = json.data as AdminPayoutQr;
+      if (!data?.hasPayoutQr || !data?.payoutQrUrl) {
+        throw new Error('该用户尚未上传收款码');
+      }
+      setPayoutQrModal((prev) => ({ ...prev, loading: false, url: data.payoutQrUrl || null }));
+    } catch (err: any) {
+      setPayoutQrModal((prev) => ({
+        ...prev,
+        loading: false,
+        error: err.message || '加载收款码失败',
+      }));
+    }
+  };
+
+  const closePayoutQrModal = () => {
+    setPayoutQrModal({
+      open: false,
+      title: '',
+      loading: false,
+      error: null,
+      url: null,
+    });
+  };
+
+  const loadSchedule = async () => {
+    setScheduleLoading(true);
+    try {
+      const resp = await fetchBackend('/admin/payout-schedule');
+      const json = await resp.json();
+      if (resp.ok && json.ok) {
+        setSchedule(json.data);
+        setScheduleForm({
+          launchDate: json.data.launchDate || '',
+          nextPayoutDate: json.data.nextPayoutDate || '',
+        });
+      } else {
+        throw new Error(json.msg || '加载上线日期失败');
+      }
+    } catch (err: any) {
+      setScheduleMessage({ type: 'error', text: err.message || '加载上线日期失败' });
+    } finally {
+      setScheduleLoading(false);
+    }
+  };
+
+  const handleCreate = async (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!form.username || !form.password) {
+      setMessage({ type: 'error', text: '用户名和密码不能为空' });
+      return;
+    }
+    setSubmitting(true);
+    setMessage(null);
+    try {
+      const roleMask =
+        1 |
+        (form.admin ? RoleMask.ADMIN : 0) |
+        (form.developer ? RoleMask.DEVELOPER : 0) |
+        RoleMask.CONTRIBUTOR;
+      const resp = await fetchBackend('/admin/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          username: form.username,
+          password: form.password,
+          nickname: form.nickname,
+          roleMask,
+        }),
+      });
+      const json = await resp.json();
+      if (!resp.ok || !json.ok) {
+        throw new Error(json.msg || '创建失败');
+      }
+      setMessage({ type: 'success', text: '管理员已创建' });
+      setForm({ username: '', password: '', nickname: '', admin: true, developer: true });
+      reloadUsers();
+    } catch (err: any) {
+      setMessage({ type: 'error', text: err.message || '创建失败' });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleUserSearch = async (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    reloadUsers(userSearch.trim());
+  };
+
+  const toggleNotePanel = async (userId: number) => {
+    setNotePanelOpen((prev) => ({ ...prev, [userId]: !prev[userId] }));
+    const willOpen = !notePanelOpen[userId];
+    if (willOpen) {
+      await loadUserNotes(userId);
+    }
+  };
+
+  const loadUserNotes = async (userId: number) => {
+    setNotesLoading((prev) => ({ ...prev, [userId]: true }));
+    const resp = await fetch(`/api/admin/user-notes?userId=${userId}`);
+    const json = await resp.json();
+    if (resp.ok && json.ok) {
+      setUserNotes((prev) => ({ ...prev, [userId]: json.data || [] }));
+    }
+    setNotesLoading((prev) => ({ ...prev, [userId]: false }));
+  };
+
+  const handleSendNote = async (userId: number) => {
+    const messageText = noteDrafts[userId]?.trim();
+    if (!messageText) {
+      setNoteAlerts((prev) => ({ ...prev, [userId]: { type: 'error', text: '留言不能为空' } }));
+      return;
+    }
+    setNoteAlerts((prev) => ({ ...prev, [userId]: { type: 'success', text: '发送中...' } }));
+    const resp = await fetch(`/api/admin/user-notes?userId=${userId}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: messageText }),
+    });
+    const json = await resp.json();
+    if (!resp.ok || !json.ok) {
+      setNoteAlerts((prev) => ({ ...prev, [userId]: { type: 'error', text: json.msg || '发送失败' } }));
+      return;
+    }
+    setNoteDrafts((prev) => ({ ...prev, [userId]: '' }));
+    setNoteAlerts((prev) => ({ ...prev, [userId]: { type: 'success', text: '留言已发送' } }));
+    await loadUserNotes(userId);
+  };
+
+  const updateFeedbackStatus = async (id: number, status: string) => {
+    setFeedbackMessage(null);
+    try {
+      const resp = await fetch(`/api/admin/feedbacks?id=${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status }),
+      });
+      const json = await resp.json();
+      if (!resp.ok || !json.ok) {
+        throw new Error(json.msg || '更新失败');
+      }
+      setFeedbackMessage({ type: 'success', text: '反馈状态已更新' });
+      reloadFeedbacks();
+    } catch (err: any) {
+      setFeedbackMessage({ type: 'error', text: err.message || '更新失败' });
+    }
+  };
+
+  const updateVolunteerStatus = async (id: number, status: string) => {
+    setVolunteerMessage(null);
+    try {
+      const resp = await fetch(`/api/admin/volunteers?id=${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status }),
+      });
+      const json = await resp.json();
+      if (!resp.ok || !json.ok) {
+        throw new Error(json.msg || '更新失败');
+      }
+      setVolunteerMessage({ type: 'success', text: '申请状态已更新' });
+      reloadVolunteers();
+    } catch (err: any) {
+      setVolunteerMessage({ type: 'error', text: err.message || '更新失败' });
+    }
+  };
+
+  const toggleRole = async (id: number, roleMask: number) => {
+    const resp = await fetch(`/api/admin/users?id=${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ roleMask }),
+    });
+    const json = await resp.json();
+    if (!resp.ok || !json.ok) {
+      setMessage({ type: 'error', text: json.msg || '更新失败' });
+    } else {
+      setMessage({ type: 'success', text: '角色更新成功' });
+      reloadUsers();
+    }
+  };
+
+  const handlePayoutAction = async (id: number, status: 'APPROVED' | 'REJECTED', reviewNotes?: string) => {
+    setPayoutMessage(null);
+    try {
+      const resp = await fetchBackend(`/admin/creator-payout-applications?id=${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status, reviewNotes }),
+      });
+      const json = await resp.json();
+      if (!resp.ok || !json.ok) {
+        throw new Error(json.msg || '操作失败');
+      }
+      setPayoutMessage({ type: 'success', text: '已更新收益申请' });
+      reloadPayouts();
+    } catch (err: any) {
+      setPayoutMessage({ type: 'error', text: err.message || '操作失败' });
+    }
+  };
+
+  const togglePayoutDetails = async (id: number) => {
+    setPayoutDetailOpen((prev) => ({ ...prev, [id]: !prev[id] }));
+    if (payoutDetails[id] || payoutDetailLoading[id]) {
+      return;
+    }
+    setPayoutDetailLoading((prev) => ({ ...prev, [id]: true }));
+    try {
+      const resp = await fetchBackend(`/admin/creator-payout-applications/${id}/details`);
+      const json = await resp.json();
+      if (!resp.ok || !json.ok) {
+        throw new Error(json.msg || '加载收益明细失败');
+      }
+      setPayoutDetails((prev) => ({ ...prev, [id]: (json.data || []) as PayoutSettlementDetail[] }));
+    } catch (error: any) {
+      setPayoutMessage({ type: 'error', text: error.message || '加载收益明细失败' });
+    } finally {
+      setPayoutDetailLoading((prev) => ({ ...prev, [id]: false }));
+    }
+  };
+
+  const submitSchedule = async (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setScheduleMessage(null);
+    try {
+      const payload: any = { launchDate: scheduleForm.launchDate || null };
+      if (scheduleForm.nextPayoutDate) {
+        payload.nextPayoutDate = scheduleForm.nextPayoutDate;
+      }
+      const resp = await fetchBackend('/admin/payout-schedule', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const json = await resp.json();
+      if (!resp.ok || !json.ok) {
+        throw new Error(json.msg || '更新失败');
+      }
+      setSchedule(json.data);
+      setScheduleForm({
+        launchDate: json.data.launchDate || '',
+        nextPayoutDate: json.data.nextPayoutDate || '',
+      });
+      setScheduleMessage({ type: 'success', text: '上线日期已更新' });
+    } catch (err: any) {
+      setScheduleMessage({ type: 'error', text: err.message || '更新失败' });
+    } finally {
+      setScheduleLoading(false);
+    }
+  };
+
+  const handleBroadcast = async (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const messageText = broadcastText.trim();
+    if (!messageText) {
+      setBroadcastStatus({ type: 'error', text: '通知内容不能为空' });
+      return;
+    }
+    setBroadcasting(true);
+    setBroadcastStatus(null);
+    try {
+      const resp = await fetchBackend('/admin/notifications', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: messageText, userId: null }),
+      });
+      const json = await resp.json();
+      if (!resp.ok || !json.ok) {
+        throw new Error(json.msg || '广播失败');
+      }
+      setBroadcastStatus({ type: 'success', text: '已广播给所有用户' });
+      setBroadcastText('');
+    } catch (err: any) {
+      setBroadcastStatus({ type: 'error', text: err.message || '广播失败' });
+    } finally {
+      setBroadcasting(false);
+    }
+  };
+
+  const handleConfirmActualTotal = () => {
+    const parsed = parseFloat(actualTotalRaw);
+    if (Number.isNaN(parsed) || parsed < 0) {
+      setActualTotalNotice({ type: 'error', text: '请输入合法的实际总收入（非负数字）' });
+      return;
+    }
+    setActualTotalNotice({ type: 'success', text: '已更新实际总收入' });
+    setActualTotalValue(parsed);
+  };
+
+  useEffect(() => {
+    reloadPayouts();
+    reloadMonthlyPayoutOverview();
+    loadSchedule();
+  }, []);
+
+  useEffect(() => {
+    const sections = adminNavItems
+      .map((item) => document.getElementById(item.id))
+      .filter((el): el is HTMLElement => Boolean(el));
+    if (sections.length === 0) {
+      return;
+    }
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            setActiveAdminSection(entry.target.id);
+          }
+        });
+      },
+      { rootMargin: '-20% 0px -60% 0px', threshold: [0.1, 0.25, 0.5] }
+    );
+    sections.forEach((section) => observer.observe(section));
+    return () => observer.disconnect();
+  }, [adminNavItems]);
+
+  return (
+    <>
+      <NavBar user={user} />
+      <main className="container admin-layout">
+        <aside className="admin-sidebar">
+          <div className="admin-sidebar__title">管理导航</div>
+          <div className="admin-sidebar__items">
+            {adminNavItems.map((item) => (
+              <a
+                key={item.id}
+                className={`admin-sidebar__item ${activeAdminSection === item.id ? 'active' : ''}`}
+                href={`#${item.id}`}
+                onClick={() => setActiveAdminSection(item.id)}
+              >
+                <span className="admin-sidebar__indicator" aria-hidden="true" />
+                <span className="admin-sidebar__text">{item.label}</span>
+              </a>
+            ))}
+          </div>
+        </aside>
+
+        <div className="admin-content admin-grid">
+        <section id="admin-top" className="card admin-hero">
+          <div className="admin-hero__content">
+            <div className="admin-hero__left">
+              <span className="admin-hero__eyebrow">{roleLabel}控制台</span>
+              <h1>管理后台</h1>
+              <div className="admin-hero__meta">
+                <span className="admin-meta-chip">当前登录：{user.nickname}</span>
+                <span className="admin-meta-chip">角色：{roleLabel}</span>
+                <span className="admin-meta-chip">ID：{user.id}</span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section id="admin-income" className="card admin-section">
+          <div className="card-title">收入总览</div>
+          <p className="help-text">所有用户应得收入汇总</p>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, flexWrap: 'wrap' }}>
+            <strong style={{ fontSize: '2rem' }}>¥{totalEarnings.toFixed(2)}</strong>
+            <span className="material-meta">应得收入汇总</span>
+          </div>
+          <div className="form-grid" style={{ marginTop: 12 }}>
+            <div className="form-item">
+              <label htmlFor="actual-total">实际总收入</label>
+              <input
+                id="actual-total"
+                type="number"
+                inputMode="decimal"
+                placeholder="填写实际总收入"
+                value={actualTotalRaw}
+                onChange={(e) => setActualTotalRaw(e.target.value)}
+              />
+            </div>
+            <div className="form-item">
+              <button className="button primary" type="button" onClick={handleConfirmActualTotal}>
+                确认计算
+              </button>
+            </div>
+            {actualTotalNotice && (
+              <p className={actualTotalNotice.type === 'error' ? 'error-text' : 'success-text'}>
+                {actualTotalNotice.text}
+              </p>
+            )}
+            {actualTotalValue !== null && (
+              <p className="help-text">已设置实际总收入：¥{actualTotalValue.toFixed(2)}</p>
+            )}
+          </div>
+        </section>
+
+        <section id="admin-broadcast" className="card admin-section">
+          <div className="card-title">广播通知</div>
+          <p className="help-text">发送后所有用户的悬浮窗会出现“新消息”提示。</p>
+          <form className="form-grid" onSubmit={handleBroadcast}>
+            <div className="form-item">
+              <label htmlFor="broadcast-message">通知内容</label>
+              <textarea
+                id="broadcast-message"
+                className="input"
+                rows={3}
+                placeholder="填写要广播的消息，所有用户都会收到"
+                value={broadcastText}
+                onChange={(e) => setBroadcastText(e.target.value)}
+              />
+            </div>
+            {broadcastStatus && (
+              <p className={broadcastStatus.type === 'error' ? 'error-text' : 'success-text'}>{broadcastStatus.text}</p>
+            )}
+            <div className="form-item">
+              <button className="button primary" type="submit" disabled={broadcasting}>
+                {broadcasting ? '发送中...' : '广播给所有用户'}
+              </button>
+            </div>
+          </form>
+        </section>
+
+        <section id="admin-materials" className="card admin-section">
+          <div className="card-title">资料批量管理</div>
+          <p className="help-text">
+            {isRemovedMaterialView
+              ? '展示最近删除的资料，可逐一或批量恢复。'
+              : '勾选资料后，可一次性调整专业、年级、课程类型、标签，或批量删除。'}
+          </p>
+          <div className="inline-group wrap" style={{ marginBottom: 12 }}>
+            <button className="button ghost small" type="button" onClick={() => loadMaterials(currentMaterialPage - 1)} disabled={materialsLoading}>
+              {materialsLoading ? '刷新中...' : '刷新列表'}
+            </button>
+            <button
+              className="button ghost small"
+              type="button"
+              onClick={() => handleMaterialViewChange(isRemovedMaterialView ? 'active' : 'removed')}
+              disabled={materialsLoading}
+            >
+              {isRemovedMaterialView ? '查看正常资料' : '查看已删除'}
+            </button>
+            <button className="button ghost small" type="button" onClick={selectAllMaterials}>
+              全选当前页
+            </button>
+            <button className="button ghost small" type="button" onClick={clearMaterialSelection}>
+              清空选择
+            </button>
+            {isRemovedMaterialView ? (
+              <button
+                className="button ghost small"
+                type="button"
+                onClick={handleBatchRestore}
+                disabled={batchRestoring || selectedMaterialIds.length === 0}
+              >
+                {batchRestoring ? '恢复中...' : '恢复所选'}
+              </button>
+            ) : (
+              <button
+                className="button danger small"
+                type="button"
+                onClick={handleBatchDelete}
+                disabled={batchDeleting || selectedMaterialIds.length === 0}
+              >
+                {batchDeleting ? '删除中...' : '删除所选'}
+              </button>
+            )}
+            <span className="help-text">已选 {selectedMaterialIds.length} 条</span>
+          </div>
+          {batchMessage && (
+            <p className={batchMessage.type === 'error' ? 'error-text' : 'success-text'}>{batchMessage.text}</p>
+          )}
+          {materials.length === 0 ? (
+            <p className="help-text">暂无资料</p>
+          ) : (
+            <ul className="materials-list" style={{ alignItems: 'flex-start' }}>
+              {materials.map((material) => {
+                const majorLabel = formatMajorDisplay(material.major);
+                return (
+                  <li key={material.id} className="purchase-row">
+                    <label className="checkbox" style={{ marginRight: 12 }}>
+                      <input
+                        type="checkbox"
+                        checked={selectedMaterialIds.includes(material.id)}
+                        onChange={() => toggleMaterialSelection(material.id)}
+                      />
+                    </label>
+                    <div>
+                      <strong>{material.title}</strong>
+                      <p className="material-meta">
+                        {resolveCourseCategoryLabel(material.courseCategory)} · {material.gradeValue || '未设置'} ·{' '}
+                        {material.college || '未设置'} {majorLabel || ''}
+                      </p>
+                      {material.tags && material.tags.length > 0 && (
+                        <p className="material-meta">标签：{material.tags.join(' / ')}</p>
+                      )}
+                      <p className="material-meta">
+                        上传者：{material.uploaderNickname || material.uploaderUsername || '匿名'} ·{' '}
+                        {formatDateTime(material.createdAt) || '-'}
+                      </p>
+                      {isRemovedMaterialView && (
+                        <p className="material-meta">
+                          状态：已删除
+                          {material.deletedAt ? ` · 删除时间：${formatDateTime(material.deletedAt)}` : ''}
+                        </p>
+                      )}
+                    </div>
+                    {isRemovedMaterialView && (
+                      <button
+                        className="button ghost small"
+                        type="button"
+                        onClick={() => handleRestoreMaterial(material.id)}
+                        disabled={restoringMaterialId === material.id}
+                        style={{ marginLeft: 'auto' }}
+                      >
+                        {restoringMaterialId === material.id ? '恢复中...' : '恢复'}
+                      </button>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+          <PaginationBar
+            currentPage={currentMaterialPage}
+            totalItems={materialTotalItems}
+            pageSize={materialPageSize}
+            loading={materialsLoading}
+            onPageChange={handleMaterialPageChange}
+            className="admin-pagination"
+          />
+          <form className="form-grid" onSubmit={handleBatchSubmit}>
+            <div className="form-item">
+              <label htmlFor="batch-college">学院</label>
+              <select
+                id="batch-college"
+                value={batchForm.college}
+                onChange={(e) => handleBatchInputChange('college', e.target.value)}
+              >
+                <option value="">保持不变</option>
+                {SUPPORTED_COLLEGES.map((college) => (
+                  <option key={college} value={college}>
+                    {college}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="form-item">
+              <label>专业（多选）</label>
+              <div className="inline-group wrap">
+                {SUPPORTED_MAJORS.map((major) => (
+                  <label key={major} className={`choice badge-outline ${batchMajorSelections.includes(major) ? 'active' : ''}`}>
+                    <input
+                      type="checkbox"
+                      checked={batchMajorSelections.includes(major)}
+                      onChange={(e) => handleBatchMajorToggle(major, e.target.checked)}
+                    />
+                    {major}
+                  </label>
+                ))}
+              </div>
+              <div className="inline-group wrap" style={{ marginTop: 6 }}>
+                <button
+                  className="button ghost small"
+                  type="button"
+                  onClick={() => handleBatchInputChange('major', '')}
+                  disabled={!batchForm.major}
+                >
+                  {batchForm.major ? '清空选择（保持不变）' : '保持不变'}
+                </button>
+              </div>
+            </div>
+            <div className="form-item">
+              <label htmlFor="batch-grade">年级/阶段</label>
+              <select
+                id="batch-grade"
+                value={batchForm.gradeValue}
+                onChange={(e) => handleBatchInputChange('gradeValue', e.target.value)}
+              >
+                <option value="">保持不变</option>
+                {GRADE_STAGE_OPTIONS.map((grade) => (
+                  <option key={grade} value={grade}>
+                    {grade}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="form-item">
+              <label htmlFor="batch-course-category">课程类型</label>
+              <select
+                id="batch-course-category"
+                value={batchForm.courseCategory}
+                onChange={(e) => handleBatchInputChange('courseCategory', e.target.value)}
+              >
+                <option value="">保持不变</option>
+                {COURSE_CATEGORY_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="form-item full">
+              <label htmlFor="batch-tags">标签（逗号分隔）</label>
+              <input
+                id="batch-tags"
+                type="text"
+                placeholder="示例：期末速成,教材答案"
+                value={batchForm.tags}
+                onChange={(e) => handleBatchInputChange('tags', e.target.value)}
+              />
+              {batchForm.tags && (
+                <div className="inline-group" style={{ marginTop: 6 }}>
+                  <label className="checkbox">
+                    <input
+                      type="radio"
+                      name="tags-mode"
+                      value="replace"
+                      checked={batchForm.tagsMode === 'replace'}
+                      onChange={(e) => handleBatchInputChange('tagsMode', e.target.value)}
+                    />
+                    覆盖
+                  </label>
+                  <label className="checkbox">
+                    <input
+                      type="radio"
+                      name="tags-mode"
+                      value="append"
+                      checked={batchForm.tagsMode === 'append'}
+                      onChange={(e) => handleBatchInputChange('tagsMode', e.target.value)}
+                    />
+                    追加
+                  </label>
+                </div>
+              )}
+            </div>
+            <div className="form-item full">
+              <button className="button primary" type="submit" disabled={materialsLoading}>
+                批量更新（已选 {selectedMaterialIds.length} 条）
+              </button>
+            </div>
+          </form>
+        </section>
+
+        <section id="admin-market" className="card admin-section">
+          <div className="card-title">校园集市商品批量管理</div>
+          <p className="help-text">
+            勾选商品后，可批量调整状态、分类、学校或联系方式；隐藏商品将不在前台展示，可随时恢复展示。
+          </p>
+          <div className="inline-group wrap" style={{ marginBottom: 12 }}>
+            <button
+              className="button ghost small"
+              type="button"
+              onClick={() => loadMarketItems(currentMarketPage)}
+              disabled={marketLoading}
+            >
+              {marketLoading ? '刷新中...' : '刷新商品列表'}
+            </button>
+            <button className="button ghost small" type="button" onClick={selectAllMarketItems}>
+              全选当前页
+            </button>
+            <button className="button ghost small" type="button" onClick={clearMarketSelection}>
+              清空选择
+            </button>
+            <button
+              className="button ghost small"
+              type="button"
+              onClick={() => applyMarketBatchUpdate({ itemIds: selectedMarketIds, status: 'HIDDEN' }, '隐藏所选')}
+              disabled={marketLoading || selectedMarketIds.length === 0}
+            >
+              隐藏所选
+            </button>
+            <button
+              className="button ghost small"
+              type="button"
+              onClick={() => applyMarketBatchUpdate({ itemIds: selectedMarketIds, status: 'SALE' }, '恢复展示')}
+              disabled={marketLoading || selectedMarketIds.length === 0}
+            >
+              恢复展示
+            </button>
+            <button
+              className="button danger small"
+              type="button"
+              onClick={handleMarketBatchDelete}
+              disabled={marketBatchDeleting || selectedMarketIds.length === 0}
+            >
+              {marketBatchDeleting ? '删除中...' : '删除所选'}
+            </button>
+            <span className="help-text">已选 {selectedMarketIds.length} 条</span>
+          </div>
+          {marketBatchMessage && (
+            <p className={marketBatchMessage.type === 'error' ? 'error-text' : 'success-text'}>{marketBatchMessage.text}</p>
+          )}
+          {marketItems.length === 0 ? (
+            <p className="help-text">暂无校园集市商品</p>
+          ) : (
+            <ul className="materials-list" style={{ alignItems: 'flex-start' }}>
+              {marketItems.map((item) => (
+                <li key={item.id} className="purchase-row">
+                  <label className="checkbox" style={{ marginRight: 12 }}>
+                    <input
+                      type="checkbox"
+                      checked={selectedMarketIds.includes(item.id)}
+                      onChange={() => toggleMarketSelection(item.id)}
+                    />
+                  </label>
+                  <div className="market-admin-entry">
+                    <div className="inline-group" style={{ alignItems: 'flex-start', gap: 16 }}>
+                      {item.thumbnail ? (
+                        <img
+                          src={item.thumbnail}
+                          alt={item.title}
+                          style={{ width: 72, height: 72, objectFit: 'cover', borderRadius: 8 }}
+                        />
+                      ) : (
+                        <div
+                          style={{
+                            width: 72,
+                            height: 72,
+                            borderRadius: 8,
+                            background: '#f5f5f5',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontSize: 12,
+                            color: '#666',
+                          }}
+                        >
+                          无图
+                        </div>
+                      )}
+                      <div>
+                        <strong>{item.title}</strong>
+                        <p className="material-meta">
+                          {item.priceText || `¥${item.price?.toFixed(2) ?? '--'}`} · 分类：
+                          {MARKET_CATEGORY_OPTIONS.find((opt) => opt.value === item.category)?.label || item.category || '未分类'} · 状态：
+                          {MARKET_STATUS_OPTIONS.find((opt) => opt.value === item.status)?.label || item.status || '未知'}
+                        </p>
+                        <p className="material-meta">
+                          想要人数：{item.wantCount ?? 0} · 学校：{item.school || '不限'} · 发布者：
+                          {item.sellerName || '未知'} ({item.sellerId ? `#${item.sellerId}` : '—'}) ·
+                          {item.createdAt ? `发布时间：${formatDateTime(item.createdAt)}` : '发布时间未知'}
+                        </p>
+                        <p className="material-meta">
+                          联系方式：
+                          {item.contactType ? `${item.contactType} · ${item.contactValue || '未填写'}` : '未填写'}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+          <PaginationBar
+            currentPage={currentMarketPage}
+            totalItems={marketTotalItems}
+            pageSize={marketPageSize}
+            loading={marketLoading}
+            onPageChange={handleMarketPageChange}
+            className="admin-pagination"
+          />
+          <form className="form-grid" onSubmit={handleMarketBatchSubmit}>
+            <div className="form-item">
+              <label htmlFor="market-status">状态</label>
+              <select
+                id="market-status"
+                value={marketBatchForm.status}
+                onChange={(e) => handleMarketBatchInputChange('status', e.target.value)}
+              >
+                <option value="">保持不变</option>
+                {MARKET_STATUS_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="form-item">
+              <label htmlFor="market-category">分类</label>
+              <select
+                id="market-category"
+                value={marketBatchForm.category}
+                onChange={(e) => handleMarketBatchInputChange('category', e.target.value)}
+              >
+                <option value="">保持不变</option>
+                {MARKET_CATEGORY_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="form-item">
+              <label htmlFor="market-school">学校</label>
+              <input
+                id="market-school"
+                value={marketBatchForm.school}
+                placeholder="保持为空则不变"
+                onChange={(e) => handleMarketBatchInputChange('school', e.target.value)}
+              />
+            </div>
+            <div className="form-item">
+              <label htmlFor="market-contact-type">联系方式类型</label>
+              <select
+                id="market-contact-type"
+                value={marketBatchForm.contactType}
+                onChange={(e) => handleMarketBatchInputChange('contactType', e.target.value)}
+              >
+                <option value="">保持不变</option>
+                {MARKET_CONTACT_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="form-item">
+              <label htmlFor="market-contact-value">联系方式内容</label>
+              <input
+                id="market-contact-value"
+                value={marketBatchForm.contactValue}
+                placeholder="保持为空则不变"
+                onChange={(e) => handleMarketBatchInputChange('contactValue', e.target.value)}
+              />
+            </div>
+            <div className="form-item full">
+              <button className="button primary" type="submit" disabled={marketLoading}>
+                批量更新（已选 {selectedMarketIds.length} 条）
+              </button>
+            </div>
+          </form>
+        </section>
+
+        <section id="admin-reports" className="card admin-section">
+          <div className="card-title">举报工单</div>
+          <p className="help-text">资料 / 评论 / 集市 / 用户的举报汇总。</p>
+          <div className="inline-group wrap" style={{ marginBottom: 12 }}>
+            <select
+              value={reportFilters.status}
+              onChange={(e) => handleReportFilterChange('status', e.target.value)}
+            >
+              {REPORT_STATUS_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+            <select
+              value={reportFilters.targetType}
+              onChange={(e) => handleReportFilterChange('targetType', e.target.value)}
+            >
+              {REPORT_TARGET_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+            <button
+              className="button ghost small"
+              type="button"
+              onClick={() => loadReports(reportsMeta?.page ?? 0)}
+              disabled={reportsLoading}
+            >
+              {reportsLoading ? '刷新中...' : '刷新列表'}
+            </button>
+          </div>
+          {reportNotice && (
+            <p className={reportNotice.type === 'error' ? 'error-text' : 'success-text'}>{reportNotice.text}</p>
+          )}
+          {reports.length === 0 ? (
+            <p className="help-text">暂无举报记录</p>
+          ) : (
+            <ul className="materials-list">
+              {reports.map((report) => {
+                const typeLabel =
+                  REPORT_TARGET_OPTIONS.find((option) => option.value === report.targetType)?.label || report.targetType;
+                const statusLabel =
+                  REPORT_STATUS_OPTIONS.find((option) => option.value === report.status)?.label || report.status;
+                const targetHidden = report.targetStatus?.toLowerCase() === 'hidden';
+                return (
+                  <li key={report.id} className="purchase-row">
+                    <div>
+                      <strong>
+                        {typeLabel} · {report.targetLabel || `#${report.targetId}`}
+                      </strong>
+                      <p className="material-meta">举报理由：{report.reason}</p>
+                      <p className="material-meta">
+                        举报人：{report.reporterName || report.reporterId || '匿名'} · 状态：{statusLabel}
+                        {report.targetStatus ? ` · 目标状态：${report.targetStatus}` : ''}
+                      </p>
+                      <p className="material-meta">
+                        {formatDateTime(report.createdAt) || '-'}
+                      </p>
+                      {report.targetUrl && (
+                        <p className="material-meta">
+                          <a className="text-button" href={report.targetUrl} target="_blank" rel="noreferrer">
+                            查看目标
+                          </a>
+                        </p>
+                      )}
+                    </div>
+                    <div className="inline-group wrap">
+                      <select
+                        value={report.status}
+                        onChange={(e) => handleReportFieldUpdate(report.id, 'status', e.target.value)}
+                      >
+                        {REPORT_STATUS_OPTIONS.filter((option) => option.value).map((option) => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+                      <input
+                        value={report.adminNote || ''}
+                        placeholder="管理员备注"
+                        onChange={(e) => handleReportFieldUpdate(report.id, 'adminNote', e.target.value)}
+                      />
+                      <button
+                        className="button primary small"
+                        type="button"
+                        onClick={() => handleReportUpdate(report.id)}
+                        disabled={reportUpdatingId === report.id}
+                      >
+                        {reportUpdatingId === report.id ? '更新中...' : '更新'}
+                      </button>
+                      {targetHidden && (
+                        <button
+                          className="button ghost small"
+                          type="button"
+                          onClick={() => handleReportRestore(report.id)}
+                          disabled={reportRestoringId === report.id}
+                        >
+                          {reportRestoringId === report.id ? '恢复中...' : '恢复展示'}
+                        </button>
+                      )}
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+          <PaginationBar
+            currentPage={currentReportPage}
+            totalItems={reportTotalItems}
+            pageSize={reportPageSize}
+            loading={reportsLoading}
+            onPageChange={handleReportPageChange}
+            className="admin-pagination"
+          />
+        </section>
+
+        <section id="admin-settlements" className="card admin-section">
+          <div className="card-title">结算管理</div>
+          <p className="help-text">创作者收益申请，按周期审核/结算。</p>
+          <div className="inline-group" style={{ marginBottom: 12 }}>
+            <button className="button primary" type="button" onClick={reloadPayouts} disabled={payoutLoading}>
+              {payoutLoading ? '刷新中...' : '刷新申请列表'}
+            </button>
+          </div>
+          {payoutMessage && (
+            <p className={payoutMessage.type === 'error' ? 'error-text' : 'success-text'}>{payoutMessage.text}</p>
+          )}
+          {payouts.length === 0 ? (
+            <p className="help-text">暂无收益申请</p>
+          ) : (
+            <ul className="materials-list">
+              {payouts.map((p) => (
+                <li key={p.id} className="purchase-row">
+                  <div>
+                    <strong>{p.applicantName || '未知用户'}</strong> · {p.alipayName || '-'} · {p.alipayAccount || '-'}
+                    <span className="material-meta">联系方式：{p.contactValue} · {p.contactType}</span>
+                    <p className="material-meta">
+                      周期：{p.cycleKey || '-'} · 状态：{p.status} · 实名：{p.kycStatus || '-'} · 提交时间：
+                      {formatDateTime(p.createdAt) || '--'}
+                    </p>
+                    {p.reviewNotes && <p className="material-meta">审核备注：{p.reviewNotes}</p>}
+                    {p.earnings && (
+                      <p className="material-meta">
+                        预计实得：¥{scaleToActual(p.earnings.payoutAmount ?? 0).toFixed(2)} · 未结算累计：¥
+                        {scaleToActual(p.earnings.unclaimedPayoutTotal ?? 0).toFixed(2)}
+                      </p>
+                    )}
+                    {payoutDetailOpen[p.id!] && (
+                      <div className="request-detail-responses" style={{ marginTop: 12 }}>
+                        {payoutDetailLoading[p.id!] && <p className="help-text">明细加载中...</p>}
+                        {!payoutDetailLoading[p.id!] && (payoutDetails[p.id!] || []).length === 0 && (
+                          <p className="help-text">暂无可结算明细</p>
+                        )}
+                        {!payoutDetailLoading[p.id!] && (payoutDetails[p.id!] || []).length > 0 && (
+                          <ul className="request-response-list">
+                            {(payoutDetails[p.id!] || []).map((detail) => (
+                              <li key={detail.settlementId}>
+                                <div className="request-response-header">
+                                  <span>{detail.materialTitle || '资料结算'}</span>
+                                  <span className="help-text">
+                                    {detail.sourceType || '-'} · {detail.policyVersion || '-'}
+                                  </span>
+                                </div>
+                                <p className="material-meta">
+                                  毛额 ¥{scaleToActual(detail.grossAmount ?? 0).toFixed(2)} · 平台费 ¥
+                                  {scaleToActual(detail.platformFee ?? 0).toFixed(2)} · 净额 ¥
+                                  {scaleToActual(detail.payoutAmount ?? 0).toFixed(2)}
+                                </p>
+                                <p className="help-text">
+                                  结算时间：{detail.scheduledPayoutAt ? formatDateTime(detail.scheduledPayoutAt) : '--'} · 状态：
+                                  {detail.status || '-'}
+                                </p>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                  <div className="inline-group wrap">
+                    <button
+                      className="button ghost small"
+                      type="button"
+                      disabled={p.status !== 'PENDING' || p.kycStatus !== 'VERIFIED'}
+                      onClick={() => handlePayoutAction(p.id!, 'APPROVED')}
+                    >
+                      通过
+                    </button>
+                    <button className="button ghost small" type="button" onClick={() => togglePayoutDetails(p.id!)}>
+                      {payoutDetailOpen[p.id!] ? '收起明细' : '查看明细'}
+                    </button>
+                    <button
+                      className="button ghost small"
+                      type="button"
+                      onClick={() => handlePayoutAction(p.id!, 'REJECTED', '资料不全')}
+                    >
+                      拒绝
+                    </button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+
+        <section id="admin-monthly-payout" className="card admin-section">
+          <div className="card-title">月度打款</div>
+          <p className="help-text">仅统计「支付成功且已下载」的付费记录；按下载时订单实得金额汇总，重复下载不重复计入。</p>
+          <div className="inline-group wrap" style={{ marginBottom: 12, alignItems: 'center' }}>
+            <label className="material-meta" htmlFor="monthly-payout-month">
+              结算月份
+            </label>
+            <input
+              id="monthly-payout-month"
+              type="month"
+              value={monthlyPayoutMonth}
+              onChange={(e) => setMonthlyPayoutMonth(e.target.value)}
+              max={getCurrentMonthValue()}
+            />
+            <button
+              className="button primary small"
+              type="button"
+              onClick={() => reloadMonthlyPayoutOverview(monthlyPayoutMonth)}
+              disabled={monthlyPayoutLoading}
+            >
+              {monthlyPayoutLoading ? '加载中...' : '查询'}
+            </button>
+          </div>
+          {monthlyPayoutMessage && (
+            <p className={monthlyPayoutMessage.type === 'error' ? 'error-text' : 'success-text'}>
+              {monthlyPayoutMessage.text}
+            </p>
+          )}
+          {monthlyPayoutOverview && (
+            <p className="help-text">
+              区间：{monthlyPayoutOverview.periodStart || '--'} 至 {monthlyPayoutOverview.periodEnd || '--'} · 创作者：
+              {monthlyPayoutOverview.creatorCount ?? 0} 人 · 应付合计：¥
+              {((monthlyPayoutOverview.totalPayoutAmount ?? 0) / 100).toFixed(2)} · 付费下载：
+              {monthlyPayoutOverview.totalPaidDownloadCount ?? 0} 次
+            </p>
+          )}
+          {!monthlyPayoutOverview || (monthlyPayoutOverview.items || []).length === 0 ? (
+            <p className="help-text">该月份暂无可打款记录。</p>
+          ) : (
+            <ul className="materials-list">
+              {(monthlyPayoutOverview.items || []).map((item) => {
+                const displayName = item.uploaderNickname || item.uploaderUsername || `用户 #${item.uploaderId}`;
+                const marking = monthlyPayoutMarkingId === item.uploaderId;
+                return (
+                  <li key={`${item.uploaderId}-${monthlyPayoutOverview.monthKey}`} className="purchase-row">
+                    <div>
+                      <strong>{displayName}</strong>
+                      <p className="material-meta">
+                        用户ID：{item.uploaderId} · 应付金额：¥{((item.payoutAmount ?? 0) / 100).toFixed(2)} · 计入下载：
+                        {item.paidDownloadCount ?? 0}
+                      </p>
+                      <p className="material-meta">
+                        收款码：{item.hasPayoutQr ? '已上传' : '未上传'}
+                        {item.markedPaid
+                          ? ` · 已打款${item.markedAt ? `：${formatDateTime(item.markedAt)}` : ''}${
+                              item.markedByName ? `（${item.markedByName}）` : ''
+                            }`
+                          : ' · 未打款'}
+                      </p>
+                    </div>
+                    <div className="inline-group wrap">
+                      <button
+                        className="button ghost small"
+                        type="button"
+                        disabled={!item.hasPayoutQr}
+                        onClick={() => openPayoutQrModal(item)}
+                        style={!item.hasPayoutQr ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}
+                      >
+                        查看收款码
+                      </button>
+                      <button
+                        className={`button ${item.markedPaid ? 'ghost' : 'primary'} small`}
+                        type="button"
+                        disabled={marking}
+                        onClick={() => handleMonthlyMark(item, !item.markedPaid)}
+                      >
+                        {marking ? '处理中...' : item.markedPaid ? '撤销已打款' : '标记已打款'}
+                      </button>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </section>
+
+        <section id="admin-schedule" className="card admin-section">
+          <div className="card-title">上线日期 / 结算日</div>
+          <p className="help-text">首结算日 = 上线日 + 7 天，可选自定义下一结算日。</p>
+          <form className="form-grid" onSubmit={submitSchedule}>
+            <div className="form-item">
+              <label htmlFor="launch-date">上线日期</label>
+              <input
+                id="launch-date"
+                type="date"
+                value={scheduleForm.launchDate}
+                onChange={(e) => setScheduleForm((prev) => ({ ...prev, launchDate: e.target.value }))}
+                required
+              />
+            </div>
+            <div className="form-item">
+              <label htmlFor="next-payout-date">下一结算日（可选）</label>
+              <input
+                id="next-payout-date"
+                type="date"
+                value={scheduleForm.nextPayoutDate}
+                onChange={(e) => setScheduleForm((prev) => ({ ...prev, nextPayoutDate: e.target.value }))}
+              />
+            </div>
+            <div className="form-item">
+              <button className="button primary" type="submit">
+                {scheduleLoading ? '更新中...' : '更新'}
+              </button>
+            </div>
+          </form>
+          {scheduleMessage && (
+            <p className={scheduleMessage.type === 'error' ? 'error-text' : 'success-text'}>{scheduleMessage.text}</p>
+          )}
+          {schedule && (
+            <div className="help-text">
+              <div>上线日期：{schedule.launchDate || '--'}</div>
+              <div>上次结算：{schedule.lastPayoutDate || '--'}</div>
+              <div>下一结算：{schedule.nextPayoutDate || '--'}</div>
+              <div>
+                所有结算日：
+                {schedule.recentPayoutDates && schedule.recentPayoutDates.length > 0
+                  ? schedule.recentPayoutDates.join(' / ')
+                  : '--'}
+              </div>
+            </div>
+          )}
+        </section>
+
+        <section id="admin-admins" className="card admin-section">
+          <div className="card-title">创建新的管理员</div>
+          <form className="form-grid" onSubmit={handleCreate}>
+            <div className="form-item">
+              <label htmlFor="new-username">用户名</label>
+              <input
+                id="new-username"
+                value={form.username}
+                onChange={(e) => setForm((prev) => ({ ...prev, username: e.target.value }))}
+                required
+              />
+            </div>
+            <div className="form-item">
+              <label htmlFor="new-password">密码</label>
+              <input
+                id="new-password"
+                type="password"
+                value={form.password}
+                onChange={(e) => setForm((prev) => ({ ...prev, password: e.target.value }))}
+                required
+              />
+            </div>
+            <div className="form-item">
+              <label htmlFor="new-nickname">昵称（可选）</label>
+              <input
+                id="new-nickname"
+                value={form.nickname}
+                onChange={(e) => setForm((prev) => ({ ...prev, nickname: e.target.value }))}
+              />
+            </div>
+            <div className="form-item">
+              <label>角色</label>
+              <div className="inline-group wrap">
+                <label className="choice">
+                  <input
+                    type="checkbox"
+                    checked={form.admin}
+                    onChange={(e) => setForm((prev) => ({ ...prev, admin: e.target.checked }))}
+                  />
+                  管理员
+                </label>
+                <label className="choice">
+                  <input
+                    type="checkbox"
+                    checked={form.developer}
+                    onChange={(e) => setForm((prev) => ({ ...prev, developer: e.target.checked }))}
+                  />
+                  开发者
+                </label>
+              </div>
+            </div>
+            <div className="form-item">
+              <button className="button primary" type="submit" disabled={submitting}>
+                {submitting ? '创建中...' : '创建账号'}
+              </button>
+            </div>
+          </form>
+          {message && <p className={message.type === 'error' ? 'error-text' : 'success-text'}>{message.text}</p>}
+        </section>
+
+        <section id="admin-users" className="card admin-section">
+          <div className="card-title">用户列表</div>
+          <form className="inline-form" onSubmit={handleUserSearch} style={{ marginBottom: 16 }}>
+            <input
+              type="text"
+              placeholder="搜索用户名或昵称"
+              value={userSearch}
+              onChange={(e) => setUserSearch(e.target.value)}
+            />
+            <button className="button primary" type="submit">
+              查找
+            </button>
+            <button
+              className="button ghost"
+              type="button"
+              onClick={() => {
+                setUserSearch('');
+                reloadUsers();
+              }}
+            >
+              重置
+            </button>
+          </form>
+          {users.length === 0 ? (
+            <p className="help-text">暂无用户</p>
+          ) : (
+            <ul className="materials-list">
+              {users.map((u) => (
+                <li key={u.id} className="purchase-row">
+                  <div>
+                    <strong>{u.username}</strong> · {u.nickname || '未填写昵称'}
+                    <p className="material-meta">
+                      role_mask={u.roleMask} · 创建于 {formatDateTime(u.createdAt) || '--'}
+                      {typeof u.totalEarnings === 'number' && (
+                        <span style={{ marginLeft: 8 }}>| 应得收入 ¥{(u.totalEarnings ?? 0).toFixed(2)}</span>
+                      )}
+                      {actualTotalValue !== null && totalEarnings > 0 && typeof u.totalEarnings === 'number' && (
+                        <span style={{ marginLeft: 8 }}>
+                          | 预计实得 ¥{(((u.totalEarnings ?? 0) / totalEarnings) * actualTotalValue).toFixed(2)}
+                        </span>
+                      )}
+                    </p>
+                  </div>
+                  <div className="inline-group wrap">
+                    <button
+                      className="button ghost small"
+                      type="button"
+                      onClick={() => {
+                        const nextMask = u.roleMask ^ RoleMask.ADMIN;
+                        toggleRole(u.id, nextMask);
+                      }}
+                    >
+                      {u.roleMask & RoleMask.ADMIN ? '移除管理员' : '设为管理员'}
+                    </button>
+                    <button
+                      className="button ghost small"
+                      type="button"
+                      onClick={() => {
+                        const nextMask = u.roleMask ^ RoleMask.DEVELOPER;
+                        toggleRole(u.id, nextMask);
+                      }}
+                    >
+                      {u.roleMask & RoleMask.DEVELOPER ? '移除开发者' : '设为开发者'}
+                    </button>
+                  </div>
+                  <div className="user-note-tools">
+                    <textarea
+                      placeholder="管理员留言（会展示给该用户）"
+                      value={noteDrafts[u.id] ?? ''}
+                      onChange={(e) => setNoteDrafts((prev) => ({ ...prev, [u.id]: e.target.value }))}
+                    />
+                    <div className="inline-group wrap">
+                      <button className="button primary small" type="button" onClick={() => handleSendNote(u.id)}>
+                        发送留言
+                      </button>
+                      <button className="button ghost small" type="button" onClick={() => toggleNotePanel(u.id)}>
+                        {notePanelOpen[u.id] ? '收起留言' : '查看留言'}
+                      </button>
+                    </div>
+                    {noteAlerts[u.id] && (
+                      <p className={noteAlerts[u.id]?.type === 'error' ? 'error-text' : 'success-text'}>
+                        {noteAlerts[u.id]?.text}
+                      </p>
+                    )}
+                    {notePanelOpen[u.id] && (
+                      <div className="user-note-list">
+                        {notesLoading[u.id] ? (
+                          <p className="help-text">加载中...</p>
+                        ) : (userNotes[u.id] || []).length === 0 ? (
+                          <p className="help-text">暂无留言</p>
+                        ) : (
+                          <ul>
+                            {userNotes[u.id]?.map((note) => (
+                              <li key={note.id}>
+                                <p>{note.message}</p>
+                                <span>
+                                  {note.adminNickname || note.adminUsername || '管理员'} ·{' '}
+                                  {formatDateTime(note.createdAt)}
+                                </span>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+        </div>
+
+        {payoutQrModal.open && (
+          <div className="modal-mask" role="presentation" onClick={closePayoutQrModal}>
+            <div className="modal-card wechat-modal" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
+              <button className="modal-close" type="button" onClick={closePayoutQrModal} aria-label="关闭弹窗">
+                ×
+              </button>
+              <h2 className="wechat-modal__title">{payoutQrModal.title || '收款码'}</h2>
+              {payoutQrModal.loading && <p className="wechat-modal__hint">收款码加载中...</p>}
+              {!payoutQrModal.loading && payoutQrModal.error && <p className="error-text">{payoutQrModal.error}</p>}
+              {!payoutQrModal.loading && !payoutQrModal.error && payoutQrModal.url && (
+                <>
+                  <p className="wechat-modal__hint">请核对收款码后再进行线下打款。</p>
+                  <img src={payoutQrModal.url} alt="用户收款码" loading="lazy" />
+                </>
+              )}
+            </div>
+          </div>
+        )}
+      </main>
+    </>
+  );
+}
+
+export const getServerSideProps: GetServerSideProps<AdminPageProps> = async (ctx) => {
+  const session = readSession(ctx.req);
+  if (
+    !session.user ||
+    (!hasRole(session.user.roleMask, RoleMask.ADMIN) && !hasRole(session.user.roleMask, RoleMask.DEVELOPER))
+  ) {
+    return {
+      redirect: {
+        destination: '/login?next=/admin',
+        permanent: false,
+      },
+    };
+  }
+  let users: UserSummary[] = [];
+  let feedbacks: FeedbackEntry[] = [];
+  let volunteers: VolunteerApplicationEntry[] = [];
+  let materials: AdminMaterial[] = [];
+  let materialsMeta = { page: 0, size: 15, total: 0 };
+  let marketItems: AdminMarketItem[] = [];
+  let marketMeta: AdminListMeta = { page: 1, size: 15, total: 0 };
+  let reports: AdminReport[] = [];
+  let reportsMeta: AdminListMeta = { page: 0, size: 15, total: 0 };
+  if (session.token) {
+    try {
+      const base = resolveApiBase(getRequestOrigin(ctx.req));
+      const [userResp, feedbackResp, volunteerResp, materialResp, marketResp, reportResp] = await Promise.all([
+        fetch(`${base}/admin/users`, {
+          headers: { Authorization: `Bearer ${session.token}` },
+        }),
+        fetch(`${base}/admin/community/feedbacks`, {
+          headers: { Authorization: `Bearer ${session.token}` },
+        }),
+        fetch(`${base}/admin/community/volunteers`, {
+          headers: { Authorization: `Bearer ${session.token}` },
+        }),
+        fetch(`${base}/admin/materials?page=0&size=15`, {
+          headers: { Authorization: `Bearer ${session.token}` },
+        }),
+        fetch(`${base}/admin/market?page=1&size=15`, {
+          headers: { Authorization: `Bearer ${session.token}` },
+        }),
+        fetch(`${base}/admin/reports?page=0&size=15`, {
+          headers: { Authorization: `Bearer ${session.token}` },
+        }),
+      ]);
+      const [userJson, feedbackJson, volunteerJson, materialJson, marketJson, reportJson] = await Promise.all([
+        userResp.json(),
+        feedbackResp.json(),
+        volunteerResp.json(),
+        materialResp.json(),
+        marketResp.json(),
+        reportResp.json(),
+      ]);
+      if (userResp.ok && userJson.ok) {
+        users = userJson.data;
+      }
+      if (feedbackResp.ok && feedbackJson.ok) {
+        feedbacks = feedbackJson.data;
+      }
+      if (volunteerResp.ok && volunteerJson.ok) {
+        volunteers = volunteerJson.data;
+      }
+      if (materialResp.ok && materialJson.ok) {
+        materials = materialJson.data.items || [];
+        materialsMeta = materialJson.data.meta || materialsMeta;
+      }
+      if (marketResp.ok && marketJson.ok) {
+        marketItems = marketJson.data.items || [];
+        marketMeta = marketJson.data.meta || marketMeta;
+      }
+      if (reportResp.ok && reportJson.ok) {
+        reports = reportJson.data.items || [];
+        reportsMeta = reportJson.data.meta || reportsMeta;
+      }
+    } catch (err) {
+      // ignore fetch errors in SSR
+    }
+  }
+  return {
+    props: {
+      user: session.user,
+      users,
+      token: session.token || '',
+      feedbacks,
+      volunteers,
+      materials,
+      materialsMeta,
+      marketItems,
+      marketMeta,
+      reports,
+      reportsMeta,
+    },
+  };
+};

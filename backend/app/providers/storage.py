@@ -1,0 +1,246 @@
+from __future__ import annotations
+
+from datetime import UTC, datetime, timedelta
+import mimetypes
+from pathlib import Path
+import re
+import secrets
+from typing import Any, Protocol
+from urllib.parse import quote
+
+from fastapi import HTTPException, UploadFile, status
+
+from app.core.config import Settings
+
+
+class StorageProvider(Protocol):
+    provider_name: str
+
+    def save_upload(self, *, root: Path, relative_dir: Path, upload: UploadFile, fallback_name: str) -> tuple[str, int]: ...
+
+    def delete_key(self, *, root: Path, key: str | None) -> None: ...
+
+    def resolve_path(self, *, root: Path, key: str, invalid_detail: str) -> Path: ...
+
+    def guess_media_type(self, key: str | None, default: str = "application/octet-stream") -> str: ...
+
+    def build_public_url(self, *, root: Path, key: str) -> str | None: ...
+
+    def build_signed_download_url(
+        self,
+        *,
+        root: Path,
+        key: str,
+        filename: str | None,
+        ttl_seconds: int,
+        content_type: str | None = None,
+    ) -> tuple[str, str | None] | None: ...
+
+    def probe(self, *, root: Path, deep: bool = False) -> dict[str, Any]: ...
+
+
+class LocalFileStorageProvider:
+    provider_name = "local_fs"
+
+    def save_upload(self, *, root: Path, relative_dir: Path, upload: UploadFile, fallback_name: str) -> tuple[str, int]:
+        original_name = upload.filename or fallback_name
+        safe_name = self._sanitize_filename(original_name, fallback_name=fallback_name)
+        relative_key = relative_dir / f"{secrets.token_hex(8)}-{safe_name}"
+        target = root / relative_key
+        target.parent.mkdir(parents=True, exist_ok=True)
+        content = upload.file.read()
+        target.write_bytes(content)
+        return relative_key.as_posix(), len(content)
+
+    def delete_key(self, *, root: Path, key: str | None) -> None:
+        if not key or key.startswith("http://") or key.startswith("https://"):
+            return
+        path = root / key
+        if path.exists():
+            path.unlink()
+        parent = path.parent
+        while parent != root and parent.exists():
+            if any(parent.iterdir()):
+                break
+            parent.rmdir()
+            parent = parent.parent
+
+    def resolve_path(self, *, root: Path, key: str, invalid_detail: str) -> Path:
+        root_resolved = root.resolve()
+        path = (root / key).resolve()
+        if root_resolved not in path.parents and path != root_resolved:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=invalid_detail)
+        return path
+
+    def guess_media_type(self, key: str | None, default: str = "application/octet-stream") -> str:
+        if not key:
+            return default
+        media_type, _ = mimetypes.guess_type(key)
+        return media_type or default
+
+    def build_public_url(self, *, root: Path, key: str) -> str | None:
+        return None
+
+    def build_signed_download_url(
+        self,
+        *,
+        root: Path,
+        key: str,
+        filename: str | None,
+        ttl_seconds: int,
+        content_type: str | None = None,
+    ) -> tuple[str, str | None] | None:
+        return None
+
+    def probe(self, *, root: Path, deep: bool = False) -> dict[str, Any]:
+        del deep
+        return {
+            "status": "ok",
+            "provider": self.provider_name,
+            "root": str(root),
+            "exists": root.exists(),
+        }
+
+    def _sanitize_filename(self, value: str, *, fallback_name: str) -> str:
+        normalized = re.sub(r"[^A-Za-z0-9._\-\u4e00-\u9fff]+", "-", value).strip("-")
+        if "." not in normalized:
+            fallback_suffix = Path(fallback_name).suffix or ".bin"
+            normalized = f"{normalized or Path(fallback_name).stem or 'file'}{fallback_suffix}"
+        return normalized
+
+
+class AliyunOssStorageProvider:
+    provider_name = "oss"
+
+    def __init__(self, settings: Settings) -> None:
+        self.settings = settings
+
+    def save_upload(self, *, root: Path, relative_dir: Path, upload: UploadFile, fallback_name: str) -> tuple[str, int]:
+        safe_name = self._sanitize_filename(upload.filename or fallback_name, fallback_name=fallback_name)
+        relative_key = self._build_relative_key(root, relative_dir / f"{secrets.token_hex(8)}-{safe_name}")
+        content = upload.file.read()
+        metadata_headers = {
+            "Content-Type": upload.content_type or self.guess_media_type(safe_name),
+        }
+        if metadata_headers["Content-Type"].startswith("image/"):
+            metadata_headers["Cache-Control"] = "public, max-age=2592000, immutable"
+        metadata_headers["Content-Disposition"] = self._build_content_disposition(safe_name)
+        self._bucket().put_object(relative_key, content, headers=metadata_headers)
+        return relative_key, len(content)
+
+    def delete_key(self, *, root: Path, key: str | None) -> None:
+        normalized_key = self._normalize_key_from_any(key)
+        if not normalized_key:
+            return
+        try:
+            self._bucket().delete_object(normalized_key)
+        except Exception:
+            return
+
+    def resolve_path(self, *, root: Path, key: str, invalid_detail: str) -> Path:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=invalid_detail)
+
+    def guess_media_type(self, key: str | None, default: str = "application/octet-stream") -> str:
+        if not key:
+            return default
+        media_type, _ = mimetypes.guess_type(key)
+        return media_type or default
+
+    def build_public_url(self, *, root: Path, key: str) -> str | None:
+        normalized_key = self._normalize_key_from_any(key)
+        if not normalized_key:
+            return None
+        if self.settings.oss_public_base_url:
+            base = self.settings.oss_public_base_url.rstrip("/")
+            return f"{base}/{normalized_key}"
+        endpoint = self.settings.oss_endpoint or ""
+        endpoint_no_scheme = endpoint.removeprefix("https://").removeprefix("http://")
+        return f"https://{self.settings.oss_bucket}.{endpoint_no_scheme}/{normalized_key}"
+
+    def build_signed_download_url(
+        self,
+        *,
+        root: Path,
+        key: str,
+        filename: str | None,
+        ttl_seconds: int,
+        content_type: str | None = None,
+    ) -> tuple[str, str | None] | None:
+        normalized_key = self._normalize_key_from_any(key)
+        if not normalized_key:
+            return None
+        expires_at = datetime.now(UTC) + timedelta(seconds=max(60, ttl_seconds))
+        params = {}
+        final_filename = filename or Path(normalized_key).name
+        params["response-content-disposition"] = self._build_content_disposition(final_filename)
+        if content_type:
+            params["response-content-type"] = content_type
+        auth = self._import_oss2()
+        url = self._bucket().sign_url(
+            "GET",
+            normalized_key,
+            max(60, ttl_seconds),
+            slash_safe=True,
+            headers=None,
+            params=params,
+        )
+        return url, expires_at.isoformat()
+
+    def probe(self, *, root: Path, deep: bool = False) -> dict[str, Any]:
+        payload: dict[str, Any] = {
+            "status": "ok",
+            "provider": self.provider_name,
+            "bucket": self.settings.oss_bucket,
+            "endpoint": self.settings.oss_endpoint,
+            "namespace": root.name,
+        }
+        if not deep:
+            payload["mode"] = "configured"
+            return payload
+        bucket = self._bucket()
+        info = bucket.get_bucket_info()
+        payload["bucketRegion"] = getattr(getattr(info, "bucket", None), "location", None)
+        return payload
+
+    def _bucket(self):
+        auth_module = self._import_oss2()
+        auth = auth_module.Auth(self.settings.oss_access_key_id, self.settings.oss_access_key_secret)
+        return auth_module.Bucket(auth, self.settings.oss_endpoint, self.settings.oss_bucket)
+
+    def _build_relative_key(self, root: Path, relative_key: Path) -> str:
+        namespace = root.name.strip("/").strip() or "assets"
+        key_prefix = self.settings.oss_key_prefix.strip("/").strip()
+        parts = [part for part in [key_prefix, namespace, relative_key.as_posix().strip("/")] if part]
+        return "/".join(parts)
+
+    def _normalize_key_from_any(self, key: str | None) -> str | None:
+        if not key:
+            return None
+        value = key.strip()
+        if value.startswith("http://") or value.startswith("https://"):
+            public_base = (self.settings.oss_public_base_url or "").rstrip("/")
+            if public_base and value.startswith(public_base + "/"):
+                return value.removeprefix(public_base + "/")
+            endpoint = (self.settings.oss_endpoint or "").removeprefix("https://").removeprefix("http://")
+            host_prefix = f"https://{self.settings.oss_bucket}.{endpoint}/"
+            if endpoint and value.startswith(host_prefix):
+                return value.removeprefix(host_prefix)
+        return value.lstrip("/").replace("\\", "/")
+
+    def _sanitize_filename(self, value: str, *, fallback_name: str) -> str:
+        normalized = re.sub(r"[^A-Za-z0-9._\-\u4e00-\u9fff]+", "-", value).strip("-")
+        if "." not in normalized:
+            fallback_suffix = Path(fallback_name).suffix or ".bin"
+            normalized = f"{normalized or Path(fallback_name).stem or 'file'}{fallback_suffix}"
+        return normalized
+
+    def _build_content_disposition(self, filename: str) -> str:
+        quoted = quote(filename)
+        return f"attachment; filename=\"{filename}\"; filename*=UTF-8''{quoted}"
+
+    def _import_oss2(self):
+        try:
+            import oss2  # type: ignore[import-not-found]
+        except Exception as exc:  # noqa: BLE001
+            raise RuntimeError("Aliyun OSS provider 依赖缺失，请安装 oss2。") from exc
+        return oss2

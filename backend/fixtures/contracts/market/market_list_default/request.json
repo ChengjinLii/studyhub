@@ -1,0 +1,11 @@
+{
+  "sample_id": "market_list_default",
+  "bundle": "market",
+  "method": "GET",
+  "path": "/api/market",
+  "request_kind": "query",
+  "response_kind": "json",
+  "query": {
+    "page": 1
+  }
+}

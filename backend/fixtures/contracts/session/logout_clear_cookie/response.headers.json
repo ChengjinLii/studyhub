@@ -1,0 +1,11 @@
+{
+  "content-type": {
+    "contains": "application/json"
+  },
+  "set-cookie": {
+    "values": [
+      "studyhub_token=; Max-Age=0; Path=/; SameSite=Lax; HttpOnly",
+      "studyhub_user=; Max-Age=0; Path=/; SameSite=Lax; HttpOnly"
+    ]
+  }
+}

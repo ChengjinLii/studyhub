@@ -1,0 +1,54 @@
+{
+  "ok": true,
+  "data": {
+    "items": [
+      {
+        "id": 9002,
+        "materialId": 101,
+        "parentId": null,
+        "content": "如果再补一道图遍历大题会更完整。",
+        "likeCount": 1,
+        "replyCount": 0,
+        "edited": true,
+        "deleted": false,
+        "createdAt": "2026-03-20T09:30:00+08:00",
+        "updatedAt": "2026-03-20T10:00:00+08:00",
+        "user": {
+          "id": 2,
+          "nickname": "白山",
+          "avatar": "https://static.studyhub.local/avatar/baishan.png",
+          "isAuthor": true
+        },
+        "hasLiked": false,
+        "rating": null,
+        "replies": []
+      },
+      {
+        "id": 9001,
+        "materialId": 101,
+        "parentId": null,
+        "content": "解析写得很清楚，期末前过一遍特别有用。",
+        "likeCount": 2,
+        "replyCount": 1,
+        "edited": false,
+        "deleted": false,
+        "createdAt": "2026-03-19T13:00:00+08:00",
+        "updatedAt": "2026-03-19T13:00:00+08:00",
+        "user": {
+          "id": 1,
+          "nickname": "Alice Chen",
+          "avatar": null,
+          "isAuthor": false
+        },
+        "hasLiked": false,
+        "rating": 5,
+        "replies": []
+      }
+    ],
+    "meta": {
+      "page": 0,
+      "size": 20,
+      "total": 2
+    }
+  }
+}

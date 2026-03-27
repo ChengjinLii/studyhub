@@ -1,0 +1,8 @@
+{
+  "sample_id": "session_invalid_cookie",
+  "bundle": "session",
+  "method": "GET",
+  "path": "/api/session",
+  "request_kind": "none",
+  "response_kind": "json"
+}

@@ -1,0 +1,22 @@
+{
+  "ok": true,
+  "data": {
+    "id": 1,
+    "username": "alice",
+    "nickname": "Alice Chen",
+    "signature": "热衷整理通信课程资料，也会在集市淘点好物。",
+    "school": "电子科技大学",
+    "college": "信息与通信工程学院",
+    "major": "通信工程",
+    "gradeStages": [
+      "大三"
+    ],
+    "email": "alice@example.com",
+    "emailPrivacy": false,
+    "avatar": null,
+    "payoutQrUrl": "/api/users/1/payout-qr/image",
+    "legendaryContributorUntil": "2026-12-31T00:00:00",
+    "purchaseCount": 1,
+    "saleCount": 1
+  }
+}

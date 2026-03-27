@@ -1,0 +1,12 @@
+{
+  "sample_id": "requests_list_hot",
+  "bundle": "requests",
+  "method": "GET",
+  "path": "/api/requests",
+  "request_kind": "query",
+  "response_kind": "json",
+  "query": {
+    "sort": "hot",
+    "limit": 0
+  }
+}

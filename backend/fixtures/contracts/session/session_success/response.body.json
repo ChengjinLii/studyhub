@@ -1,0 +1,11 @@
+{
+  "ok": true,
+  "data": {
+    "user": {
+      "id": 1,
+      "username": "demo_user",
+      "nickname": "Demo User",
+      "roleMask": 1
+    }
+  }
+}

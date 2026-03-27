@@ -1,0 +1,8 @@
+{
+  "content-type": {
+    "contains": "text/plain"
+  },
+  "set-cookie": {
+    "count": 0
+  }
+}

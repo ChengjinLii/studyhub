@@ -1,0 +1,13 @@
+{
+  "sample_id": "materials_column_200",
+  "bundle": "materials",
+  "method": "GET",
+  "path": "/api/materials/column",
+  "request_kind": "query",
+  "response_kind": "json",
+  "query": {
+    "topic": "experience",
+    "page": 1,
+    "size": 2
+  }
+}

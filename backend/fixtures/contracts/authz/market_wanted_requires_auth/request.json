@@ -1,0 +1,8 @@
+{
+  "sample_id": "market_wanted_requires_auth",
+  "bundle": "authz",
+  "method": "GET",
+  "path": "/api/market/wanted",
+  "request_kind": "none",
+  "response_kind": "json"
+}

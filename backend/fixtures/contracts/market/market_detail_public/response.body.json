@@ -1,0 +1,41 @@
+{
+  "ok": true,
+  "data": {
+    "id": 201,
+    "sellerId": 2,
+    "sellerName": "白山",
+    "title": "九成新机械键盘",
+    "description": "宿舍清库存，红轴，带原装数据线。",
+    "price": 129.0,
+    "category": "DIGITAL",
+    "images": [
+      "https://static.studyhub.local/market/201/1.jpg",
+      "https://static.studyhub.local/market/201/2.jpg"
+    ],
+    "imageVariants": [
+      {
+        "src": "https://static.studyhub.local/market/201/1.jpg",
+        "srcSet": "https://static.studyhub.local/market/201/1.jpg 1x, https://static.studyhub.local/market/201/1@2x.jpg 2x",
+        "webpSrcSet": null,
+        "avifSrcSet": null,
+        "lqip": "data:image/jpeg;base64,market201-1"
+      },
+      {
+        "src": "https://static.studyhub.local/market/201/2.jpg",
+        "srcSet": "https://static.studyhub.local/market/201/2.jpg 1x, https://static.studyhub.local/market/201/2@2x.jpg 2x",
+        "webpSrcSet": null,
+        "avifSrcSet": null,
+        "lqip": "data:image/jpeg;base64,market201-2"
+      }
+    ],
+    "wantCount": 5,
+    "school": "电子科技大学",
+    "status": "SALE",
+    "canViewContact": false,
+    "contactType": null,
+    "contactValue": null,
+    "wanted": false,
+    "isOwner": false,
+    "createdAt": "2026-03-21T16:30:00+08:00"
+  }
+}
