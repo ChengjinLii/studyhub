@@ -3,12 +3,19 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_comments_service, get_optional_auth_context, require_auth_context
+from app.api.deps import (
+    get_comments_service,
+    get_legacy_comments_read_service,
+    get_optional_auth_context,
+    require_auth_context,
+)
+from app.core.config import get_settings
 from app.core.db import get_db_session
 from app.core.response import api_ok
 from app.core.security import AuthContext
 from app.schemas.comments import CommentCreatePayload, CommentReportPayload, CommentUpdatePayload
 from app.services.comments_service import CommentsService
+from app.services.legacy_comments_read_service import LegacyCommentsReadService
 
 
 router = APIRouter(tags=["comments"])
@@ -23,7 +30,20 @@ def list_comments(
     auth: AuthContext | None = Depends(get_optional_auth_context),
     session: Session = Depends(get_db_session),
     service: CommentsService = Depends(get_comments_service),
+    legacy_service: LegacyCommentsReadService = Depends(get_legacy_comments_read_service),
 ) -> dict[str, object]:
+    settings = get_settings()
+    if settings.requires_private_env_file:
+        return api_ok(
+            legacy_service.list_comments(
+                session,
+                materialId,
+                sort=sort,
+                page=page,
+                size=size,
+                current_user_id=auth.user_id if auth else None,
+            )
+        )
     return api_ok(
         service.list_comments(session, materialId, sort=sort, page=page, size=size, current_user_id=auth.user_id if auth else None)
     )
@@ -37,7 +57,11 @@ def comment_replies(
     auth: AuthContext | None = Depends(get_optional_auth_context),
     session: Session = Depends(get_db_session),
     service: CommentsService = Depends(get_comments_service),
+    legacy_service: LegacyCommentsReadService = Depends(get_legacy_comments_read_service),
 ) -> dict[str, object]:
+    settings = get_settings()
+    if settings.requires_private_env_file:
+        return api_ok(legacy_service.list_replies(session, id, page=page, size=size, current_user_id=auth.user_id if auth else None))
     return api_ok(service.list_replies(session, id, page=page, size=size, current_user_id=auth.user_id if auth else None))
 
 

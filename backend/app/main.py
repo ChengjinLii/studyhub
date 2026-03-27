@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import re
 from contextlib import asynccontextmanager
 from time import perf_counter
 from uuid import uuid4
@@ -20,6 +21,21 @@ from app.core.observability import get_runtime_metrics
 
 logger = logging.getLogger(__name__)
 _LOCAL_API_PATHS = {"/api/healthz", "/api/readyz", "/api/metrics", "/healthz", "/readyz", "/metrics"}
+_LOCAL_PREVIEW_DIRECT_API_ROUTES = (
+    ("GET", re.compile(r"^/api/materials$")),
+    ("GET", re.compile(r"^/api/materials/recommendations$")),
+    ("GET", re.compile(r"^/api/materials/\d+$")),
+    ("GET", re.compile(r"^/api/leaderboard/contributors$")),
+    ("GET", re.compile(r"^/api/market$")),
+    ("GET", re.compile(r"^/api/market/\d+$")),
+    ("GET", re.compile(r"^/api/requests$")),
+    ("GET", re.compile(r"^/api/requests/leaderboard$")),
+    ("GET", re.compile(r"^/api/requests/\d+$")),
+    ("GET", re.compile(r"^/api/requests/\d+/responses$")),
+    ("GET", re.compile(r"^/api/requests/\d+/contributions$")),
+    ("GET", re.compile(r"^/api/comments$")),
+    ("GET", re.compile(r"^/api/comments/\d+/replies$")),
+)
 _HOP_BY_HOP_HEADERS = {
     "connection",
     "keep-alive",
@@ -52,7 +68,13 @@ def _should_proxy_api_request(settings, request: Request) -> bool:
     if not settings.legacy_api_proxy_enabled:
         return False
     path = request.url.path
-    return path.startswith("/api/") and path not in _LOCAL_API_PATHS
+    if not path.startswith("/api/") or path in _LOCAL_API_PATHS:
+        return False
+    method = request.method.upper()
+    for allowed_method, pattern in _LOCAL_PREVIEW_DIRECT_API_ROUTES:
+        if method == allowed_method and pattern.match(path):
+            return False
+    return True
 
 
 async def _proxy_api_request(settings, request: Request) -> Response:

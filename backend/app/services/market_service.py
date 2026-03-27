@@ -64,7 +64,7 @@ class MarketService:
             "stats": {
                 "active": sum(1 for item in all_items if item.status == "SALE"),
                 "sold": sum(1 for item in all_items if item.status == "SOLD"),
-                "userCount": self.auth_repo.count_users(session),
+                "userCount": self._user_count_with_seed_fallback(session),
             },
         }
 
@@ -73,6 +73,14 @@ class MarketService:
         if current_user_id is None:
             return []
         return self.market_repo.wanted_ids_for_user(session, current_user_id)
+
+    def _user_count_with_seed_fallback(self, session: Session) -> int:
+        count = self.auth_repo.count_users(session)
+        if count > 0:
+            return count
+        seed = self.read_repo.load_seed()
+        users = seed.get("users") if isinstance(seed, dict) else None
+        return len(users) if isinstance(users, dict) else 0
 
     def get_detail(self, session: Session, current_user_id: int | None, item_id: int) -> dict[str, Any]:
         self._bootstrap(session)

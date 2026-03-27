@@ -10,12 +10,14 @@ from fastapi.responses import FileResponse, JSONResponse
 from sqlalchemy.orm import Session
 
 from app.api.deps import (
+    get_legacy_materials_read_service,
     get_materials_column_service,
     get_materials_service,
     get_optional_auth_context,
     get_requests_service,
     require_auth_context,
 )
+from app.core.config import get_settings
 from app.core.db import get_db_session
 from app.core.response import api_ok
 from app.core.security import AuthContext
@@ -29,6 +31,7 @@ from app.schemas.materials import (
     parse_payload_json,
 )
 from app.services.materials_column_service import MaterialsColumnService
+from app.services.legacy_materials_read_service import LegacyMaterialsReadService
 from app.services.materials_service import MaterialsService
 from app.services.requests_service import RequestsService
 
@@ -51,8 +54,28 @@ def list_materials(
     size: int = 20,
     auth: AuthContext | None = Depends(get_optional_auth_context),
     session: Session = Depends(get_db_session),
+    legacy_service: LegacyMaterialsReadService = Depends(get_legacy_materials_read_service),
     service: MaterialsService = Depends(get_materials_service),
 ) -> dict[str, object]:
+    settings = get_settings()
+    if settings.requires_private_env_file:
+        return api_ok(
+            legacy_service.list_materials(
+                session,
+                auth.user_id if auth else None,
+                keyword=keyword,
+                school=school,
+                college=college,
+                major=major,
+                tag=tag,
+                grade_value=gradeValue,
+                course_category=courseCategory,
+                price=price,
+                sort=sort,
+                page=page,
+                size=size,
+            )
+        )
     return api_ok(
         service.list_materials(
             session,
@@ -92,8 +115,12 @@ def material_recommendations(
     limit: int | None = None,
     auth: AuthContext | None = Depends(get_optional_auth_context),
     session: Session = Depends(get_db_session),
+    legacy_service: LegacyMaterialsReadService = Depends(get_legacy_materials_read_service),
     service: MaterialsService = Depends(get_materials_service),
 ) -> dict[str, object]:
+    settings = get_settings()
+    if settings.requires_private_env_file:
+        return api_ok(legacy_service.get_recommendations(session, auth.user_id if auth else None, limit))
     return api_ok(service.get_recommendations(session, auth.user_id if auth else None, limit))
 
 
@@ -102,8 +129,19 @@ def material_detail(
     id: int,
     auth: AuthContext | None = Depends(get_optional_auth_context),
     session: Session = Depends(get_db_session),
+    legacy_service: LegacyMaterialsReadService = Depends(get_legacy_materials_read_service),
     service: MaterialsService = Depends(get_materials_service),
 ) -> dict[str, object]:
+    settings = get_settings()
+    if settings.requires_private_env_file:
+        return api_ok(
+            legacy_service.get_detail(
+                session,
+                auth.user_id if auth else None,
+                id,
+                bool(auth and auth.role_mask and auth.role_mask & 24),
+            )
+        )
     return api_ok(service.get_detail(session, auth.user_id if auth else None, id, bool(auth and auth.role_mask and auth.role_mask & 24)))
 
 

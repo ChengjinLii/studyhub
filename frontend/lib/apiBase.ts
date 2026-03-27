@@ -27,6 +27,9 @@ export const resolveApiBase = (origin?: string) => {
         if (originUrl.protocol === 'https:' && envUrl.protocol === 'http:') {
           return normalizeApiBase(originUrl.origin);
         }
+        if (!isLoopbackBase(originUrl.origin) && !isLoopbackBase(envUrl.origin) && originUrl.host !== envUrl.host) {
+          return normalizeApiBase(originUrl.origin);
+        }
       } catch {
         // ignore invalid origin/env values
       }
@@ -103,11 +106,11 @@ export const fetchBackend = async (path: string, init: RequestInit = {}, origin?
     credentials,
   });
   return new Proxy(response, {
-    get(targetResponse, prop, receiver) {
+    get(targetResponse, prop) {
       if (prop === 'json') {
         return async () => normalizeMockAssets(await targetResponse.clone().json());
       }
-      const value = Reflect.get(targetResponse, prop, receiver);
+      const value = Reflect.get(targetResponse, prop, targetResponse);
       return typeof value === 'function' ? value.bind(targetResponse) : value;
     },
   });

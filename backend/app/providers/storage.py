@@ -36,6 +36,15 @@ class StorageProvider(Protocol):
         content_type: str | None = None,
     ) -> tuple[str, str | None] | None: ...
 
+    def build_signed_object_url(
+        self,
+        *,
+        root: Path,
+        key: str,
+        ttl_seconds: int,
+        process: str | None = None,
+    ) -> str | None: ...
+
     def probe(self, *, root: Path, deep: bool = False) -> dict[str, Any]: ...
 
 
@@ -90,6 +99,17 @@ class LocalFileStorageProvider:
         ttl_seconds: int,
         content_type: str | None = None,
     ) -> tuple[str, str | None] | None:
+        return None
+
+    def build_signed_object_url(
+        self,
+        *,
+        root: Path,
+        key: str,
+        ttl_seconds: int,
+        process: str | None = None,
+    ) -> str | None:
+        del root, key, ttl_seconds, process
         return None
 
     def probe(self, *, root: Path, deep: bool = False) -> dict[str, Any]:
@@ -185,6 +205,28 @@ class AliyunOssStorageProvider:
             params=params,
         )
         return url, expires_at.isoformat()
+
+    def build_signed_object_url(
+        self,
+        *,
+        root: Path,
+        key: str,
+        ttl_seconds: int,
+        process: str | None = None,
+    ) -> str | None:
+        del root
+        normalized_key = self._normalize_key_from_any(key)
+        if not normalized_key:
+            return None
+        params = {"x-oss-process": process} if process else None
+        return self._bucket().sign_url(
+            "GET",
+            normalized_key,
+            max(60, ttl_seconds),
+            slash_safe=True,
+            headers=None,
+            params=params,
+        )
 
     def probe(self, *, root: Path, deep: bool = False) -> dict[str, Any]:
         payload: dict[str, Any] = {

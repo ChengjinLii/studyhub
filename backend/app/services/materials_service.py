@@ -90,7 +90,7 @@ class MaterialsService:
                 "totalMaterials": len(items),
                 "freeMaterials": sum(1 for material in visible_materials if material.is_free),
                 "totalDownloads": sum(int(material.download_count or 0) for material in visible_materials),
-                "userCount": self.auth_repo.count_users(session),
+                "userCount": self._user_count_with_seed_fallback(session),
             },
             "availableTags": available_tags,
         }
@@ -109,6 +109,14 @@ class MaterialsService:
         safe_limit = clamp_limit(limit, max_value=100)
         sliced = items[:safe_limit] if safe_limit else items
         return [self._to_list_item(material) for material in sliced]
+
+    def _user_count_with_seed_fallback(self, session: Session) -> int:
+        count = self.auth_repo.count_users(session)
+        if count > 0:
+            return count
+        seed = self.read_repo.load_seed()
+        users = seed.get("users") if isinstance(seed, dict) else None
+        return len(users) if isinstance(users, dict) else 0
 
     def get_detail(self, session: Session, current_user_id: int | None, material_id: int, can_manage_all: bool = False) -> dict[str, Any]:
         self._bootstrap(session)
