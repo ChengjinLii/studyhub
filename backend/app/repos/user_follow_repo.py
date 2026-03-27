@@ -3,8 +3,8 @@ from __future__ import annotations
 from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
-from app.models.auth import AuthUser
 from app.models.social import UserFollow
+from app.repos.auth_repo import AuthUserModel, resolve_user_model
 
 
 class UserFollowRepository:
@@ -47,19 +47,21 @@ class UserFollowRepository:
         stmt = select(func.count(UserFollow.id)).where(UserFollow.follower_id == user_id)
         return int(session.scalar(stmt) or 0)
 
-    def list_followers(self, session: Session, user_id: int) -> list[AuthUser]:
+    def list_followers(self, session: Session, user_id: int) -> list[AuthUserModel]:
+        user_model = resolve_user_model(session)
         stmt = (
-            select(AuthUser)
-            .join(UserFollow, UserFollow.follower_id == AuthUser.id)
+            select(user_model)
+            .join(UserFollow, UserFollow.follower_id == user_model.id)
             .where(UserFollow.following_id == user_id)
             .order_by(UserFollow.created_at.desc(), UserFollow.id.desc())
         )
         return list(session.scalars(stmt))
 
-    def list_following(self, session: Session, user_id: int) -> list[AuthUser]:
+    def list_following(self, session: Session, user_id: int) -> list[AuthUserModel]:
+        user_model = resolve_user_model(session)
         stmt = (
-            select(AuthUser)
-            .join(UserFollow, UserFollow.following_id == AuthUser.id)
+            select(user_model)
+            .join(UserFollow, UserFollow.following_id == user_model.id)
             .where(UserFollow.follower_id == user_id)
             .order_by(UserFollow.created_at.desc(), UserFollow.id.desc())
         )

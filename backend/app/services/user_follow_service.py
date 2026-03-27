@@ -3,7 +3,6 @@ from __future__ import annotations
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
-from app.models.auth import AuthUser
 from app.repos.auth_repo import AuthRepository
 from app.repos.user_follow_repo import UserFollowRepository
 
@@ -51,13 +50,13 @@ class UserFollowService:
     def count_following(self, session: Session, user_id: int) -> int:
         return self.follow_repo.count_following(session, user_id)
 
-    def _require_user(self, session: Session, user_id: int) -> AuthUser:
+    def _require_user(self, session: Session, user_id: int):
         user = self.auth_repo.find_user_by_id(session, user_id)
         if user is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="用户不存在")
         return user
 
-    def _to_follow_item(self, user: AuthUser) -> dict[str, object]:
+    def _to_follow_item(self, user) -> dict[str, object]:
         return {
             "id": user.id,
             "username": user.username,

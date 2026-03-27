@@ -1,4 +1,4 @@
-# studyhub frontend
+# StudyHub Frontend
 
 前端位于 `frontend/`，基于 Next.js。它需要同时适配 `local-dev`、`preview` 和 `production` 三类环境，并且不依赖仓库外的绝对路径。
 

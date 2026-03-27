@@ -84,7 +84,8 @@ class AuthService:
         if self.repo.email_exists(session, verification.email):
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="EMAIL_EXISTS")
 
-        user = AuthUser(
+        user = self.repo.build_user(
+            session,
             username=verification.username,
             email=verification.email,
             password_hash=verification.password_hash,
@@ -214,7 +215,8 @@ class AuthService:
         normalized_email = self._normalize_email(email) if email else None
         if normalized_email and self.repo.email_exists(session, normalized_email):
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="EMAIL_EXISTS")
-        user = AuthUser(
+        user = self.repo.build_user(
+            session,
             id=user_id,
             username=normalized_username,
             email=normalized_email,

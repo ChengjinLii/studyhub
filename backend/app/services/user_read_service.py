@@ -5,11 +5,12 @@ from decimal import Decimal, ROUND_HALF_UP
 from typing import Any
 
 from fastapi import HTTPException, status
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.core.profile_metadata import DEFAULT_FREE_DOWNLOAD_QUOTA, resolve_free_download_quota
-from app.models.auth import AuthUser
-from app.repos.auth_repo import AuthRepository
+from app.models.auth import AuthUser, LegacyAuthUser
+from app.repos.auth_repo import AuthRepository, resolve_user_model
 from app.repos.finance_repo import FinanceRepository
 from app.repos.market_repo import MarketRepository
 from app.repos.material_repo import MaterialRepository
@@ -19,6 +20,7 @@ from app.services.read_support import (
     ROLE_ADMIN,
     ROLE_DEVELOPER,
     clamp_limit,
+    compat_serialize_datetime,
     duration_to_iso,
     has_role,
     parse_iso_datetime,
@@ -121,6 +123,8 @@ class UserReadService:
         limit: int | None,
     ) -> list[dict[str, Any]]:
         self._require_accessible_user(session, viewer_id, viewer_role_mask, target_user_id)
+        if self._uses_legacy_user_table(session):
+            return self._compat_get_user_uploads(session, target_user_id, limit)
         self._bootstrap_content(session)
         items = [
             self._to_upload_record(material)
@@ -145,6 +149,8 @@ class UserReadService:
         limit: int | None,
     ) -> list[dict[str, Any]]:
         self._require_accessible_user(session, viewer_id, viewer_role_mask, target_user_id)
+        if self._uses_legacy_user_table(session):
+            return self._compat_get_user_market_listings(session, target_user_id, limit)
         self._bootstrap_content(session)
         items = [
             self._to_market_sell_record(item)
@@ -288,6 +294,21 @@ class UserReadService:
         return monday.replace(hour=0, minute=0, second=0, microsecond=0).astimezone(UTC)
 
     def _sale_count(self, session: Session, seed: dict[str, Any], user_id: int) -> int:
+        if self._uses_legacy_user_table(session):
+            row = session.execute(
+                text(
+                    """
+                    SELECT COUNT(*)
+                    FROM materials
+                    WHERE uploader_id = :user_id
+                      AND deleted_at IS NULL
+                      AND LOWER(status) NOT IN ('removed', 'hidden')
+                      AND is_free = 0
+                    """
+                ),
+                {"user_id": user_id},
+            ).scalar()
+            return int(row or 0)
         self._bootstrap_content(session)
         return sum(
             1
@@ -373,3 +394,78 @@ class UserReadService:
             "status": item.status,
             "createdAt": serialize_datetime(item.created_at),
         }
+
+    def _uses_legacy_user_table(self, session: Session) -> bool:
+        return resolve_user_model(session) is LegacyAuthUser
+
+    def _compat_get_user_uploads(self, session: Session, target_user_id: int, limit: int | None) -> list[dict[str, Any]]:
+        safe_limit = clamp_limit(limit, max_value=100)
+        sql = """
+            SELECT
+              m.id,
+              m.title,
+              m.status,
+              m.is_free,
+              m.price,
+              m.sales_count,
+              m.download_count,
+              m.created_at,
+              m.like_count
+            FROM materials m
+            WHERE m.uploader_id = :user_id
+              AND m.deleted_at IS NULL
+              AND LOWER(m.status) NOT IN ('removed', 'hidden')
+            ORDER BY COALESCE(m.download_count, 0) DESC, m.created_at DESC, m.id DESC
+        """
+        params: dict[str, Any] = {"user_id": target_user_id}
+        if safe_limit is not None:
+            sql += "\nLIMIT :limit"
+            params["limit"] = safe_limit
+        rows = session.execute(text(sql), params).mappings().all()
+        return [
+            {
+                "materialId": int(row["id"]),
+                "title": row["title"],
+                "status": row["status"],
+                "free": bool(row["is_free"]),
+                "price": int(row["price"] or 0) / 100.0,
+                "salesCount": int(row["sales_count"] or 0),
+                "downloadCount": int(row["download_count"] or 0),
+                "createdAt": compat_serialize_datetime(row["created_at"]),
+                "commentCount": 0,
+                "likeCount": int(row["like_count"] or 0),
+            }
+            for row in rows
+        ]
+
+    def _compat_get_user_market_listings(self, session: Session, target_user_id: int, limit: int | None) -> list[dict[str, Any]]:
+        safe_limit = clamp_limit(limit, max_value=100)
+        sql = """
+            SELECT
+              mi.id,
+              mi.title,
+              mi.price,
+              mi.want_count,
+              mi.status,
+              mi.created_at
+            FROM market_items mi
+            WHERE mi.seller_id = :user_id
+              AND LOWER(mi.status) NOT IN ('removed', 'hidden')
+            ORDER BY COALESCE(mi.want_count, 0) DESC, mi.created_at DESC, mi.id DESC
+        """
+        params: dict[str, Any] = {"user_id": target_user_id}
+        if safe_limit is not None:
+            sql += "\nLIMIT :limit"
+            params["limit"] = safe_limit
+        rows = session.execute(text(sql), params).mappings().all()
+        return [
+            {
+                "itemId": int(row["id"]),
+                "title": row["title"],
+                "price": int(row["price"] or 0) / 100.0,
+                "wantCount": int(row["want_count"] or 0),
+                "status": row["status"],
+                "createdAt": compat_serialize_datetime(row["created_at"]),
+            }
+            for row in rows
+        ]

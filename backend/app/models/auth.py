@@ -33,6 +33,35 @@ class AuthUser(TimestampMixin, Base):
     payout_qr_key: Mapped[str | None] = mapped_column(String(512), nullable=True)
 
 
+class LegacyAuthUser(TimestampMixin, Base):
+    __tablename__ = "users"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    openid: Mapped[str | None] = mapped_column(String(128), unique=True, nullable=True)
+    unionid: Mapped[str | None] = mapped_column(String(128), unique=True, nullable=True)
+    username: Mapped[str | None] = mapped_column(String(191), unique=True, index=True, nullable=True)
+    email: Mapped[str | None] = mapped_column(String(255), unique=True, index=True, nullable=True)
+    password_hash: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    nickname: Mapped[str] = mapped_column(String(100), nullable=False)
+    avatar: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    role_mask: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    verified: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    free_download_quota: Mapped[int] = mapped_column(Integer, nullable=False, default=200)
+    email_privacy: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="active")
+    signature: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    school: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    college: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    major: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    grade_stages: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    legendary_contributor_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    notification_read_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    market_event_read_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    payout_qr_key: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    last_checkin_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    unique_downloaders: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+
+
 class EmailVerification(TimestampMixin, Base):
     __tablename__ = "email_verifications"
 

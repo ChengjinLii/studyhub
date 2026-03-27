@@ -1,4 +1,4 @@
-# studyhub backend
+# StudyHub Backend
 
 后端位于 `backend/`。目录结构尽量贴近成熟 FastAPI 项目的常见组织方式，方便开源协作者快速定位路由、服务、仓储、provider 和测试代码。
 

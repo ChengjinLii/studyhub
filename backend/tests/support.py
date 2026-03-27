@@ -72,15 +72,12 @@ def seed_read_users(auth_service: AuthService, *, with_follow_graph: bool = Fals
 
             follow_1 = follow_repo.create(session, follower_id=alice.id, following_id=baishan.id)
             follow_1.created_at = datetime(2026, 3, 20, 1, 0, tzinfo=UTC)
-            follow_1.updated_at = follow_1.created_at
 
             follow_2 = follow_repo.create(session, follower_id=baishan.id, following_id=alice.id)
             follow_2.created_at = datetime(2026, 3, 20, 2, 0, tzinfo=UTC)
-            follow_2.updated_at = follow_2.created_at
 
             follow_3 = follow_repo.create(session, follower_id=admin.id, following_id=baishan.id)
             follow_3.created_at = datetime(2026, 3, 20, 3, 0, tzinfo=UTC)
-            follow_3.updated_at = follow_3.created_at
 
 
 def build_auth_headers(user_id: int, role_mask: int) -> dict[str, str]:
