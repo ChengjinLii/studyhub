@@ -1,4 +1,4 @@
-# StudyHub-FastAPI Scripts
+# studyhub scripts
 
 这里收敛两套启动方式：
 
@@ -44,49 +44,42 @@
 ### 启动
 
 ```bash
-cd /root/StudyHub-FastAPI
 bash scripts/docker-dev-up.sh
 ```
 
 等价原生命令：
 
 ```bash
-cd /root/StudyHub-FastAPI
 docker compose up -d --build
 ```
 
 ### 状态
 
 ```bash
-cd /root/StudyHub-FastAPI
 bash scripts/docker-dev-status.sh
 ```
 
 ### 日志
 
 ```bash
-cd /root/StudyHub-FastAPI
 bash scripts/docker-dev-logs.sh
 ```
 
 只看某个服务：
 
 ```bash
-cd /root/StudyHub-FastAPI
 bash scripts/docker-dev-logs.sh backend
 ```
 
 ### 停止
 
 ```bash
-cd /root/StudyHub-FastAPI
 bash scripts/docker-dev-down.sh
 ```
 
 等价原生命令：
 
 ```bash
-cd /root/StudyHub-FastAPI
 docker compose down
 ```
 
@@ -125,7 +118,7 @@ docker compose down
 
 ### 运行产物
 
-- backend 本地资产 / outbox：`/root/StudyHub-FastAPI/.local-dev-docker/`
+- backend 本地资产 / outbox：`.local-dev-docker/`
 - mysql 数据：compose named volume `mysql-data`
 
 ## 备用方式：Shell Quickstart
@@ -134,9 +127,9 @@ docker compose down
 
 ### 前置条件
 
-- Python 虚拟环境已准备好：`/root/StudyHub-FastAPI/.venv`
-- 前端依赖已安装：`cd /root/StudyHub-FastAPI/frontend && npm install`
-- 如需后端开发依赖：`cd /root/StudyHub-FastAPI/backend && /root/StudyHub-FastAPI/.venv/bin/pip install -e '.[dev]'`
+- Python 虚拟环境已准备好：`.venv`
+- 前端依赖已安装：`cd frontend && npm install`
+- 如需后端开发依赖：`cd backend && ../.venv/bin/pip install -e '.[dev]'`
 
 ### 默认端口
 
@@ -155,47 +148,43 @@ docker compose down
 
 - backend: `127.0.0.1:8111`
 - frontend: `127.0.0.1:3100`
-- root dir: `/root/.studyhub-fastapi-local-dev-shell`
+- root dir: `./.runtime/local-dev-shell`
 
 ### 启动
 
 ```bash
-cd /root/StudyHub-FastAPI
 bash scripts/local-dev-up.sh
 ```
 
 后台运行示例：
 
 ```bash
-mkdir -p /root/.studyhub-fastapi-local-dev-shell
-cd /root/StudyHub-FastAPI
+mkdir -p ./.runtime/local-dev-shell
 nohup env \
   LOCAL_DEV_BACKEND_PORT=8111 \
   LOCAL_DEV_FRONTEND_PORT=3100 \
-  STUDYHUB_LOCAL_DEV_ROOT_DIR=/root/.studyhub-fastapi-local-dev-shell \
+  STUDYHUB_LOCAL_DEV_ROOT_DIR=./.runtime/local-dev-shell \
   bash scripts/local-dev-up.sh \
-  >/root/.studyhub-fastapi-local-dev-shell/launcher.log 2>&1 &
+  >./.runtime/local-dev-shell/launcher.log 2>&1 &
 ```
 
 ### 停止
 
 ```bash
-cd /root/StudyHub-FastAPI
 env \
   LOCAL_DEV_BACKEND_PORT=8111 \
   LOCAL_DEV_FRONTEND_PORT=3100 \
-  STUDYHUB_LOCAL_DEV_ROOT_DIR=/root/.studyhub-fastapi-local-dev-shell \
+  STUDYHUB_LOCAL_DEV_ROOT_DIR=./.runtime/local-dev-shell \
   bash scripts/local-dev-down.sh
 ```
 
 ### 查看状态
 
 ```bash
-cd /root/StudyHub-FastAPI
 env \
   LOCAL_DEV_BACKEND_PORT=8111 \
   LOCAL_DEV_FRONTEND_PORT=3100 \
-  STUDYHUB_LOCAL_DEV_ROOT_DIR=/root/.studyhub-fastapi-local-dev-shell \
+  STUDYHUB_LOCAL_DEV_ROOT_DIR=./.runtime/local-dev-shell \
   bash scripts/local-dev-status.sh
 ```
 
@@ -222,7 +211,6 @@ env \
 ### Preview
 
 ```bash
-cd /root/StudyHub-FastAPI
 bash scripts/preview-up.sh
 bash scripts/preview-status.sh
 bash scripts/preview-smoke.sh
@@ -237,7 +225,6 @@ bash scripts/preview-down.sh
 ### Production
 
 ```bash
-cd /root/StudyHub-FastAPI
 bash scripts/production-up.sh
 bash scripts/production-status.sh
 bash scripts/production-smoke.sh
@@ -252,7 +239,6 @@ bash scripts/production-down.sh
 ### Worker / Scheduler
 
 ```bash
-cd /root/StudyHub-FastAPI
 STUDYHUB_ENVIRONMENT=preview bash scripts/worker-up.sh
 STUDYHUB_ENVIRONMENT=preview bash scripts/worker-status.sh
 STUDYHUB_ENVIRONMENT=preview bash scripts/worker-down.sh
@@ -269,7 +255,6 @@ STUDYHUB_ENVIRONMENT=preview bash scripts/scheduler-down.sh
 ### Health Check
 
 ```bash
-cd /root/StudyHub-FastAPI
 bash scripts/healthcheck.sh http://127.0.0.1:8211
 ```
 
@@ -285,14 +270,12 @@ bash scripts/healthcheck.sh http://127.0.0.1:8211
 #### 只读检查
 
 ```bash
-cd /root/StudyHub-FastAPI
 STUDYHUB_ENVIRONMENT=preview bash scripts/db-check.sh
 ```
 
 #### preview 显式建表
 
 ```bash
-cd /root/StudyHub-FastAPI
 ALLOW_PREVIEW_DB_CREATE=I_UNDERSTAND_CREATE_SCHEMA \
 STUDYHUB_ENVIRONMENT=preview \
 bash scripts/db-init-schema.sh
@@ -301,15 +284,13 @@ bash scripts/db-init-schema.sh
 #### 数据库备份
 
 ```bash
-cd /root/StudyHub-FastAPI
 STUDYHUB_ENVIRONMENT=preview bash scripts/db-backup.sh
-STUDYHUB_ENVIRONMENT=production bash scripts/db-backup.sh /root/StudyHub-FastAPI/private/backups/manual-prod.sql.gz
+STUDYHUB_ENVIRONMENT=production bash scripts/db-backup.sh private/backups/manual-prod.sql.gz
 ```
 
 #### preview 恢复
 
 ```bash
-cd /root/StudyHub-FastAPI
 YES_PREVIEW_DB_RESTORE=I_UNDERSTAND_RESTORE \
 STUDYHUB_ENVIRONMENT=preview \
 bash scripts/db-restore-preview.sh /path/to/preview-backup.sql.gz
@@ -333,7 +314,7 @@ bash scripts/db-restore-preview.sh /path/to/preview-backup.sql.gz
 
 ### 硬约束提醒
 
-- 不允许修改 `/root/StudyHub`
+- 不允许修改外部 Spring Boot 基线仓库
 - 不允许用这些脚本对现有生产 MySQL / OSS / Redis / SMTP / 支付宝 / KYC 做破坏性测试
 - 所有敏感配置、证书、密钥都只能放在 `private/`
 - 真实写链路应先在隔离 preview 资源完成，不应直接对现有 production 资源试写

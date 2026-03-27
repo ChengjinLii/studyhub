@@ -23,6 +23,9 @@ from app.repos.request_repo import RequestRepository
 from app.services.market_service import MarketService
 from app.services.materials_service import MaterialsService
 
+REPO_ROOT = Path(__file__).resolve().parents[2]
+PRIVATE_FIXTURE_DIR = REPO_ROOT / "private"
+
 
 def _reset_runtime_state() -> None:
     reset_database_runtime()
@@ -82,10 +85,12 @@ def test_production_disables_seed_loading(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    mock_private_key = PRIVATE_FIXTURE_DIR / "mock-alipay-private.pem"
+    mock_public_key = PRIVATE_FIXTURE_DIR / "mock-alipay-public.pem"
     private_dir = _write_private_env(
         tmp_path,
         "production",
-        """
+        f"""
         STUDYHUB_ENVIRONMENT=production
         STUDYHUB_DATABASE_URL=mysql+pymysql://prod_user:prod_pass@127.0.0.1:3306/studyhub_prod
         STUDYHUB_JWT_SECRET=prod-secret-abcdefghijklmnopqrstuvwxyz
@@ -99,8 +104,8 @@ def test_production_disables_seed_loading(
         STUDYHUB_OSS_ACCESS_KEY_SECRET=prod-sk
         STUDYHUB_PAYMENT_PROVIDER=alipay_page
         STUDYHUB_ALIPAY_APP_ID=2021000000000000
-        STUDYHUB_ALIPAY_APP_PRIVATE_KEY_PATH=/root/StudyHub-FastAPI/private/mock-alipay-private.pem
-        STUDYHUB_ALIPAY_PUBLIC_KEY_PATH=/root/StudyHub-FastAPI/private/mock-alipay-public.pem
+        STUDYHUB_ALIPAY_APP_PRIVATE_KEY_PATH={mock_private_key}
+        STUDYHUB_ALIPAY_PUBLIC_KEY_PATH={mock_public_key}
         STUDYHUB_PAYOUT_TRANSFER_PROVIDER=alipay_transfer
         STUDYHUB_KYC_PROVIDER=aliyun_cloud_auth
         STUDYHUB_ALIBABA_CLOUD_ACCESS_KEY_ID=aliyun-ak

@@ -1,4 +1,4 @@
-# StudyHub Frontend
+# studyhub frontend
 
 StudyHub 的 Next.js 前端，目录已经从旧的 `apps/web` 收敛到顶层 `frontend/`。
 
@@ -7,7 +7,6 @@ StudyHub 的 Next.js 前端，目录已经从旧的 `apps/web` 收敛到顶层 `
 优先配合仓库根目录的 `docker compose`：
 
 ```bash
-cd /root/StudyHub-FastAPI
 bash scripts/docker-dev-up.sh
 ```
 
@@ -37,7 +36,7 @@ bash scripts/docker-dev-up.sh
 如果不用 Docker：
 
 ```bash
-cd /root/StudyHub-FastAPI/frontend
+cd frontend
 npm install
 NEXT_PUBLIC_API_BASE=http://127.0.0.1:8011/api npm run dev
 ```
@@ -45,7 +44,7 @@ NEXT_PUBLIC_API_BASE=http://127.0.0.1:8011/api npm run dev
 ## 构建
 
 ```bash
-cd /root/StudyHub-FastAPI/frontend
+cd frontend
 npm run build
 npm start
 ```

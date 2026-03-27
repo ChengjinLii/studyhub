@@ -1,6 +1,10 @@
-# StudyHub-FastAPI
+# studyhub
 
 StudyHub 的 FastAPI 重构仓库。目录组织参考 `fastapi/full-stack-fastapi-template`，把后端、前端、脚本和本地文档分开管理。
+
+GitHub 仓库：
+- FastAPI 主仓库：`https://github.com/ChengjinLii/studyhub`
+- Spring Boot 基线仓库：`https://github.com/ChengjinLii/studyhub-springboot`
 
 ## 目录
 
@@ -17,7 +21,6 @@ private/   仅供 preview / production 使用的私密配置与运行资产（gi
 推荐用 `docker compose` 跑本地开发环境：
 
 ```bash
-cd /root/StudyHub-FastAPI
 bash scripts/docker-dev-up.sh
 ```
 
@@ -75,7 +78,6 @@ bash scripts/docker-dev-up.sh
 如果暂时不使用 Docker，可以退回 shell quickstart：
 
 ```bash
-cd /root/StudyHub-FastAPI
 bash scripts/local-dev-up.sh
 ```
 
@@ -83,7 +85,7 @@ bash scripts/local-dev-up.sh
 
 完整说明见：
 
-- [scripts/README.md](/root/StudyHub-FastAPI/scripts/README.md)
+- [scripts/README.md](scripts/README.md)
 
 ## Preview / Production 运行入口
 
@@ -127,6 +129,6 @@ bash scripts/local-dev-up.sh
 
 ## 子目录说明
 
-- [backend/README.md](/root/StudyHub-FastAPI/backend/README.md)
-- [frontend/README.md](/root/StudyHub-FastAPI/frontend/README.md)
-- [scripts/README.md](/root/StudyHub-FastAPI/scripts/README.md)
+- [backend/README.md](backend/README.md)
+- [frontend/README.md](frontend/README.md)
+- [scripts/README.md](scripts/README.md)

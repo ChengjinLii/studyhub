@@ -1,4 +1,4 @@
-# StudyHub FastAPI Backend
+# studyhub backend
 
 后端代码集中在 `backend/`。目录布局参考成熟 FastAPI 项目的常见组织方式：`app/` 放业务代码，`tests/` 放 pytest，`fixtures/` 放契约和本地种子，`artifacts/` 放本地产物。
 
@@ -27,7 +27,6 @@ scripts/         后端侧辅助脚本
 优先从仓库根目录启动：
 
 ```bash
-cd /root/StudyHub-FastAPI
 bash scripts/docker-dev-up.sh
 ```
 
@@ -75,15 +74,15 @@ bash scripts/docker-dev-up.sh
 如果你要绕开 `docker compose` 单独跑后端：
 
 ```bash
-cd /root/StudyHub-FastAPI/backend
-/root/StudyHub-FastAPI/.venv/bin/pip install -e '.[dev]'
-/root/StudyHub-FastAPI/.venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8011
+cd backend
+../.venv/bin/pip install -e '.[dev]'
+../.venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8011
 ```
 
 建议先准备环境样例：
 
 ```bash
-cd /root/StudyHub-FastAPI/backend
+cd backend
 cp .env.example .env
 ```
 
@@ -100,15 +99,15 @@ curl -X POST http://127.0.0.1:8111/api/auth/dev-login -i
 ## 测试
 
 ```bash
-cd /root/StudyHub-FastAPI/backend
-/root/StudyHub-FastAPI/.venv/bin/pytest
+cd backend
+../.venv/bin/pytest
 ```
 
 ## Contract Diff
 
 ```bash
-cd /root/StudyHub-FastAPI/backend
-/root/StudyHub-FastAPI/.venv/bin/python scripts/contract_diff.py \
+cd backend
+../.venv/bin/python scripts/contract_diff.py \
   --candidate-base-url http://127.0.0.1:8011 \
   --sample-dir fixtures/contracts \
   --output-dir artifacts/contract-diff
@@ -117,7 +116,8 @@ cd /root/StudyHub-FastAPI/backend
 如果需要拿另一套正在运行的 StudyHub FastAPI 基线做在线对比：
 
 ```bash
-/root/StudyHub-FastAPI/.venv/bin/python scripts/contract_diff.py \
+cd backend
+../.venv/bin/python scripts/contract_diff.py \
   --candidate-base-url http://127.0.0.1:8011 \
   --baseline-base-url http://127.0.0.1:8112 \
   --sample-dir fixtures/contracts \

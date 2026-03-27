@@ -104,7 +104,7 @@ def prepare_contract_diff_state(auth_service: AuthService) -> None:
     为 Step 12 contract diff 准备最小但稳定的前置状态。
 
     这里显式创建当前仓库内需要的本地用户、支付记录和二进制资产，
-    避免 contract 样本运行时去依赖 /root/StudyHub 或外部服务。
+    避免 contract 样本运行时去依赖外部 Spring Boot 仓库或外部服务。
     """
 
     seed_read_users(auth_service, with_follow_graph=False)
