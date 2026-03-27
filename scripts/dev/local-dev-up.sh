@@ -1,23 +1,16 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-PRIVATE_DIR="${STUDYHUB_PRIVATE_DIR_PATH:-$ROOT_DIR/private}"
-ENV_FILE="${PRIVATE_DIR}/.env.preview"
-RUNTIME_ROOT="${STUDYHUB_PREVIEW_RUNTIME_DIR:-$PRIVATE_DIR/.runtime-preview}"
-RUN_DIR="$RUNTIME_ROOT/run"
-LOG_DIR="$RUNTIME_ROOT/logs"
-BACKEND_PORT="${PREVIEW_BACKEND_PORT:-8211}"
-FRONTEND_PORT="${PREVIEW_FRONTEND_PORT:-3200}"
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+LOCAL_DEV_ROOT="${STUDYHUB_LOCAL_DEV_ROOT_DIR:-$ROOT_DIR/.local-dev}"
+RUN_DIR="$LOCAL_DEV_ROOT/run"
+LOG_DIR="$LOCAL_DEV_ROOT/logs"
+BACKEND_PORT="${LOCAL_DEV_BACKEND_PORT:-8011}"
+FRONTEND_PORT="${LOCAL_DEV_FRONTEND_PORT:-3000}"
 BACKEND_PID_FILE="$RUN_DIR/backend.pid"
 FRONTEND_PID_FILE="$RUN_DIR/frontend.pid"
 
-mkdir -p "$RUN_DIR" "$LOG_DIR" "$RUNTIME_ROOT"
-
-if [[ ! -f "$ENV_FILE" ]]; then
-  echo "missing preview env file: $ENV_FILE"
-  exit 1
-fi
+mkdir -p "$RUN_DIR" "$LOG_DIR" "$LOCAL_DEV_ROOT"
 
 is_running() {
   local pid_file="$1"
@@ -51,25 +44,17 @@ if [[ ! -d "$ROOT_DIR/frontend/node_modules" ]]; then
   exit 1
 fi
 
-(
-  cd "$ROOT_DIR/backend"
-  export STUDYHUB_ENVIRONMENT=preview
-  export STUDYHUB_PRIVATE_DIR_PATH="$PRIVATE_DIR"
-  "$ROOT_DIR/.venv/bin/python" -m app.ops.db_admin check >/dev/null
-)
-
-if [[ ! -f "$ROOT_DIR/frontend/.next/BUILD_ID" ]]; then
-  (
-    cd "$ROOT_DIR/frontend"
-    NEXT_PUBLIC_API_BASE="${NEXT_PUBLIC_API_BASE:-/api}" npm run build >/dev/null
-  )
-fi
-
 if ! is_running "$BACKEND_PID_FILE"; then
   (
     cd "$ROOT_DIR/backend"
-    export STUDYHUB_ENVIRONMENT=preview
-    export STUDYHUB_PRIVATE_DIR_PATH="$PRIVATE_DIR"
+    if [[ -f .env ]]; then
+      set -a
+      # shellcheck disable=SC1091
+      source .env
+      set +a
+    fi
+    export STUDYHUB_ENVIRONMENT="${STUDYHUB_ENVIRONMENT:-local-dev}"
+    export STUDYHUB_LOCAL_DEV_ROOT_DIR="$LOCAL_DEV_ROOT"
     launch_background "$LOG_DIR/backend.log" "$ROOT_DIR/.venv/bin/uvicorn" app.main:app --host 127.0.0.1 --port "$BACKEND_PORT" >"$BACKEND_PID_FILE"
   )
 fi
@@ -77,14 +62,14 @@ fi
 if ! is_running "$FRONTEND_PID_FILE"; then
   (
     cd "$ROOT_DIR/frontend"
-    export NEXT_PUBLIC_API_BASE="${NEXT_PUBLIC_API_BASE:-/api}"
+    export NEXT_PUBLIC_API_BASE="${NEXT_PUBLIC_API_BASE:-http://127.0.0.1:$BACKEND_PORT/api}"
     export API_BASE_URL="${API_BASE_URL:-http://127.0.0.1:$BACKEND_PORT/api}"
     export API_BASE_INTERNAL="${API_BASE_INTERNAL:-http://127.0.0.1:$BACKEND_PORT/api}"
-    launch_background "$LOG_DIR/frontend.log" npm run start -- --hostname 127.0.0.1 --port "$FRONTEND_PORT" >"$FRONTEND_PID_FILE"
+    launch_background "$LOG_DIR/frontend.log" npm run dev -- --hostname 127.0.0.1 --port "$FRONTEND_PORT" >"$FRONTEND_PID_FILE"
   )
 fi
 
-echo "preview started"
+echo "local-dev started"
 echo "backend:  http://127.0.0.1:$BACKEND_PORT"
 echo "frontend: http://127.0.0.1:$FRONTEND_PORT"
 echo "logs:     $LOG_DIR"

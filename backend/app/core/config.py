@@ -28,6 +28,7 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
     log_format: str = "text"
     access_log_enabled: bool = True
+    access_log_skip_paths: str = "/api/healthz,/api/readyz,/api/metrics"
     build_git_sha: str | None = None
     local_dev_root_dir: str | None = None
     private_dir_path: str | None = None
@@ -60,6 +61,14 @@ class Settings(BaseSettings):
     database_pool_timeout_seconds: int = 30
     database_pool_recycle_seconds: int = 1800
     database_echo: bool = False
+    public_read_cache_enabled: bool = True
+    public_read_cache_backend: str = "auto"
+    public_read_cache_prefix: str = "public-read-cache"
+    public_read_cache_ttl_seconds: int = 5
+    public_read_cache_max_entries: int = 256
+    response_gzip_enabled: bool = True
+    response_gzip_minimum_size_bytes: int = 1024
+    response_gzip_compresslevel: int = 5
 
     lock_provider: str = "db_row"
     redis_url: str | None = None
@@ -189,6 +198,11 @@ class Settings(BaseSettings):
         except Exception:
             pass
         return "local-dev"
+
+    @property
+    def resolved_access_log_skip_paths(self) -> set[str]:
+        raw = self.access_log_skip_paths or ""
+        return {item.strip() for item in raw.split(",") if item.strip()}
 
     @property
     def private_dir(self) -> Path:

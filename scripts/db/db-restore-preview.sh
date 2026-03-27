@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 PRIVATE_DIR="${STUDYHUB_PRIVATE_DIR_PATH:-$ROOT_DIR/private}"
 ENVIRONMENT="${STUDYHUB_ENVIRONMENT:-preview}"
 INPUT_PATH="${1:-}"
 
 if [[ -z "$INPUT_PATH" ]]; then
-  echo "usage: bash scripts/db-restore-preview.sh /path/to/backup.sql.gz"
+  echo "usage: bash scripts/db/db-restore-preview.sh /path/to/backup.sql.gz"
   exit 1
 fi
 

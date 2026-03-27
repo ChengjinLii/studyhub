@@ -5,11 +5,13 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import (
     get_optional_auth_context,
+    get_public_read_cache,
     get_requests_service,
     require_auth_context,
     require_privileged_auth_context,
 )
 from app.core.db import get_db_session
+from app.core.public_read_cache import PublicReadCache, cache_if_anonymous, invalidate_prefixes
 from app.core.response import api_ok
 from app.core.security import AuthContext
 from app.schemas.requests import (
@@ -34,9 +36,18 @@ def list_requests(
     limit: int | None = None,
     auth: AuthContext | None = Depends(get_optional_auth_context),
     session: Session = Depends(get_db_session),
+    cache: PublicReadCache = Depends(get_public_read_cache),
     service: RequestsService = Depends(get_requests_service),
 ) -> dict[str, object]:
-    return api_ok(service.list_requests(session, auth.user_id if auth else None, sort=sort, limit=limit))
+    current_user_id = auth.user_id if auth else None
+    data = cache_if_anonymous(
+        cache,
+        current_user_id=current_user_id,
+        namespace="requests:list",
+        key=(sort, limit),
+        factory=lambda: service.list_requests(session, current_user_id, sort=sort, limit=limit),
+    )
+    return api_ok(data)
 
 
 @router.get("/api/requests/leaderboard")
@@ -44,9 +55,18 @@ def request_leaderboard(
     limit: int | None = None,
     auth: AuthContext | None = Depends(get_optional_auth_context),
     session: Session = Depends(get_db_session),
+    cache: PublicReadCache = Depends(get_public_read_cache),
     service: RequestsService = Depends(get_requests_service),
 ) -> dict[str, object]:
-    return api_ok(service.list_leaderboard(session, auth.user_id if auth else None, limit=limit))
+    current_user_id = auth.user_id if auth else None
+    data = cache_if_anonymous(
+        cache,
+        current_user_id=current_user_id,
+        namespace="requests:leaderboard",
+        key=(limit,),
+        factory=lambda: service.list_leaderboard(session, current_user_id, limit=limit),
+    )
+    return api_ok(data)
 
 
 @router.get("/api/requests/{id}")
@@ -66,7 +86,9 @@ def create_request(
     session: Session = Depends(get_db_session),
     service: RequestsService = Depends(get_requests_service),
 ) -> dict[str, object]:
-    return api_ok(service.create_request(session, auth.user_id or 0, payload))
+    data = service.create_request(session, auth.user_id or 0, payload)
+    _invalidate_request_read_caches()
+    return api_ok(data)
 
 
 @router.post("/api/requests/{id}/follow")
@@ -77,7 +99,9 @@ def follow_request(
     session: Session = Depends(get_db_session),
     service: RequestsService = Depends(get_requests_service),
 ) -> dict[str, object]:
-    return api_ok(service.follow_request(session, id, auth.user_id or 0, payload))
+    data = service.follow_request(session, id, auth.user_id or 0, payload)
+    _invalidate_request_read_caches()
+    return api_ok(data)
 
 
 @router.get("/api/requests/{id}/responses")
@@ -119,7 +143,9 @@ def request_respond(
     session: Session = Depends(get_db_session),
     service: RequestsService = Depends(get_requests_service),
 ) -> dict[str, object]:
-    return api_ok(service.respond(session, id, auth.user_id or 0, payload or RequestRespondPayload()))
+    data = service.respond(session, id, auth.user_id or 0, payload or RequestRespondPayload())
+    _invalidate_request_read_caches()
+    return api_ok(data)
 
 
 @router.post("/api/requests/{id}/accept")
@@ -130,7 +156,9 @@ def request_accept(
     session: Session = Depends(get_db_session),
     service: RequestsService = Depends(get_requests_service),
 ) -> dict[str, object]:
-    return api_ok(service.accept_response(session, id, auth.user_id or 0, auth.role_mask, payload))
+    data = service.accept_response(session, id, auth.user_id or 0, auth.role_mask, payload)
+    _invalidate_request_read_caches()
+    return api_ok(data)
 
 
 @router.post("/api/requests/{id}/preview-view")
@@ -142,6 +170,7 @@ def request_preview_view(
     service: RequestsService = Depends(get_requests_service),
 ) -> dict[str, object]:
     service.record_preview_view(session, id, auth.user_id or 0, payload)
+    _invalidate_request_read_caches()
     return api_ok()
 
 
@@ -153,7 +182,9 @@ def request_dispute(
     session: Session = Depends(get_db_session),
     service: RequestsService = Depends(get_requests_service),
 ) -> dict[str, object]:
-    return api_ok(service.submit_dispute(session, id, auth.user_id or 0, payload))
+    data = service.submit_dispute(session, id, auth.user_id or 0, payload)
+    _invalidate_request_read_caches()
+    return api_ok(data)
 
 
 @router.post("/api/requests/arbitrations/{id}/decision")
@@ -164,7 +195,9 @@ def request_arbitration_decision(
     session: Session = Depends(get_db_session),
     service: RequestsService = Depends(get_requests_service),
 ) -> dict[str, object]:
-    return api_ok(service.decide_arbitration(session, id, auth.user_id or 0, payload))
+    data = service.decide_arbitration(session, id, auth.user_id or 0, payload)
+    _invalidate_request_read_caches()
+    return api_ok(data)
 
 
 @router.post("/api/requests/contributions/{id}/cancel")
@@ -174,7 +207,9 @@ def request_contribution_cancel(
     session: Session = Depends(get_db_session),
     service: RequestsService = Depends(get_requests_service),
 ) -> dict[str, object]:
-    return api_ok(service.cancel_contribution(session, id, auth.user_id or 0))
+    data = service.cancel_contribution(session, id, auth.user_id or 0)
+    _invalidate_request_read_caches()
+    return api_ok(data)
 
 
 @router.put("/api/requests/contributions/{id}/deadline")
@@ -185,4 +220,10 @@ def request_contribution_deadline(
     session: Session = Depends(get_db_session),
     service: RequestsService = Depends(get_requests_service),
 ) -> dict[str, object]:
-    return api_ok(service.update_contribution_deadline(session, id, auth.user_id or 0, payload))
+    data = service.update_contribution_deadline(session, id, auth.user_id or 0, payload)
+    _invalidate_request_read_caches()
+    return api_ok(data)
+
+
+def _invalidate_request_read_caches() -> None:
+    invalidate_prefixes(get_public_read_cache(), "requests")

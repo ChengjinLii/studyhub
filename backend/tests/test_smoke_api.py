@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.testclient import TestClient
 
 from app.main import create_app
@@ -39,3 +40,8 @@ def test_materials_column_supports_etag_304() -> None:
     )
     assert second.status_code == 304
     assert second.headers["etag"] == etag
+
+
+def test_app_uses_gzip_middleware() -> None:
+    app = create_app()
+    assert any(middleware.cls is GZipMiddleware for middleware in app.user_middleware)

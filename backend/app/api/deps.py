@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
 from app.core.db import get_db_session
+from app.core.public_read_cache import PublicReadCache
 from app.core.security import AuthContext, JwtTokenCodec, resolve_token_from_request
 from app.integrations.material_asset_store import MaterialAssetStore
 from app.integrations.market_asset_store import MarketAssetStore
@@ -65,6 +66,11 @@ def get_material_catalog_repo() -> MaterialCatalogRepository:
 def get_read_api_repo() -> ReadApiRepository:
     settings = get_settings()
     return ReadApiRepository(settings.resolved_read_api_seed_path)
+
+
+@lru_cache(maxsize=1)
+def get_public_read_cache() -> PublicReadCache:
+    return PublicReadCache(get_settings())
 
 
 @lru_cache(maxsize=1)
@@ -413,6 +419,7 @@ def require_privileged_auth_context(auth: AuthContext = Depends(require_auth_con
 
 
 def clear_dependency_caches() -> None:
+    get_public_read_cache.cache_clear()
     get_material_catalog_repo.cache_clear()
     get_read_api_repo.cache_clear()
     get_system_repo.cache_clear()

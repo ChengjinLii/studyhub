@@ -6,12 +6,14 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import (
     get_market_asset_store,
+    get_public_read_cache,
     get_market_service,
     get_optional_auth_context,
     require_auth_context,
     require_privileged_auth_context,
 )
 from app.core.db import get_db_session
+from app.core.public_read_cache import PublicReadCache, cache_if_anonymous, invalidate_prefixes
 from app.core.response import api_ok
 from app.core.security import AuthContext
 from app.integrations.market_asset_store import MarketAssetStore
@@ -36,11 +38,25 @@ def list_market(
     size: int = 20,
     auth: AuthContext | None = Depends(get_optional_auth_context),
     session: Session = Depends(get_db_session),
+    cache: PublicReadCache = Depends(get_public_read_cache),
     service: MarketService = Depends(get_market_service),
 ) -> dict[str, object]:
-    return api_ok(
-        service.list_market(session, auth.user_id if auth else None, keyword=keyword, category=category, page=page, size=size)
+    current_user_id = auth.user_id if auth else None
+    data = cache_if_anonymous(
+        cache,
+        current_user_id=current_user_id,
+        namespace="market:list",
+        key=(keyword, category, page, size),
+        factory=lambda: service.list_market(
+            session,
+            current_user_id,
+            keyword=keyword,
+            category=category,
+            page=page,
+            size=size,
+        ),
     )
+    return api_ok(data)
 
 
 @router.get("/api/market/wanted")
@@ -57,9 +73,18 @@ def market_detail(
     id: int,
     auth: AuthContext | None = Depends(get_optional_auth_context),
     session: Session = Depends(get_db_session),
+    cache: PublicReadCache = Depends(get_public_read_cache),
     service: MarketService = Depends(get_market_service),
 ) -> dict[str, object]:
-    return api_ok(service.get_detail(session, auth.user_id if auth else None, id))
+    current_user_id = auth.user_id if auth else None
+    data = cache_if_anonymous(
+        cache,
+        current_user_id=current_user_id,
+        namespace="market:detail",
+        key=(id,),
+        factory=lambda: service.get_detail(session, current_user_id, id),
+    )
+    return api_ok(data)
 
 
 @router.get("/api/market/{id}/images/{index}")
@@ -89,7 +114,9 @@ async def create_market_item(
     form = await request.form()
     payload = parse_payload_json(form.get("payload"), MarketCreatePayload)
     images = _coerce_upload_list(form.getlist("images"))
-    return api_ok(service.create_item(session, payload, images, auth.user_id or 0))
+    data = service.create_item(session, payload, images, auth.user_id or 0)
+    _invalidate_market_read_caches()
+    return api_ok(data)
 
 
 @router.post("/api/market/{id}/want")
@@ -99,7 +126,9 @@ def want_market_item(
     session: Session = Depends(get_db_session),
     service: MarketService = Depends(get_market_service),
 ) -> dict[str, object]:
-    return api_ok(service.want_item(session, id, auth.user_id or 0))
+    data = service.want_item(session, id, auth.user_id or 0)
+    _invalidate_market_read_caches()
+    return api_ok(data)
 
 
 @router.delete("/api/market/{id}/want")
@@ -109,7 +138,9 @@ def cancel_want_market_item(
     session: Session = Depends(get_db_session),
     service: MarketService = Depends(get_market_service),
 ) -> dict[str, object]:
-    return api_ok(service.cancel_want_item(session, id, auth.user_id or 0))
+    data = service.cancel_want_item(session, id, auth.user_id or 0)
+    _invalidate_market_read_caches()
+    return api_ok(data)
 
 
 @router.patch("/api/market/{id}/status")
@@ -120,7 +151,9 @@ def update_market_item_status(
     session: Session = Depends(get_db_session),
     service: MarketService = Depends(get_market_service),
 ) -> dict[str, object]:
-    return api_ok(service.update_status(session, id, auth.user_id or 0, payload))
+    data = service.update_status(session, id, auth.user_id or 0, payload)
+    _invalidate_market_read_caches()
+    return api_ok(data)
 
 
 @router.delete("/api/market/{id}")
@@ -131,6 +164,7 @@ def delete_market_item(
     service: MarketService = Depends(get_market_service),
 ) -> dict[str, object]:
     service.delete_item(session, id, auth.user_id or 0)
+    _invalidate_market_read_caches()
     return api_ok()
 
 
@@ -155,7 +189,9 @@ def batch_update_market_for_admin(
     session: Session = Depends(get_db_session),
     service: MarketService = Depends(get_market_service),
 ) -> dict[str, object]:
-    return api_ok(service.batch_update(session, payload))
+    data = service.batch_update(session, payload)
+    _invalidate_market_read_caches()
+    return api_ok(data)
 
 
 @router.post("/api/admin/market/batch-delete")
@@ -165,7 +201,9 @@ def batch_delete_market_for_admin(
     session: Session = Depends(get_db_session),
     service: MarketService = Depends(get_market_service),
 ) -> dict[str, object]:
-    return api_ok(service.batch_delete(session, payload))
+    data = service.batch_delete(session, payload)
+    _invalidate_market_read_caches()
+    return api_ok(data)
 
 
 @router.delete("/api/admin/market/{id}")
@@ -176,8 +214,13 @@ def delete_market_item_for_admin(
     service: MarketService = Depends(get_market_service),
 ) -> dict[str, object]:
     service.remove_by_admin(session, id)
+    _invalidate_market_read_caches()
     return api_ok()
 
 
 def _coerce_upload_list(values: list[object]) -> list[UploadFile]:
     return [item for item in values if isinstance(item, UploadFile) or hasattr(item, "filename")]
+
+
+def _invalidate_market_read_caches() -> None:
+    invalidate_prefixes(get_public_read_cache(), "market")

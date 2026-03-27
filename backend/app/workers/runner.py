@@ -17,7 +17,21 @@ logger = logging.getLogger(__name__)
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="StudyHub FastAPI worker runner")
-    parser.add_argument("--job", default="all", choices=["all", "settlement", "request-refund", "refund", "payout-transfer", "transfer"])
+    parser.add_argument(
+        "--job",
+        default="all",
+        choices=[
+            "all",
+            "settlement",
+            "request-maintenance",
+            "request-timeout",
+            "timeout",
+            "request-refund",
+            "refund",
+            "payout-transfer",
+            "transfer",
+        ],
+    )
     parser.add_argument("--once", action="store_true", help="仅执行一轮任务后退出")
     parser.add_argument("--interval-seconds", type=int, default=300, help="非 once 模式下的轮询间隔")
     args = parser.parse_args(argv)

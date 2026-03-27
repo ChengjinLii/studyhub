@@ -1058,7 +1058,11 @@ class MaterialsService:
         page: int,
         size: int,
     ) -> dict[str, Any]:
-        rows = self._compat_load_material_rows(
+        profile = self._compat_load_user_profile(session, current_user_id)
+        safe_page = max(page, 1)
+        safe_size = max(1, min(size, 100))
+        start = (safe_page - 1) * safe_size
+        total = self._compat_count_material_rows(
             session,
             keyword=keyword,
             school=school,
@@ -1069,13 +1073,21 @@ class MaterialsService:
             course_category=course_category,
             price=price,
         )
-        profile = self._compat_load_user_profile(session, current_user_id)
-        ordered = self._compat_sort_material_rows(rows, sort=sort, profile=profile)
-        safe_page = max(page, 1)
-        safe_size = max(1, min(size, 100))
-        start = (safe_page - 1) * safe_size
-        end = start + safe_size
-        page_rows = ordered[start:end]
+        page_rows = self._compat_load_material_rows(
+            session,
+            keyword=keyword,
+            school=school,
+            college=college,
+            major=major,
+            tag=tag,
+            grade_value=grade_value,
+            course_category=course_category,
+            price=price,
+            sort=sort,
+            profile=profile,
+            limit=safe_size,
+            offset=start,
+        )
         material_ids = [int(row["id"]) for row in page_rows]
         tags_by_material = self._compat_load_tags_map(session, material_ids)
         comment_counts = self._compat_load_comment_counts(session, material_ids)
@@ -1088,13 +1100,15 @@ class MaterialsService:
                 )
                 for row in page_rows
             ],
-            "meta": {"page": safe_page, "size": safe_size, "total": len(rows)},
+            "meta": {"page": safe_page, "size": safe_size, "total": total},
             "stats": self._compat_load_material_stats(session),
             "availableTags": self._compat_load_available_tags(session),
         }
 
     def _compat_get_recommendations(self, session: Session, current_user_id: int | None, limit: int | None) -> list[dict[str, Any]]:
-        rows = self._compat_load_material_rows(
+        profile = self._compat_load_user_profile(session, current_user_id)
+        safe_limit = clamp_limit(limit, max_value=100)
+        sliced = self._compat_load_material_rows(
             session,
             keyword=None,
             school=None,
@@ -1104,11 +1118,11 @@ class MaterialsService:
             grade_value=None,
             course_category=None,
             price=None,
+            sort="latest",
+            profile=profile,
+            limit=safe_limit or None,
+            offset=0,
         )
-        profile = self._compat_load_user_profile(session, current_user_id)
-        ordered = self._compat_sort_material_rows(rows, sort="latest", profile=profile)
-        safe_limit = clamp_limit(limit, max_value=100)
-        sliced = ordered[:safe_limit] if safe_limit else ordered
         material_ids = [int(row["id"]) for row in sliced]
         tags_by_material = self._compat_load_tags_map(session, material_ids)
         comment_counts = self._compat_load_comment_counts(session, material_ids)
@@ -1281,50 +1295,32 @@ class MaterialsService:
         grade_value: str | None,
         course_category: str | None,
         price: str | None,
+        sort: str | None = None,
+        profile: dict[str, Any] | None = None,
+        limit: int | None = None,
+        offset: int | None = None,
     ) -> list[dict[str, Any]]:
-        where_clauses = ["m.deleted_at IS NULL", VISIBLE_MATERIAL_STATUS_SQL]
-        params: dict[str, Any] = {}
-        if self._compat_has_text(keyword):
-            params["keyword"] = f"%{keyword.strip().lower()}%"
-            where_clauses.append(
-                "(LOWER(COALESCE(m.title, '')) LIKE :keyword OR LOWER(COALESCE(m.description, '')) LIKE :keyword OR LOWER(COALESCE(m.keywords, '')) LIKE :keyword)"
-            )
-        if self._compat_has_text(school):
-            params["school"] = school.strip()
-            where_clauses.append("m.school = :school")
-        if self._compat_has_text(college):
-            params["college"] = college.strip()
-            where_clauses.append("m.college = :college")
-        if self._compat_has_text(major):
-            normalized_major = self._compat_extract_primary_major(major)
-            if normalized_major is None:
-                return []
-            params["major_like"] = f"%{normalized_major}%"
-            where_clauses.append("LOWER(COALESCE(m.major, '')) LIKE LOWER(:major_like)")
-        if self._compat_has_text(tag):
-            params["tag"] = tag.strip().lower()
-            where_clauses.append(
-                """
-                EXISTS (
-                    SELECT 1
-                    FROM material_tags mt
-                    WHERE mt.material_id = m.id
-                      AND LOWER(mt.tag) = :tag
-                )
-                """
-            )
-        if self._compat_has_text(grade_value):
-            params["grade_value"] = grade_value.strip().lower()
-            where_clauses.append("LOWER(COALESCE(m.grade_value, '')) = :grade_value")
-        if self._compat_has_text(course_category):
-            params["course_category"] = course_category.strip().upper()
-            where_clauses.append("UPPER(COALESCE(m.course_category, 'MAJOR')) = :course_category")
-        if self._compat_has_text(price):
-            normalized_price = price.strip().lower()
-            if normalized_price == "free":
-                where_clauses.append("m.is_free = 1")
-            elif normalized_price == "paid":
-                where_clauses.append("m.is_free = 0")
+        where_clauses, params = self._compat_material_filter_parts(
+            keyword=keyword,
+            school=school,
+            college=college,
+            major=major,
+            tag=tag,
+            grade_value=grade_value,
+            course_category=course_category,
+            price=price,
+        )
+        if where_clauses == ["1 = 0"]:
+            return []
+        order_sql, order_params, recommendation_score_sql = self._compat_material_order_clause(sort=sort, profile=profile)
+        params.update(order_params)
+        paging_sql = ""
+        if limit is not None:
+            params["limit"] = max(1, int(limit))
+            paging_sql = "\n            LIMIT :limit"
+        if offset:
+            params["offset"] = max(0, int(offset))
+            paging_sql += "\n            OFFSET :offset"
 
         sql = f"""
             SELECT
@@ -1352,13 +1348,155 @@ class MaterialsService:
                 m.sales_count,
                 m.created_at,
                 m.file_key,
-                m.netdisk_url
+                m.netdisk_url,
+                {recommendation_score_sql} AS recommendation_score
             FROM materials m
             LEFT JOIN users u ON u.id = m.uploader_id
             WHERE {' AND '.join(where_clauses)}
+            ORDER BY {order_sql}
+            {paging_sql}
         """
         rows = session.execute(text(sql), params).mappings().all()
         return [dict(row) for row in rows]
+
+    def _compat_count_material_rows(
+        self,
+        session: Session,
+        *,
+        keyword: str | None,
+        school: str | None,
+        college: str | None,
+        major: str | None,
+        tag: str | None,
+        grade_value: str | None,
+        course_category: str | None,
+        price: str | None,
+    ) -> int:
+        where_clauses, params = self._compat_material_filter_parts(
+            keyword=keyword,
+            school=school,
+            college=college,
+            major=major,
+            tag=tag,
+            grade_value=grade_value,
+            course_category=course_category,
+            price=price,
+        )
+        if where_clauses == ["1 = 0"]:
+            return 0
+        total = session.execute(
+            text(
+                f"""
+                SELECT COUNT(*)
+                FROM materials m
+                WHERE {' AND '.join(where_clauses)}
+                """
+            ),
+            params,
+        ).scalar()
+        return int(total or 0)
+
+    def _compat_material_filter_parts(
+        self,
+        *,
+        keyword: str | None,
+        school: str | None,
+        college: str | None,
+        major: str | None,
+        tag: str | None,
+        grade_value: str | None,
+        course_category: str | None,
+        price: str | None,
+    ) -> tuple[list[str], dict[str, Any]]:
+        where_clauses = ["m.deleted_at IS NULL", VISIBLE_MATERIAL_STATUS_SQL]
+        params: dict[str, Any] = {}
+        if self._compat_has_text(keyword):
+            params["keyword"] = f"%{keyword.strip().lower()}%"
+            where_clauses.append(
+                "(LOWER(COALESCE(m.title, '')) LIKE :keyword OR LOWER(COALESCE(m.description, '')) LIKE :keyword OR LOWER(COALESCE(m.keywords, '')) LIKE :keyword)"
+            )
+        if self._compat_has_text(school):
+            params["school"] = school.strip()
+            where_clauses.append("m.school = :school")
+        if self._compat_has_text(college):
+            params["college"] = college.strip()
+            where_clauses.append("m.college = :college")
+        if self._compat_has_text(major):
+            normalized_major = self._compat_extract_primary_major(major)
+            if normalized_major is None:
+                return ["1 = 0"], {}
+            params["major_like"] = f"%{normalized_major}%"
+            where_clauses.append("LOWER(COALESCE(m.major, '')) LIKE LOWER(:major_like)")
+        if self._compat_has_text(tag):
+            params["tag"] = tag.strip().lower()
+            where_clauses.append(
+                """
+                EXISTS (
+                    SELECT 1
+                    FROM material_tags mt
+                    WHERE mt.material_id = m.id
+                      AND LOWER(mt.tag) = :tag
+                )
+                """
+            )
+        if self._compat_has_text(grade_value):
+            params["grade_value"] = grade_value.strip().lower()
+            where_clauses.append("LOWER(COALESCE(m.grade_value, '')) = :grade_value")
+        if self._compat_has_text(course_category):
+            params["course_category"] = course_category.strip().upper()
+            where_clauses.append("UPPER(COALESCE(m.course_category, 'MAJOR')) = :course_category")
+        if self._compat_has_text(price):
+            normalized_price = price.strip().lower()
+            if normalized_price == "free":
+                where_clauses.append("m.is_free = 1")
+            elif normalized_price == "paid":
+                where_clauses.append("m.is_free = 0")
+        return where_clauses, params
+
+    def _compat_material_order_clause(self, *, sort: str | None, profile: dict[str, Any] | None) -> tuple[str, dict[str, Any], str]:
+        normalized_sort = (sort or "latest").strip().lower()
+        if normalized_sort == "price":
+            return "COALESCE(m.price, 0) DESC, m.created_at DESC, m.id DESC", {}, "0"
+        if normalized_sort == "sales":
+            return "COALESCE(m.sales_count, 0) DESC, m.created_at DESC, m.id DESC", {}, "0"
+
+        school = self._compat_normalize_text(profile.get("school")) if profile else None
+        college = self._compat_normalize_text(profile.get("college")) if profile else None
+        major = self._compat_extract_primary_major(profile.get("major")) if profile else None
+        params: dict[str, Any] = {
+            "profile_school": school,
+            "profile_college": college,
+            "profile_major_like": f"%{major}%" if major else None,
+        }
+        recommendation_score_sql = """
+            (
+                CASE
+                    WHEN :profile_school IS NOT NULL
+                     AND COALESCE(m.school, '') <> ''
+                     AND m.school <> :profile_school
+                    THEN -45 ELSE 0
+                END
+                +
+                CASE
+                    WHEN :profile_college IS NOT NULL
+                     AND COALESCE(m.college, '') <> ''
+                     AND m.college <> :profile_college
+                    THEN -15 ELSE 0
+                END
+                +
+                CASE
+                    WHEN :profile_major_like IS NOT NULL
+                     AND COALESCE(m.major, '') <> ''
+                     AND LOWER(COALESCE(m.major, '')) NOT LIKE LOWER(:profile_major_like)
+                    THEN -8 ELSE 0
+                END
+            )
+        """
+        return (
+            "recommendation_score DESC, COALESCE(m.download_count, 0) DESC, m.created_at DESC, m.id DESC",
+            params,
+            recommendation_score_sql,
+        )
 
     def _compat_load_user_profile(self, session: Session, user_id: int | None) -> dict[str, Any] | None:
         if user_id is None:

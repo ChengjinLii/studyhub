@@ -45,6 +45,15 @@ class WorkerService:
             task=lambda: self.requests_service.run_scheduled_refunds(session),
         )
 
+    def run_request_maintenance_job(self, session: Session, *, owner_token: str | None = None) -> dict[str, Any]:
+        return self._run_locked(
+            session,
+            lock_name=self.settings.request_refund_lock_name,
+            lock_timeout_seconds=self.settings.request_refund_lock_timeout_seconds,
+            owner_token=owner_token,
+            task=lambda: self.requests_service.run_request_maintenance(session),
+        )
+
     def run_payout_transfer_job(self, session: Session, *, owner_token: str | None = None) -> dict[str, Any]:
         return self._run_locked(
             session,
@@ -58,6 +67,8 @@ class WorkerService:
         normalized = (job_name or "all").strip().lower()
         if normalized == "settlement":
             return self.run_settlement_job(session, owner_token=owner_token)
+        if normalized in {"request-maintenance", "request-timeout", "timeout"}:
+            return self.run_request_maintenance_job(session, owner_token=owner_token)
         if normalized in {"request-refund", "refund"}:
             return self.run_request_refund_job(session, owner_token=owner_token)
         if normalized in {"payout-transfer", "transfer"}:
@@ -65,6 +76,7 @@ class WorkerService:
         if normalized == "all":
             return {
                 "settlement": self.run_settlement_job(session, owner_token=owner_token),
+                "requestMaintenance": self.run_request_maintenance_job(session, owner_token=owner_token),
                 "requestRefund": self.run_request_refund_job(session, owner_token=owner_token),
                 "payoutTransfer": self.run_payout_transfer_job(session, owner_token=owner_token),
             }

@@ -7,6 +7,7 @@ from uuid import uuid4
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 
 from app.api.deps import get_auth_service
 from app.api.main import api_router
@@ -70,6 +71,12 @@ def create_app() -> FastAPI:
             allow_methods=["*"],
             allow_headers=["*"],
         )
+    if settings.response_gzip_enabled:
+        app.add_middleware(
+            GZipMiddleware,
+            minimum_size=max(256, settings.response_gzip_minimum_size_bytes),
+            compresslevel=max(1, min(settings.response_gzip_compresslevel, 9)),
+        )
 
     @app.middleware("http")
     async def record_http_observability(request: Request, call_next):
@@ -95,20 +102,21 @@ def create_app() -> FastAPI:
                 status_code=status_code,
                 duration_seconds=duration_seconds,
             )
-            log_level = logging.ERROR if status_code >= 500 else logging.INFO
-            logger.log(
-                log_level,
-                "HTTP request completed",
-                extra={
-                    "event": "http_request",
-                    "environment": settings.environment,
-                    "method": request.method,
-                    "path": route_path,
-                    "status_code": status_code,
-                    "duration_ms": duration_ms,
-                    "client_ip": request.client.host if request.client else None,
-                },
-            )
+            if route_path not in settings.resolved_access_log_skip_paths:
+                log_level = logging.ERROR if status_code >= 500 else logging.INFO
+                logger.log(
+                    log_level,
+                    "HTTP request completed",
+                    extra={
+                        "event": "http_request",
+                        "environment": settings.environment,
+                        "method": request.method,
+                        "path": route_path,
+                        "status_code": status_code,
+                        "duration_ms": duration_ms,
+                        "client_ip": request.client.host if request.client else None,
+                    },
+                )
             reset_request_id(token)
 
     install_exception_handlers(app)

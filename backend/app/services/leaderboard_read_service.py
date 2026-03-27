@@ -37,31 +37,40 @@ class LeaderboardReadService:
         safe_limit = max(1, min(limit, 100))
         normalized_period = self._compat_normalize_period(period)
         params: dict[str, object] = {"limit": safe_limit}
-        where_clause = ""
+        where_clauses = [
+            "m.deleted_at IS NULL",
+            "(m.status IS NULL OR LOWER(m.status) NOT IN ('hidden', 'removed'))",
+        ]
         if normalized_period == "week":
             start, end = self._compat_resolve_week_range()
             params.update({"start": start, "end": end})
-            where_clause = "WHERE md.created_at >= :start AND md.created_at < :end"
+            where_clauses.extend(["md.created_at >= :start", "md.created_at < :end"])
         elif normalized_period == "month":
             start, end = self._compat_resolve_month_range()
             params.update({"start": start, "end": end})
-            where_clause = "WHERE md.created_at >= :start AND md.created_at < :end"
+            where_clauses.extend(["md.created_at >= :start", "md.created_at < :end"])
 
         rows = session.execute(
             text(
                 f"""
                 SELECT
-                    u.id AS user_id,
+                    agg.user_id,
                     COALESCE(NULLIF(u.nickname, ''), u.username) AS username,
-                    COUNT(md.id) AS downloads,
+                    agg.downloads,
                     u.role_mask
-                FROM material_downloads md
-                JOIN materials m ON m.id = md.material_id
-                JOIN users u ON u.id = m.uploader_id
-                {where_clause}
-                GROUP BY u.id, u.nickname, u.username, u.role_mask
-                ORDER BY COUNT(md.id) DESC, u.id ASC
-                LIMIT :limit
+                FROM (
+                    SELECT
+                        m.uploader_id AS user_id,
+                        COUNT(md.id) AS downloads
+                    FROM material_downloads md
+                    JOIN materials m ON m.id = md.material_id
+                    WHERE {' AND '.join(where_clauses)}
+                    GROUP BY m.uploader_id
+                    ORDER BY COUNT(md.id) DESC, m.uploader_id ASC
+                    LIMIT :limit
+                ) agg
+                JOIN users u ON u.id = agg.user_id
+                ORDER BY agg.downloads DESC, agg.user_id ASC
                 """
             ),
             params,

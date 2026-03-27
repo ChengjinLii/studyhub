@@ -11,12 +11,14 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import (
     get_materials_column_service,
+    get_public_read_cache,
     get_materials_service,
     get_optional_auth_context,
     get_requests_service,
     require_auth_context,
 )
 from app.core.db import get_db_session
+from app.core.public_read_cache import PublicReadCache, cache_if_anonymous, invalidate_prefixes
 from app.core.response import api_ok
 from app.core.security import AuthContext
 from app.schemas.materials import (
@@ -51,12 +53,18 @@ def list_materials(
     size: int = 20,
     auth: AuthContext | None = Depends(get_optional_auth_context),
     session: Session = Depends(get_db_session),
+    cache: PublicReadCache = Depends(get_public_read_cache),
     service: MaterialsService = Depends(get_materials_service),
 ) -> dict[str, object]:
-    return api_ok(
-        service.list_materials(
+    current_user_id = auth.user_id if auth else None
+    data = cache_if_anonymous(
+        cache,
+        current_user_id=current_user_id,
+        namespace="materials:list",
+        key=(keyword, school, college, major, tag, gradeValue, courseCategory, price, sort, page, size),
+        factory=lambda: service.list_materials(
             session,
-            auth.user_id if auth else None,
+            current_user_id,
             keyword=keyword,
             school=school,
             college=college,
@@ -68,8 +76,9 @@ def list_materials(
             sort=sort,
             page=page,
             size=size,
-        )
+        ),
     )
+    return api_ok(data)
 
 
 @router.get("/api/materials/column")
@@ -92,9 +101,18 @@ def material_recommendations(
     limit: int | None = None,
     auth: AuthContext | None = Depends(get_optional_auth_context),
     session: Session = Depends(get_db_session),
+    cache: PublicReadCache = Depends(get_public_read_cache),
     service: MaterialsService = Depends(get_materials_service),
 ) -> dict[str, object]:
-    return api_ok(service.get_recommendations(session, auth.user_id if auth else None, limit))
+    current_user_id = auth.user_id if auth else None
+    data = cache_if_anonymous(
+        cache,
+        current_user_id=current_user_id,
+        namespace="materials:recommendations",
+        key=(limit,),
+        factory=lambda: service.get_recommendations(session, current_user_id, limit),
+    )
+    return api_ok(data)
 
 
 @router.get("/api/materials/{id}")
@@ -102,9 +120,19 @@ def material_detail(
     id: int,
     auth: AuthContext | None = Depends(get_optional_auth_context),
     session: Session = Depends(get_db_session),
+    cache: PublicReadCache = Depends(get_public_read_cache),
     service: MaterialsService = Depends(get_materials_service),
 ) -> dict[str, object]:
-    return api_ok(service.get_detail(session, auth.user_id if auth else None, id, bool(auth and auth.role_mask and auth.role_mask & 24)))
+    current_user_id = auth.user_id if auth else None
+    can_manage_all = bool(auth and auth.role_mask and auth.role_mask & 24)
+    data = cache_if_anonymous(
+        cache,
+        current_user_id=current_user_id,
+        namespace="materials:detail",
+        key=(id,),
+        factory=lambda: service.get_detail(session, current_user_id, id, can_manage_all),
+    )
+    return api_ok(data)
 
 
 @router.post("/api/materials/{id}/view")
@@ -118,6 +146,7 @@ async def record_view(
     payload_dict = await request.json() if request.headers.get("content-type", "").startswith("application/json") else {}
     payload = MaterialViewPayload.model_validate(payload_dict or {})
     view_count = service.record_view(session, id, auth.user_id if auth else None, bool(auth and auth.role_mask and auth.role_mask & 24), payload.viewerToken)
+    _invalidate_material_read_caches()
     return api_ok({"viewCount": view_count})
 
 
@@ -156,6 +185,7 @@ async def create_material(
     )
     if payload.requestId is not None:
         requests_service.attach_material_to_request(session, payload.requestId, auth.user_id or 0, int(detail["id"]))
+    _invalidate_material_read_caches()
     return api_ok(detail)
 
 
@@ -173,19 +203,19 @@ async def update_material(
     markdown_file = form.get("markdown")
     previews = _coerce_upload_list(form.getlist("previews"))
     custom_previews = _coerce_upload_list(form.getlist("customPreviews"))
-    return api_ok(
-        service.update_material(
-            session,
-            material_id=id,
-            payload=payload,
-            operator_id=auth.user_id or 0,
-            can_manage_all=bool(auth.role_mask and auth.role_mask & 24),
-            zip_file=zip_file if hasattr(zip_file, "filename") else None,
-            markdown_file=markdown_file if hasattr(markdown_file, "filename") else None,
-            previews=previews,
-            custom_previews=custom_previews,
-        )
+    detail = service.update_material(
+        session,
+        material_id=id,
+        payload=payload,
+        operator_id=auth.user_id or 0,
+        can_manage_all=bool(auth.role_mask and auth.role_mask & 24),
+        zip_file=zip_file if hasattr(zip_file, "filename") else None,
+        markdown_file=markdown_file if hasattr(markdown_file, "filename") else None,
+        previews=previews,
+        custom_previews=custom_previews,
     )
+    _invalidate_material_read_caches()
+    return api_ok(detail)
 
 
 @router.delete("/api/materials/{id}")
@@ -196,6 +226,7 @@ def delete_material(
     service: MaterialsService = Depends(get_materials_service),
 ) -> dict[str, object]:
     service.delete_material(session, id, operator_id=auth.user_id or 0, can_manage_all=bool(auth.role_mask and auth.role_mask & 24))
+    _invalidate_material_read_caches()
     return api_ok()
 
 
@@ -207,7 +238,9 @@ def rate_material(
     session: Session = Depends(get_db_session),
     service: MaterialsService = Depends(get_materials_service),
 ) -> dict[str, object]:
-    return api_ok(service.rate_material(session, id, auth.user_id or 0, payload.rating))
+    data = service.rate_material(session, id, auth.user_id or 0, payload.rating)
+    _invalidate_material_read_caches()
+    return api_ok(data)
 
 
 @router.post("/api/materials/{id}/review")
@@ -219,6 +252,7 @@ def review_material(
     service: MaterialsService = Depends(get_materials_service),
 ) -> dict[str, object]:
     service.add_review(session, id, auth.user_id or 0, payload)
+    _invalidate_material_read_caches()
     return api_ok()
 
 
@@ -251,7 +285,9 @@ def like_material(
     session: Session = Depends(get_db_session),
     service: MaterialsService = Depends(get_materials_service),
 ) -> dict[str, object]:
-    return api_ok(service.like(session, id, auth.user_id or 0))
+    data = service.like(session, id, auth.user_id or 0)
+    _invalidate_material_read_caches()
+    return api_ok(data)
 
 
 @router.delete("/api/materials/{id}/like")
@@ -261,7 +297,9 @@ def unlike_material(
     session: Session = Depends(get_db_session),
     service: MaterialsService = Depends(get_materials_service),
 ) -> dict[str, object]:
-    return api_ok(service.unlike(session, id, auth.user_id or 0))
+    data = service.unlike(session, id, auth.user_id or 0)
+    _invalidate_material_read_caches()
+    return api_ok(data)
 
 
 @router.get("/api/materials/{id}/download")
@@ -271,7 +309,9 @@ def download_material(
     session: Session = Depends(get_db_session),
     service: MaterialsService = Depends(get_materials_service),
 ) -> dict[str, object]:
-    return api_ok(service.generate_download(session, id, user_id=auth.user_id or 0, role_mask=auth.role_mask))
+    data = service.generate_download(session, id, user_id=auth.user_id or 0, role_mask=auth.role_mask)
+    _invalidate_material_read_caches()
+    return api_ok(data)
 
 
 @router.post("/api/materials/downloads/batch")
@@ -281,7 +321,9 @@ def batch_download(
     session: Session = Depends(get_db_session),
     service: MaterialsService = Depends(get_materials_service),
 ) -> dict[str, object]:
-    return api_ok(service.generate_batch_downloads(session, payload.materialIds, user_id=auth.user_id or 0, role_mask=auth.role_mask))
+    data = service.generate_batch_downloads(session, payload.materialIds, user_id=auth.user_id or 0, role_mask=auth.role_mask)
+    _invalidate_material_read_caches()
+    return api_ok(data)
 
 
 @router.get("/api/materials/{id}/download/file")
@@ -331,6 +373,10 @@ def material_custom_preview_asset(
 
 def _coerce_upload_list(values: list[object]) -> list[UploadFile]:
     return [value for value in values if hasattr(value, "filename")]
+
+
+def _invalidate_material_read_caches() -> None:
+    invalidate_prefixes(get_public_read_cache(), "materials", "leaderboard")
 
 
 def _placeholder_download_response(file_type: str, filename: str) -> Response:

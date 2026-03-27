@@ -98,7 +98,6 @@ class RequestsService:
         if self.settings.requires_private_env_file:
             return self._compat_list_requests(session, viewer_id, sort=sort, limit=limit)
         self._bootstrap(session)
-        self._process_timeouts(session)
         items = [item for item in self.request_repo.list_requests(session) if self._is_publicly_visible(item)]
         items = [item for item in items if not self._should_hide_by_early_exit(session, item)]
         normalized = (sort or "latest").lower()
@@ -119,7 +118,6 @@ class RequestsService:
         if self.settings.requires_private_env_file:
             return self._compat_get_detail(session, viewer_id, viewer_role_mask, request_id)
         self._bootstrap(session)
-        self._process_timeouts(session)
         request = self._require_request(session, request_id)
         is_owner = request.requester_id == viewer_id
         can_manage_all = self._can_manage_all(viewer_role_mask)
@@ -149,7 +147,6 @@ class RequestsService:
 
     def create_request(self, session: Session, user_id: int, payload: RequestCreatePayload) -> dict[str, Any]:
         seed = self._bootstrap(session)
-        self._process_timeouts(session)
         requester = self._require_user(session, user_id)
         course = self._strip(payload.course)
         keyword = self._strip(payload.keyword)
@@ -450,6 +447,9 @@ class RequestsService:
         return seed
 
     def run_scheduled_refunds(self, session: Session) -> dict[str, int]:
+        return self.run_request_maintenance(session)
+
+    def run_request_maintenance(self, session: Session) -> dict[str, int]:
         self._bootstrap(session)
         processed = self._process_timeouts(session)
         return {"processed": processed}

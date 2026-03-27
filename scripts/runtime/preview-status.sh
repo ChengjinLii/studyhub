@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 PRIVATE_DIR="${STUDYHUB_PRIVATE_DIR_PATH:-$ROOT_DIR/private}"
 RUNTIME_ROOT="${STUDYHUB_PREVIEW_RUNTIME_DIR:-$PRIVATE_DIR/.runtime-preview}"
 RUN_DIR="$RUNTIME_ROOT/run"

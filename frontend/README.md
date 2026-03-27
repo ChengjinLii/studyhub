@@ -1,39 +1,41 @@
 # studyhub frontend
 
-StudyHub 的 Next.js 前端，目录已经从旧的 `apps/web` 收敛到顶层 `frontend/`。
+前端位于 `frontend/`，基于 Next.js。它需要同时适配 `local-dev`、`preview` 和 `production` 三类环境，并且不依赖仓库外的绝对路径。
 
 ## 推荐开发方式
 
-优先配合仓库根目录的 `docker compose`：
+优先从仓库根目录启动整套本地开发环境：
 
 ```bash
-bash scripts/docker-dev-up.sh
+bash scripts/dev/docker-dev-up.sh
 ```
 
-此时前端地址：
+默认地址：
 
-- `http://127.0.0.1:3100`
+- frontend：`http://127.0.0.1:3100`
+- backend API：`http://127.0.0.1:8111/api`
 
-后端 API 默认会指向：
+## local-dev 下的前端体验
 
-- `http://127.0.0.1:8111/api`
+当前前端已经对 `local-dev` 做了几项开发友好处理：
 
-配合 `local-dev` 使用时：
+- 登录页提供开发账号的快捷入口
+- 页面会显示明确的环境标识，避免误认成 preview 或 production
+- mock 场景下的外链图片会自动映射到本地占位图，避免页面因为示例域名失效而崩溃
 
-- 登录页会显示 `Local Dev` 快捷入口
-- 可以直接进入预置账号 `developer`
-- 页面左下角会显示 `Local Dev` 环境标识
-- 示例外链资源会自动映射到本地占位图，避免 mock 域名导致页面崩溃
+这样做的目标是：既保留真实应用的登录流程，又不让开源协作者把时间浪费在无关的环境问题上。
 
-## 开发方式选择
+## 什么时候用 Docker，什么时候手动跑前端
 
-- 如果你要参与这个项目的正常开发，优先使用根目录的 `docker compose`
-- 如果你只是想快速打开前端页面看看，或者临时改 UI，可以手动本地运行
-- 两者最大的区别不在前端本身，而在后端和依赖环境：`docker compose` 更接近真实开发环境，shell 方式更轻但更偏演示/调试
+- 如果你在做正常功能开发，或者需要和后端联调，优先使用 `docker compose local-dev`
+- 如果你只是想快速看页面、改样式或临时检查某个 UI，手动启动前端会更轻
 
-## 手动开发
+两者最大的区别不在前端本身，而在后端和依赖环境：
 
-如果不用 Docker：
+- Docker local-dev 更接近真实开发环境
+- 手动方式更轻，但通常更偏演示和局部调试
+
+## 手动启动
 
 ```bash
 cd frontend

@@ -1,17 +1,17 @@
-# Historical Data Fixtures
+# 历史兼容数据样本
 
-These files are synthetic, hand-crafted compatibility cases for Step 3 and later regression tests.
+这组文件是手工整理的合成兼容样本，用来覆盖 Step 3 之后的历史数据回归场景。
 
-Rules:
+## 规则
 
-1. They are not copied from production and contain no real credentials, user data, or billing records.
-2. They are JSON snapshots for mapper/query tests, not guaranteed to be directly loadable SQL fixtures.
-3. Each file captures one family of edge cases that the FastAPI rewrite must tolerate without re-scanning the Java repository.
+1. 这些文件不是从生产环境直接导出的，不包含真实凭据、真实用户数据或真实账单记录。
+2. 它们是给映射逻辑、查询逻辑和兼容测试使用的 JSON 样本，不保证能直接当作 SQL fixture 导入。
+3. 每个文件都代表一类 FastAPI 重构必须兼容的边界情况，避免后续开发又回头重新扫描旧仓库。
 
-Files:
+## 文件说明
 
-- `materials_legacy.json`: material/file/preview/view edge cases
-- `commerce_legacy.json`: order/payment/settlement/payout edge cases
-- `requests_legacy.json`: request/contribution/refund/arbitration edge cases
-- `engagement_legacy.json`: user/profile/notification/market/report edge cases
-- `legacy_tables_manifest.json`: legacy SQL-only tables still present in Flyway history
+- `materials_legacy.json`：资料、文件、预览、浏览记录相关的历史边界情况
+- `commerce_legacy.json`：订单、支付、结算、提现相关的历史边界情况
+- `requests_legacy.json`：求购、跟购、退款、仲裁相关的历史边界情况
+- `engagement_legacy.json`：用户、主页、通知、集市、举报相关的历史边界情况
+- `legacy_tables_manifest.json`：仍然出现在历史迁移记录中的旧 SQL 表清单
