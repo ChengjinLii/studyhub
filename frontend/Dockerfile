@@ -17,5 +17,5 @@ COPY --from=builder /app/package.json ./
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/public ./public
 EXPOSE 3000
-ENV NEXT_PUBLIC_API_BASE=http://localhost:8080/api
+ENV NEXT_PUBLIC_API_BASE=http://127.0.0.1:8011/api
 CMD ["npm","run","start"]

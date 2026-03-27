@@ -1,5 +1,5 @@
 const normalizeApiBase = (base?: string) => {
-  if (!base) return 'http://localhost:8080/api';
+  if (!base) return 'http://127.0.0.1:8111/api';
   const trimmed = base.replace(/\/+$/, '');
   if (/\/api$/i.test(trimmed)) {
     return trimmed;

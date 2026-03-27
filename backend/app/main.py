@@ -1,13 +1,11 @@
 from __future__ import annotations
 
 import logging
-import re
 from contextlib import asynccontextmanager
 from time import perf_counter
 from uuid import uuid4
 
-import httpx
-from fastapi import FastAPI, Request, Response
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.deps import get_auth_service
@@ -20,33 +18,6 @@ from app.core.observability import get_runtime_metrics
 
 
 logger = logging.getLogger(__name__)
-_LOCAL_API_PATHS = {"/api/healthz", "/api/readyz", "/api/metrics", "/healthz", "/readyz", "/metrics"}
-_LOCAL_PREVIEW_DIRECT_API_ROUTES = (
-    ("GET", re.compile(r"^/api/materials$")),
-    ("GET", re.compile(r"^/api/materials/recommendations$")),
-    ("GET", re.compile(r"^/api/materials/\d+$")),
-    ("GET", re.compile(r"^/api/leaderboard/contributors$")),
-    ("GET", re.compile(r"^/api/market$")),
-    ("GET", re.compile(r"^/api/market/\d+$")),
-    ("GET", re.compile(r"^/api/requests$")),
-    ("GET", re.compile(r"^/api/requests/leaderboard$")),
-    ("GET", re.compile(r"^/api/requests/\d+$")),
-    ("GET", re.compile(r"^/api/requests/\d+/responses$")),
-    ("GET", re.compile(r"^/api/requests/\d+/contributions$")),
-    ("GET", re.compile(r"^/api/comments$")),
-    ("GET", re.compile(r"^/api/comments/\d+/replies$")),
-)
-_HOP_BY_HOP_HEADERS = {
-    "connection",
-    "keep-alive",
-    "proxy-authenticate",
-    "proxy-authorization",
-    "te",
-    "trailers",
-    "transfer-encoding",
-    "upgrade",
-    "content-length",
-}
 
 
 def _ensure_runtime_directories() -> None:
@@ -62,53 +33,6 @@ def _ensure_runtime_directories() -> None:
         settings.resolved_payout_qr_asset_dir.mkdir(parents=True, exist_ok=True)
     if settings.mail_provider == "local_outbox":
         settings.resolved_mail_outbox_dir.mkdir(parents=True, exist_ok=True)
-
-
-def _should_proxy_api_request(settings, request: Request) -> bool:
-    if not settings.legacy_api_proxy_enabled:
-        return False
-    path = request.url.path
-    if not path.startswith("/api/") or path in _LOCAL_API_PATHS:
-        return False
-    method = request.method.upper()
-    for allowed_method, pattern in _LOCAL_PREVIEW_DIRECT_API_ROUTES:
-        if method == allowed_method and pattern.match(path):
-            return False
-    return True
-
-
-async def _proxy_api_request(settings, request: Request) -> Response:
-    upstream_base = (settings.legacy_api_proxy_base_url or "").rstrip("/")
-    upstream_url = f"{upstream_base}{request.url.path}"
-    if request.url.query:
-        upstream_url = f"{upstream_url}?{request.url.query}"
-
-    forwarded_headers = {
-        key: value
-        for key, value in request.headers.items()
-        if key.lower() not in {"host", "content-length"}
-    }
-    body = await request.body()
-    timeout = httpx.Timeout(connect=5.0, read=60.0, write=60.0, pool=5.0)
-    async with httpx.AsyncClient(follow_redirects=False, timeout=timeout) as client:
-        upstream_response = await client.request(
-            request.method,
-            upstream_url,
-            content=body,
-            headers=forwarded_headers,
-            cookies=request.cookies,
-        )
-
-    response = Response(content=upstream_response.content, status_code=upstream_response.status_code)
-    for key, value in upstream_response.headers.items():
-        lower_key = key.lower()
-        if lower_key in _HOP_BY_HOP_HEADERS or lower_key == "set-cookie":
-            continue
-        response.headers[key] = value
-    for cookie_header in upstream_response.headers.get_list("set-cookie"):
-        response.headers.append("set-cookie", cookie_header)
-    response.headers["x-studyhub-preview-upstream"] = "legacy-java"
-    return response
 
 
 @asynccontextmanager
@@ -156,11 +80,7 @@ def create_app() -> FastAPI:
         status_code = 500
         route_path = request.url.path
         try:
-            if _should_proxy_api_request(settings, request):
-                response = await _proxy_api_request(settings, request)
-                route_path = f"legacy-proxy:{request.url.path}"
-            else:
-                response = await call_next(request)
+            response = await call_next(request)
             status_code = response.status_code
             route = request.scope.get("route")
             route_path = getattr(route, "path", None) or route_path

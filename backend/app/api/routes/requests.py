@@ -4,13 +4,11 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from app.api.deps import (
-    get_legacy_requests_read_service,
     get_optional_auth_context,
     get_requests_service,
     require_auth_context,
     require_privileged_auth_context,
 )
-from app.core.config import get_settings
 from app.core.db import get_db_session
 from app.core.response import api_ok
 from app.core.security import AuthContext
@@ -24,7 +22,6 @@ from app.schemas.requests import (
     RequestPreviewViewPayload,
     RequestRespondPayload,
 )
-from app.services.legacy_requests_read_service import LegacyRequestsReadService
 from app.services.requests_service import RequestsService
 
 
@@ -38,11 +35,7 @@ def list_requests(
     auth: AuthContext | None = Depends(get_optional_auth_context),
     session: Session = Depends(get_db_session),
     service: RequestsService = Depends(get_requests_service),
-    legacy_service: LegacyRequestsReadService = Depends(get_legacy_requests_read_service),
 ) -> dict[str, object]:
-    settings = get_settings()
-    if settings.requires_private_env_file:
-        return api_ok(legacy_service.list_requests(session, auth.user_id if auth else None, sort=sort, limit=limit))
     return api_ok(service.list_requests(session, auth.user_id if auth else None, sort=sort, limit=limit))
 
 
@@ -52,11 +45,7 @@ def request_leaderboard(
     auth: AuthContext | None = Depends(get_optional_auth_context),
     session: Session = Depends(get_db_session),
     service: RequestsService = Depends(get_requests_service),
-    legacy_service: LegacyRequestsReadService = Depends(get_legacy_requests_read_service),
 ) -> dict[str, object]:
-    settings = get_settings()
-    if settings.requires_private_env_file:
-        return api_ok(legacy_service.list_leaderboard(session, auth.user_id if auth else None, limit=limit))
     return api_ok(service.list_leaderboard(session, auth.user_id if auth else None, limit=limit))
 
 
@@ -66,11 +55,7 @@ def request_detail(
     auth: AuthContext = Depends(require_auth_context),
     session: Session = Depends(get_db_session),
     service: RequestsService = Depends(get_requests_service),
-    legacy_service: LegacyRequestsReadService = Depends(get_legacy_requests_read_service),
 ) -> dict[str, object]:
-    settings = get_settings()
-    if settings.requires_private_env_file:
-        return api_ok(legacy_service.get_detail(session, auth.user_id or 0, auth.role_mask, id))
     return api_ok(service.get_detail(session, auth.user_id or 0, auth.role_mask, id))
 
 
@@ -101,11 +86,7 @@ def request_responses(
     auth: AuthContext = Depends(require_auth_context),
     session: Session = Depends(get_db_session),
     service: RequestsService = Depends(get_requests_service),
-    legacy_service: LegacyRequestsReadService = Depends(get_legacy_requests_read_service),
 ) -> dict[str, object]:
-    settings = get_settings()
-    if settings.requires_private_env_file:
-        return api_ok(legacy_service.get_responses(session, auth.user_id or 0, auth.role_mask, id))
     return api_ok(service.get_responses(session, auth.user_id or 0, auth.role_mask, id))
 
 
@@ -115,11 +96,7 @@ def request_contributions(
     auth: AuthContext = Depends(require_auth_context),
     session: Session = Depends(get_db_session),
     service: RequestsService = Depends(get_requests_service),
-    legacy_service: LegacyRequestsReadService = Depends(get_legacy_requests_read_service),
 ) -> dict[str, object]:
-    settings = get_settings()
-    if settings.requires_private_env_file:
-        return api_ok(legacy_service.get_contributions(session, auth.user_id or 0, auth.role_mask, id))
     return api_ok(service.get_contributions(session, auth.user_id or 0, auth.role_mask, id))
 
 

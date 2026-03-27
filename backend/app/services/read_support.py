@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
+import json
 from typing import Any
 from zoneinfo import ZoneInfo
 
@@ -124,3 +125,118 @@ def serialize_datetime(value: datetime | None) -> str | None:
         return None
     normalized = value if value.tzinfo is not None else value.replace(tzinfo=DEFAULT_OUTPUT_TIMEZONE)
     return normalized.isoformat()
+
+
+def count_users_with_seed_fallback(session: Any, auth_repo: Any, read_repo: Any) -> int:
+    count = auth_repo.count_users(session)
+    if count > 0:
+        return count
+    seed = read_repo.load_seed() if read_repo is not None else {}
+    users = seed.get("users") if isinstance(seed, dict) else None
+    return len(users) if isinstance(users, dict) else 0
+
+
+def compat_serialize_datetime(value: Any) -> str | None:
+    if value is None:
+        return None
+    if isinstance(value, str):
+        try:
+            value = parse_iso_datetime(value)
+        except ValueError:
+            return value
+    if isinstance(value, datetime):
+        normalized = value if value.tzinfo is not None else value.replace(tzinfo=UTC)
+        return normalized.astimezone(UTC).isoformat().replace("+00:00", "Z")
+    return str(value)
+
+
+def compat_timestamp(value: Any) -> float:
+    serialized = compat_serialize_datetime(value)
+    if not serialized:
+        return 0.0
+    normalized = serialized.replace("Z", "+00:00")
+    return datetime.fromisoformat(normalized).timestamp()
+
+
+def compat_as_int(value: Any, default: int = 0) -> int:
+    if value is None:
+        return default
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def compat_as_float(value: Any, default: float = 0.0) -> float:
+    if value is None:
+        return default
+    try:
+        return round(float(value), 2)
+    except (TypeError, ValueError):
+        return default
+
+
+def compat_to_bool(value: Any, default: bool = False) -> bool:
+    if value is None:
+        return default
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return bool(value)
+    if isinstance(value, str):
+        return value.strip().lower() in {"1", "true", "yes", "y"}
+    return bool(value)
+
+
+def compat_normalize_text(value: Any) -> str | None:
+    if value is None:
+        return None
+    normalized = str(value).strip()
+    return normalized or None
+
+
+def compat_has_text(value: Any) -> bool:
+    return compat_normalize_text(value) is not None
+
+
+def compat_cents_to_price(value: Any) -> float:
+    return round(compat_as_int(value) / 100.0, 2)
+
+
+def compat_amount_yuan(value: Any) -> float | None:
+    if value is None:
+        return None
+    return round(compat_as_int(value) / 100.0, 2)
+
+
+def compat_json_list_loads(value: Any) -> list[Any]:
+    if value is None:
+        return []
+    if isinstance(value, list):
+        return value
+    if isinstance(value, str):
+        text_value = value.strip()
+        if not text_value:
+            return []
+        try:
+            loaded = json.loads(text_value)
+        except json.JSONDecodeError:
+            return []
+        return loaded if isinstance(loaded, list) else []
+    return []
+
+
+def compat_is_external_non_oss_url(key: str, settings: Any, *, treat_generic_oss_as_internal: bool = False) -> bool:
+    if not (key.startswith("http://") or key.startswith("https://")):
+        return False
+    public_base = (getattr(settings, "oss_public_base_url", None) or "").rstrip("/")
+    endpoint = (getattr(settings, "oss_endpoint", None) or "").removeprefix("https://").removeprefix("http://")
+    bucket = getattr(settings, "oss_bucket", None)
+    bucket_host = f"https://{bucket}.{endpoint}" if bucket and endpoint else ""
+    if public_base and key.startswith(public_base + "/"):
+        return False
+    if bucket_host and key.startswith(bucket_host + "/"):
+        return False
+    if treat_generic_oss_as_internal and ("aliyuncs.com" in key or "oss-" in key):
+        return False
+    return True

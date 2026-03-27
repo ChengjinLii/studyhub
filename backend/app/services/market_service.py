@@ -4,8 +4,10 @@ import json
 from typing import Any
 
 from fastapi import HTTPException, UploadFile, status
+from sqlalchemy import bindparam, text
 from sqlalchemy.orm import Session
 
+from app.core.config import Settings
 from app.integrations.market_asset_store import MarketAssetStore
 from app.models.market import MarketItemRecord
 from app.repos.auth_repo import AuthRepository
@@ -17,23 +19,43 @@ from app.schemas.market import (
     MarketCreatePayload,
     MarketStatusPayload,
 )
-from app.services.read_support import parse_iso_datetime, serialize_datetime
+from app.services.read_support import (
+    compat_as_int,
+    compat_cents_to_price,
+    compat_has_text,
+    compat_is_external_non_oss_url,
+    compat_json_list_loads,
+    compat_serialize_datetime,
+    count_users_with_seed_fallback,
+    parse_iso_datetime,
+    serialize_datetime,
+)
 
 
 CATEGORIES = {"BOOK", "DIGITAL", "LIFE", "SPORT", "OTHER"}
 CONTACT_TYPES = {"QQ", "WECHAT", "PHONE"}
 ADMIN_STATUSES = {"SALE", "RESERVED", "SOLD", "REMOVED", "HIDDEN"}
 PLACEHOLDER_IMAGE = "https://placehold.co/600x400?text=Campus+Market"
+THUMB_PROCESS = "image/resize,w_600/quality,q_75"
+DETAIL_PROCESS = "image/resize,w_1400/quality,q_80"
+THUMB_WIDTHS = (400, 800, 1200)
+DETAIL_WIDTHS = (800, 1200, 1600)
+THUMB_QUALITY = 75
+DETAIL_QUALITY = 80
+LQIP_PROCESS = "image/resize,w_24/quality,q_30"
+MARKET_SIGNED_URL_TTL_SECONDS = 604800
 
 
 class MarketService:
     def __init__(
         self,
+        settings: Settings,
         read_repo: ReadApiRepository,
         auth_repo: AuthRepository,
         market_repo: MarketRepository,
         asset_store: MarketAssetStore,
     ) -> None:
+        self.settings = settings
         self.read_repo = read_repo
         self.auth_repo = auth_repo
         self.market_repo = market_repo
@@ -49,6 +71,15 @@ class MarketService:
         page: int,
         size: int,
     ) -> dict[str, Any]:
+        if self.settings.requires_private_env_file:
+            return self._compat_list_market(
+                session,
+                current_user_id,
+                keyword=keyword,
+                category=category,
+                page=page,
+                size=size,
+            )
         self._bootstrap(session)
         wanted_ids = set(self.get_wanted_ids(session, current_user_id)) if current_user_id is not None else set()
         all_items = self.market_repo.list_items(session)
@@ -75,14 +106,11 @@ class MarketService:
         return self.market_repo.wanted_ids_for_user(session, current_user_id)
 
     def _user_count_with_seed_fallback(self, session: Session) -> int:
-        count = self.auth_repo.count_users(session)
-        if count > 0:
-            return count
-        seed = self.read_repo.load_seed()
-        users = seed.get("users") if isinstance(seed, dict) else None
-        return len(users) if isinstance(users, dict) else 0
+        return count_users_with_seed_fallback(session, self.auth_repo, self.read_repo)
 
     def get_detail(self, session: Session, current_user_id: int | None, item_id: int) -> dict[str, Any]:
+        if self.settings.requires_private_env_file:
+            return self._compat_get_detail(session, current_user_id, item_id)
         self._bootstrap(session)
         item = self.market_repo.get_item(session, item_id)
         if item is None:
@@ -449,3 +477,241 @@ class MarketService:
 
     def _is_external_url(self, value: str) -> bool:
         return value.startswith("http://") or value.startswith("https://")
+
+    def _compat_list_market(
+        self,
+        session: Session,
+        current_user_id: int | None,
+        *,
+        keyword: str | None,
+        category: str | None,
+        page: int,
+        size: int,
+    ) -> dict[str, Any]:
+        safe_page = max(page, 1)
+        safe_size = max(1, min(size, 50))
+        offset = (safe_page - 1) * safe_size
+        where_clauses = ["mi.status = 'SALE'"]
+        params: dict[str, Any] = {"limit": safe_size, "offset": offset}
+        if self._compat_has_text(keyword):
+            params["keyword"] = f"%{keyword.strip().lower()}%"
+            where_clauses.append(
+                "(LOWER(COALESCE(mi.title, '')) LIKE :keyword OR LOWER(COALESCE(mi.description, '')) LIKE :keyword)"
+            )
+        if self._compat_has_text(category):
+            params["category"] = category.strip().upper()
+            where_clauses.append("UPPER(mi.category) = :category")
+
+        count_sql = f"SELECT COUNT(*) FROM market_items mi WHERE {' AND '.join(where_clauses)}"
+        total = int(session.execute(text(count_sql), params).scalar() or 0)
+        list_sql = f"""
+            SELECT
+                mi.id,
+                mi.seller_id,
+                u.username AS seller_username,
+                u.nickname AS seller_nickname,
+                mi.title,
+                mi.price,
+                mi.category,
+                mi.images_json,
+                mi.want_count,
+                mi.school,
+                mi.created_at
+            FROM market_items mi
+            LEFT JOIN users u ON u.id = mi.seller_id
+            WHERE {' AND '.join(where_clauses)}
+            ORDER BY mi.created_at DESC, mi.id DESC
+            LIMIT :limit OFFSET :offset
+        """
+        rows = [dict(row) for row in session.execute(text(list_sql), params).mappings().all()]
+        item_ids = [int(row["id"]) for row in rows]
+        wanted_ids = self._compat_load_wanted_ids(session, current_user_id, item_ids)
+        return {
+            "items": [self._compat_to_list_item(row, wanted=int(row["id"]) in wanted_ids) for row in rows],
+            "meta": {"page": safe_page, "size": safe_size, "total": total},
+            "stats": self._compat_load_market_stats(session),
+        }
+
+    def _compat_get_detail(self, session: Session, current_user_id: int | None, item_id: int) -> dict[str, Any]:
+        row = session.execute(
+            text(
+                """
+                SELECT
+                    mi.id,
+                    mi.seller_id,
+                    u.username AS seller_username,
+                    u.nickname AS seller_nickname,
+                    mi.title,
+                    mi.description,
+                    mi.price,
+                    mi.category,
+                    mi.images_json,
+                    mi.want_count,
+                    mi.school,
+                    mi.status,
+                    mi.contact_type,
+                    mi.contact_value,
+                    mi.created_at
+                FROM market_items mi
+                LEFT JOIN users u ON u.id = mi.seller_id
+                WHERE mi.id = :item_id
+                LIMIT 1
+                """
+            ),
+            {"item_id": item_id},
+        ).mappings().first()
+        if row is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="商品不存在")
+
+        is_owner = current_user_id is not None and int(row["seller_id"] or 0) == current_user_id
+        if not is_owner and self._compat_is_hidden_market_status(row["status"]):
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="商品已下架或已被删除")
+
+        wanted = item_id in self._compat_load_wanted_ids(session, current_user_id, [item_id])
+        can_view_contact = is_owner or wanted
+        images = self._compat_parse_images(row["images_json"])
+        return {
+            "id": int(row["id"]),
+            "sellerId": self._compat_as_int(row["seller_id"]),
+            "sellerName": row["seller_nickname"],
+            "title": row["title"] or "",
+            "description": row["description"],
+            "price": self._compat_cents_to_price(row["price"]),
+            "category": row["category"],
+            "images": [self._compat_build_detail_url(int(row["id"]), index + 1, key) for index, key in enumerate(images)],
+            "imageVariants": [self._compat_build_detail_variant(int(row["id"]), index + 1, key) for index, key in enumerate(images)],
+            "wantCount": self._compat_as_int(row["want_count"]),
+            "school": row["school"],
+            "status": row["status"],
+            "canViewContact": can_view_contact,
+            "contactType": row["contact_type"] if can_view_contact else None,
+            "contactValue": row["contact_value"] if can_view_contact else None,
+            "wanted": wanted,
+            "isOwner": is_owner,
+            "createdAt": self._compat_serialize_datetime(row["created_at"]),
+        }
+
+    def _compat_load_market_stats(self, session: Session) -> dict[str, int]:
+        active = int(session.execute(text("SELECT COUNT(*) FROM market_items WHERE status = 'SALE'")).scalar() or 0)
+        sold = int(session.execute(text("SELECT COUNT(*) FROM market_items WHERE status = 'SOLD'")).scalar() or 0)
+        user_count = int(session.execute(text("SELECT COUNT(*) FROM users")).scalar() or 0)
+        return {"active": active, "sold": sold, "userCount": user_count}
+
+    def _compat_load_wanted_ids(self, session: Session, current_user_id: int | None, item_ids: list[int]) -> set[int]:
+        if current_user_id is None or not item_ids:
+            return set()
+        stmt = text(
+            """
+            SELECT item_id
+            FROM market_wants
+            WHERE user_id = :user_id AND item_id IN :item_ids
+            """
+        ).bindparams(bindparam("item_ids", expanding=True))
+        rows = session.execute(stmt, {"user_id": current_user_id, "item_ids": item_ids}).scalars().all()
+        return {int(item_id) for item_id in rows}
+
+    def _compat_to_list_item(self, row: dict[str, Any], *, wanted: bool) -> dict[str, Any]:
+        images = self._compat_parse_images(row["images_json"])
+        thumbnail_key = images[0] if images else PLACEHOLDER_IMAGE
+        item_id = int(row["id"])
+        return {
+            "id": item_id,
+            "sellerId": self._compat_as_int(row["seller_id"]),
+            "title": row["title"] or "",
+            "price": self._compat_cents_to_price(row["price"]),
+            "category": row["category"],
+            "thumbnail": self._compat_build_thumb_url(item_id, 1, thumbnail_key),
+            "thumbnailVariant": self._compat_build_thumb_variant(item_id, 1, thumbnail_key),
+            "wantCount": self._compat_as_int(row["want_count"]),
+            "wanted": wanted,
+            "school": row["school"],
+            "createdAt": self._compat_serialize_datetime(row["created_at"]),
+            "sellerName": row["seller_nickname"] or row["seller_username"],
+        }
+
+    def _compat_build_thumb_url(self, item_id: int, index: int, key: str) -> str:
+        return self._compat_build_processed_url(item_id, index, key, THUMB_PROCESS)
+
+    def _compat_build_detail_url(self, item_id: int, index: int, key: str) -> str:
+        return self._compat_build_processed_url(item_id, index, key, DETAIL_PROCESS)
+
+    def _compat_build_thumb_variant(self, item_id: int, index: int, key: str) -> dict[str, Any]:
+        if self._compat_is_external_non_oss_url(key):
+            return {"src": key, "srcSet": None, "webpSrcSet": None, "avifSrcSet": None, "lqip": None}
+        return {
+            "src": self._compat_build_thumb_url(item_id, index, key),
+            "srcSet": self._compat_build_src_set(item_id, index, key, THUMB_WIDTHS, THUMB_QUALITY, None),
+            "webpSrcSet": self._compat_build_src_set(item_id, index, key, THUMB_WIDTHS, THUMB_QUALITY, "webp"),
+            "avifSrcSet": self._compat_build_src_set(item_id, index, key, THUMB_WIDTHS, THUMB_QUALITY, "avif"),
+            "lqip": self._compat_build_processed_url(item_id, index, key, LQIP_PROCESS),
+        }
+
+    def _compat_build_detail_variant(self, item_id: int, index: int, key: str) -> dict[str, Any]:
+        if self._compat_is_external_non_oss_url(key):
+            return {"src": key, "srcSet": None, "webpSrcSet": None, "avifSrcSet": None, "lqip": None}
+        return {
+            "src": self._compat_build_detail_url(item_id, index, key),
+            "srcSet": self._compat_build_src_set(item_id, index, key, DETAIL_WIDTHS, DETAIL_QUALITY, None),
+            "webpSrcSet": self._compat_build_src_set(item_id, index, key, DETAIL_WIDTHS, DETAIL_QUALITY, "webp"),
+            "avifSrcSet": self._compat_build_src_set(item_id, index, key, DETAIL_WIDTHS, DETAIL_QUALITY, "avif"),
+            "lqip": self._compat_build_processed_url(item_id, index, key, LQIP_PROCESS),
+        }
+
+    def _compat_build_src_set(
+        self,
+        item_id: int,
+        index: int,
+        key: str,
+        widths: tuple[int, ...],
+        quality: int,
+        image_format: str | None,
+    ) -> str | None:
+        variants = []
+        for width in widths:
+            process = self._compat_build_process(width, quality, image_format)
+            url = self._compat_build_processed_url(item_id, index, key, process)
+            if url:
+                variants.append(f"{url} {width}w")
+        return ", ".join(variants) or None
+
+    def _compat_build_process(self, width: int, quality: int, image_format: str | None) -> str:
+        process = f"image/resize,w_{max(1, width)}/quality,q_{max(1, min(quality, 100))}"
+        if image_format:
+            process = f"{process}/format,{image_format}"
+        return process
+
+    def _compat_build_processed_url(self, item_id: int, index: int, key: str, process: str | None) -> str:
+        if self._compat_is_external_non_oss_url(key):
+            return key
+        signed = self.asset_store.storage_provider.build_signed_object_url(
+            root=self.asset_store.root,
+            key=key,
+            ttl_seconds=MARKET_SIGNED_URL_TTL_SECONDS,
+            process=process,
+        )
+        if signed is not None:
+            return signed
+        return self.asset_store.build_public_url(item_id=item_id, index=index, key=key)
+
+    def _compat_parse_images(self, raw_json: Any) -> list[str]:
+        return [str(item) for item in compat_json_list_loads(raw_json) if str(item).strip()]
+
+    def _compat_serialize_datetime(self, value: Any) -> str | None:
+        return compat_serialize_datetime(value)
+
+    def _compat_cents_to_price(self, value: Any) -> float:
+        return compat_cents_to_price(value)
+
+    def _compat_as_int(self, value: Any, default: int = 0) -> int:
+        return compat_as_int(value, default)
+
+    def _compat_has_text(self, value: Any) -> bool:
+        return compat_has_text(value)
+
+    def _compat_is_hidden_market_status(self, status_value: Any) -> bool:
+        if status_value is None:
+            return False
+        return str(status_value).strip().lower() in {"removed", "hidden"}
+
+    def _compat_is_external_non_oss_url(self, key: str) -> bool:
+        return compat_is_external_non_oss_url(key, self.settings, treat_generic_oss_as_internal=True)

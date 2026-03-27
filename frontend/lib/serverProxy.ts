@@ -1,7 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { readSession } from './auth';
 
-const DEFAULT_API_BASE = 'http://localhost:8080/api';
+const DEFAULT_API_BASE = 'http://127.0.0.1:8111/api';
 
 const getHeaderValue = (value?: string | string[]) => {
   if (Array.isArray(value)) {

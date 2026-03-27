@@ -2,20 +2,24 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
-from app.services.legacy_materials_read_service import LegacyMaterialsReadService
+from app.services.materials_service import MaterialsService
 
 
-def _build_service() -> LegacyMaterialsReadService:
+def _build_service() -> MaterialsService:
     fake_storage = SimpleNamespace(build_signed_object_url=lambda **kwargs: None)
     fake_asset_store = SimpleNamespace(
         storage_provider=fake_storage,
         build_public_custom_preview_url=lambda **kwargs: "/preview.png",
     )
     fake_settings = SimpleNamespace(
+        requires_private_env_file=True,
         resolved_material_asset_dir="/tmp/materials",
         material_signed_url_ttl_seconds=900,
+        oss_public_base_url=None,
+        oss_endpoint=None,
+        oss_bucket=None,
     )
-    return LegacyMaterialsReadService(fake_settings, fake_asset_store)
+    return MaterialsService(fake_settings, read_repo=None, auth_repo=None, material_repo=None, asset_store=fake_asset_store)
 
 
 def test_legacy_recommendations_limit_zero_keeps_all(monkeypatch) -> None:
@@ -76,11 +80,11 @@ def test_legacy_recommendations_limit_zero_keeps_all(monkeypatch) -> None:
             "keywords": None,
         },
     ]
-    monkeypatch.setattr(service, "_load_material_rows", lambda *args, **kwargs: rows)
-    monkeypatch.setattr(service, "_load_user_profile", lambda *args, **kwargs: None)
-    monkeypatch.setattr(service, "_sort_material_rows", lambda items, **kwargs: list(items))
-    monkeypatch.setattr(service, "_load_tags_map", lambda *args, **kwargs: {})
-    monkeypatch.setattr(service, "_load_comment_counts", lambda *args, **kwargs: {})
+    monkeypatch.setattr(service, "_compat_load_material_rows", lambda *args, **kwargs: rows)
+    monkeypatch.setattr(service, "_compat_load_user_profile", lambda *args, **kwargs: None)
+    monkeypatch.setattr(service, "_compat_sort_material_rows", lambda items, **kwargs: list(items))
+    monkeypatch.setattr(service, "_compat_load_tags_map", lambda *args, **kwargs: {})
+    monkeypatch.setattr(service, "_compat_load_comment_counts", lambda *args, **kwargs: {})
 
     data = service.get_recommendations(session=None, current_user_id=None, limit=0)
 

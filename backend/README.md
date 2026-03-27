@@ -114,12 +114,12 @@ cd /root/StudyHub-FastAPI/backend
   --output-dir artifacts/contract-diff
 ```
 
-如果需要拿 Java 版本做在线对比：
+如果需要拿另一套正在运行的 StudyHub FastAPI 基线做在线对比：
 
 ```bash
 /root/StudyHub-FastAPI/.venv/bin/python scripts/contract_diff.py \
   --candidate-base-url http://127.0.0.1:8011 \
-  --baseline-base-url http://127.0.0.1:8080 \
+  --baseline-base-url http://127.0.0.1:8112 \
   --sample-dir fixtures/contracts \
   --output-dir artifacts/contract-diff
 ```

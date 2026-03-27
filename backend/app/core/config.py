@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from functools import lru_cache
 import os
 from pathlib import Path
 import subprocess
+from functools import lru_cache
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -53,8 +53,6 @@ class Settings(BaseSettings):
     smtp_timeout_seconds: int = 15
     cors_allowed_origins: str | None = None
     cors_allow_origin_regex: str | None = None
-    legacy_api_proxy_base_url: str | None = None
-
     database_url: str | None = None
     database_auto_create: bool | None = None
     database_pool_size: int = 10
@@ -215,12 +213,12 @@ class Settings(BaseSettings):
         return not (self.is_preview or self.is_production)
 
     @property
-    def legacy_api_proxy_enabled(self) -> bool:
-        return bool((self.legacy_api_proxy_base_url or "").strip())
-
-    @property
     def requires_private_env_file(self) -> bool:
         return self.is_preview or self.is_production
+
+    @property
+    def allows_partial_schema_compatibility(self) -> bool:
+        return self.is_preview
 
     @property
     def private_env_file(self) -> Path | None:

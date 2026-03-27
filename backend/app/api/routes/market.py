@@ -6,13 +6,11 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import (
     get_market_asset_store,
-    get_legacy_market_read_service,
     get_market_service,
     get_optional_auth_context,
     require_auth_context,
     require_privileged_auth_context,
 )
-from app.core.config import get_settings
 from app.core.db import get_db_session
 from app.core.response import api_ok
 from app.core.security import AuthContext
@@ -24,7 +22,6 @@ from app.schemas.market import (
     MarketCreatePayload,
     parse_payload_json,
 )
-from app.services.legacy_market_read_service import LegacyMarketReadService
 from app.services.market_service import MarketService
 
 
@@ -39,21 +36,8 @@ def list_market(
     size: int = 20,
     auth: AuthContext | None = Depends(get_optional_auth_context),
     session: Session = Depends(get_db_session),
-    legacy_service: LegacyMarketReadService = Depends(get_legacy_market_read_service),
     service: MarketService = Depends(get_market_service),
 ) -> dict[str, object]:
-    settings = get_settings()
-    if settings.requires_private_env_file:
-        return api_ok(
-            legacy_service.list_market(
-                session,
-                auth.user_id if auth else None,
-                keyword=keyword,
-                category=category,
-                page=page,
-                size=size,
-            )
-        )
     return api_ok(
         service.list_market(session, auth.user_id if auth else None, keyword=keyword, category=category, page=page, size=size)
     )
@@ -73,12 +57,8 @@ def market_detail(
     id: int,
     auth: AuthContext | None = Depends(get_optional_auth_context),
     session: Session = Depends(get_db_session),
-    legacy_service: LegacyMarketReadService = Depends(get_legacy_market_read_service),
     service: MarketService = Depends(get_market_service),
 ) -> dict[str, object]:
-    settings = get_settings()
-    if settings.requires_private_env_file:
-        return api_ok(legacy_service.get_detail(session, auth.user_id if auth else None, id))
     return api_ok(service.get_detail(session, auth.user_id if auth else None, id))
 
 

@@ -98,13 +98,11 @@ def ensure_database_schema_ready() -> None:
 
 def prepare_database_runtime() -> None:
     settings = get_settings()
-    if settings.legacy_api_proxy_enabled:
-        check_database()
-        return
     if settings.should_auto_create_database:
         initialize_database()
     check_database()
-    ensure_database_schema_ready()
+    if not settings.allows_partial_schema_compatibility:
+        ensure_database_schema_ready()
 
 
 def reset_database_runtime() -> None:

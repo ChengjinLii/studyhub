@@ -44,7 +44,7 @@ export const resolveApiBase = (origin?: string) => {
   }
   if (origin) {
     if (isLoopbackBase(origin)) {
-      const devFallback = process.env.NEXT_PUBLIC_DEV_API_BASE || 'http://localhost:8080/api';
+      const devFallback = process.env.NEXT_PUBLIC_DEV_API_BASE || 'http://127.0.0.1:8111/api';
       return normalizeApiBase(devFallback);
     }
     return normalizeApiBase(origin);
@@ -55,7 +55,7 @@ export const resolveApiBase = (origin?: string) => {
   if (process.env.VERCEL_URL) {
     return normalizeApiBase(`https://${process.env.VERCEL_URL}`);
   }
-  const fallbackOrigin = process.env.NODE_ENV === 'production' ? 'https://study-hub.store' : 'http://localhost:8080';
+  const fallbackOrigin = process.env.NODE_ENV === 'production' ? 'https://study-hub.store' : 'http://127.0.0.1:8111';
   return normalizeApiBase(fallbackOrigin);
 };
 

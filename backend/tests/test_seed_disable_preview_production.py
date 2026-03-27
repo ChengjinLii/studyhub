@@ -171,7 +171,7 @@ def test_materials_and_market_stats_use_real_user_count_when_seed_disabled(
         user_id = user.id
 
         materials_service = MaterialsService(settings, read_repo, auth_repo, MaterialRepository(), asset_store=None)
-        market_service = MarketService(read_repo, auth_repo, MarketRepository(), asset_store=None)
+        market_service = MarketService(settings, read_repo, auth_repo, MarketRepository(), asset_store=None)
 
         materials_payload = materials_service.list_materials(
             session,

@@ -48,11 +48,6 @@ from app.services.payout_service import PayoutService
 from app.services.requests_service import RequestsService
 from app.services.report_service import ReportService
 from app.services.kyc_crypto_service import KycCryptoService
-from app.services.legacy_leaderboard_read_service import LegacyLeaderboardReadService
-from app.services.legacy_comments_read_service import LegacyCommentsReadService
-from app.services.legacy_market_read_service import LegacyMarketReadService
-from app.services.legacy_materials_read_service import LegacyMaterialsReadService
-from app.services.legacy_requests_read_service import LegacyRequestsReadService
 from app.services.read_support import ROLE_ADMIN, ROLE_DEVELOPER, has_role
 from app.services.session_service import SessionService
 from app.services.user_follow_service import UserFollowService
@@ -260,38 +255,13 @@ def get_materials_service() -> MaterialsService:
 
 
 @lru_cache(maxsize=1)
-def get_legacy_materials_read_service() -> LegacyMaterialsReadService:
-    return LegacyMaterialsReadService(get_settings(), get_material_asset_store())
-
-
-@lru_cache(maxsize=1)
 def get_leaderboard_read_service() -> LeaderboardReadService:
-    return LeaderboardReadService(get_read_api_repo())
-
-
-@lru_cache(maxsize=1)
-def get_legacy_leaderboard_read_service() -> LegacyLeaderboardReadService:
-    return LegacyLeaderboardReadService()
+    return LeaderboardReadService(get_settings(), get_read_api_repo())
 
 
 @lru_cache(maxsize=1)
 def get_market_service() -> MarketService:
-    return MarketService(get_read_api_repo(), get_auth_repo(), get_market_repo(), get_market_asset_store())
-
-
-@lru_cache(maxsize=1)
-def get_legacy_market_read_service() -> LegacyMarketReadService:
-    return LegacyMarketReadService(get_settings(), get_market_asset_store())
-
-
-@lru_cache(maxsize=1)
-def get_legacy_comments_read_service() -> LegacyCommentsReadService:
-    return LegacyCommentsReadService()
-
-
-@lru_cache(maxsize=1)
-def get_legacy_requests_read_service() -> LegacyRequestsReadService:
-    return LegacyRequestsReadService()
+    return MarketService(get_settings(), get_read_api_repo(), get_auth_repo(), get_market_repo(), get_market_asset_store())
 
 
 @lru_cache(maxsize=1)
@@ -309,6 +279,7 @@ def get_report_service() -> ReportService:
 @lru_cache(maxsize=1)
 def get_comments_service() -> CommentsService:
     return CommentsService(
+        get_settings(),
         get_read_api_repo(),
         get_auth_repo(),
         get_material_repo(),
@@ -329,7 +300,7 @@ def get_notification_service() -> NotificationService:
 
 @lru_cache(maxsize=1)
 def get_requests_service() -> RequestsService:
-    return RequestsService(get_read_api_repo(), get_auth_repo(), get_material_repo(), get_request_repo())
+    return RequestsService(get_settings(), get_read_api_repo(), get_auth_repo(), get_material_repo(), get_request_repo())
 
 
 @lru_cache(maxsize=1)
@@ -472,13 +443,8 @@ def clear_dependency_caches() -> None:
     get_materials_column_service.cache_clear()
     get_user_read_service.cache_clear()
     get_materials_service.cache_clear()
-    get_legacy_materials_read_service.cache_clear()
     get_leaderboard_read_service.cache_clear()
-    get_legacy_leaderboard_read_service.cache_clear()
     get_market_service.cache_clear()
-    get_legacy_market_read_service.cache_clear()
-    get_legacy_comments_read_service.cache_clear()
-    get_legacy_requests_read_service.cache_clear()
     get_report_service.cache_clear()
     get_comments_service.cache_clear()
     get_community_service.cache_clear()
