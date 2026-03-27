@@ -25,7 +25,7 @@ StudyHub 是一个面向高校场景的知识共享与校园互助平台，提�
 
 - `backend/`：FastAPI 后端、测试、fixtures 与运维辅助代码
 - `frontend/`：Next.js 前端
-- `reports/`：技术报告、项目复盘与面试问答材料
+- `reports/`：技术报告、项目复盘材料
 - `scripts/`：开发、部署、worker 与数据库操作脚本
 
 ## 快速开始
