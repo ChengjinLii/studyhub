@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal, ROUND_HALF_UP
 from typing import Any
@@ -9,6 +10,7 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.core.profile_metadata import DEFAULT_FREE_DOWNLOAD_QUOTA, resolve_free_download_quota
+from app.core.db import session_scope
 from app.models.auth import AuthUser, LegacyAuthUser
 from app.repos.auth_repo import AuthRepository, resolve_user_model
 from app.repos.finance_repo import FinanceRepository
@@ -71,6 +73,34 @@ class UserReadService:
             "totalEarnings": float(totals.get("totalEarnings", 0)),
         }
 
+    async def get_overview_async(self, user_id: int) -> dict[str, Any]:
+        if not self._allows_concurrent_profile_reads():
+            with session_scope() as session:
+                return self.get_overview(session, user_id)
+        seed, profile_seed, totals = await asyncio.to_thread(self._load_overview_base, user_id)
+        market_wants_task = asyncio.to_thread(self._call_with_new_session, self._load_market_wants_for_overview, seed, user_id)
+        uploads_task = asyncio.to_thread(self._call_with_new_session, self._load_uploads_for_overview, user_id)
+        market_listings_task = asyncio.to_thread(self._call_with_new_session, self._load_market_listings_for_overview, user_id)
+        free_download_task = asyncio.to_thread(self._call_with_new_session, self.get_free_download_status, user_id)
+        market_wants, uploads, market_listings, free_download_status = await asyncio.gather(
+            market_wants_task,
+            uploads_task,
+            market_listings_task,
+            free_download_task,
+        )
+        return {
+            "purchases": list(profile_seed.get("purchases") or []),
+            "uploads": uploads,
+            "marketWants": market_wants,
+            "marketListings": market_listings,
+            "adminNotes": list(profile_seed.get("adminNotes") or []),
+            "freeDownloadStatus": free_download_status,
+            "hasNewAlerts": bool(profile_seed.get("hasNewAlerts")),
+            "totalDownloads": int(totals.get("totalDownloads", sum(item.get("downloadCount", 0) or 0 for item in uploads))),
+            "uniqueDownloaders": int(totals.get("uniqueDownloaders", 0)),
+            "totalEarnings": float(totals.get("totalEarnings", 0)),
+        }
+
     def get_public_profile(
         self,
         session: Session,
@@ -113,6 +143,69 @@ class UserReadService:
             "recentUploads": uploads,
             "recentMarketListings": listings,
         }
+
+    async def get_public_profile_async(
+        self,
+        viewer_id: int,
+        viewer_role_mask: int | None,
+        target_user_id: int,
+    ) -> dict[str, Any]:
+        if not self._allows_concurrent_profile_reads():
+            with session_scope() as session:
+                return self.get_public_profile(session, viewer_id, viewer_role_mask, target_user_id)
+        base = await asyncio.to_thread(
+            self._call_with_new_session,
+            self._load_public_profile_base,
+            viewer_id,
+            viewer_role_mask,
+            target_user_id,
+        )
+        recent_uploads_task = asyncio.to_thread(
+            self._call_with_new_session,
+            self.get_user_uploads,
+            viewer_id,
+            target_user_id,
+            viewer_role_mask,
+            5,
+        )
+        recent_market_listings_task = asyncio.to_thread(
+            self._call_with_new_session,
+            self.get_user_market_listings,
+            viewer_id,
+            target_user_id,
+            viewer_role_mask,
+            5,
+        )
+        upload_count_task = asyncio.to_thread(self._call_with_new_session, self._count_user_uploads, target_user_id)
+        market_count_task = asyncio.to_thread(self._call_with_new_session, self._count_user_market_listings, target_user_id)
+        relationship_task = asyncio.to_thread(
+            self._call_with_new_session,
+            self._load_public_profile_relationships,
+            viewer_id,
+            target_user_id,
+        )
+        sale_count_task = asyncio.to_thread(self._call_with_new_session, self._load_public_profile_sale_count, target_user_id)
+        recent_uploads, recent_market_listings, upload_count, market_count, relationships, sale_count = await asyncio.gather(
+            recent_uploads_task,
+            recent_market_listings_task,
+            upload_count_task,
+            market_count_task,
+            relationship_task,
+            sale_count_task,
+        )
+        base.update(
+            {
+                "uploadCount": upload_count,
+                "marketCount": market_count,
+                "saleCount": sale_count,
+                "followersCount": relationships["followersCount"],
+                "followingCount": relationships["followingCount"],
+                "isFollowing": relationships["isFollowing"],
+                "recentUploads": recent_uploads,
+                "recentMarketListings": recent_market_listings,
+            }
+        )
+        return base
 
     def get_user_uploads(
         self,
@@ -397,6 +490,109 @@ class UserReadService:
 
     def _uses_legacy_user_table(self, session: Session) -> bool:
         return resolve_user_model(session) is LegacyAuthUser
+
+    def _allows_concurrent_profile_reads(self) -> bool:
+        return self.repo.load_seed() == {} and self.auth_repo is not None
+
+    def _call_with_new_session(self, loader, *args, **kwargs):
+        with session_scope() as session:
+            return loader(session, *args, **kwargs)
+
+    def _load_overview_base(self, user_id: int) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
+        with session_scope() as session:
+            seed = self.repo.load_seed()
+            self._require_user_snapshot(session, user_id)
+            profile_seed = (seed.get("profileSummary") or {}).get(str(user_id), {})
+            totals = profile_seed.get("totals") or {}
+            return seed, profile_seed, totals
+
+    def _load_market_wants_for_overview(self, session: Session, seed: dict[str, Any], user_id: int) -> list[dict[str, Any]]:
+        return self._build_market_wants(session, seed, user_id)
+
+    def _load_uploads_for_overview(self, session: Session, user_id: int) -> list[dict[str, Any]]:
+        return self.get_user_uploads(session, user_id, user_id, None, limit=None)
+
+    def _load_market_listings_for_overview(self, session: Session, user_id: int) -> list[dict[str, Any]]:
+        return self.get_user_market_listings(session, user_id, user_id, None, limit=None)
+
+    def _load_public_profile_base(
+        self,
+        session: Session,
+        viewer_id: int,
+        viewer_role_mask: int | None,
+        target_user_id: int,
+    ) -> dict[str, Any]:
+        seed = self.repo.load_seed()
+        target = self._require_accessible_user(session, viewer_id, viewer_role_mask, target_user_id)
+        is_owner = viewer_id == target_user_id
+        email_visible = is_owner or not bool(target.get("emailPrivacy"))
+        can_view_payout_qr = is_owner or has_role(viewer_role_mask, ROLE_ADMIN)
+        return {
+            "id": target["id"],
+            "username": target["username"],
+            "nickname": target["nickname"] or target["username"],
+            "signature": target.get("signature"),
+            "school": target.get("school"),
+            "college": target.get("college"),
+            "major": target.get("major"),
+            "gradeStages": list(target.get("gradeStages") or []),
+            "avatar": target.get("avatar"),
+            "email": target.get("email") if email_visible else None,
+            "emailVisible": email_visible,
+            "payoutQrUrl": target.get("payoutQrUrl") if can_view_payout_qr else None,
+            "legendaryContributorUntil": target.get("legendaryContributorUntil"),
+            "purchaseCount": self._purchase_count(seed, target_user_id),
+        }
+
+    def _load_public_profile_relationships(self, session: Session, viewer_id: int, target_user_id: int) -> dict[str, Any]:
+        seed = self.repo.load_seed()
+        return {
+            "followersCount": self._followers_count(session, seed, target_user_id),
+            "followingCount": self._following_count(session, seed, target_user_id),
+            "isFollowing": self._is_following(session, seed, viewer_id, target_user_id),
+        }
+
+    def _load_public_profile_sale_count(self, session: Session, target_user_id: int) -> int:
+        return self._sale_count(session, self.repo.load_seed(), target_user_id)
+
+    def _count_user_uploads(self, session: Session, target_user_id: int) -> int:
+        if self._uses_legacy_user_table(session):
+            row = session.execute(
+                text(
+                    """
+                    SELECT COUNT(*)
+                    FROM materials
+                    WHERE uploader_id = :user_id
+                      AND deleted_at IS NULL
+                      AND LOWER(status) NOT IN ('removed', 'hidden')
+                    """
+                ),
+                {"user_id": target_user_id},
+            ).scalar()
+            return int(row or 0)
+        self._bootstrap_content(session)
+        return sum(1 for material in self.material_repo.list_visible_materials(session) if int(material.uploader_id or 0) == target_user_id)
+
+    def _count_user_market_listings(self, session: Session, target_user_id: int) -> int:
+        if self._uses_legacy_user_table(session):
+            row = session.execute(
+                text(
+                    """
+                    SELECT COUNT(*)
+                    FROM market_items
+                    WHERE seller_id = :user_id
+                      AND LOWER(status) NOT IN ('removed', 'hidden')
+                    """
+                ),
+                {"user_id": target_user_id},
+            ).scalar()
+            return int(row or 0)
+        self._bootstrap_content(session)
+        return sum(
+            1
+            for item in self.market_repo.list_items(session)
+            if int(item.seller_id or 0) == target_user_id and item.status not in {"REMOVED", "HIDDEN"}
+        )
 
     def _compat_get_user_uploads(self, session: Session, target_user_id: int, limit: int | None) -> list[dict[str, Any]]:
         safe_limit = clamp_limit(limit, max_value=100)

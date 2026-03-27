@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from datetime import UTC, datetime
 import hashlib
 import json
@@ -11,6 +12,7 @@ from fastapi import HTTPException, UploadFile, status
 from sqlalchemy import bindparam, text
 from sqlalchemy.orm import Session
 
+from app.core.async_db import async_session_scope
 from app.core.config import Settings
 from app.core.profile_metadata import DEFAULT_FREE_DOWNLOAD_QUOTA
 from app.integrations.material_asset_store import MaterialAssetStore
@@ -129,6 +131,98 @@ class MaterialsService:
             "availableTags": available_tags,
         }
 
+    async def list_materials_async(
+        self,
+        session: Session,
+        current_user_id: int | None,
+        *,
+        keyword: str | None,
+        school: str | None,
+        college: str | None,
+        major: str | None,
+        tag: str | None,
+        grade_value: str | None,
+        course_category: str | None,
+        price: str | None,
+        sort: str,
+        page: int,
+        size: int,
+    ) -> dict[str, Any]:
+        if not (self.settings.requires_private_env_file and self.settings.async_read_db_enabled):
+            return await asyncio.to_thread(
+                self.list_materials,
+                session,
+                current_user_id,
+                keyword=keyword,
+                school=school,
+                college=college,
+                major=major,
+                tag=tag,
+                grade_value=grade_value,
+                course_category=course_category,
+                price=price,
+                sort=sort,
+                page=page,
+                size=size,
+            )
+
+        safe_page = max(page, 1)
+        safe_size = max(1, min(size, 100))
+        start = (safe_page - 1) * safe_size
+        profile = await self._call_with_new_async_session(self._compat_load_user_profile_async, current_user_id)
+        total_task = self._call_with_new_async_session(
+            self._compat_count_material_rows_async,
+            keyword=keyword,
+            school=school,
+            college=college,
+            major=major,
+            tag=tag,
+            grade_value=grade_value,
+            course_category=course_category,
+            price=price,
+        )
+        rows_task = self._call_with_new_async_session(
+            self._compat_load_material_rows_async,
+            keyword=keyword,
+            school=school,
+            college=college,
+            major=major,
+            tag=tag,
+            grade_value=grade_value,
+            course_category=course_category,
+            price=price,
+            sort=sort,
+            profile=profile,
+            limit=safe_size,
+            offset=start,
+        )
+        stats_task = self._call_with_new_async_session(self._compat_load_material_stats_async)
+        available_tags_task = self._call_with_new_async_session(self._compat_load_available_tags_async)
+        total, page_rows, stats, available_tags = await asyncio.gather(
+            total_task,
+            rows_task,
+            stats_task,
+            available_tags_task,
+        )
+        material_ids = [int(row["id"]) for row in page_rows]
+        tags_by_material, comment_counts = await asyncio.gather(
+            self._call_with_new_async_session(self._compat_load_tags_map_async, material_ids),
+            self._call_with_new_async_session(self._compat_load_comment_counts_async, material_ids),
+        )
+        return {
+            "items": [
+                self._compat_to_list_item(
+                    row,
+                    tags=tags_by_material.get(int(row["id"]), []),
+                    comment_count=comment_counts.get(int(row["id"]), 0),
+                )
+                for row in page_rows
+            ],
+            "meta": {"page": safe_page, "size": safe_size, "total": total},
+            "stats": stats,
+            "availableTags": available_tags,
+        }
+
     def get_recommendations(self, session: Session, current_user_id: int | None, limit: int | None) -> list[dict[str, Any]]:
         if self.settings.requires_private_env_file:
             return self._compat_get_recommendations(session, current_user_id, limit)
@@ -146,8 +240,52 @@ class MaterialsService:
         sliced = items[:safe_limit] if safe_limit else items
         return [self._to_list_item(material) for material in sliced]
 
+    async def get_recommendations_async(
+        self,
+        session: Session,
+        current_user_id: int | None,
+        limit: int | None,
+    ) -> list[dict[str, Any]]:
+        if not (self.settings.requires_private_env_file and self.settings.async_read_db_enabled):
+            return await asyncio.to_thread(self.get_recommendations, session, current_user_id, limit)
+
+        profile = await self._call_with_new_async_session(self._compat_load_user_profile_async, current_user_id)
+        safe_limit = clamp_limit(limit, max_value=100)
+        rows = await self._call_with_new_async_session(
+            self._compat_load_material_rows_async,
+            keyword=None,
+            school=None,
+            college=None,
+            major=None,
+            tag=None,
+            grade_value=None,
+            course_category=None,
+            price=None,
+            sort="latest",
+            profile=profile,
+            limit=safe_limit or None,
+            offset=0,
+        )
+        material_ids = [int(row["id"]) for row in rows]
+        tags_by_material, comment_counts = await asyncio.gather(
+            self._call_with_new_async_session(self._compat_load_tags_map_async, material_ids),
+            self._call_with_new_async_session(self._compat_load_comment_counts_async, material_ids),
+        )
+        return [
+            self._compat_to_list_item(
+                row,
+                tags=tags_by_material.get(int(row["id"]), []),
+                comment_count=comment_counts.get(int(row["id"]), 0),
+            )
+            for row in rows
+        ]
+
     def _user_count_with_seed_fallback(self, session: Session) -> int:
         return count_users_with_seed_fallback(session, self.auth_repo, self.read_repo)
+
+    async def _call_with_new_async_session(self, loader, *args, **kwargs):
+        async with async_session_scope() as session:
+            return await loader(session, *args, **kwargs)
 
     def get_detail(self, session: Session, current_user_id: int | None, material_id: int, can_manage_all: bool = False) -> dict[str, Any]:
         if self.settings.requires_private_env_file:
@@ -198,6 +336,131 @@ class MaterialsService:
             }
         )
         return detail
+
+    async def get_detail_async(
+        self,
+        session: Session,
+        current_user_id: int | None,
+        material_id: int,
+        can_manage_all: bool = False,
+    ) -> dict[str, Any]:
+        if not (self.settings.requires_private_env_file and self.settings.async_read_db_enabled):
+            return await asyncio.to_thread(self.get_detail, session, current_user_id, material_id, can_manage_all)
+
+        row = await self._call_with_new_async_session(self._compat_load_material_detail_row_async, material_id)
+        is_owner = current_user_id is not None and int(row["uploader_id"] or 0) == current_user_id
+        if not (can_manage_all or is_owner) and self._compat_is_hidden_material(row["status"]):
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="资料不存在")
+        detail_base = {
+            "id": int(row["id"]),
+            "uploaderId": self._compat_as_int(row["uploader_id"]),
+            "uploaderUsername": row["uploader_username"],
+            "uploaderNickname": row["uploader_nickname"],
+            "copyrightOwner": self._compat_normalize_text(row["keywords"]),
+            "title": row["title"] or "",
+            "description": row["description"] or "",
+            "originalFilename": row["original_filename"],
+            "fileType": row["file_type"],
+            "hasFile": self._compat_has_text(row["file_key"]),
+            "fileSize": self._compat_as_int(row["file_size"], default=0),
+            "price": self._compat_cents_to_price(row["price"]),
+            "free": self._compat_to_bool(row["is_free"]),
+            "school": row["school"],
+            "college": row["college"],
+            "major": row["major"],
+            "generalEducation": self._compat_to_bool(row["is_general_education"]),
+            "hasNetdisk": self._compat_has_text(row["netdisk_url"]),
+            "courseCategory": row["course_category"] or "MAJOR",
+            "gradeType": row["grade_type"] or "UG",
+            "gradeValue": row["grade_value"] or "",
+            "previewWatermarkEnabled": self._compat_to_bool(row["preview_watermark_enabled"], default=True),
+            "previewSource": row["preview_source"] or "AUTO",
+            "previewManifest": self._compat_serialize_preview_manifest(row["preview_manifest"]),
+            "customPreviewText": row["custom_preview_text"] if current_user_id is not None else None,
+            "ratingAvg": self._compat_as_float(row["rating_avg"]),
+            "ratingCount": self._compat_as_int(row["rating_count"]),
+            "likeCount": self._compat_as_int(row["like_count"]),
+            "viewCount": self._compat_as_int(row["view_count"]),
+            "downloadCount": self._compat_as_int(row["download_count"]),
+            "salesCount": self._compat_as_int(row["sales_count"]),
+        }
+        tags_task = self._call_with_new_async_session(self._compat_load_tags_map_async, [material_id])
+        comment_count_task = self._call_with_new_async_session(self._compat_load_comment_counts_async, [material_id])
+        versions_task = self._call_with_new_async_session(self._compat_load_versions_async, material_id)
+        reviews_task = self._call_with_new_async_session(self._compat_load_reviews_async, material_id)
+        relation_tasks: list[Any] = []
+        if current_user_id is not None:
+            relation_tasks.extend(
+                [
+                    self._call_with_new_async_session(
+                        self._compat_material_relation_exists_async,
+                        """
+                        SELECT 1
+                        FROM favorites
+                        WHERE material_id = :material_id AND user_id = :user_id
+                        LIMIT 1
+                        """,
+                        material_id,
+                        current_user_id,
+                    ),
+                    self._call_with_new_async_session(
+                        self._compat_material_relation_exists_async,
+                        """
+                        SELECT 1
+                        FROM material_likes
+                        WHERE material_id = :material_id AND user_id = :user_id
+                        LIMIT 1
+                        """,
+                        material_id,
+                        current_user_id,
+                    ),
+                    self._call_with_new_async_session(self._compat_load_my_rating_async, material_id, current_user_id),
+                    self._call_with_new_async_session(self._compat_has_paid_access_async, material_id, current_user_id),
+                ]
+            )
+        results = await asyncio.gather(
+            tags_task,
+            comment_count_task,
+            versions_task,
+            reviews_task,
+            *(relation_tasks or []),
+        )
+        tags_map = results[0]
+        comment_counts = results[1]
+        versions = results[2]
+        reviews = results[3]
+        favorited = bool(results[4]) if current_user_id is not None else False
+        liked = bool(results[5]) if current_user_id is not None else False
+        my_rating = results[6] if current_user_id is not None else None
+        purchased = bool(results[7]) if current_user_id is not None else False
+        netdisk_accessible = detail_base["hasNetdisk"] and (detail_base["free"] or purchased or can_manage_all or is_owner)
+        custom_preview_images = (
+            await self._compat_build_custom_preview_urls_async(
+                material_id,
+                self._compat_json_loads(row["custom_preview_images"]),
+            )
+            if current_user_id is not None
+            else []
+        )
+        detail_base.update(
+            {
+                "tags": tags_map.get(material_id, []),
+                "commentCount": comment_counts.get(material_id, 0),
+                "netdiskUrl": row["netdisk_url"] if netdisk_accessible else None,
+                "netdiskPassword": row["netdisk_password"] if netdisk_accessible else None,
+                "netdiskExpiredAt": row["netdisk_expired_at"].isoformat() if row["netdisk_expired_at"] is not None else None,
+                "netdiskReminderAt": row["netdisk_reminder_at"].isoformat() if row["netdisk_reminder_at"] is not None else None,
+                "netdiskAccessible": netdisk_accessible,
+                "customPreviewImages": custom_preview_images,
+                "favorited": favorited,
+                "purchased": purchased,
+                "liked": liked,
+                "myRating": my_rating,
+                "versions": versions,
+                "reviews": reviews,
+            }
+        )
+        return detail_base
 
     def record_view(
         self,
@@ -1516,6 +1779,26 @@ class MaterialsService:
             return None
         return dict(row)
 
+    async def _compat_load_user_profile_async(self, session, user_id: int | None) -> dict[str, Any] | None:
+        if user_id is None:
+            return None
+        row = (
+            await session.execute(
+                text(
+                    """
+                    SELECT school, college, major, grade_stages
+                    FROM users
+                    WHERE id = :user_id
+                    LIMIT 1
+                    """
+                ),
+                {"user_id": user_id},
+            )
+        ).mappings().first()
+        if row is None:
+            return None
+        return dict(row)
+
     def _compat_sort_material_rows(self, rows: list[dict[str, Any]], *, sort: str, profile: dict[str, Any] | None) -> list[dict[str, Any]]:
         ordered = list(rows)
         normalized_sort = (sort or "latest").strip().lower()
@@ -1570,6 +1853,25 @@ class MaterialsService:
                 result.setdefault(material_id, []).append(str(row["tag"]))
         return result
 
+    async def _compat_load_tags_map_async(self, session, material_ids: list[int]) -> dict[int, list[str]]:
+        if not material_ids:
+            return {}
+        stmt = text(
+            """
+            SELECT material_id, tag
+            FROM material_tags
+            WHERE material_id IN :material_ids
+            ORDER BY id ASC
+            """
+        ).bindparams(bindparam("material_ids", expanding=True))
+        rows = (await session.execute(stmt, {"material_ids": material_ids})).mappings().all()
+        result: dict[int, list[str]] = {material_id: [] for material_id in material_ids}
+        for row in rows:
+            material_id = int(row["material_id"])
+            if self._compat_has_text(row["tag"]):
+                result.setdefault(material_id, []).append(str(row["tag"]))
+        return result
+
     def _compat_load_comment_counts(self, session: Session, material_ids: list[int]) -> dict[int, int]:
         if not material_ids:
             return {}
@@ -1584,6 +1886,20 @@ class MaterialsService:
         rows = session.execute(stmt, {"material_ids": material_ids}).mappings().all()
         return {int(row["material_id"]): int(row["total"]) for row in rows}
 
+    async def _compat_load_comment_counts_async(self, session, material_ids: list[int]) -> dict[int, int]:
+        if not material_ids:
+            return {}
+        stmt = text(
+            """
+            SELECT material_id, COUNT(*) AS total
+            FROM comments
+            WHERE status = 'visible' AND material_id IN :material_ids
+            GROUP BY material_id
+            """
+        ).bindparams(bindparam("material_ids", expanding=True))
+        rows = (await session.execute(stmt, {"material_ids": material_ids})).mappings().all()
+        return {int(row["material_id"]): int(row["total"]) for row in rows}
+
     def _compat_load_material_stats(self, session: Session) -> dict[str, int]:
         total_materials = int(session.execute(text("SELECT COUNT(*) FROM materials")).scalar() or 0)
         free_materials = int(session.execute(text("SELECT COUNT(*) FROM materials WHERE is_free = 1")).scalar() or 0)
@@ -1594,6 +1910,24 @@ class MaterialsService:
             "freeMaterials": free_materials,
             "totalDownloads": total_downloads,
             "userCount": user_count,
+        }
+
+    async def _compat_load_material_stats_async(self, session) -> dict[str, int]:
+        total_task = session.execute(text("SELECT COUNT(*) FROM materials"))
+        free_task = session.execute(text("SELECT COUNT(*) FROM materials WHERE is_free = 1"))
+        downloads_task = session.execute(text("SELECT COALESCE(SUM(download_count), 0) FROM materials"))
+        users_task = session.execute(text("SELECT COUNT(*) FROM users"))
+        total_result, free_result, downloads_result, users_result = await asyncio.gather(
+            total_task,
+            free_task,
+            downloads_task,
+            users_task,
+        )
+        return {
+            "totalMaterials": int(total_result.scalar() or 0),
+            "freeMaterials": int(free_result.scalar() or 0),
+            "totalDownloads": int(downloads_result.scalar() or 0),
+            "userCount": int(users_result.scalar() or 0),
         }
 
     def _compat_load_available_tags(self, session: Session, limit: int = 30) -> list[str]:
@@ -1612,6 +1946,24 @@ class MaterialsService:
         ).mappings().all()
         return [str(row["tag"]) for row in rows if self._compat_has_text(row["tag"])]
 
+    async def _compat_load_available_tags_async(self, session, limit: int = 30) -> list[str]:
+        rows = (
+            await session.execute(
+                text(
+                    """
+                    SELECT LOWER(tag) AS tag
+                    FROM material_tags
+                    WHERE tag IS NOT NULL AND tag <> ''
+                    GROUP BY LOWER(tag)
+                    ORDER BY COUNT(id) DESC
+                    LIMIT :limit
+                    """
+                ),
+                {"limit": limit},
+            )
+        ).mappings().all()
+        return [str(row["tag"]) for row in rows if self._compat_has_text(row["tag"])]
+
     def _compat_load_versions(self, session: Session, material_id: int) -> list[dict[str, Any]]:
         rows = session.execute(
             text(
@@ -1623,6 +1975,31 @@ class MaterialsService:
                 """
             ),
             {"material_id": material_id},
+        ).mappings().all()
+        return [
+            {
+                "id": int(row["id"]),
+                "versionLabel": row["version_label"],
+                "changelog": row["changelog"],
+                "fileType": row["file_type"],
+                "createdAt": self._compat_serialize_datetime(row["created_at"]),
+            }
+            for row in rows
+        ]
+
+    async def _compat_load_versions_async(self, session, material_id: int) -> list[dict[str, Any]]:
+        rows = (
+            await session.execute(
+                text(
+                    """
+                    SELECT id, version_label, changelog, file_type, created_at
+                    FROM material_versions
+                    WHERE material_id = :material_id
+                    ORDER BY created_at DESC, id DESC
+                    """
+                ),
+                {"material_id": material_id},
+            )
         ).mappings().all()
         return [
             {
@@ -1658,8 +2035,37 @@ class MaterialsService:
             for row in rows
         ]
 
+    async def _compat_load_reviews_async(self, session, material_id: int) -> list[dict[str, Any]]:
+        rows = (
+            await session.execute(
+                text(
+                    """
+                    SELECT id, reviewer, rating, comment, created_at
+                    FROM reviews
+                    WHERE material_id = :material_id
+                    ORDER BY created_at DESC, id DESC
+                    """
+                ),
+                {"material_id": material_id},
+            )
+        ).mappings().all()
+        return [
+            {
+                "id": int(row["id"]),
+                "reviewer": row["reviewer"],
+                "rating": self._compat_as_int(row["rating"]),
+                "comment": row["comment"],
+                "createdAt": self._compat_serialize_datetime(row["created_at"]),
+            }
+            for row in rows
+        ]
+
     def _compat_material_relation_exists(self, session: Session, sql: str, material_id: int, user_id: int) -> bool:
         row = session.execute(text(sql), {"material_id": material_id, "user_id": user_id}).first()
+        return row is not None
+
+    async def _compat_material_relation_exists_async(self, session, sql: str, material_id: int, user_id: int) -> bool:
+        row = (await session.execute(text(sql), {"material_id": material_id, "user_id": user_id})).first()
         return row is not None
 
     def _compat_load_my_rating(self, session: Session, material_id: int, user_id: int) -> int | None:
@@ -1674,6 +2080,23 @@ class MaterialsService:
                 """
             ),
             {"material_id": material_id, "user_id": user_id},
+        ).scalar()
+        return None if value is None else int(value)
+
+    async def _compat_load_my_rating_async(self, session, material_id: int, user_id: int) -> int | None:
+        value = (
+            await session.execute(
+                text(
+                    """
+                    SELECT rating
+                    FROM reviews
+                    WHERE material_id = :material_id AND user_id = :user_id
+                    ORDER BY created_at DESC, id DESC
+                    LIMIT 1
+                    """
+                ),
+                {"material_id": material_id, "user_id": user_id},
+            )
         ).scalar()
         return None if value is None else int(value)
 
@@ -1707,6 +2130,37 @@ class MaterialsService:
         ).first()
         return payment_paid is not None
 
+    async def _compat_has_paid_access_async(self, session, material_id: int, user_id: int) -> bool:
+        order_paid_task = session.execute(
+            text(
+                """
+                SELECT 1
+                FROM orders
+                WHERE material_id = :material_id AND user_id = :user_id AND status = 'PAID'
+                LIMIT 1
+                """
+            ),
+            {"material_id": material_id, "user_id": user_id},
+        )
+        payment_paid_task = session.execute(
+            text(
+                """
+                SELECT 1
+                FROM payments p
+                JOIN orders o ON o.id = p.order_id
+                WHERE o.material_id = :material_id
+                  AND o.user_id = :user_id
+                  AND p.status = 'PAID'
+                LIMIT 1
+                """
+            ),
+            {"material_id": material_id, "user_id": user_id},
+        )
+        order_paid_result, payment_paid_result = await asyncio.gather(order_paid_task, payment_paid_task)
+        if order_paid_result.first() is not None:
+            return True
+        return payment_paid_result.first() is not None
+
     def _compat_build_custom_preview_urls(self, material_id: int, keys: list[Any]) -> list[str]:
         urls: list[str] = []
         for raw_key in keys:
@@ -1726,6 +2180,208 @@ class MaterialsService:
                 continue
             urls.append(self.asset_store.build_public_custom_preview_url(material_id=material_id, index=len(urls) + 1, key=key))
         return urls
+
+    async def _compat_build_custom_preview_urls_async(self, material_id: int, keys: list[Any]) -> list[str]:
+        async def build_one(index: int, key: str) -> str:
+            if self._compat_is_external_non_oss_url(key):
+                return key
+            signed = await self.asset_store.storage_provider.build_signed_object_url_async(
+                root=self.settings.resolved_material_asset_dir,
+                key=key,
+                ttl_seconds=self.settings.material_signed_url_ttl_seconds,
+            )
+            if signed is not None:
+                return signed
+            return await self.asset_store.build_public_custom_preview_url_async(
+                material_id=material_id,
+                index=index,
+                key=key,
+            )
+
+        cleaned_keys = []
+        for raw_key in keys:
+            key = str(raw_key).strip() if raw_key is not None else ""
+            if key:
+                cleaned_keys.append(key)
+        if not cleaned_keys:
+            return []
+        return list(
+            await asyncio.gather(
+                *(build_one(index + 1, key) for index, key in enumerate(cleaned_keys))
+            )
+        )
+
+    async def _compat_count_material_rows_async(
+        self,
+        session,
+        *,
+        keyword: str | None,
+        school: str | None,
+        college: str | None,
+        major: str | None,
+        tag: str | None,
+        grade_value: str | None,
+        course_category: str | None,
+        price: str | None,
+    ) -> int:
+        where_clauses, params = self._compat_material_filter_parts(
+            keyword=keyword,
+            school=school,
+            college=college,
+            major=major,
+            tag=tag,
+            grade_value=grade_value,
+            course_category=course_category,
+            price=price,
+        )
+        if where_clauses == ["1 = 0"]:
+            return 0
+        total = (
+            await session.execute(
+                text(
+                    f"""
+                    SELECT COUNT(*)
+                    FROM materials m
+                    WHERE {' AND '.join(where_clauses)}
+                    """
+                ),
+                params,
+            )
+        ).scalar()
+        return int(total or 0)
+
+    async def _compat_load_material_rows_async(
+        self,
+        session,
+        *,
+        keyword: str | None,
+        school: str | None,
+        college: str | None,
+        major: str | None,
+        tag: str | None,
+        grade_value: str | None,
+        course_category: str | None,
+        price: str | None,
+        sort: str | None = None,
+        profile: dict[str, Any] | None = None,
+        limit: int | None = None,
+        offset: int | None = None,
+    ) -> list[dict[str, Any]]:
+        where_clauses, params = self._compat_material_filter_parts(
+            keyword=keyword,
+            school=school,
+            college=college,
+            major=major,
+            tag=tag,
+            grade_value=grade_value,
+            course_category=course_category,
+            price=price,
+        )
+        if where_clauses == ["1 = 0"]:
+            return []
+        order_sql, order_params, recommendation_score_sql = self._compat_material_order_clause(sort=sort, profile=profile)
+        params.update(order_params)
+        paging_sql = ""
+        if limit is not None:
+            params["limit"] = max(1, int(limit))
+            paging_sql = "\n            LIMIT :limit"
+        if offset is not None:
+            params["offset"] = max(0, int(offset))
+            paging_sql += "\n            OFFSET :offset"
+        rows = (
+            await session.execute(
+                text(
+                    f"""
+                    SELECT
+                        m.id,
+                        m.uploader_id,
+                        COALESCE(NULLIF(u.nickname, ''), u.username) AS uploader_nickname,
+                        u.username AS uploader_username,
+                        m.title,
+                        m.description,
+                        m.price,
+                        m.is_free,
+                        m.school,
+                        m.college,
+                        m.major,
+                        m.is_general_education,
+                        m.course_category,
+                        m.grade_type,
+                        m.grade_value,
+                        m.rating_avg,
+                        m.rating_count,
+                        m.like_count,
+                        m.view_count,
+                        m.download_count,
+                        m.sales_count,
+                        m.created_at,
+                        {recommendation_score_sql} AS recommendation_score
+                    FROM materials m
+                    LEFT JOIN users u ON u.id = m.uploader_id
+                    WHERE {' AND '.join(where_clauses)}
+                    ORDER BY {order_sql}
+                    {paging_sql}
+                    """
+                ),
+                params,
+            )
+        ).mappings().all()
+        return [dict(row) for row in rows]
+
+    async def _compat_load_material_detail_row_async(self, session, material_id: int) -> dict[str, Any]:
+        row = (
+            await session.execute(
+                text(
+                    """
+                    SELECT
+                        m.id,
+                        m.uploader_id,
+                        u.username AS uploader_username,
+                        u.nickname AS uploader_nickname,
+                        m.title,
+                        m.description,
+                        m.original_filename,
+                        m.file_type,
+                        m.file_size,
+                        m.price,
+                        m.is_free,
+                        m.school,
+                        m.college,
+                        m.major,
+                        m.is_general_education,
+                        m.netdisk_url,
+                        m.netdisk_password,
+                        m.netdisk_expired_at,
+                        m.netdisk_reminder_at,
+                        m.course_category,
+                        m.grade_type,
+                        m.grade_value,
+                        m.preview_watermark_enabled,
+                        m.preview_source,
+                        m.preview_manifest,
+                        m.custom_preview_text,
+                        m.custom_preview_images,
+                        m.rating_avg,
+                        m.rating_count,
+                        m.like_count,
+                        m.view_count,
+                        m.download_count,
+                        m.sales_count,
+                        m.file_key,
+                        m.keywords,
+                        m.status
+                    FROM materials m
+                    LEFT JOIN users u ON u.id = m.uploader_id
+                    WHERE m.id = :material_id
+                    LIMIT 1
+                    """
+                ),
+                {"material_id": material_id},
+            )
+        ).mappings().first()
+        if row is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="资料不存在")
+        return dict(row)
 
     def _compat_to_list_item(self, row: dict[str, Any], *, tags: list[str], comment_count: int) -> dict[str, Any]:
         return {

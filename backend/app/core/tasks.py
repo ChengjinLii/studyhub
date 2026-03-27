@@ -1,12 +1,14 @@
 from __future__ import annotations
 
+import asyncio
 from collections.abc import Callable
 from dataclasses import dataclass, field
+import inspect
 
 from fastapi import BackgroundTasks
 
 
-Callback = Callable[[], None]
+Callback = Callable[..., object]
 
 
 @dataclass
@@ -31,8 +33,13 @@ class AfterCommitQueue:
 class BackgroundDispatcher:
     background_tasks: BackgroundTasks | None = None
 
-    def schedule(self, callback: Callback) -> None:
+    def schedule(self, callback: Callback, *args, **kwargs) -> None:
         if self.background_tasks is None:
-            callback()
+            result = callback(*args, **kwargs)
+            if inspect.isawaitable(result):
+                try:
+                    asyncio.get_running_loop()
+                except RuntimeError:
+                    asyncio.run(result)
             return
-        self.background_tasks.add_task(callback)
+        self.background_tasks.add_task(callback, *args, **kwargs)

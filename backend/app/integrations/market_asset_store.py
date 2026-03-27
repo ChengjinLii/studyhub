@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from pathlib import Path
 
 from fastapi import UploadFile
@@ -30,8 +31,20 @@ class MarketAssetStore:
         )
         return key
 
+    async def save_upload_async(self, *, item_id: int, upload: UploadFile) -> str:
+        key, _ = await self.storage_provider.save_upload_async(
+            root=self.root,
+            relative_dir=Path(str(item_id)),
+            upload=upload,
+            fallback_name="image.bin",
+        )
+        return key
+
     def delete_key(self, key: str | None) -> None:
         self.storage_provider.delete_key(root=self.root, key=key)
+
+    async def delete_key_async(self, key: str | None) -> None:
+        await self.storage_provider.delete_key_async(root=self.root, key=key)
 
     def resolve_path(self, key: str) -> Path:
         return self.storage_provider.resolve_path(root=self.root, key=key, invalid_detail="无效的图片路径")
@@ -44,3 +57,9 @@ class MarketAssetStore:
         if direct_url is not None:
             return direct_url
         return f"/api/market/{item_id}/images/{index}"
+
+    async def build_public_url_async(self, *, item_id: int, index: int, key: str) -> str:
+        direct_url = await self.storage_provider.build_public_url_async(root=self.root, key=key)
+        if direct_url is not None:
+            return direct_url
+        return await asyncio.to_thread(self.build_public_url, item_id=item_id, index=index, key=key)

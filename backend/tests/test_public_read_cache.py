@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
+from threading import Event
+import time
 from types import SimpleNamespace
 
 from app.api.deps import (
@@ -43,6 +46,31 @@ def test_public_read_cache_reuses_anonymous_value() -> None:
     assert first == {"value": 1}
     assert second == {"value": 1}
     assert calls == 1
+
+
+def test_public_read_cache_singleflight_coalesces_parallel_requests() -> None:
+    cache = _build_cache()
+    entered = 0
+    factory_started = Event()
+    release_factory = Event()
+
+    def factory() -> dict[str, int]:
+        nonlocal entered
+        entered += 1
+        factory_started.set()
+        release_factory.wait(timeout=2)
+        return {"value": 1}
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        first = executor.submit(cache.get_or_set, "materials:list", ("page", 1), factory)
+        assert factory_started.wait(timeout=1)
+        second = executor.submit(cache.get_or_set, "materials:list", ("page", 1), factory)
+        time.sleep(0.05)
+        release_factory.set()
+
+    assert first.result() == {"value": 1}
+    assert second.result() == {"value": 1}
+    assert entered == 1
 
 
 def test_cache_if_anonymous_bypasses_authenticated_requests() -> None:

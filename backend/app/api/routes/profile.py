@@ -15,22 +15,20 @@ router = APIRouter(tags=["profile"])
 
 
 @router.get("/api/me")
-def profile_overview(
+async def profile_overview(
     auth: AuthContext = Depends(require_auth_context),
-    session: Session = Depends(get_db_session),
     service: UserReadService = Depends(get_user_read_service),
 ) -> dict[str, object]:
-    return api_ok(service.get_overview(session, auth.user_id or 0))
+    return api_ok(await service.get_overview_async(auth.user_id or 0))
 
 
 @router.get("/api/users/{id}/profile")
-def user_profile(
+async def user_profile(
     id: int,
     auth: AuthContext = Depends(require_auth_context),
-    session: Session = Depends(get_db_session),
     service: UserReadService = Depends(get_user_read_service),
 ) -> dict[str, object]:
-    return api_ok(service.get_public_profile(session, auth.user_id or 0, auth.role_mask, id))
+    return api_ok(await service.get_public_profile_async(auth.user_id or 0, auth.role_mask, id))
 
 
 @router.get("/api/users/{id}/uploads")

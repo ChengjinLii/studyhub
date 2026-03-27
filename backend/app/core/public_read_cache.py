@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import asyncio
 from dataclasses import dataclass
 import hashlib
+import inspect
 import json
-from threading import RLock
+from threading import Event, RLock
 from time import monotonic
-from typing import Any, Callable, Hashable
+from typing import Any, Awaitable, Callable, Hashable
 
 from app.core.config import Settings
 
@@ -38,6 +40,8 @@ class PublicReadCache:
         self._entries: dict[tuple[str, Hashable], _CacheEntry] = {}
         self._lock = RLock()
         self._redis_client: Any | None = None
+        self._inflight: dict[tuple[str, Hashable], Event] = {}
+        self._async_inflight: dict[tuple[str, Hashable], asyncio.Event] = {}
 
     def get_or_set(self, namespace: str, key: Hashable, factory: Callable[[], Any]) -> Any:
         if not self.enabled:
@@ -45,6 +49,18 @@ class PublicReadCache:
         if self.backend == "redis":
             return self._redis_get_or_set(namespace, key, factory)
         return self._local_get_or_set(namespace, key, factory)
+
+    async def get_or_set_async(
+        self,
+        namespace: str,
+        key: Hashable,
+        factory: Callable[[], Any],
+    ) -> Any:
+        if not self.enabled:
+            return await self._await_if_needed(factory())
+        if self.backend == "redis":
+            return await self._redis_get_or_set_async(namespace, key, factory)
+        return await self._local_get_or_set_async(namespace, key, factory)
 
     def invalidate_prefix(self, prefix: str) -> None:
         if not self.enabled:
@@ -68,18 +84,40 @@ class PublicReadCache:
         return "local"
 
     def _local_get_or_set(self, namespace: str, key: Hashable, factory: Callable[[], Any]) -> Any:
-        now = monotonic()
         composite_key = (namespace, key)
+        while True:
+            now = monotonic()
+            with self._lock:
+                self._purge_expired_locked(now)
+                cached = self._entries.get(composite_key)
+                if cached is not None and cached.expires_at > now:
+                    return cached.value
+                inflight = self._inflight.get(composite_key)
+                if inflight is None:
+                    inflight = Event()
+                    self._inflight[composite_key] = inflight
+                    producer = True
+                else:
+                    producer = False
+            if producer:
+                break
+            inflight.wait(timeout=max(1, self.ttl_seconds))
+
+        try:
+            value = factory()
+        except Exception:
+            with self._lock:
+                waiter = self._inflight.pop(composite_key, None)
+                if waiter is not None:
+                    waiter.set()
+            raise
+
         with self._lock:
-            self._purge_expired_locked(now)
-            cached = self._entries.get(composite_key)
-            if cached is not None and cached.expires_at > now:
-                return cached.value
-        value = factory()
-        with self._lock:
-            self._purge_expired_locked(now)
-            self._entries[composite_key] = _CacheEntry(expires_at=now + self.ttl_seconds, value=value)
-            self._evict_overflow_locked()
+            self._purge_expired_locked(monotonic())
+            self._store_local_entry_locked(composite_key, value)
+            waiter = self._inflight.pop(composite_key, None)
+            if waiter is not None:
+                waiter.set()
         return value
 
     def _redis_get_or_set(self, namespace: str, key: Hashable, factory: Callable[[], Any]) -> Any:
@@ -87,17 +125,159 @@ class PublicReadCache:
         if client is None:
             return self._local_get_or_set(namespace, key, factory)
         redis_key = self._redis_key(namespace, key)
+        composite_key = (namespace, key)
+        while True:
+            try:
+                cached = client.get(redis_key)
+                if cached:
+                    value = json.loads(cached.decode("utf-8"))
+                    with self._lock:
+                        self._purge_expired_locked(monotonic())
+                        self._store_local_entry_locked(composite_key, value)
+                    return value
+            except Exception:
+                return self._local_get_or_set(namespace, key, factory)
+
+            with self._lock:
+                inflight = self._inflight.get(composite_key)
+                if inflight is None:
+                    inflight = Event()
+                    self._inflight[composite_key] = inflight
+                    producer = True
+                else:
+                    producer = False
+            if producer:
+                break
+            inflight.wait(timeout=max(1, self.ttl_seconds))
+
         try:
-            cached = client.get(redis_key)
-            if cached:
-                return json.loads(cached.decode("utf-8"))
+            value = factory()
         except Exception:
-            return self._local_get_or_set(namespace, key, factory)
-        value = factory()
+            with self._lock:
+                waiter = self._inflight.pop(composite_key, None)
+                if waiter is not None:
+                    waiter.set()
+            raise
+
         try:
             client.set(redis_key, self._serialize_value(value), ex=self.ttl_seconds)
         except Exception:
-            return self._local_get_or_set(namespace, key, lambda: value)
+            value = self._local_get_or_set(namespace, key, lambda: value)
+        else:
+            with self._lock:
+                self._purge_expired_locked(monotonic())
+                self._store_local_entry_locked(composite_key, value)
+        finally:
+            with self._lock:
+                waiter = self._inflight.pop(composite_key, None)
+                if waiter is not None:
+                    waiter.set()
+        return value
+
+    async def _local_get_or_set_async(
+        self,
+        namespace: str,
+        key: Hashable,
+        factory: Callable[[], Any],
+    ) -> Any:
+        composite_key = (namespace, key)
+        while True:
+            now = monotonic()
+            with self._lock:
+                self._purge_expired_locked(now)
+                cached = self._entries.get(composite_key)
+                if cached is not None and cached.expires_at > now:
+                    return cached.value
+                inflight = self._async_inflight.get(composite_key)
+                if inflight is None:
+                    inflight = asyncio.Event()
+                    self._async_inflight[composite_key] = inflight
+                    producer = True
+                else:
+                    producer = False
+            if producer:
+                break
+            await inflight.wait()
+
+        try:
+            value = await self._await_if_needed(factory())
+        except Exception:
+            with self._lock:
+                waiter = self._async_inflight.pop(composite_key, None)
+                if waiter is not None:
+                    waiter.set()
+            raise
+
+        with self._lock:
+            self._purge_expired_locked(monotonic())
+            self._store_local_entry_locked(composite_key, value)
+            waiter = self._async_inflight.pop(composite_key, None)
+            if waiter is not None:
+                waiter.set()
+        return value
+
+    async def _redis_get_or_set_async(
+        self,
+        namespace: str,
+        key: Hashable,
+        factory: Callable[[], Any],
+    ) -> Any:
+        client = self._safe_redis_client()
+        if client is None:
+            return await self._local_get_or_set_async(namespace, key, factory)
+        redis_key = self._redis_key(namespace, key)
+        composite_key = (namespace, key)
+        while True:
+            try:
+                cached = await asyncio.to_thread(client.get, redis_key)
+                if cached:
+                    value = json.loads(cached.decode("utf-8"))
+                    with self._lock:
+                        self._purge_expired_locked(monotonic())
+                        self._store_local_entry_locked(composite_key, value)
+                    return value
+            except Exception:
+                return await self._local_get_or_set_async(namespace, key, factory)
+
+            with self._lock:
+                inflight = self._async_inflight.get(composite_key)
+                if inflight is None:
+                    inflight = asyncio.Event()
+                    self._async_inflight[composite_key] = inflight
+                    producer = True
+                else:
+                    producer = False
+            if producer:
+                break
+            await inflight.wait()
+
+        try:
+            value = await self._await_if_needed(factory())
+        except Exception:
+            with self._lock:
+                waiter = self._async_inflight.pop(composite_key, None)
+                if waiter is not None:
+                    waiter.set()
+            raise
+
+        try:
+            await asyncio.to_thread(client.set, redis_key, self._serialize_value(value), self.ttl_seconds)
+        except TypeError:
+            try:
+                await asyncio.to_thread(client.set, redis_key, self._serialize_value(value), ex=self.ttl_seconds)
+            except Exception:
+                value = await self._local_get_or_set_async(namespace, key, lambda: self._constant_async_value(value))
+        except Exception:
+            value = await self._local_get_or_set_async(namespace, key, lambda: self._constant_async_value(value))
+        else:
+            with self._lock:
+                self._purge_expired_locked(monotonic())
+                self._store_local_entry_locked(composite_key, value)
+        finally:
+            with self._lock:
+                waiter = self._async_inflight.pop(composite_key, None)
+                if waiter is not None:
+                    waiter.set()
         return value
 
     def _invalidate_local_prefix(self, prefix: str) -> None:
@@ -169,10 +349,22 @@ class PublicReadCache:
         for key in doomed:
             self._entries.pop(key, None)
 
+    def _store_local_entry_locked(self, composite_key: tuple[str, Hashable], value: Any) -> None:
+        self._entries[composite_key] = _CacheEntry(expires_at=monotonic() + self.ttl_seconds, value=value)
+        self._evict_overflow_locked()
+
     def _evict_overflow_locked(self) -> None:
         while len(self._entries) > self.max_entries:
             oldest_key = next(iter(self._entries))
             self._entries.pop(oldest_key, None)
+
+    async def _constant_async_value(self, value: Any) -> Any:
+        return value
+
+    async def _await_if_needed(self, value: Any) -> Any:
+        if inspect.isawaitable(value):
+            return await value
+        return value
 
 
 def cache_if_anonymous(
@@ -186,6 +378,19 @@ def cache_if_anonymous(
     if current_user_id is not None:
         return factory()
     return cache.get_or_set(namespace, key, factory)
+
+
+async def cache_if_anonymous_async(
+    cache: PublicReadCache,
+    *,
+    current_user_id: int | None,
+    namespace: str,
+    key: Hashable,
+    factory: Callable[[], Any],
+) -> Any:
+    if current_user_id is not None:
+        return await cache._await_if_needed(factory())
+    return await cache.get_or_set_async(namespace, key, factory)
 
 
 def invalidate_prefixes(cache: PublicReadCache, *prefixes: str) -> None:

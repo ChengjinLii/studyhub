@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from pathlib import Path
 
 from fastapi import UploadFile
@@ -32,8 +33,20 @@ class PayoutQrStore:
         )
         return key
 
+    async def save_upload_async(self, *, user_id: int, upload: UploadFile) -> str:
+        key, _ = await self.storage_provider.save_upload_async(
+            root=self.root,
+            relative_dir=Path(str(user_id)),
+            upload=upload,
+            fallback_name="payout-qr.bin",
+        )
+        return key
+
     def delete_key(self, key: str | None) -> None:
         self.storage_provider.delete_key(root=self.root, key=key)
+
+    async def delete_key_async(self, key: str | None) -> None:
+        await self.storage_provider.delete_key_async(root=self.root, key=key)
 
     def resolve_path(self, key: str) -> Path:
         return self.storage_provider.resolve_path(root=self.root, key=key, invalid_detail="无效的收款码路径")
@@ -43,6 +56,18 @@ class PayoutQrStore:
 
     def build_private_access_url(self, *, key: str) -> str | None:
         direct_url = self.storage_provider.build_signed_download_url(
+            root=self.root,
+            key=key,
+            filename=Path(key).name,
+            ttl_seconds=300,
+            content_type=self.guess_media_type(key, default="image/png"),
+        )
+        if direct_url is None:
+            return None
+        return direct_url[0]
+
+    async def build_private_access_url_async(self, *, key: str) -> str | None:
+        direct_url = await self.storage_provider.build_signed_download_url_async(
             root=self.root,
             key=key,
             filename=Path(key).name,

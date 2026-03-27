@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from email.message import EmailMessage
@@ -29,8 +30,10 @@ class MailProvider(Protocol):
     provider_name: str
 
     def send_verification_email(self, message: MailMessage) -> Path: ...
+    async def send_verification_email_async(self, message: MailMessage) -> Path: ...
 
     def probe(self, *, deep: bool = False) -> dict[str, Any]: ...
+    async def probe_async(self, *, deep: bool = False) -> dict[str, Any]: ...
 
 
 class LocalOutboxMailProvider:
@@ -55,6 +58,9 @@ class LocalOutboxMailProvider:
         target.write_text(json.dumps(asdict(message), ensure_ascii=False, indent=2), encoding="utf-8")
         return target
 
+    async def send_verification_email_async(self, message: MailMessage) -> Path:
+        return await asyncio.to_thread(self.send_verification_email, message)
+
     def probe(self, *, deep: bool = False) -> dict[str, Any]:
         del deep
         return {
@@ -63,6 +69,9 @@ class LocalOutboxMailProvider:
             "mode": "filesystem",
             "target": str(self.settings.resolved_mail_outbox_dir),
         }
+
+    async def probe_async(self, *, deep: bool = False) -> dict[str, Any]:
+        return await asyncio.to_thread(self.probe, deep=deep)
 
 
 class SmtpMailProvider:
@@ -103,6 +112,9 @@ class SmtpMailProvider:
         safe_email = message.email.replace("@", "_at_").replace(".", "_")
         return Path("smtp-sent") / f"{timestamp}-{safe_email}.eml"
 
+    async def send_verification_email_async(self, message: MailMessage) -> Path:
+        return await asyncio.to_thread(self.send_verification_email, message)
+
     def probe(self, *, deep: bool = False) -> dict[str, Any]:
         payload: dict[str, Any] = {
             "status": "ok",
@@ -133,6 +145,9 @@ class SmtpMailProvider:
                 code, banner = server.noop()
         payload["probe"] = {"code": int(code), "banner": str(banner)}
         return payload
+
+    async def probe_async(self, *, deep: bool = False) -> dict[str, Any]:
+        return await asyncio.to_thread(self.probe, deep=deep)
 
     def _login_if_needed(self, server: smtplib.SMTP) -> None:
         if self.settings.smtp_username:

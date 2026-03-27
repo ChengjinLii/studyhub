@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from datetime import UTC, datetime, timedelta
 import mimetypes
 from pathlib import Path
@@ -17,16 +18,28 @@ class StorageProvider(Protocol):
     provider_name: str
 
     def save_upload(self, *, root: Path, relative_dir: Path, upload: UploadFile, fallback_name: str) -> tuple[str, int]: ...
+    async def save_upload_async(self, *, root: Path, relative_dir: Path, upload: UploadFile, fallback_name: str) -> tuple[str, int]: ...
 
     def delete_key(self, *, root: Path, key: str | None) -> None: ...
+    async def delete_key_async(self, *, root: Path, key: str | None) -> None: ...
 
     def resolve_path(self, *, root: Path, key: str, invalid_detail: str) -> Path: ...
 
     def guess_media_type(self, key: str | None, default: str = "application/octet-stream") -> str: ...
 
     def build_public_url(self, *, root: Path, key: str) -> str | None: ...
+    async def build_public_url_async(self, *, root: Path, key: str) -> str | None: ...
 
     def build_signed_download_url(
+        self,
+        *,
+        root: Path,
+        key: str,
+        filename: str | None,
+        ttl_seconds: int,
+        content_type: str | None = None,
+    ) -> tuple[str, str | None] | None: ...
+    async def build_signed_download_url_async(
         self,
         *,
         root: Path,
@@ -44,8 +57,17 @@ class StorageProvider(Protocol):
         ttl_seconds: int,
         process: str | None = None,
     ) -> str | None: ...
+    async def build_signed_object_url_async(
+        self,
+        *,
+        root: Path,
+        key: str,
+        ttl_seconds: int,
+        process: str | None = None,
+    ) -> str | None: ...
 
     def probe(self, *, root: Path, deep: bool = False) -> dict[str, Any]: ...
+    async def probe_async(self, *, root: Path, deep: bool = False) -> dict[str, Any]: ...
 
 
 class LocalFileStorageProvider:
@@ -61,6 +83,22 @@ class LocalFileStorageProvider:
         target.write_bytes(content)
         return relative_key.as_posix(), len(content)
 
+    async def save_upload_async(
+        self,
+        *,
+        root: Path,
+        relative_dir: Path,
+        upload: UploadFile,
+        fallback_name: str,
+    ) -> tuple[str, int]:
+        return await asyncio.to_thread(
+            self.save_upload,
+            root=root,
+            relative_dir=relative_dir,
+            upload=upload,
+            fallback_name=fallback_name,
+        )
+
     def delete_key(self, *, root: Path, key: str | None) -> None:
         if not key or key.startswith("http://") or key.startswith("https://"):
             return
@@ -73,6 +111,9 @@ class LocalFileStorageProvider:
                 break
             parent.rmdir()
             parent = parent.parent
+
+    async def delete_key_async(self, *, root: Path, key: str | None) -> None:
+        await asyncio.to_thread(self.delete_key, root=root, key=key)
 
     def resolve_path(self, *, root: Path, key: str, invalid_detail: str) -> Path:
         root_resolved = root.resolve()
@@ -90,6 +131,9 @@ class LocalFileStorageProvider:
     def build_public_url(self, *, root: Path, key: str) -> str | None:
         return None
 
+    async def build_public_url_async(self, *, root: Path, key: str) -> str | None:
+        return await asyncio.to_thread(self.build_public_url, root=root, key=key)
+
     def build_signed_download_url(
         self,
         *,
@@ -100,6 +144,24 @@ class LocalFileStorageProvider:
         content_type: str | None = None,
     ) -> tuple[str, str | None] | None:
         return None
+
+    async def build_signed_download_url_async(
+        self,
+        *,
+        root: Path,
+        key: str,
+        filename: str | None,
+        ttl_seconds: int,
+        content_type: str | None = None,
+    ) -> tuple[str, str | None] | None:
+        return await asyncio.to_thread(
+            self.build_signed_download_url,
+            root=root,
+            key=key,
+            filename=filename,
+            ttl_seconds=ttl_seconds,
+            content_type=content_type,
+        )
 
     def build_signed_object_url(
         self,
@@ -112,6 +174,22 @@ class LocalFileStorageProvider:
         del root, key, ttl_seconds, process
         return None
 
+    async def build_signed_object_url_async(
+        self,
+        *,
+        root: Path,
+        key: str,
+        ttl_seconds: int,
+        process: str | None = None,
+    ) -> str | None:
+        return await asyncio.to_thread(
+            self.build_signed_object_url,
+            root=root,
+            key=key,
+            ttl_seconds=ttl_seconds,
+            process=process,
+        )
+
     def probe(self, *, root: Path, deep: bool = False) -> dict[str, Any]:
         del deep
         return {
@@ -120,6 +198,9 @@ class LocalFileStorageProvider:
             "root": str(root),
             "exists": root.exists(),
         }
+
+    async def probe_async(self, *, root: Path, deep: bool = False) -> dict[str, Any]:
+        return await asyncio.to_thread(self.probe, root=root, deep=deep)
 
     def _sanitize_filename(self, value: str, *, fallback_name: str) -> str:
         normalized = re.sub(r"[^A-Za-z0-9._\-\u4e00-\u9fff]+", "-", value).strip("-")
@@ -148,6 +229,22 @@ class AliyunOssStorageProvider:
         self._bucket().put_object(relative_key, content, headers=metadata_headers)
         return relative_key, len(content)
 
+    async def save_upload_async(
+        self,
+        *,
+        root: Path,
+        relative_dir: Path,
+        upload: UploadFile,
+        fallback_name: str,
+    ) -> tuple[str, int]:
+        return await asyncio.to_thread(
+            self.save_upload,
+            root=root,
+            relative_dir=relative_dir,
+            upload=upload,
+            fallback_name=fallback_name,
+        )
+
     def delete_key(self, *, root: Path, key: str | None) -> None:
         normalized_key = self._normalize_key_from_any(key)
         if not normalized_key:
@@ -156,6 +253,9 @@ class AliyunOssStorageProvider:
             self._bucket().delete_object(normalized_key)
         except Exception:
             return
+
+    async def delete_key_async(self, *, root: Path, key: str | None) -> None:
+        await asyncio.to_thread(self.delete_key, root=root, key=key)
 
     def resolve_path(self, *, root: Path, key: str, invalid_detail: str) -> Path:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=invalid_detail)
@@ -176,6 +276,9 @@ class AliyunOssStorageProvider:
         endpoint = self.settings.oss_endpoint or ""
         endpoint_no_scheme = endpoint.removeprefix("https://").removeprefix("http://")
         return f"https://{self.settings.oss_bucket}.{endpoint_no_scheme}/{normalized_key}"
+
+    async def build_public_url_async(self, *, root: Path, key: str) -> str | None:
+        return await asyncio.to_thread(self.build_public_url, root=root, key=key)
 
     def build_signed_download_url(
         self,
@@ -206,6 +309,24 @@ class AliyunOssStorageProvider:
         )
         return url, expires_at.isoformat()
 
+    async def build_signed_download_url_async(
+        self,
+        *,
+        root: Path,
+        key: str,
+        filename: str | None,
+        ttl_seconds: int,
+        content_type: str | None = None,
+    ) -> tuple[str, str | None] | None:
+        return await asyncio.to_thread(
+            self.build_signed_download_url,
+            root=root,
+            key=key,
+            filename=filename,
+            ttl_seconds=ttl_seconds,
+            content_type=content_type,
+        )
+
     def build_signed_object_url(
         self,
         *,
@@ -228,6 +349,22 @@ class AliyunOssStorageProvider:
             params=params,
         )
 
+    async def build_signed_object_url_async(
+        self,
+        *,
+        root: Path,
+        key: str,
+        ttl_seconds: int,
+        process: str | None = None,
+    ) -> str | None:
+        return await asyncio.to_thread(
+            self.build_signed_object_url,
+            root=root,
+            key=key,
+            ttl_seconds=ttl_seconds,
+            process=process,
+        )
+
     def probe(self, *, root: Path, deep: bool = False) -> dict[str, Any]:
         payload: dict[str, Any] = {
             "status": "ok",
@@ -243,6 +380,9 @@ class AliyunOssStorageProvider:
         info = bucket.get_bucket_info()
         payload["bucketRegion"] = getattr(getattr(info, "bucket", None), "location", None)
         return payload
+
+    async def probe_async(self, *, root: Path, deep: bool = False) -> dict[str, Any]:
+        return await asyncio.to_thread(self.probe, root=root, deep=deep)
 
     def _bucket(self):
         auth_module = self._import_oss2()

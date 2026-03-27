@@ -61,6 +61,7 @@ class Settings(BaseSettings):
     database_pool_timeout_seconds: int = 30
     database_pool_recycle_seconds: int = 1800
     database_echo: bool = False
+    async_read_db_enabled: bool = True
     public_read_cache_enabled: bool = True
     public_read_cache_backend: str = "auto"
     public_read_cache_prefix: str = "public-read-cache"

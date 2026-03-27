@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 from typing import Any
 
@@ -7,6 +8,7 @@ from fastapi import HTTPException, UploadFile, status
 from sqlalchemy import bindparam, text
 from sqlalchemy.orm import Session
 
+from app.core.async_db import async_session_scope
 from app.core.config import Settings
 from app.integrations.market_asset_store import MarketAssetStore
 from app.models.market import MarketItemRecord
@@ -120,6 +122,46 @@ class MarketService:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="商品已下架或已被删除")
         wanted = current_user_id is not None and self.market_repo.find_want(session, item_id, current_user_id) is not None
         return self._to_detail_item(item, wanted=wanted, is_owner=is_owner)
+
+    async def get_detail_async(self, session: Session, current_user_id: int | None, item_id: int) -> dict[str, Any]:
+        if not (self.settings.requires_private_env_file and self.settings.async_read_db_enabled):
+            return await asyncio.to_thread(self.get_detail, session, current_user_id, item_id)
+
+        row = await self._call_with_new_async_session(self._compat_load_market_detail_row_async, item_id)
+        is_owner = current_user_id is not None and int(row["seller_id"] or 0) == current_user_id
+        if not is_owner and self._compat_is_hidden_market_status(row["status"]):
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="商品已下架或已被删除")
+        wanted_task = self._call_with_new_async_session(self._compat_load_wanted_ids_async, current_user_id, [item_id])
+        images = self._compat_parse_images(row["images_json"])
+        image_urls_task = asyncio.gather(
+            *(self._compat_build_detail_url_async(int(row["id"]), index + 1, key) for index, key in enumerate(images))
+        )
+        image_variants_task = asyncio.gather(
+            *(self._compat_build_detail_variant_async(int(row["id"]), index + 1, key) for index, key in enumerate(images))
+        )
+        wanted_ids, image_urls, image_variants = await asyncio.gather(wanted_task, image_urls_task, image_variants_task)
+        wanted = item_id in wanted_ids
+        can_view_contact = is_owner or wanted
+        return {
+            "id": int(row["id"]),
+            "sellerId": self._compat_as_int(row["seller_id"]),
+            "sellerName": row["seller_nickname"],
+            "title": row["title"] or "",
+            "description": row["description"],
+            "price": self._compat_cents_to_price(row["price"]),
+            "category": row["category"],
+            "images": image_urls,
+            "imageVariants": image_variants,
+            "wantCount": self._compat_as_int(row["want_count"]),
+            "school": row["school"],
+            "status": row["status"],
+            "canViewContact": can_view_contact,
+            "contactType": row["contact_type"] if can_view_contact else None,
+            "contactValue": row["contact_value"] if can_view_contact else None,
+            "wanted": wanted,
+            "isOwner": is_owner,
+            "createdAt": self._compat_serialize_datetime(row["created_at"]),
+        }
 
     def create_item(self, session: Session, payload: MarketCreatePayload, images: list[UploadFile], seller_id: int) -> dict[str, Any]:
         seed = self._bootstrap(session)
@@ -469,6 +511,10 @@ class MarketService:
     def _serialize_dt(self, value) -> str | None:
         return serialize_datetime(value)
 
+    async def _call_with_new_async_session(self, loader, *args, **kwargs):
+        async with async_session_scope() as session:
+            return await loader(session, *args, **kwargs)
+
     def _strip(self, value: str | None) -> str | None:
         if value is None:
             return None
@@ -591,6 +637,40 @@ class MarketService:
             "createdAt": self._compat_serialize_datetime(row["created_at"]),
         }
 
+    async def _compat_load_market_detail_row_async(self, session, item_id: int) -> dict[str, Any]:
+        row = (
+            await session.execute(
+                text(
+                    """
+                    SELECT
+                        mi.id,
+                        mi.seller_id,
+                        u.username AS seller_username,
+                        u.nickname AS seller_nickname,
+                        mi.title,
+                        mi.description,
+                        mi.price,
+                        mi.category,
+                        mi.images_json,
+                        mi.want_count,
+                        mi.school,
+                        mi.status,
+                        mi.contact_type,
+                        mi.contact_value,
+                        mi.created_at
+                    FROM market_items mi
+                    LEFT JOIN users u ON u.id = mi.seller_id
+                    WHERE mi.id = :item_id
+                    LIMIT 1
+                    """
+                ),
+                {"item_id": item_id},
+            )
+        ).mappings().first()
+        if row is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="商品不存在")
+        return dict(row)
+
     def _compat_load_market_stats(self, session: Session) -> dict[str, int]:
         active = int(session.execute(text("SELECT COUNT(*) FROM market_items WHERE status = 'SALE'")).scalar() or 0)
         sold = int(session.execute(text("SELECT COUNT(*) FROM market_items WHERE status = 'SOLD'")).scalar() or 0)
@@ -608,6 +688,19 @@ class MarketService:
             """
         ).bindparams(bindparam("item_ids", expanding=True))
         rows = session.execute(stmt, {"user_id": current_user_id, "item_ids": item_ids}).scalars().all()
+        return {int(item_id) for item_id in rows}
+
+    async def _compat_load_wanted_ids_async(self, session, current_user_id: int | None, item_ids: list[int]) -> set[int]:
+        if current_user_id is None or not item_ids:
+            return set()
+        stmt = text(
+            """
+            SELECT item_id
+            FROM market_wants
+            WHERE user_id = :user_id AND item_id IN :item_ids
+            """
+        ).bindparams(bindparam("item_ids", expanding=True))
+        rows = (await session.execute(stmt, {"user_id": current_user_id, "item_ids": item_ids})).scalars().all()
         return {int(item_id) for item_id in rows}
 
     def _compat_to_list_item(self, row: dict[str, Any], *, wanted: bool) -> dict[str, Any]:
@@ -635,6 +728,9 @@ class MarketService:
     def _compat_build_detail_url(self, item_id: int, index: int, key: str) -> str:
         return self._compat_build_processed_url(item_id, index, key, DETAIL_PROCESS)
 
+    async def _compat_build_detail_url_async(self, item_id: int, index: int, key: str) -> str:
+        return await self._compat_build_processed_url_async(item_id, index, key, DETAIL_PROCESS)
+
     def _compat_build_thumb_variant(self, item_id: int, index: int, key: str) -> dict[str, Any]:
         if self._compat_is_external_non_oss_url(key):
             return {"src": key, "srcSet": None, "webpSrcSet": None, "avifSrcSet": None, "lqip": None}
@@ -657,6 +753,29 @@ class MarketService:
             "lqip": self._compat_build_processed_url(item_id, index, key, LQIP_PROCESS),
         }
 
+    async def _compat_build_detail_variant_async(self, item_id: int, index: int, key: str) -> dict[str, Any]:
+        if self._compat_is_external_non_oss_url(key):
+            return {"src": key, "srcSet": None, "webpSrcSet": None, "avifSrcSet": None, "lqip": None}
+        src_task = self._compat_build_detail_url_async(item_id, index, key)
+        src_set_task = self._compat_build_src_set_async(item_id, index, key, DETAIL_WIDTHS, DETAIL_QUALITY, None)
+        webp_src_set_task = self._compat_build_src_set_async(item_id, index, key, DETAIL_WIDTHS, DETAIL_QUALITY, "webp")
+        avif_src_set_task = self._compat_build_src_set_async(item_id, index, key, DETAIL_WIDTHS, DETAIL_QUALITY, "avif")
+        lqip_task = self._compat_build_processed_url_async(item_id, index, key, LQIP_PROCESS)
+        src, src_set, webp_src_set, avif_src_set, lqip = await asyncio.gather(
+            src_task,
+            src_set_task,
+            webp_src_set_task,
+            avif_src_set_task,
+            lqip_task,
+        )
+        return {
+            "src": src,
+            "srcSet": src_set,
+            "webpSrcSet": webp_src_set,
+            "avifSrcSet": avif_src_set,
+            "lqip": lqip,
+        }
+
     def _compat_build_src_set(
         self,
         item_id: int,
@@ -670,6 +789,23 @@ class MarketService:
         for width in widths:
             process = self._compat_build_process(width, quality, image_format)
             url = self._compat_build_processed_url(item_id, index, key, process)
+            if url:
+                variants.append(f"{url} {width}w")
+        return ", ".join(variants) or None
+
+    async def _compat_build_src_set_async(
+        self,
+        item_id: int,
+        index: int,
+        key: str,
+        widths: tuple[int, ...],
+        quality: int,
+        image_format: str | None,
+    ) -> str | None:
+        variants = []
+        for width in widths:
+            process = self._compat_build_process(width, quality, image_format)
+            url = await self._compat_build_processed_url_async(item_id, index, key, process)
             if url:
                 variants.append(f"{url} {width}w")
         return ", ".join(variants) or None
@@ -692,6 +828,19 @@ class MarketService:
         if signed is not None:
             return signed
         return self.asset_store.build_public_url(item_id=item_id, index=index, key=key)
+
+    async def _compat_build_processed_url_async(self, item_id: int, index: int, key: str, process: str | None) -> str:
+        if self._compat_is_external_non_oss_url(key):
+            return key
+        signed = await self.asset_store.storage_provider.build_signed_object_url_async(
+            root=self.asset_store.root,
+            key=key,
+            ttl_seconds=MARKET_SIGNED_URL_TTL_SECONDS,
+            process=process,
+        )
+        if signed is not None:
+            return signed
+        return await self.asset_store.build_public_url_async(item_id=item_id, index=index, key=key)
 
     def _compat_parse_images(self, raw_json: Any) -> list[str]:
         return [str(item) for item in compat_json_list_loads(raw_json) if str(item).strip()]

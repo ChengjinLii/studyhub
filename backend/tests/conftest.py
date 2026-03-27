@@ -6,6 +6,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.api.deps import clear_dependency_caches, get_auth_service, get_captcha_service
+from app.core.async_db import reset_async_database_runtime
 from app.core.config import get_settings
 from app.core.db import reset_database_runtime
 from app.main import create_app
@@ -27,6 +28,9 @@ def client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> TestClient:
     get_settings.cache_clear()
     clear_dependency_caches()
     reset_database_runtime()
+    import asyncio
+
+    asyncio.run(reset_async_database_runtime())
 
     app = create_app()
     with TestClient(app) as test_client:
@@ -35,6 +39,7 @@ def client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> TestClient:
 
     clear_dependency_caches()
     reset_database_runtime()
+    asyncio.run(reset_async_database_runtime())
     get_settings.cache_clear()
 
 

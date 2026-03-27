@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import Settings
 from app.core.exceptions import BizException
+from app.core.tasks import BackgroundDispatcher
 from app.models.auth import AuthUser, EmailVerification
 from app.providers.mail import MailMessage, MailProvider
 from app.repos.auth_repo import AuthRepository
@@ -47,7 +48,12 @@ class AuthService:
         remember_me = bool(payload.rememberMe)
         return self.auth_cookie_service.write_auth_cookies_for_user(response, user, remember_me)
 
-    def send_register_code(self, session: Session, payload: RegisterRequestPayload) -> VerificationSendResponsePayload:
+    def send_register_code(
+        self,
+        session: Session,
+        payload: RegisterRequestPayload,
+        dispatcher: BackgroundDispatcher | None = None,
+    ) -> VerificationSendResponsePayload:
         self.captcha_service.validate(payload.captchaId, payload.captchaCode)
         verification = self._create_verification(
             session,
@@ -57,7 +63,7 @@ class AuthService:
             password_hash=self._hash_password(payload.password),
         )
         session.commit()
-        self._deliver_verification_email(verification)
+        self._dispatch_verification_email(verification, dispatcher)
         return self._to_send_response(verification)
 
     def complete_registration(
@@ -104,6 +110,7 @@ class AuthService:
         self,
         session: Session,
         payload: ResetPasswordRequestPayload,
+        dispatcher: BackgroundDispatcher | None = None,
     ) -> VerificationSendResponsePayload:
         if not payload.captchaId or not payload.captchaCode:
             raise BizException("CAPTCHA_REQUIRED", "请先完成验证码验证")
@@ -120,7 +127,7 @@ class AuthService:
             user_id=user.id,
         )
         session.commit()
-        self._deliver_verification_email(verification)
+        self._dispatch_verification_email(verification, dispatcher)
         return self._to_send_response(verification)
 
     def reset_password(self, session: Session, payload: ResetPasswordRequestPayload, response: Response) -> None:
@@ -145,6 +152,7 @@ class AuthService:
         session: Session,
         user_id: int,
         payload: BindEmailRequestPayload,
+        dispatcher: BackgroundDispatcher | None = None,
     ) -> VerificationSendResponsePayload | BindEmailResponsePayload:
         normalized_email = self._normalize_email(payload.email)
         if not payload.code:
@@ -155,7 +163,7 @@ class AuthService:
                 user_id=user_id,
             )
             session.commit()
-            self._deliver_verification_email(verification)
+            self._dispatch_verification_email(verification, dispatcher)
             return self._to_send_response(verification)
 
         self._consume_verification(
@@ -403,6 +411,22 @@ class AuthService:
         return str(value).zfill(self.settings.verification_code_length)
 
     def _deliver_verification_email(self, verification: EmailVerification) -> None:
+        self.mail_provider.send_verification_email(self._build_verification_mail_message(verification))
+
+    async def _deliver_verification_email_async(self, verification: EmailVerification) -> None:
+        await self.mail_provider.send_verification_email_async(self._build_verification_mail_message(verification))
+
+    def _dispatch_verification_email(
+        self,
+        verification: EmailVerification,
+        dispatcher: BackgroundDispatcher | None,
+    ) -> None:
+        if dispatcher is None:
+            self._deliver_verification_email(verification)
+            return
+        dispatcher.schedule(self._deliver_verification_email_async, verification)
+
+    def _build_verification_mail_message(self, verification: EmailVerification) -> MailMessage:
         expires_at = self._normalize_db_datetime(verification.expires_at)
         expires_in = max(1, int((expires_at - self._utcnow()).total_seconds()))
         purpose_label = {
@@ -412,23 +436,21 @@ class AuthService:
         }.get(verification.purpose, "邮箱验证")
         mail_source = "StudyHub local-dev" if self.settings.is_local_dev else "StudyHub"
         subject = f"{mail_source} {purpose_label}"
-        self.mail_provider.send_verification_email(
-            MailMessage(
-                purpose=verification.purpose,
-                email=verification.email,
-                subject=subject,
-                code=verification.code,
-                username=verification.username,
-                expires_in_seconds=expires_in,
-                resend_after_seconds=self.settings.verification_resend_after_seconds,
-                issued_at=self._utcnow().replace(tzinfo=UTC).isoformat(),
-                body_text=(
-                    f"你好，这是一封来自 {mail_source} 的 {purpose_label} 邮件。\n"
-                    f"验证码：{verification.code}\n"
-                    f"有效期：{expires_in} 秒\n"
-                    f"若非你本人操作，可直接忽略。"
-                ),
-            )
+        return MailMessage(
+            purpose=verification.purpose,
+            email=verification.email,
+            subject=subject,
+            code=verification.code,
+            username=verification.username,
+            expires_in_seconds=expires_in,
+            resend_after_seconds=self.settings.verification_resend_after_seconds,
+            issued_at=self._utcnow().replace(tzinfo=UTC).isoformat(),
+            body_text=(
+                f"你好，这是一封来自 {mail_source} 的 {purpose_label} 邮件。\n"
+                f"验证码：{verification.code}\n"
+                f"有效期：{expires_in} 秒\n"
+                f"若非你本人操作，可直接忽略。"
+            ),
         )
 
     def _hash_password(self, raw_password: str) -> str:

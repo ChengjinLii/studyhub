@@ -1,8 +1,25 @@
 # StudyHub
 
-StudyHub 是一个面向高校场景的知识共享与校园互助平台，支持资料共享、经验分享、求购协作与校园集市等能力。官网网址：https://study-hub.cn/
+StudyHub 是一个面向高校场景的知识共享与校园互助平台，提供资料共享、经验分享、求购协作与校园集市等功能。  
+官网：https://study-hub.cn/
 
 ![StudyHub 海报](assets/studyhub-poster.png)
+
+## 核心功能
+
+- 资料共享：课程资料、复习资料与学习笔记上传与浏览
+- 经验分享：学习经验、选课建议与校园生活内容沉淀
+- 求购协作：支持求购、互助与资源交换
+- 校园集市：面向校内场景的二手交易与信息发布
+
+## 技术栈
+
+- 后端：FastAPI、SQLAlchemy、Pydantic Settings、Uvicorn
+- 前端：Next.js 14、React、TypeScript
+- 数据层：MySQL（preview / production）、SQLite（local-dev / quickstart）
+- 存储与缓存：阿里云 OSS / 本地文件存储、Redis（可选缓存与锁）
+- 任务与异步：BackgroundTasks、独立 worker、局部 async DB 与异步 I/O 路径
+- 运维：Docker Compose、systemd、Nginx
 
 ## 仓库结构
 
@@ -10,10 +27,10 @@ StudyHub 是一个面向高校场景的知识共享与校园互助平台，支�
 - `frontend/`：Next.js 前端
 - `scripts/`：开发、部署、worker 与数据库操作脚本
 
-## 开发入口
+## 快速开始
 
-- 推荐开发：`bash scripts/dev/docker-dev-up.sh`
-- 轻量启动：`bash scripts/dev/local-dev-up.sh`
+- Docker 开发环境：`bash scripts/dev/docker-dev-up.sh`
+- 本地轻量启动：`bash scripts/dev/local-dev-up.sh`
 
 具体说明见：
 
@@ -21,6 +38,24 @@ StudyHub 是一个面向高校场景的知识共享与校园互助平台，支�
 - [frontend/README.md](frontend/README.md)
 - [scripts/README.md](scripts/README.md)
 
-## 相关仓库
+## 参与贡献
 
-- SpringBoot 版本：`https://github.com/ChengjinLii/studyhub-springboot`（暂未开源）
+欢迎通过 Issue 和 Pull Request 参与项目改进。
+
+## 核心贡献者
+
+- [@ChengjinLii](https://github.com/ChengjinLii)（李承锦）
+- [@Sgt-Friedrich](https://github.com/Sgt-Friedrich)（曾逸帆）
+
+## 其他贡献者
+
+暂未添加，欢迎通过 Pull Request 参与项目贡献。
+
+
+## 相关项目
+
+- 初始版本 SpringBoot 实现： https://github.com/ChengjinLii/studyhub-springboot（当前为内部仓库，暂未开源）
+
+## License
+
+本项目采用 [MIT License](LICENSE)。

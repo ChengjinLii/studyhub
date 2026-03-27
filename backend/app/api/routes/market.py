@@ -13,7 +13,7 @@ from app.api.deps import (
     require_privileged_auth_context,
 )
 from app.core.db import get_db_session
-from app.core.public_read_cache import PublicReadCache, cache_if_anonymous, invalidate_prefixes
+from app.core.public_read_cache import PublicReadCache, cache_if_anonymous, cache_if_anonymous_async, invalidate_prefixes
 from app.core.response import api_ok
 from app.core.security import AuthContext
 from app.integrations.market_asset_store import MarketAssetStore
@@ -28,6 +28,13 @@ from app.services.market_service import MarketService
 
 
 router = APIRouter(tags=["market"])
+
+
+def _call_service_method(service, async_name: str, sync_name: str, *args, **kwargs):
+    method = getattr(service, async_name, None)
+    if method is not None:
+        return method(*args, **kwargs)
+    return getattr(service, sync_name)(*args, **kwargs)
 
 
 @router.get("/api/market")
@@ -69,7 +76,7 @@ def market_wanted(
 
 
 @router.get("/api/market/{id}")
-def market_detail(
+async def market_detail(
     id: int,
     auth: AuthContext | None = Depends(get_optional_auth_context),
     session: Session = Depends(get_db_session),
@@ -77,12 +84,19 @@ def market_detail(
     service: MarketService = Depends(get_market_service),
 ) -> dict[str, object]:
     current_user_id = auth.user_id if auth else None
-    data = cache_if_anonymous(
+    data = await cache_if_anonymous_async(
         cache,
         current_user_id=current_user_id,
         namespace="market:detail",
         key=(id,),
-        factory=lambda: service.get_detail(session, current_user_id, id),
+        factory=lambda: _call_service_method(
+            service,
+            "get_detail_async",
+            "get_detail",
+            session,
+            current_user_id,
+            id,
+        ),
     )
     return api_ok(data)
 

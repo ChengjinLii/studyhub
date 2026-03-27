@@ -18,7 +18,7 @@ from app.api.deps import (
     require_auth_context,
 )
 from app.core.db import get_db_session
-from app.core.public_read_cache import PublicReadCache, cache_if_anonymous, invalidate_prefixes
+from app.core.public_read_cache import PublicReadCache, cache_if_anonymous_async, invalidate_prefixes
 from app.core.response import api_ok
 from app.core.security import AuthContext
 from app.schemas.materials import (
@@ -38,8 +38,15 @@ from app.services.requests_service import RequestsService
 router = APIRouter(tags=["materials"])
 
 
+def _call_service_method(service, async_name: str, sync_name: str, *args, **kwargs):
+    method = getattr(service, async_name, None)
+    if method is not None:
+        return method(*args, **kwargs)
+    return getattr(service, sync_name)(*args, **kwargs)
+
+
 @router.get("/api/materials")
-def list_materials(
+async def list_materials(
     keyword: str | None = None,
     school: str | None = None,
     college: str | None = None,
@@ -57,12 +64,15 @@ def list_materials(
     service: MaterialsService = Depends(get_materials_service),
 ) -> dict[str, object]:
     current_user_id = auth.user_id if auth else None
-    data = cache_if_anonymous(
+    data = await cache_if_anonymous_async(
         cache,
         current_user_id=current_user_id,
         namespace="materials:list",
         key=(keyword, school, college, major, tag, gradeValue, courseCategory, price, sort, page, size),
-        factory=lambda: service.list_materials(
+        factory=lambda: _call_service_method(
+            service,
+            "list_materials_async",
+            "list_materials",
             session,
             current_user_id,
             keyword=keyword,
@@ -97,7 +107,7 @@ def materials_column(
 
 
 @router.get("/api/materials/recommendations")
-def material_recommendations(
+async def material_recommendations(
     limit: int | None = None,
     auth: AuthContext | None = Depends(get_optional_auth_context),
     session: Session = Depends(get_db_session),
@@ -105,18 +115,25 @@ def material_recommendations(
     service: MaterialsService = Depends(get_materials_service),
 ) -> dict[str, object]:
     current_user_id = auth.user_id if auth else None
-    data = cache_if_anonymous(
+    data = await cache_if_anonymous_async(
         cache,
         current_user_id=current_user_id,
         namespace="materials:recommendations",
         key=(limit,),
-        factory=lambda: service.get_recommendations(session, current_user_id, limit),
+        factory=lambda: _call_service_method(
+            service,
+            "get_recommendations_async",
+            "get_recommendations",
+            session,
+            current_user_id,
+            limit,
+        ),
     )
     return api_ok(data)
 
 
 @router.get("/api/materials/{id}")
-def material_detail(
+async def material_detail(
     id: int,
     auth: AuthContext | None = Depends(get_optional_auth_context),
     session: Session = Depends(get_db_session),
@@ -125,12 +142,20 @@ def material_detail(
 ) -> dict[str, object]:
     current_user_id = auth.user_id if auth else None
     can_manage_all = bool(auth and auth.role_mask and auth.role_mask & 24)
-    data = cache_if_anonymous(
+    data = await cache_if_anonymous_async(
         cache,
         current_user_id=current_user_id,
         namespace="materials:detail",
         key=(id,),
-        factory=lambda: service.get_detail(session, current_user_id, id, can_manage_all),
+        factory=lambda: _call_service_method(
+            service,
+            "get_detail_async",
+            "get_detail",
+            session,
+            current_user_id,
+            id,
+            can_manage_all,
+        ),
     )
     return api_ok(data)
 

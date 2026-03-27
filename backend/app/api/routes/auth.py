@@ -1,12 +1,13 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Response
+from fastapi import APIRouter, BackgroundTasks, Depends, Response
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_auth_service, require_auth_context
 from app.core.db import get_db_session
 from app.core.response import api_ok
 from app.core.security import AuthContext
+from app.core.tasks import BackgroundDispatcher
 from app.schemas.auth import (
     BindEmailRequestPayload,
     LoginRequestPayload,
@@ -32,10 +33,11 @@ def get_captcha(
 @router.post("/api/auth/register")
 def register(
     payload: RegisterRequestPayload,
+    background_tasks: BackgroundTasks,
     session: Session = Depends(get_db_session),
     service: AuthService = Depends(get_auth_service),
 ) -> dict[str, object]:
-    return api_ok(service.send_register_code(session, payload))
+    return api_ok(service.send_register_code(session, payload, dispatcher=BackgroundDispatcher(background_tasks)))
 
 
 @router.post("/api/auth/verify")
@@ -75,6 +77,7 @@ def auth_logout() -> dict[str, object]:
 @router.post("/api/auth/reset-password")
 def reset_password(
     payload: ResetPasswordRequestPayload,
+    background_tasks: BackgroundTasks,
     response: Response,
     session: Session = Depends(get_db_session),
     service: AuthService = Depends(get_auth_service),
@@ -82,7 +85,7 @@ def reset_password(
     if payload.code:
         service.reset_password(session, payload, response)
         return api_ok()
-    return api_ok(service.send_reset_password_code(session, payload))
+    return api_ok(service.send_reset_password_code(session, payload, dispatcher=BackgroundDispatcher(background_tasks)))
 
 
 @router.post("/api/auth/password")
@@ -100,8 +103,16 @@ def change_password(
 @router.post("/api/auth/bind-email")
 def bind_email(
     payload: BindEmailRequestPayload,
+    background_tasks: BackgroundTasks,
     auth: AuthContext = Depends(require_auth_context),
     session: Session = Depends(get_db_session),
     service: AuthService = Depends(get_auth_service),
 ) -> dict[str, object]:
-    return api_ok(service.bind_email(session, auth.user_id or 0, payload))
+    return api_ok(
+        service.bind_email(
+            session,
+            auth.user_id or 0,
+            payload,
+            dispatcher=BackgroundDispatcher(background_tasks),
+        )
+    )
