@@ -13,9 +13,11 @@ interface RuntimeInfo {
   } | null;
 }
 
+type EntryModalVariant = 'stable' | 'welcome' | null;
+
 export default function MyApp({ Component, pageProps }: AppProps) {
   const [wechatModalOpen, setWechatModalOpen] = useState(false);
-  const [stableVersionModalOpen, setStableVersionModalOpen] = useState(false);
+  const [entryModalVariant, setEntryModalVariant] = useState<EntryModalVariant>(null);
   const [runtimeInfo, setRuntimeInfo] = useState<RuntimeInfo | null>(null);
 
   useEffect(() => {
@@ -35,8 +37,10 @@ export default function MyApp({ Component, pageProps }: AppProps) {
     }
     const hostname = window.location.hostname.toLowerCase();
     if (hostname === 'study-hub.store' || hostname.endsWith('.study-hub.store')) {
-      setStableVersionModalOpen(true);
+      setEntryModalVariant('stable');
+      return;
     }
+    setEntryModalVariant('welcome');
   }, []);
 
   useEffect(() => {
@@ -77,6 +81,7 @@ export default function MyApp({ Component, pageProps }: AppProps) {
   const localDevLabel = runtimeInfo?.localDev?.developerUsername
     ? `Local Dev · ${runtimeInfo.localDev.developerUsername}`
     : 'Local Dev';
+  const isStableEntryModal = entryModalVariant === 'stable';
 
   return (
     <>
@@ -94,20 +99,20 @@ export default function MyApp({ Component, pageProps }: AppProps) {
       <div className="page-with-footer">
         <FloatingSidebar />
         {showLocalDevBadge && <div className="runtime-environment-badge">{localDevLabel}</div>}
-        {stableVersionModalOpen && (
-          <div className="modal-mask stable-version-mask" onClick={() => setStableVersionModalOpen(false)}>
+        {entryModalVariant && (
+          <div className="modal-mask stable-version-mask" onClick={() => setEntryModalVariant(null)}>
             <div
               className="modal-card stable-version-modal"
               role="dialog"
               aria-modal="true"
-              aria-label="StudyHub 稳定版提示"
+              aria-label={isStableEntryModal ? 'StudyHub 稳定版提示' : '欢迎来到 StudyHub'}
               onClick={(event) => event.stopPropagation()}
             >
               <button
                 className="modal-close stable-version-modal__close"
                 type="button"
                 aria-label="关闭"
-                onClick={() => setStableVersionModalOpen(false)}
+                onClick={() => setEntryModalVariant(null)}
               >
                 ×
               </button>
@@ -120,28 +125,73 @@ export default function MyApp({ Component, pageProps }: AppProps) {
                 />
               </div>
               <div className="stable-version-modal__content">
-                <span className="stable-version-modal__eyebrow">Stable Version 提示</span>
-                <h2 className="stable-version-modal__title">建议使用正式稳定入口</h2>
-                <p className="stable-version-modal__text">
-                  你当前访问的是 StudyHub 的更新预览站 <strong>https://study-hub.store</strong>。新功能和界面调整通常会先在这里上线，因此在版本更新期间，个别页面或交互可能出现短暂波动。
-                </p>
-                <p className="stable-version-modal__text">
-                  如果你更看重稳定体验，建议使用正式稳定入口{' '}
-                  <a className="stable-version-modal__inline-link" href="https://study-hub.cn">
-                    https://study-hub.cn
-                  </a>
-                  。两个网址的数据完全互通，你可以按自己的习惯自由切换。
-                </p>
+                <span className="stable-version-modal__eyebrow">
+                  {isStableEntryModal ? 'Stable Version 提示' : 'Welcome to StudyHub'}
+                </span>
+                <h2 className="stable-version-modal__title">
+                  {isStableEntryModal ? '建议使用正式稳定入口' : '欢迎来到 StudyHub · 学汇'}
+                </h2>
+                {isStableEntryModal ? (
+                  <>
+                    <p className="stable-version-modal__text">
+                      你当前访问的是 StudyHub 的更新预览站 <strong>https://study-hub.store</strong>。新功能和界面调整通常会先在这里上线，因此在版本更新期间，个别页面或交互可能出现短暂波动。
+                    </p>
+                    <p className="stable-version-modal__text">
+                      如果你更看重稳定体验，建议使用正式稳定入口{' '}
+                      <a className="stable-version-modal__inline-link" href="https://study-hub.cn">
+                        https://study-hub.cn
+                      </a>
+                      。两个网址的数据完全互通，你可以按自己的习惯自由切换。
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <p className="stable-version-modal__text">
+                      欢迎访问 StudyHub。这里是一个面向高校场景的知识共享与校园互助平台，你可以在这里投稿资料、获取所需、经验分享，也可以浏览校园集市与社区内容。
+                    </p>
+                    <p className="stable-version-modal__text">
+                      如果你希望了解项目实现、部署方式或参与后续协作，也可以直接查看开源仓库。下面附上官方 QQ 群与仓库入口，方便你继续交流或跟进更新。
+                    </p>
+                    <div className="stable-version-modal__meta">
+                      <div className="stable-version-modal__meta-card">
+                        <span className="stable-version-modal__meta-label">官方QQ群</span>
+                        <strong className="stable-version-modal__meta-value">245934740</strong>
+                      </div>
+                      <div className="stable-version-modal__meta-card">
+                        <span className="stable-version-modal__meta-label">代码仓库</span>
+                        <a
+                          className="stable-version-modal__meta-link"
+                          href="https://github.com/ChengjinLii/studyhub"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          github.com/ChengjinLii/studyhub
+                        </a>
+                      </div>
+                    </div>
+                  </>
+                )}
                 <div className="stable-version-modal__actions">
-                  <a className="button primary stable-version-modal__cta" href="https://study-hub.cn">
-                    前往 Stable Version
-                  </a>
+                  {isStableEntryModal ? (
+                    <a className="button primary stable-version-modal__cta" href="https://study-hub.cn">
+                      前往 Stable Version
+                    </a>
+                  ) : (
+                    <a
+                      className="button primary stable-version-modal__cta"
+                      href="https://github.com/ChengjinLii/studyhub"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      查看代码仓库
+                    </a>
+                  )}
                   <button
                     className="button secondary stable-version-modal__stay"
                     type="button"
-                    onClick={() => setStableVersionModalOpen(false)}
+                    onClick={() => setEntryModalVariant(null)}
                   >
-                    留在当前版本
+                    {isStableEntryModal ? '留在当前版本' : '开始浏览'}
                   </button>
                 </div>
               </div>
@@ -179,6 +229,18 @@ export default function MyApp({ Component, pageProps }: AppProps) {
                 <div className="footer-info__item">
                   <span className="footer-info__label">联系邮箱</span>
                   <span className="footer-info__value">chengjinli@std.uestc.edu.cn</span>
+                </div>
+                <span className="footer-divider">|</span>
+                <div className="footer-info__item">
+                  <span className="footer-info__label">代码仓库</span>
+                  <a
+                    className="footer-info__value"
+                    href="https://github.com/ChengjinLii/studyhub"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    github.com/ChengjinLii/studyhub
+                  </a>
                 </div>
                 <span className="footer-divider">|</span>
                 <button

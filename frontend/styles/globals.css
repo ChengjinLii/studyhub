@@ -2608,6 +2608,47 @@ main {
   font-weight: 700;
 }
 
+.stable-version-modal__meta {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 4px;
+}
+
+.stable-version-modal__meta-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 14px 16px;
+  border-radius: 16px;
+  border: 1px solid rgba(15, 23, 42, 0.1);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(248, 250, 252, 0.94)),
+    radial-gradient(circle at top right, rgba(37, 99, 235, 0.08), transparent 52%);
+}
+
+.stable-version-modal__meta-label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #64748b;
+}
+
+.stable-version-modal__meta-value,
+.stable-version-modal__meta-link {
+  color: #0f172a;
+  font-size: 1rem;
+  font-weight: 700;
+  line-height: 1.5;
+  text-decoration: none;
+  word-break: break-word;
+}
+
+.stable-version-modal__meta-link:hover {
+  color: #2563eb;
+}
+
 .stable-version-modal__actions {
   display: flex;
   gap: 12px;
@@ -2709,6 +2750,10 @@ main {
 
   .stable-version-modal__content {
     padding: 24px 20px 24px;
+  }
+
+  .stable-version-modal__meta {
+    grid-template-columns: 1fr;
   }
 
   .stable-version-modal__actions {
