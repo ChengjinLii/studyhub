@@ -389,10 +389,11 @@ def material_preview_asset(
 def material_custom_preview_asset(
     id: int,
     index: int,
+    token: str = Query(...),
     session: Session = Depends(get_db_session),
     service: MaterialsService = Depends(get_materials_service),
 ) -> Response:
-    path = service.resolve_public_custom_preview_path(session, id, index)
+    path = service.resolve_public_custom_preview_path(session, id, index, token)
     return FileResponse(path, media_type=service.asset_store.guess_media_type(path.name, default="image/png"))
 
 

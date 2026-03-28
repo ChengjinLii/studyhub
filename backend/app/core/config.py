@@ -123,6 +123,7 @@ class Settings(BaseSettings):
     cookie_user_name: str = "studyhub_user"
     cookie_same_site: str = "Lax"
     cookie_path: str = "/"
+    cookie_secure: bool | None = None
     auth_cookie_ttl_seconds: int = 86400
     remember_cookie_ttl_seconds: int = 604800
 
@@ -155,6 +156,14 @@ class Settings(BaseSettings):
     kyc_retry_cooldown_seconds: int = 60
     kyc_max_attempts_per_day: int = 2
     payout_qr_max_size_bytes: int = 5 * 1024 * 1024
+    material_file_max_size_bytes: int = 50 * 1024 * 1024
+    material_preview_image_max_size_bytes: int = 5 * 1024 * 1024
+    material_manual_preview_max_images: int = 10
+    material_custom_preview_max_images: int = 5
+    market_image_max_size_bytes: int = 5 * 1024 * 1024
+    market_max_images: int = 3
+    safe_image_mime_types: str = "image/png,image/jpeg,image/webp,image/gif,image/bmp,image/avif,image/heic,image/heif"
+    safe_image_extensions: str = ".png,.jpg,.jpeg,.webp,.gif,.bmp,.avif,.heic,.heif"
 
     default_column_topic: str = "experience"
     default_column_page_size: int = 12
@@ -330,6 +339,28 @@ class Settings(BaseSettings):
         if self.environment.strip().lower() in {"local-dev", "test"}:
             return r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$"
         return None
+
+    @property
+    def resolved_cookie_secure(self) -> bool:
+        if self.cookie_secure is not None:
+            return bool(self.cookie_secure)
+        return self.is_preview or self.is_production
+
+    @property
+    def resolved_safe_image_mime_types(self) -> set[str]:
+        raw = self.safe_image_mime_types or ""
+        return {item.strip().lower() for item in raw.split(",") if item.strip()}
+
+    @property
+    def resolved_safe_image_extensions(self) -> set[str]:
+        raw = self.safe_image_extensions or ""
+        normalized: set[str] = set()
+        for item in raw.split(","):
+            value = item.strip().lower()
+            if not value:
+                continue
+            normalized.add(value if value.startswith(".") else f".{value}")
+        return normalized
 
     def validate_runtime_configuration(self) -> None:
         if self.log_format not in {"text", "json"}:

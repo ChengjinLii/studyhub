@@ -219,18 +219,11 @@ class UserReadService:
         if self._uses_legacy_user_table(session):
             return self._compat_get_user_uploads(session, target_user_id, limit)
         self._bootstrap_content(session)
+        safe_limit = clamp_limit(limit, max_value=100)
         items = [
             self._to_upload_record(material)
-            for material in self.material_repo.list_visible_materials(session)
-            if int(material.uploader_id or 0) == target_user_id
+            for material in self.material_repo.list_visible_materials_for_uploader(session, target_user_id, limit=safe_limit)
         ]
-        items.sort(
-            key=lambda item: (
-                -(item.get("downloadCount") or 0),
-                -parse_iso_datetime(item.get("createdAt")).timestamp(),
-            )
-        )
-        safe_limit = clamp_limit(limit, max_value=100)
         return items[:safe_limit] if safe_limit else items
 
     def get_user_market_listings(
@@ -245,18 +238,11 @@ class UserReadService:
         if self._uses_legacy_user_table(session):
             return self._compat_get_user_market_listings(session, target_user_id, limit)
         self._bootstrap_content(session)
+        safe_limit = clamp_limit(limit, max_value=100)
         items = [
             self._to_market_sell_record(item)
-            for item in self.market_repo.list_items(session)
-            if int(item.seller_id or 0) == target_user_id and item.status not in {"REMOVED", "HIDDEN"}
+            for item in self.market_repo.list_visible_items_for_seller(session, target_user_id, limit=safe_limit)
         ]
-        items.sort(
-            key=lambda item: (
-                -(item.get("wantCount") or 0),
-                -parse_iso_datetime(item.get("createdAt")).timestamp(),
-            )
-        )
-        safe_limit = clamp_limit(limit, max_value=100)
         return items[:safe_limit] if safe_limit else items
 
     def get_free_download_status(self, session: Session, user_id: int) -> dict[str, Any]:
@@ -346,7 +332,7 @@ class UserReadService:
     def _build_market_wants(self, session: Session, seed: dict[str, Any], user_id: int) -> list[dict[str, Any]]:
         self._bootstrap_content(session)
         wanted_ids = set(self.market_repo.wanted_ids_for_user(session, user_id))
-        items_by_id = {int(item.id): item for item in self.market_repo.list_items(session)}
+        items_by_id = {int(item.id): item for item in self.market_repo.list_items_by_ids(session, list(wanted_ids))}
         results: list[dict[str, Any]] = []
         for item_id in wanted_ids:
             item = items_by_id.get(int(item_id))
@@ -403,11 +389,7 @@ class UserReadService:
             ).scalar()
             return int(row or 0)
         self._bootstrap_content(session)
-        return sum(
-            1
-            for material in self.material_repo.list_visible_materials(session)
-            if int(material.uploader_id or 0) == user_id and not bool(material.is_free)
-        )
+        return self.material_repo.count_paid_visible_materials_for_uploader(session, user_id)
 
     def _bootstrap_content(self, session: Session) -> dict[str, Any]:
         seed = self.repo.load_seed()
@@ -571,7 +553,7 @@ class UserReadService:
             ).scalar()
             return int(row or 0)
         self._bootstrap_content(session)
-        return sum(1 for material in self.material_repo.list_visible_materials(session) if int(material.uploader_id or 0) == target_user_id)
+        return self.material_repo.count_visible_materials_for_uploader(session, target_user_id)
 
     def _count_user_market_listings(self, session: Session, target_user_id: int) -> int:
         if self._uses_legacy_user_table(session):
@@ -588,11 +570,7 @@ class UserReadService:
             ).scalar()
             return int(row or 0)
         self._bootstrap_content(session)
-        return sum(
-            1
-            for item in self.market_repo.list_items(session)
-            if int(item.seller_id or 0) == target_user_id and item.status not in {"REMOVED", "HIDDEN"}
-        )
+        return self.market_repo.count_visible_items_for_seller(session, target_user_id)
 
     def _compat_get_user_uploads(self, session: Session, target_user_id: int, limit: int | None) -> list[dict[str, Any]]:
         safe_limit = clamp_limit(limit, max_value=100)

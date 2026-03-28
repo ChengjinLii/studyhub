@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 from app.core.async_db import async_session_scope
 from app.core.config import Settings
 from app.core.profile_metadata import DEFAULT_FREE_DOWNLOAD_QUOTA
+from app.core.upload_validation import validate_file_size, validate_image_upload
 from app.integrations.material_asset_store import MaterialAssetStore
 from app.models.auth import AuthUser
 from app.models.materials import MaterialFavoriteRecord, MaterialRatingRecord, MaterialRecord
@@ -902,13 +903,18 @@ class MaterialsService:
         material = self._ensure_material_exists(session, material_id)
         return material, claims
 
-    def resolve_public_custom_preview_path(self, session: Session, material_id: int, index: int) -> Path:
+    def resolve_public_custom_preview_path(self, session: Session, material_id: int, index: int, token: str) -> Path:
         self._bootstrap(session)
+        claims = self.asset_store.verify_custom_preview_token(material_id=material_id, token=token)
+        if int(claims.get("index", 0) or 0) != index:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="链接已失效")
         material = self._ensure_material_exists(session, material_id)
         keys = self._loads(material.custom_preview_images_json)
         if index < 1 or index > len(keys):
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="预览图片不存在")
         key = keys[index - 1]
+        if str(claims.get("key") or "") != str(key):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="链接已失效")
         if self._is_external_url(key):
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="预览图片不存在")
         return self.asset_store.resolve_path(key)
@@ -930,6 +936,34 @@ class MaterialsService:
         custom_previews: list[UploadFile],
         is_create: bool,
     ) -> None:
+        if file_upload is not None:
+            validate_file_size(
+                file_upload,
+                max_size_bytes=self.settings.material_file_max_size_bytes,
+                too_large_detail="资料文件不能超过 50MB",
+            )
+        if len(previews) > self.settings.material_manual_preview_max_images:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="手动预览图最多上传 10 张")
+        if len(custom_previews) > self.settings.material_custom_preview_max_images:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="自定义配图最多上传 5 张")
+        for preview_file in previews:
+            validate_image_upload(
+                preview_file,
+                settings=self.settings,
+                max_size_bytes=self.settings.material_preview_image_max_size_bytes,
+                missing_detail="请上传有效的预览图片",
+                invalid_type_detail="预览图片仅支持 PNG、JPG、WEBP、GIF、BMP、AVIF、HEIC、HEIF 格式",
+                too_large_detail="预览图片不能超过 5MB",
+            )
+        for preview_file in custom_previews:
+            validate_image_upload(
+                preview_file,
+                settings=self.settings,
+                max_size_bytes=self.settings.material_preview_image_max_size_bytes,
+                missing_detail="请上传有效的自定义配图",
+                invalid_type_detail="自定义配图仅支持 PNG、JPG、WEBP、GIF、BMP、AVIF、HEIC、HEIF 格式",
+                too_large_detail="自定义配图不能超过 5MB",
+            )
         delivery_method = (payload.deliveryMethod or material.delivery_method or "FILE").upper()
         material.title = payload.title.strip()
         material.description = payload.description

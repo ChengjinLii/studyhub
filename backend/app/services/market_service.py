@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.core.async_db import async_session_scope
 from app.core.config import Settings
+from app.core.upload_validation import validate_image_upload
 from app.integrations.market_asset_store import MarketAssetStore
 from app.models.market import MarketItemRecord
 from app.repos.auth_repo import AuthRepository
@@ -166,8 +167,17 @@ class MarketService:
     def create_item(self, session: Session, payload: MarketCreatePayload, images: list[UploadFile], seller_id: int) -> dict[str, Any]:
         seed = self._bootstrap(session)
         seller = self._require_user(session, seller_id)
-        if len(images) > 3:
+        if len(images) > self.settings.market_max_images:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="最多上传 3 张图片")
+        for file in images:
+            validate_image_upload(
+                file,
+                settings=self.settings,
+                max_size_bytes=self.settings.market_image_max_size_bytes,
+                missing_detail="请上传有效的商品图片",
+                invalid_type_detail="商品图片仅支持 PNG、JPG、WEBP、GIF、BMP、AVIF、HEIC、HEIF 格式",
+                too_large_detail="商品图片不能超过 5MB",
+            )
         item_id = self.market_repo.next_item_id(session, seed)
         keys = [self.asset_store.save_upload(item_id=item_id, upload=file) for file in images if getattr(file, "filename", None)]
         item = MarketItemRecord(

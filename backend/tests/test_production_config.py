@@ -88,6 +88,7 @@ def test_preview_loads_private_env_and_supports_smtp_provider(
     assert settings.private_env_file == private_dir / ".env.preview"
     assert settings.resolved_database_url.startswith("mysql+pymysql://")
     assert settings.mail_provider == "smtp"
+    assert settings.resolved_cookie_secure is True
     assert isinstance(provider, SmtpMailProvider)
 
     _reset_runtime_state()

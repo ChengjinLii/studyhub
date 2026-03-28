@@ -1,8 +1,9 @@
 # Security Policy
 
-感谢你帮助 StudyHub 保持安全。
+感谢您帮助 StudyHub 保持安全。
 
-如果你发现了潜在的安全问题，请不要通过公开 Issue、Pull Request 或讨论区直接披露细节。请优先使用 GitHub 的私密漏洞上报功能；如果暂时无法使用，再通过邮件联系维护者。
+如果您发现了潜在的安全问题，请不要通过公开 Issue、Pull Request 或讨论区直接披露细节。
+请使用 GitHub 的私密漏洞上报功能；或者通过邮件联系维护者 chengjinli@std.uestc.edu.cn。
 
 ## 支持范围
 
@@ -15,12 +16,7 @@
 
 ## 如何报告漏洞
 
-优先方式：
-
 - 使用 GitHub 的 `Private vulnerability reporting`
-
-备选方式：
-
 - 发送邮件到 `chengjinli@std.uestc.edu.cn`
 - 邮件标题建议使用：`[StudyHub Security] 简短问题描述`
 
@@ -84,4 +80,4 @@
 
 ## 致谢
 
-感谢每一位负责任地提交安全问题的研究者和开发者。
+感谢每一位负责任地提交安全问题的研究者和开发者！

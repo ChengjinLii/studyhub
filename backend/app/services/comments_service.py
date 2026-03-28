@@ -44,7 +44,12 @@ class CommentsService:
                 current_user_id=current_user_id,
             )
         material = self._ensure_material(session, material_id)
-        comments = [self._to_comment(session, item, current_user_id, material.uploader_id or 0) for item in self.comment_repo.list_comments(session, material_id=material_id, parent_id=None, visible_only=True)]
+        comments = self._serialize_comments(
+            session,
+            self.comment_repo.list_comments(session, material_id=material_id, parent_id=None, visible_only=True),
+            current_user_id=current_user_id,
+            material_uploader_id=material.uploader_id or 0,
+        )
         comments.sort(key=self._resolve_sort(sort))
         items, meta = paginate_zero_based(comments, page=page, size=size)
         return {"items": items, "meta": meta}
@@ -63,7 +68,12 @@ class CommentsService:
         if parent is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="评论不存在")
         material = self._ensure_material(session, parent.material_id)
-        replies = [self._to_comment(session, item, current_user_id, material.uploader_id or 0) for item in self.comment_repo.list_comments(session, material_id=parent.material_id, parent_id=parent_id, visible_only=True)]
+        replies = self._serialize_comments(
+            session,
+            self.comment_repo.list_comments(session, material_id=parent.material_id, parent_id=parent_id, visible_only=True),
+            current_user_id=current_user_id,
+            material_uploader_id=material.uploader_id or 0,
+        )
         replies.sort(key=lambda item: parse_iso_datetime(item.get("createdAt")))
         items, meta = paginate_zero_based(replies, page=page, size=size)
         return {"items": items, "meta": meta}
@@ -93,7 +103,12 @@ class CommentsService:
             parent.reply_count = int(parent.reply_count or 0) + 1
             self.comment_repo.save_comment(session, parent)
         session.commit()
-        return self._to_comment(session, entity, user_id, material.uploader_id or 0)
+        return self._serialize_comments(
+            session,
+            [entity],
+            current_user_id=user_id,
+            material_uploader_id=material.uploader_id or 0,
+        )[0]
 
     def update(self, session: Session, comment_id: int, payload: CommentUpdatePayload, *, user_id: int, can_moderate: bool) -> dict[str, Any]:
         self._bootstrap(session)
@@ -107,7 +122,12 @@ class CommentsService:
         self.comment_repo.save_comment(session, entity)
         session.commit()
         material = self._ensure_material(session, entity.material_id)
-        return self._to_comment(session, entity, user_id, material.uploader_id or 0)
+        return self._serialize_comments(
+            session,
+            [entity],
+            current_user_id=user_id,
+            material_uploader_id=material.uploader_id or 0,
+        )[0]
 
     def delete(self, session: Session, comment_id: int, *, user_id: int, can_moderate: bool) -> None:
         self._bootstrap(session)
@@ -182,9 +202,32 @@ class CommentsService:
             return lambda item: (-(item.get("likeCount") or 0), -parse_iso_datetime(item.get("createdAt")).timestamp())
         return lambda item: -parse_iso_datetime(item.get("createdAt")).timestamp()
 
-    def _to_comment(self, session: Session, entity: CommentRecord, current_user_id: int | None, material_uploader_id: int) -> dict[str, Any]:
-        user = self.auth_repo.find_user_by_id(session, entity.user_id)
-        liked_ids = self.comment_repo.liked_comment_ids(session, comment_ids=[entity.id], user_id=current_user_id)
+    def _serialize_comments(
+        self,
+        session: Session,
+        entities: list[CommentRecord],
+        *,
+        current_user_id: int | None,
+        material_uploader_id: int,
+    ) -> list[dict[str, Any]]:
+        if not entities:
+            return []
+        user_ids = [int(entity.user_id) for entity in entities if entity.user_id is not None]
+        users_by_id = {int(user.id): user for user in self.auth_repo.find_users_by_ids(session, user_ids)}
+        comment_ids = [int(entity.id) for entity in entities]
+        liked_ids = self.comment_repo.liked_comment_ids(session, comment_ids=comment_ids, user_id=current_user_id)
+        return [
+            self._to_comment(entity, users_by_id.get(int(entity.user_id)), entity.id in liked_ids, material_uploader_id)
+            for entity in entities
+        ]
+
+    def _to_comment(
+        self,
+        entity: CommentRecord,
+        user,
+        has_liked: bool,
+        material_uploader_id: int,
+    ) -> dict[str, Any]:
         nickname = entity.user_nickname or (user.nickname if user else None) or (user.username if user else "匿名同学")
         avatar = entity.user_avatar or (user.avatar if user else None)
         deleted = entity.status != "visible"
@@ -205,7 +248,7 @@ class CommentsService:
                 "avatar": avatar,
                 "isAuthor": material_uploader_id == entity.user_id,
             },
-            "hasLiked": entity.id in liked_ids,
+            "hasLiked": has_liked,
             "rating": entity.rating,
             "replies": [],
         }

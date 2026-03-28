@@ -81,9 +81,12 @@ def build_cookie_header(
     http_only: bool = True,
     path: str = "/",
     same_site: str = "Lax",
+    secure: bool = False,
 ) -> str:
     encoded = quote(value, safe="")
     segments = [f"{name}={encoded}", f"Max-Age={max_age}", f"Path={path}", f"SameSite={same_site}"]
+    if secure:
+        segments.append("Secure")
     if http_only:
         segments.append("HttpOnly")
     return "; ".join(segments)

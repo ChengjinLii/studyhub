@@ -64,6 +64,7 @@ class AuthCookieService:
                 max_age=ttl_seconds,
                 path=self.settings.cookie_path,
                 same_site=self.settings.cookie_same_site,
+                secure=self.settings.resolved_cookie_secure,
             ),
         )
         response.headers.append(
@@ -74,6 +75,7 @@ class AuthCookieService:
                 max_age=ttl_seconds,
                 path=self.settings.cookie_path,
                 same_site=self.settings.cookie_same_site,
+                secure=self.settings.resolved_cookie_secure,
             ),
         )
 
@@ -91,6 +93,7 @@ class AuthCookieService:
                 max_age=0,
                 path=self.settings.cookie_path,
                 same_site=self.settings.cookie_same_site,
+                secure=self.settings.resolved_cookie_secure,
             ),
         )
         response.headers.append(
@@ -101,6 +104,7 @@ class AuthCookieService:
                 max_age=0,
                 path=self.settings.cookie_path,
                 same_site=self.settings.cookie_same_site,
+                secure=self.settings.resolved_cookie_secure,
             ),
         )
 

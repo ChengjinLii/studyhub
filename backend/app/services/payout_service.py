@@ -10,6 +10,7 @@ from fastapi import HTTPException, UploadFile, status
 from sqlalchemy.orm import Session
 
 from app.core.config import Settings
+from app.core.upload_validation import validate_image_upload
 from app.models.auth import AuthUser
 from app.models.finance import (
     AdminMonthlyPayoutMarkRecord,
@@ -69,16 +70,14 @@ class PayoutService:
         self.transfer_provider = transfer_provider
 
     def upload_payout_qr(self, session: Session, *, user_id: int, upload: UploadFile) -> dict[str, Any]:
-        if upload is None or not upload.filename:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="请先选择收款码图片")
-        content_type = (upload.content_type or "").strip().lower()
-        if not content_type.startswith("image/"):
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="仅支持上传图片文件")
-        upload.file.seek(0, 2)
-        size = upload.file.tell()
-        upload.file.seek(0)
-        if size > self.settings.payout_qr_max_size_bytes:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="收款码图片不能超过 5MB")
+        validate_image_upload(
+            upload,
+            settings=self.settings,
+            max_size_bytes=self.settings.payout_qr_max_size_bytes,
+            missing_detail="请先选择收款码图片",
+            invalid_type_detail="收款码仅支持 PNG、JPG、WEBP、GIF、BMP、AVIF、HEIC、HEIF 格式",
+            too_large_detail="收款码图片不能超过 5MB",
+        )
 
         user = self._require_user(session, user_id)
         previous_key = user.payout_qr_key

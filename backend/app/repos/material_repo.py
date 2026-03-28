@@ -149,6 +149,43 @@ class MaterialRepository:
         stmt = select(MaterialRecord).where(MaterialRecord.deleted_at.is_(None), MaterialRecord.status.not_in(("REMOVED", "HIDDEN")))
         return list(session.scalars(stmt))
 
+    def list_visible_materials_for_uploader(
+        self,
+        session: Session,
+        uploader_id: int,
+        *,
+        limit: int | None = None,
+    ) -> list[MaterialRecord]:
+        stmt = (
+            select(MaterialRecord)
+            .where(
+                MaterialRecord.deleted_at.is_(None),
+                MaterialRecord.status.not_in(("REMOVED", "HIDDEN")),
+                MaterialRecord.uploader_id == uploader_id,
+            )
+            .order_by(MaterialRecord.download_count.desc(), MaterialRecord.created_at.desc(), MaterialRecord.id.desc())
+        )
+        if limit is not None:
+            stmt = stmt.limit(limit)
+        return list(session.scalars(stmt))
+
+    def count_visible_materials_for_uploader(self, session: Session, uploader_id: int) -> int:
+        stmt = select(func.count()).select_from(MaterialRecord).where(
+            MaterialRecord.deleted_at.is_(None),
+            MaterialRecord.status.not_in(("REMOVED", "HIDDEN")),
+            MaterialRecord.uploader_id == uploader_id,
+        )
+        return int(session.scalar(stmt) or 0)
+
+    def count_paid_visible_materials_for_uploader(self, session: Session, uploader_id: int) -> int:
+        stmt = select(func.count()).select_from(MaterialRecord).where(
+            MaterialRecord.deleted_at.is_(None),
+            MaterialRecord.status.not_in(("REMOVED", "HIDDEN")),
+            MaterialRecord.uploader_id == uploader_id,
+            MaterialRecord.is_free.is_(False),
+        )
+        return int(session.scalar(stmt) or 0)
+
     def list_all_materials(self, session: Session) -> list[MaterialRecord]:
         stmt = select(MaterialRecord).order_by(MaterialRecord.created_at.desc(), MaterialRecord.id.desc())
         return list(session.scalars(stmt))

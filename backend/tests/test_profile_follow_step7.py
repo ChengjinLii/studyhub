@@ -48,6 +48,7 @@ def test_step7_me_account_patch_matches_java_cookie_and_profile_semantics(
     refreshed_headers = patch_response.headers.get_list("set-cookie")
     assert any("studyhub_token=" in header and "Max-Age=604800" in header for header in refreshed_headers)
     assert any("studyhub_user=" in header and "Max-Age=604800" in header for header in refreshed_headers)
+    assert all("Secure" not in header for header in refreshed_headers)
 
     session_response = client.get("/api/session")
     assert session_response.status_code == 200

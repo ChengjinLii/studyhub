@@ -132,11 +132,12 @@ def test_step8_create_update_delete_and_batch_download_support_multipart_materia
     assert material_id > 104
     assert created["hasFile"] is True
     assert created["previewSource"] == "MANUAL"
-    assert created["customPreviewImages"][0] == f"/api/materials/{material_id}/assets/custom/1"
+    assert created["customPreviewImages"][0].startswith(f"/api/materials/{material_id}/assets/custom/1?token=")
 
     custom_preview_response = client.get(created["customPreviewImages"][0])
     assert custom_preview_response.status_code == 200
     assert custom_preview_response.headers["content-type"].startswith("image/png")
+    assert client.get(f"/api/materials/{material_id}/assets/custom/1").status_code == 400
 
     preview_response = client.get(f"/api/materials/{material_id}/preview", headers=alice_headers)
     assert preview_response.status_code == 200

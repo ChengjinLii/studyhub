@@ -126,6 +126,9 @@ class MaterialAssetStore:
     def verify_preview_token(self, *, material_id: int, token: str) -> dict[str, Any]:
         return self._verify_token(material_id=material_id, token=token, allowed_kind={"preview-image", "preview-placeholder"})
 
+    def verify_custom_preview_token(self, *, material_id: int, token: str) -> dict[str, Any]:
+        return self._verify_token(material_id=material_id, token=token, allowed_kind={"custom-preview"})
+
     def resolve_path(self, key: str) -> Path:
         return self.storage_provider.resolve_path(
             root=self.settings.resolved_material_asset_dir,
@@ -137,16 +140,39 @@ class MaterialAssetStore:
         return self.storage_provider.guess_media_type(key, default=default)
 
     def build_public_custom_preview_url(self, *, material_id: int, index: int, key: str) -> str:
-        direct_url = self.storage_provider.build_public_url(root=self.settings.resolved_material_asset_dir, key=key)
+        direct_url = self.storage_provider.build_signed_object_url(
+            root=self.settings.resolved_material_asset_dir,
+            key=key,
+            ttl_seconds=self.settings.material_signed_url_ttl_seconds,
+        )
         if direct_url is not None:
             return direct_url
-        return f"/api/materials/{material_id}/assets/custom/{index}"
+        token = self.token_codec.encode(
+            {
+                "sub": f"material-custom-preview:{material_id}:{index}",
+                "materialId": material_id,
+                "kind": "custom-preview",
+                "key": key,
+                "index": index,
+            },
+            ttl_seconds=self.settings.material_signed_url_ttl_seconds,
+        )
+        return f"/api/materials/{material_id}/assets/custom/{index}?token={token}"
 
     async def build_public_custom_preview_url_async(self, *, material_id: int, index: int, key: str) -> str:
-        direct_url = await self.storage_provider.build_public_url_async(root=self.settings.resolved_material_asset_dir, key=key)
+        direct_url = await self.storage_provider.build_signed_object_url_async(
+            root=self.settings.resolved_material_asset_dir,
+            key=key,
+            ttl_seconds=self.settings.material_signed_url_ttl_seconds,
+        )
         if direct_url is not None:
             return direct_url
-        return f"/api/materials/{material_id}/assets/custom/{index}"
+        return await asyncio.to_thread(
+            self.build_public_custom_preview_url,
+            material_id=material_id,
+            index=index,
+            key=key,
+        )
 
     def _verify_token(self, *, material_id: int, token: str, allowed_kind: set[str]) -> dict[str, Any]:
         try:

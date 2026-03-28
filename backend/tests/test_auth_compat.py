@@ -91,6 +91,7 @@ def test_login_logout_and_session_restore(
     set_cookie_headers = login_response.headers.get_list("set-cookie")
     assert any("studyhub_token=" in header and "Max-Age=604800" in header and "SameSite=Lax" in header for header in set_cookie_headers)
     assert any("studyhub_user=" in header and "HttpOnly" in header for header in set_cookie_headers)
+    assert all("Secure" not in header for header in set_cookie_headers)
 
     auth_logout = client.post("/api/auth/logout")
     assert auth_logout.status_code == 200
@@ -150,6 +151,7 @@ def test_me_account_patch_refreshes_cookies(
     refreshed_headers = patch_response.headers.get_list("set-cookie")
     assert any("studyhub_token=" in header and "Max-Age=604800" in header for header in refreshed_headers)
     assert any("studyhub_user=" in header and "%E5%88%B7%E6%96%B0%E5%90%8E%E7%9A%84%E6%98%B5%E7%A7%B0" in header for header in refreshed_headers)
+    assert all("Secure" not in header for header in refreshed_headers)
 
     session_response = client.get("/api/session")
     assert session_response.status_code == 200

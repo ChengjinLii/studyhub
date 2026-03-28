@@ -56,6 +56,38 @@ class MarketRepository:
         stmt = select(MarketItemRecord).order_by(MarketItemRecord.created_at.desc(), MarketItemRecord.id.desc())
         return list(session.scalars(stmt))
 
+    def list_visible_items_for_seller(
+        self,
+        session: Session,
+        seller_id: int,
+        *,
+        limit: int | None = None,
+    ) -> list[MarketItemRecord]:
+        stmt = (
+            select(MarketItemRecord)
+            .where(
+                MarketItemRecord.seller_id == seller_id,
+                MarketItemRecord.status.not_in(("REMOVED", "HIDDEN")),
+            )
+            .order_by(MarketItemRecord.want_count.desc(), MarketItemRecord.created_at.desc(), MarketItemRecord.id.desc())
+        )
+        if limit is not None:
+            stmt = stmt.limit(limit)
+        return list(session.scalars(stmt))
+
+    def count_visible_items_for_seller(self, session: Session, seller_id: int) -> int:
+        stmt = select(func.count()).select_from(MarketItemRecord).where(
+            MarketItemRecord.seller_id == seller_id,
+            MarketItemRecord.status.not_in(("REMOVED", "HIDDEN")),
+        )
+        return int(session.scalar(stmt) or 0)
+
+    def list_items_by_ids(self, session: Session, item_ids: list[int]) -> list[MarketItemRecord]:
+        if not item_ids:
+            return []
+        stmt = select(MarketItemRecord).where(MarketItemRecord.id.in_(item_ids))
+        return list(session.scalars(stmt))
+
     def get_item(self, session: Session, item_id: int) -> MarketItemRecord | None:
         return session.get(MarketItemRecord, item_id)
 

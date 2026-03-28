@@ -42,6 +42,13 @@ class AuthRepository:
     def find_user_by_id(self, session: Session, user_id: int) -> AuthUserModel | None:
         return session.get(resolve_user_model(session), user_id)
 
+    def find_users_by_ids(self, session: Session, user_ids: list[int]) -> list[AuthUserModel]:
+        if not user_ids:
+            return []
+        user_model = resolve_user_model(session)
+        stmt = select(user_model).where(user_model.id.in_(sorted(set(user_ids))))
+        return list(session.scalars(stmt))
+
     def find_user_by_username(self, session: Session, username: str) -> AuthUserModel | None:
         user_model = resolve_user_model(session)
         stmt = select(user_model).where(user_model.username == username)

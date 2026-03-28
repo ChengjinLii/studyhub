@@ -53,7 +53,7 @@ const yearSuggestions = Array.from({ length: 6 }, (_, index) => currentYear - in
   .flatMap((year) => [year.toString(), `${year}-${year + 1}`])
   .filter((value, index, array) => array.indexOf(value) === index);
 
-const MAX_FILE_BYTES = 20 * 1024 * 1024;
+const MAX_FILE_BYTES = 50 * 1024 * 1024;
 const MAX_TAGS = 3;
 const MAX_TITLE_LENGTH = 80;
 const MAX_DESC_LENGTH = 300;
@@ -689,7 +689,7 @@ export default function UploadPage({ user, token, account }: UploadPageProps) {
     setUploadProgress(null);
     const totalBytes = files.reduce((sum, file) => sum + file.size, 0);
     if (totalBytes > MAX_FILE_BYTES) {
-      setStatus({ type: 'error', message: '文件总大小需小于 20MB，请改用网盘链接。' });
+      setStatus({ type: 'error', message: '文件总大小需小于 50MB，请改用网盘链接。' });
       clearZipFile();
       return;
     }
@@ -755,7 +755,7 @@ export default function UploadPage({ user, token, account }: UploadPageProps) {
     });
     const blob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE', compressionOptions: { level: 6 } });
     if (blob.size > MAX_FILE_BYTES) {
-      throw new Error('打包后的文件超过 20MB，请删除部分文件或改用网盘链接。');
+      throw new Error('打包后的文件超过 50MB，请删除部分文件或改用网盘链接。');
     }
     return new File([blob], zipName, { type: 'application/zip', lastModified: Date.now() });
   };
@@ -766,7 +766,7 @@ export default function UploadPage({ user, token, account }: UploadPageProps) {
     const zipName = buildZipName(titleValue, '经验分享');
     const blob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE', compressionOptions: { level: 6 } });
     if (blob.size > MAX_FILE_BYTES) {
-      throw new Error('内容过长，打包后超过 20MB。');
+      throw new Error('内容过长，打包后超过 50MB。');
     }
     return new File([blob], zipName, { type: 'application/zip', lastModified: Date.now() });
   };
@@ -807,7 +807,7 @@ export default function UploadPage({ user, token, account }: UploadPageProps) {
     const trimmedNetdiskUrl = netdiskUrl.trim();
     const resolvedDelivery = isExperience ? 'FILE' : deliveryMethod === 'NETDISK' ? 'NETDISK' : 'FILE';
     if (!isExperience && resolvedDelivery === 'FILE' && !zipFile && !hasExistingFile) {
-      setStatus({ type: 'error', message: '请上传 20MB 以内的资料文件。' });
+      setStatus({ type: 'error', message: '请上传 50MB 以内的资料文件。' });
       return;
     }
     if (!isExperience && resolvedDelivery === 'NETDISK' && !trimmedNetdiskUrl) {
@@ -1456,7 +1456,7 @@ export default function UploadPage({ user, token, account }: UploadPageProps) {
                     checked={deliveryMethod === 'FILE'}
                     onChange={() => setDeliveryMethod('FILE')}
                   />
-                  <span>上传文件（≤20MB）</span>
+                  <span>上传文件（≤50MB）</span>
                 </label>
                 <label className={`choice-pill ${deliveryMethod === 'NETDISK' ? 'active' : ''}`}>
                   <input
@@ -1472,7 +1472,7 @@ export default function UploadPage({ user, token, account }: UploadPageProps) {
               <p className="help-text">
                 {isQuickMode
                   ? '一键投稿默认自动生成预览，仅保留文件交付与网盘链接两种方式。'
-                  : '超过 20MB 或特殊格式的资料请改用网盘链接，确保链接长期有效。'}
+                  : '超过 50MB 或特殊格式的资料请改用网盘链接，确保链接长期有效。'}
               </p>
             </div>
             {!isQuickMode && (
@@ -1670,7 +1670,7 @@ export default function UploadPage({ user, token, account }: UploadPageProps) {
             )}
             {deliveryMethod === 'FILE' && (
               <div className="form-item full">
-                <SectionLabel htmlFor="zip" text="资料文件（总大小≤20MB，支持多文件）" />
+                <SectionLabel htmlFor="zip" text="资料文件（总大小≤50MB，支持多文件）" />
                 <div className="file-field drop-zone" onDragOver={(e) => e.preventDefault()} onDrop={handleZipDrop}>
                   <span className="file-trigger">选择文件</span>
                   <span className="file-name">
@@ -1706,7 +1706,7 @@ export default function UploadPage({ user, token, account }: UploadPageProps) {
                     <span className="upload-percent">{uploadProgress}%</span>
                   </div>
                 )}
-                <p className="help-text">将文件拖拽到此区域或点击选择，总大小不超过 20MB，多文件将自动打包为 zip。</p>
+                <p className="help-text">将文件拖拽到此区域或点击选择，总大小不超过 50MB，多文件将自动打包为 zip。</p>
               </div>
             )}
             <div className="form-item full">

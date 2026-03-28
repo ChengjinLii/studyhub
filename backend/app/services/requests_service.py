@@ -98,16 +98,25 @@ class RequestsService:
         if self.settings.requires_private_env_file:
             return self._compat_list_requests(session, viewer_id, sort=sort, limit=limit)
         self._bootstrap(session)
-        items = [item for item in self.request_repo.list_requests(session) if self._is_publicly_visible(item)]
-        items = [item for item in items if not self._should_hide_by_early_exit(session, item)]
         normalized = (sort or "latest").lower()
-        if normalized == "hot":
-            items.sort(key=lambda item: (-(item.funded_amount_cents or 0), -int(item.response_count or 0), -self._created_ts(item)))
-        else:
-            items.sort(key=lambda item: -self._created_ts(item))
+        items = self.request_repo.list_public_requests(session, sort=normalized)
+        hidden_ids = self.request_repo.find_hidden_early_exit_request_ids(
+            session,
+            request_ids=[int(item.id) for item in items],
+        )
+        if hidden_ids:
+            items = [item for item in items if int(item.id) not in hidden_ids]
         safe_limit = clamp_limit(limit, max_value=100)
         sliced = items[:safe_limit] if safe_limit else items
-        return [self._to_request_item(session, item, viewer_id, None) for item in sliced]
+        responded_ids = self.request_repo.find_responded_request_ids(
+            session,
+            responder_id=viewer_id,
+            request_ids=[int(item.id) for item in sliced],
+        )
+        return [
+            self._to_request_item(session, item, viewer_id, None, responded_ids=responded_ids)
+            for item in sliced
+        ]
 
     def list_leaderboard(self, session: Session, viewer_id: int | None, *, limit: int | None) -> list[dict[str, Any]]:
         if self.settings.requires_private_env_file:
@@ -483,6 +492,7 @@ class RequestsService:
         now = datetime.now(UTC)
         changed = False
         processed = 0
+        processed_request_ids: set[int] = set()
         arbitration_threshold = now - timedelta(hours=ARBITRATION_TIMEOUT_HOURS)
         for arbitration in self.request_repo.list_timed_out_pending_arbitrations(session, arbitration_threshold):
             if arbitration.source == "seed":
@@ -497,28 +507,29 @@ class RequestsService:
             self.request_repo.save_arbitration(session, arbitration)
             changed = True
             processed += 1
+            processed_request_ids.add(int(request.id))
 
-        for request in self.request_repo.list_requests(session):
-            if request.source == "seed":
+        for request in self.request_repo.list_timed_out_unanswered_requests(
+            session,
+            created_before=now - timedelta(hours=NO_ACCEPT_HOURS),
+        ):
+            if int(request.id) in processed_request_ids:
                 continue
-            if request.accepted_response_id is not None:
+            self._refund_request_contributions(session, request, reason="48 小时未验收自动退款")
+            changed = True
+            processed += 1
+            processed_request_ids.add(int(request.id))
+
+        for request in self.request_repo.list_requests_with_expired_delivery_window(
+            session,
+            latest_deadline_before=now - timedelta(days=NO_DELIVERY_DAYS),
+        ):
+            if int(request.id) in processed_request_ids:
                 continue
-            if request.status not in {REQUEST_STATUS_OPEN, REQUEST_STATUS_REFUNDING}:
-                continue
-            request_created_at = self._normalize_dt(request.created_at)
-            if request.response_count == 0 and request_created_at and request_created_at <= now - timedelta(hours=NO_ACCEPT_HOURS):
-                self._refund_request_contributions(session, request, reason="48 小时未验收自动退款")
-                changed = True
-                processed += 1
-                continue
-            paid_contributions = [item for item in self.request_repo.list_contributions(session, request.id) if item.status == CONTRIBUTION_STATUS_PAID]
-            if not paid_contributions:
-                continue
-            latest_deadline = max((self._normalize_dt(item.deadline_at) for item in paid_contributions if item.deadline_at is not None), default=None)
-            if latest_deadline is not None and latest_deadline <= now - timedelta(days=NO_DELIVERY_DAYS):
-                self._refund_request_contributions(session, request, reason="45 天未交付自动退款")
-                changed = True
-                processed += 1
+            self._refund_request_contributions(session, request, reason="45 天未交付自动退款")
+            changed = True
+            processed += 1
+            processed_request_ids.add(int(request.id))
         if changed:
             session.commit()
         else:
@@ -715,7 +726,15 @@ class RequestsService:
         if max(preview_pages, len(custom_previews)) < 2:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="预览图不足")
 
-    def _to_request_item(self, session: Session, item: RequestRecord, viewer_id: int | None, viewer_role_mask: int | None) -> dict[str, Any]:
+    def _to_request_item(
+        self,
+        session: Session,
+        item: RequestRecord,
+        viewer_id: int | None,
+        viewer_role_mask: int | None,
+        *,
+        responded_ids: set[int] | None = None,
+    ) -> dict[str, Any]:
         is_owner = viewer_id is not None and item.requester_id == viewer_id
         can_manage_all = self._can_manage_all(viewer_role_mask)
         requester_name = item.requester_name
@@ -723,7 +742,10 @@ class RequestsService:
             requester_name = None
         responded = False
         if viewer_id is not None:
-            responded = self.request_repo.find_response_by_request_and_responder(session, item.id, viewer_id) is not None
+            if responded_ids is not None:
+                responded = int(item.id) in responded_ids
+            else:
+                responded = self.request_repo.find_response_by_request_and_responder(session, item.id, viewer_id) is not None
         return {
             "id": item.id,
             "course": item.course,

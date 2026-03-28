@@ -4,7 +4,7 @@ from datetime import date, datetime
 import uuid
 from typing import Any
 
-from sqlalchemy import func, select
+from sqlalchemy import case, func, select
 from sqlalchemy.orm import Session
 
 from app.models.requests import (
@@ -103,6 +103,47 @@ class RequestRepository:
     def list_requests(self, session: Session) -> list[RequestRecord]:
         stmt = select(RequestRecord).order_by(RequestRecord.created_at.desc(), RequestRecord.id.desc())
         return list(session.scalars(stmt))
+
+    def list_public_requests(self, session: Session, *, sort: str | None, limit: int | None = None) -> list[RequestRecord]:
+        stmt = select(RequestRecord).where(RequestRecord.status == "OPEN")
+        normalized = (sort or "latest").lower()
+        if normalized == "hot":
+            stmt = stmt.order_by(
+                RequestRecord.funded_amount_cents.desc(),
+                RequestRecord.response_count.desc(),
+                RequestRecord.created_at.desc(),
+                RequestRecord.id.desc(),
+            )
+        else:
+            stmt = stmt.order_by(RequestRecord.created_at.desc(), RequestRecord.id.desc())
+        if limit is not None:
+            stmt = stmt.limit(limit)
+        return list(session.scalars(stmt))
+
+    def find_hidden_early_exit_request_ids(self, session: Session, *, request_ids: list[int]) -> set[int]:
+        if not request_ids:
+            return set()
+        stmt = (
+            select(RequestContributionRecord.request_id)
+            .where(
+                RequestContributionRecord.request_id.in_(sorted(set(request_ids))),
+                RequestContributionRecord.status.in_(("PAID", "REFUNDING", "REFUNDED")),
+            )
+            .group_by(RequestContributionRecord.request_id)
+            .having(
+                func.sum(case((RequestContributionRecord.status == "REFUNDED", 1), else_=0)) == func.count()
+            )
+        )
+        return {int(value) for value in session.scalars(stmt)}
+
+    def find_responded_request_ids(self, session: Session, *, responder_id: int | None, request_ids: list[int]) -> set[int]:
+        if responder_id is None or not request_ids:
+            return set()
+        stmt = select(RequestResponseRecord.request_id).where(
+            RequestResponseRecord.responder_id == responder_id,
+            RequestResponseRecord.request_id.in_(sorted(set(request_ids))),
+        )
+        return {int(value) for value in session.scalars(stmt)}
 
     def get_request(self, session: Session, request_id: int) -> RequestRecord | None:
         return session.get(RequestRecord, request_id)
@@ -226,6 +267,51 @@ class RequestRepository:
         stmt = select(RequestArbitrationRecord).where(
             RequestArbitrationRecord.status == "PENDING",
             RequestArbitrationRecord.created_at <= threshold,
+        )
+        return list(session.scalars(stmt))
+
+    def list_timed_out_unanswered_requests(self, session: Session, *, created_before: datetime) -> list[RequestRecord]:
+        stmt = (
+            select(RequestRecord)
+            .where(
+                RequestRecord.source != "seed",
+                RequestRecord.accepted_response_id.is_(None),
+                RequestRecord.status.in_(("OPEN", "REFUNDING")),
+                RequestRecord.response_count == 0,
+                RequestRecord.created_at <= created_before,
+            )
+            .order_by(RequestRecord.created_at.asc(), RequestRecord.id.asc())
+        )
+        return list(session.scalars(stmt))
+
+    def list_requests_with_expired_delivery_window(
+        self,
+        session: Session,
+        *,
+        latest_deadline_before: datetime,
+    ) -> list[RequestRecord]:
+        deadline_subquery = (
+            select(
+                RequestContributionRecord.request_id.label("request_id"),
+                func.max(RequestContributionRecord.deadline_at).label("latest_deadline"),
+            )
+            .where(
+                RequestContributionRecord.status == "PAID",
+                RequestContributionRecord.deadline_at.is_not(None),
+            )
+            .group_by(RequestContributionRecord.request_id)
+            .subquery()
+        )
+        stmt = (
+            select(RequestRecord)
+            .join(deadline_subquery, deadline_subquery.c.request_id == RequestRecord.id)
+            .where(
+                RequestRecord.source != "seed",
+                RequestRecord.accepted_response_id.is_(None),
+                RequestRecord.status.in_(("OPEN", "REFUNDING")),
+                deadline_subquery.c.latest_deadline <= latest_deadline_before,
+            )
+            .order_by(deadline_subquery.c.latest_deadline.asc(), RequestRecord.id.asc())
         )
         return list(session.scalars(stmt))
 
