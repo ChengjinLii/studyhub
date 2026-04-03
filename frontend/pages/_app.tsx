@@ -153,12 +153,12 @@ export default function MyApp({ Component, pageProps }: AppProps) {
                       如果你希望了解项目实现、部署方式或参与后续协作，也可以直接查看开源仓库。下面附上官方 QQ 群与仓库入口，方便你继续交流或跟进更新。
                     </p>
                     <div className="stable-version-modal__meta">
-                      <div className="stable-version-modal__meta-card">
-                        <span className="stable-version-modal__meta-label">官方QQ群</span>
+                      <div className="stable-version-modal__meta-row">
+                        <span className="stable-version-modal__meta-label">官方QQ群：</span>
                         <strong className="stable-version-modal__meta-value">245934740</strong>
                       </div>
-                      <div className="stable-version-modal__meta-card">
-                        <span className="stable-version-modal__meta-label">代码仓库</span>
+                      <div className="stable-version-modal__meta-row">
+                        <span className="stable-version-modal__meta-label">代码仓库：</span>
                         <a
                           className="stable-version-modal__meta-link"
                           href="https://github.com/ChengjinLii/studyhub"
@@ -220,6 +220,14 @@ export default function MyApp({ Component, pageProps }: AppProps) {
                   <span className="footer-info__value">2025-11-26</span>
                 </div>
                 <span className="footer-divider">|</span>
+                <button
+                  className="footer-action"
+                  type="button"
+                  onClick={() => setWechatModalOpen(true)}
+                >
+                  官方微信公众号
+                </button>
+                <span className="footer-divider">|</span>
                 <div className="footer-info__item">
                   <span className="footer-info__label">官方QQ群</span>
                   <span className="footer-info__value">245934740</span>
@@ -242,14 +250,6 @@ export default function MyApp({ Component, pageProps }: AppProps) {
                     github.com/ChengjinLii/studyhub
                   </a>
                 </div>
-                <span className="footer-divider">|</span>
-                <button
-                  className="footer-action"
-                  type="button"
-                  onClick={() => setWechatModalOpen(true)}
-                >
-                  官方微信公众号
-                </button>
                 <span className="footer-divider">|</span>
                 <div className="footer-info__item">
                   <span className="footer-info__label">核心贡献者</span>

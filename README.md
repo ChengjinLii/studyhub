@@ -1,7 +1,17 @@
-# StudyHub
+# StudyHub — Source Code
 
-StudyHub 是一个面向高校场景的知识共享与校园互助平台，提供资料共享、经验分享、求购协作与校园集市等功能。  
-官网：https://study-hub.cn
+**The full source code of StudyHub, published for open-source collaboration.**
+
+[![FastAPI](https://img.shields.io/badge/Backend-FastAPI-009688?logo=fastapi&logoColor=white)](#技术栈)
+[![Next.js](https://img.shields.io/badge/Frontend-Next.js-000000?logo=nextdotjs&logoColor=white)](#技术栈)
+[![TypeScript](https://img.shields.io/badge/Language-TypeScript-3178C6?logo=typescript&logoColor=white)](#技术栈)
+[![MySQL + OSS](https://img.shields.io/badge/Data-MySQL_%2B_OSS-2563eb)](#技术栈)
+[![Redis + Worker](https://img.shields.io/badge/Runtime-Redis_%2B_Worker-dc2626?logo=redis&logoColor=white)](#技术栈)
+[![Website](https://img.shields.io/badge/Website-study--hub.cn-111827)](https://study-hub.cn)
+[![MIT](https://img.shields.io/badge/License-MIT-22c55e)](./LICENSE)
+
+> StudyHub 是一个面向高校场景的知识共享与校园互助平台，提供资料共享、经验分享、求购协作与校园集市等功能。  
+> 官网：https://study-hub.cn
 
 ![StudyHub 海报](assets/studyhub-poster.png)
 
@@ -55,7 +65,7 @@ StudyHub 是一个面向高校场景的知识共享与校园互助平台，提�
 
 ## 相关项目
 
-- 初始版本 SpringBoot 实现：https://github.com/ChengjinLii/studyhub-springboot （当前为内部仓库，暂未开源）
+- 初版 SpringBoot 实现：https://github.com/ChengjinLii/studyhub-springboot （当前为内部仓库，暂未开源）
 
 ## 未来规划
 

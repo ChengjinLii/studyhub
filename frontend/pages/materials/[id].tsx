@@ -12,6 +12,7 @@ import { readSession, hasRole } from '../../lib/auth';
 import { fetchMaterialDetail, fetchMaterialPreview, recordMaterialView, reportTarget, setMaterialRating } from '../../lib/api';
 import { fetchBackend } from '../../lib/apiBase';
 import { formatDateTime } from '../../lib/format';
+import { warmImages } from '../../lib/imageWarmup';
 import { formatMajorDisplay } from '../../lib/major';
 import { materialPath, parseMaterialId, slugifyTitle, userPath } from '../../lib/slug';
 import { copyToClipboard, isLikelyMobile, tryNativeShare } from '../../lib/share';
@@ -70,6 +71,7 @@ export default function MaterialDetailPage({ material, user }: MaterialDetailPag
   const [previewExpanded, setPreviewExpanded] = useState(false);
   const [previewPage, setPreviewPage] = useState(1);
   const [previewImageIndex, setPreviewImageIndex] = useState<number | null>(null);
+  const [previewModalImageReady, setPreviewModalImageReady] = useState(false);
   const previewPageSize = 1;
   const uploaderLabel = material?.uploaderNickname || material?.uploaderUsername || '匿名同学';
   const hasCustomPreview =
@@ -149,6 +151,21 @@ export default function MaterialDetailPage({ material, user }: MaterialDetailPag
   }, [preview?.images?.length]);
 
   useEffect(() => {
+    if (!previewExpanded || !preview?.images?.length) {
+      return;
+    }
+    const currentIndex = Math.max(0, previewPage - 1);
+    const targets = [preview.images[currentIndex - 1], preview.images[currentIndex], preview.images[currentIndex + 1]]
+      .filter((item): item is NonNullable<typeof item> => Boolean(item))
+      .map((item) => ({
+        src: item.img.src,
+        srcSet: item.img.srcSet || undefined,
+        sizes: item.img.sizes || undefined,
+      }));
+    void warmImages(targets);
+  }, [previewExpanded, preview, previewPage]);
+
+  useEffect(() => {
     if (!material?.id || typeof window === 'undefined') {
       return;
     }
@@ -194,14 +211,19 @@ export default function MaterialDetailPage({ material, user }: MaterialDetailPag
 
   useEffect(() => {
     if (previewImageIndex === null || typeof window === 'undefined') return;
+    setPreviewModalImageReady(false);
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         setPreviewImageIndex(null);
       }
     };
+    const current = experienceImages[previewImageIndex];
+    const prev = experienceImages[(previewImageIndex - 1 + experienceImages.length) % experienceImages.length];
+    const next = experienceImages[(previewImageIndex + 1) % experienceImages.length];
+    void warmImages([{ src: current }, { src: prev }, { src: next }]);
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [previewImageIndex]);
+  }, [experienceImages, previewImageIndex]);
 
   const handlePreviewImagePrev = () => {
     if (previewImageIndex === null || experienceImages.length <= 1) return;
@@ -211,6 +233,10 @@ export default function MaterialDetailPage({ material, user }: MaterialDetailPag
   const handlePreviewImageNext = () => {
     if (previewImageIndex === null || experienceImages.length <= 1) return;
     setPreviewImageIndex((previewImageIndex + 1) % experienceImages.length);
+  };
+
+  const handleOpenExperienceImage = (index: number) => {
+    setPreviewImageIndex(index);
   };
 
   const notifyQuotaLimit = (message?: string) => {
@@ -857,8 +883,9 @@ export default function MaterialDetailPage({ material, user }: MaterialDetailPag
                           <img
                             src={imageUrl}
                             alt={`经验配图 ${index + 1}`}
+                            decoding="async"
                             loading={index === 0 ? 'eager' : 'lazy'}
-                            onClick={() => setPreviewImageIndex(index)}
+                            onClick={() => handleOpenExperienceImage(index)}
                           />
                         </div>
                       ))}
@@ -938,7 +965,13 @@ export default function MaterialDetailPage({ material, user }: MaterialDetailPag
                         {material?.customPreviewImages && material.customPreviewImages.length > 0 && (
                           <div className="material-custom-preview__grid">
                             {material.customPreviewImages.map((url, index) => (
-                              <img key={`${url}-${index}`} src={url} alt={`预览图 ${index + 1}`} loading="lazy" />
+                              <img
+                                key={`${url}-${index}`}
+                                src={url}
+                                alt={`预览图 ${index + 1}`}
+                                loading="lazy"
+                                decoding="async"
+                              />
                             ))}
                           </div>
                         )}
@@ -987,6 +1020,7 @@ export default function MaterialDetailPage({ material, user }: MaterialDetailPag
                                         srcSet={item.img.srcSet || undefined}
                                         sizes={item.img.sizes || undefined}
                                         alt={`预览第 ${item.index} 页`}
+                                        decoding="async"
                                         loading={previewPage === item.index ? 'eager' : 'lazy'}
                                         fetchPriority={previewPage === item.index ? 'high' : undefined}
                                       />
@@ -1134,7 +1168,15 @@ export default function MaterialDetailPage({ material, user }: MaterialDetailPag
                 </button>
               </>
             )}
-            <img src={experienceImages[previewImageIndex]} alt={`经验配图大图 ${previewImageIndex + 1}`} />
+            <div className={`experience-image-modal__frame${previewModalImageReady ? ' is-ready' : ' is-loading'}`}>
+              {!previewModalImageReady && <div className="experience-image-modal__loading">高清图加载中...</div>}
+              <img
+                src={experienceImages[previewImageIndex]}
+                alt={`经验配图大图 ${previewImageIndex + 1}`}
+                decoding="async"
+                onLoad={() => setPreviewModalImageReady(true)}
+              />
+            </div>
             <div className="experience-image-modal__meta">
               第 {previewImageIndex + 1} / {experienceImages.length} 张
             </div>

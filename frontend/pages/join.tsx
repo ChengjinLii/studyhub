@@ -29,58 +29,51 @@ const ABOUT_POINTS = [
 
 const ENGINEERING_STATUS_CARDS = [
   {
-    title: '当前状态',
-    body: '资料投稿、内容阅读、校园集市与个人主页已形成四条稳定主线，当前工程重点是统一交互标准、收敛页面结构和减少跨页面体验割裂。',
+    title: '仓库定位',
+    body: 'StudyHub 是一个面向高校场景的知识共享与校园互助平台，提供资料共享、经验分享、求购协作与校园集市等功能，官网为 https://study-hub.cn。',
   },
   {
-    title: '核心技术栈',
-    body: '前端采用 Next.js 14 + React + TypeScript，后端采用 Spring Boot 3 + Spring Security + MySQL，文件与图片由 OSS 体系承接，整体以“前后端分层 + 脚本化发布”保障迭代效率。',
+    title: '核心功能',
+    body: '当前主线能力集中在资料共享、经验分享、求购协作与校园集市四块，目标是在一个站内完成找资料、看内容、发布与互动。',
   },
   {
-    title: '迭代方向',
-    body: '近期迭代围绕阅读体验、投稿效率、内容推荐与性能体感展开，优先处理高频路径卡点与交互一致性问题，不做无节制功能铺量。',
+    title: '技术栈',
+    body: '后端基于 FastAPI、SQLAlchemy、Pydantic Settings 与 Uvicorn，前端基于 Next.js 14、React 与 TypeScript，并围绕 MySQL、OSS、Redis、worker 与脚本化部署组织工程。',
   },
   {
-    title: '质量基线',
-    body: '所有页面改造以“可回归、可部署、可维护”为底线：先保证稳定上线，再优化视觉细节与交互质感，避免局部优化破坏整体一致性。',
+    title: '相关项目',
+    body: '初版 SpringBoot 实现仍保留为相关项目；当前仓库聚焦 FastAPI 主线，并持续把开发、预览与生产环境说明收敛为适合开源协作的形式。',
   },
 ];
 
-const ENGINEERING_MODULE_CARDS = [
+const ENGINEERING_STRUCTURE_CARDS = [
   {
     id: '01',
-    title: '资料投稿',
-    body: '持续优化分段填写路径、文件与网盘并行提交流程、预览配置与上架可用性，重点减少投稿步骤中的中断与回退。',
+    title: 'backend/',
+    body: 'FastAPI 后端、测试、fixtures 与运维辅助代码都放在这里，是主要的业务逻辑与服务入口。',
   },
   {
     id: '02',
-    title: '学汇专栏',
-    body: '承接经验、面经与题解等阅读型内容，持续拉开与资料下载页的体验差异，强化文章化结构、栏目入口与内容沉淀逻辑。',
+    title: 'frontend/',
+    body: 'Next.js 前端工程，负责首页、资料页、校园集市、个人主页与内容展示等交互体验。',
   },
   {
     id: '03',
-    title: '校园集市',
-    body: '聚焦信息检索效率、卡片信息密度与交易提示规范，优化列表浏览节奏与二手信息发布体验，降低无效沟通成本。',
+    title: 'reports/',
+    body: '公开的技术报告、项目复盘材料与对外说明，适合协作者快速理解项目背景与设计取舍。',
   },
   {
     id: '04',
-    title: '个人主页',
-    body: '围绕资料、购买、收益、关注关系与身份展示构建个人空间，并作为投稿默认信息来源，提高内容发布的一致性与效率。',
-  },
-  {
-    id: '05',
-    title: '推荐与 AI 能力',
-    body: '逐步接入可解释推荐与结构化输出约束，优先保证合规、证据引用与稳定性，再推进更深入的个性化优化。',
+    title: 'scripts/',
+    body: '开发、部署、worker 与数据库操作脚本集中在这里，方便本地开发和服务维护。',
   },
 ];
 
-const ENGINEERING_STACK_OVERVIEW = [
-  '前端基于 Next.js 页面体系与 React 组件化开发，采用 SSR 与客户端交互结合的方式平衡首屏速度、交互响应与页面可维护性。',
-  '样式系统以全站统一变量与模块化样式为基础，围绕“同语义同表现”持续收敛视觉规范，避免页面级风格漂移。',
-  '后端由 Spring Boot API 提供业务服务，Spring Security + JWT 负责登录态和权限边界，支撑资料、专栏、集市、求购与个人中心等模块。',
-  '数据层以 MySQL 管理用户、内容、订单与互动数据，配合版本化迁移保证表结构演进可控，便于后续推荐与统计能力扩展。',
-  '资源层通过 OSS 承接文件与图片，并在前端落实按需加载、懒加载与静态资源优化，提升弱网环境下的可用性与加载稳定性。',
-  '发布层使用脚本化构建与服务重启流程，保证线上更新可追溯、可回退，降低频繁页面迭代带来的运维风险。',
+const ENGINEERING_FUTURE_ITEMS = [
+  '资料审核：逐步完善资料审核、版权风险识别与异常内容处理流程，提升平台内容质量与合规性。',
+  '语义搜索：为资料、经验分享和求购内容提供更自然的检索体验，减少关键词命中不足的问题。',
+  'MCP 接口：开放面向智能体和开发工具的标准化能力入口，便于后续接入更丰富的自动化工作流。',
+  '检索与推荐：继续增强资料推荐、贡献榜与校园集市的排序策略，让首页内容更贴近用户当前需求。',
 ];
 
 interface JoinPageProps {
@@ -254,8 +247,27 @@ export default function JoinPage({ user }: JoinPageProps) {
                 </div>
                 <div className="join-engineering-block">
                   <div className="join-engineering-meta">
-                    <span>当前阶段：2026 Q1</span>
-                    <span>关键词：资料共享 / 内容阅读 / 校园互助</span>
+                    <span>当前仓库：studyhub</span>
+                    <span>公开主线：FastAPI + Next.js</span>
+                    <span>官网：https://study-hub.cn</span>
+                  </div>
+                  <div className="join-engineering-links" aria-label="GitHub 索引">
+                    <a
+                      className="join-engineering-link"
+                      href="https://github.com/ChengjinLii/studyhub"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      GitHub 主仓库
+                    </a>
+                    <a
+                      className="join-engineering-link"
+                      href="https://github.com/ChengjinLii/studyhub-springboot"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      SpringBoot 版本
+                    </a>
                   </div>
 
                   <div className="join-engineering-status-grid">
@@ -268,9 +280,9 @@ export default function JoinPage({ user }: JoinPageProps) {
                   </div>
 
                   <section className="join-engineering-subsection">
-                    <h3 className="join-engineering-subtitle">当前主要模块</h3>
+                    <h3 className="join-engineering-subtitle">仓库结构</h3>
                     <div className="join-engineering-module-grid">
-                      {ENGINEERING_MODULE_CARDS.map((item) => (
+                      {ENGINEERING_STRUCTURE_CARDS.map((item) => (
                         <article key={item.id} className="join-engineering-module-item">
                           <span className="join-engineering-module-item__id">{item.id}</span>
                           <h4>{item.title}</h4>
@@ -281,9 +293,9 @@ export default function JoinPage({ user }: JoinPageProps) {
                   </section>
 
                   <section className="join-engineering-subsection">
-                    <h3 className="join-engineering-subtitle">技术栈概述</h3>
+                    <h3 className="join-engineering-subtitle">未来规划</h3>
                     <div className="join-engineering-stack-list">
-                      {ENGINEERING_STACK_OVERVIEW.map((item, index) => (
+                      {ENGINEERING_FUTURE_ITEMS.map((item, index) => (
                         <article key={item} className="join-engineering-stack-item">
                           <span className="join-engineering-stack-item__id">{String(index + 1).padStart(2, '0')}</span>
                           <p className="help-text">{item}</p>

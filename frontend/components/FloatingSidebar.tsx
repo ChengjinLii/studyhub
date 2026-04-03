@@ -2,10 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { hasRole, readSession } from '../lib/auth';
 import { fetchBackend } from '../lib/apiBase';
-import { formatDateTime } from '../lib/format';
 import { materialPath } from '../lib/slug';
 import { RoleMask, SessionUser } from '../types/user';
-import { ProfileSummary, NotificationItem } from '../types/profile';
 import { MaterialListItem } from '../types/material';
 
 type EyeOffset = { x: number; y: number };
@@ -24,13 +22,8 @@ type AiRecommendation = {
 const POS_STORAGE_KEY = 'floating-sidebar-pos';
 
 export default function FloatingSidebar() {
-  const { user: sessionUser, token: sessionToken } = readSession();
+  const { user: sessionUser } = readSession();
   const [user, setUser] = useState<SessionUser | null>(sessionUser);
-  const [profileSummary, setProfileSummary] = useState<ProfileSummary | null>(null);
-  const [hasNewAlerts, setHasNewAlerts] = useState(false);
-  const [notificationList, setNotificationList] = useState<NotificationItem[]>([]);
-  const [latestNotification, setLatestNotification] = useState<string | null>(null);
-  const [latestNotificationSender, setLatestNotificationSender] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarPosition, setSidebarPosition] = useState({ x: 60, y: 220 });
   const sidebarRef = useRef<HTMLDivElement>(null);
@@ -44,8 +37,6 @@ export default function FloatingSidebar() {
   const [eyeOffset, setEyeOffset] = useState<EyeOffset>({ x: 0, y: 0 });
   const eyeTrackingEnabled = true; // 眼睛跟随默认开启（无开关）
   const lastFetchRef = useRef<number>(0);
-  const notificationSectionRef = useRef<HTMLDivElement>(null);
-  const statsSectionRef = useRef<HTMLDivElement>(null);
   const [chatQuery, setChatQuery] = useState('');
   const [chatLoading, setChatLoading] = useState(false);
   const [chatError, setChatError] = useState<string | null>(null);
@@ -163,18 +154,6 @@ export default function FloatingSidebar() {
       .map((role) => role.label);
   }, [user]);
 
-  const userMetrics = useMemo(() => {
-    const uploads = profileSummary?.uploads ?? [];
-    const listings = profileSummary?.marketListings ?? [];
-    return {
-      downloadTotal: uploads.reduce((sum, item) => sum + (item.downloadCount ?? item.salesCount ?? 0), 0),
-      commentTotal: uploads.reduce((sum, item) => sum + (item.commentCount ?? 0), 0),
-      likeTotal: uploads.reduce((sum, item) => sum + (item.likeCount ?? 0), 0),
-      marketWantTotal: listings.reduce((sum, item) => sum + (item.wantCount ?? 0), 0),
-    };
-  }, [profileSummary]);
-
-
   useEffect(() => {
     const handleOpen = (event: Event) => {
       const custom = event as CustomEvent<string>;
@@ -195,45 +174,12 @@ export default function FloatingSidebar() {
     };
 
     try {
-      const [
-        { resp: sessionResp, json: sessionJson },
-        { resp: summaryResp, json: summaryJson },
-        { resp: listResp, json: listJson },
-        { resp: meResp, json: meJson },
-      ] = await Promise.all([
-        fetchJson('/session'),
-        fetchJson('/notifications/summary'),
-        fetchJson('/notifications/list'),
-        fetchJson('/me'),
-      ]);
+      const { resp: sessionResp, json: sessionJson } = await fetchJson('/session');
 
       if (!cancelled && sessionResp.ok && sessionJson?.data?.user) {
         setUser(sessionJson.data.user);
       } else if (!cancelled && (sessionResp.status === 401 || sessionResp.status === 403)) {
         setUser(null);
-      }
-
-      if (!cancelled && summaryJson?.ok) {
-        setHasNewAlerts(summaryJson.data?.hasUnread ?? false);
-        setLatestNotification(summaryJson.data?.latestMessage || null);
-        setLatestNotificationSender(summaryJson.data?.latestSender || null);
-      } else if (!cancelled && (summaryResp.status === 401 || summaryResp.status === 403)) {
-        setHasNewAlerts(false);
-        setLatestNotification(null);
-        setLatestNotificationSender(null);
-      }
-
-      if (!cancelled && listJson?.ok && Array.isArray(listJson.data)) {
-        setNotificationList(listJson.data);
-      } else if (!cancelled && (listResp.status === 401 || listResp.status === 403)) {
-        setNotificationList([]);
-      }
-
-      if (!cancelled && meResp.ok && meJson?.ok) {
-        setProfileSummary(meJson.data);
-        if (meJson.data?.user) setUser(meJson.data.user);
-      } else if (!cancelled && (meResp.status === 401 || meResp.status === 403)) {
-        setProfileSummary(null);
       }
       lastFetchRef.current = Date.now();
     } catch {
@@ -452,31 +398,6 @@ export default function FloatingSidebar() {
 
   const loginLink = { pathname: '/login' };
   const registerLink = { pathname: '/login', query: { mode: 'register' } };
-  const scrollToSection = (ref: React.RefObject<HTMLElement>) => {
-    if (ref.current) {
-      ref.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
-  };
-  const sidebarQuickNavItems = [
-    { key: 'notifications', label: '通知', icon: '🔔', action: () => scrollToSection(notificationSectionRef) },
-    {
-      key: 'quota',
-      label: '下载次数',
-      icon: '📥',
-      action: () => {
-        window.location.href = '/me#download-quota';
-      },
-    },
-    { key: 'stats', label: '数据', icon: '📊', action: () => scrollToSection(statsSectionRef) },
-    {
-      key: 'payout',
-      label: '收益申请',
-      icon: '💰',
-      action: () => {
-        window.location.href = '/me#payout';
-      },
-    },
-  ];
 
   return (
     <aside
@@ -498,14 +419,8 @@ export default function FloatingSidebar() {
         onClick={() => {
           if (suppressClickRef.current) return;
           setSidebarOpen((prev) => !prev);
-          if (hasNewAlerts) {
-            fetchBackend('/notifications/read', { method: 'POST' })
-              .then(() => setHasNewAlerts(false))
-              .catch(() => {});
-          }
         }}
       >
-        {hasNewAlerts && <span className="floating-sidebar__badge">新</span>}
         <span className="floating-sidebar__hat" aria-hidden="true" />
         <span className="floating-face" aria-hidden="true" />
       </button>
@@ -524,19 +439,6 @@ export default function FloatingSidebar() {
             </button>
           </div>
           <div className="sidebar-body">
-            <div className="sidebar-quick-nav">
-              {sidebarQuickNavItems.map((item) => (
-                <button key={item.key} type="button" className="sidebar-quick-nav__action" onClick={item.action}>
-                  <span className="sidebar-quick-nav__icon" aria-hidden="true">
-                    {item.icon}
-                  </span>
-                  <span className="sidebar-quick-nav__label">{item.label}</span>
-                  <span className="sidebar-quick-nav__chevron" aria-hidden="true">
-                    ↗
-                  </span>
-                </button>
-              ))}
-            </div>
             <div className="sidebar-section">
               {user ? (
                 <>
@@ -588,73 +490,6 @@ export default function FloatingSidebar() {
                 </>
               )}
             </div>
-            {user && (
-              <div className="sidebar-section" ref={notificationSectionRef}>
-                <h4 className="sidebar-section-title">通知列表</h4>
-                {notificationList.length === 0 ? (
-                  <p className="sidebar-muted">最近一个月暂无通知</p>
-                ) : (
-                  <>
-                    <ul className="sidebar-note-list">
-                      {notificationList.slice(0, 3).map((item) => (
-                        <li key={item.id}>
-                          <p>{item.message}</p>
-                          <span>
-                            {item.sender || '管理员'} · {formatNoteTime(item.createdAt)}
-                          </span>
-                        </li>
-                      ))}
-                    </ul>
-                    {notificationList.length > 3 && (
-                      <Link href="/me#notifications" className="sidebar-link subtle">
-                        查看更多通知（{notificationList.length - 3}）
-                      </Link>
-                    )}
-                  </>
-                )}
-              </div>
-            )}
-            {user && (
-              <div className="sidebar-section" ref={statsSectionRef}>
-                <h4 className="sidebar-section-title">投稿 & 好物表现</h4>
-                <ul className="sidebar-stat-list dense">
-                  <li>
-                    <span>资料下载</span>
-                    <strong>{userMetrics.downloadTotal}</strong>
-                  </li>
-                  <li>
-                    <span>资料评论</span>
-                    <strong>{userMetrics.commentTotal}</strong>
-                  </li>
-                  <li>
-                    <span>资料点赞</span>
-                    <strong>{userMetrics.likeTotal}</strong>
-                  </li>
-                  <li>
-                    <span>校园好物想要</span>
-                    <strong>{userMetrics.marketWantTotal}</strong>
-                  </li>
-                </ul>
-              </div>
-            )}
-            {user && profileSummary?.adminNotes && profileSummary.adminNotes.length > 0 && (
-              <div className="sidebar-section">
-                <h4>管理员留言</h4>
-                <ul className="sidebar-note-list">
-                  {profileSummary.adminNotes.slice(0, 3).map((note) => (
-                    <li key={note.id}>
-                      <p>{note.message}</p>
-                      <span>
-                        {note.adminNickname || note.adminUsername || '管理员'} · {formatNoteTime(note.createdAt)}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-                {profileSummary.adminNotes.length > 3 && (
-                  <p className="sidebar-muted">还有 {profileSummary.adminNotes.length - 3} 条留言可在“我的”中查看。</p>
-                )}
-              </div>
-            )}
             <div className="sidebar-section sidebar-chat">
               <h4 className="sidebar-section-title">AI 资料推荐</h4>
               <p className="sidebar-muted">输入关键词，AI 只会推荐资料库内的内容。</p>

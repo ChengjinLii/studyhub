@@ -8,6 +8,7 @@ import { readSession, hasRole } from '../../lib/auth';
 import { reportTarget } from '../../lib/api';
 import { getRequestOrigin } from '../../lib/apiBase';
 import { fetchMarketItemDetail } from '../../lib/market';
+import { warmImage } from '../../lib/imageWarmup';
 import { SAMPLE_MARKET_ITEMS } from '../../constants/marketSamples';
 import { marketPath, parseMarketId, slugifyTitle, userPath } from '../../lib/slug';
 import { copyToClipboard, isLikelyMobile, tryNativeShare } from '../../lib/share';
@@ -46,6 +47,7 @@ export default function MarketDetailPage({ user, item }: DetailPageProps) {
   const [shareSheetText, setShareSheetText] = useState('');
   const [shareSheetUrl, setShareSheetUrl] = useState('');
   const [activeImageIndex, setActiveImageIndex] = useState(0);
+  const [mainImageReady, setMainImageReady] = useState(false);
   const isAdmin = Boolean(user && hasRole(user.roleMask, RoleMask.ADMIN));
   const canViewImages = Boolean(user);
 
@@ -279,6 +281,23 @@ export default function MarketDetailPage({ user, item }: DetailPageProps) {
     setActiveImageIndex(0);
   }, [state?.id, galleryItems.length]);
 
+  useEffect(() => {
+    if (!galleryItems.length) {
+      setMainImageReady(false);
+      return;
+    }
+    setMainImageReady(false);
+    const next = galleryItems[(activeImageIndex + 1) % galleryItems.length];
+    if (!next || galleryItems.length < 2) {
+      return;
+    }
+    const { src, variant } = next;
+    void warmImage(variant?.src || src, {
+      srcSet: variant?.srcSet || variant?.webpSrcSet || variant?.avifSrcSet || undefined,
+      sizes: '(max-width: 768px) 90vw, (max-width: 1200px) 70vw, 60vw',
+    });
+  }, [activeImageIndex, galleryItems]);
+
   const handlePrevImage = () => {
     if (!canSwitchGallery) return;
     setActiveImageIndex((prev) => (prev - 1 + galleryItems.length) % galleryItems.length);
@@ -355,7 +374,11 @@ export default function MarketDetailPage({ user, item }: DetailPageProps) {
                     ? ({ '--lqip': `url(${responsive.lqip})` } as CSSProperties)
                     : undefined;
                   return (
-                    <div className={`market-gallery__main${lqipStyle ? ' has-lqip' : ''}`} style={lqipStyle}>
+                    <div
+                      className={`market-gallery__main${lqipStyle ? ' has-lqip' : ''}${mainImageReady ? ' is-ready' : ' is-loading'}`}
+                      style={lqipStyle}
+                    >
+                      {!mainImageReady && <div className="market-gallery__loading">图片加载中...</div>}
                       <picture>
                         {responsive.avifSrcSet && (
                           <source type="image/avif" srcSet={responsive.avifSrcSet} sizes={sizes} />
@@ -365,11 +388,14 @@ export default function MarketDetailPage({ user, item }: DetailPageProps) {
                         )}
                         <img
                           {...responsive.img}
+                          decoding="async"
+                          onLoad={() => setMainImageReady(true)}
                           onError={(e) => {
                             const target = e.currentTarget;
                             target.onerror = null;
                             target.src = fallback;
                             target.removeAttribute('srcset');
+                            setMainImageReady(true);
                           }}
                         />
                       </picture>
@@ -400,7 +426,7 @@ export default function MarketDetailPage({ user, item }: DetailPageProps) {
                         aria-label={`查看第 ${index + 1} 张图片`}
                         aria-pressed={index === activeImageIndex}
                       >
-                        <img src={variant?.src || src} alt={`商品图片 ${index + 1}`} loading="lazy" />
+                        <img src={variant?.src || src} alt={`商品图片 ${index + 1}`} loading="lazy" decoding="async" />
                       </button>
                     ))}
                   </div>

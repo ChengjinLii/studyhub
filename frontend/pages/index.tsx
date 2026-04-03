@@ -516,7 +516,7 @@ export default function Home({
           throw new Error(json.msg || '关注失败');
         }
         setLeaderboardFollowed((prev) => ({ ...prev, [userId]: true }));
-        setLeaderboardFollowNotice({ type: 'success', text: '已关注' });
+        setLeaderboardFollowNotice(null);
       } catch (error: any) {
         setLeaderboardFollowNotice({ type: 'error', text: error.message || '关注失败' });
       } finally {
@@ -1240,11 +1240,7 @@ export default function Home({
               </div>
             </div>
           </div>
-          {leaderboardFollowNotice && (
-            <p className={leaderboardFollowNotice.type === 'error' ? 'error-text' : 'success-text'}>
-              {leaderboardFollowNotice.text}
-            </p>
-          )}
+          {leaderboardFollowNotice?.type === 'error' && <p className="error-text">{leaderboardFollowNotice.text}</p>}
           {leaderboardError && <p className="error-text">{leaderboardError}</p>}
           {leaderboardLoading && <p className="help-text">贡献榜单加载中...</p>}
           {topContributors.length === 0 ? (

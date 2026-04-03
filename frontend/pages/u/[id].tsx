@@ -450,11 +450,7 @@ export default function UserProfilePage({ user, profile }: UserProfilePageProps)
                     <span className="profile-hero__stat-label">关注</span>
                   </div>
                 </div>
-                {followNotice && (
-                  <p className={followNotice.type === 'error' ? 'error-text' : 'success-text'}>
-                    {followNotice.text}
-                  </p>
-                )}
+                {followNotice?.type === 'error' && <p className="error-text">{followNotice.text}</p>}
                 {reportNotice && (
                   <p className={reportNotice.type === 'error' ? 'error-text' : 'success-text'}>
                     {reportNotice.text}
