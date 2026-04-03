@@ -1,6 +1,4 @@
-# StudyHub — Source Code
-
-**The full source code of StudyHub, published for open-source collaboration.**
+# StudyHub
 
 [![FastAPI](https://img.shields.io/badge/Backend-FastAPI-009688?logo=fastapi&logoColor=white)](#技术栈)
 [![Next.js](https://img.shields.io/badge/Frontend-Next.js-000000?logo=nextdotjs&logoColor=white)](#技术栈)
@@ -10,10 +8,10 @@
 [![Website](https://img.shields.io/badge/Website-study--hub.cn-111827)](https://study-hub.cn)
 [![MIT](https://img.shields.io/badge/License-MIT-22c55e)](./LICENSE)
 
+![StudyHub 海报](assets/studyhub-poster.png)
+
 > StudyHub 是一个面向高校场景的知识共享与校园互助平台，提供资料共享、经验分享、求购协作与校园集市等功能。  
 > 官网：https://study-hub.cn
-
-![StudyHub 海报](assets/studyhub-poster.png)
 
 ## 核心功能
 
