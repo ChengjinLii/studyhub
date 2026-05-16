@@ -19,13 +19,11 @@ const nextConfig = {
   env: {
     ...(apiBase ? { NEXT_PUBLIC_API_BASE: apiBase } : {}),
   },
-  // 构建时忽略 TypeScript 错误（先让网站跑起来）
   typescript: {
-    ignoreBuildErrors: true,
+    ignoreBuildErrors: false,
   },
-  // 构建时忽略 ESLint 错误
   eslint: {
-    ignoreDuringBuilds: true,
+    ignoreDuringBuilds: false,
   },
 };
 

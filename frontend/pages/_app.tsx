@@ -1,5 +1,6 @@
 import type { AppProps } from 'next/app';
 import Head from 'next/head';
+import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { fetchBackend } from '../lib/apiBase';
 import '../styles/globals.css';
@@ -259,13 +260,13 @@ export default function MyApp({ Component, pageProps }: AppProps) {
             </div>
             <div className="footer-hairline" />
             <div className="footer-links">
-              <a href="/join#engineering">工程日志</a>
+              <Link href="/join#engineering">工程日志</Link>
               <span className="footer-divider">|</span>
-              <a href="/join">关于我们</a>
+              <Link href="/join">关于我们</Link>
               <span className="footer-divider">|</span>
-              <a href="/identity-info">身份信息说明</a>
+              <Link href="/identity-info">身份信息说明</Link>
               <span className="footer-divider">|</span>
-              <a href="/identity-info">用户协议 / 隐私政策</a>
+              <Link href="/identity-info">用户协议 / 隐私政策</Link>
               <span className="footer-divider">|</span>
               <span>内容版权归作者</span>
             </div>

@@ -499,9 +499,9 @@ export default function UploadPage({ user, token, account }: UploadPageProps) {
       )
     );
     const combined: string[] = [];
-    for (const tag of baseSet) {
+    Array.from(baseSet).forEach((tag) => {
       if (combined.length < MAX_TAGS) combined.push(tag);
-    }
+    });
     let trimmedCustom = false;
     for (const tag of customEntries) {
       if (combined.length >= MAX_TAGS) {

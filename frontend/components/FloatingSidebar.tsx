@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { hasRole, readSession } from '../lib/auth';
 import { fetchBackend } from '../lib/apiBase';
+import { formatDateTime } from '../lib/format';
 import { materialPath } from '../lib/slug';
 import { RoleMask, SessionUser } from '../types/user';
 import { MaterialListItem } from '../types/material';
@@ -472,12 +473,12 @@ export default function FloatingSidebar() {
                     <div>
                       <strong>未登录</strong>
                       <span className="sidebar-username">
-                        <a className="login-link" href="/login">登录</a>后解锁个人中心
+                        <Link className="login-link" href="/login">登录</Link>后解锁个人中心
                       </span>
                     </div>
                   </div>
                   <p className="sidebar-muted">
-                    <a className="login-link" href="/login">登录</a>后可同步购买、投稿、批量下载记录。
+                    <Link className="login-link" href="/login">登录</Link>后可同步购买、投稿、批量下载记录。
                   </p>
                   <div className="sidebar-auth-actions">
                     <Link className="button primary small" href={loginLink}>

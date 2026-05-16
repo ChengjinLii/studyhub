@@ -40,6 +40,36 @@ export interface MaterialVersion {
   id: number;
   versionLabel: string;
   createdAt: string;
+  changelog?: string | null;
+}
+
+export interface CommentUser {
+  id?: number | null;
+  nickname?: string | null;
+  avatar?: string | null;
+  isAuthor?: boolean;
+}
+
+export interface Comment {
+  id: number;
+  materialId: number;
+  parentId?: number | null;
+  content: string;
+  likeCount: number;
+  replyCount: number;
+  edited?: boolean;
+  deleted?: boolean;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+  user: CommentUser;
+  hasLiked?: boolean;
+  rating?: number | null;
+  replies?: Comment[];
+}
+
+export interface CommentListResponse {
+  items: Comment[];
+  meta: PaginationMeta;
 }
 
 export interface MaterialReview {

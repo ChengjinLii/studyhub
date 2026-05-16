@@ -110,6 +110,6 @@ export default function IdentityInfoPage({ user }: IdentityInfoPageProps) {
 }
 
 export const getServerSideProps: GetServerSideProps<IdentityInfoPageProps> = async ({ req }) => {
-  const user = readSession(req);
-  return { props: { user } };
+  const session = readSession(req);
+  return { props: { user: session.user } };
 };

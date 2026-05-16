@@ -8,6 +8,7 @@ export interface PayoutEarnings {
 
 export interface PayoutApplication {
   id?: number;
+  applicantName?: string;
   status?: 'PENDING' | 'APPROVED' | 'REJECTED' | 'SETTLED' | 'KYC_FAILED' | 'KYC_PENDING';
   alipayAccount?: string;
   alipayName?: string;

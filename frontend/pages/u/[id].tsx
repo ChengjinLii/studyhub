@@ -199,7 +199,7 @@ export default function UserProfilePage({ user, profile }: UserProfilePageProps)
             const tags = Array.isArray(json?.data?.tags) ? (json.data.tags as string[]) : [];
             return [materialId, tags] as const;
           } catch {
-            return [materialId, []] as const;
+            return [materialId, [] as string[]] as const;
           }
         })
       );

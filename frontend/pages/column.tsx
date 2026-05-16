@@ -78,7 +78,12 @@ const DEFAULT_COLUMN_TOPIC: ColumnTopicKey = 'experience';
 const COMMUNITY_ENTRIES = COLUMN_ENTRIES.filter((entry) => entry.type === 'community');
 const EDITORIAL_ENTRIES = COLUMN_ENTRIES.filter((entry) => entry.type === 'editorial');
 
-const COLUMN_TRACKS = [
+const COLUMN_TRACKS: Array<{
+  key: string;
+  title: string;
+  status: string;
+  description: string;
+}> = [
   {
     key: 'guide',
     title: '学习攻略',

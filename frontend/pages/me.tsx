@@ -1,7 +1,7 @@
 import { GetServerSideProps } from 'next';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import { FormEvent, useEffect, useState } from 'react';
+import { FormEvent, ReactElement, useEffect, useState } from 'react';
 import NavBar from '../components/NavBar';
 import ProfileCard from '../components/ProfileCard';
 import { readSession } from '../lib/auth';
@@ -224,7 +224,7 @@ export default function MePage({ user, summary, account }: MePageProps) {
     { id: 'listings', label: '校园好物', icon: 'shop' },
     { id: 'security', label: '安全设置', icon: 'lock' },
   ];
-  const quickNavIcons: Record<string, JSX.Element> = {
+  const quickNavIcons: Record<string, ReactElement> = {
     profile: (
       <svg viewBox="0 0 24 24" aria-hidden="true">
         <circle cx="12" cy="8" r="4" fill="none" stroke="currentColor" strokeWidth="1.8" />
@@ -820,7 +820,7 @@ export default function MePage({ user, summary, account }: MePageProps) {
                 <div className="me-hero__eyebrow">我的 StudyHub</div>
                 <h1 className="me-hero__title">欢迎来到 StudyHub。</h1>
                 <p className="me-hero__subtitle">
-                  您当前为游客，<a className="login-link" href="/login?next=/me">登录</a>后可查看订单、收藏、投稿与结算信息。
+                  您当前为游客，<Link className="login-link" href="/login?next=/me">登录</Link>后可查看订单、收藏、投稿与结算信息。
                 </p>
                 <div className="me-hero__actions">
                   <Link className="button primary" href="/login?next=/me">

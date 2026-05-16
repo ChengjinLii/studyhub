@@ -18,6 +18,18 @@ STUDYHUB_ENVIRONMENT=preview \
 bash scripts/db/db-init-schema.sh
 ```
 
+迁移：
+
+```bash
+STUDYHUB_ENVIRONMENT=preview bash scripts/db/db-migrate.sh
+```
+
+如果目标库已经由旧流程建好表，只需要记录当前迁移版本：
+
+```bash
+STUDYHUB_ENVIRONMENT=preview bash scripts/db/db-stamp-head.sh
+```
+
 备份：
 
 ```bash
@@ -38,3 +50,4 @@ bash scripts/db/db-restore-preview.sh /path/to/preview-backup.sql.gz
 - 默认以只读检查和备份为主
 - production 不允许通过该目录下脚本直接恢复数据库
 - preview 恢复和建表都需要显式确认环境变量
+- migration 需要显式执行，不会在 Web 服务启动时自动修改 schema

@@ -14,7 +14,7 @@ import { marketPath, parseMarketId, slugifyTitle, userPath } from '../../lib/slu
 import { copyToClipboard, isLikelyMobile, tryNativeShare } from '../../lib/share';
 import { SessionUser, RoleMask } from '../../types/user';
 import { MarketItemDetail } from '../../types/market';
-import { buildResponsiveImage, isMarketPlaceholder } from '../../lib/ossImage';
+import { buildResponsiveImage, isMarketPlaceholder, ResponsiveImageResult } from '../../lib/ossImage';
 
 interface DetailPageProps {
   user: SessionUser | null;
@@ -30,6 +30,13 @@ const CATEGORY_LABELS: Record<string, string> = {
 };
 const HEART_ICON_FILLED = '\u2665\uFE0E';
 const HEART_ICON_OUTLINE = '\u2661\uFE0E';
+
+type MarketResponsiveImage = {
+  img: ResponsiveImageResult['img'];
+  webpSrcSet?: string;
+  avifSrcSet?: string;
+  lqip?: string;
+};
 
 export default function MarketDetailPage({ user, item }: DetailPageProps) {
   const router = useRouter();
@@ -51,28 +58,11 @@ export default function MarketDetailPage({ user, item }: DetailPageProps) {
   const isAdmin = Boolean(user && hasRole(user.roleMask, RoleMask.ADMIN));
   const canViewImages = Boolean(user);
 
-  if (!state) {
-    return (
-      <>
-        <NavBar user={user} />
-        <main className="container">
-          <section className="card">
-            <h2>未找到商品</h2>
-            <p>该商品可能已下架或不存在。</p>
-            <Link className="button primary" href="/market">
-              返回校园集市
-            </Link>
-          </section>
-        </main>
-      </>
-    );
-  }
-
-  const sellerDisplay = state.sellerName || '匿名同学';
-  const galleryItems = state.images
+  const sellerDisplay = state?.sellerName || '匿名同学';
+  const galleryItems = (state?.images ?? [])
     .map((src, index) => ({
       src,
-      variant: state.imageVariants?.[index],
+      variant: state?.imageVariants?.[index],
     }))
     .filter(({ src, variant }) => !isMarketPlaceholder(variant?.src ?? src));
   const hasImages = galleryItems.length > 0;
@@ -80,15 +70,15 @@ export default function MarketDetailPage({ user, item }: DetailPageProps) {
   const loginHref = `/login?next=${encodeURIComponent(router.asPath)}`;
   const canSwitchGallery = hasImages && galleryItems.length > 1;
   const activeGalleryItem = galleryItems[activeImageIndex] || galleryItems[0];
-  const categoryLabel = CATEGORY_LABELS[state.category] || '其他';
+  const categoryLabel = CATEGORY_LABELS[state?.category || ''] || '其他';
   const statusLabel =
-    state.status === 'SOLD'
+    state?.status === 'SOLD'
       ? '已售出'
-      : state.status === 'REMOVED' || state.status === 'HIDDEN'
+      : state?.status === 'REMOVED' || state?.status === 'HIDDEN'
       ? '已下架'
       : '在售';
   const statusTone =
-    state.status === 'SOLD' ? 'sold' : state.status === 'REMOVED' || state.status === 'HIDDEN' ? 'removed' : 'sale';
+    state?.status === 'SOLD' ? 'sold' : state?.status === 'REMOVED' || state?.status === 'HIDDEN' ? 'removed' : 'sale';
 
   const handleShowContact = async () => {
     if (!state || state.id < 0) return;
@@ -308,6 +298,23 @@ export default function MarketDetailPage({ user, item }: DetailPageProps) {
     setActiveImageIndex((prev) => (prev + 1) % galleryItems.length);
   };
 
+  if (!state) {
+    return (
+      <>
+        <NavBar user={user} />
+        <main className="container">
+          <section className="card">
+            <h2>未找到商品</h2>
+            <p>该商品可能已下架或不存在。</p>
+            <Link className="button primary" href="/market">
+              返回校园集市
+            </Link>
+          </section>
+        </main>
+      </>
+    );
+  }
+
   return (
     <>
       <NavBar user={user} />
@@ -340,7 +347,7 @@ export default function MarketDetailPage({ user, item }: DetailPageProps) {
                   const fallback = '/placeholders/market-item.svg';
                   const variant = activeGalleryItem?.variant;
                   const src = activeGalleryItem?.src;
-                  const responsive = variant?.src
+                  const responsive: MarketResponsiveImage = variant?.src
                     ? {
                         img: {
                           src: variant.src || src || fallback,
@@ -388,6 +395,7 @@ export default function MarketDetailPage({ user, item }: DetailPageProps) {
                         )}
                         <img
                           {...responsive.img}
+                          alt={responsive.img.alt}
                           decoding="async"
                           onLoad={() => setMainImageReady(true)}
                           onError={(e) => {

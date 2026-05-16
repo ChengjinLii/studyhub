@@ -1,4 +1,5 @@
 import type { IncomingMessage } from 'http';
+import type { TLSSocket } from 'tls';
 import { normalizeMockAssets } from './mockAsset';
 
 const normalizeApiBase = (value: string) => {
@@ -63,7 +64,7 @@ export const getRequestOrigin = (req?: IncomingMessage | null) => {
   if (!req) return undefined;
   const host = req.headers.host;
   if (!host) return undefined;
-  const proto = (req.headers['x-forwarded-proto'] as string) || (req.socket?.encrypted ? 'https' : 'http');
+  const proto = (req.headers['x-forwarded-proto'] as string) || ((req.socket as TLSSocket | undefined)?.encrypted ? 'https' : 'http');
   return `${proto}://${host}`;
 };
 

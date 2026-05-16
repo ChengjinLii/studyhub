@@ -40,6 +40,8 @@ export interface MarketItemDetail {
   id: number;
   sellerId: number;
   sellerName?: string | null;
+  sellerNickname?: string | null;
+  sellerUsername?: string | null;
   title: string;
   description?: string | null;
   price: number;

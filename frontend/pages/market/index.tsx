@@ -10,7 +10,7 @@ import { formatNumber } from '../../lib/format';
 import { SessionUser, RoleMask } from '../../types/user';
 import { MarketItem, MarketListResponse } from '../../types/market';
 import { SAMPLE_MARKET_ITEMS } from '../../constants/marketSamples';
-import { buildResponsiveImage, isMarketPlaceholder } from '../../lib/ossImage';
+import { buildResponsiveImage, isMarketPlaceholder, ResponsiveImageResult } from '../../lib/ossImage';
 import { getRequestOrigin, resolveApiBase } from '../../lib/apiBase';
 import { marketPath, userPath } from '../../lib/slug';
 
@@ -31,6 +31,13 @@ const CATEGORY_LABELS: Record<string, string> = {
 };
 const HEART_ICON_FILLED = '\u2665\uFE0E';
 const HEART_ICON_OUTLINE = '\u2661\uFE0E';
+
+type MarketResponsiveImage = {
+  img: ResponsiveImageResult['img'];
+  webpSrcSet?: string;
+  avifSrcSet?: string;
+  lqip?: string;
+};
 
 interface MarketPageProps {
   user: SessionUser | null;
@@ -203,6 +210,28 @@ export default function MarketPage({ user, items, meta, filters, stats }: Market
       );
     } finally {
       setPaginationLoading(false);
+    }
+  };
+
+  const handleAdminDelete = async (itemId: number) => {
+    if (!isAdmin || itemId < 0) return;
+    if (!window.confirm('确定要删除该商品吗？此操作不可撤销。')) {
+      return;
+    }
+    setDeletingId(itemId);
+    setModerationAlert(null);
+    try {
+      const resp = await fetch(`/api/admin/market/${itemId}`, { method: 'DELETE' });
+      const json = await resp.json();
+      if (!resp.ok || !json.ok) {
+        throw new Error(json.msg || '删除失败');
+      }
+      setModerationAlert({ type: 'success', text: '商品已删除。' });
+      await router.replace(router.asPath, undefined, { scroll: false });
+    } catch (error: any) {
+      setModerationAlert({ type: 'error', text: error.message || '删除失败，请稍后重试。' });
+    } finally {
+      setDeletingId((prev) => (prev === itemId ? null : prev));
     }
   };
 
@@ -406,7 +435,7 @@ export default function MarketPage({ user, items, meta, filters, stats }: Market
               const showLocked = !canViewImages && hasImage;
               const showImage = canViewImages && hasImage;
               const categoryText = CATEGORY_LABELS[item.category] || '其他';
-              const cardImage = showImage
+              const cardImage: MarketResponsiveImage | null = showImage
                 ? item.thumbnailVariant?.src
                   ? {
                       img: {
@@ -459,6 +488,7 @@ export default function MarketPage({ user, items, meta, filters, stats }: Market
                         {cardImage.webpSrcSet && <source type="image/webp" srcSet={cardImage.webpSrcSet} sizes={sizes} />}
                         <img
                           {...cardImage.img}
+                          alt={cardImage.img.alt}
                           onError={(e) => {
                             const target = e.currentTarget;
                             target.onerror = null;
@@ -627,24 +657,3 @@ export const getServerSideProps: GetServerSideProps<MarketPageProps> = async (ct
     },
   };
 };
-  const handleAdminDelete = async (itemId: number) => {
-    if (!isAdmin || itemId < 0) return;
-    if (!window.confirm('确定要删除该商品吗？此操作不可撤销。')) {
-      return;
-    }
-    setDeletingId(itemId);
-    setModerationAlert(null);
-    try {
-      const resp = await fetch(`/api/admin/market/${itemId}`, { method: 'DELETE' });
-      const json = await resp.json();
-      if (!resp.ok || !json.ok) {
-        throw new Error(json.msg || '删除失败');
-      }
-      setModerationAlert({ type: 'success', text: '商品已删除。' });
-      await router.replace(router.asPath, undefined, { scroll: false });
-    } catch (error: any) {
-      setModerationAlert({ type: 'error', text: error.message || '删除失败，请稍后重试。' });
-    } finally {
-      setDeletingId((prev) => (prev === itemId ? null : prev));
-    }
-  };
