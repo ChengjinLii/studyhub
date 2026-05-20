@@ -1,9 +1,10 @@
 import { GetServerSideProps } from 'next';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import { CSSProperties, useCallback, useEffect, useState } from 'react';
+import { CSSProperties, useCallback, useEffect, useMemo, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import AppImage from '../../components/AppImage';
 import NavBar from '../../components/NavBar';
 import ShareSheet from '../../components/ShareSheet';
 import CommentSection from '../../components/comments/CommentSection';
@@ -11,6 +12,7 @@ import StarRating from '../../components/StarRating';
 import { readSession, hasRole } from '../../lib/auth';
 import { fetchMaterialDetail, fetchMaterialPreview, recordMaterialView, reportTarget, setMaterialRating } from '../../lib/api';
 import { fetchBackend } from '../../lib/apiBase';
+import { toErrorMessage } from '../../lib/errors';
 import { formatDateTime } from '../../lib/format';
 import { warmImages } from '../../lib/imageWarmup';
 import { formatMajorDisplay } from '../../lib/major';
@@ -79,7 +81,7 @@ export default function MaterialDetailPage({ material, user }: MaterialDetailPag
   const isManualPreview = material?.previewSource === 'MANUAL';
   const isPdfMaterial = Boolean(material?.hasFile && material?.fileType?.toLowerCase() === 'pdf');
   const isExperienceMaterial = Boolean(material?.tags?.includes('经验分享'));
-  const experienceImages = material?.customPreviewImages || [];
+  const experienceImages = useMemo(() => material?.customPreviewImages ?? [], [material?.customPreviewImages]);
   const hasExperienceImages = experienceImages.length > 0;
   const experiencePlaceholder = user ? '暂无配图' : '登录后可查看配图（如作者已上传）';
   const hasPreviewContent = hasCustomPreview || isManualPreview || isPdfMaterial;
@@ -133,9 +135,9 @@ export default function MaterialDetailPage({ material, user }: MaterialDetailPag
         if (!active) return;
         setPreview(data);
       })
-      .catch((err: any) => {
+      .catch((err: unknown) => {
         if (!active) return;
-        setPreviewError(err?.message || '预览加载失败');
+        setPreviewError(toErrorMessage(err, '预览加载失败'));
       })
       .finally(() => {
         if (!active) return;
@@ -269,8 +271,8 @@ export default function MaterialDetailPage({ material, user }: MaterialDetailPag
       }
       setPurchased(true);
       setInfo('下单成功！已完成支付并标记为已支付，可立即下载。');
-    } catch (err: any) {
-      setError(err.message || '下单失败');
+    } catch (err: unknown) {
+      setError(toErrorMessage(err, '下单失败'));
     } finally {
       setOrdering(false);
     }
@@ -312,8 +314,8 @@ export default function MaterialDetailPage({ material, user }: MaterialDetailPag
         setShowNetdiskLink(true);
         setInfo('下载链接已生成，请记得尊重知识创作者的辛勤付出，不要外传或用于商业用途哦~');
       }
-    } catch (err: any) {
-      setError(err.message || '下载失败');
+    } catch (err: unknown) {
+      setError(toErrorMessage(err, '下载失败'));
     } finally {
       setDownloading(false);
     }
@@ -331,8 +333,8 @@ export default function MaterialDetailPage({ material, user }: MaterialDetailPag
       setRatingAvg(Number(resp.ratingAvg ?? 0));
       setRatingCount(resp.ratingCount ?? 0);
       setInfo('评分提交成功！');
-    } catch (err: any) {
-      setError(err.message || '评分失败');
+    } catch (err: unknown) {
+      setError(toErrorMessage(err, '评分失败'));
     } finally {
       setRatingSubmitting(false);
     }
@@ -397,10 +399,10 @@ export default function MaterialDetailPage({ material, user }: MaterialDetailPag
       if (typeof json.data === 'number') {
         setLikeCount(json.data);
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       setLiked(liked);
       setLikeCount(likeCount);
-      setError(err.message || '操作失败');
+      setError(toErrorMessage(err, '操作失败'));
     }
   };
 
@@ -414,8 +416,8 @@ export default function MaterialDetailPage({ material, user }: MaterialDetailPag
     try {
       await reportTarget('MATERIAL', material.id, reason);
       setInfo('已收到举报，我们会尽快处理。');
-    } catch (err: any) {
-      setError(err.message || '举报失败');
+    } catch (err: unknown) {
+      setError(toErrorMessage(err, '举报失败'));
     }
   };
 
@@ -445,8 +447,8 @@ export default function MaterialDetailPage({ material, user }: MaterialDetailPag
         return;
       }
       setError('复制失败，请手动复制链接。');
-    } catch (err: any) {
-      setError(err?.message || '复制失败，请手动复制链接。');
+    } catch (err: unknown) {
+      setError(toErrorMessage(err, '复制失败，请手动复制链接。'));
     }
   };
 
@@ -880,7 +882,7 @@ export default function MaterialDetailPage({ material, user }: MaterialDetailPag
                     <div className="experience-post__media-list">
                       {experienceImages.map((imageUrl, index) => (
                         <div className="experience-post__media" key={`${imageUrl}-${index}`}>
-                          <img
+                          <AppImage
                             src={imageUrl}
                             alt={`经验配图 ${index + 1}`}
                             decoding="async"
@@ -965,7 +967,7 @@ export default function MaterialDetailPage({ material, user }: MaterialDetailPag
                         {material?.customPreviewImages && material.customPreviewImages.length > 0 && (
                           <div className="material-custom-preview__grid">
                             {material.customPreviewImages.map((url, index) => (
-                              <img
+                              <AppImage
                                 key={`${url}-${index}`}
                                 src={url}
                                 alt={`预览图 ${index + 1}`}
@@ -1170,7 +1172,7 @@ export default function MaterialDetailPage({ material, user }: MaterialDetailPag
             )}
             <div className={`experience-image-modal__frame${previewModalImageReady ? ' is-ready' : ' is-loading'}`}>
               {!previewModalImageReady && <div className="experience-image-modal__loading">高清图加载中...</div>}
-              <img
+              <AppImage
                 src={experienceImages[previewImageIndex]}
                 alt={`经验配图大图 ${previewImageIndex + 1}`}
                 decoding="async"

@@ -30,13 +30,19 @@ from app.schemas.requests import (
     RequestPreviewViewPayload,
     RequestRespondPayload,
 )
+from app.services.requests_query_support import (
+    compat_exclude_hidden_early_exit_requests,
+    compat_load_hidden_early_exit_request_ids,
+    compat_normalize_list_limit,
+    compat_request_hidden_by_early_exit,
+    compat_sort_requests,
+)
 from app.services.read_support import (
     ROLE_ADMIN,
     ROLE_DEVELOPER,
     clamp_limit,
     compat_amount_yuan,
     compat_serialize_datetime,
-    compat_timestamp,
     has_role,
     parse_iso_datetime,
     serialize_datetime,
@@ -1113,56 +1119,31 @@ class RequestsService:
         return dict(row)
 
     def _compat_exclude_hidden_early_exit_requests(self, session: Session, rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
-        if not rows:
-            return []
-        hidden_ids = self._compat_load_hidden_early_exit_request_ids(session, [int(row["id"]) for row in rows])
-        return [row for row in rows if int(row["id"]) not in hidden_ids]
+        return compat_exclude_hidden_early_exit_requests(
+            session,
+            rows,
+            paid_contribution_statuses=COMPAT_PAID_CONTRIBUTION_STATUSES,
+            early_exit_refund_type=EARLY_EXIT_REFUND_TYPE,
+            success_refund_status=SUCCESS_REFUND_STATUS,
+        )
 
     def _compat_request_hidden_by_early_exit(self, session: Session, request_id: int) -> bool:
-        return request_id in self._compat_load_hidden_early_exit_request_ids(session, [request_id])
+        return compat_request_hidden_by_early_exit(
+            session,
+            request_id,
+            paid_contribution_statuses=COMPAT_PAID_CONTRIBUTION_STATUSES,
+            early_exit_refund_type=EARLY_EXIT_REFUND_TYPE,
+            success_refund_status=SUCCESS_REFUND_STATUS,
+        )
 
     def _compat_load_hidden_early_exit_request_ids(self, session: Session, request_ids: list[int]) -> set[int]:
-        if not request_ids:
-            return set()
-        paid_stmt = text(
-            """
-            SELECT request_id, COUNT(*) AS cnt
-            FROM material_request_contributions
-            WHERE request_id IN :request_ids
-              AND status IN :statuses
-            GROUP BY request_id
-            """
-        ).bindparams(
-            bindparam("request_ids", expanding=True),
-            bindparam("statuses", expanding=True),
+        return compat_load_hidden_early_exit_request_ids(
+            session,
+            request_ids,
+            paid_contribution_statuses=COMPAT_PAID_CONTRIBUTION_STATUSES,
+            early_exit_refund_type=EARLY_EXIT_REFUND_TYPE,
+            success_refund_status=SUCCESS_REFUND_STATUS,
         )
-        refund_stmt = text(
-            """
-            SELECT request_id, COUNT(*) AS cnt
-            FROM material_request_refunds
-            WHERE request_id IN :request_ids
-              AND refund_type = :refund_type
-              AND status = :status
-            GROUP BY request_id
-            """
-        ).bindparams(bindparam("request_ids", expanding=True))
-        paid_rows = session.execute(
-            paid_stmt,
-            {"request_ids": request_ids, "statuses": list(COMPAT_PAID_CONTRIBUTION_STATUSES)},
-        ).mappings().all()
-        refund_rows = session.execute(
-            refund_stmt,
-            {"request_ids": request_ids, "refund_type": EARLY_EXIT_REFUND_TYPE, "status": SUCCESS_REFUND_STATUS},
-        ).mappings().all()
-        paid_counts = {int(row["request_id"]): int(row["cnt"] or 0) for row in paid_rows}
-        refund_counts = {int(row["request_id"]): int(row["cnt"] or 0) for row in refund_rows}
-        hidden_ids: set[int] = set()
-        for request_id in request_ids:
-            total_paid = paid_counts.get(request_id, 0)
-            early_exit = refund_counts.get(request_id, 0)
-            if total_paid > 0 and early_exit >= total_paid:
-                hidden_ids.add(request_id)
-        return hidden_ids
 
     def _compat_load_viewer_profile(self, session: Session, viewer_id: int | None) -> dict[str, str | None] | None:
         if viewer_id is None:
@@ -1220,62 +1201,10 @@ class RequestsService:
         sort: str | None,
         profile: dict[str, str | None] | None,
     ) -> list[dict[str, Any]]:
-        normalized = (sort or "").lower()
-        if profile and any(profile.get(key) for key in ("school", "college", "major")):
-            def match_score(row: dict[str, Any]) -> int:
-                school = profile.get("school")
-                college = profile.get("college")
-                major = profile.get("major")
-                request_school = row.get("school")
-                request_college = row.get("college")
-                request_major = row.get("major")
-                if not school or not request_school or school != request_school:
-                    return 0
-                if request_college:
-                    if not college or college != request_college:
-                        return 0
-                    if request_major:
-                        if not major or major != request_major:
-                            return 0
-                        return 3
-                    return 2
-                return 1
-
-            if normalized == "hot":
-                return sorted(
-                    rows,
-                    key=lambda row: (
-                        -match_score(row),
-                        -int(row.get("response_count") or 0),
-                        -self._compat_timestamp(row.get("created_at")),
-                    ),
-                )
-            return sorted(
-                rows,
-                key=lambda row: (
-                    -match_score(row),
-                    -self._compat_timestamp(row.get("created_at")),
-                ),
-            )
-        if normalized == "hot":
-            return sorted(
-                rows,
-                key=lambda row: (
-                    -int(row.get("response_count") or 0),
-                    -self._compat_timestamp(row.get("created_at")),
-                ),
-            )
-        return sorted(rows, key=lambda row: -self._compat_timestamp(row.get("created_at")))
-
-    def _compat_timestamp(self, value: Any) -> float:
-        return compat_timestamp(value)
+        return compat_sort_requests(rows, sort=sort, profile=profile)
 
     def _compat_normalize_list_limit(self, limit: int | None) -> int | None:
-        if limit is None:
-            return 6
-        if limit <= 0:
-            return None
-        return clamp_limit(limit, max_value=100)
+        return compat_normalize_list_limit(limit)
 
     def _compat_to_request_item(self, row: dict[str, Any], viewer_id: int | None, responded: bool) -> dict[str, Any]:
         requester_id = int(row["requester_id"]) if row["requester_id"] is not None else None

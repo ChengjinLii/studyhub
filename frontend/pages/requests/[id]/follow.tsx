@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import NavBar from '../../../components/NavBar';
 import { readSession } from '../../../lib/auth';
 import { fetchBackend, getRequestOrigin } from '../../../lib/apiBase';
+import { toErrorMessage } from '../../../lib/errors';
 import { formatDate } from '../../../lib/format';
 import { REQUEST_TIERS, RequestTierValue, getTierLabel } from '../../../constants/request';
 import { MaterialRequestItem } from '../../../types/request';
@@ -103,8 +104,8 @@ export default function RequestFollowPage({ user, request }: RequestFollowProps)
         throw new Error('支付表单获取失败');
       }
       setFollowFormHtml(data.form as string);
-    } catch (error: any) {
-      setFollowNotice({ type: 'error', text: error.message || '跟购失败' });
+    } catch (error: unknown) {
+      setFollowNotice({ type: 'error', text: toErrorMessage(error, '跟购失败') });
     } finally {
       setFollowLoading(false);
     }

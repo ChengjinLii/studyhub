@@ -1902,12 +1902,12 @@ main {
 
 @media (max-width: 720px) {
   .theme-xmas {
-    --hat-scale: 1.6;
-    --hat-x: -60%;
-    --hat-y: -82%;
+    --hat-scale: 1.5;
+    --hat-x: -58%;
+    --hat-y: -74%;
     --hat-rot: -9deg;
-    --hat-width: 104%;
-    --hat-height: 70%;
+    --hat-width: 116%;
+    --hat-height: 78%;
   }
 
   .theme-xmas .hero-meteor {
@@ -1916,7 +1916,7 @@ main {
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
+@media (prefers-reduced-motion: reduce) and (min-width: 721px) {
   .theme-xmas .xmas-snowfall {
     display: none;
   }

@@ -1,9 +1,11 @@
 import { GetServerSideProps } from 'next';
 import { useRouter } from 'next/router';
 import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from 'react';
+import AppImage from '../components/AppImage';
 import NavBar from '../components/NavBar';
 import { readSession } from '../lib/auth';
 import { fetchBackend } from '../lib/apiBase';
+import { toErrorMessage } from '../lib/errors';
 import { SessionUser } from '../types/user';
 
 type AuthMode = 'login' | 'register';
@@ -91,8 +93,8 @@ export default function Login({ user }: LoginPageProps) {
       setCaptcha(json.data);
       setLoginForm((prev) => ({ ...prev, captchaCode: '' }));
       setRegisterForm((prev) => ({ ...prev, captchaCode: '' }));
-    } catch (err: any) {
-      setError(err.message || '获取验证码失败');
+    } catch (err: unknown) {
+      setError(toErrorMessage(err, '获取验证码失败'));
     }
   };
 
@@ -155,8 +157,8 @@ export default function Login({ user }: LoginPageProps) {
       }
       setResetCaptcha(json.data);
       setResetCaptchaCode('');
-    } catch (err: any) {
-      setResetMsg({ type: 'error', text: err.message || '获取验证码失败' });
+    } catch (err: unknown) {
+      setResetMsg({ type: 'error', text: toErrorMessage(err, '获取验证码失败') });
     }
   };
 
@@ -189,8 +191,8 @@ export default function Login({ user }: LoginPageProps) {
       }
       setSuccess('登录成功，正在跳转...');
       router.replace(nextPath || '/');
-    } catch (err: any) {
-      setError(err.message || '登录失败');
+    } catch (err: unknown) {
+      setError(toErrorMessage(err, '登录失败'));
     } finally {
       setLoading(false);
       fetchCaptcha();
@@ -211,8 +213,8 @@ export default function Login({ user }: LoginPageProps) {
       }
       setSuccess('local-dev 账号已就绪，正在跳转...');
       router.replace(nextPath || '/');
-    } catch (err: any) {
-      setError(err.message || '进入 local-dev 账号失败');
+    } catch (err: unknown) {
+      setError(toErrorMessage(err, '进入 local-dev 账号失败'));
     } finally {
       setDevLoginLoading(false);
     }
@@ -249,8 +251,8 @@ export default function Login({ user }: LoginPageProps) {
       }
       setSuccess('注册并登录成功，正在跳转...');
       router.replace(nextPath || '/');
-    } catch (err: any) {
-      setError(err.message || '注册失败');
+    } catch (err: unknown) {
+      setError(toErrorMessage(err, '注册失败'));
     } finally {
       setLoading(false);
     }
@@ -288,8 +290,8 @@ export default function Login({ user }: LoginPageProps) {
       const resendSeconds = json.data?.resendAfterSeconds ?? 60;
       setCooldown(resendSeconds);
       setSuccess('验证码已发送至邮箱，请在 5 分钟内完成验证。建议使用国内邮箱，未收到请查看垃圾邮件或稍后重试。');
-    } catch (err: any) {
-      setError(err.message || '发送验证码失败');
+    } catch (err: unknown) {
+      setError(toErrorMessage(err, '发送验证码失败'));
     } finally {
       setLoading(false);
       fetchCaptcha();
@@ -324,8 +326,8 @@ export default function Login({ user }: LoginPageProps) {
       }
       setResetCooldown(json.data?.resendAfterSeconds ?? 60);
       setResetMsg({ type: 'success', text: '验证码已发送，请查收邮箱' });
-    } catch (err: any) {
-      setResetMsg({ type: 'error', text: err.message || '发送验证码失败' });
+    } catch (err: unknown) {
+      setResetMsg({ type: 'error', text: toErrorMessage(err, '发送验证码失败') });
     } finally {
       setResetLoading(false);
     }
@@ -356,8 +358,8 @@ export default function Login({ user }: LoginPageProps) {
       setResetCooldown(0);
       setResetForm((prev) => ({ ...prev, code: '' }));
       setLoginForm((prev) => ({ ...prev, identifier: resetForm.identifier }));
-    } catch (err: any) {
-      setResetMsg({ type: 'error', text: err.message || '重置失败' });
+    } catch (err: unknown) {
+      setResetMsg({ type: 'error', text: toErrorMessage(err, '重置失败') });
     } finally {
       setResetLoading(false);
     }
@@ -497,7 +499,7 @@ export default function Login({ user }: LoginPageProps) {
                         required
                       />
                       {captcha.imageBase64 ? (
-                        <img
+                        <AppImage
                           src={captcha.imageBase64}
                           alt="验证码"
                           className="captcha-image"
@@ -582,7 +584,7 @@ export default function Login({ user }: LoginPageProps) {
                         required
                       />
                       {captcha.imageBase64 ? (
-                        <img
+                        <AppImage
                           src={captcha.imageBase64}
                           alt="验证码"
                           className="captcha-image"
@@ -765,7 +767,7 @@ export default function Login({ user }: LoginPageProps) {
                           required
                         />
                         {resetCaptcha.imageBase64 ? (
-                          <img
+                          <AppImage
                             src={resetCaptcha.imageBase64}
                             alt="验证码"
                             className="captcha-image"

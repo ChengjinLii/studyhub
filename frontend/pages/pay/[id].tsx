@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import NavBar from '../../components/NavBar';
 import { readSession, hasRole } from '../../lib/auth';
 import { fetchBackend, getRequestOrigin, resolveApiBase } from '../../lib/apiBase';
+import { toErrorMessage } from '../../lib/errors';
 import { materialPath, userPath } from '../../lib/slug';
 import { SessionUser, RoleMask } from '../../types/user';
 import { MaterialDetail } from '../../types/material';
@@ -49,8 +50,8 @@ export default function PayPage({ user, material }: PayPageProps) {
         throw new Error('支付表单获取失败');
       }
       setFormHtml(data.form as string);
-    } catch (err: any) {
-      setError(err.message || '发起支付失败');
+    } catch (err: unknown) {
+      setError(toErrorMessage(err, '发起支付失败'));
     } finally {
       setLoading(false);
     }

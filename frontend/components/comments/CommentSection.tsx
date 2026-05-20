@@ -3,6 +3,7 @@ import { useRouter } from 'next/router';
 import { Comment, CommentListResponse } from '../../types/material';
 import { SessionUser } from '../../types/user';
 import { fetchComments, createComment } from '../../lib/api';
+import { toErrorMessage } from '../../lib/errors';
 import CommentInput from './CommentInput';
 import CommentItem from './CommentItem';
 
@@ -42,8 +43,8 @@ export default function CommentSection({ materialId, user, initialCount = 0 }: C
         });
         setComments(resp.items);
         setMeta(resp.meta);
-      } catch (err: any) {
-        setError(err.message || '评论加载失败');
+      } catch (err: unknown) {
+        setError(toErrorMessage(err, '评论加载失败'));
       } finally {
         if (!opts?.silent) {
           setLoading(false);
@@ -85,8 +86,8 @@ export default function CommentSection({ materialId, user, initialCount = 0 }: C
       setSubmitMessage('评论发布成功！');
       await loadComments({ page: 0, silent: true });
       setPage(0);
-    } catch (err: any) {
-      setSubmitError(err.message || '评论失败');
+    } catch (err: unknown) {
+      setSubmitError(toErrorMessage(err, '评论失败'));
     } finally {
       setSubmitting(false);
     }

@@ -5,7 +5,6 @@ from datetime import UTC, datetime
 import hashlib
 import json
 from pathlib import Path
-import re
 from typing import Any
 
 from fastapi import HTTPException, UploadFile, status
@@ -24,6 +23,15 @@ from app.repos.material_repo import MaterialRepository
 from app.repos.read_api_repo import ReadApiRepository
 from app.schemas.admin import AdminMaterialBatchUpdatePayload
 from app.schemas.materials import MaterialCreatePayload, MaterialUpdatePayload, ReviewPayload
+from app.services.materials_query_support import (
+    compat_extract_primary_major,
+    compat_major_matches,
+    compat_material_filter_parts,
+    compat_material_order_clause,
+    compat_normalize_major_selections,
+    compat_recommendation_score,
+    compat_sort_material_rows,
+)
 from app.services.read_support import (
     clamp_limit,
     compat_as_float,
@@ -47,7 +55,6 @@ ROLE_ADMIN = 8
 ROLE_DEVELOPER = 16
 VISIBLE_STATUSES = {"VISIBLE", "visible", "", None}
 VISIBLE_MATERIAL_STATUS_SQL = "(m.status IS NULL OR LOWER(m.status) NOT IN ('hidden', 'removed'))"
-MAJOR_SPLIT_PATTERN = re.compile(r"[，,、/]+")
 
 
 class MaterialsService:
@@ -1612,11 +1619,17 @@ class MaterialsService:
         order_sql, order_params, recommendation_score_sql = self._compat_material_order_clause(sort=sort, profile=profile)
         params.update(order_params)
         paging_sql = ""
-        if limit is not None:
-            params["limit"] = max(1, int(limit))
+        safe_limit = max(1, int(limit)) if limit is not None else None
+        safe_offset = max(0, int(offset)) if offset is not None else None
+        if safe_limit is not None:
+            params["limit"] = safe_limit
             paging_sql = "\n            LIMIT :limit"
-        if offset:
-            params["offset"] = max(0, int(offset))
+        if safe_offset is not None and safe_offset > 0:
+            # MySQL requires LIMIT when OFFSET is present.
+            if safe_limit is None:
+                params["limit"] = 18446744073709551615
+                paging_sql = "\n            LIMIT :limit"
+            params["offset"] = safe_offset
             paging_sql += "\n            OFFSET :offset"
 
         sql = f"""
@@ -1705,95 +1718,20 @@ class MaterialsService:
         course_category: str | None,
         price: str | None,
     ) -> tuple[list[str], dict[str, Any]]:
-        where_clauses = ["m.deleted_at IS NULL", VISIBLE_MATERIAL_STATUS_SQL]
-        params: dict[str, Any] = {}
-        if self._compat_has_text(keyword):
-            params["keyword"] = f"%{keyword.strip().lower()}%"
-            where_clauses.append(
-                "(LOWER(COALESCE(m.title, '')) LIKE :keyword OR LOWER(COALESCE(m.description, '')) LIKE :keyword OR LOWER(COALESCE(m.keywords, '')) LIKE :keyword)"
-            )
-        if self._compat_has_text(school):
-            params["school"] = school.strip()
-            where_clauses.append("m.school = :school")
-        if self._compat_has_text(college):
-            params["college"] = college.strip()
-            where_clauses.append("m.college = :college")
-        if self._compat_has_text(major):
-            normalized_major = self._compat_extract_primary_major(major)
-            if normalized_major is None:
-                return ["1 = 0"], {}
-            params["major_like"] = f"%{normalized_major}%"
-            where_clauses.append("LOWER(COALESCE(m.major, '')) LIKE LOWER(:major_like)")
-        if self._compat_has_text(tag):
-            params["tag"] = tag.strip().lower()
-            where_clauses.append(
-                """
-                EXISTS (
-                    SELECT 1
-                    FROM material_tags mt
-                    WHERE mt.material_id = m.id
-                      AND LOWER(mt.tag) = :tag
-                )
-                """
-            )
-        if self._compat_has_text(grade_value):
-            params["grade_value"] = grade_value.strip().lower()
-            where_clauses.append("LOWER(COALESCE(m.grade_value, '')) = :grade_value")
-        if self._compat_has_text(course_category):
-            params["course_category"] = course_category.strip().upper()
-            where_clauses.append("UPPER(COALESCE(m.course_category, 'MAJOR')) = :course_category")
-        if self._compat_has_text(price):
-            normalized_price = price.strip().lower()
-            if normalized_price == "free":
-                where_clauses.append("m.is_free = 1")
-            elif normalized_price == "paid":
-                where_clauses.append("m.is_free = 0")
-        return where_clauses, params
+        return compat_material_filter_parts(
+            keyword=keyword,
+            school=school,
+            college=college,
+            major=major,
+            tag=tag,
+            grade_value=grade_value,
+            course_category=course_category,
+            price=price,
+            visible_material_status_sql=VISIBLE_MATERIAL_STATUS_SQL,
+        )
 
     def _compat_material_order_clause(self, *, sort: str | None, profile: dict[str, Any] | None) -> tuple[str, dict[str, Any], str]:
-        normalized_sort = (sort or "latest").strip().lower()
-        if normalized_sort == "price":
-            return "COALESCE(m.price, 0) DESC, m.created_at DESC, m.id DESC", {}, "0"
-        if normalized_sort == "sales":
-            return "COALESCE(m.sales_count, 0) DESC, m.created_at DESC, m.id DESC", {}, "0"
-
-        school = self._compat_normalize_text(profile.get("school")) if profile else None
-        college = self._compat_normalize_text(profile.get("college")) if profile else None
-        major = self._compat_extract_primary_major(profile.get("major")) if profile else None
-        params: dict[str, Any] = {
-            "profile_school": school,
-            "profile_college": college,
-            "profile_major_like": f"%{major}%" if major else None,
-        }
-        recommendation_score_sql = """
-            (
-                CASE
-                    WHEN :profile_school IS NOT NULL
-                     AND COALESCE(m.school, '') <> ''
-                     AND m.school <> :profile_school
-                    THEN -45 ELSE 0
-                END
-                +
-                CASE
-                    WHEN :profile_college IS NOT NULL
-                     AND COALESCE(m.college, '') <> ''
-                     AND m.college <> :profile_college
-                    THEN -15 ELSE 0
-                END
-                +
-                CASE
-                    WHEN :profile_major_like IS NOT NULL
-                     AND COALESCE(m.major, '') <> ''
-                     AND LOWER(COALESCE(m.major, '')) NOT LIKE LOWER(:profile_major_like)
-                    THEN -8 ELSE 0
-                END
-            )
-        """
-        return (
-            "recommendation_score DESC, COALESCE(m.download_count, 0) DESC, m.created_at DESC, m.id DESC",
-            params,
-            recommendation_score_sql,
-        )
+        return compat_material_order_clause(sort=sort, profile=profile)
 
     def _compat_load_user_profile(self, session: Session, user_id: int | None) -> dict[str, Any] | None:
         if user_id is None:
@@ -1834,39 +1772,7 @@ class MaterialsService:
         return dict(row)
 
     def _compat_sort_material_rows(self, rows: list[dict[str, Any]], *, sort: str, profile: dict[str, Any] | None) -> list[dict[str, Any]]:
-        ordered = list(rows)
-        normalized_sort = (sort or "latest").strip().lower()
-        if normalized_sort == "price":
-            ordered.sort(
-                key=lambda row: (
-                    self._compat_as_int(row["price"]),
-                    self._compat_created_timestamp(row["created_at"]),
-                ),
-                reverse=True,
-            )
-            return ordered
-        if normalized_sort == "sales":
-            ordered.sort(
-                key=lambda row: (
-                    self._compat_as_int(row["sales_count"]),
-                    self._compat_created_timestamp(row["created_at"]),
-                ),
-                reverse=True,
-            )
-            return ordered
-
-        school = self._compat_normalize_text(profile.get("school")) if profile else None
-        college = self._compat_normalize_text(profile.get("college")) if profile else None
-        major = self._compat_extract_primary_major(profile.get("major")) if profile else None
-        ordered.sort(
-            key=lambda row: (
-                self._compat_recommendation_score(row, school=school, college=college, major=major),
-                self._compat_as_int(row["download_count"]),
-                self._compat_created_timestamp(row["created_at"]),
-            ),
-            reverse=True,
-        )
-        return ordered
+        return compat_sort_material_rows(rows, sort=sort, profile=profile)
 
     def _compat_load_tags_map(self, session: Session, material_ids: list[int]) -> dict[int, list[str]]:
         if not material_ids:
@@ -2103,6 +2009,12 @@ class MaterialsService:
         return row is not None
 
     def _compat_load_my_rating(self, session: Session, material_id: int, user_id: int) -> int | None:
+        try:
+            rating_entity = self.material_repo.find_rating(session, material_id, user_id)
+        except Exception:
+            rating_entity = None
+        if rating_entity is not None:
+            return int(rating_entity.rating)
         value = session.execute(
             text(
                 """
@@ -2118,20 +2030,38 @@ class MaterialsService:
         return None if value is None else int(value)
 
     async def _compat_load_my_rating_async(self, session, material_id: int, user_id: int) -> int | None:
-        value = (
-            await session.execute(
-                text(
-                    """
-                    SELECT rating
-                    FROM reviews
-                    WHERE material_id = :material_id AND user_id = :user_id
-                    ORDER BY created_at DESC, id DESC
-                    LIMIT 1
-                    """
-                ),
-                {"material_id": material_id, "user_id": user_id},
-            )
-        ).scalar()
+        value = None
+        try:
+            value = (
+                await session.execute(
+                    text(
+                        """
+                        SELECT rating
+                        FROM material_ratings
+                        WHERE material_id = :material_id AND user_id = :user_id
+                        LIMIT 1
+                        """
+                    ),
+                    {"material_id": material_id, "user_id": user_id},
+                )
+            ).scalar()
+        except Exception:
+            value = None
+        if value is None:
+            value = (
+                await session.execute(
+                    text(
+                        """
+                        SELECT rating
+                        FROM reviews
+                        WHERE material_id = :material_id AND user_id = :user_id
+                        ORDER BY created_at DESC, id DESC
+                        LIMIT 1
+                        """
+                    ),
+                    {"material_id": material_id, "user_id": user_id},
+                )
+            ).scalar()
         return None if value is None else int(value)
 
     def _compat_has_paid_access(self, session: Session, material_id: int, user_id: int) -> bool:
@@ -2316,11 +2246,17 @@ class MaterialsService:
         order_sql, order_params, recommendation_score_sql = self._compat_material_order_clause(sort=sort, profile=profile)
         params.update(order_params)
         paging_sql = ""
-        if limit is not None:
-            params["limit"] = max(1, int(limit))
+        safe_limit = max(1, int(limit)) if limit is not None else None
+        safe_offset = max(0, int(offset)) if offset is not None else None
+        if safe_limit is not None:
+            params["limit"] = safe_limit
             paging_sql = "\n            LIMIT :limit"
-        if offset is not None:
-            params["offset"] = max(0, int(offset))
+        if safe_offset is not None and safe_offset > 0:
+            # MySQL requires LIMIT when OFFSET is present.
+            if safe_limit is None:
+                params["limit"] = 18446744073709551615
+                paging_sql = "\n            LIMIT :limit"
+            params["offset"] = safe_offset
             paging_sql += "\n            OFFSET :offset"
         rows = (
             await session.execute(
@@ -2449,41 +2385,16 @@ class MaterialsService:
         }
 
     def _compat_recommendation_score(self, row: dict[str, Any], *, school: str | None, college: str | None, major: str | None) -> int:
-        score = 0
-        material_school = self._compat_normalize_text(row["school"])
-        material_college = self._compat_normalize_text(row["college"])
-        material_major = self._compat_normalize_text(row["major"])
-        if school and material_school and school != material_school:
-            score -= 45
-        if college and material_college and college != material_college:
-            score -= 15
-        if major and material_major and not self._compat_major_matches(material_major, major):
-            score -= 8
-        return score
+        return compat_recommendation_score(row, school=school, college=college, major=major)
 
     def _compat_major_matches(self, stored: str, target: str) -> bool:
-        if not target:
-            return False
-        return target in self._compat_normalize_major_selections(stored)
+        return compat_major_matches(stored, target)
 
     def _compat_extract_primary_major(self, raw: Any) -> str | None:
-        selections = self._compat_normalize_major_selections(raw)
-        return selections[0] if selections else None
+        return compat_extract_primary_major(raw)
 
     def _compat_normalize_major_selections(self, raw: Any) -> list[str]:
-        value = self._compat_normalize_text(raw)
-        if not value:
-            return []
-        normalized = []
-        seen: set[str] = set()
-        for chunk in MAJOR_SPLIT_PATTERN.split(value):
-            item = chunk.strip()
-            if not item:
-                continue
-            if item not in seen:
-                seen.add(item)
-                normalized.append(item)
-        return normalized
+        return compat_normalize_major_selections(raw)
 
     def _compat_serialize_preview_manifest(self, value: Any) -> str | None:
         if value is None:

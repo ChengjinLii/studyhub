@@ -1,10 +1,17 @@
 import { GetServerSideProps } from 'next';
 import { FormEvent, useEffect, useMemo, useState } from 'react';
+import AppImage from '../../components/AppImage';
 import NavBar from '../../components/NavBar';
 import PaginationBar from '../../components/PaginationBar';
 import { readSession, hasRole } from '../../lib/auth';
 import { fetchBackend, getRequestOrigin, resolveApiBase } from '../../lib/apiBase';
+import { toErrorMessage } from '../../lib/errors';
+import { useAdminMonthlyPayout } from '../../lib/useAdminMonthlyPayout';
 import { formatDateTime } from '../../lib/format';
+import { useSectionNavigation } from '../../lib/useSectionNavigation';
+import { useAdminBatchActions } from '../../lib/useAdminBatchActions';
+import { useAdminReports } from '../../lib/useAdminReports';
+import { useAdminUserNotes } from '../../lib/useAdminUserNotes';
 import { SessionUser, RoleMask } from '../../types/user';
 import {
   UserSummary,
@@ -30,7 +37,7 @@ import {
   COURSE_CATEGORY_OPTIONS,
   COURSE_CATEGORY_LABELS,
 } from '../../constants/metadata';
-import { formatMajorDisplay, parseMajorList, serializeMajorList } from '../../lib/major';
+import { formatMajorDisplay } from '../../lib/major';
 
 interface AdminPageProps {
   user: SessionUser;
@@ -45,17 +52,6 @@ interface AdminPageProps {
   reports: AdminReport[];
   reportsMeta: AdminListMeta;
 }
-
-interface AdminUserNote {
-  id: number;
-  adminUsername?: string | null;
-  adminNickname?: string | null;
-  message: string;
-  createdAt: string;
-}
-
-type NoteAlert = { type: 'success' | 'error'; text: string };
-type MarketBatchField = 'status' | 'category' | 'school' | 'contactType' | 'contactValue';
 
 const FEEDBACK_TYPES = [
   { value: 'BUG', label: 'Bug 反馈' },
@@ -164,46 +160,13 @@ export default function AdminPage({
   const [reportsMeta, setReportsMeta] = useState(initialReportsMeta);
   const [materialsLoading, setMaterialsLoading] = useState(false);
   const [marketLoading, setMarketLoading] = useState(false);
-  const [reportsLoading, setReportsLoading] = useState(false);
-  const [reportUpdatingId, setReportUpdatingId] = useState<number | null>(null);
-  const [reportRestoringId, setReportRestoringId] = useState<number | null>(null);
-  const [selectedMaterialIds, setSelectedMaterialIds] = useState<number[]>([]);
-  const [selectedMarketIds, setSelectedMarketIds] = useState<number[]>([]);
-  const [batchForm, setBatchForm] = useState({
-    college: '',
-    major: '',
-    gradeValue: '',
-    courseCategory: '',
-    tags: '',
-    tagsMode: 'replace',
-  });
-  const batchMajorSelections = parseMajorList(batchForm.major);
-  const [batchMessage, setBatchMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
-  const [batchDeleting, setBatchDeleting] = useState(false);
-  const [batchRestoring, setBatchRestoring] = useState(false);
   const [restoringMaterialId, setRestoringMaterialId] = useState<number | null>(null);
-  const [marketBatchForm, setMarketBatchForm] = useState({
-    status: '',
-    category: '',
-    school: '',
-    contactType: '',
-    contactValue: '',
-  });
-  const [reportFilters, setReportFilters] = useState({ status: '', targetType: '' });
-  const [reportNotice, setReportNotice] = useState<NoteAlert | null>(null);
-  const [marketBatchMessage, setMarketBatchMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
-  const [marketBatchDeleting, setMarketBatchDeleting] = useState(false);
   const [form, setForm] = useState({ username: '', password: '', nickname: '', admin: true, developer: true });
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [feedbackMessage, setFeedbackMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [volunteerMessage, setVolunteerMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [userSearch, setUserSearch] = useState('');
-  const [noteDrafts, setNoteDrafts] = useState<Record<number, string>>({});
-  const [noteAlerts, setNoteAlerts] = useState<Record<number, NoteAlert>>({});
-  const [userNotes, setUserNotes] = useState<Record<number, AdminUserNote[]>>({});
-  const [notesLoading, setNotesLoading] = useState<Record<number, boolean>>({});
-  const [notePanelOpen, setNotePanelOpen] = useState<Record<number, boolean>>({});
   const [broadcastText, setBroadcastText] = useState('');
   const [broadcastStatus, setBroadcastStatus] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [broadcasting, setBroadcasting] = useState(false);
@@ -216,30 +179,28 @@ export default function AdminPage({
   const [payoutDetails, setPayoutDetails] = useState<Record<number, PayoutSettlementDetail[]>>({});
   const [payoutDetailLoading, setPayoutDetailLoading] = useState<Record<number, boolean>>({});
   const [payoutDetailOpen, setPayoutDetailOpen] = useState<Record<number, boolean>>({});
-  const [monthlyPayoutMonth, setMonthlyPayoutMonth] = useState(getCurrentMonthValue);
-  const [monthlyPayoutOverview, setMonthlyPayoutOverview] = useState<AdminMonthlyPayoutOverview | null>(null);
-  const [monthlyPayoutMessage, setMonthlyPayoutMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
-  const [monthlyPayoutLoading, setMonthlyPayoutLoading] = useState(false);
-  const [monthlyPayoutMarkingId, setMonthlyPayoutMarkingId] = useState<number | null>(null);
-  const [payoutQrModal, setPayoutQrModal] = useState<{
-    open: boolean;
-    title: string;
-    loading: boolean;
-    error: string | null;
-    url: string | null;
-  }>({
-    open: false,
-    title: '',
-    loading: false,
-    error: null,
-    url: null,
-  });
+  const {
+    monthlyPayoutMonth,
+    setMonthlyPayoutMonth,
+    monthlyPayoutOverview,
+    monthlyPayoutMessage,
+    monthlyPayoutLoading,
+    monthlyPayoutMarkingId,
+    payoutQrModal,
+    reloadMonthlyPayoutOverview,
+    handleMonthlyMark,
+    openPayoutQrModal,
+    closePayoutQrModal,
+  } = useAdminMonthlyPayout(getCurrentMonthValue());
   const [schedule, setSchedule] = useState<PayoutSchedule | null>(null);
   const [scheduleForm, setScheduleForm] = useState({ launchDate: '', nextPayoutDate: '' });
   const [scheduleMessage, setScheduleMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [scheduleLoading, setScheduleLoading] = useState(false);
-  const [activeAdminSection, setActiveAdminSection] = useState(ADMIN_QUICK_NAV_ITEMS[0]?.id ?? 'admin-income');
   const adminNavItems = useMemo(() => ADMIN_QUICK_NAV_ITEMS, []);
+  const { activeSection: activeAdminSection, jumpToSection } = useSectionNavigation(adminNavItems, {
+    rootMargin: '-20% 0px -60% 0px',
+    threshold: [0.1, 0.25, 0.5],
+  });
   const materialPageSize = materialsMeta?.size || 15;
   const materialTotalItems = materialsMeta?.total || 0;
   const currentMaterialPage = Math.max(1, (materialsMeta?.page ?? 0) + 1);
@@ -309,8 +270,8 @@ export default function AdminPage({
       setSelectedMaterialIds((prev) =>
         prev.filter((id) => (json.data.items || []).some((entry: AdminMaterial) => entry.id === id))
       );
-    } catch (err: any) {
-      setBatchMessage({ type: 'error', text: err.message || '加载资料失败' });
+    } catch (err: unknown) {
+      setBatchMessage({ type: 'error', text: toErrorMessage(err, '加载资料失败') });
     } finally {
       setMaterialsLoading(false);
     }
@@ -326,7 +287,7 @@ export default function AdminPage({
       return;
     }
     setMaterialView(nextView);
-    setSelectedMaterialIds([]);
+    clearMaterialSelection();
     void loadMaterials(0, nextView);
   };
 
@@ -345,8 +306,8 @@ export default function AdminPage({
       setMarketItems(items);
       setMarketMeta(json.data?.meta || { page, size: marketMeta?.size ?? 15, total: 0 });
       setSelectedMarketIds((prev) => prev.filter((id) => items.some((entry) => entry.id === id)));
-    } catch (err: any) {
-      setMarketBatchMessage({ type: 'error', text: err.message || '加载校园集市商品失败' });
+    } catch (err: unknown) {
+      setMarketBatchMessage({ type: 'error', text: toErrorMessage(err, '加载校园集市商品失败') });
     } finally {
       setMarketLoading(false);
     }
@@ -357,257 +318,63 @@ export default function AdminPage({
     void loadMarketItems(safeTarget);
   };
 
-  const loadReports = async (page = reportsMeta?.page ?? 0, nextFilters = reportFilters) => {
-    setReportsLoading(true);
-    setReportNotice(null);
-    try {
-      const params = new URLSearchParams();
-      params.set('page', String(Math.max(page, 0)));
-      params.set('size', String(reportsMeta?.size ?? 15));
-      if (nextFilters.status) {
-        params.set('status', nextFilters.status);
-      }
-      if (nextFilters.targetType) {
-        params.set('targetType', nextFilters.targetType);
-      }
-      const resp = await fetchBackend(`/admin/reports?${params.toString()}`);
-      const json = await resp.json();
-      if (!resp.ok || !json.ok) {
-        throw new Error(json.msg || '加载举报列表失败');
-      }
-      setReports(json.data.items || []);
-      setReportsMeta(json.data.meta || { page: 0, size: reportsMeta?.size ?? 15, total: 0 });
-    } catch (err: any) {
-      setReportNotice({ type: 'error', text: err.message || '加载举报列表失败' });
-    } finally {
-      setReportsLoading(false);
-    }
-  };
-
-  const handleReportPageChange = (targetPage: number) => {
-    const pageIndex = Math.max(targetPage - 1, 0);
-    void loadReports(pageIndex);
-  };
-
-  const handleReportFilterChange = (field: 'status' | 'targetType', value: string) => {
-    const next = { ...reportFilters, [field]: value };
-    setReportFilters(next);
-    void loadReports(0, next);
-  };
-
-  const handleReportFieldUpdate = (id: number, field: 'status' | 'adminNote', value: string) => {
-    setReports((prev) =>
-      prev.map((report) => (report.id === id ? { ...report, [field]: value } : report))
-    );
-  };
-
-  const handleReportUpdate = async (id: number) => {
-    const target = reports.find((entry) => entry.id === id);
-    if (!target) return;
-    setReportUpdatingId(id);
-    setReportNotice(null);
-    try {
-      const resp = await fetchBackend(`/admin/reports/${id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: target.status, adminNote: target.adminNote ?? '' }),
-      });
-      const json = await resp.json();
-      if (!resp.ok || !json.ok) {
-        throw new Error(json.msg || '更新举报失败');
-      }
-      setReports((prev) => prev.map((item) => (item.id === id ? json.data : item)));
-      setReportNotice({ type: 'success', text: '举报工单已更新' });
-    } catch (err: any) {
-      setReportNotice({ type: 'error', text: err.message || '更新举报失败' });
-    } finally {
-      setReportUpdatingId(null);
-    }
-  };
-
-  const handleReportRestore = async (id: number) => {
-    setReportRestoringId(id);
-    setReportNotice(null);
-    try {
-      const resp = await fetchBackend(`/admin/reports/${id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ restoreTarget: true }),
-      });
-      const json = await resp.json();
-      if (!resp.ok || !json.ok) {
-        throw new Error(json.msg || '恢复展示失败');
-      }
-      setReports((prev) => prev.map((item) => (item.id === id ? json.data : item)));
-      setReportNotice({ type: 'success', text: '目标已恢复展示' });
-    } catch (err: any) {
-      setReportNotice({ type: 'error', text: err.message || '恢复展示失败' });
-    } finally {
-      setReportRestoringId(null);
-    }
-  };
-
-  const toggleMaterialSelection = (id: number) => {
-    setSelectedMaterialIds((prev) => (prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]));
-  };
-
-  const selectAllMaterials = () => {
-    setSelectedMaterialIds(materials.map((item) => item.id));
-  };
-
-  const clearMaterialSelection = () => {
-    setSelectedMaterialIds([]);
-  };
-
-  const toggleMarketSelection = (id: number) => {
-    setSelectedMarketIds((prev) => (prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]));
-  };
-
-  const selectAllMarketItems = () => {
-    setSelectedMarketIds(marketItems.map((item) => item.id));
-  };
-
-  const clearMarketSelection = () => {
-    setSelectedMarketIds([]);
-  };
-
-  const handleBatchInputChange = (field: string, value: string) => {
-    setBatchForm((prev) => ({ ...prev, [field]: value }));
-  };
-
-  const handleBatchMajorToggle = (value: string, checked: boolean) => {
-    setBatchForm((prev) => {
-      const current = parseMajorList(prev.major);
-      let next: string[];
-      if (checked) {
-        next = current.includes(value) ? current : [...current, value];
-      } else {
-        next = current.filter((item) => item !== value);
-      }
-      return { ...prev, major: serializeMajorList(next) };
-    });
-  };
-
-  const handleMarketBatchInputChange = (field: MarketBatchField, value: string) => {
-    setMarketBatchForm((prev) => ({ ...prev, [field]: value }));
-  };
-
-  const handleBatchSubmit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    if (selectedMaterialIds.length === 0) {
-      setBatchMessage({ type: 'error', text: '请先选择至少一条资料' });
-      return;
-    }
-    const payload: Record<string, any> = { materialIds: selectedMaterialIds };
-    if (batchForm.college) payload.college = batchForm.college;
-    if (batchForm.major) payload.major = batchForm.major;
-    if (batchForm.gradeValue) payload.gradeValue = batchForm.gradeValue;
-    if (batchForm.courseCategory) payload.courseCategory = batchForm.courseCategory;
-    if (batchForm.tags) {
-      payload.tags = batchForm.tags;
-      payload.tagsMode = batchForm.tagsMode || 'replace';
-    }
-    setBatchMessage(null);
-    try {
-      const resp = await fetchBackend('/admin/materials/batch-update', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-      const json = await resp.json();
-      if (!resp.ok || !json.ok) {
-        throw new Error(json.msg || '批量更新失败');
-      }
-      const updatedCount = json.data?.updated ?? selectedMaterialIds.length;
-      const missingCount = Array.isArray(json.data?.missingIds) ? json.data.missingIds.length : 0;
-      setBatchMessage({
-        type: 'success',
-        text: `已更新 ${updatedCount} 条资料${missingCount ? `，其中 ${missingCount} 条未找到` : ''}`,
-      });
-      setSelectedMaterialIds([]);
-      loadMaterials(materialsMeta?.page ?? 0, materialView);
-    } catch (err: any) {
-      setBatchMessage({ type: 'error', text: err.message || '批量更新失败' });
-    }
-  };
-
-  const handleBatchDelete = async () => {
-    if (selectedMaterialIds.length === 0) {
-      setBatchMessage({ type: 'error', text: '请先选择至少一条资料' });
-      return;
-    }
-    if (!window.confirm(`确定删除选中的 ${selectedMaterialIds.length} 条资料？管理员可在后台恢复。`)) {
-      return;
-    }
-    setBatchDeleting(true);
-    setBatchMessage(null);
-    try {
-      const resp = await fetchBackend('/admin/materials/batch-delete', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ materialIds: selectedMaterialIds }),
-      });
-      const json = await resp.json();
-      if (!resp.ok || !json.ok) {
-        throw new Error(json.msg || '批量删除失败');
-      }
-      const deleted = json.data?.deleted ?? 0;
-      const failedIds: number[] = Array.isArray(json.data?.failedIds) ? json.data.failedIds : [];
-      let text = `已删除 ${deleted} 条资料。`;
-      if (failedIds.length) {
-        text += ` ${failedIds.length} 条删除失败：${failedIds.join(', ')}`;
-      }
-      setBatchMessage({
-        type: failedIds.length ? 'error' : 'success',
-        text,
-      });
-      setSelectedMaterialIds(failedIds);
-      await loadMaterials(currentMaterialPage - 1, materialView);
-    } catch (err: any) {
-      setBatchMessage({ type: 'error', text: err.message || '批量删除失败' });
-    } finally {
-      setBatchDeleting(false);
-    }
-  };
-
-  const handleBatchRestore = async () => {
-    if (selectedMaterialIds.length === 0) {
-      setBatchMessage({ type: 'error', text: '请先选择至少一条资料' });
-      return;
-    }
-    if (!window.confirm(`确定恢复选中的 ${selectedMaterialIds.length} 条资料？`)) {
-      return;
-    }
-    setBatchRestoring(true);
-    setBatchMessage(null);
-    try {
-      const resp = await fetchBackend('/admin/materials/batch-restore', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ materialIds: selectedMaterialIds }),
-      });
-      const json = await resp.json();
-      if (!resp.ok || !json.ok) {
-        throw new Error(json.msg || '批量恢复失败');
-      }
-      const restored = json.data?.restored ?? 0;
-      const failedIds: number[] = Array.isArray(json.data?.failedIds) ? json.data.failedIds : [];
-      let text = `已恢复 ${restored} 条资料。`;
-      if (failedIds.length) {
-        text += ` ${failedIds.length} 条恢复失败：${failedIds.join(', ')}`;
-      }
-      setBatchMessage({
-        type: failedIds.length ? 'error' : 'success',
-        text,
-      });
-      setSelectedMaterialIds(failedIds);
-      await loadMaterials(currentMaterialPage - 1, 'removed');
-    } catch (err: any) {
-      setBatchMessage({ type: 'error', text: err.message || '批量恢复失败' });
-    } finally {
-      setBatchRestoring(false);
-    }
-  };
+  const {
+    selectedMaterialIds,
+    setSelectedMaterialIds,
+    selectedMarketIds,
+    setSelectedMarketIds,
+    batchForm,
+    batchMajorSelections,
+    batchMessage,
+    setBatchMessage,
+    batchDeleting,
+    batchRestoring,
+    marketBatchForm,
+    marketBatchMessage,
+    setMarketBatchMessage,
+    marketBatchDeleting,
+    toggleMaterialSelection,
+    selectAllMaterials,
+    clearMaterialSelection,
+    toggleMarketSelection,
+    selectAllMarketItems,
+    clearMarketSelection,
+    handleBatchInputChange,
+    handleBatchMajorToggle,
+    handleMarketBatchInputChange,
+    handleBatchSubmit,
+    handleBatchDelete,
+    handleBatchRestore,
+    applyMarketBatchUpdate,
+    handleMarketBatchSubmit,
+    handleMarketBatchDelete,
+  } = useAdminBatchActions({
+    materials,
+    marketItems,
+    materialView,
+    currentMaterialPage,
+    currentMarketPage,
+    loadMaterials,
+    loadMarketItems,
+  });
+  const {
+    reportFilters,
+    reportNotice,
+    reportsLoading,
+    reportUpdatingId,
+    reportRestoringId,
+    loadReports,
+    handleReportPageChange,
+    handleReportFilterChange,
+    handleReportFieldUpdate,
+    handleReportUpdate,
+    handleReportRestore,
+  } = useAdminReports({
+    reports,
+    setReports,
+    reportsMeta,
+    setReportsMeta,
+  });
 
   const handleRestoreMaterial = async (materialId: number) => {
     if (!materialId) return;
@@ -622,94 +389,10 @@ export default function AdminPage({
       }
       setBatchMessage({ type: 'success', text: '资料已恢复' });
       await loadMaterials(currentMaterialPage - 1, 'removed');
-    } catch (err: any) {
-      setBatchMessage({ type: 'error', text: err.message || '恢复失败' });
+    } catch (err: unknown) {
+      setBatchMessage({ type: 'error', text: toErrorMessage(err, '恢复失败') });
     } finally {
       setRestoringMaterialId((prev) => (prev === materialId ? null : prev));
-    }
-  };
-
-  const handleMarketBatchSubmit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    const payload: Record<string, any> = { itemIds: selectedMarketIds };
-    if (marketBatchForm.status) payload.status = marketBatchForm.status;
-    if (marketBatchForm.category) payload.category = marketBatchForm.category;
-    if (marketBatchForm.school) payload.school = marketBatchForm.school.trim();
-    if (marketBatchForm.contactType) payload.contactType = marketBatchForm.contactType;
-    if (marketBatchForm.contactValue) payload.contactValue = marketBatchForm.contactValue.trim();
-    await applyMarketBatchUpdate(payload);
-  };
-
-  const applyMarketBatchUpdate = async (payload: Record<string, any>, actionLabel?: string) => {
-    if (selectedMarketIds.length === 0) {
-      setMarketBatchMessage({ type: 'error', text: '请先选择至少一条商品' });
-      return;
-    }
-    if (!payload || Object.keys(payload).length === 1) {
-      setMarketBatchMessage({ type: 'error', text: '请至少填写一个需要更新的字段' });
-      return;
-    }
-    setMarketBatchMessage(null);
-    try {
-      const resp = await fetchBackend('/admin/market/batch-update', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-      const json = await resp.json();
-      if (!resp.ok || !json.ok) {
-        throw new Error(json.msg || '批量更新失败');
-      }
-      const updated = json.data?.updated ?? selectedMarketIds.length;
-      const missingIds: number[] = Array.isArray(json.data?.missingIds) ? json.data.missingIds : [];
-      const prefix = actionLabel ? `${actionLabel}：` : '';
-      setMarketBatchMessage({
-        type: missingIds.length ? 'error' : 'success',
-        text: `${prefix}已更新 ${updated} 条商品${missingIds.length ? `，${missingIds.length} 条未找到` : ''}`,
-      });
-      setSelectedMarketIds(missingIds);
-      await loadMarketItems(currentMarketPage);
-    } catch (err: any) {
-      setMarketBatchMessage({ type: 'error', text: err.message || '批量更新失败' });
-    }
-  };
-
-  const handleMarketBatchDelete = async () => {
-    if (selectedMarketIds.length === 0) {
-      setMarketBatchMessage({ type: 'error', text: '请先选择至少一条商品' });
-      return;
-    }
-    if (!window.confirm(`确定删除选中的 ${selectedMarketIds.length} 条商品？该操作不可恢复。`)) {
-      return;
-    }
-    setMarketBatchDeleting(true);
-    setMarketBatchMessage(null);
-    try {
-      const resp = await fetchBackend('/admin/market/batch-delete', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ itemIds: selectedMarketIds }),
-      });
-      const json = await resp.json();
-      if (!resp.ok || !json.ok) {
-        throw new Error(json.msg || '批量删除失败');
-      }
-      const deleted = json.data?.deleted ?? 0;
-      const failedIds: number[] = Array.isArray(json.data?.failedIds) ? json.data.failedIds : [];
-      let text = `已删除 ${deleted} 条商品。`;
-      if (failedIds.length) {
-        text += ` ${failedIds.length} 条删除失败：${failedIds.join(', ')}`;
-      }
-      setMarketBatchMessage({
-        type: failedIds.length ? 'error' : 'success',
-        text,
-      });
-      setSelectedMarketIds(failedIds);
-      await loadMarketItems(currentMarketPage);
-    } catch (err: any) {
-      setMarketBatchMessage({ type: 'error', text: err.message || '批量删除失败' });
-    } finally {
-      setMarketBatchDeleting(false);
     }
   };
 
@@ -723,103 +406,11 @@ export default function AdminPage({
       } else {
         throw new Error(json.msg || '加载收益申请失败');
       }
-    } catch (err: any) {
-      setPayoutMessage({ type: 'error', text: err.message || '加载收益申请失败' });
+    } catch (err: unknown) {
+      setPayoutMessage({ type: 'error', text: toErrorMessage(err, '加载收益申请失败') });
     } finally {
       setPayoutLoading(false);
     }
-  };
-
-  const reloadMonthlyPayoutOverview = async (monthParam = monthlyPayoutMonth) => {
-    if (!monthParam) {
-      setMonthlyPayoutMessage({ type: 'error', text: '请选择月份' });
-      return;
-    }
-    setMonthlyPayoutLoading(true);
-    setMonthlyPayoutMessage(null);
-    try {
-      const resp = await fetchBackend(`/admin/monthly-payout-overview?month=${encodeURIComponent(monthParam)}`);
-      const json = await resp.json();
-      if (!resp.ok || !json.ok) {
-        throw new Error(json.msg || '加载月度打款数据失败');
-      }
-      setMonthlyPayoutOverview(json.data as AdminMonthlyPayoutOverview);
-    } catch (err: any) {
-      setMonthlyPayoutMessage({ type: 'error', text: err.message || '加载月度打款数据失败' });
-    } finally {
-      setMonthlyPayoutLoading(false);
-    }
-  };
-
-  const handleMonthlyMark = async (item: AdminMonthlyPayoutItem, markPaid: boolean) => {
-    if (!item?.uploaderId) {
-      return;
-    }
-    setMonthlyPayoutMarkingId(item.uploaderId);
-    setMonthlyPayoutMessage(null);
-    try {
-      const resp = await fetchBackend('/admin/monthly-payout-overview/marks', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          monthKey: monthlyPayoutMonth,
-          uploaderId: item.uploaderId,
-          markPaid,
-        }),
-      });
-      const json = await resp.json();
-      if (!resp.ok || !json.ok) {
-        throw new Error(json.msg || '更新打款标记失败');
-      }
-      setMonthlyPayoutMessage({ type: 'success', text: markPaid ? '已标记为已打款' : '已撤销打款标记' });
-      await reloadMonthlyPayoutOverview();
-    } catch (err: any) {
-      setMonthlyPayoutMessage({ type: 'error', text: err.message || '更新打款标记失败' });
-    } finally {
-      setMonthlyPayoutMarkingId(null);
-    }
-  };
-
-  const openPayoutQrModal = async (item: AdminMonthlyPayoutItem) => {
-    const name = item.uploaderNickname || item.uploaderUsername || `用户 #${item.uploaderId}`;
-    if (!item?.uploaderId) {
-      return;
-    }
-    setPayoutQrModal({
-      open: true,
-      title: `${name} 的收款码`,
-      loading: true,
-      error: null,
-      url: null,
-    });
-    try {
-      const resp = await fetchBackend(`/admin/monthly-payout-overview/users/${item.uploaderId}/payout-qr`);
-      const json = await resp.json();
-      if (!resp.ok || !json.ok) {
-        throw new Error(json.msg || '加载收款码失败');
-      }
-      const data = json.data as AdminPayoutQr;
-      if (!data?.hasPayoutQr || !data?.payoutQrUrl) {
-        throw new Error('该用户尚未上传收款码');
-      }
-      setPayoutQrModal((prev) => ({ ...prev, loading: false, url: data.payoutQrUrl || null }));
-    } catch (err: any) {
-      setPayoutQrModal((prev) => ({
-        ...prev,
-        loading: false,
-        error: err.message || '加载收款码失败',
-      }));
-    }
-  };
-
-  const closePayoutQrModal = () => {
-    setPayoutQrModal({
-      open: false,
-      title: '',
-      loading: false,
-      error: null,
-      url: null,
-    });
   };
 
   const loadSchedule = async () => {
@@ -836,8 +427,8 @@ export default function AdminPage({
       } else {
         throw new Error(json.msg || '加载上线日期失败');
       }
-    } catch (err: any) {
-      setScheduleMessage({ type: 'error', text: err.message || '加载上线日期失败' });
+    } catch (err: unknown) {
+      setScheduleMessage({ type: 'error', text: toErrorMessage(err, '加载上线日期失败') });
     } finally {
       setScheduleLoading(false);
     }
@@ -874,8 +465,8 @@ export default function AdminPage({
       setMessage({ type: 'success', text: '管理员已创建' });
       setForm({ username: '', password: '', nickname: '', admin: true, developer: true });
       reloadUsers();
-    } catch (err: any) {
-      setMessage({ type: 'error', text: err.message || '创建失败' });
+    } catch (err: unknown) {
+      setMessage({ type: 'error', text: toErrorMessage(err, '创建失败') });
     } finally {
       setSubmitting(false);
     }
@@ -885,46 +476,16 @@ export default function AdminPage({
     e.preventDefault();
     reloadUsers(userSearch.trim());
   };
-
-  const toggleNotePanel = async (userId: number) => {
-    setNotePanelOpen((prev) => ({ ...prev, [userId]: !prev[userId] }));
-    const willOpen = !notePanelOpen[userId];
-    if (willOpen) {
-      await loadUserNotes(userId);
-    }
-  };
-
-  const loadUserNotes = async (userId: number) => {
-    setNotesLoading((prev) => ({ ...prev, [userId]: true }));
-    const resp = await fetch(`/api/admin/user-notes?userId=${userId}`);
-    const json = await resp.json();
-    if (resp.ok && json.ok) {
-      setUserNotes((prev) => ({ ...prev, [userId]: json.data || [] }));
-    }
-    setNotesLoading((prev) => ({ ...prev, [userId]: false }));
-  };
-
-  const handleSendNote = async (userId: number) => {
-    const messageText = noteDrafts[userId]?.trim();
-    if (!messageText) {
-      setNoteAlerts((prev) => ({ ...prev, [userId]: { type: 'error', text: '留言不能为空' } }));
-      return;
-    }
-    setNoteAlerts((prev) => ({ ...prev, [userId]: { type: 'success', text: '发送中...' } }));
-    const resp = await fetch(`/api/admin/user-notes?userId=${userId}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message: messageText }),
-    });
-    const json = await resp.json();
-    if (!resp.ok || !json.ok) {
-      setNoteAlerts((prev) => ({ ...prev, [userId]: { type: 'error', text: json.msg || '发送失败' } }));
-      return;
-    }
-    setNoteDrafts((prev) => ({ ...prev, [userId]: '' }));
-    setNoteAlerts((prev) => ({ ...prev, [userId]: { type: 'success', text: '留言已发送' } }));
-    await loadUserNotes(userId);
-  };
+  const {
+    noteDrafts,
+    setNoteDrafts,
+    noteAlerts,
+    userNotes,
+    notesLoading,
+    notePanelOpen,
+    toggleNotePanel,
+    handleSendNote,
+  } = useAdminUserNotes();
 
   const updateFeedbackStatus = async (id: number, status: string) => {
     setFeedbackMessage(null);
@@ -940,8 +501,8 @@ export default function AdminPage({
       }
       setFeedbackMessage({ type: 'success', text: '反馈状态已更新' });
       reloadFeedbacks();
-    } catch (err: any) {
-      setFeedbackMessage({ type: 'error', text: err.message || '更新失败' });
+    } catch (err: unknown) {
+      setFeedbackMessage({ type: 'error', text: toErrorMessage(err, '更新失败') });
     }
   };
 
@@ -959,8 +520,8 @@ export default function AdminPage({
       }
       setVolunteerMessage({ type: 'success', text: '申请状态已更新' });
       reloadVolunteers();
-    } catch (err: any) {
-      setVolunteerMessage({ type: 'error', text: err.message || '更新失败' });
+    } catch (err: unknown) {
+      setVolunteerMessage({ type: 'error', text: toErrorMessage(err, '更新失败') });
     }
   };
 
@@ -993,8 +554,8 @@ export default function AdminPage({
       }
       setPayoutMessage({ type: 'success', text: '已更新收益申请' });
       reloadPayouts();
-    } catch (err: any) {
-      setPayoutMessage({ type: 'error', text: err.message || '操作失败' });
+    } catch (err: unknown) {
+      setPayoutMessage({ type: 'error', text: toErrorMessage(err, '操作失败') });
     }
   };
 
@@ -1011,8 +572,8 @@ export default function AdminPage({
         throw new Error(json.msg || '加载收益明细失败');
       }
       setPayoutDetails((prev) => ({ ...prev, [id]: (json.data || []) as PayoutSettlementDetail[] }));
-    } catch (error: any) {
-      setPayoutMessage({ type: 'error', text: error.message || '加载收益明细失败' });
+    } catch (error: unknown) {
+      setPayoutMessage({ type: 'error', text: toErrorMessage(error, '加载收益明细失败') });
     } finally {
       setPayoutDetailLoading((prev) => ({ ...prev, [id]: false }));
     }
@@ -1022,7 +583,9 @@ export default function AdminPage({
     e.preventDefault();
     setScheduleMessage(null);
     try {
-      const payload: any = { launchDate: scheduleForm.launchDate || null };
+      const payload: { launchDate: string | null; nextPayoutDate?: string } = {
+        launchDate: scheduleForm.launchDate || null,
+      };
       if (scheduleForm.nextPayoutDate) {
         payload.nextPayoutDate = scheduleForm.nextPayoutDate;
       }
@@ -1041,8 +604,8 @@ export default function AdminPage({
         nextPayoutDate: json.data.nextPayoutDate || '',
       });
       setScheduleMessage({ type: 'success', text: '上线日期已更新' });
-    } catch (err: any) {
-      setScheduleMessage({ type: 'error', text: err.message || '更新失败' });
+    } catch (err: unknown) {
+      setScheduleMessage({ type: 'error', text: toErrorMessage(err, '更新失败') });
     } finally {
       setScheduleLoading(false);
     }
@@ -1069,8 +632,8 @@ export default function AdminPage({
       }
       setBroadcastStatus({ type: 'success', text: '已广播给所有用户' });
       setBroadcastText('');
-    } catch (err: any) {
-      setBroadcastStatus({ type: 'error', text: err.message || '广播失败' });
+    } catch (err: unknown) {
+      setBroadcastStatus({ type: 'error', text: toErrorMessage(err, '广播失败') });
     } finally {
       setBroadcasting(false);
     }
@@ -1090,28 +653,7 @@ export default function AdminPage({
     reloadPayouts();
     reloadMonthlyPayoutOverview();
     loadSchedule();
-  }, []);
-
-  useEffect(() => {
-    const sections = adminNavItems
-      .map((item) => document.getElementById(item.id))
-      .filter((el): el is HTMLElement => Boolean(el));
-    if (sections.length === 0) {
-      return;
-    }
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            setActiveAdminSection(entry.target.id);
-          }
-        });
-      },
-      { rootMargin: '-20% 0px -60% 0px', threshold: [0.1, 0.25, 0.5] }
-    );
-    sections.forEach((section) => observer.observe(section));
-    return () => observer.disconnect();
-  }, [adminNavItems]);
+  }, [reloadMonthlyPayoutOverview]);
 
   return (
     <>
@@ -1125,7 +667,10 @@ export default function AdminPage({
                 key={item.id}
                 className={`admin-sidebar__item ${activeAdminSection === item.id ? 'active' : ''}`}
                 href={`#${item.id}`}
-                onClick={() => setActiveAdminSection(item.id)}
+                onClick={(event) => {
+                  event.preventDefault();
+                  jumpToSection(item.id);
+                }}
               >
                 <span className="admin-sidebar__indicator" aria-hidden="true" />
                 <span className="admin-sidebar__text">{item.label}</span>
@@ -1496,7 +1041,7 @@ export default function AdminPage({
                   <div className="market-admin-entry">
                     <div className="inline-group" style={{ alignItems: 'flex-start', gap: 16 }}>
                       {item.thumbnail ? (
-                        <img
+                        <AppImage
                           src={item.thumbnail}
                           alt={item.title}
                           style={{ width: 72, height: 72, objectFit: 'cover', borderRadius: 8 }}
@@ -2146,7 +1691,7 @@ export default function AdminPage({
               {!payoutQrModal.loading && !payoutQrModal.error && payoutQrModal.url && (
                 <>
                   <p className="wechat-modal__hint">请核对收款码后再进行线下打款。</p>
-                  <img src={payoutQrModal.url} alt="用户收款码" loading="lazy" />
+                  <AppImage src={payoutQrModal.url} alt="用户收款码" loading="lazy" />
                 </>
               )}
             </div>

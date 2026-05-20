@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { GetServerSideProps } from 'next';
+import AppImage from '../components/AppImage';
 import NavBar from '../components/NavBar';
 import { readSession } from '../lib/auth';
 import { SessionUser } from '../types/user';
@@ -224,7 +225,7 @@ export default function JoinPage({ user }: JoinPageProps) {
                   </div>
                   <div className="wechat-card__qr join-channel-layout__visual">
                     <div className="lazy-image-box join-qr-box">
-                      <img
+                      <AppImage
                         className="lazy-blur"
                         src="/wechat/wechat-qr.jpeg"
                         alt="StudyHub 官方微信公众号二维码"

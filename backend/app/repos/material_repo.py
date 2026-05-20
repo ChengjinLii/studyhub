@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 
-from sqlalchemy import func, select
+from sqlalchemy import func, inspect, select, text
 from sqlalchemy.orm import Session
 
 from app.models.materials import (
@@ -20,7 +20,71 @@ from app.models.materials import (
 )
 
 
+_TABLE_NAME_CACHE: dict[str, set[str]] = {}
+
+
+def _bind_cache_key(session: Session) -> str:
+    bind = session.get_bind()
+    try:
+        return bind.engine.url.render_as_string(hide_password=True)
+    except Exception:
+        return str(bind)
+
+
+def _table_names(session: Session) -> set[str]:
+    cache_key = _bind_cache_key(session)
+    cached = _TABLE_NAME_CACHE.get(cache_key)
+    if cached is not None:
+        return cached
+    inspector = inspect(session.get_bind())
+    table_names = set(inspector.get_table_names())
+    _TABLE_NAME_CACHE[cache_key] = table_names
+    return table_names
+
+
 class MaterialRepository:
+    def _uses_legacy_reviews(self, session: Session) -> bool:
+        table_names = _table_names(session)
+        return "material_reviews" not in table_names and "reviews" in table_names
+
+    def _uses_legacy_favorites(self, session: Session) -> bool:
+        table_names = _table_names(session)
+        return "material_favorites" not in table_names and "favorites" in table_names
+
+    def _uses_legacy_purchases(self, session: Session) -> bool:
+        table_names = _table_names(session)
+        return "material_purchases" not in table_names and "orders" in table_names
+
+    def _legacy_purchase_exists(self, session: Session, material_id: int, user_id: int) -> bool:
+        paid_order = session.execute(
+            text(
+                """
+                SELECT 1
+                FROM orders
+                WHERE material_id = :material_id AND user_id = :user_id AND status = 'PAID'
+                LIMIT 1
+                """
+            ),
+            {"material_id": material_id, "user_id": user_id},
+        ).first()
+        if paid_order is not None:
+            return True
+        paid_payment = session.execute(
+            text(
+                """
+                SELECT 1
+                FROM payments p
+                JOIN orders o ON o.id = p.order_id
+                WHERE o.material_id = :material_id
+                  AND o.user_id = :user_id
+                  AND p.status = 'PAID'
+                LIMIT 1
+                """
+            ),
+            {"material_id": material_id, "user_id": user_id},
+        ).first()
+        return paid_payment is not None
+
     def ensure_seed_bootstrap(self, session: Session, seed: dict[str, Any]) -> None:
         if not seed:
             return
@@ -223,6 +287,31 @@ class MaterialRepository:
         return entity
 
     def list_reviews(self, session: Session, material_id: int) -> list[MaterialReviewRecord]:
+        if self._uses_legacy_reviews(session):
+            rows = session.execute(
+                text(
+                    """
+                    SELECT id, material_id, user_id, reviewer, rating, comment, created_at
+                    FROM reviews
+                    WHERE material_id = :material_id
+                    ORDER BY created_at DESC, id DESC
+                    """
+                ),
+                {"material_id": material_id},
+            ).mappings().all()
+            return [
+                MaterialReviewRecord(
+                    id=int(row["id"]),
+                    material_id=int(row["material_id"]),
+                    user_id=int(row["user_id"]) if row["user_id"] is not None else None,
+                    reviewer=str(row["reviewer"] or ""),
+                    rating=int(row["rating"] or 0),
+                    comment=row["comment"],
+                    created_at=row["created_at"],
+                    updated_at=row["created_at"],
+                )
+                for row in rows
+            ]
         stmt = (
             select(MaterialReviewRecord)
             .where(MaterialReviewRecord.material_id == material_id)
@@ -241,6 +330,35 @@ class MaterialRepository:
         comment: str | None,
         created_at: datetime | None = None,
     ) -> MaterialReviewRecord:
+        if self._uses_legacy_reviews(session):
+            timestamp = created_at or datetime.now(UTC)
+            result = session.execute(
+                text(
+                    """
+                    INSERT INTO reviews (material_id, user_id, reviewer, rating, comment, created_at)
+                    VALUES (:material_id, :user_id, :reviewer, :rating, :comment, :created_at)
+                    """
+                ),
+                {
+                    "material_id": material_id,
+                    "user_id": user_id,
+                    "reviewer": reviewer,
+                    "rating": rating,
+                    "comment": comment,
+                    "created_at": timestamp,
+                },
+            )
+            review_id = int(result.lastrowid) if result.lastrowid is not None else 0
+            return MaterialReviewRecord(
+                id=review_id or None,
+                material_id=material_id,
+                user_id=user_id,
+                reviewer=reviewer,
+                rating=rating,
+                comment=comment,
+                created_at=timestamp,
+                updated_at=timestamp,
+            )
         entity = MaterialReviewRecord(
             material_id=material_id,
             user_id=user_id,
@@ -281,10 +399,50 @@ class MaterialRepository:
         session.delete(entity)
 
     def find_favorite(self, session: Session, material_id: int, user_id: int) -> MaterialFavoriteRecord | None:
+        if self._uses_legacy_favorites(session):
+            row = session.execute(
+                text(
+                    """
+                    SELECT id, material_id, user_id, created_at
+                    FROM favorites
+                    WHERE material_id = :material_id AND user_id = :user_id
+                    LIMIT 1
+                    """
+                ),
+                {"material_id": material_id, "user_id": user_id},
+            ).mappings().first()
+            if row is None:
+                return None
+            return MaterialFavoriteRecord(
+                id=int(row["id"]),
+                material_id=int(row["material_id"]),
+                user_id=int(row["user_id"]),
+                created_at=row["created_at"],
+                updated_at=row["created_at"],
+            )
         stmt = select(MaterialFavoriteRecord).where(MaterialFavoriteRecord.material_id == material_id, MaterialFavoriteRecord.user_id == user_id)
         return session.scalar(stmt)
 
     def add_favorite(self, session: Session, *, material_id: int, user_id: int) -> MaterialFavoriteRecord:
+        if self._uses_legacy_favorites(session):
+            timestamp = datetime.now(UTC)
+            result = session.execute(
+                text(
+                    """
+                    INSERT INTO favorites (material_id, user_id, created_at)
+                    VALUES (:material_id, :user_id, :created_at)
+                    """
+                ),
+                {"material_id": material_id, "user_id": user_id, "created_at": timestamp},
+            )
+            favorite_id = int(result.lastrowid) if result.lastrowid is not None else 0
+            return MaterialFavoriteRecord(
+                id=favorite_id or None,
+                material_id=material_id,
+                user_id=user_id,
+                created_at=timestamp,
+                updated_at=timestamp,
+            )
         entity = MaterialFavoriteRecord(material_id=material_id, user_id=user_id)
         session.add(entity)
         session.flush()
@@ -292,6 +450,15 @@ class MaterialRepository:
         return entity
 
     def remove_favorite(self, session: Session, entity: MaterialFavoriteRecord) -> None:
+        if self._uses_legacy_favorites(session):
+            if entity.id is not None:
+                session.execute(text("DELETE FROM favorites WHERE id = :id"), {"id": int(entity.id)})
+            else:
+                session.execute(
+                    text("DELETE FROM favorites WHERE material_id = :material_id AND user_id = :user_id"),
+                    {"material_id": int(entity.material_id), "user_id": int(entity.user_id)},
+                )
+            return
         session.delete(entity)
 
     def find_view_by_user(self, session: Session, material_id: int, user_id: int) -> MaterialViewRecord | None:
@@ -324,10 +491,14 @@ class MaterialRepository:
         return entity
 
     def has_purchase(self, session: Session, material_id: int, user_id: int) -> bool:
+        if self._uses_legacy_purchases(session):
+            return self._legacy_purchase_exists(session, material_id, user_id)
         stmt = select(MaterialPurchaseRecord.id).where(MaterialPurchaseRecord.material_id == material_id, MaterialPurchaseRecord.user_id == user_id)
         return session.scalar(stmt) is not None
 
     def add_purchase(self, session: Session, *, material_id: int, user_id: int, source: str) -> MaterialPurchaseRecord:
+        if self._uses_legacy_purchases(session):
+            return MaterialPurchaseRecord(material_id=material_id, user_id=user_id, source=source)
         entity = MaterialPurchaseRecord(material_id=material_id, user_id=user_id, source=source)
         session.add(entity)
         session.flush()

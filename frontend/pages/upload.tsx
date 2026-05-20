@@ -2,7 +2,7 @@ import { GetServerSideProps } from 'next';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
-import JSZip from 'jszip';
+import AppImage from '../components/AppImage';
 import NavBar from '../components/NavBar';
 import { readSession } from '../lib/auth';
 import { SessionUser } from '../types/user';
@@ -29,8 +29,13 @@ import {
   resolveExperienceTopicFromTags,
 } from '../lib/column';
 import { resolveApiBase } from '../lib/apiBase';
+import { toErrorMessage } from '../lib/errors';
 import { parseMajorList, serializeMajorList } from '../lib/major';
 import { materialPath } from '../lib/slug';
+import { buildZipName, resolveZipFileName, zipFiles, zipMarkdownContent } from '../lib/uploadAssets';
+import { sendUploadFormData, type UploadMutationResponse } from '../lib/uploadSubmit';
+import { useSectionNavigation } from '../lib/useSectionNavigation';
+import { useUploadImageSelection } from '../lib/useUploadImageSelection';
 
 const presetTags = [
   '日常学习笔记',
@@ -75,12 +80,6 @@ const UPLOAD_NAV_ITEMS = [
   { id: 'upload-delivery', label: '交付与预览' },
   { id: 'upload-confirm', label: '发布确认' },
 ];
-
-const sanitizeFilename = (value: string) =>
-  value
-    .replace(/[\\/:*?"<>|]+/g, '_')
-    .replace(/\s+/g, ' ')
-    .trim();
 
 const sanitizePriceInput = (value: string) => value.replace(/[^\d]/g, '');
 
@@ -187,15 +186,21 @@ export default function UploadPage({ user, token, account }: UploadPageProps) {
   const [deliveryMethod, setDeliveryMethod] = useState<'FILE' | 'NETDISK'>('FILE');
   const [previewWatermarkEnabled, setPreviewWatermarkEnabled] = useState(true);
   const [previewSource, setPreviewSource] = useState<'AUTO' | 'MANUAL'>(PREVIEW_SOURCE_AUTO);
-  const [manualPreviewFiles, setManualPreviewFiles] = useState<File[]>([]);
-  const [manualPreviewNotice, setManualPreviewNotice] = useState<string | null>(null);
-  const previewInputRef = useRef<HTMLInputElement | null>(null);
+  const isExperience = uploadMode === 'experience';
+  const customPreviewLabel = isExperience ? '经验配图' : '自定义预览图';
+  const manualPreviewSelection = useUploadImageSelection({
+    label: '预览图',
+    maxFiles: MAX_PREVIEW_IMAGES,
+    maxFileBytes: MAX_PREVIEW_IMAGE_BYTES,
+  });
   const [customPreviewText, setCustomPreviewText] = useState('');
-  const [customPreviewFiles, setCustomPreviewFiles] = useState<File[]>([]);
-  const [customPreviewNotice, setCustomPreviewNotice] = useState<string | null>(null);
+  const customPreviewSelection = useUploadImageSelection({
+    label: customPreviewLabel,
+    maxFiles: MAX_CUSTOM_PREVIEW_IMAGES,
+    maxFileBytes: MAX_PREVIEW_IMAGE_BYTES,
+  });
   const [customPreviewClear, setCustomPreviewClear] = useState(false);
   const [existingCustomPreviewImages, setExistingCustomPreviewImages] = useState<string[]>([]);
-  const customPreviewInputRef = useRef<HTMLInputElement | null>(null);
   const [requestPreviewRequirement, setRequestPreviewRequirement] = useState('');
   const [hasExistingFile, setHasExistingFile] = useState(false);
   const [netdiskUrl, setNetdiskUrl] = useState('');
@@ -211,13 +216,11 @@ export default function UploadPage({ user, token, account }: UploadPageProps) {
   const [quickSelectedOption, setQuickSelectedOption] = useState<string | null>(null);
   const [requestId, setRequestId] = useState<number | null>(null);
   const [requestPrefilled, setRequestPrefilled] = useState(false);
-  const [activeSection, setActiveSection] = useState('upload-overview');
   const uploadRequestRef = useRef<XMLHttpRequest | null>(null);
   const apiBase = useMemo(
     () => resolveApiBase(typeof window !== 'undefined' ? window.location.origin : undefined),
     []
   );
-  const isExperience = uploadMode === 'experience';
   const isExperienceCustomTopic = experienceTopic === 'leetcode';
   const experienceTopicTitle = getColumnTopicTitle(experienceTopic);
   const experienceTopicExtraTagRaw = getColumnTopicExtraTag(experienceTopic);
@@ -242,12 +245,35 @@ export default function UploadPage({ user, token, account }: UploadPageProps) {
     }
     return UPLOAD_NAV_ITEMS;
   }, [isExperience]);
+  const { activeSection, jumpToSection } = useSectionNavigation(uploadNavItems, {
+    rootMargin: '-24% 0px -58% 0px',
+    threshold: [0.12, 0.38, 0.72],
+  });
   const descriptionLimit = isExperience ? MAX_EXPERIENCE_LENGTH : MAX_DESC_LENGTH;
   const customPreviewTitle = isExperience ? '经验配图' : '自定义预览';
-  const customPreviewLabel = isExperience ? '经验配图' : '自定义预览图';
   const customPreviewHint = isExperience
     ? '可选：最多上传 5 张配图，单张 ≤ 5MB，无水印。'
     : '可选：图文结合展示，文字最多 800 字，图片最多 5 张。';
+  const {
+    files: manualPreviewFiles,
+    notice: manualPreviewNotice,
+    setFiles: setManualPreviewFiles,
+    setNotice: setManualPreviewNotice,
+    inputRef: manualPreviewInputRef,
+    handleSelection: handleManualPreviewSelection,
+    removeFile: removeManualPreviewFile,
+    clearFiles: clearManualPreviewFiles,
+  } = manualPreviewSelection;
+  const {
+    files: customPreviewFiles,
+    notice: customPreviewNotice,
+    setFiles: setCustomPreviewFiles,
+    setNotice: setCustomPreviewNotice,
+    inputRef: customPreviewInputRef,
+    handleSelection: handleCustomPreviewFilesSelection,
+    removeFile: removeCustomPreviewFile,
+    clearFiles: clearCustomPreviewFiles,
+  } = customPreviewSelection;
   const priceSummary = useMemo(() => formatPriceSummary(price), [price]);
   const hasPayoutQr = Boolean(account?.payoutQrUrl);
   const experienceHeading = isExperienceCustomTopic
@@ -284,33 +310,6 @@ export default function UploadPage({ user, token, account }: UploadPageProps) {
     if (stage === '英语' || stage === '技能') return 'SKILL';
     return 'UG';
   };
-
-  useEffect(() => {
-    if (!uploadNavItems.some((item) => item.id === activeSection)) {
-      setActiveSection('upload-overview');
-    }
-  }, [uploadNavItems, activeSection]);
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const sections = uploadNavItems
-      .map((item) => document.getElementById(item.id))
-      .filter((item): item is HTMLElement => Boolean(item));
-    if (!sections.length) return;
-    const observer = new IntersectionObserver(
-      (entries) => {
-        const visible = entries
-          .filter((entry) => entry.isIntersecting)
-          .sort((left, right) => left.boundingClientRect.top - right.boundingClientRect.top);
-        if (visible.length > 0) {
-          setActiveSection(visible[0].target.id);
-        }
-      },
-      { rootMargin: '-24% 0px -58% 0px', threshold: [0.12, 0.38, 0.72] }
-    );
-    sections.forEach((section) => observer.observe(section));
-    return () => observer.disconnect();
-  }, [uploadNavItems, isEditing, uploadMode, quickPanelOpen, isRequestResponse]);
 
   useEffect(() => {
     const loadMaterial = async () => {
@@ -378,27 +377,30 @@ export default function UploadPage({ user, token, account }: UploadPageProps) {
         setPreviewWatermarkEnabled(detail.previewWatermarkEnabled ?? true);
         setPreviewSource(detail.previewSource === PREVIEW_SOURCE_MANUAL ? PREVIEW_SOURCE_MANUAL : PREVIEW_SOURCE_AUTO);
         setManualPreviewFiles([]);
+        setManualPreviewNotice(null);
         setCustomPreviewText(detail.customPreviewText || '');
         setExistingCustomPreviewImages(detail.customPreviewImages || []);
         setCustomPreviewFiles([]);
         setCustomPreviewNotice(null);
         setCustomPreviewClear(false);
-      } catch (err: any) {
-        setStatus({ type: 'error', message: err.message || '加载资料信息失败' });
+      } catch (err: unknown) {
+        setStatus({ type: 'error', message: toErrorMessage(err, '加载资料信息失败') });
       } finally {
         setLoadingExisting(false);
       }
     };
     loadMaterial();
-  }, [isEditing, editingId, token, apiBase, gradeStageOptions]);
-
-  const jumpToSection = (id: string) => {
-    if (typeof window === 'undefined') return;
-    const target = document.getElementById(id);
-    if (!target) return;
-    setActiveSection(id);
-    target.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  };
+  }, [
+    apiBase,
+    editingId,
+    gradeStageOptions,
+    isEditing,
+    setCustomPreviewFiles,
+    setCustomPreviewNotice,
+    setManualPreviewFiles,
+    setManualPreviewNotice,
+    token,
+  ]);
 
   useEffect(() => {
     if (courseCategory === 'MAJOR') {
@@ -415,7 +417,7 @@ export default function UploadPage({ user, token, account }: UploadPageProps) {
       setManualPreviewNotice(null);
       setManualPreviewFiles([]);
     }
-  }, [previewSource]);
+  }, [previewSource, setManualPreviewFiles, setManualPreviewNotice]);
 
   useEffect(() => {
     if (isEditing || requestPrefilled) return;
@@ -462,9 +464,9 @@ export default function UploadPage({ user, token, account }: UploadPageProps) {
     setPrice('0');
     setCopyrightOwner('');
     setPreviewSource(PREVIEW_SOURCE_AUTO);
-    clearManualPreviews();
+    clearManualPreviewFiles();
     setStatus(null);
-  }, [router.query.topic, isEditing]);
+  }, [clearManualPreviewFiles, isEditing, router.query.topic]);
 
   useEffect(() => {
     if (isEditing || !isExperience) return;
@@ -545,86 +547,11 @@ export default function UploadPage({ user, token, account }: UploadPageProps) {
     }
   };
 
-  const handlePreviewSelection = (files: FileList | null) => {
-    if (!files) return;
-    setManualPreviewNotice(null);
-    const next = [...manualPreviewFiles];
-    const errors: string[] = [];
-    Array.from(files).forEach((file) => {
-      if (!file.type.startsWith('image/')) {
-        errors.push(`${file.name} 不是图片格式`);
-        return;
-      }
-      if (file.size > MAX_PREVIEW_IMAGE_BYTES) {
-        errors.push(`${file.name} 超过 5MB`);
-        return;
-      }
-      if (next.length >= MAX_PREVIEW_IMAGES) {
-        errors.push(`最多上传 ${MAX_PREVIEW_IMAGES} 张预览图`);
-        return;
-      }
-      next.push(file);
-    });
-    setManualPreviewFiles(next);
-    if (previewInputRef.current) {
-      previewInputRef.current.value = '';
-    }
-    if (errors.length) {
-      setManualPreviewNotice(errors[0]);
-    }
-  };
-
-  const removePreviewFile = (index: number) => {
-    setManualPreviewFiles((prev) => prev.filter((_, idx) => idx !== index));
-  };
-
-  const clearManualPreviews = () => {
-    setManualPreviewFiles([]);
-    if (previewInputRef.current) {
-      previewInputRef.current.value = '';
-    }
-  };
-
   const handleCustomPreviewSelection = (files: FileList | null) => {
     if (!files) return;
-    setCustomPreviewNotice(null);
     setCustomPreviewClear(false);
     setExistingCustomPreviewImages([]);
-    const next = [...customPreviewFiles];
-    const errors: string[] = [];
-    Array.from(files).forEach((file) => {
-      if (!file.type.startsWith('image/')) {
-        errors.push(`${file.name} 不是图片格式`);
-        return;
-      }
-      if (file.size > MAX_PREVIEW_IMAGE_BYTES) {
-        errors.push(`${file.name} 超过 5MB`);
-        return;
-      }
-      if (next.length >= MAX_CUSTOM_PREVIEW_IMAGES) {
-        errors.push(`最多上传 ${MAX_CUSTOM_PREVIEW_IMAGES} 张${customPreviewLabel}`);
-        return;
-      }
-      next.push(file);
-    });
-    setCustomPreviewFiles(next);
-    if (customPreviewInputRef.current) {
-      customPreviewInputRef.current.value = '';
-    }
-    if (errors.length) {
-      setCustomPreviewNotice(errors[0]);
-    }
-  };
-
-  const removeCustomPreviewFile = (index: number) => {
-    setCustomPreviewFiles((prev) => prev.filter((_, idx) => idx !== index));
-  };
-
-  const clearCustomPreviewFiles = () => {
-    setCustomPreviewFiles([]);
-    if (customPreviewInputRef.current) {
-      customPreviewInputRef.current.value = '';
-    }
+    handleCustomPreviewFilesSelection(files);
   };
 
   const clearCustomPreviewAll = () => {
@@ -634,48 +561,6 @@ export default function UploadPage({ user, token, account }: UploadPageProps) {
     setExistingCustomPreviewImages([]);
     clearCustomPreviewFiles();
   };
-
-  const sendFormData = (
-    url: string,
-    method: 'POST' | 'PUT',
-    formData: FormData,
-    onProgress: (value: number) => void,
-    requestRef: { current: XMLHttpRequest | null }
-  ): Promise<any> =>
-    new Promise((resolve, reject) => {
-      const xhr = new XMLHttpRequest();
-      requestRef.current = xhr;
-      xhr.open(method, url);
-      xhr.responseType = 'json';
-      if (token) {
-        xhr.setRequestHeader('Authorization', `Bearer ${token}`);
-      }
-      xhr.upload.onprogress = (event) => {
-        if (!event.lengthComputable) return;
-        const percent = Math.round((event.loaded / event.total) * 100);
-        onProgress(percent);
-      };
-      xhr.onload = () => {
-        const response =
-          xhr.response ||
-          (() => {
-            try {
-              return JSON.parse(xhr.responseText);
-            } catch (error) {
-              return null;
-            }
-          })();
-        if (xhr.status >= 200 && xhr.status < 300 && response?.ok) {
-          onProgress(100);
-          resolve(response);
-          return;
-        }
-        reject(new Error(response?.msg || '投稿失败'));
-      };
-      xhr.onerror = () => reject(new Error('网络异常'));
-      xhr.onabort = () => reject(new Error('上传已取消'));
-      xhr.send(formData);
-    });
 
   const handleZipSelection = async (fileList: FileList | null) => {
     const files = fileList ? Array.from(fileList) : [];
@@ -703,13 +588,13 @@ export default function UploadPage({ user, token, account }: UploadPageProps) {
     }
     setZipPreparing(true);
     try {
-      const zipName = buildZipName(title, deriveAutoTitle(files[0].name));
-      const zipped = await zipFiles(files, zipName);
+      const zipName = buildZipName(title, deriveAutoTitle(files[0].name), MAX_TITLE_LENGTH);
+      const zipped = await zipFiles(files, zipName, MAX_FILE_BYTES);
       if (zipTaskRef.current !== taskId) return;
       setZipFile(zipped);
-    } catch (error: any) {
+    } catch (error: unknown) {
       if (zipTaskRef.current !== taskId) return;
-      setStatus({ type: 'error', message: error.message || '文件打包失败，请重试。' });
+      setStatus({ type: 'error', message: toErrorMessage(error, '文件打包失败，请重试。') });
       clearZipFile();
     } finally {
       if (zipTaskRef.current === taskId) {
@@ -729,46 +614,6 @@ export default function UploadPage({ user, token, account }: UploadPageProps) {
   const deriveAutoTitle = (name: string) => {
     const withoutExt = name.replace(/\.[^/.]+$/, '');
     return withoutExt.slice(0, MAX_TITLE_LENGTH);
-  };
-
-  const buildZipName = (titleValue: string, fallbackName: string) => {
-    const base = sanitizeFilename(titleValue || fallbackName || '资料');
-    const trimmed = base.slice(0, MAX_TITLE_LENGTH).trim() || '资料';
-    const normalized = trimmed.replace(/\.zip$/i, '');
-    return `${normalized}.zip`;
-  };
-
-  const resolveZipFileName = (file: File, titleValue: string) => {
-    const fallback = file.name.replace(/\.zip$/i, '') || '资料';
-    const zipName = buildZipName(titleValue, fallback);
-    if (file.name === zipName) return file;
-    return new File([file], zipName, {
-      type: file.type || 'application/zip',
-      lastModified: file.lastModified,
-    });
-  };
-
-  const zipFiles = async (files: File[], zipName: string) => {
-    const zip = new JSZip();
-    files.forEach((file) => {
-      zip.file(file.name, file);
-    });
-    const blob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE', compressionOptions: { level: 6 } });
-    if (blob.size > MAX_FILE_BYTES) {
-      throw new Error('打包后的文件超过 50MB，请删除部分文件或改用网盘链接。');
-    }
-    return new File([blob], zipName, { type: 'application/zip', lastModified: Date.now() });
-  };
-
-  const zipMarkdownContent = async (titleValue: string, content: string) => {
-    const zip = new JSZip();
-    zip.file('experience.md', content);
-    const zipName = buildZipName(titleValue, '经验分享');
-    const blob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE', compressionOptions: { level: 6 } });
-    if (blob.size > MAX_FILE_BYTES) {
-      throw new Error('内容过长，打包后超过 50MB。');
-    }
-    return new File([blob], zipName, { type: 'application/zip', lastModified: Date.now() });
   };
 
   const handleSubmit = async (event: FormEvent) => {
@@ -917,11 +762,11 @@ export default function UploadPage({ user, token, account }: UploadPageProps) {
       }
       const formData = new FormData();
       let uploadFile =
-        zipFile && zipSourceCount > 1 ? resolveZipFileName(zipFile, trimmedTitle) : zipFile;
+        zipFile && zipSourceCount > 1 ? resolveZipFileName(zipFile, trimmedTitle, MAX_TITLE_LENGTH) : zipFile;
       if (isExperience) {
         setZipPreparing(true);
         try {
-          uploadFile = await zipMarkdownContent(trimmedTitle, trimmedDescription);
+          uploadFile = await zipMarkdownContent(trimmedTitle, trimmedDescription, MAX_FILE_BYTES, MAX_TITLE_LENGTH);
         } finally {
           setZipPreparing(false);
         }
@@ -939,7 +784,11 @@ export default function UploadPage({ user, token, account }: UploadPageProps) {
       const endpoint = isEditing ? `${apiBase}/materials/${editingId}` : `${apiBase}/materials`;
       const method = isEditing ? 'PUT' : 'POST';
       const json = uploadFile
-        ? await sendFormData(endpoint, method, formData, setUploadProgress, uploadRequestRef)
+        ? await sendUploadFormData(endpoint, method, formData, {
+            token,
+            onProgress: setUploadProgress,
+            requestRef: uploadRequestRef,
+          })
         : await (async () => {
             const res = await fetch(endpoint, {
               method,
@@ -959,8 +808,8 @@ export default function UploadPage({ user, token, account }: UploadPageProps) {
       }
       setStatus({ type: 'success', message: isEditing ? '更新成功，正在跳转...' : '投稿成功，正在跳转到资料详情...' });
       await router.push(materialPath(json.data.id, json.data.title || trimmedTitle));
-    } catch (error: any) {
-      setStatus({ type: 'error', message: error.message || '投稿失败' });
+    } catch (error: unknown) {
+      setStatus({ type: 'error', message: toErrorMessage(error, '投稿失败') });
     } finally {
       setSubmitting(false);
       setUploadProgress(null);
@@ -981,7 +830,7 @@ export default function UploadPage({ user, token, account }: UploadPageProps) {
       setPrice('0');
       setCopyrightOwner('');
       setPreviewSource(PREVIEW_SOURCE_AUTO);
-      clearManualPreviews();
+      clearManualPreviewFiles();
     }
   };
 
@@ -1089,7 +938,12 @@ export default function UploadPage({ user, token, account }: UploadPageProps) {
                     : `单张 ≤ 5MB，最多 ${MAX_CUSTOM_PREVIEW_IMAGES} 张`}
                 </span>
                 {customPreviewFiles.length > 0 && (
-                  <button type="button" className="file-clear" onClick={clearCustomPreviewFiles} aria-label="清空配图">
+                  <button
+                    type="button"
+                    className="file-clear"
+                    onClick={clearCustomPreviewFiles}
+                    aria-label="清空配图"
+                  >
                     x
                   </button>
                 )}
@@ -1124,7 +978,7 @@ export default function UploadPage({ user, token, account }: UploadPageProps) {
                   <p className="help-text">已存在 {existingCustomPreviewImages.length} 张配图。</p>
                   <div className="custom-preview-existing__grid">
                     {existingCustomPreviewImages.map((url, index) => (
-                      <img key={`${url}-${index}`} src={url} alt={`已上传配图 ${index + 1}`} loading="lazy" />
+                      <AppImage key={`${url}-${index}`} src={url} alt={`已上传配图 ${index + 1}`} loading="lazy" />
                     ))}
                   </div>
                 </div>
@@ -1519,7 +1373,7 @@ export default function UploadPage({ user, token, account }: UploadPageProps) {
                     onDragOver={(e) => e.preventDefault()}
                     onDrop={(e) => {
                       e.preventDefault();
-                      handlePreviewSelection(e.dataTransfer.files);
+                      handleManualPreviewSelection(e.dataTransfer.files);
                     }}
                   >
                     <span className="file-trigger">选择预览图</span>
@@ -1529,16 +1383,21 @@ export default function UploadPage({ user, token, account }: UploadPageProps) {
                         : `单张 ≤ 5MB，至少 ${isRequestResponse ? MIN_REQUEST_PREVIEW_IMAGES : MIN_MANUAL_PREVIEW_IMAGES} 张`}
                     </span>
                     {manualPreviewFiles.length > 0 && (
-                      <button type="button" className="file-clear" onClick={clearManualPreviews} aria-label="清空预览图">
+                      <button
+                        type="button"
+                        className="file-clear"
+                        onClick={clearManualPreviewFiles}
+                        aria-label="清空预览图"
+                      >
                         x
                       </button>
                     )}
                     <input
                       type="file"
-                      ref={previewInputRef}
+                      ref={manualPreviewInputRef}
                       accept="image/*"
                       multiple
-                      onChange={(e) => handlePreviewSelection(e.target.files)}
+                      onChange={(e) => handleManualPreviewSelection(e.target.files)}
                     />
                   </div>
                   {manualPreviewFiles.length > 0 && (
@@ -1549,7 +1408,7 @@ export default function UploadPage({ user, token, account }: UploadPageProps) {
                           <button
                             type="button"
                             className="file-clear"
-                            onClick={() => removePreviewFile(index)}
+                            onClick={() => removeManualPreviewFile(index)}
                             aria-label={`移除 ${file.name}`}
                           >
                             ×
@@ -1656,7 +1515,7 @@ export default function UploadPage({ user, token, account }: UploadPageProps) {
                   <p className="help-text">已存在 {existingCustomPreviewImages.length} 张自定义预览图。</p>
                   <div className="custom-preview-existing__grid">
                     {existingCustomPreviewImages.map((url, index) => (
-                      <img key={`${url}-${index}`} src={url} alt={`已上传预览图 ${index + 1}`} loading="lazy" />
+                      <AppImage key={`${url}-${index}`} src={url} alt={`已上传预览图 ${index + 1}`} loading="lazy" />
                     ))}
                   </div>
                 </div>
@@ -1680,7 +1539,8 @@ export default function UploadPage({ user, token, account }: UploadPageProps) {
                         ? zipSourceCount > 1
                           ? `已选择 ${zipSourceCount} 个文件，打包为 ${buildZipName(
                               title,
-                              zipFile.name.replace(/\.zip$/i, '')
+                              zipFile.name.replace(/\.zip$/i, ''),
+                              MAX_TITLE_LENGTH
                             )}`
                           : zipFile.name
                         : isEditing

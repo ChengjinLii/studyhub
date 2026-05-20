@@ -11,6 +11,7 @@
     "check": "npm run typecheck && npm run lint",
     "format": "prettier --write .",
     "test:smoke": "playwright test tests/smoke.spec.ts",
+    "test:critical": "playwright test tests/critical-paths.spec.ts",
     "xmas:hat": "node scripts/vectorize-hat.mjs"
   },
   "dependencies": {

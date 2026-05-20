@@ -2,11 +2,13 @@ import { GetServerSideProps } from 'next';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { CSSProperties, useEffect, useState } from 'react';
+import AppImage from '../../components/AppImage';
 import NavBar from '../../components/NavBar';
 import ShareSheet from '../../components/ShareSheet';
 import { readSession, hasRole } from '../../lib/auth';
 import { reportTarget } from '../../lib/api';
 import { getRequestOrigin } from '../../lib/apiBase';
+import { toErrorMessage } from '../../lib/errors';
 import { fetchMarketItemDetail } from '../../lib/market';
 import { warmImage } from '../../lib/imageWarmup';
 import { SAMPLE_MARKET_ITEMS } from '../../constants/marketSamples';
@@ -101,8 +103,8 @@ export default function MarketDetailPage({ user, item }: DetailPageProps) {
       }
       setState(json.data);
       setShowContact(true);
-    } catch (err: any) {
-      setError(err.message || '操作失败');
+    } catch (err: unknown) {
+      setError(toErrorMessage(err, '操作失败'));
     } finally {
       setSubmitting(false);
     }
@@ -128,8 +130,8 @@ export default function MarketDetailPage({ user, item }: DetailPageProps) {
       if (!nextState.canViewContact) {
         setShowContact(false);
       }
-    } catch (err: any) {
-      setError(err.message || '操作失败');
+    } catch (err: unknown) {
+      setError(toErrorMessage(err, '操作失败'));
     } finally {
       setWanting(false);
     }
@@ -189,8 +191,8 @@ export default function MarketDetailPage({ user, item }: DetailPageProps) {
       }
       setShareNotice({ type: 'error', text: '复制失败，请手动复制链接。' });
       window.setTimeout(() => setShareNotice(null), 2200);
-    } catch (err: any) {
-      setShareNotice({ type: 'error', text: err?.message || '复制失败，请稍后重试。' });
+    } catch (err: unknown) {
+      setShareNotice({ type: 'error', text: toErrorMessage(err, '复制失败，请稍后重试。') });
       window.setTimeout(() => setShareNotice(null), 2200);
     }
   };
@@ -214,8 +216,8 @@ export default function MarketDetailPage({ user, item }: DetailPageProps) {
         throw new Error(json.msg || '操作失败');
       }
       setState(json.data);
-    } catch (err: any) {
-      setError(err.message || '操作失败');
+    } catch (err: unknown) {
+      setError(toErrorMessage(err, '操作失败'));
     } finally {
       setStatusUpdating(false);
     }
@@ -231,7 +233,7 @@ export default function MarketDetailPage({ user, item }: DetailPageProps) {
     try {
       const url = state.isOwner ? `/api/market/${state.id}` : `/api/admin/market/${state.id}`;
       const resp = await fetch(url, { method: 'DELETE' });
-      let json: any = null;
+      let json: { ok?: boolean; msg?: string } | null = null;
       try {
         json = await resp.json();
       } catch {
@@ -243,8 +245,8 @@ export default function MarketDetailPage({ user, item }: DetailPageProps) {
       }
       setModerationAlert({ type: 'success', text: '商品已删除，正在返回集市…' });
       await router.replace('/market');
-    } catch (err: any) {
-      setModerationAlert({ type: 'error', text: err.message || '删除失败，请稍后重试。' });
+    } catch (err: unknown) {
+      setModerationAlert({ type: 'error', text: toErrorMessage(err, '删除失败，请稍后重试。') });
     } finally {
       setRemoving(false);
     }
@@ -262,8 +264,8 @@ export default function MarketDetailPage({ user, item }: DetailPageProps) {
     try {
       await reportTarget('MARKET_ITEM', state.id, reason);
       setModerationAlert({ type: 'success', text: '已收到举报，我们会尽快处理。' });
-    } catch (err: any) {
-      setModerationAlert({ type: 'error', text: err.message || '举报失败，请稍后再试。' });
+    } catch (err: unknown) {
+      setModerationAlert({ type: 'error', text: toErrorMessage(err, '举报失败，请稍后再试。') });
     }
   };
 
@@ -434,7 +436,7 @@ export default function MarketDetailPage({ user, item }: DetailPageProps) {
                         aria-label={`查看第 ${index + 1} 张图片`}
                         aria-pressed={index === activeImageIndex}
                       >
-                        <img src={variant?.src || src} alt={`商品图片 ${index + 1}`} loading="lazy" decoding="async" />
+                        <AppImage src={variant?.src || src} alt={`商品图片 ${index + 1}`} loading="lazy" decoding="async" />
                       </button>
                     ))}
                   </div>

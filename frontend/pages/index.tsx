@@ -6,6 +6,7 @@ import Link from 'next/link';
 import Snowfall from 'react-snowfall';
 import NavBar from '../components/NavBar';
 import ShareSheet from '../components/ShareSheet';
+import AppImage from '../components/AppImage';
 import MaterialCard from '../components/MaterialCard';
 import PaginationBar from '../components/PaginationBar';
 import { MaterialListItem, PaginationMeta } from '../types/material';
@@ -24,6 +25,7 @@ import {
 } from '../lib/api';
 import { fetchBackend } from '../lib/apiBase';
 import { getRequestOrigin } from '../lib/apiBase';
+import { toErrorMessage } from '../lib/errors';
 import { formatMajorDisplay } from '../lib/major';
 import { formatDate, formatNumber } from '../lib/format';
 import { materialPath, userPath } from '../lib/slug';
@@ -186,8 +188,8 @@ export default function Home({
             materialsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
           }
         });
-      } catch (error: any) {
-        setPaginationError(error.message || '筛选加载失败');
+      } catch (error: unknown) {
+        setPaginationError(toErrorMessage(error, '筛选加载失败'));
       } finally {
         setLoadingPage(false);
       }
@@ -235,7 +237,7 @@ export default function Home({
       unique.add(filtersState.tag);
     }
     return Array.from(unique);
-  }, [tagOptions, filtersState.tag]);
+  }, [tagOptions, tagOptionsState, filtersState.tag]);
   const gradeStageOptions = GRADE_STAGE_OPTIONS;
   const hasAdvancedFilters = useMemo(() => {
     const priceActive = filtersState.price && filtersState.price !== 'all';
@@ -303,6 +305,7 @@ export default function Home({
   const [leaderboardFollowLoading, setLeaderboardFollowLoading] = useState<Record<number, boolean>>({});
   const [leaderboardFollowNotice, setLeaderboardFollowNotice] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [supportModalOpen, setSupportModalOpen] = useState(false);
+  const showSeasonalEffects = !reduceMotion || isMobile;
   useEffect(() => {
     setMaterialList(initialMaterials);
     setPageMeta(meta);
@@ -310,14 +313,14 @@ export default function Home({
     setTagOptionsState(tagOptions);
   }, [initialMaterials, meta, stats, tagOptions]);
   useEffect(() => {
-    if (reduceMotion) {
+    if (!showSeasonalEffects) {
       setMeteorStyles([]);
       return;
     }
     randomizeMeteors();
     const interval = window.setInterval(randomizeMeteors, 10000);
     return () => window.clearInterval(interval);
-  }, [reduceMotion, randomizeMeteors]);
+  }, [showSeasonalEffects, randomizeMeteors]);
   const pageSize = pageMeta.size || MATERIALS_PAGE_SIZE;
   const currentPage = pageMeta.page || 1;
   const totalPages = useMemo(
@@ -475,8 +478,8 @@ export default function Home({
         throw new Error(json.msg || '加载求购失败');
       }
       setRequestItems(json.data as MaterialRequestItem[]);
-    } catch (error: any) {
-      setRequestError(error.message || '加载求购失败');
+    } catch (error: unknown) {
+      setRequestError(toErrorMessage(error, '加载求购失败'));
     } finally {
       setRequestLoading(false);
     }
@@ -492,11 +495,11 @@ export default function Home({
   );
   const selectedCount = selectedMaterials.length;
 
-  const ensureLoggedIn = () => {
+  const ensureLoggedIn = useCallback(() => {
     if (user) return true;
-    router.push({ pathname: '/login', query: { next: router.asPath } });
+    void router.push({ pathname: '/login', query: { next: router.asPath } });
     return false;
-  };
+  }, [router, user]);
 
   const handleFollowContributor = useCallback(
     async (userId: number) => {
@@ -517,8 +520,8 @@ export default function Home({
         }
         setLeaderboardFollowed((prev) => ({ ...prev, [userId]: true }));
         setLeaderboardFollowNotice(null);
-      } catch (error: any) {
-        setLeaderboardFollowNotice({ type: 'error', text: error.message || '关注失败' });
+      } catch (error: unknown) {
+        setLeaderboardFollowNotice({ type: 'error', text: toErrorMessage(error, '关注失败') });
       } finally {
         setLeaderboardFollowLoading((prev) => ({ ...prev, [userId]: false }));
       }
@@ -661,7 +664,7 @@ export default function Home({
           </div>
         )}
         <section className="hero card hero-magazine">
-          {!reduceMotion && (
+          {showSeasonalEffects && (
             <div className="xmas-snowfall" aria-hidden="true">
               <Snowfall
                 snowflakeCount={snowCountFar}
@@ -681,7 +684,7 @@ export default function Home({
               />
             </div>
           )}
-          {!reduceMotion && (
+          {showSeasonalEffects && (
             <div className="hero-meteors" aria-hidden="true">
               {meteorStyles.map((style, index) => (
                 <span key={`${meteorSeed}-${index}`} className="hero-meteor" style={style} />
@@ -1327,7 +1330,7 @@ export default function Home({
                 ×
               </button>
               <div className="lazy-image-box qr-large">
-                <img
+                <AppImage
                   className="lazy-blur"
                   src="/payments/support.png"
                   alt="打赏二维码"

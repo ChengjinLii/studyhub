@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import NavBar from '../../components/NavBar';
 import { readSession } from '../../lib/auth';
 import { fetchBackend } from '../../lib/apiBase';
+import { toErrorMessage } from '../../lib/errors';
 import { materialPath } from '../../lib/slug';
 import { SessionUser } from '../../types/user';
 
@@ -53,8 +54,8 @@ export default function PayResult({ user, orderNo }: PayResultProps) {
       if (data.requestId) {
         setRequestId(data.requestId as number);
       }
-    } catch (err: any) {
-      setError(err.message || '查询订单状态失败');
+    } catch (err: unknown) {
+      setError(toErrorMessage(err, '查询订单状态失败'));
     } finally {
       setLoading(false);
     }

@@ -2,7 +2,9 @@ import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import AppImage from './AppImage';
 import { fetchBackend } from '../lib/apiBase';
+import { toErrorMessage } from '../lib/errors';
 import { formatDate } from '../lib/format';
 import { marketPath, materialPath, userPath } from '../lib/slug';
 import { UploadItem, MarketListingItem } from '../types/profile';
@@ -231,8 +233,8 @@ export default function ProfileCard({
       setEditingSignature(false);
       setEditingSchool(false);
       setMessage({ type: 'success', text: '已保存' });
-    } catch (error: any) {
-      setMessage({ type: 'error', text: error.message || '更新失败' });
+    } catch (error: unknown) {
+      setMessage({ type: 'error', text: toErrorMessage(error, '更新失败') });
     } finally {
       setSaving(false);
     }
@@ -305,8 +307,8 @@ export default function ProfileCard({
       setPayoutQrUrl(nextProfile.payoutQrUrl ?? null);
       onProfileUpdated?.(nextProfile);
       setMessage({ type: 'success', text: '收款码已更新' });
-    } catch (error: any) {
-      setMessage({ type: 'error', text: error.message || '上传失败' });
+    } catch (error: unknown) {
+      setMessage({ type: 'error', text: toErrorMessage(error, '上传失败') });
     } finally {
       setUploadingPayoutQr(false);
       if (payoutQrInputRef.current) {
@@ -331,8 +333,8 @@ export default function ProfileCard({
       setPayoutQrUrl(nextProfile.payoutQrUrl ?? null);
       onProfileUpdated?.(nextProfile);
       setMessage({ type: 'success', text: '收款码已删除' });
-    } catch (error: any) {
-      setMessage({ type: 'error', text: error.message || '删除失败' });
+    } catch (error: unknown) {
+      setMessage({ type: 'error', text: toErrorMessage(error, '删除失败') });
     } finally {
       setUploadingPayoutQr(false);
     }
@@ -840,7 +842,7 @@ export default function ProfileCard({
                 className="profile-card__payout-preview-link"
                 title="点击查看大图"
               >
-                <img className="profile-card__payout-preview" src={payoutQrUrl} alt="个人收款码" loading="lazy" />
+                <AppImage className="profile-card__payout-preview" src={payoutQrUrl} alt="个人收款码" loading="lazy" />
               </a>
             ) : (
               <div className="profile-card__payout-empty">尚未上传收款码</div>

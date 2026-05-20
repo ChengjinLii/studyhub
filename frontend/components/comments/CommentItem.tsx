@@ -10,7 +10,9 @@ import {
   updateComment,
   reportComment,
 } from '../../lib/api';
+import { toErrorMessage } from '../../lib/errors';
 import { formatDateTime } from '../../lib/format';
+import AppImage from '../AppImage';
 import CommentInput from './CommentInput';
 import StarRating from '../StarRating';
 
@@ -59,8 +61,8 @@ export default function CommentItem({
       const resp = await fetchCommentReplies(local.id, 0, 20);
       setReplies(resp.items);
       setRepliesMeta(resp.meta);
-    } catch (err: any) {
-      setActionError(err.message || '加载回复失败');
+    } catch (err: unknown) {
+      setActionError(toErrorMessage(err, '加载回复失败'));
     } finally {
       setRepliesLoading(false);
     }
@@ -74,8 +76,8 @@ export default function CommentItem({
       const updated = { ...local, hasLiked: !local.hasLiked, likeCount: result.likeCount };
       setLocal(updated);
       onUpdated(updated);
-    } catch (err: any) {
-      setActionError(err.message || '操作失败');
+    } catch (err: unknown) {
+      setActionError(toErrorMessage(err, '操作失败'));
     }
   };
 
@@ -86,8 +88,8 @@ export default function CommentItem({
     try {
       await deleteComment(local.id);
       onDeleted(local.id);
-    } catch (err: any) {
-      setActionError(err.message || '删除失败');
+    } catch (err: unknown) {
+      setActionError(toErrorMessage(err, '删除失败'));
     }
   };
 
@@ -99,8 +101,8 @@ export default function CommentItem({
       setLocal(updated);
       onUpdated(updated);
       setEditing(false);
-    } catch (err: any) {
-      setActionError(err.message || '更新失败');
+    } catch (err: unknown) {
+      setActionError(toErrorMessage(err, '更新失败'));
     }
   };
 
@@ -118,8 +120,8 @@ export default function CommentItem({
       setLocal(updated);
       onReplyAdded(local.id, reply);
       setReplying(false);
-    } catch (err: any) {
-      setActionError(err.message || '回复失败');
+    } catch (err: unknown) {
+      setActionError(toErrorMessage(err, '回复失败'));
     }
   };
 
@@ -131,8 +133,8 @@ export default function CommentItem({
     try {
       await reportComment(local.id, reason, '');
       alert('感谢反馈，我们会尽快处理。');
-    } catch (err: any) {
-      setActionError(err.message || '举报失败');
+    } catch (err: unknown) {
+      setActionError(toErrorMessage(err, '举报失败'));
     }
   };
 
@@ -141,7 +143,7 @@ export default function CommentItem({
       <aside className="avatar">
         <div className="avatar-circle">
           {local.user.avatar && !avatarBroken ? (
-            <img
+            <AppImage
               src={local.user.avatar}
               alt={local.user.nickname}
               width={40}

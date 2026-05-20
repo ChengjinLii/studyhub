@@ -11,6 +11,12 @@ from app.core.config import get_settings
 
 _ENGINE = None
 _SESSION_FACTORY = None
+LEGACY_TABLE_COMPATIBILITY: dict[str, tuple[str, ...]] = {
+    "auth_users": ("users",),
+    "material_favorites": ("favorites",),
+    "material_reviews": ("reviews",),
+    "material_purchases": ("orders",),
+}
 
 
 def get_engine():
@@ -82,10 +88,21 @@ def expected_table_names() -> list[str]:
     return sorted(Base.metadata.tables.keys())
 
 
+def has_compatible_legacy_table(table_name: str, actual_tables: set[str]) -> bool:
+    legacy_tables = LEGACY_TABLE_COMPATIBILITY.get(table_name)
+    if not legacy_tables:
+        return False
+    return all(legacy_table in actual_tables for legacy_table in legacy_tables)
+
+
 def list_missing_tables() -> list[str]:
     inspector = inspect(get_engine())
     actual_tables = set(inspector.get_table_names())
-    return [name for name in expected_table_names() if name not in actual_tables]
+    return [
+        name
+        for name in expected_table_names()
+        if name not in actual_tables and not has_compatible_legacy_table(name, actual_tables)
+    ]
 
 
 def ensure_database_schema_ready() -> None:

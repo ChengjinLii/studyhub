@@ -1,14 +1,16 @@
 import { GetServerSideProps } from 'next';
 import Link from 'next/link';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/router';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import AppImage from '../../components/AppImage';
 import NavBar from '../../components/NavBar';
 import ShareSheet from '../../components/ShareSheet';
 import { readSession } from '../../lib/auth';
 import { fetchUserProfile, reportTarget } from '../../lib/api';
 import { fetchBackend, getRequestOrigin } from '../../lib/apiBase';
+import { toErrorMessage } from '../../lib/errors';
 import { formatDate } from '../../lib/format';
 import { marketPath, materialPath, parseUserId, slugifyTitle, userPath } from '../../lib/slug';
 import { copyToClipboard, isLikelyMobile, tryNativeShare } from '../../lib/share';
@@ -76,7 +78,7 @@ export default function UserProfilePage({ user, profile }: UserProfilePageProps)
     setReportNotice(null);
     setShareNotice(null);
     setUploadTagMap({});
-  }, [profile?.id]);
+  }, [profile]);
 
   const displayName = useMemo(() => {
     if (!profile) return 'StudyHub 用户';
@@ -115,20 +117,20 @@ export default function UserProfilePage({ user, profile }: UserProfilePageProps)
       return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
     });
   }, [listings]);
-  const isExperienceByTags = (item: UploadItem) => {
+  const isExperienceByTags = useCallback((item: UploadItem) => {
     const detailTags = uploadTagMap[item.materialId];
     if (Array.isArray(detailTags)) {
       return detailTags.some((tag) => EXPERIENCE_TAGS.has(tag));
     }
     return isExperienceUpload(item);
-  };
+  }, [uploadTagMap]);
   const sortedExperienceUploads = useMemo(
     () => sortedUploads.filter((item) => isExperienceByTags(item)),
-    [sortedUploads, uploadTagMap]
+    [sortedUploads, isExperienceByTags]
   );
   const sortedMaterialUploads = useMemo(
     () => sortedUploads.filter((item) => !isExperienceByTags(item)),
-    [sortedUploads, uploadTagMap]
+    [sortedUploads, isExperienceByTags]
   );
   const visibleUploads = materialsExpanded ? sortedMaterialUploads : sortedMaterialUploads.slice(0, 5);
   const visibleExperienceUploads = experienceExpanded ? sortedExperienceUploads : sortedExperienceUploads.slice(0, 5);
@@ -153,8 +155,8 @@ export default function UserProfilePage({ user, profile }: UserProfilePageProps)
       const next = !isFollowing;
       setIsFollowing(next);
       setFollowersCount((prev) => Math.max(0, prev + (next ? 1 : -1)));
-    } catch (error: any) {
-      setFollowNotice({ type: 'error', text: error.message || '操作失败' });
+    } catch (error: unknown) {
+      setFollowNotice({ type: 'error', text: toErrorMessage(error, '操作失败') });
     } finally {
       setFollowLoading(false);
     }
@@ -253,8 +255,8 @@ export default function UserProfilePage({ user, profile }: UserProfilePageProps)
     try {
       await reportTarget('USER', profile.id, reason);
       setReportNotice({ type: 'success', text: '已收到举报，我们会尽快处理。' });
-    } catch (err: any) {
-      setReportNotice({ type: 'error', text: err.message || '举报失败，请稍后再试。' });
+    } catch (err: unknown) {
+      setReportNotice({ type: 'error', text: toErrorMessage(err, '举报失败，请稍后再试。') });
     }
   };
 
@@ -284,8 +286,8 @@ export default function UserProfilePage({ user, profile }: UserProfilePageProps)
         return;
       }
       setShareNotice({ type: 'error', text: '复制失败，请手动复制链接。' });
-    } catch (err: any) {
-      setShareNotice({ type: 'error', text: err?.message || '复制失败，请稍后重试。' });
+    } catch (err: unknown) {
+      setShareNotice({ type: 'error', text: toErrorMessage(err, '复制失败，请稍后重试。') });
     }
   };
 
@@ -506,7 +508,7 @@ export default function UserProfilePage({ user, profile }: UserProfilePageProps)
                 <div className="profile-info__item profile-info__item--wide profile-info__item--payout">
                   <span className="profile-info__label">个人收款码</span>
                   <a href={profile.payoutQrUrl} target="_blank" rel="noreferrer" title="点击查看大图">
-                    <img
+                    <AppImage
                       className="profile-info__payout-preview"
                       src={profile.payoutQrUrl}
                       alt="个人收款码"

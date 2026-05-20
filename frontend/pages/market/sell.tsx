@@ -5,6 +5,7 @@ import { FormEvent, useState } from 'react';
 import NavBar from '../../components/NavBar';
 import { readSession } from '../../lib/auth';
 import { marketPath } from '../../lib/slug';
+import { toErrorMessage } from '../../lib/errors';
 import { SessionUser } from '../../types/user';
 import { SUPPORTED_SCHOOL } from '../../constants/metadata';
 import { resolveApiBase } from '../../lib/apiBase';
@@ -75,8 +76,8 @@ export default function SellPage({ user, token }: SellPageProps) {
       }
       setStatus({ type: 'success', text: '发布成功，正在跳转…' });
       router.push(marketPath(json.data.id, json.data.title || title));
-    } catch (error: any) {
-      setStatus({ type: 'error', text: error.message || '发布失败' });
+    } catch (error: unknown) {
+      setStatus({ type: 'error', text: toErrorMessage(error, '发布失败') });
     } finally {
       setSubmitting(false);
     }

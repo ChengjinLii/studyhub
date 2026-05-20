@@ -2,15 +2,18 @@ import { GetServerSideProps } from 'next';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { FormEvent, ReactElement, useEffect, useState } from 'react';
+import AppImage from '../components/AppImage';
 import NavBar from '../components/NavBar';
 import ProfileCard from '../components/ProfileCard';
 import { readSession } from '../lib/auth';
 import { fetchAccountProfile, fetchProfile } from '../lib/api';
 import { fetchBackend, getRequestOrigin } from '../lib/apiBase';
+import { toErrorMessage } from '../lib/errors';
 import { formatDateTime } from '../lib/format';
 import { marketPath, materialPath } from '../lib/slug';
 import { SessionUser } from '../types/user';
 import { UserAccountProfile, UserFollowItem } from '../types/userProfile';
+import { PayoutApplication } from '../types/payout';
 import {
   ProfileSummary,
   PurchaseItem,
@@ -31,6 +34,32 @@ interface CaptchaState {
   captchaId: string;
   imageBase64: string;
 }
+
+const ME_NAV_GROUPS = [
+  {
+    label: '我的主页',
+    items: [
+      { id: 'profile', label: '个人主页设置' },
+      { id: 'security', label: '安全设置' },
+    ],
+  },
+  {
+    label: '内容与资料',
+    items: [
+      { id: 'download-quota', label: '下载次数' },
+      { id: 'uploads', label: '我的投稿' },
+      { id: 'purchases', label: '最近购买' },
+      { id: 'wants', label: '我的想要' },
+    ],
+  },
+  {
+    label: '交易与收益',
+    items: [
+      { id: 'listings', label: '校园好物' },
+      { id: 'payout', label: '创作者收益' },
+    ],
+  },
+];
 
 export default function MePage({ user, summary, account }: MePageProps) {
   const router = useRouter();
@@ -58,7 +87,7 @@ export default function MePage({ user, summary, account }: MePageProps) {
   const totalDownloads = summary?.totalDownloads ?? 0;
   const uniqueDownloaders = summary?.uniqueDownloaders ?? 0;
   const totalEarnings = summary?.totalEarnings ?? 0;
-  const [payoutApp, setPayoutApp] = useState<any>(null);
+  const [payoutApp, setPayoutApp] = useState<PayoutApplication | null>(null);
   const [payoutLoading, setPayoutLoading] = useState(false);
   const [payoutMessage, setPayoutMessage] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [payoutForm, setPayoutForm] = useState({
@@ -93,32 +122,6 @@ export default function MePage({ user, summary, account }: MePageProps) {
   const canExpandUploads = uploads.length > 5;
   const canExpandMarketListings = marketListings.length > 5;
 
-  const navGroups = [
-    {
-      label: '我的主页',
-      items: [
-        { id: 'profile', label: '个人主页设置' },
-        { id: 'security', label: '安全设置' },
-      ],
-    },
-    {
-      label: '内容与资料',
-      items: [
-        { id: 'download-quota', label: '下载次数' },
-        { id: 'uploads', label: '我的投稿' },
-        { id: 'purchases', label: '最近购买' },
-        { id: 'wants', label: '我的想要' },
-      ],
-    },
-    {
-      label: '交易与收益',
-      items: [
-        { id: 'listings', label: '校园好物' },
-        { id: 'payout', label: '创作者收益' },
-      ],
-    },
-  ];
-
   useEffect(() => {
     if (bindCooldown <= 0) return;
     const timer = setInterval(() => {
@@ -151,8 +154,8 @@ export default function MePage({ user, summary, account }: MePageProps) {
             setPayoutForm((prev) => ({ ...prev, contactType: json.data.contactType, contactValue: json.data.contactValue || '' }));
           }
         }
-      } catch (e: any) {
-        setPayoutMessage({ type: 'error', message: e.message || '加载收益申请失败' });
+      } catch (e: unknown) {
+        setPayoutMessage({ type: 'error', message: toErrorMessage(e, '加载收益申请失败') });
       } finally {
         setPayoutLoading(false);
       }
@@ -182,8 +185,8 @@ export default function MePage({ user, summary, account }: MePageProps) {
         ]);
         setFollowingUsers(following);
         setFollowersUsers(followers);
-      } catch (e: any) {
-        setFollowMessage({ type: 'error', message: e.message || '加载关注列表失败' });
+      } catch (e: unknown) {
+        setFollowMessage({ type: 'error', message: toErrorMessage(e, '加载关注列表失败') });
       } finally {
         setFollowLoading(false);
       }
@@ -193,7 +196,7 @@ export default function MePage({ user, summary, account }: MePageProps) {
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    const ids = navGroups.flatMap((group) => group.items.map((item) => item.id));
+    const ids = ME_NAV_GROUPS.flatMap((group) => group.items.map((item) => item.id));
     const sections = ids
       .map((id) => document.getElementById(id))
       .filter((el): el is HTMLElement => Boolean(el));
@@ -329,8 +332,8 @@ export default function MePage({ user, summary, account }: MePageProps) {
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-    } catch (error: any) {
-      setToast({ type: 'error', message: error.message || '下载失败' });
+    } catch (error: unknown) {
+      setToast({ type: 'error', message: toErrorMessage(error, '下载失败') });
     }
   };
 
@@ -361,8 +364,8 @@ export default function MePage({ user, summary, account }: MePageProps) {
       } else {
         setPayoutMessage({ type: 'success', message: '提交成功' });
       }
-    } catch (err: any) {
-      setPayoutMessage({ type: 'error', message: err.message || '提交失败' });
+    } catch (err: unknown) {
+      setPayoutMessage({ type: 'error', message: toErrorMessage(err, '提交失败') });
     } finally {
       setPayoutLoading(false);
     }
@@ -377,8 +380,8 @@ export default function MePage({ user, summary, account }: MePageProps) {
       }
       setResetCaptcha(json.data);
       setResetCaptchaCode('');
-    } catch (err: any) {
-      setEmailResetMessage({ type: 'error', message: err.message || '获取验证码失败' });
+    } catch (err: unknown) {
+      setEmailResetMessage({ type: 'error', message: toErrorMessage(err, '获取验证码失败') });
     }
   };
 
@@ -423,8 +426,8 @@ export default function MePage({ user, summary, account }: MePageProps) {
       }
       setEmailResetCooldown(json.data?.resendAfterSeconds ?? 60);
       setEmailResetMessage({ type: 'success', message: '验证码已发送至邮箱，请在 5 分钟内完成验证。' });
-    } catch (error: any) {
-      setEmailResetMessage({ type: 'error', message: error.message || '发送验证码失败' });
+    } catch (error: unknown) {
+      setEmailResetMessage({ type: 'error', message: toErrorMessage(error, '发送验证码失败') });
     } finally {
       setEmailResetLoading(false);
       fetchResetCaptcha();
@@ -468,8 +471,8 @@ export default function MePage({ user, summary, account }: MePageProps) {
       setEmailResetMessage({ type: 'success', message: '重置成功，请使用新密码登录。' });
       setEmailResetCooldown(0);
       setEmailResetForm((prev) => ({ ...prev, newPassword: '', confirm: '', code: '' }));
-    } catch (error: any) {
-      setEmailResetMessage({ type: 'error', message: error.message || '重置密码失败' });
+    } catch (error: unknown) {
+      setEmailResetMessage({ type: 'error', message: toErrorMessage(error, '重置密码失败') });
     } finally {
       setEmailResetLoading(false);
     }
@@ -510,8 +513,8 @@ export default function MePage({ user, summary, account }: MePageProps) {
       const resendAfter = json.data?.resendAfterSeconds ?? 30;
       setBindCooldown(resendAfter);
       setBindMessage({ type: 'success', message: '验证码已发送至邮箱，请在 5 分钟内完成绑定。' });
-    } catch (error: any) {
-      setBindMessage({ type: 'error', message: error.message || '发送验证码失败' });
+    } catch (error: unknown) {
+      setBindMessage({ type: 'error', message: toErrorMessage(error, '发送验证码失败') });
     } finally {
       setBindLoading(false);
     }
@@ -538,8 +541,8 @@ export default function MePage({ user, summary, account }: MePageProps) {
       setBindVerified(true);
       setBindMessage({ type: 'success', message: '邮箱绑定成功' });
       setBindForm((prev) => ({ ...prev, code: '' }));
-    } catch (error: any) {
-      setBindMessage({ type: 'error', message: error.message || '绑定失败' });
+    } catch (error: unknown) {
+      setBindMessage({ type: 'error', message: toErrorMessage(error, '绑定失败') });
     } finally {
       setBindLoading(false);
     }
@@ -685,8 +688,8 @@ export default function MePage({ user, summary, account }: MePageProps) {
       }
       setToast({ type: 'success', message: status === 'SOLD' ? '已标记为已售' : '状态已更新' });
       router.replace(router.asPath);
-    } catch (error: any) {
-      setToast({ type: 'error', message: error.message || '操作失败' });
+    } catch (error: unknown) {
+      setToast({ type: 'error', message: toErrorMessage(error, '操作失败') });
     }
   };
 
@@ -702,8 +705,8 @@ export default function MePage({ user, summary, account }: MePageProps) {
       }
       setToast({ type: 'success', message: '资料已删除' });
       router.replace(router.asPath);
-    } catch (error: any) {
-      setToast({ type: 'error', message: error.message || '删除失败' });
+    } catch (error: unknown) {
+      setToast({ type: 'error', message: toErrorMessage(error, '删除失败') });
     } finally {
       setDeletingMaterialId((prev) => (prev === materialId ? null : prev));
     }
@@ -721,8 +724,8 @@ export default function MePage({ user, summary, account }: MePageProps) {
       }
       setToast({ type: 'success', message: '商品已删除' });
       router.replace(router.asPath);
-    } catch (error: any) {
-      setToast({ type: 'error', message: error.message || '删除失败' });
+    } catch (error: unknown) {
+      setToast({ type: 'error', message: toErrorMessage(error, '删除失败') });
     } finally {
       setDeletingListingId((prev) => (prev === itemId ? null : prev));
     }
@@ -752,8 +755,8 @@ export default function MePage({ user, summary, account }: MePageProps) {
       }
       setPwdMessage({ type: 'success', message: '密码修改成功，下次登录请使用新密码。' });
       setPasswordForm({ oldPassword: '', newPassword: '', confirm: '' });
-    } catch (error: any) {
-      setPwdMessage({ type: 'error', message: error.message || '修改密码失败' });
+    } catch (error: unknown) {
+      setPwdMessage({ type: 'error', message: toErrorMessage(error, '修改密码失败') });
     } finally {
       setPwdLoading(false);
     }
@@ -766,7 +769,7 @@ export default function MePage({ user, summary, account }: MePageProps) {
         <div className="me-layout">
           <aside className="me-sidebar">
             <div className="me-sidebar__brand">个人中心</div>
-            {navGroups.map((group) => (
+            {ME_NAV_GROUPS.map((group) => (
               <div key={group.label} className="me-sidebar__group">
                 <div className="me-sidebar__label">{group.label}</div>
                 <div className="me-sidebar__items">
@@ -946,7 +949,7 @@ export default function MePage({ user, summary, account }: MePageProps) {
                           required
                         />
                         {resetCaptcha.imageBase64 ? (
-                          <img
+                          <AppImage
                             src={resetCaptcha.imageBase64}
                             alt="验证码"
                             className="captcha-image"

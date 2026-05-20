@@ -4,6 +4,7 @@ import { FormEvent, useEffect, useRef, useState } from 'react';
 import NavBar from '../../components/NavBar';
 import { readSession } from '../../lib/auth';
 import { fetchBackend } from '../../lib/apiBase';
+import { toErrorMessage } from '../../lib/errors';
 import { SessionUser } from '../../types/user';
 import { SUPPORTED_SCHOOL, SUPPORTED_COLLEGES, SUPPORTED_MAJORS } from '../../constants/metadata';
 import { REQUEST_TIERS, RequestTierValue } from '../../constants/request';
@@ -158,8 +159,8 @@ export default function RequestNewPage({ user }: RequestNewProps) {
       setCollege('');
       setMajor('');
       setStatus({ type: 'success', text: '发布成功！你可以回到首页查看求购列表。' });
-    } catch (error: any) {
-      setStatus({ type: 'error', text: error.message || '发布失败' });
+    } catch (error: unknown) {
+      setStatus({ type: 'error', text: toErrorMessage(error, '发布失败') });
     } finally {
       setSubmitting(false);
     }

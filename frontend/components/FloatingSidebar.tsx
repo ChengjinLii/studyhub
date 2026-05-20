@@ -155,16 +155,6 @@ export default function FloatingSidebar() {
       .map((role) => role.label);
   }, [user]);
 
-  useEffect(() => {
-    const handleOpen = (event: Event) => {
-      const custom = event as CustomEvent<string>;
-      setSidebarOpen(custom.detail === 'toggle' ? (prev) => !prev : true);
-      loadData();
-    };
-    window.addEventListener('floating-sidebar:toggle', handleOpen as EventListener);
-    return () => window.removeEventListener('floating-sidebar:toggle', handleOpen as EventListener);
-  }, []);
-
   const loadData = useCallback(async () => {
     let cancelled = false;
 
@@ -190,6 +180,16 @@ export default function FloatingSidebar() {
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    const handleOpen = (event: Event) => {
+      const custom = event as CustomEvent<string>;
+      setSidebarOpen(custom.detail === 'toggle' ? (prev) => !prev : true);
+      loadData();
+    };
+    window.addEventListener('floating-sidebar:toggle', handleOpen as EventListener);
+    return () => window.removeEventListener('floating-sidebar:toggle', handleOpen as EventListener);
+  }, [loadData]);
 
   const extractAiJson = (raw: string) => {
     if (!raw) return '';

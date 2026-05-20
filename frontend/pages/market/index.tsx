@@ -13,6 +13,7 @@ import { SAMPLE_MARKET_ITEMS } from '../../constants/marketSamples';
 import { buildResponsiveImage, isMarketPlaceholder, ResponsiveImageResult } from '../../lib/ossImage';
 import { getRequestOrigin, resolveApiBase } from '../../lib/apiBase';
 import { marketPath, userPath } from '../../lib/slug';
+import { toErrorMessage } from '../../lib/errors';
 
 const CATEGORY_OPTIONS = [
   { value: '', label: '全部分类' },
@@ -46,6 +47,11 @@ interface MarketPageProps {
   filters: { keyword?: string; category?: string; page?: string };
   stats: MarketListResponse['stats'];
 }
+
+const readSampleSlug = (item: MarketItem) => {
+  const maybe = item as unknown as { sampleSlug?: unknown };
+  return typeof maybe.sampleSlug === 'string' ? maybe.sampleSlug : undefined;
+};
 
 const swrFetcher = async (url: string) => {
   const resp = await fetch(url);
@@ -176,8 +182,8 @@ export default function MarketPage({ user, items, meta, filters, stats }: Market
       if (mutateWanted) {
         mutateWanted();
       }
-    } catch (err: any) {
-      setActionError(err.message || '操作失败');
+    } catch (err: unknown) {
+      setActionError(toErrorMessage(err, '操作失败'));
       setItemStates((prev) => ({
         ...prev,
         [itemId]: prev[itemId] || previous,
@@ -228,8 +234,8 @@ export default function MarketPage({ user, items, meta, filters, stats }: Market
       }
       setModerationAlert({ type: 'success', text: '商品已删除。' });
       await router.replace(router.asPath, undefined, { scroll: false });
-    } catch (error: any) {
-      setModerationAlert({ type: 'error', text: error.message || '删除失败，请稍后重试。' });
+    } catch (error: unknown) {
+      setModerationAlert({ type: 'error', text: toErrorMessage(error, '删除失败，请稍后重试。') });
     } finally {
       setDeletingId((prev) => (prev === itemId ? null : prev));
     }
@@ -335,7 +341,7 @@ export default function MarketPage({ user, items, meta, filters, stats }: Market
           <ul className={viewMode === 'grid' ? 'market-grid' : 'market-list'}>
             {displayItems.map((item, idx) => {
               const priceText = `¥${(item.price ?? 0).toFixed(2)}`;
-              const sampleSlug = (item as any).sampleSlug as string | undefined;
+              const sampleSlug = readSampleSlug(item);
               const isSample = typeof sampleSlug === 'string' || item.id < 0;
               const stored = itemStates[item.id];
               const wantCount = stored ? stored.wantCount : item.wantCount ?? 0;

@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { fetchBackend } from '../lib/apiBase';
 import '../styles/globals.css';
+import AppImage from '../components/AppImage';
 import FloatingSidebar from '../components/FloatingSidebar';
 
 interface RuntimeInfo {
@@ -118,7 +119,7 @@ export default function MyApp({ Component, pageProps }: AppProps) {
                 ×
               </button>
               <div className="stable-version-modal__media">
-                <img
+                <AppImage
                   src="/local/stable-version-poster.png"
                   alt="StudyHub 稳定版海报"
                   loading="eager"
@@ -292,7 +293,7 @@ export default function MyApp({ Component, pageProps }: AppProps) {
               <div className="wechat-modal__title">官方微信公众号</div>
               <div className="wechat-modal__hint">扫码关注获取公告与更新</div>
               <div className="lazy-image-box qr-medium">
-                <img
+                <AppImage
                   className="lazy-blur"
                   src="/wechat/wechat-qr.jpeg"
                   alt="StudyHub 官方微信公众号二维码"

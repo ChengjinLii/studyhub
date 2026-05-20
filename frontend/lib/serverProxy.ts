@@ -3,6 +3,11 @@ import { readSession } from './auth';
 
 const DEFAULT_API_BASE = 'http://127.0.0.1:8111/api';
 
+type CookieAwareHeaders = Headers & {
+  getSetCookie?: () => string[];
+  raw?: () => Record<string, string[]>;
+};
+
 const getHeaderValue = (value?: string | string[]) => {
   if (Array.isArray(value)) {
     return value.join('; ');
@@ -11,12 +16,12 @@ const getHeaderValue = (value?: string | string[]) => {
 };
 
 const getSetCookies = (headers: Headers): string[] => {
-  const anyHeaders = headers as any;
-  if (typeof anyHeaders.getSetCookie === 'function') {
-    return anyHeaders.getSetCookie();
+  const cookieAwareHeaders = headers as CookieAwareHeaders;
+  if (typeof cookieAwareHeaders.getSetCookie === 'function') {
+    return cookieAwareHeaders.getSetCookie();
   }
-  if (typeof anyHeaders.raw === 'function') {
-    const raw = anyHeaders.raw();
+  if (typeof cookieAwareHeaders.raw === 'function') {
+    const raw = cookieAwareHeaders.raw();
     if (raw && raw['set-cookie']) {
       return raw['set-cookie'];
     }

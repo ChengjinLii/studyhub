@@ -1,10 +1,12 @@
 import { GetServerSideProps } from 'next';
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
+import AppImage from '../../components/AppImage';
 import NavBar from '../../components/NavBar';
 import { readSession } from '../../lib/auth';
 import { fetchMaterialPreview } from '../../lib/api';
 import { fetchBackend, getRequestOrigin } from '../../lib/apiBase';
+import { toErrorMessage } from '../../lib/errors';
 import { formatDate } from '../../lib/format';
 import { materialPath } from '../../lib/slug';
 import { MaterialPreview } from '../../types/material';
@@ -47,7 +49,7 @@ export default function RequestDetailPage({ user, request, responses, contributi
   useEffect(() => {
     setRequestState(request);
     setContributionState(contributions);
-  }, [request]);
+  }, [request, contributions]);
 
   const formatBudget = (budget?: number | null) => {
     if (budget == null) return '预算不限';
@@ -105,8 +107,8 @@ export default function RequestDetailPage({ user, request, responses, contributi
       const nextRequest = json.data as MaterialRequestItem;
       setRequestState(nextRequest);
       setAcceptNotice({ type: 'success', text: '已采纳该应答，进入结算流程。' });
-    } catch (error: any) {
-      setAcceptNotice({ type: 'error', text: error.message || '采纳失败' });
+    } catch (error: unknown) {
+      setAcceptNotice({ type: 'error', text: toErrorMessage(error, '采纳失败') });
     } finally {
       setAcceptLoadingId(null);
     }
@@ -126,20 +128,20 @@ export default function RequestDetailPage({ user, request, responses, contributi
       setDisputeNotice(null);
       setDisputeLoadingId(responseId);
       try {
-      const resp = await fetchBackend(`/requests/${requestState.id}/dispute`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ responseId, reason: trimmedReason }),
-      });
-      const json = await parseApiResponse(resp);
-      if (!resp.ok || !json?.ok) {
-        throw new Error(json?.msg || `提交失败（${resp.status}）`);
-      }
+        const resp = await fetchBackend(`/requests/${requestState.id}/dispute`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ responseId, reason: trimmedReason }),
+        });
+        const json = await parseApiResponse(resp);
+        if (!resp.ok || !json?.ok) {
+          throw new Error(json?.msg || `提交失败（${resp.status}）`);
+        }
         const nextRequest = json.data as MaterialRequestItem;
         setRequestState(nextRequest);
         setDisputeNotice({ type: 'success', text: '已提交仲裁申请，等待管理员处理。' });
-      } catch (error: any) {
-        setDisputeNotice({ type: 'error', text: error.message || '提交失败' });
+      } catch (error: unknown) {
+        setDisputeNotice({ type: 'error', text: toErrorMessage(error, '提交失败') });
       } finally {
         setDisputeLoadingId(null);
       }
@@ -155,8 +157,8 @@ export default function RequestDetailPage({ user, request, responses, contributi
     try {
       const data = await fetchMaterialPreview(response.materialId);
       setPreviewMap((prev) => ({ ...prev, [responseId]: data }));
-    } catch (error: any) {
-      setPreviewError((prev) => ({ ...prev, [responseId]: error.message || '预览加载失败' }));
+    } catch (error: unknown) {
+      setPreviewError((prev) => ({ ...prev, [responseId]: toErrorMessage(error, '预览加载失败') }));
     } finally {
       setPreviewLoading((prev) => ({ ...prev, [responseId]: false }));
     }
@@ -176,8 +178,8 @@ export default function RequestDetailPage({ user, request, responses, contributi
         throw new Error(json?.msg || `预览记录失败（${resp.status}）`);
       }
       setPreviewReady((prev) => ({ ...prev, [responseId]: true }));
-    } catch (error: any) {
-      setPreviewError((prev) => ({ ...prev, [responseId]: error.message || '预览记录失败' }));
+    } catch (error: unknown) {
+      setPreviewError((prev) => ({ ...prev, [responseId]: toErrorMessage(error, '预览记录失败') }));
     }
   };
 
@@ -216,8 +218,8 @@ export default function RequestDetailPage({ user, request, responses, contributi
         const next = json.data as MaterialRequestContributionItem;
         setContributionState((prev) => prev.map((entry) => (entry.id === next.id ? next : entry)));
         setContributionNotice({ type: 'success', text: '已更新期限。' });
-      } catch (error: any) {
-        setContributionNotice({ type: 'error', text: error.message || '修改失败' });
+      } catch (error: unknown) {
+        setContributionNotice({ type: 'error', text: toErrorMessage(error, '修改失败') });
       } finally {
         setContributionActionLoading((prev) => ({ ...prev, [item.id]: false }));
       }
@@ -254,8 +256,8 @@ export default function RequestDetailPage({ user, request, responses, contributi
         });
       }
       setContributionNotice({ type: 'success', text: '已提交结束申请。' });
-    } catch (error: any) {
-      setContributionNotice({ type: 'error', text: error.message || '结束失败' });
+    } catch (error: unknown) {
+      setContributionNotice({ type: 'error', text: toErrorMessage(error, '结束失败') });
     } finally {
       setContributionActionLoading((prev) => ({ ...prev, [item.id]: false }));
     }
@@ -410,7 +412,7 @@ export default function RequestDetailPage({ user, request, responses, contributi
                       {previewMap[response.id] && (
                         <div className="request-preview">
                           {previewMap[response.id]?.images?.slice(0, 2).map((image) => (
-                            <img
+                            <AppImage
                               key={image.index}
                               src={image.img.src}
                               srcSet={image.img.srcSet || undefined}
