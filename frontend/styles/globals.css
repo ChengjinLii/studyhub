@@ -2530,10 +2530,11 @@ main {
 
 .stable-version-modal {
   width: min(980px, 94vw);
+  max-height: min(90vh, 980px);
   padding: 0;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  overflow: auto;
   border: 1px solid rgba(0, 0, 0, 0.16);
   border-radius: 28px;
   background: #ffffff;
@@ -2543,6 +2544,7 @@ main {
 .stable-version-modal__media {
   position: relative;
   width: 100%;
+  flex: 0 0 auto;
   background: linear-gradient(180deg, #f4f4f5, #e5e7eb);
   border-bottom: 1px solid rgba(0, 0, 0, 0.12);
 }
@@ -2551,8 +2553,10 @@ main {
   display: block;
   width: 100%;
   aspect-ratio: 16 / 9;
-  object-fit: cover;
+  max-height: min(52vh, 552px);
+  object-fit: contain;
   height: auto;
+  background: #ffffff;
   box-shadow: 0 18px 36px rgba(0, 0, 0, 0.14);
 }
 
@@ -2737,10 +2741,15 @@ main {
   .stable-version-modal {
     padding: 0;
     width: min(560px, 94vw);
+    max-height: 88vh;
   }
 
   .stable-version-modal__media {
     border-bottom: 1px solid rgba(148, 163, 184, 0.16);
+  }
+
+  .stable-version-modal__media img {
+    max-height: 38vh;
   }
 
   .stable-version-modal__content {
