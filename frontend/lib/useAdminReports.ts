@@ -1,5 +1,5 @@
 import { Dispatch, SetStateAction, useState } from 'react';
-import { fetchBackend } from './apiBase';
+import { fetchAdminReports, updateAdminReport } from './adminApi';
 import { toErrorMessage } from './errors';
 import { AdminListMeta, AdminReport } from '../types/admin';
 
@@ -29,22 +29,14 @@ export const useAdminReports = ({
     setReportsLoading(true);
     setReportNotice(null);
     try {
-      const params = new URLSearchParams();
-      params.set('page', String(Math.max(page, 0)));
-      params.set('size', String(reportsMeta?.size ?? 15));
-      if (nextFilters.status) {
-        params.set('status', nextFilters.status);
-      }
-      if (nextFilters.targetType) {
-        params.set('targetType', nextFilters.targetType);
-      }
-      const resp = await fetchBackend(`/admin/reports?${params.toString()}`);
-      const json = await resp.json();
-      if (!resp.ok || !json.ok) {
-        throw new Error(json.msg || '加载举报列表失败');
-      }
-      setReports(json.data.items || []);
-      setReportsMeta(json.data.meta || { page: 0, size: reportsMeta?.size ?? 15, total: 0 });
+      const data = await fetchAdminReports({
+        page: Math.max(page, 0),
+        size: reportsMeta?.size ?? 15,
+        status: nextFilters.status || undefined,
+        targetType: nextFilters.targetType || undefined,
+      });
+      setReports(data.items || []);
+      setReportsMeta(data.meta || { page: 0, size: reportsMeta?.size ?? 15, total: 0 });
     } catch (err: unknown) {
       setReportNotice({ type: 'error', text: toErrorMessage(err, '加载举报列表失败') });
     } finally {
@@ -75,16 +67,8 @@ export const useAdminReports = ({
     setReportUpdatingId(id);
     setReportNotice(null);
     try {
-      const resp = await fetchBackend(`/admin/reports/${id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: target.status, adminNote: target.adminNote ?? '' }),
-      });
-      const json = await resp.json();
-      if (!resp.ok || !json.ok) {
-        throw new Error(json.msg || '更新举报失败');
-      }
-      setReports((prev) => prev.map((item) => (item.id === id ? json.data : item)));
+      const data = await updateAdminReport(id, { status: target.status, adminNote: target.adminNote ?? '' });
+      setReports((prev) => prev.map((item) => (item.id === id ? data : item)));
       setReportNotice({ type: 'success', text: '举报工单已更新' });
     } catch (err: unknown) {
       setReportNotice({ type: 'error', text: toErrorMessage(err, '更新举报失败') });
@@ -97,16 +81,8 @@ export const useAdminReports = ({
     setReportRestoringId(id);
     setReportNotice(null);
     try {
-      const resp = await fetchBackend(`/admin/reports/${id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ restoreTarget: true }),
-      });
-      const json = await resp.json();
-      if (!resp.ok || !json.ok) {
-        throw new Error(json.msg || '恢复展示失败');
-      }
-      setReports((prev) => prev.map((item) => (item.id === id ? json.data : item)));
+      const data = await updateAdminReport(id, { restoreTarget: true });
+      setReports((prev) => prev.map((item) => (item.id === id ? data : item)));
       setReportNotice({ type: 'success', text: '目标已恢复展示' });
     } catch (err: unknown) {
       setReportNotice({ type: 'error', text: toErrorMessage(err, '恢复展示失败') });

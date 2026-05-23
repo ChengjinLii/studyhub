@@ -64,6 +64,9 @@ test('material detail core endpoints should stay available', async ({ request })
   const available = await isSmokeTargetAvailable(request);
   test.skip(!available, 'smoke target is unavailable (SMOKE_BASE_URL is not reachable)');
 
+  const loggedIn = await tryDevLogin(request);
+  test.skip(!loggedIn, 'local-dev quick login is disabled on this target');
+
   const listResp = await request.get(apiPath('/api/materials?page=1&size=12'));
   expect(listResp.status()).toBeLessThan(500);
   const listJson = await listResp.json();
@@ -89,6 +92,21 @@ test('material detail core endpoints should stay available', async ({ request })
   expect(commentResp.status()).toBeLessThan(500);
   const commentJson = await commentResp.json();
   expect(commentJson).toHaveProperty('ok', true);
+
+  const likeResp = await request.post(apiPath(`/api/materials/${id}/like`));
+  expect(likeResp.status()).toBeLessThan(500);
+  const likeJson = await likeResp.json().catch(() => ({}));
+  if (likeResp.ok()) {
+    expect(likeJson).toHaveProperty('ok', true);
+  }
+  await request.delete(apiPath(`/api/materials/${id}/like`)).catch(() => undefined);
+
+  const downloadResp = await request.get(apiPath(`/api/materials/${id}/download`));
+  expect(downloadResp.status()).toBeLessThan(500);
+  const downloadJson = await downloadResp.json().catch(() => ({}));
+  if (downloadResp.ok()) {
+    expect(downloadJson).toHaveProperty('ok', true);
+  }
 });
 
 test('pay result page should render after auth with orderNo query', async ({ request }) => {

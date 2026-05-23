@@ -5,7 +5,13 @@ import {
   type MarketBatchFormState,
   type MaterialBatchFormState,
 } from './adminBatchPayloads';
-import { fetchBackend } from './apiBase';
+import {
+  batchDeleteAdminMarketItems,
+  batchDeleteAdminMaterials,
+  batchRestoreAdminMaterials,
+  batchUpdateAdminMarketItems,
+  batchUpdateAdminMaterials,
+} from './adminApi';
 import { toErrorMessage } from './errors';
 import { parseMajorList, serializeMajorList } from './major';
 import { AdminMaterial, AdminMarketItem } from '../types/admin';
@@ -110,17 +116,9 @@ export const useAdminBatchActions = ({
     const payload = buildMaterialBatchUpdatePayload(selectedMaterialIds, batchForm);
     setBatchMessage(null);
     try {
-      const resp = await fetchBackend('/admin/materials/batch-update', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-      const json = await resp.json();
-      if (!resp.ok || !json.ok) {
-        throw new Error(json.msg || '批量更新失败');
-      }
-      const updatedCount = json.data?.updated ?? selectedMaterialIds.length;
-      const missingCount = Array.isArray(json.data?.missingIds) ? json.data.missingIds.length : 0;
+      const data = await batchUpdateAdminMaterials(payload);
+      const updatedCount = data.updated ?? selectedMaterialIds.length;
+      const missingCount = Array.isArray(data.missingIds) ? data.missingIds.length : 0;
       setBatchMessage({
         type: 'success',
         text: `已更新 ${updatedCount} 条资料${missingCount ? `，其中 ${missingCount} 条未找到` : ''}`,
@@ -143,17 +141,9 @@ export const useAdminBatchActions = ({
     setBatchDeleting(true);
     setBatchMessage(null);
     try {
-      const resp = await fetchBackend('/admin/materials/batch-delete', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ materialIds: selectedMaterialIds }),
-      });
-      const json = await resp.json();
-      if (!resp.ok || !json.ok) {
-        throw new Error(json.msg || '批量删除失败');
-      }
-      const deleted = json.data?.deleted ?? 0;
-      const failedIds: number[] = Array.isArray(json.data?.failedIds) ? json.data.failedIds : [];
+      const data = await batchDeleteAdminMaterials(selectedMaterialIds);
+      const deleted = data.deleted ?? 0;
+      const failedIds: number[] = Array.isArray(data.failedIds) ? data.failedIds : [];
       let text = `已删除 ${deleted} 条资料。`;
       if (failedIds.length) {
         text += ` ${failedIds.length} 条删除失败：${failedIds.join(', ')}`;
@@ -182,17 +172,9 @@ export const useAdminBatchActions = ({
     setBatchRestoring(true);
     setBatchMessage(null);
     try {
-      const resp = await fetchBackend('/admin/materials/batch-restore', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ materialIds: selectedMaterialIds }),
-      });
-      const json = await resp.json();
-      if (!resp.ok || !json.ok) {
-        throw new Error(json.msg || '批量恢复失败');
-      }
-      const restored = json.data?.restored ?? 0;
-      const failedIds: number[] = Array.isArray(json.data?.failedIds) ? json.data.failedIds : [];
+      const data = await batchRestoreAdminMaterials(selectedMaterialIds);
+      const restored = data.restored ?? 0;
+      const failedIds: number[] = Array.isArray(data.failedIds) ? data.failedIds : [];
       let text = `已恢复 ${restored} 条资料。`;
       if (failedIds.length) {
         text += ` ${failedIds.length} 条恢复失败：${failedIds.join(', ')}`;
@@ -224,17 +206,9 @@ export const useAdminBatchActions = ({
     }
     setMarketBatchMessage(null);
     try {
-      const resp = await fetchBackend('/admin/market/batch-update', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-      const json = await resp.json();
-      if (!resp.ok || !json.ok) {
-        throw new Error(json.msg || '批量更新失败');
-      }
-      const updated = json.data?.updated ?? selectedMarketIds.length;
-      const missingIds: number[] = Array.isArray(json.data?.missingIds) ? json.data.missingIds : [];
+      const data = await batchUpdateAdminMarketItems(payload);
+      const updated = data.updated ?? selectedMarketIds.length;
+      const missingIds: number[] = Array.isArray(data.missingIds) ? data.missingIds : [];
       const prefix = actionLabel ? `${actionLabel}：` : '';
       setMarketBatchMessage({
         type: missingIds.length ? 'error' : 'success',
@@ -264,17 +238,9 @@ export const useAdminBatchActions = ({
     setMarketBatchDeleting(true);
     setMarketBatchMessage(null);
     try {
-      const resp = await fetchBackend('/admin/market/batch-delete', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ itemIds: selectedMarketIds }),
-      });
-      const json = await resp.json();
-      if (!resp.ok || !json.ok) {
-        throw new Error(json.msg || '批量删除失败');
-      }
-      const deleted = json.data?.deleted ?? 0;
-      const failedIds: number[] = Array.isArray(json.data?.failedIds) ? json.data.failedIds : [];
+      const data = await batchDeleteAdminMarketItems(selectedMarketIds);
+      const deleted = data.deleted ?? 0;
+      const failedIds: number[] = Array.isArray(data.failedIds) ? data.failedIds : [];
       let text = `已删除 ${deleted} 条商品。`;
       if (failedIds.length) {
         text += ` ${failedIds.length} 条删除失败：${failedIds.join(', ')}`;

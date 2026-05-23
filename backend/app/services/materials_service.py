@@ -32,6 +32,7 @@ from app.services.materials_query_support import (
     compat_recommendation_score,
     compat_sort_material_rows,
 )
+from app.services.materials_serializers import admin_material_item, load_json_list, material_has_file, material_list_item
 from app.services.read_support import (
     clamp_limit,
     compat_as_float,
@@ -125,7 +126,7 @@ class MaterialsService:
         safe_size = max(1, min(size, 100))
         start = (safe_page - 1) * safe_size
         end = start + safe_size
-        page_items = [self._to_list_item(material) for material in items[start:end]]
+        page_items = [material_list_item(material) for material in items[start:end]]
         available_tags = sorted({tag_name for material in visible_materials for tag_name in self._loads(material.tags_json)})
         return {
             "items": page_items,
@@ -246,7 +247,7 @@ class MaterialsService:
         )
         safe_limit = clamp_limit(limit, max_value=100)
         sliced = items[:safe_limit] if safe_limit else items
-        return [self._to_list_item(material) for material in sliced]
+        return [material_list_item(material) for material in sliced]
 
     async def get_recommendations_async(
         self,
@@ -304,7 +305,7 @@ class MaterialsService:
         liked = current_user_id is not None and self.material_repo.find_like(session, material_id, current_user_id) is not None
         favorited = current_user_id is not None and self.material_repo.find_favorite(session, material_id, current_user_id) is not None
         rating_record = self.material_repo.find_rating(session, material_id, current_user_id) if current_user_id is not None else None
-        detail = self._to_list_item(material)
+        detail = material_list_item(material)
         detail.update(
             {
                 "originalFilename": material.original_filename,
@@ -632,7 +633,7 @@ class MaterialsService:
         material.deleted_at = None
         self.material_repo.save_material(session, material)
         session.commit()
-        return self._to_admin_item(material)
+        return admin_material_item(material)
 
     def list_for_admin(
         self,
@@ -663,7 +664,7 @@ class MaterialsService:
         start = safe_page * safe_size
         end = start + safe_size
         return {
-            "items": [self._to_admin_item(item) for item in filtered[start:end]],
+            "items": [admin_material_item(item) for item in filtered[start:end]],
             "meta": {"page": safe_page, "size": safe_size, "total": len(filtered)},
         }
 
@@ -1134,39 +1135,6 @@ class MaterialsService:
             score += 1
         return score
 
-    def _to_list_item(self, material: MaterialRecord) -> dict[str, Any]:
-        return {
-            "id": material.id,
-            "uploaderId": material.uploader_id,
-            "title": material.title,
-            "description": material.description,
-            "price": material.price / 100.0,
-            "free": bool(material.is_free),
-            "school": material.school,
-            "college": material.college,
-            "major": material.major,
-            "generalEducation": bool(material.general_course),
-            "hasFile": self._has_file(material),
-            "hasNetdisk": bool(material.netdisk_url),
-            "courseCategory": material.course_category,
-            "gradeType": material.grade_type,
-            "gradeValue": material.grade_value,
-            "tags": self._loads(material.tags_json),
-            "previewWatermarkEnabled": material.preview_watermark_enabled,
-            "previewSource": material.preview_source,
-            "ratingAvg": material.rating_avg,
-            "ratingCount": material.rating_count,
-            "likeCount": material.like_count,
-            "commentCount": material.comment_count,
-            "viewCount": material.view_count,
-            "downloadCount": material.download_count,
-            "salesCount": material.sales_count,
-            "createdAt": self._serialize_datetime(material.created_at),
-            "uploaderUsername": material.uploader_username,
-            "uploaderNickname": material.uploader_nickname,
-            "copyrightOwner": material.copyright_owner,
-        }
-
     def _load_accessible_material(
         self,
         session: Session,
@@ -1260,7 +1228,7 @@ class MaterialsService:
         return urls
 
     def _has_file(self, material: MaterialRecord) -> bool:
-        return bool(material.file_storage_key or (material.delivery_method == "FILE" and (material.original_filename or material.file_type)))
+        return material_has_file(material)
 
     def _require_user(self, session: Session, user_id: int) -> AuthUser:
         user = self.auth_repo.find_user_by_id(session, user_id)
@@ -1300,39 +1268,8 @@ class MaterialsService:
     def _serialize_datetime(self, value: datetime | None) -> str | None:
         return serialize_datetime(value)
 
-    def _to_admin_item(self, material: MaterialRecord) -> dict[str, Any]:
-        return {
-            "id": material.id,
-            "title": material.title,
-            "school": material.school,
-            "college": material.college,
-            "major": material.major,
-            "gradeValue": material.grade_value,
-            "gradeType": material.grade_type,
-            "courseCategory": material.course_category,
-            "tags": self._loads(material.tags_json),
-            "price": material.price / 100.0,
-            "free": bool(material.is_free),
-            "status": material.status,
-            "reviewStatus": material.review_status,
-            "uploaderId": material.uploader_id,
-            "uploaderUsername": material.uploader_username,
-            "uploaderNickname": material.uploader_nickname,
-            "downloadCount": material.download_count,
-            "salesCount": material.sales_count,
-            "createdAt": self._serialize_datetime(material.created_at),
-            "updatedAt": self._serialize_datetime(material.updated_at),
-            "deletedAt": self._serialize_datetime(material.deleted_at),
-        }
-
     def _loads(self, raw: str | None) -> list[Any]:
-        if not raw:
-            return []
-        try:
-            value = json.loads(raw)
-        except Exception:  # noqa: BLE001
-            return []
-        return value if isinstance(value, list) else []
+        return load_json_list(raw)
 
     def _json_dumps(self, value: Any) -> str:
         return json.dumps(value, ensure_ascii=False, separators=(",", ":"))

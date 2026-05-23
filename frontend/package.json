@@ -9,6 +9,7 @@
     "lint": "next lint",
     "typecheck": "tsc --noEmit --pretty false",
     "check": "npm run typecheck && npm run lint",
+    "test:unit": "vitest run tests/unit",
     "format": "prettier --write .",
     "test:smoke": "playwright test tests/smoke.spec.ts",
     "test:critical": "playwright test tests/critical-paths.spec.ts",
@@ -34,6 +35,7 @@
     "eslint-config-next": "14.2.3",
     "eslint-config-prettier": "9.1.0",
     "prettier": "3.3.3",
-    "typescript": "5.4.5"
+    "typescript": "5.4.5",
+    "vitest": "^1.6.1"
   }
 }

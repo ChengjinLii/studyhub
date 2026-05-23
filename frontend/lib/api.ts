@@ -11,19 +11,8 @@ import { ContributorRank, LeaderboardPeriod } from '../types/contributor';
 import { PublicUserProfile, UserAccountProfile } from '../types/userProfile';
 import { MaterialRequestItem } from '../types/request';
 import { resolveApiBase, buildBackendUrl } from './apiBase';
-import { extractErrorMessage, extractErrorCode } from './errors';
+import { ApiEnvelope, unwrapApiResponse } from './apiEnvelope';
 import { normalizeMockAssets } from './mockAsset';
-
-type ApiEnvelope<T> = {
-  ok: boolean;
-  data?: T;
-  msg?: string;
-  error?: {
-    code?: string;
-    message?: string;
-  };
-  code?: string;
-};
 
 export interface MaterialListResponse {
   items: MaterialListItem[];
@@ -53,14 +42,7 @@ async function apiFetch<T>(path: string, init: RequestInit = {}, token?: string,
     headers,
     cache: 'no-store',
   });
-  const json: ApiEnvelope<T> = await res.json().catch(() => ({ ok: false } as ApiEnvelope<T>));
-  if (!res.ok || !json.ok || !json.data) {
-    const msg = extractErrorMessage(json, res.statusText || '请求失败');
-    const code = extractErrorCode(json);
-    const error = new Error(code ? `${msg}（${code}）` : msg);
-    throw error;
-  }
-  return normalizeMockAssets(json.data);
+  return unwrapApiResponse<T>(res, '请求失败');
 }
 
 const buildQuery = (params: Record<string, string | number | undefined>) => {
@@ -83,12 +65,7 @@ async function webApiFetch<T>(path: string, init: RequestInit = {}): Promise<T> 
     headers,
     credentials: init.credentials ?? 'include',
   });
-  const json: ApiEnvelope<T> = await res.json().catch(() => ({ ok: false } as ApiEnvelope<T>));
-  if (!res.ok || !json.ok || !json.data) {
-    const msg = extractErrorMessage(json, res.statusText || '请求失败');
-    throw new Error(msg);
-  }
-  return normalizeMockAssets(json.data);
+  return unwrapApiResponse<T>(res, '请求失败');
 }
 
 export async function fetchMaterials(

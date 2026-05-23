@@ -37,6 +37,7 @@ from app.services.requests_query_support import (
     compat_request_hidden_by_early_exit,
     compat_sort_requests,
 )
+from app.services.requests_serializers import amount_to_yuan, request_contribution_item, request_response_item
 from app.services.read_support import (
     ROLE_ADMIN,
     ROLE_DEVELOPER,
@@ -148,7 +149,7 @@ class RequestsService:
         _ = request
         items = self.request_repo.list_responses(session, request_id)
         items.sort(key=lambda item: -parse_iso_datetime(serialize_datetime(item.updated_at) or serialize_datetime(item.created_at)).timestamp())
-        return [self._to_response_item(item) for item in items]
+        return [request_response_item(item) for item in items]
 
     def get_contributions(self, session: Session, viewer_id: int, viewer_role_mask: int | None, request_id: int) -> list[dict[str, Any]]:
         if self.settings.requires_private_env_file:
@@ -158,7 +159,7 @@ class RequestsService:
         _ = request
         items = [item for item in self.request_repo.list_contributions(session, request_id) if item.status in CONTRIBUTION_VISIBLE_STATUSES]
         items.sort(key=lambda item: -self._created_ts(item))
-        return [self._to_contribution_item(item) for item in items]
+        return [request_contribution_item(item) for item in items]
 
     def create_request(self, session: Session, user_id: int, payload: RequestCreatePayload) -> dict[str, Any]:
         seed = self._bootstrap(session)
@@ -297,7 +298,7 @@ class RequestsService:
             message=self._strip(payload.message),
         )
         session.commit()
-        return self._to_response_item(response)
+        return request_response_item(response)
 
     def attach_material_to_request(self, session: Session, request_id: int, user_id: int, material_id: int) -> None:
         self._bootstrap(session)
@@ -427,7 +428,7 @@ class RequestsService:
         self.request_repo.save_contribution(session, contribution)
         self._apply_refund_to_request(request, contribution.amount_cents)
         session.commit()
-        return self._to_contribution_item(contribution)
+        return request_contribution_item(contribution)
 
     def update_contribution_deadline(self, session: Session, contribution_id: int, user_id: int, payload: RequestContributionDeadlinePayload) -> dict[str, Any]:
         self._bootstrap(session)
@@ -453,7 +454,7 @@ class RequestsService:
         contribution.deadline_at = next_deadline
         self.request_repo.save_contribution(session, contribution)
         session.commit()
-        return self._to_contribution_item(contribution)
+        return request_contribution_item(contribution)
 
     def _bootstrap(self, session: Session) -> dict[str, Any]:
         seed = self.read_repo.load_seed()
@@ -776,30 +777,6 @@ class RequestsService:
             "createdAt": serialize_datetime(item.created_at),
         }
 
-    def _to_response_item(self, item: RequestResponseRecord) -> dict[str, Any]:
-        return {
-            "id": item.id,
-            "responderName": item.responder_name,
-            "message": item.message,
-            "materialId": item.material_id,
-            "revisionCount": item.revision_count,
-            "updatedAt": serialize_datetime(item.updated_at),
-            "createdAt": serialize_datetime(item.created_at),
-        }
-
-    def _to_contribution_item(self, item: RequestContributionRecord) -> dict[str, Any]:
-        return {
-            "id": item.id,
-            "contributorId": item.contributor_id,
-            "contributorName": item.contributor_name,
-            "type": item.type,
-            "amount": self._to_yuan(item.amount_cents),
-            "status": item.status,
-            "deadlineTier": item.deadline_tier,
-            "deadlineAt": serialize_datetime(item.deadline_at),
-            "createdAt": serialize_datetime(item.created_at),
-        }
-
     def _normalize_tier(self, value: str | None, fallback: str | None) -> str:
         normalized = (value or "").strip().upper()
         if normalized in OWNER_MINIMUMS:
@@ -856,9 +833,7 @@ class RequestsService:
         return normalized or None
 
     def _to_yuan(self, cents: int | None) -> float | None:
-        if cents is None:
-            return None
-        return cents / 100.0
+        return amount_to_yuan(cents)
 
     def _created_ts(self, entity: Any) -> float:
         value = serialize_datetime(entity.created_at) if getattr(entity, "created_at", None) else None

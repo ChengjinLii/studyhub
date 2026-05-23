@@ -4,7 +4,20 @@ import AppImage from '../../components/AppImage';
 import NavBar from '../../components/NavBar';
 import PaginationBar from '../../components/PaginationBar';
 import { readSession, hasRole } from '../../lib/auth';
-import { fetchBackend, getRequestOrigin, resolveApiBase } from '../../lib/apiBase';
+import { getRequestOrigin, resolveApiBase } from '../../lib/apiBase';
+import {
+  broadcastAdminNotification,
+  createAdminUser,
+  fetchAdminFeedbacks,
+  fetchAdminMarketItems,
+  fetchAdminMaterials,
+  fetchAdminUsers,
+  fetchAdminVolunteers,
+  restoreAdminMaterial,
+  updateAdminFeedbackStatus,
+  updateAdminUserRole,
+  updateAdminVolunteerStatus,
+} from '../../lib/adminApi';
 import { toErrorMessage } from '../../lib/errors';
 import { useAdminMonthlyPayout } from '../../lib/useAdminMonthlyPayout';
 import { formatDateTime } from '../../lib/format';
@@ -12,6 +25,7 @@ import { useSectionNavigation } from '../../lib/useSectionNavigation';
 import { useAdminBatchActions } from '../../lib/useAdminBatchActions';
 import { useAdminReports } from '../../lib/useAdminReports';
 import { useAdminUserNotes } from '../../lib/useAdminUserNotes';
+import { useAdminPayouts } from '../../lib/useAdminPayouts';
 import { SessionUser, RoleMask } from '../../types/user';
 import {
   UserSummary,
@@ -23,9 +37,6 @@ import {
   AdminReport,
 } from '../../types/admin';
 import {
-  PayoutApplication,
-  PayoutSchedule,
-  PayoutSettlementDetail,
   AdminMonthlyPayoutOverview,
   AdminMonthlyPayoutItem,
   AdminPayoutQr,
@@ -173,12 +184,6 @@ export default function AdminPage({
   const [actualTotalRaw, setActualTotalRaw] = useState('');
   const [actualTotalValue, setActualTotalValue] = useState<number | null>(null);
   const [actualTotalNotice, setActualTotalNotice] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
-  const [payouts, setPayouts] = useState<PayoutApplication[]>([]);
-  const [payoutMessage, setPayoutMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
-  const [payoutLoading, setPayoutLoading] = useState(false);
-  const [payoutDetails, setPayoutDetails] = useState<Record<number, PayoutSettlementDetail[]>>({});
-  const [payoutDetailLoading, setPayoutDetailLoading] = useState<Record<number, boolean>>({});
-  const [payoutDetailOpen, setPayoutDetailOpen] = useState<Record<number, boolean>>({});
   const {
     monthlyPayoutMonth,
     setMonthlyPayoutMonth,
@@ -192,10 +197,24 @@ export default function AdminPage({
     openPayoutQrModal,
     closePayoutQrModal,
   } = useAdminMonthlyPayout(getCurrentMonthValue());
-  const [schedule, setSchedule] = useState<PayoutSchedule | null>(null);
-  const [scheduleForm, setScheduleForm] = useState({ launchDate: '', nextPayoutDate: '' });
-  const [scheduleMessage, setScheduleMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
-  const [scheduleLoading, setScheduleLoading] = useState(false);
+  const {
+    payouts,
+    payoutMessage,
+    payoutLoading,
+    payoutDetails,
+    payoutDetailLoading,
+    payoutDetailOpen,
+    reloadPayouts,
+    handlePayoutAction,
+    togglePayoutDetails,
+    schedule,
+    scheduleForm,
+    setScheduleForm,
+    scheduleMessage,
+    scheduleLoading,
+    loadSchedule,
+    submitSchedule,
+  } = useAdminPayouts();
   const adminNavItems = useMemo(() => ADMIN_QUICK_NAV_ITEMS, []);
   const { activeSection: activeAdminSection, jumpToSection } = useSectionNavigation(adminNavItems, {
     rootMargin: '-20% 0px -60% 0px',
@@ -227,48 +246,32 @@ export default function AdminPage({
   };
 
   const reloadUsers = async (keywordParam?: string) => {
-    const qs = keywordParam ? `?keyword=${encodeURIComponent(keywordParam)}` : '';
-    const resp = await fetchBackend(`/admin/users${qs}`);
-    const json = await resp.json();
-    if (resp.ok && json.ok) {
-      setUsers(json.data);
-    }
+    const data = await fetchAdminUsers(keywordParam);
+    setUsers(data);
   };
 
   const reloadFeedbacks = async () => {
-    const resp = await fetchBackend('/admin/feedbacks');
-    const json = await resp.json();
-    if (resp.ok && json.ok) {
-      setFeedbacks(json.data);
-    }
+    const data = await fetchAdminFeedbacks();
+    setFeedbacks(data);
   };
 
   const reloadVolunteers = async () => {
-    const resp = await fetchBackend('/admin/volunteers');
-    const json = await resp.json();
-    if (resp.ok && json.ok) {
-      setVolunteers(json.data);
-    }
+    const data = await fetchAdminVolunteers();
+    setVolunteers(data);
   };
 
   const loadMaterials = async (page = materialsMeta?.page ?? 0, view = materialView) => {
     setMaterialsLoading(true);
     try {
-      const params = new URLSearchParams();
-      params.set('page', String(Math.max(page, 0)));
-      params.set('size', String(materialsMeta?.size ?? 15));
-      if (view === 'removed') {
-        params.set('status', 'removed');
-      }
-      const resp = await fetchBackend(`/admin/materials?${params.toString()}`);
-      const json = await resp.json();
-      if (!resp.ok || !json.ok) {
-        throw new Error(json.msg || '加载资料失败');
-      }
-      setMaterials(json.data.items || []);
-      setMaterialsMeta(json.data.meta || { page: 0, size: materialsMeta?.size ?? 15, total: 0 });
+      const data = await fetchAdminMaterials({
+        page: Math.max(page, 0),
+        size: materialsMeta?.size ?? 15,
+        status: view === 'removed' ? 'removed' : undefined,
+      });
+      setMaterials(data.items || []);
+      setMaterialsMeta(data.meta || { page: 0, size: materialsMeta?.size ?? 15, total: 0 });
       setSelectedMaterialIds((prev) =>
-        prev.filter((id) => (json.data.items || []).some((entry: AdminMaterial) => entry.id === id))
+        prev.filter((id) => (data.items || []).some((entry: AdminMaterial) => entry.id === id))
       );
     } catch (err: unknown) {
       setBatchMessage({ type: 'error', text: toErrorMessage(err, '加载资料失败') });
@@ -294,17 +297,10 @@ export default function AdminPage({
   const loadMarketItems = async (page = marketMeta?.page ?? 1) => {
     setMarketLoading(true);
     try {
-      const params = new URLSearchParams();
-      params.set('page', String(Math.max(page, 1)));
-      params.set('size', String(marketMeta?.size ?? 15));
-      const resp = await fetchBackend(`/admin/market?${params.toString()}`);
-      const json = await resp.json();
-      if (!resp.ok || !json.ok) {
-        throw new Error(json.msg || '加载校园集市商品失败');
-      }
-      const items: AdminMarketItem[] = json.data?.items || [];
+      const data = await fetchAdminMarketItems({ page: Math.max(page, 1), size: marketMeta?.size ?? 15 });
+      const items: AdminMarketItem[] = data.items || [];
       setMarketItems(items);
-      setMarketMeta(json.data?.meta || { page, size: marketMeta?.size ?? 15, total: 0 });
+      setMarketMeta(data.meta || { page, size: marketMeta?.size ?? 15, total: 0 });
       setSelectedMarketIds((prev) => prev.filter((id) => items.some((entry) => entry.id === id)));
     } catch (err: unknown) {
       setMarketBatchMessage({ type: 'error', text: toErrorMessage(err, '加载校园集市商品失败') });
@@ -382,55 +378,13 @@ export default function AdminPage({
     setRestoringMaterialId(materialId);
     setBatchMessage(null);
     try {
-      const resp = await fetchBackend(`/admin/materials/${materialId}/restore`, { method: 'POST' });
-      const json = await resp.json();
-      if (!resp.ok || !json.ok) {
-        throw new Error(json.msg || '恢复失败');
-      }
+      await restoreAdminMaterial(materialId);
       setBatchMessage({ type: 'success', text: '资料已恢复' });
       await loadMaterials(currentMaterialPage - 1, 'removed');
     } catch (err: unknown) {
       setBatchMessage({ type: 'error', text: toErrorMessage(err, '恢复失败') });
     } finally {
       setRestoringMaterialId((prev) => (prev === materialId ? null : prev));
-    }
-  };
-
-  const reloadPayouts = async () => {
-    setPayoutLoading(true);
-    try {
-      const resp = await fetchBackend('/admin/creator-payout-applications');
-      const json = await resp.json();
-      if (resp.ok && json.ok) {
-        setPayouts(json.data.items || []);
-      } else {
-        throw new Error(json.msg || '加载收益申请失败');
-      }
-    } catch (err: unknown) {
-      setPayoutMessage({ type: 'error', text: toErrorMessage(err, '加载收益申请失败') });
-    } finally {
-      setPayoutLoading(false);
-    }
-  };
-
-  const loadSchedule = async () => {
-    setScheduleLoading(true);
-    try {
-      const resp = await fetchBackend('/admin/payout-schedule');
-      const json = await resp.json();
-      if (resp.ok && json.ok) {
-        setSchedule(json.data);
-        setScheduleForm({
-          launchDate: json.data.launchDate || '',
-          nextPayoutDate: json.data.nextPayoutDate || '',
-        });
-      } else {
-        throw new Error(json.msg || '加载上线日期失败');
-      }
-    } catch (err: unknown) {
-      setScheduleMessage({ type: 'error', text: toErrorMessage(err, '加载上线日期失败') });
-    } finally {
-      setScheduleLoading(false);
     }
   };
 
@@ -448,20 +402,12 @@ export default function AdminPage({
         (form.admin ? RoleMask.ADMIN : 0) |
         (form.developer ? RoleMask.DEVELOPER : 0) |
         RoleMask.CONTRIBUTOR;
-      const resp = await fetchBackend('/admin/users', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          username: form.username,
-          password: form.password,
-          nickname: form.nickname,
-          roleMask,
-        }),
+      await createAdminUser({
+        username: form.username,
+        password: form.password,
+        nickname: form.nickname,
+        roleMask,
       });
-      const json = await resp.json();
-      if (!resp.ok || !json.ok) {
-        throw new Error(json.msg || '创建失败');
-      }
       setMessage({ type: 'success', text: '管理员已创建' });
       setForm({ username: '', password: '', nickname: '', admin: true, developer: true });
       reloadUsers();
@@ -490,15 +436,7 @@ export default function AdminPage({
   const updateFeedbackStatus = async (id: number, status: string) => {
     setFeedbackMessage(null);
     try {
-      const resp = await fetch(`/api/admin/feedbacks?id=${id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status }),
-      });
-      const json = await resp.json();
-      if (!resp.ok || !json.ok) {
-        throw new Error(json.msg || '更新失败');
-      }
+      await updateAdminFeedbackStatus(id, status);
       setFeedbackMessage({ type: 'success', text: '反馈状态已更新' });
       reloadFeedbacks();
     } catch (err: unknown) {
@@ -509,15 +447,7 @@ export default function AdminPage({
   const updateVolunteerStatus = async (id: number, status: string) => {
     setVolunteerMessage(null);
     try {
-      const resp = await fetch(`/api/admin/volunteers?id=${id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status }),
-      });
-      const json = await resp.json();
-      if (!resp.ok || !json.ok) {
-        throw new Error(json.msg || '更新失败');
-      }
+      await updateAdminVolunteerStatus(id, status);
       setVolunteerMessage({ type: 'success', text: '申请状态已更新' });
       reloadVolunteers();
     } catch (err: unknown) {
@@ -526,88 +456,12 @@ export default function AdminPage({
   };
 
   const toggleRole = async (id: number, roleMask: number) => {
-    const resp = await fetch(`/api/admin/users?id=${id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ roleMask }),
-    });
-    const json = await resp.json();
-    if (!resp.ok || !json.ok) {
-      setMessage({ type: 'error', text: json.msg || '更新失败' });
-    } else {
+    try {
+      await updateAdminUserRole(id, roleMask);
       setMessage({ type: 'success', text: '角色更新成功' });
       reloadUsers();
-    }
-  };
-
-  const handlePayoutAction = async (id: number, status: 'APPROVED' | 'REJECTED', reviewNotes?: string) => {
-    setPayoutMessage(null);
-    try {
-      const resp = await fetchBackend(`/admin/creator-payout-applications?id=${id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status, reviewNotes }),
-      });
-      const json = await resp.json();
-      if (!resp.ok || !json.ok) {
-        throw new Error(json.msg || '操作失败');
-      }
-      setPayoutMessage({ type: 'success', text: '已更新收益申请' });
-      reloadPayouts();
     } catch (err: unknown) {
-      setPayoutMessage({ type: 'error', text: toErrorMessage(err, '操作失败') });
-    }
-  };
-
-  const togglePayoutDetails = async (id: number) => {
-    setPayoutDetailOpen((prev) => ({ ...prev, [id]: !prev[id] }));
-    if (payoutDetails[id] || payoutDetailLoading[id]) {
-      return;
-    }
-    setPayoutDetailLoading((prev) => ({ ...prev, [id]: true }));
-    try {
-      const resp = await fetchBackend(`/admin/creator-payout-applications/${id}/details`);
-      const json = await resp.json();
-      if (!resp.ok || !json.ok) {
-        throw new Error(json.msg || '加载收益明细失败');
-      }
-      setPayoutDetails((prev) => ({ ...prev, [id]: (json.data || []) as PayoutSettlementDetail[] }));
-    } catch (error: unknown) {
-      setPayoutMessage({ type: 'error', text: toErrorMessage(error, '加载收益明细失败') });
-    } finally {
-      setPayoutDetailLoading((prev) => ({ ...prev, [id]: false }));
-    }
-  };
-
-  const submitSchedule = async (e: FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    setScheduleMessage(null);
-    try {
-      const payload: { launchDate: string | null; nextPayoutDate?: string } = {
-        launchDate: scheduleForm.launchDate || null,
-      };
-      if (scheduleForm.nextPayoutDate) {
-        payload.nextPayoutDate = scheduleForm.nextPayoutDate;
-      }
-      const resp = await fetchBackend('/admin/payout-schedule', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-      const json = await resp.json();
-      if (!resp.ok || !json.ok) {
-        throw new Error(json.msg || '更新失败');
-      }
-      setSchedule(json.data);
-      setScheduleForm({
-        launchDate: json.data.launchDate || '',
-        nextPayoutDate: json.data.nextPayoutDate || '',
-      });
-      setScheduleMessage({ type: 'success', text: '上线日期已更新' });
-    } catch (err: unknown) {
-      setScheduleMessage({ type: 'error', text: toErrorMessage(err, '更新失败') });
-    } finally {
-      setScheduleLoading(false);
+      setMessage({ type: 'error', text: toErrorMessage(err, '更新失败') });
     }
   };
 
@@ -621,15 +475,7 @@ export default function AdminPage({
     setBroadcasting(true);
     setBroadcastStatus(null);
     try {
-      const resp = await fetchBackend('/admin/notifications', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: messageText, userId: null }),
-      });
-      const json = await resp.json();
-      if (!resp.ok || !json.ok) {
-        throw new Error(json.msg || '广播失败');
-      }
+      await broadcastAdminNotification(messageText);
       setBroadcastStatus({ type: 'success', text: '已广播给所有用户' });
       setBroadcastText('');
     } catch (err: unknown) {
@@ -653,7 +499,7 @@ export default function AdminPage({
     reloadPayouts();
     reloadMonthlyPayoutOverview();
     loadSchedule();
-  }, [reloadMonthlyPayoutOverview]);
+  }, [loadSchedule, reloadMonthlyPayoutOverview, reloadPayouts]);
 
   return (
     <>

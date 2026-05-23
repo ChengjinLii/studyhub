@@ -18,7 +18,7 @@ import {
   normalizeCourseCategory,
   GRADE_STAGE_OPTIONS,
 } from '../constants/metadata';
-import { fetchAccountProfile } from '../lib/api';
+import { fetchAccountProfile, fetchMaterialDetail } from '../lib/api';
 import { getRequestOrigin } from '../lib/apiBase';
 import {
   ColumnTopicKey,
@@ -34,6 +34,12 @@ import { parseMajorList, serializeMajorList } from '../lib/major';
 import { materialPath } from '../lib/slug';
 import { buildZipName, resolveZipFileName, zipFiles, zipMarkdownContent } from '../lib/uploadAssets';
 import { sendUploadFormData, type UploadMutationResponse } from '../lib/uploadSubmit';
+import {
+  formatPriceSummary,
+  normalizePriceInput,
+  sanitizePriceInput,
+  validateUploadSubmitInput,
+} from '../lib/uploadValidation';
 import { useSectionNavigation } from '../lib/useSectionNavigation';
 import { useUploadImageSelection } from '../lib/useUploadImageSelection';
 
@@ -80,28 +86,6 @@ const UPLOAD_NAV_ITEMS = [
   { id: 'upload-delivery', label: '交付与预览' },
   { id: 'upload-confirm', label: '发布确认' },
 ];
-
-const sanitizePriceInput = (value: string) => value.replace(/[^\d]/g, '');
-
-const normalizePriceInput = (value: string) => {
-  const cleaned = sanitizePriceInput(value);
-  if (!cleaned) return '0';
-  return cleaned.replace(/^0+(?=\\d)/, '');
-};
-
-const parsePriceValue = (value: string) => {
-  const normalized = normalizePriceInput(value);
-  if (!/^\d+$/.test(normalized)) return null;
-  const parsed = Number(normalized);
-  if (!Number.isSafeInteger(parsed) || parsed < 0) return null;
-  return parsed;
-};
-
-const formatPriceSummary = (value: string) => {
-  const parsed = parsePriceValue(value);
-  if (parsed === null) return '';
-  return parsed === 0 ? '当前：免费' : `当前：¥${parsed}`;
-};
 
 const SectionLabel = ({ text, htmlFor, optional }: { text: string; htmlFor?: string; optional?: boolean }) => (
   <label htmlFor={htmlFor} className="section-label">
@@ -316,16 +300,7 @@ export default function UploadPage({ user, token, account }: UploadPageProps) {
       if (!isEditing || !editingId) return;
       setLoadingExisting(true);
       try {
-        const headers: Record<string, string> = { Accept: 'application/json' };
-        if (token) {
-          headers.Authorization = `Bearer ${token}`;
-        }
-        const res = await fetch(`${apiBase}/materials/${editingId}`, { headers });
-        const json = await res.json();
-        if (!res.ok || !json.ok || !json.data) {
-          throw new Error(json.msg || '无法获取资料信息');
-        }
-        const detail: MaterialDetail = json.data;
+        const detail: MaterialDetail = await fetchMaterialDetail(editingId, token || undefined);
         setTitle(detail.title || '');
         setDescription(detail.description || '');
         const detailPrice = detail.price != null ? Math.round(detail.price) : 0;
@@ -391,7 +366,6 @@ export default function UploadPage({ user, token, account }: UploadPageProps) {
     };
     loadMaterial();
   }, [
-    apiBase,
     editingId,
     gradeStageOptions,
     isEditing,
@@ -619,26 +593,6 @@ export default function UploadPage({ user, token, account }: UploadPageProps) {
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
     setStatus(null);
-    if (!token) {
-      setStatus({ type: 'error', message: '请先登录后再投稿。' });
-      return;
-    }
-    if (isExperience && !description.trim()) {
-      setStatus({ type: 'error', message: '请填写经验分享内容。' });
-      return;
-    }
-    if (isExperience && isExperienceCustomTopic && !experienceCustomTag.trim()) {
-      setStatus({ type: 'error', message: '请选择自定义标签时，请填写标签名称。' });
-      return;
-    }
-    if (!isExperience && customTags.split(/[,，\s]+/).some((tag) => tag.trim() === '经验分享')) {
-      setStatus({ type: 'error', message: '“经验分享”标签仅用于经验分享投稿。' });
-      return;
-    }
-    if (zipPreparing) {
-      setStatus({ type: 'error', message: '正在打包文件，请稍后再提交。' });
-      return;
-    }
     const fallbackGradeValue = gradeStageOptions[0];
     const effectiveTitle = (title.trim() || (isQuickMode && zipFile ? deriveAutoTitle(zipFile.name) : '')).slice(
       0,
@@ -651,14 +605,6 @@ export default function UploadPage({ user, token, account }: UploadPageProps) {
     const effectiveTagList = isQuickMode ? [] : tagList;
     const trimmedNetdiskUrl = netdiskUrl.trim();
     const resolvedDelivery = isExperience ? 'FILE' : deliveryMethod === 'NETDISK' ? 'NETDISK' : 'FILE';
-    if (!isExperience && resolvedDelivery === 'FILE' && !zipFile && !hasExistingFile) {
-      setStatus({ type: 'error', message: '请上传 50MB 以内的资料文件。' });
-      return;
-    }
-    if (!isExperience && resolvedDelivery === 'NETDISK' && !trimmedNetdiskUrl) {
-      setStatus({ type: 'error', message: '使用网盘链接时请填写链接地址。' });
-      return;
-    }
     const effectivePreviewSource = isExperience
       ? PREVIEW_SOURCE_AUTO
       : isRequestResponse
@@ -666,66 +612,47 @@ export default function UploadPage({ user, token, account }: UploadPageProps) {
         : isQuickMode
           ? PREVIEW_SOURCE_AUTO
           : previewSource;
-    if (!isExperience && effectivePreviewSource === PREVIEW_SOURCE_MANUAL) {
-      const minRequired = isRequestResponse ? MIN_REQUEST_PREVIEW_IMAGES : MIN_MANUAL_PREVIEW_IMAGES;
-      if (!isEditing && manualPreviewFiles.length < minRequired) {
-        setStatus({ type: 'error', message: `请至少上传 ${minRequired} 张预览图。` });
-        return;
-      }
-      if (manualPreviewFiles.length > 0 && manualPreviewFiles.length < minRequired) {
-        setStatus({ type: 'error', message: `预览图数量不足（至少 ${minRequired} 张）。` });
-        return;
-      }
-      const oversized = manualPreviewFiles.find((file) => file.size > MAX_PREVIEW_IMAGE_BYTES);
-      if (oversized) {
-        setStatus({ type: 'error', message: `预览图 ${oversized.name} 超过 5MB。` });
-        return;
-      }
-    }
-    if (!isExperience && !isQuickMode && customPreviewText.trim().length > MAX_CUSTOM_PREVIEW_TEXT) {
-      setStatus({ type: 'error', message: `自定义预览文字需在 ${MAX_CUSTOM_PREVIEW_TEXT} 字以内。` });
+    const validation = validateUploadSubmitInput({
+      token,
+      isExperience,
+      description,
+      isExperienceCustomTopic,
+      experienceCustomTag,
+      customTags,
+      zipPreparing,
+      resolvedDelivery,
+      zipFile,
+      hasExistingFile,
+      trimmedNetdiskUrl,
+      effectivePreviewSource,
+      isRequestResponse,
+      isEditing,
+      manualPreviewFiles,
+      customPreviewText,
+      isQuickMode,
+      customPreviewFiles,
+      customPreviewLabel,
+      effectiveTitle,
+      descriptionLimit,
+      copyrightOwner,
+      price,
+      limits: {
+        maxTitleLength: MAX_TITLE_LENGTH,
+        maxDescLength: MAX_DESC_LENGTH,
+        maxExperienceLength: MAX_EXPERIENCE_LENGTH,
+        maxCopyrightLength: MAX_COPYRIGHT_LENGTH,
+        maxPreviewImageBytes: MAX_PREVIEW_IMAGE_BYTES,
+        maxCustomPreviewText: MAX_CUSTOM_PREVIEW_TEXT,
+        maxCustomPreviewImages: MAX_CUSTOM_PREVIEW_IMAGES,
+        minManualPreviewImages: MIN_MANUAL_PREVIEW_IMAGES,
+        minRequestPreviewImages: MIN_REQUEST_PREVIEW_IMAGES,
+      },
+    });
+    if (validation.error) {
+      setStatus({ type: 'error', message: validation.error });
       return;
     }
-    if (!isQuickMode && customPreviewFiles.length > MAX_CUSTOM_PREVIEW_IMAGES) {
-      setStatus({ type: 'error', message: `${customPreviewLabel}最多上传 ${MAX_CUSTOM_PREVIEW_IMAGES} 张。` });
-      return;
-    }
-    const customOversized =
-      !isQuickMode && customPreviewFiles.find((file) => file.size > MAX_PREVIEW_IMAGE_BYTES);
-    if (customOversized) {
-      setStatus({ type: 'error', message: `${customPreviewLabel} ${customOversized.name} 超过 5MB。` });
-      return;
-    }
-    if (!effectiveTitle) {
-      setStatus({
-        type: 'error',
-        message: isQuickMode ? '请填写资料标题或上传文件以自动生成标题。' : '请填写资料标题。',
-      });
-      return;
-    }
-    if (effectiveTitle.length > MAX_TITLE_LENGTH) {
-      setStatus({ type: 'error', message: `标题需在 ${MAX_TITLE_LENGTH} 个字符以内。` });
-      return;
-    }
-    if ((description || '').length > descriptionLimit) {
-      setStatus({
-        type: 'error',
-        message: isExperience
-          ? `经验分享内容需在 ${MAX_EXPERIENCE_LENGTH} 个字符以内。`
-          : `资料简介需在 ${MAX_DESC_LENGTH} 个字符以内。`,
-      });
-      return;
-    }
-    if (!isQuickMode && copyrightOwner.trim().length > MAX_COPYRIGHT_LENGTH) {
-      setStatus({ type: 'error', message: `版权持有者需在 ${MAX_COPYRIGHT_LENGTH} 个字符以内。` });
-      return;
-    }
-    const priceValue = isExperience ? 0 : parsePriceValue(price);
-    if (!isExperience && priceValue === null) {
-      setStatus({ type: 'error', message: '价格需为正整数，免费请填 0。' });
-      return;
-    }
-    const resolvedPriceValue = priceValue ?? 0;
+    const resolvedPriceValue = validation.priceValue;
     try {
       setSubmitting(true);
       setUploadProgress(isExperience || zipFile ? 0 : null);
@@ -783,26 +710,11 @@ export default function UploadPage({ user, token, account }: UploadPageProps) {
       }
       const endpoint = isEditing ? `${apiBase}/materials/${editingId}` : `${apiBase}/materials`;
       const method = isEditing ? 'PUT' : 'POST';
-      const json = uploadFile
-        ? await sendUploadFormData(endpoint, method, formData, {
-            token,
-            onProgress: setUploadProgress,
-            requestRef: uploadRequestRef,
-          })
-        : await (async () => {
-            const res = await fetch(endpoint, {
-              method,
-              headers: {
-                Authorization: `Bearer ${token}`,
-              },
-              body: formData,
-            });
-            const data = await res.json();
-            if (!res.ok || !data.ok) {
-              throw new Error(data.msg || '投稿失败');
-            }
-            return data;
-          })();
+      const json = await sendUploadFormData(endpoint, method, formData, {
+        token,
+        onProgress: setUploadProgress,
+        requestRef: uploadRequestRef,
+      });
       if (isQuickMode && !title.trim()) {
         setTitle(trimmedTitle);
       }

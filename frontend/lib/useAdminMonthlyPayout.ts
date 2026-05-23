@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { fetchBackend } from './apiBase';
+import { fetchAdminMonthlyPayoutOverview, fetchAdminPayoutQr, updateAdminMonthlyPayoutMark } from './adminApi';
 import { toErrorMessage } from './errors';
-import { AdminMonthlyPayoutItem, AdminMonthlyPayoutOverview, AdminPayoutQr } from '../types/payout';
+import { AdminMonthlyPayoutItem, AdminMonthlyPayoutOverview } from '../types/payout';
 
 export interface PayoutQrModalState {
   open: boolean;
@@ -41,12 +41,8 @@ export const useAdminMonthlyPayout = (initialMonth: string) => {
     setMonthlyPayoutLoading(true);
     setMonthlyPayoutMessage(null);
     try {
-      const resp = await fetchBackend(`/admin/monthly-payout-overview?month=${encodeURIComponent(targetMonth)}`);
-      const json = await resp.json();
-      if (!resp.ok || !json.ok) {
-        throw new Error(json.msg || '加载月度打款数据失败');
-      }
-      setMonthlyPayoutOverview(json.data as AdminMonthlyPayoutOverview);
+      const data = await fetchAdminMonthlyPayoutOverview(targetMonth);
+      setMonthlyPayoutOverview(data);
     } catch (error: unknown) {
       setMonthlyPayoutMessage({ type: 'error', text: toErrorMessage(error, '加载月度打款数据失败') });
     } finally {
@@ -62,19 +58,11 @@ export const useAdminMonthlyPayout = (initialMonth: string) => {
       setMonthlyPayoutMarkingId(item.uploaderId);
       setMonthlyPayoutMessage(null);
       try {
-        const resp = await fetchBackend('/admin/monthly-payout-overview/marks', {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            monthKey: monthlyPayoutMonthRef.current,
-            uploaderId: item.uploaderId,
-            markPaid,
-          }),
+        await updateAdminMonthlyPayoutMark({
+          monthKey: monthlyPayoutMonthRef.current,
+          uploaderId: item.uploaderId,
+          markPaid,
         });
-        const json = await resp.json();
-        if (!resp.ok || !json.ok) {
-          throw new Error(json.msg || '更新打款标记失败');
-        }
         setMonthlyPayoutMessage({ type: 'success', text: markPaid ? '已标记为已打款' : '已撤销打款标记' });
         await reloadMonthlyPayoutOverview();
       } catch (error: unknown) {
@@ -99,12 +87,7 @@ export const useAdminMonthlyPayout = (initialMonth: string) => {
       url: null,
     });
     try {
-      const resp = await fetchBackend(`/admin/monthly-payout-overview/users/${item.uploaderId}/payout-qr`);
-      const json = await resp.json();
-      if (!resp.ok || !json.ok) {
-        throw new Error(json.msg || '加载收款码失败');
-      }
-      const data = json.data as AdminPayoutQr;
+      const data = await fetchAdminPayoutQr(item.uploaderId);
       if (!data?.hasPayoutQr || !data?.payoutQrUrl) {
         throw new Error('该用户尚未上传收款码');
       }
