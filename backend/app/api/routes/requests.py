@@ -91,7 +91,8 @@ def create_request(
     return api_ok(data)
 
 
-@router.post("/api/requests/{id}/follow")
+@router.post("/api/requests/{id}/contributions")
+@router.post("/api/requests/{id}/follow", include_in_schema=False)
 def follow_request(
     id: int,
     payload: RequestContributionCreatePayload,
@@ -135,7 +136,8 @@ def request_contribution_status(
     return api_ok(service.get_contribution_status(session, orderNo, auth.user_id or 0, force_check=bool(force)))
 
 
-@router.post("/api/requests/{id}/respond")
+@router.post("/api/requests/{id}/responses")
+@router.post("/api/requests/{id}/respond", include_in_schema=False)
 def request_respond(
     id: int,
     payload: RequestRespondPayload | None = None,
@@ -148,7 +150,8 @@ def request_respond(
     return api_ok(data)
 
 
-@router.post("/api/requests/{id}/accept")
+@router.put("/api/requests/{id}/accepted-response")
+@router.post("/api/requests/{id}/accept", include_in_schema=False)
 def request_accept(
     id: int,
     payload: RequestAcceptPayload,
@@ -161,7 +164,8 @@ def request_accept(
     return api_ok(data)
 
 
-@router.post("/api/requests/{id}/preview-view")
+@router.post("/api/requests/{id}/preview-views")
+@router.post("/api/requests/{id}/preview-view", include_in_schema=False)
 def request_preview_view(
     id: int,
     payload: RequestPreviewViewPayload,
@@ -174,7 +178,8 @@ def request_preview_view(
     return api_ok()
 
 
-@router.post("/api/requests/{id}/dispute")
+@router.post("/api/requests/{id}/disputes")
+@router.post("/api/requests/{id}/dispute", include_in_schema=False)
 def request_dispute(
     id: int,
     payload: RequestDisputePayload,
@@ -187,7 +192,8 @@ def request_dispute(
     return api_ok(data)
 
 
-@router.post("/api/requests/arbitrations/{id}/decision")
+@router.patch("/api/requests/arbitrations/{id}")
+@router.post("/api/requests/arbitrations/{id}/decision", include_in_schema=False)
 def request_arbitration_decision(
     id: int,
     payload: RequestArbitrationDecisionPayload,
@@ -200,7 +206,8 @@ def request_arbitration_decision(
     return api_ok(data)
 
 
-@router.post("/api/requests/contributions/{id}/cancel")
+@router.delete("/api/requests/contributions/{id}")
+@router.post("/api/requests/contributions/{id}/cancel", include_in_schema=False)
 def request_contribution_cancel(
     id: int,
     auth: AuthContext = Depends(require_auth_context),
@@ -212,7 +219,8 @@ def request_contribution_cancel(
     return api_ok(data)
 
 
-@router.put("/api/requests/contributions/{id}/deadline")
+@router.patch("/api/requests/contributions/{id}")
+@router.put("/api/requests/contributions/{id}/deadline", include_in_schema=False)
 def request_contribution_deadline(
     id: int,
     payload: RequestContributionDeadlinePayload,

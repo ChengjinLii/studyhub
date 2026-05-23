@@ -96,7 +96,7 @@ export default function MarketDetailPage({ user, item }: DetailPageProps) {
     setSubmitting(true);
     setError('');
     try {
-      const resp = await fetch(`/api/market/${state.id}/want`, { method: 'POST' });
+      const resp = await fetch(`/api/market/${state.id}/want`, { method: 'PUT' });
       const json = await resp.json();
       if (!resp.ok || !json.ok || !json.data) {
         throw new Error(json.msg || '操作失败');
@@ -119,7 +119,7 @@ export default function MarketDetailPage({ user, item }: DetailPageProps) {
     setWanting(true);
     setError('');
     try {
-      const method = state.wanted ? 'DELETE' : 'POST';
+      const method = state.wanted ? 'DELETE' : 'PUT';
       const resp = await fetch(`/api/market/${state.id}/want`, { method });
       const json = await resp.json();
       if (!resp.ok || !json.ok || !json.data) {

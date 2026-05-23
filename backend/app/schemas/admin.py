@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Literal
+
 from pydantic import BaseModel, ConfigDict, Field
 
 
@@ -22,6 +24,12 @@ class AdminCreateUserNotePayload(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
     message: str = Field(min_length=1, max_length=1000)
+
+
+class AdminMaterialStatusPayload(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    status: Literal["active", "restored", "published", "available"]
 
 
 class AdminMaterialBatchUpdatePayload(BaseModel):

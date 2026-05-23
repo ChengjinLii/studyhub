@@ -85,7 +85,7 @@ export default function Login({ user }: LoginPageProps) {
 
   const fetchCaptcha = async () => {
     try {
-      const resp = await fetchBackend('/auth/captcha');
+      const resp = await fetchBackend('/captchas');
       const json = await resp.json();
       if (!resp.ok || !json.ok || !json.data) {
         throw new Error(json.msg || '获取验证码失败');
@@ -150,7 +150,7 @@ export default function Login({ user }: LoginPageProps) {
 
   const fetchResetCaptcha = async () => {
     try {
-      const resp = await fetchBackend('/auth/captcha');
+      const resp = await fetchBackend('/captchas');
       const json = await resp.json();
       if (!resp.ok || !json.ok || !json.data) {
         throw new Error(json.msg || '获取验证码失败');
@@ -180,7 +180,7 @@ export default function Login({ user }: LoginPageProps) {
         captchaCode: loginForm.captchaCode,
         rememberMe: loginForm.rememberMe,
       };
-      const resp = await fetchBackend('/auth/login', {
+      const resp = await fetchBackend('/session', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -204,7 +204,7 @@ export default function Login({ user }: LoginPageProps) {
     setError('');
     setSuccess('');
     try {
-      const resp = await fetchBackend('/auth/dev-login', {
+      const resp = await fetchBackend('/dev-session', {
         method: 'POST',
       });
       const json = await resp.json();
@@ -236,7 +236,7 @@ export default function Login({ user }: LoginPageProps) {
       return;
     }
     try {
-      const resp = await fetchBackend('/auth/verify', {
+      const resp = await fetchBackend('/registrations', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -278,7 +278,7 @@ export default function Login({ user }: LoginPageProps) {
         captchaId: captcha.captchaId,
         captchaCode: registerForm.captchaCode,
       };
-      const resp = await fetchBackend('/auth/register', {
+      const resp = await fetchBackend('/registration-verifications', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -310,7 +310,7 @@ export default function Login({ user }: LoginPageProps) {
     }
     setResetLoading(true);
     try {
-      const resp = await fetchBackend('/auth/reset-password', {
+      const resp = await fetchBackend('/password-resets', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -341,7 +341,7 @@ export default function Login({ user }: LoginPageProps) {
     }
     setResetLoading(true);
     try {
-      const resp = await fetchBackend('/auth/reset-password', {
+      const resp = await fetchBackend('/password-resets', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

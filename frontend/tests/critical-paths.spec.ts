@@ -12,7 +12,7 @@ const isSmokeTargetAvailable = async (request: APIRequestContext) => {
 };
 
 const tryDevLogin = async (request: APIRequestContext) => {
-  const resp = await request.post(apiPath('/api/auth/dev-login'));
+  const resp = await request.post(apiPath('/api/dev-session'));
   if (resp.status() === 404) {
     return false;
   }
@@ -93,7 +93,7 @@ test('material detail core endpoints should stay available', async ({ request })
   const commentJson = await commentResp.json();
   expect(commentJson).toHaveProperty('ok', true);
 
-  const likeResp = await request.post(apiPath(`/api/materials/${id}/like`));
+  const likeResp = await request.put(apiPath(`/api/materials/${id}/like`));
   expect(likeResp.status()).toBeLessThan(500);
   const likeJson = await likeResp.json().catch(() => ({}));
   if (likeResp.ok()) {
@@ -101,7 +101,7 @@ test('material detail core endpoints should stay available', async ({ request })
   }
   await request.delete(apiPath(`/api/materials/${id}/like`)).catch(() => undefined);
 
-  const downloadResp = await request.get(apiPath(`/api/materials/${id}/download`));
+  const downloadResp = await request.post(apiPath(`/api/materials/${id}/downloads`));
   expect(downloadResp.status()).toBeLessThan(500);
   const downloadJson = await downloadResp.json().catch(() => ({}));
   if (downloadResp.ok()) {

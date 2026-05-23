@@ -133,7 +133,8 @@ async def create_market_item(
     return api_ok(data)
 
 
-@router.post("/api/market/{id}/want")
+@router.put("/api/market/{id}/want")
+@router.post("/api/market/{id}/want", include_in_schema=False)
 def want_market_item(
     id: int,
     auth: AuthContext = Depends(require_auth_context),
@@ -196,7 +197,8 @@ def list_market_for_admin(
     return api_ok(service.list_for_admin(session, page=page, size=size, keyword=keyword, category=category, status_value=status))
 
 
-@router.post("/api/admin/market/batch-update")
+@router.patch("/api/admin/market")
+@router.post("/api/admin/market/batch-update", include_in_schema=False)
 def batch_update_market_for_admin(
     payload: AdminMarketBatchUpdatePayload,
     _: AuthContext = Depends(require_privileged_auth_context),
@@ -208,7 +210,8 @@ def batch_update_market_for_admin(
     return api_ok(data)
 
 
-@router.post("/api/admin/market/batch-delete")
+@router.delete("/api/admin/market")
+@router.post("/api/admin/market/batch-delete", include_in_schema=False)
 def batch_delete_market_for_admin(
     payload: AdminMarketBatchDeletePayload,
     _: AuthContext = Depends(require_privileged_auth_context),

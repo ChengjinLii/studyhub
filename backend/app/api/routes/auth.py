@@ -22,15 +22,17 @@ from app.services.auth_service import AuthService
 router = APIRouter(tags=["auth"])
 
 
-@router.get("/api/auth/captcha")
-@router.get("/api/captcha")
+@router.get("/api/auth/captcha", include_in_schema=False)
+@router.get("/api/captcha", include_in_schema=False)
+@router.get("/api/captchas")
 def get_captcha(
     service: AuthService = Depends(get_auth_service),
 ) -> dict[str, object]:
     return api_ok(service.captcha_service.generate())
 
 
-@router.post("/api/auth/register")
+@router.post("/api/registration-verifications")
+@router.post("/api/auth/register", include_in_schema=False)
 def register(
     payload: RegisterRequestPayload,
     background_tasks: BackgroundTasks,
@@ -40,7 +42,8 @@ def register(
     return api_ok(service.send_register_code(session, payload, dispatcher=BackgroundDispatcher(background_tasks)))
 
 
-@router.post("/api/auth/verify")
+@router.post("/api/registrations")
+@router.post("/api/auth/verify", include_in_schema=False)
 def verify_email(
     payload: VerifyEmailRequestPayload,
     response: Response,
@@ -50,7 +53,8 @@ def verify_email(
     return api_ok(service.complete_registration(session, payload, response))
 
 
-@router.post("/api/auth/login")
+@router.post("/api/session")
+@router.post("/api/auth/login", include_in_schema=False)
 def login(
     payload: LoginRequestPayload,
     response: Response,
@@ -60,7 +64,8 @@ def login(
     return api_ok(service.login(session, payload, response))
 
 
-@router.post("/api/auth/dev-login")
+@router.post("/api/dev-session")
+@router.post("/api/auth/dev-login", include_in_schema=False)
 def dev_login(
     response: Response,
     session: Session = Depends(get_db_session),
@@ -74,7 +79,8 @@ def auth_logout() -> dict[str, object]:
     return api_ok()
 
 
-@router.post("/api/auth/reset-password")
+@router.post("/api/password-resets")
+@router.post("/api/auth/reset-password", include_in_schema=False)
 def reset_password(
     payload: ResetPasswordRequestPayload,
     background_tasks: BackgroundTasks,
@@ -88,7 +94,8 @@ def reset_password(
     return api_ok(service.send_reset_password_code(session, payload, dispatcher=BackgroundDispatcher(background_tasks)))
 
 
-@router.post("/api/auth/password")
+@router.patch("/api/me/password")
+@router.post("/api/auth/password", include_in_schema=False)
 def change_password(
     payload: PasswordChangeRequestPayload,
     response: Response,
@@ -100,7 +107,8 @@ def change_password(
     return api_ok()
 
 
-@router.post("/api/auth/bind-email")
+@router.put("/api/me/email")
+@router.post("/api/auth/bind-email", include_in_schema=False)
 def bind_email(
     payload: BindEmailRequestPayload,
     background_tasks: BackgroundTasks,

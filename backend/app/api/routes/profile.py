@@ -73,7 +73,8 @@ def user_following(
     return api_ok(service.list_following(session, id))
 
 
-@router.post("/api/users/{id}/follow")
+@router.put("/api/users/{id}/follow")
+@router.post("/api/users/{id}/follow", include_in_schema=False)
 def follow_user(
     id: int,
     auth: AuthContext = Depends(require_auth_context),

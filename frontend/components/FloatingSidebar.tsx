@@ -248,7 +248,7 @@ export default function FloatingSidebar() {
       setChatLoading(true);
       setChatError(null);
       try {
-        const resp = await fetchBackend('/ai/recommend', {
+        const resp = await fetchBackend('/ai-recommendations', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ query: chatQuery.trim() }),

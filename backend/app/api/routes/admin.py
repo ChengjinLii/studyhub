@@ -16,6 +16,7 @@ from app.schemas.admin import (
     AdminCreateUserNotePayload,
     AdminCreateUserPayload,
     AdminMaterialBatchDeletePayload,
+    AdminMaterialStatusPayload,
     AdminMaterialBatchUpdatePayload,
     AdminUpdateRolePayload,
 )
@@ -46,7 +47,7 @@ def create_user(
     return api_ok(service.create_user(session, payload, operator_role_mask=auth.role_mask))
 
 
-@router.patch("/api/admin/users")
+@router.patch("/api/admin/users", include_in_schema=False)
 def update_user_roles_alias(
     payload: AdminUpdateRolePayload,
     id: int = Query(..., ge=1),
@@ -58,6 +59,7 @@ def update_user_roles_alias(
 
 
 @router.patch("/api/admin/users/{id}/roles")
+@router.patch("/api/admin/users/{id}")
 def update_user_roles(
     id: int,
     payload: AdminUpdateRolePayload,
@@ -68,7 +70,7 @@ def update_user_roles(
     return api_ok(service.update_roles(session, id, payload.roleMask, operator_role_mask=auth.role_mask))
 
 
-@router.get("/api/admin/user-notes")
+@router.get("/api/admin/user-notes", include_in_schema=False)
 def list_user_notes_alias(
     userId: int = Query(..., ge=1),
     _: AuthContext = Depends(require_privileged_auth_context),
@@ -78,7 +80,7 @@ def list_user_notes_alias(
     return api_ok(service.list_notes(session, userId))
 
 
-@router.post("/api/admin/user-notes")
+@router.post("/api/admin/user-notes", include_in_schema=False)
 def create_user_note_alias(
     payload: AdminCreateUserNotePayload,
     userId: int = Query(..., ge=1),
@@ -133,7 +135,8 @@ def delete_material_for_admin(
     return api_ok()
 
 
-@router.post("/api/admin/materials/{id}/restore")
+@router.post("/api/admin/materials/{id}/restore", include_in_schema=False)
+@router.put("/api/admin/materials/{id}/restoration")
 def restore_material_for_admin(
     id: int,
     _: AuthContext = Depends(require_privileged_auth_context),
@@ -144,7 +147,20 @@ def restore_material_for_admin(
     return api_ok()
 
 
-@router.post("/api/admin/materials/batch-update")
+@router.patch("/api/admin/materials/{id}")
+def update_material_status_for_admin(
+    id: int,
+    payload: AdminMaterialStatusPayload,
+    _: AuthContext = Depends(require_privileged_auth_context),
+    session: Session = Depends(get_db_session),
+    service: MaterialsService = Depends(get_materials_service),
+) -> dict[str, object]:
+    service.restore_material(session, id, can_manage_all=True)
+    return api_ok()
+
+
+@router.post("/api/admin/materials/batch-update", include_in_schema=False)
+@router.patch("/api/admin/materials")
 def batch_update_materials_for_admin(
     payload: AdminMaterialBatchUpdatePayload,
     _: AuthContext = Depends(require_privileged_auth_context),
@@ -154,7 +170,8 @@ def batch_update_materials_for_admin(
     return api_ok(service.batch_update_materials(session, payload))
 
 
-@router.post("/api/admin/materials/batch-delete")
+@router.post("/api/admin/materials/batch-delete", include_in_schema=False)
+@router.delete("/api/admin/materials")
 def batch_delete_materials_for_admin(
     payload: AdminMaterialBatchDeletePayload,
     _: AuthContext = Depends(require_privileged_auth_context),
@@ -164,7 +181,8 @@ def batch_delete_materials_for_admin(
     return api_ok(service.batch_delete_materials(session, payload.materialIds))
 
 
-@router.post("/api/admin/materials/batch-restore")
+@router.post("/api/admin/materials/batch-restore", include_in_schema=False)
+@router.post("/api/admin/material-restorations")
 def batch_restore_materials_for_admin(
     payload: AdminMaterialBatchDeletePayload,
     _: AuthContext = Depends(require_privileged_auth_context),

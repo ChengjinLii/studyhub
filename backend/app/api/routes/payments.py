@@ -16,7 +16,8 @@ from app.services.payout_service import PayoutService
 router = APIRouter(tags=["payments"])
 
 
-@router.post("/api/pay/alipay/create")
+@router.post("/api/alipay-payments")
+@router.post("/api/pay/alipay/create", include_in_schema=False)
 def create_alipay_payment(
     payload: AlipayCreatePayload,
     auth: AuthContext = Depends(require_auth_context),
@@ -33,7 +34,8 @@ def create_alipay_payment(
     )
 
 
-@router.post("/api/pay/alipay/notify", response_class=PlainTextResponse)
+@router.post("/api/alipay-payment-notifications", response_class=PlainTextResponse)
+@router.post("/api/pay/alipay/notify", response_class=PlainTextResponse, include_in_schema=False)
 async def alipay_notify(
     request: Request,
     session: Session = Depends(get_db_session),
@@ -46,7 +48,8 @@ async def alipay_notify(
     return service.handle_alipay_notify(session, params)
 
 
-@router.post("/api/pay/alipay/gateway", response_class=PlainTextResponse)
+@router.post("/api/alipay-gateway-notifications", response_class=PlainTextResponse)
+@router.post("/api/pay/alipay/gateway", response_class=PlainTextResponse, include_in_schema=False)
 async def alipay_gateway(
     request: Request,
     session: Session = Depends(get_db_session),
@@ -59,7 +62,7 @@ async def alipay_gateway(
     return service.handle_gateway_notification(session, params)
 
 
-@router.get("/api/pay/orders/status")
+@router.get("/api/pay/orders/status", include_in_schema=False)
 def pay_order_status(
     orderNo: str,
     force: bool | None = None,
@@ -70,7 +73,8 @@ def pay_order_status(
     return api_ok(service.get_order_status(session, user_id=auth.user_id or 0, out_trade_no=orderNo, force_check=bool(force)))
 
 
-@router.get("/api/pay/alipay/query")
+@router.get("/api/alipay-payments/{out_trade_no}")
+@router.get("/api/pay/alipay/query", include_in_schema=False)
 def alipay_query(
     out_trade_no: str,
     _: AuthContext = Depends(require_privileged_auth_context),

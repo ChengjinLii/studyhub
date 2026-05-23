@@ -21,7 +21,7 @@ export const createSimulatedMaterialOrder = async (materialId: number) => {
 };
 
 export const fetchMaterialDownloadLink = async (materialId: number) => {
-  const response = await fetchBackend(`/materials/${materialId}/download`);
+  const response = await fetchBackend(`/materials/${materialId}/downloads`, { method: 'POST' });
   const json = await readApiEnvelope<MaterialDownloadResult>(response);
   if (response.status === 403 && json?.error?.code === 'DOWNLOAD_QUOTA_EXHAUSTED') {
     throw new ApiError(json.msg || '下载次数已用完，如需继续下载请联系管理员重置额度。', response.status, json.error.code, json);
@@ -31,7 +31,7 @@ export const fetchMaterialDownloadLink = async (materialId: number) => {
 
 export const toggleMaterialLike = async (materialId: number, liked: boolean) => {
   const response = await fetchBackend(`/materials/${materialId}/like`, {
-    method: liked ? 'DELETE' : 'POST',
+    method: liked ? 'DELETE' : 'PUT',
   });
   return unwrapApiResponse<number>(response, '操作失败');
 };

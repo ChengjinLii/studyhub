@@ -146,7 +146,7 @@ export default function MePage({ user, summary, account }: MePageProps) {
     const loadPayout = async () => {
       setPayoutLoading(true);
       try {
-        const resp = await fetchBackend('/creator-payout-applications/me');
+        const resp = await fetchBackend('/me/creator-payout-application');
         const json = await resp.json();
         if (resp.ok && json.ok) {
           setPayoutApp(json.data);
@@ -317,7 +317,7 @@ export default function MePage({ user, summary, account }: MePageProps) {
   const handleDownload = async (materialId: number) => {
     setToast(null);
     try {
-      const resp = await fetchBackend(`/materials/${materialId}/download`);
+      const resp = await fetchBackend(`/materials/${materialId}/downloads`, { method: 'POST' });
       const json = await resp.json();
       if (resp.status === 403 && json?.error?.code === 'DOWNLOAD_QUOTA_EXHAUSTED') {
         notifyQuotaLimit(json.msg);
@@ -373,7 +373,7 @@ export default function MePage({ user, summary, account }: MePageProps) {
 
   const fetchResetCaptcha = async () => {
     try {
-      const resp = await fetchBackend('/auth/captcha');
+      const resp = await fetchBackend('/captchas');
       const json = await resp.json();
       if (!resp.ok || !json.ok || !json.data) {
         throw new Error(json.msg || '获取验证码失败');
@@ -410,7 +410,7 @@ export default function MePage({ user, summary, account }: MePageProps) {
     }
     setEmailResetLoading(true);
     try {
-      const resp = await fetchBackend('/auth/reset-password', {
+      const resp = await fetchBackend('/password-resets', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -455,7 +455,7 @@ export default function MePage({ user, summary, account }: MePageProps) {
     }
     setEmailResetLoading(true);
     try {
-      const resp = await fetchBackend('/auth/reset-password', {
+      const resp = await fetchBackend('/password-resets', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -501,8 +501,8 @@ export default function MePage({ user, summary, account }: MePageProps) {
     setBindLoading(true);
     setBindMessage(null);
     try {
-      const resp = await fetchBackend('/auth/bind-email', {
-        method: 'POST',
+      const resp = await fetchBackend('/me/email', {
+        method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: bindForm.email }),
       });
@@ -529,8 +529,8 @@ export default function MePage({ user, summary, account }: MePageProps) {
     setBindLoading(true);
     setBindMessage(null);
     try {
-      const resp = await fetchBackend('/auth/bind-email', {
-        method: 'POST',
+      const resp = await fetchBackend('/me/email', {
+        method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: bindForm.email, code: bindForm.code }),
       });
@@ -744,8 +744,8 @@ export default function MePage({ user, summary, account }: MePageProps) {
     }
     setPwdLoading(true);
     try {
-      const resp = await fetchBackend('/auth/password', {
-        method: 'POST',
+      const resp = await fetchBackend('/me/password', {
+        method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ oldPassword: passwordForm.oldPassword, newPassword: passwordForm.newPassword }),
       });

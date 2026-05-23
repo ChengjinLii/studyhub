@@ -47,6 +47,7 @@ def list_feedbacks_for_admin(
 
 
 @router.patch("/api/admin/community/feedbacks/{id}")
+@router.patch("/api/admin/feedbacks/{id}")
 def update_feedback_status_for_admin(
     id: int,
     payload: UpdateStatusPayload,
@@ -57,7 +58,7 @@ def update_feedback_status_for_admin(
     return api_ok(service.update_feedback_status(session, id, payload))
 
 
-@router.patch("/api/admin/feedbacks")
+@router.patch("/api/admin/feedbacks", include_in_schema=False)
 def update_feedback_status_for_admin_alias(
     payload: UpdateStatusPayload,
     id: int = Query(..., ge=1),
@@ -80,6 +81,7 @@ def list_volunteers_for_admin(
 
 
 @router.patch("/api/admin/community/volunteers/{id}")
+@router.patch("/api/admin/volunteers/{id}")
 def update_volunteer_status_for_admin(
     id: int,
     payload: UpdateStatusPayload,
@@ -90,7 +92,7 @@ def update_volunteer_status_for_admin(
     return api_ok(service.update_volunteer_status(session, id, payload))
 
 
-@router.patch("/api/admin/volunteers")
+@router.patch("/api/admin/volunteers", include_in_schema=False)
 def update_volunteer_status_for_admin_alias(
     payload: UpdateStatusPayload,
     id: int = Query(..., ge=1),

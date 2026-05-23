@@ -90,7 +90,7 @@ export default function RequestFollowPage({ user, request }: RequestFollowProps)
     setFollowNotice(null);
     setFollowLoading(true);
     try {
-      const resp = await fetchBackend(`/requests/${requestState.id}/follow`, {
+      const resp = await fetchBackend(`/requests/${requestState.id}/contributions`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ amount: Math.round(amountValue * 100), deadlineTier: followTier }),

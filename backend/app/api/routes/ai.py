@@ -14,7 +14,8 @@ from app.services.ai_service import AiService
 router = APIRouter(tags=["ai"])
 
 
-@router.post("/api/ai/chat")
+@router.post("/api/ai-chats")
+@router.post("/api/ai/chat", include_in_schema=False)
 def ai_chat(
     payload: AiChatRequestPayload,
     _: AuthContext = Depends(require_auth_context),
@@ -23,7 +24,8 @@ def ai_chat(
     return api_ok(service.chat(payload))
 
 
-@router.post("/api/ai/recommend")
+@router.post("/api/ai-recommendations")
+@router.post("/api/ai/recommend", include_in_schema=False)
 def ai_recommend(
     payload: AiRecommendRequestPayload,
     _: AuthContext = Depends(require_auth_context),

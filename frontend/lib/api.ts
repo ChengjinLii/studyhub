@@ -227,7 +227,7 @@ export async function deleteComment(commentId: number) {
 
 export async function likeComment(commentId: number) {
   return webApiFetch<{ likeCount: number }>(`/api/comments/${commentId}/like`, {
-    method: 'POST',
+    method: 'PUT',
   });
 }
 

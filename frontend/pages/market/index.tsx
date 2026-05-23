@@ -158,7 +158,7 @@ export default function MarketPage({ user, items, meta, filters, stats }: Market
     setPendingMap((prev) => ({ ...prev, [itemId]: true }));
 
     try {
-      const method = currentlyWanted ? 'DELETE' : 'POST';
+      const method = currentlyWanted ? 'DELETE' : 'PUT';
       const resp = await fetch(`/api/market/${itemId}/want`, { method });
       const json = await resp.json();
       if (!resp.ok || !json.ok || !json.data) {
@@ -166,7 +166,7 @@ export default function MarketPage({ user, items, meta, filters, stats }: Market
       }
       const data = json.data as { wanted?: boolean; wantCount?: number };
       const fallbackCount =
-        method === 'POST'
+        method === 'PUT'
           ? baseWantCount + 1
           : Math.max(0, baseWantCount - 1);
       setItemStates((prev) => ({

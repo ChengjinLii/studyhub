@@ -19,7 +19,8 @@ def read_session(
     return api_ok(service.read_session(raw_user_cookie))
 
 
-@router.post("/api/logout")
+@router.delete("/api/session")
+@router.post("/api/logout", include_in_schema=False)
 def logout(
     response: Response,
     service: SessionService = Depends(get_session_service),

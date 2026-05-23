@@ -95,8 +95,8 @@ export default function RequestDetailPage({ user, request, responses, contributi
     setAcceptNotice(null);
     setAcceptLoadingId(responseId);
     try {
-      const resp = await fetchBackend(`/requests/${requestState.id}/accept`, {
-        method: 'POST',
+      const resp = await fetchBackend(`/requests/${requestState.id}/accepted-response`, {
+        method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ responseId }),
       });
@@ -128,7 +128,7 @@ export default function RequestDetailPage({ user, request, responses, contributi
       setDisputeNotice(null);
       setDisputeLoadingId(responseId);
       try {
-        const resp = await fetchBackend(`/requests/${requestState.id}/dispute`, {
+        const resp = await fetchBackend(`/requests/${requestState.id}/disputes`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ responseId, reason: trimmedReason }),
@@ -168,7 +168,7 @@ export default function RequestDetailPage({ user, request, responses, contributi
     if (!requestState?.id) return;
     if (previewReady[responseId]) return;
     try {
-      const resp = await fetchBackend(`/requests/${requestState.id}/preview-view`, {
+      const resp = await fetchBackend(`/requests/${requestState.id}/preview-views`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ responseId, loadedCount }),
@@ -206,8 +206,8 @@ export default function RequestDetailPage({ user, request, responses, contributi
       setContributionNotice(null);
       setContributionActionLoading((prev) => ({ ...prev, [item.id]: true }));
       try {
-        const resp = await fetchBackend(`/requests/contributions/${item.id}/deadline`, {
-          method: 'PUT',
+        const resp = await fetchBackend(`/requests/contributions/${item.id}`, {
+          method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ deadlineTier: normalized }),
         });
@@ -235,7 +235,7 @@ export default function RequestDetailPage({ user, request, responses, contributi
     setContributionNotice(null);
     setContributionActionLoading((prev) => ({ ...prev, [item.id]: true }));
     try {
-      const resp = await fetchBackend(`/requests/contributions/${item.id}/cancel`, { method: 'POST' });
+      const resp = await fetchBackend(`/requests/contributions/${item.id}`, { method: 'DELETE' });
       const json = await parseApiResponse(resp);
       if (!resp.ok || !json?.ok) {
         throw new Error(json?.msg || `结束失败（${resp.status}）`);

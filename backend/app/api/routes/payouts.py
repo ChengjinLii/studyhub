@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, File, Query, Response, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, Query, Response, UploadFile
 from fastapi.responses import FileResponse, RedirectResponse
 from sqlalchemy.orm import Session
 
@@ -36,7 +36,8 @@ def create_payout_application(
     return api_ok(service.create_application(session, user_id=auth.user_id or 0, payload=payload.model_dump()))
 
 
-@router.get("/api/creator-payout-applications/me")
+@router.get("/api/me/creator-payout-application")
+@router.get("/api/creator-payout-applications/me", include_in_schema=False)
 def get_my_payout_application(
     auth: AuthContext = Depends(require_auth_context),
     session: Session = Depends(get_db_session),
@@ -56,7 +57,7 @@ def list_payout_applications_for_admin(
     return api_ok(service.list_for_admin(session, page=page, size=size))
 
 
-@router.patch("/api/admin/creator-payout-applications")
+@router.patch("/api/admin/creator-payout-applications", include_in_schema=False)
 def review_payout_application_alias(
     payload: PayoutApplicationReviewPayload,
     id: int = Query(..., ge=1),
@@ -94,7 +95,8 @@ def review_payout_application(
     )
 
 
-@router.get("/api/admin/creator-payout-applications/{id}/details")
+@router.get("/api/admin/creator-payout-applications/{id}/settlements")
+@router.get("/api/admin/creator-payout-applications/{id}/details", include_in_schema=False)
 def get_payout_application_details(
     id: int,
     _: AuthContext = Depends(require_privileged_auth_context),
@@ -133,7 +135,8 @@ def get_monthly_payout_overview(
     return api_ok(service.get_monthly_overview(session, month_key_raw=month))
 
 
-@router.patch("/api/admin/monthly-payout-overview/marks")
+@router.put("/api/admin/monthly-payout-marks")
+@router.patch("/api/admin/monthly-payout-overview/marks", include_in_schema=False)
 def mark_monthly_payout(
     payload: AdminMonthlyPayoutMarkPayload,
     auth: AuthContext = Depends(require_privileged_auth_context),
@@ -151,7 +154,8 @@ def mark_monthly_payout(
     )
 
 
-@router.get("/api/admin/monthly-payout-overview/users/{uploaderId}/payout-qr")
+@router.get("/api/admin/users/{uploaderId}/payout-qr")
+@router.get("/api/admin/monthly-payout-overview/users/{uploaderId}/payout-qr", include_in_schema=False)
 def get_admin_payout_qr(
     uploaderId: int,
     _: AuthContext = Depends(require_privileged_auth_context),

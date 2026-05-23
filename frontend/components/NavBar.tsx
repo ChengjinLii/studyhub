@@ -19,7 +19,7 @@ export default function NavBar({ user }: NavBarProps) {
 
   const handleLogout = async () => {
     setSubmitting(true);
-    await fetchBackend('/logout', { method: 'POST' });
+    await fetchBackend('/session', { method: 'DELETE' });
     router.replace('/');
   };
 

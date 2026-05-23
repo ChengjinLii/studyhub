@@ -513,7 +513,7 @@ export default function Home({
       setLeaderboardFollowNotice(null);
       setLeaderboardFollowLoading((prev) => ({ ...prev, [userId]: true }));
       try {
-        const resp = await fetchBackend(`/users/${userId}/follow`, { method: 'POST' });
+        const resp = await fetchBackend(`/users/${userId}/follow`, { method: 'PUT' });
         const json = await resp.json();
         if (!resp.ok || !json.ok) {
           throw new Error(json.msg || '关注失败');

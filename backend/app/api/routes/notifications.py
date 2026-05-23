@@ -23,7 +23,8 @@ def notifications_summary(
     return api_ok(service.get_summary(session, auth.user_id or 0))
 
 
-@router.get("/api/notifications/list")
+@router.get("/api/notifications")
+@router.get("/api/notifications/list", include_in_schema=False)
 def notifications_list(
     auth: AuthContext = Depends(require_auth_context),
     session: Session = Depends(get_db_session),
@@ -32,7 +33,8 @@ def notifications_list(
     return api_ok(service.list_recent(session, auth.user_id or 0))
 
 
-@router.post("/api/notifications/read")
+@router.patch("/api/notifications")
+@router.post("/api/notifications/read", include_in_schema=False)
 def mark_notifications_read(
     auth: AuthContext = Depends(require_auth_context),
     session: Session = Depends(get_db_session),
@@ -43,7 +45,7 @@ def mark_notifications_read(
 
 
 @router.post("/api/admin/notifications")
-@router.post("/api/notifications/admin")
+@router.post("/api/notifications/admin", include_in_schema=False)
 def create_notification_for_admin(
     payload: NotificationCreatePayload,
     auth: AuthContext = Depends(require_privileged_auth_context),

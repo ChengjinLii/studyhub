@@ -13,7 +13,8 @@ from app.services.user_read_service import UserReadService
 router = APIRouter(tags=["free-download"])
 
 
-@router.get("/api/free-download/status")
+@router.get("/api/free-download")
+@router.get("/api/free-download/status", include_in_schema=False)
 def free_download_status(
     auth: AuthContext = Depends(require_auth_context),
     session: Session = Depends(get_db_session),

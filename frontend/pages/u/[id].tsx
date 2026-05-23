@@ -146,7 +146,7 @@ export default function UserProfilePage({ user, profile }: UserProfilePageProps)
     setFollowLoading(true);
     try {
       const resp = await fetchBackend(`/users/${profile.id}/follow`, {
-        method: isFollowing ? 'DELETE' : 'POST',
+        method: isFollowing ? 'DELETE' : 'PUT',
       });
       const json = await resp.json();
       if (!resp.ok || !json.ok) {

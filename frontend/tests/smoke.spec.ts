@@ -21,7 +21,7 @@ test('materials list responds successfully', async ({ request }) => {
 });
 
 test('login endpoint reachable', async ({ request }) => {
-  const resp = await request.post(apiPath('/api/auth/login'), {
+  const resp = await request.post(apiPath('/api/session'), {
     data: { identifier: 'smoke@test', password: 'invalid', captchaId: 'x', captchaCode: '0000' },
   });
   expect(resp.status()).toBeGreaterThanOrEqual(400);

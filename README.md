@@ -29,6 +29,20 @@
 - 任务与异步：BackgroundTasks、独立 worker、局部 async DB 与异步 I/O 路径
 - 运维：Docker Compose、systemd、Nginx
 
+## RESTful API 设计
+
+StudyHub 后端以 RESTful 风格作为公开 API 的主要设计约定，便于前端、第三方工具和后续 MCP 能力基于 OpenAPI 进行稳定接入。
+
+- 资源使用名词复数表达，例如 `materials`、`requests`、`comments`、`orders`、`notifications`。
+- 使用 HTTP Method 表达操作语义：`GET` 读取，`POST` 创建，`PUT` 创建或整体确认某个子资源，`PATCH` 局部更新，`DELETE` 删除或取消关系。
+- 动作型接口会优先映射为资源或子资源，例如：
+  - 登录：`POST /api/session`
+  - 登出：`DELETE /api/session`
+  - 资料下载授权：`POST /api/materials/{id}/downloads`
+  - AI 对话：`POST /api/ai-chats`
+  - AI 推荐：`POST /api/ai-recommendations`
+- 为了避免破坏历史调用，旧的动作型路径会保留兼容，但不作为公开 OpenAPI 的首选路径；面向 MCP 或新客户端时应优先使用 OpenAPI 中暴露的 RESTful 路径。
+
 ## 仓库结构
 
 - `backend/`：FastAPI 后端、测试、fixtures 与运维辅助代码

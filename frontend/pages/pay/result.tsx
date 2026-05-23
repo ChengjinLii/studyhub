@@ -32,7 +32,7 @@ export default function PayResult({ user, orderNo }: PayResultProps) {
       const forceSuffix = forceCheck ? '&force=1' : '';
       const endpoint = isRequestContribution
         ? `/requests/contributions/status?orderNo=${encodeURIComponent(orderNo)}${forceSuffix}`
-        : `/pay/orders/status?orderNo=${encodeURIComponent(orderNo)}${forceSuffix}`;
+        : `/orders/status?orderNo=${encodeURIComponent(orderNo)}${forceSuffix}`;
       let resp = await fetchBackend(endpoint);
       if (resp.status === 401) {
         router.push({ pathname: '/login', query: { next: router.asPath } });

@@ -74,6 +74,47 @@ cp .env.example .env
 
 真实密钥、证书、Redis URL、OSS 凭据、支付宝证书路径、KYC 凭据都必须只放在 `private/`。
 
+## RESTful API 约定
+
+后端公开接口以 RESTful API 为主，目标是让 Web 前端、外部客户端和后续 MCP 工具可以直接从 OpenAPI 中获得稳定、可解释的资源操作。
+
+设计规则：
+
+- 路径表达资源，不把业务动作直接放进公开路径中。
+- HTTP Method 表达操作语义：
+  - `GET`：读取资源或资源集合
+  - `POST`：创建资源，例如创建订单、创建求购贡献、创建 AI 对话
+  - `PUT`：创建或确认一个确定的子资源，例如关注关系、订单确认
+  - `PATCH`：局部更新资源或集合，例如批量修改资料元信息、标记通知已读
+  - `DELETE`：删除资源、取消关系或取消贡献
+- 关系和派生能力使用子资源表达，例如 `/api/users/{id}/follow`、`/api/materials/{id}/downloads`、`/api/requests/{id}/responses`。
+- 管理后台批量操作优先放在集合资源上，例如 `PATCH /api/admin/materials`、`DELETE /api/admin/market`。
+- 支付、AI、通知、收款码等能力也按资源建模，例如 `/api/alipay-payments`、`/api/ai-chats`、`/api/notifications`、`/api/admin/users/{id}/payout-qr`。
+
+兼容策略：
+
+- 历史动作型路径仍保留可用，避免旧前端版本或外部调用突然失效。
+- 旧路径会通过 `include_in_schema=False` 从 OpenAPI 中隐藏。
+- 新客户端、MCP 代码和文档应只依赖 OpenAPI 暴露的 RESTful 路径。
+- 如果必须新增非 RESTful 兼容路径，需要同时提供 RESTful canonical 路径，并补充测试确认它出现在 OpenAPI 中。
+
+典型映射：
+
+```text
+POST   /api/session                         登录
+DELETE /api/session                         登出
+GET    /api/captchas                        获取验证码
+POST   /api/registration-verifications      发送注册验证码
+POST   /api/registrations                   完成注册
+POST   /api/materials/{id}/downloads        生成资料下载授权
+PUT    /api/materials/{id}/like             点赞资料
+POST   /api/requests/{id}/contributions     跟购求购
+PUT    /api/requests/{id}/accepted-response 采纳求购应答
+PATCH  /api/notifications                   标记通知已读
+POST   /api/ai-chats                        AI 对话
+POST   /api/ai-recommendations              AI 推荐
+```
+
 ## 当前已经做的性能优化
 
 结合 StudyHub 当前以公开读流量为主的特点，后端先做了这几类收益稳定的优化：

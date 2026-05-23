@@ -2530,7 +2530,8 @@ main {
 
 .stable-version-modal {
   width: min(980px, 94vw);
-  max-height: calc(100vh - 48px);
+  height: min(900px, calc(100vh - 48px));
+  max-height: none;
   padding: 0;
   display: flex;
   flex-direction: column;
@@ -2544,8 +2545,8 @@ main {
 .stable-version-modal__media {
   position: relative;
   width: 100%;
-  flex: 0 0 auto;
-  height: clamp(260px, 42vh, 460px);
+  flex: 1 1 auto;
+  min-height: 0;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2557,7 +2558,9 @@ main {
   display: block;
   width: auto;
   max-width: 100%;
-  height: 100%;
+  height: auto;
+  max-height: 100%;
+  aspect-ratio: 16 / 9;
   object-fit: contain;
   margin: 0 auto;
   background: #ffffff;
@@ -2745,11 +2748,12 @@ main {
   .stable-version-modal {
     padding: 0;
     width: min(560px, 94vw);
-    max-height: calc(100vh - 32px);
+    height: min(760px, calc(100vh - 32px));
+    max-height: none;
   }
 
   .stable-version-modal__media {
-    height: clamp(190px, 34vh, 300px);
+    min-height: 0;
     border-bottom: 1px solid rgba(148, 163, 184, 0.16);
   }
 

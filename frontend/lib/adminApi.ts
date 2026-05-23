@@ -60,7 +60,7 @@ export const createAdminUser = async (payload: {
 };
 
 export const updateAdminUserRole = async (id: number, roleMask: number) => {
-  const response = await fetchBackend(`/admin/users?id=${id}`, {
+  const response = await fetchBackend(`/admin/users/${id}/roles`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ roleMask }),
@@ -74,7 +74,7 @@ export const fetchAdminFeedbacks = async () => {
 };
 
 export const updateAdminFeedbackStatus = async (id: number, status: string) => {
-  const response = await fetchBackend(`/admin/feedbacks?id=${id}`, {
+  const response = await fetchBackend(`/admin/feedbacks/${id}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ status }),
@@ -88,7 +88,7 @@ export const fetchAdminVolunteers = async () => {
 };
 
 export const updateAdminVolunteerStatus = async (id: number, status: string) => {
-  const response = await fetchBackend(`/admin/volunteers?id=${id}`, {
+  const response = await fetchBackend(`/admin/volunteers/${id}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ status }),
@@ -102,7 +102,7 @@ export const fetchAdminMaterials = async (params: { page: number; size: number; 
 };
 
 export const restoreAdminMaterial = async (materialId: number) => {
-  const response = await fetchBackend(`/admin/materials/${materialId}/restore`, { method: 'POST' });
+  const response = await fetchBackend(`/admin/materials/${materialId}/restoration`, { method: 'PUT' });
   return ensureApiSuccess(response, '恢复失败');
 };
 
@@ -121,8 +121,8 @@ export const broadcastAdminNotification = async (message: string) => {
 };
 
 export const batchUpdateAdminMaterials = async (payload: object) => {
-  const response = await fetchBackend('/admin/materials/batch-update', {
-    method: 'POST',
+  const response = await fetchBackend('/admin/materials', {
+    method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
   });
@@ -130,8 +130,8 @@ export const batchUpdateAdminMaterials = async (payload: object) => {
 };
 
 export const batchDeleteAdminMaterials = async (materialIds: number[]) => {
-  const response = await fetchBackend('/admin/materials/batch-delete', {
-    method: 'POST',
+  const response = await fetchBackend('/admin/materials', {
+    method: 'DELETE',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ materialIds }),
   });
@@ -139,7 +139,7 @@ export const batchDeleteAdminMaterials = async (materialIds: number[]) => {
 };
 
 export const batchRestoreAdminMaterials = async (materialIds: number[]) => {
-  const response = await fetchBackend('/admin/materials/batch-restore', {
+  const response = await fetchBackend('/admin/material-restorations', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ materialIds }),
@@ -148,8 +148,8 @@ export const batchRestoreAdminMaterials = async (materialIds: number[]) => {
 };
 
 export const batchUpdateAdminMarketItems = async (payload: object) => {
-  const response = await fetchBackend('/admin/market/batch-update', {
-    method: 'POST',
+  const response = await fetchBackend('/admin/market', {
+    method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
   });
@@ -157,8 +157,8 @@ export const batchUpdateAdminMarketItems = async (payload: object) => {
 };
 
 export const batchDeleteAdminMarketItems = async (itemIds: number[]) => {
-  const response = await fetchBackend('/admin/market/batch-delete', {
-    method: 'POST',
+  const response = await fetchBackend('/admin/market', {
+    method: 'DELETE',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ itemIds }),
   });
@@ -197,8 +197,8 @@ export const updateAdminMonthlyPayoutMark = async (payload: {
   uploaderId: number;
   markPaid: boolean;
 }) => {
-  const response = await fetchBackend('/admin/monthly-payout-overview/marks', {
-    method: 'PATCH',
+  const response = await fetchBackend('/admin/monthly-payout-marks', {
+    method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
   });
@@ -206,7 +206,7 @@ export const updateAdminMonthlyPayoutMark = async (payload: {
 };
 
 export const fetchAdminPayoutQr = async (uploaderId: number) => {
-  const response = await fetchBackend(`/admin/monthly-payout-overview/users/${uploaderId}/payout-qr`);
+  const response = await fetchBackend(`/admin/users/${uploaderId}/payout-qr`);
   return unwrapApiResponse<AdminPayoutQr>(response, '加载收款码失败');
 };
 
@@ -224,7 +224,7 @@ export const updatePayoutApplication = async (
   status: 'APPROVED' | 'REJECTED',
   reviewNotes?: string
 ) => {
-  const response = await fetchBackend(`/admin/creator-payout-applications?id=${id}`, {
+  const response = await fetchBackend(`/admin/creator-payout-applications/${id}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ status, reviewNotes }),
@@ -233,7 +233,7 @@ export const updatePayoutApplication = async (
 };
 
 export const fetchPayoutSettlementDetails = async (id: number) => {
-  const response = await fetchBackend(`/admin/creator-payout-applications/${id}/details`);
+  const response = await fetchBackend(`/admin/creator-payout-applications/${id}/settlements`);
   return unwrapApiResponse<PayoutSettlementDetail[]>(response, '加载收益明细失败');
 };
 

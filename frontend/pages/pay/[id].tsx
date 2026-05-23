@@ -28,7 +28,7 @@ export default function PayPage({ user, material }: PayPageProps) {
     setLoading(true);
     setError('');
     try {
-      const resp = await fetchBackend('/pay/alipay/create', {
+      const resp = await fetchBackend('/alipay-payments', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ materialId: material.id }),
