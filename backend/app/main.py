@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from contextlib import AsyncExitStack
 from contextlib import asynccontextmanager
 from time import perf_counter
 from uuid import uuid4
@@ -8,6 +9,7 @@ from uuid import uuid4
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
+from fastapi.responses import JSONResponse
 
 from app.api.deps import get_auth_service
 from app.api.main import api_router
@@ -16,6 +18,8 @@ from app.core.db import prepare_database_runtime, session_scope
 from app.core.exceptions import install_exception_handlers
 from app.core.logging import bind_request_id, configure_logging, reset_request_id
 from app.core.observability import get_runtime_metrics
+from app.mcp.auth import origin_allowed
+from app.mcp.server import create_studyhub_mcp
 
 
 logger = logging.getLogger(__name__)
@@ -37,7 +41,7 @@ def _ensure_runtime_directories() -> None:
 
 
 @asynccontextmanager
-async def lifespan(_: FastAPI):
+async def lifespan(app: FastAPI):
     settings = get_settings()
     configure_logging(settings.log_level, log_format=settings.log_format, access_log_enabled=settings.access_log_enabled)
     _ensure_runtime_directories()
@@ -51,7 +55,13 @@ async def lifespan(_: FastAPI):
         if local_dev_identity is not None:
             logger.info("Local-dev developer account ready: %s#%s", local_dev_identity[0], local_dev_identity[1])
     logger.info("Application booted on %s:%s in %s", settings.host, settings.port, settings.environment)
-    yield
+    mcp_server = getattr(app.state, "studyhub_mcp", None)
+    if mcp_server is None:
+        yield
+    else:
+        async with AsyncExitStack() as stack:
+            await stack.enter_async_context(mcp_server.session_manager.run())
+            yield
     logger.info("Application shutdown complete")
 
 
@@ -87,6 +97,9 @@ def create_app() -> FastAPI:
         status_code = 500
         route_path = request.url.path
         try:
+            if route_path.startswith("/mcp") and not origin_allowed(settings, request.headers.get("origin")):
+                status_code = 403
+                return JSONResponse({"detail": "MCP Origin is not allowed"}, status_code=status_code)
             response = await call_next(request)
             status_code = response.status_code
             route = request.scope.get("route")
@@ -121,6 +134,10 @@ def create_app() -> FastAPI:
 
     install_exception_handlers(app)
     app.include_router(api_router)
+    if settings.mcp_enabled:
+        studyhub_mcp = create_studyhub_mcp()
+        app.state.studyhub_mcp = studyhub_mcp
+        app.mount("/", studyhub_mcp.streamable_http_app())
     return app
 
 
