@@ -66,6 +66,12 @@ class Settings(BaseSettings):
     response_gzip_enabled: bool = True
     response_gzip_minimum_size_bytes: int = 1024
     response_gzip_compresslevel: int = 5
+    mcp_enabled: bool = True
+    mcp_allowed_origins: str | None = None
+    mcp_require_auth: bool | None = None
+    mcp_read_scope: str = "studyhub.read"
+    mcp_write_scope: str = "studyhub.write"
+    mcp_admin_scope: str = "studyhub.admin"
 
     lock_provider: str = "db_row"
     redis_url: str | None = None
@@ -335,6 +341,12 @@ class Settings(BaseSettings):
         if self.environment.strip().lower() in {"local-dev", "test"}:
             return r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$"
         return None
+
+    @property
+    def resolved_mcp_allowed_origins(self) -> list[str]:
+        if not self.mcp_allowed_origins:
+            return []
+        return [origin.strip() for origin in self.mcp_allowed_origins.split(",") if origin.strip()]
 
     @property
     def resolved_cookie_secure(self) -> bool:

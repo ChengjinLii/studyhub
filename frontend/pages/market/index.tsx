@@ -14,6 +14,7 @@ import { buildResponsiveImage, isMarketPlaceholder, ResponsiveImageResult } from
 import { getRequestOrigin, resolveApiBase } from '../../lib/apiBase';
 import { marketPath, userPath } from '../../lib/slug';
 import { toErrorMessage } from '../../lib/errors';
+import { ensureApiSuccess, readApiEnvelope, unwrapApiResponse } from '../../lib/apiEnvelope';
 
 const CATEGORY_OPTIONS = [
   { value: '', label: '全部分类' },
@@ -55,7 +56,7 @@ const readSampleSlug = (item: MarketItem) => {
 
 const swrFetcher = async (url: string) => {
   const resp = await fetch(url);
-  const json = await resp.json();
+  const json = await readApiEnvelope(resp);
   if (!resp.ok || !json?.ok) {
     const message = json?.msg || resp.statusText || '请求失败';
     throw new Error(message);
@@ -160,11 +161,7 @@ export default function MarketPage({ user, items, meta, filters, stats }: Market
     try {
       const method = currentlyWanted ? 'DELETE' : 'PUT';
       const resp = await fetch(`/api/market/${itemId}/want`, { method });
-      const json = await resp.json();
-      if (!resp.ok || !json.ok || !json.data) {
-        throw new Error(json.msg || '操作失败');
-      }
-      const data = json.data as { wanted?: boolean; wantCount?: number };
+      const data = await unwrapApiResponse<{ wanted?: boolean; wantCount?: number }>(resp, '操作失败');
       const fallbackCount =
         method === 'PUT'
           ? baseWantCount + 1
@@ -228,10 +225,7 @@ export default function MarketPage({ user, items, meta, filters, stats }: Market
     setModerationAlert(null);
     try {
       const resp = await fetch(`/api/admin/market/${itemId}`, { method: 'DELETE' });
-      const json = await resp.json();
-      if (!resp.ok || !json.ok) {
-        throw new Error(json.msg || '删除失败');
-      }
+      await ensureApiSuccess(resp, '删除失败');
       setModerationAlert({ type: 'success', text: '商品已删除。' });
       await router.replace(router.asPath, undefined, { scroll: false });
     } catch (error: unknown) {
@@ -640,7 +634,7 @@ export const getServerSideProps: GetServerSideProps<MarketPageProps> = async (ct
       headers,
       cache: 'no-store',
     });
-    const json = await resp.json();
+    const json = await readApiEnvelope<MarketListResponse>(resp);
     if (json?.ok && json.data) {
       items = json.data.items || [];
       meta = json.data.meta || meta;

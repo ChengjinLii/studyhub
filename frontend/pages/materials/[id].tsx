@@ -1,26 +1,27 @@
 import { GetServerSideProps } from 'next';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import { CSSProperties, useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import AppImage from '../../components/AppImage';
+import ExperienceImageModal from '../../components/materials/ExperienceImageModal';
+import MaterialPreviewPanel from '../../components/materials/MaterialPreviewPanel';
 import NavBar from '../../components/NavBar';
 import ShareSheet from '../../components/ShareSheet';
 import CommentSection from '../../components/comments/CommentSection';
 import StarRating from '../../components/StarRating';
 import { readSession, hasRole } from '../../lib/auth';
-import { fetchMaterialDetail, fetchMaterialPreview } from '../../lib/api';
-import { toErrorMessage } from '../../lib/errors';
+import { fetchMaterialDetail } from '../../lib/api';
 import { formatDateTime } from '../../lib/format';
-import { warmImages } from '../../lib/imageWarmup';
 import { formatMajorDisplay } from '../../lib/major';
 import { materialPath, parseMaterialId, slugifyTitle, userPath } from '../../lib/slug';
+import { useExperienceImageModal } from '../../lib/useExperienceImageModal';
 import { useMaterialActions } from '../../lib/useMaterialActions';
-import { MaterialDetail, MaterialPreview } from '../../types/material';
+import { useMaterialPreview } from '../../lib/useMaterialPreview';
+import { MaterialDetail } from '../../types/material';
 import { SessionUser, RoleMask } from '../../types/user';
 import { COURSE_CATEGORY_LABELS, CourseCategoryValue, normalizeCourseCategory } from '../../constants/metadata';
-import PaginationBar from '../../components/PaginationBar';
 
 interface MaterialDetailPageProps {
   material: MaterialDetail | null;
@@ -72,29 +73,24 @@ export default function MaterialDetailPage({ material, user }: MaterialDetailPag
     handleShare,
   } = useMaterialActions({ material, user, canManage, isSuperAdmin, router });
   const [autoDownloadTriggered, setAutoDownloadTriggered] = useState(false);
-  const [preview, setPreview] = useState<MaterialPreview | null>(null);
-  const [previewLoading, setPreviewLoading] = useState(false);
-  const [previewError, setPreviewError] = useState('');
-  const [previewExpanded, setPreviewExpanded] = useState(false);
-  const [previewPage, setPreviewPage] = useState(1);
-  const [previewImageIndex, setPreviewImageIndex] = useState<number | null>(null);
-  const [previewModalImageReady, setPreviewModalImageReady] = useState(false);
   const previewPageSize = 1;
   const uploaderLabel = material?.uploaderNickname || material?.uploaderUsername || '匿名同学';
   const hasCustomPreview =
     Boolean(material?.customPreviewText?.trim()) || (material?.customPreviewImages?.length ?? 0) > 0;
-  const isManualPreview = material?.previewSource === 'MANUAL';
+  const isManualPreview = Boolean(material?.previewSource === 'MANUAL');
   const isPdfMaterial = Boolean(material?.hasFile && material?.fileType?.toLowerCase() === 'pdf');
   const isExperienceMaterial = Boolean(material?.tags?.includes('经验分享'));
   const experienceImages = useMemo(() => material?.customPreviewImages ?? [], [material?.customPreviewImages]);
   const hasExperienceImages = experienceImages.length > 0;
   const experiencePlaceholder = user ? '暂无配图' : '登录后可查看配图（如作者已上传）';
   const hasPreviewContent = hasCustomPreview || isManualPreview || isPdfMaterial;
+  const previewState = useMaterialPreview({ material, user, isManualPreview, isPdfMaterial });
+  const imageModal = useExperienceImageModal(experienceImages);
   const previewHint =
     hasCustomPreview && !isManualPreview && !isPdfMaterial
       ? '作者自定义预览'
-      : preview?.previewPages
-        ? `仅展示前 ${preview.previewPages} 页`
+      : previewState.preview?.previewPages
+        ? `仅展示前 ${previewState.preview.previewPages} 页`
         : '仅供下载前浏览（前 3/5 页）';
   const copyrightOwner = material?.copyrightOwner?.trim();
   const formatFileSize = (value?: number | null) => {
@@ -109,98 +105,6 @@ export default function MaterialDetailPage({ material, user }: MaterialDetailPag
     return `${size.toFixed(unitIndex === 0 ? 0 : 1)} ${units[unitIndex]}`;
   };
   const canViewNetdisk = Boolean(material?.hasNetdisk && (material.netdiskAccessible || canManage));
-
-  useEffect(() => {
-    if (!previewExpanded) {
-      return;
-    }
-    if (!material || !user) {
-      setPreview(null);
-      return;
-    }
-    if (!isManualPreview && !isPdfMaterial) {
-      setPreview(null);
-      return;
-    }
-    let active = true;
-    setPreviewLoading(true);
-    setPreviewError('');
-    fetchMaterialPreview(material.id)
-      .then((data) => {
-        if (!active) return;
-        setPreview(data);
-      })
-      .catch((err: unknown) => {
-        if (!active) return;
-        setPreviewError(toErrorMessage(err, '预览加载失败'));
-      })
-      .finally(() => {
-        if (!active) return;
-        setPreviewLoading(false);
-      });
-    return () => {
-      active = false;
-    };
-  }, [material, previewExpanded, user, isManualPreview, isPdfMaterial]);
-
-  useEffect(() => {
-    setPreviewPage(1);
-  }, [preview?.images?.length]);
-
-  useEffect(() => {
-    if (!previewExpanded || !preview?.images?.length) {
-      return;
-    }
-    const currentIndex = Math.max(0, previewPage - 1);
-    const targets = [preview.images[currentIndex - 1], preview.images[currentIndex], preview.images[currentIndex + 1]]
-      .filter((item): item is NonNullable<typeof item> => Boolean(item))
-      .map((item) => ({
-        src: item.img.src,
-        srcSet: item.img.srcSet || undefined,
-        sizes: item.img.sizes || undefined,
-      }));
-    void warmImages(targets);
-  }, [previewExpanded, preview, previewPage]);
-
-  const handlePreviewToggle = () => {
-    setPreviewExpanded((prev) => {
-      const next = !prev;
-      if (next) {
-        setPreviewPage(1);
-      }
-      return next;
-    });
-  };
-
-  useEffect(() => {
-    if (previewImageIndex === null || typeof window === 'undefined') return;
-    setPreviewModalImageReady(false);
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        setPreviewImageIndex(null);
-      }
-    };
-    const current = experienceImages[previewImageIndex];
-    const prev = experienceImages[(previewImageIndex - 1 + experienceImages.length) % experienceImages.length];
-    const next = experienceImages[(previewImageIndex + 1) % experienceImages.length];
-    void warmImages([{ src: current }, { src: prev }, { src: next }]);
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, [experienceImages, previewImageIndex]);
-
-  const handlePreviewImagePrev = () => {
-    if (previewImageIndex === null || experienceImages.length <= 1) return;
-    setPreviewImageIndex((previewImageIndex - 1 + experienceImages.length) % experienceImages.length);
-  };
-
-  const handlePreviewImageNext = () => {
-    if (previewImageIndex === null || experienceImages.length <= 1) return;
-    setPreviewImageIndex((previewImageIndex + 1) % experienceImages.length);
-  };
-
-  const handleOpenExperienceImage = (index: number) => {
-    setPreviewImageIndex(index);
-  };
 
   const formattedRatingAvg = Number(ratingAvg ?? 0).toFixed(1);
   const detailCommentCount = material?.commentCount ?? material?.reviews.length ?? 0;
@@ -678,7 +582,7 @@ export default function MaterialDetailPage({ material, user }: MaterialDetailPag
                             alt={`经验配图 ${index + 1}`}
                             decoding="async"
                             loading={index === 0 ? 'eager' : 'lazy'}
-                            onClick={() => handleOpenExperienceImage(index)}
+                            onClick={() => imageModal.handleOpenExperienceImage(index)}
                           />
                         </div>
                       ))}
@@ -698,148 +602,24 @@ export default function MaterialDetailPage({ material, user }: MaterialDetailPag
                 </div>
               </section>
             ) : (
-              <section className="card material-preview">
-                <div className="material-preview__header">
-                  <div className="material-preview__header-left">
-                    <h2>资料预览</h2>
-                    <span className="material-preview__hint">{previewHint}</span>
-                  </div>
-                  <button
-                    type="button"
-                    className="button ghost small material-preview__toggle"
-                    onClick={handlePreviewToggle}
-                  >
-                    {previewExpanded ? '收起预览' : '展示预览'}
-                  </button>
-                </div>
-                {!previewExpanded ? (
-                  !hasPreviewContent ? (
-                    <div className="material-preview__collapsed">
-                      <p>当前资料暂不支持预览。</p>
-                    </div>
-                  ) : !user ? (
-                    <div className="material-preview__collapsed">
-                      <p>
-                        <a className="login-link" href={`/login?next=${encodeURIComponent(router.asPath)}`}>登录</a>后可查看预览缩略图。
-                      </p>
-                      <Link className="button ghost small" href={`/login?next=${encodeURIComponent(router.asPath)}`}>
-                        立即登录
-                      </Link>
-                    </div>
-                  ) : (
-                    <button
-                      type="button"
-                      className="material-preview__collapsed material-preview__collapsed-btn"
-                      onClick={handlePreviewToggle}
-                    >
-                      点击查看预览
-                    </button>
-                  )
-                ) : !user ? (
-                  <div className="material-preview__locked">
-                    <p>
-                      <a className="login-link" href={`/login?next=${encodeURIComponent(router.asPath)}`}>登录</a>后可查看预览缩略图。
-                    </p>
-                    <Link className="button ghost small" href={`/login?next=${encodeURIComponent(router.asPath)}`}>
-                      立即登录
-                    </Link>
-                  </div>
-                ) : (
-                  <>
-                    {hasCustomPreview && (
-                      <div className="material-custom-preview">
-                        <div className="material-custom-preview__header">
-                          <h3>作者自定义预览</h3>
-                          <span className="material-custom-preview__hint">图文展示</span>
-                        </div>
-                        {material?.customPreviewText && (
-                          <div className="material-custom-preview__text">{material.customPreviewText}</div>
-                        )}
-                        {material?.customPreviewImages && material.customPreviewImages.length > 0 && (
-                          <div className="material-custom-preview__grid">
-                            {material.customPreviewImages.map((url, index) => (
-                              <AppImage
-                                key={`${url}-${index}`}
-                                src={url}
-                                alt={`预览图 ${index + 1}`}
-                                loading="lazy"
-                                decoding="async"
-                              />
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    )}
-                    {isManualPreview || isPdfMaterial ? (
-                      previewLoading ? (
-                        <p className="help-text">预览生成中，请稍候刷新。</p>
-                      ) : previewError ? (
-                        <p className="error-text">{previewError}</p>
-                      ) : preview?.status === 'failed' ? (
-                        <p className="help-text">预览生成失败，请稍后重试。</p>
-                      ) : preview?.status === 'done' && preview.images.length > 0 ? (
-                        <>
-                          <div className="material-preview__grid">
-                            {preview.images
-                              .slice((previewPage - 1) * previewPageSize, previewPage * previewPageSize)
-                              .map((item) => {
-                                const lqipStyle = item.lqip
-                                  ? ({ '--lqip': `url(${item.lqip})` } as CSSProperties)
-                                  : undefined;
-                                const hasLqip = Boolean(item.lqip);
-                                return (
-                                  <div
-                                    key={item.index}
-                                    className={`material-preview__page${hasLqip ? ' has-lqip' : ''}`}
-                                    style={lqipStyle}
-                                  >
-                                    <picture>
-                                      {item.avif?.srcSet && (
-                                        <source
-                                          type="image/avif"
-                                          srcSet={item.avif.srcSet}
-                                          sizes={item.avif.sizes || item.img.sizes || undefined}
-                                        />
-                                      )}
-                                      {item.webp?.srcSet && (
-                                        <source
-                                          type="image/webp"
-                                          srcSet={item.webp.srcSet}
-                                          sizes={item.webp.sizes || item.img.sizes || undefined}
-                                        />
-                                      )}
-                                      <img
-                                        src={item.img.src}
-                                        srcSet={item.img.srcSet || undefined}
-                                        sizes={item.img.sizes || undefined}
-                                        alt={`预览第 ${item.index} 页`}
-                                        decoding="async"
-                                        loading={previewPage === item.index ? 'eager' : 'lazy'}
-                                        fetchPriority={previewPage === item.index ? 'high' : undefined}
-                                      />
-                                    </picture>
-                                    <span className="material-preview__label">第 {item.index} 页</span>
-                                  </div>
-                                );
-                              })}
-                          </div>
-                          <PaginationBar
-                            currentPage={previewPage}
-                            totalItems={preview.images.length}
-                            pageSize={previewPageSize}
-                            onPageChange={setPreviewPage}
-                            className="materials-pagination material-preview__pagination"
-                          />
-                        </>
-                      ) : (
-                        <p className="help-text">预览生成中，请稍后刷新。</p>
-                      )
-                    ) : (
-                      !hasCustomPreview && <p className="help-text">当前资料暂不支持预览。</p>
-                    )}
-                  </>
-                )}
-              </section>
+              <MaterialPreviewPanel
+                material={material}
+                user={user}
+                loginHref={`/login?next=${encodeURIComponent(router.asPath)}`}
+                hasPreviewContent={hasPreviewContent}
+                hasCustomPreview={hasCustomPreview}
+                isManualPreview={Boolean(isManualPreview)}
+                isPdfMaterial={isPdfMaterial}
+                previewHint={previewHint}
+                preview={previewState.preview}
+                previewLoading={previewState.previewLoading}
+                previewError={previewState.previewError}
+                previewExpanded={previewState.previewExpanded}
+                previewPage={previewState.previewPage}
+                previewPageSize={previewPageSize}
+                onPreviewToggle={previewState.handlePreviewToggle}
+                onPreviewPageChange={previewState.setPreviewPage}
+              />
             )}
 
             {material.hasNetdisk && !isExperienceMaterial && (
@@ -924,57 +704,16 @@ export default function MaterialDetailPage({ material, user }: MaterialDetailPag
         linkUrl={shareSheetUrl}
         onClose={() => setShareSheetOpen(false)}
       />
-      {isExperienceMaterial && previewImageIndex !== null && experienceImages[previewImageIndex] && (
-        <div className="modal-mask" onClick={() => setPreviewImageIndex(null)}>
-          <div
-            className="modal-card experience-image-modal"
-            role="dialog"
-            aria-modal="true"
-            aria-label="查看配图详情"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <button
-              className="modal-close"
-              type="button"
-              aria-label="关闭"
-              onClick={() => setPreviewImageIndex(null)}
-            >
-              ×
-            </button>
-            {experienceImages.length > 1 && (
-              <>
-                <button
-                  type="button"
-                  className="experience-image-modal__arrow left"
-                  aria-label="查看上一张图片"
-                  onClick={handlePreviewImagePrev}
-                >
-                  ‹
-                </button>
-                <button
-                  type="button"
-                  className="experience-image-modal__arrow right"
-                  aria-label="查看下一张图片"
-                  onClick={handlePreviewImageNext}
-                >
-                  ›
-                </button>
-              </>
-            )}
-            <div className={`experience-image-modal__frame${previewModalImageReady ? ' is-ready' : ' is-loading'}`}>
-              {!previewModalImageReady && <div className="experience-image-modal__loading">高清图加载中...</div>}
-              <AppImage
-                src={experienceImages[previewImageIndex]}
-                alt={`经验配图大图 ${previewImageIndex + 1}`}
-                decoding="async"
-                onLoad={() => setPreviewModalImageReady(true)}
-              />
-            </div>
-            <div className="experience-image-modal__meta">
-              第 {previewImageIndex + 1} / {experienceImages.length} 张
-            </div>
-          </div>
-        </div>
+      {isExperienceMaterial && (
+        <ExperienceImageModal
+          images={experienceImages}
+          currentIndex={imageModal.previewImageIndex}
+          imageReady={imageModal.previewModalImageReady}
+          onImageReady={() => imageModal.setPreviewModalImageReady(true)}
+          onClose={imageModal.handleCloseExperienceImage}
+          onPrev={imageModal.handlePreviewImagePrev}
+          onNext={imageModal.handlePreviewImageNext}
+        />
       )}
       <style jsx>{`
         .rating-widget {

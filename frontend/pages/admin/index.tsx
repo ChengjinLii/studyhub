@@ -1,14 +1,17 @@
 import { GetServerSideProps } from 'next';
 import { FormEvent, useEffect, useMemo, useState } from 'react';
-import AppImage from '../../components/AppImage';
+import AdminMarketPanel from '../../components/admin/AdminMarketPanel';
+import AdminMaterialsPanel from '../../components/admin/AdminMaterialsPanel';
+import AdminPayoutQrModal from '../../components/admin/AdminPayoutQrModal';
 import NavBar from '../../components/NavBar';
 import PaginationBar from '../../components/PaginationBar';
 import { readSession, hasRole } from '../../lib/auth';
-import { getRequestOrigin, resolveApiBase } from '../../lib/apiBase';
+import { getRequestOrigin } from '../../lib/apiBase';
 import {
   broadcastAdminNotification,
   createAdminUser,
   fetchAdminFeedbacks,
+  fetchAdminInitialDashboard,
   fetchAdminMarketItems,
   fetchAdminMaterials,
   fetchAdminUsers,
@@ -36,19 +39,7 @@ import {
   AdminListMeta,
   AdminReport,
 } from '../../types/admin';
-import {
-  AdminMonthlyPayoutOverview,
-  AdminMonthlyPayoutItem,
-  AdminPayoutQr,
-} from '../../types/payout';
-import {
-  SUPPORTED_COLLEGES,
-  SUPPORTED_MAJORS,
-  GRADE_STAGE_OPTIONS,
-  COURSE_CATEGORY_OPTIONS,
-  COURSE_CATEGORY_LABELS,
-} from '../../constants/metadata';
-import { formatMajorDisplay } from '../../lib/major';
+import { AdminMonthlyPayoutOverview, AdminMonthlyPayoutItem, AdminPayoutQr } from '../../types/payout';
 
 interface AdminPageProps {
   user: SessionUser;
@@ -90,28 +81,6 @@ const TIME_COMMITMENT_LABELS: Record<string, string> = {
   '4-8H': '每周 4-8 小时',
   '8H+': '每周 8 小时以上',
 };
-
-const MARKET_CATEGORY_OPTIONS = [
-  { value: 'BOOK', label: '书籍' },
-  { value: 'DIGITAL', label: '数码' },
-  { value: 'LIFE', label: '日用品' },
-  { value: 'SPORT', label: '运动' },
-  { value: 'OTHER', label: '其他' },
-];
-
-const MARKET_STATUS_OPTIONS = [
-  { value: 'SALE', label: '在售' },
-  { value: 'RESERVED', label: '已预定' },
-  { value: 'SOLD', label: '已售出' },
-  { value: 'REMOVED', label: '已下架' },
-  { value: 'HIDDEN', label: '隐藏（不展示）' },
-];
-
-const MARKET_CONTACT_OPTIONS = [
-  { value: 'QQ', label: 'QQ' },
-  { value: 'WECHAT', label: '微信' },
-  { value: 'PHONE', label: '手机号' },
-];
 
 const REPORT_STATUS_OPTIONS = [
   { value: '', label: '全部状态' },
@@ -229,11 +198,6 @@ export default function AdminPage({
   const reportPageSize = reportsMeta?.size || 15;
   const reportTotalItems = reportsMeta?.total || 0;
   const currentReportPage = Math.max(1, (reportsMeta?.page ?? 0) + 1);
-  const isRemovedMaterialView = materialView === 'removed';
-  const resolveCourseCategoryLabel = (value?: string | null) => {
-    if (!value) return '未分类';
-    return COURSE_CATEGORY_LABELS[value as keyof typeof COURSE_CATEGORY_LABELS] || value;
-  };
   const isSuperAdmin = hasRole(user.roleMask, RoleMask.DEVELOPER);
   const roleLabel = isSuperAdmin ? '超级管理员' : '管理员';
   const totalEarnings = users.reduce((sum, item) => sum + Number(item.totalEarnings ?? 0), 0);
@@ -601,416 +565,54 @@ export default function AdminPage({
           </form>
         </section>
 
-        <section id="admin-materials" className="card admin-section">
-          <div className="card-title">资料批量管理</div>
-          <p className="help-text">
-            {isRemovedMaterialView
-              ? '展示最近删除的资料，可逐一或批量恢复。'
-              : '勾选资料后，可一次性调整专业、年级、课程类型、标签，或批量删除。'}
-          </p>
-          <div className="inline-group wrap" style={{ marginBottom: 12 }}>
-            <button className="button ghost small" type="button" onClick={() => loadMaterials(currentMaterialPage - 1)} disabled={materialsLoading}>
-              {materialsLoading ? '刷新中...' : '刷新列表'}
-            </button>
-            <button
-              className="button ghost small"
-              type="button"
-              onClick={() => handleMaterialViewChange(isRemovedMaterialView ? 'active' : 'removed')}
-              disabled={materialsLoading}
-            >
-              {isRemovedMaterialView ? '查看正常资料' : '查看已删除'}
-            </button>
-            <button className="button ghost small" type="button" onClick={selectAllMaterials}>
-              全选当前页
-            </button>
-            <button className="button ghost small" type="button" onClick={clearMaterialSelection}>
-              清空选择
-            </button>
-            {isRemovedMaterialView ? (
-              <button
-                className="button ghost small"
-                type="button"
-                onClick={handleBatchRestore}
-                disabled={batchRestoring || selectedMaterialIds.length === 0}
-              >
-                {batchRestoring ? '恢复中...' : '恢复所选'}
-              </button>
-            ) : (
-              <button
-                className="button danger small"
-                type="button"
-                onClick={handleBatchDelete}
-                disabled={batchDeleting || selectedMaterialIds.length === 0}
-              >
-                {batchDeleting ? '删除中...' : '删除所选'}
-              </button>
-            )}
-            <span className="help-text">已选 {selectedMaterialIds.length} 条</span>
-          </div>
-          {batchMessage && (
-            <p className={batchMessage.type === 'error' ? 'error-text' : 'success-text'}>{batchMessage.text}</p>
-          )}
-          {materials.length === 0 ? (
-            <p className="help-text">暂无资料</p>
-          ) : (
-            <ul className="materials-list" style={{ alignItems: 'flex-start' }}>
-              {materials.map((material) => {
-                const majorLabel = formatMajorDisplay(material.major);
-                return (
-                  <li key={material.id} className="purchase-row">
-                    <label className="checkbox" style={{ marginRight: 12 }}>
-                      <input
-                        type="checkbox"
-                        checked={selectedMaterialIds.includes(material.id)}
-                        onChange={() => toggleMaterialSelection(material.id)}
-                      />
-                    </label>
-                    <div>
-                      <strong>{material.title}</strong>
-                      <p className="material-meta">
-                        {resolveCourseCategoryLabel(material.courseCategory)} · {material.gradeValue || '未设置'} ·{' '}
-                        {material.college || '未设置'} {majorLabel || ''}
-                      </p>
-                      {material.tags && material.tags.length > 0 && (
-                        <p className="material-meta">标签：{material.tags.join(' / ')}</p>
-                      )}
-                      <p className="material-meta">
-                        上传者：{material.uploaderNickname || material.uploaderUsername || '匿名'} ·{' '}
-                        {formatDateTime(material.createdAt) || '-'}
-                      </p>
-                      {isRemovedMaterialView && (
-                        <p className="material-meta">
-                          状态：已删除
-                          {material.deletedAt ? ` · 删除时间：${formatDateTime(material.deletedAt)}` : ''}
-                        </p>
-                      )}
-                    </div>
-                    {isRemovedMaterialView && (
-                      <button
-                        className="button ghost small"
-                        type="button"
-                        onClick={() => handleRestoreMaterial(material.id)}
-                        disabled={restoringMaterialId === material.id}
-                        style={{ marginLeft: 'auto' }}
-                      >
-                        {restoringMaterialId === material.id ? '恢复中...' : '恢复'}
-                      </button>
-                    )}
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-          <PaginationBar
-            currentPage={currentMaterialPage}
-            totalItems={materialTotalItems}
-            pageSize={materialPageSize}
-            loading={materialsLoading}
-            onPageChange={handleMaterialPageChange}
-            className="admin-pagination"
-          />
-          <form className="form-grid" onSubmit={handleBatchSubmit}>
-            <div className="form-item">
-              <label htmlFor="batch-college">学院</label>
-              <select
-                id="batch-college"
-                value={batchForm.college}
-                onChange={(e) => handleBatchInputChange('college', e.target.value)}
-              >
-                <option value="">保持不变</option>
-                {SUPPORTED_COLLEGES.map((college) => (
-                  <option key={college} value={college}>
-                    {college}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="form-item">
-              <label>专业（多选）</label>
-              <div className="inline-group wrap">
-                {SUPPORTED_MAJORS.map((major) => (
-                  <label key={major} className={`choice badge-outline ${batchMajorSelections.includes(major) ? 'active' : ''}`}>
-                    <input
-                      type="checkbox"
-                      checked={batchMajorSelections.includes(major)}
-                      onChange={(e) => handleBatchMajorToggle(major, e.target.checked)}
-                    />
-                    {major}
-                  </label>
-                ))}
-              </div>
-              <div className="inline-group wrap" style={{ marginTop: 6 }}>
-                <button
-                  className="button ghost small"
-                  type="button"
-                  onClick={() => handleBatchInputChange('major', '')}
-                  disabled={!batchForm.major}
-                >
-                  {batchForm.major ? '清空选择（保持不变）' : '保持不变'}
-                </button>
-              </div>
-            </div>
-            <div className="form-item">
-              <label htmlFor="batch-grade">年级/阶段</label>
-              <select
-                id="batch-grade"
-                value={batchForm.gradeValue}
-                onChange={(e) => handleBatchInputChange('gradeValue', e.target.value)}
-              >
-                <option value="">保持不变</option>
-                {GRADE_STAGE_OPTIONS.map((grade) => (
-                  <option key={grade} value={grade}>
-                    {grade}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="form-item">
-              <label htmlFor="batch-course-category">课程类型</label>
-              <select
-                id="batch-course-category"
-                value={batchForm.courseCategory}
-                onChange={(e) => handleBatchInputChange('courseCategory', e.target.value)}
-              >
-                <option value="">保持不变</option>
-                {COURSE_CATEGORY_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="form-item full">
-              <label htmlFor="batch-tags">标签（逗号分隔）</label>
-              <input
-                id="batch-tags"
-                type="text"
-                placeholder="示例：期末速成,教材答案"
-                value={batchForm.tags}
-                onChange={(e) => handleBatchInputChange('tags', e.target.value)}
-              />
-              {batchForm.tags && (
-                <div className="inline-group" style={{ marginTop: 6 }}>
-                  <label className="checkbox">
-                    <input
-                      type="radio"
-                      name="tags-mode"
-                      value="replace"
-                      checked={batchForm.tagsMode === 'replace'}
-                      onChange={(e) => handleBatchInputChange('tagsMode', e.target.value)}
-                    />
-                    覆盖
-                  </label>
-                  <label className="checkbox">
-                    <input
-                      type="radio"
-                      name="tags-mode"
-                      value="append"
-                      checked={batchForm.tagsMode === 'append'}
-                      onChange={(e) => handleBatchInputChange('tagsMode', e.target.value)}
-                    />
-                    追加
-                  </label>
-                </div>
-              )}
-            </div>
-            <div className="form-item full">
-              <button className="button primary" type="submit" disabled={materialsLoading}>
-                批量更新（已选 {selectedMaterialIds.length} 条）
-              </button>
-            </div>
-          </form>
-        </section>
+        <AdminMaterialsPanel
+          materials={materials}
+          materialView={materialView}
+          materialsLoading={materialsLoading}
+          batchMessage={batchMessage}
+          selectedMaterialIds={selectedMaterialIds}
+          batchDeleting={batchDeleting}
+          batchRestoring={batchRestoring}
+          restoringMaterialId={restoringMaterialId}
+          currentMaterialPage={currentMaterialPage}
+          materialTotalItems={materialTotalItems}
+          materialPageSize={materialPageSize}
+          batchForm={batchForm}
+          batchMajorSelections={batchMajorSelections}
+          onRefresh={() => loadMaterials(currentMaterialPage - 1)}
+          onViewChange={handleMaterialViewChange}
+          onSelectAll={selectAllMaterials}
+          onClearSelection={clearMaterialSelection}
+          onBatchRestore={handleBatchRestore}
+          onBatchDelete={handleBatchDelete}
+          onToggleSelection={toggleMaterialSelection}
+          onRestoreMaterial={handleRestoreMaterial}
+          onPageChange={handleMaterialPageChange}
+          onBatchSubmit={handleBatchSubmit}
+          onBatchInputChange={handleBatchInputChange}
+          onBatchMajorToggle={handleBatchMajorToggle}
+        />
 
-        <section id="admin-market" className="card admin-section">
-          <div className="card-title">校园集市商品批量管理</div>
-          <p className="help-text">
-            勾选商品后，可批量调整状态、分类、学校或联系方式；隐藏商品将不在前台展示，可随时恢复展示。
-          </p>
-          <div className="inline-group wrap" style={{ marginBottom: 12 }}>
-            <button
-              className="button ghost small"
-              type="button"
-              onClick={() => loadMarketItems(currentMarketPage)}
-              disabled={marketLoading}
-            >
-              {marketLoading ? '刷新中...' : '刷新商品列表'}
-            </button>
-            <button className="button ghost small" type="button" onClick={selectAllMarketItems}>
-              全选当前页
-            </button>
-            <button className="button ghost small" type="button" onClick={clearMarketSelection}>
-              清空选择
-            </button>
-            <button
-              className="button ghost small"
-              type="button"
-              onClick={() => applyMarketBatchUpdate({ itemIds: selectedMarketIds, status: 'HIDDEN' }, '隐藏所选')}
-              disabled={marketLoading || selectedMarketIds.length === 0}
-            >
-              隐藏所选
-            </button>
-            <button
-              className="button ghost small"
-              type="button"
-              onClick={() => applyMarketBatchUpdate({ itemIds: selectedMarketIds, status: 'SALE' }, '恢复展示')}
-              disabled={marketLoading || selectedMarketIds.length === 0}
-            >
-              恢复展示
-            </button>
-            <button
-              className="button danger small"
-              type="button"
-              onClick={handleMarketBatchDelete}
-              disabled={marketBatchDeleting || selectedMarketIds.length === 0}
-            >
-              {marketBatchDeleting ? '删除中...' : '删除所选'}
-            </button>
-            <span className="help-text">已选 {selectedMarketIds.length} 条</span>
-          </div>
-          {marketBatchMessage && (
-            <p className={marketBatchMessage.type === 'error' ? 'error-text' : 'success-text'}>{marketBatchMessage.text}</p>
-          )}
-          {marketItems.length === 0 ? (
-            <p className="help-text">暂无校园集市商品</p>
-          ) : (
-            <ul className="materials-list" style={{ alignItems: 'flex-start' }}>
-              {marketItems.map((item) => (
-                <li key={item.id} className="purchase-row">
-                  <label className="checkbox" style={{ marginRight: 12 }}>
-                    <input
-                      type="checkbox"
-                      checked={selectedMarketIds.includes(item.id)}
-                      onChange={() => toggleMarketSelection(item.id)}
-                    />
-                  </label>
-                  <div className="market-admin-entry">
-                    <div className="inline-group" style={{ alignItems: 'flex-start', gap: 16 }}>
-                      {item.thumbnail ? (
-                        <AppImage
-                          src={item.thumbnail}
-                          alt={item.title}
-                          style={{ width: 72, height: 72, objectFit: 'cover', borderRadius: 8 }}
-                        />
-                      ) : (
-                        <div
-                          style={{
-                            width: 72,
-                            height: 72,
-                            borderRadius: 8,
-                            background: '#f5f5f5',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            fontSize: 12,
-                            color: '#666',
-                          }}
-                        >
-                          无图
-                        </div>
-                      )}
-                      <div>
-                        <strong>{item.title}</strong>
-                        <p className="material-meta">
-                          {item.priceText || `¥${item.price?.toFixed(2) ?? '--'}`} · 分类：
-                          {MARKET_CATEGORY_OPTIONS.find((opt) => opt.value === item.category)?.label || item.category || '未分类'} · 状态：
-                          {MARKET_STATUS_OPTIONS.find((opt) => opt.value === item.status)?.label || item.status || '未知'}
-                        </p>
-                        <p className="material-meta">
-                          想要人数：{item.wantCount ?? 0} · 学校：{item.school || '不限'} · 发布者：
-                          {item.sellerName || '未知'} ({item.sellerId ? `#${item.sellerId}` : '—'}) ·
-                          {item.createdAt ? `发布时间：${formatDateTime(item.createdAt)}` : '发布时间未知'}
-                        </p>
-                        <p className="material-meta">
-                          联系方式：
-                          {item.contactType ? `${item.contactType} · ${item.contactValue || '未填写'}` : '未填写'}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
-          <PaginationBar
-            currentPage={currentMarketPage}
-            totalItems={marketTotalItems}
-            pageSize={marketPageSize}
-            loading={marketLoading}
-            onPageChange={handleMarketPageChange}
-            className="admin-pagination"
-          />
-          <form className="form-grid" onSubmit={handleMarketBatchSubmit}>
-            <div className="form-item">
-              <label htmlFor="market-status">状态</label>
-              <select
-                id="market-status"
-                value={marketBatchForm.status}
-                onChange={(e) => handleMarketBatchInputChange('status', e.target.value)}
-              >
-                <option value="">保持不变</option>
-                {MARKET_STATUS_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="form-item">
-              <label htmlFor="market-category">分类</label>
-              <select
-                id="market-category"
-                value={marketBatchForm.category}
-                onChange={(e) => handleMarketBatchInputChange('category', e.target.value)}
-              >
-                <option value="">保持不变</option>
-                {MARKET_CATEGORY_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="form-item">
-              <label htmlFor="market-school">学校</label>
-              <input
-                id="market-school"
-                value={marketBatchForm.school}
-                placeholder="保持为空则不变"
-                onChange={(e) => handleMarketBatchInputChange('school', e.target.value)}
-              />
-            </div>
-            <div className="form-item">
-              <label htmlFor="market-contact-type">联系方式类型</label>
-              <select
-                id="market-contact-type"
-                value={marketBatchForm.contactType}
-                onChange={(e) => handleMarketBatchInputChange('contactType', e.target.value)}
-              >
-                <option value="">保持不变</option>
-                {MARKET_CONTACT_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="form-item">
-              <label htmlFor="market-contact-value">联系方式内容</label>
-              <input
-                id="market-contact-value"
-                value={marketBatchForm.contactValue}
-                placeholder="保持为空则不变"
-                onChange={(e) => handleMarketBatchInputChange('contactValue', e.target.value)}
-              />
-            </div>
-            <div className="form-item full">
-              <button className="button primary" type="submit" disabled={marketLoading}>
-                批量更新（已选 {selectedMarketIds.length} 条）
-              </button>
-            </div>
-          </form>
-        </section>
+        <AdminMarketPanel
+          marketItems={marketItems}
+          marketLoading={marketLoading}
+          selectedMarketIds={selectedMarketIds}
+          marketBatchMessage={marketBatchMessage}
+          marketBatchDeleting={marketBatchDeleting}
+          marketBatchForm={marketBatchForm}
+          currentMarketPage={currentMarketPage}
+          marketTotalItems={marketTotalItems}
+          marketPageSize={marketPageSize}
+          onRefresh={() => loadMarketItems(currentMarketPage)}
+          onSelectAll={selectAllMarketItems}
+          onClearSelection={clearMarketSelection}
+          onApplyMarketBatchUpdate={applyMarketBatchUpdate}
+          onMarketBatchDelete={handleMarketBatchDelete}
+          onToggleSelection={toggleMarketSelection}
+          onPageChange={handleMarketPageChange}
+          onMarketBatchSubmit={handleMarketBatchSubmit}
+          onMarketBatchInputChange={handleMarketBatchInputChange}
+        />
 
         <section id="admin-reports" className="card admin-section">
           <div className="card-title">举报工单</div>
@@ -1525,24 +1127,14 @@ export default function AdminPage({
         </section>
         </div>
 
-        {payoutQrModal.open && (
-          <div className="modal-mask" role="presentation" onClick={closePayoutQrModal}>
-            <div className="modal-card wechat-modal" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
-              <button className="modal-close" type="button" onClick={closePayoutQrModal} aria-label="关闭弹窗">
-                ×
-              </button>
-              <h2 className="wechat-modal__title">{payoutQrModal.title || '收款码'}</h2>
-              {payoutQrModal.loading && <p className="wechat-modal__hint">收款码加载中...</p>}
-              {!payoutQrModal.loading && payoutQrModal.error && <p className="error-text">{payoutQrModal.error}</p>}
-              {!payoutQrModal.loading && !payoutQrModal.error && payoutQrModal.url && (
-                <>
-                  <p className="wechat-modal__hint">请核对收款码后再进行线下打款。</p>
-                  <AppImage src={payoutQrModal.url} alt="用户收款码" loading="lazy" />
-                </>
-              )}
-            </div>
-          </div>
-        )}
+        <AdminPayoutQrModal
+          open={payoutQrModal.open}
+          loading={payoutQrModal.loading}
+          error={payoutQrModal.error}
+          url={payoutQrModal.url}
+          title={payoutQrModal.title}
+          onClose={closePayoutQrModal}
+        />
       </main>
     </>
   );
@@ -1572,56 +1164,16 @@ export const getServerSideProps: GetServerSideProps<AdminPageProps> = async (ctx
   let reportsMeta: AdminListMeta = { page: 0, size: 15, total: 0 };
   if (session.token) {
     try {
-      const base = resolveApiBase(getRequestOrigin(ctx.req));
-      const [userResp, feedbackResp, volunteerResp, materialResp, marketResp, reportResp] = await Promise.all([
-        fetch(`${base}/admin/users`, {
-          headers: { Authorization: `Bearer ${session.token}` },
-        }),
-        fetch(`${base}/admin/community/feedbacks`, {
-          headers: { Authorization: `Bearer ${session.token}` },
-        }),
-        fetch(`${base}/admin/community/volunteers`, {
-          headers: { Authorization: `Bearer ${session.token}` },
-        }),
-        fetch(`${base}/admin/materials?page=0&size=15`, {
-          headers: { Authorization: `Bearer ${session.token}` },
-        }),
-        fetch(`${base}/admin/market?page=1&size=15`, {
-          headers: { Authorization: `Bearer ${session.token}` },
-        }),
-        fetch(`${base}/admin/reports?page=0&size=15`, {
-          headers: { Authorization: `Bearer ${session.token}` },
-        }),
-      ]);
-      const [userJson, feedbackJson, volunteerJson, materialJson, marketJson, reportJson] = await Promise.all([
-        userResp.json(),
-        feedbackResp.json(),
-        volunteerResp.json(),
-        materialResp.json(),
-        marketResp.json(),
-        reportResp.json(),
-      ]);
-      if (userResp.ok && userJson.ok) {
-        users = userJson.data;
-      }
-      if (feedbackResp.ok && feedbackJson.ok) {
-        feedbacks = feedbackJson.data;
-      }
-      if (volunteerResp.ok && volunteerJson.ok) {
-        volunteers = volunteerJson.data;
-      }
-      if (materialResp.ok && materialJson.ok) {
-        materials = materialJson.data.items || [];
-        materialsMeta = materialJson.data.meta || materialsMeta;
-      }
-      if (marketResp.ok && marketJson.ok) {
-        marketItems = marketJson.data.items || [];
-        marketMeta = marketJson.data.meta || marketMeta;
-      }
-      if (reportResp.ok && reportJson.ok) {
-        reports = reportJson.data.items || [];
-        reportsMeta = reportJson.data.meta || reportsMeta;
-      }
+      const dashboard = await fetchAdminInitialDashboard(session.token, getRequestOrigin(ctx.req));
+      users = dashboard.users;
+      feedbacks = dashboard.feedbacks;
+      volunteers = dashboard.volunteers;
+      materials = dashboard.materials;
+      materialsMeta = dashboard.materialsMeta;
+      marketItems = dashboard.marketItems;
+      marketMeta = dashboard.marketMeta;
+      reports = dashboard.reports;
+      reportsMeta = dashboard.reportsMeta;
     } catch (err) {
       // ignore fetch errors in SSR
     }

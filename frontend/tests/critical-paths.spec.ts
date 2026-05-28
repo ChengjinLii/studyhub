@@ -21,6 +21,48 @@ const tryDevLogin = async (request: APIRequestContext) => {
   return resp.ok() && json?.ok === true;
 };
 
+test('mock API mode covers login and upload failure envelopes', async ({ page }) => {
+  await page.route('**/api/session', async (route) => {
+    if (route.request().method() === 'POST') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ ok: true, data: { user: { id: 1, username: 'mock-user' } } }),
+      });
+      return;
+    }
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ ok: true, data: { user: { id: 1, username: 'mock-user' } } }),
+    });
+  });
+  await page.route('**/api/materials', async (route) => {
+    await route.fulfill({
+      status: 400,
+      contentType: 'application/json',
+      body: JSON.stringify({ ok: false, msg: '请上传资料文件或填写网盘链接' }),
+    });
+  });
+  await page.goto('about:blank');
+  const result = await page.evaluate(async () => {
+    const loginResp = await fetch('https://mock.studyhub.local/api/session', { method: 'POST' });
+    const loginJson = await loginResp.json();
+    const uploadResp = await fetch('https://mock.studyhub.local/api/materials', { method: 'POST' });
+    const uploadJson = await uploadResp.json();
+    return {
+      loginOk: loginResp.ok && loginJson.ok === true && loginJson.data?.user?.id === 1,
+      uploadRejected: uploadResp.status === 400 && uploadJson.ok === false,
+      uploadMessage: uploadJson.msg,
+    };
+  });
+  expect(result).toEqual({
+    loginOk: true,
+    uploadRejected: true,
+    uploadMessage: '请上传资料文件或填写网盘链接',
+  });
+});
+
 test('login success should make session readable', async ({ request }) => {
   const available = await isSmokeTargetAvailable(request);
   test.skip(!available, 'smoke target is unavailable (SMOKE_BASE_URL is not reachable)');

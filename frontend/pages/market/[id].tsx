@@ -7,6 +7,7 @@ import NavBar from '../../components/NavBar';
 import ShareSheet from '../../components/ShareSheet';
 import { readSession, hasRole } from '../../lib/auth';
 import { reportTarget } from '../../lib/api';
+import { readApiEnvelope, unwrapApiResponse } from '../../lib/apiEnvelope';
 import { getRequestOrigin } from '../../lib/apiBase';
 import { toErrorMessage } from '../../lib/errors';
 import { fetchMarketItemDetail } from '../../lib/market';
@@ -97,11 +98,8 @@ export default function MarketDetailPage({ user, item }: DetailPageProps) {
     setError('');
     try {
       const resp = await fetch(`/api/market/${state.id}/want`, { method: 'PUT' });
-      const json = await resp.json();
-      if (!resp.ok || !json.ok || !json.data) {
-        throw new Error(json.msg || '操作失败');
-      }
-      setState(json.data);
+      const data = await unwrapApiResponse<MarketItemDetail>(resp, '操作失败');
+      setState(data);
       setShowContact(true);
     } catch (err: unknown) {
       setError(toErrorMessage(err, '操作失败'));
@@ -121,11 +119,7 @@ export default function MarketDetailPage({ user, item }: DetailPageProps) {
     try {
       const method = state.wanted ? 'DELETE' : 'PUT';
       const resp = await fetch(`/api/market/${state.id}/want`, { method });
-      const json = await resp.json();
-      if (!resp.ok || !json.ok || !json.data) {
-        throw new Error(json.msg || '操作失败');
-      }
-      const nextState = json.data as MarketItemDetail;
+      const nextState = await unwrapApiResponse<MarketItemDetail>(resp, '操作失败');
       setState(nextState);
       if (!nextState.canViewContact) {
         setShowContact(false);
@@ -211,11 +205,8 @@ export default function MarketDetailPage({ user, item }: DetailPageProps) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: nextStatus }),
       });
-      const json = await resp.json();
-      if (!resp.ok || !json.ok || !json.data) {
-        throw new Error(json.msg || '操作失败');
-      }
-      setState(json.data);
+      const data = await unwrapApiResponse<MarketItemDetail>(resp, '操作失败');
+      setState(data);
     } catch (err: unknown) {
       setError(toErrorMessage(err, '操作失败'));
     } finally {
@@ -233,13 +224,8 @@ export default function MarketDetailPage({ user, item }: DetailPageProps) {
     try {
       const url = state.isOwner ? `/api/market/${state.id}` : `/api/admin/market/${state.id}`;
       const resp = await fetch(url, { method: 'DELETE' });
-      let json: { ok?: boolean; msg?: string } | null = null;
-      try {
-        json = await resp.json();
-      } catch {
-        json = null;
-      }
-      if (!resp.ok || !json?.ok) {
+      const json = await readApiEnvelope(resp);
+      if (!resp.ok || !json.ok) {
         const msg = json?.msg || `删除失败（状态码 ${resp.status}）`;
         throw new Error(msg);
       }

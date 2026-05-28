@@ -1,26 +1,24 @@
 import { GetServerSideProps } from 'next';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import { FormEvent, ReactElement, useEffect, useState } from 'react';
-import AppImage from '../components/AppImage';
+import { FormEvent, useEffect, useState } from 'react';
+import MeAccountSections from '../components/me/MeAccountSections';
+import MeContentSections from '../components/me/MeContentSections';
+import MePayoutSection from '../components/me/MePayoutSection';
+import MeSecuritySection from '../components/me/MeSecuritySection';
 import NavBar from '../components/NavBar';
 import ProfileCard from '../components/ProfileCard';
 import { readSession } from '../lib/auth';
 import { fetchAccountProfile, fetchProfile } from '../lib/api';
 import { fetchBackend, getRequestOrigin } from '../lib/apiBase';
+import { ensureApiSuccess, readApiEnvelope, unwrapApiResponse } from '../lib/apiEnvelope';
 import { toErrorMessage } from '../lib/errors';
 import { formatDateTime } from '../lib/format';
 import { marketPath, materialPath } from '../lib/slug';
 import { SessionUser } from '../types/user';
 import { UserAccountProfile, UserFollowItem } from '../types/userProfile';
 import { PayoutApplication } from '../types/payout';
-import {
-  ProfileSummary,
-  PurchaseItem,
-  UploadItem,
-  MarketWantItem,
-  MarketListingItem,
-} from '../types/profile';
+import { ProfileSummary, PurchaseItem, UploadItem, MarketWantItem, MarketListingItem } from '../types/profile';
 
 const ADMIN_QQ = '245934740';
 
@@ -147,7 +145,7 @@ export default function MePage({ user, summary, account }: MePageProps) {
       setPayoutLoading(true);
       try {
         const resp = await fetchBackend('/me/creator-payout-application');
-        const json = await resp.json();
+        const json = await readApiEnvelope<PayoutApplication | null>(resp);
         if (resp.ok && json.ok) {
           setPayoutApp(json.data);
           if (json.data?.contactType) {
@@ -173,11 +171,7 @@ export default function MePage({ user, summary, account }: MePageProps) {
       try {
         const loadList = async (path: string) => {
           const resp = await fetchBackend(path);
-          const json = await resp.json();
-          if (!resp.ok || !json.ok || !Array.isArray(json.data)) {
-            throw new Error(json.msg || '加载关注列表失败');
-          }
-          return json.data as UserFollowItem[];
+          return unwrapApiResponse<UserFollowItem[]>(resp, '加载关注列表失败');
         };
         const [following, followers] = await Promise.all([
           loadList(`/users/${user.id}/following`),
@@ -217,98 +211,6 @@ export default function MePage({ user, summary, account }: MePageProps) {
   }, []);
 
   const freeDownloadsLeft = freeStatus?.unlimited ? '无限' : freeStatus?.remaining ?? 0;
-  const quickNavItems = [
-    { id: 'profile', label: '个人主页', icon: 'profile' },
-    { id: 'download-quota', label: '下载次数', icon: 'download' },
-    { id: 'purchases', label: '最近购买', icon: 'bag' },
-    { id: 'wants', label: '我的想要', icon: 'star' },
-    { id: 'uploads', label: '我的投稿', icon: 'upload' },
-    { id: 'payout', label: '创作者收益', icon: 'wallet' },
-    { id: 'listings', label: '校园好物', icon: 'shop' },
-    { id: 'security', label: '安全设置', icon: 'lock' },
-  ];
-  const quickNavIcons: Record<string, ReactElement> = {
-    profile: (
-      <svg viewBox="0 0 24 24" aria-hidden="true">
-        <circle cx="12" cy="8" r="4" fill="none" stroke="currentColor" strokeWidth="1.8" />
-        <path
-          d="M4 20a8 8 0 0 1 16 0"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.8"
-          strokeLinecap="round"
-        />
-      </svg>
-    ),
-    download: (
-      <svg viewBox="0 0 24 24" aria-hidden="true">
-        <path d="M12 4v10" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" fill="none" />
-        <path d="M7 11l5 5 5-5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" fill="none" />
-        <path d="M5 20h14" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" fill="none" />
-      </svg>
-    ),
-    bag: (
-      <svg viewBox="0 0 24 24" aria-hidden="true">
-        <path
-          d="M6 8h12l-1 12H7L6 8z"
-          stroke="currentColor"
-          strokeWidth="1.8"
-          strokeLinejoin="round"
-          fill="none"
-        />
-        <path d="M9 8a3 3 0 0 1 6 0" stroke="currentColor" strokeWidth="1.8" fill="none" />
-      </svg>
-    ),
-    star: (
-      <svg viewBox="0 0 24 24" aria-hidden="true">
-        <path
-          d="M12 4l2.3 4.7 5.2.8-3.8 3.7.9 5.3-4.6-2.4-4.6 2.4.9-5.3-3.8-3.7 5.2-.8L12 4z"
-          stroke="currentColor"
-          strokeWidth="1.6"
-          strokeLinejoin="round"
-          fill="none"
-        />
-      </svg>
-    ),
-    upload: (
-      <svg viewBox="0 0 24 24" aria-hidden="true">
-        <path d="M12 19V9" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" fill="none" />
-        <path d="M7 12l5-5 5 5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" fill="none" />
-        <path d="M5 19h14" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" fill="none" />
-      </svg>
-    ),
-    wallet: (
-      <svg viewBox="0 0 24 24" aria-hidden="true">
-        <path
-          d="M4 7h14a3 3 0 0 1 3 3v6a1 1 0 0 1-1 1H4a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2z"
-          stroke="currentColor"
-          strokeWidth="1.6"
-          strokeLinejoin="round"
-          fill="none"
-        />
-        <path d="M16 12h4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" fill="none" />
-      </svg>
-    ),
-    shop: (
-      <svg viewBox="0 0 24 24" aria-hidden="true">
-        <path
-          d="M4 10h16l-1 9H5l-1-9z"
-          stroke="currentColor"
-          strokeWidth="1.6"
-          strokeLinejoin="round"
-          fill="none"
-        />
-        <path d="M7 10a5 5 0 0 1 10 0" stroke="currentColor" strokeWidth="1.6" fill="none" />
-      </svg>
-    ),
-    lock: (
-      <svg viewBox="0 0 24 24" aria-hidden="true">
-        <rect x="5" y="11" width="14" height="9" rx="2" stroke="currentColor" strokeWidth="1.6" fill="none" />
-        <path d="M8 11V8a4 4 0 0 1 8 0v3" stroke="currentColor" strokeWidth="1.6" fill="none" />
-      </svg>
-    ),
-  };
-
   const notifyQuotaLimit = (message?: string) => {
     if (typeof window === 'undefined') return;
     window.alert(message || '下载次数已用完，如需继续下载请联系管理员重置额度。');
@@ -318,7 +220,7 @@ export default function MePage({ user, summary, account }: MePageProps) {
     setToast(null);
     try {
       const resp = await fetchBackend(`/materials/${materialId}/downloads`, { method: 'POST' });
-      const json = await resp.json();
+      const json = await readApiEnvelope<{ url?: string }>(resp);
       if (resp.status === 403 && json?.error?.code === 'DOWNLOAD_QUOTA_EXHAUSTED') {
         notifyQuotaLimit(json.msg);
       }
@@ -336,8 +238,6 @@ export default function MePage({ user, summary, account }: MePageProps) {
       setToast({ type: 'error', message: toErrorMessage(error, '下载失败') });
     }
   };
-
-
   const submitPayout = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setPayoutMessage(null);
@@ -352,14 +252,11 @@ export default function MePage({ user, summary, account }: MePageProps) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
-      const json = await resp.json();
-      if (!resp.ok || !json.ok) {
-        throw new Error(json.msg || '提交失败');
-      }
-      setPayoutApp(json.data);
-      if (json.data?.status === 'KYC_FAILED') {
+      const data = await unwrapApiResponse<PayoutApplication>(resp, '提交失败');
+      setPayoutApp(data);
+      if (data?.status === 'KYC_FAILED') {
         setPayoutMessage({ type: 'error', message: '实名核验失败，请核对姓名与身份证号后重试。' });
-      } else if (json.data?.status === 'KYC_PENDING') {
+      } else if (data?.status === 'KYC_PENDING') {
         setPayoutMessage({ type: 'error', message: '核验中断，请稍后再试（1 分钟后可重试）。' });
       } else {
         setPayoutMessage({ type: 'success', message: '提交成功' });
@@ -374,11 +271,8 @@ export default function MePage({ user, summary, account }: MePageProps) {
   const fetchResetCaptcha = async () => {
     try {
       const resp = await fetchBackend('/captchas');
-      const json = await resp.json();
-      if (!resp.ok || !json.ok || !json.data) {
-        throw new Error(json.msg || '获取验证码失败');
-      }
-      setResetCaptcha(json.data);
+      const data = await unwrapApiResponse<CaptchaState>(resp, '获取验证码失败');
+      setResetCaptcha(data);
       setResetCaptchaCode('');
     } catch (err: unknown) {
       setEmailResetMessage({ type: 'error', message: toErrorMessage(err, '获取验证码失败') });
@@ -420,10 +314,7 @@ export default function MePage({ user, summary, account }: MePageProps) {
           captchaCode: resetCaptchaCode,
         }),
       });
-      const json = await resp.json();
-      if (!resp.ok || !json.ok) {
-        throw new Error(json.msg || '发送验证码失败');
-      }
+      const json = await ensureApiSuccess<{ resendAfterSeconds?: number }>(resp, '发送验证码失败');
       setEmailResetCooldown(json.data?.resendAfterSeconds ?? 60);
       setEmailResetMessage({ type: 'success', message: '验证码已发送至邮箱，请在 5 分钟内完成验证。' });
     } catch (error: unknown) {
@@ -464,10 +355,7 @@ export default function MePage({ user, summary, account }: MePageProps) {
           code: emailResetForm.code,
         }),
       });
-      const json = await resp.json();
-      if (!resp.ok || !json.ok) {
-        throw new Error(json.msg || '重置密码失败');
-      }
+      await ensureApiSuccess(resp, '重置密码失败');
       setEmailResetMessage({ type: 'success', message: '重置成功，请使用新密码登录。' });
       setEmailResetCooldown(0);
       setEmailResetForm((prev) => ({ ...prev, newPassword: '', confirm: '', code: '' }));
@@ -506,10 +394,7 @@ export default function MePage({ user, summary, account }: MePageProps) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: bindForm.email }),
       });
-      const json = await resp.json();
-      if (!resp.ok || !json.ok) {
-        throw new Error(json.msg || '发送验证码失败');
-      }
+      const json = await ensureApiSuccess<{ resendAfterSeconds?: number }>(resp, '发送验证码失败');
       const resendAfter = json.data?.resendAfterSeconds ?? 30;
       setBindCooldown(resendAfter);
       setBindMessage({ type: 'success', message: '验证码已发送至邮箱，请在 5 分钟内完成绑定。' });
@@ -534,10 +419,7 @@ export default function MePage({ user, summary, account }: MePageProps) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: bindForm.email, code: bindForm.code }),
       });
-      const json = await resp.json();
-      if (!resp.ok || !json.ok) {
-        throw new Error(json.msg || '绑定失败');
-      }
+      await ensureApiSuccess(resp, '绑定失败');
       setBindVerified(true);
       setBindMessage({ type: 'success', message: '邮箱绑定成功' });
       setBindForm((prev) => ({ ...prev, code: '' }));
@@ -682,10 +564,7 @@ export default function MePage({ user, summary, account }: MePageProps) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status }),
       });
-      const json = await resp.json();
-      if (!resp.ok || !json.ok) {
-        throw new Error(json.msg || '操作失败');
-      }
+      await ensureApiSuccess(resp, '操作失败');
       setToast({ type: 'success', message: status === 'SOLD' ? '已标记为已售' : '状态已更新' });
       router.replace(router.asPath);
     } catch (error: unknown) {
@@ -699,10 +578,7 @@ export default function MePage({ user, summary, account }: MePageProps) {
     setDeletingMaterialId(materialId);
     try {
       const resp = await fetchBackend(`/materials/${materialId}`, { method: 'DELETE' });
-      const json = await resp.json();
-      if (!resp.ok || !json.ok) {
-        throw new Error(json.msg || '删除失败');
-      }
+      await ensureApiSuccess(resp, '删除失败');
       setToast({ type: 'success', message: '资料已删除' });
       router.replace(router.asPath);
     } catch (error: unknown) {
@@ -718,10 +594,7 @@ export default function MePage({ user, summary, account }: MePageProps) {
     setDeletingListingId(itemId);
     try {
       const resp = await fetchBackend(`/market/${itemId}`, { method: 'DELETE' });
-      const json = await resp.json();
-      if (!resp.ok || !json.ok) {
-        throw new Error(json.msg || '删除失败');
-      }
+      await ensureApiSuccess(resp, '删除失败');
       setToast({ type: 'success', message: '商品已删除' });
       router.replace(router.asPath);
     } catch (error: unknown) {
@@ -749,10 +622,7 @@ export default function MePage({ user, summary, account }: MePageProps) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ oldPassword: passwordForm.oldPassword, newPassword: passwordForm.newPassword }),
       });
-      const json = await resp.json();
-      if (!resp.ok || !json.ok) {
-        throw new Error(json.msg || '修改密码失败');
-      }
+      await ensureApiSuccess(resp, '修改密码失败');
       setPwdMessage({ type: 'success', message: '密码修改成功，下次登录请使用新密码。' });
       setPasswordForm({ oldPassword: '', newPassword: '', confirm: '' });
     } catch (error: unknown) {
@@ -853,409 +723,74 @@ export default function MePage({ user, summary, account }: MePageProps) {
           )}
           {user && summary && (
             <>
-              <section className="card" id="security">
-                <div className="card-title">修改密码</div>
-                <div className="security-block">
-                  <h4>已记得旧密码</h4>
-                  <form className="form-grid" onSubmit={submitPasswordChange}>
-                    <div className="form-item full">
-                      <label htmlFor="oldPassword">旧密码</label>
-                      <input
-                        id="oldPassword"
-                        type="password"
-                        value={passwordForm.oldPassword}
-                        onChange={(e) => setPasswordForm((prev) => ({ ...prev, oldPassword: e.target.value }))}
-                        required
-                      />
-                    </div>
-                    <div className="form-item full">
-                      <label htmlFor="newPassword">新密码</label>
-                      <input
-                        id="newPassword"
-                        type="password"
-                        value={passwordForm.newPassword}
-                        onChange={(e) => setPasswordForm((prev) => ({ ...prev, newPassword: e.target.value }))}
-                        placeholder="不少于 6 位"
-                        required
-                      />
-                    </div>
-                    <div className="form-item full">
-                      <label htmlFor="confirmPassword">确认新密码</label>
-                      <input
-                        id="confirmPassword"
-                        type="password"
-                        value={passwordForm.confirm}
-                        onChange={(e) => setPasswordForm((prev) => ({ ...prev, confirm: e.target.value }))}
-                        required
-                      />
-                    </div>
-                    <div className="form-item">
-                      <button className="button primary" type="submit" disabled={pwdLoading}>
-                        {pwdLoading ? '提交中...' : '更新密码'}
-                      </button>
-                    </div>
-                  </form>
-                  <p className="help-text">推荐常规方式修改；若遗忘旧密码，可尝试下方邮箱验证。</p>
-                  {pwdMessage && (
-                    <p className={pwdMessage.type === 'error' ? 'error-text' : 'success-text'}>{pwdMessage.message}</p>
-                  )}
-                </div>
-                <div className="divider" style={{ margin: '16px 0', borderTop: '1px dashed #e0e4ef' }} />
-                <div className="security-block">
-                  <h4>忘记旧密码（邮箱验证）</h4>
-                  <form className="form-grid" onSubmit={confirmEmailReset}>
-                    <div className="form-item full">
-                      <label htmlFor="reset-identifier">账号 / 邮箱</label>
-                      <input
-                        id="reset-identifier"
-                        value={emailResetForm.identifier}
-                        onChange={(e) => setEmailResetForm((prev) => ({ ...prev, identifier: e.target.value }))}
-                        placeholder="请输入已绑定的邮箱或账号"
-                        required
-                      />
-                      <p className="help-text">
-                        {user?.email ? `验证码将发送至：${user.email}` : '需先绑定邮箱后才可通过邮箱重置密码。'}
-                      </p>
-                    </div>
-                    <div className="form-item full">
-                      <label htmlFor="reset-new-password">新密码</label>
-                      <input
-                        id="reset-new-password"
-                        type="password"
-                        value={emailResetForm.newPassword}
-                        onChange={(e) => setEmailResetForm((prev) => ({ ...prev, newPassword: e.target.value }))}
-                        placeholder="不少于 6 位"
-                        required
-                      />
-                    </div>
-                    <div className="form-item full">
-                      <label htmlFor="reset-confirm-password">确认新密码</label>
-                      <input
-                        id="reset-confirm-password"
-                        type="password"
-                        value={emailResetForm.confirm}
-                        onChange={(e) => setEmailResetForm((prev) => ({ ...prev, confirm: e.target.value }))}
-                        required
-                      />
-                    </div>
-                    <div className="form-item full">
-                      <label htmlFor="reset-captcha">图形验证码</label>
-                      <div className="captcha-row">
-                        <input
-                          id="reset-captcha"
-                          value={resetCaptchaCode}
-                          onChange={(e) => setResetCaptchaCode(e.target.value)}
-                          placeholder="请输入图形验证码"
-                          required
-                        />
-                        {resetCaptcha.imageBase64 ? (
-                          <AppImage
-                            src={resetCaptcha.imageBase64}
-                            alt="验证码"
-                            className="captcha-image"
-                            onClick={fetchResetCaptcha}
-                            role="button"
-                            aria-label="点击刷新验证码"
-                          />
-                        ) : (
-                          <button
-                            className="button ghost"
-                            type="button"
-                            onClick={fetchResetCaptcha}
-                            disabled={emailResetLoading}
-                          >
-                            获取验证码
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                    <div className="form-item full">
-                      <label htmlFor="reset-code">邮箱验证码</label>
-                      <div className="captcha-row">
-                        <input
-                          id="reset-code"
-                          value={emailResetForm.code}
-                          onChange={(e) => setEmailResetForm((prev) => ({ ...prev, code: e.target.value }))}
-                          placeholder="输入邮箱验证码"
-                          required
-                        />
-                        <button
-                          className="button ghost"
-                          type="button"
-                          disabled={emailResetLoading || emailResetCooldown > 0 || !emailResetForm.identifier}
-                          onClick={sendEmailResetCode}
-                        >
-                          {emailResetCooldown > 0 ? `重新发送 (${emailResetCooldown}s)` : '发送验证码'}
-                        </button>
-                      </div>
-                    </div>
-                    <div className="form-item">
-                      <button className="button primary" type="submit" disabled={emailResetLoading}>
-                        {emailResetLoading ? '提交中...' : '通过邮箱重置'}
-                      </button>
-                    </div>
-                  </form>
-                  <p className="help-text">若邮箱无法使用，仍可联系管理员协助处理（QQ群 {ADMIN_QQ}）。</p>
-                  {emailResetMessage && (
-                    <p className={emailResetMessage.type === 'error' ? 'error-text' : 'success-text'}>
-                      {emailResetMessage.message}
-                    </p>
-                  )}
-                </div>
-              </section>
-              <section className="card" id="email-binding">
-              <div className="card-title">邮箱绑定</div>
-              <form className="form-grid" onSubmit={confirmBindEmail}>
-                <div className="form-item full">
-                  <label htmlFor="bind-email">邮箱地址</label>
-                  <input
-                    id="bind-email"
-                    type="email"
-                    value={bindForm.email}
-                    onChange={(e) => setBindForm((prev) => ({ ...prev, email: e.target.value }))}
-                    placeholder="输入要绑定的邮箱"
-                    required
-                  />
-                  <p className="help-text">
-                    状态：{bindVerified ? '已验证' : '未验证'} {user?.email ? `(当前：${user.email})` : ''}
-                  </p>
-                </div>
-                <div className="form-item full">
-                  <label htmlFor="bind-code">邮箱验证码</label>
-                  <div className="captcha-row">
-                    <input
-                      id="bind-code"
-                      value={bindForm.code}
-                      onChange={(e) => setBindForm((prev) => ({ ...prev, code: e.target.value }))}
-                      placeholder="输入邮箱验证码"
-                      required
-                    />
-                    <button
-                      className="button ghost"
-                      type="button"
-                      disabled={bindLoading || bindCooldown > 0}
-                      onClick={sendBindCode}
-                    >
-                      {bindCooldown > 0 ? `重新发送 (${bindCooldown}s)` : '发送验证码'}
-                    </button>
-                  </div>
-                </div>
-                <div className="form-item">
-                  <button className="button primary" type="submit" disabled={bindLoading}>
-                    {bindLoading ? '处理中...' : '确认绑定'}
-                  </button>
-                </div>
-              </form>
-              {bindMessage && (
-                <p className={bindMessage.type === 'error' ? 'error-text' : 'success-text'}>{bindMessage.message}</p>
-              )}
-            </section>
-              <section className="card" id="download-quota">
-                <div className="card-title">下载次数额度</div>
-                <p>
-                  剩余：<strong>{freeDownloadsLeft}</strong> 次 / 200 次上限（含免费与付费资料）。
-                </p>
-                <p className="help-text">如需重置请联系管理员（QQ群 {ADMIN_QQ}）。</p>
-                <div className="inline-group" style={{ marginTop: 8 }}>
-                  <Link className="button ghost" href="/">
-                    去下载资料
-                  </Link>
-                  <Link className="button ghost" href="/join">
-                    关于我们
-                  </Link>
-                </div>
-              </section>
-              <section className="card" id="uploads">
-                <div className="card-title">我的投稿</div>
-                {uploads.length === 0 ? (
-                  <p className="help-text">
-                    还没有投稿，<Link href="/upload">前往投稿</Link> 提供优质资料吧。
-                  </p>
-                ) : (
-                  <>
-                    <ul className="materials-list">{visibleUploads.map(renderUpload)}</ul>
-                    {canExpandUploads && (
-                      <button
-                        type="button"
-                        className="profile-card__expand"
-                        onClick={() => setUploadsExpanded((prev) => !prev)}
-                        data-expanded={uploadsExpanded}
-                      >
-                        {uploadsExpanded ? '收起' : '展开全部'}
-                      </button>
-                    )}
-                  </>
-                )}
-              </section>
-              <section className="card" id="purchases">
-                <div className="card-title">最近购买</div>
-                {purchases.length === 0 ? (
-                  <p className="help-text">暂无购买记录，去首页看看吧。</p>
-                ) : (
-                  <>
-                    <ul className="materials-list">{visiblePurchases.map(renderPurchase)}</ul>
-                    {canExpandPurchases && (
-                      <button
-                        type="button"
-                        className="profile-card__expand"
-                        onClick={() => setPurchasesExpanded((prev) => !prev)}
-                        data-expanded={purchasesExpanded}
-                      >
-                        {purchasesExpanded ? '收起' : '展开全部'}
-                      </button>
-                    )}
-                  </>
-                )}
-              </section>
-              <section className="card" id="wants">
-                <div className="card-title">我想要的校园好物</div>
-                {marketWants.length === 0 ? (
-                  <p className="help-text">
-                    还没有关注校园好物，<Link href="/market">去集市逛逛</Link>。
-                  </p>
-                ) : (
-                  <>
-                    <ul className="materials-list">{visibleMarketWants.map(renderMarketWant)}</ul>
-                    {canExpandMarketWants && (
-                      <button
-                        type="button"
-                        className="profile-card__expand"
-                        onClick={() => setWantsExpanded((prev) => !prev)}
-                        data-expanded={wantsExpanded}
-                      >
-                        {wantsExpanded ? '收起' : '展开全部'}
-                      </button>
-                    )}
-                  </>
-                )}
-              </section>
-              <section className="card" id="listings">
-                <div className="card-title">我发布的校园好物</div>
-                {marketListings.length === 0 ? (
-                  <p className="help-text">
-                    还没有发布校园好物，<Link href="/market/sell">去集市发布</Link>。
-                  </p>
-                ) : (
-                  <>
-                    <ul className="materials-list">{visibleMarketListings.map(renderMarketListing)}</ul>
-                    {canExpandMarketListings && (
-                      <button
-                        type="button"
-                        className="profile-card__expand"
-                        onClick={() => setListingsExpanded((prev) => !prev)}
-                        data-expanded={listingsExpanded}
-                      >
-                        {listingsExpanded ? '收起' : '展开全部'}
-                      </button>
-                    )}
-                  </>
-                )}
-              </section>
-              <section className="card" id="payout">
-                <div className="card-title">创作者收益申请</div>
-                <form className="form-grid" onSubmit={submitPayout}>
-                <div className="form-item">
-                  <label htmlFor="payout-alipay-account">支付宝账号</label>
-                  <input
-                    id="payout-alipay-account"
-                    value={payoutForm.alipayAccount}
-                    onChange={(e) => setPayoutForm((prev) => ({ ...prev, alipayAccount: e.target.value }))}
-                    placeholder="用于收款的支付宝账号"
-                    required
-                  />
-                </div>
-                <div className="form-item">
-                  <label htmlFor="payout-real-name">
-                    收款人姓名（需与支付宝实名一致）
-                    <Link
-                      href="/identity-info"
-                      className="identity-help-link"
-                      title="为了向创作者支付收益并依法办理个人所得税扣缴申报，我们需要采集收款人姓名、身份证号等身份信息，并做同名支付宝校验。信息仅用于提现审核、税务申报与风控合规，严格加密与脱敏。"
-                      aria-label="为什么需要身份信息"
-                    >
-                      ？为什么需要我的身份信息
-                    </Link>
-                  </label>
-                  <input
-                    id="payout-real-name"
-                    value={payoutForm.realName}
-                    onChange={(e) =>
-                      setPayoutForm((prev) => ({
-                        ...prev,
-                        realName: e.target.value,
-                        alipayName: e.target.value,
-                      }))
-                    }
-                    placeholder="将用于实名核验"
-                    required
-                  />
-                </div>
-                <div className="form-item">
-                  <label htmlFor="payout-id-card">身份证号</label>
-                  <input
-                    id="payout-id-card"
-                    value={payoutForm.idCardNo}
-                    onChange={(e) => setPayoutForm((prev) => ({ ...prev, idCardNo: e.target.value }))}
-                    placeholder="仅用于实名核验"
-                    required
-                  />
-                </div>
-                <div className="form-item full">
-                  <p className="help-text">实名信息仅用于核验与打款，同名校验不通过将无法结算。</p>
-                </div>
-                <div className="form-item">
-                  <label htmlFor="payout-contact-type">联系方式类型</label>
-                  <select
-                    id="payout-contact-type"
-                    value={payoutForm.contactType}
-                    onChange={(e) => setPayoutForm((prev) => ({ ...prev, contactType: e.target.value }))}
-                  >
-                    <option value="WECHAT">微信</option>
-                    <option value="QQ">QQ</option>
-                    <option value="PHONE">手机号</option>
-                    <option value="OTHER">其他</option>
-                  </select>
-                </div>
-                <div className="form-item">
-                  <label htmlFor="payout-contact-value">联系方式</label>
-                  <input
-                    id="payout-contact-value"
-                    value={payoutForm.contactValue}
-                    onChange={(e) => setPayoutForm((prev) => ({ ...prev, contactValue: e.target.value }))}
-                    placeholder="请输入联系账号，便于结算沟通"
-                    required
-                  />
-                </div>
-                <div className="form-item full">
-                  <p className="help-text">最低提现金额为 10 元。</p>
-                </div>
-                <div className="form-item full">
-                  <label htmlFor="payout-notes">备注（可选）</label>
-                  <textarea
-                    id="payout-notes"
-                    value={payoutForm.notes}
-                    onChange={(e) => setPayoutForm((prev) => ({ ...prev, notes: e.target.value }))}
-                    rows={3}
-                    placeholder="补充结算说明"
-                  />
-                </div>
-                <div className="form-item">
-                  <button className="button primary" type="submit" disabled={payoutLoading}>
-                    {payoutLoading ? '提交中...' : '提交收益申请'}
-                  </button>
-                </div>
-              </form>
-              {payoutMessage && (
-                <p className={payoutMessage.type === 'error' ? 'error-text' : 'success-text'}>{payoutMessage.message}</p>
-              )}
-              {payoutApp && (
-                <div className="help-text" style={{ marginTop: 8 }}>
-                  <div>状态：{payoutApp.status || '未提交'}</div>
-                  <div>周期：{payoutApp.cycleKey || '-'}</div>
-                  <div>说明：{renderPayoutStatus()}</div>
-                </div>
-              )}
-            </section>
+              <MeSecuritySection
+                userEmail={user.email}
+                adminQq={ADMIN_QQ}
+                passwordForm={passwordForm}
+                pwdLoading={pwdLoading}
+                pwdMessage={pwdMessage}
+                emailResetForm={emailResetForm}
+                resetCaptcha={resetCaptcha}
+                resetCaptchaCode={resetCaptchaCode}
+                emailResetLoading={emailResetLoading}
+                emailResetCooldown={emailResetCooldown}
+                emailResetMessage={emailResetMessage}
+                onPasswordFormChange={(patch) => setPasswordForm((prev) => ({ ...prev, ...patch }))}
+                onEmailResetFormChange={(patch) => setEmailResetForm((prev) => ({ ...prev, ...patch }))}
+                onResetCaptchaCodeChange={setResetCaptchaCode}
+                onPasswordSubmit={submitPasswordChange}
+                onEmailResetSubmit={confirmEmailReset}
+                onFetchResetCaptcha={fetchResetCaptcha}
+                onSendEmailResetCode={sendEmailResetCode}
+              />
+              <MeAccountSections
+                adminQq={ADMIN_QQ}
+                bindForm={bindForm}
+                bindVerified={bindVerified}
+                bindLoading={bindLoading}
+                bindCooldown={bindCooldown}
+                bindMessage={bindMessage}
+                currentEmail={user.email}
+                freeDownloadsLeft={freeDownloadsLeft}
+                onBindFormChange={(patch) => setBindForm((prev) => ({ ...prev, ...patch }))}
+                onSendBindCode={sendBindCode}
+                onConfirmBindEmail={confirmBindEmail}
+              />
+              <MeContentSections
+                uploads={uploads}
+                visibleUploads={visibleUploads}
+                uploadsExpanded={uploadsExpanded}
+                canExpandUploads={canExpandUploads}
+                purchases={purchases}
+                visiblePurchases={visiblePurchases}
+                purchasesExpanded={purchasesExpanded}
+                canExpandPurchases={canExpandPurchases}
+                marketWants={marketWants}
+                visibleMarketWants={visibleMarketWants}
+                wantsExpanded={wantsExpanded}
+                canExpandMarketWants={canExpandMarketWants}
+                marketListings={marketListings}
+                visibleMarketListings={visibleMarketListings}
+                listingsExpanded={listingsExpanded}
+                canExpandMarketListings={canExpandMarketListings}
+                renderUpload={renderUpload}
+                renderPurchase={renderPurchase}
+                renderMarketWant={renderMarketWant}
+                renderMarketListing={renderMarketListing}
+                onUploadsExpandedChange={setUploadsExpanded}
+                onPurchasesExpandedChange={setPurchasesExpanded}
+                onWantsExpandedChange={setWantsExpanded}
+                onListingsExpandedChange={setListingsExpanded}
+              />
+              <MePayoutSection
+                payoutForm={payoutForm}
+                payoutLoading={payoutLoading}
+                payoutMessage={payoutMessage}
+                payoutApp={payoutApp}
+                payoutStatusText={renderPayoutStatus()}
+                onPayoutFormChange={(patch) => setPayoutForm((prev) => ({ ...prev, ...patch }))}
+                onSubmit={submitPayout}
+              />
             {adminNotes.length > 0 && (
               <section className="card" id="admin-notes">
                 <div className="card-title">管理员留言</div>

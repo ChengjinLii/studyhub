@@ -4,21 +4,22 @@ import { useRouter } from 'next/router';
 import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import AppImage from '../components/AppImage';
 import NavBar from '../components/NavBar';
+import UploadBasicSection from '../components/upload/UploadBasicSection';
+import UploadConfirmSection from '../components/upload/UploadConfirmSection';
+import UploadHero from '../components/upload/UploadHero';
+import UploadMetaSection from '../components/upload/UploadMetaSection';
+import UploadPolicyModal from '../components/upload/UploadPolicyModal';
+import SectionLabel from '../components/upload/UploadSectionLabel';
 import { readSession } from '../lib/auth';
 import { SessionUser } from '../types/user';
-import { MaterialDetail } from '../types/material';
 import { UserAccountProfile } from '../types/userProfile';
 import {
   SUPPORTED_SCHOOL,
-  SUPPORTED_COLLEGES,
-  SUPPORTED_MAJORS,
   defaultCollege,
-  COURSE_CATEGORY_OPTIONS,
   CourseCategoryValue,
-  normalizeCourseCategory,
   GRADE_STAGE_OPTIONS,
 } from '../constants/metadata';
-import { fetchAccountProfile, fetchMaterialDetail } from '../lib/api';
+import { fetchAccountProfile } from '../lib/api';
 import { getRequestOrigin } from '../lib/apiBase';
 import {
   ColumnTopicKey,
@@ -26,14 +27,14 @@ import {
   getColumnTopicTitle,
   isCommunityColumnTopic,
   normalizeColumnTopic,
-  resolveExperienceTopicFromTags,
 } from '../lib/column';
 import { resolveApiBase } from '../lib/apiBase';
 import { toErrorMessage } from '../lib/errors';
-import { parseMajorList, serializeMajorList } from '../lib/major';
+import { parseMajorList } from '../lib/major';
 import { materialPath } from '../lib/slug';
 import { buildZipName, resolveZipFileName, zipFiles, zipMarkdownContent } from '../lib/uploadAssets';
-import { sendUploadFormData, type UploadMutationResponse } from '../lib/uploadSubmit';
+import { buildUploadPayload } from '../lib/uploadPayload';
+import { sendUploadFormData } from '../lib/uploadSubmit';
 import {
   formatPriceSummary,
   normalizePriceInput,
@@ -41,6 +42,7 @@ import {
   validateUploadSubmitInput,
 } from '../lib/uploadValidation';
 import { useSectionNavigation } from '../lib/useSectionNavigation';
+import { useUploadExistingMaterial } from '../lib/useUploadExistingMaterial';
 import { useUploadImageSelection } from '../lib/useUploadImageSelection';
 
 const presetTags = [
@@ -86,24 +88,6 @@ const UPLOAD_NAV_ITEMS = [
   { id: 'upload-delivery', label: '交付与预览' },
   { id: 'upload-confirm', label: '发布确认' },
 ];
-
-const SectionLabel = ({ text, htmlFor, optional }: { text: string; htmlFor?: string; optional?: boolean }) => (
-  <label htmlFor={htmlFor} className="section-label">
-    <span className="section-marker" aria-hidden="true" />
-    <span>{text}</span>
-    {optional && <span className="optional-pill">可选</span>}
-  </label>
-);
-
-const UploadTitleIcon = () => (
-  <span className="upload-title-icon" aria-hidden="true">
-    <svg viewBox="0 0 24 24" role="img" focusable="false">
-      <path d="M3.5 7.5L12 3l8.5 4.5L12 12z" />
-      <path d="M3.5 12L12 16.5 20.5 12" />
-      <path d="M3.5 16.5L12 21l8.5-4.5" />
-    </svg>
-  </span>
-);
 
 interface UploadPageProps {
   user: SessionUser | null;
@@ -194,7 +178,6 @@ export default function UploadPage({ user, token, account }: UploadPageProps) {
   const [copyrightOwner, setCopyrightOwner] = useState('');
   const [status, setStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const [loadingExisting, setLoadingExisting] = useState(false);
   const [zipPlaceholder, setZipPlaceholder] = useState('未选择任何文件');
   const [quickPanelOpen, setQuickPanelOpen] = useState(false);
   const [quickSelectedOption, setQuickSelectedOption] = useState<string | null>(null);
@@ -289,92 +272,41 @@ export default function UploadPage({ user, token, account }: UploadPageProps) {
       courseCategoryLabel: resolvedCourseCategory === 'MAJOR' ? '专业课' : '通识课',
     };
   }, [account, gradeStageOptions]);
-  const deriveGradeType = (stage: string) => {
-    if (stage === '研究生') return 'GR';
-    if (stage === '英语' || stage === '技能') return 'SKILL';
-    return 'UG';
-  };
-
-  useEffect(() => {
-    const loadMaterial = async () => {
-      if (!isEditing || !editingId) return;
-      setLoadingExisting(true);
-      try {
-        const detail: MaterialDetail = await fetchMaterialDetail(editingId, token || undefined);
-        setTitle(detail.title || '');
-        setDescription(detail.description || '');
-        const detailPrice = detail.price != null ? Math.round(detail.price) : 0;
-        setPrice(detailPrice > 0 ? String(detailPrice) : '0');
-        setSchool(detail.school === SUPPORTED_SCHOOL ? detail.school : SUPPORTED_SCHOOL);
-        const normalizedCategory = normalizeCourseCategory(detail.courseCategory, detail.generalEducation);
-        setCourseCategory(normalizedCategory);
-        const lockDepartment = normalizedCategory !== 'MAJOR';
-        setCollege(lockDepartment ? '' : detail.college || defaultCollege);
-        const parsedMajors = parseMajorList(detail.major);
-        setSelectedMajors(lockDepartment ? [] : parsedMajors);
-        const resolvedGradeStage =
-          detail.gradeValue && gradeStageOptions.includes(detail.gradeValue as (typeof gradeStageOptions)[number])
-            ? detail.gradeValue
-            : gradeStageOptions[0];
-        setGradeValue(resolvedGradeStage);
-        const resolvedTags = detail.tags || [];
-        setSelectedTags(resolvedTags.slice(0, MAX_TAGS));
-        setUploadMode(resolvedTags.includes('经验分享') ? 'experience' : 'material');
-        const resolvedTopic = resolveExperienceTopicFromTags(resolvedTags);
-        setExperienceTopic(resolvedTopic);
-        if (resolvedTags.includes('经验分享')) {
-          const extraCustomTag = resolvedTags.find(
-            (tag) =>
-              tag &&
-              tag !== '经验分享' &&
-              tag !== '保研面经' &&
-              tag !== '求职面经' &&
-              tag !== '考研攻略' &&
-              tag !== '留学指南' &&
-              tag !== '考研心得' &&
-              tag !== '留学心得'
-          );
-          setExperienceCustomTag(extraCustomTag || '');
-          if (extraCustomTag && (resolvedTopic === 'experience' || resolvedTopic === 'leetcode' || resolvedTopic === 'llm')) {
-            setExperienceTopic('leetcode');
-          }
-        } else {
-          setExperienceCustomTag('');
-        }
-        setZipPlaceholder(detail.originalFilename || '当前资料文件');
-        setHasExistingFile(Boolean(detail.hasFile));
-        setDeliveryMethod(detail.hasFile ? 'FILE' : detail.hasNetdisk ? 'NETDISK' : 'FILE');
-        setNetdiskUrl(detail.netdiskUrl || '');
-        setNetdiskPassword(detail.netdiskPassword || '');
-        setNetdiskExpiredAt(detail.netdiskExpiredAt || '');
-        setNetdiskReminderAt(detail.netdiskReminderAt || '');
-        setCopyrightOwner(detail.copyrightOwner || '');
-        setPreviewWatermarkEnabled(detail.previewWatermarkEnabled ?? true);
-        setPreviewSource(detail.previewSource === PREVIEW_SOURCE_MANUAL ? PREVIEW_SOURCE_MANUAL : PREVIEW_SOURCE_AUTO);
-        setManualPreviewFiles([]);
-        setManualPreviewNotice(null);
-        setCustomPreviewText(detail.customPreviewText || '');
-        setExistingCustomPreviewImages(detail.customPreviewImages || []);
-        setCustomPreviewFiles([]);
-        setCustomPreviewNotice(null);
-        setCustomPreviewClear(false);
-      } catch (err: unknown) {
-        setStatus({ type: 'error', message: toErrorMessage(err, '加载资料信息失败') });
-      } finally {
-        setLoadingExisting(false);
-      }
-    };
-    loadMaterial();
-  }, [
-    editingId,
-    gradeStageOptions,
+  const { loadingExisting } = useUploadExistingMaterial({
     isEditing,
-    setCustomPreviewFiles,
-    setCustomPreviewNotice,
+    editingId,
+    token,
+    setTitle,
+    setDescription,
+    setPrice,
+    setSchool,
+    setCollege,
+    setSelectedMajors,
+    setCourseCategory,
+    setGradeValue,
+    setSelectedTags,
+    setUploadMode,
+    setExperienceTopic,
+    setExperienceCustomTag,
+    setZipPlaceholder,
+    setHasExistingFile,
+    setDeliveryMethod,
+    setNetdiskUrl,
+    setNetdiskPassword,
+    setNetdiskExpiredAt,
+    setNetdiskReminderAt,
+    setCopyrightOwner,
+    setPreviewWatermarkEnabled,
+    setPreviewSource,
     setManualPreviewFiles,
     setManualPreviewNotice,
-    token,
-  ]);
+    setCustomPreviewText,
+    setExistingCustomPreviewImages,
+    setCustomPreviewFiles,
+    setCustomPreviewNotice,
+    setCustomPreviewClear,
+    setStatus,
+  });
 
   useEffect(() => {
     if (courseCategory === 'MAJOR') {
@@ -659,34 +591,31 @@ export default function UploadPage({ user, token, account }: UploadPageProps) {
       const trimmedTitle = effectiveTitle;
       const trimmedDescription = description.trim();
       const trimmedCustomPreviewText = isExperience || isQuickMode ? '' : customPreviewText.trim();
-      const payload = {
+      const payload = buildUploadPayload({
         title: trimmedTitle,
         description: trimmedDescription,
-        price: resolvedPriceValue * 100,
+        priceValue: resolvedPriceValue,
         school: isQuickMode ? quickProfile.school : SUPPORTED_SCHOOL,
         college: effectiveCollege,
-        major: effectiveMajors.length > 0 ? serializeMajorList(effectiveMajors) : '',
+        majors: effectiveMajors,
         gradeValue: effectiveGradeValue,
-        gradeType: deriveGradeType(effectiveGradeValue),
-        generalCourse: effectiveCourseCategory === 'GENERAL',
         courseCategory: effectiveCourseCategory,
-        tags: effectiveTagList.join(','),
+        tags: effectiveTagList,
         deliveryMethod: resolvedDelivery,
-        netdiskUrl: isExperience ? null : trimmedNetdiskUrl || null,
-        netdiskPassword: isExperience ? null : netdiskPassword.trim() || null,
-        netdiskExpiredAt: isExperience ? null : netdiskExpiredAt || null,
-        netdiskReminderAt: isExperience ? null : netdiskReminderAt || null,
+        netdiskUrl: trimmedNetdiskUrl,
+        netdiskPassword,
+        netdiskExpiredAt,
+        netdiskReminderAt,
         previewWatermarkEnabled,
         previewSource: effectivePreviewSource,
-        customPreviewText: trimmedCustomPreviewText || null,
-        copyrightOwner: isExperience || isQuickMode ? null : copyrightOwner.trim() || null,
-      };
-      if (!isEditing && requestId) {
-        (payload as Record<string, unknown>).requestId = requestId;
-      }
-      if (isEditing) {
-        (payload as Record<string, unknown>).customPreviewClear = customPreviewClear;
-      }
+        customPreviewText: trimmedCustomPreviewText,
+        copyrightOwner,
+        isExperience,
+        isQuickMode,
+        isEditing,
+        requestId,
+        customPreviewClear,
+      });
       const formData = new FormData();
       let uploadFile =
         zipFile && zipSourceCount > 1 ? resolveZipFileName(zipFile, trimmedTitle, MAX_TITLE_LENGTH) : zipFile;
@@ -782,425 +711,67 @@ export default function UploadPage({ user, token, account }: UploadPageProps) {
 
   const formContent = (
     <form className="upload-stacked-form" onSubmit={handleSubmit}>
-      <div className="upload-section-shell" id="upload-basic">
-        <div className="upload-section-heading">
-          <div className="upload-section-heading__copy">
-            <h2 className="upload-section-heading__title">基础信息</h2>
-          </div>
-        </div>
-        <section className="card upload-main-card upload-section-card">
-          <div className="form-grid upload-section-grid">
-          <div className="form-item full">
-            <SectionLabel
-              htmlFor="title"
-              text={isExperience ? `${experienceHeading}标题` : '资料标题'}
-              optional={isQuickMode}
-            />
-            <input
-              id="title"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              required={!isQuickMode}
-              placeholder={isQuickMode ? '可留空，系统将优先使用文件名自动生成标题' : undefined}
-            />
-            <p className="help-text">
-              {isQuickMode
-                ? `标题可留空；如已上传文件会自动生成，当前：${title.length}`
-                : `标题需在 ${MAX_TITLE_LENGTH} 个字符以内，当前：${title.length}`}
-            </p>
-          </div>
-          {!isQuickMode && (
-            <div className="form-item full">
-            <SectionLabel
-              htmlFor="description"
-              text={isExperience ? `${experienceHeading}内容` : '资料简介'}
-              optional={!isExperience}
-            />
-            <textarea
-              id="description"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder={isExperience ? '写下你的经验分享，支持 Markdown 语法' : '支持 Markdown 语法'}
-              maxLength={descriptionLimit}
-              required={isExperience}
-            />
-            <p className="help-text">
-              {isExperience
-                ? `内容支持 Markdown 语法，当前：${description.length}`
-                : `资料简介需在 ${descriptionLimit} 个字符以内，当前：${description.length}`}
-            </p>
-            </div>
-          )}
-          {isExperience && (
-            <div className="form-item full">
-              <SectionLabel text={customPreviewTitle} optional />
-              <p className="help-text">{customPreviewHint}</p>
-              <div
-                className="file-field drop-zone"
-                onDragOver={(e) => e.preventDefault()}
-                onDrop={(e) => {
-                  e.preventDefault();
-                  handleCustomPreviewSelection(e.dataTransfer.files);
-                }}
-              >
-                <span className="file-trigger">选择{customPreviewLabel}</span>
-                <span className="file-name">
-                  {customPreviewFiles.length
-                    ? `已选择 ${customPreviewFiles.length} 张配图`
-                    : `单张 ≤ 5MB，最多 ${MAX_CUSTOM_PREVIEW_IMAGES} 张`}
-                </span>
-                {customPreviewFiles.length > 0 && (
-                  <button
-                    type="button"
-                    className="file-clear"
-                    onClick={clearCustomPreviewFiles}
-                    aria-label="清空配图"
-                  >
-                    x
-                  </button>
-                )}
-                <input
-                  type="file"
-                  ref={customPreviewInputRef}
-                  accept="image/*"
-                  multiple
-                  onChange={(e) => handleCustomPreviewSelection(e.target.files)}
-                />
-              </div>
-              {customPreviewFiles.length > 0 && (
-                <div className="inline-group wrap" style={{ marginTop: 8 }}>
-                  {customPreviewFiles.map((file, index) => (
-                    <span key={`${file.name}-${index}`} className="badge-outline">
-                      {file.name}
-                      <button
-                        type="button"
-                        className="file-clear"
-                        onClick={() => removeCustomPreviewFile(index)}
-                        aria-label={`移除 ${file.name}`}
-                      >
-                        ×
-                      </button>
-                    </span>
-                  ))}
-                </div>
-              )}
-              {customPreviewNotice && <p className="error-text">{customPreviewNotice}</p>}
-              {existingCustomPreviewImages.length > 0 && customPreviewFiles.length === 0 && (
-                <div className="custom-preview-existing">
-                  <p className="help-text">已存在 {existingCustomPreviewImages.length} 张配图。</p>
-                  <div className="custom-preview-existing__grid">
-                    {existingCustomPreviewImages.map((url, index) => (
-                      <AppImage key={`${url}-${index}`} src={url} alt={`已上传配图 ${index + 1}`} loading="lazy" />
-                    ))}
-                  </div>
-                </div>
-              )}
-              {(customPreviewFiles.length > 0 || existingCustomPreviewImages.length > 0) && (
-                <button type="button" className="text-button" onClick={clearCustomPreviewAll}>
-                  清空配图
-                </button>
-              )}
-            </div>
-          )}
-          {!isExperience && (
-            <div className="form-item full">
-              <SectionLabel htmlFor="price" text="价格（元）" />
-              <input
-                id="price"
-                value={price}
-                inputMode="numeric"
-                pattern="[0-9]*"
-                placeholder="0"
-                onChange={(e) => setPrice(sanitizePriceInput(e.target.value))}
-                onBlur={() => setPrice(normalizePriceInput(price))}
-              />
-              {priceSummary && <p className="help-text">默认免费；{priceSummary}</p>}
-              <div className={`upload-price-payout-tip ${hasPayoutQr ? 'is-ready' : 'is-missing'}`}>
-                <div className="upload-price-payout-tip__text">
-                  {hasPayoutQr
-                    ? '已检测到你已上传个人收款码，可直接投稿。'
-                    : '你还未上传个人收款码，建议先补充，方便后续收益打款。'}
-                </div>
-                {!hasPayoutQr && (
-                  <Link className="button ghost small upload-price-payout-tip__action" href="/me#profile">
-                    去上传
-                  </Link>
-                )}
-              </div>
-            </div>
-          )}
-          </div>
-        </section>
-      </div>
+      <UploadBasicSection
+        isExperience={isExperience}
+        isQuickMode={isQuickMode}
+        experienceHeading={experienceHeading}
+        title={title}
+        description={description}
+        descriptionLimit={descriptionLimit}
+        maxTitleLength={MAX_TITLE_LENGTH}
+        price={price}
+        priceSummary={priceSummary}
+        hasPayoutQr={hasPayoutQr}
+        customPreviewTitle={customPreviewTitle}
+        customPreviewHint={customPreviewHint}
+        customPreviewLabel={customPreviewLabel}
+        customPreviewFiles={customPreviewFiles}
+        customPreviewNotice={customPreviewNotice}
+        existingCustomPreviewImages={existingCustomPreviewImages}
+        maxCustomPreviewImages={MAX_CUSTOM_PREVIEW_IMAGES}
+        customPreviewInputRef={customPreviewInputRef}
+        onTitleChange={setTitle}
+        onDescriptionChange={setDescription}
+        onPriceChange={(value) => setPrice(sanitizePriceInput(value))}
+        onPriceBlur={() => setPrice(normalizePriceInput(price))}
+        onCustomPreviewSelection={handleCustomPreviewSelection}
+        onClearCustomPreviewFiles={clearCustomPreviewFiles}
+        onRemoveCustomPreviewFile={removeCustomPreviewFile}
+        onClearCustomPreviewAll={clearCustomPreviewAll}
+      />
 
-      <div className="upload-section-shell" id="upload-meta">
-        <div className="upload-section-heading">
-          <div className="upload-section-heading__copy">
-            <h2 className="upload-section-heading__title">课程与标签</h2>
-          </div>
-        </div>
-        <section className="card upload-main-card upload-section-card">
-          <div className="form-grid upload-section-grid">
-          {isExperience ? (
-            <div className="form-item full">
-              <div className="upload-meta-empty">
-                <p className="help-text">
-                  经验分享标签为系统固定标签，所有分享都会自动附加。
-                </p>
-                <p className="help-text">可选择投稿到保研面经、求职面经、考研攻略、留学指南，或填写自定义标签归档到指定栏目。</p>
-              </div>
-              <div className="form-item full" style={{ marginTop: 12 }}>
-                <SectionLabel text="投稿栏目" optional />
-                <div className="inline-group wrap">
-                  <label className={`choice-pill ${experienceTopic === 'experience' ? 'active' : ''}`}>
-                    <input
-                      type="radio"
-                      name="experienceTopic"
-                      value="experience"
-                      checked={experienceTopic === 'experience'}
-                      onChange={() => {
-                        setExperienceTopic('experience');
-                        setExperienceCustomTag('');
-                      }}
-                    />
-                    <span>经验心得</span>
-                  </label>
-                  <label className={`choice-pill ${experienceTopic === 'grad-school' ? 'active' : ''}`}>
-                    <input
-                      type="radio"
-                      name="experienceTopic"
-                      value="grad-school"
-                      checked={experienceTopic === 'grad-school'}
-                      onChange={() => {
-                        setExperienceTopic('grad-school');
-                        setExperienceCustomTag('');
-                      }}
-                    />
-                    <span>保研面经</span>
-                  </label>
-                  <label className={`choice-pill ${experienceTopic === 'career' ? 'active' : ''}`}>
-                    <input
-                      type="radio"
-                      name="experienceTopic"
-                      value="career"
-                      checked={experienceTopic === 'career'}
-                      onChange={() => {
-                        setExperienceTopic('career');
-                        setExperienceCustomTag('');
-                      }}
-                    />
-                    <span>求职面经</span>
-                  </label>
-                  <label className={`choice-pill ${experienceTopic === 'postgrad-exam' ? 'active' : ''}`}>
-                    <input
-                      type="radio"
-                      name="experienceTopic"
-                      value="postgrad-exam"
-                      checked={experienceTopic === 'postgrad-exam'}
-                      onChange={() => {
-                        setExperienceTopic('postgrad-exam');
-                        setExperienceCustomTag('');
-                      }}
-                    />
-                    <span>考研攻略</span>
-                  </label>
-                  <label className={`choice-pill ${experienceTopic === 'overseas' ? 'active' : ''}`}>
-                    <input
-                      type="radio"
-                      name="experienceTopic"
-                      value="overseas"
-                      checked={experienceTopic === 'overseas'}
-                      onChange={() => {
-                        setExperienceTopic('overseas');
-                        setExperienceCustomTag('');
-                      }}
-                    />
-                    <span>留学指南</span>
-                  </label>
-                  <label className={`choice-pill ${isExperienceCustomTopic ? 'active' : ''}`}>
-                    <input
-                      type="radio"
-                      name="experienceTopic"
-                      value="custom"
-                      checked={isExperienceCustomTopic}
-                      onChange={() => setExperienceTopic('leetcode')}
-                    />
-                    <span>自定义标签</span>
-                  </label>
-                </div>
-                {isExperienceCustomTopic && (
-                  <div className="form-item full" style={{ marginTop: 10 }}>
-                    <input
-                      placeholder="填写自定义栏目标签（例如：考研经验 / 竞赛复盘）"
-                      value={experienceCustomTag}
-                      onChange={(e) => setExperienceCustomTag(e.target.value.replace(/\s+/g, ' ').slice(0, 16))}
-                    />
-                    <p className="help-text">自定义标签将与“经验分享”一起保存并用于专栏归档。</p>
-                  </div>
-                )}
-              </div>
-            </div>
-          ) : isQuickMode ? (
-            <div className="form-item full">
-                <div className="upload-quick-summary">
-                  <div className="upload-quick-summary__item">
-                    <span className="upload-quick-summary__label">学校</span>
-                    <strong className="upload-quick-summary__value">{quickProfile.school}</strong>
-                  </div>
-                  <div className="upload-quick-summary__item">
-                    <span className="upload-quick-summary__label">年级/阶段</span>
-                    <strong className="upload-quick-summary__value">{quickProfile.gradeValue}</strong>
-                  </div>
-                  <div className="upload-quick-summary__item">
-                    <span className="upload-quick-summary__label">学院</span>
-                    <strong className="upload-quick-summary__value">{quickProfile.college || '未填写'}</strong>
-                  </div>
-                  <div className="upload-quick-summary__item">
-                    <span className="upload-quick-summary__label">专业</span>
-                    <strong className="upload-quick-summary__value">{quickProfile.majorDisplay}</strong>
-                  </div>
-                  <div className="upload-quick-summary__item">
-                    <span className="upload-quick-summary__label">课程类型</span>
-                    <strong className="upload-quick-summary__value">{quickProfile.courseCategoryLabel}</strong>
-                  </div>
-                </div>
-              <p className="help-text">一键投稿会优先使用“我的”里个人主页概览所填的学校、学院、专业与年级信息；未填写的字段将按默认值补齐。</p>
-            </div>
-          ) : (
-            <>
-              <div className="form-item">
-                <SectionLabel htmlFor="school" text="学校" />
-                <select id="school" value={school} onChange={(e) => setSchool(e.target.value)} required>
-                  <option value={SUPPORTED_SCHOOL}>{SUPPORTED_SCHOOL}</option>
-                </select>
-              </div>
-              <div className="form-item">
-                <SectionLabel htmlFor="college" text="学院" />
-                <select
-                  id="college"
-                  value={college}
-                  onChange={(e) => setCollege(e.target.value)}
-                  disabled={courseCategory !== 'MAJOR'}
-                  required={courseCategory === 'MAJOR'}
-                >
-                  <option value="">{courseCategory === 'MAJOR' ? '请选择学院' : '无需选择'}</option>
-                  {SUPPORTED_COLLEGES.map((name) => (
-                    <option key={name} value={name}>
-                      {name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="form-item">
-                <SectionLabel text="年级/阶段" />
-                <select id="gradeValue" value={gradeValue} onChange={(e) => setGradeValue(e.target.value)}>
-                  {gradeStageOptions.map((stage) => (
-                    <option key={stage} value={stage}>
-                      {stage}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="form-item">
-                <SectionLabel text="专业" optional />
-                <div className="inline-group wrap">
-                  {SUPPORTED_MAJORS.map((name) => {
-                    const checked = selectedMajors.includes(name);
-                    return (
-                      <label key={name} className={`choice badge-outline ${checked ? 'active' : ''}`}>
-                        <input
-                          type="checkbox"
-                          value={name}
-                          checked={checked}
-                          disabled={courseCategory !== 'MAJOR'}
-                          onChange={(e) => handleMajorToggle(name, e.target.checked)}
-                        />
-                        {name}
-                      </label>
-                    );
-                  })}
-                </div>
-              </div>
-              <div className="form-item full">
-                <SectionLabel text="课程类型" />
-                <div className="course-type-options upload-course-type-options">
-                  {COURSE_CATEGORY_OPTIONS.map((option) => (
-                    <label
-                      key={option.value}
-                      className={`choice-pill course upload-course-type-chip ${courseCategory === option.value ? 'active' : ''}`}
-                    >
-                      <input
-                        type="radio"
-                        name="courseCategory"
-                        value={option.value}
-                        checked={courseCategory === option.value}
-                        onChange={(e) => setCourseCategory(e.target.value as CourseCategoryValue)}
-                      />
-                      <div>
-                        <strong>{option.label}</strong>
-                      </div>
-                    </label>
-                  ))}
-                </div>
-              </div>
-              <div className="form-item full">
-                <SectionLabel text="标签" optional />
-                <div className="inline-group wrap">
-                  {presetTags.map((tag) => (
-                    <label key={tag} className="choice badge-outline">
-                      <input
-                        type="checkbox"
-                        checked={selectedTags.includes(tag)}
-                        disabled={!selectedTags.includes(tag) && tagList.length >= MAX_TAGS}
-                        onChange={(e) =>
-                          setSelectedTags((prev) => {
-                            const exists = prev.includes(tag);
-                            if (e.target.checked) {
-                              if (exists || tagList.length >= MAX_TAGS) {
-                                return prev;
-                              }
-                              return [...prev, tag];
-                            }
-                            return prev.filter((item) => item !== tag);
-                          })
-                        }
-                      />
-                      {tag}
-                    </label>
-                  ))}
-                </div>
-                <input
-                  placeholder="自定义标签，使用逗号或空格分隔（最多 3 个）"
-                  value={customTags}
-                  onChange={(e) => setCustomTags(e.target.value)}
-                />
-                <p className="help-text">
-                  已选择 {tagList.length}/{MAX_TAGS} 个标签
-                  {trimmedCustom ? '，多余的自定义标签将不会保存' : ''}
-                </p>
-                <div className="upload-year-field">
-                  <SectionLabel text="资料年份" optional />
-                  <div className="inline-group wrap">
-                    <input
-                      type="text"
-                      list="year-options"
-                      placeholder="可输入或选择：如 2023 / 2023-2024"
-                      value={yearTag}
-                      onChange={(e) => setYearTag(e.target.value)}
-                    />
-                    <datalist id="year-options">
-                      {yearSuggestions.map((option) => (
-                        <option key={option} value={option} />
-                      ))}
-                    </datalist>
-                  </div>
-                </div>
-              </div>
-            </>
-          )}
-          </div>
-        </section>
-      </div>
+      <UploadMetaSection
+        isExperience={isExperience}
+        isQuickMode={isQuickMode}
+        isExperienceCustomTopic={isExperienceCustomTopic}
+        experienceTopic={experienceTopic}
+        experienceCustomTag={experienceCustomTag}
+        quickProfile={quickProfile}
+        school={school}
+        college={college}
+        gradeValue={gradeValue}
+        gradeStageOptions={gradeStageOptions}
+        selectedMajors={selectedMajors}
+        courseCategory={courseCategory}
+        selectedTags={selectedTags}
+        customTags={customTags}
+        yearTag={yearTag}
+        yearSuggestions={yearSuggestions}
+        presetTags={presetTags}
+        tagList={tagList}
+        maxTags={MAX_TAGS}
+        trimmedCustom={trimmedCustom}
+        onExperienceTopicChange={setExperienceTopic}
+        onExperienceCustomTagChange={setExperienceCustomTag}
+        onSchoolChange={setSchool}
+        onCollegeChange={setCollege}
+        onGradeValueChange={setGradeValue}
+        onMajorToggle={handleMajorToggle}
+        onCourseCategoryChange={setCourseCategory}
+        onSelectedTagsChange={setSelectedTags}
+        onCustomTagsChange={setCustomTags}
+        onYearTagChange={setYearTag}
+      />
 
       {!isExperience && (
         <div className="upload-section-shell" id="upload-delivery">
@@ -1507,78 +1078,18 @@ export default function UploadPage({ user, token, account }: UploadPageProps) {
         </div>
       )}
 
-      <div className="upload-section-shell" id="upload-confirm">
-        <div className="upload-section-heading">
-          <div className="upload-section-heading__copy">
-            <h2 className="upload-section-heading__title">发布确认</h2>
-          </div>
-        </div>
-        <section className="card upload-main-card upload-section-card">
-          <div className="form-grid upload-section-grid">
-          {!isExperience && !isQuickMode && (
-            <div className="form-item full">
-              <SectionLabel htmlFor="copyrightOwner" text="版权持有者" optional />
-              <input
-                id="copyrightOwner"
-                value={copyrightOwner}
-                onChange={(e) => setCopyrightOwner(e.target.value)}
-                maxLength={MAX_COPYRIGHT_LENGTH}
-                placeholder="不超过 8 个字符，如：张三"
-              />
-              <p className="help-text">
-                若为学校官网或个人原创资料可不填；如来源于其他同学/渠道，请先征得同意再发布，并填写对方姓名。
-              </p>
-            </div>
-          )}
-          <div className="form-item full">
-            <label className="choice agreement">
-              <input type="checkbox" required />
-              <span>
-                我已阅读并同意
-                <button
-                  type="button"
-                  className="policy-link"
-                  onClick={(event) => {
-                    event.preventDefault();
-                    event.stopPropagation();
-                    setPolicyModalOpen(true);
-                  }}
-                >
-                  平台隐私政策/用户协议
-                </button>
-                ，确认资料合法且授权发布。平台运营初期由平台统一收费与分发，抽成比例暂定 30%，用于运营成本和维护；后续若有调整将提前公告，请知悉。
-              </span>
-            </label>
-          </div>
-          <div className="form-item">
-            <button className="button primary" type="submit" disabled={submitting}>
-              {submitting
-                ? isEditing
-                  ? '更新中...'
-                  : '提交中...'
-                : isEditing
-                  ? isExperience
-                    ? '更新经验分享'
-                    : '更新资料'
-                  : isExperience
-                    ? '提交经验分享'
-                    : isQuickMode
-                      ? '一键投稿'
-                      : '提交资料'}
-            </button>
-          </div>
-          {isExperience && uploadProgress !== null && (
-            <div className="form-item full">
-              <div className="upload-progress" aria-live="polite">
-                <progress value={uploadProgress} max={100} />
-                <span className="upload-percent">{uploadProgress}%</span>
-              </div>
-            </div>
-          )}
-          {status && <p className={status.type === 'error' ? 'error-text' : 'success-text'}>{status.message}</p>}
-          </div>
-        </section>
-      </div>
+      <UploadConfirmSection
+        isEditing={isEditing}
+        isExperience={isExperience}
+        isQuickMode={isQuickMode}
+        copyrightOwner={copyrightOwner}
+        maxCopyrightLength={MAX_COPYRIGHT_LENGTH}
+        submitting={submitting}
+        uploadProgress={uploadProgress}
+        status={status}
+        onCopyrightOwnerChange={setCopyrightOwner}
+        onPolicyOpen={() => setPolicyModalOpen(true)}
+      />
     </form>
   );
 
@@ -1624,182 +1135,26 @@ export default function UploadPage({ user, token, account }: UploadPageProps) {
               </div>
             </aside>
             <div className="upload-main">
-              <section className="card me-hero upload-hero" id="upload-overview">
-                <div className="me-hero__inner">
-                  <div className="me-hero__intro">
-                    <div className="me-hero__eyebrow">{isEditing ? '编辑模式' : '投稿工作台'}</div>
-                        <div className="me-hero__title-row">
-                          <h1 className="me-hero__title upload-title">
-                            <UploadTitleIcon />
-                            <span>{pageTitle}</span>
-                          </h1>
-                        </div>
-                        {uploadMode === 'experience' && (
-                          <p className="me-hero__subtitle upload-hero__subtitle">
-                            当前方向：{experienceHeading}
-                            {resolvedExperienceExtraTag ? ` · 自动附加 #${resolvedExperienceExtraTag}` : ''}
-                          </p>
-                        )}
-                    {!isEditing && !isRequestResponse && (
-                      <div className="upload-hero__actions">
-                        <div className="upload-hero__tools">
-                          {uploadMode === 'experience' ? (
-                            <>
-                              <Link className="upload-hero__action upload-hero__action--secondary" href="/column">
-                                <span className="upload-hero__action-label">返回学汇专栏</span>
-                              </Link>
-                              <button
-                                type="button"
-                                className="upload-hero__action upload-hero__action--secondary active"
-                                onClick={() => switchUploadMode('material')}
-                              >
-                                <span className="upload-hero__action-label">返回资料投稿</span>
-                              </button>
-                            </>
-                          ) : (
-                            <>
-                              <button
-                                type="button"
-                                className={`upload-hero__action${quickPanelOpen ? ' active' : ''}`}
-                                onClick={toggleQuickPanel}
-                              >
-                                <span className="upload-hero__action-label">
-                                  {quickPanelOpen ? '收起一键投稿' : '太麻烦？一键投稿'}
-                                </span>
-                              </button>
-                              <button
-                                type="button"
-                                className="upload-hero__action upload-hero__action--secondary"
-                                onClick={() => switchUploadMode('experience')}
-                              >
-                                <span className="upload-hero__action-label">开始经验分享</span>
-                              </button>
-                            </>
-                          )}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                  {!isEditing && !isRequestResponse && QUICK_UPLOAD_OPTIONS.length > 0 && (
-                    <div className="upload-hero__pills">
-                      <div className="upload-option-pills">
-                        {QUICK_UPLOAD_OPTIONS.map((option) => (
-                          <button
-                            key={option}
-                            type="button"
-                            className={`button ${quickSelectedOption === option ? 'primary' : 'ghost'} small`}
-                            onClick={() => handleQuickOptionSelect(option)}
-                          >
-                            {option}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </section>
+              <UploadHero
+                isEditing={isEditing}
+                isRequestResponse={isRequestResponse}
+                uploadMode={uploadMode}
+                pageTitle={pageTitle}
+                experienceHeading={experienceHeading}
+                resolvedExperienceExtraTag={resolvedExperienceExtraTag}
+                quickPanelOpen={quickPanelOpen}
+                quickSelectedOption={quickSelectedOption}
+                quickUploadOptions={QUICK_UPLOAD_OPTIONS}
+                onSwitchUploadMode={switchUploadMode}
+                onToggleQuickPanel={toggleQuickPanel}
+                onQuickOptionSelect={handleQuickOptionSelect}
+              />
               {formContent}
             </div>
           </div>
         )}
       </main>
-      {policyModalOpen && (
-        <div className="modal-mask" onClick={() => setPolicyModalOpen(false)}>
-          <div
-            className="modal-card policy-modal"
-            role="dialog"
-            aria-modal="true"
-            aria-label="平台隐私政策与用户协议"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <button
-              className="modal-close"
-              type="button"
-              aria-label="关闭"
-              onClick={() => setPolicyModalOpen(false)}
-            >
-              ×
-            </button>
-            <h2>平台隐私政策/用户协议</h2>
-            <h3>为什么需要身份信息？</h3>
-            <p className="help-text">
-              我们仅在<strong>提现</strong>等涉及向个人支付创作者收益的环节，要求填写姓名、身份证号及同名支付宝账号，主要基于两类需求：
-            </p>
-            <ol>
-              <li>
-                <strong>税务合规（依法扣缴申报）</strong>
-                <p className="help-text">
-                  当平台向个人支付所得时，通常需要依法履行个人所得税的扣缴申报义务。个人所得税法明确：扣缴义务人应当按照国家规定办理
-                  <strong>全员全额扣缴申报</strong>。（
-                  <a href="https://gongbao.court.gov.cn/Details/8387ed08755a9be653320a8fc12c8e.html" target="_blank" rel="noreferrer">[1]</a>
-                  ）在扣缴申报制度下，扣缴义务人需要向税务机关报送包括<strong>姓名、证件信息等</strong>在内的个人基础信息、支付所得项目与数额等涉税信息。（
-                  <a href="https://fgk.chinatax.gov.cn/zcfgk/c100012/c5193745/content.html" target="_blank" rel="noreferrer">[2]</a>
-                  ）关于自然人纳税人识别号的规定/解读也强调：自然人首次办理涉税事项时，需要向税务机关或扣缴义务人提供有效身份证件及相关信息。（
-                  <a href="https://shanghai.chinatax.gov.cn/zcfw/zcjd/201812/t443337.html" target="_blank" rel="noreferrer">[3]</a>
-                  ）
-                </p>
-              </li>
-              <li>
-                <strong>打款成功与安全（同名校验与防冒领）</strong>
-                <p className="help-text">
-                  同名支付宝信息用于减少转账失败、退回等情况，并降低冒领、盗刷、异常提现风险。
-                </p>
-              </li>
-            </ol>
-            <h3>身份信息如何使用与保护</h3>
-            <h4>使用范围（用途限制）</h4>
-            <ul>
-              <li>税务扣缴申报与合规留存（按规定报送必要的个人基础信息与所得信息）。</li>
-              <li>提现审核与打款校验（核验收款人实名信息与同名支付宝）。</li>
-              <li>风控与纠纷处理（异常提现、申诉、争议仲裁时用于核验与审计）。</li>
-            </ul>
-            <h4>保护措施（合规要求）</h4>
-            <p className="help-text">
-              我们遵循《个人信息保护法》的基本要求：以<strong>明确目的、最小必要</strong>方式收集，公开透明说明用途，并采取必要安全措施。包括但不限于：加密存储、脱敏展示、权限控制、访问留痕与审计。（
-              <a href="https://www.cac.gov.cn/2021-08/20/c_1631050028355286.htm" target="_blank" rel="noreferrer">[4]</a>
-              ）
-            </p>
-            <h3>谁能看到我的信息？</h3>
-            <ul>
-              <li>✅ 可见范围：仅限与提现审核、税务申报/对账、风控合规相关的人员在履职范围内查看。</li>
-              <li>❌ 不可见范围：其他普通用户、购买者、非相关岗位人员均不可见。</li>
-              <li>
-                ✅ 访问可追溯：对敏感信息的访问会记录日志，用于安全审计与责任追踪。（
-                <a href="https://npcobserver.com/wp-content/uploads/2023/09/2021-Personal-Information-Protection-Law_Gazette.pdf" target="_blank" rel="noreferrer">[5]</a>
-                ）
-              </li>
-            </ul>
-            <h4>参考链接</h4>
-            <ul>
-              <li>
-                <a href="https://gongbao.court.gov.cn/Details/8387ed08755a9be653320a8fc12c8e.html" target="_blank" rel="noreferrer">
-                  [1] 中华人民共和国个人所得税法（公报网）
-                </a>
-              </li>
-              <li>
-                <a href="https://fgk.chinatax.gov.cn/zcfgk/c100012/c5193745/content.html" target="_blank" rel="noreferrer">
-                  [2] 国家税务总局关于印发《个人所得税全员全额扣缴申报管理》相关内容
-                </a>
-              </li>
-              <li>
-                <a href="https://shanghai.chinatax.gov.cn/zcfw/zcjd/201812/t443337.html" target="_blank" rel="noreferrer">
-                  [3] 自然人纳税人识别号有关事项解读（上海税务）
-                </a>
-              </li>
-              <li>
-                <a href="https://www.cac.gov.cn/2021-08/20/c_1631050028355286.htm" target="_blank" rel="noreferrer">
-                  [4] 中华人民共和国个人信息保护法（国家网信办）
-                </a>
-              </li>
-              <li>
-                <a href="https://npcobserver.com/wp-content/uploads/2023/09/2021-Personal-Information-Protection-Law_Gazette.pdf" target="_blank" rel="noreferrer">
-                  [5] 个人信息保护法全文（NPC Observer）
-                </a>
-              </li>
-            </ul>
-          </div>
-        </div>
-      )}
+      {policyModalOpen && <UploadPolicyModal onClose={() => setPolicyModalOpen(false)} />}
     </>
   );
 }

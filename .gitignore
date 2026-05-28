@@ -18,4 +18,5 @@ frontend/node_modules/
 frontend/.next/
 frontend/tsconfig.tsbuildinfo
 frontend/test-results/
+frontend/playwright-report/
 backup/

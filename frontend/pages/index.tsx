@@ -4,6 +4,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
 import Snowfall from 'react-snowfall';
+import HomeFilterCard from '../components/home/HomeFilterCard';
+import HomeLeaderboard from '../components/home/HomeLeaderboard';
+import HomeRequestPanels from '../components/home/HomeRequestPanels';
 import NavBar from '../components/NavBar';
 import ShareSheet from '../components/ShareSheet';
 import AppImage from '../components/AppImage';
@@ -25,10 +28,10 @@ import {
 } from '../lib/api';
 import { fetchBackend } from '../lib/apiBase';
 import { getRequestOrigin } from '../lib/apiBase';
+import { ensureApiSuccess, unwrapApiResponse } from '../lib/apiEnvelope';
 import { toErrorMessage } from '../lib/errors';
-import { formatMajorDisplay } from '../lib/major';
 import { formatDate, formatNumber } from '../lib/format';
-import { materialPath, userPath } from '../lib/slug';
+import { materialPath } from '../lib/slug';
 import { copyToClipboard, isLikelyMobile, tryNativeShare } from '../lib/share';
 import {
   SUPPORTED_SCHOOL,
@@ -169,11 +172,7 @@ export default function Home({
       const query = buildQuery(normalized);
       try {
         const resp = await fetchBackend(`/materials${buildQueryString({ ...query, size: MATERIALS_PAGE_SIZE })}`);
-        const json = await resp.json().catch(() => ({ ok: false }));
-        if (!resp.ok || !json.ok || !json.data) {
-          throw new Error(json.msg || '筛选加载失败');
-        }
-        const data = json.data as MaterialListResponse;
+        const data = await unwrapApiResponse<MaterialListResponse>(resp, '筛选加载失败');
         setMaterialList(data.items);
         setPageMeta(data.meta);
         if (data.stats) setStatsState(data.stats);
@@ -416,13 +415,10 @@ export default function Home({
     const loadFollowing = async () => {
       try {
         const resp = await fetchBackend(`/users/${user.id}/following`);
-        const json = await resp.json();
-        if (!resp.ok || !json.ok || !Array.isArray(json.data)) {
-          throw new Error(json.msg || '关注列表加载失败');
-        }
+        const data = await unwrapApiResponse<Array<{ id?: number }>>(resp, '关注列表加载失败');
         if (cancelled) return;
         const next: Record<number, boolean> = {};
-        (json.data as Array<{ id?: number }>).forEach((item) => {
+        data.forEach((item) => {
           if (typeof item?.id === 'number') {
             next[item.id] = true;
           }
@@ -473,11 +469,8 @@ export default function Home({
     setRequestNotice(null);
     try {
       const resp = await fetchBackend('/requests?limit=0');
-      const json = await resp.json();
-      if (!resp.ok || !json.ok || !Array.isArray(json.data)) {
-        throw new Error(json.msg || '加载求购失败');
-      }
-      setRequestItems(json.data as MaterialRequestItem[]);
+      const data = await unwrapApiResponse<MaterialRequestItem[]>(resp, '加载求购失败');
+      setRequestItems(data);
     } catch (error: unknown) {
       setRequestError(toErrorMessage(error, '加载求购失败'));
     } finally {
@@ -514,10 +507,7 @@ export default function Home({
       setLeaderboardFollowLoading((prev) => ({ ...prev, [userId]: true }));
       try {
         const resp = await fetchBackend(`/users/${userId}/follow`, { method: 'PUT' });
-        const json = await resp.json();
-        if (!resp.ok || !json.ok) {
-          throw new Error(json.msg || '关注失败');
-        }
+        await ensureApiSuccess(resp, '关注失败');
         setLeaderboardFollowed((prev) => ({ ...prev, [userId]: true }));
         setLeaderboardFollowNotice(null);
       } catch (error: unknown) {
@@ -726,383 +716,30 @@ export default function Home({
             </div>
           </aside>
         </section>
-        <div className="home-dual-panel">
-          <section className="card request-card">
-            <div className="materials-header">
-              <div>
-                <h2 className="card-title">求购列表</h2>
-                {/* 已移除排序提示 */}
-              </div>
-              <div className="request-header-actions">
-                <Link className="button primary small" href="/requests/new">
-                  我要购买
-                </Link>
-              </div>
-            </div>
-            <div className="request-list-wrapper">
-              {requestLoading && <p className="help-text">加载中...</p>}
-              {requestError && <p className="error-text">{requestError}</p>}
-              {requestNotice && (
-                <p className={requestNotice.type === 'error' ? 'error-text' : 'success-text'}>
-                  {requestNotice.text}
-                </p>
-              )}
-              {!requestLoading && requestItems.length === 0 ? (
-                <div className="empty-state">暂无求购需求。</div>
-              ) : (
-                <ul className="request-list">
-                  {requestItems.map((item) => {
-                    const title = item.course || '求购需求';
-                    const detailLink = `/requests/${item.id}`;
-                    const budgetLabel = item.budget != null ? `预算 ¥${item.budget}` : '预算 待议';
-                    const fundedLabel =
-                      item.fundedAmount != null && item.fundedAmount > 0 ? `已筹 ¥${item.fundedAmount}` : '已筹 待议';
-                    const canRespond = (item.responseCount ?? 0) === 0 || Boolean(item.responded);
-                    return (
-                      <li key={item.id} className="request-item">
-                        <div className="request-title-row">
-                          <div className="request-title">
-                            <Link href={detailLink}>{title}</Link>
-                          </div>
-                          <div className="request-action-row">
-                            {item.owner ? (
-                              <>
-                                <Link className="button ghost small" href={detailLink}>
-                                  查看
-                                </Link>
-                              </>
-                            ) : (
-                              <>
-                                <button
-                                  className="button primary small"
-                                  type="button"
-                                  onClick={() => handleFollowRequest(item)}
-                                >
-                                  跟购
-                                </button>
-                                {canRespond ? (
-                                  <Link className="button ghost small" href={buildUploadLink(item)}>
-                                    应答
-                                  </Link>
-                                ) : (
-                                  <span className="help-text">已有应答</span>
-                                )}
-                                <Link className="button ghost small" href={detailLink}>
-                                  查看
-                                </Link>
-                              </>
-                            )}
-                          </div>
-                        </div>
-                        <div className="request-footer">
-                          <span className="request-footer__tag request-footer__budget">{budgetLabel}</span>
-                          {item.creatorFloor != null && (
-                            <span className="request-footer__tag">跟购底价 ¥{item.creatorFloor}</span>
-                          )}
-                          <span className="request-footer__tag request-footer__funded">{fundedLabel}</span>
-                          <span className="request-footer__tag request-footer__responses">
-                            应答 {item.responseCount ?? 0}
-                          </span>
-                        </div>
-                      </li>
-                    );
-                  })}
-                </ul>
-              )}
-              {leaderboardItems.length > 0 && (
-                <div className="request-leaderboard">
-                  <div className="request-leaderboard__title">
-                    求购榜 <span className="request-leaderboard__hint">按已筹金额</span>
-                  </div>
-                  <ul className="request-leaderboard__list">
-                    {leaderboardItems.map((item, index) => {
-                      const title = item.course || '求购需求';
-                      const fundedLabel =
-                        item.fundedAmount != null && item.fundedAmount > 0 ? `已筹 ¥${item.fundedAmount}` : '待议';
-                      return (
-                        <li key={item.id} className="request-leaderboard__item">
-                          <span className="request-leaderboard__rank">{index + 1}</span>
-                          <Link href={`/requests/${item.id}`}>{title}</Link>
-                          <span className="request-leaderboard__amount">{fundedLabel}</span>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                </div>
-              )}
-            </div>
-          </section>
+        <HomeRequestPanels
+          requestItems={requestItems}
+          requestLoading={requestLoading}
+          requestError={requestError}
+          requestNotice={requestNotice}
+          leaderboardItems={leaderboardItems}
+          recommendedItems={recommendedItems}
+          recommendationHint={recommendationHint}
+          recommendationEmpty={recommendationEmpty}
+          buildUploadLink={buildUploadLink}
+          onFollowRequest={handleFollowRequest}
+        />
 
-          <section className="card recommend-card">
-            <div className="materials-header">
-              <div>
-                <h2 className="card-title">为你推荐</h2>
-                {recommendationHint ? <p className="help-text">{recommendationHint}</p> : null}
-              </div>
-              <div className="request-header-actions">
-                <Link className="button primary small" href="/me#profile">
-                  完善主页
-                </Link>
-              </div>
-            </div>
-            {recommendedItems.length === 0 ? (
-              <div className="empty-state">{recommendationEmpty}</div>
-            ) : (
-              <ul className="recommend-list">
-                {recommendedItems.map((item) => {
-                  const majorLabel = formatMajorDisplay(item.major);
-                  return (
-                    <li key={item.id} className="recommend-item">
-                      <Link href={materialPath(item.id, item.title)}>{item.title}</Link>
-                      <div className="recommend-meta">
-                        <span className="recommend-meta__school">
-                          {(item.school || '未知学校') +
-                            (item.college ? ` · ${item.college}` : '') +
-                            (majorLabel ? ` · ${majorLabel}` : '')}
-                        </span>
-                        <span className="recommend-meta__downloads">下载 {item.downloadCount ?? 0}</span>
-                      </div>
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
-          </section>
-        </div>
-
-        <section className="card filter-card" ref={filterRef}>
-            <div className="filter-header">
-              <div>
-                <h2 className="card-title">
-                  筛选资料
-                  <svg className="title-icon" viewBox="0 0 24 24" aria-hidden="true">
-                    <circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" strokeWidth="1.6" />
-                    <path
-                      d="M20 20l-3.5-3.5"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="1.6"
-                      strokeLinecap="round"
-                    />
-                  </svg>
-                </h2>
-              </div>
-            </div>
-            <form className="filter-form compact" onSubmit={handleFilterSubmit}>
-              <div className="filter-quick-row">
-                <div className="form-item filter-keyword">
-                  <label htmlFor="keyword">关键词</label>
-                  <div className="filter-keyword__input">
-                    <input
-                      id="keyword"
-                      name="keyword"
-                      value={filtersState.keyword}
-                      onChange={(event) => updateFilter('keyword', event.target.value)}
-                      placeholder="课程名 / 知识点 / 讲义"
-                    />
-                  </div>
-                </div>
-                <div className="filter-actions quick">
-                  <button
-                    type="button"
-                    className="button ghost small"
-                    onClick={toggleAdvancedFilters}
-                    aria-expanded={showAdvanced}
-                  >
-                    {showAdvanced ? '收起高级筛选' : '更多筛选'}
-                  </button>
-                  <button className="button primary" type="submit">
-                    应用筛选
-                  </button>
-                </div>
-              </div>
-              <div className={`filter-advanced ${showAdvanced ? 'open' : ''}`}>
-                <div className="advanced-grid">
-                  <div className="form-item">
-                    <label htmlFor="school">学校</label>
-                    <select
-                      id="school"
-                      name="school"
-                      value={filtersState.school}
-                      onChange={(event) => updateFilter('school', event.target.value)}
-                    >
-                      <option value="">全部</option>
-                      <option value={SUPPORTED_SCHOOL}>{SUPPORTED_SCHOOL}</option>
-                    </select>
-                  </div>
-                  <div className="form-item">
-                    <label htmlFor="college">学院</label>
-                    <select
-                      id="college"
-                      name="college"
-                      value={filtersState.college}
-                      onChange={(event) => updateFilter('college', event.target.value)}
-                    >
-                      <option value="">全部</option>
-                      {SUPPORTED_COLLEGES.map((name) => (
-                        <option key={name} value={name}>
-                          {name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="form-item">
-                    <label htmlFor="major">专业</label>
-                    <select
-                      id="major"
-                      name="major"
-                      value={filtersState.major}
-                      onChange={(event) => updateFilter('major', event.target.value)}
-                    >
-                      <option value="">全部</option>
-                      {SUPPORTED_MAJORS.map((name) => (
-                        <option key={name} value={name}>
-                          {name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="form-item">
-                    <label htmlFor="gradeValue">年级</label>
-                    <select
-                      id="gradeValue"
-                      name="gradeValue"
-                      value={filtersState.gradeValue}
-                      onChange={(event) => updateFilter('gradeValue', event.target.value)}
-                    >
-                      <option value="">全部</option>
-                      {gradeStageOptions.map((value) => (
-                        <option key={value} value={value}>
-                          {value}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="form-item">
-                    <label htmlFor="tag">标签</label>
-                    <select
-                      id="tag"
-                      name="tag"
-                      value={filtersState.tag}
-                      onChange={(event) => updateFilter('tag', event.target.value)}
-                      disabled={!availableTagOptions.length}
-                    >
-                      <option value="">全部</option>
-                      {availableTagOptions.map((tag) => (
-                        <option key={tag} value={tag}>
-                          #{tag}
-                        </option>
-                      ))}
-                    </select>
-                    {!availableTagOptions.length && <p className="help-text">暂无热门标签，等待更多投稿。</p>}
-                  </div>
-                  <div
-                    className="form-item full price-sort-row"
-                    style={{
-                      display: 'grid',
-                      gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
-                      alignItems: 'center',
-                      gap: 12,
-                    }}
-                  >
-                    <div
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 16,
-                        flexWrap: 'wrap',
-                      }}
-                    >
-                      <div className="form-item price-group" style={{ margin: 0 }}>
-                        <label>价格</label>
-                        <div className="choice-group">
-                          <label className="choice">
-                            <input
-                              type="radio"
-                              name="price"
-                              value=""
-                              checked={!filtersState.price || filtersState.price === 'all'}
-                              onChange={(event) => updateFilter('price', event.target.value)}
-                            />
-                            全部
-                          </label>
-                          <label className="choice">
-                            <input
-                              type="radio"
-                              name="price"
-                              value="free"
-                              checked={filtersState.price === 'free'}
-                              onChange={(event) => updateFilter('price', event.target.value)}
-                            />
-                            免费
-                          </label>
-                          <label className="choice">
-                            <input
-                              type="radio"
-                              name="price"
-                              value="paid"
-                              checked={filtersState.price === 'paid'}
-                              onChange={(event) => updateFilter('price', event.target.value)}
-                            />
-                            付费
-                          </label>
-                        </div>
-                      </div>
-                      <div className="form-item sort-group" style={{ margin: 0 }}>
-                        <label htmlFor="sort">排序</label>
-                        <select
-                          id="sort"
-                          name="sort"
-                          value={filtersState.sort || 'latest'}
-                          onChange={(event) => updateFilter('sort', event.target.value)}
-                          style={{ minWidth: 160 }}
-                        >
-                          <option value="latest">默认（综合）</option>
-                          <option value="price">价格</option>
-                          <option value="sales">销量</option>
-                        </select>
-                      </div>
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                      <button type="button" className="button primary" onClick={handleResetFilters} style={{ minWidth: 100 }}>
-                        重置筛选
-                      </button>
-                    </div>
-                  </div>
-                </div>
-                <div className="form-item full course-type-advanced">
-                  <label>课程类型</label>
-                  <div className="course-type-options compact">
-                    <label className={`choice-pill ${!filtersState.courseCategory ? 'active' : ''}`}>
-                      <input
-                        type="radio"
-                        name="courseCategory"
-                        value=""
-                        checked={!filtersState.courseCategory}
-                        onChange={() => applyCourseCategory(null)}
-                      />
-                      全部
-                    </label>
-                    {COURSE_CATEGORY_OPTIONS.map((option) => (
-                      <label
-                        key={option.value}
-                        className={`choice-pill ${filtersState.courseCategory === option.value ? 'active' : ''}`}
-                      >
-                        <input
-                          type="radio"
-                          name="courseCategory"
-                          value={option.value}
-                          checked={filtersState.courseCategory === option.value}
-                          onChange={() => applyCourseCategory(option.value)}
-                        />
-                        {option.label}
-                      </label>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </form>
-        </section>
+        <HomeFilterCard
+          filterRef={filterRef}
+          filtersState={filtersState}
+          showAdvanced={showAdvanced}
+          availableTagOptions={availableTagOptions}
+          onFilterChange={updateFilter}
+          onCourseCategoryChange={applyCourseCategory}
+          onToggleAdvancedFilters={toggleAdvancedFilters}
+          onResetFilters={handleResetFilters}
+          onSubmit={handleFilterSubmit}
+        />
 
         <section className="card" ref={materialsRef} style={{ gridColumn: '1 / -1' }}>
           <div className="materials-header">
@@ -1166,138 +803,22 @@ export default function Home({
             </>
           )}
         </section>
-        <section id="leaderboard" className="card leaderboard-card" style={{ gridColumn: '1 / -1' }}>
-          <div className="materials-header">
-            <div>
-              <h2 className="card-title">
-                贡献榜单
-                <svg className="title-icon" viewBox="0 0 24 24" aria-hidden="true">
-                  <path
-                    d="M8 21h8"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.6"
-                    strokeLinecap="round"
-                  />
-                  <path
-                    d="M12 17v4"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.6"
-                    strokeLinecap="round"
-                  />
-                  <path
-                    d="M7 4h10"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.6"
-                    strokeLinecap="round"
-                  />
-                  <path
-                    d="M17 4v5a5 5 0 0 1-10 0V4"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.6"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                  <path
-                    d="M5 4h2v3a5 5 0 0 1-2 4"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.6"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                  <path
-                    d="M19 4h-2v3a5 5 0 0 0 2 4"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.6"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
-              </h2>
-              <p className="help-text">
-                {leaderboardLabels[leaderboardPeriod]}按去重下载次数排行（同一用户下载同一资料只算一次），展示前{' '}
-                {topContributors.length || 0} 位投稿者。
-                {leaderboardRangeHint && <span className="leaderboard-period-hint">{leaderboardRangeHint}</span>}
-              </p>
-              <p className="help-text">同一用户下载同一上传者不同资料会累计；重复下载同一资料不重复计数。</p>
-            </div>
-            <div className="leaderboard-controls">
-              <div className="leaderboard-tabs" role="tablist" aria-label="贡献榜单周期">
-                {leaderboardPeriods.map((period) => (
-                  <button
-                    key={period}
-                    type="button"
-                    role="tab"
-                    aria-selected={leaderboardPeriod === period}
-                    className={`leaderboard-tab ${leaderboardPeriod === period ? 'active' : ''}`}
-                    onClick={() => setLeaderboardPeriod(period)}
-                  >
-                    {leaderboardLabels[period]}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-          {leaderboardFollowNotice?.type === 'error' && <p className="error-text">{leaderboardFollowNotice.text}</p>}
-          {leaderboardError && <p className="error-text">{leaderboardError}</p>}
-          {leaderboardLoading && <p className="help-text">贡献榜单加载中...</p>}
-          {topContributors.length === 0 ? (
-            <div className="empty-state">{leaderboardEmptyHint}</div>
-          ) : (
-            <div className="leaderboard-scroll">
-              <ol className="leaderboard-list">
-                {(() => {
-                  let rankCounter = 0;
-                  return topContributors.map((c, idx) => {
-                    const isSelf = Boolean(user && user.id === c.userId);
-                    const isFollowed = Boolean(leaderboardFollowed[c.userId]);
-                    const isLoading = Boolean(leaderboardFollowLoading[c.userId]);
-                    const followLabel = isSelf ? '自己' : isFollowed ? '已关注' : isLoading ? '关注中...' : '关注';
-                    const followClass = `button ${isFollowed || isSelf ? 'ghost muted' : 'primary'} small`;
-                    const roleMask = c.roleMask ?? 0;
-                    const isAdmin =
-                      (roleMask & RoleMask.ADMIN) === RoleMask.ADMIN ||
-                      (roleMask & RoleMask.DEVELOPER) === RoleMask.DEVELOPER;
-                    const rankLabel = isAdmin ? '管' : String(++rankCounter);
-                    return (
-                      <li key={`${c.userId}-${idx}`}>
-                        <div className={`leaderboard-rank ${isAdmin ? 'rank-admin' : `rank-${rankCounter}`}`}>
-                          {rankLabel}
-                        </div>
-                      <div className="leaderboard-meta">
-                        <strong>
-                          <Link className="text-button" href={userPath(c.userId, c.username || '匿名贡献者')}>
-                            {c.username || '匿名贡献者'}
-                          </Link>
-                        </strong>
-                        <span>{c.downloads} 位同学下载过 Ta 的资料</span>
-                      </div>
-                      <div className="leaderboard-actions">
-                        <Link className="button ghost small" href={userPath(c.userId, c.username || '匿名贡献者')}>
-                          查看
-                        </Link>
-                        <button
-                          className={followClass}
-                          type="button"
-                          onClick={() => handleFollowContributor(c.userId)}
-                          disabled={isSelf || isFollowed || isLoading}
-                        >
-                          {followLabel}
-                        </button>
-                      </div>
-                    </li>
-                    );
-                  });
-                })()}
-              </ol>
-            </div>
-          )}
-        </section>
+        <HomeLeaderboard
+          user={user}
+          topContributors={topContributors}
+          leaderboardPeriod={leaderboardPeriod}
+          leaderboardLabels={leaderboardLabels}
+          leaderboardPeriods={leaderboardPeriods}
+          leaderboardRangeHint={leaderboardRangeHint}
+          leaderboardEmptyHint={leaderboardEmptyHint}
+          leaderboardLoading={leaderboardLoading}
+          leaderboardError={leaderboardError}
+          leaderboardFollowNotice={leaderboardFollowNotice}
+          leaderboardFollowed={leaderboardFollowed}
+          leaderboardFollowLoading={leaderboardFollowLoading}
+          onPeriodChange={setLeaderboardPeriod}
+          onFollowContributor={handleFollowContributor}
+        />
         <section className="card support-card" style={{ gridColumn: '1 / -1' }}>
           <div>
             <h3 className="card-title" style={{ margin: 0 }}>

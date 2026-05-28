@@ -30,6 +30,18 @@ interface AdminBatchResult {
   failedIds?: number[];
 }
 
+export interface AdminInitialDashboardData {
+  users: UserSummary[];
+  feedbacks: FeedbackEntry[];
+  volunteers: VolunteerApplicationEntry[];
+  materials: AdminMaterial[];
+  materialsMeta: AdminListMeta;
+  marketItems: AdminMarketItem[];
+  marketMeta: AdminListMeta;
+  reports: AdminReport[];
+  reportsMeta: AdminListMeta;
+}
+
 const buildQuery = (params: Record<string, string | number | undefined>) => {
   const search = new URLSearchParams();
   Object.entries(params).forEach(([key, value]) => {
@@ -173,6 +185,60 @@ export const fetchAdminReports = async (params: {
 }) => {
   const response = await fetchBackend(`/admin/reports${buildQuery(params)}`);
   return unwrapApiResponse<AdminListResponse<AdminReport>>(response, '加载举报列表失败');
+};
+
+const readOptionalAdminData = async <T>(response: Response, fallback: T): Promise<T> => {
+  try {
+    return await unwrapApiResponse<T>(response, '加载管理后台数据失败');
+  } catch {
+    return fallback;
+  }
+};
+
+export const fetchAdminInitialDashboard = async (
+  token: string,
+  origin?: string
+): Promise<AdminInitialDashboardData> => {
+  const authInit = { headers: { Authorization: `Bearer ${token}` } };
+  const [userResp, feedbackResp, volunteerResp, materialResp, marketResp, reportResp] = await Promise.all([
+    fetchBackend('/admin/users', authInit, origin),
+    fetchBackend('/admin/community/feedbacks', authInit, origin),
+    fetchBackend('/admin/community/volunteers', authInit, origin),
+    fetchBackend('/admin/materials?page=0&size=15', authInit, origin),
+    fetchBackend('/admin/market?page=1&size=15', authInit, origin),
+    fetchBackend('/admin/reports?page=0&size=15', authInit, origin),
+  ]);
+  const defaultMaterialsMeta = { page: 0, size: 15, total: 0 };
+  const defaultMarketMeta = { page: 1, size: 15, total: 0 };
+  const defaultReportsMeta = { page: 0, size: 15, total: 0 };
+  const [users, feedbacks, volunteers, materialData, marketData, reportData] = await Promise.all([
+    readOptionalAdminData<UserSummary[]>(userResp, []),
+    readOptionalAdminData<FeedbackEntry[]>(feedbackResp, []),
+    readOptionalAdminData<VolunteerApplicationEntry[]>(volunteerResp, []),
+    readOptionalAdminData<AdminListResponse<AdminMaterial>>(materialResp, {
+      items: [],
+      meta: defaultMaterialsMeta,
+    }),
+    readOptionalAdminData<AdminListResponse<AdminMarketItem>>(marketResp, {
+      items: [],
+      meta: defaultMarketMeta,
+    }),
+    readOptionalAdminData<AdminListResponse<AdminReport>>(reportResp, {
+      items: [],
+      meta: defaultReportsMeta,
+    }),
+  ]);
+  return {
+    users,
+    feedbacks,
+    volunteers,
+    materials: materialData.items || [],
+    materialsMeta: materialData.meta || defaultMaterialsMeta,
+    marketItems: marketData.items || [],
+    marketMeta: marketData.meta || defaultMarketMeta,
+    reports: reportData.items || [],
+    reportsMeta: reportData.meta || defaultReportsMeta,
+  };
 };
 
 export const updateAdminReport = async (
