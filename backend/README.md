@@ -38,6 +38,64 @@ cd backend
 ../.venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8011
 ```
 
+MCP Gateway 会跟随后端一起启动，Streamable HTTP 入口是：
+
+```text
+http://127.0.0.1:8011/mcp
+```
+
+用 MCP Inspector 验证：
+
+```bash
+npx -y @modelcontextprotocol/inspector http://127.0.0.1:8011/mcp
+```
+
+接入支持 MCP Streamable HTTP 的本地 CLI 时，把 StudyHub 配成一个 HTTP MCP server：
+
+```json
+{
+  "mcpServers": {
+    "studyhub": {
+      "type": "http",
+      "url": "http://127.0.0.1:8011/mcp"
+    }
+  }
+}
+```
+
+如果 CLI 支持命令式添加 MCP server，也可以按同样的信息添加：
+
+```bash
+<your-cli> mcp add studyhub --transport http --url http://127.0.0.1:8011/mcp
+```
+
+接入后可以直接用自然语言测试，例如：
+
+```text
+我想要数据结构期末复习资料，帮我在 StudyHub 里找几份，并打开最相关的一份看看内容。
+```
+
+预期行为：CLI 会先调用 `search` 搜索资料、求购和集市结果，再对最相关的 `material:*` 结果调用 `fetch` 读取详情。
+
+也可以直接用 JSON-RPC 验证：
+
+```bash
+curl -s http://127.0.0.1:8011/mcp \
+  -H 'Accept: application/json, text/event-stream' \
+  -H 'Content-Type: application/json' \
+  --data '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}'
+
+curl -s http://127.0.0.1:8011/mcp \
+  -H 'Accept: application/json, text/event-stream' \
+  -H 'Content-Type: application/json' \
+  --data '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"search","arguments":{"query":"数据结构","limit":10}}}'
+
+curl -s http://127.0.0.1:8011/mcp \
+  -H 'Accept: application/json, text/event-stream' \
+  -H 'Content-Type: application/json' \
+  --data '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"fetch","arguments":{"id":"material:101"}}}'
+```
+
 需要本地环境变量样例时：
 
 ```bash
