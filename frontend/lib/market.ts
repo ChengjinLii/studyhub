@@ -1,16 +1,6 @@
 import { MarketItemDetail, MarketListResponse } from '../types/market';
-import { extractErrorMessage } from './errors';
+import { unwrapApiResponse } from './apiEnvelope';
 import { resolveApiBase } from './apiBase';
-
-type ApiEnvelope<T> = {
-  ok: boolean;
-  data?: T;
-  msg?: string;
-  error?: {
-    code?: string;
-    message?: string;
-  };
-};
 
 const buildQuery = (params: Record<string, string | number | undefined>) => {
   const search = new URLSearchParams();
@@ -27,11 +17,7 @@ async function apiFetch<T>(path: string, token?: string, origin?: string) {
   if (token) headers.Authorization = `Bearer ${token}`;
   const apiBase = resolveApiBase(origin);
   const res = await fetch(`${apiBase}${path}`, { headers, cache: 'no-store' });
-  const json: ApiEnvelope<T> = await res.json().catch(() => ({ ok: false }));
-  if (!res.ok || !json.ok || !json.data) {
-    throw new Error(extractErrorMessage(json, '请求失败'));
-  }
-  return json.data;
+  return unwrapApiResponse<T>(res, '请求失败');
 }
 
 export async function fetchMarketItems(
@@ -44,4 +30,16 @@ export async function fetchMarketItems(
 
 export async function fetchMarketItemDetail(id: string, token?: string, origin?: string) {
   return apiFetch<MarketItemDetail>(`/market/${id}`, token, origin);
+}
+
+export async function createMarketItem(formData: FormData, token: string, origin?: string) {
+  const headers: Record<string, string> = { Accept: 'application/json' };
+  if (token) headers.Authorization = `Bearer ${token}`;
+  const apiBase = resolveApiBase(origin);
+  const response = await fetch(`${apiBase}/market`, {
+    method: 'POST',
+    headers,
+    body: formData,
+  });
+  return unwrapApiResponse<MarketItemDetail>(response, '发布失败');
 }

@@ -18,7 +18,10 @@ from app.core.db import prepare_database_runtime, session_scope
 from app.core.exceptions import install_exception_handlers
 from app.core.logging import bind_request_id, configure_logging, reset_request_id
 from app.core.observability import get_runtime_metrics
-from app.mcp.auth import origin_allowed
+from app.core.origin_guard import write_origin_allowed
+from app.core.rate_limit import rate_limit_allowed
+from app.core.security_headers import apply_security_headers
+from app.mcp.auth import mcp_request_allowed
 from app.mcp.server import create_studyhub_mcp
 
 
@@ -97,14 +100,30 @@ def create_app() -> FastAPI:
         status_code = 500
         route_path = request.url.path
         try:
-            if route_path.startswith("/mcp") and not origin_allowed(settings, request.headers.get("origin")):
+            rate_allowed, rate_error = rate_limit_allowed(settings, request)
+            if not rate_allowed:
+                status_code = 429
+                response = JSONResponse({"detail": rate_error or "Too many requests"}, status_code=status_code)
+                apply_security_headers(settings, response.headers)
+                return response
+            origin_allowed, origin_error = write_origin_allowed(settings, request)
+            if not origin_allowed:
                 status_code = 403
-                return JSONResponse({"detail": "MCP Origin is not allowed"}, status_code=status_code)
+                response = JSONResponse({"detail": origin_error or "Write request origin is not allowed"}, status_code=status_code)
+                apply_security_headers(settings, response.headers)
+                return response
+            mcp_allowed, mcp_error = mcp_request_allowed(settings, request) if route_path.startswith("/mcp") else (True, None)
+            if not mcp_allowed:
+                status_code = 403
+                response = JSONResponse({"detail": mcp_error or "MCP request is not allowed"}, status_code=status_code)
+                apply_security_headers(settings, response.headers)
+                return response
             response = await call_next(request)
             status_code = response.status_code
             route = request.scope.get("route")
             route_path = getattr(route, "path", None) or route_path
             response.headers["x-request-id"] = request_id
+            apply_security_headers(settings, response.headers)
             return response
         finally:
             duration_seconds = perf_counter() - started_at
@@ -134,7 +153,7 @@ def create_app() -> FastAPI:
 
     install_exception_handlers(app)
     app.include_router(api_router)
-    if settings.mcp_enabled:
+    if settings.resolved_mcp_enabled:
         studyhub_mcp = create_studyhub_mcp()
         app.state.studyhub_mcp = studyhub_mcp
         app.mount("/", studyhub_mcp.streamable_http_app())

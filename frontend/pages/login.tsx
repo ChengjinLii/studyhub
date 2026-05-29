@@ -4,7 +4,16 @@ import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from 'react';
 import AppImage from '../components/AppImage';
 import NavBar from '../components/NavBar';
 import { readSession } from '../lib/auth';
-import { fetchBackend } from '../lib/apiBase';
+import {
+  completeRegistration,
+  confirmPasswordReset,
+  fetchCaptchaPayload,
+  fetchLocalDevInfo,
+  loginWithLocalDev,
+  loginWithPassword,
+  sendPasswordResetCode,
+  sendRegistrationVerification,
+} from '../lib/authApi';
 import { toErrorMessage } from '../lib/errors';
 import { SessionUser } from '../types/user';
 
@@ -85,12 +94,7 @@ export default function Login({ user }: LoginPageProps) {
 
   const fetchCaptcha = async () => {
     try {
-      const resp = await fetchBackend('/captchas');
-      const json = await resp.json();
-      if (!resp.ok || !json.ok || !json.data) {
-        throw new Error(json.msg || '获取验证码失败');
-      }
-      setCaptcha(json.data);
+      setCaptcha(await fetchCaptchaPayload());
       setLoginForm((prev) => ({ ...prev, captchaCode: '' }));
       setRegisterForm((prev) => ({ ...prev, captchaCode: '' }));
     } catch (err: unknown) {
@@ -106,20 +110,11 @@ export default function Login({ user }: LoginPageProps) {
     let active = true;
     const fetchRuntimeInfo = async () => {
       try {
-        const resp = await fetchBackend('/healthz');
-        const json = await resp.json();
-        if (!active || !resp.ok || !json.ok || !json.data?.localDev) {
+        const localDevPayload = await fetchLocalDevInfo();
+        if (!active || !localDevPayload) {
           return;
         }
-        const localDevPayload = json.data.localDev;
-        setLocalDevInfo({
-          enabled: localDevPayload.enabled === true,
-          quickLoginEnabled: localDevPayload.quickLoginEnabled === true,
-          developerUsername:
-            typeof localDevPayload.developerUsername === 'string' && localDevPayload.developerUsername
-              ? localDevPayload.developerUsername
-              : 'developer',
-        });
+        setLocalDevInfo(localDevPayload);
       } catch {
         if (active) {
           setLocalDevInfo(null);
@@ -150,12 +145,7 @@ export default function Login({ user }: LoginPageProps) {
 
   const fetchResetCaptcha = async () => {
     try {
-      const resp = await fetchBackend('/captchas');
-      const json = await resp.json();
-      if (!resp.ok || !json.ok || !json.data) {
-        throw new Error(json.msg || '获取验证码失败');
-      }
-      setResetCaptcha(json.data);
+      setResetCaptcha(await fetchCaptchaPayload());
       setResetCaptchaCode('');
     } catch (err: unknown) {
       setResetMsg({ type: 'error', text: toErrorMessage(err, '获取验证码失败') });
@@ -180,15 +170,7 @@ export default function Login({ user }: LoginPageProps) {
         captchaCode: loginForm.captchaCode,
         rememberMe: loginForm.rememberMe,
       };
-      const resp = await fetchBackend('/session', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-      const json = await resp.json();
-      if (!resp.ok || !json.ok) {
-        throw new Error(json.msg || '登录失败');
-      }
+      await loginWithPassword(payload);
       setSuccess('登录成功，正在跳转...');
       router.replace(nextPath || '/');
     } catch (err: unknown) {
@@ -204,13 +186,7 @@ export default function Login({ user }: LoginPageProps) {
     setError('');
     setSuccess('');
     try {
-      const resp = await fetchBackend('/dev-session', {
-        method: 'POST',
-      });
-      const json = await resp.json();
-      if (!resp.ok || !json.ok) {
-        throw new Error(json.msg || '进入 local-dev 账号失败');
-      }
+      await loginWithLocalDev();
       setSuccess('local-dev 账号已就绪，正在跳转...');
       router.replace(nextPath || '/');
     } catch (err: unknown) {
@@ -236,19 +212,11 @@ export default function Login({ user }: LoginPageProps) {
       return;
     }
     try {
-      const resp = await fetchBackend('/registrations', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: registerForm.email,
-          code: registerForm.code,
-          purpose: 'REGISTER',
-        }),
+      await completeRegistration({
+        email: registerForm.email,
+        code: registerForm.code,
+        purpose: 'REGISTER',
       });
-      const json = await resp.json();
-      if (!resp.ok || !json.ok) {
-        throw new Error(json.msg || '注册失败');
-      }
       setSuccess('注册并登录成功，正在跳转...');
       router.replace(nextPath || '/');
     } catch (err: unknown) {
@@ -278,16 +246,8 @@ export default function Login({ user }: LoginPageProps) {
         captchaId: captcha.captchaId,
         captchaCode: registerForm.captchaCode,
       };
-      const resp = await fetchBackend('/registration-verifications', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-      const json = await resp.json();
-      if (!resp.ok || !json.ok) {
-        throw new Error(json.msg || '发送验证码失败');
-      }
-      const resendSeconds = json.data?.resendAfterSeconds ?? 60;
+      const result = await sendRegistrationVerification(payload);
+      const resendSeconds = result?.resendAfterSeconds ?? 60;
       setCooldown(resendSeconds);
       setSuccess('验证码已发送至邮箱，请在 5 分钟内完成验证。建议使用国内邮箱，未收到请查看垃圾邮件或稍后重试。');
     } catch (err: unknown) {
@@ -310,21 +270,13 @@ export default function Login({ user }: LoginPageProps) {
     }
     setResetLoading(true);
     try {
-      const resp = await fetchBackend('/password-resets', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          identifier: resetForm.identifier,
-          newPassword: resetForm.newPassword,
-          captchaId: resetCaptcha.captchaId,
-          captchaCode: resetCaptchaCode,
-        }),
+      const result = await sendPasswordResetCode({
+        identifier: resetForm.identifier,
+        newPassword: resetForm.newPassword,
+        captchaId: resetCaptcha.captchaId,
+        captchaCode: resetCaptchaCode,
       });
-      const json = await resp.json();
-      if (!resp.ok || !json.ok) {
-        throw new Error(json.msg || '发送验证码失败');
-      }
-      setResetCooldown(json.data?.resendAfterSeconds ?? 60);
+      setResetCooldown(result?.resendAfterSeconds ?? 60);
       setResetMsg({ type: 'success', text: '验证码已发送，请查收邮箱' });
     } catch (err: unknown) {
       setResetMsg({ type: 'error', text: toErrorMessage(err, '发送验证码失败') });
@@ -341,19 +293,11 @@ export default function Login({ user }: LoginPageProps) {
     }
     setResetLoading(true);
     try {
-      const resp = await fetchBackend('/password-resets', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          identifier: resetForm.identifier,
-          newPassword: resetForm.newPassword,
-          code: resetForm.code,
-        }),
+      await confirmPasswordReset({
+        identifier: resetForm.identifier,
+        newPassword: resetForm.newPassword,
+        code: resetForm.code,
       });
-      const json = await resp.json();
-      if (!resp.ok || !json.ok) {
-        throw new Error(json.msg || '重置失败');
-      }
       setResetMsg({ type: 'success', text: '重置成功，请使用新密码登录' });
       setResetCooldown(0);
       setResetForm((prev) => ({ ...prev, code: '' }));

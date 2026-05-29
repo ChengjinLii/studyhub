@@ -3,8 +3,11 @@ from __future__ import annotations
 import json
 from typing import Any
 
+from app.core.config import get_settings
 
-PUBLIC_BASE_URL = "https://study-hub.cn"
+
+def public_base_url() -> str:
+    return get_settings().resolved_public_site_base_url
 
 
 def json_text(payload: Any) -> str:
@@ -12,19 +15,19 @@ def json_text(payload: Any) -> str:
 
 
 def material_url(material_id: int | str) -> str:
-    return f"{PUBLIC_BASE_URL}/materials/{material_id}"
+    return f"{public_base_url()}/materials/{material_id}"
 
 
 def request_url(request_id: int | str) -> str:
-    return f"{PUBLIC_BASE_URL}/requests/{request_id}"
+    return f"{public_base_url()}/requests/{request_id}"
 
 
 def market_url(item_id: int | str) -> str:
-    return f"{PUBLIC_BASE_URL}/market/{item_id}"
+    return f"{public_base_url()}/market/{item_id}"
 
 
 def user_url(user_id: int | str) -> str:
-    return f"{PUBLIC_BASE_URL}/u/{user_id}"
+    return f"{public_base_url()}/u/{user_id}"
 
 
 def material_result(item: dict[str, Any]) -> dict[str, Any]:

@@ -46,6 +46,39 @@ def origin_locked_client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Tes
     get_settings.cache_clear()
 
 
+@pytest.fixture()
+def auth_required_client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> TestClient:
+    db_path = tmp_path / "studyhub-fastapi-test.sqlite3"
+    monkeypatch.setenv("STUDYHUB_ENVIRONMENT", "test")
+    monkeypatch.setenv("STUDYHUB_DATABASE_URL", f"sqlite+pysqlite:///{db_path}")
+    monkeypatch.setenv("STUDYHUB_JWT_SECRET", "studyhub-fastapi-test-secret-1234567890abcdefghijkl")
+    monkeypatch.setenv("STUDYHUB_CONTRACT_REPORT_DIR", str(tmp_path / "artifacts"))
+    monkeypatch.setenv("STUDYHUB_MATERIAL_ASSET_DIR", str(tmp_path / "materials"))
+    monkeypatch.setenv("STUDYHUB_MARKET_ASSET_DIR", str(tmp_path / "market"))
+    monkeypatch.setenv("STUDYHUB_PAYOUT_QR_ASSET_DIR", str(tmp_path / "payout-qr"))
+    monkeypatch.setenv("STUDYHUB_MAIL_OUTBOX_DIR", str(tmp_path / "outbox" / "mail"))
+    monkeypatch.setenv("STUDYHUB_LOCAL_DEV_BOOTSTRAP_USER", "false")
+    monkeypatch.setenv("STUDYHUB_MCP_REQUIRE_AUTH", "true")
+    monkeypatch.setenv("STUDYHUB_MCP_ACCESS_TOKEN", "test-mcp-token")
+
+    get_settings.cache_clear()
+    clear_dependency_caches()
+    reset_database_runtime()
+    import asyncio
+
+    asyncio.run(reset_async_database_runtime())
+
+    app = create_app()
+    with TestClient(app) as test_client:
+        get_captcha_service().reset()
+        yield test_client
+
+    clear_dependency_caches()
+    reset_database_runtime()
+    asyncio.run(reset_async_database_runtime())
+    get_settings.cache_clear()
+
+
 def test_mcp_allows_anonymous_read_tools_in_local_test(client: TestClient) -> None:
     response = call_tool(client, "health.ready")
 
@@ -84,3 +117,27 @@ def test_mcp_rejects_browser_origin_by_default_in_production() -> None:
 
     assert origin_allowed(settings, None) is True
     assert origin_allowed(settings, "https://study-hub.cn") is False
+
+
+def test_mcp_is_disabled_by_default_in_production_settings() -> None:
+    settings = Settings(environment="production")
+
+    assert settings.resolved_mcp_enabled is False
+    assert settings.resolved_mcp_require_auth is True
+
+
+def test_mcp_require_auth_rejects_anonymous_requests(auth_required_client: TestClient) -> None:
+    response = call_tool(auth_required_client, "health.ready")
+
+    assert response.status_code == 403
+
+
+def test_mcp_require_auth_accepts_configured_bearer_token(auth_required_client: TestClient) -> None:
+    response = call_tool(
+        auth_required_client,
+        "health.ready",
+        headers={"Authorization": "Bearer test-mcp-token"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["result"]["structuredContent"]["status"] == "ok"

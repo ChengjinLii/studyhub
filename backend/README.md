@@ -38,11 +38,26 @@ cd backend
 ../.venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8011
 ```
 
-MCP Gateway 会跟随后端一起启动，Streamable HTTP 入口是：
+MCP Gateway 在本地和测试环境默认跟随后端一起启动，Streamable HTTP 入口是：
 
 ```text
 http://127.0.0.1:8011/mcp
 ```
+
+生产和预览环境默认不会开放 MCP，需要显式配置后才会挂载：
+
+```bash
+STUDYHUB_MCP_ENABLED=true
+```
+
+如果开启 MCP 访问鉴权，客户端请求需要附带 Bearer token：
+
+```bash
+STUDYHUB_MCP_REQUIRE_AUTH=true
+STUDYHUB_MCP_ACCESS_TOKEN=<your-token>
+```
+
+MCP 返回的站内 URL 默认使用 `https://study-hub.cn`，可以通过 `STUDYHUB_PUBLIC_SITE_BASE_URL` 改成当前部署域名。
 
 用 MCP Inspector 验证：
 
@@ -83,6 +98,7 @@ npx -y @modelcontextprotocol/inspector http://127.0.0.1:8011/mcp
 curl -s http://127.0.0.1:8011/mcp \
   -H 'Accept: application/json, text/event-stream' \
   -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer <your-token>' \
   --data '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}'
 
 curl -s http://127.0.0.1:8011/mcp \

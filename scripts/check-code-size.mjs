@@ -22,7 +22,7 @@ const forbiddenDirs = [
   'backend/.pytest_cache',
 ];
 
-const pageJsonBudget = 25;
+const pageJsonBudget = 15;
 const failures = [];
 
 for (const [file, maxLines] of lineBudgets) {

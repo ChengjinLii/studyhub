@@ -4,11 +4,11 @@ import { useRouter } from 'next/router';
 import { FormEvent, useState } from 'react';
 import NavBar from '../../components/NavBar';
 import { readSession } from '../../lib/auth';
+import { createMarketItem } from '../../lib/market';
 import { marketPath } from '../../lib/slug';
 import { toErrorMessage } from '../../lib/errors';
 import { SessionUser } from '../../types/user';
 import { SUPPORTED_SCHOOL } from '../../constants/metadata';
-import { resolveApiBase } from '../../lib/apiBase';
 
 const CATEGORY_OPTIONS = [
   { value: 'BOOK', label: '书籍' },
@@ -62,20 +62,9 @@ export default function SellPage({ user, token }: SellPageProps) {
       const formData = new FormData();
       formData.append('payload', new Blob([JSON.stringify(payload)], { type: 'application/json' }));
       images.forEach((file) => formData.append('images', file));
-      const apiBase = resolveApiBase(typeof window !== 'undefined' ? window.location.origin : undefined);
-      const resp = await fetch(`${apiBase}/market`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-        body: formData,
-      });
-      const json = await resp.json();
-      if (!resp.ok || !json.ok || !json.data) {
-        throw new Error(json.msg || '发布失败');
-      }
+      const item = await createMarketItem(formData, token, typeof window !== 'undefined' ? window.location.origin : undefined);
       setStatus({ type: 'success', text: '发布成功，正在跳转…' });
-      router.push(marketPath(json.data.id, json.data.title || title));
+      router.push(marketPath(item.id, item.title || title));
     } catch (error: unknown) {
       setStatus({ type: 'error', text: toErrorMessage(error, '发布失败') });
     } finally {

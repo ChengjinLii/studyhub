@@ -12,14 +12,18 @@ from app.api.deps import (
     get_requests_service,
 )
 from app.core.db import session_scope
+from app.mcp.public_serializers import public_market, public_material, public_request
 from app.mcp.serializers import (
     json_text,
     market_result,
     market_text,
+    market_url,
     material_result,
     material_text,
+    material_url,
     request_result,
     request_text,
+    request_url,
 )
 
 
@@ -52,7 +56,8 @@ def search_materials(query: str | None, limit: int | None) -> dict[str, Any]:
 
 def material_detail(material_id: int) -> dict[str, Any]:
     with session_scope() as session:
-        return get_materials_service().get_detail(session, None, material_id, False)
+        detail = get_materials_service().get_detail(session, None, material_id, False)
+    return public_material(detail)
 
 
 def material_preview(material_id: int) -> dict[str, Any]:
@@ -75,29 +80,28 @@ def material_recommendations(limit: int | None) -> dict[str, Any]:
 
 def search_requests(query: str | None, limit: int | None) -> dict[str, Any]:
     safe_limit = clamp_limit(limit)
+    source_limit = 100 if query else safe_limit
     with session_scope() as session:
-        items = get_requests_service().list_requests(session, None, sort="hot", limit=safe_limit)
+        items = get_requests_service().list_requests(session, None, sort="hot", limit=source_limit)
     if query:
         filtered = [item for item in items if _matches_text(item, query)]
-        if filtered:
-            items = filtered
-    return {"items": items[:safe_limit]}
+        if not filtered:
+            return {"items": [], "message": "未找到相关求购"}
+        items = filtered
+    return {"items": [public_request(item) for item in items[:safe_limit]]}
 
 
 def request_detail(request_id: int) -> dict[str, Any]:
     with session_scope() as session:
-        items = get_requests_service().list_requests(session, None, sort="latest", limit=100)
-    for item in items:
-        if int(item.get("id") or 0) == request_id:
-            return item
-    raise HTTPException(status_code=404, detail="求购不存在")
+        detail = get_requests_service().get_detail(session, 0, None, request_id)
+    return public_request(detail)
 
 
 def request_leaderboard(limit: int | None) -> dict[str, Any]:
     safe_limit = clamp_limit(limit)
     with session_scope() as session:
         items = get_requests_service().list_leaderboard(session, None, limit=safe_limit)
-    return {"items": items}
+    return {"items": [public_request(item) for item in items]}
 
 
 def search_market(query: str | None, limit: int | None) -> dict[str, Any]:
@@ -105,14 +109,15 @@ def search_market(query: str | None, limit: int | None) -> dict[str, Any]:
     with session_scope() as session:
         data = get_market_service().list_market(session, None, keyword=query, category=None, page=1, size=safe_limit)
     if query and not data.get("items"):
-        with session_scope() as session:
-            data = get_market_service().list_market(session, None, keyword=None, category=None, page=1, size=safe_limit)
+        return {"items": [], "meta": data.get("meta"), "stats": data.get("stats"), "message": "未找到相关集市商品"}
+    data["items"] = [public_market(item) for item in data.get("items") or []]
     return data
 
 
 def market_detail(item_id: int) -> dict[str, Any]:
     with session_scope() as session:
-        return get_market_service().get_detail(session, None, item_id)
+        detail = get_market_service().get_detail(session, None, item_id)
+    return public_market(detail)
 
 
 def contributor_leaderboard(limit: int | None, period: str | None) -> dict[str, Any]:
@@ -133,9 +138,9 @@ def search_all(query: str, limit: int | None) -> dict[str, Any]:
     market = search_market(query, per_kind).get("items") or []
 
     if query and not requests:
-        requests = search_requests(None, per_kind).get("items") or []
+        requests = []
     if query and not market:
-        market = search_market(None, per_kind).get("items") or []
+        market = []
 
     results = [material_result(item) for item in materials[:per_kind]]
     results.extend(request_result(item) for item in requests[:per_kind])
@@ -152,8 +157,8 @@ def fetch_typed(resource_id: str) -> dict[str, Any]:
             "id": resource_id,
             "title": detail.get("title") or f"资料 {item_id}",
             "text": material_text(detail),
-            "url": f"https://study-hub.cn/materials/{item_id}",
-            "metadata": {"type": "material", "raw": detail},
+            "url": material_url(item_id),
+            "metadata": {"type": "material", "public": detail},
         }
     if kind == "request":
         detail = request_detail(item_id)
@@ -161,8 +166,8 @@ def fetch_typed(resource_id: str) -> dict[str, Any]:
             "id": resource_id,
             "title": detail.get("course") or detail.get("keyword") or f"求购 {item_id}",
             "text": request_text(detail),
-            "url": f"https://study-hub.cn/requests/{item_id}",
-            "metadata": {"type": "request", "raw": detail},
+            "url": request_url(item_id),
+            "metadata": {"type": "request", "public": detail},
         }
     if kind == "market":
         detail = market_detail(item_id)
@@ -170,8 +175,8 @@ def fetch_typed(resource_id: str) -> dict[str, Any]:
             "id": resource_id,
             "title": detail.get("title") or f"集市商品 {item_id}",
             "text": market_text(detail),
-            "url": f"https://study-hub.cn/market/{item_id}",
-            "metadata": {"type": "market", "raw": detail},
+            "url": market_url(item_id),
+            "metadata": {"type": "market", "public": detail},
         }
     raise HTTPException(status_code=400, detail=f"Unsupported fetch id: {resource_id}")
 

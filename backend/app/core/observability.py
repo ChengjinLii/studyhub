@@ -39,6 +39,8 @@ class RuntimeMetrics:
         self._http_request_durations: dict[tuple[str, str], _Aggregate] = defaultdict(_Aggregate)
         self._worker_jobs_total: dict[tuple[str, str], int] = defaultdict(int)
         self._worker_job_durations: dict[tuple[str, str], _Aggregate] = defaultdict(_Aggregate)
+        self._mcp_tool_calls_total: dict[tuple[str, str], int] = defaultdict(int)
+        self._mcp_tool_durations: dict[tuple[str, str], _Aggregate] = defaultdict(_Aggregate)
 
     def clear(self) -> None:
         with self._lock:
@@ -46,6 +48,8 @@ class RuntimeMetrics:
             self._http_request_durations.clear()
             self._worker_jobs_total.clear()
             self._worker_job_durations.clear()
+            self._mcp_tool_calls_total.clear()
+            self._mcp_tool_durations.clear()
             self.started_at = time.time()
 
     def record_http_request(
@@ -75,6 +79,19 @@ class RuntimeMetrics:
         with self._lock:
             self._worker_jobs_total[(job_key, status_key)] += 1
             self._worker_job_durations[(job_key, status_key)].observe(duration_seconds)
+
+    def record_mcp_tool_call(
+        self,
+        *,
+        tool: str,
+        status: str,
+        duration_seconds: float,
+    ) -> None:
+        tool_key = tool or "unknown"
+        status_key = (status or "unknown").lower()
+        with self._lock:
+            self._mcp_tool_calls_total[(tool_key, status_key)] += 1
+            self._mcp_tool_durations[(tool_key, status_key)].observe(duration_seconds)
 
     def render_prometheus(self, settings: Settings) -> str:
         lines: list[str] = [
@@ -131,6 +148,22 @@ class RuntimeMetrics:
                 aggregate = self._worker_job_durations[(job, status)]
                 lines.append(f"studyhub_worker_job_duration_seconds_count{{{labels}}} {aggregate.count}")
                 lines.append(f"studyhub_worker_job_duration_seconds_sum{{{labels}}} {aggregate.total_seconds:.6f}")
+            lines.extend(
+                [
+                    "# HELP studyhub_mcp_tool_calls_total MCP tool calls by tool and status.",
+                    "# TYPE studyhub_mcp_tool_calls_total counter",
+                    "# HELP studyhub_mcp_tool_duration_seconds_count MCP tool call count by tool and status.",
+                    "# TYPE studyhub_mcp_tool_duration_seconds_count counter",
+                    "# HELP studyhub_mcp_tool_duration_seconds_sum MCP tool call duration sum by tool and status.",
+                    "# TYPE studyhub_mcp_tool_duration_seconds_sum counter",
+                ]
+            )
+            for (tool, status), count in sorted(self._mcp_tool_calls_total.items()):
+                labels = 'tool="%s",status="%s"' % (_sanitize_label(tool), _sanitize_label(status))
+                lines.append(f"studyhub_mcp_tool_calls_total{{{labels}}} {count}")
+                aggregate = self._mcp_tool_durations[(tool, status)]
+                lines.append(f"studyhub_mcp_tool_duration_seconds_count{{{labels}}} {aggregate.count}")
+                lines.append(f"studyhub_mcp_tool_duration_seconds_sum{{{labels}}} {aggregate.total_seconds:.6f}")
         lines.append("")
         return "\n".join(lines)
 

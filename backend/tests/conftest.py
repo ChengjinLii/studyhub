@@ -9,6 +9,7 @@ from app.api.deps import clear_dependency_caches, get_auth_service, get_captcha_
 from app.core.async_db import reset_async_database_runtime
 from app.core.config import get_settings
 from app.core.db import reset_database_runtime
+from app.core.rate_limit import get_rate_limiter
 from app.main import create_app
 
 
@@ -27,6 +28,7 @@ def client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> TestClient:
 
     get_settings.cache_clear()
     clear_dependency_caches()
+    get_rate_limiter().clear()
     reset_database_runtime()
     import asyncio
 
@@ -38,6 +40,7 @@ def client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> TestClient:
         yield test_client
 
     clear_dependency_caches()
+    get_rate_limiter().clear()
     reset_database_runtime()
     asyncio.run(reset_async_database_runtime())
     get_settings.cache_clear()

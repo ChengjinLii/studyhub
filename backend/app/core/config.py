@@ -66,12 +66,28 @@ class Settings(BaseSettings):
     response_gzip_enabled: bool = True
     response_gzip_minimum_size_bytes: int = 1024
     response_gzip_compresslevel: int = 5
-    mcp_enabled: bool = True
+    mcp_enabled: bool | None = None
     mcp_allowed_origins: str | None = None
     mcp_require_auth: bool | None = None
+    mcp_access_token: str | None = None
     mcp_read_scope: str = "studyhub.read"
     mcp_write_scope: str = "studyhub.write"
     mcp_admin_scope: str = "studyhub.admin"
+    public_site_base_url: str = "https://study-hub.cn"
+    security_headers_enabled: bool = True
+    security_hsts_enabled: bool | None = None
+    security_hsts_max_age_seconds: int = 15552000
+    security_frame_options: str = "DENY"
+    security_referrer_policy: str = "strict-origin-when-cross-origin"
+    security_permissions_policy: str = "camera=(), microphone=(), geolocation=()"
+    write_origin_protection_enabled: bool | None = None
+    trusted_site_origins: str | None = None
+    rate_limit_enabled: bool = True
+    rate_limit_window_seconds: int = 60
+    rate_limit_login: int = 1000
+    rate_limit_captcha: int = 1000
+    rate_limit_upload: int = 1000
+    rate_limit_mcp: int = 1000
 
     lock_provider: str = "db_row"
     redis_url: str | None = None
@@ -347,6 +363,46 @@ class Settings(BaseSettings):
         if not self.mcp_allowed_origins:
             return []
         return [origin.strip() for origin in self.mcp_allowed_origins.split(",") if origin.strip()]
+
+    @property
+    def resolved_mcp_enabled(self) -> bool:
+        if self.mcp_enabled is not None:
+            return bool(self.mcp_enabled)
+        return not (self.is_preview or self.is_production)
+
+    @property
+    def resolved_mcp_require_auth(self) -> bool:
+        if self.mcp_require_auth is not None:
+            return bool(self.mcp_require_auth)
+        return self.is_preview or self.is_production
+
+    @property
+    def resolved_public_site_base_url(self) -> str:
+        return self.public_site_base_url.rstrip("/")
+
+    @property
+    def resolved_security_hsts_enabled(self) -> bool:
+        if self.security_hsts_enabled is not None:
+            return bool(self.security_hsts_enabled)
+        return self.is_preview or self.is_production
+
+    @property
+    def resolved_write_origin_protection_enabled(self) -> bool:
+        if self.write_origin_protection_enabled is not None:
+            return bool(self.write_origin_protection_enabled)
+        return self.is_preview or self.is_production
+
+    @property
+    def resolved_trusted_site_origins(self) -> set[str]:
+        origins = set(self.resolved_cors_allowed_origins)
+        if self.trusted_site_origins:
+            origins.update(origin.strip() for origin in self.trusted_site_origins.split(",") if origin.strip())
+        public_base = self.resolved_public_site_base_url
+        if public_base:
+            origins.add(public_base)
+        if self.environment.strip().lower() in {"local-dev", "test"}:
+            origins.update({"http://localhost:3000", "http://127.0.0.1:3000", "http://testserver"})
+        return origins
 
     @property
     def resolved_cookie_secure(self) -> bool:
