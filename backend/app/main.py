@@ -112,7 +112,7 @@ def create_app() -> FastAPI:
                 response = JSONResponse({"detail": origin_error or "Write request origin is not allowed"}, status_code=status_code)
                 apply_security_headers(settings, response.headers)
                 return response
-            mcp_allowed, mcp_error = mcp_request_allowed(settings, request) if route_path.startswith("/mcp") else (True, None)
+            mcp_allowed, mcp_error = await mcp_request_allowed(settings, request) if route_path.startswith("/mcp") else (True, None)
             if not mcp_allowed:
                 status_code = 403
                 response = JSONResponse({"detail": mcp_error or "MCP request is not allowed"}, status_code=status_code)

@@ -12,6 +12,7 @@ from app.api.deps import (
     get_public_read_cache,
 )
 from app.core.public_read_cache import PublicReadCache, cache_if_anonymous, invalidate_prefixes
+from app.core.observability import get_runtime_metrics
 from app.core.security import AuthContext
 
 
@@ -32,6 +33,7 @@ def _build_cache(*, ttl_seconds: int = 30) -> PublicReadCache:
 
 
 def test_public_read_cache_reuses_anonymous_value() -> None:
+    get_runtime_metrics().clear()
     cache = _build_cache()
     calls = 0
 
@@ -46,6 +48,10 @@ def test_public_read_cache_reuses_anonymous_value() -> None:
     assert first == {"value": 1}
     assert second == {"value": 1}
     assert calls == 1
+    metrics = get_runtime_metrics().render_prometheus(SimpleNamespace(app_name="test", environment="test", resolved_build_git_sha="test"))
+    assert 'studyhub_cache_events_total{namespace="materials:list",backend="local",event="miss"} 1' in metrics
+    assert 'studyhub_cache_events_total{namespace="materials:list",backend="local",event="hit"} 1' in metrics
+    assert 'studyhub_cache_events_total{namespace="materials:list",backend="local",event="set"} 1' in metrics
 
 
 def test_public_read_cache_singleflight_coalesces_parallel_requests() -> None:
@@ -103,6 +109,7 @@ def test_cache_if_anonymous_bypasses_authenticated_requests() -> None:
 
 
 def test_invalidate_prefixes_evicts_matching_namespaces() -> None:
+    get_runtime_metrics().clear()
     cache = _build_cache()
 
     cache.get_or_set("materials:list", ("page", 1), lambda: {"kind": "materials"})
@@ -112,6 +119,8 @@ def test_invalidate_prefixes_evicts_matching_namespaces() -> None:
 
     assert ("materials:list", ("page", 1)) not in cache._entries
     assert ("market:list", ("page", 1)) in cache._entries
+    metrics = get_runtime_metrics().render_prometheus(SimpleNamespace(app_name="test", environment="test", resolved_build_git_sha="test"))
+    assert 'studyhub_cache_events_total{namespace="materials",backend="local",event="invalidate"} 1' in metrics
 
 
 def test_public_read_cache_supports_redis_backend(monkeypatch) -> None:

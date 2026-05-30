@@ -107,15 +107,8 @@ class RequestsService(RequestsCompatMixin):
             return self._compat_list_requests(session, viewer_id, sort=sort, limit=limit)
         self._bootstrap(session)
         normalized = (sort or "latest").lower()
-        items = self.request_repo.list_public_requests(session, sort=normalized)
-        hidden_ids = self.request_repo.find_hidden_early_exit_request_ids(
-            session,
-            request_ids=[int(item.id) for item in items],
-        )
-        if hidden_ids:
-            items = [item for item in items if int(item.id) not in hidden_ids]
         safe_limit = clamp_limit(limit, max_value=100)
-        sliced = items[:safe_limit] if safe_limit else items
+        sliced = self.request_repo.list_visible_public_requests(session, sort=normalized, limit=safe_limit)
         responded_ids = self.request_repo.find_responded_request_ids(
             session,
             responder_id=viewer_id,

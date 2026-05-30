@@ -10,6 +10,7 @@ from time import monotonic
 from typing import Any, Awaitable, Callable, Hashable
 
 from app.core.config import Settings
+from app.core.observability import get_runtime_metrics
 
 
 @dataclass(slots=True)
@@ -45,6 +46,7 @@ class PublicReadCache:
 
     def get_or_set(self, namespace: str, key: Hashable, factory: Callable[[], Any]) -> Any:
         if not self.enabled:
+            self._record_event(namespace, "disabled")
             return factory()
         if self.backend == "redis":
             return self._redis_get_or_set(namespace, key, factory)
@@ -57,6 +59,7 @@ class PublicReadCache:
         factory: Callable[[], Any],
     ) -> Any:
         if not self.enabled:
+            self._record_event(namespace, "disabled")
             return await self._await_if_needed(factory())
         if self.backend == "redis":
             return await self._redis_get_or_set_async(namespace, key, factory)
@@ -65,6 +68,7 @@ class PublicReadCache:
     def invalidate_prefix(self, prefix: str) -> None:
         if not self.enabled:
             return
+        self._record_event(prefix, "invalidate")
         self._invalidate_local_prefix(prefix)
         if self.backend == "redis":
             self._invalidate_redis_prefix(prefix)
@@ -91,6 +95,7 @@ class PublicReadCache:
                 self._purge_expired_locked(now)
                 cached = self._entries.get(composite_key)
                 if cached is not None and cached.expires_at > now:
+                    self._record_event(namespace, "hit")
                     return cached.value
                 inflight = self._inflight.get(composite_key)
                 if inflight is None:
@@ -115,6 +120,8 @@ class PublicReadCache:
         with self._lock:
             self._purge_expired_locked(monotonic())
             self._store_local_entry_locked(composite_key, value)
+            self._record_event(namespace, "miss")
+            self._record_event(namespace, "set")
             waiter = self._inflight.pop(composite_key, None)
             if waiter is not None:
                 waiter.set()
@@ -134,8 +141,10 @@ class PublicReadCache:
                     with self._lock:
                         self._purge_expired_locked(monotonic())
                         self._store_local_entry_locked(composite_key, value)
+                    self._record_event(namespace, "hit")
                     return value
             except Exception:
+                self._record_event(namespace, "error")
                 return self._local_get_or_set(namespace, key, factory)
 
             with self._lock:
@@ -162,11 +171,14 @@ class PublicReadCache:
         try:
             client.set(redis_key, self._serialize_value(value), ex=self.ttl_seconds)
         except Exception:
+            self._record_event(namespace, "error")
             value = self._local_get_or_set(namespace, key, lambda: value)
         else:
             with self._lock:
                 self._purge_expired_locked(monotonic())
                 self._store_local_entry_locked(composite_key, value)
+            self._record_event(namespace, "miss")
+            self._record_event(namespace, "set")
         finally:
             with self._lock:
                 waiter = self._inflight.pop(composite_key, None)
@@ -187,6 +199,7 @@ class PublicReadCache:
                 self._purge_expired_locked(now)
                 cached = self._entries.get(composite_key)
                 if cached is not None and cached.expires_at > now:
+                    self._record_event(namespace, "hit")
                     return cached.value
                 inflight = self._async_inflight.get(composite_key)
                 if inflight is None:
@@ -211,6 +224,8 @@ class PublicReadCache:
         with self._lock:
             self._purge_expired_locked(monotonic())
             self._store_local_entry_locked(composite_key, value)
+            self._record_event(namespace, "miss")
+            self._record_event(namespace, "set")
             waiter = self._async_inflight.pop(composite_key, None)
             if waiter is not None:
                 waiter.set()
@@ -235,8 +250,10 @@ class PublicReadCache:
                     with self._lock:
                         self._purge_expired_locked(monotonic())
                         self._store_local_entry_locked(composite_key, value)
+                    self._record_event(namespace, "hit")
                     return value
             except Exception:
+                self._record_event(namespace, "error")
                 return await self._local_get_or_set_async(namespace, key, factory)
 
             with self._lock:
@@ -266,13 +283,17 @@ class PublicReadCache:
             try:
                 await asyncio.to_thread(client.set, redis_key, self._serialize_value(value), ex=self.ttl_seconds)
             except Exception:
+                self._record_event(namespace, "error")
                 value = await self._local_get_or_set_async(namespace, key, lambda: self._constant_async_value(value))
         except Exception:
+            self._record_event(namespace, "error")
             value = await self._local_get_or_set_async(namespace, key, lambda: self._constant_async_value(value))
         else:
             with self._lock:
                 self._purge_expired_locked(monotonic())
                 self._store_local_entry_locked(composite_key, value)
+            self._record_event(namespace, "miss")
+            self._record_event(namespace, "set")
         finally:
             with self._lock:
                 waiter = self._async_inflight.pop(composite_key, None)
@@ -352,6 +373,9 @@ class PublicReadCache:
     def _store_local_entry_locked(self, composite_key: tuple[str, Hashable], value: Any) -> None:
         self._entries[composite_key] = _CacheEntry(expires_at=monotonic() + self.ttl_seconds, value=value)
         self._evict_overflow_locked()
+
+    def _record_event(self, namespace: str, event: str) -> None:
+        get_runtime_metrics().record_cache_event(namespace=namespace, backend=self.backend if self.enabled else "disabled", event=event)
 
     def _evict_overflow_locked(self) -> None:
         while len(self._entries) > self.max_entries:

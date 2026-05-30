@@ -8,6 +8,36 @@ from tests.test_mcp_protocol import MCP_HEADERS
 
 
 MCP_SENSITIVE_KEYS = {"raw", "netdiskUrl", "netdiskPassword", "contactValue", "contactType"}
+MATERIAL_PUBLIC_KEYS = {
+    "id",
+    "title",
+    "description",
+    "school",
+    "college",
+    "major",
+    "tags",
+    "free",
+    "downloadCount",
+    "ratingAvg",
+    "ratingCount",
+    "previewManifest",
+    "previewWatermarkEnabled",
+    "previewSource",
+}
+REQUEST_PUBLIC_KEYS = {
+    "id",
+    "course",
+    "keyword",
+    "school",
+    "college",
+    "major",
+    "budget",
+    "fundedAmount",
+    "responseCount",
+    "status",
+    "createdAt",
+}
+MARKET_PUBLIC_KEYS = {"id", "title", "description", "school", "category", "price", "wantCount", "status"}
 
 
 def assert_no_sensitive_mcp_keys(value) -> None:
@@ -18,6 +48,16 @@ def assert_no_sensitive_mcp_keys(value) -> None:
     elif isinstance(value, list):
         for item in value:
             assert_no_sensitive_mcp_keys(item)
+
+
+def assert_fetch_contract(structured: dict, *, resource_id: str, public_keys: set[str]) -> None:
+    assert set(structured) == {"id", "title", "text", "url", "metadata"}
+    assert structured["id"] == resource_id
+    assert isinstance(structured["title"], str)
+    assert isinstance(structured["text"], str)
+    assert structured["url"].startswith("https://")
+    assert set(structured["metadata"]) == {"type", "public"}
+    assert set(structured["metadata"]["public"]) == public_keys
 
 
 def call_tool(client: TestClient, name: str, arguments: dict | None = None, headers: dict[str, str] | None = None):
@@ -55,6 +95,7 @@ def test_mcp_fetch_material_returns_full_structured_content(client: TestClient) 
     structured = result["structuredContent"]
     assert structured["id"] == "material:101"
     assert structured["title"] == "数据结构期末真题解析"
+    assert_fetch_contract(structured, resource_id="material:101", public_keys=MATERIAL_PUBLIC_KEYS)
     assert "text" in structured
     assert structured["metadata"]["type"] == "material"
     assert "raw" not in structured["metadata"]
@@ -73,6 +114,16 @@ def test_mcp_fetch_market_does_not_expose_contact_value(client: TestClient) -> N
     public = response.json()["result"]["structuredContent"]["metadata"]["public"]
     assert "contactValue" not in public
     assert "contactType" not in public
+    assert_fetch_contract(response.json()["result"]["structuredContent"], resource_id="market:201", public_keys=MARKET_PUBLIC_KEYS)
+    assert_no_sensitive_mcp_keys(response.json())
+
+
+def test_mcp_fetch_request_uses_public_contract(client: TestClient) -> None:
+    response = call_tool(client, "fetch", {"id": "request:401"})
+
+    assert response.status_code == 200
+    structured = response.json()["result"]["structuredContent"]
+    assert_fetch_contract(structured, resource_id="request:401", public_keys=REQUEST_PUBLIC_KEYS)
     assert_no_sensitive_mcp_keys(response.json())
 
 

@@ -41,6 +41,8 @@ class RuntimeMetrics:
         self._worker_job_durations: dict[tuple[str, str], _Aggregate] = defaultdict(_Aggregate)
         self._mcp_tool_calls_total: dict[tuple[str, str], int] = defaultdict(int)
         self._mcp_tool_durations: dict[tuple[str, str], _Aggregate] = defaultdict(_Aggregate)
+        self._cache_events_total: dict[tuple[str, str, str], int] = defaultdict(int)
+        self._security_events_total: dict[tuple[str, str], int] = defaultdict(int)
 
     def clear(self) -> None:
         with self._lock:
@@ -50,6 +52,8 @@ class RuntimeMetrics:
             self._worker_job_durations.clear()
             self._mcp_tool_calls_total.clear()
             self._mcp_tool_durations.clear()
+            self._cache_events_total.clear()
+            self._security_events_total.clear()
             self.started_at = time.time()
 
     def record_http_request(
@@ -92,6 +96,19 @@ class RuntimeMetrics:
         with self._lock:
             self._mcp_tool_calls_total[(tool_key, status_key)] += 1
             self._mcp_tool_durations[(tool_key, status_key)].observe(duration_seconds)
+
+    def record_cache_event(self, *, namespace: str, backend: str, event: str) -> None:
+        namespace_key = namespace or "unknown"
+        backend_key = backend or "unknown"
+        event_key = (event or "unknown").lower()
+        with self._lock:
+            self._cache_events_total[(namespace_key, backend_key, event_key)] += 1
+
+    def record_security_event(self, *, event: str, reason: str) -> None:
+        event_key = (event or "unknown").lower()
+        reason_key = reason or "unknown"
+        with self._lock:
+            self._security_events_total[(event_key, reason_key)] += 1
 
     def render_prometheus(self, settings: Settings) -> str:
         lines: list[str] = [
@@ -164,6 +181,28 @@ class RuntimeMetrics:
                 aggregate = self._mcp_tool_durations[(tool, status)]
                 lines.append(f"studyhub_mcp_tool_duration_seconds_count{{{labels}}} {aggregate.count}")
                 lines.append(f"studyhub_mcp_tool_duration_seconds_sum{{{labels}}} {aggregate.total_seconds:.6f}")
+            lines.extend(
+                [
+                    "# HELP studyhub_cache_events_total Cache events by namespace, backend, and event.",
+                    "# TYPE studyhub_cache_events_total counter",
+                ]
+            )
+            for (namespace, backend, event), count in sorted(self._cache_events_total.items()):
+                labels = 'namespace="%s",backend="%s",event="%s"' % (
+                    _sanitize_label(namespace),
+                    _sanitize_label(backend),
+                    _sanitize_label(event),
+                )
+                lines.append(f"studyhub_cache_events_total{{{labels}}} {count}")
+            lines.extend(
+                [
+                    "# HELP studyhub_security_events_total Security events by type and reason.",
+                    "# TYPE studyhub_security_events_total counter",
+                ]
+            )
+            for (event, reason), count in sorted(self._security_events_total.items()):
+                labels = 'event="%s",reason="%s"' % (_sanitize_label(event), _sanitize_label(reason))
+                lines.append(f"studyhub_security_events_total{{{labels}}} {count}")
         lines.append("")
         return "\n".join(lines)
 

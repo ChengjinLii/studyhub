@@ -3,7 +3,7 @@ import { useRouter } from 'next/router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import NavBar from '../../components/NavBar';
 import { readSession } from '../../lib/auth';
-import { fetchBackend } from '../../lib/apiBase';
+import { fetchOrderStatus } from '../../lib/paymentApi';
 import { toErrorMessage } from '../../lib/errors';
 import { materialPath } from '../../lib/slug';
 import { SessionUser } from '../../types/user';
@@ -28,25 +28,12 @@ export default function PayResult({ user, orderNo }: PayResultProps) {
     setLoading(true);
     setError('');
     try {
-      const isRequestContribution = orderNo.startsWith('RQ');
-      const forceSuffix = forceCheck ? '&force=1' : '';
-      const endpoint = isRequestContribution
-        ? `/requests/contributions/status?orderNo=${encodeURIComponent(orderNo)}${forceSuffix}`
-        : `/orders/status?orderNo=${encodeURIComponent(orderNo)}${forceSuffix}`;
-      let resp = await fetchBackend(endpoint);
-      if (resp.status === 401) {
+      const result = await fetchOrderStatus(orderNo, forceCheck);
+      if (result.unauthorized) {
         router.push({ pathname: '/login', query: { next: router.asPath } });
         return;
       }
-      let json = await resp.json();
-      if ((!resp.ok || !json.ok) && !isRequestContribution) {
-        resp = await fetchBackend(`/requests/contributions/status?orderNo=${encodeURIComponent(orderNo)}`);
-        json = await resp.json();
-      }
-      if (!resp.ok || !json.ok) {
-        throw new Error(json.msg || '查询订单状态失败');
-      }
-      const data = json.data || {};
+      const data = result.data || {};
       setStatus(data.status || 'CREATED');
       if (data.materialId) {
         setMaterialId(data.materialId as number);

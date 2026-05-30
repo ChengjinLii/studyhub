@@ -59,6 +59,8 @@ def _rule_for_request(settings: Settings, request: Request) -> RateLimitRule | N
         return RateLimitRule("login", settings.rate_limit_login)
     if method == "GET" and path in {"/api/captchas", "/api/captcha", "/api/auth/captcha"}:
         return RateLimitRule("captcha", settings.rate_limit_captcha)
+    if method == "POST" and path in {"/api/registration-verifications", "/api/auth/register", "/api/password-resets", "/api/auth/reset-password"}:
+        return RateLimitRule("email-verification", settings.rate_limit_email_verification)
     if method == "POST" and path in {"/api/materials", "/api/market"}:
         return RateLimitRule("upload", settings.rate_limit_upload)
     return None

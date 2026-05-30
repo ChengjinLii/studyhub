@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { FormEvent, useEffect, useRef, useState } from 'react';
 import NavBar from '../../components/NavBar';
 import { readSession } from '../../lib/auth';
-import { fetchBackend } from '../../lib/apiBase';
+import { createMaterialRequest } from '../../lib/requestsApi';
 import { toErrorMessage } from '../../lib/errors';
 import { SessionUser } from '../../types/user';
 import { SUPPORTED_SCHOOL, SUPPORTED_COLLEGES, SUPPORTED_MAJORS } from '../../constants/metadata';
@@ -131,16 +131,7 @@ export default function RequestNewPage({ user }: RequestNewProps) {
         college: college || null,
         major: major || null,
       };
-      const resp = await fetchBackend('/requests', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-      const json = await resp.json();
-      if (!resp.ok || !json.ok) {
-        throw new Error(json.msg || '发布失败');
-      }
-      const data = json.data || {};
+      const data = await createMaterialRequest(payload);
       if (data.paymentRequired) {
         if (!data.form) {
           throw new Error('支付表单获取失败');

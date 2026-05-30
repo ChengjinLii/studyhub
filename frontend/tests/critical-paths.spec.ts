@@ -63,6 +63,63 @@ test('mock API mode covers login and upload failure envelopes', async ({ page })
   });
 });
 
+test('mock API mode covers request creation payment branch', async ({ page }) => {
+  await page.route('**/api/requests', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ ok: true, data: { id: 301, paymentRequired: true, form: '<form id="pay-form"></form>' } }),
+    });
+  });
+  await page.goto('about:blank');
+  const result = await page.evaluate(async () => {
+    const resp = await fetch('https://mock.studyhub.local/api/requests', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ course: '概率论', keyword: '真题' }),
+    });
+    const json = await resp.json();
+    return {
+      ok: resp.ok && json.ok === true,
+      requiresPayment: json.data?.paymentRequired === true,
+      hasForm: typeof json.data?.form === 'string' && json.data.form.includes('<form'),
+    };
+  });
+  expect(result).toEqual({ ok: true, requiresPayment: true, hasForm: true });
+});
+
+test('mock API mode covers payment status fallback envelope', async ({ page }) => {
+  await page.route('**/api/orders/status*', async (route) => {
+    await route.fulfill({
+      status: 404,
+      contentType: 'application/json',
+      body: JSON.stringify({ ok: false, msg: '订单不存在' }),
+    });
+  });
+  await page.route('**/api/requests/contributions/status*', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ ok: true, data: { status: 'PAID', requestId: 401 } }),
+    });
+  });
+  await page.goto('about:blank');
+  const result = await page.evaluate(async () => {
+    const orderResp = await fetch('https://mock.studyhub.local/api/orders/status?orderNo=SMOKE_ORDER');
+    const orderJson = await orderResp.json();
+    const fallbackResp = orderResp.ok
+      ? orderResp
+      : await fetch('https://mock.studyhub.local/api/requests/contributions/status?orderNo=SMOKE_ORDER');
+    const fallbackJson = orderResp.ok ? orderJson : await fallbackResp.json();
+    return {
+      fallbackUsed: !orderResp.ok,
+      paid: fallbackResp.ok && fallbackJson.ok === true && fallbackJson.data?.status === 'PAID',
+      requestId: fallbackJson.data?.requestId,
+    };
+  });
+  expect(result).toEqual({ fallbackUsed: true, paid: true, requestId: 401 });
+});
+
 test('login success should make session readable', async ({ request }) => {
   const available = await isSmokeTargetAvailable(request);
   test.skip(!available, 'smoke target is unavailable (SMOKE_BASE_URL is not reachable)');

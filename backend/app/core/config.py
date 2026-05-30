@@ -70,6 +70,7 @@ class Settings(BaseSettings):
     mcp_allowed_origins: str | None = None
     mcp_require_auth: bool | None = None
     mcp_access_token: str | None = None
+    mcp_access_tokens: str | None = None
     mcp_read_scope: str = "studyhub.read"
     mcp_write_scope: str = "studyhub.write"
     mcp_admin_scope: str = "studyhub.admin"
@@ -80,12 +81,14 @@ class Settings(BaseSettings):
     security_frame_options: str = "DENY"
     security_referrer_policy: str = "strict-origin-when-cross-origin"
     security_permissions_policy: str = "camera=(), microphone=(), geolocation=()"
+    security_csp_report_only: str | None = None
     write_origin_protection_enabled: bool | None = None
     trusted_site_origins: str | None = None
     rate_limit_enabled: bool = True
     rate_limit_window_seconds: int = 60
     rate_limit_login: int = 1000
     rate_limit_captcha: int = 1000
+    rate_limit_email_verification: int = 1000
     rate_limit_upload: int = 1000
     rate_limit_mcp: int = 1000
 

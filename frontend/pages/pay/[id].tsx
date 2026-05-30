@@ -4,7 +4,9 @@ import { useRouter } from 'next/router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import NavBar from '../../components/NavBar';
 import { readSession, hasRole } from '../../lib/auth';
-import { fetchBackend, getRequestOrigin, resolveApiBase } from '../../lib/apiBase';
+import { getRequestOrigin } from '../../lib/apiBase';
+import { fetchMaterialDetail } from '../../lib/api';
+import { createAlipayPayment } from '../../lib/paymentApi';
 import { toErrorMessage } from '../../lib/errors';
 import { materialPath, userPath } from '../../lib/slug';
 import { SessionUser, RoleMask } from '../../types/user';
@@ -28,20 +30,12 @@ export default function PayPage({ user, material }: PayPageProps) {
     setLoading(true);
     setError('');
     try {
-      const resp = await fetchBackend('/alipay-payments', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ materialId: material.id }),
-      });
-      if (resp.status === 401) {
+      const result = await createAlipayPayment(material.id);
+      if (result.unauthorized) {
         router.push({ pathname: '/login', query: { next: router.asPath } });
         return;
       }
-      const json = await resp.json();
-      if (!resp.ok || !json.ok) {
-        throw new Error(json.msg || '发起支付失败');
-      }
-      const data = json.data || {};
+      const data = result.data || {};
       if (data.status === 'PAID') {
         await router.push(`${materialPath(material.id, material.title)}?autoDownload=1`);
         return;
@@ -136,18 +130,12 @@ export const getServerSideProps: GetServerSideProps<PayPageProps> = async (ctx) 
     };
   }
   const isSuperAdmin = hasRole(session.user.roleMask, RoleMask.DEVELOPER);
-  const base = resolveApiBase(getRequestOrigin(ctx.req));
-  const detailResp = await fetch(`${base}/materials/${id}`, {
-    headers: {
-      Accept: 'application/json',
-      Authorization: `Bearer ${session.token}`,
-    },
-  });
-  const detailJson = await detailResp.json().catch(() => null);
-  if (!detailResp.ok || !detailJson?.ok || !detailJson.data) {
+  let material: MaterialDetail;
+  try {
+    material = await fetchMaterialDetail(id, session.token, getRequestOrigin(ctx.req));
+  } catch {
     return { notFound: true };
   }
-  const material: MaterialDetail = detailJson.data;
   if (material.free || isSuperAdmin) {
     return {
       redirect: {

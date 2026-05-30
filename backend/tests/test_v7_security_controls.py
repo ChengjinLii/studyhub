@@ -32,6 +32,7 @@ def strict_security_client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> T
     monkeypatch.setenv("STUDYHUB_RATE_LIMIT_WINDOW_SECONDS", "60")
     monkeypatch.setenv("STUDYHUB_RATE_LIMIT_LOGIN", "2")
     monkeypatch.setenv("STUDYHUB_RATE_LIMIT_CAPTCHA", "2")
+    monkeypatch.setenv("STUDYHUB_RATE_LIMIT_EMAIL_VERIFICATION", "2")
     monkeypatch.setenv("STUDYHUB_RATE_LIMIT_UPLOAD", "2")
     monkeypatch.setenv("STUDYHUB_RATE_LIMIT_MCP", "2")
 
@@ -112,3 +113,47 @@ def test_mcp_rate_limit_returns_429(strict_security_client: TestClient) -> None:
 
     assert response.status_code == 429
     assert response.json()["detail"] == "Too many mcp requests"
+
+
+def test_material_upload_rate_limit_returns_429(strict_security_client: TestClient) -> None:
+    for _ in range(2):
+        assert strict_security_client.post("/api/materials").status_code in {400, 401, 422}
+
+    response = strict_security_client.post("/api/materials")
+
+    assert response.status_code == 429
+    assert response.json()["detail"] == "Too many upload requests"
+
+
+def test_market_publish_rate_limit_returns_429_from_same_bucket(strict_security_client: TestClient) -> None:
+    for _ in range(2):
+        assert strict_security_client.post("/api/market").status_code in {400, 401, 422}
+
+    response = strict_security_client.post("/api/market")
+
+    assert response.status_code == 429
+    assert response.json()["detail"] == "Too many upload requests"
+
+
+def test_registration_verification_rate_limit_returns_429(strict_security_client: TestClient) -> None:
+    payload = {"username": "alice", "email": "alice@example.com", "password": "secret123", "captchaId": "missing", "captchaCode": "0000"}
+
+    for _ in range(2):
+        assert strict_security_client.post("/api/registration-verifications", json=payload).status_code in {400, 401}
+
+    response = strict_security_client.post("/api/registration-verifications", json=payload)
+
+    assert response.status_code == 429
+    assert response.json()["detail"] == "Too many email-verification requests"
+
+
+def test_password_reset_rate_limit_returns_429(strict_security_client: TestClient) -> None:
+    payload = {"identifier": "alice", "newPassword": "secret123", "captchaId": "missing", "captchaCode": "0000"}
+
+    for _ in range(2):
+        assert strict_security_client.post("/api/password-resets", json=payload).status_code in {400, 401}
+
+    response = strict_security_client.post("/api/password-resets", json=payload)
+
+    assert response.status_code == 429
+    assert response.json()["detail"] == "Too many email-verification requests"

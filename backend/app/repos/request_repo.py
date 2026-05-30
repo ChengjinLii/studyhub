@@ -106,19 +106,36 @@ class RequestRepository:
 
     def list_public_requests(self, session: Session, *, sort: str | None, limit: int | None = None) -> list[RequestRecord]:
         stmt = select(RequestRecord).where(RequestRecord.status == "OPEN")
+        stmt = self._order_public_requests(stmt, sort)
+        if limit is not None:
+            stmt = stmt.limit(limit)
+        return list(session.scalars(stmt))
+
+    def list_visible_public_requests(self, session: Session, *, sort: str | None, limit: int | None = None) -> list[RequestRecord]:
+        hidden_ids = (
+            select(RequestContributionRecord.request_id)
+            .where(RequestContributionRecord.status.in_(("PAID", "REFUNDING", "REFUNDED")))
+            .group_by(RequestContributionRecord.request_id)
+            .having(
+                func.sum(case((RequestContributionRecord.status == "REFUNDED", 1), else_=0)) == func.count()
+            )
+        )
+        stmt = select(RequestRecord).where(RequestRecord.status == "OPEN", RequestRecord.id.not_in(hidden_ids))
+        stmt = self._order_public_requests(stmt, sort)
+        if limit is not None:
+            stmt = stmt.limit(limit)
+        return list(session.scalars(stmt))
+
+    def _order_public_requests(self, stmt, sort: str | None):
         normalized = (sort or "latest").lower()
         if normalized == "hot":
-            stmt = stmt.order_by(
+            return stmt.order_by(
                 RequestRecord.funded_amount_cents.desc(),
                 RequestRecord.response_count.desc(),
                 RequestRecord.created_at.desc(),
                 RequestRecord.id.desc(),
             )
-        else:
-            stmt = stmt.order_by(RequestRecord.created_at.desc(), RequestRecord.id.desc())
-        if limit is not None:
-            stmt = stmt.limit(limit)
-        return list(session.scalars(stmt))
+        return stmt.order_by(RequestRecord.created_at.desc(), RequestRecord.id.desc())
 
     def find_hidden_early_exit_request_ids(self, session: Session, *, request_ids: list[int]) -> set[int]:
         if not request_ids:

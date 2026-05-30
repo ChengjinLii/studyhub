@@ -22,6 +22,7 @@ from app.api.routes import (
     payouts,
     reports,
     requests,
+    security,
     session,
 )
 
@@ -47,3 +48,4 @@ api_router.include_router(notifications.router)
 api_router.include_router(reports.router)
 api_router.include_router(admin.router)
 api_router.include_router(requests.router)
+api_router.include_router(security.router)

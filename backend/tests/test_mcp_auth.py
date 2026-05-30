@@ -79,6 +79,39 @@ def auth_required_client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Tes
     get_settings.cache_clear()
 
 
+@pytest.fixture()
+def scoped_mcp_client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> TestClient:
+    db_path = tmp_path / "studyhub-fastapi-test.sqlite3"
+    monkeypatch.setenv("STUDYHUB_ENVIRONMENT", "test")
+    monkeypatch.setenv("STUDYHUB_DATABASE_URL", f"sqlite+pysqlite:///{db_path}")
+    monkeypatch.setenv("STUDYHUB_JWT_SECRET", "studyhub-fastapi-test-secret-1234567890abcdefghijkl")
+    monkeypatch.setenv("STUDYHUB_CONTRACT_REPORT_DIR", str(tmp_path / "artifacts"))
+    monkeypatch.setenv("STUDYHUB_MATERIAL_ASSET_DIR", str(tmp_path / "materials"))
+    monkeypatch.setenv("STUDYHUB_MARKET_ASSET_DIR", str(tmp_path / "market"))
+    monkeypatch.setenv("STUDYHUB_PAYOUT_QR_ASSET_DIR", str(tmp_path / "payout-qr"))
+    monkeypatch.setenv("STUDYHUB_MAIL_OUTBOX_DIR", str(tmp_path / "outbox" / "mail"))
+    monkeypatch.setenv("STUDYHUB_LOCAL_DEV_BOOTSTRAP_USER", "false")
+    monkeypatch.setenv("STUDYHUB_MCP_REQUIRE_AUTH", "true")
+    monkeypatch.setenv("STUDYHUB_MCP_ACCESS_TOKENS", "read-token:studyhub.read;admin-token:studyhub.read,studyhub.admin;admin-only-token:studyhub.admin")
+
+    get_settings.cache_clear()
+    clear_dependency_caches()
+    reset_database_runtime()
+    import asyncio
+
+    asyncio.run(reset_async_database_runtime())
+
+    app = create_app()
+    with TestClient(app) as test_client:
+        get_captcha_service().reset()
+        yield test_client
+
+    clear_dependency_caches()
+    reset_database_runtime()
+    asyncio.run(reset_async_database_runtime())
+    get_settings.cache_clear()
+
+
 def test_mcp_allows_anonymous_read_tools_in_local_test(client: TestClient) -> None:
     response = call_tool(client, "health.ready")
 
@@ -141,3 +174,40 @@ def test_mcp_require_auth_accepts_configured_bearer_token(auth_required_client: 
 
     assert response.status_code == 200
     assert response.json()["result"]["structuredContent"]["status"] == "ok"
+
+
+def test_mcp_scoped_read_token_allows_read_tool(scoped_mcp_client: TestClient) -> None:
+    response = call_tool(scoped_mcp_client, "health.ready", headers={"Authorization": "Bearer read-token"})
+
+    assert response.status_code == 200
+    assert response.json()["result"]["structuredContent"]["status"] == "ok"
+
+
+def test_mcp_scoped_read_token_rejects_registered_admin_tool(scoped_mcp_client: TestClient) -> None:
+    response = call_tool(scoped_mcp_client, "admin.users.search", {"query": "alice"}, headers={"Authorization": "Bearer read-token"})
+
+    assert response.status_code == 403
+    assert response.json()["detail"] == "MCP scope is not allowed"
+
+
+def test_mcp_scoped_token_without_read_scope_rejects_tools_list(scoped_mcp_client: TestClient) -> None:
+    response = scoped_mcp_client.post(
+        "/mcp",
+        headers={
+            "Accept": "application/json, text/event-stream",
+            "Content-Type": "application/json",
+            "Authorization": "Bearer admin-only-token",
+        },
+        json={"jsonrpc": "2.0", "id": 1, "method": "tools/list", "params": {}},
+    )
+
+    assert response.status_code == 403
+    assert response.json()["detail"] == "MCP scope is not allowed"
+
+
+def test_mcp_scoped_admin_token_reaches_registered_admin_tool_policy(scoped_mcp_client: TestClient) -> None:
+    response = call_tool(scoped_mcp_client, "admin.users.search", {"query": "alice"}, headers={"Authorization": "Bearer admin-token"})
+
+    assert response.status_code == 200
+    assert response.json()["result"]["isError"] is True
+    assert "Unknown tool" in response.json()["result"]["content"][0]["text"]
