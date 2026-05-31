@@ -14,6 +14,8 @@ __pycache__/
 build/
 dist/
 backend/artifacts/
+ai_platform/data/*.local.json
+ai_platform/logs/
 frontend/node_modules/
 frontend/.next/
 frontend/tsconfig.tsbuildinfo

@@ -1,0 +1,92 @@
+[
+  {
+    "id": "material-001",
+    "type": "material",
+    "title": "通信原理期末复习重点与历年真题",
+    "text": "整理通信原理课程的调制解调、信道编码、随机过程基础和近三年期末试卷。",
+    "metadata": {
+      "school": "电子科技大学",
+      "college": "信息与通信工程学院",
+      "major": "通信工程",
+      "tags": "通原,期末,真题,复习"
+    }
+  },
+  {
+    "id": "material-002",
+    "type": "material",
+    "title": "数据结构课程笔记：树、图与排序算法",
+    "text": "适合计科和软件工程同学复习数据结构，包含红黑树、最短路、排序复杂度和习题解析。",
+    "metadata": {
+      "school": "电子科技大学",
+      "college": "计算机学院",
+      "major": "计算机科学与技术",
+      "tags": "数据结构,算法,笔记"
+    }
+  },
+  {
+    "id": "material-003",
+    "type": "material",
+    "title": "高等数学上册知识点速查",
+    "text": "覆盖极限、导数、积分、微分方程等高数上册核心考点，适合考前快速查漏补缺。",
+    "metadata": {
+      "school": "电子科技大学",
+      "college": "数学科学学院",
+      "major": "通识课程",
+      "tags": "高数,微积分,期末"
+    }
+  },
+  {
+    "id": "column-001",
+    "type": "column",
+    "title": "通信工程大三专业课备考经验",
+    "text": "分享通信原理、数字信号处理和电磁场课程的复习顺序、刷题节奏和资料选择。",
+    "metadata": {
+      "topic": "experience",
+      "tags": "经验,通信,备考"
+    }
+  },
+  {
+    "id": "column-002",
+    "type": "column",
+    "title": "计算机专业保研与项目经历整理",
+    "text": "介绍如何准备算法项目、课程成绩、科研经历和夏令营材料。",
+    "metadata": {
+      "topic": "experience",
+      "tags": "经验,计科,保研"
+    }
+  },
+  {
+    "id": "request-001",
+    "type": "request",
+    "title": "求通信原理近年期末卷",
+    "text": "希望找到通原最近几年的考试题和复习资料，最好带答案解析。",
+    "metadata": {
+      "school": "电子科技大学",
+      "college": "信息与通信工程学院",
+      "budget": "20"
+    }
+  },
+  {
+    "id": "request-002",
+    "type": "request",
+    "title": "求数据结构实验报告模板",
+    "text": "需要链表、二叉树、图算法相关实验报告参考模板。",
+    "metadata": {
+      "school": "电子科技大学",
+      "college": "计算机学院",
+      "budget": "15"
+    }
+  },
+  {
+    "id": "request-003",
+    "type": "request",
+    "title": "求高数下历年真题解析",
+    "text": "希望找到高等数学下册历年期末真题，重点需要多元函数、重积分、级数和微分方程的答案解析。",
+    "metadata": {
+      "school": "电子科技大学",
+      "college": "数学科学学院",
+      "budget": "18",
+      "tags": "高数下,真题,解析,求购"
+    }
+  }
+]

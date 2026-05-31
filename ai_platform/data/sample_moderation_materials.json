@@ -1,0 +1,60 @@
+[
+  {
+    "id": "material-safe-001",
+    "title": "通信原理期末复习重点整理",
+    "description": "个人整理的通信原理知识点、错题和复习路线，不包含教材扫描内容。",
+    "filename": "communication-review-notes.pdf",
+    "priceCents": 0,
+    "uploaderAgeDays": 120,
+    "uploaderUploads24h": 1,
+    "reports7d": 0,
+    "duplicateCount": 0,
+    "metadata": {
+      "school": "电子科技大学",
+      "tags": "通信,复习,笔记"
+    }
+  },
+  {
+    "id": "material-review-001",
+    "title": "高数上册考点速查",
+    "description": "",
+    "filename": "math-final-summary.pdf",
+    "priceCents": 3999,
+    "uploaderAgeDays": 2,
+    "uploaderUploads24h": 7,
+    "reports7d": 0,
+    "duplicateCount": 0,
+    "metadata": {
+      "school": "电子科技大学",
+      "tags": "高数,期末"
+    }
+  },
+  {
+    "id": "material-reject-001",
+    "title": "某机构付费课录屏合集",
+    "description": "包含机构课程录屏和网课全集，打包分享。",
+    "filename": "paid-course-recording.zip",
+    "priceCents": 1999,
+    "uploaderAgeDays": 30,
+    "uploaderUploads24h": 1,
+    "reports7d": 1,
+    "duplicateCount": 0,
+    "metadata": {
+      "tags": "网课,录屏"
+    }
+  },
+  {
+    "id": "material-hide-001",
+    "title": "考试答案泄露与代写服务",
+    "description": "提供考试答案、代写和包过服务。",
+    "filename": "exam-answer-leak.docx",
+    "priceCents": 9999,
+    "uploaderAgeDays": 1,
+    "uploaderUploads24h": 10,
+    "reports7d": 4,
+    "duplicateCount": 3,
+    "metadata": {
+      "tags": "答案,代写"
+    }
+  }
+]

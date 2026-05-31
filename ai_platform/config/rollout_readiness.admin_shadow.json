@@ -1,0 +1,10 @@
+{
+  "featureFlagDefined": true,
+  "rollbackPlanDefined": true,
+  "costMonitoringDefined": true,
+  "privacyPolicyDefined": true,
+  "humanFallbackDefined": true,
+  "productionDatabaseWritesDisabled": true,
+  "frontendEntryDisabled": true,
+  "adminOrTestOnly": true
+}
