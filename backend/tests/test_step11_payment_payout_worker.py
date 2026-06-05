@@ -143,10 +143,10 @@ def test_step11_payout_schedule_qr_application_gateway_and_monthly_overview(
     assert schedule_update.status_code == 200, schedule_update.text
 
     finance_repo = get_finance_repo()
+    paid_at = datetime.now(UTC) - timedelta(days=8)
     with session_scope() as session:
         order = finance_repo.find_order_by_out_trade_no(session, out_trade_no)
         assert order is not None
-        paid_at = datetime.now(UTC) - timedelta(days=8)
         order.paid_at = paid_at
         order.created_at = paid_at
         finance_repo.save_order(session, order)
@@ -229,7 +229,7 @@ def test_step11_payout_schedule_qr_application_gateway_and_monthly_overview(
     assert latest_application.status_code == 200
     assert latest_application.json()["data"]["status"] == "SETTLED"
 
-    month_key = datetime.now(UTC).strftime("%Y-%m")
+    month_key = paid_at.strftime("%Y-%m")
     monthly_overview = client.get("/api/admin/monthly-payout-overview", params={"month": month_key}, headers=admin_headers)
     assert monthly_overview.status_code == 200
     monthly_payload = monthly_overview.json()["data"]
