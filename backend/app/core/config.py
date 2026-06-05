@@ -74,6 +74,12 @@ class Settings(BaseSettings):
     mcp_read_scope: str = "studyhub.read"
     mcp_write_scope: str = "studyhub.write"
     mcp_admin_scope: str = "studyhub.admin"
+    ai_agent_provider: str = "local"
+    ai_agent_base_url: str | None = None
+    ai_agent_api_key: str | None = None
+    ai_agent_model: str | None = None
+    ai_agent_timeout_seconds: float = 20.0
+    ai_agent_max_context_materials: int = 6
     public_site_base_url: str = "https://study-hub.cn"
     security_headers_enabled: bool = True
     security_hsts_enabled: bool | None = None

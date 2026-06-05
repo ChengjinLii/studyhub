@@ -6,6 +6,7 @@ import { fetchBackend } from '../lib/apiBase';
 import '../styles/globals.css';
 import AppImage from '../components/AppImage';
 import FloatingSidebar from '../components/FloatingSidebar';
+import HermesAgentWidget from '../components/HermesAgentWidget';
 
 interface RuntimeInfo {
   environment: string;
@@ -100,6 +101,7 @@ export default function MyApp({ Component, pageProps }: AppProps) {
       </Head>
       <div className="page-with-footer">
         <FloatingSidebar />
+        <HermesAgentWidget />
         {showLocalDevBadge && <div className="runtime-environment-badge">{localDevLabel}</div>}
         {entryModalVariant && (
           <div className="modal-mask stable-version-mask" onClick={() => setEntryModalVariant(null)}>

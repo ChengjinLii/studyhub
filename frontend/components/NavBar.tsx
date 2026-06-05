@@ -38,8 +38,7 @@ export default function NavBar({ user }: NavBarProps) {
           </div>
           <nav className="main-nav">
             <Link href="/">首页</Link>
-            <Link href="/column">学汇专栏</Link>
-            <Link href="/market">校园集市</Link>
+            <Link href="/more">其他</Link>
             <Link href="/upload">我要投稿</Link>
             <Link href="/join">关于我们</Link>
             {user && (hasRole(user.roleMask, RoleMask.ADMIN) || hasRole(user.roleMask, RoleMask.DEVELOPER)) && (

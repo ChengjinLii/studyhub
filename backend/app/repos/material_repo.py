@@ -5,7 +5,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from sqlalchemy import func, inspect, select, text
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, load_only
 
 from app.models.materials import (
     MaterialDownloadRecord,
@@ -21,6 +21,8 @@ from app.models.materials import (
 
 
 _TABLE_NAME_CACHE: dict[str, set[str]] = {}
+_TABLE_COLUMN_CACHE: dict[tuple[str, str], set[str]] = {}
+_MATERIAL_MAPPED_COLUMNS = tuple(MaterialRecord.__table__.columns)
 
 
 def _bind_cache_key(session: Session) -> str:
@@ -40,6 +42,31 @@ def _table_names(session: Session) -> set[str]:
     table_names = set(inspector.get_table_names())
     _TABLE_NAME_CACHE[cache_key] = table_names
     return table_names
+
+
+def _table_columns(session: Session, table_name: str) -> set[str]:
+    cache_key = (_bind_cache_key(session), table_name)
+    cached = _TABLE_COLUMN_CACHE.get(cache_key)
+    if cached is not None:
+        return cached
+    inspector = inspect(session.get_bind())
+    column_names = {column["name"] for column in inspector.get_columns(table_name)}
+    _TABLE_COLUMN_CACHE[cache_key] = column_names
+    return column_names
+
+
+def _has_table_column(session: Session, table_name: str, column_name: str) -> bool:
+    return column_name in _table_columns(session, table_name)
+
+
+def _material_record_load_options(session: Session):
+    existing_columns = _table_columns(session, "materials")
+    if all(column.name in existing_columns for column in _MATERIAL_MAPPED_COLUMNS):
+        return ()
+    mapped_existing_columns = tuple(
+        getattr(MaterialRecord, column.name) for column in _MATERIAL_MAPPED_COLUMNS if column.name in existing_columns
+    )
+    return (load_only(*mapped_existing_columns),)
 
 
 class MaterialRepository:
@@ -87,6 +114,8 @@ class MaterialRepository:
 
     def ensure_seed_bootstrap(self, session: Session, seed: dict[str, Any]) -> None:
         if not seed:
+            return
+        if not _has_table_column(session, "materials", "source"):
             return
         users = seed.get("users") or {}
         materials = seed.get("materials") or []
@@ -210,7 +239,11 @@ class MaterialRepository:
         session.flush()
 
     def list_visible_materials(self, session: Session) -> list[MaterialRecord]:
-        stmt = select(MaterialRecord).where(MaterialRecord.deleted_at.is_(None), MaterialRecord.status.not_in(("REMOVED", "HIDDEN")))
+        stmt = (
+            select(MaterialRecord)
+            .options(*_material_record_load_options(session))
+            .where(MaterialRecord.deleted_at.is_(None), MaterialRecord.status.not_in(("REMOVED", "HIDDEN")))
+        )
         return list(session.scalars(stmt))
 
     def list_visible_materials_for_uploader(
@@ -222,6 +255,7 @@ class MaterialRepository:
     ) -> list[MaterialRecord]:
         stmt = (
             select(MaterialRecord)
+            .options(*_material_record_load_options(session))
             .where(
                 MaterialRecord.deleted_at.is_(None),
                 MaterialRecord.status.not_in(("REMOVED", "HIDDEN")),
@@ -251,7 +285,7 @@ class MaterialRepository:
         return int(session.scalar(stmt) or 0)
 
     def list_all_materials(self, session: Session) -> list[MaterialRecord]:
-        stmt = select(MaterialRecord).order_by(MaterialRecord.created_at.desc(), MaterialRecord.id.desc())
+        stmt = select(MaterialRecord).options(*_material_record_load_options(session)).order_by(MaterialRecord.created_at.desc(), MaterialRecord.id.desc())
         return list(session.scalars(stmt))
 
     def get_material(self, session: Session, material_id: int) -> MaterialRecord | None:
