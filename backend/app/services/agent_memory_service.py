@@ -12,6 +12,7 @@ from app.core.config import Settings
 from app.models.materials import MaterialRecord
 from app.repos.auth_repo import AuthRepository
 from app.repos.material_repo import MaterialRepository
+from app.services.agent_material_signal_service import build_material_signals
 from app.services.material_pdf_evidence_service import MaterialPageEvidence
 
 
@@ -92,6 +93,8 @@ class AgentMemoryService:
         course_counter: Counter[str] = Counter()
         school_counter: Counter[str] = Counter()
         signal_counter: Counter[str] = Counter()
+        material_quality_counter: Counter[str] = Counter()
+        material_risk_counter: Counter[str] = Counter()
         year_counter: Counter[str] = Counter()
         question_type_counter: Counter[str] = Counter()
         question_number_counter: Counter[str] = Counter()
@@ -106,6 +109,9 @@ class AgentMemoryService:
             if material.school:
                 school_counter.update([material.school.strip()])
             signal_counter.update(_signal_terms(_material_text(material)))
+            material_signals = build_material_signals(material)
+            material_quality_counter.update(material_signals.quality_signals)
+            material_risk_counter.update(material_signals.risk_signals)
         for item in pdf_evidence:
             signal_counter.update(_signal_terms(item.text))
             year_counter.update(item.years)
@@ -116,17 +122,12 @@ class AgentMemoryService:
             if item.source_type != "unknown":
                 source_type_counter.update([item.source_type])
         top_materials = [
-            {
-                "material_id": int(material.id),
-                "title": material.title,
-                "downloads": int(material.download_count or 0),
-                "rating_avg": float(material.rating_avg or 0),
-                "tags": _json_string_list(material.tags_json)[:4],
-            }
+            _high_signal_material_payload(material)
             for material in sorted(
                 materials,
                 key=lambda item: (
                     -int(item.download_count or 0),
+                    -build_material_signals(item).quality_score,
                     -float(item.rating_avg or 0),
                     -int(item.like_count or 0),
                     int(item.id),
@@ -140,6 +141,8 @@ class AgentMemoryService:
             "course_signals": _counter_items(course_counter, limit=5),
             "school_signals": _counter_items(school_counter, limit=3),
             "question_type_signals": _counter_items(signal_counter, limit=6),
+            "material_quality_signals": _counter_items(material_quality_counter, limit=8),
+            "material_risk_signals": _counter_items(material_risk_counter, limit=8),
             "pdf_year_signals": _counter_items(year_counter, limit=6),
             "pdf_question_type_signals": _counter_items(question_type_counter, limit=6),
             "pdf_question_number_signals": _counter_items(question_number_counter, limit=8),
@@ -242,6 +245,24 @@ class AgentMemoryService:
             "preferred_content_types_from_existing_actions": _counter_items(type_counter, limit=5),
         }
         return {key: value for key, value in payload.items() if value}
+
+
+def _high_signal_material_payload(material: MaterialRecord) -> dict[str, Any]:
+    material_signals = build_material_signals(material)
+    payload: dict[str, Any] = {
+        "material_id": int(material.id),
+        "title": material.title,
+        "downloads": int(material.download_count or 0),
+        "rating_avg": float(material.rating_avg or 0),
+        "tags": _json_string_list(material.tags_json)[:4],
+    }
+    if material_signals.quality_score:
+        payload["quality_score"] = material_signals.quality_score
+    if material_signals.quality_signals:
+        payload["quality_signals"] = list(material_signals.quality_signals[:4])
+    if material_signals.risk_signals:
+        payload["risk_signals"] = list(material_signals.risk_signals[:4])
+    return payload
 
 
 def _user_profile_payload(user: Any) -> dict[str, str]:

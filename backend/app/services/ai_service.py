@@ -16,6 +16,7 @@ from app.repos.material_repo import MaterialRepository
 from app.repos.read_api_repo import ReadApiRepository
 from app.schemas.ai import AiChatRequestPayload, AiRecommendRequestPayload
 from app.services.agent_course_memory_service import AgentCourseMemoryService, CourseMemoryCard
+from app.services.agent_material_signal_service import build_material_signals
 from app.services.agent_memory_service import AgentMemoryContext, AgentMemoryService
 from app.services.agent_query_planner_service import AgentQueryPlan, AgentQueryPlannerService
 from app.services.agent_safety_service import AgentSafetyService
@@ -410,6 +411,7 @@ class AiService:
             "不要编造不存在的资料。用户可能需要资料推荐、真题讲解思路、复习规划或错题辅导。"
             "如果候选资料不足，要明确说明并追问课程范围。"
             "如果提供了 pdf_evidence，你必须优先基于这些页级证据总结，并在关键结论中引用资料名和页码。"
+            "如果候选资料提供了 quality_signals 或 risk_signals，你可以用它们辅助排序和提示，但不能把风险提示夸大成确定违规。"
             "如果提供了 memory_context，你可以用平台集体记忆增强课程/题型判断，用用户个人记忆做个性化建议；"
             "但不能把用户个人记忆写入或表述成平台集体结论。"
             "如果提供了 query_plan，你必须按照该意图和 evidence_tasks 组织回答；"
@@ -527,6 +529,7 @@ class AiService:
             "title": self._safe_text(material, "title"),
             "reason": self._build_reason(material, query, pdf_evidence),
             "summary": description[:180],
+            **build_material_signals(material).to_prompt_payload(),
         }
 
     def _merge_llm_recommendations(self, body: dict[str, Any], fallback: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -870,23 +873,25 @@ class AiService:
         for item in self.material_repo.list_visible_materials(session):
             score = self._score(item, query_terms, normalized_query, school=school, major=major)
             course_score = self._course_score(item, query_terms)
-            scored_items.append((score, course_score, item))
-        course_items = [(score, item) for score, course_score, item in scored_items if course_score > 0]
+            quality_score = build_material_signals(item).quality_score
+            scored_items.append((score, course_score, quality_score, item))
+        course_items = [(score, quality_score, item) for score, course_score, quality_score, item in scored_items if course_score > 0]
         if course_items:
             items = course_items
         else:
-            items = [(score, item) for score, _, item in scored_items]
-        positive_items = [(score, item) for score, item in items if score > 0]
+            items = [(score, quality_score, item) for score, _, quality_score, item in scored_items]
+        positive_items = [(score, quality_score, item) for score, quality_score, item in items if score > 0]
         items = positive_items or items
         items.sort(
             key=lambda scored_item: (
                 -scored_item[0],
-                -int(scored_item[1].download_count or 0),
-                -parse_iso_datetime(scored_item[1].created_at.isoformat() if scored_item[1].created_at else None).timestamp(),
+                -scored_item[1],
+                -int(scored_item[2].download_count or 0),
+                -parse_iso_datetime(scored_item[2].created_at.isoformat() if scored_item[2].created_at else None).timestamp(),
             )
         )
         if positive_items:
-            return [item for _, item in items]
+            return [item for _, _, item in items]
         return []
 
     def _score(self, material: MaterialRecord, query_terms: list[str], query: str, *, school: str | None, major: str | None) -> int:
@@ -959,6 +964,7 @@ class AiService:
         pdf_evidence: list[MaterialPageEvidence] | None = None,
     ) -> str:
         parts = []
+        material_signals = build_material_signals(material)
         evidence_items = _evidence_for_material(pdf_evidence or [], material)
         if evidence_items:
             pages = _evidence_pages(evidence_items)
@@ -982,6 +988,10 @@ class AiService:
                 parts.append(f"分值信号：{_join_values([f'{value}分' for value in score_points[:3]])}")
             if difficulty_signals:
                 parts.append(f"难度信号：{_join_values(difficulty_signals[:3])}")
+        if material_signals.quality_signals:
+            parts.append(f"质量信号：{_join_values(list(material_signals.quality_signals)[:3])}")
+        if material_signals.risk_signals:
+            parts.append(f"需留意：{_join_values(list(material_signals.risk_signals)[:2])}")
         school = self._safe_text(material, "school")
         major = self._safe_text(material, "major")
         title = self._safe_text(material, "title")

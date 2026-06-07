@@ -23,6 +23,8 @@ def _material(
     uploader_id: int | None = 2,
     downloads: int = 0,
     rating_avg: float = 0,
+    rating_count: int = 0,
+    file_storage_key: str | None = "materials/demo.pdf",
 ) -> MaterialRecord:
     return MaterialRecord(
         id=material_id,
@@ -37,9 +39,11 @@ def _material(
         uploader_id=uploader_id,
         download_count=downloads,
         rating_avg=rating_avg,
+        rating_count=rating_count,
         like_count=0,
         is_free=True,
         file_type="pdf",
+        file_storage_key=file_storage_key,
     )
 
 
@@ -97,7 +101,15 @@ def test_agent_memory_context_aggregates_platform_and_current_user_only() -> Non
     material_repo = _FakeMaterialRepo()
     service = AgentMemoryService(_settings(), _FakeAuthRepo(), material_repo)  # type: ignore[arg-type]
     materials = [
-        _material(101, title="通信原理四年真题解析", tags=["通信原理", "真题"], downloads=80, rating_avg=4.8),
+        _material(
+            101,
+            title="通信原理四年真题解析",
+            tags=["通信原理", "真题"],
+            description="2021-2024 通信原理期末真题、答案解析和常考题型整理",
+            downloads=80,
+            rating_avg=4.8,
+            rating_count=5,
+        ),
         _material(102, title="通信原理期末速成笔记", tags=["通信原理", "速成"], downloads=40, rating_avg=4.5),
     ]
     evidence = [
@@ -144,6 +156,11 @@ def test_agent_memory_context_aggregates_platform_and_current_user_only() -> Non
     assert platform["pdf_score_point_signals"] == [{"value": "10", "count": 1}]
     assert platform["pdf_difficulty_signals"] == [{"value": "综合", "count": 1}]
     assert platform["pdf_source_type_signals"] == [{"value": "past_exam", "count": 1}]
+    assert {"value": "交付信息可用", "count": 2} in platform["material_quality_signals"]
+    assert {"value": "高评分资料", "count": 1} in platform["material_quality_signals"]
+    assert platform["material_risk_signals"] == [{"value": "简介较短", "count": 1}]
+    assert platform["high_signal_materials"][0]["quality_score"] > 0
+    assert "quality_signals" in platform["high_signal_materials"][0]
     assert "individual user" in platform["privacy_boundary"]
 
     user_memory = prompt["user_personal_memory"]

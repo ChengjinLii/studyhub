@@ -55,6 +55,53 @@ def _evidence() -> MaterialPageEvidence:
     )
 
 
+def test_agent_ranking_uses_material_quality_as_tie_breaker() -> None:
+    high_quality = MaterialRecord(
+        id=301,
+        title="通信原理真题资料",
+        description="通信原理期末真题、详细答案解析、常考题型和复习建议整理",
+        tags_json=json.dumps(["通信原理", "真题", "解析"], ensure_ascii=False),
+        file_storage_key="materials/high.pdf",
+        file_type="pdf",
+        preview_status="done",
+        review_status="APPROVED",
+        copyright_owner="课程组",
+        download_count=20,
+        like_count=12,
+        rating_avg=4.8,
+        rating_count=5,
+        is_free=True,
+    )
+    low_quality = MaterialRecord(
+        id=302,
+        title="通信原理真题资料",
+        description="短",
+        tags_json=json.dumps(["通信原理"], ensure_ascii=False),
+        download_count=90,
+        rating_avg=0,
+        rating_count=0,
+        is_free=True,
+    )
+
+    class FakeReadRepo:
+        def load_seed(self) -> dict[str, Any]:
+            return {}
+
+    class FakeMaterialRepo:
+        def ensure_seed_bootstrap(self, session: object, seed: dict[str, Any]) -> None:
+            del session, seed
+
+        def list_visible_materials(self, session: object) -> list[MaterialRecord]:
+            del session
+            return [low_quality, high_quality]
+
+    service = AiService(read_repo=FakeReadRepo(), material_repo=FakeMaterialRepo())  # type: ignore[arg-type]
+
+    ranked = service._rank_materials(object(), "通信原理真题", {})  # type: ignore[arg-type]
+
+    assert [item.id for item in ranked] == [301, 302]
+
+
 def test_agent_exam_trend_closed_loop_prompt_and_response_contract(monkeypatch) -> None:
     captured: dict[str, Any] = {}
     metrics = get_runtime_metrics()
@@ -175,11 +222,15 @@ def test_agent_exam_trend_closed_loop_prompt_and_response_contract(monkeypatch) 
     assert prompt["pdf_evidence"][0]["difficulty_signals"] == ["综合", "偏难"]
     assert "aggregate_score_point_signals" in prompt["query_plan"]["evidence_tasks"]
     assert "aggregate_difficulty_signals" in prompt["query_plan"]["evidence_tasks"]
+    assert prompt["candidate_materials"][0]["quality_score"] > 0
+    assert "quality_signals" in prompt["candidate_materials"][0]
+    assert "risk_signals" in prompt["candidate_materials"][0]
     assert "已读取 PDF 第 3 页证据" in prompt["candidate_materials"][0]["reason"]
     assert "题型信号：计算题" in prompt["candidate_materials"][0]["reason"]
     assert "题号信号：第3题" in prompt["candidate_materials"][0]["reason"]
     assert "分值信号：10分" in prompt["candidate_materials"][0]["reason"]
     assert "难度信号：综合、偏难" in prompt["candidate_materials"][0]["reason"]
+    assert "quality_signals" in captured["system_prompt"]
     assert prompt["memory_context"]["platform_collective_memory"]["pdf_question_type_signals"][0]["value"] == "计算题"
     assert prompt["memory_context"]["user_personal_memory"]["profile"]["major"] == "通信工程"
     assert prompt["course_memory_card"]["course"] == "通信原理"
@@ -439,6 +490,8 @@ def test_agent_model_failure_uses_structured_local_exam_trend_fallback(monkeypat
     assert "题号信号：第3题" in body["recommendations"][0]["reason"]
     assert "分值信号：10分" in body["recommendations"][0]["reason"]
     assert "难度信号：综合、偏难" in body["recommendations"][0]["reason"]
+    assert "质量信号：" in body["recommendations"][0]["reason"]
+    assert "需留意：" in body["recommendations"][0]["reason"]
     assert body["evidence_sources"][0]["question_numbers"] == ["第3题"]
     assert body["followup_questions"] == [
         "要不要我按年份整理常考题型？",
