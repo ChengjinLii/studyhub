@@ -1,12 +1,42 @@
 import type { AppProps } from 'next/app';
+import dynamic from 'next/dynamic';
 import Head from 'next/head';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { fetchBackend } from '../lib/apiBase';
 import '../styles/globals.css';
 import AppImage from '../components/AppImage';
-import FloatingSidebar from '../components/FloatingSidebar';
-import HermesAgentWidget from '../components/HermesAgentWidget';
+
+const FloatingSidebar = dynamic(() => import('../components/FloatingSidebar'), { ssr: false });
+const HermesAgentWidget = dynamic(() => import('../components/HermesAgentWidget'), { ssr: false });
+
+const PUBLIC_API_ORIGIN = process.env.NEXT_PUBLIC_API_ORIGIN || '';
+const scheduleAfterFirstPaint = (task: () => void) => {
+  if (typeof window === 'undefined') return () => {};
+  let timeoutId: ReturnType<typeof setTimeout> | null = null;
+  let idleId: number | null = null;
+  const requestIdle =
+    typeof window.requestIdleCallback === 'function' ? window.requestIdleCallback.bind(window) : null;
+  const cancelIdle =
+    typeof window.cancelIdleCallback === 'function' ? window.cancelIdleCallback.bind(window) : null;
+  const run = () => {
+    if (requestIdle) {
+      idleId = requestIdle(task, { timeout: 2500 });
+      return;
+    }
+    timeoutId = setTimeout(task, 1200);
+  };
+  if (document.readyState === 'complete') {
+    run();
+  } else {
+    window.addEventListener('load', run, { once: true });
+  }
+  return () => {
+    window.removeEventListener('load', run);
+    if (timeoutId !== null) clearTimeout(timeoutId);
+    if (idleId !== null && cancelIdle) cancelIdle(idleId);
+  };
+};
 
 interface RuntimeInfo {
   environment: string;
@@ -22,6 +52,7 @@ export default function MyApp({ Component, pageProps }: AppProps) {
   const [wechatModalOpen, setWechatModalOpen] = useState(false);
   const [entryModalVariant, setEntryModalVariant] = useState<EntryModalVariant>(null);
   const [runtimeInfo, setRuntimeInfo] = useState<RuntimeInfo | null>(null);
+  const [globalChromeReady, setGlobalChromeReady] = useState(false);
 
   useEffect(() => {
     if (!('serviceWorker' in navigator)) {
@@ -32,6 +63,13 @@ export default function MyApp({ Component, pageProps }: AppProps) {
     };
     window.addEventListener('load', handleLoad);
     return () => window.removeEventListener('load', handleLoad);
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+    return scheduleAfterFirstPaint(() => setGlobalChromeReady(true));
   }, []);
 
   useEffect(() => {
@@ -74,9 +112,12 @@ export default function MyApp({ Component, pageProps }: AppProps) {
         }
       }
     };
-    void fetchRuntimeInfo();
+    const cancelScheduledFetch = scheduleAfterFirstPaint(() => {
+      void fetchRuntimeInfo();
+    });
     return () => {
       active = false;
+      cancelScheduledFetch();
     };
   }, []);
 
@@ -92,6 +133,12 @@ export default function MyApp({ Component, pageProps }: AppProps) {
         <title>StudyHub·学汇</title>
         <link rel="icon" href="/favicon.png" />
         <meta name="viewport" content="width=1100" />
+        {PUBLIC_API_ORIGIN ? (
+          <>
+            <link rel="preconnect" href={PUBLIC_API_ORIGIN} crossOrigin="anonymous" />
+            <link rel="dns-prefetch" href={PUBLIC_API_ORIGIN} />
+          </>
+        ) : null}
         <link rel="manifest" href="/manifest.json" />
         <meta name="theme-color" content="#2563eb" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -100,8 +147,12 @@ export default function MyApp({ Component, pageProps }: AppProps) {
         <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
       </Head>
       <div className="page-with-footer">
-        <FloatingSidebar />
-        <HermesAgentWidget />
+        {globalChromeReady && (
+          <>
+            <FloatingSidebar />
+            <HermesAgentWidget />
+          </>
+        )}
         {showLocalDevBadge && <div className="runtime-environment-badge">{localDevLabel}</div>}
         {entryModalVariant && (
           <div className="modal-mask stable-version-mask" onClick={() => setEntryModalVariant(null)}>
@@ -124,7 +175,7 @@ export default function MyApp({ Component, pageProps }: AppProps) {
                 <AppImage
                   src="/local/stable-version-poster.png"
                   alt="StudyHub 稳定版海报"
-                  loading="eager"
+                  loading="lazy"
                   decoding="async"
                 />
               </div>

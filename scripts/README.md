@@ -18,6 +18,7 @@
 - 生产运行：`bash scripts/runtime/production-up.sh`
 - 清理本地生成物：`bash scripts/clean-generated.sh`
 - 发布前检查：`bash scripts/predeploy-check.sh`
+- 浏览器加载性能预算：`npm --prefix frontend run test:perf`
 
 `predeploy-check.sh` 会串起后端测试、前端检查、前端单测、Playwright critical tests、代码体积检查和生产预检。只想在本地跑代码质量门禁时，可以临时跳过生产环境检查：
 
@@ -26,3 +27,21 @@ STUDYHUB_PREDEPLOY_PRODUCTION_CHECKS=0 bash scripts/predeploy-check.sh
 ```
 
 更具体的命令、环境变量和注意事项已经分别下沉到各子目录 README。
+
+## 浏览器加载性能预算
+
+`frontend/scripts/perf-budget.mjs` 会用 Chromium 打开页面并读取浏览器 Navigation Timing，默认按 `DOMContentLoaded p95 <= 200ms` 检查：
+
+```bash
+npm --prefix frontend run test:perf
+```
+
+常用配置：
+
+```bash
+PERF_BASE_URL=https://study-hub.cn npm --prefix frontend run test:perf
+PERF_BASE_URL=https://110.42.223.173 PERF_ROUTES=/,/more,/market npm --prefix frontend run test:perf
+PERF_DYNAMIC_ROUTES=/materials/1,/market/1 PERF_SAMPLE_RUNS=5 npm --prefix frontend run test:perf
+```
+
+默认会 warmup 一次，让浏览器缓存和 service worker 生效，再采样 3 次。要测完全冷启动，可以设置 `PERF_WARMUP_RUNS=0`。网络抖动会直接影响结果，所以这个检查是部署验证工具，不放进默认 `predeploy-check.sh`。

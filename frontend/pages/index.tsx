@@ -1,9 +1,9 @@
 import type React from 'react';
 import { GetServerSideProps } from 'next';
+import dynamic from 'next/dynamic';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
-import Snowfall from 'react-snowfall';
 import HomeFilterCard from '../components/home/HomeFilterCard';
 import HomeLeaderboard from '../components/home/HomeLeaderboard';
 import HomeRequestPanels from '../components/home/HomeRequestPanels';
@@ -46,6 +46,7 @@ import { ContributorRank, LeaderboardPeriod } from '../types/contributor';
 import { MaterialRequestItem } from '../types/request';
 
 const MATERIALS_PAGE_SIZE = 18;
+const Snowfall = dynamic(() => import('react-snowfall'), { ssr: false });
 
 const ROLE_LABELS = [
   { mask: RoleMask.DEVELOPER, label: '开发者' },
@@ -259,6 +260,7 @@ export default function Home({
   ]);
   const [isMobile, setIsMobile] = useState(false);
   const [reduceMotion, setReduceMotion] = useState(false);
+  const [seasonalEffectsReady, setSeasonalEffectsReady] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [batchError, setBatchError] = useState('');
@@ -304,7 +306,7 @@ export default function Home({
   const [leaderboardFollowLoading, setLeaderboardFollowLoading] = useState<Record<number, boolean>>({});
   const [leaderboardFollowNotice, setLeaderboardFollowNotice] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [supportModalOpen, setSupportModalOpen] = useState(false);
-  const showSeasonalEffects = !reduceMotion || isMobile;
+  const showSeasonalEffects = seasonalEffectsReady && (!reduceMotion || isMobile);
   useEffect(() => {
     setMaterialList(initialMaterials);
     setPageMeta(meta);
@@ -380,6 +382,23 @@ export default function Home({
     if (typeof document === 'undefined') return undefined;
     document.body.classList.add('theme-xmas');
     return () => document.body.classList.remove('theme-xmas');
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+    const enableEffects = () => {
+      timeoutId = setTimeout(() => setSeasonalEffectsReady(true), 0);
+    };
+    if (document.readyState === 'complete') {
+      enableEffects();
+    } else {
+      window.addEventListener('load', enableEffects, { once: true });
+    }
+    return () => {
+      window.removeEventListener('load', enableEffects);
+      if (timeoutId !== null) clearTimeout(timeoutId);
+    };
   }, []);
 
   useEffect(() => {

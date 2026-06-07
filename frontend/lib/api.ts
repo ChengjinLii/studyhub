@@ -13,6 +13,12 @@ import { MaterialRequestItem } from '../types/request';
 import { resolveApiBase, buildBackendUrl } from './apiBase';
 import { ApiEnvelope, unwrapApiResponse } from './apiEnvelope';
 import { normalizeMockAssets } from './mockAsset';
+import {
+  readServerPublicApiCache,
+  refreshServerPublicApiCache,
+  shouldUseServerPublicApiCache,
+  writeServerPublicApiCache,
+} from './serverPublicApiCache';
 
 export interface MaterialListResponse {
   items: MaterialListItem[];
@@ -37,12 +43,29 @@ async function apiFetch<T>(path: string, init: RequestInit = {}, token?: string,
     headers['Authorization'] = `Bearer ${token}`;
   }
   const apiBase = resolveApiBase(origin);
-  const res = await fetch(`${apiBase}${path}`, {
-    ...init,
-    headers,
-    cache: 'no-store',
-  });
-  return unwrapApiResponse<T>(res, '请求失败');
+  const cacheKey = `${apiBase}${path}`;
+  const requestBackend = async () => {
+    const res = await fetch(cacheKey, {
+      ...init,
+      headers,
+      cache: 'no-store',
+    });
+    return unwrapApiResponse<T>(res, '请求失败');
+  };
+  if (shouldUseServerPublicApiCache(path, init, token)) {
+    const cached = readServerPublicApiCache<T>(cacheKey);
+    if (cached) {
+      if (cached.state === 'stale') {
+        refreshServerPublicApiCache(cacheKey, requestBackend);
+      }
+      return cached.value;
+    }
+  }
+  const data = await requestBackend();
+  if (shouldUseServerPublicApiCache(path, init, token)) {
+    writeServerPublicApiCache(cacheKey, data);
+  }
+  return data;
 }
 
 const buildQuery = (params: Record<string, string | number | undefined>) => {

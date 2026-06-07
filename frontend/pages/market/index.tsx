@@ -11,10 +11,11 @@ import { SessionUser, RoleMask } from '../../types/user';
 import { MarketItem, MarketListResponse } from '../../types/market';
 import { SAMPLE_MARKET_ITEMS } from '../../constants/marketSamples';
 import { buildResponsiveImage, isMarketPlaceholder, ResponsiveImageResult } from '../../lib/ossImage';
-import { getRequestOrigin, resolveApiBase } from '../../lib/apiBase';
+import { getRequestOrigin } from '../../lib/apiBase';
 import { marketPath, userPath } from '../../lib/slug';
 import { toErrorMessage } from '../../lib/errors';
 import { ensureApiSuccess, readApiEnvelope, unwrapApiResponse } from '../../lib/apiEnvelope';
+import { fetchMarketItems } from '../../lib/market';
 
 const CATEGORY_OPTIONS = [
   { value: '', label: '全部分类' },
@@ -616,30 +617,19 @@ export const getServerSideProps: GetServerSideProps<MarketPageProps> = async (ct
     category: rawCategory,
     page,
   };
-  const query = new URLSearchParams();
-  if (rawKeyword) query.set('keyword', rawKeyword);
-  if (rawCategory) query.set('category', rawCategory);
-  query.set('page', page);
   const origin = getRequestOrigin(ctx.req);
-  const apiBase = resolveApiBase(origin);
   let items: MarketItem[] = [];
   let meta: MarketListResponse['meta'] = { page: Number(page) || 1, size: 20, total: 0 };
   let stats: MarketListResponse['stats'] = { active: 0, sold: 0, userCount: 0 };
   try {
-    const headers: Record<string, string> = { Accept: 'application/json' };
-    if (session.token) {
-      headers.Authorization = `Bearer ${session.token}`;
-    }
-    const resp = await fetch(`${apiBase}/market?${query.toString()}`, {
-      headers,
-      cache: 'no-store',
-    });
-    const json = await readApiEnvelope<MarketListResponse>(resp);
-    if (json?.ok && json.data) {
-      items = json.data.items || [];
-      meta = json.data.meta || meta;
-      stats = json.data.stats || stats;
-    }
+    const data = await fetchMarketItems(
+      { keyword: rawKeyword, category: rawCategory, page },
+      origin,
+      session.token || undefined
+    );
+    items = data.items || [];
+    meta = data.meta || meta;
+    stats = data.stats || stats;
   } catch (error) {
     // eslint-disable-next-line no-console
     console.warn('Failed to load market items', error);

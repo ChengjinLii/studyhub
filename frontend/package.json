@@ -13,6 +13,7 @@
     "format": "prettier --write .",
     "test:smoke": "playwright test tests/smoke.spec.ts",
     "test:critical": "playwright test tests/critical-paths.spec.ts",
+    "test:perf": "node scripts/perf-budget.mjs",
     "xmas:hat": "node scripts/vectorize-hat.mjs"
   },
   "dependencies": {
