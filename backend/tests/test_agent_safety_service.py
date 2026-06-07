@@ -29,6 +29,8 @@ def _evidence() -> MaterialPageEvidence:
         page=2,
         text="第 2 页包含通信原理计算题。",
         score=30,
+        question_numbers=("第3题",),
+        source_type="past_exam",
     )
 
 
@@ -56,7 +58,15 @@ def test_agent_safety_filters_unknown_recommendations_and_unread_pages() -> None
     assert sanitized == {
         "answer": "建议先看候选真题资料。",
         "recommendations": [{"material_id": 101, "reason": "与通信原理真题匹配"}],
-        "evidence_sources": [{"material_id": 101, "title": "通信原理四年真题解析", "page": 2}],
+        "evidence_sources": [
+            {
+                "material_id": 101,
+                "title": "通信原理四年真题解析",
+                "page": 2,
+                "question_numbers": ["第3题"],
+                "source_type": "past_exam",
+            }
+        ],
         "followup_questions": ["要不要按题型整理？"],
     }
 

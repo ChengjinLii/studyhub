@@ -94,6 +94,8 @@ class AgentMemoryService:
         signal_counter: Counter[str] = Counter()
         year_counter: Counter[str] = Counter()
         question_type_counter: Counter[str] = Counter()
+        question_number_counter: Counter[str] = Counter()
+        source_type_counter: Counter[str] = Counter()
         for material in materials:
             tag_counter.update(_json_string_list(material.tags_json))
             for value in (material.major, material.college, material.course_category, material.grade_value):
@@ -106,6 +108,9 @@ class AgentMemoryService:
             signal_counter.update(_signal_terms(item.text))
             year_counter.update(item.years)
             question_type_counter.update(item.question_types)
+            question_number_counter.update(item.question_numbers)
+            if item.source_type != "unknown":
+                source_type_counter.update([item.source_type])
         top_materials = [
             {
                 "material_id": int(material.id),
@@ -133,9 +138,11 @@ class AgentMemoryService:
             "question_type_signals": _counter_items(signal_counter, limit=6),
             "pdf_year_signals": _counter_items(year_counter, limit=6),
             "pdf_question_type_signals": _counter_items(question_type_counter, limit=6),
+            "pdf_question_number_signals": _counter_items(question_number_counter, limit=8),
+            "pdf_source_type_signals": _counter_items(source_type_counter, limit=5),
             "high_signal_materials": top_materials,
             "pdf_evidence_pages": [
-                {"material_id": item.material_id, "title": item.title, "page": item.page}
+                _evidence_page_payload(item)
                 for item in pdf_evidence[: max(0, int(self.settings.ai_agent_pdf_evidence_max_pages or 0))]
             ],
             "privacy_boundary": "Only aggregate platform signals are included here; no individual user profile or private conversation is mixed into collective memory.",
@@ -239,6 +246,15 @@ def _user_profile_payload(user: Any) -> dict[str, str]:
         "grade_stages": _clean_text(getattr(user, "grade_stages", None)),
     }
     return {key: value for key, value in payload.items() if value}
+
+
+def _evidence_page_payload(item: MaterialPageEvidence) -> dict[str, Any]:
+    payload: dict[str, Any] = {"material_id": item.material_id, "title": item.title, "page": item.page}
+    if item.question_numbers:
+        payload["question_numbers"] = list(item.question_numbers)
+    if item.source_type != "unknown":
+        payload["source_type"] = item.source_type
+    return payload
 
 
 def _json_string_list(value: str | None) -> list[str]:

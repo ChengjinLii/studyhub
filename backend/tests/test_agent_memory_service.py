@@ -110,6 +110,8 @@ def test_agent_memory_context_aggregates_platform_and_current_user_only() -> Non
             years=("2024",),
             question_types=("计算题",),
             knowledge_signals=("调制",),
+            question_numbers=("第3题",),
+            source_type="past_exam",
         )
     ]
 
@@ -125,9 +127,17 @@ def test_agent_memory_context_aggregates_platform_and_current_user_only() -> Non
     platform = prompt["platform_collective_memory"]
     assert platform["candidate_count"] == 2
     assert {"value": "通信原理", "count": 2} in platform["top_tags"]
-    assert {"material_id": 101, "title": "通信原理四年真题解析", "page": 3} in platform["pdf_evidence_pages"]
+    assert {
+        "material_id": 101,
+        "title": "通信原理四年真题解析",
+        "page": 3,
+        "question_numbers": ["第3题"],
+        "source_type": "past_exam",
+    } in platform["pdf_evidence_pages"]
     assert platform["pdf_year_signals"] == [{"value": "2024", "count": 1}]
     assert platform["pdf_question_type_signals"] == [{"value": "计算题", "count": 1}]
+    assert platform["pdf_question_number_signals"] == [{"value": "第3题", "count": 1}]
+    assert platform["pdf_source_type_signals"] == [{"value": "past_exam", "count": 1}]
     assert "individual user" in platform["privacy_boundary"]
 
     user_memory = prompt["user_personal_memory"]

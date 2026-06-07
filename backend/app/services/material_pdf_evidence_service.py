@@ -61,6 +61,14 @@ KNOWLEDGE_SIGNAL_TERMS = (
     "分布",
 )
 
+SOURCE_TYPE_PATTERNS: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("past_exam", ("真题", "往年", "历年", "试卷", "期末", "期中")),
+    ("answer_explanation", ("解析", "答案", "标答", "参考答案")),
+    ("lecture_notes", ("讲义", "课件", "笔记")),
+    ("study_outline", ("速成", "提纲", "复习")),
+    ("exercise", ("习题", "练习", "例题", "作业")),
+)
+
 
 @dataclass(frozen=True, slots=True)
 class MaterialPageChunk:
@@ -69,6 +77,8 @@ class MaterialPageChunk:
     years: tuple[str, ...]
     question_types: tuple[str, ...]
     knowledge_signals: tuple[str, ...]
+    question_numbers: tuple[str, ...]
+    source_type: str
 
 
 @dataclass(slots=True)
@@ -81,6 +91,8 @@ class MaterialPageEvidence:
     years: tuple[str, ...] = ()
     question_types: tuple[str, ...] = ()
     knowledge_signals: tuple[str, ...] = ()
+    question_numbers: tuple[str, ...] = ()
+    source_type: str = "unknown"
 
     def to_prompt_payload(self) -> dict[str, Any]:
         payload: dict[str, Any] = {
@@ -95,6 +107,10 @@ class MaterialPageEvidence:
             payload["question_types"] = list(self.question_types)
         if self.knowledge_signals:
             payload["knowledge_signals"] = list(self.knowledge_signals)
+        if self.question_numbers:
+            payload["question_numbers"] = list(self.question_numbers)
+        if self.source_type != "unknown":
+            payload["source_type"] = self.source_type
         return payload
 
     def to_source_payload(self) -> dict[str, Any]:
@@ -108,6 +124,10 @@ class MaterialPageEvidence:
             payload["years"] = list(self.years)
         if self.question_types:
             payload["question_types"] = list(self.question_types)
+        if self.question_numbers:
+            payload["question_numbers"] = list(self.question_numbers)
+        if self.source_type != "unknown":
+            payload["source_type"] = self.source_type
         return payload
 
 
@@ -177,6 +197,8 @@ class MaterialPdfEvidenceService:
                 years=chunk.years,
                 question_types=chunk.question_types,
                 knowledge_signals=chunk.knowledge_signals,
+                question_numbers=chunk.question_numbers,
+                source_type=chunk.source_type,
             )
             for chunk in chunks
             if chunk.text.strip()
@@ -240,6 +262,8 @@ def build_pdf_page_chunks(pdf_bytes: bytes, *, max_pages: int) -> list[MaterialP
                 years=tuple(_extract_years(compact)),
                 question_types=tuple(_extract_question_types(compact)),
                 knowledge_signals=tuple(_extract_knowledge_signals(compact)),
+                question_numbers=tuple(_extract_question_numbers(compact)),
+                source_type=_classify_source_type(compact),
             )
         )
     return chunks
@@ -331,6 +355,9 @@ def _score_page(chunk: MaterialPageChunk, query_terms: list[str]) -> int:
     score += len(chunk.question_types) * 3
     score += len(chunk.years) * 2
     score += len(chunk.knowledge_signals)
+    score += len(chunk.question_numbers) * 2
+    if chunk.source_type in {"past_exam", "answer_explanation"}:
+        score += 3
     return score
 
 
@@ -363,3 +390,34 @@ def _extract_knowledge_signals(text: str) -> list[str]:
         if term.lower() in normalized and term not in result:
             result.append(term)
     return result[:8]
+
+
+def _extract_question_numbers(text: str) -> list[str]:
+    patterns = (
+        r"第\s*([0-9一二三四五六七八九十]{1,3})\s*[题問问]",
+        r"(?<!\d)([0-9]{1,2})\s*[\.、)]\s*(?:[^\s，。；：:]{0,12})",
+        r"[Qq]uestion\s*([0-9]{1,2})",
+        r"\b[Qq]\s*([0-9]{1,2})\b",
+    )
+    result: list[str] = []
+    for pattern in patterns:
+        for match in re.findall(pattern, text):
+            value = str(match).strip()
+            label = f"第{value}题"
+            if label not in result:
+                result.append(label)
+            if len(result) >= 8:
+                return result
+    return result
+
+
+def _classify_source_type(text: str) -> str:
+    normalized = text.lower()
+    best_label = "unknown"
+    best_hits = 0
+    for label, aliases in SOURCE_TYPE_PATTERNS:
+        hits = sum(1 for alias in aliases if alias.lower() in normalized)
+        if hits > best_hits:
+            best_label = label
+            best_hits = hits
+    return best_label

@@ -75,7 +75,7 @@ def test_extract_pdf_page_texts_uses_safe_literal_fallback_for_simple_pdf_bytes(
 
 def test_build_pdf_page_chunks_extracts_year_question_type_and_knowledge_signals() -> None:
     chunks = build_pdf_page_chunks(
-        "%PDF-1.4\n1 0 obj << /Type /Page >> stream (2024 通信原理 计算题 调制 解调 误码率) endstream".encode(),
+        "%PDF-1.4\n1 0 obj << /Type /Page >> stream (2024 通信原理 真题 第3题 计算题 调制 解调 误码率) endstream".encode(),
         max_pages=2,
     )
 
@@ -84,6 +84,8 @@ def test_build_pdf_page_chunks_extracts_year_question_type_and_knowledge_signals
     assert chunks[0].years == ("2024",)
     assert "计算题" in chunks[0].question_types
     assert "调制" in chunks[0].knowledge_signals
+    assert chunks[0].question_numbers == ("第3题",)
+    assert chunks[0].source_type == "past_exam"
 
 
 def test_pdf_evidence_only_loads_for_study_queries_and_respects_file_limit() -> None:

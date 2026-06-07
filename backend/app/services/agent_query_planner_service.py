@@ -204,6 +204,8 @@ def _build_evidence_tasks(
         tasks.extend(["choose_study_sequence", "adapt_to_user_profile"])
     if pdf_evidence:
         tasks.append("cite_material_pages")
+    if any(item.question_numbers for item in pdf_evidence):
+        tasks.append("cite_question_numbers")
     if memory_context and memory_context.user:
         tasks.append("personalize_with_current_user_memory")
     if memory_context and memory_context.platform:

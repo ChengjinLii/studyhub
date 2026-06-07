@@ -97,7 +97,12 @@ class AgentSafetyService:
             if material_id is None or page is None or (material_id, page) not in allowed:
                 continue
             evidence = allowed[(material_id, page)]
-            sources.append({"material_id": material_id, "title": evidence.title, "page": page})
+            source: dict[str, Any] = {"material_id": material_id, "title": evidence.title, "page": page}
+            if evidence.question_numbers:
+                source["question_numbers"] = list(evidence.question_numbers)
+            if evidence.source_type != "unknown":
+                source["source_type"] = evidence.source_type
+            sources.append(source)
             if len(sources) >= 6:
                 break
         return sources
