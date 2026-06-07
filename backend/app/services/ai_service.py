@@ -151,7 +151,7 @@ class AiService:
                 memory_context=memory_context,
                 query_plan=query_plan,
             )
-            recommendations = [self._recommendation_payload(material, payload.query) for material in materials[:3]]
+            recommendations = [self._recommendation_payload(material, payload.query, pdf_evidence) for material in materials[:3]]
             llm_body = self._generate_agent_recommendation(
                 payload.query,
                 materials,
@@ -291,12 +291,17 @@ class AiService:
             "candidateMaterialCount": len(materials),
         }
 
-    def _recommendation_payload(self, material: MaterialRecord, query: str) -> dict[str, Any]:
+    def _recommendation_payload(
+        self,
+        material: MaterialRecord,
+        query: str,
+        pdf_evidence: list[MaterialPageEvidence] | None = None,
+    ) -> dict[str, Any]:
         return {
             "material_id": material.id,
             "title": self._safe_text(material, "title"),
             "tags": self._loads(self._safe_text(material, "tags_json")),
-            "reason": self._build_reason(material, query),
+            "reason": self._build_reason(material, query, pdf_evidence),
             "summary": self._safe_text(material, "description"),
         }
 
@@ -397,7 +402,7 @@ class AiService:
 
         context_materials = materials[: min(3, max(1, settings.ai_agent_max_context_materials))]
         candidates = [
-            self._compact_recommendation_payload(material, query)
+            self._compact_recommendation_payload(material, query, pdf_evidence)
             for material in context_materials
         ]
         system_prompt = (
@@ -510,12 +515,17 @@ class AiService:
             "Content-Type": "application/json",
         }
 
-    def _compact_recommendation_payload(self, material: MaterialRecord, query: str) -> dict[str, Any]:
+    def _compact_recommendation_payload(
+        self,
+        material: MaterialRecord,
+        query: str,
+        pdf_evidence: list[MaterialPageEvidence] | None = None,
+    ) -> dict[str, Any]:
         description = self._safe_text(material, "description").replace("\n", " ").strip()
         return {
             "material_id": material.id,
             "title": self._safe_text(material, "title"),
-            "reason": self._build_reason(material, query),
+            "reason": self._build_reason(material, query, pdf_evidence),
             "summary": description[:180],
         }
 
@@ -835,8 +845,30 @@ class AiService:
                 deduped.append(term)
         return deduped
 
-    def _build_reason(self, material: MaterialRecord, query: str) -> str:
+    def _build_reason(
+        self,
+        material: MaterialRecord,
+        query: str,
+        pdf_evidence: list[MaterialPageEvidence] | None = None,
+    ) -> str:
         parts = []
+        evidence_items = _evidence_for_material(pdf_evidence or [], material)
+        if evidence_items:
+            pages = _evidence_pages(evidence_items)
+            if pages:
+                parts.append(f"已读取 PDF 第 {_join_values(pages)} 页证据")
+            years = _material_evidence_values(evidence_items, "years")
+            question_types = _material_evidence_values(evidence_items, "question_types")
+            question_numbers = _material_evidence_values(evidence_items, "question_numbers")
+            knowledge_signals = _material_evidence_values(evidence_items, "knowledge_signals")
+            if years:
+                parts.append(f"年份信号：{_join_values(years[:3])}")
+            if question_types:
+                parts.append(f"题型信号：{_join_values(question_types[:3])}")
+            if question_numbers:
+                parts.append(f"题号信号：{_join_values(question_numbers[:3])}")
+            elif knowledge_signals:
+                parts.append(f"知识点信号：{_join_values(knowledge_signals[:3])}")
         school = self._safe_text(material, "school")
         major = self._safe_text(material, "major")
         title = self._safe_text(material, "title")
@@ -868,6 +900,43 @@ class AiService:
 
 
 def _evidence_values(pdf_evidence: list[MaterialPageEvidence], field: str) -> list[str]:
+    values: list[str] = []
+    for item in pdf_evidence:
+        raw_values = getattr(item, field, ())
+        if not isinstance(raw_values, tuple):
+            continue
+        for value in raw_values:
+            cleaned = str(value).strip()
+            if cleaned and cleaned not in values:
+                values.append(cleaned)
+            if len(values) >= 6:
+                return values
+    return values
+
+
+def _evidence_for_material(
+    pdf_evidence: list[MaterialPageEvidence],
+    material: MaterialRecord,
+) -> list[MaterialPageEvidence]:
+    try:
+        material_id = int(material.id)
+    except (TypeError, ValueError):
+        return []
+    return [item for item in pdf_evidence if int(item.material_id) == material_id]
+
+
+def _evidence_pages(pdf_evidence: list[MaterialPageEvidence]) -> list[str]:
+    pages: list[str] = []
+    for item in pdf_evidence:
+        page = str(item.page).strip()
+        if page and page not in pages:
+            pages.append(page)
+        if len(pages) >= 3:
+            break
+    return pages
+
+
+def _material_evidence_values(pdf_evidence: list[MaterialPageEvidence], field: str) -> list[str]:
     values: list[str] = []
     for item in pdf_evidence:
         raw_values = getattr(item, field, ())
