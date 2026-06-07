@@ -10,6 +10,8 @@ from app.core.config import Settings, get_settings
 from app.core.db import reset_database_runtime
 from app.ops.db_admin import (
     _validate_backup_file,
+    _migration_plan_token,
+    _require_production_plan_token,
     _require_production_migration_scope,
     command_backup,
     command_check,
@@ -183,6 +185,35 @@ def test_production_migrate_requires_explicit_only_scope() -> None:
         _require_production_migration_scope(settings, None)
 
     _require_production_migration_scope(settings, {("market_items", "source")})
+
+
+def test_migration_plan_token_is_stable_and_sensitive() -> None:
+    base = {
+        "onlyColumns": ["market_items.source"],
+        "additiveStatements": ["ALTER TABLE `market_items` ADD COLUMN `source` VARCHAR(16) NOT NULL DEFAULT 'local';"],
+    }
+    same = {
+        "additiveStatements": ["ALTER TABLE `market_items` ADD COLUMN `source` VARCHAR(16) NOT NULL DEFAULT 'local';"],
+        "onlyColumns": ["market_items.source"],
+    }
+    changed = {
+        "onlyColumns": ["orders.uploader_id"],
+        "additiveStatements": ["ALTER TABLE `orders` ADD COLUMN `uploader_id` INTEGER NULL;"],
+    }
+
+    assert _migration_plan_token(base) == _migration_plan_token(same)
+    assert _migration_plan_token(base) != _migration_plan_token(changed)
+
+
+def test_production_migrate_requires_matching_plan_token() -> None:
+    settings = Settings(environment="production")
+
+    with pytest.raises(RuntimeError, match="confirm-plan-token"):
+        _require_production_plan_token(settings, expected="abc123", confirmed=None)
+    with pytest.raises(RuntimeError, match="不匹配"):
+        _require_production_plan_token(settings, expected="abc123", confirmed="wrong")
+
+    _require_production_plan_token(settings, expected="abc123", confirmed="abc123")
 
 
 def test_db_admin_backup_rejects_sqlite(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

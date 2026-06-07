@@ -42,7 +42,20 @@ STUDYHUB_PRIVATE_DIR_PATH=/data/studyhub/private \
   --only orders.uploader_id
 ```
 
-确认备份和 SQL 后才允许执行 `--yes`。`migrate-additive` 只会执行审计生成的 `ADD COLUMN` 语句，production 执行前默认要求最近 120 分钟内已有非空备份；如需调整窗口，可传入 `--backup-max-age-minutes`。
+确认备份、SQL 和 `planToken` 后才允许执行 `--yes`。production 执行时必须保留相同 `--only` 范围，并传入计划输出里的 token：
+
+```bash
+cd /data/studyhub/backend
+STUDYHUB_ENVIRONMENT=production \
+STUDYHUB_PRIVATE_DIR_PATH=/data/studyhub/private \
+../.venv/bin/python -m app.ops.db_admin migrate-additive \
+  --yes \
+  --only market_items.source \
+  --only orders.uploader_id \
+  --confirm-plan-token <PLAN_TOKEN_FROM_PLAN_OUTPUT>
+```
+
+`migrate-additive` 只会执行审计生成的 `ADD COLUMN` 语句，production 执行前默认要求最近 120 分钟内已有非空备份；如需调整窗口，可传入 `--backup-max-age-minutes`。
 
 如果目标库已经由旧流程建好表，只需要记录当前迁移版本：
 

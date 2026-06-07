@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 from datetime import UTC, datetime
 import gzip
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -223,6 +224,28 @@ def _require_production_migration_scope(settings: Settings, only_columns: set[tu
         raise RuntimeError("production migrate-additive --yes 必须至少传入一个 --only table.column，禁止全量执行。")
 
 
+def _migration_plan_token(payload: dict[str, object]) -> str:
+    canonical = json.dumps(
+        {
+            "onlyColumns": payload.get("onlyColumns", []),
+            "additiveStatements": payload.get("additiveStatements", []),
+        },
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()[:16]
+
+
+def _require_production_plan_token(settings: Settings, *, expected: str, confirmed: str | None) -> None:
+    if not settings.is_production:
+        return
+    if not confirmed:
+        raise RuntimeError("production migrate-additive --yes 必须传入 --confirm-plan-token。")
+    if confirmed != expected:
+        raise RuntimeError("production migrate-additive --yes 的 --confirm-plan-token 与当前计划不匹配。")
+
+
 def command_migrate_additive(
     settings: Settings,
     *,
@@ -230,6 +253,7 @@ def command_migrate_additive(
     yes: bool,
     only: list[str] | None = None,
     backup_max_age_minutes: int = 120,
+    confirm_plan_token: str | None = None,
 ) -> int:
     if plan == yes:
         raise RuntimeError("migrate-additive 必须且只能传入 --plan 或 --yes。")
@@ -250,10 +274,13 @@ def command_migrate_additive(
     statements = list(payload["additiveStatements"])
     for sql in statements:
         assert_additive_sql(sql)
+    payload["planToken"] = _migration_plan_token(payload)
 
     if plan:
         print(json.dumps(payload, ensure_ascii=False, indent=2))
         return 0 if payload["executable"] else 2
+
+    _require_production_plan_token(settings, expected=str(payload["planToken"]), confirmed=confirm_plan_token)
 
     if settings.is_production:
         backup_file = require_recent_nonempty_backup(
@@ -371,6 +398,10 @@ def build_parser() -> argparse.ArgumentParser:
         default=120,
         help="maximum allowed production backup age before --yes execution",
     )
+    migrate_parser.add_argument(
+        "--confirm-plan-token",
+        help="required for production --yes; copy the planToken printed by --plan",
+    )
     return parser
 
 
@@ -403,6 +434,7 @@ def main(argv: list[str] | None = None) -> int:
             yes=bool(args.yes),
             only=list(args.only),
             backup_max_age_minutes=int(args.backup_max_age_minutes),
+            confirm_plan_token=args.confirm_plan_token,
         )
     parser.error(f"unsupported command: {args.command}")
     return 2
