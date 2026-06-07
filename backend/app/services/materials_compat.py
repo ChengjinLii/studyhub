@@ -545,16 +545,10 @@ class MaterialsCompatMixin:
         }
 
     async def _compat_load_material_stats_async(self, session) -> dict[str, int]:
-        total_task = session.execute(text("SELECT COUNT(*) FROM materials"))
-        free_task = session.execute(text("SELECT COUNT(*) FROM materials WHERE is_free = 1"))
-        downloads_task = session.execute(text("SELECT COALESCE(SUM(download_count), 0) FROM materials"))
-        users_task = session.execute(text("SELECT COUNT(*) FROM users"))
-        total_result, free_result, downloads_result, users_result = await asyncio.gather(
-            total_task,
-            free_task,
-            downloads_task,
-            users_task,
-        )
+        total_result = await session.execute(text("SELECT COUNT(*) FROM materials"))
+        free_result = await session.execute(text("SELECT COUNT(*) FROM materials WHERE is_free = 1"))
+        downloads_result = await session.execute(text("SELECT COALESCE(SUM(download_count), 0) FROM materials"))
+        users_result = await session.execute(text("SELECT COUNT(*) FROM users"))
         return {
             "totalMaterials": int(total_result.scalar() or 0),
             "freeMaterials": int(free_result.scalar() or 0),
@@ -970,6 +964,7 @@ class MaterialsCompatMixin:
                         m.course_category,
                         m.grade_type,
                         m.grade_value,
+                        m.keywords,
                         m.rating_avg,
                         m.rating_count,
                         m.like_count,
@@ -977,6 +972,8 @@ class MaterialsCompatMixin:
                         m.download_count,
                         m.sales_count,
                         m.created_at,
+                        m.file_key,
+                        m.netdisk_url,
                         {recommendation_score_sql} AS recommendation_score
                     FROM materials m
                     LEFT JOIN users u ON u.id = m.uploader_id
