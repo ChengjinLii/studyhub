@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from collections import Counter
 from dataclasses import dataclass
+import hashlib
+import json
 from typing import Any
 
 from app.models.materials import MaterialRecord
@@ -14,6 +16,8 @@ from app.services.material_pdf_evidence_service import MaterialPageEvidence
 class CourseMemoryCard:
     course: str
     version: str
+    version_fingerprint: str
+    version_basis: dict[str, Any]
     source: str
     years: tuple[str, ...]
     question_type_distribution: tuple[dict[str, Any], ...]
@@ -28,6 +32,8 @@ class CourseMemoryCard:
         return {
             "course": self.course,
             "version": self.version,
+            "version_fingerprint": self.version_fingerprint,
+            "version_basis": self.version_basis,
             "source": self.source,
             "years": list(self.years),
             "question_type_distribution": list(self.question_type_distribution),
@@ -64,9 +70,19 @@ class AgentCourseMemoryService:
         question_types = _counter_payload(_question_type_counter(pdf_evidence, memory_context), limit=6)
         knowledge_signals = _counter_payload(_knowledge_counter(pdf_evidence), limit=8)
         source_types = _counter_payload(_source_type_counter(pdf_evidence, memory_context), limit=5)
+        version_basis = _version_basis(
+            course=course,
+            materials=materials,
+            pdf_evidence=pdf_evidence,
+            memory_context=memory_context,
+            query_plan=query_plan,
+        )
+        fingerprint = _version_fingerprint(version_basis)
         return CourseMemoryCard(
             course=course,
-            version="ephemeral-v1",
+            version=f"ephemeral-v1-{fingerprint[:12]}",
+            version_fingerprint=fingerprint,
+            version_basis=version_basis,
             source="current_request_candidates",
             years=tuple(years),
             question_type_distribution=tuple(question_types),
@@ -216,6 +232,52 @@ def _limitations(materials: list[MaterialRecord], pdf_evidence: list[MaterialPag
     if not limitations:
         limitations.append("该卡片为当前请求的只读临时汇总，尚未持久化为平台正式课程记忆。")
     return limitations
+
+
+def _version_basis(
+    *,
+    course: str,
+    materials: list[MaterialRecord],
+    pdf_evidence: list[MaterialPageEvidence],
+    memory_context: AgentMemoryContext | None,
+    query_plan: AgentQueryPlan | None,
+) -> dict[str, Any]:
+    platform = memory_context.platform if memory_context else {}
+    return {
+        "schema": "course-memory-card-v1",
+        "course": course,
+        "material_ids": sorted({int(material.id) for material in materials})[:12],
+        "evidence_refs": [
+            {
+                "material_id": int(item.material_id),
+                "page": int(item.page),
+                "years": list(item.years),
+                "question_types": list(item.question_types),
+                "question_numbers": list(item.question_numbers),
+                "source_type": item.source_type,
+            }
+            for item in sorted(pdf_evidence[:12], key=lambda evidence: (int(evidence.material_id), int(evidence.page)))
+        ],
+        "query_plan": _query_plan_basis(query_plan),
+        "platform_signal_keys": sorted(str(key) for key, value in platform.items() if value not in (None, [], {}, "")),
+    }
+
+
+def _query_plan_basis(query_plan: AgentQueryPlan | None) -> dict[str, Any]:
+    if query_plan is None:
+        return {}
+    return {
+        "intent": query_plan.intent,
+        "course_terms": list(query_plan.course_terms),
+        "resource_types": list(query_plan.resource_types),
+        "years": list(query_plan.years),
+        "evidence_tasks": list(query_plan.evidence_tasks),
+    }
+
+
+def _version_fingerprint(version_basis: dict[str, Any]) -> str:
+    payload = json.dumps(version_basis, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()[:16]
 
 
 def _counter_payload(counter: Counter[str], *, limit: int) -> list[dict[str, Any]]:

@@ -76,7 +76,23 @@ def test_course_memory_card_summarizes_current_request_collective_signals() -> N
     assert card is not None
     payload = card.to_prompt_payload()
     assert payload["course"] == "通信原理"
-    assert payload["version"] == "ephemeral-v1"
+    assert payload["version"].startswith("ephemeral-v1-")
+    assert len(payload["version_fingerprint"]) == 16
+    assert payload["version"].endswith(payload["version_fingerprint"][:12])
+    assert payload["version_basis"]["schema"] == "course-memory-card-v1"
+    assert payload["version_basis"]["material_ids"] == [101, 102]
+    assert payload["version_basis"]["evidence_refs"][0] == {
+        "material_id": 101,
+        "page": 3,
+        "years": ["2024"],
+        "question_types": ["计算题"],
+        "question_numbers": ["第3题"],
+        "source_type": "past_exam",
+    }
+    assert payload["version_basis"]["query_plan"]["intent"] == "exam_trend_analysis"
+    version_basis_text = json.dumps(payload["version_basis"], ensure_ascii=False).lower()
+    assert "user" not in version_basis_text
+    assert "profile" not in version_basis_text
     assert payload["years"] == ["2023", "2024", "2022"]
     assert payload["question_type_distribution"] == [{"value": "计算题", "count": 1}]
     assert payload["knowledge_signals"] == [{"value": "调制", "count": 1}, {"value": "解调", "count": 1}]
@@ -84,6 +100,51 @@ def test_course_memory_card_summarizes_current_request_collective_signals() -> N
     assert payload["page_references"][0]["question_numbers"] == ["第3题"]
     assert payload["recommended_sequence"] == ["先看高频题型", "再核对年份趋势", "最后按页码打开真题资料查漏补缺"]
     assert payload["limitations"] == ["该卡片为当前请求的只读临时汇总，尚未持久化为平台正式课程记忆。"]
+
+
+def test_course_memory_card_version_is_stable_and_changes_with_sources() -> None:
+    plan = AgentQueryPlan(
+        intent="exam_trend_analysis",
+        confidence=0.9,
+        course_terms=("通信原理",),
+        resource_types=("past_exam",),
+        years=("2024",),
+        search_terms=("通信原理", "真题"),
+        evidence_tasks=("read_relevant_pdf_pages",),
+        response_guidance=("优先输出常考题型",),
+    )
+    memory = AgentMemoryContext(
+        platform={"pdf_year_signals": [{"value": "2024", "count": 1}]},
+        user={"profile": {"major": "不应进入版本依据"}},
+    )
+    service = AgentCourseMemoryService()
+
+    first = service.build_card(
+        materials=[_material()],
+        pdf_evidence=[_evidence()],
+        memory_context=memory,
+        query_plan=plan,
+    )
+    second = service.build_card(
+        materials=[_material()],
+        pdf_evidence=[_evidence()],
+        memory_context=memory,
+        query_plan=plan,
+    )
+    changed = service.build_card(
+        materials=[_material(), _material(103, title="通信原理补充真题", downloads=10)],
+        pdf_evidence=[_evidence()],
+        memory_context=memory,
+        query_plan=plan,
+    )
+
+    assert first is not None
+    assert second is not None
+    assert changed is not None
+    assert first.version_fingerprint == second.version_fingerprint
+    assert first.version == second.version
+    assert first.version_fingerprint != changed.version_fingerprint
+    assert "不应进入版本依据" not in json.dumps(first.version_basis, ensure_ascii=False)
 
 
 def test_ai_prompt_receives_course_memory_card(monkeypatch) -> None:
