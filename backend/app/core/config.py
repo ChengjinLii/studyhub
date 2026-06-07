@@ -84,6 +84,9 @@ class Settings(BaseSettings):
     ai_agent_pdf_evidence_max_materials: int = 2
     ai_agent_pdf_evidence_max_pages: int = 6
     ai_agent_pdf_evidence_max_bytes: int = 4 * 1024 * 1024
+    ai_agent_memory_context_enabled: bool = True
+    ai_agent_memory_max_materials: int = 8
+    ai_agent_memory_max_interaction_checks: int = 6
     public_site_base_url: str = "https://study-hub.cn"
     security_headers_enabled: bool = True
     security_hsts_enabled: bool | None = None

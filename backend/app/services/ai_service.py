@@ -12,6 +12,7 @@ from app.models.materials import MaterialRecord
 from app.repos.material_repo import MaterialRepository
 from app.repos.read_api_repo import ReadApiRepository
 from app.schemas.ai import AiChatRequestPayload, AiRecommendRequestPayload
+from app.services.agent_memory_service import AgentMemoryContext, AgentMemoryService
 from app.services.material_pdf_evidence_service import MaterialPageEvidence, MaterialPdfEvidenceService
 from app.services.read_support import parse_iso_datetime
 
@@ -78,10 +79,12 @@ class AiService:
         read_repo: ReadApiRepository,
         material_repo: MaterialRepository,
         pdf_evidence_service: MaterialPdfEvidenceService | None = None,
+        memory_service: AgentMemoryService | None = None,
     ) -> None:
         self.read_repo = read_repo
         self.material_repo = material_repo
         self.pdf_evidence_service = pdf_evidence_service
+        self.memory_service = memory_service
 
     def chat(self, payload: AiChatRequestPayload) -> dict[str, Any]:
         latest_user_message = next((item.content.strip() for item in reversed(payload.messages) if item.role.lower() == "user"), "")
@@ -103,13 +106,27 @@ class AiService:
     ) -> dict[str, Any]:
         materials = self._rank_materials(session, payload.query, payload.filters or {})
         pdf_evidence = self._collect_pdf_evidence(materials, payload.query, current_user_id=current_user_id)
+        memory_context = self._collect_memory_context(
+            session,
+            query=payload.query,
+            materials=materials,
+            current_user_id=current_user_id,
+            pdf_evidence=pdf_evidence,
+        )
         recommendations = [self._recommendation_payload(material, payload.query) for material in materials[:3]]
-        llm_body = self._generate_agent_recommendation(payload.query, materials, pdf_evidence=pdf_evidence)
+        llm_body = self._generate_agent_recommendation(
+            payload.query,
+            materials,
+            pdf_evidence=pdf_evidence,
+            memory_context=memory_context,
+        )
         if llm_body:
             recommendations = self._merge_llm_recommendations(llm_body, recommendations)
         body = {
             "recommendations": recommendations,
-            "answer": llm_body.get("answer") if llm_body else self._build_local_answer(payload.query, recommendations, pdf_evidence),
+            "answer": llm_body.get("answer")
+            if llm_body
+            else self._build_local_answer(payload.query, recommendations, pdf_evidence, memory_context),
             "followup_questions": [
                 "你更想要真题、笔记还是经验分享？",
                 "是否需要限定学校、学院或专业？",
@@ -152,12 +169,36 @@ class AiService:
         except Exception:
             return []
 
+    def _collect_memory_context(
+        self,
+        session: Session,
+        *,
+        query: str,
+        materials: list[MaterialRecord],
+        current_user_id: int | None,
+        pdf_evidence: list[MaterialPageEvidence],
+    ) -> AgentMemoryContext | None:
+        if not self.memory_service:
+            return None
+        try:
+            context = self.memory_service.collect(
+                session,
+                query=query,
+                materials=materials,
+                current_user_id=current_user_id,
+                pdf_evidence=pdf_evidence,
+            )
+        except Exception:
+            return None
+        return None if context.is_empty() else context
+
     def _generate_agent_recommendation(
         self,
         query: str,
         materials: list[MaterialRecord],
         *,
         pdf_evidence: list[MaterialPageEvidence],
+        memory_context: AgentMemoryContext | None,
     ) -> dict[str, Any] | None:
         settings = get_settings()
         provider = settings.ai_agent_provider.strip().lower()
@@ -175,14 +216,17 @@ class AiService:
             "不要编造不存在的资料。用户可能需要资料推荐、真题讲解思路、复习规划或错题辅导。"
             "如果候选资料不足，要明确说明并追问课程范围。"
             "如果提供了 pdf_evidence，你必须优先基于这些页级证据总结，并在关键结论中引用资料名和页码。"
+            "如果提供了 memory_context，你可以用平台集体记忆增强课程/题型判断，用用户个人记忆做个性化建议；"
+            "但不能把用户个人记忆写入或表述成平台集体结论。"
             "必须输出严格 JSON，不要输出 Markdown，不要包裹代码块。"
         )
         user_prompt = {
             "user_query": query,
             "candidate_materials": candidates,
             "pdf_evidence": [item.to_prompt_payload() for item in pdf_evidence],
+            "memory_context": memory_context.to_prompt_payload() if memory_context else {},
             "output_schema": {
-                "answer": "面向学生的自然语言回答，结合资料说明下一步怎么学。若用户要求讲解真题，先给通用解题路径，并建议打开最相关真题资料。",
+                "answer": "面向学生的自然语言回答，结合资料、PDF 证据和可用记忆上下文说明下一步怎么学。若用户要求讲解真题，先给通用解题路径，并建议打开最相关真题资料。",
                 "recommendations": [
                     {
                         "material_id": "候选资料中的 material_id",
@@ -296,14 +340,31 @@ class AiService:
         query: str,
         recommendations: list[dict[str, Any]],
         pdf_evidence: list[MaterialPageEvidence] | None = None,
+        memory_context: AgentMemoryContext | None = None,
     ) -> str:
         if not recommendations:
             return f"我没有在平台资料库里找到足够贴近「{query}」的候选。你可以补充课程名、考试范围、题型或学校专业，我再帮你缩小检索。"
         titles = "、".join(f"《{item.get('title') or '资料'}》" for item in recommendations)
+        profile_hint = self._local_profile_hint(memory_context)
         if pdf_evidence:
             sources = "；".join(f"《{item.title}》第 {item.page} 页" for item in pdf_evidence[:3])
-            return f"我先基于 StudyHub 资料库找到 {titles}，并读取到相关 PDF 页级证据：{sources}。建议先用这些页面确认题型和高频知识点，再结合真题或经验内容做查漏补缺。"
-        return f"我先基于 StudyHub 资料库找到 {titles}。建议先用最匹配的资料建立知识框架，再结合真题或经验内容做查漏补缺。"
+            return f"我先基于 StudyHub 资料库找到 {titles}，并读取到相关 PDF 页级证据：{sources}。{profile_hint}建议先用这些页面确认题型和高频知识点，再结合真题或经验内容做查漏补缺。"
+        return f"我先基于 StudyHub 资料库找到 {titles}。{profile_hint}建议先用最匹配的资料建立知识框架，再结合真题或经验内容做查漏补缺。"
+
+    def _local_profile_hint(self, memory_context: AgentMemoryContext | None) -> str:
+        if not memory_context or not memory_context.user:
+            return ""
+        profile = memory_context.user.get("profile")
+        if not isinstance(profile, dict):
+            return ""
+        parts = [
+            str(profile.get(key)).strip()
+            for key in ("school", "college", "major", "grade_stages")
+            if profile.get(key)
+        ]
+        if not parts:
+            return ""
+        return f"我会优先按你的{'/'.join(parts[:3])}背景来判断匹配度。"
 
     def _extract_chat_content(self, payload: Any) -> str:
         if not isinstance(payload, dict):
