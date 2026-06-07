@@ -67,6 +67,22 @@ def _ensure_sqlite_parent_dir(settings: Settings) -> None:
         sqlite_path.parent.mkdir(parents=True, exist_ok=True)
 
 
+def _validate_backup_file(path: Path) -> int:
+    if not path.exists() or not path.is_file():
+        raise RuntimeError(f"备份文件未生成：{path}")
+    size_bytes = path.stat().st_size
+    if size_bytes <= 0:
+        raise RuntimeError(f"备份文件为空：{path}")
+    if path.suffix == ".gz":
+        try:
+            with gzip.open(path, "rb") as source:
+                while source.read(1024 * 1024):
+                    pass
+        except OSError as exc:
+            raise RuntimeError(f"备份 gzip 校验失败：{path}: {exc}") from exc
+    return size_bytes
+
+
 def command_describe(settings: Settings) -> int:
     url = make_url(settings.resolved_database_url)
     payload = {
@@ -169,11 +185,13 @@ def command_backup(settings: Settings, *, output: Path | None) -> int:
         finally:
             if sink is not raw_file:
                 sink.close()
+    size_bytes = _validate_backup_file(target)
     print(
         json.dumps(
             {
                 "environment": settings.environment,
                 "backupFile": str(target),
+                "backupSizeBytes": size_bytes,
                 "databaseUrl": _masked_database_url(url),
             },
             ensure_ascii=False,

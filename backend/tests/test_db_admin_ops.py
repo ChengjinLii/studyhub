@@ -8,7 +8,14 @@ import pytest
 
 from app.core.config import get_settings
 from app.core.db import reset_database_runtime
-from app.ops.db_admin import command_backup, command_check, command_check_schema, command_init_schema, command_restore
+from app.ops.db_admin import (
+    _validate_backup_file,
+    command_backup,
+    command_check,
+    command_check_schema,
+    command_init_schema,
+    command_restore,
+)
 from app.ops.schema_audit import compare_metadata_schema, require_recent_nonempty_backup, select_additive_migration_scope
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -140,6 +147,32 @@ def test_require_recent_backup_accepts_latest_nonempty_backup(tmp_path: Path) ->
     os.utime(backup_file, (fresh_ts, fresh_ts))
 
     assert require_recent_nonempty_backup(tmp_path, "production", max_age_seconds=120 * 60, now=now) == backup_file
+
+
+def test_validate_backup_file_accepts_readable_gzip(tmp_path: Path) -> None:
+    import gzip
+
+    backup_file = tmp_path / "backup.sql.gz"
+    with gzip.open(backup_file, "wb") as target:
+        target.write(b"CREATE TABLE example (id int);\n")
+
+    assert _validate_backup_file(backup_file) == backup_file.stat().st_size
+
+
+def test_validate_backup_file_rejects_corrupt_gzip(tmp_path: Path) -> None:
+    backup_file = tmp_path / "backup.sql.gz"
+    backup_file.write_bytes(b"not gzip")
+
+    with pytest.raises(RuntimeError, match="gzip 校验失败"):
+        _validate_backup_file(backup_file)
+
+
+def test_validate_backup_file_rejects_empty_file(tmp_path: Path) -> None:
+    backup_file = tmp_path / "backup.sql"
+    backup_file.write_bytes(b"")
+
+    with pytest.raises(RuntimeError, match="备份文件为空"):
+        _validate_backup_file(backup_file)
 
 
 def test_db_admin_backup_rejects_sqlite(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
