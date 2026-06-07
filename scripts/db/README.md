@@ -10,6 +10,12 @@
 STUDYHUB_ENVIRONMENT=preview bash scripts/db/db-check.sh
 ```
 
+默认会执行 `db_admin check-schema`，检查缺表和缺字段。只需要兼容旧行为检查缺表时，可以使用：
+
+```bash
+STUDYHUB_DB_CHECK_MODE=tables STUDYHUB_ENVIRONMENT=preview bash scripts/db/db-check.sh
+```
+
 建表：
 
 ```bash

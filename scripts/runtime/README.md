@@ -34,6 +34,6 @@ bash scripts/runtime/production-down.sh
 ## 使用约束
 
 - 运行前需要准备好 `private/.env.preview` 或 `private/.env.production`
-- production 启动前建议先跑 `production-preflight.sh` 检查证书路径和数据库网络连通性
+- production 启动前建议先跑 `production-preflight.sh` 检查证书路径、数据库网络连通性和 schema 缺字段
 - preview / production 不应隐式回退到 SQLite 或本地 fake provider
 - 生产环境相关操作应保持显式、保守、可回滚

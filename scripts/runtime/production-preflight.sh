@@ -13,3 +13,4 @@ cd "$ROOT_DIR/backend"
 export STUDYHUB_ENVIRONMENT=production
 export STUDYHUB_PRIVATE_DIR_PATH="$PRIVATE_DIR"
 "$ROOT_DIR/.venv/bin/python" -m app.ops.preflight --network
+"$ROOT_DIR/.venv/bin/python" -m app.ops.db_admin check-schema
