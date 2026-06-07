@@ -246,6 +246,26 @@ class MaterialRepository:
         )
         return list(session.scalars(stmt))
 
+    def list_visible_materials_for_agent_memory(
+        self,
+        session: Session,
+        *,
+        limit: int,
+    ) -> list[MaterialRecord]:
+        stmt = (
+            select(MaterialRecord)
+            .options(*_material_record_load_options(session))
+            .where(MaterialRecord.deleted_at.is_(None), MaterialRecord.status.not_in(("REMOVED", "HIDDEN")))
+            .order_by(
+                MaterialRecord.download_count.desc(),
+                MaterialRecord.rating_avg.desc(),
+                MaterialRecord.like_count.desc(),
+                MaterialRecord.id.desc(),
+            )
+            .limit(max(1, int(limit)))
+        )
+        return list(session.scalars(stmt))
+
     def list_visible_materials_for_uploader(
         self,
         session: Session,

@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
 from app.core.observability import get_runtime_metrics
+from app.core.security import build_cookie_header
 from app.models.materials import MaterialRecord
 from app.repos.material_repo import MaterialRepository
 from app.repos.read_api_repo import ReadApiRepository
@@ -114,6 +115,7 @@ class AiService:
         payload: AiRecommendRequestPayload,
         *,
         current_user_id: int | None = None,
+        personal_memory_enabled: bool = True,
     ) -> dict[str, Any]:
         started_at = perf_counter()
         settings = get_settings()
@@ -126,12 +128,16 @@ class AiService:
         try:
             materials = self._rank_materials(session, payload.query, payload.filters or {})
             pdf_evidence = self._collect_pdf_evidence(materials, payload.query, current_user_id=current_user_id)
-            memory_context = self._collect_memory_context(
-                session,
-                query=payload.query,
-                materials=materials,
-                current_user_id=current_user_id,
-                pdf_evidence=pdf_evidence,
+            memory_context = (
+                self._collect_memory_context(
+                    session,
+                    query=payload.query,
+                    materials=materials,
+                    current_user_id=current_user_id,
+                    pdf_evidence=pdf_evidence,
+                )
+                if personal_memory_enabled
+                else None
             )
             query_plan = self._build_query_plan(
                 payload.query,
@@ -190,6 +196,90 @@ class AiService:
                 course_memory_card=course_memory_card is not None,
                 duration_seconds=perf_counter() - started_at,
             )
+
+    def resolve_personal_memory_enabled(self, raw_cookie: str | None) -> bool:
+        if raw_cookie is None:
+            return True
+        return raw_cookie.strip().lower() not in {"0", "false", "disabled", "off", "no"}
+
+    def memory_cookie_name(self) -> str:
+        return get_settings().ai_agent_memory_cookie_name
+
+    def write_personal_memory_preference_cookie(self, response: Any, *, enabled: bool) -> None:
+        settings = get_settings()
+        response.headers.append(
+            "set-cookie",
+            build_cookie_header(
+                settings.ai_agent_memory_cookie_name,
+                "enabled" if enabled else "disabled",
+                max_age=settings.remember_cookie_ttl_seconds,
+                path=settings.cookie_path,
+                same_site=settings.cookie_same_site,
+                secure=settings.resolved_cookie_secure,
+            ),
+        )
+
+    def memory_preference_payload(self, *, enabled: bool) -> dict[str, Any]:
+        return {
+            "personalMemoryEnabled": enabled,
+            "mode": "read_only_derived",
+            "scope": "current_browser",
+            "privacyBoundary": "This preference only controls whether the StudyHub Agent uses derived personal memory for this browser session.",
+        }
+
+    def preview_memory(
+        self,
+        session: Session,
+        *,
+        current_user_id: int,
+        personal_memory_enabled: bool,
+    ) -> dict[str, Any]:
+        settings = get_settings()
+        controls = {
+            "canView": True,
+            "canDisableCurrentBrowser": True,
+            "canDeletePersistedMemory": False,
+            "deleteExplanation": "当前 StudyHub Agent 个人记忆为只读派生上下文，尚未持久化保存用户对话记忆；因此本阶段没有可删除的 Agent 专属持久化记忆。",
+        }
+        base_payload: dict[str, Any] = {
+            "mode": "read_only_derived",
+            "sourceTypes": ["account_profile", "candidate_material_interactions", "visible_material_metadata"],
+            "controls": controls,
+            "privacyBoundary": "Only the current authenticated user's derived profile and material interaction signals are shown; private memory is not mixed into platform collective memory.",
+        }
+        if not settings.ai_agent_memory_context_enabled or not self.memory_service:
+            return {
+                **base_payload,
+                "personalMemoryEnabled": False,
+                "disabledReason": "global_disabled",
+                "personalMemory": None,
+                "platformMemoryPreview": {},
+            }
+        if not personal_memory_enabled:
+            return {
+                **base_payload,
+                "personalMemoryEnabled": False,
+                "disabledReason": "user_preference",
+                "personalMemory": None,
+                "platformMemoryPreview": {},
+            }
+
+        max_materials = max(1, int(settings.ai_agent_memory_max_materials or 1))
+        materials = self.material_repo.list_visible_materials_for_agent_memory(session, limit=max_materials)
+        memory_context = self._collect_memory_context(
+            session,
+            query="个人学习偏好和资料推荐",
+            materials=materials,
+            current_user_id=current_user_id,
+            pdf_evidence=[],
+        )
+        return {
+            **base_payload,
+            "personalMemoryEnabled": True,
+            "personalMemory": memory_context.user if memory_context else {},
+            "platformMemoryPreview": memory_context.platform if memory_context else {},
+            "candidateMaterialCount": len(materials),
+        }
 
     def _recommendation_payload(self, material: MaterialRecord, query: str) -> dict[str, Any]:
         return {

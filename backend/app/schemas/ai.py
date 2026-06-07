@@ -32,3 +32,9 @@ class AiRecommendRequestPayload(BaseModel):
 
     query: str = Field(min_length=1)
     filters: dict[str, Any] | None = None
+
+
+class AiMemoryPreferencePayload(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    enabled: bool

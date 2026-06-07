@@ -1,13 +1,13 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request, Response
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_ai_service, require_auth_context
 from app.core.db import get_db_session
 from app.core.response import api_ok
 from app.core.security import AuthContext
-from app.schemas.ai import AiChatRequestPayload, AiRecommendRequestPayload
+from app.schemas.ai import AiChatRequestPayload, AiMemoryPreferencePayload, AiRecommendRequestPayload
 from app.services.ai_service import AiService
 
 
@@ -28,8 +28,49 @@ def ai_chat(
 @router.post("/api/ai/recommend", include_in_schema=False)
 def ai_recommend(
     payload: AiRecommendRequestPayload,
+    request: Request,
     auth: AuthContext = Depends(require_auth_context),
     session: Session = Depends(get_db_session),
     service: AiService = Depends(get_ai_service),
 ) -> dict[str, object]:
-    return api_ok(service.recommend(session, payload, current_user_id=auth.user_id))
+    personal_memory_enabled = service.resolve_personal_memory_enabled(
+        request.cookies.get(service.memory_cookie_name())
+    )
+    return api_ok(
+        service.recommend(
+            session,
+            payload,
+            current_user_id=auth.user_id,
+            personal_memory_enabled=personal_memory_enabled,
+        )
+    )
+
+
+@router.get("/api/ai/memory")
+def ai_memory_preview(
+    request: Request,
+    auth: AuthContext = Depends(require_auth_context),
+    session: Session = Depends(get_db_session),
+    service: AiService = Depends(get_ai_service),
+) -> dict[str, object]:
+    personal_memory_enabled = service.resolve_personal_memory_enabled(
+        request.cookies.get(service.memory_cookie_name())
+    )
+    return api_ok(
+        service.preview_memory(
+            session,
+            current_user_id=auth.user_id or 0,
+            personal_memory_enabled=personal_memory_enabled,
+        )
+    )
+
+
+@router.put("/api/ai/memory-preferences")
+def update_ai_memory_preferences(
+    payload: AiMemoryPreferencePayload,
+    response: Response,
+    _: AuthContext = Depends(require_auth_context),
+    service: AiService = Depends(get_ai_service),
+) -> dict[str, object]:
+    service.write_personal_memory_preference_cookie(response, enabled=payload.enabled)
+    return api_ok(service.memory_preference_payload(enabled=payload.enabled))

@@ -89,6 +89,7 @@ class Settings(BaseSettings):
     ai_agent_memory_context_enabled: bool = True
     ai_agent_memory_max_materials: int = 8
     ai_agent_memory_max_interaction_checks: int = 6
+    ai_agent_memory_cookie_name: str = "studyhub_ai_memory"
     public_site_base_url: str = "https://study-hub.cn"
     security_headers_enabled: bool = True
     security_hsts_enabled: bool | None = None
