@@ -33,6 +33,7 @@ from app.repos.user_follow_repo import UserFollowRepository
 from app.services.account_service import AccountService
 from app.services.admin_user_service import AdminUserService
 from app.services.agent_course_memory_service import AgentCourseMemoryService
+from app.services.agent_feedback_service import AgentFeedbackService
 from app.services.agent_memory_service import AgentMemoryService
 from app.services.agent_query_planner_service import AgentQueryPlannerService
 from app.services.ai_service import AiService
@@ -367,6 +368,11 @@ def get_ai_service() -> AiService:
 
 
 @lru_cache(maxsize=1)
+def get_agent_feedback_service() -> AgentFeedbackService:
+    return AgentFeedbackService(get_material_repo())
+
+
+@lru_cache(maxsize=1)
 def get_auth_service() -> AuthService:
     return AuthService(
         get_settings(),
@@ -473,6 +479,7 @@ def clear_dependency_caches() -> None:
     get_worker_service.cache_clear()
     get_admin_user_service.cache_clear()
     get_ai_service.cache_clear()
+    get_agent_feedback_service.cache_clear()
     get_auth_service.cache_clear()
     get_user_follow_service.cache_clear()
     get_account_service.cache_clear()

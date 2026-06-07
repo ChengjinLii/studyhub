@@ -38,3 +38,24 @@ class AiMemoryPreferencePayload(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
     enabled: bool
+
+
+class AiFeedbackPayload(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    hook: str = Field(min_length=1, max_length=32)
+    note: str | None = Field(default=None, max_length=500)
+    selectedMaterialIds: list[int] = Field(default_factory=list)
+
+    @field_validator("selectedMaterialIds")
+    @classmethod
+    def validate_selected_material_ids(cls, value: list[int]) -> list[int]:
+        deduped: list[int] = []
+        for item in value:
+            material_id = int(item)
+            if material_id <= 0 or material_id in deduped:
+                continue
+            deduped.append(material_id)
+            if len(deduped) >= 10:
+                break
+        return deduped

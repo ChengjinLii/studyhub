@@ -53,6 +53,7 @@ def test_restful_alias_routes_are_registered(client: TestClient) -> None:
         ("PUT", "/api/users/{id}/follow"),
         ("POST", "/api/ai-chats"),
         ("POST", "/api/ai-recommendations"),
+        ("POST", "/api/ai/feedback"),
         ("GET", "/api/ai/memory"),
         ("PUT", "/api/ai/memory-preferences"),
         ("GET", "/api/free-download"),

@@ -45,6 +45,7 @@ class RuntimeMetrics:
         self._security_events_total: dict[tuple[str, str], int] = defaultdict(int)
         self._ai_agent_runs_total: dict[tuple[str, str, str, str, str], int] = defaultdict(int)
         self._ai_agent_run_durations: dict[tuple[str, str, str, str, str], _Aggregate] = defaultdict(_Aggregate)
+        self._ai_agent_feedback_total: dict[tuple[str, str, str, str], int] = defaultdict(int)
 
     def clear(self) -> None:
         with self._lock:
@@ -58,6 +59,7 @@ class RuntimeMetrics:
             self._security_events_total.clear()
             self._ai_agent_runs_total.clear()
             self._ai_agent_run_durations.clear()
+            self._ai_agent_feedback_total.clear()
             self.started_at = time.time()
 
     def record_http_request(
@@ -134,6 +136,23 @@ class RuntimeMetrics:
         with self._lock:
             self._ai_agent_runs_total[labels] += 1
             self._ai_agent_run_durations[labels].observe(duration_seconds)
+
+    def record_ai_agent_feedback(
+        self,
+        *,
+        hook: str,
+        status: str,
+        personal_memory: bool,
+        selected_materials: bool,
+    ) -> None:
+        labels = (
+            _bounded_label(hook or "unknown"),
+            _bounded_label((status or "unknown").lower()),
+            "yes" if personal_memory else "no",
+            "yes" if selected_materials else "no",
+        )
+        with self._lock:
+            self._ai_agent_feedback_total[labels] += 1
 
     def render_prometheus(self, settings: Settings) -> str:
         lines: list[str] = [
@@ -255,6 +274,20 @@ class RuntimeMetrics:
                 lines.append(f"studyhub_ai_agent_run_duration_seconds_count{{{labels}}} {aggregate.count}")
                 lines.append(f"studyhub_ai_agent_run_duration_seconds_sum{{{labels}}} {aggregate.total_seconds:.6f}")
                 lines.append(f"studyhub_ai_agent_run_duration_seconds_max{{{labels}}} {aggregate.max_seconds:.6f}")
+            lines.extend(
+                [
+                    "# HELP studyhub_ai_agent_feedback_total StudyHub Agent explicit feedback events by hook, status, and bounded memory context.",
+                    "# TYPE studyhub_ai_agent_feedback_total counter",
+                ]
+            )
+            for (hook, status, personal_memory, selected_materials), count in sorted(self._ai_agent_feedback_total.items()):
+                labels = 'hook="%s",status="%s",personal_memory="%s",selected_materials="%s"' % (
+                    _sanitize_label(hook),
+                    _sanitize_label(status),
+                    _sanitize_label(personal_memory),
+                    _sanitize_label(selected_materials),
+                )
+                lines.append(f"studyhub_ai_agent_feedback_total{{{labels}}} {count}")
         lines.append("")
         return "\n".join(lines)
 
