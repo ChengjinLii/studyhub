@@ -9,6 +9,7 @@ from app.services.ai_service import AiService
 from app.services.material_pdf_evidence_service import (
     MaterialPageEvidence,
     MaterialPdfEvidenceService,
+    build_pdf_page_chunks,
     extract_pdf_page_texts,
 )
 
@@ -19,6 +20,8 @@ def _settings(**overrides: Any) -> SimpleNamespace:
         "ai_agent_pdf_evidence_max_materials": 2,
         "ai_agent_pdf_evidence_max_pages": 3,
         "ai_agent_pdf_evidence_max_bytes": 4096,
+        "ai_agent_pdf_extract_cache_enabled": True,
+        "ai_agent_pdf_extract_cache_max_entries": 64,
     }
     values.update(overrides)
     return SimpleNamespace(**values)
@@ -70,6 +73,19 @@ def test_extract_pdf_page_texts_uses_safe_literal_fallback_for_simple_pdf_bytes(
     assert pages == [(1, "通信原理 真题 解析 常考题型")]
 
 
+def test_build_pdf_page_chunks_extracts_year_question_type_and_knowledge_signals() -> None:
+    chunks = build_pdf_page_chunks(
+        "%PDF-1.4\n1 0 obj << /Type /Page >> stream (2024 通信原理 计算题 调制 解调 误码率) endstream".encode(),
+        max_pages=2,
+    )
+
+    assert len(chunks) == 1
+    assert chunks[0].page == 1
+    assert chunks[0].years == ("2024",)
+    assert "计算题" in chunks[0].question_types
+    assert "调制" in chunks[0].knowledge_signals
+
+
 def test_pdf_evidence_only_loads_for_study_queries_and_respects_file_limit() -> None:
     store = _FakeAssetStore()
     service = MaterialPdfEvidenceService(_settings(ai_agent_pdf_evidence_max_bytes=32), store)  # type: ignore[arg-type]
@@ -85,6 +101,21 @@ def test_pdf_evidence_only_loads_for_study_queries_and_respects_file_limit() -> 
     assert "通信原理" in evidence[0].text
     assert store.read_keys == ["materials/demo.pdf"]
     assert store.max_size_bytes == [32]
+
+
+def test_pdf_evidence_caches_only_free_material_extractions() -> None:
+    store = _FakeAssetStore()
+    service = MaterialPdfEvidenceService(_settings(), store)  # type: ignore[arg-type]
+
+    free_material = _material(free=True)
+    service.collect_for_material(free_material, "通信原理真题")
+    service.collect_for_material(free_material, "通信原理真题")
+    assert store.read_keys == ["materials/demo.pdf"]
+
+    paid_material = _material(material_id=2, free=False, key="materials/paid.pdf")
+    service.collect_for_material(paid_material, "通信原理真题")
+    service.collect_for_material(paid_material, "通信原理真题")
+    assert store.read_keys == ["materials/demo.pdf", "materials/paid.pdf", "materials/paid.pdf"]
 
 
 def test_pdf_evidence_skips_paid_material_when_user_does_not_own_it() -> None:

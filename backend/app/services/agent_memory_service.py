@@ -92,6 +92,8 @@ class AgentMemoryService:
         course_counter: Counter[str] = Counter()
         school_counter: Counter[str] = Counter()
         signal_counter: Counter[str] = Counter()
+        year_counter: Counter[str] = Counter()
+        question_type_counter: Counter[str] = Counter()
         for material in materials:
             tag_counter.update(_json_string_list(material.tags_json))
             for value in (material.major, material.college, material.course_category, material.grade_value):
@@ -102,6 +104,8 @@ class AgentMemoryService:
             signal_counter.update(_signal_terms(_material_text(material)))
         for item in pdf_evidence:
             signal_counter.update(_signal_terms(item.text))
+            year_counter.update(item.years)
+            question_type_counter.update(item.question_types)
         top_materials = [
             {
                 "material_id": int(material.id),
@@ -127,6 +131,8 @@ class AgentMemoryService:
             "course_signals": _counter_items(course_counter, limit=5),
             "school_signals": _counter_items(school_counter, limit=3),
             "question_type_signals": _counter_items(signal_counter, limit=6),
+            "pdf_year_signals": _counter_items(year_counter, limit=6),
+            "pdf_question_type_signals": _counter_items(question_type_counter, limit=6),
             "high_signal_materials": top_materials,
             "pdf_evidence_pages": [
                 {"material_id": item.material_id, "title": item.title, "page": item.page}
