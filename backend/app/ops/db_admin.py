@@ -24,8 +24,8 @@ from app.core.db import (
 )
 from app.ops.schema_audit import (
     assert_additive_sql,
-    build_additive_migration_payload,
     build_schema_audit_payload,
+    build_scoped_additive_migration_payload,
     find_latest_nonempty_backup,
 )
 
@@ -183,13 +183,31 @@ def command_backup(settings: Settings, *, output: Path | None) -> int:
     return 0
 
 
-def command_migrate_additive(settings: Settings, *, plan: bool, yes: bool) -> int:
+def _parse_only_columns(values: list[str]) -> set[tuple[str, str]] | None:
+    if not values:
+        return None
+    parsed: set[tuple[str, str]] = set()
+    for value in values:
+        raw = value.strip()
+        if raw.count(".") != 1:
+            raise RuntimeError(f"--only 需要使用 table.column 格式：{value}")
+        table, column = raw.split(".", 1)
+        table = table.strip()
+        column = column.strip()
+        if not table or not column:
+            raise RuntimeError(f"--only 需要使用 table.column 格式：{value}")
+        parsed.add((table, column))
+    return parsed
+
+
+def command_migrate_additive(settings: Settings, *, plan: bool, yes: bool, only: list[str] | None = None) -> int:
     if plan == yes:
         raise RuntimeError("migrate-additive 必须且只能传入 --plan 或 --yes。")
 
     _ensure_sqlite_parent_dir(settings)
     check_database()
-    payload = build_additive_migration_payload()
+    only_columns = _parse_only_columns(only or [])
+    payload = build_scoped_additive_migration_payload(only_columns=only_columns)
     payload.update(
         {
             "environment": settings.environment,
@@ -227,6 +245,12 @@ def command_migrate_additive(settings: Settings, *, plan: bool, yes: bool) -> in
     payload["executedStatements"] = statements
     payload["after"] = after
     print(json.dumps(payload, ensure_ascii=False, indent=2))
+    if only_columns:
+        missing_after = {
+            (item["table"], item["column"])
+            for item in after["missingColumns"]
+        }
+        return 0 if not (missing_after & only_columns) else 2
     return 0 if after["ready"] else 2
 
 
@@ -300,6 +324,13 @@ def build_parser() -> argparse.ArgumentParser:
     migrate_mode = migrate_parser.add_mutually_exclusive_group(required=True)
     migrate_mode.add_argument("--plan", action="store_true")
     migrate_mode.add_argument("--yes", action="store_true")
+    migrate_parser.add_argument(
+        "--only",
+        action="append",
+        default=[],
+        metavar="TABLE.COLUMN",
+        help="limit the additive plan to a confirmed missing column; may be repeated",
+    )
     return parser
 
 
@@ -326,7 +357,7 @@ def main(argv: list[str] | None = None) -> int:
             yes_preview_restore=bool(args.yes_preview_restore),
         )
     if args.command == "migrate-additive":
-        return command_migrate_additive(settings, plan=bool(args.plan), yes=bool(args.yes))
+        return command_migrate_additive(settings, plan=bool(args.plan), yes=bool(args.yes), only=list(args.only))
     parser.error(f"unsupported command: {args.command}")
     return 2
 

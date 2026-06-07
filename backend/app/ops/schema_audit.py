@@ -108,9 +108,85 @@ def compare_metadata_schema(
 
 
 def build_additive_migration_payload(*, engine: Engine | None = None, metadata: MetaData | None = None) -> dict[str, Any]:
+    return build_scoped_additive_migration_payload(engine=engine, metadata=metadata, only_columns=None)
+
+
+def build_scoped_additive_migration_payload(
+    *,
+    engine: Engine | None = None,
+    metadata: MetaData | None = None,
+    only_columns: set[tuple[str, str]] | None,
+) -> dict[str, Any]:
     payload = build_schema_audit_payload(engine=engine, metadata=metadata)
+    if metadata is None:
+        from app.models import Base
+
+        metadata = Base.metadata
+    payload = select_additive_migration_scope(payload, metadata=metadata, only_columns=only_columns)
     payload["statementCount"] = len(payload["additiveStatements"])
     payload["readyAfterMigration"] = payload["executable"]
+    return payload
+
+
+def select_additive_migration_scope(
+    payload: dict[str, Any],
+    *,
+    metadata: MetaData,
+    only_columns: set[tuple[str, str]] | None,
+) -> dict[str, Any]:
+    if not only_columns:
+        payload["scope"] = "all"
+        payload["onlyColumns"] = []
+        return payload
+
+    expected_columns = {
+        (table_name, column.name)
+        for table_name, table in metadata.tables.items()
+        for column in table.columns
+    }
+    missing_by_key = {
+        (item["table"], item["column"]): item
+        for item in payload["missingColumns"]
+    }
+    manual_by_key = {
+        (item["table"], item["column"]): item
+        for item in payload["manualReviewColumns"]
+    }
+    selected_missing = [
+        missing_by_key[key]
+        for key in sorted(only_columns)
+        if key in missing_by_key
+    ]
+    selected_manual = [
+        manual_by_key[key]
+        for key in sorted(only_columns)
+        if key in manual_by_key
+    ]
+    unknown_requested = [
+        {"table": table, "column": column, "reason": "column is not part of current SQLAlchemy metadata"}
+        for table, column in sorted(only_columns)
+        if (table, column) not in expected_columns
+    ]
+    already_present = [
+        {"table": table, "column": column}
+        for table, column in sorted(only_columns)
+        if (table, column) in expected_columns and (table, column) not in missing_by_key
+    ]
+
+    payload["scope"] = "selected"
+    payload["onlyColumns"] = [f"{table}.{column}" for table, column in sorted(only_columns)]
+    payload["allMissingColumnCount"] = len(payload["missingColumns"])
+    payload["missingColumns"] = selected_missing
+    payload["manualReviewColumns"] = selected_manual
+    payload["unknownRequestedColumns"] = unknown_requested
+    payload["alreadyPresentColumns"] = already_present
+    payload["missingIndexes"] = [
+        item
+        for item in payload["missingIndexes"]
+        if any((item["table"], column) in only_columns for column in item["columns"])
+    ]
+    payload["additiveStatements"] = [item["sql"] for item in selected_missing if item["autoMigratable"]]
+    payload["executable"] = not selected_manual and not unknown_requested
     return payload
 
 

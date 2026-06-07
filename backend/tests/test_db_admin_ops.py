@@ -7,7 +7,7 @@ import pytest
 from app.core.config import get_settings
 from app.core.db import reset_database_runtime
 from app.ops.db_admin import command_backup, command_check, command_check_schema, command_init_schema, command_restore
-from app.ops.schema_audit import compare_metadata_schema
+from app.ops.schema_audit import compare_metadata_schema, select_additive_migration_scope
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 PRIVATE_FIXTURE_DIR = REPO_ROOT / "private"
@@ -72,6 +72,19 @@ def test_schema_audit_reports_known_production_drift_columns() -> None:
     assert "ADD COLUMN" in missing[("orders", "uploader_id")]["sql"]
     assert payload["ready"] is False
     assert payload["executable"] is True
+
+    scoped = select_additive_migration_scope(
+        payload,
+        metadata=Base.metadata,
+        only_columns={("market_items", "source")},
+    )
+
+    assert scoped["scope"] == "selected"
+    assert scoped["onlyColumns"] == ["market_items.source"]
+    assert scoped["allMissingColumnCount"] == 2
+    assert [(item["table"], item["column"]) for item in scoped["missingColumns"]] == [("market_items", "source")]
+    assert scoped["additiveStatements"] == [missing[("market_items", "source")]["sql"]]
+    assert scoped["executable"] is True
 
 
 def test_db_admin_backup_rejects_sqlite(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
