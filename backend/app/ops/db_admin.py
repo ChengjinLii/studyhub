@@ -218,6 +218,11 @@ def _parse_only_columns(values: list[str]) -> set[tuple[str, str]] | None:
     return parsed
 
 
+def _require_production_migration_scope(settings: Settings, only_columns: set[tuple[str, str]] | None) -> None:
+    if settings.is_production and not only_columns:
+        raise RuntimeError("production migrate-additive --yes 必须至少传入一个 --only table.column，禁止全量执行。")
+
+
 def command_migrate_additive(
     settings: Settings,
     *,
@@ -229,9 +234,11 @@ def command_migrate_additive(
     if plan == yes:
         raise RuntimeError("migrate-additive 必须且只能传入 --plan 或 --yes。")
 
+    only_columns = _parse_only_columns(only or [])
+    if yes:
+        _require_production_migration_scope(settings, only_columns)
     _ensure_sqlite_parent_dir(settings)
     check_database()
-    only_columns = _parse_only_columns(only or [])
     payload = build_scoped_additive_migration_payload(only_columns=only_columns)
     payload.update(
         {

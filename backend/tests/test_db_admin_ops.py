@@ -6,10 +6,11 @@ from pathlib import Path
 import os
 import pytest
 
-from app.core.config import get_settings
+from app.core.config import Settings, get_settings
 from app.core.db import reset_database_runtime
 from app.ops.db_admin import (
     _validate_backup_file,
+    _require_production_migration_scope,
     command_backup,
     command_check,
     command_check_schema,
@@ -173,6 +174,15 @@ def test_validate_backup_file_rejects_empty_file(tmp_path: Path) -> None:
 
     with pytest.raises(RuntimeError, match="备份文件为空"):
         _validate_backup_file(backup_file)
+
+
+def test_production_migrate_requires_explicit_only_scope() -> None:
+    settings = Settings(environment="production")
+
+    with pytest.raises(RuntimeError, match="必须至少传入一个 --only"):
+        _require_production_migration_scope(settings, None)
+
+    _require_production_migration_scope(settings, {("market_items", "source")})
 
 
 def test_db_admin_backup_rejects_sqlite(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
