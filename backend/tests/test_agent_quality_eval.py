@@ -203,3 +203,71 @@ def test_agent_exam_trend_closed_loop_prompt_and_response_contract(monkeypatch) 
         'pdf_evidence="yes",memory_context="yes",course_memory_card="yes"} 1'
     ) in metrics_text
     metrics.clear()
+
+
+def test_agent_model_failure_uses_structured_local_exam_trend_fallback(monkeypatch) -> None:
+    metrics = get_runtime_metrics()
+    metrics.clear()
+    settings = Settings(
+        ai_agent_provider="openai-compatible",
+        ai_agent_base_url="https://example.test/v1",
+        ai_agent_api_key="test-key",
+        ai_agent_model="demo-model",
+    )
+    monkeypatch.setattr("app.services.ai_service.get_settings", lambda: settings)
+
+    class FakePdfEvidenceService:
+        def collect_for_materials(
+            self,
+            materials: list[MaterialRecord],
+            query: str,
+            *,
+            current_user_id: int | None,
+        ) -> list[MaterialPageEvidence]:
+            del materials, query, current_user_id
+            return [_evidence()]
+
+    service = AiService(
+        read_repo=None,
+        material_repo=None,
+        pdf_evidence_service=FakePdfEvidenceService(),
+        query_planner_service=AgentQueryPlannerService(),
+        course_memory_service=AgentCourseMemoryService(),
+    )  # type: ignore[arg-type]
+    monkeypatch.setattr(
+        service,
+        "_rank_materials",
+        lambda session, query, filters: [
+            _material(
+                101,
+                title="通信原理四年真题解析",
+                description="2021-2024 通信原理期末真题和答案解析",
+                downloads=90,
+            )
+        ],
+    )
+
+    def raise_model_error(settings: Settings, system_prompt: str, user_prompt: dict[str, Any]) -> str:
+        del settings, system_prompt, user_prompt
+        raise RuntimeError("model down")
+
+    monkeypatch.setattr(service, "_call_agent_model", raise_model_error)
+
+    response = service.recommend(
+        object(),  # type: ignore[arg-type]
+        SimpleNamespace(query="通信原理往年题常考什么", filters={}),
+        current_user_id=7,
+    )
+    body = json.loads(str(response["output"]).removeprefix("<json>").removesuffix("</json>"))
+
+    assert "年份信号包括 2024" in body["answer"]
+    assert "题型集中在 计算题" in body["answer"]
+    assert "高频知识点包括 调制、解调、误码率" in body["answer"]
+    assert "《通信原理四年真题解析》第 3 页" in body["answer"]
+    assert body["evidence_sources"][0]["question_numbers"] == ["第3题"]
+    metrics_text = metrics.render_prometheus(settings)
+    assert (
+        'studyhub_ai_agent_runs_total{provider="openai-compatible",status="model_fallback",'
+        'pdf_evidence="yes",memory_context="no",course_memory_card="yes"} 1'
+    ) in metrics_text
+    metrics.clear()

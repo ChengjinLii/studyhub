@@ -169,7 +169,14 @@ class AiService:
                 "recommendations": recommendations,
                 "answer": llm_body.get("answer")
                 if llm_body
-                else self._build_local_answer(payload.query, recommendations, pdf_evidence, memory_context),
+                else self._build_local_answer(
+                    payload.query,
+                    recommendations,
+                    pdf_evidence,
+                    memory_context,
+                    query_plan=query_plan,
+                    course_memory_card=course_memory_card,
+                ),
                 "followup_questions": [
                     "你更想要真题、笔记还是经验分享？",
                     "是否需要限定学校、学院或专业？",
@@ -537,6 +544,8 @@ class AiService:
         recommendations: list[dict[str, Any]],
         pdf_evidence: list[MaterialPageEvidence] | None = None,
         memory_context: AgentMemoryContext | None = None,
+        query_plan: AgentQueryPlan | None = None,
+        course_memory_card: CourseMemoryCard | None = None,
     ) -> str:
         if not recommendations:
             return f"我没有在平台资料库里找到足够贴近「{query}」的候选。你可以补充课程名、考试范围、题型或学校专业，我再帮你缩小检索。"
@@ -544,8 +553,45 @@ class AiService:
         profile_hint = self._local_profile_hint(memory_context)
         if pdf_evidence:
             sources = "；".join(f"《{item.title}》第 {item.page} 页" for item in pdf_evidence[:3])
-            return f"我先基于 StudyHub 资料库找到 {titles}，并读取到相关 PDF 页级证据：{sources}。{profile_hint}建议先用这些页面确认题型和高频知识点，再结合真题或经验内容做查漏补缺。"
+            evidence_summary = self._local_evidence_summary(pdf_evidence, course_memory_card)
+            sequence_hint = self._local_sequence_hint(query_plan, course_memory_card)
+            return (
+                f"我先基于 StudyHub 资料库找到 {titles}，并读取到相关 PDF 页级证据：{sources}。"
+                f"{evidence_summary}{profile_hint}{sequence_hint}"
+            )
         return f"我先基于 StudyHub 资料库找到 {titles}。{profile_hint}建议先用最匹配的资料建立知识框架，再结合真题或经验内容做查漏补缺。"
+
+    def _local_evidence_summary(
+        self,
+        pdf_evidence: list[MaterialPageEvidence],
+        course_memory_card: CourseMemoryCard | None,
+    ) -> str:
+        years = _evidence_values(pdf_evidence, "years")
+        question_types = _course_card_values(course_memory_card, "question_type_distribution") or _evidence_values(pdf_evidence, "question_types")
+        knowledge_signals = _course_card_values(course_memory_card, "knowledge_signals") or _evidence_values(pdf_evidence, "knowledge_signals")
+        parts: list[str] = []
+        if years:
+            parts.append(f"年份信号包括 {_join_values(years)}")
+        if question_types:
+            parts.append(f"题型集中在 {_join_values(question_types)}")
+        if knowledge_signals:
+            parts.append(f"高频知识点包括 {_join_values(knowledge_signals)}")
+        if not parts:
+            return "这些页面可以先用来确认题型和高频知识点。"
+        return f"从这些页面看，{'；'.join(parts)}。"
+
+    def _local_sequence_hint(
+        self,
+        query_plan: AgentQueryPlan | None,
+        course_memory_card: CourseMemoryCard | None,
+    ) -> str:
+        if course_memory_card and course_memory_card.recommended_sequence:
+            return f"建议按这个顺序处理：{_join_values(list(course_memory_card.recommended_sequence)[:3])}。"
+        if query_plan and query_plan.intent == "exam_trend_analysis":
+            return "建议先按题型归类，再对照年份趋势刷题查漏补缺。"
+        if query_plan and query_plan.intent == "study_plan":
+            return "建议先建立知识框架，再刷真题或例题，最后复盘薄弱点。"
+        return "建议先用这些页面确认题型和高频知识点，再结合真题或经验内容做查漏补缺。"
 
     def _local_profile_hint(self, memory_context: AgentMemoryContext | None) -> str:
         if not memory_context or not memory_context.user:
@@ -770,3 +816,40 @@ class AiService:
         except json.JSONDecodeError:
             return []
         return [str(item) for item in parsed if isinstance(item, (str, int, float))]
+
+
+def _evidence_values(pdf_evidence: list[MaterialPageEvidence], field: str) -> list[str]:
+    values: list[str] = []
+    for item in pdf_evidence:
+        raw_values = getattr(item, field, ())
+        if not isinstance(raw_values, tuple):
+            continue
+        for value in raw_values:
+            cleaned = str(value).strip()
+            if cleaned and cleaned not in values:
+                values.append(cleaned)
+            if len(values) >= 6:
+                return values
+    return values
+
+
+def _course_card_values(course_memory_card: CourseMemoryCard | None, field: str) -> list[str]:
+    if course_memory_card is None:
+        return []
+    raw_items = getattr(course_memory_card, field, ())
+    if not isinstance(raw_items, tuple):
+        return []
+    values: list[str] = []
+    for item in raw_items:
+        if not isinstance(item, dict):
+            continue
+        value = str(item.get("value") or "").strip()
+        if value and value not in values:
+            values.append(value)
+        if len(values) >= 6:
+            break
+    return values
+
+
+def _join_values(values: list[str]) -> str:
+    return "、".join(value for value in values if value)

@@ -169,6 +169,11 @@ def test_ai_recommendation_response_includes_pdf_evidence_sources(monkeypatch) -
                     page=2,
                     text="通信原理真题第 2 页包含调制解调常考题。",
                     score=20,
+                    years=("2024",),
+                    question_types=("计算题",),
+                    knowledge_signals=("调制", "解调"),
+                    question_numbers=("第3题",),
+                    source_type="past_exam",
                 )
             ]
 
@@ -194,6 +199,13 @@ def test_ai_recommendation_response_includes_pdf_evidence_sources(monkeypatch) -
             "title": "通信原理往年真题解析",
             "page": 2,
             "excerpt": "通信原理真题第 2 页包含调制解调常考题。",
+            "years": ["2024"],
+            "question_types": ["计算题"],
+            "question_numbers": ["第3题"],
+            "source_type": "past_exam",
         }
     ]
     assert "第 2 页" in body["answer"]
+    assert "年份信号包括 2024" in body["answer"]
+    assert "题型集中在 计算题" in body["answer"]
+    assert "高频知识点包括 调制、解调" in body["answer"]
