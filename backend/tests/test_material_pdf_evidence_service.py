@@ -173,7 +173,7 @@ def test_ai_recommendation_response_includes_pdf_evidence_sources(monkeypatch) -
     service = AiService(read_repo=None, material_repo=None, pdf_evidence_service=FakePdfEvidenceService())  # type: ignore[arg-type]
     material = _material()
     monkeypatch.setattr(service, "_rank_materials", lambda session, query, filters: [material])
-    monkeypatch.setattr(service, "_generate_agent_recommendation", lambda query, materials, *, pdf_evidence, memory_context: None)
+    monkeypatch.setattr(service, "_generate_agent_recommendation", lambda query, materials, *, pdf_evidence, memory_context, query_plan: None)
 
     response = service.recommend(object(), SimpleNamespace(query="通信原理往年题常考什么", filters={}), current_user_id=7)  # type: ignore[arg-type]
     raw_output = response["output"]

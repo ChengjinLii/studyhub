@@ -173,6 +173,8 @@ STUDYHUB_AI_AGENT_PDF_EXTRACT_CACHE_ENABLED=true
 STUDYHUB_AI_AGENT_PDF_EXTRACT_CACHE_MAX_ENTRIES=64
 ```
 
+Agent 会在后端用轻量规则生成 `query_plan`，用于识别资料推荐、往年常考分析、复习计划、资料总结或错题辅导等意图；该步骤不访问外部服务、不写入数据库。
+
 ## RESTful API 约定
 
 后端公开接口以 RESTful API 为主，目标是让 Web 前端、外部客户端和后续 MCP 工具可以直接从 OpenAPI 中获得稳定、可解释的资源操作。

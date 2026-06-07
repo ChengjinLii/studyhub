@@ -13,6 +13,7 @@ from app.repos.material_repo import MaterialRepository
 from app.repos.read_api_repo import ReadApiRepository
 from app.schemas.ai import AiChatRequestPayload, AiRecommendRequestPayload
 from app.services.agent_memory_service import AgentMemoryContext, AgentMemoryService
+from app.services.agent_query_planner_service import AgentQueryPlan, AgentQueryPlannerService
 from app.services.material_pdf_evidence_service import MaterialPageEvidence, MaterialPdfEvidenceService
 from app.services.read_support import parse_iso_datetime
 
@@ -80,11 +81,13 @@ class AiService:
         material_repo: MaterialRepository,
         pdf_evidence_service: MaterialPdfEvidenceService | None = None,
         memory_service: AgentMemoryService | None = None,
+        query_planner_service: AgentQueryPlannerService | None = None,
     ) -> None:
         self.read_repo = read_repo
         self.material_repo = material_repo
         self.pdf_evidence_service = pdf_evidence_service
         self.memory_service = memory_service
+        self.query_planner_service = query_planner_service
 
     def chat(self, payload: AiChatRequestPayload) -> dict[str, Any]:
         latest_user_message = next((item.content.strip() for item in reversed(payload.messages) if item.role.lower() == "user"), "")
@@ -113,12 +116,19 @@ class AiService:
             current_user_id=current_user_id,
             pdf_evidence=pdf_evidence,
         )
+        query_plan = self._build_query_plan(
+            payload.query,
+            materials=materials,
+            pdf_evidence=pdf_evidence,
+            memory_context=memory_context,
+        )
         recommendations = [self._recommendation_payload(material, payload.query) for material in materials[:3]]
         llm_body = self._generate_agent_recommendation(
             payload.query,
             materials,
             pdf_evidence=pdf_evidence,
             memory_context=memory_context,
+            query_plan=query_plan,
         )
         if llm_body:
             recommendations = self._merge_llm_recommendations(llm_body, recommendations)
@@ -192,6 +202,26 @@ class AiService:
             return None
         return None if context.is_empty() else context
 
+    def _build_query_plan(
+        self,
+        query: str,
+        *,
+        materials: list[MaterialRecord],
+        pdf_evidence: list[MaterialPageEvidence],
+        memory_context: AgentMemoryContext | None,
+    ) -> AgentQueryPlan | None:
+        if not self.query_planner_service:
+            return None
+        try:
+            return self.query_planner_service.build_plan(
+                query,
+                materials=materials,
+                pdf_evidence=pdf_evidence,
+                memory_context=memory_context,
+            )
+        except Exception:
+            return None
+
     def _generate_agent_recommendation(
         self,
         query: str,
@@ -199,6 +229,7 @@ class AiService:
         *,
         pdf_evidence: list[MaterialPageEvidence],
         memory_context: AgentMemoryContext | None,
+        query_plan: AgentQueryPlan | None,
     ) -> dict[str, Any] | None:
         settings = get_settings()
         provider = settings.ai_agent_provider.strip().lower()
@@ -218,15 +249,17 @@ class AiService:
             "如果提供了 pdf_evidence，你必须优先基于这些页级证据总结，并在关键结论中引用资料名和页码。"
             "如果提供了 memory_context，你可以用平台集体记忆增强课程/题型判断，用用户个人记忆做个性化建议；"
             "但不能把用户个人记忆写入或表述成平台集体结论。"
+            "如果提供了 query_plan，你必须按照该意图和 evidence_tasks 组织回答；"
             "必须输出严格 JSON，不要输出 Markdown，不要包裹代码块。"
         )
         user_prompt = {
             "user_query": query,
+            "query_plan": query_plan.to_prompt_payload() if query_plan else {},
             "candidate_materials": candidates,
             "pdf_evidence": [item.to_prompt_payload() for item in pdf_evidence],
             "memory_context": memory_context.to_prompt_payload() if memory_context else {},
             "output_schema": {
-                "answer": "面向学生的自然语言回答，结合资料、PDF 证据和可用记忆上下文说明下一步怎么学。若用户要求讲解真题，先给通用解题路径，并建议打开最相关真题资料。",
+                "answer": "面向学生的自然语言回答，先遵循 query_plan 的意图与任务，再结合资料、PDF 证据和可用记忆上下文说明下一步怎么学。",
                 "recommendations": [
                     {
                         "material_id": "候选资料中的 material_id",
