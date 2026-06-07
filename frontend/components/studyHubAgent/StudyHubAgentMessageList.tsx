@@ -1,0 +1,49 @@
+import { RefObject } from 'react';
+import StudyHubAgentMaterialCards from './StudyHubAgentMaterialCards';
+import { StudyHubAgentMaterialDetails, StudyHubAgentMessage } from './types';
+
+interface StudyHubAgentMessageListProps {
+  listRef: RefObject<HTMLDivElement>;
+  messages: StudyHubAgentMessage[];
+  loading: boolean;
+  materialDetails: StudyHubAgentMaterialDetails;
+  onFollowup: (value: string) => void;
+}
+
+export default function StudyHubAgentMessageList({
+  listRef,
+  messages,
+  loading,
+  materialDetails,
+  onFollowup,
+}: StudyHubAgentMessageListProps) {
+  return (
+    <div className="hermes-agent__messages" ref={listRef} role="log" aria-live="polite" aria-relevant="additions">
+      {messages.map((message) => (
+        <article key={message.id} className={`hermes-agent__message hermes-agent__message--${message.role}`}>
+          <p>{message.content}</p>
+          {message.recommendations && message.recommendations.length > 0 && (
+            <StudyHubAgentMaterialCards
+              recommendations={message.recommendations}
+              materialDetails={materialDetails}
+            />
+          )}
+          {message.followups && message.followups.length > 0 && (
+            <div className="hermes-agent__followups">
+              {message.followups.slice(0, 3).map((item) => (
+                <button key={item} type="button" onClick={() => onFollowup(item)}>
+                  {item}
+                </button>
+              ))}
+            </div>
+          )}
+        </article>
+      ))}
+      {loading && (
+        <article className="hermes-agent__message hermes-agent__message--assistant">
+          <p>StudyHub 正在检索平台资料...</p>
+        </article>
+      )}
+    </div>
+  );
+}

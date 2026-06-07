@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from fastapi.testclient import TestClient
 
+from app.api.deps import get_user_read_service
+from app.core.db import session_scope
 from app.services.auth_service import AuthService
 from tests.support import build_auth_headers, seed_read_users
 
@@ -87,6 +89,8 @@ def test_step6_authenticated_read_endpoints_follow_expected_shapes(
     assert profile_data["email"] is None
     assert profile_data["isFollowing"] is True
     assert profile_data["followersCount"] == 2
+    assert profile_data["uploadCount"] == 3
+    assert profile_data["marketCount"] == 1
     assert [item["materialId"] for item in profile_data["recentUploads"]] == [101, 103, 102]
 
     uploads_response = client.get("/api/users/2/uploads", params={"limit": 1}, headers=alice_headers)
@@ -168,3 +172,29 @@ def test_step6_login_boundaries_match_java_style_401(client: TestClient) -> None
     assert client.get("/api/requests/401").status_code == 401
     assert client.get("/api/free-download/status").status_code == 401
     assert client.get("/api/creator/metrics").status_code == 401
+
+
+def test_public_profile_counts_do_not_load_full_collections(client: TestClient, monkeypatch) -> None:
+    _ = client
+    service = get_user_read_service()
+    original_uploads = service.get_user_uploads
+    original_market = service.get_user_market_listings
+
+    def guarded_uploads(session, viewer_id, target_user_id, viewer_role_mask, limit):
+        if limit is None:
+            raise AssertionError("public profile uploadCount should use count query")
+        return original_uploads(session, viewer_id, target_user_id, viewer_role_mask, limit)
+
+    def guarded_market(session, viewer_id, target_user_id, viewer_role_mask, limit):
+        if limit is None:
+            raise AssertionError("public profile marketCount should use count query")
+        return original_market(session, viewer_id, target_user_id, viewer_role_mask, limit)
+
+    monkeypatch.setattr(service, "get_user_uploads", guarded_uploads)
+    monkeypatch.setattr(service, "get_user_market_listings", guarded_market)
+
+    with session_scope() as session:
+        profile = service.get_public_profile(session, viewer_id=1, viewer_role_mask=1, target_user_id=2)
+
+    assert profile["uploadCount"] == 3
+    assert profile["marketCount"] == 1

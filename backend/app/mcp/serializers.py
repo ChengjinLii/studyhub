@@ -4,6 +4,7 @@ import json
 from typing import Any
 
 from app.core.config import get_settings
+from app.mcp.schemas import validate_search_result
 
 
 def public_base_url() -> str:
@@ -32,7 +33,7 @@ def user_url(user_id: int | str) -> str:
 
 def material_result(item: dict[str, Any]) -> dict[str, Any]:
     material_id = item["id"]
-    return {
+    return validate_search_result({
         "id": f"material:{material_id}",
         "title": item.get("title") or f"资料 {material_id}",
         "url": material_url(material_id),
@@ -44,13 +45,13 @@ def material_result(item: dict[str, Any]) -> dict[str, Any]:
             "tags": item.get("tags") or [],
             "free": item.get("free"),
         },
-    }
+    })
 
 
 def request_result(item: dict[str, Any]) -> dict[str, Any]:
     request_id = item["id"]
     title = item.get("course") or item.get("keyword") or f"求购 {request_id}"
-    return {
+    return validate_search_result({
         "id": f"request:{request_id}",
         "title": title,
         "url": request_url(request_id),
@@ -62,12 +63,12 @@ def request_result(item: dict[str, Any]) -> dict[str, Any]:
             "budget": item.get("budget"),
             "status": item.get("status"),
         },
-    }
+    })
 
 
 def market_result(item: dict[str, Any]) -> dict[str, Any]:
     item_id = item["id"]
-    return {
+    return validate_search_result({
         "id": f"market:{item_id}",
         "title": item.get("title") or f"集市商品 {item_id}",
         "url": market_url(item_id),
@@ -78,7 +79,7 @@ def market_result(item: dict[str, Any]) -> dict[str, Any]:
             "price": item.get("price"),
             "status": item.get("status"),
         },
-    }
+    })
 
 
 def material_text(item: dict[str, Any]) -> str:

@@ -1,4 +1,7 @@
 import { useState } from 'react';
+import { fetchBackend } from './apiBase';
+import { unwrapApiResponse } from './apiEnvelope';
+import { toErrorMessage } from './errors';
 
 type NoteAlert = { type: 'success' | 'error'; text: string };
 
@@ -19,12 +22,15 @@ export const useAdminUserNotes = () => {
 
   const loadUserNotes = async (userId: number) => {
     setNotesLoading((prev) => ({ ...prev, [userId]: true }));
-    const resp = await fetch(`/api/admin/user-notes?userId=${userId}`);
-    const json = await resp.json();
-    if (resp.ok && json.ok) {
-      setUserNotes((prev) => ({ ...prev, [userId]: json.data || [] }));
+    try {
+      const resp = await fetchBackend(`/admin/user-notes?userId=${userId}`);
+      const notes = await unwrapApiResponse<AdminUserNote[]>(resp, '加载留言失败', { requireData: false });
+      setUserNotes((prev) => ({ ...prev, [userId]: notes || [] }));
+    } catch (error) {
+      setNoteAlerts((prev) => ({ ...prev, [userId]: { type: 'error', text: toErrorMessage(error, '加载留言失败') } }));
+    } finally {
+      setNotesLoading((prev) => ({ ...prev, [userId]: false }));
     }
-    setNotesLoading((prev) => ({ ...prev, [userId]: false }));
   };
 
   const toggleNotePanel = async (userId: number) => {
@@ -42,14 +48,15 @@ export const useAdminUserNotes = () => {
       return;
     }
     setNoteAlerts((prev) => ({ ...prev, [userId]: { type: 'success', text: '发送中...' } }));
-    const resp = await fetch(`/api/admin/user-notes?userId=${userId}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message: messageText }),
-    });
-    const json = await resp.json();
-    if (!resp.ok || !json.ok) {
-      setNoteAlerts((prev) => ({ ...prev, [userId]: { type: 'error', text: json.msg || '发送失败' } }));
+    try {
+      const resp = await fetchBackend(`/admin/user-notes?userId=${userId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: messageText }),
+      });
+      await unwrapApiResponse<AdminUserNote>(resp, '发送失败');
+    } catch (error) {
+      setNoteAlerts((prev) => ({ ...prev, [userId]: { type: 'error', text: toErrorMessage(error, '发送失败') } }));
       return;
     }
     setNoteDrafts((prev) => ({ ...prev, [userId]: '' }));

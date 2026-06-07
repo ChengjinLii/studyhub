@@ -3,9 +3,15 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import AppImage from './AppImage';
-import { fetchBackend } from '../lib/apiBase';
 import { toErrorMessage } from '../lib/errors';
 import { formatDate } from '../lib/format';
+import {
+  clearPayoutQr,
+  fetchUserMarketListings,
+  fetchUserUploads,
+  updateAccountProfile,
+  uploadPayoutQr,
+} from '../lib/profileApi';
 import { marketPath, materialPath, userPath } from '../lib/slug';
 import { UploadItem, MarketListingItem } from '../types/profile';
 import { PublicUserProfile, UserAccountProfile, UserFollowItem } from '../types/userProfile';
@@ -211,24 +217,16 @@ export default function ProfileCard({
     setMessage(null);
     setSaving(true);
     try {
-      const resp = await fetchBackend('/me/account', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          nickname: nickname?.trim(),
-          emailPrivacy,
-          signature: signature.trim(),
-          school: school.trim(),
-          college: college.trim(),
-          major: major.trim(),
-          gradeStages,
-        }),
+      const nextProfile = await updateAccountProfile({
+        nickname: nickname?.trim(),
+        emailPrivacy,
+        signature: signature.trim(),
+        school: school.trim(),
+        college: college.trim(),
+        major: major.trim(),
+        gradeStages,
       });
-      const json = await resp.json();
-      if (!resp.ok || !json.ok || !json.data) {
-        throw new Error(json.msg || '更新失败');
-      }
-      onProfileUpdated?.(json.data as UserAccountProfile);
+      onProfileUpdated?.(nextProfile);
       setEditingNickname(false);
       setEditingSignature(false);
       setEditingSchool(false);
@@ -252,11 +250,7 @@ export default function ProfileCard({
     if (!uploadsExpanded && profile.id && uploadsState.length < totalUploads) {
       setUploadsLoading(true);
       try {
-        const resp = await fetchBackend(`/users/${profile.id}/uploads`);
-        const json = await resp.json();
-        if (resp.ok && json.ok && Array.isArray(json.data)) {
-          setUploadsState(json.data as UploadItem[]);
-        }
+        setUploadsState(await fetchUserUploads(profile.id));
       } finally {
         setUploadsLoading(false);
       }
@@ -268,11 +262,7 @@ export default function ProfileCard({
     if (!listingsExpanded && profile.id && listingsState.length < totalListings) {
       setListingsLoading(true);
       try {
-        const resp = await fetchBackend(`/users/${profile.id}/market`);
-        const json = await resp.json();
-        if (resp.ok && json.ok && Array.isArray(json.data)) {
-          setListingsState(json.data as MarketListingItem[]);
-        }
+        setListingsState(await fetchUserMarketListings(profile.id));
       } finally {
         setListingsLoading(false);
       }
@@ -293,17 +283,7 @@ export default function ProfileCard({
     setMessage(null);
     setUploadingPayoutQr(true);
     try {
-      const formData = new FormData();
-      formData.append('file', file);
-      const resp = await fetchBackend('/me/payout-qr', {
-        method: 'POST',
-        body: formData,
-      });
-      const json = await resp.json();
-      if (!resp.ok || !json.ok || !json.data) {
-        throw new Error(json.msg || '上传失败');
-      }
-      const nextProfile = json.data as UserAccountProfile;
+      const nextProfile = await uploadPayoutQr(file);
       setPayoutQrUrl(nextProfile.payoutQrUrl ?? null);
       onProfileUpdated?.(nextProfile);
       setMessage({ type: 'success', text: '收款码已更新' });
@@ -322,14 +302,7 @@ export default function ProfileCard({
     setMessage(null);
     setUploadingPayoutQr(true);
     try {
-      const resp = await fetchBackend('/me/payout-qr', {
-        method: 'DELETE',
-      });
-      const json = await resp.json();
-      if (!resp.ok || !json.ok || !json.data) {
-        throw new Error(json.msg || '删除失败');
-      }
-      const nextProfile = json.data as UserAccountProfile;
+      const nextProfile = await clearPayoutQr();
       setPayoutQrUrl(nextProfile.payoutQrUrl ?? null);
       onProfileUpdated?.(nextProfile);
       setMessage({ type: 'success', text: '收款码已删除' });

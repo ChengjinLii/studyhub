@@ -64,7 +64,10 @@ if (pycache) {
 }
 
 if (failures.length) {
-  console.error(`Code size check failed:\n- ${failures.join('\n- ')}`);
+  console.error(
+    `Code size check failed:\n- ${failures.join('\n- ')}\n\n` +
+      'If this is caused by generated caches or test artifacts, run: bash scripts/clean-generated.sh'
+  );
   process.exit(1);
 }
 

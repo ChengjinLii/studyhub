@@ -147,6 +147,40 @@ def test_mcp_specific_read_tools_return_structured_content(client: TestClient) -
     assert materials.json()["result"]["structuredContent"]["items"]
     assert requests.json()["result"]["structuredContent"]["items"]
     assert market.json()["result"]["structuredContent"]["items"]
+    assert set(materials.json()["result"]["structuredContent"]["items"][0]) == MATERIAL_PUBLIC_KEYS
+    assert set(requests.json()["result"]["structuredContent"]["items"][0]) == REQUEST_PUBLIC_KEYS
+    assert set(market.json()["result"]["structuredContent"]["items"][0]) == MARKET_PUBLIC_KEYS
+    assert_no_sensitive_mcp_keys(materials.json())
+    assert_no_sensitive_mcp_keys(requests.json())
+    assert_no_sensitive_mcp_keys(market.json())
+
+
+def test_mcp_get_tools_use_fixed_public_schema(client: TestClient) -> None:
+    material = call_tool(client, "materials.get", {"id": 101})
+    request = call_tool(client, "requests.get", {"id": 401})
+    market = call_tool(client, "market.get", {"id": 201})
+
+    assert material.status_code == 200
+    assert request.status_code == 200
+    assert market.status_code == 200
+    assert set(material.json()["result"]["structuredContent"]) == MATERIAL_PUBLIC_KEYS
+    assert set(request.json()["result"]["structuredContent"]) == REQUEST_PUBLIC_KEYS
+    assert set(market.json()["result"]["structuredContent"]) == MARKET_PUBLIC_KEYS
+    assert_no_sensitive_mcp_keys(material.json())
+    assert_no_sensitive_mcp_keys(request.json())
+    assert_no_sensitive_mcp_keys(market.json())
+
+
+def test_mcp_contributor_leaderboard_uses_fixed_public_schema(client: TestClient) -> None:
+    response = call_tool(client, "leaderboard.contributors", {"limit": 3, "period": "all"})
+
+    assert response.status_code == 200
+    items = response.json()["result"]["structuredContent"]["items"]
+    assert items
+    assert set(items[0]) == {"userId", "username", "downloads", "roleMask"}
+    assert isinstance(items[0]["userId"], int)
+    assert isinstance(items[0]["downloads"], int)
+    assert isinstance(items[0]["roleMask"], int)
 
 
 def test_mcp_tool_call_records_safe_metrics(client: TestClient) -> None:

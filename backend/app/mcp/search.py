@@ -13,6 +13,7 @@ from app.api.deps import (
 )
 from app.core.db import session_scope
 from app.mcp.public_serializers import public_market, public_material, public_request
+from app.mcp.schemas import validate_contributor, validate_fetch_resource
 from app.mcp.serializers import (
     json_text,
     market_result,
@@ -51,6 +52,7 @@ def search_materials(query: str | None, limit: int | None) -> dict[str, Any]:
             page=1,
             size=safe_limit,
         )
+    data["items"] = [public_material(item) for item in data.get("items") or []]
     return data
 
 
@@ -75,7 +77,7 @@ def material_preview(material_id: int) -> dict[str, Any]:
 def material_recommendations(limit: int | None) -> dict[str, Any]:
     with session_scope() as session:
         items = get_materials_service().get_recommendations(session, None, clamp_limit(limit))
-    return {"items": items}
+    return {"items": [public_material(item) for item in items]}
 
 
 def search_requests(query: str | None, limit: int | None) -> dict[str, Any]:
@@ -123,7 +125,7 @@ def market_detail(item_id: int) -> dict[str, Any]:
 def contributor_leaderboard(limit: int | None, period: str | None) -> dict[str, Any]:
     with session_scope() as session:
         items = get_leaderboard_read_service().get_contributors(session, clamp_limit(limit, default=20, max_value=100), period)
-    return {"items": items}
+    return {"items": [validate_contributor(item) for item in items]}
 
 
 def health_ready() -> dict[str, Any]:
@@ -153,31 +155,31 @@ def fetch_typed(resource_id: str) -> dict[str, Any]:
     item_id = int(raw_id)
     if kind == "material":
         detail = material_detail(item_id)
-        return {
+        return validate_fetch_resource({
             "id": resource_id,
             "title": detail.get("title") or f"资料 {item_id}",
             "text": material_text(detail),
             "url": material_url(item_id),
             "metadata": {"type": "material", "public": detail},
-        }
+        })
     if kind == "request":
         detail = request_detail(item_id)
-        return {
+        return validate_fetch_resource({
             "id": resource_id,
             "title": detail.get("course") or detail.get("keyword") or f"求购 {item_id}",
             "text": request_text(detail),
             "url": request_url(item_id),
             "metadata": {"type": "request", "public": detail},
-        }
+        })
     if kind == "market":
         detail = market_detail(item_id)
-        return {
+        return validate_fetch_resource({
             "id": resource_id,
             "title": detail.get("title") or f"集市商品 {item_id}",
             "text": market_text(detail),
             "url": market_url(item_id),
             "metadata": {"type": "market", "public": detail},
-        }
+        })
     raise HTTPException(status_code=400, detail=f"Unsupported fetch id: {resource_id}")
 
 

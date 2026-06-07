@@ -16,5 +16,13 @@
 - 轻量启动：`bash scripts/dev/local-dev-up.sh`
 - 预发布运行：`bash scripts/runtime/preview-up.sh`
 - 生产运行：`bash scripts/runtime/production-up.sh`
+- 清理本地生成物：`bash scripts/clean-generated.sh`
+- 发布前检查：`bash scripts/predeploy-check.sh`
+
+`predeploy-check.sh` 会串起后端测试、前端检查、前端单测、Playwright critical tests、代码体积检查和生产预检。只想在本地跑代码质量门禁时，可以临时跳过生产环境检查：
+
+```bash
+STUDYHUB_PREDEPLOY_PRODUCTION_CHECKS=0 bash scripts/predeploy-check.sh
+```
 
 更具体的命令、环境变量和注意事项已经分别下沉到各子目录 README。

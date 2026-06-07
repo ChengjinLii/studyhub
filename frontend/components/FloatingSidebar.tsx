@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { hasRole, readSession } from '../lib/auth';
-import { fetchBackend } from '../lib/apiBase';
 import { formatDateTime } from '../lib/format';
+import { fetchOptionalSessionUser } from '../lib/sessionApi';
 import { materialPath } from '../lib/slug';
+import { fetchStudyHubAgentMaterial, requestStudyHubAgentRecommendations } from '../lib/studyHubAgentApi';
 import { RoleMask, SessionUser } from '../types/user';
 import { MaterialListItem } from '../types/material';
 
@@ -156,29 +157,12 @@ export default function FloatingSidebar() {
   }, [user]);
 
   const loadData = useCallback(async () => {
-    let cancelled = false;
-
-    const fetchJson = async (path: string, init?: RequestInit) => {
-      const resp = await fetchBackend(path, init);
-      const json = await resp.json();
-      return { resp, json };
-    };
-
     try {
-      const { resp: sessionResp, json: sessionJson } = await fetchJson('/session');
-
-      if (!cancelled && sessionResp.ok && sessionJson?.data?.user) {
-        setUser(sessionJson.data.user);
-      } else if (!cancelled && (sessionResp.status === 401 || sessionResp.status === 403)) {
-        setUser(null);
-      }
+      setUser(await fetchOptionalSessionUser());
       lastFetchRef.current = Date.now();
     } catch {
       // ignore fetch errors
     }
-    return () => {
-      cancelled = true;
-    };
   }, []);
 
   useEffect(() => {
@@ -228,10 +212,8 @@ export default function FloatingSidebar() {
   const loadMaterialDetail = useCallback(async (materialId: number) => {
     if (aiDetails[materialId]) return;
     try {
-      const resp = await fetchBackend(`/materials/${materialId}`);
-      const json = await resp.json().catch(() => null);
-      if (!resp.ok || !json?.ok || !json.data) return;
-      setAiDetails((prev) => ({ ...prev, [materialId]: json.data }));
+      const detail = await fetchStudyHubAgentMaterial(materialId);
+      setAiDetails((prev) => ({ ...prev, [materialId]: detail }));
     } catch {
       // ignore detail fetch errors
     }
@@ -248,18 +230,8 @@ export default function FloatingSidebar() {
       setChatLoading(true);
       setChatError(null);
       try {
-        const resp = await fetchBackend('/ai-recommendations', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ query: chatQuery.trim() }),
-        });
-        const json = await resp.json().catch(() => null);
-        if (!resp.ok || !json?.ok) {
-          setChatError(json?.msg || '推荐失败，请稍后重试');
-          setChatLoading(false);
-          return;
-        }
-        const output = json?.data?.output;
+        const data = await requestStudyHubAgentRecommendations(chatQuery.trim());
+        const output = data.output;
         if (!output || typeof output !== 'string') {
           setChatError('AI 响应为空，请稍后再试');
           setChatLoading(false);

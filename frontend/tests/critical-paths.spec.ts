@@ -1,4 +1,4 @@
-import { expect, test, type APIRequestContext } from '@playwright/test';
+import { expect, test, type APIRequestContext, type Page } from '@playwright/test';
 
 const apiPath = (path: string) => (path.startsWith('/') ? path : `/${path}`);
 
@@ -19,6 +19,13 @@ const tryDevLogin = async (request: APIRequestContext) => {
   expect(resp.status(), 'dev-login should not return 5xx').toBeLessThan(500);
   const json = await resp.json().catch(() => ({}));
   return resp.ok() && json?.ok === true;
+};
+
+const closeEntryModalIfPresent = async (page: Page) => {
+  const closeButton = page.locator('.stable-version-modal__close').first();
+  if (await closeButton.isVisible().catch(() => false)) {
+    await closeButton.click({ force: true });
+  }
 };
 
 test('mock API mode covers login and upload failure envelopes', async ({ page }) => {
@@ -118,6 +125,98 @@ test('mock API mode covers payment status fallback envelope', async ({ page }) =
     };
   });
   expect(result).toEqual({ fallbackUsed: true, paid: true, requestId: 401 });
+});
+
+test('mock page mode covers StudyHub Agent open, fallback, drag and collapse', async ({ page }) => {
+  await page.route('**/api/session', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        ok: true,
+        data: { user: { id: 1, username: 'mock-user', nickname: 'Mock User', roleMask: 1 } },
+      }),
+    });
+  });
+  await page.route('**/api/ai-recommendations', async (route) => {
+    await route.fulfill({
+      status: 503,
+      contentType: 'application/json',
+      body: JSON.stringify({ ok: false, msg: '推荐失败，请稍后重试' }),
+    });
+  });
+  await page.route('**/api/**', async (route) => {
+    const url = route.request().url();
+    if (url.includes('/api/session') || url.includes('/api/ai-recommendations')) {
+      await route.fallback();
+      return;
+    }
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ ok: true, data: {} }),
+    });
+  });
+
+  await page.goto('/more');
+  await closeEntryModalIfPresent(page);
+  const launcher = page.locator('.hermes-agent__launcher');
+  await expect(launcher).toBeVisible();
+
+  const initialBox = await launcher.boundingBox();
+  expect(initialBox).not.toBeNull();
+  const startX = (initialBox?.x ?? 0) + (initialBox?.width ?? 0) / 2;
+  const startY = (initialBox?.y ?? 0) + (initialBox?.height ?? 0) / 2;
+  await page.mouse.move(startX, startY);
+  await page.mouse.down();
+  await page.mouse.move(startX - 80, startY - 40, { steps: 6 });
+  await page.mouse.up();
+
+  const movedBox = await launcher.boundingBox();
+  expect(movedBox).not.toBeNull();
+  expect(
+    Math.hypot((movedBox?.x ?? 0) - (initialBox?.x ?? 0), (movedBox?.y ?? 0) - (initialBox?.y ?? 0))
+  ).toBeGreaterThan(20);
+
+  await launcher.click();
+  await expect(page.getByRole('heading', { name: 'StudyHub 学习辅导' })).toBeVisible();
+  await page.getByPlaceholder('描述你要学什么、多久考试、哪里卡住').fill('ESD 怎么复习');
+  await page.getByRole('button', { name: '发送' }).click();
+  await expect(page.getByText('推荐失败，请稍后重试')).toBeVisible();
+
+  await page.getByLabel('收起 StudyHub 学习辅导').click({ force: true });
+  await expect(launcher).toBeVisible();
+  const collapsedBox = await launcher.boundingBox();
+  expect(collapsedBox).not.toBeNull();
+  expect(Math.abs((collapsedBox?.x ?? 0) - (movedBox?.x ?? 0))).toBeLessThan(4);
+  expect(Math.abs((collapsedBox?.y ?? 0) - (movedBox?.y ?? 0))).toBeLessThan(4);
+});
+
+test('mock page mode covers more page secondary navigation', async ({ page }) => {
+  await page.route('**/api/session', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ ok: true, data: { user: null } }),
+    });
+  });
+  await page.route('**/api/**', async (route) => {
+    if (route.request().url().includes('/api/session')) {
+      await route.fallback();
+      return;
+    }
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ ok: true, data: {} }),
+    });
+  });
+
+  await page.goto('/more');
+  await closeEntryModalIfPresent(page);
+  await expect(page.getByRole('heading', { name: '其他功能' })).toBeVisible();
+  await expect(page.getByRole('link', { name: /学汇专栏/ })).toHaveAttribute('href', '/column');
+  await expect(page.getByRole('link', { name: /校园集市/ })).toHaveAttribute('href', '/market');
 });
 
 test('login success should make session readable', async ({ request }) => {
