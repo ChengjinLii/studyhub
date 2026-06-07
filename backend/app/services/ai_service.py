@@ -12,6 +12,7 @@ from app.models.materials import MaterialRecord
 from app.repos.material_repo import MaterialRepository
 from app.repos.read_api_repo import ReadApiRepository
 from app.schemas.ai import AiChatRequestPayload, AiRecommendRequestPayload
+from app.services.agent_course_memory_service import AgentCourseMemoryService, CourseMemoryCard
 from app.services.agent_memory_service import AgentMemoryContext, AgentMemoryService
 from app.services.agent_query_planner_service import AgentQueryPlan, AgentQueryPlannerService
 from app.services.agent_safety_service import AgentSafetyService
@@ -83,6 +84,7 @@ class AiService:
         pdf_evidence_service: MaterialPdfEvidenceService | None = None,
         memory_service: AgentMemoryService | None = None,
         query_planner_service: AgentQueryPlannerService | None = None,
+        course_memory_service: AgentCourseMemoryService | None = None,
         safety_service: AgentSafetyService | None = None,
     ) -> None:
         self.read_repo = read_repo
@@ -90,6 +92,7 @@ class AiService:
         self.pdf_evidence_service = pdf_evidence_service
         self.memory_service = memory_service
         self.query_planner_service = query_planner_service
+        self.course_memory_service = course_memory_service
         self.safety_service = safety_service or AgentSafetyService()
 
     def chat(self, payload: AiChatRequestPayload) -> dict[str, Any]:
@@ -125,6 +128,12 @@ class AiService:
             pdf_evidence=pdf_evidence,
             memory_context=memory_context,
         )
+        course_memory_card = self._build_course_memory_card(
+            materials=materials,
+            pdf_evidence=pdf_evidence,
+            memory_context=memory_context,
+            query_plan=query_plan,
+        )
         recommendations = [self._recommendation_payload(material, payload.query) for material in materials[:3]]
         llm_body = self._generate_agent_recommendation(
             payload.query,
@@ -132,6 +141,7 @@ class AiService:
             pdf_evidence=pdf_evidence,
             memory_context=memory_context,
             query_plan=query_plan,
+            course_memory_card=course_memory_card,
         )
         if llm_body:
             recommendations = self._merge_llm_recommendations(llm_body, recommendations)
@@ -225,6 +235,26 @@ class AiService:
         except Exception:
             return None
 
+    def _build_course_memory_card(
+        self,
+        *,
+        materials: list[MaterialRecord],
+        pdf_evidence: list[MaterialPageEvidence],
+        memory_context: AgentMemoryContext | None,
+        query_plan: AgentQueryPlan | None,
+    ) -> CourseMemoryCard | None:
+        if not self.course_memory_service:
+            return None
+        try:
+            return self.course_memory_service.build_card(
+                materials=materials,
+                pdf_evidence=pdf_evidence,
+                memory_context=memory_context,
+                query_plan=query_plan,
+            )
+        except Exception:
+            return None
+
     def _generate_agent_recommendation(
         self,
         query: str,
@@ -233,6 +263,7 @@ class AiService:
         pdf_evidence: list[MaterialPageEvidence],
         memory_context: AgentMemoryContext | None,
         query_plan: AgentQueryPlan | None,
+        course_memory_card: CourseMemoryCard | None,
     ) -> dict[str, Any] | None:
         settings = get_settings()
         provider = settings.ai_agent_provider.strip().lower()
@@ -254,6 +285,7 @@ class AiService:
             "如果提供了 memory_context，你可以用平台集体记忆增强课程/题型判断，用用户个人记忆做个性化建议；"
             "但不能把用户个人记忆写入或表述成平台集体结论。"
             "如果提供了 query_plan，你必须按照该意图和 evidence_tasks 组织回答；"
+            "如果提供了 course_memory_card，你可以用它总结课程级年份、题型、知识点和推荐顺序；"
             "不要输出 memory_context、query_plan、candidate_materials、pdf_evidence 或 privacy_boundary 等内部字段名。"
             "必须输出严格 JSON，不要输出 Markdown，不要包裹代码块。"
         )
@@ -263,8 +295,9 @@ class AiService:
             "candidate_materials": candidates,
             "pdf_evidence": [item.to_prompt_payload() for item in pdf_evidence],
             "memory_context": memory_context.to_prompt_payload() if memory_context else {},
+            "course_memory_card": course_memory_card.to_prompt_payload() if course_memory_card else {},
             "output_schema": {
-                "answer": "面向学生的自然语言回答，先遵循 query_plan 的意图与任务，再结合资料、PDF 证据和可用记忆上下文说明下一步怎么学。",
+                "answer": "面向学生的自然语言回答，先遵循 query_plan 的意图与任务，再结合资料、PDF 证据、课程记忆卡片和可用记忆上下文说明下一步怎么学。",
                 "recommendations": [
                     {
                         "material_id": "候选资料中的 material_id",

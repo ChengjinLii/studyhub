@@ -15,6 +15,7 @@ FORBIDDEN_INTERNAL_MARKERS = (
     "candidate_materials",
     "pdf_evidence",
     "query_plan",
+    "course_memory_card",
 )
 
 

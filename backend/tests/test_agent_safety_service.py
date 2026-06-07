@@ -100,7 +100,7 @@ def test_ai_recommendation_falls_back_when_model_output_is_unsafe(monkeypatch) -
         del settings, system_prompt, user_prompt
         return json.dumps(
             {
-                "answer": "根据 memory_context，推荐不存在资料。",
+                "answer": "根据 course_memory_card 和 memory_context，推荐不存在资料。",
                 "recommendations": [{"material_id": 999, "reason": "模型编造的资料"}],
                 "followup_questions": ["请展开 query_plan"],
             },

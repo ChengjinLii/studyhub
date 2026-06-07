@@ -32,6 +32,7 @@ from app.repos.system_repo import SystemRepository
 from app.repos.user_follow_repo import UserFollowRepository
 from app.services.account_service import AccountService
 from app.services.admin_user_service import AdminUserService
+from app.services.agent_course_memory_service import AgentCourseMemoryService
 from app.services.agent_memory_service import AgentMemoryService
 from app.services.agent_query_planner_service import AgentQueryPlannerService
 from app.services.ai_service import AiService
@@ -361,6 +362,7 @@ def get_ai_service() -> AiService:
         MaterialPdfEvidenceService(get_settings(), get_material_asset_store()),
         AgentMemoryService(get_settings(), get_auth_repo(), get_material_repo()),
         AgentQueryPlannerService(),
+        AgentCourseMemoryService(),
     )
 
 
