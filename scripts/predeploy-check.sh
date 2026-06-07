@@ -7,6 +7,7 @@ BACKEND_DIR="$ROOT_DIR/backend"
 PYTHON_BIN="${STUDYHUB_PYTHON_BIN:-$ROOT_DIR/.venv/bin/python}"
 RUN_RUNTIME_CHECKS="${STUDYHUB_PREDEPLOY_RUNTIME_CHECKS:-auto}"
 RUN_PRODUCTION_CHECKS="${STUDYHUB_PREDEPLOY_PRODUCTION_CHECKS:-auto}"
+GENERATED_CLEAN_MODE="${STUDYHUB_PREDEPLOY_CLEAN_MODE:-all}"
 
 section() {
   printf '\n[%s] %s\n' "$(date '+%H:%M:%S')" "$1"
@@ -32,7 +33,7 @@ run_optional() {
 
 cd "$ROOT_DIR"
 
-run "clean generated artifacts" bash "$ROOT_DIR/scripts/clean-generated.sh"
+run "clean generated artifacts" bash "$ROOT_DIR/scripts/clean-generated.sh" "--$GENERATED_CLEAN_MODE"
 
 section "git working tree"
 git status --short
@@ -50,8 +51,11 @@ run "frontend unit tests" npm --prefix "$FRONTEND_DIR" run test:unit
 
 run "frontend critical mock tests" npm --prefix "$FRONTEND_DIR" run test:critical
 
-run "clean generated artifacts after frontend tests" bash "$ROOT_DIR/scripts/clean-generated.sh"
+run "clean generated artifacts after frontend tests" bash "$ROOT_DIR/scripts/clean-generated.sh" "--$GENERATED_CLEAN_MODE"
 
+if [[ "$GENERATED_CLEAN_MODE" == "source" ]]; then
+  export STUDYHUB_CODE_SIZE_ALLOW_FRONTEND_BUILD="${STUDYHUB_CODE_SIZE_ALLOW_FRONTEND_BUILD:-1}"
+fi
 run "code size and generated artifact budget" node "$ROOT_DIR/scripts/check-code-size.mjs"
 
 if [[ "$RUN_PRODUCTION_CHECKS" == "0" || "$RUN_PRODUCTION_CHECKS" == "false" ]]; then

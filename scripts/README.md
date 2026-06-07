@@ -16,7 +16,8 @@
 - 轻量启动：`bash scripts/dev/local-dev-up.sh`
 - 预发布运行：`bash scripts/runtime/preview-up.sh`
 - 生产运行：`bash scripts/runtime/production-up.sh`
-- 清理本地生成物：`bash scripts/clean-generated.sh`
+- 清理源码缓存：`bash scripts/clean-generated.sh --source`
+- 清理全部生成物并准备重新构建前端：`bash scripts/clean-generated.sh --all`
 - 发布前检查：`bash scripts/predeploy-check.sh`
 - 浏览器加载性能预算：`npm --prefix frontend run test:perf`
 
@@ -24,6 +25,12 @@
 
 ```bash
 STUDYHUB_PREDEPLOY_PRODUCTION_CHECKS=0 bash scripts/predeploy-check.sh
+```
+
+`predeploy-check.sh` 默认使用 `--all` 清理生成物，适合本地和 CI。若必须在生产机器上检查源码但要保留当前运行中的 Next.js 构建产物，可以改用：
+
+```bash
+STUDYHUB_PREDEPLOY_CLEAN_MODE=source bash scripts/predeploy-check.sh
 ```
 
 更具体的命令、环境变量和注意事项已经分别下沉到各子目录 README。

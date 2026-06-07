@@ -4,6 +4,9 @@ import { existsSync, readFileSync } from 'node:fs';
 import { relative, resolve } from 'node:path';
 
 const root = resolve(new URL('..', import.meta.url).pathname);
+const allowFrontendBuild = ['1', 'true', 'yes'].includes(
+  String(process.env.STUDYHUB_CODE_SIZE_ALLOW_FRONTEND_BUILD || '').toLowerCase()
+);
 
 const lineBudgets = [
   ['frontend/pages/upload.tsx', 1200],
@@ -15,12 +18,10 @@ const lineBudgets = [
   ['backend/app/services/requests_service.py', 900],
 ];
 
-const forbiddenDirs = [
-  'frontend/.next',
-  'frontend/test-results',
-  'frontend/playwright-report',
-  'backend/.pytest_cache',
-];
+const forbiddenDirs = ['frontend/test-results', 'frontend/playwright-report', 'backend/.pytest_cache'];
+if (!allowFrontendBuild) {
+  forbiddenDirs.unshift('frontend/.next');
+}
 
 const pageJsonBudget = 10;
 const failures = [];
@@ -66,7 +67,9 @@ if (pycache) {
 if (failures.length) {
   console.error(
     `Code size check failed:\n- ${failures.join('\n- ')}\n\n` +
-      'If this is caused by generated caches or test artifacts, run: bash scripts/clean-generated.sh'
+      'If this is a local or CI source check, run: bash scripts/clean-generated.sh --all\n' +
+      'If this is a production machine that must keep the active Next.js build, run: ' +
+      'bash scripts/clean-generated.sh --source && STUDYHUB_CODE_SIZE_ALLOW_FRONTEND_BUILD=1 node scripts/check-code-size.mjs'
   );
   process.exit(1);
 }
