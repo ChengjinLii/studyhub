@@ -35,7 +35,12 @@ echo "[5/6] key readonly APIs"
 curl --fail --silent --show-error "${BACKEND_BASE%/}/api/materials?page=1&pageSize=3" >/dev/null
 curl --fail --silent --show-error "${BACKEND_BASE%/}/api/requests?sort=hot&limit=3" >/dev/null
 
-echo "[6/6] worker once"
+echo "[6/7] recent schema drift logs"
+STUDYHUB_BACKEND_SERVICE="${STUDYHUB_BACKEND_SERVICE:-studyhub-backend.service}" \
+STUDYHUB_P0_LOG_SINCE="${STUDYHUB_P0_LOG_SINCE:-30 minutes ago}" \
+bash "$ROOT_DIR/scripts/db/db-log-p0-schema.sh"
+
+echo "[7/7] worker once"
 if [[ "$RUN_WORKER_ONCE" == "1" || "$RUN_WORKER_ONCE" == "true" ]]; then
   cd "$ROOT_DIR/backend"
   export STUDYHUB_ENVIRONMENT="$ENVIRONMENT"

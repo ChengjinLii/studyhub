@@ -73,6 +73,14 @@ STUDYHUB_ENVIRONMENT=production bash scripts/db/db-smoke-p0-schema.sh
 
 该脚本会先验证 P0 字段已经补齐，再检查 health/ready、metrics 和关键只读接口。默认不跑 worker；需要验证 worker once 时设置 `STUDYHUB_P0_RUN_WORKER_ONCE=1`。
 
+检查近期日志是否还有 P0 schema 漂移错误：
+
+```bash
+STUDYHUB_ENVIRONMENT=production bash scripts/db/db-log-p0-schema.sh
+```
+
+默认检查 `studyhub-backend.service` 最近 30 分钟日志中的 `market_items.source` 和 `orders.uploader_id` 缺字段错误。可用 `STUDYHUB_BACKEND_SERVICE` 和 `STUDYHUB_P0_LOG_SINCE` 调整服务名和时间窗口。
+
 如果目标库已经由旧流程建好表，只需要记录当前迁移版本：
 
 ```bash
