@@ -259,7 +259,7 @@ export default function MarketPage({ user, items, meta, filters, stats }: Market
                 <Link className="button primary" href="#market-buy">
                   我要购买
                 </Link>
-                <Link className="button ghost" href="/market/sell">
+                <Link className="button ghost" href="/market/sell" prefetch={false}>
                   我要出售
                 </Link>
               </div>
@@ -300,7 +300,7 @@ export default function MarketPage({ user, items, meta, filters, stats }: Market
                 <span className="market-buy-pill">共 {meta.total} 件好物</span>
               </div>
             </div>
-            <Link className="button ghost" href="/market/sell">
+            <Link className="button ghost" href="/market/sell" prefetch={false}>
               去出售
             </Link>
           </div>

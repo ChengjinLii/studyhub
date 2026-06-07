@@ -314,13 +314,13 @@ export default function MyApp({ Component, pageProps }: AppProps) {
             </div>
             <div className="footer-hairline" />
             <div className="footer-links">
-              <Link href="/join#engineering">工程日志</Link>
+              <Link href="/join#engineering" prefetch={false}>工程日志</Link>
               <span className="footer-divider">|</span>
-              <Link href="/join">关于我们</Link>
+              <Link href="/join" prefetch={false}>关于我们</Link>
               <span className="footer-divider">|</span>
-              <Link href="/identity-info">身份信息说明</Link>
+              <Link href="/identity-info" prefetch={false}>身份信息说明</Link>
               <span className="footer-divider">|</span>
-              <Link href="/identity-info">用户协议 / 隐私政策</Link>
+              <Link href="/identity-info" prefetch={false}>用户协议 / 隐私政策</Link>
               <span className="footer-divider">|</span>
               <span>内容版权归作者</span>
             </div>

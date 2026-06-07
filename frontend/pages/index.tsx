@@ -6,7 +6,6 @@ import { useRouter } from 'next/router';
 import Link from 'next/link';
 import NavBar from '../components/NavBar';
 import AppImage from '../components/AppImage';
-import MaterialCard from '../components/MaterialCard';
 import PaginationBar from '../components/PaginationBar';
 import { MaterialListItem, PaginationMeta } from '../types/material';
 import { SessionUser, RoleMask } from '../types/user';
@@ -43,6 +42,7 @@ import { MaterialRequestItem } from '../types/request';
 
 const MATERIALS_PAGE_SIZE = 18;
 const Snowfall = dynamic(() => import('react-snowfall'), { ssr: false });
+const MaterialCard = dynamic(() => import('../components/MaterialCard'));
 const HomeFilterCard = dynamic(() => import('../components/home/HomeFilterCard'));
 const HomeLeaderboard = dynamic(() => import('../components/home/HomeLeaderboard'));
 const HomeRequestPanels = dynamic(() => import('../components/home/HomeRequestPanels'));
@@ -692,10 +692,10 @@ export default function Home({
             <p className="hero-subtitle">你分享的每一份资料，都能让别人少走弯路。</p>
             <div className="hero-actions">
               <div className="hero-action-buttons">
-                <Link className="button primary" href="/upload">
+                <Link className="button primary" href="/upload" prefetch={false}>
                   我要投稿
                 </Link>
-                <Link className="button ghost" href="/join">
+                <Link className="button ghost" href="/join" prefetch={false}>
                   关于我们
                 </Link>
                 <button className="button ghost" type="button" onClick={handleJumpToLeaderboard}>
