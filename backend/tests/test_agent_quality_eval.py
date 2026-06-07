@@ -248,6 +248,115 @@ def test_agent_local_study_plan_uses_structured_query_constraints(monkeypatch) -
     metrics.clear()
 
 
+def test_agent_local_pdf_summary_uses_intent_specific_evidence(monkeypatch) -> None:
+    metrics = get_runtime_metrics()
+    metrics.clear()
+    settings = Settings(ai_agent_provider="local")
+    monkeypatch.setattr("app.services.ai_service.get_settings", lambda: settings)
+
+    class FakePdfEvidenceService:
+        def collect_for_materials(
+            self,
+            materials: list[MaterialRecord],
+            query: str,
+            *,
+            current_user_id: int | None,
+        ) -> list[MaterialPageEvidence]:
+            del materials, query, current_user_id
+            return [_evidence()]
+
+    service = AiService(
+        read_repo=None,
+        material_repo=None,
+        pdf_evidence_service=FakePdfEvidenceService(),
+        query_planner_service=AgentQueryPlannerService(),
+        course_memory_service=AgentCourseMemoryService(),
+    )  # type: ignore[arg-type]
+    monkeypatch.setattr(
+        service,
+        "_rank_materials",
+        lambda session, query, filters: [
+            _material(
+                101,
+                title="通信原理四年真题解析",
+                description="2021-2024 通信原理期末真题和答案解析",
+                downloads=90,
+            )
+        ],
+    )
+
+    response = service.recommend(
+        object(),  # type: ignore[arg-type]
+        SimpleNamespace(query="这份通信原理资料讲什么", filters={}),
+        current_user_id=7,
+    )
+    body = json.loads(str(response["output"]).removeprefix("<json>").removesuffix("</json>"))
+
+    assert "资料内容结构" in body["answer"]
+    assert "资料类型偏向 往年真题" in body["answer"]
+    assert "涉及知识点 调制、解调、误码率" in body["answer"]
+    assert "建议先读《通信原理四年真题解析》第 3 页建立概览" in body["answer"]
+    assert body["followup_questions"] == [
+        "要不要我继续按章节或页码拆解这份资料？",
+        "是否需要标出最适合先看的重点页面？",
+    ]
+    metrics.clear()
+
+
+def test_agent_local_problem_tutoring_uses_intent_specific_evidence(monkeypatch) -> None:
+    metrics = get_runtime_metrics()
+    metrics.clear()
+    settings = Settings(ai_agent_provider="local")
+    monkeypatch.setattr("app.services.ai_service.get_settings", lambda: settings)
+
+    class FakePdfEvidenceService:
+        def collect_for_materials(
+            self,
+            materials: list[MaterialRecord],
+            query: str,
+            *,
+            current_user_id: int | None,
+        ) -> list[MaterialPageEvidence]:
+            del materials, query, current_user_id
+            return [_evidence()]
+
+    service = AiService(
+        read_repo=None,
+        material_repo=None,
+        pdf_evidence_service=FakePdfEvidenceService(),
+        query_planner_service=AgentQueryPlannerService(),
+        course_memory_service=AgentCourseMemoryService(),
+    )  # type: ignore[arg-type]
+    monkeypatch.setattr(
+        service,
+        "_rank_materials",
+        lambda session, query, filters: [
+            _material(
+                101,
+                title="通信原理四年真题解析",
+                description="2021-2024 通信原理期末真题和答案解析",
+                downloads=90,
+            )
+        ],
+    )
+
+    response = service.recommend(
+        object(),  # type: ignore[arg-type]
+        SimpleNamespace(query="这道通信原理第3题不会怎么做", filters={}),
+        current_user_id=7,
+    )
+    body = json.loads(str(response["output"]).removeprefix("<json>").removesuffix("</json>"))
+
+    assert "这类问题可以先定位到 《通信原理四年真题解析》第 3 页（第3题）" in body["answer"]
+    assert "先判断题型：计算题" in body["answer"]
+    assert "再抓核心知识点：调制、解调、误码率" in body["answer"]
+    assert body["followup_questions"] == [
+        "你卡住的是概念理解、公式推导还是计算步骤？",
+        "要不要我按同类题型再找几页练习？",
+    ]
+    metrics.clear()
+
+
 def test_agent_model_failure_uses_structured_local_exam_trend_fallback(monkeypatch) -> None:
     metrics = get_runtime_metrics()
     metrics.clear()

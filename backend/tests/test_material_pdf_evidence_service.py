@@ -94,6 +94,8 @@ def test_pdf_evidence_only_loads_for_study_queries_and_respects_file_limit() -> 
 
     assert service.collect_for_materials([_material()], "随便看看资料", current_user_id=7) == []
     assert store.read_keys == []
+    assert service.should_load_evidence("这份资料讲什么")
+    assert service.should_load_evidence("这道题不会怎么做")
 
     evidence = service.collect_for_materials([_material()], "通信原理往年真题常考题型", current_user_id=7)
 

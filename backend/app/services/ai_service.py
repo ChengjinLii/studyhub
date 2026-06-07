@@ -566,7 +566,7 @@ class AiService:
         profile_hint = self._local_profile_hint(memory_context)
         if pdf_evidence:
             sources = "；".join(f"《{item.title}》第 {item.page} 页" for item in pdf_evidence[:3])
-            evidence_summary = self._local_evidence_summary(pdf_evidence, course_memory_card)
+            evidence_summary = self._local_evidence_summary(pdf_evidence, course_memory_card, query_plan)
             sequence_hint = self._local_sequence_hint(query_plan, course_memory_card)
             return (
                 f"我先基于 StudyHub 资料库找到 {titles}，并读取到相关 PDF 页级证据：{sources}。"
@@ -581,7 +581,12 @@ class AiService:
         self,
         pdf_evidence: list[MaterialPageEvidence],
         course_memory_card: CourseMemoryCard | None,
+        query_plan: AgentQueryPlan | None = None,
     ) -> str:
+        if query_plan and query_plan.intent == "pdf_summary":
+            return self._local_pdf_summary(pdf_evidence, course_memory_card)
+        if query_plan and query_plan.intent == "problem_tutoring":
+            return self._local_problem_tutoring_summary(pdf_evidence, course_memory_card)
         years = _evidence_values(pdf_evidence, "years")
         question_types = _course_card_values(course_memory_card, "question_type_distribution") or _evidence_values(pdf_evidence, "question_types")
         knowledge_signals = _course_card_values(course_memory_card, "knowledge_signals") or _evidence_values(pdf_evidence, "knowledge_signals")
@@ -596,6 +601,49 @@ class AiService:
             return "这些页面可以先用来确认题型和高频知识点。"
         return f"从这些页面看，{'；'.join(parts)}。"
 
+    def _local_pdf_summary(
+        self,
+        pdf_evidence: list[MaterialPageEvidence],
+        course_memory_card: CourseMemoryCard | None,
+    ) -> str:
+        years = _evidence_values(pdf_evidence, "years")
+        question_types = _course_card_values(course_memory_card, "question_type_distribution") or _evidence_values(pdf_evidence, "question_types")
+        knowledge_signals = _course_card_values(course_memory_card, "knowledge_signals") or _evidence_values(pdf_evidence, "knowledge_signals")
+        source_types = _evidence_source_types(pdf_evidence)
+        parts: list[str] = []
+        if source_types:
+            parts.append(f"资料类型偏向 {_join_values([_source_type_label(value) for value in source_types[:3]])}")
+        if years:
+            parts.append(f"覆盖年份信号 {_join_values(years[:4])}")
+        if question_types:
+            parts.append(f"包含题型 {_join_values(question_types[:4])}")
+        if knowledge_signals:
+            parts.append(f"涉及知识点 {_join_values(knowledge_signals[:5])}")
+        first = pdf_evidence[0]
+        page_hint = f"建议先读《{first.title}》第 {first.page} 页建立概览"
+        if not parts:
+            return f"这些页面可以先用来判断资料覆盖范围和阅读顺序。{page_hint}。"
+        return f"这些页面主要可用来了解资料内容结构：{'；'.join(parts)}。{page_hint}，再按题型或知识点继续展开。"
+
+    def _local_problem_tutoring_summary(
+        self,
+        pdf_evidence: list[MaterialPageEvidence],
+        course_memory_card: CourseMemoryCard | None,
+    ) -> str:
+        question_types = _course_card_values(course_memory_card, "question_type_distribution") or _evidence_values(pdf_evidence, "question_types")
+        knowledge_signals = _course_card_values(course_memory_card, "knowledge_signals") or _evidence_values(pdf_evidence, "knowledge_signals")
+        anchors = []
+        for item in pdf_evidence[:3]:
+            question_hint = f"（{_join_values(list(item.question_numbers)[:2])}）" if item.question_numbers else ""
+            anchors.append(f"《{item.title}》第 {item.page} 页{question_hint}")
+        parts: list[str] = []
+        if question_types:
+            parts.append(f"先判断题型：{_join_values(question_types[:3])}")
+        if knowledge_signals:
+            parts.append(f"再抓核心知识点：{_join_values(knowledge_signals[:5])}")
+        detail = "；".join(parts) if parts else "先定位题干条件、公式或步骤，再对照解析页复盘"
+        return f"这类问题可以先定位到 {_join_values(anchors)}。{detail}。建议你先说卡住的是概念、公式推导还是计算步骤，我再按同类题继续拆。"
+
     def _local_sequence_hint(
         self,
         query_plan: AgentQueryPlan | None,
@@ -604,6 +652,10 @@ class AiService:
         study_plan_hint = self._local_study_plan_hint(query_plan)
         if study_plan_hint:
             return study_plan_hint
+        if query_plan and query_plan.intent == "pdf_summary":
+            return "建议先读已引用页码建立资料概览，再按题型、年份或知识点决定是否继续深入。"
+        if query_plan and query_plan.intent == "problem_tutoring":
+            return "建议先定位题号和知识点，再拆解解题步骤，最后用同类题复盘。"
         if course_memory_card and course_memory_card.recommended_sequence:
             return f"建议按这个顺序处理：{_join_values(list(course_memory_card.recommended_sequence)[:3])}。"
         if query_plan and query_plan.intent == "exam_trend_analysis":
@@ -986,6 +1038,28 @@ def _material_evidence_values(pdf_evidence: list[MaterialPageEvidence], field: s
             if len(values) >= 6:
                 return values
     return values
+
+
+def _evidence_source_types(pdf_evidence: list[MaterialPageEvidence]) -> list[str]:
+    values: list[str] = []
+    for item in pdf_evidence:
+        cleaned = str(item.source_type or "").strip()
+        if cleaned and cleaned != "unknown" and cleaned not in values:
+            values.append(cleaned)
+        if len(values) >= 6:
+            break
+    return values
+
+
+def _source_type_label(value: str) -> str:
+    labels = {
+        "past_exam": "往年真题",
+        "answer_explanation": "答案解析",
+        "lecture_notes": "讲义笔记",
+        "study_outline": "复习提纲",
+        "exercise": "习题练习",
+    }
+    return labels.get(value, value)
 
 
 def _course_card_values(course_memory_card: CourseMemoryCard | None, field: str) -> list[str]:
