@@ -6,6 +6,7 @@ import { useRouter } from 'next/router';
 import Link from 'next/link';
 import NavBar from '../components/NavBar';
 import AppImage from '../components/AppImage';
+import MaterialIconSprite from '../components/MaterialIconSprite';
 import PaginationBar from '../components/PaginationBar';
 import { MaterialListItem, PaginationMeta } from '../types/material';
 import { SessionUser, RoleMask } from '../types/user';
@@ -648,6 +649,7 @@ export default function Home({
 
   return (
     <>
+      <MaterialIconSprite />
       <NavBar user={user} />
       <main className="container page-grid home-page theme-xmas">
         {officialQQ && bannerVisible && (

@@ -35,6 +35,12 @@ const cardActionLabel = (material: MaterialListItem, isExperience: boolean) => {
   return '购买下载';
 };
 
+const MaterialStatIcon = ({ name }: { name: 'like' | 'comment' | 'view' | 'download' }) => (
+  <svg className="material-icon" viewBox="0 0 24 24" aria-hidden="true">
+    <use href={`#studyhub-material-icon-${name}`} />
+  </svg>
+);
+
 export default function MaterialCard({
   material,
   selectable,
@@ -112,7 +118,7 @@ export default function MaterialCard({
           </button>
         )}
         <div className="material-list-row">
-          <Link href={materialPath(material.id, material.title)} className="material-list-link">
+          <Link href={materialPath(material.id, material.title)} className="material-list-link" prefetch={false}>
             <div className="material-list-title">
               {orderLabel && <span className="order-label">{orderLabel}</span>}
               {isExperienceTag ? (
@@ -159,7 +165,7 @@ export default function MaterialCard({
             {isExperienceTag ? (
               <>
                 <span className="badge badge-ghost material-reading-tag">专栏文章</span>
-                <Link className="material-card__cta" href={materialPath(material.id, material.title)}>
+                <Link className="material-card__cta" href={materialPath(material.id, material.title)} prefetch={false}>
                   {cardActionLabel(material, isExperienceTag)}
                 </Link>
               </>
@@ -235,7 +241,7 @@ export default function MaterialCard({
         )}
         {isExperienceTag && <span className="badge badge-ghost">经验分享</span>}
         {filteredTags.map((tag) => (
-          <Link key={tag} className="badge badge-outline" href={`/?tag=${encodeURIComponent(tag)}`}>
+          <Link key={tag} className="badge badge-outline" href={`/?tag=${encodeURIComponent(tag)}`} prefetch={false}>
             #{tag}
           </Link>
         ))}
@@ -243,53 +249,17 @@ export default function MaterialCard({
       {isExperienceTag ? (
         <div className="material-stats material-stats__rating material-stats__experience">
           <span className="material-emoji" aria-label="点赞">
-            <svg className="material-icon" viewBox="0 0 24 24" aria-hidden="true">
-              <path
-                d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3z"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.6"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-              <path
-                d="M7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.6"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-              </svg>
-              {likeCount}
-            </span>
-            <span className="material-emoji" aria-label="评论">
-              <svg className="material-icon" viewBox="0 0 24 24" aria-hidden="true">
-                <path
-                  d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.6"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
-              {commentCount}
-            </span>
-            <span className="material-emoji" aria-label="阅读">
-              <svg className="material-icon" viewBox="0 0 24 24" aria-hidden="true">
-                <path
-                  d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6-10-6-10-6z"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.6"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-                <circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" strokeWidth="1.6" />
-              </svg>
-              {viewCount}
-            </span>
+            <MaterialStatIcon name="like" />
+            {likeCount}
+          </span>
+          <span className="material-emoji" aria-label="评论">
+            <MaterialStatIcon name="comment" />
+            {commentCount}
+          </span>
+          <span className="material-emoji" aria-label="阅读">
+            <MaterialStatIcon name="view" />
+            {viewCount}
+          </span>
         </div>
       ) : (
         <div className="material-stats material-stats__rating">
@@ -300,66 +270,15 @@ export default function MaterialCard({
         {!isExperienceTag && (
           <>
             <span className="material-emoji" aria-label="点赞">
-              <svg className="material-icon" viewBox="0 0 24 24" aria-hidden="true">
-                <path
-                  d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3z"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.6"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-                <path
-                  d="M7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.6"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
+              <MaterialStatIcon name="like" />
               {likeCount}
             </span>
             <span className="material-emoji" aria-label="评论">
-              <svg className="material-icon" viewBox="0 0 24 24" aria-hidden="true">
-                <path
-                  d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.6"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
+              <MaterialStatIcon name="comment" />
               {commentCount}
             </span>
             <span className="material-emoji" aria-label="下载">
-              <svg className="material-icon" viewBox="0 0 24 24" aria-hidden="true">
-                <path
-                  d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.6"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-                <path
-                  d="M7 10l5 5 5-5"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.6"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-                <path
-                  d="M12 15V3"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.6"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
+              <MaterialStatIcon name="download" />
               {downloadCount}
             </span>
           </>
