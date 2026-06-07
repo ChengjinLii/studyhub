@@ -6,7 +6,8 @@ import pytest
 
 from app.core.config import get_settings
 from app.core.db import reset_database_runtime
-from app.ops.db_admin import command_backup, command_check, command_init_schema, command_restore
+from app.ops.db_admin import command_backup, command_check, command_check_schema, command_init_schema, command_restore
+from app.ops.schema_audit import compare_metadata_schema
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 PRIVATE_FIXTURE_DIR = REPO_ROOT / "private"
@@ -35,8 +36,42 @@ def test_db_admin_local_dev_check_then_init_schema(tmp_path: Path, monkeypatch: 
     assert command_check(settings) == 2
     assert command_init_schema(settings, allow_preview=False) == 0
     assert command_check(settings) == 0
+    assert command_check_schema(settings) == 0
 
     _reset_runtime_state()
+
+
+def test_schema_audit_reports_known_production_drift_columns() -> None:
+    from sqlalchemy.dialects import mysql
+
+    from app.models import Base
+
+    actual_tables = set(Base.metadata.tables)
+    actual_columns_by_table = {
+        table_name: {column.name for column in table.columns}
+        for table_name, table in Base.metadata.tables.items()
+    }
+    actual_columns_by_table["market_items"].remove("source")
+    actual_columns_by_table["orders"].remove("uploader_id")
+
+    payload = compare_metadata_schema(
+        metadata=Base.metadata,
+        actual_tables=actual_tables,
+        actual_columns_by_table=actual_columns_by_table,
+        actual_indexes_by_table={},
+        dialect=mysql.dialect(),
+    )
+
+    missing = {(item["table"], item["column"]): item for item in payload["missingColumns"]}
+    assert ("market_items", "source") in missing
+    assert ("orders", "uploader_id") in missing
+    assert missing[("market_items", "source")]["autoMigratable"] is True
+    assert "ADD COLUMN" in missing[("market_items", "source")]["sql"]
+    assert "DEFAULT 'local'" in missing[("market_items", "source")]["sql"]
+    assert missing[("orders", "uploader_id")]["autoMigratable"] is True
+    assert "ADD COLUMN" in missing[("orders", "uploader_id")]["sql"]
+    assert payload["ready"] is False
+    assert payload["executable"] is True
 
 
 def test_db_admin_backup_rejects_sqlite(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

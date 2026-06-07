@@ -10,6 +10,7 @@ import shutil
 import subprocess
 from typing import BinaryIO
 
+from sqlalchemy import text
 from sqlalchemy.engine import URL, make_url
 
 from app.core.config import Settings, get_settings
@@ -20,6 +21,12 @@ from app.core.db import (
     initialize_database,
     list_missing_tables,
     reset_database_runtime,
+)
+from app.ops.schema_audit import (
+    assert_additive_sql,
+    build_additive_migration_payload,
+    build_schema_audit_payload,
+    find_latest_nonempty_backup,
 )
 
 
@@ -84,6 +91,20 @@ def command_check(settings: Settings) -> int:
     }
     print(json.dumps(payload, ensure_ascii=False, indent=2))
     return 0 if not missing_tables else 2
+
+
+def command_check_schema(settings: Settings) -> int:
+    _ensure_sqlite_parent_dir(settings)
+    check_database()
+    payload = build_schema_audit_payload()
+    payload.update(
+        {
+            "environment": settings.environment,
+            "databaseUrl": _masked_database_url(make_url(settings.resolved_database_url)),
+        }
+    )
+    print(json.dumps(payload, ensure_ascii=False, indent=2))
+    return 0 if payload["ready"] else 2
 
 
 def command_init_schema(settings: Settings, *, allow_preview: bool) -> int:
@@ -162,6 +183,53 @@ def command_backup(settings: Settings, *, output: Path | None) -> int:
     return 0
 
 
+def command_migrate_additive(settings: Settings, *, plan: bool, yes: bool) -> int:
+    if plan == yes:
+        raise RuntimeError("migrate-additive 必须且只能传入 --plan 或 --yes。")
+
+    _ensure_sqlite_parent_dir(settings)
+    check_database()
+    payload = build_additive_migration_payload()
+    payload.update(
+        {
+            "environment": settings.environment,
+            "databaseUrl": _masked_database_url(make_url(settings.resolved_database_url)),
+            "mode": "plan" if plan else "execute",
+        }
+    )
+    statements = list(payload["additiveStatements"])
+    for sql in statements:
+        assert_additive_sql(sql)
+
+    if plan:
+        print(json.dumps(payload, ensure_ascii=False, indent=2))
+        return 0 if payload["executable"] else 2
+
+    if settings.is_production:
+        backup_file = find_latest_nonempty_backup(settings.private_dir, settings.environment)
+        if backup_file is None:
+            raise RuntimeError("production migrate-additive --yes 需要先完成非空数据库备份。")
+        payload["backupFile"] = str(backup_file)
+
+    if not payload["executable"]:
+        print(json.dumps(payload, ensure_ascii=False, indent=2))
+        return 2
+
+    if statements:
+        from app.core.db import get_engine
+
+        engine = get_engine()
+        with engine.begin() as connection:
+            for sql in statements:
+                connection.execute(text(sql.rstrip(";")))
+
+    after = build_schema_audit_payload()
+    payload["executedStatements"] = statements
+    payload["after"] = after
+    print(json.dumps(payload, ensure_ascii=False, indent=2))
+    return 0 if after["ready"] else 2
+
+
 def command_restore(settings: Settings, *, input_path: Path, yes_preview_restore: bool) -> int:
     if settings.is_production:
         raise RuntimeError("production 模式禁止通过 db_admin restore 执行恢复。")
@@ -216,6 +284,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     subparsers.add_parser("describe")
     subparsers.add_parser("check")
+    subparsers.add_parser("check-schema")
 
     init_parser = subparsers.add_parser("init-schema")
     init_parser.add_argument("--allow-preview-create", action="store_true")
@@ -226,6 +295,11 @@ def build_parser() -> argparse.ArgumentParser:
     restore_parser = subparsers.add_parser("restore")
     restore_parser.add_argument("--input", type=Path, required=True)
     restore_parser.add_argument("--yes-preview-restore", action="store_true")
+
+    migrate_parser = subparsers.add_parser("migrate-additive")
+    migrate_mode = migrate_parser.add_mutually_exclusive_group(required=True)
+    migrate_mode.add_argument("--plan", action="store_true")
+    migrate_mode.add_argument("--yes", action="store_true")
     return parser
 
 
@@ -239,6 +313,8 @@ def main(argv: list[str] | None = None) -> int:
         return command_describe(settings)
     if args.command == "check":
         return command_check(settings)
+    if args.command == "check-schema":
+        return command_check_schema(settings)
     if args.command == "init-schema":
         return command_init_schema(settings, allow_preview=bool(args.allow_preview_create))
     if args.command == "backup":
@@ -249,6 +325,8 @@ def main(argv: list[str] | None = None) -> int:
             input_path=args.input,
             yes_preview_restore=bool(args.yes_preview_restore),
         )
+    if args.command == "migrate-additive":
+        return command_migrate_additive(settings, plan=bool(args.plan), yes=bool(args.yes))
     parser.error(f"unsupported command: {args.command}")
     return 2
 
