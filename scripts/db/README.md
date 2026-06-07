@@ -38,6 +38,14 @@ STUDYHUB_ENVIRONMENT=production bash scripts/db/db-plan-p0-schema.sh
 
 该脚本默认只生成 `market_items.source` 和 `orders.uploader_id` 的计划。需要调整范围时可设置 `STUDYHUB_P0_SCHEMA_COLUMNS`，值为空格分隔的 `table.column` 列表。
 
+执行前准备备份和计划：
+
+```bash
+STUDYHUB_ENVIRONMENT=production bash scripts/db/db-prepare-p0-schema.sh
+```
+
+该脚本只执行备份和 `--plan`，不会执行 DDL。输出里的 `backupFile`、SQL 和 `planToken` 都需要人工确认。
+
 验证 P0 字段是否已经补齐：
 
 ```bash
