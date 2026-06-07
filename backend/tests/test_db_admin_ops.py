@@ -1,13 +1,15 @@
 from __future__ import annotations
 
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
+import os
 import pytest
 
 from app.core.config import get_settings
 from app.core.db import reset_database_runtime
 from app.ops.db_admin import command_backup, command_check, command_check_schema, command_init_schema, command_restore
-from app.ops.schema_audit import compare_metadata_schema, select_additive_migration_scope
+from app.ops.schema_audit import compare_metadata_schema, require_recent_nonempty_backup, select_additive_migration_scope
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 PRIVATE_FIXTURE_DIR = REPO_ROOT / "private"
@@ -111,6 +113,33 @@ def test_schema_audit_reports_only_relevant_legacy_compatibility_tables() -> Non
 
     auth_compat = next(item for item in payload["legacyCompatibleTables"] if item["table"] == "auth_users")
     assert auth_compat["coveredBy"] == ["users"]
+
+
+def test_require_recent_backup_rejects_stale_backup(tmp_path: Path) -> None:
+    backup_root = tmp_path / "backups" / "production"
+    backup_root.mkdir(parents=True)
+    backup_file = backup_root / "studyhub-production-old.sql.gz"
+    backup_file.write_bytes(b"backup")
+    now = datetime(2026, 6, 8, 12, 0, tzinfo=UTC)
+    stale_ts = (now - timedelta(minutes=121)).timestamp()
+    os.utime(backup_file, (stale_ts, stale_ts))
+
+    with pytest.raises(RuntimeError, match="最近 120 分钟"):
+        require_recent_nonempty_backup(tmp_path, "production", max_age_seconds=120 * 60, now=now)
+
+
+def test_require_recent_backup_accepts_latest_nonempty_backup(tmp_path: Path) -> None:
+    backup_root = tmp_path / "backups" / "production"
+    backup_root.mkdir(parents=True)
+    empty_backup = backup_root / "studyhub-production-empty.sql.gz"
+    empty_backup.write_bytes(b"")
+    backup_file = backup_root / "studyhub-production-fresh.sql.gz"
+    backup_file.write_bytes(b"backup")
+    now = datetime(2026, 6, 8, 12, 0, tzinfo=UTC)
+    fresh_ts = (now - timedelta(minutes=30)).timestamp()
+    os.utime(backup_file, (fresh_ts, fresh_ts))
+
+    assert require_recent_nonempty_backup(tmp_path, "production", max_age_seconds=120 * 60, now=now) == backup_file
 
 
 def test_db_admin_backup_rejects_sqlite(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

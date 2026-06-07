@@ -26,7 +26,7 @@ from app.ops.schema_audit import (
     assert_additive_sql,
     build_schema_audit_payload,
     build_scoped_additive_migration_payload,
-    find_latest_nonempty_backup,
+    require_recent_nonempty_backup,
 )
 
 
@@ -200,7 +200,14 @@ def _parse_only_columns(values: list[str]) -> set[tuple[str, str]] | None:
     return parsed
 
 
-def command_migrate_additive(settings: Settings, *, plan: bool, yes: bool, only: list[str] | None = None) -> int:
+def command_migrate_additive(
+    settings: Settings,
+    *,
+    plan: bool,
+    yes: bool,
+    only: list[str] | None = None,
+    backup_max_age_minutes: int = 120,
+) -> int:
     if plan == yes:
         raise RuntimeError("migrate-additive 必须且只能传入 --plan 或 --yes。")
 
@@ -224,9 +231,11 @@ def command_migrate_additive(settings: Settings, *, plan: bool, yes: bool, only:
         return 0 if payload["executable"] else 2
 
     if settings.is_production:
-        backup_file = find_latest_nonempty_backup(settings.private_dir, settings.environment)
-        if backup_file is None:
-            raise RuntimeError("production migrate-additive --yes 需要先完成非空数据库备份。")
+        backup_file = require_recent_nonempty_backup(
+            settings.private_dir,
+            settings.environment,
+            max_age_seconds=max(60, int(backup_max_age_minutes) * 60),
+        )
         payload["backupFile"] = str(backup_file)
 
     if not payload["executable"]:
@@ -331,6 +340,12 @@ def build_parser() -> argparse.ArgumentParser:
         metavar="TABLE.COLUMN",
         help="limit the additive plan to a confirmed missing column; may be repeated",
     )
+    migrate_parser.add_argument(
+        "--backup-max-age-minutes",
+        type=int,
+        default=120,
+        help="maximum allowed production backup age before --yes execution",
+    )
     return parser
 
 
@@ -357,7 +372,13 @@ def main(argv: list[str] | None = None) -> int:
             yes_preview_restore=bool(args.yes_preview_restore),
         )
     if args.command == "migrate-additive":
-        return command_migrate_additive(settings, plan=bool(args.plan), yes=bool(args.yes), only=list(args.only))
+        return command_migrate_additive(
+            settings,
+            plan=bool(args.plan),
+            yes=bool(args.yes),
+            only=list(args.only),
+            backup_max_age_minutes=int(args.backup_max_age_minutes),
+        )
     parser.error(f"unsupported command: {args.command}")
     return 2
 

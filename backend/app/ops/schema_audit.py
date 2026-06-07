@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 from collections.abc import Mapping
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -216,6 +217,28 @@ def find_latest_nonempty_backup(private_dir: Path, environment: str) -> Path | N
     if not candidates:
         return None
     return max(candidates, key=lambda path: path.stat().st_mtime)
+
+
+def require_recent_nonempty_backup(
+    private_dir: Path,
+    environment: str,
+    *,
+    max_age_seconds: int,
+    now: datetime | None = None,
+) -> Path:
+    backup = find_latest_nonempty_backup(private_dir, environment)
+    if backup is None:
+        raise RuntimeError("production migrate-additive --yes 需要先完成非空数据库备份。")
+    current_ts = (now or datetime.now(UTC)).timestamp()
+    age_seconds = max(0, int(current_ts - backup.stat().st_mtime))
+    if age_seconds > max_age_seconds:
+        max_age_minutes = max(1, max_age_seconds // 60)
+        age_minutes = max(1, age_seconds // 60)
+        raise RuntimeError(
+            f"production migrate-additive --yes 需要最近 {max_age_minutes} 分钟内的非空数据库备份；"
+            f"最新备份已约 {age_minutes} 分钟。"
+        )
+    return backup
 
 
 def _index_column_sets(indexes: list[dict[str, Any]]) -> set[tuple[str, ...]]:
