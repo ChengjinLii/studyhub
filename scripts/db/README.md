@@ -33,14 +33,10 @@ STUDYHUB_ENVIRONMENT=preview bash scripts/db/db-migrate.sh
 生成生产 additive 迁移计划时，先只选定已确认的缺字段，不会执行 SQL：
 
 ```bash
-cd /data/studyhub/backend
-STUDYHUB_ENVIRONMENT=production \
-STUDYHUB_PRIVATE_DIR_PATH=/data/studyhub/private \
-../.venv/bin/python -m app.ops.db_admin migrate-additive \
-  --plan \
-  --only market_items.source \
-  --only orders.uploader_id
+STUDYHUB_ENVIRONMENT=production bash scripts/db/db-plan-p0-schema.sh
 ```
+
+该脚本默认只生成 `market_items.source` 和 `orders.uploader_id` 的计划。需要调整范围时可设置 `STUDYHUB_P0_SCHEMA_COLUMNS`，值为空格分隔的 `table.column` 列表。
 
 确认备份、SQL 和 `planToken` 后才允许执行 `--yes`。production 执行时必须保留相同 `--only` 范围，并传入计划输出里的 token：
 
