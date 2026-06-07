@@ -238,6 +238,18 @@ class AiService:
             "privacyBoundary": "This preference only controls whether the StudyHub Agent uses derived personal memory for this browser session.",
         }
 
+    def delete_personal_memory_payload(self) -> dict[str, Any]:
+        return {
+            "personalMemoryEnabled": False,
+            "mode": "read_only_derived",
+            "scope": "current_browser",
+            "deletedPersistedMemory": False,
+            "disabledCurrentBrowserMemory": True,
+            "persistence": "not_persisted",
+            "deleteExplanation": "当前 StudyHub Agent 个人记忆为只读派生上下文，尚未持久化保存用户对话记忆；本次操作已关闭当前浏览器继续使用派生个人记忆。",
+            "privacyBoundary": "No persisted Agent personal memory was deleted because this phase stores no dedicated Agent memory records. Platform collective memory is not affected.",
+        }
+
     def preview_memory(
         self,
         session: Session,

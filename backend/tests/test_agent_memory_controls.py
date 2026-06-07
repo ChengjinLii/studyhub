@@ -90,6 +90,32 @@ def test_ai_memory_preference_cookie_disables_preview(client, auth_service) -> N
     assert data["personalMemory"] is None
 
 
+def test_ai_memory_delete_disables_current_browser_without_persisted_delete(client, auth_service) -> None:
+    seed_read_users(auth_service)
+    _seed_memory_material(user_id=1)
+    headers = build_auth_headers(1, 1)
+
+    delete_response = client.delete("/api/ai/memory", headers=headers)
+    preview_response = client.get("/api/ai/memory", headers=headers)
+
+    assert delete_response.status_code == 200
+    assert any(
+        "studyhub_ai_memory=disabled" in header and "HttpOnly" in header
+        for header in delete_response.headers.get_list("set-cookie")
+    )
+    delete_data = delete_response.json()["data"]
+    assert delete_data["personalMemoryEnabled"] is False
+    assert delete_data["deletedPersistedMemory"] is False
+    assert delete_data["disabledCurrentBrowserMemory"] is True
+    assert delete_data["persistence"] == "not_persisted"
+    assert "Platform collective memory is not affected" in delete_data["privacyBoundary"]
+
+    preview_data = preview_response.json()["data"]
+    assert preview_data["personalMemoryEnabled"] is False
+    assert preview_data["disabledReason"] == "user_preference"
+    assert preview_data["personalMemory"] is None
+
+
 def test_ai_recommendation_skips_memory_collection_when_personal_memory_disabled(monkeypatch) -> None:
     material = MaterialRecord(
         id=771,
