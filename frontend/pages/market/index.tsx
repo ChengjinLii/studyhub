@@ -1,8 +1,7 @@
 import { GetServerSideProps } from 'next';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import { CSSProperties, useMemo, useState } from 'react';
-import useSWR from 'swr';
+import { CSSProperties, useCallback, useEffect, useMemo, useState } from 'react';
 import NavBar from '../../components/NavBar';
 import PaginationBar from '../../components/PaginationBar';
 import { readSession, hasRole } from '../../lib/auth';
@@ -55,14 +54,15 @@ const readSampleSlug = (item: MarketItem) => {
   return typeof maybe.sampleSlug === 'string' ? maybe.sampleSlug : undefined;
 };
 
-const swrFetcher = async (url: string) => {
+const fetchWantedIds = async () => {
+  const url = '/api/market/wanted';
   const resp = await fetch(url);
-  const json = await readApiEnvelope(resp);
+  const json = await readApiEnvelope<number[]>(resp);
   if (!resp.ok || !json?.ok) {
     const message = json?.msg || resp.statusText || '请求失败';
     throw new Error(message);
   }
-  return json;
+  return Array.isArray(json.data) ? json.data : [];
 };
 
 export default function MarketPage({ user, items, meta, filters, stats }: MarketPageProps) {
@@ -106,20 +106,33 @@ export default function MarketPage({ user, items, meta, filters, stats }: Market
   const [actionError, setActionError] = useState('');
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [moderationAlert, setModerationAlert] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [wantedIds, setWantedIds] = useState<number[]>([]);
 
-  const {
-    data: wantedResponse,
-    mutate: mutateWanted,
-  } = useSWR(user ? '/api/market/wanted' : null, swrFetcher, {
-    revalidateOnFocus: true,
-  });
-
-  const wantedIdSet = useMemo(() => {
-    if (!wantedResponse || !wantedResponse.ok || !Array.isArray(wantedResponse.data)) {
-      return new Set<number>();
+  const loadWantedIds = useCallback(async () => {
+    if (!user) {
+      setWantedIds([]);
+      return;
     }
-    return new Set<number>((wantedResponse.data as number[]) || []);
-  }, [wantedResponse]);
+    try {
+      setWantedIds(await fetchWantedIds());
+    } catch {
+      // Keep the server-rendered wanted state when the auxiliary sync fails.
+    }
+  }, [user]);
+
+  useEffect(() => {
+    void loadWantedIds();
+    if (!user) {
+      return undefined;
+    }
+    const handleFocus = () => {
+      void loadWantedIds();
+    };
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
+  }, [loadWantedIds, user]);
+
+  const wantedIdSet = useMemo(() => new Set<number>(wantedIds), [wantedIds]);
 
   const resolveWantedState = (itemId: number) => {
     const stored = itemStates[itemId];
@@ -177,9 +190,7 @@ export default function MarketPage({ user, items, meta, filters, stats }: Market
               : fallbackCount,
         },
       }));
-      if (mutateWanted) {
-        mutateWanted();
-      }
+      void loadWantedIds();
     } catch (err: unknown) {
       setActionError(toErrorMessage(err, '操作失败'));
       setItemStates((prev) => ({

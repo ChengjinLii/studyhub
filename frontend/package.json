@@ -25,8 +25,7 @@
     "react-markdown": "^9.1.0",
     "react-snowfall": "^2.4.0",
     "remark-gfm": "^4.0.1",
-    "svgo": "^4.0.0",
-    "swr": "^2.3.6"
+    "svgo": "^4.0.0"
   },
   "devDependencies": {
     "@playwright/test": "^1.47.2",

@@ -4,11 +4,7 @@ import dynamic from 'next/dynamic';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
-import HomeFilterCard from '../components/home/HomeFilterCard';
-import HomeLeaderboard from '../components/home/HomeLeaderboard';
-import HomeRequestPanels from '../components/home/HomeRequestPanels';
 import NavBar from '../components/NavBar';
-import ShareSheet from '../components/ShareSheet';
 import AppImage from '../components/AppImage';
 import MaterialCard from '../components/MaterialCard';
 import PaginationBar from '../components/PaginationBar';
@@ -47,6 +43,10 @@ import { MaterialRequestItem } from '../types/request';
 
 const MATERIALS_PAGE_SIZE = 18;
 const Snowfall = dynamic(() => import('react-snowfall'), { ssr: false });
+const HomeFilterCard = dynamic(() => import('../components/home/HomeFilterCard'));
+const HomeLeaderboard = dynamic(() => import('../components/home/HomeLeaderboard'));
+const HomeRequestPanels = dynamic(() => import('../components/home/HomeRequestPanels'));
+const ShareSheet = dynamic(() => import('../components/ShareSheet'), { ssr: false });
 
 const ROLE_LABELS = [
   { mask: RoleMask.DEVELOPER, label: '开发者' },
@@ -260,7 +260,7 @@ export default function Home({
   ]);
   const [isMobile, setIsMobile] = useState(false);
   const [reduceMotion, setReduceMotion] = useState(false);
-  const [seasonalEffectsReady, setSeasonalEffectsReady] = useState(false);
+  const [deferredClientReady, setDeferredClientReady] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [batchError, setBatchError] = useState('');
@@ -270,6 +270,7 @@ export default function Home({
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [contributors, setContributors] = useState<ContributorRank[]>(initialContributors);
   const [leaderboardPeriod, setLeaderboardPeriod] = useState<LeaderboardPeriod>('all');
+  const didRunInitialLeaderboardEffect = useRef(false);
   const [leaderboardLoading, setLeaderboardLoading] = useState(false);
   const [leaderboardError, setLeaderboardError] = useState('');
   const snowCountFar = isMobile ? 16 : 26;
@@ -297,16 +298,16 @@ export default function Home({
     setMeteorStyles(styles);
     setMeteorSeed((prev) => prev + 1);
   }, []);
-  const [requestItems, setRequestItems] = useState<MaterialRequestItem[]>(requests || []);
+  const [requestItems] = useState<MaterialRequestItem[]>(requests || []);
   const [leaderboardItems] = useState<MaterialRequestItem[]>(requestLeaderboard || []);
-  const [requestLoading, setRequestLoading] = useState(false);
-  const [requestError, setRequestError] = useState('');
-  const [requestNotice, setRequestNotice] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const requestLoading = false;
+  const requestError = '';
+  const requestNotice: { type: 'success' | 'error'; text: string } | null = null;
   const [leaderboardFollowed, setLeaderboardFollowed] = useState<Record<number, boolean>>({});
   const [leaderboardFollowLoading, setLeaderboardFollowLoading] = useState<Record<number, boolean>>({});
   const [leaderboardFollowNotice, setLeaderboardFollowNotice] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [supportModalOpen, setSupportModalOpen] = useState(false);
-  const showSeasonalEffects = seasonalEffectsReady && (!reduceMotion || isMobile);
+  const showSeasonalEffects = deferredClientReady && (!reduceMotion || isMobile);
   useEffect(() => {
     setMaterialList(initialMaterials);
     setPageMeta(meta);
@@ -388,7 +389,7 @@ export default function Home({
     if (typeof window === 'undefined') return undefined;
     let timeoutId: ReturnType<typeof setTimeout> | null = null;
     const enableEffects = () => {
-      timeoutId = setTimeout(() => setSeasonalEffectsReady(true), 0);
+      timeoutId = setTimeout(() => setDeferredClientReady(true), 0);
     };
     if (document.readyState === 'complete') {
       enableEffects();
@@ -463,6 +464,10 @@ export default function Home({
   };
 
   useEffect(() => {
+    if (!didRunInitialLeaderboardEffect.current) {
+      didRunInitialLeaderboardEffect.current = true;
+      return;
+    }
     let cancelled = false;
     setLeaderboardLoading(true);
     setLeaderboardError('');
@@ -481,25 +486,6 @@ export default function Home({
       cancelled = true;
     };
   }, [leaderboardPeriod]);
-
-  const loadRequests = useCallback(async () => {
-    setRequestLoading(true);
-    setRequestError('');
-    setRequestNotice(null);
-    try {
-      const resp = await fetchBackend('/requests?limit=0');
-      const data = await unwrapApiResponse<MaterialRequestItem[]>(resp, '加载求购失败');
-      setRequestItems(data);
-    } catch (error: unknown) {
-      setRequestError(toErrorMessage(error, '加载求购失败'));
-    } finally {
-      setRequestLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    loadRequests();
-  }, [loadRequests]);
 
   const selectedMaterials = useMemo(
     () => materialList.filter((item) => selectedIds.includes(item.id)),
@@ -735,30 +721,34 @@ export default function Home({
             </div>
           </aside>
         </section>
-        <HomeRequestPanels
-          requestItems={requestItems}
-          requestLoading={requestLoading}
-          requestError={requestError}
-          requestNotice={requestNotice}
-          leaderboardItems={leaderboardItems}
-          recommendedItems={recommendedItems}
-          recommendationHint={recommendationHint}
-          recommendationEmpty={recommendationEmpty}
-          buildUploadLink={buildUploadLink}
-          onFollowRequest={handleFollowRequest}
-        />
+        {deferredClientReady && (
+          <HomeRequestPanels
+            requestItems={requestItems}
+            requestLoading={requestLoading}
+            requestError={requestError}
+            requestNotice={requestNotice}
+            leaderboardItems={leaderboardItems}
+            recommendedItems={recommendedItems}
+            recommendationHint={recommendationHint}
+            recommendationEmpty={recommendationEmpty}
+            buildUploadLink={buildUploadLink}
+            onFollowRequest={handleFollowRequest}
+          />
+        )}
 
-        <HomeFilterCard
-          filterRef={filterRef}
-          filtersState={filtersState}
-          showAdvanced={showAdvanced}
-          availableTagOptions={availableTagOptions}
-          onFilterChange={updateFilter}
-          onCourseCategoryChange={applyCourseCategory}
-          onToggleAdvancedFilters={toggleAdvancedFilters}
-          onResetFilters={handleResetFilters}
-          onSubmit={handleFilterSubmit}
-        />
+        {deferredClientReady && (
+          <HomeFilterCard
+            filterRef={filterRef}
+            filtersState={filtersState}
+            showAdvanced={showAdvanced}
+            availableTagOptions={availableTagOptions}
+            onFilterChange={updateFilter}
+            onCourseCategoryChange={applyCourseCategory}
+            onToggleAdvancedFilters={toggleAdvancedFilters}
+            onResetFilters={handleResetFilters}
+            onSubmit={handleFilterSubmit}
+          />
+        )}
 
         <section className="card" ref={materialsRef} style={{ gridColumn: '1 / -1' }}>
           <div className="materials-header">
@@ -822,36 +812,40 @@ export default function Home({
             </>
           )}
         </section>
-        <HomeLeaderboard
-          user={user}
-          topContributors={topContributors}
-          leaderboardPeriod={leaderboardPeriod}
-          leaderboardLabels={leaderboardLabels}
-          leaderboardPeriods={leaderboardPeriods}
-          leaderboardRangeHint={leaderboardRangeHint}
-          leaderboardEmptyHint={leaderboardEmptyHint}
-          leaderboardLoading={leaderboardLoading}
-          leaderboardError={leaderboardError}
-          leaderboardFollowNotice={leaderboardFollowNotice}
-          leaderboardFollowed={leaderboardFollowed}
-          leaderboardFollowLoading={leaderboardFollowLoading}
-          onPeriodChange={setLeaderboardPeriod}
-          onFollowContributor={handleFollowContributor}
-        />
-        <section className="card support-card" style={{ gridColumn: '1 / -1' }}>
-          <div>
-            <h3 className="card-title" style={{ margin: 0 }}>
-              支持 StudyHub
-            </h3>
-            <p style={{ marginTop: 8, marginBottom: 4 }}>
-              您的支持是我们继续运营的动力😁
-            </p>
-            <p className="help-text">所有打赏将用于服务器、带宽与内容审核支出，感谢你的信任。</p>
-          </div>
-          <button className="button primary" type="button" onClick={() => setSupportModalOpen(true)}>
-            打赏
-          </button>
-        </section>
+        {deferredClientReady && (
+          <>
+            <HomeLeaderboard
+              user={user}
+              topContributors={topContributors}
+              leaderboardPeriod={leaderboardPeriod}
+              leaderboardLabels={leaderboardLabels}
+              leaderboardPeriods={leaderboardPeriods}
+              leaderboardRangeHint={leaderboardRangeHint}
+              leaderboardEmptyHint={leaderboardEmptyHint}
+              leaderboardLoading={leaderboardLoading}
+              leaderboardError={leaderboardError}
+              leaderboardFollowNotice={leaderboardFollowNotice}
+              leaderboardFollowed={leaderboardFollowed}
+              leaderboardFollowLoading={leaderboardFollowLoading}
+              onPeriodChange={setLeaderboardPeriod}
+              onFollowContributor={handleFollowContributor}
+            />
+            <section className="card support-card" style={{ gridColumn: '1 / -1' }}>
+              <div>
+                <h3 className="card-title" style={{ margin: 0 }}>
+                  支持 StudyHub
+                </h3>
+                <p style={{ marginTop: 8, marginBottom: 4 }}>
+                  您的支持是我们继续运营的动力😁
+                </p>
+                <p className="help-text">所有打赏将用于服务器、带宽与内容审核支出，感谢你的信任。</p>
+              </div>
+              <button className="button primary" type="button" onClick={() => setSupportModalOpen(true)}>
+                打赏
+              </button>
+            </section>
+          </>
+        )}
         {supportModalOpen && (
           <div className="modal-mask" onClick={() => setSupportModalOpen(false)}>
             <div
@@ -967,8 +961,7 @@ export const getServerSideProps: GetServerSideProps<HomeProps> = async (ctx) => 
     : Promise.resolve(null);
   const recommendationsPromise: Promise<MaterialListItem[]> = fetchRecommendations(
     session.token || undefined,
-    origin,
-    0
+    origin
   ).catch((error) => {
     // eslint-disable-next-line no-console
     console.warn('Failed to fetch recommendations', error);

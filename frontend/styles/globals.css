@@ -1,5 +1,3 @@
-@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@500;600;700&family=IBM+Plex+Mono:wght@600&family=Ma+Shan+Zheng&family=Noto+Sans+SC:wght@600;700&family=ZCOOL+XiaoWei&display=swap');
-
 *,
 *::before,
 *::after {
@@ -5803,6 +5801,14 @@ main {
 
 .home-page {
   margin-top: -6px;
+}
+
+.home-page .home-dual-panel,
+.home-page .filter-card,
+.home-page .leaderboard-card,
+.home-page .support-card {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 560px;
 }
 
 
