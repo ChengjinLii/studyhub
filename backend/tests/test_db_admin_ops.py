@@ -87,6 +87,32 @@ def test_schema_audit_reports_known_production_drift_columns() -> None:
     assert scoped["executable"] is True
 
 
+def test_schema_audit_reports_only_relevant_legacy_compatibility_tables() -> None:
+    from sqlalchemy.dialects import mysql
+
+    from app.models import Base
+
+    actual_tables = set(Base.metadata.tables)
+    actual_tables.remove("auth_users")
+    actual_tables.add("users")
+    actual_tables.add("unrelated_runtime_table")
+
+    payload = compare_metadata_schema(
+        metadata=Base.metadata,
+        actual_tables=actual_tables,
+        actual_columns_by_table={
+            table_name: {column.name for column in table.columns}
+            for table_name, table in Base.metadata.tables.items()
+            if table_name in actual_tables
+        },
+        actual_indexes_by_table={},
+        dialect=mysql.dialect(),
+    )
+
+    auth_compat = next(item for item in payload["legacyCompatibleTables"] if item["table"] == "auth_users")
+    assert auth_compat["coveredBy"] == ["users"]
+
+
 def test_db_admin_backup_rejects_sqlite(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("STUDYHUB_ENVIRONMENT", "local-dev")
     monkeypatch.setenv("STUDYHUB_LOCAL_DEV_ROOT_DIR", str(tmp_path / ".local-dev"))

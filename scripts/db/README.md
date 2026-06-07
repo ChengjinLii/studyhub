@@ -30,6 +30,20 @@ bash scripts/db/db-init-schema.sh
 STUDYHUB_ENVIRONMENT=preview bash scripts/db/db-migrate.sh
 ```
 
+生成生产 additive 迁移计划时，先只选定已确认的缺字段，不会执行 SQL：
+
+```bash
+cd /data/studyhub/backend
+STUDYHUB_ENVIRONMENT=production \
+STUDYHUB_PRIVATE_DIR_PATH=/data/studyhub/private \
+../.venv/bin/python -m app.ops.db_admin migrate-additive \
+  --plan \
+  --only market_items.source \
+  --only orders.uploader_id
+```
+
+确认备份和 SQL 后才允许执行 `--yes`。`migrate-additive` 只会执行审计生成的 `ADD COLUMN` 语句，production 执行前要求已有非空备份。
+
 如果目标库已经由旧流程建好表，只需要记录当前迁移版本：
 
 ```bash

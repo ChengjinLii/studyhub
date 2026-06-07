@@ -10,7 +10,7 @@ from sqlalchemy.engine import Engine
 from sqlalchemy.engine.interfaces import Dialect
 from sqlalchemy.schema import Column, MetaData, Table
 
-from app.core.db import get_engine, has_compatible_legacy_table
+from app.core.db import LEGACY_TABLE_COMPATIBILITY, get_engine, has_compatible_legacy_table
 
 
 DESTRUCTIVE_SQL_PATTERN = re.compile(
@@ -68,7 +68,12 @@ def compare_metadata_schema(
         table = expected_tables[table_name]
         if table_name not in actual_tables:
             if has_compatible_legacy_table(table_name, actual_tables):
-                legacy_compatible_tables.append({"table": table_name, "coveredBy": list(actual_tables)})
+                covered_by = [
+                    legacy_table
+                    for legacy_table in LEGACY_TABLE_COMPATIBILITY.get(table_name, ())
+                    if legacy_table in actual_tables
+                ]
+                legacy_compatible_tables.append({"table": table_name, "coveredBy": covered_by})
                 continue
             missing_tables.append(table_name)
             continue
