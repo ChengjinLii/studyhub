@@ -86,6 +86,8 @@ class MaterialPageChunk:
     knowledge_signals: tuple[str, ...]
     question_numbers: tuple[str, ...]
     source_type: str
+    score_points: tuple[int, ...]
+    difficulty_signals: tuple[str, ...]
 
 
 @dataclass(slots=True)
@@ -100,6 +102,8 @@ class MaterialPageEvidence:
     knowledge_signals: tuple[str, ...] = ()
     question_numbers: tuple[str, ...] = ()
     source_type: str = "unknown"
+    score_points: tuple[int, ...] = ()
+    difficulty_signals: tuple[str, ...] = ()
 
     def to_prompt_payload(self) -> dict[str, Any]:
         payload: dict[str, Any] = {
@@ -118,6 +122,10 @@ class MaterialPageEvidence:
             payload["question_numbers"] = list(self.question_numbers)
         if self.source_type != "unknown":
             payload["source_type"] = self.source_type
+        if self.score_points:
+            payload["score_points"] = list(self.score_points)
+        if self.difficulty_signals:
+            payload["difficulty_signals"] = list(self.difficulty_signals)
         return payload
 
     def to_source_payload(self) -> dict[str, Any]:
@@ -206,6 +214,8 @@ class MaterialPdfEvidenceService:
                 knowledge_signals=chunk.knowledge_signals,
                 question_numbers=chunk.question_numbers,
                 source_type=chunk.source_type,
+                score_points=chunk.score_points,
+                difficulty_signals=chunk.difficulty_signals,
             )
             for chunk in chunks
             if chunk.text.strip()
@@ -271,6 +281,8 @@ def build_pdf_page_chunks(pdf_bytes: bytes, *, max_pages: int) -> list[MaterialP
                 knowledge_signals=tuple(_extract_knowledge_signals(compact)),
                 question_numbers=tuple(_extract_question_numbers(compact)),
                 source_type=_classify_source_type(compact),
+                score_points=tuple(_extract_score_points(compact)),
+                difficulty_signals=tuple(_extract_difficulty_signals(compact)),
             )
         )
     return chunks
@@ -363,6 +375,8 @@ def _score_page(chunk: MaterialPageChunk, query_terms: list[str]) -> int:
     score += len(chunk.years) * 2
     score += len(chunk.knowledge_signals)
     score += len(chunk.question_numbers) * 2
+    score += len(chunk.score_points) * 2
+    score += len(chunk.difficulty_signals)
     if chunk.source_type in {"past_exam", "answer_explanation"}:
         score += 3
     return score
@@ -416,6 +430,32 @@ def _extract_question_numbers(text: str) -> list[str]:
             if len(result) >= 8:
                 return result
     return result
+
+
+def _extract_score_points(text: str) -> list[int]:
+    result: list[int] = []
+    for match in re.findall(r"(?<!\d)(\d{1,2})\s*分(?!钟)", text):
+        value = int(match)
+        if 0 < value <= 100 and value not in result:
+            result.append(value)
+        if len(result) >= 8:
+            break
+    return result
+
+
+def _extract_difficulty_signals(text: str) -> list[str]:
+    normalized = text.lower()
+    result: list[str] = []
+    patterns: tuple[tuple[str, tuple[str, ...]], ...] = (
+        ("基础", ("基础", "简单", "容易", "入门")),
+        ("中等", ("中等", "常规", "典型")),
+        ("综合", ("综合", "综合题", "跨章节")),
+        ("偏难", ("较难", "偏难", "难度较大", "压轴", "提高题")),
+    )
+    for label, aliases in patterns:
+        if any(alias.lower() in normalized for alias in aliases) and label not in result:
+            result.append(label)
+    return result[:4]
 
 
 def _classify_source_type(text: str) -> str:

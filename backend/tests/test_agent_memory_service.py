@@ -112,6 +112,8 @@ def test_agent_memory_context_aggregates_platform_and_current_user_only() -> Non
             knowledge_signals=("调制",),
             question_numbers=("第3题",),
             source_type="past_exam",
+            score_points=(10,),
+            difficulty_signals=("综合",),
         )
     ]
 
@@ -132,11 +134,15 @@ def test_agent_memory_context_aggregates_platform_and_current_user_only() -> Non
         "title": "通信原理四年真题解析",
         "page": 3,
         "question_numbers": ["第3题"],
+        "score_points": [10],
+        "difficulty_signals": ["综合"],
         "source_type": "past_exam",
     } in platform["pdf_evidence_pages"]
     assert platform["pdf_year_signals"] == [{"value": "2024", "count": 1}]
     assert platform["pdf_question_type_signals"] == [{"value": "计算题", "count": 1}]
     assert platform["pdf_question_number_signals"] == [{"value": "第3题", "count": 1}]
+    assert platform["pdf_score_point_signals"] == [{"value": "10", "count": 1}]
+    assert platform["pdf_difficulty_signals"] == [{"value": "综合", "count": 1}]
     assert platform["pdf_source_type_signals"] == [{"value": "past_exam", "count": 1}]
     assert "individual user" in platform["privacy_boundary"]
 

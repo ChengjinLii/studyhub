@@ -75,7 +75,7 @@ def test_extract_pdf_page_texts_uses_safe_literal_fallback_for_simple_pdf_bytes(
 
 def test_build_pdf_page_chunks_extracts_year_question_type_and_knowledge_signals() -> None:
     chunks = build_pdf_page_chunks(
-        "%PDF-1.4\n1 0 obj << /Type /Page >> stream (2024 通信原理 真题 第3题 计算题 调制 解调 误码率) endstream".encode(),
+        "%PDF-1.4\n1 0 obj << /Type /Page >> stream (2024 通信原理 真题 第3题 计算题 10分 综合题 较难 调制 解调 误码率) endstream".encode(),
         max_pages=2,
     )
 
@@ -86,6 +86,8 @@ def test_build_pdf_page_chunks_extracts_year_question_type_and_knowledge_signals
     assert "调制" in chunks[0].knowledge_signals
     assert chunks[0].question_numbers == ("第3题",)
     assert chunks[0].source_type == "past_exam"
+    assert chunks[0].score_points == (10,)
+    assert chunks[0].difficulty_signals == ("综合", "偏难")
 
 
 def test_pdf_evidence_only_loads_for_study_queries_and_respects_file_limit() -> None:
@@ -176,6 +178,8 @@ def test_ai_recommendation_response_includes_pdf_evidence_sources(monkeypatch) -
                     knowledge_signals=("调制", "解调"),
                     question_numbers=("第3题",),
                     source_type="past_exam",
+                    score_points=(10,),
+                    difficulty_signals=("综合",),
                 )
             ]
 
@@ -207,7 +211,11 @@ def test_ai_recommendation_response_includes_pdf_evidence_sources(monkeypatch) -
             "source_type": "past_exam",
         }
     ]
+    assert "score_points" not in body["evidence_sources"][0]
+    assert "difficulty_signals" not in body["evidence_sources"][0]
     assert "第 2 页" in body["answer"]
     assert "年份信号包括 2024" in body["answer"]
     assert "题型集中在 计算题" in body["answer"]
     assert "高频知识点包括 调制、解调" in body["answer"]
+    assert "分值信号包括 10分" in body["answer"]
+    assert "难度信号包括 综合" in body["answer"]

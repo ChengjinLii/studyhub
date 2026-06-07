@@ -95,6 +95,8 @@ class AgentMemoryService:
         year_counter: Counter[str] = Counter()
         question_type_counter: Counter[str] = Counter()
         question_number_counter: Counter[str] = Counter()
+        score_point_counter: Counter[str] = Counter()
+        difficulty_counter: Counter[str] = Counter()
         source_type_counter: Counter[str] = Counter()
         for material in materials:
             tag_counter.update(_json_string_list(material.tags_json))
@@ -109,6 +111,8 @@ class AgentMemoryService:
             year_counter.update(item.years)
             question_type_counter.update(item.question_types)
             question_number_counter.update(item.question_numbers)
+            score_point_counter.update(str(value) for value in item.score_points)
+            difficulty_counter.update(item.difficulty_signals)
             if item.source_type != "unknown":
                 source_type_counter.update([item.source_type])
         top_materials = [
@@ -139,6 +143,8 @@ class AgentMemoryService:
             "pdf_year_signals": _counter_items(year_counter, limit=6),
             "pdf_question_type_signals": _counter_items(question_type_counter, limit=6),
             "pdf_question_number_signals": _counter_items(question_number_counter, limit=8),
+            "pdf_score_point_signals": _counter_items(score_point_counter, limit=8),
+            "pdf_difficulty_signals": _counter_items(difficulty_counter, limit=5),
             "pdf_source_type_signals": _counter_items(source_type_counter, limit=5),
             "high_signal_materials": top_materials,
             "pdf_evidence_pages": [
@@ -252,6 +258,10 @@ def _evidence_page_payload(item: MaterialPageEvidence) -> dict[str, Any]:
     payload: dict[str, Any] = {"material_id": item.material_id, "title": item.title, "page": item.page}
     if item.question_numbers:
         payload["question_numbers"] = list(item.question_numbers)
+    if item.score_points:
+        payload["score_points"] = list(item.score_points)
+    if item.difficulty_signals:
+        payload["difficulty_signals"] = list(item.difficulty_signals)
     if item.source_type != "unknown":
         payload["source_type"] = item.source_type
     return payload

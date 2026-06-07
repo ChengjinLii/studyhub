@@ -47,6 +47,8 @@ def _evidence() -> MaterialPageEvidence:
         knowledge_signals=("调制", "解调"),
         question_numbers=("第3题",),
         source_type="past_exam",
+        score_points=(10,),
+        difficulty_signals=("综合", "偏难"),
     )
 
 
@@ -88,6 +90,8 @@ def test_course_memory_card_summarizes_current_request_collective_signals() -> N
         "question_types": ["计算题"],
         "question_numbers": ["第3题"],
         "source_type": "past_exam",
+        "score_points": [10],
+        "difficulty_signals": ["综合", "偏难"],
     }
     assert payload["version_basis"]["query_plan"]["intent"] == "exam_trend_analysis"
     version_basis_text = json.dumps(payload["version_basis"], ensure_ascii=False).lower()
@@ -96,8 +100,12 @@ def test_course_memory_card_summarizes_current_request_collective_signals() -> N
     assert payload["years"] == ["2023", "2024", "2022"]
     assert payload["question_type_distribution"] == [{"value": "计算题", "count": 1}]
     assert payload["knowledge_signals"] == [{"value": "调制", "count": 1}, {"value": "解调", "count": 1}]
+    assert payload["score_point_distribution"] == [{"value": "10", "count": 1}]
+    assert payload["difficulty_distribution"] == [{"value": "综合", "count": 1}, {"value": "偏难", "count": 1}]
     assert payload["source_type_distribution"] == [{"value": "past_exam", "count": 1}]
     assert payload["page_references"][0]["question_numbers"] == ["第3题"]
+    assert payload["page_references"][0]["score_points"] == [10]
+    assert payload["page_references"][0]["difficulty_signals"] == ["综合", "偏难"]
     assert payload["recommended_sequence"] == ["先看高频题型", "再核对年份趋势", "最后按页码打开真题资料查漏补缺"]
     assert payload["limitations"] == ["该卡片为当前请求的只读临时汇总，尚未持久化为平台正式课程记忆。"]
 

@@ -317,6 +317,10 @@ def _build_evidence_tasks(
         tasks.append("read_relevant_pdf_pages")
     if intent == "exam_trend_analysis":
         tasks.extend(["aggregate_year_signals", "aggregate_question_type_signals"])
+        if any(item.score_points for item in pdf_evidence):
+            tasks.append("aggregate_score_point_signals")
+        if any(item.difficulty_signals for item in pdf_evidence):
+            tasks.append("aggregate_difficulty_signals")
     if intent == "study_plan":
         tasks.extend(["choose_study_sequence", "adapt_to_user_profile"])
     if pdf_evidence:
@@ -338,7 +342,7 @@ def _build_response_guidance(
 ) -> list[str]:
     guidance = ["只基于候选资料、PDF 证据和记忆上下文回答，不编造平台外资料。"]
     if intent == "exam_trend_analysis":
-        guidance.append("优先输出常考题型、高频知识点、年份趋势、推荐资料和复习顺序。")
+        guidance.append("优先输出常考题型、高频知识点、年份趋势、分值结构、难度信号、推荐资料和复习顺序。")
     elif intent == "study_plan":
         guidance.append("优先输出阶段化复习顺序、资料使用顺序和下一步学习动作。")
     elif intent == "pdf_summary":

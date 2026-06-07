@@ -48,6 +48,8 @@ def test_query_planner_detects_exam_trend_plan_from_query_and_evidence() -> None
             knowledge_signals=("调制", "解调"),
             question_numbers=("第3题",),
             source_type="past_exam",
+            score_points=(10,),
+            difficulty_signals=("综合", "偏难"),
         )
     ]
     memory = AgentMemoryContext(
@@ -69,8 +71,11 @@ def test_query_planner_detects_exam_trend_plan_from_query_and_evidence() -> None
     assert plan.years == ("2024", "2023")
     assert "read_relevant_pdf_pages" in plan.evidence_tasks
     assert "aggregate_question_type_signals" in plan.evidence_tasks
+    assert "aggregate_score_point_signals" in plan.evidence_tasks
+    assert "aggregate_difficulty_signals" in plan.evidence_tasks
     assert "cite_question_numbers" in plan.evidence_tasks
     assert "personalize_with_current_user_memory" in plan.evidence_tasks
+    assert any("分值结构" in item and "难度信号" in item for item in plan.response_guidance)
 
 
 def test_query_planner_detects_study_plan_without_extra_io() -> None:

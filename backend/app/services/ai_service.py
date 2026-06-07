@@ -590,6 +590,8 @@ class AiService:
         years = _evidence_values(pdf_evidence, "years")
         question_types = _course_card_values(course_memory_card, "question_type_distribution") or _evidence_values(pdf_evidence, "question_types")
         knowledge_signals = _course_card_values(course_memory_card, "knowledge_signals") or _evidence_values(pdf_evidence, "knowledge_signals")
+        score_points = _course_card_values(course_memory_card, "score_point_distribution") or _evidence_values(pdf_evidence, "score_points")
+        difficulty_signals = _course_card_values(course_memory_card, "difficulty_distribution") or _evidence_values(pdf_evidence, "difficulty_signals")
         parts: list[str] = []
         if years:
             parts.append(f"年份信号包括 {_join_values(years)}")
@@ -597,6 +599,10 @@ class AiService:
             parts.append(f"题型集中在 {_join_values(question_types)}")
         if knowledge_signals:
             parts.append(f"高频知识点包括 {_join_values(knowledge_signals)}")
+        if score_points:
+            parts.append(f"分值信号包括 {_join_values([f'{value}分' for value in score_points])}")
+        if difficulty_signals:
+            parts.append(f"难度信号包括 {_join_values(difficulty_signals)}")
         if not parts:
             return "这些页面可以先用来确认题型和高频知识点。"
         return f"从这些页面看，{'；'.join(parts)}。"
@@ -609,6 +615,8 @@ class AiService:
         years = _evidence_values(pdf_evidence, "years")
         question_types = _course_card_values(course_memory_card, "question_type_distribution") or _evidence_values(pdf_evidence, "question_types")
         knowledge_signals = _course_card_values(course_memory_card, "knowledge_signals") or _evidence_values(pdf_evidence, "knowledge_signals")
+        score_points = _course_card_values(course_memory_card, "score_point_distribution") or _evidence_values(pdf_evidence, "score_points")
+        difficulty_signals = _course_card_values(course_memory_card, "difficulty_distribution") or _evidence_values(pdf_evidence, "difficulty_signals")
         source_types = _evidence_source_types(pdf_evidence)
         parts: list[str] = []
         if source_types:
@@ -619,6 +627,10 @@ class AiService:
             parts.append(f"包含题型 {_join_values(question_types[:4])}")
         if knowledge_signals:
             parts.append(f"涉及知识点 {_join_values(knowledge_signals[:5])}")
+        if score_points:
+            parts.append(f"出现分值 {_join_values([f'{value}分' for value in score_points[:4]])}")
+        if difficulty_signals:
+            parts.append(f"难度信号 {_join_values(difficulty_signals[:4])}")
         first = pdf_evidence[0]
         page_hint = f"建议先读《{first.title}》第 {first.page} 页建立概览"
         if not parts:
@@ -632,6 +644,8 @@ class AiService:
     ) -> str:
         question_types = _course_card_values(course_memory_card, "question_type_distribution") or _evidence_values(pdf_evidence, "question_types")
         knowledge_signals = _course_card_values(course_memory_card, "knowledge_signals") or _evidence_values(pdf_evidence, "knowledge_signals")
+        score_points = _course_card_values(course_memory_card, "score_point_distribution") or _evidence_values(pdf_evidence, "score_points")
+        difficulty_signals = _course_card_values(course_memory_card, "difficulty_distribution") or _evidence_values(pdf_evidence, "difficulty_signals")
         anchors = []
         for item in pdf_evidence[:3]:
             question_hint = f"（{_join_values(list(item.question_numbers)[:2])}）" if item.question_numbers else ""
@@ -641,6 +655,10 @@ class AiService:
             parts.append(f"先判断题型：{_join_values(question_types[:3])}")
         if knowledge_signals:
             parts.append(f"再抓核心知识点：{_join_values(knowledge_signals[:5])}")
+        if score_points:
+            parts.append(f"按分值投入时间：{_join_values([f'{value}分' for value in score_points[:4]])}")
+        if difficulty_signals:
+            parts.append(f"预估难度：{_join_values(difficulty_signals[:4])}")
         detail = "；".join(parts) if parts else "先定位题干条件、公式或步骤，再对照解析页复盘"
         return f"这类问题可以先定位到 {_join_values(anchors)}。{detail}。建议你先说卡住的是概念、公式推导还是计算步骤，我再按同类题继续拆。"
 
@@ -950,6 +968,8 @@ class AiService:
             question_types = _material_evidence_values(evidence_items, "question_types")
             question_numbers = _material_evidence_values(evidence_items, "question_numbers")
             knowledge_signals = _material_evidence_values(evidence_items, "knowledge_signals")
+            score_points = _material_evidence_values(evidence_items, "score_points")
+            difficulty_signals = _material_evidence_values(evidence_items, "difficulty_signals")
             if years:
                 parts.append(f"年份信号：{_join_values(years[:3])}")
             if question_types:
@@ -958,6 +978,10 @@ class AiService:
                 parts.append(f"题号信号：{_join_values(question_numbers[:3])}")
             elif knowledge_signals:
                 parts.append(f"知识点信号：{_join_values(knowledge_signals[:3])}")
+            if score_points:
+                parts.append(f"分值信号：{_join_values([f'{value}分' for value in score_points[:3]])}")
+            if difficulty_signals:
+                parts.append(f"难度信号：{_join_values(difficulty_signals[:3])}")
         school = self._safe_text(material, "school")
         major = self._safe_text(material, "major")
         title = self._safe_text(material, "title")

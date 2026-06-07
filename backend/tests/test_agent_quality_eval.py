@@ -50,6 +50,8 @@ def _evidence() -> MaterialPageEvidence:
         knowledge_signals=("调制", "解调", "误码率"),
         question_numbers=("第3题",),
         source_type="past_exam",
+        score_points=(10,),
+        difficulty_signals=("综合", "偏难"),
     )
 
 
@@ -169,13 +171,21 @@ def test_agent_exam_trend_closed_loop_prompt_and_response_contract(monkeypatch) 
     assert prompt["pdf_evidence"][0]["page"] == 3
     assert prompt["pdf_evidence"][0]["question_numbers"] == ["第3题"]
     assert prompt["pdf_evidence"][0]["source_type"] == "past_exam"
+    assert prompt["pdf_evidence"][0]["score_points"] == [10]
+    assert prompt["pdf_evidence"][0]["difficulty_signals"] == ["综合", "偏难"]
+    assert "aggregate_score_point_signals" in prompt["query_plan"]["evidence_tasks"]
+    assert "aggregate_difficulty_signals" in prompt["query_plan"]["evidence_tasks"]
     assert "已读取 PDF 第 3 页证据" in prompt["candidate_materials"][0]["reason"]
     assert "题型信号：计算题" in prompt["candidate_materials"][0]["reason"]
     assert "题号信号：第3题" in prompt["candidate_materials"][0]["reason"]
+    assert "分值信号：10分" in prompt["candidate_materials"][0]["reason"]
+    assert "难度信号：综合、偏难" in prompt["candidate_materials"][0]["reason"]
     assert prompt["memory_context"]["platform_collective_memory"]["pdf_question_type_signals"][0]["value"] == "计算题"
     assert prompt["memory_context"]["user_personal_memory"]["profile"]["major"] == "通信工程"
     assert prompt["course_memory_card"]["course"] == "通信原理"
     assert prompt["course_memory_card"]["page_references"][0]["question_numbers"] == ["第3题"]
+    assert prompt["course_memory_card"]["score_point_distribution"] == [{"value": "10", "count": 1}]
+    assert prompt["course_memory_card"]["difficulty_distribution"] == [{"value": "综合", "count": 1}, {"value": "偏难", "count": 1}]
 
     assert body["answer"].startswith("我看了《通信原理四年真题解析》第 3 页")
     assert {item["material_id"] for item in body["recommendations"]} == {101, 202}
@@ -192,6 +202,8 @@ def test_agent_exam_trend_closed_loop_prompt_and_response_contract(monkeypatch) 
             "source_type": "past_exam",
         }
     ]
+    assert "score_points" not in body["evidence_sources"][0]
+    assert "difficulty_signals" not in body["evidence_sources"][0]
     assert body["followup_questions"] == ["要不要按年份整理题型？", "是否需要两周复习顺序？"]
     assert "memory_context" not in json.dumps(body, ensure_ascii=False)
     assert "query_plan" not in json.dumps(body, ensure_ascii=False)
@@ -295,6 +307,8 @@ def test_agent_local_pdf_summary_uses_intent_specific_evidence(monkeypatch) -> N
     assert "资料内容结构" in body["answer"]
     assert "资料类型偏向 往年真题" in body["answer"]
     assert "涉及知识点 调制、解调、误码率" in body["answer"]
+    assert "出现分值 10分" in body["answer"]
+    assert "难度信号 综合、偏难" in body["answer"]
     assert "建议先读《通信原理四年真题解析》第 3 页建立概览" in body["answer"]
     assert body["followup_questions"] == [
         "要不要我继续按章节或页码拆解这份资料？",
@@ -350,6 +364,8 @@ def test_agent_local_problem_tutoring_uses_intent_specific_evidence(monkeypatch)
     assert "这类问题可以先定位到 《通信原理四年真题解析》第 3 页（第3题）" in body["answer"]
     assert "先判断题型：计算题" in body["answer"]
     assert "再抓核心知识点：调制、解调、误码率" in body["answer"]
+    assert "按分值投入时间：10分" in body["answer"]
+    assert "预估难度：综合、偏难" in body["answer"]
     assert body["followup_questions"] == [
         "你卡住的是概念理解、公式推导还是计算步骤？",
         "要不要我按同类题型再找几页练习？",
@@ -415,10 +431,14 @@ def test_agent_model_failure_uses_structured_local_exam_trend_fallback(monkeypat
     assert "年份信号包括 2024" in body["answer"]
     assert "题型集中在 计算题" in body["answer"]
     assert "高频知识点包括 调制、解调、误码率" in body["answer"]
+    assert "分值信号包括 10分" in body["answer"]
+    assert "难度信号包括 综合、偏难" in body["answer"]
     assert "《通信原理四年真题解析》第 3 页" in body["answer"]
     assert "已读取 PDF 第 3 页证据" in body["recommendations"][0]["reason"]
     assert "年份信号：2024" in body["recommendations"][0]["reason"]
     assert "题号信号：第3题" in body["recommendations"][0]["reason"]
+    assert "分值信号：10分" in body["recommendations"][0]["reason"]
+    assert "难度信号：综合、偏难" in body["recommendations"][0]["reason"]
     assert body["evidence_sources"][0]["question_numbers"] == ["第3题"]
     assert body["followup_questions"] == [
         "要不要我按年份整理常考题型？",
