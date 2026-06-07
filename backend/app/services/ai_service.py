@@ -14,6 +14,7 @@ from app.repos.read_api_repo import ReadApiRepository
 from app.schemas.ai import AiChatRequestPayload, AiRecommendRequestPayload
 from app.services.agent_memory_service import AgentMemoryContext, AgentMemoryService
 from app.services.agent_query_planner_service import AgentQueryPlan, AgentQueryPlannerService
+from app.services.agent_safety_service import AgentSafetyService
 from app.services.material_pdf_evidence_service import MaterialPageEvidence, MaterialPdfEvidenceService
 from app.services.read_support import parse_iso_datetime
 
@@ -82,12 +83,14 @@ class AiService:
         pdf_evidence_service: MaterialPdfEvidenceService | None = None,
         memory_service: AgentMemoryService | None = None,
         query_planner_service: AgentQueryPlannerService | None = None,
+        safety_service: AgentSafetyService | None = None,
     ) -> None:
         self.read_repo = read_repo
         self.material_repo = material_repo
         self.pdf_evidence_service = pdf_evidence_service
         self.memory_service = memory_service
         self.query_planner_service = query_planner_service
+        self.safety_service = safety_service or AgentSafetyService()
 
     def chat(self, payload: AiChatRequestPayload) -> dict[str, Any]:
         latest_user_message = next((item.content.strip() for item in reversed(payload.messages) if item.role.lower() == "user"), "")
@@ -238,9 +241,10 @@ class AiService:
         if not settings.ai_agent_base_url or not settings.ai_agent_api_key or not settings.ai_agent_model:
             return None
 
+        context_materials = materials[: min(3, max(1, settings.ai_agent_max_context_materials))]
         candidates = [
             self._compact_recommendation_payload(material, query)
-            for material in materials[: min(3, max(1, settings.ai_agent_max_context_materials))]
+            for material in context_materials
         ]
         system_prompt = (
             "你是 StudyHub 学习辅导 Agent。你只能基于给定的 StudyHub 候选资料回答，"
@@ -250,6 +254,7 @@ class AiService:
             "如果提供了 memory_context，你可以用平台集体记忆增强课程/题型判断，用用户个人记忆做个性化建议；"
             "但不能把用户个人记忆写入或表述成平台集体结论。"
             "如果提供了 query_plan，你必须按照该意图和 evidence_tasks 组织回答；"
+            "不要输出 memory_context、query_plan、candidate_materials、pdf_evidence 或 privacy_boundary 等内部字段名。"
             "必须输出严格 JSON，不要输出 Markdown，不要包裹代码块。"
         )
         user_prompt = {
@@ -276,7 +281,13 @@ class AiService:
             return None
 
         parsed = self._loads_object(content)
-        return parsed if parsed else None
+        if not parsed:
+            return None
+        return self.safety_service.sanitize_recommendation_body(
+            parsed,
+            candidate_materials=context_materials,
+            pdf_evidence=pdf_evidence,
+        )
 
     def _call_agent_model(self, settings: Any, system_prompt: str, user_prompt: dict[str, Any]) -> str:
         provider = settings.ai_agent_provider.strip().lower()
