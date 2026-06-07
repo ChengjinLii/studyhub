@@ -523,6 +523,13 @@ class PayoutService:
 
         now = datetime.now(UTC)
         bound = self.finance_repo.list_settlements_for_transfer(session, transfer.id)
+        if not bound:
+            # 遗留兼容：部署前提交的在途转账没有绑定记录，按旧口径认领当前到期结算单。
+            # 认领即盖章，因此重复回调不会再次进入该分支。
+            bound = self.finance_repo.list_pending_due_settlements_for_uploader(session, application.user_id, now)
+            for settlement in bound:
+                settlement.payout_transfer_id = transfer.id
+                self.finance_repo.save_settlement(session, settlement)
         for settlement in bound:
             if settlement.status != "PENDING":
                 continue

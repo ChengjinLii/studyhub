@@ -213,3 +213,60 @@ def test_in_flight_settlements_excluded_from_withdrawable_earnings(
     earnings = after.json()["data"]["earnings"]
     assert earnings["payoutAmount"] == 0  # S1 在途，不可重复提现
     assert earnings["unclaimedPayoutTotal"] == 1400  # 仍是 PENDING，未结总额口径不变
+
+
+def test_legacy_unbound_transfer_falls_back_and_repeat_callback_is_idempotent(
+    client: TestClient,
+    auth_service: AuthService,
+) -> None:
+    """遗留兼容：部署前已提交、无绑定结算单的在途转账，SUCCESS 时按旧口径认领；重复回调幂等。"""
+    seed_read_users(auth_service, with_follow_graph=True)
+    alice_headers = build_auth_headers(1, 1)
+    baishan_headers = build_auth_headers(2, 2)
+    finance_repo = get_finance_repo()
+
+    material_1 = _create_paid_material(client, baishan_headers, title="遗留回退资料一", price_cents=2000)
+    out_trade_no_1, order_id_1 = _pay_order(client, alice_headers, material_1, total_amount="20.00")
+    _make_settlement_due(out_trade_no_1)
+
+    application_id = _create_payout_application(client, baishan_headers)
+
+    # 直接落库一笔"部署前"的在途转账：SUBMITTED 且没有任何绑定结算单
+    from app.models.finance import PayoutTransferRecord
+
+    with session_scope() as session:
+        legacy = PayoutTransferRecord(
+            payout_application_id=application_id,
+            uploader_id=2,
+            out_biz_no=finance_repo.build_out_biz_no(),
+            amount=1400,
+            payee_account="chengjin@example.com",
+            payee_name="白山",
+            status="SUBMITTED",
+        )
+        legacy = finance_repo.save_payout_transfer(session, legacy)
+        legacy_id = int(legacy.id)
+        out_biz_no = legacy.out_biz_no
+        session.commit()
+
+    _gateway_success(client, out_biz_no)
+
+    with session_scope() as session:
+        settlements = finance_repo.list_settlements_for_uploader(session, 2)
+        s1 = next(item for item in settlements if item.order_id == order_id_1)
+        assert s1.status == "PAID"  # 回退口径认领并结算
+        assert s1.payout_transfer_id == legacy_id  # 盖章，防重复
+
+    # 在途期间又有新结算单到期，然后重复投递 SUCCESS 回调
+    material_2 = _create_paid_material(client, baishan_headers, title="遗留回退资料二", price_cents=1000)
+    out_trade_no_2, order_id_2 = _pay_order(client, alice_headers, material_2, total_amount="10.00")
+    _make_settlement_due(out_trade_no_2)
+
+    _gateway_success(client, out_biz_no)
+
+    with session_scope() as session:
+        settlements = finance_repo.list_settlements_for_uploader(session, 2)
+        s2 = next(item for item in settlements if item.order_id == order_id_2)
+        # 幂等关键断言：已盖章的转账重复回调不得再认领新结算单
+        assert s2.status == "PENDING"
+        assert s2.payout_transfer_id is None
