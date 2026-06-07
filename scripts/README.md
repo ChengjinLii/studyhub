@@ -27,10 +27,10 @@
 STUDYHUB_PREDEPLOY_PRODUCTION_CHECKS=0 bash scripts/predeploy-check.sh
 ```
 
-`predeploy-check.sh` 默认使用 `--all` 清理生成物，适合本地和 CI。若必须在生产机器上检查源码但要保留当前运行中的 Next.js 构建产物，可以改用：
+`predeploy-check.sh` 默认使用 `--source` 清理源码缓存和测试产物，并保留当前运行可能依赖的 Next.js 构建产物。若在本地或 CI 中准备重新构建前端，可以显式改用全量清理：
 
 ```bash
-STUDYHUB_PREDEPLOY_CLEAN_MODE=source bash scripts/predeploy-check.sh
+STUDYHUB_PREDEPLOY_CLEAN_MODE=all bash scripts/predeploy-check.sh
 ```
 
 更具体的命令、环境变量和注意事项已经分别下沉到各子目录 README。
