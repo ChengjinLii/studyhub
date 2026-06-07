@@ -11,6 +11,7 @@ BACKEND_PORT="${PRODUCTION_BACKEND_PORT:-8311}"
 FRONTEND_PORT="${PRODUCTION_FRONTEND_PORT:-3300}"
 BACKEND_PID_FILE="$RUN_DIR/backend.pid"
 FRONTEND_PID_FILE="$RUN_DIR/frontend.pid"
+RUN_PREFLIGHT="${STUDYHUB_PRODUCTION_UP_PREFLIGHT:-1}"
 
 mkdir -p "$RUN_DIR" "$LOG_DIR" "$RUNTIME_ROOT"
 
@@ -51,12 +52,11 @@ if [[ ! -d "$ROOT_DIR/frontend/node_modules" ]]; then
   exit 1
 fi
 
-(
-  cd "$ROOT_DIR/backend"
-  export STUDYHUB_ENVIRONMENT=production
-  export STUDYHUB_PRIVATE_DIR_PATH="$PRIVATE_DIR"
-  "$ROOT_DIR/.venv/bin/python" -m app.ops.db_admin check >/dev/null
-)
+if [[ "$RUN_PREFLIGHT" == "0" || "$RUN_PREFLIGHT" == "false" ]]; then
+  echo "production preflight skipped: STUDYHUB_PRODUCTION_UP_PREFLIGHT=$RUN_PREFLIGHT"
+else
+  STUDYHUB_PRIVATE_DIR_PATH="$PRIVATE_DIR" bash "$ROOT_DIR/scripts/runtime/production-preflight.sh"
+fi
 
 (
   cd "$ROOT_DIR/frontend"
