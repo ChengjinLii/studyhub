@@ -56,7 +56,7 @@ def test_agent_safety_filters_unknown_recommendations_and_unread_pages() -> None
     )
 
     assert sanitized == {
-        "answer": "建议先看候选真题资料。",
+        "answer": "建议先看候选真题资料。 来源：《通信原理四年真题解析》第 2 页（第3题）。",
         "recommendations": [{"material_id": 101, "reason": "与通信原理真题匹配"}],
         "evidence_sources": [
             {
@@ -69,6 +69,29 @@ def test_agent_safety_filters_unknown_recommendations_and_unread_pages() -> None
         ],
         "followup_questions": ["要不要按题型整理？"],
     }
+
+
+def test_agent_safety_adds_read_pdf_source_hint_when_model_omits_citation() -> None:
+    sanitized = AgentSafetyService().sanitize_recommendation_body(
+        {
+            "answer": "通信原理近年常考计算题，建议优先复盘调制解调。",
+            "recommendations": [{"material_id": 101, "reason": "与通信原理真题匹配"}],
+        },
+        candidate_materials=[_material()],
+        pdf_evidence=[_evidence()],
+    )
+
+    assert sanitized is not None
+    assert sanitized["answer"] == "通信原理近年常考计算题，建议优先复盘调制解调。 来源：《通信原理四年真题解析》第 2 页（第3题）。"
+    assert sanitized["evidence_sources"] == [
+        {
+            "material_id": 101,
+            "title": "通信原理四年真题解析",
+            "page": 2,
+            "question_numbers": ["第3题"],
+            "source_type": "past_exam",
+        }
+    ]
 
 
 def test_agent_safety_rejects_internal_context_leaks_and_invalid_only_recommendations() -> None:

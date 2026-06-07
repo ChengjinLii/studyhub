@@ -37,6 +37,10 @@ class AgentSafetyService:
 
         if had_recommendation_list and not recommendations:
             answer = ""
+        if answer and pdf_evidence:
+            if not evidence_sources:
+                evidence_sources = self._fallback_evidence_sources(pdf_evidence)
+            answer = self._ensure_answer_has_source_hint(answer, evidence_sources)
         if not answer and not recommendations:
             return None
 
@@ -108,6 +112,31 @@ class AgentSafetyService:
                 break
         return sources
 
+    def _fallback_evidence_sources(self, pdf_evidence: list[MaterialPageEvidence]) -> list[dict[str, Any]]:
+        sources: list[dict[str, Any]] = []
+        for evidence in pdf_evidence[:6]:
+            source: dict[str, Any] = {
+                "material_id": int(evidence.material_id),
+                "title": evidence.title,
+                "page": int(evidence.page),
+            }
+            if evidence.question_numbers:
+                source["question_numbers"] = list(evidence.question_numbers)
+            if evidence.source_type != "unknown":
+                source["source_type"] = evidence.source_type
+            sources.append(source)
+        return sources
+
+    def _ensure_answer_has_source_hint(self, answer: str, evidence_sources: list[dict[str, Any]]) -> str:
+        if not answer or not evidence_sources or _answer_mentions_source(answer, evidence_sources):
+            return answer
+        hint = _source_hint(evidence_sources)
+        if not hint:
+            return answer
+        max_chars = 1800
+        trimmed_answer = answer[: max(0, max_chars - len(hint) - 1)].rstrip()
+        return f"{trimmed_answer} {hint}".strip()
+
     def _sanitize_followups(self, value: Any) -> list[str]:
         if not isinstance(value, list):
             return []
@@ -136,3 +165,35 @@ def _clean_text(value: Any, *, max_chars: int) -> str:
     if value is None:
         return ""
     return re.sub(r"\s+", " ", str(value)).strip()[:max_chars]
+
+
+def _answer_mentions_source(answer: str, evidence_sources: list[dict[str, Any]]) -> bool:
+    normalized = answer.lower()
+    for source in evidence_sources:
+        title = _clean_text(source.get("title"), max_chars=120)
+        page = _safe_int(source.get("page"))
+        if title and title.lower() in normalized:
+            return True
+        if page is not None and (f"第 {page} 页" in answer or f"第{page}页" in answer):
+            return True
+    return False
+
+
+def _source_hint(evidence_sources: list[dict[str, Any]]) -> str:
+    parts: list[str] = []
+    for source in evidence_sources[:3]:
+        title = _clean_text(source.get("title"), max_chars=80)
+        page = _safe_int(source.get("page"))
+        if not title or page is None:
+            continue
+        question_numbers = source.get("question_numbers")
+        question_hint = ""
+        if isinstance(question_numbers, list):
+            cleaned = [_clean_text(item, max_chars=24) for item in question_numbers[:3]]
+            cleaned = [item for item in cleaned if item]
+            if cleaned:
+                question_hint = f"（{', '.join(cleaned)}）"
+        parts.append(f"《{title}》第 {page} 页{question_hint}")
+    if not parts:
+        return ""
+    return f"来源：{'；'.join(parts)}。"

@@ -201,4 +201,4 @@ def test_ai_prompt_receives_course_memory_card(monkeypatch) -> None:
     assert captured["user_prompt"]["course_memory_card"]["course"] == "通信工程"
     assert captured["user_prompt"]["course_memory_card"]["page_references"][0]["page"] == 3
     assert "course_memory_card" in captured["system_prompt"]
-    assert body["answer"] == "已结合课程记忆卡片分析通信原理真题。"
+    assert body["answer"] == "已结合课程记忆卡片分析通信原理真题。 来源：《通信原理四年真题解析》第 3 页（第3题）。"
