@@ -42,7 +42,7 @@ STUDYHUB_PRIVATE_DIR_PATH=/data/studyhub/private \
   --only orders.uploader_id
 ```
 
-确认备份和 SQL 后才允许执行 `--yes`。`migrate-additive` 只会执行审计生成的 `ADD COLUMN` 语句，production 执行前要求已有非空备份。
+确认备份和 SQL 后才允许执行 `--yes`。`migrate-additive` 只会执行审计生成的 `ADD COLUMN` 语句，production 执行前默认要求最近 120 分钟内已有非空备份；如需调整窗口，可传入 `--backup-max-age-minutes`。
 
 如果目标库已经由旧流程建好表，只需要记录当前迁移版本：
 
