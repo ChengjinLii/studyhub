@@ -2,12 +2,14 @@ from __future__ import annotations
 
 import json
 import re
+from time import perf_counter
 from typing import Any
 
 import httpx
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
+from app.core.observability import get_runtime_metrics
 from app.models.materials import MaterialRecord
 from app.repos.material_repo import MaterialRepository
 from app.repos.read_api_repo import ReadApiRepository
@@ -113,57 +115,81 @@ class AiService:
         *,
         current_user_id: int | None = None,
     ) -> dict[str, Any]:
-        materials = self._rank_materials(session, payload.query, payload.filters or {})
-        pdf_evidence = self._collect_pdf_evidence(materials, payload.query, current_user_id=current_user_id)
-        memory_context = self._collect_memory_context(
-            session,
-            query=payload.query,
-            materials=materials,
-            current_user_id=current_user_id,
-            pdf_evidence=pdf_evidence,
-        )
-        query_plan = self._build_query_plan(
-            payload.query,
-            materials=materials,
-            pdf_evidence=pdf_evidence,
-            memory_context=memory_context,
-        )
-        course_memory_card = self._build_course_memory_card(
-            materials=materials,
-            pdf_evidence=pdf_evidence,
-            memory_context=memory_context,
-            query_plan=query_plan,
-        )
-        recommendations = [self._recommendation_payload(material, payload.query) for material in materials[:3]]
-        llm_body = self._generate_agent_recommendation(
-            payload.query,
-            materials,
-            pdf_evidence=pdf_evidence,
-            memory_context=memory_context,
-            query_plan=query_plan,
-            course_memory_card=course_memory_card,
-        )
-        if llm_body:
-            recommendations = self._merge_llm_recommendations(llm_body, recommendations)
-        body = {
-            "recommendations": recommendations,
-            "answer": llm_body.get("answer")
-            if llm_body
-            else self._build_local_answer(payload.query, recommendations, pdf_evidence, memory_context),
-            "followup_questions": [
-                "你更想要真题、笔记还是经验分享？",
-                "是否需要限定学校、学院或专业？",
-            ],
-        }
-        if pdf_evidence:
-            body["evidence_sources"] = [item.to_source_payload() for item in pdf_evidence]
-        if llm_body and isinstance(llm_body.get("followup_questions"), list):
-            body["followup_questions"] = [
-                str(item).strip()
-                for item in llm_body["followup_questions"]
-                if isinstance(item, (str, int, float)) and str(item).strip()
-            ][:3] or body["followup_questions"]
-        return {"output": f"<json>{json.dumps(body, ensure_ascii=False, separators=(',', ':'))}</json>"}
+        started_at = perf_counter()
+        settings = get_settings()
+        provider = settings.ai_agent_provider.strip().lower() or "local"
+        model_configured = self._is_agent_model_configured(settings)
+        status = "local_fallback"
+        pdf_evidence: list[MaterialPageEvidence] = []
+        memory_context: AgentMemoryContext | None = None
+        course_memory_card: CourseMemoryCard | None = None
+        try:
+            materials = self._rank_materials(session, payload.query, payload.filters or {})
+            pdf_evidence = self._collect_pdf_evidence(materials, payload.query, current_user_id=current_user_id)
+            memory_context = self._collect_memory_context(
+                session,
+                query=payload.query,
+                materials=materials,
+                current_user_id=current_user_id,
+                pdf_evidence=pdf_evidence,
+            )
+            query_plan = self._build_query_plan(
+                payload.query,
+                materials=materials,
+                pdf_evidence=pdf_evidence,
+                memory_context=memory_context,
+            )
+            course_memory_card = self._build_course_memory_card(
+                materials=materials,
+                pdf_evidence=pdf_evidence,
+                memory_context=memory_context,
+                query_plan=query_plan,
+            )
+            recommendations = [self._recommendation_payload(material, payload.query) for material in materials[:3]]
+            llm_body = self._generate_agent_recommendation(
+                payload.query,
+                materials,
+                pdf_evidence=pdf_evidence,
+                memory_context=memory_context,
+                query_plan=query_plan,
+                course_memory_card=course_memory_card,
+            )
+            if llm_body:
+                status = "model_success"
+                recommendations = self._merge_llm_recommendations(llm_body, recommendations)
+            elif model_configured:
+                status = "model_fallback"
+            body = {
+                "recommendations": recommendations,
+                "answer": llm_body.get("answer")
+                if llm_body
+                else self._build_local_answer(payload.query, recommendations, pdf_evidence, memory_context),
+                "followup_questions": [
+                    "你更想要真题、笔记还是经验分享？",
+                    "是否需要限定学校、学院或专业？",
+                ],
+            }
+            if pdf_evidence:
+                body["evidence_sources"] = [item.to_source_payload() for item in pdf_evidence]
+            if llm_body and isinstance(llm_body.get("followup_questions"), list):
+                body["followup_questions"] = [
+                    str(item).strip()
+                    for item in llm_body["followup_questions"]
+                    if isinstance(item, (str, int, float)) and str(item).strip()
+                ][:3] or body["followup_questions"]
+            return {"output": f"<json>{json.dumps(body, ensure_ascii=False, separators=(',', ':'))}</json>"}
+        except Exception:
+            status = "error"
+            raise
+        finally:
+            get_runtime_metrics().record_ai_agent_run(
+                provider=provider,
+                status=status,
+                pdf_evidence=bool(pdf_evidence),
+                memory_context=memory_context is not None,
+                course_memory_card=course_memory_card is not None,
+                duration_seconds=perf_counter() - started_at,
+            )
 
     def _recommendation_payload(self, material: MaterialRecord, query: str) -> dict[str, Any]:
         return {
@@ -266,10 +292,7 @@ class AiService:
         course_memory_card: CourseMemoryCard | None,
     ) -> dict[str, Any] | None:
         settings = get_settings()
-        provider = settings.ai_agent_provider.strip().lower()
-        if provider not in CHAT_COMPLETIONS_AGENT_PROVIDERS | SUB2API_AGENT_PROVIDERS:
-            return None
-        if not settings.ai_agent_base_url or not settings.ai_agent_api_key or not settings.ai_agent_model:
+        if not self._is_agent_model_configured(settings):
             return None
 
         context_materials = materials[: min(3, max(1, settings.ai_agent_max_context_materials))]
@@ -321,6 +344,12 @@ class AiService:
             candidate_materials=context_materials,
             pdf_evidence=pdf_evidence,
         )
+
+    def _is_agent_model_configured(self, settings: Any) -> bool:
+        provider = settings.ai_agent_provider.strip().lower()
+        if provider not in CHAT_COMPLETIONS_AGENT_PROVIDERS | SUB2API_AGENT_PROVIDERS:
+            return False
+        return bool(settings.ai_agent_base_url and settings.ai_agent_api_key and settings.ai_agent_model)
 
     def _call_agent_model(self, settings: Any, system_prompt: str, user_prompt: dict[str, Any]) -> str:
         provider = settings.ai_agent_provider.strip().lower()

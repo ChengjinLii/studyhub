@@ -43,6 +43,8 @@ class RuntimeMetrics:
         self._mcp_tool_durations: dict[tuple[str, str], _Aggregate] = defaultdict(_Aggregate)
         self._cache_events_total: dict[tuple[str, str, str], int] = defaultdict(int)
         self._security_events_total: dict[tuple[str, str], int] = defaultdict(int)
+        self._ai_agent_runs_total: dict[tuple[str, str, str, str, str], int] = defaultdict(int)
+        self._ai_agent_run_durations: dict[tuple[str, str, str, str, str], _Aggregate] = defaultdict(_Aggregate)
 
     def clear(self) -> None:
         with self._lock:
@@ -54,6 +56,8 @@ class RuntimeMetrics:
             self._mcp_tool_durations.clear()
             self._cache_events_total.clear()
             self._security_events_total.clear()
+            self._ai_agent_runs_total.clear()
+            self._ai_agent_run_durations.clear()
             self.started_at = time.time()
 
     def record_http_request(
@@ -109,6 +113,27 @@ class RuntimeMetrics:
         reason_key = reason or "unknown"
         with self._lock:
             self._security_events_total[(event_key, reason_key)] += 1
+
+    def record_ai_agent_run(
+        self,
+        *,
+        provider: str,
+        status: str,
+        pdf_evidence: bool,
+        memory_context: bool,
+        course_memory_card: bool,
+        duration_seconds: float,
+    ) -> None:
+        labels = (
+            _bounded_label(provider or "local"),
+            _bounded_label((status or "unknown").lower()),
+            "yes" if pdf_evidence else "no",
+            "yes" if memory_context else "no",
+            "yes" if course_memory_card else "no",
+        )
+        with self._lock:
+            self._ai_agent_runs_total[labels] += 1
+            self._ai_agent_run_durations[labels].observe(duration_seconds)
 
     def render_prometheus(self, settings: Settings) -> str:
         lines: list[str] = [
@@ -203,6 +228,33 @@ class RuntimeMetrics:
             for (event, reason), count in sorted(self._security_events_total.items()):
                 labels = 'event="%s",reason="%s"' % (_sanitize_label(event), _sanitize_label(reason))
                 lines.append(f"studyhub_security_events_total{{{labels}}} {count}")
+            lines.extend(
+                [
+                    "# HELP studyhub_ai_agent_runs_total StudyHub Agent recommendation runs by provider, status, and bounded context usage.",
+                    "# TYPE studyhub_ai_agent_runs_total counter",
+                    "# HELP studyhub_ai_agent_run_duration_seconds_count StudyHub Agent run count by provider, status, and bounded context usage.",
+                    "# TYPE studyhub_ai_agent_run_duration_seconds_count counter",
+                    "# HELP studyhub_ai_agent_run_duration_seconds_sum StudyHub Agent run duration sum by provider, status, and bounded context usage.",
+                    "# TYPE studyhub_ai_agent_run_duration_seconds_sum counter",
+                    "# HELP studyhub_ai_agent_run_duration_seconds_max StudyHub Agent run max duration by provider, status, and bounded context usage.",
+                    "# TYPE studyhub_ai_agent_run_duration_seconds_max gauge",
+                ]
+            )
+            for (provider, status, pdf_evidence, memory_context, course_memory_card), count in sorted(
+                self._ai_agent_runs_total.items()
+            ):
+                labels = 'provider="%s",status="%s",pdf_evidence="%s",memory_context="%s",course_memory_card="%s"' % (
+                    _sanitize_label(provider),
+                    _sanitize_label(status),
+                    _sanitize_label(pdf_evidence),
+                    _sanitize_label(memory_context),
+                    _sanitize_label(course_memory_card),
+                )
+                lines.append(f"studyhub_ai_agent_runs_total{{{labels}}} {count}")
+                aggregate = self._ai_agent_run_durations[(provider, status, pdf_evidence, memory_context, course_memory_card)]
+                lines.append(f"studyhub_ai_agent_run_duration_seconds_count{{{labels}}} {aggregate.count}")
+                lines.append(f"studyhub_ai_agent_run_duration_seconds_sum{{{labels}}} {aggregate.total_seconds:.6f}")
+                lines.append(f"studyhub_ai_agent_run_duration_seconds_max{{{labels}}} {aggregate.max_seconds:.6f}")
         lines.append("")
         return "\n".join(lines)
 
@@ -212,3 +264,8 @@ _RUNTIME_METRICS = RuntimeMetrics()
 
 def get_runtime_metrics() -> RuntimeMetrics:
     return _RUNTIME_METRICS
+
+
+def _bounded_label(value: str) -> str:
+    normalized = (value or "unknown").strip().lower().replace(" ", "_")
+    return normalized[:64] or "unknown"

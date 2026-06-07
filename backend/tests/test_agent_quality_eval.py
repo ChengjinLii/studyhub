@@ -5,6 +5,7 @@ from types import SimpleNamespace
 from typing import Any
 
 from app.core.config import Settings
+from app.core.observability import get_runtime_metrics
 from app.models.materials import MaterialRecord
 from app.services.agent_course_memory_service import AgentCourseMemoryService
 from app.services.agent_memory_service import AgentMemoryContext
@@ -54,6 +55,8 @@ def _evidence() -> MaterialPageEvidence:
 
 def test_agent_exam_trend_closed_loop_prompt_and_response_contract(monkeypatch) -> None:
     captured: dict[str, Any] = {}
+    metrics = get_runtime_metrics()
+    metrics.clear()
     materials = [
         _material(
             101,
@@ -189,3 +192,14 @@ def test_agent_exam_trend_closed_loop_prompt_and_response_contract(monkeypatch) 
     assert body["followup_questions"] == ["要不要按年份整理题型？", "是否需要两周复习顺序？"]
     assert "memory_context" not in json.dumps(body, ensure_ascii=False)
     assert "query_plan" not in json.dumps(body, ensure_ascii=False)
+
+    metrics_text = metrics.render_prometheus(settings)
+    assert (
+        'studyhub_ai_agent_runs_total{provider="openai-compatible",status="model_success",'
+        'pdf_evidence="yes",memory_context="yes",course_memory_card="yes"} 1'
+    ) in metrics_text
+    assert (
+        'studyhub_ai_agent_run_duration_seconds_count{provider="openai-compatible",status="model_success",'
+        'pdf_evidence="yes",memory_context="yes",course_memory_card="yes"} 1'
+    ) in metrics_text
+    metrics.clear()
