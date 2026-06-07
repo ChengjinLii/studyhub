@@ -12,6 +12,7 @@ from app.models.materials import MaterialRecord
 from app.repos.material_repo import MaterialRepository
 from app.repos.read_api_repo import ReadApiRepository
 from app.schemas.ai import AiChatRequestPayload, AiRecommendRequestPayload
+from app.services.material_pdf_evidence_service import MaterialPageEvidence, MaterialPdfEvidenceService
 from app.services.read_support import parse_iso_datetime
 
 
@@ -65,13 +66,22 @@ LOW_VALUE_QUERY_TERMS = {
     "更有效",
 }
 
+CHAT_COMPLETIONS_AGENT_PROVIDERS = {"custom", "openai-compatible", "openai_compatible"}
+SUB2API_AGENT_PROVIDERS = {"sub2api", "codex-sub2api", "codex_sub2api"}
+
 
 class AiService:
-    """本地兼容层只负责维持现有请求/响应契约，不在 Step 10 引入外部 AI 依赖。"""
+    """StudyHub AI compatibility layer with optional external agent providers."""
 
-    def __init__(self, read_repo: ReadApiRepository, material_repo: MaterialRepository) -> None:
+    def __init__(
+        self,
+        read_repo: ReadApiRepository,
+        material_repo: MaterialRepository,
+        pdf_evidence_service: MaterialPdfEvidenceService | None = None,
+    ) -> None:
         self.read_repo = read_repo
         self.material_repo = material_repo
+        self.pdf_evidence_service = pdf_evidence_service
 
     def chat(self, payload: AiChatRequestPayload) -> dict[str, Any]:
         latest_user_message = next((item.content.strip() for item in reversed(payload.messages) if item.role.lower() == "user"), "")
@@ -84,20 +94,29 @@ class AiService:
         )
         return {"content": content}
 
-    def recommend(self, session: Session, payload: AiRecommendRequestPayload) -> dict[str, Any]:
+    def recommend(
+        self,
+        session: Session,
+        payload: AiRecommendRequestPayload,
+        *,
+        current_user_id: int | None = None,
+    ) -> dict[str, Any]:
         materials = self._rank_materials(session, payload.query, payload.filters or {})
+        pdf_evidence = self._collect_pdf_evidence(materials, payload.query, current_user_id=current_user_id)
         recommendations = [self._recommendation_payload(material, payload.query) for material in materials[:3]]
-        llm_body = self._generate_agent_recommendation(payload.query, materials)
+        llm_body = self._generate_agent_recommendation(payload.query, materials, pdf_evidence=pdf_evidence)
         if llm_body:
             recommendations = self._merge_llm_recommendations(llm_body, recommendations)
         body = {
             "recommendations": recommendations,
-            "answer": llm_body.get("answer") if llm_body else self._build_local_answer(payload.query, recommendations),
+            "answer": llm_body.get("answer") if llm_body else self._build_local_answer(payload.query, recommendations, pdf_evidence),
             "followup_questions": [
                 "你更想要真题、笔记还是经验分享？",
                 "是否需要限定学校、学院或专业？",
             ],
         }
+        if pdf_evidence:
+            body["evidence_sources"] = [item.to_source_payload() for item in pdf_evidence]
         if llm_body and isinstance(llm_body.get("followup_questions"), list):
             body["followup_questions"] = [
                 str(item).strip()
@@ -115,9 +134,34 @@ class AiService:
             "summary": self._safe_text(material, "description"),
         }
 
-    def _generate_agent_recommendation(self, query: str, materials: list[MaterialRecord]) -> dict[str, Any] | None:
+    def _collect_pdf_evidence(
+        self,
+        materials: list[MaterialRecord],
+        query: str,
+        *,
+        current_user_id: int | None,
+    ) -> list[MaterialPageEvidence]:
+        if not self.pdf_evidence_service:
+            return []
+        try:
+            return self.pdf_evidence_service.collect_for_materials(
+                materials,
+                query,
+                current_user_id=current_user_id,
+            )
+        except Exception:
+            return []
+
+    def _generate_agent_recommendation(
+        self,
+        query: str,
+        materials: list[MaterialRecord],
+        *,
+        pdf_evidence: list[MaterialPageEvidence],
+    ) -> dict[str, Any] | None:
         settings = get_settings()
-        if settings.ai_agent_provider.strip().lower() not in {"custom", "openai-compatible", "openai_compatible"}:
+        provider = settings.ai_agent_provider.strip().lower()
+        if provider not in CHAT_COMPLETIONS_AGENT_PROVIDERS | SUB2API_AGENT_PROVIDERS:
             return None
         if not settings.ai_agent_base_url or not settings.ai_agent_api_key or not settings.ai_agent_model:
             return None
@@ -127,14 +171,16 @@ class AiService:
             for material in materials[: min(3, max(1, settings.ai_agent_max_context_materials))]
         ]
         system_prompt = (
-            "你是 StudyHub 的 Hermes 学习辅导 Agent。你只能基于给定的 StudyHub 候选资料回答，"
+            "你是 StudyHub 学习辅导 Agent。你只能基于给定的 StudyHub 候选资料回答，"
             "不要编造不存在的资料。用户可能需要资料推荐、真题讲解思路、复习规划或错题辅导。"
             "如果候选资料不足，要明确说明并追问课程范围。"
+            "如果提供了 pdf_evidence，你必须优先基于这些页级证据总结，并在关键结论中引用资料名和页码。"
             "必须输出严格 JSON，不要输出 Markdown，不要包裹代码块。"
         )
         user_prompt = {
             "user_query": query,
             "candidate_materials": candidates,
+            "pdf_evidence": [item.to_prompt_payload() for item in pdf_evidence],
             "output_schema": {
                 "answer": "面向学生的自然语言回答，结合资料说明下一步怎么学。若用户要求讲解真题，先给通用解题路径，并建议打开最相关真题资料。",
                 "recommendations": [
@@ -143,37 +189,76 @@ class AiService:
                         "reason": "为什么推荐这份资料，必须贴合用户问题",
                     }
                 ],
+                "evidence_sources": [{"material_id": "候选资料中的 material_id", "page": "页码", "title": "资料名"}],
                 "followup_questions": ["最多 3 个追问或下一步学习动作"],
             },
         }
         try:
-            with httpx.Client(timeout=max(10.0, settings.ai_agent_timeout_seconds), trust_env=False) as client:
-                response = client.post(
-                    f"{settings.ai_agent_base_url.rstrip('/')}/chat/completions",
-                    headers={
-                        "Authorization": f"Bearer {settings.ai_agent_api_key}",
-                        "Content-Type": "application/json",
-                    },
-                    json={
-                        "model": settings.ai_agent_model,
-                        "temperature": 0.2,
-                        "max_tokens": 900,
-                        "chat_template_kwargs": {"enable_thinking": False},
-                        "thinking": {"type": "disabled"},
-                        "messages": [
-                            {"role": "system", "content": system_prompt},
-                            {"role": "user", "content": json.dumps(user_prompt, ensure_ascii=False)},
-                        ],
-                    },
-                )
-                response.raise_for_status()
-                payload = response.json()
+            content = self._call_agent_model(settings, system_prompt, user_prompt)
         except Exception:
             return None
 
-        content = self._extract_chat_content(payload)
         parsed = self._loads_object(content)
         return parsed if parsed else None
+
+    def _call_agent_model(self, settings: Any, system_prompt: str, user_prompt: dict[str, Any]) -> str:
+        provider = settings.ai_agent_provider.strip().lower()
+        if provider in SUB2API_AGENT_PROVIDERS:
+            return self._call_sub2api_responses_api(settings, system_prompt, user_prompt)
+        return self._call_chat_completions_api(settings, system_prompt, user_prompt)
+
+    def _call_chat_completions_api(self, settings: Any, system_prompt: str, user_prompt: dict[str, Any]) -> str:
+        with httpx.Client(timeout=max(10.0, settings.ai_agent_timeout_seconds), trust_env=False) as client:
+            response = client.post(
+                f"{settings.ai_agent_base_url.rstrip('/')}/chat/completions",
+                headers=self._agent_headers(settings.ai_agent_api_key),
+                json={
+                    "model": settings.ai_agent_model,
+                    "temperature": 0.2,
+                    "max_tokens": 900,
+                    "chat_template_kwargs": {"enable_thinking": False},
+                    "thinking": {"type": "disabled"},
+                    "messages": [
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": json.dumps(user_prompt, ensure_ascii=False)},
+                    ],
+                },
+            )
+            response.raise_for_status()
+            return self._extract_chat_content(response.json())
+
+    def _call_sub2api_responses_api(self, settings: Any, system_prompt: str, user_prompt: dict[str, Any]) -> str:
+        with httpx.Client(timeout=max(10.0, settings.ai_agent_timeout_seconds), trust_env=False) as client:
+            response = client.post(
+                f"{settings.ai_agent_base_url.rstrip('/')}/responses",
+                headers=self._agent_headers(settings.ai_agent_api_key),
+                json={
+                    "model": settings.ai_agent_model,
+                    "instructions": system_prompt,
+                    "input": [
+                        {
+                            "role": "user",
+                            "content": [
+                                {
+                                    "type": "input_text",
+                                    "text": json.dumps(user_prompt, ensure_ascii=False),
+                                }
+                            ],
+                        }
+                    ],
+                    "max_output_tokens": 900,
+                    "reasoning": {"effort": "none"},
+                    "store": False,
+                },
+            )
+            response.raise_for_status()
+            return self._extract_sub2api_content(response.text)
+
+    def _agent_headers(self, api_key: str) -> dict[str, str]:
+        return {
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+        }
 
     def _compact_recommendation_payload(self, material: MaterialRecord, query: str) -> dict[str, Any]:
         description = self._safe_text(material, "description").replace("\n", " ").strip()
@@ -206,10 +291,18 @@ class AiService:
                 merged.append(item)
         return merged[:3]
 
-    def _build_local_answer(self, query: str, recommendations: list[dict[str, Any]]) -> str:
+    def _build_local_answer(
+        self,
+        query: str,
+        recommendations: list[dict[str, Any]],
+        pdf_evidence: list[MaterialPageEvidence] | None = None,
+    ) -> str:
         if not recommendations:
             return f"我没有在平台资料库里找到足够贴近「{query}」的候选。你可以补充课程名、考试范围、题型或学校专业，我再帮你缩小检索。"
         titles = "、".join(f"《{item.get('title') or '资料'}》" for item in recommendations)
+        if pdf_evidence:
+            sources = "；".join(f"《{item.title}》第 {item.page} 页" for item in pdf_evidence[:3])
+            return f"我先基于 StudyHub 资料库找到 {titles}，并读取到相关 PDF 页级证据：{sources}。建议先用这些页面确认题型和高频知识点，再结合真题或经验内容做查漏补缺。"
         return f"我先基于 StudyHub 资料库找到 {titles}。建议先用最匹配的资料建立知识框架，再结合真题或经验内容做查漏补缺。"
 
     def _extract_chat_content(self, payload: Any) -> str:
@@ -225,6 +318,57 @@ class AiService:
         if isinstance(message, dict) and isinstance(message.get("content"), str):
             return message["content"]
         return first.get("text") if isinstance(first.get("text"), str) else ""
+
+    def _extract_sub2api_content(self, payload: str) -> str:
+        text = payload.strip()
+        if not text:
+            return ""
+        parsed = self._loads_object(text)
+        if parsed:
+            content = self._extract_response_output_text(parsed)
+            if content:
+                return content
+        chunks: list[str] = []
+        for line in text.splitlines():
+            if not line.startswith("data:"):
+                continue
+            raw_data = line.removeprefix("data:").strip()
+            if not raw_data or raw_data == "[DONE]":
+                continue
+            try:
+                event = json.loads(raw_data)
+            except json.JSONDecodeError:
+                continue
+            if not isinstance(event, dict):
+                continue
+            if event.get("type") == "response.output_text.done" and isinstance(event.get("text"), str):
+                return event["text"]
+            if event.get("type") == "response.output_text.delta" and isinstance(event.get("delta"), str):
+                chunks.append(event["delta"])
+            if event.get("type") == "response.completed" and isinstance(event.get("response"), dict):
+                content = self._extract_response_output_text(event["response"])
+                if content:
+                    return content
+        return "".join(chunks)
+
+    def _extract_response_output_text(self, payload: dict[str, Any]) -> str:
+        output_text = payload.get("output_text")
+        if isinstance(output_text, str):
+            return output_text
+        output = payload.get("output")
+        if not isinstance(output, list):
+            return ""
+        parts: list[str] = []
+        for item in output:
+            if not isinstance(item, dict):
+                continue
+            content = item.get("content")
+            if not isinstance(content, list):
+                continue
+            for part in content:
+                if isinstance(part, dict) and part.get("type") == "output_text" and isinstance(part.get("text"), str):
+                    parts.append(part["text"])
+        return "".join(parts)
 
     def _loads_object(self, value: str) -> dict[str, Any] | None:
         body = value.strip()

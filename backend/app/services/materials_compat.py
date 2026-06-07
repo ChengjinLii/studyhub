@@ -781,7 +781,7 @@ class MaterialsCompatMixin:
         return payment_paid is not None
 
     async def _compat_has_paid_access_async(self, session, material_id: int, user_id: int) -> bool:
-        order_paid_task = session.execute(
+        order_paid_result = await session.execute(
             text(
                 """
                 SELECT 1
@@ -792,7 +792,9 @@ class MaterialsCompatMixin:
             ),
             {"material_id": material_id, "user_id": user_id},
         )
-        payment_paid_task = session.execute(
+        if order_paid_result.first() is not None:
+            return True
+        payment_paid_result = await session.execute(
             text(
                 """
                 SELECT 1
@@ -806,9 +808,6 @@ class MaterialsCompatMixin:
             ),
             {"material_id": material_id, "user_id": user_id},
         )
-        order_paid_result, payment_paid_result = await asyncio.gather(order_paid_task, payment_paid_task)
-        if order_paid_result.first() is not None:
-            return True
         return payment_paid_result.first() is not None
 
     def _compat_build_custom_preview_urls(self, material_id: int, keys: list[Any]) -> list[str]:

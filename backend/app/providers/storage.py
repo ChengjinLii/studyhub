@@ -24,6 +24,8 @@ class StorageProvider(Protocol):
     async def delete_key_async(self, *, root: Path, key: str | None) -> None: ...
 
     def resolve_path(self, *, root: Path, key: str, invalid_detail: str) -> Path: ...
+    def read_bytes(self, *, root: Path, key: str, max_size_bytes: int) -> bytes: ...
+    async def read_bytes_async(self, *, root: Path, key: str, max_size_bytes: int) -> bytes: ...
 
     def guess_media_type(self, key: str | None, default: str = "application/octet-stream") -> str: ...
 
@@ -121,6 +123,17 @@ class LocalFileStorageProvider:
         if root_resolved not in path.parents and path != root_resolved:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=invalid_detail)
         return path
+
+    def read_bytes(self, *, root: Path, key: str, max_size_bytes: int) -> bytes:
+        path = self.resolve_path(root=root, key=key, invalid_detail="无效的文件路径")
+        if not path.exists() or not path.is_file():
+            raise FileNotFoundError(key)
+        if path.stat().st_size > max_size_bytes:
+            raise ValueError("file exceeds max_size_bytes")
+        return path.read_bytes()
+
+    async def read_bytes_async(self, *, root: Path, key: str, max_size_bytes: int) -> bytes:
+        return await asyncio.to_thread(self.read_bytes, root=root, key=key, max_size_bytes=max_size_bytes)
 
     def guess_media_type(self, key: str | None, default: str = "application/octet-stream") -> str:
         if not key:
@@ -259,6 +272,20 @@ class AliyunOssStorageProvider:
 
     def resolve_path(self, *, root: Path, key: str, invalid_detail: str) -> Path:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=invalid_detail)
+
+    def read_bytes(self, *, root: Path, key: str, max_size_bytes: int) -> bytes:
+        del root
+        normalized_key = self._normalize_key_from_any(key)
+        if not normalized_key:
+            raise FileNotFoundError(key)
+        result = self._bucket().get_object(normalized_key)
+        content = result.read(max_size_bytes + 1)
+        if len(content) > max_size_bytes:
+            raise ValueError("file exceeds max_size_bytes")
+        return content
+
+    async def read_bytes_async(self, *, root: Path, key: str, max_size_bytes: int) -> bytes:
+        return await asyncio.to_thread(self.read_bytes, root=root, key=key, max_size_bytes=max_size_bytes)
 
     def guess_media_type(self, key: str | None, default: str = "application/octet-stream") -> str:
         if not key:

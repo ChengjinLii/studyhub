@@ -136,6 +136,20 @@ class MaterialAssetStore:
             invalid_detail="无效的文件路径",
         )
 
+    def read_bytes(self, key: str, *, max_size_bytes: int) -> bytes:
+        return self.storage_provider.read_bytes(
+            root=self.settings.resolved_material_asset_dir,
+            key=key,
+            max_size_bytes=max_size_bytes,
+        )
+
+    async def read_bytes_async(self, key: str, *, max_size_bytes: int) -> bytes:
+        return await self.storage_provider.read_bytes_async(
+            root=self.settings.resolved_material_asset_dir,
+            key=key,
+            max_size_bytes=max_size_bytes,
+        )
+
     def guess_media_type(self, key: str | None, default: str = "application/octet-stream") -> str:
         return self.storage_provider.guess_media_type(key, default=default)
 

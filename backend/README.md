@@ -145,8 +145,19 @@ cp .env.example .env
 - payout transfer：`local_transfer` / `alipay_transfer`
 - kyc：`mock_local` / `aliyun_cloud_auth`
 - lock：`db_row` / `redis`
+- ai agent：`local` / `openai-compatible` / `sub2api`
 
 真实密钥、证书、Redis URL、OSS 凭据、支付宝证书路径、KYC 凭据都必须只放在 `private/`。
+
+AI 学习辅导默认可以保持 `local` 兼容回复；如果要接本机 sub2api，生产私有配置示例：
+
+```env
+STUDYHUB_AI_AGENT_PROVIDER=sub2api
+STUDYHUB_AI_AGENT_BASE_URL=http://127.0.0.1:8787/v1
+STUDYHUB_AI_AGENT_API_KEY=CHANGE_ME
+STUDYHUB_AI_AGENT_MODEL=gpt-5.4-mini
+STUDYHUB_AI_AGENT_TIMEOUT_SECONDS=60
+```
 
 ## RESTful API 约定
 

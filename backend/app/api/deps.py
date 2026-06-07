@@ -42,6 +42,7 @@ from app.services.health_service import HealthService
 from app.services.leaderboard_read_service import LeaderboardReadService
 from app.services.materials_service import MaterialsService
 from app.services.materials_column_service import MaterialsColumnService
+from app.services.material_pdf_evidence_service import MaterialPdfEvidenceService
 from app.services.market_service import MarketService
 from app.services.payment_service import PaymentService
 from app.services.notification_service import NotificationService
@@ -352,7 +353,11 @@ def get_admin_user_service() -> AdminUserService:
 
 @lru_cache(maxsize=1)
 def get_ai_service() -> AiService:
-    return AiService(get_read_api_repo(), get_material_repo())
+    return AiService(
+        get_read_api_repo(),
+        get_material_repo(),
+        MaterialPdfEvidenceService(get_settings(), get_material_asset_store()),
+    )
 
 
 @lru_cache(maxsize=1)
