@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import re
 from typing import Any
 
@@ -48,6 +48,40 @@ LOW_VALUE_TERMS = {
     "当前",
 }
 
+STUDY_WEAKNESS_TERMS = (
+    "调制",
+    "解调",
+    "频谱",
+    "带宽",
+    "误码率",
+    "匹配滤波",
+    "判决",
+    "信噪比",
+    "傅里叶",
+    "卷积",
+    "链表",
+    "二叉树",
+    "排序",
+    "积分",
+    "微分",
+    "极限",
+    "概率",
+    "分布",
+)
+
+STUDY_TIME_PHRASES: tuple[tuple[str, int], ...] = (
+    ("明天", 1),
+    ("后天", 2),
+    ("半个月", 15),
+    ("一周", 7),
+    ("二周", 14),
+    ("两周", 14),
+    ("三周", 21),
+    ("四周", 28),
+    ("一个月", 30),
+    ("一月", 30),
+)
+
 
 @dataclass(slots=True)
 class AgentQueryPlan:
@@ -59,9 +93,10 @@ class AgentQueryPlan:
     search_terms: tuple[str, ...]
     evidence_tasks: tuple[str, ...]
     response_guidance: tuple[str, ...]
+    study_constraints: dict[str, Any] = field(default_factory=dict)
 
     def to_prompt_payload(self) -> dict[str, Any]:
-        return {
+        payload = {
             "intent": self.intent,
             "confidence": self.confidence,
             "course_terms": list(self.course_terms),
@@ -71,6 +106,9 @@ class AgentQueryPlan:
             "evidence_tasks": list(self.evidence_tasks),
             "response_guidance": list(self.response_guidance),
         }
+        if self.study_constraints:
+            payload["study_constraints"] = self.study_constraints
+        return payload
 
 
 class AgentQueryPlannerService:
@@ -95,8 +133,14 @@ class AgentQueryPlannerService:
         resource_types = _extract_resource_types(normalized, materials)
         years = _extract_years(normalized, pdf_evidence, memory_context)
         search_terms = _extract_search_terms(normalized, course_terms, resource_types)
+        study_constraints = _extract_study_constraints(normalized)
         evidence_tasks = _build_evidence_tasks(intent, pdf_evidence, memory_context)
-        response_guidance = _build_response_guidance(intent, bool(pdf_evidence), memory_context is not None)
+        response_guidance = _build_response_guidance(
+            intent,
+            bool(pdf_evidence),
+            memory_context is not None,
+            bool(study_constraints),
+        )
         return AgentQueryPlan(
             intent=intent,
             confidence=confidence,
@@ -106,6 +150,7 @@ class AgentQueryPlannerService:
             search_terms=tuple(search_terms),
             evidence_tasks=tuple(evidence_tasks),
             response_guidance=tuple(response_guidance),
+            study_constraints=study_constraints,
         )
 
 
@@ -190,6 +235,78 @@ def _extract_search_terms(normalized_query: str, course_terms: list[str], resour
     return terms[:12]
 
 
+def _extract_study_constraints(normalized_query: str) -> dict[str, Any]:
+    constraints: dict[str, Any] = {}
+    horizon = _extract_study_horizon(normalized_query)
+    if horizon:
+        constraints.update(horizon)
+    target_score = _extract_target_score(normalized_query)
+    if target_score is not None:
+        constraints["target_score"] = target_score
+    daily_hours = _extract_daily_hours(normalized_query)
+    if daily_hours is not None:
+        constraints["daily_available_hours"] = daily_hours
+    weak_points = _extract_weak_points(normalized_query)
+    if weak_points:
+        constraints["weak_points"] = weak_points
+    return constraints
+
+
+def _extract_study_horizon(normalized_query: str) -> dict[str, Any]:
+    for phrase, days in STUDY_TIME_PHRASES:
+        if phrase in normalized_query:
+            return {"time_horizon": phrase, "days_until_exam": days}
+    day_match = re.search(r"(?<!\d)(\d{1,3})\s*(?:天|日)\s*后", normalized_query)
+    if day_match:
+        days = max(0, min(180, int(day_match.group(1))))
+        return {"time_horizon": f"{days}天后", "days_until_exam": days}
+    week_match = re.search(r"(?<!\d)(\d{1,2})\s*(?:周|星期)\s*后", normalized_query)
+    if week_match:
+        weeks = max(0, min(26, int(week_match.group(1))))
+        return {"time_horizon": f"{weeks}周后", "days_until_exam": weeks * 7}
+    month_match = re.search(r"(?<!\d)(\d{1,2})\s*个?月\s*后", normalized_query)
+    if month_match:
+        months = max(0, min(6, int(month_match.group(1))))
+        return {"time_horizon": f"{months}个月后", "days_until_exam": months * 30}
+    return {}
+
+
+def _extract_target_score(normalized_query: str) -> int | None:
+    for pattern in (
+        r"(?:目标|考到|想考|希望|争取).{0,8}?(\d{2,3})\s*分?",
+        r"(\d{2,3})\s*分",
+    ):
+        match = re.search(pattern, normalized_query)
+        if not match:
+            continue
+        score = int(match.group(1))
+        if 1 <= score <= 100:
+            return score
+    return None
+
+
+def _extract_daily_hours(normalized_query: str) -> float | None:
+    match = re.search(r"(?:每天|每日|一天).{0,8}?(\d{1,2}(?:\.\d)?)\s*(?:小时|h)", normalized_query)
+    if not match:
+        return None
+    hours = float(match.group(1))
+    if 0 < hours <= 16:
+        return hours
+    return None
+
+
+def _extract_weak_points(normalized_query: str) -> list[str]:
+    if not any(marker in normalized_query for marker in ("薄弱", "不会", "不懂", "不熟", "不太会", "卡住")):
+        return []
+    weak_points: list[str] = []
+    for term in STUDY_WEAKNESS_TERMS:
+        if term.lower() in normalized_query and term not in weak_points:
+            weak_points.append(term)
+        if len(weak_points) >= 6:
+            break
+    return weak_points
+
+
 def _build_evidence_tasks(
     intent: str,
     pdf_evidence: list[MaterialPageEvidence],
@@ -213,7 +330,12 @@ def _build_evidence_tasks(
     return _dedupe(tasks)
 
 
-def _build_response_guidance(intent: str, has_pdf_evidence: bool, has_memory_context: bool) -> list[str]:
+def _build_response_guidance(
+    intent: str,
+    has_pdf_evidence: bool,
+    has_memory_context: bool,
+    has_study_constraints: bool,
+) -> list[str]:
     guidance = ["只基于候选资料、PDF 证据和记忆上下文回答，不编造平台外资料。"]
     if intent == "exam_trend_analysis":
         guidance.append("优先输出常考题型、高频知识点、年份趋势、推荐资料和复习顺序。")
@@ -227,6 +349,8 @@ def _build_response_guidance(intent: str, has_pdf_evidence: bool, has_memory_con
         guidance.append("优先解释为什么推荐这些资料，以及用户下一步应该如何筛选。")
     if has_pdf_evidence:
         guidance.append("关键结论尽量引用资料名和页码。")
+    if has_study_constraints:
+        guidance.append("如果 study_constraints 中有考试倒计时、目标分数、每日可用时间或薄弱点，必须把它们作为复习计划边界。")
     if has_memory_context:
         guidance.append("用户个人记忆只能用于当前用户个性化建议，不能写成平台集体结论。")
     return guidance

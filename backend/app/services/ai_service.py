@@ -572,6 +572,9 @@ class AiService:
                 f"我先基于 StudyHub 资料库找到 {titles}，并读取到相关 PDF 页级证据：{sources}。"
                 f"{evidence_summary}{profile_hint}{sequence_hint}"
             )
+        study_plan_hint = self._local_study_plan_hint(query_plan)
+        if study_plan_hint:
+            return f"我先基于 StudyHub 资料库找到 {titles}。{profile_hint}{study_plan_hint}"
         return f"我先基于 StudyHub 资料库找到 {titles}。{profile_hint}建议先用最匹配的资料建立知识框架，再结合真题或经验内容做查漏补缺。"
 
     def _local_evidence_summary(
@@ -598,6 +601,9 @@ class AiService:
         query_plan: AgentQueryPlan | None,
         course_memory_card: CourseMemoryCard | None,
     ) -> str:
+        study_plan_hint = self._local_study_plan_hint(query_plan)
+        if study_plan_hint:
+            return study_plan_hint
         if course_memory_card and course_memory_card.recommended_sequence:
             return f"建议按这个顺序处理：{_join_values(list(course_memory_card.recommended_sequence)[:3])}。"
         if query_plan and query_plan.intent == "exam_trend_analysis":
@@ -628,8 +634,10 @@ class AiService:
             if has_questions:
                 questions.append("要不要我按题号列出优先复盘清单？")
         elif intent == "study_plan":
+            constraints = getattr(query_plan, "study_constraints", {}) or {}
+            days = _safe_positive_int(constraints.get("days_until_exam")) if isinstance(constraints, dict) else None
             questions = [
-                "你的考试日期和每天可复习时间是多少？",
+                f"要不要我按 {days} 天拆成每日复习安排？" if days else "你的考试日期和每天可复习时间是多少？",
                 "要不要我按基础薄弱和冲刺刷题分阶段安排？",
             ]
             if recommendations:
@@ -651,6 +659,35 @@ class AiService:
         if memory_context and memory_context.user:
             questions.append("是否需要结合你的专业和年级调整推荐顺序？")
         return _dedupe_questions(questions)[:3] or _default_followups()
+
+    def _local_study_plan_hint(self, query_plan: AgentQueryPlan | None) -> str:
+        if query_plan is None or query_plan.intent != "study_plan":
+            return ""
+        constraints = getattr(query_plan, "study_constraints", {}) or {}
+        if not isinstance(constraints, dict):
+            constraints = {}
+        days = _safe_positive_int(constraints.get("days_until_exam"))
+        target_score = _safe_positive_int(constraints.get("target_score"))
+        daily_hours = _safe_positive_float(constraints.get("daily_available_hours"))
+        weak_points = _safe_text_list(constraints.get("weak_points"))
+        boundary_parts: list[str] = []
+        if days is not None:
+            boundary_parts.append(f"距离考试约 {days} 天")
+        if target_score is not None:
+            boundary_parts.append(f"目标约 {target_score} 分")
+        if daily_hours is not None:
+            boundary_parts.append(f"每天可用约 {daily_hours:g} 小时")
+        if weak_points:
+            boundary_parts.append(f"薄弱点先放在 {_join_values(weak_points[:3])}")
+        if not boundary_parts:
+            return "建议先建立知识框架，再刷真题或例题，最后复盘错题和薄弱点。"
+        if days is not None and days <= 7:
+            sequence = "优先用最匹配资料补核心框架，随后集中刷真题和错题，最后只复盘高频薄弱点"
+        elif days is not None and days <= 21:
+            sequence = "前段建立知识框架，中段用真题或例题按题型训练，最后集中复盘错题和薄弱点"
+        else:
+            sequence = "先系统过一轮知识框架，再按题型推进真题训练，最后按错题和高频考点收束"
+        return f"结合你提到的{'、'.join(boundary_parts)}，建议{sequence}。"
 
     def _local_profile_hint(self, memory_context: AgentMemoryContext | None) -> str:
         if not memory_context or not memory_context.user:
@@ -971,6 +1008,35 @@ def _course_card_values(course_memory_card: CourseMemoryCard | None, field: str)
 
 def _join_values(values: list[str]) -> str:
     return "、".join(value for value in values if value)
+
+
+def _safe_positive_int(value: Any) -> int | None:
+    try:
+        number = int(value)
+    except (TypeError, ValueError):
+        return None
+    return number if number > 0 else None
+
+
+def _safe_positive_float(value: Any) -> float | None:
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return None
+    return number if number > 0 else None
+
+
+def _safe_text_list(value: Any) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    result: list[str] = []
+    for item in value:
+        cleaned = " ".join(str(item).split())
+        if cleaned and cleaned not in result:
+            result.append(cleaned)
+        if len(result) >= 6:
+            break
+    return result
 
 
 def _default_followups() -> list[str]:

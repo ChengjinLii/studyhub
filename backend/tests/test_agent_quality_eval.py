@@ -208,6 +208,46 @@ def test_agent_exam_trend_closed_loop_prompt_and_response_contract(monkeypatch) 
     metrics.clear()
 
 
+def test_agent_local_study_plan_uses_structured_query_constraints(monkeypatch) -> None:
+    metrics = get_runtime_metrics()
+    metrics.clear()
+    settings = Settings(ai_agent_provider="local")
+    monkeypatch.setattr("app.services.ai_service.get_settings", lambda: settings)
+
+    service = AiService(
+        read_repo=None,
+        material_repo=None,
+        query_planner_service=AgentQueryPlannerService(),
+    )  # type: ignore[arg-type]
+    monkeypatch.setattr(
+        service,
+        "_rank_materials",
+        lambda session, query, filters: [
+            _material(
+                101,
+                title="通信原理期末速成讲义",
+                description="通信原理高频考点、速成提纲和例题解析",
+                downloads=90,
+            )
+        ],
+    )
+
+    response = service.recommend(
+        object(),  # type: ignore[arg-type]
+        SimpleNamespace(query="我两周后考试，目标85分，每天2小时，调制和误码率很薄弱，应该怎么复习通信原理？", filters={}),
+        current_user_id=7,
+    )
+    body = json.loads(str(response["output"]).removeprefix("<json>").removesuffix("</json>"))
+
+    assert "距离考试约 14 天" in body["answer"]
+    assert "目标约 85 分" in body["answer"]
+    assert "每天可用约 2 小时" in body["answer"]
+    assert "薄弱点先放在 调制、误码率" in body["answer"]
+    assert body["followup_questions"][0] == "要不要我按 14 天拆成每日复习安排？"
+    assert "query_plan" not in json.dumps(body, ensure_ascii=False)
+    metrics.clear()
+
+
 def test_agent_model_failure_uses_structured_local_exam_trend_fallback(monkeypatch) -> None:
     metrics = get_runtime_metrics()
     metrics.clear()

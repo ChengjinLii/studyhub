@@ -75,7 +75,7 @@ def test_query_planner_detects_exam_trend_plan_from_query_and_evidence() -> None
 
 def test_query_planner_detects_study_plan_without_extra_io() -> None:
     plan = AgentQueryPlannerService().build_plan(
-        "我两周后考试，应该怎么复习通信原理？",
+        "我两周后考试，目标85分，每天2小时，调制和误码率很薄弱，应该怎么复习通信原理？",
         materials=[_material()],
         pdf_evidence=[],
         memory_context=None,
@@ -83,8 +83,17 @@ def test_query_planner_detects_study_plan_without_extra_io() -> None:
 
     assert plan.intent == "study_plan"
     assert plan.course_terms == ("通信原理",)
+    assert plan.study_constraints == {
+        "time_horizon": "两周",
+        "days_until_exam": 14,
+        "target_score": 85,
+        "daily_available_hours": 2.0,
+        "weak_points": ["调制", "误码率"],
+    }
+    assert plan.to_prompt_payload()["study_constraints"]["days_until_exam"] == 14
     assert "choose_study_sequence" in plan.evidence_tasks
     assert "adapt_to_user_profile" in plan.evidence_tasks
+    assert any("study_constraints" in item for item in plan.response_guidance)
 
 
 def test_ai_prompt_receives_query_plan(monkeypatch) -> None:
