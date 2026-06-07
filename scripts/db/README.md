@@ -57,6 +57,14 @@ bash scripts/db/db-apply-p0-schema.sh
 
 `db-apply-p0-schema.sh` 会调用 `migrate-additive --yes`，只执行审计生成的 `ADD COLUMN` 语句。production 执行前默认要求最近 120 分钟内已有非空备份；如需调整窗口，可设置 `STUDYHUB_BACKUP_MAX_AGE_MINUTES`。
 
+迁移后验收：
+
+```bash
+STUDYHUB_ENVIRONMENT=production bash scripts/db/db-smoke-p0-schema.sh
+```
+
+该脚本会先验证 P0 字段已经补齐，再检查 health/ready、metrics 和关键只读接口。默认不跑 worker；需要验证 worker once 时设置 `STUDYHUB_P0_RUN_WORKER_ONCE=1`。
+
 如果目标库已经由旧流程建好表，只需要记录当前迁移版本：
 
 ```bash
