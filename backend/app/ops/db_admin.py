@@ -26,6 +26,7 @@ from app.core.db import (
 from app.ops.schema_audit import (
     assert_additive_sql,
     build_schema_audit_payload,
+    build_scoped_schema_audit_payload,
     build_scoped_additive_migration_payload,
     require_recent_nonempty_backup,
 )
@@ -110,10 +111,15 @@ def command_check(settings: Settings) -> int:
     return 0 if not missing_tables else 2
 
 
-def command_check_schema(settings: Settings) -> int:
+def command_check_schema(settings: Settings, *, only: list[str] | None = None) -> int:
     _ensure_sqlite_parent_dir(settings)
     check_database()
-    payload = build_schema_audit_payload()
+    only_columns = _parse_only_columns(only or [])
+    payload = (
+        build_scoped_schema_audit_payload(only_columns=only_columns)
+        if only_columns
+        else build_schema_audit_payload()
+    )
     payload.update(
         {
             "environment": settings.environment,
@@ -369,7 +375,14 @@ def build_parser() -> argparse.ArgumentParser:
 
     subparsers.add_parser("describe")
     subparsers.add_parser("check")
-    subparsers.add_parser("check-schema")
+    check_schema_parser = subparsers.add_parser("check-schema")
+    check_schema_parser.add_argument(
+        "--only",
+        action="append",
+        default=[],
+        metavar="TABLE.COLUMN",
+        help="limit the schema check to a specific column; may be repeated",
+    )
 
     init_parser = subparsers.add_parser("init-schema")
     init_parser.add_argument("--allow-preview-create", action="store_true")
@@ -416,7 +429,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "check":
         return command_check(settings)
     if args.command == "check-schema":
-        return command_check_schema(settings)
+        return command_check_schema(settings, only=list(args.only))
     if args.command == "init-schema":
         return command_init_schema(settings, allow_preview=bool(args.allow_preview_create))
     if args.command == "backup":

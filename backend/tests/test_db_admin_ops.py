@@ -19,7 +19,12 @@ from app.ops.db_admin import (
     command_init_schema,
     command_restore,
 )
-from app.ops.schema_audit import compare_metadata_schema, require_recent_nonempty_backup, select_additive_migration_scope
+from app.ops.schema_audit import (
+    build_scoped_schema_audit_payload,
+    compare_metadata_schema,
+    require_recent_nonempty_backup,
+    select_additive_migration_scope,
+)
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 PRIVATE_FIXTURE_DIR = REPO_ROOT / "private"
@@ -97,6 +102,38 @@ def test_schema_audit_reports_known_production_drift_columns() -> None:
     assert [(item["table"], item["column"]) for item in scoped["missingColumns"]] == [("market_items", "source")]
     assert scoped["additiveStatements"] == [missing[("market_items", "source")]["sql"]]
     assert scoped["executable"] is True
+
+
+def test_scoped_schema_audit_ready_reflects_selected_columns() -> None:
+    from sqlalchemy import Column, Integer, MetaData, String, Table, create_engine
+
+    expected = MetaData()
+    Table(
+        "market_items",
+        expected,
+        Column("id", Integer, primary_key=True),
+        Column("source", String(16), nullable=False, default="local"),
+    )
+    actual = MetaData()
+    Table("market_items", actual, Column("id", Integer, primary_key=True))
+    engine = create_engine("sqlite+pysqlite:///:memory:", future=True)
+    actual.create_all(bind=engine)
+
+    missing = build_scoped_schema_audit_payload(
+        engine=engine,
+        metadata=expected,
+        only_columns={("market_items", "source")},
+    )
+    assert missing["ready"] is False
+    assert [(item["table"], item["column"]) for item in missing["missingColumns"]] == [("market_items", "source")]
+
+    present = build_scoped_schema_audit_payload(
+        engine=engine,
+        metadata=expected,
+        only_columns={("market_items", "id")},
+    )
+    assert present["ready"] is True
+    assert present["missingColumns"] == []
 
 
 def test_schema_audit_reports_only_relevant_legacy_compatibility_tables() -> None:

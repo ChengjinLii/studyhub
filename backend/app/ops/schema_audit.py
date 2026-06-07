@@ -117,7 +117,7 @@ def build_additive_migration_payload(*, engine: Engine | None = None, metadata: 
     return build_scoped_additive_migration_payload(engine=engine, metadata=metadata, only_columns=None)
 
 
-def build_scoped_additive_migration_payload(
+def build_scoped_schema_audit_payload(
     *,
     engine: Engine | None = None,
     metadata: MetaData | None = None,
@@ -129,6 +129,18 @@ def build_scoped_additive_migration_payload(
 
         metadata = Base.metadata
     payload = select_additive_migration_scope(payload, metadata=metadata, only_columns=only_columns)
+    if only_columns:
+        payload["ready"] = not payload["missingColumns"] and not payload["manualReviewColumns"] and not payload.get("unknownRequestedColumns")
+    return payload
+
+
+def build_scoped_additive_migration_payload(
+    *,
+    engine: Engine | None = None,
+    metadata: MetaData | None = None,
+    only_columns: set[tuple[str, str]] | None,
+) -> dict[str, Any]:
+    payload = build_scoped_schema_audit_payload(engine=engine, metadata=metadata, only_columns=only_columns)
     payload["statementCount"] = len(payload["additiveStatements"])
     payload["readyAfterMigration"] = payload["executable"]
     return payload
