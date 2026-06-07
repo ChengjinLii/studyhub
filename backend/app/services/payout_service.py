@@ -230,7 +230,7 @@ class PayoutService:
             if int(earnings["payoutAmount"]) < self.settings.payout_min_amount_cents:
                 raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="可提现金额不足 10 元")
             entity.status = PAYOUT_STATUS_APPROVED
-            self._ensure_transfer(session, entity, amount_cents=int(earnings["payoutAmount"]))
+            self._ensure_transfer(session, entity)
         else:
             entity.status = PAYOUT_STATUS_REJECTED
 
@@ -469,12 +469,15 @@ class PayoutService:
         self,
         session: Session,
         entity: CreatorPayoutApplicationRecord,
-        *,
-        amount_cents: int,
-    ) -> PayoutTransferRecord:
+    ) -> PayoutTransferRecord | None:
         transfer = self.finance_repo.find_transfer_by_application(session, entity.id)
         if transfer is not None:
             return transfer
+        now = datetime.now(UTC)
+        claimable = self.finance_repo.list_claimable_due_settlements_for_uploader(session, entity.user_id, now)
+        if not claimable:
+            return None
+        amount_cents = sum(int(item.payout_amount or 0) for item in claimable)
         transfer = PayoutTransferRecord(
             payout_application_id=entity.id,
             uploader_id=entity.user_id,
@@ -485,6 +488,9 @@ class PayoutService:
             status=TRANSFER_STATUS_SUBMITTED,
         )
         transfer = self.finance_repo.save_payout_transfer(session, transfer)
+        for settlement in claimable:
+            settlement.payout_transfer_id = transfer.id
+            self.finance_repo.save_settlement(session, settlement)
         self._apply_transfer_provider_result(session, transfer, self.transfer_provider.submit_transfer(transfer))
         return transfer
 
@@ -516,7 +522,10 @@ class PayoutService:
         self.finance_repo.save_payout_application(session, application)
 
         now = datetime.now(UTC)
-        for settlement in self.finance_repo.list_pending_due_settlements_for_uploader(session, application.user_id, now):
+        bound = self.finance_repo.list_settlements_for_transfer(session, transfer.id)
+        for settlement in bound:
+            if settlement.status != "PENDING":
+                continue
             settlement.status = "PAID"
             settlement.processed_at = now
             self.finance_repo.save_settlement(session, settlement)
@@ -538,6 +547,7 @@ class PayoutService:
             int(item.payout_amount or 0)
             for item in settlements
             if item.status == "PENDING"
+            and item.payout_transfer_id is None
             and item.scheduled_payout_at is not None
             and self._normalize_dt(item.scheduled_payout_at) <= now
         )

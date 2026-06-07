@@ -132,6 +132,28 @@ class FinanceRepository:
         )
         return list(session.scalars(stmt))
 
+    def list_claimable_due_settlements_for_uploader(self, session: Session, uploader_id: int, now: datetime) -> list[SettlementRecord]:
+        stmt = (
+            select(SettlementRecord)
+            .where(
+                SettlementRecord.uploader_id == uploader_id,
+                SettlementRecord.status == "PENDING",
+                SettlementRecord.payout_transfer_id.is_(None),
+                SettlementRecord.scheduled_payout_at.is_not(None),
+                SettlementRecord.scheduled_payout_at <= now,
+            )
+            .order_by(SettlementRecord.created_at.asc(), SettlementRecord.id.asc())
+        )
+        return list(session.scalars(stmt))
+
+    def list_settlements_for_transfer(self, session: Session, transfer_id: int) -> list[SettlementRecord]:
+        stmt = (
+            select(SettlementRecord)
+            .where(SettlementRecord.payout_transfer_id == transfer_id)
+            .order_by(SettlementRecord.created_at.asc(), SettlementRecord.id.asc())
+        )
+        return list(session.scalars(stmt))
+
     def list_pending_transfers(self, session: Session) -> list[PayoutTransferRecord]:
         stmt = (
             select(PayoutTransferRecord)
