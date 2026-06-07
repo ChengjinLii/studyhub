@@ -165,6 +165,12 @@ class AiService:
                 recommendations = self._merge_llm_recommendations(llm_body, recommendations)
             elif model_configured:
                 status = "model_fallback"
+            followup_questions = self._local_followup_questions(
+                query_plan=query_plan,
+                pdf_evidence=pdf_evidence,
+                recommendations=recommendations,
+                memory_context=memory_context,
+            )
             body = {
                 "recommendations": recommendations,
                 "answer": llm_body.get("answer")
@@ -177,10 +183,7 @@ class AiService:
                     query_plan=query_plan,
                     course_memory_card=course_memory_card,
                 ),
-                "followup_questions": [
-                    "你更想要真题、笔记还是经验分享？",
-                    "是否需要限定学校、学院或专业？",
-                ],
+                "followup_questions": followup_questions,
             }
             if pdf_evidence:
                 body["evidence_sources"] = [item.to_source_payload() for item in pdf_evidence]
@@ -593,6 +596,52 @@ class AiService:
             return "建议先建立知识框架，再刷真题或例题，最后复盘薄弱点。"
         return "建议先用这些页面确认题型和高频知识点，再结合真题或经验内容做查漏补缺。"
 
+    def _local_followup_questions(
+        self,
+        *,
+        query_plan: AgentQueryPlan | None,
+        pdf_evidence: list[MaterialPageEvidence],
+        recommendations: list[dict[str, Any]],
+        memory_context: AgentMemoryContext | None,
+    ) -> list[str]:
+        if query_plan is None:
+            return _default_followups()
+        has_pdf = bool(pdf_evidence)
+        has_questions = any(item.question_numbers for item in pdf_evidence)
+        intent = query_plan.intent
+        questions: list[str]
+        if intent == "exam_trend_analysis":
+            questions = [
+                "要不要我按年份整理常考题型？",
+                "是否需要把这些资料整理成两周复习顺序？",
+            ]
+            if has_questions:
+                questions.append("要不要我按题号列出优先复盘清单？")
+        elif intent == "study_plan":
+            questions = [
+                "你的考试日期和每天可复习时间是多少？",
+                "要不要我按基础薄弱和冲刺刷题分阶段安排？",
+            ]
+            if recommendations:
+                questions.append("是否需要我把推荐资料排成每日学习顺序？")
+        elif intent == "pdf_summary":
+            questions = [
+                "要不要我继续按章节或页码拆解这份资料？",
+                "是否需要标出最适合先看的重点页面？",
+            ]
+        elif intent == "problem_tutoring":
+            questions = [
+                "你卡住的是概念理解、公式推导还是计算步骤？",
+                "要不要我按同类题型再找几页练习？",
+            ]
+        else:
+            questions = _default_followups()
+        if has_pdf and intent not in {"exam_trend_analysis", "pdf_summary", "problem_tutoring"}:
+            questions.append("要不要我基于已读取页码继续归纳重点？")
+        if memory_context and memory_context.user:
+            questions.append("是否需要结合你的专业和年级调整推荐顺序？")
+        return _dedupe_questions(questions)[:3] or _default_followups()
+
     def _local_profile_hint(self, memory_context: AgentMemoryContext | None) -> str:
         if not memory_context or not memory_context.user:
             return ""
@@ -853,3 +902,19 @@ def _course_card_values(course_memory_card: CourseMemoryCard | None, field: str)
 
 def _join_values(values: list[str]) -> str:
     return "、".join(value for value in values if value)
+
+
+def _default_followups() -> list[str]:
+    return [
+        "你更想要真题、笔记还是经验分享？",
+        "是否需要限定学校、学院或专业？",
+    ]
+
+
+def _dedupe_questions(questions: list[str]) -> list[str]:
+    result: list[str] = []
+    for question in questions:
+        cleaned = " ".join(str(question).split())
+        if cleaned and cleaned not in result:
+            result.append(cleaned)
+    return result

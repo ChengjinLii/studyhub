@@ -265,6 +265,11 @@ def test_agent_model_failure_uses_structured_local_exam_trend_fallback(monkeypat
     assert "高频知识点包括 调制、解调、误码率" in body["answer"]
     assert "《通信原理四年真题解析》第 3 页" in body["answer"]
     assert body["evidence_sources"][0]["question_numbers"] == ["第3题"]
+    assert body["followup_questions"] == [
+        "要不要我按年份整理常考题型？",
+        "是否需要把这些资料整理成两周复习顺序？",
+        "要不要我按题号列出优先复盘清单？",
+    ]
     metrics_text = metrics.render_prometheus(settings)
     assert (
         'studyhub_ai_agent_runs_total{provider="openai-compatible",status="model_fallback",'
