@@ -96,7 +96,7 @@ STUDYHUB_ENVIRONMENT=production bash scripts/db/db-log-p0-schema.sh
 STUDYHUB_ENVIRONMENT=preview bash scripts/db/db-stamp-head.sh
 ```
 
-production 默认也禁止直接 stamp head，避免在字段缺失时掩盖 schema 漂移。确需操作时，先运行 `db-verify-p0-schema.sh` 并人工确认 schema 状态，再设置：
+production 默认也禁止直接 stamp head，避免在字段缺失时掩盖 schema 漂移。确需操作时，脚本会先强制运行只读 `db-verify-p0-schema.sh`，通过后才会继续执行 stamp；仍需额外设置：
 
 ```bash
 YES_PRODUCTION_ALEMBIC_STAMP=I_UNDERSTAND_STAMP_PRODUCTION \

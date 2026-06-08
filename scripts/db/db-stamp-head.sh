@@ -28,6 +28,12 @@ if [[ ! -x "$ROOT_DIR/.venv/bin/alembic" ]]; then
   exit 1
 fi
 
+if [[ "$ENVIRONMENT" == "production" ]]; then
+  STUDYHUB_ENVIRONMENT="$ENVIRONMENT" \
+  STUDYHUB_PRIVATE_DIR_PATH="$PRIVATE_DIR" \
+  bash "$ROOT_DIR/scripts/db/db-verify-p0-schema.sh"
+fi
+
 cd "$ROOT_DIR/backend"
 export STUDYHUB_ENVIRONMENT="$ENVIRONMENT"
 export STUDYHUB_PRIVATE_DIR_PATH="$PRIVATE_DIR"
