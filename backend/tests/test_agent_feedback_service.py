@@ -96,6 +96,22 @@ def test_ai_feedback_builds_redacted_user_and_platform_memory_candidates(client,
     assert "[redacted-number]" in data["redactedNote"]
     assert [item["scope"] for item in data["memoryCandidates"]] == ["user", "platform"]
     assert data["memoryCandidates"][0]["key"] == "agent_feedback_preference"
+    assert data["memoryCandidates"][0]["schema"] == "agent-feedback-memory-candidate-v1"
+    assert data["memoryCandidates"][0]["writeMode"] == "deferred_not_persisted"
+    assert data["memoryCandidates"][0]["privacy"] == "current_user_private_candidate"
+    assert data["memoryCandidates"][0]["version"].startswith("feedback-candidate-v1-")
+    assert len(data["memoryCandidates"][0]["versionFingerprint"]) == 16
+    assert data["memoryCandidates"][0]["signalBasis"] == {
+        "schema": "agent-feedback-memory-candidate-v1",
+        "scope": "user",
+        "hook": "useful",
+        "selectedMaterialCount": 1,
+        "selectedMaterialIds": [780],
+        "derivedSignalKeys": ["learning_preferences", "positive_feedback"],
+        "selectedMaterialSignalKeys": ["courses", "qualitySignals", "riskSignals", "sourceTypes"],
+        "rawNoteIncluded": False,
+        "persistence": "not_persisted",
+    }
     user_memory_value = data["memoryCandidates"][0]["value"]
     assert "用户补充" not in user_memory_value
     assert "[redacted-" not in user_memory_value
@@ -112,6 +128,26 @@ def test_ai_feedback_builds_redacted_user_and_platform_memory_candidates(client,
         "riskSignals": ["简介较短", "交付信息缺失"],
     }
     assert data["memoryCandidates"][1]["privacy"] == "anonymous_aggregate_candidate"
+    assert data["memoryCandidates"][1]["schema"] == "agent-feedback-memory-candidate-v1"
+    assert data["memoryCandidates"][1]["writeMode"] == "deferred_not_persisted"
+    assert data["memoryCandidates"][1]["version"].startswith("feedback-candidate-v1-")
+    assert len(data["memoryCandidates"][1]["versionFingerprint"]) == 16
+    assert data["memoryCandidates"][1]["signalBasis"] == {
+        "schema": "agent-feedback-memory-candidate-v1",
+        "scope": "platform",
+        "hook": "useful",
+        "selectedMaterialCount": 1,
+        "selectedMaterialIds": [780],
+        "derivedSignalKeys": ["learning_preferences", "positive_feedback"],
+        "selectedMaterialSignalKeys": ["courses", "qualitySignals", "riskSignals", "sourceTypes"],
+        "rawNoteIncluded": False,
+        "persistence": "not_persisted",
+    }
+    assert data["memoryCandidates"][1]["anonymization"] == {
+        "rawNotePersisted": False,
+        "rawUserIdentityPersisted": False,
+        "personalMemoryMixedIntoPlatform": False,
+    }
     assert data["memoryCandidates"][1]["aggregateSignals"] == {
         "positive_feedback": ["有帮助"],
         "learning_preferences": ["补基础优先", "刷题优先", "详细解析"],
@@ -146,6 +182,8 @@ def test_ai_feedback_respects_disabled_personal_memory_cookie(client, auth_servi
         "difficulty_feedback": ["偏困难"],
         "learning_preferences": ["补基础优先", "详细解析"],
     }
+    assert data["memoryCandidates"][0]["signalBasis"]["scope"] == "platform"
+    assert data["memoryCandidates"][0]["anonymization"]["personalMemoryMixedIntoPlatform"] is False
     assert data["memoryCandidates"][0]["selectedMaterialSignals"]["courses"] == ["通信原理"]
 
 

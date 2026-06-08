@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 from typing import Any
@@ -20,6 +21,8 @@ ALLOWED_FEEDBACK_HOOKS = {
     "too_hard",
     "not_relevant",
 }
+
+FEEDBACK_MEMORY_CANDIDATE_SCHEMA = "agent-feedback-memory-candidate-v1"
 
 USER_MEMORY_FEEDBACK_SUMMARIES = {
     "useful": "用户认为这次推荐或学习建议有帮助。",
@@ -146,32 +149,58 @@ class AgentFeedbackService:
         selected_material_signals = _selected_material_signals(selected_materials)
         if personal_memory_enabled:
             user_candidate: dict[str, Any] = {
+                "schema": FEEDBACK_MEMORY_CANDIDATE_SCHEMA,
                 "scope": "user",
                 "key": "agent_feedback_preference",
                 "value": _feedback_memory_summary(hook, derived_signals),
                 "source": "agent_feedback",
+                "writeMode": "deferred_not_persisted",
                 "confidence": _feedback_confidence(hook),
                 "materialIds": selected_material_ids,
+                "signalBasis": _signal_basis(
+                    hook=hook,
+                    selected_material_ids=selected_material_ids,
+                    derived_signals=derived_signals,
+                    selected_material_signals=selected_material_signals,
+                    scope="user",
+                ),
+                "privacy": "current_user_private_candidate",
             }
             if derived_signals:
                 user_candidate["derivedSignals"] = derived_signals
             if selected_material_signals:
                 user_candidate["selectedMaterialSignals"] = selected_material_signals
+            _attach_candidate_version(user_candidate)
             candidates.append(user_candidate)
         if selected_material_ids:
             platform_candidate: dict[str, Any] = {
+                "schema": FEEDBACK_MEMORY_CANDIDATE_SCHEMA,
                 "scope": "platform",
                 "key": "recommendation_feedback_signal",
                 "value": hook,
                 "source": "agent_feedback_aggregate",
+                "writeMode": "deferred_not_persisted",
                 "confidence": 0.5,
                 "materialIds": selected_material_ids,
                 "privacy": "anonymous_aggregate_candidate",
+                "signalBasis": _signal_basis(
+                    hook=hook,
+                    selected_material_ids=selected_material_ids,
+                    derived_signals=derived_signals,
+                    selected_material_signals=selected_material_signals,
+                    scope="platform",
+                ),
+                "anonymization": {
+                    "rawNotePersisted": False,
+                    "rawUserIdentityPersisted": False,
+                    "personalMemoryMixedIntoPlatform": False,
+                },
             }
             if derived_signals:
                 platform_candidate["aggregateSignals"] = derived_signals
             if selected_material_signals:
                 platform_candidate["selectedMaterialSignals"] = selected_material_signals
+            _attach_candidate_version(platform_candidate)
             candidates.append(platform_candidate)
         return candidates
 
@@ -316,6 +345,48 @@ def _feedback_confidence(hook: str) -> float:
     if hook in {"too_easy", "too_hard"}:
         return 0.68
     return 0.6
+
+
+def _signal_basis(
+    *,
+    hook: str,
+    selected_material_ids: list[int],
+    derived_signals: dict[str, list[str]],
+    selected_material_signals: dict[str, list[str]],
+    scope: str,
+) -> dict[str, Any]:
+    return {
+        "schema": FEEDBACK_MEMORY_CANDIDATE_SCHEMA,
+        "scope": scope,
+        "hook": hook,
+        "selectedMaterialCount": len(selected_material_ids),
+        "selectedMaterialIds": selected_material_ids[:10],
+        "derivedSignalKeys": sorted(derived_signals),
+        "selectedMaterialSignalKeys": sorted(selected_material_signals),
+        "rawNoteIncluded": False,
+        "persistence": "not_persisted",
+    }
+
+
+def _attach_candidate_version(candidate: dict[str, Any]) -> None:
+    basis = {
+        "schema": candidate.get("schema"),
+        "scope": candidate.get("scope"),
+        "key": candidate.get("key"),
+        "value": candidate.get("value"),
+        "materialIds": candidate.get("materialIds") or [],
+        "derivedSignals": candidate.get("derivedSignals") or candidate.get("aggregateSignals") or {},
+        "selectedMaterialSignals": candidate.get("selectedMaterialSignals") or {},
+        "signalBasis": candidate.get("signalBasis") or {},
+    }
+    fingerprint = _stable_feedback_fingerprint(basis)
+    candidate["versionFingerprint"] = fingerprint
+    candidate["version"] = f"feedback-candidate-v1-{fingerprint[:12]}"
+
+
+def _stable_feedback_fingerprint(value: dict[str, Any]) -> str:
+    serialized = json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(serialized.encode("utf-8")).hexdigest()[:16]
 
 
 def _privacy_boundary() -> str:
