@@ -182,15 +182,15 @@ def test_public_profile_counts_do_not_load_full_collections(client: TestClient, 
     original_uploads = service.get_user_uploads
     original_market = service.get_user_market_listings
 
-    def guarded_uploads(session, viewer_id, target_user_id, viewer_role_mask, limit):
+    def guarded_uploads(session, viewer_id, target_user_id, viewer_role_mask, limit, **kwargs):
         if limit is None:
             raise AssertionError("public profile uploadCount should use count query")
-        return original_uploads(session, viewer_id, target_user_id, viewer_role_mask, limit)
+        return original_uploads(session, viewer_id, target_user_id, viewer_role_mask, limit, **kwargs)
 
-    def guarded_market(session, viewer_id, target_user_id, viewer_role_mask, limit):
+    def guarded_market(session, viewer_id, target_user_id, viewer_role_mask, limit, **kwargs):
         if limit is None:
             raise AssertionError("public profile marketCount should use count query")
-        return original_market(session, viewer_id, target_user_id, viewer_role_mask, limit)
+        return original_market(session, viewer_id, target_user_id, viewer_role_mask, limit, **kwargs)
 
     monkeypatch.setattr(service, "get_user_uploads", guarded_uploads)
     monkeypatch.setattr(service, "get_user_market_listings", guarded_market)

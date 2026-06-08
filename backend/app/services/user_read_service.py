@@ -89,12 +89,12 @@ class UserReadService:
 
     def get_overview(self, session: Session, user_id: int) -> dict[str, Any]:
         seed = self.repo.load_seed()
-        user = self._require_user_snapshot(session, user_id)
+        user = self._require_user_snapshot(session, user_id, seed=seed)
         profile_seed = (seed.get("profileSummary") or {}).get(str(user_id), {})
         purchases = list(profile_seed.get("purchases") or [])
         market_wants = self._build_market_wants(session, seed, user_id)
-        uploads = self.get_user_uploads(session, user_id, user_id, user.get("roleMask"), limit=None)
-        market_listings = self.get_user_market_listings(session, user_id, user_id, user.get("roleMask"), limit=None)
+        uploads = self.get_user_uploads(session, user_id, user_id, user.get("roleMask"), limit=None, seed=seed)
+        market_listings = self.get_user_market_listings(session, user_id, user_id, user.get("roleMask"), limit=None, seed=seed)
         admin_notes = list(profile_seed.get("adminNotes") or [])
         totals = profile_seed.get("totals") or {}
         return {
@@ -103,7 +103,7 @@ class UserReadService:
             "marketWants": market_wants,
             "marketListings": market_listings,
             "adminNotes": admin_notes,
-            "freeDownloadStatus": self.get_free_download_status(session, user_id),
+            "freeDownloadStatus": self.get_free_download_status(session, user_id, seed=seed),
             "hasNewAlerts": bool(profile_seed.get("hasNewAlerts")),
             "totalDownloads": int(totals.get("totalDownloads", sum(item.get("downloadCount", 0) or 0 for item in uploads))),
             "uniqueDownloaders": int(totals.get("uniqueDownloaders", 0)),
@@ -116,9 +116,9 @@ class UserReadService:
                 return self.get_overview(session, user_id)
         seed, profile_seed, totals = await asyncio.to_thread(self._load_overview_base, user_id)
         market_wants_task = asyncio.to_thread(self._call_with_new_session, self._load_market_wants_for_overview, seed, user_id)
-        uploads_task = asyncio.to_thread(self._call_with_new_session, self._load_uploads_for_overview, user_id)
-        market_listings_task = asyncio.to_thread(self._call_with_new_session, self._load_market_listings_for_overview, user_id)
-        free_download_task = asyncio.to_thread(self._call_with_new_session, self.get_free_download_status, user_id)
+        uploads_task = asyncio.to_thread(self._call_with_new_session, self._load_uploads_for_overview, seed, user_id)
+        market_listings_task = asyncio.to_thread(self._call_with_new_session, self._load_market_listings_for_overview, seed, user_id)
+        free_download_task = asyncio.to_thread(self._call_with_new_session, self.get_free_download_status, user_id, seed=seed)
         market_wants, uploads, market_listings, free_download_status = await asyncio.gather(
             market_wants_task,
             uploads_task,
@@ -146,12 +146,12 @@ class UserReadService:
         target_user_id: int,
     ) -> dict[str, Any]:
         seed = self.repo.load_seed()
-        target = self._require_accessible_user(session, viewer_id, viewer_role_mask, target_user_id)
+        target = self._require_accessible_user(session, viewer_id, viewer_role_mask, target_user_id, seed=seed)
         is_owner = viewer_id == target_user_id
         email_visible = is_owner or not bool(target.get("emailPrivacy"))
         can_view_payout_qr = is_owner or has_role(viewer_role_mask, ROLE_ADMIN)
-        uploads = self.get_user_uploads(session, viewer_id, target_user_id, viewer_role_mask, limit=5)
-        listings = self.get_user_market_listings(session, viewer_id, target_user_id, viewer_role_mask, limit=5)
+        uploads = self.get_user_uploads(session, viewer_id, target_user_id, viewer_role_mask, limit=5, seed=seed)
+        listings = self.get_user_market_listings(session, viewer_id, target_user_id, viewer_role_mask, limit=5, seed=seed)
         follower_count = self._followers_count(session, seed, target_user_id)
         following_count = self._following_count(session, seed, target_user_id)
         purchase_count = self._purchase_count(seed, target_user_id)
@@ -170,8 +170,8 @@ class UserReadService:
             "emailVisible": email_visible,
             "payoutQrUrl": target.get("payoutQrUrl") if can_view_payout_qr else None,
             "legendaryContributorUntil": target.get("legendaryContributorUntil"),
-            "uploadCount": self._count_user_uploads(session, target_user_id),
-            "marketCount": self._count_user_market_listings(session, target_user_id),
+            "uploadCount": self._count_user_uploads(session, target_user_id, seed=seed),
+            "marketCount": self._count_user_market_listings(session, target_user_id, seed=seed),
             "purchaseCount": purchase_count,
             "saleCount": sale_count,
             "followersCount": follower_count,
@@ -251,11 +251,13 @@ class UserReadService:
         target_user_id: int,
         viewer_role_mask: int | None,
         limit: int | None,
+        *,
+        seed: dict[str, Any] | None = None,
     ) -> list[dict[str, Any]]:
-        self._require_accessible_user(session, viewer_id, viewer_role_mask, target_user_id)
+        self._require_accessible_user(session, viewer_id, viewer_role_mask, target_user_id, seed=seed)
         if self._uses_legacy_user_table(session):
             return self._compat_get_user_uploads(session, target_user_id, limit)
-        self._bootstrap_content(session)
+        self._bootstrap_content(session, seed=seed)
         safe_limit = clamp_limit(limit, max_value=100)
         include_tags = _table_has_column(session, "materials", "tags_json")
         items = [
@@ -271,11 +273,13 @@ class UserReadService:
         target_user_id: int,
         viewer_role_mask: int | None,
         limit: int | None,
+        *,
+        seed: dict[str, Any] | None = None,
     ) -> list[dict[str, Any]]:
-        self._require_accessible_user(session, viewer_id, viewer_role_mask, target_user_id)
+        self._require_accessible_user(session, viewer_id, viewer_role_mask, target_user_id, seed=seed)
         if self._uses_legacy_user_table(session):
             return self._compat_get_user_market_listings(session, target_user_id, limit)
-        self._bootstrap_content(session)
+        self._bootstrap_content(session, seed=seed)
         safe_limit = clamp_limit(limit, max_value=100)
         items = [
             self._to_market_sell_record(item)
@@ -283,8 +287,8 @@ class UserReadService:
         ]
         return items[:safe_limit] if safe_limit else items
 
-    def get_free_download_status(self, session: Session, user_id: int) -> dict[str, Any]:
-        snapshot = self._require_user_snapshot(session, user_id)
+    def get_free_download_status(self, session: Session, user_id: int, *, seed: dict[str, Any] | None = None) -> dict[str, Any]:
+        snapshot = self._require_user_snapshot(session, user_id, seed=seed)
         role_mask = snapshot.get("roleMask")
         unlimited = unlimited_free_download(role_mask)
         remaining = 2_147_483_647 if unlimited else DEFAULT_FREE_DOWNLOAD_QUOTA
@@ -293,8 +297,8 @@ class UserReadService:
         return {"remaining": remaining, "unlimited": unlimited}
 
     def get_creator_metrics(self, session: Session, user_id: int) -> dict[str, Any]:
-        self._require_user_snapshot(session, user_id)
         seed = self.repo.load_seed()
+        self._require_user_snapshot(session, user_id, seed=seed)
         payload = (seed.get("creatorMetrics") or {}).get(str(user_id), {})
         current_dt = datetime.now(UTC)
         week_start = self._start_of_week(current_dt)
@@ -338,8 +342,8 @@ class UserReadService:
             "commissionRate": float(commission_rate),
         }
 
-    def _require_user_snapshot(self, session: Session, user_id: int) -> dict[str, Any]:
-        snapshot = self._resolve_user_snapshot(session, user_id)
+    def _require_user_snapshot(self, session: Session, user_id: int, *, seed: dict[str, Any] | None = None) -> dict[str, Any]:
+        snapshot = self._resolve_user_snapshot(session, user_id, seed=seed)
         if snapshot is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="用户不存在")
         return snapshot
@@ -350,8 +354,10 @@ class UserReadService:
         viewer_id: int,
         viewer_role_mask: int | None,
         target_user_id: int,
+        *,
+        seed: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
-        snapshot = self._require_user_snapshot(session, target_user_id)
+        snapshot = self._require_user_snapshot(session, target_user_id, seed=seed)
         auth_user = self.auth_repo.find_user_by_id(session, target_user_id)
         is_owner = viewer_id == target_user_id
         is_privileged = has_role(viewer_role_mask, ROLE_ADMIN) or has_role(viewer_role_mask, ROLE_DEVELOPER)
@@ -359,8 +365,9 @@ class UserReadService:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="用户不存在")
         return snapshot
 
-    def _resolve_user_snapshot(self, session: Session, user_id: int) -> dict[str, Any] | None:
-        seed = self.repo.load_seed()
+    def _resolve_user_snapshot(self, session: Session, user_id: int, *, seed: dict[str, Any] | None = None) -> dict[str, Any] | None:
+        if seed is None:
+            seed = self.repo.load_seed()
         seed_user = (seed.get("users") or {}).get(str(user_id))
         auth_user = self.auth_repo.find_user_by_id(session, user_id)
         if seed_user is None and auth_user is None:
@@ -368,7 +375,7 @@ class UserReadService:
         return serialize_user_snapshot(seed_user, auth_user)
 
     def _build_market_wants(self, session: Session, seed: dict[str, Any], user_id: int) -> list[dict[str, Any]]:
-        self._bootstrap_content(session)
+        self._bootstrap_content(session, seed=seed)
         wanted_ids = set(self.market_repo.wanted_ids_for_user(session, user_id))
         items_by_id = {int(item.id): item for item in self.market_repo.list_items_by_ids(session, list(wanted_ids))}
         results: list[dict[str, Any]] = []
@@ -426,11 +433,12 @@ class UserReadService:
                 {"user_id": user_id},
             ).scalar()
             return int(row or 0)
-        self._bootstrap_content(session)
+        self._bootstrap_content(session, seed=seed)
         return self.material_repo.count_paid_visible_materials_for_uploader(session, user_id)
 
-    def _bootstrap_content(self, session: Session) -> dict[str, Any]:
-        seed = self.repo.load_seed()
+    def _bootstrap_content(self, session: Session, *, seed: dict[str, Any] | None = None) -> dict[str, Any]:
+        if seed is None:
+            seed = self.repo.load_seed()
         self.material_repo.ensure_seed_bootstrap(session, seed)
         self.market_repo.ensure_seed_bootstrap(session, seed)
         return seed
@@ -526,7 +534,7 @@ class UserReadService:
     def _load_overview_base(self, user_id: int) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
         with session_scope() as session:
             seed = self.repo.load_seed()
-            self._require_user_snapshot(session, user_id)
+            self._require_user_snapshot(session, user_id, seed=seed)
             profile_seed = (seed.get("profileSummary") or {}).get(str(user_id), {})
             totals = profile_seed.get("totals") or {}
             return seed, profile_seed, totals
@@ -534,11 +542,11 @@ class UserReadService:
     def _load_market_wants_for_overview(self, session: Session, seed: dict[str, Any], user_id: int) -> list[dict[str, Any]]:
         return self._build_market_wants(session, seed, user_id)
 
-    def _load_uploads_for_overview(self, session: Session, user_id: int) -> list[dict[str, Any]]:
-        return self.get_user_uploads(session, user_id, user_id, None, limit=None)
+    def _load_uploads_for_overview(self, session: Session, seed: dict[str, Any], user_id: int) -> list[dict[str, Any]]:
+        return self.get_user_uploads(session, user_id, user_id, None, limit=None, seed=seed)
 
-    def _load_market_listings_for_overview(self, session: Session, user_id: int) -> list[dict[str, Any]]:
-        return self.get_user_market_listings(session, user_id, user_id, None, limit=None)
+    def _load_market_listings_for_overview(self, session: Session, seed: dict[str, Any], user_id: int) -> list[dict[str, Any]]:
+        return self.get_user_market_listings(session, user_id, user_id, None, limit=None, seed=seed)
 
     def _load_public_profile_base(
         self,
@@ -548,7 +556,7 @@ class UserReadService:
         target_user_id: int,
     ) -> dict[str, Any]:
         seed = self.repo.load_seed()
-        target = self._require_accessible_user(session, viewer_id, viewer_role_mask, target_user_id)
+        target = self._require_accessible_user(session, viewer_id, viewer_role_mask, target_user_id, seed=seed)
         is_owner = viewer_id == target_user_id
         email_visible = is_owner or not bool(target.get("emailPrivacy"))
         can_view_payout_qr = is_owner or has_role(viewer_role_mask, ROLE_ADMIN)
@@ -580,7 +588,7 @@ class UserReadService:
     def _load_public_profile_sale_count(self, session: Session, target_user_id: int) -> int:
         return self._sale_count(session, self.repo.load_seed(), target_user_id)
 
-    def _count_user_uploads(self, session: Session, target_user_id: int) -> int:
+    def _count_user_uploads(self, session: Session, target_user_id: int, *, seed: dict[str, Any] | None = None) -> int:
         if self._uses_legacy_user_table(session):
             row = session.execute(
                 text(
@@ -595,10 +603,10 @@ class UserReadService:
                 {"user_id": target_user_id},
             ).scalar()
             return int(row or 0)
-        self._bootstrap_content(session)
+        self._bootstrap_content(session, seed=seed)
         return self.material_repo.count_visible_materials_for_uploader(session, target_user_id)
 
-    def _count_user_market_listings(self, session: Session, target_user_id: int) -> int:
+    def _count_user_market_listings(self, session: Session, target_user_id: int, *, seed: dict[str, Any] | None = None) -> int:
         if self._uses_legacy_user_table(session):
             row = session.execute(
                 text(
@@ -612,7 +620,7 @@ class UserReadService:
                 {"user_id": target_user_id},
             ).scalar()
             return int(row or 0)
-        self._bootstrap_content(session)
+        self._bootstrap_content(session, seed=seed)
         return self.market_repo.count_visible_items_for_seller(session, target_user_id)
 
     def _compat_get_user_uploads(self, session: Session, target_user_id: int, limit: int | None) -> list[dict[str, Any]]:

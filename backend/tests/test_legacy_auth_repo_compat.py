@@ -268,3 +268,42 @@ def test_user_read_service_builds_public_profile_against_legacy_users_schema() -
         assert profile["recentUploads"][0]["title"] == "通信原理笔记"
         assert profile["recentUploads"][0]["tags"] == []
         assert profile["recentMarketListings"][0]["title"] == "二手示波器"
+
+
+def test_user_public_profile_reuses_loaded_seed_for_nested_reads() -> None:
+    auth_repo = AuthRepository()
+    follow_repo = UserFollowRepository()
+    follow_service = UserFollowService(follow_repo, auth_repo)
+
+    class CountingReadRepo:
+        def __init__(self) -> None:
+            self.calls = 0
+
+        def load_seed(self):
+            self.calls += 1
+            return {
+                "profileSummary": {
+                    "2": {
+                        "purchases": [{"orderId": 1}],
+                    }
+                },
+                "relationships": {},
+            }
+
+    read_repo = CountingReadRepo()
+    service = UserReadService(
+        read_repo,
+        auth_repo,
+        follow_service,
+        MaterialRepository(),
+        MarketRepository(),
+        FinanceRepository(),
+    )
+
+    with _build_legacy_session() as session:
+        profile = service.get_public_profile(session, viewer_id=1, viewer_role_mask=1, target_user_id=2)
+
+    assert read_repo.calls == 1
+    assert profile["purchaseCount"] == 1
+    assert profile["uploadCount"] == 1
+    assert profile["marketCount"] == 1
