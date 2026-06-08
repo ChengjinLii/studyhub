@@ -288,6 +288,10 @@ def _evidence_page_payload(item: MaterialPageEvidence) -> dict[str, Any]:
         payload["difficulty_signals"] = list(item.difficulty_signals)
     if item.visual_signals:
         payload["visual_signals"] = list(item.visual_signals)
+    if item.anchor_terms:
+        payload["anchor_terms"] = list(item.anchor_terms)
+    if item.anchor_text:
+        payload["anchor_text"] = item.anchor_text
     if item.source_type != "unknown":
         payload["source_type"] = item.source_type
     return payload

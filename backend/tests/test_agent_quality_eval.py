@@ -53,6 +53,8 @@ def _evidence() -> MaterialPageEvidence:
         score_points=(10,),
         difficulty_signals=("综合", "偏难"),
         visual_signals=("公式", "图示"),
+        anchor_terms=("第3题", "计算题"),
+        anchor_text="2024 通信原理第3题计算题考调制、解调和误码率。",
     )
 
 
@@ -222,9 +224,12 @@ def test_agent_exam_trend_closed_loop_prompt_and_response_contract(monkeypatch) 
     assert prompt["pdf_evidence"][0]["score_points"] == [10]
     assert prompt["pdf_evidence"][0]["difficulty_signals"] == ["综合", "偏难"]
     assert prompt["pdf_evidence"][0]["visual_signals"] == ["公式", "图示"]
+    assert prompt["pdf_evidence"][0]["anchor_terms"] == ["第3题", "计算题"]
+    assert prompt["pdf_evidence"][0]["anchor_text"] == "2024 通信原理第3题计算题考调制、解调和误码率。"
     assert "aggregate_score_point_signals" in prompt["query_plan"]["evidence_tasks"]
     assert "aggregate_difficulty_signals" in prompt["query_plan"]["evidence_tasks"]
     assert "preserve_formula_or_visual_page_refs" in prompt["query_plan"]["evidence_tasks"]
+    assert "cite_anchor_snippets" in prompt["query_plan"]["evidence_tasks"]
     assert prompt["candidate_materials"][0]["quality_score"] > 0
     assert "quality_signals" in prompt["candidate_materials"][0]
     assert "risk_signals" in prompt["candidate_materials"][0]
@@ -235,10 +240,13 @@ def test_agent_exam_trend_closed_loop_prompt_and_response_contract(monkeypatch) 
     assert "难度信号：综合、偏难" in prompt["candidate_materials"][0]["reason"]
     assert "公式/图表信号：公式、图示" in prompt["candidate_materials"][0]["reason"]
     assert "quality_signals" in captured["system_prompt"]
+    assert "anchor_text" in captured["system_prompt"]
     assert prompt["memory_context"]["platform_collective_memory"]["pdf_question_type_signals"][0]["value"] == "计算题"
     assert prompt["memory_context"]["user_personal_memory"]["profile"]["major"] == "通信工程"
     assert prompt["course_memory_card"]["course"] == "通信原理"
     assert prompt["course_memory_card"]["page_references"][0]["question_numbers"] == ["第3题"]
+    assert prompt["course_memory_card"]["page_references"][0]["anchor_terms"] == ["第3题", "计算题"]
+    assert prompt["course_memory_card"]["page_references"][0]["anchor_text"] == "2024 通信原理第3题计算题考调制、解调和误码率。"
     assert prompt["course_memory_card"]["score_point_distribution"] == [{"value": "10", "count": 1}]
     assert prompt["course_memory_card"]["difficulty_distribution"] == [{"value": "综合", "count": 1}, {"value": "偏难", "count": 1}]
     assert prompt["course_memory_card"]["visual_signal_distribution"] == [{"value": "公式", "count": 1}, {"value": "图示", "count": 1}]
@@ -261,6 +269,8 @@ def test_agent_exam_trend_closed_loop_prompt_and_response_contract(monkeypatch) 
     assert "score_points" not in body["evidence_sources"][0]
     assert "difficulty_signals" not in body["evidence_sources"][0]
     assert "visual_signals" not in body["evidence_sources"][0]
+    assert "anchor_terms" not in body["evidence_sources"][0]
+    assert "anchor_text" not in body["evidence_sources"][0]
     assert body["followup_questions"] == ["要不要按年份整理题型？", "是否需要两周复习顺序？"]
     assert "memory_context" not in json.dumps(body, ensure_ascii=False)
     assert "query_plan" not in json.dumps(body, ensure_ascii=False)

@@ -106,6 +106,8 @@ def test_pdf_evidence_only_loads_for_study_queries_and_respects_file_limit() -> 
     assert evidence[0].material_id == 1
     assert evidence[0].page == 1
     assert "通信原理" in evidence[0].text
+    assert evidence[0].anchor_terms == ("真题",)
+    assert evidence[0].anchor_text == "通信原理 真题 解析 常考题型"
     assert store.read_keys == ["materials/demo.pdf"]
     assert store.max_size_bytes == [32]
 
@@ -215,6 +217,8 @@ def test_ai_recommendation_response_includes_pdf_evidence_sources(monkeypatch) -
     ]
     assert "score_points" not in body["evidence_sources"][0]
     assert "difficulty_signals" not in body["evidence_sources"][0]
+    assert "anchor_terms" not in body["evidence_sources"][0]
+    assert "anchor_text" not in body["evidence_sources"][0]
     assert "第 2 页" in body["answer"]
     assert "年份信号包括 2024" in body["answer"]
     assert "题型集中在 计算题" in body["answer"]

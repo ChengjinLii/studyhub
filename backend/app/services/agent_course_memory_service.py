@@ -246,6 +246,10 @@ def _page_references(pdf_evidence: list[MaterialPageEvidence]) -> list[dict[str,
             payload["difficulty_signals"] = list(evidence.difficulty_signals)
         if evidence.visual_signals:
             payload["visual_signals"] = list(evidence.visual_signals)
+        if evidence.anchor_terms:
+            payload["anchor_terms"] = list(evidence.anchor_terms)
+        if evidence.anchor_text:
+            payload["anchor_text"] = evidence.anchor_text
         if evidence.source_type != "unknown":
             payload["source_type"] = evidence.source_type
         references.append(payload)
@@ -310,6 +314,10 @@ def _evidence_ref_basis(item: MaterialPageEvidence) -> dict[str, Any]:
         payload["difficulty_signals"] = list(item.difficulty_signals)
     if item.visual_signals:
         payload["visual_signals"] = list(item.visual_signals)
+    if item.anchor_terms:
+        payload["anchor_terms"] = list(item.anchor_terms)
+    if item.anchor_text:
+        payload["anchor_text"] = item.anchor_text
     return payload
 
 

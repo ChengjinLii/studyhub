@@ -127,6 +127,8 @@ def test_agent_memory_context_aggregates_platform_and_current_user_only() -> Non
             score_points=(10,),
             difficulty_signals=("综合",),
             visual_signals=("公式",),
+            anchor_terms=("第3题", "计算题"),
+            anchor_text="第 3 页是通信原理常考题型和解析。",
         )
     ]
 
@@ -150,6 +152,8 @@ def test_agent_memory_context_aggregates_platform_and_current_user_only() -> Non
         "score_points": [10],
         "difficulty_signals": ["综合"],
         "visual_signals": ["公式"],
+        "anchor_terms": ["第3题", "计算题"],
+        "anchor_text": "第 3 页是通信原理常考题型和解析。",
         "source_type": "past_exam",
     } in platform["pdf_evidence_pages"]
     assert platform["pdf_year_signals"] == [{"value": "2024", "count": 1}]

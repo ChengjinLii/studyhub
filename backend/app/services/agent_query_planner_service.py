@@ -323,6 +323,8 @@ def _build_evidence_tasks(
             tasks.append("aggregate_difficulty_signals")
         if any(item.visual_signals for item in pdf_evidence):
             tasks.append("preserve_formula_or_visual_page_refs")
+        if any(item.anchor_text for item in pdf_evidence):
+            tasks.append("cite_anchor_snippets")
     if intent == "study_plan":
         tasks.extend(["choose_study_sequence", "adapt_to_user_profile"])
     if pdf_evidence:
@@ -354,7 +356,7 @@ def _build_response_guidance(
     else:
         guidance.append("优先解释为什么推荐这些资料，以及用户下一步应该如何筛选。")
     if has_pdf_evidence:
-        guidance.append("关键结论尽量引用资料名和页码。")
+        guidance.append("关键结论尽量引用资料名、页码和片段锚点。")
     if has_study_constraints:
         guidance.append("如果 study_constraints 中有考试倒计时、目标分数、每日可用时间或薄弱点，必须把它们作为复习计划边界。")
     if has_memory_context:

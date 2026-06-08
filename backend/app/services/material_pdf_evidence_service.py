@@ -83,6 +83,14 @@ VISUAL_SIGNAL_PATTERNS: tuple[tuple[str, tuple[str, ...]], ...] = (
     ("图片题", ("图片", "插图", "配图", "图题", "读图题", "看图", "如图", "见图", "下图", "上图")),
 )
 
+SOURCE_TYPE_ANCHOR_TERMS: dict[str, tuple[str, ...]] = {
+    "past_exam": ("真题", "往年", "历年", "试卷", "期末", "期中"),
+    "answer_explanation": ("解析", "答案", "标答", "参考答案"),
+    "lecture_notes": ("讲义", "课件", "笔记"),
+    "study_outline": ("速成", "提纲", "复习"),
+    "exercise": ("习题", "练习", "例题", "作业"),
+}
+
 
 @dataclass(frozen=True, slots=True)
 class MaterialPageChunk:
@@ -113,6 +121,8 @@ class MaterialPageEvidence:
     score_points: tuple[int, ...] = ()
     difficulty_signals: tuple[str, ...] = ()
     visual_signals: tuple[str, ...] = ()
+    anchor_terms: tuple[str, ...] = ()
+    anchor_text: str = ""
 
     def to_prompt_payload(self) -> dict[str, Any]:
         payload: dict[str, Any] = {
@@ -137,6 +147,10 @@ class MaterialPageEvidence:
             payload["difficulty_signals"] = list(self.difficulty_signals)
         if self.visual_signals:
             payload["visual_signals"] = list(self.visual_signals)
+        if self.anchor_terms:
+            payload["anchor_terms"] = list(self.anchor_terms)
+        if self.anchor_text:
+            payload["anchor_text"] = self.anchor_text
         return payload
 
     def to_source_payload(self) -> dict[str, Any]:
@@ -213,25 +227,30 @@ class MaterialPdfEvidenceService:
         if not chunks:
             return []
         query_terms = _query_terms(query)
-        evidence = [
-            MaterialPageEvidence(
-                material_id=int(material.id),
-                title=material.title or f"资料 #{material.id}",
-                page=chunk.page,
-                text=chunk.text,
-                score=_score_page(chunk, query_terms),
-                years=chunk.years,
-                question_types=chunk.question_types,
-                knowledge_signals=chunk.knowledge_signals,
-                question_numbers=chunk.question_numbers,
-                source_type=chunk.source_type,
-                score_points=chunk.score_points,
-                difficulty_signals=chunk.difficulty_signals,
-                visual_signals=chunk.visual_signals,
+        evidence: list[MaterialPageEvidence] = []
+        for chunk in chunks:
+            if not chunk.text.strip():
+                continue
+            anchor_terms = tuple(_anchor_terms(chunk, query_terms))
+            evidence.append(
+                MaterialPageEvidence(
+                    material_id=int(material.id),
+                    title=material.title or f"资料 #{material.id}",
+                    page=chunk.page,
+                    text=chunk.text,
+                    score=_score_page(chunk, query_terms),
+                    years=chunk.years,
+                    question_types=chunk.question_types,
+                    knowledge_signals=chunk.knowledge_signals,
+                    question_numbers=chunk.question_numbers,
+                    source_type=chunk.source_type,
+                    score_points=chunk.score_points,
+                    difficulty_signals=chunk.difficulty_signals,
+                    visual_signals=chunk.visual_signals,
+                    anchor_terms=anchor_terms,
+                    anchor_text=_anchor_text(chunk.text, anchor_terms),
+                )
             )
-            for chunk in chunks
-            if chunk.text.strip()
-        ]
         evidence.sort(key=lambda item: (-item.score, item.page))
         return evidence[: max(1, self.settings.ai_agent_pdf_evidence_max_pages)]
 
@@ -479,6 +498,65 @@ def _extract_visual_signals(text: str) -> list[str]:
         if any(alias.lower() in normalized for alias in aliases) and label not in result:
             result.append(label)
     return result[:4]
+
+
+def _anchor_terms(chunk: MaterialPageChunk, query_terms: list[str]) -> list[str]:
+    normalized = chunk.text.lower()
+    result: list[str] = []
+
+    def add(value: str) -> None:
+        cleaned = str(value).strip()
+        if not cleaned or cleaned in result:
+            return
+        if cleaned.lower() in normalized:
+            result.append(cleaned)
+
+    for term in query_terms:
+        add(term)
+    for values in (
+        chunk.question_numbers,
+        chunk.question_types,
+        chunk.years,
+        chunk.knowledge_signals,
+        tuple(f"{value}分" for value in chunk.score_points),
+        chunk.difficulty_signals,
+        chunk.visual_signals,
+        SOURCE_TYPE_ANCHOR_TERMS.get(chunk.source_type, ()),
+    ):
+        for value in values:
+            add(str(value))
+            if len(result) >= 8:
+                return result
+    return result
+
+
+def _anchor_text(text: str, anchor_terms: tuple[str, ...], *, max_chars: int = 240) -> str:
+    if not anchor_terms:
+        return ""
+    compact = _compact_text(text, max_chars=max(700, max_chars))
+    if not compact:
+        return ""
+    normalized = compact.lower()
+    match_index: int | None = None
+    match_end = 0
+    for term in anchor_terms:
+        index = normalized.find(term.lower())
+        if index < 0:
+            continue
+        if match_index is None or index < match_index:
+            match_index = index
+            match_end = index + len(term)
+    if match_index is None:
+        return compact[:max_chars]
+    start = max(0, match_index - 60)
+    end = min(len(compact), max(match_end + 160, start + max_chars))
+    end = min(len(compact), end)
+    snippet = compact[start:end].strip()
+    if start > 0:
+        snippet = f"...{snippet}"
+    if end < len(compact):
+        snippet = f"{snippet}..."
+    return snippet
 
 
 def _classify_source_type(text: str) -> str:

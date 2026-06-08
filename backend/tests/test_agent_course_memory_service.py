@@ -50,6 +50,8 @@ def _evidence() -> MaterialPageEvidence:
         score_points=(10,),
         difficulty_signals=("综合", "偏难"),
         visual_signals=("公式", "图示"),
+        anchor_terms=("第3题", "计算题"),
+        anchor_text="2024 通信原理第3题计算题考调制解调。",
     )
 
 
@@ -94,6 +96,8 @@ def test_course_memory_card_summarizes_current_request_collective_signals() -> N
         "score_points": [10],
         "difficulty_signals": ["综合", "偏难"],
         "visual_signals": ["公式", "图示"],
+        "anchor_terms": ["第3题", "计算题"],
+        "anchor_text": "2024 通信原理第3题计算题考调制解调。",
     }
     assert payload["version_basis"]["query_plan"]["intent"] == "exam_trend_analysis"
     version_basis_text = json.dumps(payload["version_basis"], ensure_ascii=False).lower()
@@ -110,6 +114,8 @@ def test_course_memory_card_summarizes_current_request_collective_signals() -> N
     assert payload["page_references"][0]["score_points"] == [10]
     assert payload["page_references"][0]["difficulty_signals"] == ["综合", "偏难"]
     assert payload["page_references"][0]["visual_signals"] == ["公式", "图示"]
+    assert payload["page_references"][0]["anchor_terms"] == ["第3题", "计算题"]
+    assert payload["page_references"][0]["anchor_text"] == "2024 通信原理第3题计算题考调制解调。"
     assert payload["recommended_sequence"] == ["先看高频题型", "再核对年份趋势", "最后按页码打开真题资料查漏补缺"]
     assert payload["limitations"] == ["该卡片为当前请求的只读临时汇总，尚未持久化为平台正式课程记忆。"]
 
