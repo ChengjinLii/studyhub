@@ -19,7 +19,7 @@ if [[ ! -f "$PRIVATE_DIR/.env.production" ]]; then
   exit 1
 fi
 
-if [[ -z "$SCHEMA_COLUMNS" ]]; then
+if [[ -z "${SCHEMA_COLUMNS//[[:space:]]/}" ]]; then
   echo "STUDYHUB_P0_SCHEMA_COLUMNS must contain at least one table.column value"
   exit 2
 fi
