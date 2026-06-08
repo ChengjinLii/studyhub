@@ -97,6 +97,8 @@ class AgentSafetyService:
             return None
         if answer and not pdf_evidence and _answer_overclaims_pdf_evidence(answer):
             return None
+        if answer and pdf_evidence and _answer_mentions_unread_pdf_page(answer, pdf_evidence):
+            return None
         if answer and pdf_evidence:
             if not evidence_sources:
                 evidence_sources = self._fallback_evidence_sources(pdf_evidence)
@@ -461,9 +463,11 @@ def _answer_mentions_source(answer: str, evidence_sources: list[dict[str, Any]])
     for source in evidence_sources:
         title = _clean_public_title(source.get("title"), max_chars=120)
         page = _safe_int(source.get("page"))
-        if title and title.lower() in normalized:
+        title_mentioned = bool(title and title.lower() in normalized)
+        page_mentioned = page is not None and (f"第 {page} 页" in answer or f"第{page}页" in answer)
+        if title_mentioned and page_mentioned:
             return True
-        if page is not None and (f"第 {page} 页" in answer or f"第{page}页" in answer):
+        if page_mentioned and len(evidence_sources) == 1:
             return True
     return False
 
@@ -611,6 +615,23 @@ def _answer_overclaims_pdf_evidence(answer: str) -> bool:
     if re.search(r"来源[:：]?《[^》]{1,120}》第\d{1,4}页", normalized):
         return True
     return False
+
+
+def _answer_mentions_unread_pdf_page(answer: str, pdf_evidence: list[MaterialPageEvidence]) -> bool:
+    allowed_pages = {int(item.page) for item in pdf_evidence}
+    if not allowed_pages:
+        return False
+    mentioned_pages = _answer_pdf_page_numbers(answer)
+    return any(page not in allowed_pages for page in mentioned_pages)
+
+
+def _answer_pdf_page_numbers(answer: str) -> list[int]:
+    pages: list[int] = []
+    for raw_page in re.findall(r"第\s*(\d{1,4})\s*页", answer):
+        page = _safe_int(raw_page)
+        if page is not None and page not in pages:
+            pages.append(page)
+    return pages
 
 
 def _source_hint(evidence_sources: list[dict[str, Any]]) -> str:

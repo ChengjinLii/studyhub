@@ -104,6 +104,23 @@ def test_agent_safety_adds_read_pdf_source_hint_when_model_omits_citation() -> N
     ]
 
 
+def test_agent_safety_adds_page_source_hint_when_answer_only_mentions_title() -> None:
+    sanitized = AgentSafetyService().sanitize_recommendation_body(
+        {
+            "answer": "根据《通信原理四年真题解析》，通信原理近年常考计算题。",
+            "recommendations": [{"material_id": 101, "reason": "与通信原理真题匹配"}],
+        },
+        candidate_materials=[_material()],
+        pdf_evidence=[_evidence()],
+    )
+
+    assert sanitized is not None
+    assert sanitized["answer"] == (
+        "根据《通信原理四年真题解析》，通信原理近年常考计算题。 "
+        "来源：《通信原理四年真题解析》第 2 页（第3题）。"
+    )
+
+
 def test_agent_safety_downgrades_answer_without_pdf_evidence() -> None:
     sanitized = AgentSafetyService().sanitize_recommendation_body(
         {
@@ -221,6 +238,20 @@ def test_agent_safety_rejects_pdf_page_overclaim_without_pdf_evidence() -> None:
         },
         candidate_materials=[_material()],
         pdf_evidence=[],
+    )
+
+    assert sanitized is None
+
+
+def test_agent_safety_rejects_unread_pdf_page_when_pdf_evidence_exists() -> None:
+    sanitized = AgentSafetyService().sanitize_recommendation_body(
+        {
+            "answer": "我看了《通信原理四年真题解析》第 99 页，近年常考计算题。",
+            "recommendations": [{"material_id": 101, "reason": "与通信原理真题匹配"}],
+            "evidence_sources": [{"material_id": 101, "page": 99, "title": "通信原理四年真题解析"}],
+        },
+        candidate_materials=[_material()],
+        pdf_evidence=[_evidence()],
     )
 
     assert sanitized is None
@@ -439,6 +470,61 @@ def test_ai_recommendation_falls_back_when_model_overclaims_pdf_pages(monkeypatc
 
     assert "第 3 页" not in body["answer"]
     assert body["answer"].startswith("我先基于 StudyHub 资料库找到")
+    assert body["recommendations"][0]["material_id"] == 101
+
+
+def test_ai_recommendation_falls_back_when_model_cites_unread_pdf_page(monkeypatch) -> None:
+    settings = Settings(
+        ai_agent_provider="openai-compatible",
+        ai_agent_base_url="https://example.test/v1",
+        ai_agent_api_key="test-key",
+        ai_agent_model="demo-model",
+    )
+    monkeypatch.setattr("app.services.ai_service.get_settings", lambda: settings)
+
+    class FakePdfEvidenceService:
+        def collect_for_materials(
+            self,
+            materials: list[MaterialRecord],
+            query: str,
+            *,
+            current_user_id: int | None,
+        ) -> list[MaterialPageEvidence]:
+            del materials, query, current_user_id
+            return [_evidence()]
+
+    service = AiService(
+        read_repo=None,
+        material_repo=None,
+        pdf_evidence_service=FakePdfEvidenceService(),
+        query_planner_service=AgentQueryPlannerService(),
+        course_memory_service=AgentCourseMemoryService(),
+    )  # type: ignore[arg-type]
+    monkeypatch.setattr(service, "_rank_materials", lambda session, query, filters: [_material()])
+
+    def fake_call_agent_model(settings: Settings, system_prompt: str, user_prompt: dict[str, Any]) -> str:
+        del settings, system_prompt, user_prompt
+        return json.dumps(
+            {
+                "answer": "我看了《通信原理四年真题解析》第 99 页，通信原理近年常考计算题。",
+                "recommendations": [{"material_id": 101, "reason": "与通信原理真题匹配"}],
+                "evidence_sources": [{"material_id": 101, "page": 99, "title": "通信原理四年真题解析"}],
+            },
+            ensure_ascii=False,
+        )
+
+    monkeypatch.setattr(service, "_call_agent_model", fake_call_agent_model)
+
+    response = service.recommend(
+        object(),  # type: ignore[arg-type]
+        SimpleNamespace(query="通信原理往年题常考什么", filters={}),
+        current_user_id=7,
+    )
+    body = json.loads(str(response["output"]).removeprefix("<json>").removesuffix("</json>"))
+
+    assert "第 99 页" not in body["answer"]
+    assert "第 2 页" in body["answer"]
+    assert body["evidence_sources"][0]["page"] == 2
     assert body["recommendations"][0]["material_id"] == 101
 
 
