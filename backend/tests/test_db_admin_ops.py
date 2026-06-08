@@ -30,6 +30,7 @@ from app.ops.db_admin import (
 from app.ops.schema_audit import (
     build_scoped_schema_audit_payload,
     compare_metadata_schema,
+    find_latest_nonempty_backup,
     require_recent_nonempty_backup,
     select_additive_migration_scope,
 )
@@ -310,6 +311,25 @@ def test_require_recent_backup_accepts_latest_nonempty_backup(tmp_path: Path) ->
     os.utime(backup_file, (fresh_ts, fresh_ts))
 
     assert require_recent_nonempty_backup(tmp_path, "production", max_age_seconds=120 * 60, now=now) == backup_file
+
+
+def test_find_latest_backup_ignores_hidden_temporary_files(tmp_path: Path) -> None:
+    backup_root = tmp_path / "backups" / "production"
+    backup_root.mkdir(parents=True)
+    backup_file = backup_root / "studyhub-production-fresh.sql.gz"
+    with gzip.open(backup_file, "wb") as target:
+        target.write(b"backup")
+    temp_backup = backup_root / ".studyhub-production.sql.tmp-123.gz"
+    with gzip.open(temp_backup, "wb") as target:
+        target.write(b"newer temp backup")
+
+    now = datetime(2026, 6, 8, 12, 0, tzinfo=UTC)
+    backup_ts = (now - timedelta(minutes=30)).timestamp()
+    temp_ts = (now - timedelta(minutes=1)).timestamp()
+    os.utime(backup_file, (backup_ts, backup_ts))
+    os.utime(temp_backup, (temp_ts, temp_ts))
+
+    assert find_latest_nonempty_backup(tmp_path, "production") == backup_file
 
 
 def test_require_recent_backup_rejects_corrupt_gzip_backup(tmp_path: Path) -> None:

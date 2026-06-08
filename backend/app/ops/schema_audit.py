@@ -275,7 +275,10 @@ def find_latest_nonempty_backup(private_dir: Path, environment: str) -> Path | N
     candidates = [
         path
         for path in backup_root.iterdir()
-        if path.is_file() and path.stat().st_size > 0 and (path.name.endswith(".sql") or path.name.endswith(".sql.gz"))
+        if path.is_file()
+        and not path.name.startswith(".")
+        and path.stat().st_size > 0
+        and (path.name.endswith(".sql") or path.name.endswith(".sql.gz"))
     ]
     if not candidates:
         return None
