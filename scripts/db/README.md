@@ -80,7 +80,7 @@ STUDYHUB_ENVIRONMENT=production bash scripts/db/db-smoke-p0-schema.sh
 ```
 
 该脚本会先验证 P0 字段已经补齐，再检查 health/ready、metrics 和关键只读接口。默认不跑 worker；需要验证 worker once 时设置 `STUDYHUB_P0_RUN_WORKER_ONCE=1`。
-HTTP 检查默认使用 5 秒连接超时和 20 秒总超时，可用 `STUDYHUB_CURL_CONNECT_TIMEOUT` / `STUDYHUB_CURL_MAX_TIME` 调整。
+HTTP 检查默认使用 5 秒连接超时和 20 秒总超时，可用 `STUDYHUB_CURL_CONNECT_TIMEOUT` / `STUDYHUB_CURL_MAX_TIME` 调整，值必须是大于 0 的秒数。
 
 检查近期日志是否还有 P0 schema 漂移错误：
 
