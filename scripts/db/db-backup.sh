@@ -6,6 +6,11 @@ PRIVATE_DIR="${STUDYHUB_PRIVATE_DIR_PATH:-$ROOT_DIR/private}"
 ENVIRONMENT="${STUDYHUB_ENVIRONMENT:-preview}"
 OUTPUT_PATH="${1:-}"
 
+if [[ -n "$OUTPUT_PATH" && -z "${OUTPUT_PATH//[[:space:]]/}" ]]; then
+  echo "backup output path must not be whitespace only"
+  exit 2
+fi
+
 if [[ -n "$OUTPUT_PATH" && "$OUTPUT_PATH" != /* ]]; then
   OUTPUT_PATH="$ROOT_DIR/$OUTPUT_PATH"
 fi
