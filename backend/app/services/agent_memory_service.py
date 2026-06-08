@@ -16,6 +16,10 @@ from app.services.agent_material_signal_service import build_material_signals, s
 from app.services.material_pdf_evidence_service import MaterialPageEvidence
 
 
+AGENT_PLATFORM_MEMORY_SCHEMA = "agent-platform-collective-memory-v1"
+AGENT_PLATFORM_MEMORY_COVERAGE_SCHEMA = "agent-platform-memory-coverage-v1"
+AGENT_MEMORY_RESOURCE_BUDGET_SCHEMA = "agent-memory-resource-budget-v1"
+
 MEMORY_SIGNAL_TERMS = (
     "真题",
     "往年",
@@ -238,9 +242,21 @@ class AgentMemoryService:
                 ),
             )[:3]
         ]
+        pdf_evidence_pages = [
+            _evidence_page_payload(item)
+            for item in pdf_evidence[: max(0, int(self.settings.ai_agent_pdf_evidence_max_pages or 0))]
+        ]
         payload: dict[str, Any] = {
+            "schema": AGENT_PLATFORM_MEMORY_SCHEMA,
             "query_focus": _compact_query_focus(query),
             "candidate_count": len(materials),
+            "coverage": _platform_memory_coverage(
+                materials=materials,
+                pdf_evidence=pdf_evidence,
+                pdf_evidence_pages=pdf_evidence_pages,
+                material_source_type_counter=material_source_type_counter,
+            ),
+            "resource_budget": _memory_resource_budget(self.settings),
             "top_tags": _counter_items(tag_counter, limit=6),
             "course_signals": _counter_items(course_counter, limit=5),
             "school_signals": _counter_items(school_counter, limit=3),
@@ -260,10 +276,7 @@ class AgentMemoryService:
             "pdf_source_type_signals": _counter_items(source_type_counter, limit=5),
             "high_signal_materials": top_materials,
             "experience_materials": _experience_material_payloads(materials),
-            "pdf_evidence_pages": [
-                _evidence_page_payload(item)
-                for item in pdf_evidence[: max(0, int(self.settings.ai_agent_pdf_evidence_max_pages or 0))]
-            ],
+            "pdf_evidence_pages": pdf_evidence_pages,
             "privacy_boundary": "Only aggregate platform signals are included here; no individual user profile or private conversation is mixed into collective memory.",
         }
         return {key: value for key, value in payload.items() if value not in (None, [], {}, "")}
@@ -371,6 +384,61 @@ class AgentMemoryService:
             "preferred_content_types_from_existing_actions": _counter_items(type_counter, limit=5),
         }
         return {key: value for key, value in payload.items() if value}
+
+
+def _platform_memory_coverage(
+    *,
+    materials: list[MaterialRecord],
+    pdf_evidence: list[MaterialPageEvidence],
+    pdf_evidence_pages: list[dict[str, Any]],
+    material_source_type_counter: Counter[str],
+) -> dict[str, Any]:
+    pdf_material_ids = sorted({int(item.material_id) for item in pdf_evidence})
+    source_types = sorted(
+        {
+            *material_source_type_counter.keys(),
+            *(item.source_type for item in pdf_evidence if item.source_type != "unknown"),
+        }
+    )
+    limitations: list[str] = []
+    if not materials:
+        limitations.append("no_candidate_materials")
+    if not pdf_evidence:
+        limitations.append("no_pdf_page_evidence")
+    if len(pdf_evidence_pages) < len(pdf_evidence):
+        limitations.append("pdf_evidence_page_window_truncated")
+    if materials and not pdf_material_ids:
+        limitations.append("metadata_only_for_current_candidates")
+    coverage: dict[str, Any] = {
+        "schema": AGENT_PLATFORM_MEMORY_COVERAGE_SCHEMA,
+        "candidate_material_count": len(materials),
+        "pdf_evidence_page_count": len(pdf_evidence_pages),
+        "pdf_evidence_material_count": len(pdf_material_ids),
+        "pdf_evidence_material_ids": pdf_material_ids[:10],
+        "source_types": source_types[:10],
+        "has_pdf_evidence": bool(pdf_evidence_pages),
+        "limitations": limitations,
+    }
+    return {key: value for key, value in coverage.items() if value not in (None, [], {}, "")}
+
+
+def _memory_resource_budget(settings: Settings) -> dict[str, Any]:
+    return {
+        "schema": AGENT_MEMORY_RESOURCE_BUDGET_SCHEMA,
+        "candidate_material_limit": _settings_int(settings, "ai_agent_memory_max_materials"),
+        "interaction_check_limit": _settings_int(settings, "ai_agent_memory_max_interaction_checks"),
+        "pdf_evidence_page_limit": _settings_int(settings, "ai_agent_pdf_evidence_max_pages"),
+        "persistence": "not_persisted",
+        "runtime_scope": "current_request_only",
+        "server_resource_policy": "bounded_prompt_context_only",
+    }
+
+
+def _settings_int(settings: Settings, name: str) -> int:
+    try:
+        return max(0, int(getattr(settings, name) or 0))
+    except (TypeError, ValueError):
+        return 0
 
 
 def _high_signal_material_payload(material: MaterialRecord) -> dict[str, Any]:

@@ -153,7 +153,26 @@ def test_agent_memory_context_aggregates_platform_and_current_user_only() -> Non
     prompt = context.to_prompt_payload()
 
     platform = prompt["platform_collective_memory"]
+    assert platform["schema"] == "agent-platform-collective-memory-v1"
     assert platform["candidate_count"] == 3
+    assert platform["coverage"] == {
+        "schema": "agent-platform-memory-coverage-v1",
+        "candidate_material_count": 3,
+        "pdf_evidence_page_count": 1,
+        "pdf_evidence_material_count": 1,
+        "pdf_evidence_material_ids": [101],
+        "source_types": ["answer_explanation", "experience", "lecture_notes", "past_exam", "study_outline"],
+        "has_pdf_evidence": True,
+    }
+    assert platform["resource_budget"] == {
+        "schema": "agent-memory-resource-budget-v1",
+        "candidate_material_limit": 8,
+        "interaction_check_limit": 6,
+        "pdf_evidence_page_limit": 6,
+        "persistence": "not_persisted",
+        "runtime_scope": "current_request_only",
+        "server_resource_policy": "bounded_prompt_context_only",
+    }
     assert {"value": "通信原理", "count": 3} in platform["top_tags"]
     assert {"value": "经验分享", "count": 1} in platform["top_tags"]
     assert {"value": "通信原理", "count": 3} in platform["course_signals"]
@@ -275,6 +294,12 @@ def test_agent_memory_context_can_be_disabled_and_limits_interaction_checks() ->
     context = limited.collect(object(), query="通信原理", materials=materials, current_user_id=7, pdf_evidence=[])  # type: ignore[arg-type]
 
     assert context.platform["candidate_count"] == 2
+    assert context.platform["coverage"]["limitations"] == [
+        "no_pdf_page_evidence",
+        "metadata_only_for_current_candidates",
+    ]
+    assert context.platform["resource_budget"]["candidate_material_limit"] == 2
+    assert context.platform["resource_budget"]["interaction_check_limit"] == 1
     assert material_repo.checked_downloads == [101]
 
 
@@ -311,6 +336,7 @@ def test_agent_memory_context_derives_current_query_private_memory() -> None:
     assert "current_query_memory" not in json.dumps(prompt["platform_collective_memory"], ensure_ascii=False)
     assert "private@example.com" not in json.dumps(current_query_memory, ensure_ascii=False)
     assert "第3题公式推导看不懂" not in json.dumps(current_query_memory, ensure_ascii=False)
+    assert "resource_budget" not in json.dumps(current_query_memory, ensure_ascii=False)
 
 
 def test_ai_recommendation_prompt_receives_memory_context(monkeypatch) -> None:
