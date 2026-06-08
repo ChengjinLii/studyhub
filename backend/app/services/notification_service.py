@@ -33,7 +33,7 @@ class NotificationService:
         user = self._require_user(session, user_id)
         notifications = self._visible_notifications(session, user_id, limit=1)
         latest_notification = notifications[0] if notifications else None
-        market_events = self.market_repo.wants_for_seller(session, user_id)
+        market_events = self.market_repo.wants_for_seller(session, user_id, limit=1)
         latest_market_event = market_events[0] if market_events else None
 
         latest_notification_time = latest_notification.created_at if latest_notification is not None else None
@@ -63,7 +63,7 @@ class NotificationService:
             for entity in self._visible_notifications(session, user_id, limit=50)
         ]
         market_items = []
-        for entity in self.market_repo.wants_for_seller(session, user_id)[:50]:
+        for entity in self.market_repo.wants_for_seller(session, user_id, limit=50):
             market_items.append(
                 {
                     "id": -entity.id,

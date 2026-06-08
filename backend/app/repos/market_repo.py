@@ -140,9 +140,11 @@ class MarketRepository:
         )
         return [int(value) for value in session.scalars(stmt)]
 
-    def wants_for_seller(self, session: Session, seller_id: int) -> list[MarketWantRecord]:
+    def wants_for_seller(self, session: Session, seller_id: int, *, limit: int | None = None) -> list[MarketWantRecord]:
         item_ids = select(MarketItemRecord.id).where(MarketItemRecord.seller_id == seller_id)
         stmt = select(MarketWantRecord).where(MarketWantRecord.item_id.in_(item_ids)).order_by(MarketWantRecord.created_at.desc(), MarketWantRecord.id.desc())
+        if limit is not None:
+            stmt = stmt.limit(max(1, int(limit)))
         return list(session.scalars(stmt))
 
     def _json_dumps(self, value: Any) -> str | None:

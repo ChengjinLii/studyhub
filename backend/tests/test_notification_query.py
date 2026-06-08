@@ -24,8 +24,12 @@ class _DummyAuthRepo:
 
 
 class _DummyMarketRepo:
-    def wants_for_seller(self, session: Session, seller_id: int):
-        del session, seller_id
+    def __init__(self) -> None:
+        self.seller_queries: list[tuple[int, int | None]] = []
+
+    def wants_for_seller(self, session: Session, seller_id: int, *, limit: int | None = None):
+        del session
+        self.seller_queries.append((seller_id, limit))
         return []
 
 
@@ -42,8 +46,8 @@ class _TrackingCommunityRepo(CommunityRepository):
         return super().list_notifications_for_user(session, user_id, limit=limit)
 
 
-def _service(repo: _TrackingCommunityRepo) -> NotificationService:
-    return NotificationService(_DummyAuthRepo(), repo, _DummyMarketRepo())  # type: ignore[arg-type]
+def _service(repo: _TrackingCommunityRepo, market_repo: _DummyMarketRepo | None = None) -> NotificationService:
+    return NotificationService(_DummyAuthRepo(), repo, market_repo or _DummyMarketRepo())  # type: ignore[arg-type]
 
 
 def _session() -> Session:
@@ -74,7 +78,8 @@ def _add_notification(
 
 def test_notification_list_filters_in_query_without_loading_all_notifications() -> None:
     repo = _TrackingCommunityRepo()
-    service = _service(repo)
+    market_repo = _DummyMarketRepo()
+    service = _service(repo, market_repo)
     base = datetime(2026, 1, 1, tzinfo=UTC)
     with _session() as session:
         for index in range(60):
@@ -92,12 +97,14 @@ def test_notification_list_filters_in_query_without_loading_all_notifications() 
         items = service.list_recent(session, user_id=1)
 
     assert repo.visible_queries == [(1, 50)]
+    assert market_repo.seller_queries == [(1, 50)]
     assert [item["message"] for item in items] == ["direct", "broadcast"]
 
 
 def test_notification_summary_queries_only_latest_visible_notification() -> None:
     repo = _TrackingCommunityRepo()
-    service = _service(repo)
+    market_repo = _DummyMarketRepo()
+    service = _service(repo, market_repo)
     base = datetime(2026, 1, 1, tzinfo=UTC)
     with _session() as session:
         _add_notification(session, notification_id=1, user_id=1, message="older", created_at=base)
@@ -107,5 +114,6 @@ def test_notification_summary_queries_only_latest_visible_notification() -> None
         summary = service.get_summary(session, user_id=1)
 
     assert repo.visible_queries == [(1, 1)]
+    assert market_repo.seller_queries == [(1, 1)]
     assert summary["hasUnread"] is True
     assert summary["latestMessage"] == "newer"
