@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from types import SimpleNamespace
 
 from fastapi.testclient import TestClient
 
@@ -45,3 +46,22 @@ def test_readyz_and_metrics_are_exposed(tmp_path: Path, monkeypatch) -> None:
     reset_database_runtime()
     get_settings.cache_clear()
     get_runtime_metrics().clear()
+
+
+def test_http_metrics_include_duration_histogram_buckets() -> None:
+    metrics = get_runtime_metrics()
+    metrics.clear()
+    metrics.record_http_request(method="GET", route="/api/materials", status_code=200, duration_seconds=0.012)
+    metrics.record_http_request(method="GET", route="/api/materials", status_code=200, duration_seconds=0.28)
+
+    rendered = metrics.render_prometheus(
+        SimpleNamespace(app_name="test", environment="test", resolved_build_git_sha="test")
+    )
+
+    assert "# TYPE studyhub_http_request_duration_seconds histogram" in rendered
+    assert 'studyhub_http_request_duration_seconds_bucket{method="GET",route="/api/materials",le="0.01"} 0' in rendered
+    assert 'studyhub_http_request_duration_seconds_bucket{method="GET",route="/api/materials",le="0.025"} 1' in rendered
+    assert 'studyhub_http_request_duration_seconds_bucket{method="GET",route="/api/materials",le="0.5"} 2' in rendered
+    assert 'studyhub_http_request_duration_seconds_bucket{method="GET",route="/api/materials",le="+Inf"} 2' in rendered
+    assert 'studyhub_http_request_duration_seconds_count{method="GET",route="/api/materials"} 2' in rendered
+    metrics.clear()

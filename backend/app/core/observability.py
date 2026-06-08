@@ -1,15 +1,22 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from threading import Lock
 import time
 
 from app.core.config import Settings
 
 
+HTTP_DURATION_BUCKETS_SECONDS = (0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0)
+
+
 def _sanitize_label(value: str) -> str:
     return value.replace("\\", "\\\\").replace("\n", "\\n").replace('"', '\\"')
+
+
+def _format_bucket(value: float) -> str:
+    return ("%g" % value)
 
 
 @dataclass(slots=True)
@@ -17,12 +24,16 @@ class _Aggregate:
     count: int = 0
     total_seconds: float = 0.0
     max_seconds: float = 0.0
+    bucket_counts: dict[float, int] = field(default_factory=lambda: {bucket: 0 for bucket in HTTP_DURATION_BUCKETS_SECONDS})
 
     def observe(self, duration_seconds: float) -> None:
         bounded = max(0.0, float(duration_seconds))
         self.count += 1
         self.total_seconds += bounded
         self.max_seconds = max(self.max_seconds, bounded)
+        for bucket in HTTP_DURATION_BUCKETS_SECONDS:
+            if bounded <= bucket:
+                self.bucket_counts[bucket] += 1
 
 
 class RuntimeMetrics:
@@ -180,16 +191,18 @@ class RuntimeMetrics:
                 )
             lines.extend(
                 [
-                    "# HELP studyhub_http_request_duration_seconds_count HTTP request count by route.",
-                    "# TYPE studyhub_http_request_duration_seconds_count counter",
-                    "# HELP studyhub_http_request_duration_seconds_sum HTTP request duration sum by route.",
-                    "# TYPE studyhub_http_request_duration_seconds_sum counter",
+                    "# HELP studyhub_http_request_duration_seconds HTTP request duration histogram by route.",
+                    "# TYPE studyhub_http_request_duration_seconds histogram",
                     "# HELP studyhub_http_request_duration_seconds_max HTTP request max duration by route.",
                     "# TYPE studyhub_http_request_duration_seconds_max gauge",
                 ]
             )
             for (method, route), aggregate in sorted(self._http_request_durations.items()):
                 labels = 'method="%s",route="%s"' % (_sanitize_label(method), _sanitize_label(route))
+                for bucket in HTTP_DURATION_BUCKETS_SECONDS:
+                    bucket_labels = f'{labels},le="{_format_bucket(bucket)}"'
+                    lines.append(f"studyhub_http_request_duration_seconds_bucket{{{bucket_labels}}} {aggregate.bucket_counts[bucket]}")
+                lines.append(f'studyhub_http_request_duration_seconds_bucket{{{labels},le="+Inf"}} {aggregate.count}')
                 lines.append(f"studyhub_http_request_duration_seconds_count{{{labels}}} {aggregate.count}")
                 lines.append(f"studyhub_http_request_duration_seconds_sum{{{labels}}} {aggregate.total_seconds:.6f}")
                 lines.append(f"studyhub_http_request_duration_seconds_max{{{labels}}} {aggregate.max_seconds:.6f}")
