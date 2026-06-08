@@ -108,7 +108,7 @@ def test_schema_audit_reports_known_production_drift_columns() -> None:
 
 
 def test_schema_audit_reports_type_and_nullable_warnings_separately() -> None:
-    from sqlalchemy import Column, Integer, MetaData, String, Table
+    from sqlalchemy import Boolean, Column, Integer, MetaData, String, Table
     from sqlalchemy.dialects import mysql
 
     expected = MetaData()
@@ -117,15 +117,17 @@ def test_schema_audit_reports_type_and_nullable_warnings_separately() -> None:
         expected,
         Column("id", Integer, primary_key=True),
         Column("source", String(16), nullable=False, default="local"),
+        Column("enabled", Boolean, nullable=True),
     )
 
     payload = compare_metadata_schema(
         metadata=expected,
         actual_tables={"market_items"},
-        actual_columns_by_table={"market_items": {"id", "source"}},
+        actual_columns_by_table={"market_items": {"id", "source", "enabled"}},
         actual_column_details_by_table={
             "market_items": {
                 "source": {"name": "source", "type": String(32), "nullable": True},
+                "enabled": {"name": "enabled", "type": mysql.TINYINT(display_width=1), "nullable": True},
             }
         },
         actual_indexes_by_table={},

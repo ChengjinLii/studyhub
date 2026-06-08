@@ -416,8 +416,11 @@ def _normalize_column_type_sql(value: str) -> str:
     normalized = " ".join(value.strip().upper().split())
     normalized = re.sub(r"\bINT\(\d+\)", "INTEGER", normalized)
     normalized = re.sub(r"\bINTEGER\(\d+\)", "INTEGER", normalized)
+    normalized = re.sub(r"\bTINYINT\(1\)", "BOOLEAN", normalized)
     if normalized == "INT":
         return "INTEGER"
+    if normalized in {"BOOL", "BOOLEAN"}:
+        return "BOOLEAN"
     return normalized
 
 
