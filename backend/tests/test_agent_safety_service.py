@@ -122,6 +122,36 @@ def test_agent_safety_downgrades_answer_without_pdf_evidence() -> None:
     assert sanitized["recommendations"] == [{"material_id": 101, "reason": "标题和标签匹配通信原理真题"}]
 
 
+def test_agent_safety_rejects_unscoped_quoted_material_title() -> None:
+    sanitized = AgentSafetyService().sanitize_recommendation_body(
+        {
+            "answer": "建议先看《不存在的通信原理真题解析》，再结合候选资料复习。",
+            "recommendations": [{"material_id": 101, "reason": "标题和标签匹配通信原理真题"}],
+        },
+        candidate_materials=[_material()],
+        pdf_evidence=[],
+    )
+
+    assert sanitized is None
+
+
+def test_agent_safety_allows_quoted_course_name_without_material_marker() -> None:
+    sanitized = AgentSafetyService().sanitize_recommendation_body(
+        {
+            "answer": "《通信原理》这门课可以先从真题题型入手。",
+            "recommendations": [{"material_id": 101, "reason": "标题和标签匹配通信原理真题"}],
+        },
+        candidate_materials=[_material()],
+        pdf_evidence=[],
+    )
+
+    assert sanitized is not None
+    assert sanitized["answer"] == (
+        "《通信原理》这门课可以先从真题题型入手。 "
+        "说明：当前没有可用 PDF 页级证据，这里仅基于候选资料元数据和可见记忆信号给出保守建议。"
+    )
+
+
 def test_agent_safety_does_not_repeat_low_evidence_caveat() -> None:
     sanitized = AgentSafetyService().sanitize_recommendation_body(
         {
@@ -374,6 +404,42 @@ def test_ai_recommendation_falls_back_when_model_overclaims_pdf_pages(monkeypatc
     body = json.loads(str(response["output"]).removeprefix("<json>").removesuffix("</json>"))
 
     assert "第 3 页" not in body["answer"]
+    assert body["answer"].startswith("我先基于 StudyHub 资料库找到")
+    assert body["recommendations"][0]["material_id"] == 101
+
+
+def test_ai_recommendation_falls_back_when_model_mentions_non_candidate_material(monkeypatch) -> None:
+    settings = Settings(
+        ai_agent_provider="openai-compatible",
+        ai_agent_base_url="https://example.test/v1",
+        ai_agent_api_key="test-key",
+        ai_agent_model="demo-model",
+    )
+    monkeypatch.setattr("app.services.ai_service.get_settings", lambda: settings)
+
+    service = AiService(read_repo=None, material_repo=None)  # type: ignore[arg-type]
+    monkeypatch.setattr(service, "_rank_materials", lambda session, query, filters: [_material()])
+
+    def fake_call_agent_model(settings: Settings, system_prompt: str, user_prompt: dict[str, Any]) -> str:
+        del settings, system_prompt, user_prompt
+        return json.dumps(
+            {
+                "answer": "我建议先看《不存在的通信原理真题解析》，它最贴近你的问题。",
+                "recommendations": [{"material_id": 101, "reason": "标题和标签匹配通信原理真题"}],
+            },
+            ensure_ascii=False,
+        )
+
+    monkeypatch.setattr(service, "_call_agent_model", fake_call_agent_model)
+
+    response = service.recommend(
+        object(),  # type: ignore[arg-type]
+        SimpleNamespace(query="通信原理往年题常考什么", filters={}),
+        current_user_id=7,
+    )
+    body = json.loads(str(response["output"]).removeprefix("<json>").removesuffix("</json>"))
+
+    assert "不存在的通信原理真题解析" not in body["answer"]
     assert body["answer"].startswith("我先基于 StudyHub 资料库找到")
     assert body["recommendations"][0]["material_id"] == 101
 

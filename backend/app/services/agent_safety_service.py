@@ -90,6 +90,8 @@ class AgentSafetyService:
             answer = ""
         if answer and candidate_materials and _answer_denies_candidate_materials(answer):
             return None
+        if answer and _answer_mentions_unscoped_material_title(answer, candidate_materials, pdf_evidence):
+            return None
         if answer and not pdf_evidence and _answer_overclaims_pdf_evidence(answer):
             return None
         if answer and pdf_evidence:
@@ -488,6 +490,71 @@ def _answer_denies_candidate_materials(answer: str) -> bool:
         "没有匹配到相关资料",
     )
     return any(marker in normalized for marker in markers)
+
+
+def _answer_mentions_unscoped_material_title(
+    answer: str,
+    candidate_materials: list[MaterialRecord],
+    pdf_evidence: list[MaterialPageEvidence],
+) -> bool:
+    quoted_titles = [
+        _clean_public_title(title, max_chars=160)
+        for title in re.findall(r"《([^》]{2,160})》", answer)
+    ]
+    material_like_titles = [title for title in quoted_titles if _looks_like_material_title(title)]
+    if not material_like_titles:
+        return False
+
+    allowed_titles = [
+        _clean_public_title(getattr(material, "title", ""), max_chars=160)
+        for material in candidate_materials
+    ]
+    allowed_titles.extend(_clean_public_title(item.title, max_chars=160) for item in pdf_evidence)
+    allowed_titles = [title for title in allowed_titles if title and title != "资料"]
+    return any(not _title_matches_allowed_scope(title, allowed_titles) for title in material_like_titles)
+
+
+def _looks_like_material_title(title: str) -> bool:
+    normalized = re.sub(r"\s+", "", title).lower()
+    markers = (
+        "资料",
+        "pdf",
+        "真题",
+        "往年",
+        "历年",
+        "试卷",
+        "样卷",
+        "期末",
+        "期中",
+        "答案",
+        "解析",
+        "笔记",
+        "讲义",
+        "速成",
+        "复习",
+    )
+    return any(marker in normalized for marker in markers) or bool(re.search(r"20[0-3]\d", normalized))
+
+
+def _title_matches_allowed_scope(title: str, allowed_titles: list[str]) -> bool:
+    normalized_title = _normalize_title_for_scope(title)
+    if not normalized_title:
+        return False
+    for allowed_title in allowed_titles:
+        normalized_allowed = _normalize_title_for_scope(allowed_title)
+        if not normalized_allowed:
+            continue
+        if normalized_title == normalized_allowed:
+            return True
+        if min(len(normalized_title), len(normalized_allowed)) >= 6 and (
+            normalized_title in normalized_allowed or normalized_allowed in normalized_title
+        ):
+            return True
+    return False
+
+
+def _normalize_title_for_scope(title: str) -> str:
+    return re.sub(r"[^0-9a-zA-Z\u4e00-\u9fff]+", "", title).lower()
 
 
 def _answer_overclaims_pdf_evidence(answer: str) -> bool:
