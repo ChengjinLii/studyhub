@@ -100,6 +100,7 @@ class AgentMemoryService:
         question_number_counter: Counter[str] = Counter()
         score_point_counter: Counter[str] = Counter()
         difficulty_counter: Counter[str] = Counter()
+        visual_counter: Counter[str] = Counter()
         source_type_counter: Counter[str] = Counter()
         for material in materials:
             tag_counter.update(_json_string_list(material.tags_json))
@@ -119,6 +120,7 @@ class AgentMemoryService:
             question_number_counter.update(item.question_numbers)
             score_point_counter.update(str(value) for value in item.score_points)
             difficulty_counter.update(item.difficulty_signals)
+            visual_counter.update(item.visual_signals)
             if item.source_type != "unknown":
                 source_type_counter.update([item.source_type])
         top_materials = [
@@ -148,6 +150,7 @@ class AgentMemoryService:
             "pdf_question_number_signals": _counter_items(question_number_counter, limit=8),
             "pdf_score_point_signals": _counter_items(score_point_counter, limit=8),
             "pdf_difficulty_signals": _counter_items(difficulty_counter, limit=5),
+            "pdf_visual_signals": _counter_items(visual_counter, limit=5),
             "pdf_source_type_signals": _counter_items(source_type_counter, limit=5),
             "high_signal_materials": top_materials,
             "pdf_evidence_pages": [
@@ -283,6 +286,8 @@ def _evidence_page_payload(item: MaterialPageEvidence) -> dict[str, Any]:
         payload["score_points"] = list(item.score_points)
     if item.difficulty_signals:
         payload["difficulty_signals"] = list(item.difficulty_signals)
+    if item.visual_signals:
+        payload["visual_signals"] = list(item.visual_signals)
     if item.source_type != "unknown":
         payload["source_type"] = item.source_type
     return payload

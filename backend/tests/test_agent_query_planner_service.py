@@ -50,6 +50,7 @@ def test_query_planner_detects_exam_trend_plan_from_query_and_evidence() -> None
             source_type="past_exam",
             score_points=(10,),
             difficulty_signals=("综合", "偏难"),
+            visual_signals=("公式", "图示"),
         )
     ]
     memory = AgentMemoryContext(
@@ -73,9 +74,10 @@ def test_query_planner_detects_exam_trend_plan_from_query_and_evidence() -> None
     assert "aggregate_question_type_signals" in plan.evidence_tasks
     assert "aggregate_score_point_signals" in plan.evidence_tasks
     assert "aggregate_difficulty_signals" in plan.evidence_tasks
+    assert "preserve_formula_or_visual_page_refs" in plan.evidence_tasks
     assert "cite_question_numbers" in plan.evidence_tasks
     assert "personalize_with_current_user_memory" in plan.evidence_tasks
-    assert any("分值结构" in item and "难度信号" in item for item in plan.response_guidance)
+    assert any("分值结构" in item and "公式/图表页提示" in item for item in plan.response_guidance)
 
 
 def test_query_planner_detects_study_plan_without_extra_io() -> None:

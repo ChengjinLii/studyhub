@@ -76,6 +76,13 @@ SOURCE_TYPE_PATTERNS: tuple[tuple[str, tuple[str, ...]], ...] = (
     ("exercise", ("习题", "练习", "例题", "作业")),
 )
 
+VISUAL_SIGNAL_PATTERNS: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("公式", ("公式", "方程", "推导", "等式", "=", "∑", "∫")),
+    ("图示", ("图示", "框图", "流程图", "示意图", "频谱图", "波形图", "如图", "见图", "下图", "上图")),
+    ("表格", ("表格", "对照表", "统计表", "真值表", "数据表")),
+    ("图片题", ("图片", "插图", "配图", "图题", "读图题", "看图", "如图", "见图", "下图", "上图")),
+)
+
 
 @dataclass(frozen=True, slots=True)
 class MaterialPageChunk:
@@ -88,6 +95,7 @@ class MaterialPageChunk:
     source_type: str
     score_points: tuple[int, ...]
     difficulty_signals: tuple[str, ...]
+    visual_signals: tuple[str, ...]
 
 
 @dataclass(slots=True)
@@ -104,6 +112,7 @@ class MaterialPageEvidence:
     source_type: str = "unknown"
     score_points: tuple[int, ...] = ()
     difficulty_signals: tuple[str, ...] = ()
+    visual_signals: tuple[str, ...] = ()
 
     def to_prompt_payload(self) -> dict[str, Any]:
         payload: dict[str, Any] = {
@@ -126,6 +135,8 @@ class MaterialPageEvidence:
             payload["score_points"] = list(self.score_points)
         if self.difficulty_signals:
             payload["difficulty_signals"] = list(self.difficulty_signals)
+        if self.visual_signals:
+            payload["visual_signals"] = list(self.visual_signals)
         return payload
 
     def to_source_payload(self) -> dict[str, Any]:
@@ -216,6 +227,7 @@ class MaterialPdfEvidenceService:
                 source_type=chunk.source_type,
                 score_points=chunk.score_points,
                 difficulty_signals=chunk.difficulty_signals,
+                visual_signals=chunk.visual_signals,
             )
             for chunk in chunks
             if chunk.text.strip()
@@ -283,6 +295,7 @@ def build_pdf_page_chunks(pdf_bytes: bytes, *, max_pages: int) -> list[MaterialP
                 source_type=_classify_source_type(compact),
                 score_points=tuple(_extract_score_points(compact)),
                 difficulty_signals=tuple(_extract_difficulty_signals(compact)),
+                visual_signals=tuple(_extract_visual_signals(compact)),
             )
         )
     return chunks
@@ -377,6 +390,7 @@ def _score_page(chunk: MaterialPageChunk, query_terms: list[str]) -> int:
     score += len(chunk.question_numbers) * 2
     score += len(chunk.score_points) * 2
     score += len(chunk.difficulty_signals)
+    score += len(chunk.visual_signals)
     if chunk.source_type in {"past_exam", "answer_explanation"}:
         score += 3
     return score
@@ -453,6 +467,15 @@ def _extract_difficulty_signals(text: str) -> list[str]:
         ("偏难", ("较难", "偏难", "难度较大", "压轴", "提高题")),
     )
     for label, aliases in patterns:
+        if any(alias.lower() in normalized for alias in aliases) and label not in result:
+            result.append(label)
+    return result[:4]
+
+
+def _extract_visual_signals(text: str) -> list[str]:
+    normalized = text.lower()
+    result: list[str] = []
+    for label, aliases in VISUAL_SIGNAL_PATTERNS:
         if any(alias.lower() in normalized for alias in aliases) and label not in result:
             result.append(label)
     return result[:4]

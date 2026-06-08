@@ -24,6 +24,7 @@ class CourseMemoryCard:
     knowledge_signals: tuple[dict[str, Any], ...]
     score_point_distribution: tuple[dict[str, Any], ...]
     difficulty_distribution: tuple[dict[str, Any], ...]
+    visual_signal_distribution: tuple[dict[str, Any], ...]
     source_type_distribution: tuple[dict[str, Any], ...]
     high_signal_materials: tuple[dict[str, Any], ...]
     page_references: tuple[dict[str, Any], ...]
@@ -42,6 +43,7 @@ class CourseMemoryCard:
             "knowledge_signals": list(self.knowledge_signals),
             "score_point_distribution": list(self.score_point_distribution),
             "difficulty_distribution": list(self.difficulty_distribution),
+            "visual_signal_distribution": list(self.visual_signal_distribution),
             "source_type_distribution": list(self.source_type_distribution),
             "high_signal_materials": list(self.high_signal_materials),
             "page_references": list(self.page_references),
@@ -75,6 +77,7 @@ class AgentCourseMemoryService:
         knowledge_signals = _counter_payload(_knowledge_counter(pdf_evidence), limit=8)
         score_points = _counter_payload(_score_point_counter(pdf_evidence), limit=8)
         difficulty_signals = _counter_payload(_difficulty_counter(pdf_evidence), limit=5)
+        visual_signals = _counter_payload(_visual_counter(pdf_evidence), limit=5)
         source_types = _counter_payload(_source_type_counter(pdf_evidence, memory_context), limit=5)
         version_basis = _version_basis(
             course=course,
@@ -95,6 +98,7 @@ class AgentCourseMemoryService:
             knowledge_signals=tuple(knowledge_signals),
             score_point_distribution=tuple(score_points),
             difficulty_distribution=tuple(difficulty_signals),
+            visual_signal_distribution=tuple(visual_signals),
             source_type_distribution=tuple(source_types),
             high_signal_materials=tuple(_high_signal_materials(materials)),
             page_references=tuple(_page_references(pdf_evidence)),
@@ -176,6 +180,13 @@ def _difficulty_counter(pdf_evidence: list[MaterialPageEvidence]) -> Counter[str
     return counter
 
 
+def _visual_counter(pdf_evidence: list[MaterialPageEvidence]) -> Counter[str]:
+    counter: Counter[str] = Counter()
+    for evidence in pdf_evidence:
+        counter.update(evidence.visual_signals)
+    return counter
+
+
 def _source_type_counter(
     pdf_evidence: list[MaterialPageEvidence],
     memory_context: AgentMemoryContext | None,
@@ -233,6 +244,8 @@ def _page_references(pdf_evidence: list[MaterialPageEvidence]) -> list[dict[str,
             payload["score_points"] = list(evidence.score_points)
         if evidence.difficulty_signals:
             payload["difficulty_signals"] = list(evidence.difficulty_signals)
+        if evidence.visual_signals:
+            payload["visual_signals"] = list(evidence.visual_signals)
         if evidence.source_type != "unknown":
             payload["source_type"] = evidence.source_type
         references.append(payload)
@@ -295,6 +308,8 @@ def _evidence_ref_basis(item: MaterialPageEvidence) -> dict[str, Any]:
         payload["score_points"] = list(item.score_points)
     if item.difficulty_signals:
         payload["difficulty_signals"] = list(item.difficulty_signals)
+    if item.visual_signals:
+        payload["visual_signals"] = list(item.visual_signals)
     return payload
 
 

@@ -126,6 +126,7 @@ def test_agent_memory_context_aggregates_platform_and_current_user_only() -> Non
             source_type="past_exam",
             score_points=(10,),
             difficulty_signals=("综合",),
+            visual_signals=("公式",),
         )
     ]
 
@@ -148,6 +149,7 @@ def test_agent_memory_context_aggregates_platform_and_current_user_only() -> Non
         "question_numbers": ["第3题"],
         "score_points": [10],
         "difficulty_signals": ["综合"],
+        "visual_signals": ["公式"],
         "source_type": "past_exam",
     } in platform["pdf_evidence_pages"]
     assert platform["pdf_year_signals"] == [{"value": "2024", "count": 1}]
@@ -155,6 +157,7 @@ def test_agent_memory_context_aggregates_platform_and_current_user_only() -> Non
     assert platform["pdf_question_number_signals"] == [{"value": "第3题", "count": 1}]
     assert platform["pdf_score_point_signals"] == [{"value": "10", "count": 1}]
     assert platform["pdf_difficulty_signals"] == [{"value": "综合", "count": 1}]
+    assert platform["pdf_visual_signals"] == [{"value": "公式", "count": 1}]
     assert platform["pdf_source_type_signals"] == [{"value": "past_exam", "count": 1}]
     assert {"value": "交付信息可用", "count": 2} in platform["material_quality_signals"]
     assert {"value": "高评分资料", "count": 1} in platform["material_quality_signals"]
