@@ -1,12 +1,17 @@
 from __future__ import annotations
 
 import json
+from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 from typing import Any
+
+from sqlalchemy import create_engine
+from sqlalchemy.orm import Session
 
 from app.core.config import Settings
 from app.core.observability import get_runtime_metrics
 from app.models.materials import MaterialRecord
+from app.repos.material_repo import MaterialRepository
 from app.services.agent_course_memory_service import AgentCourseMemoryService
 from app.services.agent_memory_service import AgentMemoryContext
 from app.services.agent_query_planner_service import AgentQueryPlannerService
@@ -35,6 +40,45 @@ def _material(
         rating_avg=4.8,
         like_count=12,
         is_free=True,
+    )
+
+
+def _db_material(
+    material_id: int,
+    *,
+    title: str,
+    description: str,
+    downloads: int,
+    created_at: datetime,
+) -> MaterialRecord:
+    return MaterialRecord(
+        id=material_id,
+        source="local",
+        title=title,
+        description=description,
+        price=0,
+        is_free=True,
+        school="电子科技大学",
+        college="信通",
+        major="通信工程",
+        general_course=False,
+        course_category="MAJOR",
+        grade_value="大三",
+        keywords=description,
+        tags_json=json.dumps(["通信原理", "真题", "解析"], ensure_ascii=False) if "通信" in title else json.dumps(["高数"], ensure_ascii=False),
+        delivery_method="FILE",
+        preview_watermark_enabled=True,
+        preview_source="AUTO",
+        status="VISIBLE",
+        view_count=0,
+        download_count=downloads,
+        sales_count=0,
+        like_count=0,
+        comment_count=0,
+        rating_avg=4.8,
+        rating_count=3,
+        created_at=created_at,
+        updated_at=created_at,
     )
 
 
@@ -105,6 +149,50 @@ def test_agent_ranking_uses_material_quality_as_tie_breaker() -> None:
     ranked = service._rank_materials(object(), "通信原理真题", {})  # type: ignore[arg-type]
 
     assert [item.id for item in ranked] == [301, 302]
+
+
+def test_agent_ranking_prefilters_candidates_without_loading_all_materials() -> None:
+    class FakeReadRepo:
+        def load_seed(self) -> dict[str, Any]:
+            return {}
+
+    class NoFullListMaterialRepo(MaterialRepository):
+        def ensure_seed_bootstrap(self, session: Session, seed: dict[str, Any]) -> None:
+            del session, seed
+
+        def list_visible_materials(self, session: Session) -> list[MaterialRecord]:
+            del session
+            raise AssertionError("agent ranking should prefilter candidates before full material scan")
+
+    engine = create_engine("sqlite+pysqlite:///:memory:", future=True)
+    MaterialRecord.__table__.create(bind=engine)
+    base = datetime(2026, 1, 1, tzinfo=UTC)
+    with Session(engine) as session:
+        for index in range(5):
+            session.add(
+                _db_material(
+                    800 + index,
+                    title=f"高等数学资料 {index}",
+                    description="微积分讲义和习题",
+                    downloads=100 + index,
+                    created_at=base + timedelta(minutes=index),
+                )
+            )
+        session.add(
+            _db_material(
+                810,
+                title="通信原理真题解析",
+                description="期末试卷、常考题型和参考答案",
+                downloads=10,
+                created_at=base - timedelta(days=1),
+            )
+        )
+        session.commit()
+
+        service = AiService(read_repo=FakeReadRepo(), material_repo=NoFullListMaterialRepo())  # type: ignore[arg-type]
+        ranked = service._rank_materials(session, "通信原理真题", {})
+
+    assert [item.id for item in ranked] == [810]
 
 
 def test_agent_ranking_demotes_high_risk_material_when_relevance_ties() -> None:

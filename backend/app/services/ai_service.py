@@ -1248,8 +1248,15 @@ class AiService:
         school = str(filters.get("school")).strip() if filters.get("school") else None
         major = str(filters.get("major")).strip() if filters.get("major") else None
         query_terms = self._query_terms(normalized_query)
+        candidate_materials = self._candidate_materials_for_ranking(
+            session,
+            normalized_query=normalized_query,
+            query_terms=query_terms,
+            school=school,
+            major=major,
+        )
         scored_items = []
-        for item in self.material_repo.list_visible_materials(session):
+        for item in candidate_materials:
             score = self._score(item, query_terms, normalized_query, school=school, major=major)
             course_score = self._course_score(item, query_terms)
             material_signals = build_material_signals(item)
@@ -1279,6 +1286,28 @@ class AiService:
         if positive_items:
             return [item for _, _, _, item in items]
         return []
+
+    def _candidate_materials_for_ranking(
+        self,
+        session: Session,
+        *,
+        normalized_query: str,
+        query_terms: list[str],
+        school: str | None,
+        major: str | None,
+    ) -> list[MaterialRecord]:
+        match_values = _agent_material_match_values(normalized_query, query_terms)
+        list_matching = getattr(self.material_repo, "list_visible_materials_matching_text", None)
+        if callable(list_matching):
+            matched = list_matching(
+                session,
+                match_values=match_values,
+                school=school,
+                major=major,
+            )
+            if matched:
+                return matched
+        return self.material_repo.list_visible_materials(session)
 
     def _score(self, material: MaterialRecord, query_terms: list[str], query: str, *, school: str | None, major: str | None) -> int:
         title = self._safe_text(material, "title").lower()
@@ -2023,6 +2052,22 @@ def _count_memory_items(value: Any) -> int:
     if isinstance(value, tuple):
         return len(value) + sum(_count_memory_items(item) for item in value)
     return 1 if value not in (None, "", [], {}) else 0
+
+
+def _agent_material_match_values(normalized_query: str, query_terms: list[str]) -> list[str]:
+    values: list[str] = []
+
+    def add(value: str) -> None:
+        normalized = str(value or "").strip().lower()
+        if len(normalized) >= 2 and normalized not in values:
+            values.append(normalized)
+
+    add(normalized_query)
+    for term in query_terms:
+        add(term)
+        for alias in QUERY_TERM_ALIASES.get(term, ()):
+            add(alias)
+    return values
 
 
 def _prioritize_exam_summary_parts(

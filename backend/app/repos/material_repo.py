@@ -4,7 +4,7 @@ import json
 from datetime import UTC, datetime
 from typing import Any
 
-from sqlalchemy import func, inspect, select, text
+from sqlalchemy import func, inspect, or_, select, text
 from sqlalchemy.orm import Session, load_only
 
 from app.models.materials import (
@@ -67,6 +67,10 @@ def _material_record_load_options(session: Session):
         getattr(MaterialRecord, column.name) for column in _MATERIAL_MAPPED_COLUMNS if column.name in existing_columns
     )
     return (load_only(*mapped_existing_columns),)
+
+
+def _escape_like(value: str) -> str:
+    return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
 
 
 class MaterialRepository:
@@ -266,6 +270,40 @@ class MaterialRepository:
         )
         return list(session.scalars(stmt))
 
+    def list_visible_materials_matching_text(
+        self,
+        session: Session,
+        *,
+        match_values: list[str],
+        school: str | None,
+        major: str | None,
+    ) -> list[MaterialRecord]:
+        search_filters = self._material_text_match_filters(
+            session,
+            match_values=match_values,
+            school=school,
+            major=major,
+        )
+        if not search_filters:
+            return self.list_visible_materials(session)
+        stmt = (
+            select(MaterialRecord)
+            .options(*_material_record_load_options(session))
+            .where(
+                MaterialRecord.deleted_at.is_(None),
+                MaterialRecord.status.not_in(("REMOVED", "HIDDEN")),
+                or_(*search_filters),
+            )
+            .order_by(
+                MaterialRecord.download_count.desc(),
+                MaterialRecord.rating_avg.desc(),
+                MaterialRecord.like_count.desc(),
+                MaterialRecord.created_at.desc(),
+                MaterialRecord.id.desc(),
+            )
+        )
+        return list(session.scalars(stmt))
+
     def list_visible_materials_for_uploader(
         self,
         session: Session,
@@ -294,6 +332,45 @@ class MaterialRepository:
             MaterialRecord.uploader_id == uploader_id,
         )
         return int(session.scalar(stmt) or 0)
+
+    def _material_text_match_filters(
+        self,
+        session: Session,
+        *,
+        match_values: list[str],
+        school: str | None,
+        major: str | None,
+    ):
+        existing_columns = _table_columns(session, "materials")
+        filters = []
+        search_column_names = (
+            "title",
+            "description",
+            "original_filename",
+            "keywords",
+            "tags_json",
+            "school",
+            "college",
+            "major",
+        )
+        search_columns = [
+            getattr(MaterialRecord, column_name)
+            for column_name in search_column_names
+            if column_name in existing_columns
+        ]
+        normalized_values = []
+        for value in match_values:
+            normalized = str(value or "").strip().lower()
+            if normalized and normalized not in normalized_values:
+                normalized_values.append(normalized)
+        for value in normalized_values:
+            pattern = f"%{_escape_like(value)}%"
+            filters.extend(func.lower(func.coalesce(column, "")).like(pattern, escape="\\") for column in search_columns)
+        if school and "school" in existing_columns:
+            filters.append(MaterialRecord.school == school)
+        if major and "major" in existing_columns:
+            filters.append(func.lower(func.coalesce(MaterialRecord.major, "")).like(f"%{_escape_like(major.lower())}%", escape="\\"))
+        return tuple(filters)
 
     def count_paid_visible_materials_for_uploader(self, session: Session, uploader_id: int) -> int:
         stmt = select(func.count()).select_from(MaterialRecord).where(
