@@ -202,6 +202,44 @@ def test_scoped_schema_audit_blocks_requested_column_when_table_is_missing() -> 
     assert payload["additiveStatements"] == []
 
 
+def test_scoped_schema_audit_reports_selected_missing_indexes_separately() -> None:
+    from sqlalchemy import Column, Integer, MetaData, Table
+    from sqlalchemy.dialects import mysql
+
+    expected = MetaData()
+    Table(
+        "orders",
+        expected,
+        Column("id", Integer, primary_key=True),
+        Column("uploader_id", Integer, nullable=True, index=True),
+    )
+
+    payload = compare_metadata_schema(
+        metadata=expected,
+        actual_tables={"orders"},
+        actual_columns_by_table={"orders": {"id", "uploader_id"}},
+        actual_indexes_by_table={"orders": set()},
+        dialect=mysql.dialect(),
+    )
+    scoped = select_additive_migration_scope(
+        payload,
+        metadata=expected,
+        only_columns={("orders", "uploader_id")},
+    )
+
+    assert scoped["ready"] is True
+    assert scoped["missingColumns"] == []
+    assert scoped["allMissingIndexCount"] == 1
+    assert scoped["missingIndexes"] == [
+        {
+            "table": "orders",
+            "index": "ix_orders_uploader_id",
+            "columns": ["uploader_id"],
+            "sql": "CREATE INDEX `ix_orders_uploader_id` ON `orders` (`uploader_id`);",
+        }
+    ]
+
+
 def test_schema_audit_reports_only_relevant_legacy_compatibility_tables() -> None:
     from sqlalchemy.dialects import mysql
 

@@ -229,6 +229,7 @@ def select_additive_migration_scope(
         for item in payload.get("columnWarnings", [])
         if (item["table"], item["column"]) in only_columns
     ]
+    payload["allMissingIndexCount"] = len(payload["missingIndexes"])
     payload["unknownRequestedColumns"] = unknown_requested
     payload["alreadyPresentColumns"] = already_present
     payload["missingIndexes"] = [
