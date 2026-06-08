@@ -365,6 +365,69 @@ def test_course_memory_card_version_is_stable_and_changes_with_sources() -> None
     assert "不应进入版本依据" not in json.dumps(first.version_basis, ensure_ascii=False)
 
 
+def test_course_memory_card_redacts_sensitive_page_reference_fields() -> None:
+    plan = AgentQueryPlan(
+        intent="exam_trend_analysis",
+        confidence=0.9,
+        course_terms=("通信原理",),
+        resource_types=("past_exam",),
+        years=("2024",),
+        search_terms=("通信原理", "真题"),
+        evidence_tasks=("read_relevant_pdf_pages",),
+        response_guidance=("优先输出常考题型",),
+    )
+    evidence = MaterialPageEvidence(
+        material_id=101,
+        title="通信原理 alice@example.com 13812345678",
+        page=2,
+        text="第2页联系 13812345678，访问 https://example.test。",
+        score=42,
+        years=("2024",),
+        question_types=("计算题",),
+        knowledge_signals=("调制 token=secret-value",),
+        chapter_signals=("第2章 QQ 123456789",),
+        solution_signals=("参考答案 api_key=secret-value",),
+        question_numbers=("第3题",),
+        source_type="past_exam",
+        difficulty_signals=("综合",),
+        visual_signals=("公式",),
+        anchor_terms=("sk-testsecret1234567890",),
+        anchor_text="QQ 123456789，身份证 11010119900307561X，token=secret-value，访问 https://example.test。",
+    )
+
+    card = AgentCourseMemoryService().build_card(
+        materials=[_material()],
+        pdf_evidence=[evidence],
+        memory_context=AgentMemoryContext(platform={}, user=None),
+        query_plan=plan,
+    )
+
+    assert card is not None
+    payload = card.to_prompt_payload()
+    serialized = json.dumps(payload, ensure_ascii=False)
+    assert "alice@example.com" not in serialized
+    assert "13812345678" not in serialized
+    assert "https://example.test" not in serialized
+    assert "secret-value" not in serialized
+    assert "sk-testsecret1234567890" not in serialized
+    assert "123456789" not in serialized
+    assert "11010119900307561X" not in serialized
+    assert "[redacted-email]" in serialized
+    assert "[redacted-phone]" in serialized
+    assert "[redacted-url]" in serialized
+    assert "[redacted-secret]" in serialized
+    assert "[redacted-contact]" in serialized
+    assert "[redacted-id-card]" in serialized
+    assert payload["page_references"][0]["title"] == "通信原理 [redacted-email] [redacted-phone]"
+    assert payload["page_references"][0]["anchor_text"] == (
+        "QQ=[redacted-contact]，身份证 [redacted-id-card]，[redacted-secret]，访问 [redacted-url]。"
+    )
+    assert payload["version_basis"]["evidence_refs"][0]["anchor_terms"] == ["[redacted-secret]"]
+    assert payload["yearly_question_type_matrix"][0]["knowledge_signals"] == [
+        {"value": "调制 [redacted-secret]", "count": 1}
+    ]
+
+
 def test_ai_prompt_receives_course_memory_card(monkeypatch) -> None:
     captured: dict[str, Any] = {}
     settings = Settings(

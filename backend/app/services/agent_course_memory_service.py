@@ -4,6 +4,7 @@ from collections import Counter
 from dataclasses import dataclass
 import hashlib
 import json
+import re
 from typing import Any
 
 from app.models.materials import MaterialRecord
@@ -316,8 +317,8 @@ def _yearly_question_type_matrix(pdf_evidence: list[MaterialPageEvidence]) -> li
                     "page_references": [],
                 },
             )
-            bucket["question_types"].update(evidence.question_types)
-            bucket["knowledge_signals"].update(evidence.knowledge_signals)
+            bucket["question_types"].update(_clean_sequence(evidence.question_types))
+            bucket["knowledge_signals"].update(_clean_sequence(evidence.knowledge_signals))
             for number in evidence.question_numbers:
                 cleaned_number = _clean_text(number, max_chars=24)
                 if cleaned_number and cleaned_number not in bucket["question_numbers"]:
@@ -488,31 +489,31 @@ def _page_references(pdf_evidence: list[MaterialPageEvidence]) -> list[dict[str,
     for evidence in pdf_evidence[:8]:
         payload: dict[str, Any] = {
             "material_id": evidence.material_id,
-            "title": evidence.title,
+            "title": _clean_text(evidence.title),
             "page": evidence.page,
         }
         if evidence.years:
-            payload["years"] = list(evidence.years)
+            payload["years"] = _clean_sequence(evidence.years)
         if evidence.question_types:
-            payload["question_types"] = list(evidence.question_types)
+            payload["question_types"] = _clean_sequence(evidence.question_types)
         if evidence.question_numbers:
-            payload["question_numbers"] = list(evidence.question_numbers)
+            payload["question_numbers"] = _clean_sequence(evidence.question_numbers, max_chars=24)
         if evidence.chapter_signals:
-            payload["chapter_signals"] = list(evidence.chapter_signals)
+            payload["chapter_signals"] = _clean_sequence(evidence.chapter_signals)
         if evidence.solution_signals:
-            payload["solution_signals"] = list(evidence.solution_signals)
+            payload["solution_signals"] = _clean_sequence(evidence.solution_signals)
         if evidence.score_points:
             payload["score_points"] = list(evidence.score_points)
         if evidence.difficulty_signals:
-            payload["difficulty_signals"] = list(evidence.difficulty_signals)
+            payload["difficulty_signals"] = _clean_sequence(evidence.difficulty_signals)
         if evidence.visual_signals:
-            payload["visual_signals"] = list(evidence.visual_signals)
+            payload["visual_signals"] = _clean_sequence(evidence.visual_signals)
         if evidence.anchor_terms:
-            payload["anchor_terms"] = list(evidence.anchor_terms)
+            payload["anchor_terms"] = _clean_sequence(evidence.anchor_terms)
         if evidence.anchor_text:
-            payload["anchor_text"] = evidence.anchor_text
+            payload["anchor_text"] = _clean_text(evidence.anchor_text, max_chars=240)
         if evidence.source_type != "unknown":
-            payload["source_type"] = evidence.source_type
+            payload["source_type"] = _clean_text(evidence.source_type)
         references.append(payload)
     return references
 
@@ -582,25 +583,25 @@ def _evidence_ref_basis(item: MaterialPageEvidence) -> dict[str, Any]:
     payload: dict[str, Any] = {
         "material_id": int(item.material_id),
         "page": int(item.page),
-        "years": list(item.years),
-        "question_types": list(item.question_types),
-        "question_numbers": list(item.question_numbers),
-        "source_type": item.source_type,
+        "years": _clean_sequence(item.years),
+        "question_types": _clean_sequence(item.question_types),
+        "question_numbers": _clean_sequence(item.question_numbers, max_chars=24),
+        "source_type": _clean_text(item.source_type),
     }
     if item.chapter_signals:
-        payload["chapter_signals"] = list(item.chapter_signals)
+        payload["chapter_signals"] = _clean_sequence(item.chapter_signals)
     if item.solution_signals:
-        payload["solution_signals"] = list(item.solution_signals)
+        payload["solution_signals"] = _clean_sequence(item.solution_signals)
     if item.score_points:
         payload["score_points"] = list(item.score_points)
     if item.difficulty_signals:
-        payload["difficulty_signals"] = list(item.difficulty_signals)
+        payload["difficulty_signals"] = _clean_sequence(item.difficulty_signals)
     if item.visual_signals:
-        payload["visual_signals"] = list(item.visual_signals)
+        payload["visual_signals"] = _clean_sequence(item.visual_signals)
     if item.anchor_terms:
-        payload["anchor_terms"] = list(item.anchor_terms)
+        payload["anchor_terms"] = _clean_sequence(item.anchor_terms)
     if item.anchor_text:
-        payload["anchor_text"] = item.anchor_text
+        payload["anchor_text"] = _clean_text(item.anchor_text, max_chars=240)
     return payload
 
 
@@ -650,13 +651,30 @@ def _version_fingerprint(version_basis: dict[str, Any]) -> str:
 
 
 def _counter_payload(counter: Counter[str], *, limit: int) -> list[dict[str, Any]]:
-    return [{"value": value, "count": count} for value, count in counter.most_common(limit) if value]
+    items: list[dict[str, Any]] = []
+    for value, count in counter.most_common(limit):
+        cleaned = _clean_text(value)
+        if cleaned:
+            items.append({"value": cleaned, "count": count})
+    return items
 
 
 def _clean_text(value: Any, *, max_chars: int = 120) -> str:
     if value is None:
         return ""
-    return " ".join(str(value).split())[:max_chars]
+    normalized = " ".join(str(value).split())
+    return _redact_sensitive_text(normalized)[:max_chars]
+
+
+def _clean_sequence(values: Any, *, limit: int = 8, max_chars: int = 120) -> list[str]:
+    result: list[str] = []
+    for value in values or []:
+        cleaned = _clean_text(value, max_chars=max_chars)
+        if cleaned and cleaned not in result:
+            result.append(cleaned)
+        if len(result) >= limit:
+            break
+    return result
 
 
 def _clean_text_list(value: Any, *, limit: int) -> list[str]:
@@ -685,3 +703,49 @@ def _dedupe(values: list[str]) -> list[str]:
         if value not in result:
             result.append(value)
     return result
+
+
+def _redact_sensitive_text(text: str) -> str:
+    if not text:
+        return ""
+    text = re.sub(r"https?://[^\s,;，；。]+|www\.[^\s,;，；。]+", "[redacted-url]", text, flags=re.IGNORECASE)
+    text = re.sub(r"[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}", "[redacted-email]", text)
+    text = re.sub(r"(?<!\d)1[3-9]\d{9}(?!\d)", "[redacted-phone]", text)
+    text = re.sub(
+        r"(?i)(api[_-]?key|token|secret|authorization|bearer)\s*[:=]\s*[^\s,;，；。]+",
+        "[redacted-secret]",
+        text,
+    )
+    text = re.sub(
+        r"(?i)(?<![A-Za-z0-9_-])(?:sk|tp)-[A-Za-z0-9_-]{16,}(?![A-Za-z0-9_-])",
+        "[redacted-secret]",
+        text,
+    )
+    text = _redact_identity_numbers(text)
+    text = _redact_labeled_ids(text)
+    text = _redact_messenger_handles(text)
+    return re.sub(r"(?<!\d)\d{12,24}(?!\d)", "[redacted-number]", text)
+
+
+def _redact_identity_numbers(text: str) -> str:
+    return re.sub(
+        r"(?<![A-Za-z0-9])\d{6}(?:18|19|20)\d{2}(?:0[1-9]|1[0-2])(?:0[1-9]|[12]\d|3[01])\d{3}[\dXx](?![A-Za-z0-9])",
+        "[redacted-id-card]",
+        text,
+    )
+
+
+def _redact_labeled_ids(text: str) -> str:
+    pattern = re.compile(
+        r"(?i)(学号|工号|student[_ -]?id|employee[_ -]?id)\s*[:：=]?\s*[A-Za-z0-9_-]{5,24}"
+    )
+    return pattern.sub(lambda match: f"{match.group(1)}=[redacted-id]", text)
+
+
+def _redact_messenger_handles(text: str) -> str:
+    latin_pattern = re.compile(
+        r"(?i)(?<![A-Za-z0-9_])(qq|wechat|weixin|wx|vx)(?![A-Za-z0-9_])\s*[:：=]?\s*[A-Za-z0-9_-]{5,32}"
+    )
+    text = latin_pattern.sub(lambda match: f"{match.group(1)}=[redacted-contact]", text)
+    chinese_pattern = re.compile(r"(微信|微信号|微 信)\s*[:：=]?\s*[A-Za-z0-9_-]{5,32}")
+    return chinese_pattern.sub(lambda match: f"{match.group(1)}=[redacted-contact]", text)
