@@ -42,7 +42,8 @@ class AdminUserService:
                     )
                 )
         users = list(session.scalars(stmt.limit(200)))
-        return [self._to_summary(user) for user in users]
+        seed = self.read_repo.load_seed()
+        return [self._to_summary(user, seed=seed) for user in users]
 
     def create_user(self, session: Session, payload: AdminCreateUserPayload, *, operator_role_mask: int | None) -> dict[str, Any]:
         desired_role_mask = int(payload.roleMask or 1)
@@ -99,8 +100,9 @@ class AdminUserService:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"{label}不存在")
         return user
 
-    def _to_summary(self, user: AuthUser) -> dict[str, Any]:
-        seed = self.read_repo.load_seed()
+    def _to_summary(self, user: AuthUser, *, seed: dict[str, Any] | None = None) -> dict[str, Any]:
+        if seed is None:
+            seed = self.read_repo.load_seed()
         total_earnings = float((((seed.get("profileSummary") or {}).get(str(user.id), {}) or {}).get("totals") or {}).get("totalEarnings", 0))
         return {
             "id": user.id,

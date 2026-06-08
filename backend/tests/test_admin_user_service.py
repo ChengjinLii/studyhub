@@ -10,12 +10,17 @@ from app.services.admin_user_service import AdminUserService
 
 
 class _DummyReadRepo:
+    def __init__(self, seed=None):
+        self.seed = seed or {}
+        self.loads = 0
+
     def load_seed(self):
-        return {}
+        self.loads += 1
+        return self.seed
 
 
-def _service() -> AdminUserService:
-    return AdminUserService(_DummyReadRepo(), admin_repo=None, auth_repo=None, auth_service=None)  # type: ignore[arg-type]
+def _service(read_repo: _DummyReadRepo | None = None) -> AdminUserService:
+    return AdminUserService(read_repo or _DummyReadRepo(), admin_repo=None, auth_repo=None, auth_service=None)  # type: ignore[arg-type]
 
 
 def _add_user(session: Session, *, username: str, nickname: str, created_at: datetime) -> None:
@@ -71,3 +76,25 @@ def test_admin_user_list_treats_like_wildcards_as_literal_keyword_text() -> None
 
     assert [user["username"] for user in percent_users] == ["percent%user"]
     assert [user["username"] for user in underscore_users] == ["under_score"]
+
+
+def test_admin_user_list_reuses_seed_for_summaries() -> None:
+    read_repo = _DummyReadRepo(
+        {
+            "profileSummary": {
+                "1": {"totals": {"totalEarnings": 12.5}},
+                "2": {"totals": {"totalEarnings": 30}},
+            }
+        }
+    )
+    service = _service(read_repo)
+    created_at = datetime(2026, 1, 1, tzinfo=UTC)
+    with _session() as session:
+        _add_user(session, username="alice", nickname="Alice", created_at=created_at)
+        _add_user(session, username="bob", nickname="Bob", created_at=created_at + timedelta(minutes=1))
+        session.commit()
+
+        users = service.list_users(session, keyword=None)
+
+    assert read_repo.loads == 1
+    assert [user["totalEarnings"] for user in users] == [30.0, 12.5]
