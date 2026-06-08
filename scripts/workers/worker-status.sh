@@ -13,6 +13,10 @@ if [[ ! -f "$PID_FILE" ]]; then
 fi
 
 pid="$(cat "$PID_FILE")"
+if ! [[ "$pid" =~ ^[1-9][0-9]*$ ]]; then
+  echo "worker: invalid pid file"
+  exit 0
+fi
 if [[ -n "${pid:-}" ]] && kill -0 "$pid" 2>/dev/null; then
   echo "worker: up (pid=$pid)"
 else

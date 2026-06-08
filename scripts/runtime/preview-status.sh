@@ -17,6 +17,10 @@ status_pid_file() {
   fi
   local pid
   pid="$(cat "$pid_file")"
+  if ! [[ "$pid" =~ ^[1-9][0-9]*$ ]]; then
+    echo "$label: invalid pid file"
+    return
+  fi
   if [[ -n "$pid" ]] && kill -0 "$pid" 2>/dev/null; then
     echo "$label: up (pid=$pid)"
   else

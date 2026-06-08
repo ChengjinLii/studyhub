@@ -15,6 +15,11 @@ stop_pid_file() {
   fi
   local pid
   pid="$(cat "$pid_file")"
+  if ! [[ "$pid" =~ ^[1-9][0-9]*$ ]]; then
+    echo "$label: invalid pid file removed"
+    rm -f "$pid_file"
+    return 0
+  fi
   if [[ -n "$pid" ]] && kill -0 "$pid" 2>/dev/null; then
     kill "$pid" 2>/dev/null || true
     for _ in {1..20}; do

@@ -13,6 +13,11 @@ if [[ ! -f "$PID_FILE" ]]; then
 fi
 
 pid="$(cat "$PID_FILE")"
+if ! [[ "$pid" =~ ^[1-9][0-9]*$ ]]; then
+  echo "worker: invalid pid file removed"
+  rm -f "$PID_FILE"
+  exit 0
+fi
 if [[ -n "${pid:-}" ]] && kill -0 "$pid" 2>/dev/null; then
   kill "$pid" 2>/dev/null || true
   for _ in {1..20}; do
