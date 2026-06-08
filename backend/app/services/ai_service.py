@@ -809,28 +809,29 @@ class AiService:
         difficulty_signals = _course_card_values(course_memory_card, "difficulty_distribution") or _evidence_values(pdf_evidence, "difficulty_signals")
         visual_signals = _course_card_values(course_memory_card, "visual_signal_distribution") or _evidence_values(pdf_evidence, "visual_signals")
         yearly_summary = _course_card_yearly_question_type_summary(course_memory_card)
-        parts: list[str] = []
+        parts: list[tuple[str, str]] = []
         if years:
-            parts.append(f"年份信号包括 {_join_values(years)}")
+            parts.append(("year_trend", f"年份信号包括 {_join_values(years)}"))
         if yearly_summary:
-            parts.append(f"年份题型对应 {_join_values(yearly_summary)}")
+            parts.append(("year_trend", f"年份题型对应 {_join_values(yearly_summary)}"))
         if chapter_signals:
-            parts.append(f"章节/模块信号包括 {_join_values(chapter_signals)}")
+            parts.append(("knowledge_distribution", f"章节/模块信号包括 {_join_values(chapter_signals)}"))
         if solution_signals:
-            parts.append(f"答案/解析信号包括 {_join_values(solution_signals)}")
+            parts.append(("solution_signals", f"答案/解析信号包括 {_join_values(solution_signals)}"))
         if question_types:
-            parts.append(f"题型集中在 {_join_values(question_types)}")
+            parts.append(("question_type_distribution", f"题型集中在 {_join_values(question_types)}"))
         if knowledge_signals:
-            parts.append(f"高频知识点包括 {_join_values(knowledge_signals)}")
+            parts.append(("knowledge_distribution", f"高频知识点包括 {_join_values(knowledge_signals)}"))
         if score_points:
-            parts.append(f"分值信号包括 {_join_values([f'{value}分' for value in score_points])}")
+            parts.append(("score_distribution", f"分值信号包括 {_join_values([f'{value}分' for value in score_points])}"))
         if difficulty_signals:
-            parts.append(f"难度信号包括 {_join_values(difficulty_signals)}")
+            parts.append(("difficulty_trend", f"难度信号包括 {_join_values(difficulty_signals)}"))
         if visual_signals:
-            parts.append(f"需关注的公式/图表信号包括 {_join_values(visual_signals)}")
+            parts.append(("visual_formula_pages", f"需关注的公式/图表信号包括 {_join_values(visual_signals)}"))
         if not parts:
             return f"{scope_hint}这些页面可以先用来确认题型和高频知识点。"
-        return f"{scope_hint}从这些页面看，{'；'.join(parts)}。"
+        ordered_parts = _prioritize_exam_summary_parts(parts, query_plan)
+        return f"{scope_hint}从这些页面看，{'；'.join(ordered_parts)}。"
 
     def _local_material_scope_hint(
         self,
@@ -1974,6 +1975,28 @@ def _count_memory_items(value: Any) -> int:
     if isinstance(value, tuple):
         return len(value) + sum(_count_memory_items(item) for item in value)
     return 1 if value not in (None, "", [], {}) else 0
+
+
+def _prioritize_exam_summary_parts(
+    parts: list[tuple[str, str]],
+    query_plan: AgentQueryPlan | None,
+) -> list[str]:
+    focus = getattr(query_plan, "exam_analysis_focus", {}) if query_plan else {}
+    focus_modes = _safe_text_list(focus.get("modes")) if isinstance(focus, dict) else []
+    if not focus_modes:
+        return [text for _, text in parts]
+    ordered: list[str] = []
+    used_indexes: set[int] = set()
+    for focus_mode in focus_modes:
+        for index, (part_mode, text) in enumerate(parts):
+            if index in used_indexes or part_mode != focus_mode:
+                continue
+            ordered.append(text)
+            used_indexes.add(index)
+    for index, (_, text) in enumerate(parts):
+        if index not in used_indexes:
+            ordered.append(text)
+    return ordered
 
 
 def _course_card_values(course_memory_card: CourseMemoryCard | None, field: str) -> list[str]:

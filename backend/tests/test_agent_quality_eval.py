@@ -1132,6 +1132,73 @@ def test_agent_model_failure_uses_structured_local_exam_trend_fallback(monkeypat
     metrics.clear()
 
 
+def test_agent_local_exam_trend_prioritizes_requested_focus_dimensions(monkeypatch) -> None:
+    metrics = get_runtime_metrics()
+    metrics.clear()
+    settings = Settings(
+        ai_agent_provider="openai-compatible",
+        ai_agent_base_url="https://example.test/v1",
+        ai_agent_api_key="test-key",
+        ai_agent_model="demo-model",
+    )
+    monkeypatch.setattr("app.services.ai_service.get_settings", lambda: settings)
+
+    class FakePdfEvidenceService:
+        def collect_for_materials(
+            self,
+            materials: list[MaterialRecord],
+            query: str,
+            *,
+            current_user_id: int | None,
+        ) -> list[MaterialPageEvidence]:
+            del materials, query, current_user_id
+            return [_evidence()]
+
+    service = AiService(
+        read_repo=None,
+        material_repo=None,
+        pdf_evidence_service=FakePdfEvidenceService(),
+        query_planner_service=AgentQueryPlannerService(),
+        course_memory_service=AgentCourseMemoryService(),
+    )  # type: ignore[arg-type]
+    monkeypatch.setattr(
+        service,
+        "_rank_materials",
+        lambda session, query, filters: [
+            _material(
+                101,
+                title="通信原理四年真题解析",
+                description="2021-2024 通信原理期末真题和答案解析",
+                downloads=90,
+            )
+        ],
+    )
+
+    def raise_model_error(settings: Settings, system_prompt: str, user_prompt: dict[str, Any]) -> str:
+        del settings, system_prompt, user_prompt
+        raise RuntimeError("model down")
+
+    monkeypatch.setattr(service, "_call_agent_model", raise_model_error)
+
+    response = service.recommend(
+        object(),  # type: ignore[arg-type]
+        SimpleNamespace(query="通信原理近几年分值结构、难度变化和公式图表页怎么分布？", filters={}),
+        current_user_id=7,
+    )
+    body = json.loads(str(response["output"]).removeprefix("<json>").removesuffix("</json>"))
+    answer = body["answer"]
+
+    assert "年份信号包括 2024" in answer
+    assert "分值信号包括 10分" in answer
+    assert "难度信号包括 综合、偏难" in answer
+    assert "需关注的公式/图表信号包括 公式、图示" in answer
+    assert answer.index("分值信号包括 10分") < answer.index("章节/模块信号包括 第2章 调制解调")
+    assert answer.index("难度信号包括 综合、偏难") < answer.index("章节/模块信号包括 第2章 调制解调")
+    assert answer.index("需关注的公式/图表信号包括 公式、图示") < answer.index("章节/模块信号包括 第2章 调制解调")
+    assert "exam_analysis_focus" not in json.dumps(body, ensure_ascii=False)
+    metrics.clear()
+
+
 def test_agent_replaces_model_no_candidate_answer_when_local_materials_exist(monkeypatch) -> None:
     metrics = get_runtime_metrics()
     metrics.clear()
