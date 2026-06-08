@@ -12,6 +12,11 @@ JOB_NAME="${WORKER_JOB:-all}"
 INTERVAL_SECONDS="${WORKER_INTERVAL_SECONDS:-60}"
 RUN_SCHEMA_PREFLIGHT="${STUDYHUB_WORKER_SCHEMA_PREFLIGHT:-1}"
 
+if ! [[ "$INTERVAL_SECONDS" =~ ^[1-9][0-9]*$ ]]; then
+  echo "WORKER_INTERVAL_SECONDS must be a positive integer; got $INTERVAL_SECONDS"
+  exit 2
+fi
+
 mkdir -p "$RUN_DIR" "$LOG_DIR"
 
 if [[ "$ENVIRONMENT" == "production" && ! -f "$PRIVATE_DIR/.env.production" ]]; then
