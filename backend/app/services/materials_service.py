@@ -179,17 +179,21 @@ class MaterialsService(MaterialsCompatMixin):
         safe_page = max(page, 1)
         safe_size = max(1, min(size, 100))
         start = (safe_page - 1) * safe_size
-        profile = await self._call_with_new_async_session(self._compat_load_user_profile_async, current_user_id)
-        total = await self._call_with_new_async_session(
-            self._compat_count_material_rows_async,
-            keyword=keyword,
-            school=school,
-            college=college,
-            major=major,
-            tag=tag,
-            grade_value=grade_value,
-            course_category=course_category,
-            price=price,
+        profile, total, stats, available_tags = await asyncio.gather(
+            self._call_with_new_async_session(self._compat_load_user_profile_async, current_user_id),
+            self._call_with_new_async_session(
+                self._compat_count_material_rows_async,
+                keyword=keyword,
+                school=school,
+                college=college,
+                major=major,
+                tag=tag,
+                grade_value=grade_value,
+                course_category=course_category,
+                price=price,
+            ),
+            self._call_with_new_async_session(self._compat_load_material_stats_async),
+            self._call_with_new_async_session(self._compat_load_available_tags_async),
         )
         page_rows = await self._call_with_new_async_session(
             self._compat_load_material_rows_async,
@@ -206,11 +210,11 @@ class MaterialsService(MaterialsCompatMixin):
             limit=safe_size,
             offset=start,
         )
-        stats = await self._call_with_new_async_session(self._compat_load_material_stats_async)
-        available_tags = await self._call_with_new_async_session(self._compat_load_available_tags_async)
         material_ids = [int(row["id"]) for row in page_rows]
-        tags_by_material = await self._call_with_new_async_session(self._compat_load_tags_map_async, material_ids)
-        comment_counts = await self._call_with_new_async_session(self._compat_load_comment_counts_async, material_ids)
+        tags_by_material, comment_counts = await asyncio.gather(
+            self._call_with_new_async_session(self._compat_load_tags_map_async, material_ids),
+            self._call_with_new_async_session(self._compat_load_comment_counts_async, material_ids),
+        )
         return {
             "items": [
                 self._compat_to_list_item(

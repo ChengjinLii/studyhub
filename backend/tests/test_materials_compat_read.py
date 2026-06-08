@@ -93,6 +93,88 @@ def test_legacy_recommendations_limit_zero_keeps_all(monkeypatch) -> None:
     assert [item["id"] for item in data] == [1, 2]
 
 
+def test_async_legacy_material_list_keeps_page_stats_and_item_shape(monkeypatch) -> None:
+    service = _build_service()
+    row = {
+        "id": 5,
+        "uploader_id": 2,
+        "title": "数字信号处理真题",
+        "description": "近三年",
+        "price": 0,
+        "is_free": 1,
+        "school": "电子科技大学",
+        "college": "信通",
+        "major": "通信",
+        "is_general_education": 0,
+        "file_key": "materials/dsp.pdf",
+        "netdisk_url": None,
+        "course_category": "MAJOR",
+        "grade_type": "UG",
+        "grade_value": "大三",
+        "rating_avg": 4.8,
+        "rating_count": 12,
+        "like_count": 7,
+        "view_count": 80,
+        "download_count": 21,
+        "sales_count": 0,
+        "created_at": "2026-01-02T03:04:05Z",
+        "uploader_username": "baishan",
+        "uploader_nickname": "白山",
+        "keywords": "版权方",
+    }
+    stats = {"totalMaterials": 23, "freeMaterials": 9, "totalDownloads": 120, "userCount": 8}
+
+    async def fake_call(loader, *args, **kwargs):
+        del args
+        name = loader.__name__
+        if name == "_compat_load_user_profile_async":
+            return {"school": "电子科技大学", "major": "通信"}
+        if name == "_compat_count_material_rows_async":
+            return 23
+        if name == "_compat_load_material_stats_async":
+            return stats
+        if name == "_compat_load_available_tags_async":
+            return ["DSP", "真题"]
+        if name == "_compat_load_material_rows_async":
+            assert kwargs["profile"] == {"school": "电子科技大学", "major": "通信"}
+            assert kwargs["limit"] == 10
+            assert kwargs["offset"] == 10
+            return [row]
+        if name == "_compat_load_tags_map_async":
+            return {5: ["DSP", "真题"]}
+        if name == "_compat_load_comment_counts_async":
+            return {5: 3}
+        raise AssertionError(f"unexpected loader: {name}")
+
+    monkeypatch.setattr(service, "_call_with_new_async_session", fake_call)
+
+    data = asyncio.run(
+        service.list_materials_async(
+            session=None,
+            current_user_id=12,
+            keyword="真题",
+            school=None,
+            college=None,
+            major=None,
+            tag=None,
+            grade_value=None,
+            course_category=None,
+            price=None,
+            sort="latest",
+            page=2,
+            size=10,
+        )
+    )
+
+    assert data["meta"] == {"page": 2, "size": 10, "total": 23}
+    assert data["stats"] == stats
+    assert data["availableTags"] == ["DSP", "真题"]
+    assert data["items"][0]["id"] == 5
+    assert data["items"][0]["tags"] == ["DSP", "真题"]
+    assert data["items"][0]["commentCount"] == 3
+    assert data["items"][0]["uploaderNickname"] == "白山"
+
+
 def test_async_legacy_material_detail_keeps_user_state(monkeypatch) -> None:
     service = _build_service()
     row = {
