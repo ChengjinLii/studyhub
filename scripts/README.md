@@ -36,6 +36,8 @@ STUDYHUB_PREDEPLOY_PRODUCTION_CHECKS=0 bash scripts/predeploy-check.sh
 STUDYHUB_PREDEPLOY_CLEAN_MODE=all bash scripts/predeploy-check.sh
 ```
 
+如果当前仓库带有 `private/.env.production` 或 `STUDYHUB_ENVIRONMENT=production`，`clean-generated.sh --all` 会拒绝删除 `frontend/.next`，除非额外设置 `YES_PRODUCTION_CLEAN_FRONTEND_BUILD=I_UNDERSTAND_REBUILD_FRONTEND`。
+
 更具体的命令、环境变量和注意事项已经分别下沉到各子目录 README。
 
 ## 浏览器加载性能预算
