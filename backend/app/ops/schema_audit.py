@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import gzip
 import re
 from collections.abc import Mapping
 from datetime import UTC, datetime
@@ -300,7 +301,19 @@ def require_recent_nonempty_backup(
             f"production migrate-additive --yes 需要最近 {max_age_minutes} 分钟内的非空数据库备份；"
             f"最新备份已约 {age_minutes} 分钟。"
         )
+    ensure_readable_backup_file(backup)
     return backup
+
+
+def ensure_readable_backup_file(path: Path) -> None:
+    if path.suffix != ".gz":
+        return
+    try:
+        with gzip.open(path, "rb") as source:
+            while source.read(1024 * 1024):
+                pass
+    except OSError as exc:
+        raise RuntimeError(f"production migrate-additive --yes 需要可读取的数据库备份；gzip 校验失败：{path}") from exc
 
 
 def _index_column_sets(indexes: list[dict[str, Any]]) -> set[tuple[str, ...]]:

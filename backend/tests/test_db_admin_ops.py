@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import gzip
 import hashlib
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -286,7 +287,8 @@ def test_require_recent_backup_rejects_stale_backup(tmp_path: Path) -> None:
     backup_root = tmp_path / "backups" / "production"
     backup_root.mkdir(parents=True)
     backup_file = backup_root / "studyhub-production-old.sql.gz"
-    backup_file.write_bytes(b"backup")
+    with gzip.open(backup_file, "wb") as target:
+        target.write(b"backup")
     now = datetime(2026, 6, 8, 12, 0, tzinfo=UTC)
     stale_ts = (now - timedelta(minutes=121)).timestamp()
     os.utime(backup_file, (stale_ts, stale_ts))
@@ -301,7 +303,8 @@ def test_require_recent_backup_accepts_latest_nonempty_backup(tmp_path: Path) ->
     empty_backup = backup_root / "studyhub-production-empty.sql.gz"
     empty_backup.write_bytes(b"")
     backup_file = backup_root / "studyhub-production-fresh.sql.gz"
-    backup_file.write_bytes(b"backup")
+    with gzip.open(backup_file, "wb") as target:
+        target.write(b"backup")
     now = datetime(2026, 6, 8, 12, 0, tzinfo=UTC)
     fresh_ts = (now - timedelta(minutes=30)).timestamp()
     os.utime(backup_file, (fresh_ts, fresh_ts))
@@ -309,9 +312,20 @@ def test_require_recent_backup_accepts_latest_nonempty_backup(tmp_path: Path) ->
     assert require_recent_nonempty_backup(tmp_path, "production", max_age_seconds=120 * 60, now=now) == backup_file
 
 
-def test_validate_backup_file_accepts_readable_gzip(tmp_path: Path) -> None:
-    import gzip
+def test_require_recent_backup_rejects_corrupt_gzip_backup(tmp_path: Path) -> None:
+    backup_root = tmp_path / "backups" / "production"
+    backup_root.mkdir(parents=True)
+    backup_file = backup_root / "studyhub-production-corrupt.sql.gz"
+    backup_file.write_bytes(b"not gzip")
+    now = datetime(2026, 6, 8, 12, 0, tzinfo=UTC)
+    fresh_ts = (now - timedelta(minutes=30)).timestamp()
+    os.utime(backup_file, (fresh_ts, fresh_ts))
 
+    with pytest.raises(RuntimeError, match="gzip 校验失败"):
+        require_recent_nonempty_backup(tmp_path, "production", max_age_seconds=120 * 60, now=now)
+
+
+def test_validate_backup_file_accepts_readable_gzip(tmp_path: Path) -> None:
     backup_file = tmp_path / "backup.sql.gz"
     with gzip.open(backup_file, "wb") as target:
         target.write(b"CREATE TABLE example (id int);\n")
