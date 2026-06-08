@@ -1220,6 +1220,70 @@ def test_agent_blocks_non_learning_query_before_retrieval(monkeypatch) -> None:
     assert "recommendations" not in body
 
 
+def test_agent_blocks_non_learning_query_even_with_learning_context(monkeypatch) -> None:
+    settings = Settings(ai_agent_provider="local")
+    monkeypatch.setattr("app.services.ai_service.get_settings", lambda: settings)
+    service = AiService(read_repo=None, material_repo=None)  # type: ignore[arg-type]
+
+    def fail_rank_materials(session: object, query: str, filters: dict[str, Any]) -> list[MaterialRecord]:
+        del session, query, filters
+        raise AssertionError("non-learning query should not inherit learning context")
+
+    monkeypatch.setattr(service, "_rank_materials", fail_rank_materials)
+
+    response = service.recommend(
+        object(),  # type: ignore[arg-type]
+        SimpleNamespace(
+            query="明天天气怎么样",
+            contextQuery="用户：通信原理往年题常考什么 助手：推荐资料：《通信原理四年真题解析》",
+            filters={},
+            imageAttachments=[],
+        ),
+        current_user_id=7,
+    )
+    body = json.loads(str(response["output"]).removeprefix("<json>").removesuffix("</json>"))
+
+    assert "只处理课程学习" in body["answer"]
+    assert "recommendations" not in body
+
+
+def test_agent_allows_context_dependent_learning_followup(monkeypatch) -> None:
+    settings = Settings(ai_agent_provider="local")
+    monkeypatch.setattr("app.services.ai_service.get_settings", lambda: settings)
+    service = AiService(read_repo=None, material_repo=None)  # type: ignore[arg-type]
+    captured: dict[str, Any] = {}
+
+    def fake_rank_materials(session: object, query: str, filters: dict[str, Any]) -> list[MaterialRecord]:
+        del session, filters
+        captured["rank_query"] = query
+        return [
+            _material(
+                702,
+                title="通信原理四年真题解析",
+                description="通信原理期末真题、答案和解析",
+                downloads=20,
+            )
+        ]
+
+    monkeypatch.setattr(service, "_rank_materials", fake_rank_materials)
+
+    response = service.recommend(
+        object(),  # type: ignore[arg-type]
+        SimpleNamespace(
+            query="继续分析一下",
+            contextQuery="用户：通信原理往年题常考什么 助手：推荐资料：《通信原理四年真题解析》",
+            filters={},
+            imageAttachments=[],
+        ),
+        current_user_id=7,
+    )
+    body = json.loads(str(response["output"]).removeprefix("<json>").removesuffix("</json>"))
+
+    assert "最近上下文关键词" in captured["rank_query"]
+    assert "通信原理" in captured["rank_query"]
+    assert body["recommendations"][0]["material_id"] == 702
+
+
 def test_agent_image_attachment_local_fallback_keeps_learning_boundary(monkeypatch) -> None:
     settings = Settings(ai_agent_provider="local")
     monkeypatch.setattr("app.services.ai_service.get_settings", lambda: settings)

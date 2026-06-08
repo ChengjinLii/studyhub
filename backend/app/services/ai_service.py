@@ -1445,14 +1445,23 @@ def _split_prompt_image_payload(user_prompt: dict[str, Any]) -> tuple[dict[str, 
 
 
 def _is_learning_related_agent_query(query: str, *, context_query: str | None, has_image: bool) -> bool:
-    text = f"{query} {context_query or ''}".strip().lower()
-    normalized = re.sub(r"\s+", "", text)
-    if not normalized:
+    current = re.sub(r"\s+", " ", str(query or "")).strip()
+    normalized_current = re.sub(r"\s+", "", current).lower()
+    if not normalized_current:
         return False
-    if _is_agent_greeting(normalized):
+    if _is_agent_greeting(normalized_current):
         return True
-    if has_image and _image_query_has_learning_intent(normalized):
+    if has_image and _image_query_has_learning_intent(normalized_current):
         return True
+    if _has_learning_marker(normalized_current):
+        return True
+    context = _compact_agent_context(context_query)
+    if not context or not _should_use_agent_context(current):
+        return False
+    return _has_learning_marker(re.sub(r"\s+", "", context).lower())
+
+
+def _has_learning_marker(normalized_text: str) -> bool:
     learning_markers = (
         "学习",
         "复习",
@@ -1495,7 +1504,7 @@ def _is_learning_related_agent_query(query: str, *, context_query: str | None, h
         "微积分",
         "概率论",
     )
-    return any(marker.lower() in normalized for marker in learning_markers)
+    return any(marker.lower() in normalized_text for marker in learning_markers)
 
 
 def _is_agent_greeting(normalized_query: str) -> bool:
