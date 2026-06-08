@@ -21,10 +21,13 @@
 - 清理全部生成物并准备重新构建前端：`bash scripts/clean-generated.sh --all`
 - 检查 shell 脚本语法：`bash scripts/check-shell-scripts.sh`
 - 检查敏感文件误提交：`bash scripts/security/check-sensitive-files.sh`
+- 非生产 CI 检查：`bash scripts/ci-check.sh`
 - 发布前检查：`bash scripts/predeploy-check.sh`
 - 浏览器加载性能预算：`npm --prefix frontend run test:perf`
 
 `check-shell-scripts.sh` 只执行 `bash -n`，不会运行脚本主体，也不会连接数据库或修改运行态。
+
+`ci-check.sh` 面向 PR / CI / 本地代码质量门禁，包含 shell 语法、敏感文件、后端测试、前端 check、前端 unit、Playwright critical 和代码体积检查；它不会运行 production preflight、nginx 检查或 systemd 状态检查。
 
 `predeploy-check.sh` 会串起 shell 脚本语法、后端测试、前端检查、前端单测、Playwright critical tests、代码体积检查和生产预检。只想在本地跑代码质量门禁时，可以临时跳过生产环境检查：
 

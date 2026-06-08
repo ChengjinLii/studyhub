@@ -78,7 +78,13 @@ npm --prefix frontend run test:unit
 bash scripts/predeploy-check.sh
 ```
 
-`predeploy-check.sh` 会额外运行前端 critical path、代码体积检查和可选生产 preflight；更多环境变量和生产机器注意事项见 [scripts/README.md](scripts/README.md)。
+CI 或本地非生产质量门禁可以使用：
+
+```bash
+bash scripts/ci-check.sh
+```
+
+`predeploy-check.sh` 会额外运行可选生产 preflight、nginx 和 systemd 状态检查；更多环境变量和生产机器注意事项见 [scripts/README.md](scripts/README.md)。
 
 ## 参与贡献
 
