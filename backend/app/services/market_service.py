@@ -5,7 +5,7 @@ import json
 from typing import Any
 
 from fastapi import HTTPException, UploadFile, status
-from sqlalchemy import bindparam, text
+from sqlalchemy import bindparam, func, or_, select, text
 from sqlalchemy.orm import Session
 
 from app.core.async_db import async_session_scope
@@ -305,27 +305,29 @@ class MarketService:
         status_value: str | None,
     ) -> dict[str, Any]:
         self._bootstrap(session)
-        items = self.market_repo.list_items(session)
         normalized_category = self._normalize_category(category) if category else None
         normalized_status = self._normalize_admin_status(status_value) if status_value else None
-        filtered = []
-        for item in items:
-            if keyword:
-                haystack = f"{item.title} {item.description or ''}".lower()
-                if keyword.strip().lower() not in haystack:
-                    continue
-            if normalized_category and item.category != normalized_category:
-                continue
-            if normalized_status and item.status != normalized_status:
-                continue
-            filtered.append(item)
         safe_page = max(page, 1)
         safe_size = max(1, min(size, 100))
         start = (safe_page - 1) * safe_size
-        end = start + safe_size
+        filters = self._admin_market_filters(
+            keyword=keyword,
+            normalized_category=normalized_category,
+            normalized_status=normalized_status,
+        )
+        total = int(session.scalar(select(func.count()).select_from(MarketItemRecord).where(*filters)) or 0)
+        items = list(
+            session.scalars(
+                select(MarketItemRecord)
+                .where(*filters)
+                .order_by(MarketItemRecord.created_at.desc(), MarketItemRecord.id.desc())
+                .limit(safe_size)
+                .offset(start)
+            )
+        )
         return {
-            "items": [self._to_admin_item(item) for item in filtered[start:end]],
-            "meta": {"page": safe_page, "size": safe_size, "total": len(filtered)},
+            "items": [self._to_admin_item(item) for item in items],
+            "meta": {"page": safe_page, "size": safe_size, "total": total},
         }
 
     def batch_update(self, session: Session, payload: AdminMarketBatchUpdatePayload) -> dict[str, Any]:
@@ -457,6 +459,29 @@ class MarketService:
         if normalized not in ADMIN_STATUSES:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="状态仅支持 SALE / RESERVED / SOLD / REMOVED / HIDDEN")
         return normalized
+
+    def _admin_market_filters(
+        self,
+        *,
+        keyword: str | None,
+        normalized_category: str | None,
+        normalized_status: str | None,
+    ) -> list[Any]:
+        filters: list[Any] = []
+        normalized_keyword = keyword.strip().lower() if keyword else ""
+        if normalized_keyword:
+            pattern = f"%{_escape_like(normalized_keyword)}%"
+            filters.append(
+                or_(
+                    func.lower(MarketItemRecord.title).like(pattern, escape="\\"),
+                    func.lower(func.coalesce(MarketItemRecord.description, "")).like(pattern, escape="\\"),
+                )
+            )
+        if normalized_category:
+            filters.append(MarketItemRecord.category == normalized_category)
+        if normalized_status:
+            filters.append(MarketItemRecord.status == normalized_status)
+        return filters
 
     def _assign_images(self, item: MarketItemRecord, keys: list[str]) -> None:
         image_values = keys if keys else [PLACEHOLDER_IMAGE]
@@ -1025,3 +1050,7 @@ class MarketService:
 
     def _compat_is_external_non_oss_url(self, key: str) -> bool:
         return compat_is_external_non_oss_url(key, self.settings, treat_generic_oss_as_internal=True)
+
+
+def _escape_like(value: str) -> str:
+    return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
