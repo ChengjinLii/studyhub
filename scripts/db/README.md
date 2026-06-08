@@ -95,6 +95,14 @@ STUDYHUB_ENVIRONMENT=production bash scripts/db/db-log-p0-schema.sh
 STUDYHUB_ENVIRONMENT=preview bash scripts/db/db-stamp-head.sh
 ```
 
+production 默认也禁止直接 stamp head，避免在字段缺失时掩盖 schema 漂移。确需操作时，先运行 `db-verify-p0-schema.sh` 并人工确认 schema 状态，再设置：
+
+```bash
+YES_PRODUCTION_ALEMBIC_STAMP=I_UNDERSTAND_STAMP_PRODUCTION \
+STUDYHUB_ENVIRONMENT=production \
+bash scripts/db/db-stamp-head.sh
+```
+
 备份：
 
 ```bash
@@ -115,5 +123,6 @@ bash scripts/db/db-restore-preview.sh /path/to/preview-backup.sql.gz
 - 默认以只读检查和备份为主
 - production 不允许通过该目录下脚本直接恢复数据库
 - production 直接 Alembic migration 默认禁用，P0 字段修复走受保护的 additive 脚本
+- production 直接 Alembic stamp 默认禁用，避免掩盖尚未修复的 schema 漂移
 - preview 恢复和建表都需要显式确认环境变量
 - migration 需要显式执行，不会在 Web 服务启动时自动修改 schema
