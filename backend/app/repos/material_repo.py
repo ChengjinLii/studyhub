@@ -308,6 +308,44 @@ class MaterialRepository:
         stmt = select(MaterialRecord).options(*_material_record_load_options(session)).order_by(MaterialRecord.created_at.desc(), MaterialRecord.id.desc())
         return list(session.scalars(stmt))
 
+    def count_materials_for_admin(self, session: Session, *, status_value: str | None) -> int:
+        stmt = select(func.count()).select_from(MaterialRecord).where(*self._admin_status_filters(status_value))
+        return int(session.scalar(stmt) or 0)
+
+    def list_materials_for_admin(
+        self,
+        session: Session,
+        *,
+        status_value: str | None,
+        limit: int,
+        offset: int,
+    ) -> list[MaterialRecord]:
+        normalized_status = self._normalize_status_filter(status_value)
+        order_by = (
+            (MaterialRecord.deleted_at.desc(), MaterialRecord.created_at.desc(), MaterialRecord.id.desc())
+            if normalized_status == "removed"
+            else (MaterialRecord.created_at.desc(), MaterialRecord.id.desc())
+        )
+        stmt = (
+            select(MaterialRecord)
+            .options(*_material_record_load_options(session))
+            .where(*self._admin_status_filters(status_value))
+            .order_by(*order_by)
+            .limit(max(1, int(limit)))
+            .offset(max(0, int(offset)))
+        )
+        return list(session.scalars(stmt))
+
+    def _admin_status_filters(self, status_value: str | None):
+        normalized_status = self._normalize_status_filter(status_value)
+        status_expr = func.lower(func.trim(func.coalesce(MaterialRecord.status, "")))
+        if normalized_status:
+            return (status_expr == normalized_status,)
+        return (status_expr != "removed",)
+
+    def _normalize_status_filter(self, status_value: str | None) -> str | None:
+        return (status_value or "").strip().lower() or None
+
     def get_material(self, session: Session, material_id: int) -> MaterialRecord | None:
         return session.get(MaterialRecord, material_id)
 

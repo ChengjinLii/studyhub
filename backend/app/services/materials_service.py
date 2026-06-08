@@ -666,28 +666,18 @@ class MaterialsService(MaterialsCompatMixin):
         status_value: str | None,
     ) -> dict[str, Any]:
         self._bootstrap(session)
-        items = self.material_repo.list_all_materials(session)
-        normalized_status = (status_value or "").strip().lower() or None
-        filtered: list[MaterialRecord] = []
-        for material in items:
-            current_status = (material.status or "").strip().lower()
-            if normalized_status:
-                if current_status != normalized_status:
-                    continue
-            elif current_status == "removed":
-                continue
-            filtered.append(material)
-        if normalized_status == "removed":
-            filtered.sort(key=lambda item: -(item.deleted_at.timestamp() if item.deleted_at else 0))
-        else:
-            filtered.sort(key=lambda item: -self._material_created_ts(item))
         safe_page = max(page, 0)
         safe_size = max(1, min(size, 100))
-        start = safe_page * safe_size
-        end = start + safe_size
+        total = self.material_repo.count_materials_for_admin(session, status_value=status_value)
+        items = self.material_repo.list_materials_for_admin(
+            session,
+            status_value=status_value,
+            limit=safe_size,
+            offset=safe_page * safe_size,
+        )
         return {
-            "items": [admin_material_item(item) for item in filtered[start:end]],
-            "meta": {"page": safe_page, "size": safe_size, "total": len(filtered)},
+            "items": [admin_material_item(item) for item in items],
+            "meta": {"page": safe_page, "size": safe_size, "total": total},
         }
 
     def batch_update_materials(self, session: Session, payload: AdminMaterialBatchUpdatePayload) -> dict[str, Any]:
