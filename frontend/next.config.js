@@ -18,6 +18,11 @@ const extractOrigin = (value) => {
 const rawBase = process.env.NEXT_PUBLIC_API_BASE || process.env.API_BASE_URL;
 const apiBase = rawBase ? normalizeApiBase(rawBase) : undefined;
 const apiOrigin = apiBase ? extractOrigin(apiBase) : undefined;
+const internalApiBase = process.env.API_BASE_INTERNAL
+  ? normalizeApiBase(process.env.API_BASE_INTERNAL)
+  : apiBase && /^https?:\/\//i.test(apiBase)
+    ? apiBase
+    : undefined;
 if (apiBase) {
   process.env.NEXT_PUBLIC_API_BASE = apiBase;
   if (apiOrigin) {
@@ -101,6 +106,17 @@ const nextConfig = {
             value: 'public, max-age=0, must-revalidate',
           },
         ],
+      },
+    ];
+  },
+  async rewrites() {
+    if (!internalApiBase) {
+      return [];
+    }
+    return [
+      {
+        source: '/api/:path*',
+        destination: `${internalApiBase}/:path*`,
       },
     ];
   },
