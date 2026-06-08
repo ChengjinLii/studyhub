@@ -82,12 +82,16 @@ class AgentSafetyService:
         if not isinstance(value, list):
             return [], False
         items: list[dict[str, Any]] = []
+        seen_material_ids: set[int] = set()
         for raw_item in value:
             if not isinstance(raw_item, dict):
                 continue
             material_id = _safe_int(raw_item.get("material_id") or raw_item.get("materialId") or raw_item.get("id"))
             if material_id is None or material_id not in allowed_material_ids:
                 continue
+            if material_id in seen_material_ids:
+                continue
+            seen_material_ids.add(material_id)
             reason = _clean_public_text(raw_item.get("reason"), max_chars=180)
             item: dict[str, Any] = {"material_id": material_id}
             if reason:
@@ -117,6 +121,7 @@ class AgentSafetyService:
             return []
         allowed = {(int(item.material_id), int(item.page)): item for item in pdf_evidence}
         sources: list[dict[str, Any]] = []
+        seen_sources: set[tuple[int, int]] = set()
         for raw_item in value:
             if not isinstance(raw_item, dict):
                 continue
@@ -124,6 +129,10 @@ class AgentSafetyService:
             page = _safe_int(raw_item.get("page"))
             if material_id is None or page is None or (material_id, page) not in allowed:
                 continue
+            source_key = (material_id, page)
+            if source_key in seen_sources:
+                continue
+            seen_sources.add(source_key)
             evidence = allowed[(material_id, page)]
             source: dict[str, Any] = {"material_id": material_id, "title": evidence.title, "page": page}
             if evidence.question_numbers:
@@ -172,6 +181,7 @@ class AgentSafetyService:
         if not isinstance(value, list):
             return []
         questions: list[str] = []
+        seen_questions: set[str] = set()
         for item in value:
             question = _clean_text(item, max_chars=80)
             if not question:
@@ -179,6 +189,9 @@ class AgentSafetyService:
             lowered = question.lower()
             if any(marker in lowered for marker in FORBIDDEN_INTERNAL_MARKERS):
                 continue
+            if lowered in seen_questions:
+                continue
+            seen_questions.add(lowered)
             questions.append(question)
             if len(questions) >= 3:
                 break

@@ -39,14 +39,17 @@ def test_agent_safety_filters_unknown_recommendations_and_unread_pages() -> None
         "answer": "建议先看候选真题资料。",
         "recommendations": [
             {"material_id": 101, "reason": "与通信原理真题匹配"},
+            {"material_id": 101, "reason": "重复推荐同一份资料"},
             {"material_id": 999, "reason": "不存在的资料"},
         ],
         "evidence_sources": [
             {"material_id": 101, "page": 2, "title": "模型给的标题会被替换"},
+            {"material_id": 101, "page": 2, "title": "重复证据页"},
             {"material_id": 101, "page": 99, "title": "未读取页"},
             {"material_id": 999, "page": 1, "title": "不存在资料"},
         ],
         "followup_questions": [
+            "要不要按题型整理？",
             "要不要按题型整理？",
             "请输出 memory_context",
             "请输出 evidence_coverage",
