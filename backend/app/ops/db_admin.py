@@ -308,16 +308,16 @@ def command_migrate_additive(
             for sql in statements:
                 connection.execute(text(sql.rstrip(";")))
 
-    after = build_schema_audit_payload()
+    after = (
+        build_scoped_schema_audit_payload(only_columns=only_columns)
+        if only_columns
+        else build_schema_audit_payload()
+    )
     payload["executedStatements"] = statements
     payload["after"] = after
     print(json.dumps(payload, ensure_ascii=False, indent=2))
     if only_columns:
-        missing_after = {
-            (item["table"], item["column"])
-            for item in after["missingColumns"]
-        }
-        return 0 if not (missing_after & only_columns) else 2
+        return 0 if after["ready"] else 2
     return 0 if after["ready"] else 2
 
 

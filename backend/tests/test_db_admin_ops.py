@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
+import json
 import os
 import pytest
 
@@ -17,6 +18,7 @@ from app.ops.db_admin import (
     command_check,
     command_check_schema,
     command_init_schema,
+    command_migrate_additive,
     command_restore,
 )
 from app.ops.schema_audit import (
@@ -276,6 +278,75 @@ def test_production_migrate_requires_matching_plan_token() -> None:
         _require_production_plan_token(settings, expected="abc123", confirmed="wrong")
 
     _require_production_plan_token(settings, expected="abc123", confirmed="abc123")
+
+
+def test_migrate_additive_yes_uses_scoped_after_check_for_only_columns(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    from app.ops import db_admin as db_admin_module
+
+    settings = Settings(environment="local-dev")
+    expected_only_columns = {("market_items", "source")}
+    seen_only_columns: dict[str, set[tuple[str, str]] | None] = {}
+
+    def fake_plan_payload(*, only_columns: set[tuple[str, str]] | None) -> dict[str, object]:
+        seen_only_columns["plan"] = only_columns
+        return {
+            "scope": "selected",
+            "onlyColumns": ["market_items.source"],
+            "missingTables": [],
+            "missingColumns": [],
+            "manualReviewColumns": [],
+            "unknownRequestedColumns": [],
+            "alreadyPresentColumns": [{"table": "market_items", "column": "source"}],
+            "additiveStatements": [],
+            "executable": True,
+            "ready": True,
+            "statementCount": 0,
+            "readyAfterMigration": True,
+        }
+
+    def fake_after_payload(*, only_columns: set[tuple[str, str]] | None) -> dict[str, object]:
+        seen_only_columns["after"] = only_columns
+        return {
+            "scope": "selected",
+            "onlyColumns": ["market_items.source"],
+            "missingTables": ["market_items"],
+            "missingColumns": [],
+            "manualReviewColumns": [],
+            "unknownRequestedColumns": [],
+            "alreadyPresentColumns": [],
+            "additiveStatements": [],
+            "executable": False,
+            "ready": False,
+        }
+
+    monkeypatch.setattr(db_admin_module, "_ensure_sqlite_parent_dir", lambda settings: None)
+    monkeypatch.setattr(db_admin_module, "check_database", lambda: None)
+    monkeypatch.setattr(
+        db_admin_module,
+        "build_scoped_additive_migration_payload",
+        fake_plan_payload,
+    )
+    monkeypatch.setattr(
+        db_admin_module,
+        "build_scoped_schema_audit_payload",
+        fake_after_payload,
+    )
+    monkeypatch.setattr(
+        db_admin_module,
+        "build_schema_audit_payload",
+        lambda: (_ for _ in ()).throw(AssertionError("expected scoped after-check")),
+    )
+
+    assert command_migrate_additive(settings, plan=False, yes=True, only=["market_items.source"]) == 2
+
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["after"]["missingTables"] == ["market_items"]
+    assert payload["after"]["ready"] is False
+    assert payload["planToken"] == _migration_plan_token(payload)
+    assert seen_only_columns == {"plan": expected_only_columns, "after": expected_only_columns}
 
 
 def test_db_admin_backup_rejects_sqlite(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
