@@ -33,10 +33,13 @@ def build_schema_audit_payload(
 
     inspector = inspect(engine)
     actual_tables = set(inspector.get_table_names())
-    actual_columns_by_table = {
-        table_name: {column["name"] for column in inspector.get_columns(table_name)}
-        for table_name in actual_tables
-    }
+    actual_column_details_by_table = {}
+    actual_columns_by_table = {}
+    for table_name in actual_tables:
+        columns = inspector.get_columns(table_name)
+        details = {str(column["name"]): column for column in columns}
+        actual_column_details_by_table[table_name] = details
+        actual_columns_by_table[table_name] = set(details)
     actual_indexes_by_table = {
         table_name: _index_column_sets(inspector.get_indexes(table_name))
         for table_name in actual_tables
@@ -45,6 +48,7 @@ def build_schema_audit_payload(
         metadata=metadata,
         actual_tables=actual_tables,
         actual_columns_by_table=actual_columns_by_table,
+        actual_column_details_by_table=actual_column_details_by_table,
         actual_indexes_by_table=actual_indexes_by_table,
         dialect=engine.dialect,
     )
@@ -57,6 +61,7 @@ def compare_metadata_schema(
     actual_columns_by_table: Mapping[str, set[str]],
     actual_indexes_by_table: Mapping[str, set[tuple[str, ...]]] | None,
     dialect: Dialect,
+    actual_column_details_by_table: Mapping[str, Mapping[str, Mapping[str, Any]]] | None = None,
 ) -> dict[str, Any]:
     expected_tables = metadata.tables
     missing_tables: list[str] = []
@@ -64,6 +69,7 @@ def compare_metadata_schema(
     missing_columns: list[dict[str, Any]] = []
     manual_review_columns: list[dict[str, Any]] = []
     missing_indexes: list[dict[str, Any]] = []
+    column_warnings: list[dict[str, Any]] = []
 
     for table_name in sorted(expected_tables):
         table = expected_tables[table_name]
@@ -80,13 +86,17 @@ def compare_metadata_schema(
             continue
 
         actual_columns = actual_columns_by_table.get(table_name, set())
+        actual_column_details = (actual_column_details_by_table or {}).get(table_name, {})
         for column in table.columns:
             if column.name in actual_columns:
-                continue
-            item = _missing_column_payload(table, column, dialect)
-            missing_columns.append(item)
-            if not item["autoMigratable"]:
-                manual_review_columns.append(item)
+                actual_column = actual_column_details.get(column.name)
+                if actual_column is not None:
+                    column_warnings.extend(_column_warning_payloads(table, column, actual_column, dialect))
+            else:
+                item = _missing_column_payload(table, column, dialect)
+                missing_columns.append(item)
+                if not item["autoMigratable"]:
+                    manual_review_columns.append(item)
 
         missing_indexes.extend(
             _missing_single_column_indexes(
@@ -106,7 +116,9 @@ def compare_metadata_schema(
         "legacyCompatibleTables": legacy_compatible_tables,
         "missingColumns": missing_columns,
         "manualReviewColumns": manual_review_columns,
+        "columnWarnings": column_warnings,
         "missingIndexes": missing_indexes,
+        "destructiveChanges": [],
         "additiveStatements": statements,
         "executable": not missing_tables and not manual_review_columns,
         "ready": ready,
@@ -211,6 +223,12 @@ def select_additive_migration_scope(
     payload["allMissingColumnCount"] = len(payload["missingColumns"])
     payload["missingColumns"] = selected_missing
     payload["manualReviewColumns"] = selected_manual
+    payload["allColumnWarningCount"] = len(payload.get("columnWarnings", []))
+    payload["columnWarnings"] = [
+        item
+        for item in payload.get("columnWarnings", [])
+        if (item["table"], item["column"]) in only_columns
+    ]
     payload["unknownRequestedColumns"] = unknown_requested
     payload["alreadyPresentColumns"] = already_present
     payload["missingIndexes"] = [
@@ -304,6 +322,42 @@ def _can_auto_add_column(column: Column[Any], default_sql: str | None) -> tuple[
     return False, "non-null column has no safe default"
 
 
+def _column_warning_payloads(
+    table: Table,
+    column: Column[Any],
+    actual_column: Mapping[str, Any],
+    dialect: Dialect,
+) -> list[dict[str, Any]]:
+    warnings: list[dict[str, Any]] = []
+    expected_type = _column_type_sql(column, dialect)
+    actual_type = _actual_column_type_sql(actual_column, dialect)
+    if actual_type and _normalize_column_type_sql(actual_type) != _normalize_column_type_sql(expected_type):
+        warnings.append(
+            {
+                "table": table.name,
+                "column": column.name,
+                "kind": "type",
+                "expectedType": expected_type,
+                "actualType": actual_type,
+                "reason": "existing column type differs from SQLAlchemy metadata",
+            }
+        )
+
+    actual_nullable = actual_column.get("nullable")
+    if actual_nullable is not None and bool(actual_nullable) != bool(column.nullable):
+        warnings.append(
+            {
+                "table": table.name,
+                "column": column.name,
+                "kind": "nullable",
+                "expectedNullable": bool(column.nullable),
+                "actualNullable": bool(actual_nullable),
+                "reason": "existing column nullable flag differs from SQLAlchemy metadata",
+            }
+        )
+    return warnings
+
+
 def _missing_single_column_indexes(
     table: Table,
     *,
@@ -347,6 +401,24 @@ def _add_column_sql(table: Table, column: Column[Any], dialect: Dialect, default
 
 def _column_type_sql(column: Column[Any], dialect: Dialect) -> str:
     return column.type.compile(dialect=dialect).upper()
+
+
+def _actual_column_type_sql(actual_column: Mapping[str, Any], dialect: Dialect) -> str | None:
+    column_type = actual_column.get("type")
+    if column_type is None:
+        return None
+    if hasattr(column_type, "compile"):
+        return str(column_type.compile(dialect=dialect)).upper()
+    return str(column_type).upper()
+
+
+def _normalize_column_type_sql(value: str) -> str:
+    normalized = " ".join(value.strip().upper().split())
+    normalized = re.sub(r"\bINT\(\d+\)", "INTEGER", normalized)
+    normalized = re.sub(r"\bINTEGER\(\d+\)", "INTEGER", normalized)
+    if normalized == "INT":
+        return "INTEGER"
+    return normalized
 
 
 def _quote_identifier(value: str, dialect: Dialect) -> str:

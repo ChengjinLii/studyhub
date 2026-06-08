@@ -89,6 +89,7 @@ def test_schema_audit_reports_known_production_drift_columns() -> None:
     assert "DEFAULT 'local'" in missing[("market_items", "source")]["sql"]
     assert missing[("orders", "uploader_id")]["autoMigratable"] is True
     assert "ADD COLUMN" in missing[("orders", "uploader_id")]["sql"]
+    assert payload["destructiveChanges"] == []
     assert payload["ready"] is False
     assert payload["executable"] is True
 
@@ -104,6 +105,41 @@ def test_schema_audit_reports_known_production_drift_columns() -> None:
     assert [(item["table"], item["column"]) for item in scoped["missingColumns"]] == [("market_items", "source")]
     assert scoped["additiveStatements"] == [missing[("market_items", "source")]["sql"]]
     assert scoped["executable"] is True
+
+
+def test_schema_audit_reports_type_and_nullable_warnings_separately() -> None:
+    from sqlalchemy import Column, Integer, MetaData, String, Table
+    from sqlalchemy.dialects import mysql
+
+    expected = MetaData()
+    Table(
+        "market_items",
+        expected,
+        Column("id", Integer, primary_key=True),
+        Column("source", String(16), nullable=False, default="local"),
+    )
+
+    payload = compare_metadata_schema(
+        metadata=expected,
+        actual_tables={"market_items"},
+        actual_columns_by_table={"market_items": {"id", "source"}},
+        actual_column_details_by_table={
+            "market_items": {
+                "source": {"name": "source", "type": String(32), "nullable": True},
+            }
+        },
+        actual_indexes_by_table={},
+        dialect=mysql.dialect(),
+    )
+
+    warning_keys = {(item["table"], item["column"], item["kind"]) for item in payload["columnWarnings"]}
+    assert warning_keys == {
+        ("market_items", "source", "type"),
+        ("market_items", "source", "nullable"),
+    }
+    assert payload["missingColumns"] == []
+    assert payload["destructiveChanges"] == []
+    assert payload["ready"] is True
 
 
 def test_scoped_schema_audit_ready_reflects_selected_columns() -> None:
