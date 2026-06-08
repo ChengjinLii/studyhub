@@ -8,6 +8,18 @@ RUN_DIR="$RUNTIME_ROOT/run"
 BACKEND_PORT="${PREVIEW_BACKEND_PORT:-8211}"
 FRONTEND_PORT="${PREVIEW_FRONTEND_PORT:-3200}"
 
+require_tcp_port() {
+  local name="$1"
+  local value="$2"
+  if ! [[ "$value" =~ ^[1-9][0-9]*$ ]] || (( value > 65535 )); then
+    echo "$name must be a TCP port between 1 and 65535; got $value"
+    exit 2
+  fi
+}
+
+require_tcp_port "PREVIEW_BACKEND_PORT" "$BACKEND_PORT"
+require_tcp_port "PREVIEW_FRONTEND_PORT" "$FRONTEND_PORT"
+
 status_pid_file() {
   local pid_file="$1"
   local label="$2"
