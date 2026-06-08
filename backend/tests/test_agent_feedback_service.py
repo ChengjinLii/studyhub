@@ -61,7 +61,11 @@ def test_ai_feedback_builds_redacted_user_and_platform_memory_candidates(client,
         json={
             "hook": "useful",
             "selectedMaterialIds": [780, 781, 999, 780],
-            "note": "真题解析有帮助，联系我 13812345678 alice@example.com api_key=secret-value https://example.test",
+            "note": (
+                "真题解析有帮助，联系我 13812345678 alice@example.com api_key=secret-value "
+                "https://example.test QQ 123456789 微信 studyhub_user 学号 2023123456 "
+                "身份证 11010119900307561X 卡号 6222021234567890123"
+            ),
         },
     )
 
@@ -76,10 +80,19 @@ def test_ai_feedback_builds_redacted_user_and_platform_memory_candidates(client,
     assert "alice@example.com" not in serialized
     assert "secret-value" not in serialized
     assert "https://example.test" not in serialized
+    assert "123456789" not in serialized
+    assert "studyhub_user" not in serialized
+    assert "2023123456" not in serialized
+    assert "11010119900307561X" not in serialized
+    assert "6222021234567890123" not in serialized
     assert "[redacted-phone]" in data["redactedNote"]
     assert "[redacted-email]" in data["redactedNote"]
     assert "[redacted-secret]" in data["redactedNote"]
     assert "[redacted-url]" in data["redactedNote"]
+    assert "[redacted-contact]" in data["redactedNote"]
+    assert "[redacted-id]" in data["redactedNote"]
+    assert "[redacted-id-card]" in data["redactedNote"]
+    assert "[redacted-number]" in data["redactedNote"]
     assert [item["scope"] for item in data["memoryCandidates"]] == ["user", "platform"]
     assert data["memoryCandidates"][0]["key"] == "agent_feedback_preference"
     assert data["memoryCandidates"][1]["privacy"] == "anonymous_aggregate_candidate"

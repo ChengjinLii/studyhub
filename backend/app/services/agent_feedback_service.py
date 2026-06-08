@@ -156,7 +156,35 @@ def _redact_note(value: str | None) -> str:
     text = re.sub(r"[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}", "[redacted-email]", text)
     text = re.sub(r"(?<!\d)1[3-9]\d{9}(?!\d)", "[redacted-phone]", text)
     text = re.sub(r"(?i)(api[_-]?key|token|secret)\s*[:=]\s*\S+", r"\1=[redacted-secret]", text)
+    text = _redact_identity_numbers(text)
+    text = _redact_labeled_ids(text)
+    text = _redact_messenger_handles(text)
+    text = re.sub(r"(?<!\d)\d{12,24}(?!\d)", "[redacted-number]", text)
     return text[:240]
+
+
+def _redact_identity_numbers(text: str) -> str:
+    return re.sub(
+        r"(?<![A-Za-z0-9])\d{6}(?:18|19|20)\d{2}(?:0[1-9]|1[0-2])(?:0[1-9]|[12]\d|3[01])\d{3}[\dXx](?![A-Za-z0-9])",
+        "[redacted-id-card]",
+        text,
+    )
+
+
+def _redact_labeled_ids(text: str) -> str:
+    pattern = re.compile(
+        r"(?i)(学号|工号|student[_ -]?id|employee[_ -]?id)\s*[:：=]?\s*[A-Za-z0-9_-]{5,24}"
+    )
+    return pattern.sub(lambda match: f"{match.group(1)}=[redacted-id]", text)
+
+
+def _redact_messenger_handles(text: str) -> str:
+    latin_pattern = re.compile(
+        r"(?i)(?<![A-Za-z0-9_])(qq|wechat|weixin|wx|vx)(?![A-Za-z0-9_])\s*[:：=]?\s*[A-Za-z0-9_-]{5,32}"
+    )
+    text = latin_pattern.sub(lambda match: f"{match.group(1)}=[redacted-contact]", text)
+    chinese_pattern = re.compile(r"(微信|微信号|微 信)\s*[:：=]?\s*[A-Za-z0-9_-]{5,32}")
+    return chinese_pattern.sub(lambda match: f"{match.group(1)}=[redacted-contact]", text)
 
 
 def _feedback_confidence(hook: str) -> float:
