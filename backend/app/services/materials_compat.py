@@ -533,26 +533,43 @@ class MaterialsCompatMixin:
         return {int(row["material_id"]): int(row["total"]) for row in rows}
 
     def _compat_load_material_stats(self, session: Session) -> dict[str, int]:
-        total_materials = int(session.execute(text("SELECT COUNT(*) FROM materials")).scalar() or 0)
-        free_materials = int(session.execute(text("SELECT COUNT(*) FROM materials WHERE is_free = 1")).scalar() or 0)
-        total_downloads = int(session.execute(text("SELECT COALESCE(SUM(download_count), 0) FROM materials")).scalar() or 0)
+        material_stats = session.execute(
+            text(
+                """
+                SELECT
+                  COUNT(*) AS total_materials,
+                  COALESCE(SUM(CASE WHEN is_free = 1 THEN 1 ELSE 0 END), 0) AS free_materials,
+                  COALESCE(SUM(download_count), 0) AS total_downloads
+                FROM materials
+                """
+            )
+        ).mappings().first()
         user_count = int(session.execute(text("SELECT COUNT(*) FROM users")).scalar() or 0)
         return {
-            "totalMaterials": total_materials,
-            "freeMaterials": free_materials,
-            "totalDownloads": total_downloads,
+            "totalMaterials": int(material_stats["total_materials"] if material_stats is not None else 0),
+            "freeMaterials": int(material_stats["free_materials"] if material_stats is not None else 0),
+            "totalDownloads": int(material_stats["total_downloads"] if material_stats is not None else 0),
             "userCount": user_count,
         }
 
     async def _compat_load_material_stats_async(self, session) -> dict[str, int]:
-        total_result = await session.execute(text("SELECT COUNT(*) FROM materials"))
-        free_result = await session.execute(text("SELECT COUNT(*) FROM materials WHERE is_free = 1"))
-        downloads_result = await session.execute(text("SELECT COALESCE(SUM(download_count), 0) FROM materials"))
+        material_result = await session.execute(
+            text(
+                """
+                SELECT
+                  COUNT(*) AS total_materials,
+                  COALESCE(SUM(CASE WHEN is_free = 1 THEN 1 ELSE 0 END), 0) AS free_materials,
+                  COALESCE(SUM(download_count), 0) AS total_downloads
+                FROM materials
+                """
+            )
+        )
+        material_stats = material_result.mappings().first()
         users_result = await session.execute(text("SELECT COUNT(*) FROM users"))
         return {
-            "totalMaterials": int(total_result.scalar() or 0),
-            "freeMaterials": int(free_result.scalar() or 0),
-            "totalDownloads": int(downloads_result.scalar() or 0),
+            "totalMaterials": int(material_stats["total_materials"] if material_stats is not None else 0),
+            "freeMaterials": int(material_stats["free_materials"] if material_stats is not None else 0),
+            "totalDownloads": int(material_stats["total_downloads"] if material_stats is not None else 0),
             "userCount": int(users_result.scalar() or 0),
         }
 

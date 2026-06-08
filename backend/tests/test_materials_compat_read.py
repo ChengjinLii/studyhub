@@ -2,8 +2,50 @@ from __future__ import annotations
 
 import asyncio
 from types import SimpleNamespace
+from typing import Any
 
 from app.services.materials_service import MaterialsService
+
+
+class _MappingResult:
+    def __init__(self, row: dict[str, Any]) -> None:
+        self.row = row
+
+    def mappings(self):
+        return self
+
+    def first(self) -> dict[str, Any]:
+        return self.row
+
+
+class _ScalarResult:
+    def __init__(self, value: int) -> None:
+        self.value = value
+
+    def scalar(self) -> int:
+        return self.value
+
+
+class _StatsSession:
+    def __init__(self) -> None:
+        self.material_queries = 0
+        self.user_queries = 0
+
+    def execute(self, statement, params=None):
+        del params
+        sql = " ".join(str(statement).lower().split())
+        if "from materials" in sql:
+            self.material_queries += 1
+            return _MappingResult({"total_materials": 4, "free_materials": 2, "total_downloads": 17})
+        if "from users" in sql:
+            self.user_queries += 1
+            return _ScalarResult(3)
+        raise AssertionError(f"unexpected SQL: {statement}")
+
+
+class _AsyncStatsSession(_StatsSession):
+    async def execute(self, statement, params=None):
+        return super().execute(statement, params)
 
 
 def _build_service() -> MaterialsService:
@@ -22,6 +64,28 @@ def _build_service() -> MaterialsService:
         oss_bucket=None,
     )
     return MaterialsService(fake_settings, read_repo=None, auth_repo=None, material_repo=None, asset_store=fake_asset_store)
+
+
+def test_legacy_material_stats_uses_single_materials_aggregate_query() -> None:
+    service = _build_service()
+    session = _StatsSession()
+
+    data = service._compat_load_material_stats(session)  # type: ignore[arg-type]
+
+    assert data == {"totalMaterials": 4, "freeMaterials": 2, "totalDownloads": 17, "userCount": 3}
+    assert session.material_queries == 1
+    assert session.user_queries == 1
+
+
+def test_async_legacy_material_stats_uses_single_materials_aggregate_query() -> None:
+    service = _build_service()
+    session = _AsyncStatsSession()
+
+    data = asyncio.run(service._compat_load_material_stats_async(session))
+
+    assert data == {"totalMaterials": 4, "freeMaterials": 2, "totalDownloads": 17, "userCount": 3}
+    assert session.material_queries == 1
+    assert session.user_queries == 1
 
 
 def test_legacy_recommendations_limit_zero_keeps_all(monkeypatch) -> None:
