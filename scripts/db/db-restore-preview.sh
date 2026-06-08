@@ -15,8 +15,13 @@ if [[ "$INPUT_PATH" != /* ]]; then
   INPUT_PATH="$ROOT_DIR/$INPUT_PATH"
 fi
 
-if [[ "$ENVIRONMENT" == "production" ]]; then
-  echo "production 环境禁止通过该脚本恢复数据库。"
+if [[ "$ENVIRONMENT" != "preview" ]]; then
+  echo "db-restore-preview.sh is preview-only; got STUDYHUB_ENVIRONMENT=$ENVIRONMENT"
+  exit 2
+fi
+
+if [[ ! -f "$PRIVATE_DIR/.env.preview" ]]; then
+  echo "missing preview env file: $PRIVATE_DIR/.env.preview"
   exit 1
 fi
 

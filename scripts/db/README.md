@@ -128,5 +128,5 @@ bash scripts/db/db-restore-preview.sh /path/to/preview-backup.sql.gz
 - production 不允许通过该目录下脚本直接恢复数据库
 - production 直接 Alembic migration 默认禁用，P0 字段修复走受保护的 additive 脚本
 - production 直接 Alembic stamp 默认禁用，避免掩盖尚未修复的 schema 漂移
-- preview 恢复和建表都需要显式确认环境变量
+- preview 恢复脚本只允许 `STUDYHUB_ENVIRONMENT=preview`，且恢复和建表都需要显式确认环境变量
 - migration 需要显式执行，不会在 Web 服务启动时自动修改 schema
