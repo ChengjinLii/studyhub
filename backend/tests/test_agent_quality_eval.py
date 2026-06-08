@@ -216,6 +216,83 @@ def test_agent_ranking_handles_esd_query_with_unloaded_compatibility_columns() -
     assert "电子系统设计" in ranked[0].title
 
 
+def test_agent_followup_context_uses_clean_material_title_for_retrieval_and_plan(monkeypatch) -> None:
+    metrics = get_runtime_metrics()
+    metrics.clear()
+    captured: dict[str, Any] = {}
+    settings = Settings(
+        ai_agent_provider="openai-compatible",
+        ai_agent_base_url="https://example.test/v1",
+        ai_agent_api_key="test-key",
+        ai_agent_model="demo-model",
+    )
+    monkeypatch.setattr("app.services.ai_service.get_settings", lambda: settings)
+    esd_material = MaterialRecord(
+        id=501,
+        title="ESD-电子系统设计-2021年真题及答案",
+        description="电子系统设计 2021 年真题、样卷答案和期末考题整理",
+        tags_json=json.dumps(["电子系统设计", "真题", "答案"], ensure_ascii=False),
+        school="电子科技大学",
+        college="自动化",
+        major="电子系统设计",
+        course_category="MAJOR",
+        grade_value="大三",
+        file_type="pdf",
+        is_free=True,
+        download_count=30,
+        rating_avg=4.6,
+        rating_count=4,
+    )
+    service = AiService(
+        read_repo=None,
+        material_repo=None,
+        query_planner_service=AgentQueryPlannerService(),
+        course_memory_service=AgentCourseMemoryService(),
+    )  # type: ignore[arg-type]
+
+    def fake_rank_materials(session: object, query: str, filters: dict[str, Any]) -> list[MaterialRecord]:
+        del session, filters
+        captured["rank_query"] = query
+        return [esd_material]
+
+    def fake_call_agent_model(settings: Settings, system_prompt: str, user_prompt: dict[str, Any]) -> str:
+        del settings, system_prompt
+        captured["user_prompt"] = user_prompt
+        return json.dumps(
+            {
+                "answer": "我会基于《ESD-电子系统设计-2021年真题及答案》分析电子系统设计的考题风格。",
+                "recommendations": [{"material_id": 501, "reason": "上下文课程和资料标题匹配"}],
+            },
+            ensure_ascii=False,
+        )
+
+    monkeypatch.setattr(service, "_rank_materials", fake_rank_materials)
+    monkeypatch.setattr(service, "_call_agent_model", fake_call_agent_model)
+
+    context_query = (
+        "早期上下文摘要：课程/关键词：电子系统设计。"
+        "曾推荐资料：ESD-电子系统设计-2021年真题及答案 用户：后续讨论 助手：后续讨论"
+    )
+    response = service.recommend(
+        object(),  # type: ignore[arg-type]
+        SimpleNamespace(query="考题风格帮我分析一下", contextQuery=context_query, filters={}),
+        current_user_id=7,
+    )
+    body = json.loads(str(response["output"]).removeprefix("<json>").removesuffix("</json>"))
+    prompt = captured["user_prompt"]
+
+    assert "ESD-电子系统设计-2021年真题及答案" in captured["rank_query"]
+    assert "用户：后续讨论" not in captured["rank_query"]
+    assert "助手：后续讨论" not in captured["rank_query"]
+    assert prompt["query_plan"]["intent"] == "exam_trend_analysis"
+    assert prompt["query_plan"]["course_terms"] == ["电子系统设计"]
+    assert "最近上下文关键词" not in prompt["query_plan"]["search_terms"]
+    assert "用户：后续讨论" not in prompt["conversation_focus"]
+    assert "助手：后续讨论" not in prompt["conversation_focus"]
+    assert body["recommendations"][0]["material_id"] == 501
+    metrics.clear()
+
+
 def test_agent_exam_trend_closed_loop_prompt_and_response_contract(monkeypatch) -> None:
     captured: dict[str, Any] = {}
     metrics = get_runtime_metrics()

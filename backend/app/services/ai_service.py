@@ -85,6 +85,12 @@ LOW_VALUE_QUERY_TERMS = {
     "当前",
     "基础",
     "更有效",
+    "最近上下文关键词",
+    "早期上下文摘要",
+    "推荐资料",
+    "曾推荐资料",
+    "用户",
+    "助手",
 }
 
 CONTEXT_DEPENDENT_QUERY_MARKERS = (
@@ -1555,10 +1561,26 @@ def _agent_context_material_titles(context: str) -> list[str]:
         add_title(title)
 
     for segment in re.findall(r"(?:推荐资料|曾推荐资料)[:：]([^。\n]+)", context):
+        segment = _trim_agent_context_material_segment(segment)
         for title in re.split(r"[；;]", segment):
             add_title(title)
 
     return titles[:6]
+
+
+def _trim_agent_context_material_segment(segment: str) -> str:
+    text = str(segment or "")
+    for marker in (
+        " 用户：",
+        " 助手：",
+        " 课程/关键词：",
+        " 早期用户目标：",
+        " 图片：",
+    ):
+        index = text.find(marker)
+        if index >= 0:
+            text = text[:index]
+    return text
 
 
 def _llm_answer_denies_available_candidates(
