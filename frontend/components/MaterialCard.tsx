@@ -41,6 +41,14 @@ const MaterialStatIcon = ({ name }: { name: 'like' | 'comment' | 'view' | 'downl
   </svg>
 );
 
+const isNestedInteractiveTarget = (target: EventTarget | null, container: HTMLElement) => {
+  if (!(target instanceof HTMLElement)) {
+    return false;
+  }
+  const interactiveTarget = target.closest('a,button,input,select,textarea,label,[role="button"],[role="link"]');
+  return Boolean(interactiveTarget && interactiveTarget !== container);
+};
+
 export default function MaterialCard({
   material,
   selectable,
@@ -71,6 +79,7 @@ export default function MaterialCard({
   const filteredTags = tagItems.filter((tag) => tag !== '经验分享');
   const displayedTags = filteredTags.slice(0, 3);
   const extraTagCount = Math.max(filteredTags.length - displayedTags.length, 0);
+  const materialHref = materialPath(material.id, material.title);
   const handleToggle = (event: React.MouseEvent | React.ChangeEvent) => {
     event.stopPropagation();
     event.preventDefault();
@@ -83,7 +92,22 @@ export default function MaterialCard({
     if (!publisherId) return;
     event.preventDefault();
     event.stopPropagation();
-      router.push(userPath(publisherId, publisherName));
+    void router.push(userPath(publisherId, publisherName));
+  };
+
+  const handleCardClick = (event: React.MouseEvent<HTMLLIElement>) => {
+    if (isNestedInteractiveTarget(event.target, event.currentTarget)) {
+      return;
+    }
+    void router.push(materialHref);
+  };
+
+  const handleCardKeyDown = (event: React.KeyboardEvent<HTMLLIElement>) => {
+    if (event.currentTarget !== event.target || (event.key !== 'Enter' && event.key !== ' ')) {
+      return;
+    }
+    event.preventDefault();
+    void router.push(materialHref);
   };
 
   const listItemClasses = [
@@ -103,8 +127,8 @@ export default function MaterialCard({
         className={listItemClasses}
         role="button"
         tabIndex={0}
-        onClick={() => window.location.assign(materialPath(material.id, material.title))}
-        onKeyDown={(e) => e.key === 'Enter' && window.location.assign(materialPath(material.id, material.title))}
+        onClick={handleCardClick}
+        onKeyDown={handleCardKeyDown}
       >
         {selectable && (
           <button
@@ -118,7 +142,7 @@ export default function MaterialCard({
           </button>
         )}
         <div className="material-list-row">
-          <Link href={materialPath(material.id, material.title)} className="material-list-link" prefetch={false}>
+          <Link href={materialHref} className="material-list-link" prefetch={false}>
             <div className="material-list-title">
               {orderLabel && <span className="order-label">{orderLabel}</span>}
               {isExperienceTag ? (
@@ -165,7 +189,7 @@ export default function MaterialCard({
             {isExperienceTag ? (
               <>
                 <span className="badge badge-ghost material-reading-tag">专栏文章</span>
-                <Link className="material-card__cta" href={materialPath(material.id, material.title)} prefetch={false}>
+                <Link className="material-card__cta" href={materialHref} prefetch={false}>
                   {cardActionLabel(material, isExperienceTag)}
                 </Link>
               </>
@@ -185,8 +209,8 @@ export default function MaterialCard({
       }`}
       role="button"
       tabIndex={0}
-      onClick={() => window.location.assign(materialPath(material.id, material.title))}
-      onKeyDown={(e) => e.key === 'Enter' && window.location.assign(materialPath(material.id, material.title))}
+      onClick={handleCardClick}
+      onKeyDown={handleCardKeyDown}
     >
       {selectable && (
         <button
