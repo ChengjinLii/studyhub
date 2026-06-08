@@ -141,6 +141,39 @@ def test_query_planner_extracts_problem_context_without_extra_io() -> None:
     assert any("problem_context" in item for item in plan.response_guidance)
 
 
+def test_query_planner_detects_material_fit_assessment() -> None:
+    evidence = [
+        MaterialPageEvidence(
+            material_id=101,
+            title="通信原理四年真题解析",
+            page=3,
+            text="2024 通信原理第3题计算题考调制解调。",
+            score=42,
+            question_types=("计算题",),
+            knowledge_signals=("调制", "解调"),
+            source_type="past_exam",
+            difficulty_signals=("综合",),
+        )
+    ]
+    memory = AgentMemoryContext(platform={}, user={"profile": {"major": "通信"}})
+
+    plan = AgentQueryPlannerService().build_plan(
+        "这份通信原理真题适合我现在看吗",
+        materials=[_material()],
+        pdf_evidence=evidence,
+        memory_context=memory,
+    )
+
+    assert plan.intent == "material_fit_assessment"
+    assert plan.course_terms == ("通信原理",)
+    assert "past_exam" in plan.resource_types
+    assert "read_relevant_pdf_pages" in plan.evidence_tasks
+    assert "assess_material_fit" in plan.evidence_tasks
+    assert "rank_by_quality_and_risk" in plan.evidence_tasks
+    assert "personalize_with_current_user_memory" in plan.evidence_tasks
+    assert any("适合用户当前阶段" in item for item in plan.response_guidance)
+
+
 def test_ai_prompt_receives_query_plan(monkeypatch) -> None:
     captured: dict[str, Any] = {}
 

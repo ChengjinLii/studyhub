@@ -20,8 +20,9 @@ COURSE_ALIASES: dict[str, tuple[str, ...]] = {
 INTENT_RULES: tuple[tuple[str, tuple[str, ...]], ...] = (
     ("exam_trend_analysis", ("常考", "往年", "历年", "真题", "题型", "考点", "期末题")),
     ("study_plan", ("复习计划", "怎么复习", "两周", "一周", "考试", "规划", "速成")),
-    ("pdf_summary", ("这份资料", "这几份", "总结", "讲什么", "内容是什么", "概括")),
     ("problem_tutoring", ("错题", "不会", "怎么做", "讲解", "解析一下", "为什么")),
+    ("material_fit_assessment", ("适合我", "适合", "适不适合", "该不该看", "值得看", "能不能看", "先看这份")),
+    ("pdf_summary", ("这份资料", "这几份", "总结", "讲什么", "内容是什么", "概括")),
     ("material_recommendation", ("推荐", "找", "资料", "笔记", "讲义", "求资料")),
 )
 
@@ -378,7 +379,7 @@ def _build_evidence_tasks(
     problem_context: dict[str, Any] | None = None,
 ) -> list[str]:
     tasks = ["rank_candidate_materials"]
-    if intent in {"exam_trend_analysis", "pdf_summary", "problem_tutoring"}:
+    if intent in {"exam_trend_analysis", "pdf_summary", "problem_tutoring", "material_fit_assessment"}:
         tasks.append("read_relevant_pdf_pages")
     if intent == "exam_trend_analysis":
         tasks.extend(["aggregate_year_signals", "aggregate_question_type_signals"])
@@ -398,6 +399,8 @@ def _build_evidence_tasks(
             tasks.append("adapt_tutoring_to_problem_context")
         if problem_context and problem_context.get("question_numbers"):
             tasks.append("track_mentioned_question_numbers")
+    if intent == "material_fit_assessment":
+        tasks.extend(["assess_material_fit", "rank_by_quality_and_risk"])
     if pdf_evidence:
         tasks.append("cite_material_pages")
     if any(item.question_numbers for item in pdf_evidence):
@@ -425,6 +428,8 @@ def _build_response_guidance(
         guidance.append("优先说明资料覆盖内容、适合人群和应该先看的页码或章节。")
     elif intent == "problem_tutoring":
         guidance.append("优先给解题思路和易错点，再推荐相关资料页。")
+    elif intent == "material_fit_assessment":
+        guidance.append("优先判断资料是否适合用户当前阶段，说明适合用途、先看页码、难度风险和下一步阅读顺序。")
     else:
         guidance.append("优先解释为什么推荐这些资料，以及用户下一步应该如何筛选。")
     if has_pdf_evidence:

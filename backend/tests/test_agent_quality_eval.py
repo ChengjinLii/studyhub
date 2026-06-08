@@ -440,6 +440,82 @@ def test_agent_local_pdf_summary_uses_intent_specific_evidence(monkeypatch) -> N
     metrics.clear()
 
 
+def test_agent_local_material_fit_assessment_uses_evidence_and_profile(monkeypatch) -> None:
+    metrics = get_runtime_metrics()
+    metrics.clear()
+    settings = Settings(ai_agent_provider="local")
+    monkeypatch.setattr("app.services.ai_service.get_settings", lambda: settings)
+
+    class FakePdfEvidenceService:
+        def collect_for_materials(
+            self,
+            materials: list[MaterialRecord],
+            query: str,
+            *,
+            current_user_id: int | None,
+        ) -> list[MaterialPageEvidence]:
+            del materials, query, current_user_id
+            return [_evidence()]
+
+    class FakeMemoryService:
+        def collect(
+            self,
+            session: object,
+            *,
+            query: str,
+            materials: list[MaterialRecord],
+            current_user_id: int | None,
+            pdf_evidence: list[MaterialPageEvidence],
+        ) -> AgentMemoryContext:
+            del session, query, materials, current_user_id, pdf_evidence
+            return AgentMemoryContext(
+                platform={},
+                user={"profile": {"school": "电子科技大学", "college": "信通", "major": "通信工程"}},
+            )
+
+    service = AiService(
+        read_repo=None,
+        material_repo=None,
+        pdf_evidence_service=FakePdfEvidenceService(),
+        memory_service=FakeMemoryService(),
+        query_planner_service=AgentQueryPlannerService(),
+        course_memory_service=AgentCourseMemoryService(),
+    )  # type: ignore[arg-type]
+    monkeypatch.setattr(
+        service,
+        "_rank_materials",
+        lambda session, query, filters: [
+            _material(
+                101,
+                title="通信原理四年真题解析",
+                description="2021-2024 通信原理期末真题和答案解析",
+                downloads=90,
+            )
+        ],
+    )
+
+    response = service.recommend(
+        object(),  # type: ignore[arg-type]
+        SimpleNamespace(query="这份通信原理真题适合我现在看吗", filters={}),
+        current_user_id=7,
+    )
+    body = json.loads(str(response["output"]).removeprefix("<json>").removesuffix("</json>"))
+
+    assert "适合度判断" in body["answer"]
+    assert "用途偏向 往年真题" in body["answer"]
+    assert "它更适合考前刷题和题型复盘" in body["answer"]
+    assert "如果基础还不稳，建议先读引用页确认难度" in body["answer"]
+    assert "可先从《通信原理四年真题解析》第 3 页开始" in body["answer"]
+    assert "我会优先按你的电子科技大学/信通/通信工程背景来判断匹配度" in body["answer"]
+    assert body["followup_questions"] == [
+        "你现在是补基础、刷题冲刺还是查漏补缺？",
+        "要不要我把这份资料拆成先看页和后看页？",
+        "是否需要结合你的专业和年级调整推荐顺序？",
+    ]
+    assert "query_plan" not in json.dumps(body, ensure_ascii=False)
+    metrics.clear()
+
+
 def test_agent_local_problem_tutoring_uses_intent_specific_evidence(monkeypatch) -> None:
     metrics = get_runtime_metrics()
     metrics.clear()

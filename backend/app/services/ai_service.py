@@ -621,6 +621,8 @@ class AiService:
             return self._local_pdf_summary(pdf_evidence, course_memory_card)
         if query_plan and query_plan.intent == "problem_tutoring":
             return self._local_problem_tutoring_summary(pdf_evidence, course_memory_card, query_plan)
+        if query_plan and query_plan.intent == "material_fit_assessment":
+            return self._local_material_fit_summary(pdf_evidence, course_memory_card)
         years = _evidence_values(pdf_evidence, "years")
         question_types = _course_card_values(course_memory_card, "question_type_distribution") or _evidence_values(pdf_evidence, "question_types")
         knowledge_signals = _course_card_values(course_memory_card, "knowledge_signals") or _evidence_values(pdf_evidence, "knowledge_signals")
@@ -677,6 +679,34 @@ class AiService:
             return f"这些页面可以先用来判断资料覆盖范围和阅读顺序。{page_hint}。"
         return f"这些页面主要可用来了解资料内容结构：{'；'.join(parts)}。{page_hint}，再按题型或知识点继续展开。"
 
+    def _local_material_fit_summary(
+        self,
+        pdf_evidence: list[MaterialPageEvidence],
+        course_memory_card: CourseMemoryCard | None,
+    ) -> str:
+        source_types = _evidence_source_types(pdf_evidence)
+        question_types = _course_card_values(course_memory_card, "question_type_distribution") or _evidence_values(pdf_evidence, "question_types")
+        knowledge_signals = _course_card_values(course_memory_card, "knowledge_signals") or _evidence_values(pdf_evidence, "knowledge_signals")
+        difficulty_signals = _course_card_values(course_memory_card, "difficulty_distribution") or _evidence_values(pdf_evidence, "difficulty_signals")
+        visual_signals = _course_card_values(course_memory_card, "visual_signal_distribution") or _evidence_values(pdf_evidence, "visual_signals")
+        fit_targets = _material_fit_targets(source_types, question_types, difficulty_signals)
+        parts: list[str] = []
+        if source_types:
+            parts.append(f"用途偏向 {_join_values([_source_type_label(value) for value in source_types[:3]])}")
+        if question_types:
+            parts.append(f"题型覆盖 {_join_values(question_types[:4])}")
+        if knowledge_signals:
+            parts.append(f"关联知识点 {_join_values(knowledge_signals[:5])}")
+        if difficulty_signals:
+            parts.append(f"难度信号 {_join_values(difficulty_signals[:4])}")
+        if visual_signals:
+            parts.append(f"需要留意公式/图表 {_join_values(visual_signals[:4])}")
+        first = pdf_evidence[0]
+        basis = f"从已读页面看，{'；'.join(parts)}" if parts else "从已读页面看，当前证据还不足以做强判断"
+        fit_hint = f"它更适合{_join_values(fit_targets)}" if fit_targets else "它适合先作为候选资料快速试读"
+        difficulty_hint = "如果基础还不稳，建议先读引用页确认难度，再决定是否完整阅读" if any(value in {"综合", "偏难"} for value in difficulty_signals) else "建议先读引用页确认讲法是否顺手，再决定是否完整阅读"
+        return f"适合度判断：{basis}。{fit_hint}。{difficulty_hint}，可先从《{first.title}》第 {first.page} 页开始。"
+
     def _local_problem_tutoring_summary(
         self,
         pdf_evidence: list[MaterialPageEvidence],
@@ -730,6 +760,8 @@ class AiService:
             return "建议先读已引用页码建立资料概览，再按题型、年份或知识点决定是否继续深入。"
         if query_plan and query_plan.intent == "problem_tutoring":
             return "建议先定位题号和知识点，再拆解解题步骤，最后用同类题复盘。"
+        if query_plan and query_plan.intent == "material_fit_assessment":
+            return "建议先试读已引用页码判断难度和讲法，再决定是否作为主资料或辅助资料。"
         if course_memory_card and course_memory_card.recommended_sequence:
             return f"建议按这个顺序处理：{_join_values(list(course_memory_card.recommended_sequence)[:3])}。"
         if query_plan and query_plan.intent == "exam_trend_analysis":
@@ -778,9 +810,14 @@ class AiService:
                 "你卡住的是概念理解、公式推导还是计算步骤？",
                 "要不要我按同类题型再找几页练习？",
             ]
+        elif intent == "material_fit_assessment":
+            questions = [
+                "你现在是补基础、刷题冲刺还是查漏补缺？",
+                "要不要我把这份资料拆成先看页和后看页？",
+            ]
         else:
             questions = _default_followups()
-        if has_pdf and intent not in {"exam_trend_analysis", "pdf_summary", "problem_tutoring"}:
+        if has_pdf and intent not in {"exam_trend_analysis", "pdf_summary", "problem_tutoring", "material_fit_assessment"}:
             questions.append("要不要我基于已读取页码继续归纳重点？")
         if memory_context and memory_context.user:
             questions.append("是否需要结合你的专业和年级调整推荐顺序？")
@@ -1219,6 +1256,25 @@ def _source_type_label(value: str) -> str:
         "exercise": "习题练习",
     }
     return labels.get(value, value)
+
+
+def _material_fit_targets(source_types: list[str], question_types: list[str], difficulty_signals: list[str]) -> list[str]:
+    targets: list[str] = []
+    if "past_exam" in source_types:
+        targets.append("考前刷题和题型复盘")
+    if "answer_explanation" in source_types:
+        targets.append("对答案和理解解题步骤")
+    if "lecture_notes" in source_types:
+        targets.append("建立课程框架")
+    if "study_outline" in source_types:
+        targets.append("冲刺查漏补缺")
+    if "exercise" in source_types:
+        targets.append("专项练习")
+    if question_types and "按题型训练" not in targets:
+        targets.append("按题型训练")
+    if any(value in {"综合", "偏难"} for value in difficulty_signals):
+        targets.append("有一定基础后强化")
+    return targets[:4]
 
 
 def _course_card_values(course_memory_card: CourseMemoryCard | None, field: str) -> list[str]:
