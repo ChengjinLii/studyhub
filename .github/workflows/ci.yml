@@ -49,3 +49,6 @@ jobs:
       - name: Run frontend checks
         working-directory: frontend
         run: npm run check
+      - name: Run frontend unit tests
+        working-directory: frontend
+        run: npm run test:unit
