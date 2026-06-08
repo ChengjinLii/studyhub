@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 from time import perf_counter
@@ -281,6 +282,7 @@ class AiService:
             "sourceTypes": ["account_profile", "candidate_material_interactions", "visible_material_metadata"],
             "controls": controls,
             "memoryExplanation": _agent_memory_explanation(),
+            "memorySnapshot": None,
             "privacyBoundary": "Only the current authenticated user's derived profile and material interaction signals are shown; private memory is not mixed into platform collective memory.",
         }
         if not settings.ai_agent_memory_context_enabled or not self.memory_service:
@@ -314,6 +316,7 @@ class AiService:
             "personalMemoryEnabled": True,
             "personalMemory": memory_context.user if memory_context else {},
             "platformMemoryPreview": memory_context.platform if memory_context else {},
+            "memorySnapshot": _agent_memory_snapshot_payload(memory_context, candidate_material_count=len(materials)),
             "candidateMaterialCount": len(materials),
         }
 
@@ -1397,6 +1400,54 @@ def _agent_memory_explanation() -> dict[str, Any]:
         },
         "privacyBoundary": "Personal memory fields are derived for the current user only and are not copied into platform collective memory.",
     }
+
+
+def _agent_memory_snapshot_payload(
+    memory_context: AgentMemoryContext | None,
+    *,
+    candidate_material_count: int,
+) -> dict[str, Any]:
+    prompt_payload = memory_context.to_prompt_payload() if memory_context else {}
+    personal_memory = prompt_payload.get("user_personal_memory")
+    platform_memory = prompt_payload.get("platform_collective_memory")
+    personal_payload = personal_memory if isinstance(personal_memory, dict) else {}
+    platform_payload = platform_memory if isinstance(platform_memory, dict) else {}
+    fingerprint_basis = {
+        "schema": "agent-memory-preview-v1",
+        "candidate_material_count": int(candidate_material_count),
+        "personal_memory": personal_payload,
+        "platform_memory": platform_payload,
+    }
+    fingerprint = _stable_short_fingerprint(fingerprint_basis)
+    return {
+        "schema": "agent-memory-preview-v1",
+        "version": f"read-only-derived-v1-{fingerprint[:12]}",
+        "versionFingerprint": fingerprint,
+        "sourceCounts": {
+            "candidateMaterialCount": int(candidate_material_count),
+            "personalMemorySections": len(personal_payload),
+            "platformMemorySections": len(platform_payload),
+            "personalMemoryItemCount": _count_memory_items(personal_payload),
+            "platformMemoryItemCount": _count_memory_items(platform_payload),
+        },
+        "scope": "current_browser",
+        "persistence": "not_persisted",
+    }
+
+
+def _stable_short_fingerprint(value: dict[str, Any]) -> str:
+    serialized = json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(serialized.encode("utf-8")).hexdigest()[:16]
+
+
+def _count_memory_items(value: Any) -> int:
+    if isinstance(value, dict):
+        return sum(_count_memory_items(item) for item in value.values())
+    if isinstance(value, list):
+        return len(value) + sum(_count_memory_items(item) for item in value)
+    if isinstance(value, tuple):
+        return len(value) + sum(_count_memory_items(item) for item in value)
+    return 1 if value not in (None, "", [], {}) else 0
 
 
 def _course_card_values(course_memory_card: CourseMemoryCard | None, field: str) -> list[str]:

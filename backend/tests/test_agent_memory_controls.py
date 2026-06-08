@@ -48,9 +48,11 @@ def test_ai_memory_preview_shows_current_user_derived_memory(client, auth_servic
     _seed_memory_material(user_id=1)
 
     response = client.get("/api/ai/memory", headers=build_auth_headers(1, 1))
+    second_response = client.get("/api/ai/memory", headers=build_auth_headers(1, 1))
 
     assert response.status_code == 200
     data = response.json()["data"]
+    second_data = second_response.json()["data"]
     serialized = json.dumps(data, ensure_ascii=False)
     assert data["personalMemoryEnabled"] is True
     assert data["mode"] == "read_only_derived"
@@ -76,6 +78,15 @@ def test_ai_memory_preview_shows_current_user_derived_memory(client, auth_servic
         "dedicatedAgentMemoryRecordsDeleted": False,
         "platformCollectiveMemoryAffected": False,
     }
+    assert data["memorySnapshot"]["schema"] == "agent-memory-preview-v1"
+    assert data["memorySnapshot"]["version"].startswith("read-only-derived-v1-")
+    assert len(data["memorySnapshot"]["versionFingerprint"]) == 16
+    assert data["memorySnapshot"]["version"].endswith(data["memorySnapshot"]["versionFingerprint"][:12])
+    assert data["memorySnapshot"]["versionFingerprint"] == second_data["memorySnapshot"]["versionFingerprint"]
+    assert data["memorySnapshot"]["sourceCounts"]["candidateMaterialCount"] == data["candidateMaterialCount"]
+    assert data["memorySnapshot"]["sourceCounts"]["personalMemorySections"] >= 2
+    assert data["memorySnapshot"]["sourceCounts"]["platformMemorySections"] >= 2
+    assert data["memorySnapshot"]["persistence"] == "not_persisted"
     assert data["controls"]["canDisableCurrentBrowser"] is True
     assert data["controls"]["canDeletePersistedMemory"] is False
     assert "alice@example.com" not in serialized
@@ -99,6 +110,7 @@ def test_ai_memory_preference_cookie_disables_preview(client, auth_service) -> N
     assert data["personalMemoryEnabled"] is False
     assert data["disabledReason"] == "user_preference"
     assert data["personalMemory"] is None
+    assert data["memorySnapshot"] is None
     assert preference_response.json()["data"]["affectedScopes"] == ["current_browser_personal_memory"]
     assert "platform_collective_memory" in preference_response.json()["data"]["retainedScopes"]
     assert data["memoryExplanation"]["deleteBehavior"]["platformCollectiveMemoryAffected"] is False
@@ -135,6 +147,7 @@ def test_ai_memory_delete_disables_current_browser_without_persisted_delete(clie
     assert preview_data["personalMemoryEnabled"] is False
     assert preview_data["disabledReason"] == "user_preference"
     assert preview_data["personalMemory"] is None
+    assert preview_data["memorySnapshot"] is None
 
 
 def test_ai_recommendation_skips_memory_collection_when_personal_memory_disabled(monkeypatch) -> None:
