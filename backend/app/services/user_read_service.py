@@ -152,8 +152,7 @@ class UserReadService:
         can_view_payout_qr = is_owner or has_role(viewer_role_mask, ROLE_ADMIN)
         uploads = self.get_user_uploads(session, viewer_id, target_user_id, viewer_role_mask, limit=5, seed=seed)
         listings = self.get_user_market_listings(session, viewer_id, target_user_id, viewer_role_mask, limit=5, seed=seed)
-        follower_count = self._followers_count(session, seed, target_user_id)
-        following_count = self._following_count(session, seed, target_user_id)
+        relationships = self._public_profile_relationship_summary(session, seed, viewer_id, target_user_id)
         purchase_count = self._purchase_count(seed, target_user_id)
         sale_count = self._sale_count(session, seed, target_user_id)
         return {
@@ -174,9 +173,9 @@ class UserReadService:
             "marketCount": self._count_user_market_listings(session, target_user_id, seed=seed),
             "purchaseCount": purchase_count,
             "saleCount": sale_count,
-            "followersCount": follower_count,
-            "followingCount": following_count,
-            "isFollowing": self._is_following(session, seed, viewer_id, target_user_id),
+            "followersCount": relationships["followersCount"],
+            "followingCount": relationships["followingCount"],
+            "isFollowing": relationships["isFollowing"],
             "recentUploads": uploads,
             "recentMarketListings": listings,
         }
@@ -435,22 +434,34 @@ class UserReadService:
         self.market_repo.ensure_seed_bootstrap(session, seed)
         return seed
 
-    def _followers_count(self, session: Session, seed: dict[str, Any], target_user_id: int) -> int:
-        if self.auth_repo.find_user_by_id(session, target_user_id) is None:
-            return len(self._followers_of(seed, target_user_id))
-        return self.user_follow_service.count_followers(session, target_user_id)
+    def _public_profile_relationship_summary(
+        self,
+        session: Session,
+        seed: dict[str, Any],
+        viewer_id: int,
+        target_user_id: int,
+    ) -> dict[str, Any]:
+        target_user = self.auth_repo.find_user_by_id(session, target_user_id)
+        if target_user is None:
+            followers = self._followers_of(seed, target_user_id)
+            return {
+                "followersCount": len(followers),
+                "followingCount": len(self._following_of(seed, target_user_id)),
+                "isFollowing": viewer_id != target_user_id and viewer_id in followers,
+            }
 
-    def _following_count(self, session: Session, seed: dict[str, Any], target_user_id: int) -> int:
-        if self.auth_repo.find_user_by_id(session, target_user_id) is None:
-            return len(self._following_of(seed, target_user_id))
-        return self.user_follow_service.count_following(session, target_user_id)
-
-    def _is_following(self, session: Session, seed: dict[str, Any], viewer_id: int, target_user_id: int) -> bool:
+        is_following = False
         if viewer_id == target_user_id:
-            return False
-        if self.auth_repo.find_user_by_id(session, viewer_id) is None or self.auth_repo.find_user_by_id(session, target_user_id) is None:
-            return viewer_id in self._followers_of(seed, target_user_id)
-        return self.user_follow_service.is_following(session, follower_id=viewer_id, target_user_id=target_user_id)
+            is_following = False
+        elif self.auth_repo.find_user_by_id(session, viewer_id) is None:
+            is_following = viewer_id in self._followers_of(seed, target_user_id)
+        else:
+            is_following = self.user_follow_service.is_following(session, follower_id=viewer_id, target_user_id=target_user_id)
+        return {
+            "followersCount": self.user_follow_service.count_followers(session, target_user_id),
+            "followingCount": self.user_follow_service.count_following(session, target_user_id),
+            "isFollowing": is_following,
+        }
 
     def _next_saturday_midnight(self, reference: datetime) -> datetime:
         days_until_saturday = (5 - reference.weekday()) % 7
@@ -571,11 +582,7 @@ class UserReadService:
 
     def _load_public_profile_relationships(self, session: Session, viewer_id: int, target_user_id: int) -> dict[str, Any]:
         seed = self.repo.load_seed()
-        return {
-            "followersCount": self._followers_count(session, seed, target_user_id),
-            "followingCount": self._following_count(session, seed, target_user_id),
-            "isFollowing": self._is_following(session, seed, viewer_id, target_user_id),
-        }
+        return self._public_profile_relationship_summary(session, seed, viewer_id, target_user_id)
 
     def _load_public_profile_material_summary(
         self,

@@ -204,6 +204,34 @@ def test_public_profile_counts_do_not_load_full_collections(client: TestClient, 
     assert profile["marketCount"] == 1
 
 
+def test_public_profile_relationship_summary_reuses_auth_lookup(
+    client: TestClient,
+    auth_service: AuthService,
+    monkeypatch,
+) -> None:
+    _ = client
+    seed_read_users(auth_service, with_follow_graph=True)
+    service = get_user_read_service()
+    original_find_user = service.auth_repo.find_user_by_id
+    looked_up_user_ids: list[int] = []
+
+    def counted_find_user(session, user_id: int):
+        looked_up_user_ids.append(user_id)
+        return original_find_user(session, user_id)
+
+    monkeypatch.setattr(service.auth_repo, "find_user_by_id", counted_find_user)
+
+    with session_scope() as session:
+        relationships = service._load_public_profile_relationships(session, viewer_id=1, target_user_id=2)
+
+    assert relationships == {
+        "followersCount": 2,
+        "followingCount": 1,
+        "isFollowing": True,
+    }
+    assert looked_up_user_ids == [2, 1]
+
+
 def test_async_public_profile_groups_resource_summary_reads(client: TestClient, monkeypatch) -> None:
     _ = client
     service = get_user_read_service()
