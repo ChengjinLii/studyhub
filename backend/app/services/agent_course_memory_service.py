@@ -119,8 +119,8 @@ class AgentCourseMemoryService:
             version_fingerprint=fingerprint,
             version_basis=version_basis,
             source="current_request_candidates",
-            evidence_coverage=_evidence_coverage(materials, pdf_evidence, years),
-            confidence_assessment=_confidence_assessment(materials, pdf_evidence, years, question_types),
+            evidence_coverage=_evidence_coverage(materials, pdf_evidence, years, memory_context),
+            confidence_assessment=_confidence_assessment(materials, pdf_evidence, years, question_types, memory_context),
             years=tuple(years),
             question_type_distribution=tuple(question_types),
             knowledge_signals=tuple(knowledge_signals),
@@ -404,10 +404,12 @@ def _evidence_coverage(
     materials: list[MaterialRecord],
     pdf_evidence: list[MaterialPageEvidence],
     years: list[str],
+    memory_context: AgentMemoryContext | None,
 ) -> dict[str, Any]:
     pdf_material_ids = {int(item.material_id) for item in pdf_evidence}
     question_numbers = _dedupe([number for item in pdf_evidence for number in item.question_numbers])
     source_types = _dedupe([item.source_type for item in pdf_evidence if item.source_type != "unknown"])
+    platform_signal_keys = _platform_signal_keys(memory_context)
     payload: dict[str, Any] = {
         "candidate_material_count": len(materials),
         "pdf_evidence_page_count": len(pdf_evidence),
@@ -415,6 +417,7 @@ def _evidence_coverage(
         "year_signal_count": len(years),
         "question_number_signal_count": len(question_numbers),
         "source_types": source_types[:5],
+        "evidence_basis": _evidence_basis(pdf_evidence, platform_signal_keys),
     }
     return {key: value for key, value in payload.items() if value not in (None, [], {}, "")}
 
@@ -424,9 +427,11 @@ def _confidence_assessment(
     pdf_evidence: list[MaterialPageEvidence],
     years: list[str],
     question_types: list[dict[str, Any]],
+    memory_context: AgentMemoryContext | None,
 ) -> dict[str, Any]:
     signals: list[str] = []
     limitations: list[str] = []
+    platform_signal_keys = _platform_signal_keys(memory_context)
     if len(materials) >= 3:
         signals.append("候选资料数量较充分")
     elif len(materials) <= 1:
@@ -437,6 +442,12 @@ def _confidence_assessment(
         limitations.append("PDF 证据主要来自单份资料")
     else:
         limitations.append("缺少 PDF 页级证据")
+        if any(key.startswith("pdf_") for key in platform_signal_keys):
+            limitations.append("题型和年份主要来自平台聚合信号，当前回答不能当作已读取原文页。")
+        elif platform_signal_keys:
+            limitations.append("当前课程记忆主要基于平台聚合元数据和候选资料元数据。")
+        elif materials:
+            limitations.append("当前课程记忆主要基于候选资料元数据。")
     if len(years) >= 3:
         signals.append("年份信号覆盖较多")
     elif years:
@@ -457,6 +468,19 @@ def _confidence_assessment(
         "signals": signals[:5],
         "limitations": limitations[:5],
     }
+
+
+def _platform_signal_keys(memory_context: AgentMemoryContext | None) -> list[str]:
+    platform = memory_context.platform if memory_context else {}
+    return sorted(str(key) for key, value in platform.items() if value not in (None, [], {}, ""))
+
+
+def _evidence_basis(pdf_evidence: list[MaterialPageEvidence], platform_signal_keys: list[str]) -> str:
+    if pdf_evidence:
+        return "pdf_page_evidence"
+    if platform_signal_keys:
+        return "platform_collective_signals"
+    return "candidate_metadata_only"
 
 
 def _page_references(pdf_evidence: list[MaterialPageEvidence]) -> list[dict[str, Any]]:

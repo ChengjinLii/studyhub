@@ -114,6 +114,7 @@ def test_course_memory_card_summarizes_current_request_collective_signals() -> N
         "year_signal_count": 3,
         "question_number_signal_count": 1,
         "source_types": ["past_exam"],
+        "evidence_basis": "pdf_page_evidence",
     }
     assert payload["confidence_assessment"] == {
         "level": "medium",
@@ -263,8 +264,10 @@ def test_course_memory_card_uses_material_source_types_without_pdf_evidence() ->
         {"value": "answer_explanation", "count": 1},
         {"value": "study_outline", "count": 1},
     ]
+    assert payload["evidence_coverage"]["evidence_basis"] == "platform_collective_signals"
     assert "material_source_type_signals" in payload["version_basis"]["platform_signal_keys"]
     assert payload["confidence_assessment"]["limitations"][0] == "缺少 PDF 页级证据"
+    assert "当前课程记忆主要基于平台聚合元数据和候选资料元数据。" in payload["confidence_assessment"]["limitations"]
 
 
 def test_course_memory_card_builds_yearly_question_type_matrix() -> None:

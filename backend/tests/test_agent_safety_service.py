@@ -139,7 +139,7 @@ def test_agent_safety_does_not_repeat_low_evidence_caveat() -> None:
 def test_agent_safety_filters_anchor_internal_field_names_from_answer() -> None:
     sanitized = AgentSafetyService().sanitize_recommendation_body(
         {
-            "answer": "根据 conversation_focus、problem_context、material_scope、current_query_memory、learning_preferences、confidence_assessment、yearly_question_type_matrix、chapter_distribution、chapter_signals、solution_signal_distribution、solution_signals、material_quality_distribution、material_risk_distribution、anchor_text、anchor_terms、study_strategy_signals、study_strategy_distribution、experience_materials、experience_material_ids 和 strategy_refs，我建议你先看第 2 页。",
+            "answer": "根据 conversation_focus、problem_context、material_scope、current_query_memory、learning_preferences、evidence_basis、confidence_assessment、yearly_question_type_matrix、chapter_distribution、chapter_signals、solution_signal_distribution、solution_signals、material_quality_distribution、material_risk_distribution、anchor_text、anchor_terms、study_strategy_signals、study_strategy_distribution、experience_materials、experience_material_ids 和 strategy_refs，我建议你先看第 2 页。",
             "recommendations": [{"material_id": 101, "reason": "与通信原理真题匹配"}],
         },
         candidate_materials=[_material()],

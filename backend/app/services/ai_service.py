@@ -524,7 +524,7 @@ class AiService:
             "并结合资料质量与风险分布做保守排序和必要提醒，"
             "并根据 evidence_coverage 和 confidence_assessment 避免过度概括。"
             "不要输出 memory_context、conversation_context、conversation_focus、query_plan、problem_context、candidate_materials、user_fit_signals、"
-            "pdf_evidence、course_memory_card、material_scope、current_query_memory、learning_preferences、evidence_coverage、confidence_assessment、yearly_question_type_matrix、chapter_distribution、chapter_signals、solution_signal_distribution、solution_signals、study_strategy_distribution、material_quality_distribution、material_risk_distribution、"
+            "pdf_evidence、course_memory_card、material_scope、current_query_memory、learning_preferences、evidence_coverage、evidence_basis、confidence_assessment、yearly_question_type_matrix、chapter_distribution、chapter_signals、solution_signal_distribution、solution_signals、study_strategy_distribution、material_quality_distribution、material_risk_distribution、"
             "experience_materials、anchor_text、anchor_terms 或 privacy_boundary 等内部字段名。"
             "必须输出严格 JSON，不要输出 Markdown，不要包裹代码块。"
         )

@@ -23,6 +23,7 @@ FORBIDDEN_INTERNAL_MARKERS = (
     "learning_preferences",
     "course_memory_card",
     "evidence_coverage",
+    "evidence_basis",
     "confidence_assessment",
     "yearly_question_type_matrix",
     "chapter_distribution",
