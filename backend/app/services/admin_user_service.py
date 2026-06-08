@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from fastapi import HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from app.models.admin import UserNoteRecord
@@ -31,15 +31,18 @@ class AdminUserService:
 
     def list_users(self, session: Session, *, keyword: str | None) -> list[dict[str, Any]]:
         stmt = select(AuthUser).order_by(AuthUser.created_at.desc(), AuthUser.id.desc())
-        users = list(session.scalars(stmt))
         if keyword:
             normalized = keyword.strip().lower()
-            users = [
-                user
-                for user in users
-                if normalized in user.username.lower() or normalized in (user.nickname or "").lower()
-            ]
-        return [self._to_summary(user) for user in users[:200]]
+            if normalized:
+                pattern = f"%{_escape_like(normalized)}%"
+                stmt = stmt.where(
+                    or_(
+                        func.lower(AuthUser.username).like(pattern, escape="\\"),
+                        func.lower(AuthUser.nickname).like(pattern, escape="\\"),
+                    )
+                )
+        users = list(session.scalars(stmt.limit(200)))
+        return [self._to_summary(user) for user in users]
 
     def create_user(self, session: Session, payload: AdminCreateUserPayload, *, operator_role_mask: int | None) -> dict[str, Any]:
         desired_role_mask = int(payload.roleMask or 1)
@@ -119,3 +122,7 @@ class AdminUserService:
             "message": entity.message,
             "createdAt": serialize_datetime(entity.created_at),
         }
+
+
+def _escape_like(value: str) -> str:
+    return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
