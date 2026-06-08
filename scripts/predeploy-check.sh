@@ -9,6 +9,30 @@ RUN_RUNTIME_CHECKS="${STUDYHUB_PREDEPLOY_RUNTIME_CHECKS:-auto}"
 RUN_PRODUCTION_CHECKS="${STUDYHUB_PREDEPLOY_PRODUCTION_CHECKS:-auto}"
 GENERATED_CLEAN_MODE="${STUDYHUB_PREDEPLOY_CLEAN_MODE:-source}"
 
+validate_bool_auto() {
+  local name="$1"
+  local value="$2"
+  case "$value" in
+    0|1|false|true|auto)
+      ;;
+    *)
+      echo "$name must be one of: auto, 1, true, 0, false; got $value"
+      exit 2
+      ;;
+  esac
+}
+
+case "$GENERATED_CLEAN_MODE" in
+  source|all)
+    ;;
+  *)
+    echo "STUDYHUB_PREDEPLOY_CLEAN_MODE must be source or all; got $GENERATED_CLEAN_MODE"
+    exit 2
+    ;;
+esac
+validate_bool_auto "STUDYHUB_PREDEPLOY_RUNTIME_CHECKS" "$RUN_RUNTIME_CHECKS"
+validate_bool_auto "STUDYHUB_PREDEPLOY_PRODUCTION_CHECKS" "$RUN_PRODUCTION_CHECKS"
+
 section() {
   printf '\n[%s] %s\n' "$(date '+%H:%M:%S')" "$1"
 }
