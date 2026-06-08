@@ -85,6 +85,14 @@ def _validate_backup_file(path: Path) -> int:
     return size_bytes
 
 
+def _file_sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as source:
+        for chunk in iter(lambda: source.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
 def _ensure_backup_target_available(path: Path) -> None:
     if path.exists():
         raise RuntimeError(f"备份目标已存在，拒绝覆盖：{path}")
@@ -218,6 +226,7 @@ def command_backup(settings: Settings, *, output: Path | None) -> int:
         size_bytes = _validate_backup_file(temp_target)
         _ensure_backup_target_available(target)
         _publish_backup_file(temp_target, target)
+        sha256 = _file_sha256(target)
     except Exception:
         if temp_target.exists():
             temp_target.unlink()
@@ -228,6 +237,7 @@ def command_backup(settings: Settings, *, output: Path | None) -> int:
                 "environment": settings.environment,
                 "backupFile": str(target),
                 "backupSizeBytes": size_bytes,
+                "backupSha256": sha256,
                 "databaseUrl": _masked_database_url(url),
             },
             ensure_ascii=False,

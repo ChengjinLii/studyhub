@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
@@ -11,6 +12,7 @@ from app.core.config import Settings, get_settings
 from app.core.db import reset_database_runtime
 from app.ops.db_admin import (
     _ensure_backup_target_available,
+    _file_sha256,
     _publish_backup_file,
     _temporary_backup_path,
     _validate_backup_file,
@@ -320,6 +322,14 @@ def test_validate_backup_file_rejects_empty_file(tmp_path: Path) -> None:
 
     with pytest.raises(RuntimeError, match="备份文件为空"):
         _validate_backup_file(backup_file)
+
+
+def test_file_sha256_hashes_backup_bytes(tmp_path: Path) -> None:
+    content = b"CREATE TABLE example (id int);\n"
+    backup_file = tmp_path / "backup.sql"
+    backup_file.write_bytes(content)
+
+    assert _file_sha256(backup_file) == hashlib.sha256(content).hexdigest()
 
 
 def test_backup_target_rejects_existing_paths(tmp_path: Path) -> None:

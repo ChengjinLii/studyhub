@@ -111,6 +111,7 @@ STUDYHUB_ENVIRONMENT=production bash scripts/db/db-backup.sh private/backups/man
 ```
 
 `db-backup.sh` 的输出路径如果是相对路径，会按仓库根目录解析；上面的示例会写入 `/data/studyhub/private/backups/manual-prod.sql.gz`。
+备份命令输出会包含 `backupSizeBytes` 和 `backupSha256`，用于人工确认备份文件大小和内容指纹。
 
 恢复 preview：
 
