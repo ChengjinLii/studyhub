@@ -97,7 +97,7 @@ def create_comment(
     service: CommentsService = Depends(get_comments_service),
 ) -> dict[str, object]:
     data = service.create(session, payload, auth.user_id or 0)
-    _invalidate_comment_read_caches()
+    _invalidate_comment_content_caches()
     return api_ok(data)
 
 
@@ -111,7 +111,7 @@ def update_comment(
 ) -> dict[str, object]:
     can_moderate = bool(auth.role_mask and auth.role_mask & 24)
     data = service.update(session, id, payload, user_id=auth.user_id or 0, can_moderate=can_moderate)
-    _invalidate_comment_read_caches()
+    _invalidate_comment_content_caches()
     return api_ok(data)
 
 
@@ -124,7 +124,7 @@ def delete_comment(
 ) -> dict[str, object]:
     can_moderate = bool(auth.role_mask and auth.role_mask & 24)
     service.delete(session, id, user_id=auth.user_id or 0, can_moderate=can_moderate)
-    _invalidate_comment_read_caches()
+    _invalidate_comment_content_caches()
     return api_ok({"success": True})
 
 
@@ -137,7 +137,7 @@ def like_comment(
     service: CommentsService = Depends(get_comments_service),
 ) -> dict[str, object]:
     like_count = service.like(session, id, auth.user_id or 0)
-    _invalidate_comment_read_caches()
+    _invalidate_comment_thread_caches()
     return api_ok({"likeCount": like_count})
 
 
@@ -149,7 +149,7 @@ def unlike_comment(
     service: CommentsService = Depends(get_comments_service),
 ) -> dict[str, object]:
     like_count = service.unlike(session, id, auth.user_id or 0)
-    _invalidate_comment_read_caches()
+    _invalidate_comment_thread_caches()
     return api_ok({"likeCount": like_count})
 
 
@@ -163,9 +163,13 @@ def report_comment(
     service: CommentsService = Depends(get_comments_service),
 ) -> dict[str, object]:
     service.report(session, id, auth.user_id or 0, payload)
-    _invalidate_comment_read_caches()
+    _invalidate_comment_thread_caches()
     return api_ok({"success": True})
 
 
-def _invalidate_comment_read_caches() -> None:
-    invalidate_prefixes(get_public_read_cache(), "comments", "materials")
+def _invalidate_comment_content_caches() -> None:
+    invalidate_prefixes(get_public_read_cache(), "comments", "materials:detail")
+
+
+def _invalidate_comment_thread_caches() -> None:
+    invalidate_prefixes(get_public_read_cache(), "comments")
