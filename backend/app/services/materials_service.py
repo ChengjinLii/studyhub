@@ -281,7 +281,11 @@ class MaterialsService(MaterialsCompatMixin):
         if not (self.settings.requires_private_env_file and self.settings.async_read_db_enabled):
             return await asyncio.to_thread(self.get_recommendations, session, current_user_id, limit)
 
-        profile = await self._call_with_new_async_session(self._compat_load_user_profile_async, current_user_id)
+        profile = (
+            None
+            if current_user_id is None
+            else await self._call_with_new_async_session(self._compat_load_user_profile_async, current_user_id)
+        )
         safe_limit = clamp_limit(limit, max_value=100)
         rows = await self._call_with_new_async_session(
             self._compat_load_material_rows_async,

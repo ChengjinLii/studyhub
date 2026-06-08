@@ -322,6 +322,60 @@ def test_async_legacy_material_list_skips_profile_lookup_for_anonymous_reads(mon
     assert data["items"][0]["tags"] == ["匿名"]
 
 
+def test_async_legacy_recommendations_skips_profile_lookup_for_anonymous_reads(monkeypatch) -> None:
+    service = _build_service()
+    row = {
+        "id": 7,
+        "uploader_id": 2,
+        "title": "匿名推荐资料",
+        "description": "无需画像",
+        "price": 0,
+        "is_free": 1,
+        "school": "电子科技大学",
+        "college": "信通",
+        "major": "通信",
+        "is_general_education": 0,
+        "file_key": None,
+        "netdisk_url": None,
+        "course_category": "MAJOR",
+        "grade_type": "UG",
+        "grade_value": "大三",
+        "rating_avg": 4.0,
+        "rating_count": 1,
+        "like_count": 2,
+        "view_count": 3,
+        "download_count": 4,
+        "sales_count": 0,
+        "created_at": "2026-01-02T03:04:05Z",
+        "uploader_username": "baishan",
+        "uploader_nickname": "白山",
+        "keywords": None,
+    }
+
+    async def fake_call(loader, *args, **kwargs):
+        del args
+        name = loader.__name__
+        if name == "_compat_load_user_profile_async":
+            raise AssertionError("anonymous recommendations should not load a user profile")
+        if name == "_compat_load_material_rows_async":
+            assert kwargs["profile"] is None
+            assert kwargs["limit"] == 6
+            assert kwargs["offset"] == 0
+            return [row]
+        if name == "_compat_load_tags_map_async":
+            return {7: ["匿名推荐"]}
+        if name == "_compat_load_comment_counts_async":
+            return {7: 0}
+        raise AssertionError(f"unexpected loader: {name}")
+
+    monkeypatch.setattr(service, "_call_with_new_async_session", fake_call)
+
+    data = asyncio.run(service.get_recommendations_async(session=None, current_user_id=None, limit=6))
+
+    assert [item["id"] for item in data] == [7]
+    assert data[0]["tags"] == ["匿名推荐"]
+
+
 def test_async_legacy_material_detail_keeps_user_state(monkeypatch) -> None:
     service = _build_service()
     row = {
