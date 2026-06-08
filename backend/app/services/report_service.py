@@ -80,22 +80,25 @@ class ReportService:
 
     def list_for_admin(self, session: Session, *, status_value: str | None, target_type: str | None, page: int, size: int) -> dict[str, Any]:
         self._bootstrap(session)
-        items = self.community_repo.list_reports(session)
         normalized_status = self._normalize_status(status_value) if status_value else None
         normalized_target_type = self._normalize_target_type(target_type) if target_type else None
-        filtered = [
-            item
-            for item in items
-            if (normalized_status is None or item.status == normalized_status)
-            and (normalized_target_type is None or item.target_type == normalized_target_type)
-        ]
         safe_page = max(page, 0)
         safe_size = max(1, min(size, 100))
-        start = safe_page * safe_size
-        end = start + safe_size
+        total = self.community_repo.count_reports_for_admin(
+            session,
+            status_value=normalized_status,
+            target_type=normalized_target_type,
+        )
+        items = self.community_repo.list_reports_for_admin(
+            session,
+            status_value=normalized_status,
+            target_type=normalized_target_type,
+            limit=safe_size,
+            offset=safe_page * safe_size,
+        )
         return {
-            "items": [self._to_admin_item(session, item) for item in filtered[start:end]],
-            "meta": {"page": safe_page, "size": safe_size, "total": len(filtered)},
+            "items": [self._to_admin_item(session, item) for item in items],
+            "meta": {"page": safe_page, "size": safe_size, "total": total},
         }
 
     def update_report(self, session: Session, report_id: int, payload: AdminReportUpdatePayload) -> dict[str, Any]:
