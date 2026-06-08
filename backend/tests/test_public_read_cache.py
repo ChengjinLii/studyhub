@@ -11,6 +11,7 @@ from app.api.deps import (
     get_optional_auth_context,
     get_public_read_cache,
 )
+from app.api.routes import materials as material_routes
 from app.core.public_read_cache import PublicReadCache, cache_if_anonymous, invalidate_prefixes
 from app.core.observability import get_runtime_metrics
 from app.core.security import AuthContext
@@ -121,6 +122,38 @@ def test_invalidate_prefixes_evicts_matching_namespaces() -> None:
     assert ("market:list", ("page", 1)) in cache._entries
     metrics = get_runtime_metrics().render_prometheus(SimpleNamespace(app_name="test", environment="test", resolved_build_git_sha="test"))
     assert 'studyhub_cache_events_total{namespace="materials",backend="local",event="invalidate"} 1' in metrics
+
+
+def test_material_view_invalidation_preserves_list_caches(monkeypatch) -> None:
+    cache = _build_cache()
+    cache.get_or_set("materials:list", ("page", 1), lambda: {"kind": "list"})
+    cache.get_or_set("materials:recommendations", ("limit", 6), lambda: {"kind": "recommendations"})
+    cache.get_or_set("materials:detail", (101,), lambda: {"kind": "detail"})
+    cache.get_or_set("leaderboard:contributors", ("all", 6), lambda: {"kind": "leaderboard"})
+    monkeypatch.setattr(material_routes, "get_public_read_cache", lambda: cache)
+
+    material_routes._invalidate_material_detail_caches()
+
+    assert ("materials:list", ("page", 1)) in cache._entries
+    assert ("materials:recommendations", ("limit", 6)) in cache._entries
+    assert ("leaderboard:contributors", ("all", 6)) in cache._entries
+    assert ("materials:detail", (101,)) not in cache._entries
+
+
+def test_material_download_invalidation_preserves_material_list_caches(monkeypatch) -> None:
+    cache = _build_cache()
+    cache.get_or_set("materials:list", ("page", 1), lambda: {"kind": "list"})
+    cache.get_or_set("materials:recommendations", ("limit", 6), lambda: {"kind": "recommendations"})
+    cache.get_or_set("materials:detail", (101,), lambda: {"kind": "detail"})
+    cache.get_or_set("leaderboard:contributors", ("all", 6), lambda: {"kind": "leaderboard"})
+    monkeypatch.setattr(material_routes, "get_public_read_cache", lambda: cache)
+
+    material_routes._invalidate_material_download_caches()
+
+    assert ("materials:list", ("page", 1)) in cache._entries
+    assert ("materials:recommendations", ("limit", 6)) in cache._entries
+    assert ("materials:detail", (101,)) not in cache._entries
+    assert ("leaderboard:contributors", ("all", 6)) not in cache._entries
 
 
 def test_public_read_cache_supports_redis_backend(monkeypatch) -> None:

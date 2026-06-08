@@ -172,7 +172,7 @@ async def record_view(
     payload_dict = await request.json() if request.headers.get("content-type", "").startswith("application/json") else {}
     payload = MaterialViewPayload.model_validate(payload_dict or {})
     view_count = service.record_view(session, id, auth.user_id if auth else None, bool(auth and auth.role_mask and auth.role_mask & 24), payload.viewerToken)
-    _invalidate_material_read_caches()
+    _invalidate_material_detail_caches()
     return api_ok({"viewCount": view_count})
 
 
@@ -340,7 +340,7 @@ def download_material(
     service: MaterialsService = Depends(get_materials_service),
 ) -> dict[str, object]:
     data = service.generate_download(session, id, user_id=auth.user_id or 0, role_mask=auth.role_mask)
-    _invalidate_material_read_caches()
+    _invalidate_material_download_caches()
     return api_ok(data)
 
 
@@ -353,7 +353,7 @@ def batch_download(
     service: MaterialsService = Depends(get_materials_service),
 ) -> dict[str, object]:
     data = service.generate_batch_downloads(session, payload.materialIds, user_id=auth.user_id or 0, role_mask=auth.role_mask)
-    _invalidate_material_read_caches()
+    _invalidate_material_download_caches()
     return api_ok(data)
 
 
@@ -409,6 +409,14 @@ def _coerce_upload_list(values: list[object]) -> list[UploadFile]:
 
 def _invalidate_material_read_caches() -> None:
     invalidate_prefixes(get_public_read_cache(), "materials", "leaderboard")
+
+
+def _invalidate_material_detail_caches() -> None:
+    invalidate_prefixes(get_public_read_cache(), "materials:detail")
+
+
+def _invalidate_material_download_caches() -> None:
+    invalidate_prefixes(get_public_read_cache(), "materials:detail", "leaderboard")
 
 
 def _placeholder_download_response(file_type: str, filename: str) -> Response:
