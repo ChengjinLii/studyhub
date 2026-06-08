@@ -7,7 +7,22 @@ from app.mcp.serializers import material_url
 from tests.test_mcp_protocol import MCP_HEADERS
 
 
-MCP_SENSITIVE_KEYS = {"raw", "netdiskUrl", "netdiskPassword", "contactValue", "contactType"}
+MCP_SENSITIVE_KEYS = {
+    "raw",
+    "netdiskUrl",
+    "netdiskPassword",
+    "contactValue",
+    "contactType",
+    "downloadUrl",
+    "fileStorageKey",
+    "previewToken",
+    "assetToken",
+    "rawFileUrl",
+    "fullText",
+    "pdfText",
+    "previewManifest",
+    "previewSource",
+}
 MATERIAL_PUBLIC_KEYS = {
     "id",
     "title",
@@ -20,9 +35,26 @@ MATERIAL_PUBLIC_KEYS = {
     "downloadCount",
     "ratingAvg",
     "ratingCount",
-    "previewManifest",
-    "previewWatermarkEnabled",
-    "previewSource",
+}
+DISCOVERY_MATERIAL_KEYS = {
+    "materialId",
+    "title",
+    "summary",
+    "school",
+    "college",
+    "major",
+    "courseCategory",
+    "gradeValue",
+    "tags",
+    "free",
+    "price",
+    "ratingAvg",
+    "ratingCount",
+    "downloadCount",
+    "viewCount",
+    "uploaderDisplayName",
+    "url",
+    "reason",
 }
 REQUEST_PUBLIC_KEYS = {
     "id",
@@ -83,6 +115,8 @@ def test_mcp_search_returns_mixed_studyhub_results(client: TestClient) -> None:
     assert structured["results"]
     ids = {item["id"] for item in structured["results"]}
     assert any(item_id.startswith("material:") for item_id in ids)
+    material_results = [item for item in structured["results"] if item["id"].startswith("material:")]
+    assert material_results and "ref=mcp" in material_results[0]["url"]
     assert result["content"][0]["type"] == "text"
     assert '"results"' in result["content"][0]["text"]
 
@@ -96,6 +130,7 @@ def test_mcp_fetch_material_returns_full_structured_content(client: TestClient) 
     assert structured["id"] == "material:101"
     assert structured["title"] == "数据结构期末真题解析"
     assert_fetch_contract(structured, resource_id="material:101", public_keys=MATERIAL_PUBLIC_KEYS)
+    assert "ref=mcp" in structured["url"]
     assert "text" in structured
     assert structured["metadata"]["type"] == "material"
     assert "raw" not in structured["metadata"]
@@ -153,6 +188,29 @@ def test_mcp_specific_read_tools_return_structured_content(client: TestClient) -
     assert_no_sensitive_mcp_keys(materials.json())
     assert_no_sensitive_mcp_keys(requests.json())
     assert_no_sensitive_mcp_keys(market.json())
+
+
+def test_mcp_discovery_tools_return_referral_only_materials(client: TestClient) -> None:
+    discover = call_tool(client, "materials.discover", {"query": "数据结构", "limit": 2})
+    recommend = call_tool(client, "materials.recommend_public", {"query": "数据结构", "limit": 2})
+    summarize = call_tool(client, "materials.summarize", {"id": 101})
+
+    assert discover.status_code == 200
+    assert recommend.status_code == 200
+    assert summarize.status_code == 200
+    discover_item = discover.json()["result"]["structuredContent"]["items"][0]
+    recommend_item = recommend.json()["result"]["structuredContent"]["items"][0]
+    summary = summarize.json()["result"]["structuredContent"]
+    assert set(discover_item) == DISCOVERY_MATERIAL_KEYS
+    assert set(recommend_item) == DISCOVERY_MATERIAL_KEYS
+    assert set(summary) == DISCOVERY_MATERIAL_KEYS
+    assert discover_item["url"].startswith("https://")
+    assert "ref=mcp" in discover_item["url"]
+    assert recommend_item["reason"]
+    assert "下载" in discover.json()["result"]["structuredContent"]["message"]
+    assert_no_sensitive_mcp_keys(discover.json())
+    assert_no_sensitive_mcp_keys(recommend.json())
+    assert_no_sensitive_mcp_keys(summarize.json())
 
 
 def test_mcp_get_tools_use_fixed_public_schema(client: TestClient) -> None:

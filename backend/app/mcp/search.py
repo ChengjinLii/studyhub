@@ -12,7 +12,7 @@ from app.api.deps import (
     get_requests_service,
 )
 from app.core.db import session_scope
-from app.mcp.public_serializers import public_market, public_material, public_request
+from app.mcp.public_serializers import discovery_material, public_market, public_material, public_request
 from app.mcp.schemas import validate_contributor, validate_fetch_resource
 from app.mcp.serializers import (
     json_text,
@@ -20,8 +20,8 @@ from app.mcp.serializers import (
     market_text,
     market_url,
     material_result,
+    material_referral_url,
     material_text,
-    material_url,
     request_result,
     request_text,
     request_url,
@@ -56,28 +56,76 @@ def search_materials(query: str | None, limit: int | None) -> dict[str, Any]:
     return data
 
 
+def discover_materials(
+    query: str | None = None,
+    limit: int | None = 5,
+    school: str | None = None,
+    college: str | None = None,
+    major: str | None = None,
+    tag: str | None = None,
+) -> dict[str, Any]:
+    safe_limit = clamp_limit(limit)
+    with session_scope() as session:
+        data = get_materials_service().list_materials(
+            session,
+            None,
+            keyword=query,
+            school=school,
+            college=college,
+            major=major,
+            tag=tag,
+            grade_value=None,
+            course_category=None,
+            price=None,
+            sort="latest",
+            page=1,
+            size=safe_limit,
+        )
+    items = data.get("items") or []
+    return {
+        "items": [discovery_material(item, reason=_material_reason(item, query)) for item in items],
+        "meta": data.get("meta"),
+        "message": "请打开返回的 StudyHub 链接完成登录、购买或下载；MCP 不提供文件下载。",
+    }
+
+
 def material_detail(material_id: int) -> dict[str, Any]:
     with session_scope() as session:
         detail = get_materials_service().get_detail(session, None, material_id, False)
     return public_material(detail)
 
 
-def material_preview(material_id: int) -> dict[str, Any]:
-    detail = material_detail(material_id)
-    return {
-        "id": detail.get("id"),
-        "title": detail.get("title"),
-        "description": detail.get("description"),
-        "previewManifest": detail.get("previewManifest"),
-        "customPreviewText": detail.get("customPreviewText"),
-        "customPreviewImages": detail.get("customPreviewImages") or [],
-    }
+def material_summary(material_id: int) -> dict[str, Any]:
+    with session_scope() as session:
+        detail = get_materials_service().get_detail(session, None, material_id, False)
+    return discovery_material(detail, reason="这是 StudyHub 站内资料摘要，请打开链接查看详情并按平台流程下载。")
 
 
 def material_recommendations(limit: int | None) -> dict[str, Any]:
     with session_scope() as session:
         items = get_materials_service().get_recommendations(session, None, clamp_limit(limit))
-    return {"items": [public_material(item) for item in items]}
+    return {
+        "items": [discovery_material(item, reason=_material_reason(item, None)) for item in items],
+        "message": "这些是基于公开资料目录的推荐。请打开 StudyHub 链接完成后续查看或下载。",
+    }
+
+
+def public_material_recommendations(query: str | None = None, limit: int | None = 6) -> dict[str, Any]:
+    safe_limit = clamp_limit(limit, default=6)
+    if query and query.strip():
+        discovered = discover_materials(query=query, limit=safe_limit)
+        items = discovered.get("items") or []
+        if items:
+            return {
+                "items": items,
+                "message": "这些是基于公开资料目录的推荐。请打开 StudyHub 链接完成后续查看或下载。",
+            }
+    with session_scope() as session:
+        items = get_materials_service().get_recommendations(session, None, safe_limit)
+    return {
+        "items": [discovery_material(item, reason=_material_reason(item, query)) for item in items],
+        "message": "这些是基于公开资料目录的推荐。请打开 StudyHub 链接完成后续查看或下载。",
+    }
 
 
 def search_requests(query: str | None, limit: int | None) -> dict[str, Any]:
@@ -159,7 +207,7 @@ def fetch_typed(resource_id: str) -> dict[str, Any]:
             "id": resource_id,
             "title": detail.get("title") or f"资料 {item_id}",
             "text": material_text(detail),
-            "url": material_url(item_id),
+            "url": material_referral_url(item_id),
             "metadata": {"type": "material", "public": detail},
         })
     if kind == "request":
@@ -204,3 +252,13 @@ def _matches_text(item: dict[str, Any], query: str) -> bool:
         return True
     haystack = json_text(item).lower()
     return needle in haystack
+
+
+def _material_reason(item: dict[str, Any], query: str | None) -> str:
+    title = item.get("title") or "这份资料"
+    tags = item.get("tags") if isinstance(item.get("tags"), list) else []
+    if query and str(query).strip():
+        return f"《{title}》与“{str(query).strip()}”的检索意图相近，建议打开 StudyHub 链接查看详情。"
+    if tags:
+        return f"这份资料包含 {' / '.join(str(tag) for tag in tags[:3])} 等标签，适合作为公开目录推荐候选。"
+    return "这是 StudyHub 公开资料目录中的推荐候选，请打开站内链接查看详情。"

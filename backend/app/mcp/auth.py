@@ -12,46 +12,92 @@ from app.core.config import Settings
 @dataclass(frozen=True)
 class McpToolAccess:
     name: str
-    scope: str
+    scopes: tuple[str, ...]
     mutating: bool
     admin: bool = False
 
 
-WRITE_TOOL_REGISTRY = {
-    "comments.create": McpToolAccess("comments.create", "studyhub.write", mutating=True),
-    "requests.create": McpToolAccess("requests.create", "studyhub.write", mutating=True),
-}
+DISCOVER_PUBLIC_MATERIALS_SCOPE = "mcp:discover_public_materials"
+RECOMMEND_PUBLIC_MATERIALS_SCOPE = "mcp:recommend_public_materials"
+READ_PUBLIC_MATERIAL_SUMMARY_SCOPE = "mcp:read_public_material_summary"
+READ_PUBLIC_LEADERBOARD_SCOPE = "mcp:read_public_leaderboard"
+MCP_OPS_SCOPE = "mcp:ops"
 
-ADMIN_TOOL_REGISTRY = {
-    "admin.users.search": McpToolAccess("admin.users.search", "studyhub.admin", mutating=False, admin=True),
-    "admin.reports.search": McpToolAccess("admin.reports.search", "studyhub.admin", mutating=False, admin=True),
-}
 
-READ_TOOL_NAMES = {
-    "search",
-    "fetch",
-    "materials.search",
-    "materials.get",
-    "materials.preview",
-    "materials.recommend",
-    "requests.search",
-    "requests.get",
-    "requests.leaderboard",
-    "market.search",
-    "market.get",
-    "leaderboard.contributors",
-    "health.ready",
-}
-READ_METHODS = {"initialize", "tools/list", "resources/list", "resources/read", "prompts/list", "prompts/get"}
+def _public_discovery_scopes(settings: Settings) -> tuple[str, ...]:
+    return (settings.mcp_read_scope, DISCOVER_PUBLIC_MATERIALS_SCOPE)
+
+
+def _public_summary_scopes(settings: Settings) -> tuple[str, ...]:
+    return (settings.mcp_read_scope, READ_PUBLIC_MATERIAL_SUMMARY_SCOPE)
+
+
+def _public_recommend_scopes(settings: Settings) -> tuple[str, ...]:
+    return (settings.mcp_read_scope, RECOMMEND_PUBLIC_MATERIALS_SCOPE)
+
+
+def _public_leaderboard_scopes(settings: Settings) -> tuple[str, ...]:
+    return (settings.mcp_read_scope, READ_PUBLIC_LEADERBOARD_SCOPE)
+
+
+def _tool_access_registry(settings: Settings) -> dict[str, McpToolAccess]:
+    return {
+        "search": McpToolAccess("search", _public_discovery_scopes(settings), mutating=False),
+        "fetch": McpToolAccess("fetch", _public_summary_scopes(settings), mutating=False),
+        "materials.search": McpToolAccess("materials.search", _public_discovery_scopes(settings), mutating=False),
+        "materials.discover": McpToolAccess("materials.discover", _public_discovery_scopes(settings), mutating=False),
+        "materials.get": McpToolAccess("materials.get", _public_summary_scopes(settings), mutating=False),
+        "materials.summarize": McpToolAccess("materials.summarize", _public_summary_scopes(settings), mutating=False),
+        "materials.recommend": McpToolAccess("materials.recommend", _public_recommend_scopes(settings), mutating=False),
+        "materials.recommend_public": McpToolAccess(
+            "materials.recommend_public",
+            _public_recommend_scopes(settings),
+            mutating=False,
+        ),
+        "requests.search": McpToolAccess("requests.search", _public_discovery_scopes(settings), mutating=False),
+        "requests.get": McpToolAccess("requests.get", _public_summary_scopes(settings), mutating=False),
+        "requests.leaderboard": McpToolAccess("requests.leaderboard", _public_leaderboard_scopes(settings), mutating=False),
+        "market.search": McpToolAccess("market.search", _public_discovery_scopes(settings), mutating=False),
+        "market.get": McpToolAccess("market.get", _public_summary_scopes(settings), mutating=False),
+        "leaderboard.contributors": McpToolAccess(
+            "leaderboard.contributors",
+            _public_leaderboard_scopes(settings),
+            mutating=False,
+        ),
+        "health.ready": McpToolAccess("health.ready", (settings.mcp_read_scope, MCP_OPS_SCOPE), mutating=False),
+        "comments.create": McpToolAccess("comments.create", (settings.mcp_write_scope,), mutating=True),
+        "requests.create": McpToolAccess("requests.create", (settings.mcp_write_scope,), mutating=True),
+        "admin.users.search": McpToolAccess("admin.users.search", (settings.mcp_admin_scope,), mutating=False, admin=True),
+        "admin.reports.search": McpToolAccess("admin.reports.search", (settings.mcp_admin_scope,), mutating=False, admin=True),
+    }
+
+
+def required_scopes_for_tool(settings: Settings, tool_name: str) -> set[str] | None:
+    access = _tool_access_registry(settings).get(tool_name)
+    if access is None:
+        return None
+    return set(access.scopes)
 
 
 def required_scope_for_tool(settings: Settings, tool_name: str) -> str | None:
-    if tool_name in READ_TOOL_NAMES:
-        return settings.mcp_read_scope
-    if tool_name in WRITE_TOOL_REGISTRY:
-        return settings.mcp_write_scope
-    if tool_name in ADMIN_TOOL_REGISTRY:
-        return settings.mcp_admin_scope
+    scopes = required_scopes_for_tool(settings, tool_name)
+    if not scopes:
+        return None
+    return sorted(scopes)[0]
+
+
+def _required_scopes_for_protocol_method(settings: Settings, method: str) -> set[str] | None:
+    public_list_scopes = {
+        settings.mcp_read_scope,
+        DISCOVER_PUBLIC_MATERIALS_SCOPE,
+        RECOMMEND_PUBLIC_MATERIALS_SCOPE,
+        READ_PUBLIC_MATERIAL_SUMMARY_SCOPE,
+        READ_PUBLIC_LEADERBOARD_SCOPE,
+    }
+    if method in {"initialize", "tools/list", "prompts/list", "prompts/get"}:
+        return public_list_scopes
+    if method in {"resources/list", "resources/templates/list", "resources/read"}:
+        return {settings.mcp_read_scope, READ_PUBLIC_MATERIAL_SUMMARY_SCOPE}
     return None
 
 
@@ -100,19 +146,19 @@ def scopes_for_request(settings: Settings, request: Request) -> set[str] | None:
     return None
 
 
-async def _json_rpc_payload(request: Request) -> dict | None:
+async def _json_rpc_payload(request: Request) -> dict | list | None:
     if request.method.upper() != "POST":
         return None
     try:
         payload = json.loads((await request.body()).decode("utf-8") or "{}")
     except Exception:
         return None
-    return payload if isinstance(payload, dict) else None
+    return payload if isinstance(payload, (dict, list)) else None
 
 
 async def requested_tool_name(request: Request) -> str | None:
     payload = await _json_rpc_payload(request)
-    if payload is None:
+    if not isinstance(payload, dict):
         return None
     if payload.get("method") != "tools/call":
         return None
@@ -123,26 +169,42 @@ async def requested_tool_name(request: Request) -> str | None:
     return name if isinstance(name, str) else None
 
 
-async def required_scope_for_request(settings: Settings, request: Request) -> str | None:
+async def required_scopes_for_request(settings: Settings, request: Request) -> set[str] | None:
     payload = await _json_rpc_payload(request)
-    if payload is None:
+    if not isinstance(payload, dict):
         return None
     method = payload.get("method")
-    if method in READ_METHODS:
-        return settings.mcp_read_scope
+    if isinstance(method, str):
+        method_scopes = _required_scopes_for_protocol_method(settings, method)
+        if method_scopes is not None:
+            return method_scopes
     if method == "tools/call":
         params = payload.get("params")
         if not isinstance(params, dict):
             return None
         tool_name = params.get("name")
         if isinstance(tool_name, str):
-            return required_scope_for_tool(settings, tool_name)
+            return required_scopes_for_tool(settings, tool_name)
     return None
+
+
+async def required_scope_for_request(settings: Settings, request: Request) -> str | None:
+    scopes = await required_scopes_for_request(settings, request)
+    if not scopes:
+        return None
+    return sorted(scopes)[0]
+
+
+def _scope_allowed(granted_scopes: set[str], required_scopes: set[str]) -> bool:
+    return bool(granted_scopes.intersection(required_scopes))
 
 
 async def mcp_request_allowed(settings: Settings, request: Request) -> tuple[bool, str | None]:
     if not origin_allowed(settings, request.headers.get("origin")):
         return False, "MCP Origin is not allowed"
+    payload = await _json_rpc_payload(request)
+    if isinstance(payload, list):
+        return False, "MCP batch requests are not allowed"
     if not settings.resolved_mcp_require_auth:
         return True, None
     if not _parse_access_tokens(settings):
@@ -150,7 +212,9 @@ async def mcp_request_allowed(settings: Settings, request: Request) -> tuple[boo
     scopes = scopes_for_request(settings, request)
     if scopes is None:
         return False, "MCP authentication required"
-    required_scope = await required_scope_for_request(settings, request)
-    if required_scope and required_scope not in scopes:
+    required_scopes = await required_scopes_for_request(settings, request)
+    if required_scopes is None:
+        return False, "MCP method or tool is not allowed"
+    if not _scope_allowed(scopes, required_scopes):
         return False, "MCP scope is not allowed"
     return True, None

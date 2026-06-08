@@ -19,6 +19,14 @@ def material_url(material_id: int | str) -> str:
     return f"{public_base_url()}/materials/{material_id}"
 
 
+def material_referral_url(material_id: int | str | None, *, client_id: str | None = None) -> str:
+    base = material_url(material_id or "")
+    query = "ref=mcp"
+    if client_id:
+        query = f"{query}&client_id={client_id}"
+    return f"{base}?{query}"
+
+
 def request_url(request_id: int | str) -> str:
     return f"{public_base_url()}/requests/{request_id}"
 
@@ -36,7 +44,7 @@ def material_result(item: dict[str, Any]) -> dict[str, Any]:
     return validate_search_result({
         "id": f"material:{material_id}",
         "title": item.get("title") or f"资料 {material_id}",
-        "url": material_url(material_id),
+        "url": material_referral_url(material_id),
         "metadata": {
             "type": "material",
             "school": item.get("school"),

@@ -50,14 +50,21 @@ http://127.0.0.1:8011/mcp
 STUDYHUB_MCP_ENABLED=true
 ```
 
-如果开启 MCP 访问鉴权，客户端请求需要附带 Bearer token：
+如果开启 MCP 访问鉴权，客户端请求需要附带 Bearer token。对外部 agent 建议按 client 分配 token 和 discovery scopes：
 
 ```bash
 STUDYHUB_MCP_REQUIRE_AUTH=true
-STUDYHUB_MCP_ACCESS_TOKEN=<your-token>
+STUDYHUB_MCP_ACCESS_TOKENS='agent-token:mcp:discover_public_materials,mcp:recommend_public_materials,mcp:read_public_material_summary'
 ```
 
 MCP 返回的站内 URL 默认使用 `https://study-hub.cn`，可以通过 `STUDYHUB_PUBLIC_SITE_BASE_URL` 改成当前部署域名。
+MCP 对外定位为资料发现和导流入口，只返回公开资料摘要和 StudyHub 站内链接；不会返回下载链接、网盘链接、提取码、文件 token 或完整预览内容。用户需要打开 StudyHub 链接后，按站内正常流程登录、购买或下载。
+
+OAuth Protected Resource Metadata：
+
+```text
+http://127.0.0.1:8011/.well-known/oauth-protected-resource
+```
 
 用 MCP Inspector 验证：
 
@@ -87,10 +94,10 @@ npx -y @modelcontextprotocol/inspector http://127.0.0.1:8011/mcp
 接入后可以直接用自然语言测试，例如：
 
 ```text
-我想要数据结构期末复习资料，帮我在 StudyHub 里找几份，并打开最相关的一份看看内容。
+我想要数据结构期末复习资料，帮我在 StudyHub 里找几份，并把最相关的资料链接推荐给我。
 ```
 
-预期行为：CLI 会先调用 `search` 搜索资料、求购和集市结果，再对最相关的 `material:*` 结果调用 `fetch` 读取详情。
+预期行为：CLI 优先调用 `materials.discover` 或 `materials.recommend_public`，返回轻量资料元数据、推荐理由和 StudyHub 站内链接。后续下载、购买、打赏等动作必须由用户打开链接后在 StudyHub 站内完成。
 
 也可以直接用 JSON-RPC 验证：
 
@@ -104,12 +111,14 @@ curl -s http://127.0.0.1:8011/mcp \
 curl -s http://127.0.0.1:8011/mcp \
   -H 'Accept: application/json, text/event-stream' \
   -H 'Content-Type: application/json' \
-  --data '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"search","arguments":{"query":"数据结构","limit":10}}}'
+  -H 'Authorization: Bearer <your-token>' \
+  --data '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"materials.discover","arguments":{"query":"数据结构","limit":10}}}'
 
 curl -s http://127.0.0.1:8011/mcp \
   -H 'Accept: application/json, text/event-stream' \
   -H 'Content-Type: application/json' \
-  --data '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"fetch","arguments":{"id":"material:101"}}}'
+  -H 'Authorization: Bearer <your-token>' \
+  --data '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"materials.recommend_public","arguments":{"query":"通信原理期末","limit":3}}}'
 ```
 
 需要本地环境变量样例时：

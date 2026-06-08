@@ -44,6 +44,20 @@ def test_mcp_initialize_returns_server_capabilities(client: TestClient) -> None:
     assert "prompts" in body["result"]["capabilities"]
 
 
+def test_mcp_oauth_protected_resource_metadata(client: TestClient) -> None:
+    response = client.get("/.well-known/oauth-protected-resource")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["resource"].endswith("/mcp")
+    assert body["bearer_methods_supported"] == ["header"]
+    assert {
+        "mcp:discover_public_materials",
+        "mcp:recommend_public_materials",
+        "mcp:read_public_material_summary",
+    }.issubset(set(body["scopes_supported"]))
+
+
 def test_mcp_tools_list_exposes_v0_read_tools(client: TestClient) -> None:
     response = mcp_call(client, "tools/list")
 
@@ -54,9 +68,11 @@ def test_mcp_tools_list_exposes_v0_read_tools(client: TestClient) -> None:
         "search",
         "fetch",
         "materials.search",
+        "materials.discover",
         "materials.get",
-        "materials.preview",
+        "materials.summarize",
         "materials.recommend",
+        "materials.recommend_public",
         "requests.search",
         "requests.get",
         "requests.leaderboard",
@@ -65,5 +81,6 @@ def test_mcp_tools_list_exposes_v0_read_tools(client: TestClient) -> None:
         "leaderboard.contributors",
         "health.ready",
     }.issubset(names)
+    assert "materials.preview" not in names
     assert "comments.create" not in names
     assert "admin.users.search" not in names

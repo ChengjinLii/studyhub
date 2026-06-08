@@ -173,6 +173,24 @@ def create_app() -> FastAPI:
             reset_request_id(token)
 
     install_exception_handlers(app)
+
+    @app.get("/.well-known/oauth-protected-resource", include_in_schema=False)
+    def oauth_protected_resource_metadata() -> dict[str, object]:
+        resource = f"{settings.resolved_public_site_base_url}/mcp"
+        return {
+            "resource": resource,
+            "authorization_servers": [settings.resolved_public_site_base_url],
+            "scopes_supported": [
+                "mcp:discover_public_materials",
+                "mcp:recommend_public_materials",
+                "mcp:read_public_material_summary",
+                "mcp:read_public_leaderboard",
+                "mcp:recommend_for_user",
+                "mcp:read_user_profile_signals",
+            ],
+            "bearer_methods_supported": ["header"],
+        }
+
     app.include_router(api_router)
     if settings.resolved_mcp_enabled:
         studyhub_mcp = create_studyhub_mcp()

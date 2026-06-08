@@ -101,7 +101,17 @@ def scoped_mcp_client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> TestCl
     monkeypatch.setenv("STUDYHUB_MAIL_OUTBOX_DIR", str(tmp_path / "outbox" / "mail"))
     monkeypatch.setenv("STUDYHUB_LOCAL_DEV_BOOTSTRAP_USER", "false")
     monkeypatch.setenv("STUDYHUB_MCP_REQUIRE_AUTH", "true")
-    monkeypatch.setenv("STUDYHUB_MCP_ACCESS_TOKENS", "read-token:studyhub.read;admin-token:studyhub.read,studyhub.admin;admin-only-token:studyhub.admin")
+    monkeypatch.setenv(
+        "STUDYHUB_MCP_ACCESS_TOKENS",
+        (
+            "read-token:studyhub.read;"
+            "discovery-token:mcp:discover_public_materials;"
+            "recommend-token:mcp:recommend_public_materials;"
+            "summary-token:mcp:read_public_material_summary;"
+            "admin-token:studyhub.read,studyhub.admin;"
+            "admin-only-token:studyhub.admin"
+        ),
+    )
 
     get_settings.cache_clear()
     clear_dependency_caches()
@@ -194,6 +204,44 @@ def test_mcp_scoped_read_token_allows_read_tool(scoped_mcp_client: TestClient) -
     assert response.json()["result"]["structuredContent"]["status"] == "ok"
 
 
+def test_mcp_scoped_discovery_token_allows_discovery_tool(scoped_mcp_client: TestClient) -> None:
+    response = call_tool(
+        scoped_mcp_client,
+        "materials.discover",
+        {"query": "数据结构", "limit": 2},
+        headers={"Authorization": "Bearer discovery-token"},
+    )
+
+    assert response.status_code == 200
+    item = response.json()["result"]["structuredContent"]["items"][0]
+    assert set(item).issuperset({"materialId", "title", "url", "reason"})
+    assert "ref=mcp" in item["url"]
+
+
+def test_mcp_scoped_recommend_token_allows_public_recommendation(scoped_mcp_client: TestClient) -> None:
+    response = call_tool(
+        scoped_mcp_client,
+        "materials.recommend_public",
+        {"query": "数据结构", "limit": 2},
+        headers={"Authorization": "Bearer recommend-token"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["result"]["structuredContent"]["items"]
+
+
+def test_mcp_scoped_summary_token_rejects_unexposed_preview_tool(scoped_mcp_client: TestClient) -> None:
+    response = call_tool(
+        scoped_mcp_client,
+        "materials.preview",
+        {"id": 101},
+        headers={"Authorization": "Bearer summary-token"},
+    )
+
+    assert response.status_code == 403
+    assert_middleware_error(response, "MCP_FORBIDDEN", "MCP method or tool is not allowed")
+
+
 def test_mcp_scoped_read_token_rejects_registered_admin_tool(scoped_mcp_client: TestClient) -> None:
     response = call_tool(scoped_mcp_client, "admin.users.search", {"query": "alice"}, headers={"Authorization": "Bearer read-token"})
 
@@ -214,6 +262,36 @@ def test_mcp_scoped_token_without_read_scope_rejects_tools_list(scoped_mcp_clien
 
     assert response.status_code == 403
     assert_middleware_error(response, "MCP_FORBIDDEN", "MCP scope is not allowed")
+
+
+def test_mcp_auth_required_rejects_unknown_tools_before_sdk(scoped_mcp_client: TestClient) -> None:
+    response = call_tool(
+        scoped_mcp_client,
+        "materials.download.create",
+        {"id": 101},
+        headers={"Authorization": "Bearer read-token"},
+    )
+
+    assert response.status_code == 403
+    assert_middleware_error(response, "MCP_FORBIDDEN", "MCP method or tool is not allowed")
+
+
+def test_mcp_auth_required_rejects_json_rpc_batch(scoped_mcp_client: TestClient) -> None:
+    response = scoped_mcp_client.post(
+        "/mcp",
+        headers={
+            "Accept": "application/json, text/event-stream",
+            "Content-Type": "application/json",
+            "Authorization": "Bearer read-token",
+        },
+        json=[
+            {"jsonrpc": "2.0", "id": 1, "method": "tools/list", "params": {}},
+            {"jsonrpc": "2.0", "id": 2, "method": "tools/list", "params": {}},
+        ],
+    )
+
+    assert response.status_code == 403
+    assert_middleware_error(response, "MCP_FORBIDDEN", "MCP batch requests are not allowed")
 
 
 def test_mcp_scoped_admin_token_reaches_registered_admin_tool_policy(scoped_mcp_client: TestClient) -> None:

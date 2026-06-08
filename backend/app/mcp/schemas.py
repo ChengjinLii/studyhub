@@ -21,9 +21,27 @@ class McpPublicMaterial(McpPublicBase):
     downloadCount: int = 0
     ratingAvg: float | int = 0
     ratingCount: int = 0
-    previewManifest: Any | None = None
-    previewWatermarkEnabled: bool | None = None
-    previewSource: str | None = None
+
+
+class McpDiscoveryMaterial(McpPublicBase):
+    materialId: int | str | None = None
+    title: str | None = None
+    summary: str | None = None
+    school: str | None = None
+    college: str | None = None
+    major: str | None = None
+    courseCategory: str | None = None
+    gradeValue: str | None = None
+    tags: list[str] = Field(default_factory=list)
+    free: bool = False
+    price: int | float | None = None
+    ratingAvg: float | int = 0
+    ratingCount: int = 0
+    downloadCount: int = 0
+    viewCount: int = 0
+    uploaderDisplayName: str | None = None
+    url: str
+    reason: str | None = None
 
 
 class McpPublicRequest(McpPublicBase):
@@ -80,6 +98,10 @@ class McpContributor(McpPublicBase):
 
 def validate_public_material(payload: dict[str, Any]) -> dict[str, Any]:
     return McpPublicMaterial.model_validate(payload).model_dump()
+
+
+def validate_discovery_material(payload: dict[str, Any]) -> dict[str, Any]:
+    return McpDiscoveryMaterial.model_validate(payload).model_dump()
 
 
 def validate_public_request(payload: dict[str, Any]) -> dict[str, Any]:

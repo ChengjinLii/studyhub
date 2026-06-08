@@ -10,12 +10,14 @@ from mcp.types import ToolAnnotations
 from app.core.observability import get_runtime_metrics
 from app.mcp.search import (
     contributor_leaderboard,
+    discover_materials,
     fetch_typed,
     health_ready,
     market_detail,
     material_detail,
-    material_preview,
     material_recommendations,
+    material_summary,
+    public_material_recommendations,
     request_detail,
     request_leaderboard,
     search_all,
@@ -79,20 +81,37 @@ def register_tools(mcp: FastMCP) -> None:
         """Use this when a user specifically wants StudyHub learning materials."""
         return _call_tool("materials.search", search_materials, query, limit)
 
+    @mcp.tool(name="materials.discover", title="Discover Materials", annotations=READ_ONLY, structured_output=True)
+    def materials_discover(
+        query: str | None = None,
+        limit: int | None = 5,
+        school: str | None = None,
+        college: str | None = None,
+        major: str | None = None,
+        tag: str | None = None,
+    ) -> dict[str, Any]:
+        """Use this to recommend public StudyHub materials by returning lightweight metadata and StudyHub links, not downloads."""
+        return _call_tool("materials.discover", discover_materials, query, limit, school, college, major, tag)
+
     @mcp.tool(name="materials.get", title="Get Material", annotations=READ_ONLY, structured_output=True)
     def materials_get(id: int) -> dict[str, Any]:
         """Use this when a user wants one StudyHub material by numeric id."""
         return _call_tool("materials.get", material_detail, id)
 
-    @mcp.tool(name="materials.preview", title="Preview Material", annotations=READ_ONLY, structured_output=True)
-    def materials_preview(id: int) -> dict[str, Any]:
-        """Use this when a user wants public preview metadata for a StudyHub material."""
-        return _call_tool("materials.preview", material_preview, id)
+    @mcp.tool(name="materials.summarize", title="Summarize Material", annotations=READ_ONLY, structured_output=True)
+    def materials_summarize(id: int) -> dict[str, Any]:
+        """Use this to get a lightweight public StudyHub material summary and a StudyHub link, not a download."""
+        return _call_tool("materials.summarize", material_summary, id)
 
     @mcp.tool(name="materials.recommend", title="Recommend Materials", annotations=READ_ONLY, structured_output=True)
     def materials_recommend(limit: int | None = 6) -> dict[str, Any]:
         """Use this when a user wants StudyHub material recommendations."""
         return _call_tool("materials.recommend", material_recommendations, limit)
+
+    @mcp.tool(name="materials.recommend_public", title="Recommend Public Materials", annotations=READ_ONLY, structured_output=True)
+    def materials_recommend_public(query: str | None = None, limit: int | None = 6) -> dict[str, Any]:
+        """Use this for external agents to recommend public StudyHub materials with reasons and StudyHub links only."""
+        return _call_tool("materials.recommend_public", public_material_recommendations, query, limit)
 
     @mcp.tool(name="requests.search", title="Search Requests", annotations=READ_ONLY, structured_output=True)
     def requests_search(query: str | None = None, limit: int | None = 5) -> dict[str, Any]:
