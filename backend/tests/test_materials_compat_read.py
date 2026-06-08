@@ -175,6 +175,89 @@ def test_async_legacy_material_list_keeps_page_stats_and_item_shape(monkeypatch)
     assert data["items"][0]["uploaderNickname"] == "白山"
 
 
+def test_async_legacy_material_list_skips_profile_lookup_for_anonymous_reads(monkeypatch) -> None:
+    service = _build_service()
+    row = {
+        "id": 6,
+        "uploader_id": 2,
+        "title": "匿名资料列表",
+        "description": "无需画像",
+        "price": 0,
+        "is_free": 1,
+        "school": "电子科技大学",
+        "college": "信通",
+        "major": "通信",
+        "is_general_education": 0,
+        "file_key": None,
+        "netdisk_url": None,
+        "course_category": "MAJOR",
+        "grade_type": "UG",
+        "grade_value": "大三",
+        "rating_avg": 4.0,
+        "rating_count": 1,
+        "like_count": 2,
+        "view_count": 3,
+        "download_count": 4,
+        "sales_count": 0,
+        "created_at": "2026-01-02T03:04:05Z",
+        "uploader_username": "baishan",
+        "uploader_nickname": "白山",
+        "keywords": None,
+    }
+    stats = {"totalMaterials": 1, "freeMaterials": 1, "totalDownloads": 4, "userCount": 8}
+    call_names: list[str] = []
+
+    async def fake_call(loader, *args, **kwargs):
+        del args
+        name = loader.__name__
+        call_names.append(name)
+        if name == "_compat_load_user_profile_async":
+            raise AssertionError("anonymous material list should not load a user profile")
+        if name == "_compat_count_material_rows_async":
+            return 1
+        if name == "_compat_load_material_stats_async":
+            return stats
+        if name == "_compat_load_available_tags_async":
+            return ["匿名"]
+        if name == "_compat_load_material_rows_async":
+            assert kwargs["profile"] is None
+            assert kwargs["limit"] == 20
+            assert kwargs["offset"] == 0
+            return [row]
+        if name == "_compat_load_tags_map_async":
+            return {6: ["匿名"]}
+        if name == "_compat_load_comment_counts_async":
+            return {6: 0}
+        raise AssertionError(f"unexpected loader: {name}")
+
+    monkeypatch.setattr(service, "_call_with_new_async_session", fake_call)
+
+    data = asyncio.run(
+        service.list_materials_async(
+            session=None,
+            current_user_id=None,
+            keyword=None,
+            school=None,
+            college=None,
+            major=None,
+            tag=None,
+            grade_value=None,
+            course_category=None,
+            price=None,
+            sort="latest",
+            page=1,
+            size=20,
+        )
+    )
+
+    assert "_compat_load_user_profile_async" not in call_names
+    assert data["meta"] == {"page": 1, "size": 20, "total": 1}
+    assert data["stats"] == stats
+    assert data["availableTags"] == ["匿名"]
+    assert data["items"][0]["id"] == 6
+    assert data["items"][0]["tags"] == ["匿名"]
+
+
 def test_async_legacy_material_detail_keeps_user_state(monkeypatch) -> None:
     service = _build_service()
     row = {

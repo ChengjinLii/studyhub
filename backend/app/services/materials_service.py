@@ -179,24 +179,8 @@ class MaterialsService(MaterialsCompatMixin):
         safe_page = max(page, 1)
         safe_size = max(1, min(size, 100))
         start = (safe_page - 1) * safe_size
-        profile, total, stats, available_tags = await asyncio.gather(
-            self._call_with_new_async_session(self._compat_load_user_profile_async, current_user_id),
-            self._call_with_new_async_session(
-                self._compat_count_material_rows_async,
-                keyword=keyword,
-                school=school,
-                college=college,
-                major=major,
-                tag=tag,
-                grade_value=grade_value,
-                course_category=course_category,
-                price=price,
-            ),
-            self._call_with_new_async_session(self._compat_load_material_stats_async),
-            self._call_with_new_async_session(self._compat_load_available_tags_async),
-        )
-        page_rows = await self._call_with_new_async_session(
-            self._compat_load_material_rows_async,
+        count_call = self._call_with_new_async_session(
+            self._compat_count_material_rows_async,
             keyword=keyword,
             school=school,
             college=college,
@@ -205,11 +189,53 @@ class MaterialsService(MaterialsCompatMixin):
             grade_value=grade_value,
             course_category=course_category,
             price=price,
-            sort=sort,
-            profile=profile,
-            limit=safe_size,
-            offset=start,
         )
+        stats_call = self._call_with_new_async_session(self._compat_load_material_stats_async)
+        tags_call = self._call_with_new_async_session(self._compat_load_available_tags_async)
+        if current_user_id is None:
+            profile = None
+            total, stats, available_tags, page_rows = await asyncio.gather(
+                count_call,
+                stats_call,
+                tags_call,
+                self._call_with_new_async_session(
+                    self._compat_load_material_rows_async,
+                    keyword=keyword,
+                    school=school,
+                    college=college,
+                    major=major,
+                    tag=tag,
+                    grade_value=grade_value,
+                    course_category=course_category,
+                    price=price,
+                    sort=sort,
+                    profile=profile,
+                    limit=safe_size,
+                    offset=start,
+                ),
+            )
+        else:
+            profile, total, stats, available_tags = await asyncio.gather(
+                self._call_with_new_async_session(self._compat_load_user_profile_async, current_user_id),
+                count_call,
+                stats_call,
+                tags_call,
+            )
+            page_rows = await self._call_with_new_async_session(
+                self._compat_load_material_rows_async,
+                keyword=keyword,
+                school=school,
+                college=college,
+                major=major,
+                tag=tag,
+                grade_value=grade_value,
+                course_category=course_category,
+                price=price,
+                sort=sort,
+                profile=profile,
+                limit=safe_size,
+                offset=start,
+            )
         material_ids = [int(row["id"]) for row in page_rows]
         tags_by_material, comment_counts = await asyncio.gather(
             self._call_with_new_async_session(self._compat_load_tags_map_async, material_ids),
