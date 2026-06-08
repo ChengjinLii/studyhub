@@ -150,6 +150,8 @@ class AgentFeedbackService:
         candidates: list[dict[str, Any]] = []
         selected_material_ids = [int(material.id) for material in selected_materials]
         derived_signals = _feedback_derived_signals(hook, redacted_note)
+        hook_signals = _feedback_hook_signals(hook)
+        freeform_note_signals = _feedback_note_signals(redacted_note)
         selected_material_signals = _selected_material_signals(selected_materials)
         if personal_memory_enabled:
             user_candidate: dict[str, Any] = {
@@ -194,6 +196,8 @@ class AgentFeedbackService:
                     derived_signals=derived_signals,
                     selected_material_signals=selected_material_signals,
                     scope="platform",
+                    immediate_aggregate_signals=hook_signals,
+                    freeform_note_signals=freeform_note_signals,
                 ),
                 "anonymization": {
                     "rawNotePersisted": False,
@@ -206,8 +210,11 @@ class AgentFeedbackService:
                 ),
                 "lifecycle": _candidate_lifecycle("platform"),
             }
-            if derived_signals:
-                platform_candidate["aggregateSignals"] = derived_signals
+            if hook_signals:
+                platform_candidate["aggregateSignals"] = hook_signals
+            if freeform_note_signals:
+                platform_candidate["deferredFreeformNoteSignals"] = freeform_note_signals
+                platform_candidate["deferredFreeformNoteWriteMode"] = "requires_anonymous_aggregation"
             if selected_material_signals:
                 platform_candidate["selectedMaterialSignals"] = selected_material_signals
             _attach_candidate_version(platform_candidate)
@@ -285,16 +292,34 @@ def _redact_messenger_handles(text: str) -> str:
 
 
 def _feedback_derived_signals(hook: str, redacted_note: str) -> dict[str, list[str]]:
+    return _merge_signals(_feedback_hook_signals(hook), _feedback_note_signals(redacted_note))
+
+
+def _feedback_hook_signals(hook: str) -> dict[str, list[str]]:
     signals: dict[str, list[str]] = {}
     hook_signal = HOOK_DERIVED_SIGNALS.get(hook)
     if hook_signal:
         _append_signal(signals, hook_signal[0], hook_signal[1])
+    return {key: values[:6] for key, values in signals.items() if values}
+
+
+def _feedback_note_signals(redacted_note: str) -> dict[str, list[str]]:
+    signals: dict[str, list[str]] = {}
     normalized_note = redacted_note.lower()
     if normalized_note:
         for category, label, aliases in FEEDBACK_NOTE_SIGNAL_PATTERNS:
             if any(alias.lower() in normalized_note for alias in aliases):
                 _append_signal(signals, category, label)
     return {key: values[:6] for key, values in signals.items() if values}
+
+
+def _merge_signals(*items: dict[str, list[str]]) -> dict[str, list[str]]:
+    merged: dict[str, list[str]] = {}
+    for signals in items:
+        for key, values in signals.items():
+            for value in values:
+                _append_signal(merged, key, value)
+    return {key: values[:6] for key, values in merged.items() if values}
 
 
 def _feedback_memory_summary(hook: str, derived_signals: dict[str, list[str]]) -> str:
@@ -413,8 +438,10 @@ def _signal_basis(
     derived_signals: dict[str, list[str]],
     selected_material_signals: dict[str, list[str]],
     scope: str,
+    immediate_aggregate_signals: dict[str, list[str]] | None = None,
+    freeform_note_signals: dict[str, list[str]] | None = None,
 ) -> dict[str, Any]:
-    return {
+    basis: dict[str, Any] = {
         "schema": FEEDBACK_MEMORY_CANDIDATE_SCHEMA,
         "scope": scope,
         "hook": hook,
@@ -425,6 +452,12 @@ def _signal_basis(
         "rawNoteIncluded": False,
         "persistence": "not_persisted",
     }
+    if immediate_aggregate_signals is not None:
+        basis["immediateAggregateSignalKeys"] = sorted(immediate_aggregate_signals)
+    if freeform_note_signals is not None:
+        basis["freeformNoteSignalKeys"] = sorted(freeform_note_signals)
+        basis["freeformNoteSignalsRequireAnonymousAggregation"] = bool(freeform_note_signals)
+    return basis
 
 
 def _candidate_lifecycle(scope: str) -> dict[str, Any]:
@@ -457,6 +490,7 @@ def _attach_candidate_version(candidate: dict[str, Any]) -> None:
         "value": candidate.get("value"),
         "materialIds": candidate.get("materialIds") or [],
         "derivedSignals": candidate.get("derivedSignals") or candidate.get("aggregateSignals") or {},
+        "deferredFreeformNoteSignals": candidate.get("deferredFreeformNoteSignals") or {},
         "selectedMaterialSignals": candidate.get("selectedMaterialSignals") or {},
         "signalBasis": candidate.get("signalBasis") or {},
         "aggregationPolicy": candidate.get("aggregationPolicy") or {},

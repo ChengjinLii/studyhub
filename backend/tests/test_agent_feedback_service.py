@@ -164,6 +164,9 @@ def test_ai_feedback_builds_redacted_user_and_platform_memory_candidates(client,
         "selectedMaterialSignalKeys": ["courses", "qualitySignals", "riskSignals", "sourceTypes"],
         "rawNoteIncluded": False,
         "persistence": "not_persisted",
+        "immediateAggregateSignalKeys": ["positive_feedback"],
+        "freeformNoteSignalKeys": ["learning_preferences"],
+        "freeformNoteSignalsRequireAnonymousAggregation": True,
     }
     assert data["memoryCandidates"][1]["anonymization"] == {
         "rawNotePersisted": False,
@@ -189,8 +192,11 @@ def test_ai_feedback_builds_redacted_user_and_platform_memory_candidates(client,
     }
     assert data["memoryCandidates"][1]["aggregateSignals"] == {
         "positive_feedback": ["有帮助"],
+    }
+    assert data["memoryCandidates"][1]["deferredFreeformNoteSignals"] == {
         "learning_preferences": ["补基础优先", "刷题优先", "详细解析"],
     }
+    assert data["memoryCandidates"][1]["deferredFreeformNoteWriteMode"] == "requires_anonymous_aggregation"
     assert data["memoryCandidates"][1]["selectedMaterialSignals"] == data["memoryCandidates"][0]["selectedMaterialSignals"]
     metrics = get_runtime_metrics().render_prometheus(get_settings())
     assert (
@@ -219,9 +225,22 @@ def test_ai_feedback_respects_disabled_personal_memory_cookie(client, auth_servi
     assert [item["scope"] for item in data["memoryCandidates"]] == ["platform"]
     assert data["memoryCandidates"][0]["aggregateSignals"] == {
         "difficulty_feedback": ["偏困难"],
+    }
+    assert data["memoryCandidates"][0]["deferredFreeformNoteSignals"] == {
         "learning_preferences": ["补基础优先", "详细解析"],
     }
+    assert data["memoryCandidates"][0]["deferredFreeformNoteWriteMode"] == "requires_anonymous_aggregation"
     assert data["memoryCandidates"][0]["signalBasis"]["scope"] == "platform"
+    assert data["memoryCandidates"][0]["signalBasis"]["immediateAggregateSignalKeys"] == [
+        "difficulty_feedback"
+    ]
+    assert data["memoryCandidates"][0]["signalBasis"]["freeformNoteSignalKeys"] == [
+        "learning_preferences"
+    ]
+    assert (
+        data["memoryCandidates"][0]["signalBasis"]["freeformNoteSignalsRequireAnonymousAggregation"]
+        is True
+    )
     assert data["memoryCandidates"][0]["anonymization"]["personalMemoryMixedIntoPlatform"] is False
     assert data["memoryCandidates"][0]["aggregationPolicy"]["freeformNoteSignalKeys"] == [
         "learning_preferences"
