@@ -125,15 +125,24 @@ class RequestsService(RequestsCompatMixin):
         if not (self.settings.requires_private_env_file and self.settings.async_read_db_enabled):
             return await asyncio.to_thread(self.list_requests, session, viewer_id, sort=sort, limit=limit)
 
-        rows, profile = await asyncio.gather(
-            self._call_with_new_async_session(self._compat_load_open_requests_async),
-            self._call_with_new_async_session(self._compat_load_viewer_profile_async, viewer_id),
-        )
+        if viewer_id is None:
+            rows = await self._call_with_new_async_session(self._compat_load_open_requests_async)
+            profile = None
+        else:
+            rows, profile = await asyncio.gather(
+                self._call_with_new_async_session(self._compat_load_open_requests_async),
+                self._call_with_new_async_session(self._compat_load_viewer_profile_async, viewer_id),
+            )
         visible_rows = await self._compat_exclude_hidden_early_exit_requests_async(rows)
-        responded_ids = await self._call_with_new_async_session(
-            self._compat_load_responded_request_ids_async,
-            viewer_id,
-            [int(row["id"]) for row in visible_rows],
+        visible_ids = [int(row["id"]) for row in visible_rows]
+        responded_ids = (
+            set()
+            if viewer_id is None or not visible_ids
+            else await self._call_with_new_async_session(
+                self._compat_load_responded_request_ids_async,
+                viewer_id,
+                visible_ids,
+            )
         )
         ordered = self._compat_sort_requests(visible_rows, sort=sort, profile=profile)
         normalized_limit = self._compat_normalize_list_limit(limit)
@@ -153,10 +162,15 @@ class RequestsService(RequestsCompatMixin):
         safe_limit = max(1, min(limit or 10, 50))
         rows = await self._call_with_new_async_session(self._compat_load_leaderboard_rows_async, safe_limit)
         visible_rows = await self._compat_exclude_hidden_early_exit_requests_async(rows)
-        responded_ids = await self._call_with_new_async_session(
-            self._compat_load_responded_request_ids_async,
-            viewer_id,
-            [int(row["id"]) for row in visible_rows],
+        visible_ids = [int(row["id"]) for row in visible_rows]
+        responded_ids = (
+            set()
+            if viewer_id is None or not visible_ids
+            else await self._call_with_new_async_session(
+                self._compat_load_responded_request_ids_async,
+                viewer_id,
+                visible_ids,
+            )
         )
         return [self._compat_to_request_item(row, viewer_id, int(row["id"]) in responded_ids) for row in visible_rows]
 

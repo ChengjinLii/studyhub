@@ -66,6 +66,34 @@ def test_async_legacy_comment_list_keeps_meta_liked_and_author_state(monkeypatch
     assert data["items"][0]["rating"] == 5
 
 
+def test_async_legacy_comment_list_skips_liked_load_for_anonymous_reads(monkeypatch) -> None:
+    service = _build_service()
+    row = _comment_row(9001)
+
+    async def fake_call(loader, *args, **kwargs):
+        name = loader.__name__
+        if name == "_compat_ensure_material_exists_async":
+            assert args == (101,)
+            return None
+        if name == "_compat_count_comments_async":
+            assert kwargs == {"material_id": 101, "parent_id": None}
+            return 1
+        if name == "_compat_load_comment_rows_async":
+            assert kwargs == {"material_id": 101, "parent_id": None, "sort": "latest", "page": 0, "size": 20}
+            return [row]
+        if name == "_compat_load_liked_ids_async":
+            raise AssertionError("anonymous comment list should not load liked ids")
+        raise AssertionError(f"unexpected loader: {name}")
+
+    monkeypatch.setattr(service, "_call_with_new_async_session", fake_call)
+
+    data = asyncio.run(service.list_comments_async(None, 101, sort="latest", page=0, size=20, current_user_id=None))
+
+    assert data["meta"] == {"page": 0, "size": 20, "total": 1}
+    assert data["items"][0]["id"] == 9001
+    assert data["items"][0]["hasLiked"] is False
+
+
 def test_async_legacy_comment_replies_keep_meta_and_liked_state(monkeypatch) -> None:
     service = _build_service()
     row = _comment_row(9002, parent_id=9001)
@@ -93,4 +121,32 @@ def test_async_legacy_comment_replies_keep_meta_and_liked_state(monkeypatch) -> 
     assert data["meta"] == {"page": 0, "size": 20, "total": 2}
     assert data["items"][0]["id"] == 9002
     assert data["items"][0]["parentId"] == 9001
+    assert data["items"][0]["hasLiked"] is False
+
+
+def test_async_legacy_comment_replies_skips_liked_load_for_anonymous_reads(monkeypatch) -> None:
+    service = _build_service()
+    row = _comment_row(9002, parent_id=9001)
+
+    async def fake_call(loader, *args, **kwargs):
+        name = loader.__name__
+        if name == "_compat_load_comment_parent_async":
+            assert args == (9001,)
+            return {"id": 9001, "material_id": 101}
+        if name == "_compat_count_comments_async":
+            assert kwargs == {"material_id": None, "parent_id": 9001}
+            return 1
+        if name == "_compat_load_comment_rows_async":
+            assert kwargs == {"material_id": 101, "parent_id": 9001, "sort": "oldest", "page": 0, "size": 20}
+            return [row]
+        if name == "_compat_load_liked_ids_async":
+            raise AssertionError("anonymous comment replies should not load liked ids")
+        raise AssertionError(f"unexpected loader: {name}")
+
+    monkeypatch.setattr(service, "_call_with_new_async_session", fake_call)
+
+    data = asyncio.run(service.list_replies_async(None, 9001, page=0, size=20, current_user_id=None))
+
+    assert data["meta"] == {"page": 0, "size": 20, "total": 1}
+    assert data["items"][0]["id"] == 9002
     assert data["items"][0]["hasLiked"] is False

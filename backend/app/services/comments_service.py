@@ -89,10 +89,15 @@ class CommentsService:
                 size=size,
             ),
         )
-        liked_ids = await self._call_with_new_async_session(
-            self._compat_load_liked_ids_async,
-            current_user_id,
-            [int(row["id"]) for row in rows],
+        comment_ids = [int(row["id"]) for row in rows]
+        liked_ids = (
+            set()
+            if current_user_id is None or not comment_ids
+            else await self._call_with_new_async_session(
+                self._compat_load_liked_ids_async,
+                current_user_id,
+                comment_ids,
+            )
         )
         items = [self._compat_to_comment_item(row, int(row["id"]) in liked_ids) for row in rows]
         _, meta = paginate_zero_based(list(range(total)), page=page, size=size)
@@ -154,10 +159,15 @@ class CommentsService:
                 size=size,
             ),
         )
-        liked_ids = await self._call_with_new_async_session(
-            self._compat_load_liked_ids_async,
-            current_user_id,
-            [int(row["id"]) for row in rows],
+        comment_ids = [int(row["id"]) for row in rows]
+        liked_ids = (
+            set()
+            if current_user_id is None or not comment_ids
+            else await self._call_with_new_async_session(
+                self._compat_load_liked_ids_async,
+                current_user_id,
+                comment_ids,
+            )
         )
         items = [self._compat_to_comment_item(row, int(row["id"]) in liked_ids) for row in rows]
         _, meta = paginate_zero_based(list(range(total)), page=page, size=size)
