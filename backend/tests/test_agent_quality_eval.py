@@ -244,6 +244,8 @@ def test_agent_exam_trend_closed_loop_prompt_and_response_contract(monkeypatch) 
     assert prompt["memory_context"]["platform_collective_memory"]["pdf_question_type_signals"][0]["value"] == "计算题"
     assert prompt["memory_context"]["user_personal_memory"]["profile"]["major"] == "通信工程"
     assert prompt["course_memory_card"]["course"] == "通信原理"
+    assert prompt["course_memory_card"]["evidence_coverage"]["pdf_evidence_page_count"] == 1
+    assert prompt["course_memory_card"]["confidence_assessment"]["level"] == "medium"
     assert prompt["course_memory_card"]["page_references"][0]["question_numbers"] == ["第3题"]
     assert prompt["course_memory_card"]["page_references"][0]["anchor_terms"] == ["第3题", "计算题"]
     assert prompt["course_memory_card"]["page_references"][0]["anchor_text"] == "2024 通信原理第3题计算题考调制、解调和误码率。"

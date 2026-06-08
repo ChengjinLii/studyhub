@@ -434,8 +434,10 @@ class AiService:
             "如果候选资料提供了 user_fit_signals，可以用它解释当前用户为什么更适合先看该资料；"
             "如果提供了 query_plan，你必须按照该意图和 evidence_tasks 组织回答；"
             "如果 query_plan 提供了 problem_context，应先按卡点类型、题号和知识点拆解问题；"
-            "如果提供了 course_memory_card，你可以用它总结课程级年份、题型、知识点和推荐顺序；"
-            "不要输出 memory_context、query_plan、problem_context、candidate_materials、user_fit_signals、pdf_evidence、anchor_text、anchor_terms 或 privacy_boundary 等内部字段名。"
+            "如果提供了 course_memory_card，你可以用它总结课程级年份、题型、知识点和推荐顺序，"
+            "并根据 evidence_coverage 和 confidence_assessment 避免过度概括。"
+            "不要输出 memory_context、query_plan、problem_context、candidate_materials、user_fit_signals、"
+            "pdf_evidence、course_memory_card、evidence_coverage、confidence_assessment、anchor_text、anchor_terms 或 privacy_boundary 等内部字段名。"
             "必须输出严格 JSON，不要输出 Markdown，不要包裹代码块。"
         )
         user_prompt = {

@@ -19,6 +19,8 @@ class CourseMemoryCard:
     version_fingerprint: str
     version_basis: dict[str, Any]
     source: str
+    evidence_coverage: dict[str, Any]
+    confidence_assessment: dict[str, Any]
     years: tuple[str, ...]
     question_type_distribution: tuple[dict[str, Any], ...]
     knowledge_signals: tuple[dict[str, Any], ...]
@@ -38,6 +40,8 @@ class CourseMemoryCard:
             "version_fingerprint": self.version_fingerprint,
             "version_basis": self.version_basis,
             "source": self.source,
+            "evidence_coverage": self.evidence_coverage,
+            "confidence_assessment": self.confidence_assessment,
             "years": list(self.years),
             "question_type_distribution": list(self.question_type_distribution),
             "knowledge_signals": list(self.knowledge_signals),
@@ -93,6 +97,8 @@ class AgentCourseMemoryService:
             version_fingerprint=fingerprint,
             version_basis=version_basis,
             source="current_request_candidates",
+            evidence_coverage=_evidence_coverage(materials, pdf_evidence, years),
+            confidence_assessment=_confidence_assessment(materials, pdf_evidence, years, question_types),
             years=tuple(years),
             question_type_distribution=tuple(question_types),
             knowledge_signals=tuple(knowledge_signals),
@@ -224,6 +230,65 @@ def _high_signal_materials(materials: list[MaterialRecord]) -> list[dict[str, An
             }
         )
     return result
+
+
+def _evidence_coverage(
+    materials: list[MaterialRecord],
+    pdf_evidence: list[MaterialPageEvidence],
+    years: list[str],
+) -> dict[str, Any]:
+    pdf_material_ids = {int(item.material_id) for item in pdf_evidence}
+    question_numbers = _dedupe([number for item in pdf_evidence for number in item.question_numbers])
+    source_types = _dedupe([item.source_type for item in pdf_evidence if item.source_type != "unknown"])
+    payload: dict[str, Any] = {
+        "candidate_material_count": len(materials),
+        "pdf_evidence_page_count": len(pdf_evidence),
+        "pdf_evidence_material_count": len(pdf_material_ids),
+        "year_signal_count": len(years),
+        "question_number_signal_count": len(question_numbers),
+        "source_types": source_types[:5],
+    }
+    return {key: value for key, value in payload.items() if value not in (None, [], {}, "")}
+
+
+def _confidence_assessment(
+    materials: list[MaterialRecord],
+    pdf_evidence: list[MaterialPageEvidence],
+    years: list[str],
+    question_types: list[dict[str, Any]],
+) -> dict[str, Any]:
+    signals: list[str] = []
+    limitations: list[str] = []
+    if len(materials) >= 3:
+        signals.append("候选资料数量较充分")
+    elif len(materials) <= 1:
+        limitations.append("候选资料较少")
+    if len({int(item.material_id) for item in pdf_evidence}) >= 2:
+        signals.append("PDF 证据覆盖多份资料")
+    elif pdf_evidence:
+        limitations.append("PDF 证据主要来自单份资料")
+    else:
+        limitations.append("缺少 PDF 页级证据")
+    if len(years) >= 3:
+        signals.append("年份信号覆盖较多")
+    elif years:
+        limitations.append("年份信号有限")
+    if len(question_types) >= 2:
+        signals.append("题型信号较丰富")
+    elif question_types:
+        limitations.append("题型信号有限")
+
+    if len(signals) >= 3 and not limitations:
+        level = "high"
+    elif pdf_evidence and (signals or len(materials) >= 2):
+        level = "medium"
+    else:
+        level = "low"
+    return {
+        "level": level,
+        "signals": signals[:5],
+        "limitations": limitations[:5],
+    }
 
 
 def _page_references(pdf_evidence: list[MaterialPageEvidence]) -> list[dict[str, Any]]:

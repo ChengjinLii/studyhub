@@ -103,6 +103,19 @@ def test_course_memory_card_summarizes_current_request_collective_signals() -> N
     version_basis_text = json.dumps(payload["version_basis"], ensure_ascii=False).lower()
     assert "user" not in version_basis_text
     assert "profile" not in version_basis_text
+    assert payload["evidence_coverage"] == {
+        "candidate_material_count": 2,
+        "pdf_evidence_page_count": 1,
+        "pdf_evidence_material_count": 1,
+        "year_signal_count": 3,
+        "question_number_signal_count": 1,
+        "source_types": ["past_exam"],
+    }
+    assert payload["confidence_assessment"] == {
+        "level": "medium",
+        "signals": ["年份信号覆盖较多"],
+        "limitations": ["PDF 证据主要来自单份资料", "题型信号有限"],
+    }
     assert payload["years"] == ["2023", "2024", "2022"]
     assert payload["question_type_distribution"] == [{"value": "计算题", "count": 1}]
     assert payload["knowledge_signals"] == [{"value": "调制", "count": 1}, {"value": "解调", "count": 1}]
@@ -218,5 +231,8 @@ def test_ai_prompt_receives_course_memory_card(monkeypatch) -> None:
     assert "course_memory_card" in captured["user_prompt"]
     assert captured["user_prompt"]["course_memory_card"]["course"] == "通信工程"
     assert captured["user_prompt"]["course_memory_card"]["page_references"][0]["page"] == 3
+    assert captured["user_prompt"]["course_memory_card"]["evidence_coverage"]["pdf_evidence_page_count"] == 1
+    assert captured["user_prompt"]["course_memory_card"]["confidence_assessment"]["level"] == "low"
     assert "course_memory_card" in captured["system_prompt"]
+    assert "confidence_assessment" in captured["system_prompt"]
     assert body["answer"] == "已结合课程记忆卡片分析通信原理真题。 来源：《通信原理四年真题解析》第 3 页（第3题）。"
