@@ -261,7 +261,7 @@ export default function Home({
   ]);
   const [isMobile, setIsMobile] = useState(false);
   const [reduceMotion, setReduceMotion] = useState(false);
-  const [deferredClientReady, setDeferredClientReady] = useState(false);
+  const [seasonalEffectsReady, setSeasonalEffectsReady] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [batchError, setBatchError] = useState('');
@@ -308,7 +308,7 @@ export default function Home({
   const [leaderboardFollowLoading, setLeaderboardFollowLoading] = useState<Record<number, boolean>>({});
   const [leaderboardFollowNotice, setLeaderboardFollowNotice] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [supportModalOpen, setSupportModalOpen] = useState(false);
-  const showSeasonalEffects = deferredClientReady && (!reduceMotion || isMobile);
+  const showSeasonalEffects = seasonalEffectsReady && (!reduceMotion || isMobile);
   useEffect(() => {
     setMaterialList(initialMaterials);
     setPageMeta(meta);
@@ -390,7 +390,7 @@ export default function Home({
     if (typeof window === 'undefined') return undefined;
     let timeoutId: ReturnType<typeof setTimeout> | null = null;
     const enableEffects = () => {
-      timeoutId = setTimeout(() => setDeferredClientReady(true), 0);
+      timeoutId = setTimeout(() => setSeasonalEffectsReady(true), 0);
     };
     if (document.readyState === 'complete') {
       enableEffects();
@@ -723,34 +723,30 @@ export default function Home({
             </div>
           </aside>
         </section>
-        {deferredClientReady && (
-          <HomeRequestPanels
-            requestItems={requestItems}
-            requestLoading={requestLoading}
-            requestError={requestError}
-            requestNotice={requestNotice}
-            leaderboardItems={leaderboardItems}
-            recommendedItems={recommendedItems}
-            recommendationHint={recommendationHint}
-            recommendationEmpty={recommendationEmpty}
-            buildUploadLink={buildUploadLink}
-            onFollowRequest={handleFollowRequest}
-          />
-        )}
+        <HomeRequestPanels
+          requestItems={requestItems}
+          requestLoading={requestLoading}
+          requestError={requestError}
+          requestNotice={requestNotice}
+          leaderboardItems={leaderboardItems}
+          recommendedItems={recommendedItems}
+          recommendationHint={recommendationHint}
+          recommendationEmpty={recommendationEmpty}
+          buildUploadLink={buildUploadLink}
+          onFollowRequest={handleFollowRequest}
+        />
 
-        {deferredClientReady && (
-          <HomeFilterCard
-            filterRef={filterRef}
-            filtersState={filtersState}
-            showAdvanced={showAdvanced}
-            availableTagOptions={availableTagOptions}
-            onFilterChange={updateFilter}
-            onCourseCategoryChange={applyCourseCategory}
-            onToggleAdvancedFilters={toggleAdvancedFilters}
-            onResetFilters={handleResetFilters}
-            onSubmit={handleFilterSubmit}
-          />
-        )}
+        <HomeFilterCard
+          filterRef={filterRef}
+          filtersState={filtersState}
+          showAdvanced={showAdvanced}
+          availableTagOptions={availableTagOptions}
+          onFilterChange={updateFilter}
+          onCourseCategoryChange={applyCourseCategory}
+          onToggleAdvancedFilters={toggleAdvancedFilters}
+          onResetFilters={handleResetFilters}
+          onSubmit={handleFilterSubmit}
+        />
 
         <section className="card" ref={materialsRef} style={{ gridColumn: '1 / -1' }}>
           <div className="materials-header">
@@ -814,40 +810,36 @@ export default function Home({
             </>
           )}
         </section>
-        {deferredClientReady && (
-          <>
-            <HomeLeaderboard
-              user={user}
-              topContributors={topContributors}
-              leaderboardPeriod={leaderboardPeriod}
-              leaderboardLabels={leaderboardLabels}
-              leaderboardPeriods={leaderboardPeriods}
-              leaderboardRangeHint={leaderboardRangeHint}
-              leaderboardEmptyHint={leaderboardEmptyHint}
-              leaderboardLoading={leaderboardLoading}
-              leaderboardError={leaderboardError}
-              leaderboardFollowNotice={leaderboardFollowNotice}
-              leaderboardFollowed={leaderboardFollowed}
-              leaderboardFollowLoading={leaderboardFollowLoading}
-              onPeriodChange={setLeaderboardPeriod}
-              onFollowContributor={handleFollowContributor}
-            />
-            <section className="card support-card" style={{ gridColumn: '1 / -1' }}>
-              <div>
-                <h3 className="card-title" style={{ margin: 0 }}>
-                  支持 StudyHub
-                </h3>
-                <p style={{ marginTop: 8, marginBottom: 4 }}>
-                  您的支持是我们继续运营的动力😁
-                </p>
-                <p className="help-text">所有打赏将用于服务器、带宽与内容审核支出，感谢你的信任。</p>
-              </div>
-              <button className="button primary" type="button" onClick={() => setSupportModalOpen(true)}>
-                打赏
-              </button>
-            </section>
-          </>
-        )}
+        <HomeLeaderboard
+          user={user}
+          topContributors={topContributors}
+          leaderboardPeriod={leaderboardPeriod}
+          leaderboardLabels={leaderboardLabels}
+          leaderboardPeriods={leaderboardPeriods}
+          leaderboardRangeHint={leaderboardRangeHint}
+          leaderboardEmptyHint={leaderboardEmptyHint}
+          leaderboardLoading={leaderboardLoading}
+          leaderboardError={leaderboardError}
+          leaderboardFollowNotice={leaderboardFollowNotice}
+          leaderboardFollowed={leaderboardFollowed}
+          leaderboardFollowLoading={leaderboardFollowLoading}
+          onPeriodChange={setLeaderboardPeriod}
+          onFollowContributor={handleFollowContributor}
+        />
+        <section className="card support-card" style={{ gridColumn: '1 / -1' }}>
+          <div>
+            <h3 className="card-title" style={{ margin: 0 }}>
+              支持 StudyHub
+            </h3>
+            <p style={{ marginTop: 8, marginBottom: 4 }}>
+              您的支持是我们继续运营的动力😁
+            </p>
+            <p className="help-text">所有打赏将用于服务器、带宽与内容审核支出，感谢你的信任。</p>
+          </div>
+          <button className="button primary" type="button" onClick={() => setSupportModalOpen(true)}>
+            打赏
+          </button>
+        </section>
         {supportModalOpen && (
           <div className="modal-mask" onClick={() => setSupportModalOpen(false)}>
             <div
