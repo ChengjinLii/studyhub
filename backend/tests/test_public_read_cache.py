@@ -14,6 +14,7 @@ from app.api.deps import (
 from app.api.routes import comments as comment_routes
 from app.api.routes import market as market_routes
 from app.api.routes import materials as material_routes
+from app.core.config import Settings
 from app.core.public_read_cache import PublicReadCache, cache_if_anonymous, invalidate_prefixes
 from app.core.observability import get_runtime_metrics
 from app.core.security import AuthContext
@@ -33,6 +34,13 @@ def _build_cache(*, ttl_seconds: int = 30) -> PublicReadCache:
             redis_connect_timeout_seconds=5,
         )
     )
+
+
+def test_public_read_cache_defaults_keep_hot_anonymous_reads_warm() -> None:
+    settings = Settings()
+
+    assert settings.public_read_cache_ttl_seconds == 30
+    assert settings.public_read_cache_max_entries == 1024
 
 
 def test_public_read_cache_reuses_anonymous_value() -> None:

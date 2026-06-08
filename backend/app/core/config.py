@@ -61,8 +61,8 @@ class Settings(BaseSettings):
     public_read_cache_enabled: bool = True
     public_read_cache_backend: str = "auto"
     public_read_cache_prefix: str = "public-read-cache"
-    public_read_cache_ttl_seconds: int = 5
-    public_read_cache_max_entries: int = 256
+    public_read_cache_ttl_seconds: int = 30
+    public_read_cache_max_entries: int = 1024
     response_gzip_enabled: bool = True
     response_gzip_minimum_size_bytes: int = 1024
     response_gzip_compresslevel: int = 5
