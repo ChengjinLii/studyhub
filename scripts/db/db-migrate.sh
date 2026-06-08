@@ -7,6 +7,11 @@ ENVIRONMENT="${STUDYHUB_ENVIRONMENT:-preview}"
 TARGET_REVISION="${1:-head}"
 PRODUCTION_CONFIRM="${YES_PRODUCTION_ALEMBIC_MIGRATION:-}"
 
+if [[ -z "${TARGET_REVISION//[[:space:]]/}" ]]; then
+  echo "Alembic target revision must not be whitespace only"
+  exit 2
+fi
+
 if [[ "$ENVIRONMENT" == "preview" && ! -f "$PRIVATE_DIR/.env.preview" ]]; then
   echo "missing preview env file: $PRIVATE_DIR/.env.preview"
   exit 1

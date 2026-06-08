@@ -31,6 +31,7 @@ STUDYHUB_ENVIRONMENT=preview bash scripts/db/db-migrate.sh
 ```
 
 `db-migrate.sh` 在 production 默认拒绝直接执行 Alembic upgrade，避免绕过备份、计划 token 和 additive SQL 限制。生产 P0 schema 修复优先使用下面的 `db-prepare-p0-schema.sh` 与 `db-apply-p0-schema.sh`。确需在 production 执行 Alembic 时，必须额外设置：
+目标 revision 可作为第一个参数传入，默认是 `head`，不能是全空白。
 
 ```bash
 YES_PRODUCTION_ALEMBIC_MIGRATION=I_UNDERSTAND_ALEMBIC_PRODUCTION \
