@@ -136,6 +136,31 @@ def test_scoped_schema_audit_ready_reflects_selected_columns() -> None:
     assert present["missingColumns"] == []
 
 
+def test_scoped_schema_audit_blocks_requested_column_when_table_is_missing() -> None:
+    from sqlalchemy import Column, Integer, MetaData, String, Table, create_engine
+
+    expected = MetaData()
+    Table(
+        "market_items",
+        expected,
+        Column("id", Integer, primary_key=True),
+        Column("source", String(16), nullable=False, default="local"),
+    )
+    engine = create_engine("sqlite+pysqlite:///:memory:", future=True)
+
+    payload = build_scoped_schema_audit_payload(
+        engine=engine,
+        metadata=expected,
+        only_columns={("market_items", "source")},
+    )
+
+    assert payload["ready"] is False
+    assert payload["executable"] is False
+    assert payload["missingTables"] == ["market_items"]
+    assert payload["alreadyPresentColumns"] == []
+    assert payload["additiveStatements"] == []
+
+
 def test_schema_audit_reports_only_relevant_legacy_compatibility_tables() -> None:
     from sqlalchemy.dialects import mysql
 

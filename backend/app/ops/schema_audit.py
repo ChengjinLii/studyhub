@@ -130,7 +130,12 @@ def build_scoped_schema_audit_payload(
         metadata = Base.metadata
     payload = select_additive_migration_scope(payload, metadata=metadata, only_columns=only_columns)
     if only_columns:
-        payload["ready"] = not payload["missingColumns"] and not payload["manualReviewColumns"] and not payload.get("unknownRequestedColumns")
+        payload["ready"] = (
+            not payload["missingTables"]
+            and not payload["missingColumns"]
+            and not payload["manualReviewColumns"]
+            and not payload.get("unknownRequestedColumns")
+        )
     return payload
 
 
@@ -170,6 +175,12 @@ def select_additive_migration_scope(
         (item["table"], item["column"]): item
         for item in payload["manualReviewColumns"]
     }
+    missing_table_names = set(payload["missingTables"])
+    selected_missing_tables = [
+        table_name
+        for table_name in sorted({table for table, _column in only_columns})
+        if table_name in missing_table_names
+    ]
     selected_missing = [
         missing_by_key[key]
         for key in sorted(only_columns)
@@ -188,11 +199,15 @@ def select_additive_migration_scope(
     already_present = [
         {"table": table, "column": column}
         for table, column in sorted(only_columns)
-        if (table, column) in expected_columns and (table, column) not in missing_by_key
+        if table not in missing_table_names
+        and (table, column) in expected_columns
+        and (table, column) not in missing_by_key
     ]
 
     payload["scope"] = "selected"
     payload["onlyColumns"] = [f"{table}.{column}" for table, column in sorted(only_columns)]
+    payload["allMissingTableCount"] = len(payload["missingTables"])
+    payload["missingTables"] = selected_missing_tables
     payload["allMissingColumnCount"] = len(payload["missingColumns"])
     payload["missingColumns"] = selected_missing
     payload["manualReviewColumns"] = selected_manual
@@ -204,7 +219,7 @@ def select_additive_migration_scope(
         if any((item["table"], column) in only_columns for column in item["columns"])
     ]
     payload["additiveStatements"] = [item["sql"] for item in selected_missing if item["autoMigratable"]]
-    payload["executable"] = not selected_manual and not unknown_requested
+    payload["executable"] = not selected_missing_tables and not selected_manual and not unknown_requested
     return payload
 
 
