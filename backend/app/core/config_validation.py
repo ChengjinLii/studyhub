@@ -32,6 +32,7 @@ def validate_runtime_configuration(settings: Any, *, default_dev_jwt_secret: str
     _validate_lock(settings)
     _validate_payment(settings)
     _validate_kyc(settings)
+    _validate_mcp(settings)
     _validate_production_providers(settings)
 
 
@@ -100,6 +101,17 @@ def _validate_kyc(settings: Any) -> None:
     if missing_keys:
         missing = ", ".join(missing_keys)
         raise RuntimeError(f"KYC provider 缺少必要配置：{missing}")
+
+
+def _validate_mcp(settings: Any) -> None:
+    if not (settings.is_preview or settings.is_production):
+        return
+    if not settings.resolved_mcp_enabled:
+        return
+    if not settings.resolved_mcp_require_auth:
+        raise RuntimeError("preview/production 开启 MCP 时必须启用 STUDYHUB_MCP_REQUIRE_AUTH。")
+    if not (settings.mcp_access_token or settings.mcp_access_tokens):
+        raise RuntimeError("preview/production 开启 MCP 时必须配置 STUDYHUB_MCP_ACCESS_TOKENS 或 STUDYHUB_MCP_ACCESS_TOKEN。")
 
 
 def _validate_production_providers(settings: Any) -> None:

@@ -182,8 +182,23 @@ def test_mcp_is_disabled_by_default_in_production_settings() -> None:
 def test_mcp_require_auth_rejects_anonymous_requests(auth_required_client: TestClient) -> None:
     response = call_tool(auth_required_client, "health.ready")
 
-    assert response.status_code == 403
-    assert_middleware_error(response, "MCP_FORBIDDEN", "MCP authentication required")
+    assert response.status_code == 401
+    assert_middleware_error(response, "MCP_UNAUTHORIZED", "MCP authentication required")
+    assert response.headers["WWW-Authenticate"].startswith("Bearer ")
+    assert "resource_metadata=" in response.headers["WWW-Authenticate"]
+
+
+def test_mcp_require_auth_rejects_invalid_bearer_token(auth_required_client: TestClient) -> None:
+    response = call_tool(
+        auth_required_client,
+        "health.ready",
+        headers={"Authorization": "Bearer wrong-token"},
+    )
+
+    assert response.status_code == 401
+    assert_middleware_error(response, "MCP_UNAUTHORIZED", "MCP authentication required")
+    assert response.headers["WWW-Authenticate"].startswith("Bearer ")
+    assert "resource_metadata=" in response.headers["WWW-Authenticate"]
 
 
 def test_mcp_require_auth_accepts_configured_bearer_token(auth_required_client: TestClient) -> None:

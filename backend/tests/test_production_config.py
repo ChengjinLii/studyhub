@@ -94,6 +94,99 @@ def test_preview_loads_private_env_and_supports_smtp_provider(
     _reset_runtime_state()
 
 
+def test_preview_rejects_enabled_mcp_without_auth(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    private_dir = _write_private_env(
+        tmp_path,
+        "preview",
+        """
+        STUDYHUB_ENVIRONMENT=preview
+        STUDYHUB_DATABASE_URL=mysql+pymysql://preview_user:preview_pass@127.0.0.1:3306/studyhub_preview
+        STUDYHUB_JWT_SECRET=preview-secret-abcdefghijklmnopqrstuvwxyz
+        STUDYHUB_MAIL_PROVIDER=smtp
+        STUDYHUB_SMTP_HOST=smtp.preview.example.com
+        STUDYHUB_SMTP_PORT=587
+        STUDYHUB_SMTP_FROM_EMAIL=preview@example.com
+        STUDYHUB_SMTP_STARTTLS=true
+        STUDYHUB_STORAGE_PROVIDER=local_fs
+        STUDYHUB_PAYMENT_PROVIDER=local_alipay
+        STUDYHUB_MCP_ENABLED=true
+        STUDYHUB_MCP_REQUIRE_AUTH=false
+        STUDYHUB_MCP_ACCESS_TOKENS=agent-token:mcp:discover_public_materials
+        """,
+    )
+    monkeypatch.setenv("STUDYHUB_ENVIRONMENT", "preview")
+    monkeypatch.setenv("STUDYHUB_PRIVATE_DIR_PATH", str(private_dir))
+
+    _reset_runtime_state()
+
+    with pytest.raises(RuntimeError, match="MCP.*必须启用"):
+        get_settings()
+
+    _reset_runtime_state()
+
+
+def test_preview_rejects_enabled_mcp_without_token(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    private_dir = _write_private_env(
+        tmp_path,
+        "preview",
+        """
+        STUDYHUB_ENVIRONMENT=preview
+        STUDYHUB_DATABASE_URL=mysql+pymysql://preview_user:preview_pass@127.0.0.1:3306/studyhub_preview
+        STUDYHUB_JWT_SECRET=preview-secret-abcdefghijklmnopqrstuvwxyz
+        STUDYHUB_MAIL_PROVIDER=smtp
+        STUDYHUB_SMTP_HOST=smtp.preview.example.com
+        STUDYHUB_SMTP_PORT=587
+        STUDYHUB_SMTP_FROM_EMAIL=preview@example.com
+        STUDYHUB_SMTP_STARTTLS=true
+        STUDYHUB_STORAGE_PROVIDER=local_fs
+        STUDYHUB_PAYMENT_PROVIDER=local_alipay
+        STUDYHUB_MCP_ENABLED=true
+        STUDYHUB_MCP_REQUIRE_AUTH=true
+        """,
+    )
+    monkeypatch.setenv("STUDYHUB_ENVIRONMENT", "preview")
+    monkeypatch.setenv("STUDYHUB_PRIVATE_DIR_PATH", str(private_dir))
+
+    _reset_runtime_state()
+
+    with pytest.raises(RuntimeError, match="MCP.*必须配置"):
+        get_settings()
+
+    _reset_runtime_state()
+
+
+def test_preview_accepts_enabled_mcp_with_scoped_token(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    private_dir = _write_private_env(
+        tmp_path,
+        "preview",
+        """
+        STUDYHUB_ENVIRONMENT=preview
+        STUDYHUB_DATABASE_URL=mysql+pymysql://preview_user:preview_pass@127.0.0.1:3306/studyhub_preview
+        STUDYHUB_JWT_SECRET=preview-secret-abcdefghijklmnopqrstuvwxyz
+        STUDYHUB_MAIL_PROVIDER=smtp
+        STUDYHUB_SMTP_HOST=smtp.preview.example.com
+        STUDYHUB_SMTP_PORT=587
+        STUDYHUB_SMTP_FROM_EMAIL=preview@example.com
+        STUDYHUB_SMTP_STARTTLS=true
+        STUDYHUB_STORAGE_PROVIDER=local_fs
+        STUDYHUB_PAYMENT_PROVIDER=local_alipay
+        STUDYHUB_MCP_ENABLED=true
+        STUDYHUB_MCP_REQUIRE_AUTH=true
+        STUDYHUB_MCP_ACCESS_TOKENS=agent-token:mcp:discover_public_materials
+        """,
+    )
+    monkeypatch.setenv("STUDYHUB_ENVIRONMENT", "preview")
+    monkeypatch.setenv("STUDYHUB_PRIVATE_DIR_PATH", str(private_dir))
+
+    _reset_runtime_state()
+
+    settings = get_settings()
+    assert settings.resolved_mcp_enabled is True
+    assert settings.resolved_mcp_require_auth is True
+
+    _reset_runtime_state()
+
+
 def test_preview_supports_real_provider_selection_without_touching_network(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

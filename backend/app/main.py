@@ -107,6 +107,14 @@ def create_app() -> FastAPI:
             apply_security_headers(settings, error_response.headers)
             return error_response
 
+        def mcp_unauthorized_response(message: str) -> JSONResponse:
+            error_response = middleware_error_response("MCP_UNAUTHORIZED", message, 401)
+            error_response.headers["WWW-Authenticate"] = (
+                "Bearer "
+                f'resource_metadata="{settings.resolved_public_site_base_url}/.well-known/oauth-protected-resource"'
+            )
+            return error_response
+
         try:
             rate_allowed, rate_error = rate_limit_allowed(settings, request)
             if not rate_allowed:
@@ -132,12 +140,16 @@ def create_app() -> FastAPI:
                 else (True, None)
             )
             if not mcp_allowed:
-                status_code = 403
-                response = middleware_error_response(
-                    "MCP_FORBIDDEN",
-                    mcp_error or "MCP request is not allowed",
-                    status_code,
-                )
+                if mcp_error == "MCP authentication required":
+                    status_code = 401
+                    response = mcp_unauthorized_response(mcp_error)
+                else:
+                    status_code = 403
+                    response = middleware_error_response(
+                        "MCP_FORBIDDEN",
+                        mcp_error or "MCP request is not allowed",
+                        status_code,
+                    )
                 return response
             response = await call_next(request)
             status_code = response.status_code
