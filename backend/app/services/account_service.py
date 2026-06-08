@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any
+
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
@@ -62,7 +64,8 @@ class AccountService:
         return self._to_payload(user)
 
     def _to_payload(self, user: AuthUser) -> AccountProfilePayload:
-        snapshot = self._resolve_snapshot(user)
+        seed = self.read_repo.load_seed()
+        snapshot = self._resolve_snapshot(user, seed)
         return AccountProfilePayload(
             id=user.id,
             username=user.username,
@@ -77,21 +80,21 @@ class AccountService:
             avatar=snapshot.get("avatar"),
             payoutQrUrl=snapshot.get("payoutQrUrl"),
             legendaryContributorUntil=snapshot.get("legendaryContributorUntil"),
-            purchaseCount=self._purchase_count(user.id),
-            saleCount=self._sale_count(user.id),
+            purchaseCount=self._purchase_count(seed, user.id),
+            saleCount=self._sale_count(seed, user.id),
         )
 
-    def _resolve_snapshot(self, user: AuthUser) -> dict[str, object]:
-        seed_user = (self.read_repo.load_seed().get("users") or {}).get(str(user.id))
+    def _resolve_snapshot(self, user: AuthUser, seed: dict[str, Any]) -> dict[str, object]:
+        seed_user = (seed.get("users") or {}).get(str(user.id))
         return serialize_user_snapshot(seed_user, user)
 
-    def _purchase_count(self, user_id: int) -> int:
-        purchases = (self.read_repo.load_seed().get("profileSummary") or {}).get(str(user_id), {}).get("purchases", [])
+    def _purchase_count(self, seed: dict[str, Any], user_id: int) -> int:
+        purchases = (seed.get("profileSummary") or {}).get(str(user_id), {}).get("purchases", [])
         return len(purchases)
 
-    def _sale_count(self, user_id: int) -> int:
+    def _sale_count(self, seed: dict[str, Any], user_id: int) -> int:
         return sum(
             1
-            for material in self.read_repo.load_seed().get("materials", [])
+            for material in seed.get("materials", [])
             if int(material.get("uploaderId", 0)) == user_id and not bool(material.get("free"))
         )
