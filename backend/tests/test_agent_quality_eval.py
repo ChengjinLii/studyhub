@@ -654,6 +654,79 @@ def test_agent_local_exam_trend_uses_collective_strategy_sequence(monkeypatch) -
     metrics.clear()
 
 
+def test_agent_local_fallback_uses_collective_memory_without_pdf_evidence(monkeypatch) -> None:
+    metrics = get_runtime_metrics()
+    metrics.clear()
+    settings = Settings(ai_agent_provider="local")
+    monkeypatch.setattr("app.services.ai_service.get_settings", lambda: settings)
+
+    class FakeMemoryService:
+        def collect(
+            self,
+            session: object,
+            *,
+            query: str,
+            materials: list[MaterialRecord],
+            current_user_id: int | None,
+            pdf_evidence: list[MaterialPageEvidence],
+        ) -> AgentMemoryContext:
+            del session, query, materials, current_user_id, pdf_evidence
+            return AgentMemoryContext(
+                platform={
+                    "pdf_year_signals": [{"value": "2021", "count": 1}],
+                    "pdf_question_type_signals": [
+                        {"value": "计算题", "count": 3},
+                        {"value": "简答题", "count": 2},
+                    ],
+                    "pdf_source_type_signals": [{"value": "past_exam", "count": 2}],
+                    "study_strategy_signals": [
+                        {"value": "先刷真题", "count": 2},
+                        {"value": "再复盘错题", "count": 1},
+                    ],
+                },
+                user=None,
+            )
+
+    service = AiService(
+        read_repo=None,
+        material_repo=None,
+        memory_service=FakeMemoryService(),
+        query_planner_service=AgentQueryPlannerService(),
+        course_memory_service=AgentCourseMemoryService(),
+    )  # type: ignore[arg-type]
+    monkeypatch.setattr(
+        service,
+        "_rank_materials",
+        lambda session, query, filters: [
+            _material(
+                101,
+                title="通信原理四年真题解析",
+                description="2021 通信原理期末真题和答案解析",
+                downloads=90,
+            )
+        ],
+    )
+
+    response = service.recommend(
+        object(),  # type: ignore[arg-type]
+        SimpleNamespace(query="通信原理往年题常考什么", filters={}),
+        current_user_id=7,
+    )
+    body = json.loads(str(response["output"]).removeprefix("<json>").removesuffix("</json>"))
+
+    assert "当前暂缺可引用的 PDF 页级证据" in body["answer"]
+    assert "年份信号包括 2021" in body["answer"]
+    assert "资料类型偏向 往年真题" in body["answer"]
+    assert "题型信号集中在 计算题、简答题" in body["answer"]
+    assert "经验策略偏向 先刷真题、再复盘错题" in body["answer"]
+    assert "这些结论需要保持保守" in body["answer"]
+    assert "query_plan" not in json.dumps(body, ensure_ascii=False)
+    assert "memory_context" not in json.dumps(body, ensure_ascii=False)
+    assert "course_memory_card" not in json.dumps(body, ensure_ascii=False)
+    assert "study_strategy_distribution" not in json.dumps(body, ensure_ascii=False)
+    metrics.clear()
+
+
 def test_agent_local_exam_trend_handles_multi_material_scope(monkeypatch) -> None:
     metrics = get_runtime_metrics()
     metrics.clear()

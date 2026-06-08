@@ -673,10 +673,51 @@ class AiService:
                 f"我先基于 StudyHub 资料库找到 {titles}，并读取到相关 PDF 页级证据：{sources}。"
                 f"{evidence_summary}{profile_hint}{sequence_hint}{preference_tail}"
             )
+        course_memory_hint = self._local_course_memory_hint(course_memory_card)
+        if course_memory_hint:
+            sequence_hint = self._local_sequence_hint(query_plan, course_memory_card)
+            preference_tail = "" if query_plan and query_plan.intent == "study_plan" else preference_hint
+            return f"我先基于 StudyHub 资料库找到 {titles}。{course_memory_hint}{profile_hint}{sequence_hint}{preference_tail}"
         study_plan_hint = self._local_study_plan_hint(query_plan)
         if study_plan_hint:
             return f"我先基于 StudyHub 资料库找到 {titles}。{profile_hint}{study_plan_hint}"
         return f"我先基于 StudyHub 资料库找到 {titles}。{profile_hint}建议先用最匹配的资料建立知识框架，再结合真题或经验内容做查漏补缺。{preference_hint}"
+
+    def _local_course_memory_hint(self, course_memory_card: CourseMemoryCard | None) -> str:
+        if course_memory_card is None:
+            return ""
+        parts: list[str] = []
+        years = list(course_memory_card.years)[:4]
+        question_types = _course_card_values(course_memory_card, "question_type_distribution")
+        chapter_signals = _course_card_values(course_memory_card, "chapter_distribution")
+        solution_signals = _course_card_values(course_memory_card, "solution_signal_distribution")
+        source_types = _course_card_values(course_memory_card, "source_type_distribution")
+        study_strategies = _course_card_values(course_memory_card, "study_strategy_distribution")
+        quality_signals = _course_card_values(course_memory_card, "material_quality_distribution")
+        risk_signals = _course_card_values(course_memory_card, "material_risk_distribution")
+        if years:
+            parts.append(f"年份信号包括 {_join_values(years)}")
+        if source_types:
+            parts.append(f"资料类型偏向 {_join_values([_source_type_label(value) for value in source_types[:3]])}")
+        if question_types:
+            parts.append(f"题型信号集中在 {_join_values(question_types[:4])}")
+        if chapter_signals:
+            parts.append(f"章节/模块信号包括 {_join_values(chapter_signals[:4])}")
+        if solution_signals:
+            parts.append(f"答案/解析信号包括 {_join_values(solution_signals[:4])}")
+        if study_strategies:
+            parts.append(f"经验策略偏向 {_join_values(study_strategies[:4])}")
+        if quality_signals:
+            parts.append(f"质量信号包括 {_join_values(quality_signals[:4])}")
+        if risk_signals:
+            parts.append(f"需要留意 {_join_values(risk_signals[:3])}")
+        if not parts:
+            return ""
+        limitations = _safe_text_list(course_memory_card.confidence_assessment.get("limitations"))
+        confidence_tail = ""
+        if limitations:
+            confidence_tail = f"由于{_join_values(limitations[:2])}，这些结论需要保持保守。"
+        return f"当前暂缺可引用的 PDF 页级证据，我会先按平台聚合信号和候选资料做保守判断：{'；'.join(parts)}。{confidence_tail}"
 
     def _local_evidence_summary(
         self,
