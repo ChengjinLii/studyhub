@@ -26,6 +26,22 @@ if (!allowFrontendBuild) {
 const pageJsonBudget = 10;
 const failures = [];
 
+function execText(command, args, options = {}) {
+  try {
+    return execFileSync(command, args, {
+      cwd: root,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+  } catch (error) {
+    // ripgrep exits with 1 when there are no matches; that is a passing state here.
+    if (options.allowNoMatches && error && error.status === 1) {
+      return '';
+    }
+    throw error;
+  }
+}
+
 for (const [file, maxLines] of lineBudgets) {
   const absolute = resolve(root, file);
   if (!existsSync(absolute)) {
@@ -38,10 +54,8 @@ for (const [file, maxLines] of lineBudgets) {
   }
 }
 
-const pageJsonMatches = execFileSync('rg', ['-n', String.raw`\.json\(`, 'frontend/pages', '-g', '*.tsx'], {
-  cwd: root,
-  encoding: 'utf8',
-  stdio: ['ignore', 'pipe', 'pipe'],
+const pageJsonMatches = execText('rg', ['-n', String.raw`\.json\(`, 'frontend/pages', '-g', '*.tsx'], {
+  allowNoMatches: true,
 })
   .trim()
   .split('\n')
@@ -56,10 +70,7 @@ for (const dir of forbiddenDirs) {
   }
 }
 
-const pycache = execFileSync('find', ['backend', 'ai_platform', '-type', 'd', '-name', '__pycache__', '-print'], {
-  cwd: root,
-  encoding: 'utf8',
-}).trim();
+const pycache = execText('find', ['backend', 'ai_platform', '-type', 'd', '-name', '__pycache__', '-print']).trim();
 if (pycache) {
   failures.push(`__pycache__ directories present:\n${pycache}`);
 }
