@@ -11,6 +11,7 @@ from app.core.config import Settings, get_settings
 from app.core.db import reset_database_runtime
 from app.ops.db_admin import (
     _ensure_backup_target_available,
+    _publish_backup_file,
     _temporary_backup_path,
     _validate_backup_file,
     _migration_plan_token,
@@ -340,6 +341,30 @@ def test_temporary_backup_path_preserves_compression_suffix(tmp_path: Path) -> N
     assert _temporary_backup_path(gzip_target).suffix == ".gz"
     assert _temporary_backup_path(plain_target).suffix == ".sql"
     assert _temporary_backup_path(gzip_target).name.startswith(".studyhub-production.sql.tmp-")
+
+
+def test_publish_backup_file_refuses_to_overwrite_existing_target(tmp_path: Path) -> None:
+    temp_target = tmp_path / ".manual.tmp.sql"
+    target = tmp_path / "manual.sql"
+    temp_target.write_text("new backup", encoding="utf-8")
+    target.write_text("existing backup", encoding="utf-8")
+
+    with pytest.raises(RuntimeError, match="拒绝覆盖"):
+        _publish_backup_file(temp_target, target)
+
+    assert target.read_text(encoding="utf-8") == "existing backup"
+    assert temp_target.read_text(encoding="utf-8") == "new backup"
+
+
+def test_publish_backup_file_removes_temp_after_success(tmp_path: Path) -> None:
+    temp_target = tmp_path / ".manual.tmp.sql"
+    target = tmp_path / "manual.sql"
+    temp_target.write_text("new backup", encoding="utf-8")
+
+    _publish_backup_file(temp_target, target)
+
+    assert target.read_text(encoding="utf-8") == "new backup"
+    assert not temp_target.exists()
 
 
 def test_db_admin_backup_cleans_temporary_file_on_mysqldump_failure(

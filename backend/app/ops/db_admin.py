@@ -96,6 +96,14 @@ def _temporary_backup_path(target: Path) -> Path:
     return target.with_name(f".{stem}.tmp-{os.getpid()}{suffix}")
 
 
+def _publish_backup_file(temp_target: Path, target: Path) -> None:
+    try:
+        os.link(temp_target, target)
+    except FileExistsError as exc:
+        raise RuntimeError(f"备份目标已存在，拒绝覆盖：{target}") from exc
+    temp_target.unlink(missing_ok=True)
+
+
 def command_describe(settings: Settings) -> int:
     url = make_url(settings.resolved_database_url)
     payload = {
@@ -209,7 +217,7 @@ def command_backup(settings: Settings, *, output: Path | None) -> int:
                     sink.close()
         size_bytes = _validate_backup_file(temp_target)
         _ensure_backup_target_available(target)
-        temp_target.rename(target)
+        _publish_backup_file(temp_target, target)
     except Exception:
         if temp_target.exists():
             temp_target.unlink()
