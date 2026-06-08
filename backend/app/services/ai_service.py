@@ -251,6 +251,11 @@ class AiService:
                     for item in llm_body["followup_questions"]
                     if isinstance(item, (str, int, float)) and str(item).strip()
                 ][:3] or body["followup_questions"]
+            body = self.safety_service.sanitize_public_response_body(
+                body,
+                candidate_materials=materials,
+                pdf_evidence=pdf_evidence,
+            )
             return {"output": f"<json>{json.dumps(body, ensure_ascii=False, separators=(',', ':'))}</json>"}
         except Exception:
             status = "error"

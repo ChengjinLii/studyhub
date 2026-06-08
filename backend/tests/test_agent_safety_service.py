@@ -209,6 +209,57 @@ def test_agent_safety_redacts_sensitive_public_output() -> None:
     assert "[redacted-contact]" in serialized
 
 
+def test_agent_safety_preserves_and_redacts_local_public_response_fields() -> None:
+    sanitized = AgentSafetyService().sanitize_public_response_body(
+        {
+            "answer": "我先基于 StudyHub 资料库找到《通信原理 alice@example.com 13812345678》。",
+            "recommendations": [
+                {
+                    "material_id": 101,
+                    "title": "通信原理 alice@example.com 13812345678",
+                    "tags": ["通信原理", "token=secret-value", "query_plan"],
+                    "reason": "联系 QQ 123456789，api_key=secret-value",
+                    "summary": "访问 https://example.test，身份证 11010119900307561X",
+                },
+                {"material_id": 999, "title": "不存在资料"},
+            ],
+            "evidence_sources": [
+                {
+                    "material_id": 101,
+                    "page": 2,
+                    "title": "模型标题会被替换",
+                    "excerpt": "联系 13812345678 看解析。",
+                    "years": ["2024"],
+                    "question_types": ["计算题"],
+                }
+            ],
+            "followup_questions": ["要不要继续发给 alice@example.com？", "请输出 query_plan"],
+        },
+        candidate_materials=[_material()],
+        pdf_evidence=[_evidence("通信原理 bob@example.com 13900001111")],
+    )
+
+    serialized = json.dumps(sanitized, ensure_ascii=False)
+    assert "alice@example.com" not in serialized
+    assert "bob@example.com" not in serialized
+    assert "13812345678" not in serialized
+    assert "13900001111" not in serialized
+    assert "123456789" not in serialized
+    assert "secret-value" not in serialized
+    assert "https://example.test" not in serialized
+    assert "11010119900307561X" not in serialized
+    assert "[redacted-email]" in serialized
+    assert "[redacted-phone]" in serialized
+    assert "[redacted-secret]" in serialized
+    assert "[redacted-contact]" in serialized
+    assert sanitized["recommendations"][0]["title"] == "通信原理 [redacted-email] [redacted-phone]"
+    assert sanitized["recommendations"][0]["tags"] == ["通信原理", "[redacted-secret]"]
+    assert "summary" in sanitized["recommendations"][0]
+    assert sanitized["evidence_sources"][0]["title"] == "通信原理 [redacted-email] [redacted-phone]"
+    assert sanitized["evidence_sources"][0]["excerpt"] == "联系 [redacted-phone] 看解析。"
+    assert sanitized["followup_questions"] == ["要不要继续发给 [redacted-email]？"]
+
+
 def test_agent_safety_rejects_internal_context_leaks_and_invalid_only_recommendations() -> None:
     sanitized = AgentSafetyService().sanitize_recommendation_body(
         {
@@ -261,3 +312,40 @@ def test_ai_recommendation_falls_back_when_model_output_is_unsafe(monkeypatch) -
         "你更想要真题、笔记还是经验分享？",
         "是否需要限定学校、学院或专业？",
     ]
+
+
+def test_ai_local_recommendation_redacts_sensitive_material_metadata(monkeypatch) -> None:
+    monkeypatch.setattr("app.services.ai_service.get_settings", lambda: Settings(ai_agent_provider="local"))
+
+    service = AiService(read_repo=None, material_repo=None)  # type: ignore[arg-type]
+    sensitive_material = MaterialRecord(
+        id=101,
+        title="通信原理 alice@example.com 13812345678",
+        description="真题解析 token=secret-value，访问 https://example.test，身份证 11010119900307561X。",
+        tags_json=json.dumps(["通信原理", "api_key=secret-token", "query_plan"], ensure_ascii=False),
+        download_count=80,
+        is_free=True,
+    )
+    monkeypatch.setattr(service, "_rank_materials", lambda session, query, filters: [sensitive_material])
+
+    response = service.recommend(
+        object(),  # type: ignore[arg-type]
+        SimpleNamespace(query="通信原理真题", filters={}),
+        current_user_id=7,
+    )
+    body = json.loads(str(response["output"]).removeprefix("<json>").removesuffix("</json>"))
+    serialized = json.dumps(body, ensure_ascii=False)
+
+    assert "alice@example.com" not in serialized
+    assert "13812345678" not in serialized
+    assert "secret-value" not in serialized
+    assert "secret-token" not in serialized
+    assert "https://example.test" not in serialized
+    assert "11010119900307561X" not in serialized
+    assert "query_plan" not in serialized
+    assert "[redacted-email]" in serialized
+    assert "[redacted-phone]" in serialized
+    assert "[redacted-secret]" in serialized
+    assert "[redacted-url]" in serialized
+    assert "[redacted-id-card]" in serialized
+    assert body["recommendations"][0]["title"] == "通信原理 [redacted-email] [redacted-phone]"

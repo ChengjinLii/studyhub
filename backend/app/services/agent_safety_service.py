@@ -79,6 +79,39 @@ class AgentSafetyService:
             sanitized["followup_questions"] = followup_questions
         return sanitized or None
 
+    def sanitize_public_response_body(
+        self,
+        body: dict[str, Any],
+        *,
+        candidate_materials: list[MaterialRecord],
+        pdf_evidence: list[MaterialPageEvidence],
+    ) -> dict[str, Any]:
+        """Clean locally generated Agent output while preserving public fields."""
+
+        allowed_material_ids = {int(material.id) for material in candidate_materials}
+        recommendations = self._sanitize_public_recommendations(body.get("recommendations"), allowed_material_ids)
+        answer = self._sanitize_answer(body.get("answer"))
+        evidence_sources = self._sanitize_public_evidence_sources(body.get("evidence_sources"), pdf_evidence)
+        followup_questions = self._sanitize_followups(body.get("followup_questions"))
+
+        if answer and pdf_evidence:
+            if not evidence_sources:
+                evidence_sources = self._fallback_evidence_sources(pdf_evidence)
+            answer = self._ensure_answer_has_source_hint(answer, evidence_sources)
+        elif answer:
+            answer = self._ensure_low_evidence_caveat(answer)
+
+        sanitized: dict[str, Any] = {}
+        if recommendations:
+            sanitized["recommendations"] = recommendations
+        if answer:
+            sanitized["answer"] = answer
+        if followup_questions:
+            sanitized["followup_questions"] = followup_questions
+        if evidence_sources:
+            sanitized["evidence_sources"] = evidence_sources
+        return sanitized
+
     def _sanitize_recommendations(self, value: Any, allowed_material_ids: set[int]) -> tuple[list[dict[str, Any]], bool]:
         if not isinstance(value, list):
             return [], False
@@ -101,6 +134,36 @@ class AgentSafetyService:
             if len(items) >= 3:
                 break
         return items, True
+
+    def _sanitize_public_recommendations(self, value: Any, allowed_material_ids: set[int]) -> list[dict[str, Any]]:
+        if not isinstance(value, list):
+            return []
+        items: list[dict[str, Any]] = []
+        seen_material_ids: set[int] = set()
+        for raw_item in value:
+            if not isinstance(raw_item, dict):
+                continue
+            material_id = _safe_int(raw_item.get("material_id") or raw_item.get("materialId") or raw_item.get("id"))
+            if material_id is None or material_id not in allowed_material_ids or material_id in seen_material_ids:
+                continue
+            seen_material_ids.add(material_id)
+            item: dict[str, Any] = {"material_id": material_id}
+            title = _clean_public_title(raw_item.get("title"), max_chars=120)
+            if title:
+                item["title"] = title
+            tags = _clean_public_tags(raw_item.get("tags"))
+            if tags:
+                item["tags"] = tags
+            reason = _clean_public_text(raw_item.get("reason"), max_chars=220)
+            if reason:
+                item["reason"] = reason
+            summary = _clean_public_text(raw_item.get("summary"), max_chars=300)
+            if summary:
+                item["summary"] = summary
+            items.append(item)
+            if len(items) >= 3:
+                break
+        return items
 
     def _sanitize_answer(self, value: Any) -> str:
         if not isinstance(value, str):
@@ -145,6 +208,52 @@ class AgentSafetyService:
             if len(sources) >= 6:
                 break
         return sources
+
+    def _sanitize_public_evidence_sources(
+        self,
+        value: Any,
+        pdf_evidence: list[MaterialPageEvidence],
+    ) -> list[dict[str, Any]]:
+        if not isinstance(value, list):
+            return []
+        allowed = {(int(item.material_id), int(item.page)): item for item in pdf_evidence}
+        sources: list[dict[str, Any]] = []
+        seen_sources: set[tuple[int, int]] = set()
+        for raw_item in value:
+            if not isinstance(raw_item, dict):
+                continue
+            material_id = _safe_int(raw_item.get("material_id") or raw_item.get("materialId") or raw_item.get("id"))
+            page = _safe_int(raw_item.get("page"))
+            if material_id is None or page is None or (material_id, page) not in allowed:
+                continue
+            source_key = (material_id, page)
+            if source_key in seen_sources:
+                continue
+            seen_sources.add(source_key)
+            evidence = allowed[source_key]
+            source: dict[str, Any] = {
+                "material_id": material_id,
+                "title": _clean_public_title(evidence.title, max_chars=120),
+                "page": page,
+            }
+            excerpt = _clean_public_text(raw_item.get("excerpt"), max_chars=240)
+            if excerpt:
+                source["excerpt"] = excerpt
+            years = _clean_public_list(raw_item.get("years"), limit=6, max_chars=16)
+            if years:
+                source["years"] = years
+            question_types = _clean_public_list(raw_item.get("question_types"), limit=6, max_chars=40)
+            if question_types:
+                source["question_types"] = question_types
+            if evidence.question_numbers:
+                source["question_numbers"] = list(evidence.question_numbers)
+            if evidence.source_type != "unknown":
+                source["source_type"] = evidence.source_type
+            sources.append(source)
+            if len(sources) >= 6:
+                break
+        return sources
+
 
     def _fallback_evidence_sources(self, pdf_evidence: list[MaterialPageEvidence]) -> list[dict[str, Any]]:
         sources: list[dict[str, Any]] = []
@@ -231,6 +340,23 @@ def _clean_public_title(value: Any, *, max_chars: int) -> str:
     if any(marker in lowered for marker in FORBIDDEN_INTERNAL_MARKERS):
         return "资料"
     return text
+
+
+def _clean_public_tags(value: Any) -> list[str]:
+    return _clean_public_list(value, limit=8, max_chars=40)
+
+
+def _clean_public_list(value: Any, *, limit: int, max_chars: int) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    result: list[str] = []
+    for item in value:
+        cleaned = _clean_public_text(item, max_chars=max_chars)
+        if cleaned and cleaned not in result:
+            result.append(cleaned)
+        if len(result) >= limit:
+            break
+    return result
 
 
 def _redact_public_sensitive_text(text: str) -> str:
