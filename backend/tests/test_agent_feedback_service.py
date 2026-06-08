@@ -78,6 +78,7 @@ def test_ai_feedback_builds_redacted_user_and_platform_memory_candidates(client,
     assert data["hook"] == "useful"
     assert data["selectedMaterialIds"] == [780]
     assert data["personalMemoryEnabled"] is True
+    assert data["candidateLifecycleSchema"] == "agent-feedback-candidate-lifecycle-v1"
     assert "13812345678" not in serialized
     assert "alice@example.com" not in serialized
     assert "secret-value" not in serialized
@@ -103,6 +104,7 @@ def test_ai_feedback_builds_redacted_user_and_platform_memory_candidates(client,
     assert data["memoryCandidates"][0]["writeMode"] == "deferred_not_persisted"
     assert data["memoryCandidates"][0]["privacy"] == "current_user_private_candidate"
     assert data["memoryCandidates"][0]["lifecycle"] == {
+        "schema": "agent-feedback-candidate-lifecycle-v1",
         "persistence": "not_persisted",
         "writeMode": "deferred_not_persisted",
         "requiresExplicitFutureWritePath": True,
@@ -142,6 +144,7 @@ def test_ai_feedback_builds_redacted_user_and_platform_memory_candidates(client,
     assert data["memoryCandidates"][1]["schema"] == "agent-feedback-memory-candidate-v1"
     assert data["memoryCandidates"][1]["writeMode"] == "deferred_not_persisted"
     assert data["memoryCandidates"][1]["lifecycle"] == {
+        "schema": "agent-feedback-candidate-lifecycle-v1",
         "persistence": "not_persisted",
         "writeMode": "deferred_not_persisted",
         "requiresAnonymousAggregation": True,
@@ -221,6 +224,7 @@ def test_ai_feedback_rejects_unknown_hooks_without_memory_candidates(client, aut
     data = response.json()["data"]
     assert data["accepted"] is False
     assert data["reason"] == "invalid_hook"
+    assert data["candidateLifecycleSchema"] == "agent-feedback-candidate-lifecycle-v1"
     assert data["memoryCandidates"] == []
     assert "useful" in data["allowedHooks"]
     metrics = get_runtime_metrics().render_prometheus(get_settings())

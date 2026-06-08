@@ -23,6 +23,7 @@ ALLOWED_FEEDBACK_HOOKS = {
 }
 
 FEEDBACK_MEMORY_CANDIDATE_SCHEMA = "agent-feedback-memory-candidate-v1"
+FEEDBACK_CANDIDATE_LIFECYCLE_SCHEMA = "agent-feedback-candidate-lifecycle-v1"
 
 USER_MEMORY_FEEDBACK_SUMMARIES = {
     "useful": "用户认为这次推荐或学习建议有帮助。",
@@ -99,6 +100,7 @@ class AgentFeedbackService:
                 "selectedMaterialIds": accepted_material_ids,
                 "redactedNote": redacted_note,
                 "memoryCandidates": [],
+                "candidateLifecycleSchema": FEEDBACK_CANDIDATE_LIFECYCLE_SCHEMA,
                 "persistence": "not_persisted",
                 "privacyBoundary": _privacy_boundary(),
             }
@@ -118,6 +120,7 @@ class AgentFeedbackService:
             "redactedNote": redacted_note,
             "personalMemoryEnabled": personal_memory_enabled,
             "memoryCandidates": candidates,
+            "candidateLifecycleSchema": FEEDBACK_CANDIDATE_LIFECYCLE_SCHEMA,
             "persistence": "not_persisted",
             "privacyBoundary": _privacy_boundary(),
         }
@@ -384,6 +387,7 @@ def _signal_basis(
 def _candidate_lifecycle(scope: str) -> dict[str, Any]:
     if scope == "user":
         return {
+            "schema": FEEDBACK_CANDIDATE_LIFECYCLE_SCHEMA,
             "persistence": "not_persisted",
             "writeMode": "deferred_not_persisted",
             "requiresExplicitFutureWritePath": True,
@@ -392,6 +396,7 @@ def _candidate_lifecycle(scope: str) -> dict[str, Any]:
             "rawNotePersisted": False,
         }
     return {
+        "schema": FEEDBACK_CANDIDATE_LIFECYCLE_SCHEMA,
         "persistence": "not_persisted",
         "writeMode": "deferred_not_persisted",
         "requiresAnonymousAggregation": True,
