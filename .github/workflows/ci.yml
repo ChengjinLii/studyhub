@@ -11,10 +11,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
       - name: Check shell script syntax
         run: bash scripts/check-shell-scripts.sh
       - name: Check sensitive tracked files
         run: bash scripts/security/check-sensitive-files.sh
+      - name: Check code size budget
+        run: node scripts/check-code-size.mjs
 
   backend:
     runs-on: ubuntu-latest

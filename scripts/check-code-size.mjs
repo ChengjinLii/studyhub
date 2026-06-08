@@ -1,6 +1,5 @@
 #!/usr/bin/env node
-import { execFileSync } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { relative, resolve } from 'node:path';
 
 const root = resolve(new URL('..', import.meta.url).pathname);
@@ -26,20 +25,56 @@ if (!allowFrontendBuild) {
 const pageJsonBudget = 10;
 const failures = [];
 
-function execText(command, args, options = {}) {
-  try {
-    return execFileSync(command, args, {
-      cwd: root,
-      encoding: 'utf8',
-      stdio: ['ignore', 'pipe', 'pipe'],
-    });
-  } catch (error) {
-    // ripgrep exits with 1 when there are no matches; that is a passing state here.
-    if (options.allowNoMatches && error && error.status === 1) {
-      return '';
-    }
-    throw error;
+function listFiles(dir, predicate) {
+  const absoluteDir = resolve(root, dir);
+  if (!existsSync(absoluteDir)) {
+    return [];
   }
+
+  const files = [];
+  const stack = [absoluteDir];
+
+  while (stack.length) {
+    const current = stack.pop();
+    for (const entry of readdirSync(current, { withFileTypes: true })) {
+      const absolutePath = resolve(current, entry.name);
+      if (entry.isDirectory()) {
+        stack.push(absolutePath);
+      } else if (entry.isFile() && predicate(absolutePath)) {
+        files.push(absolutePath);
+      }
+    }
+  }
+
+  return files.sort();
+}
+
+function listDirectories(dir, dirname) {
+  const absoluteDir = resolve(root, dir);
+  if (!existsSync(absoluteDir)) {
+    return [];
+  }
+
+  const matches = [];
+  const stack = [absoluteDir];
+
+  while (stack.length) {
+    const current = stack.pop();
+    for (const entry of readdirSync(current, { withFileTypes: true })) {
+      if (!entry.isDirectory()) {
+        continue;
+      }
+
+      const absolutePath = resolve(current, entry.name);
+      if (entry.name === dirname) {
+        matches.push(relative(root, absolutePath));
+        continue;
+      }
+      stack.push(absolutePath);
+    }
+  }
+
+  return matches.sort();
 }
 
 for (const [file, maxLines] of lineBudgets) {
@@ -54,12 +89,9 @@ for (const [file, maxLines] of lineBudgets) {
   }
 }
 
-const pageJsonMatches = execText('rg', ['-n', String.raw`\.json\(`, 'frontend/pages', '-g', '*.tsx'], {
-  allowNoMatches: true,
-})
-  .trim()
-  .split('\n')
-  .filter(Boolean);
+const pageJsonMatches = listFiles('frontend/pages', (absolutePath) => absolutePath.endsWith('.tsx')).filter(
+  (absolutePath) => readFileSync(absolutePath, 'utf8').includes('.json(')
+);
 if (pageJsonMatches.length > pageJsonBudget) {
   failures.push(`frontend/pages direct resp.json(): ${pageJsonMatches.length} exceeds ${pageJsonBudget}`);
 }
@@ -70,9 +102,9 @@ for (const dir of forbiddenDirs) {
   }
 }
 
-const pycache = execText('find', ['backend', 'ai_platform', '-type', 'd', '-name', '__pycache__', '-print']).trim();
-if (pycache) {
-  failures.push(`__pycache__ directories present:\n${pycache}`);
+const pycache = ['backend', 'ai_platform'].flatMap((dir) => listDirectories(dir, '__pycache__'));
+if (pycache.length) {
+  failures.push(`__pycache__ directories present:\n${pycache.join('\n')}`);
 }
 
 if (failures.length) {
