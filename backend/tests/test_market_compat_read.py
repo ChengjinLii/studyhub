@@ -2,8 +2,50 @@ from __future__ import annotations
 
 import asyncio
 from types import SimpleNamespace
+from typing import Any
 
 from app.services.market_service import MarketService
+
+
+class _MappingResult:
+    def __init__(self, row: dict[str, Any]) -> None:
+        self.row = row
+
+    def mappings(self):
+        return self
+
+    def first(self) -> dict[str, Any]:
+        return self.row
+
+
+class _ScalarResult:
+    def __init__(self, value: int) -> None:
+        self.value = value
+
+    def scalar(self) -> int:
+        return self.value
+
+
+class _StatsSession:
+    def __init__(self) -> None:
+        self.market_queries = 0
+        self.user_queries = 0
+
+    def execute(self, statement, params=None):
+        del params
+        sql = " ".join(str(statement).lower().split())
+        if "from market_items" in sql:
+            self.market_queries += 1
+            return _MappingResult({"active": 7, "sold": 3})
+        if "from users" in sql:
+            self.user_queries += 1
+            return _ScalarResult(5)
+        raise AssertionError(f"unexpected SQL: {statement}")
+
+
+class _AsyncStatsSession(_StatsSession):
+    async def execute(self, statement, params=None):
+        return super().execute(statement, params)
 
 
 def _build_service() -> MarketService:
@@ -12,6 +54,28 @@ def _build_service() -> MarketService:
         async_read_db_enabled=True,
     )
     return MarketService(fake_settings, read_repo=None, auth_repo=None, market_repo=None, asset_store=None)
+
+
+def test_legacy_market_stats_uses_single_market_items_aggregate_query() -> None:
+    service = _build_service()
+    session = _StatsSession()
+
+    data = service._compat_load_market_stats(session)  # type: ignore[arg-type]
+
+    assert data == {"active": 7, "sold": 3, "userCount": 5}
+    assert session.market_queries == 1
+    assert session.user_queries == 1
+
+
+def test_async_legacy_market_stats_uses_single_market_items_aggregate_query() -> None:
+    service = _build_service()
+    session = _AsyncStatsSession()
+
+    data = asyncio.run(service._compat_load_market_stats_async(session))
+
+    assert data == {"active": 7, "sold": 3, "userCount": 5}
+    assert session.market_queries == 1
+    assert session.user_queries == 1
 
 
 def test_async_legacy_market_list_keeps_page_stats_and_wanted_state(monkeypatch) -> None:

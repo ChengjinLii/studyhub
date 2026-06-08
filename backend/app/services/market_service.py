@@ -802,16 +802,41 @@ class MarketService:
         return [dict(row) for row in rows]
 
     def _compat_load_market_stats(self, session: Session) -> dict[str, int]:
-        active = int(session.execute(text("SELECT COUNT(*) FROM market_items WHERE status = 'SALE'")).scalar() or 0)
-        sold = int(session.execute(text("SELECT COUNT(*) FROM market_items WHERE status = 'SOLD'")).scalar() or 0)
+        market_stats = session.execute(
+            text(
+                """
+                SELECT
+                  COALESCE(SUM(CASE WHEN status = 'SALE' THEN 1 ELSE 0 END), 0) AS active,
+                  COALESCE(SUM(CASE WHEN status = 'SOLD' THEN 1 ELSE 0 END), 0) AS sold
+                FROM market_items
+                """
+            )
+        ).mappings().first()
         user_count = int(session.execute(text("SELECT COUNT(*) FROM users")).scalar() or 0)
-        return {"active": active, "sold": sold, "userCount": user_count}
+        return {
+            "active": int(market_stats["active"] if market_stats is not None else 0),
+            "sold": int(market_stats["sold"] if market_stats is not None else 0),
+            "userCount": user_count,
+        }
 
     async def _compat_load_market_stats_async(self, session) -> dict[str, int]:
-        active = int((await session.execute(text("SELECT COUNT(*) FROM market_items WHERE status = 'SALE'"))).scalar() or 0)
-        sold = int((await session.execute(text("SELECT COUNT(*) FROM market_items WHERE status = 'SOLD'"))).scalar() or 0)
+        market_result = await session.execute(
+            text(
+                """
+                SELECT
+                  COALESCE(SUM(CASE WHEN status = 'SALE' THEN 1 ELSE 0 END), 0) AS active,
+                  COALESCE(SUM(CASE WHEN status = 'SOLD' THEN 1 ELSE 0 END), 0) AS sold
+                FROM market_items
+                """
+            )
+        )
+        market_stats = market_result.mappings().first()
         user_count = int((await session.execute(text("SELECT COUNT(*) FROM users"))).scalar() or 0)
-        return {"active": active, "sold": sold, "userCount": user_count}
+        return {
+            "active": int(market_stats["active"] if market_stats is not None else 0),
+            "sold": int(market_stats["sold"] if market_stats is not None else 0),
+            "userCount": user_count,
+        }
 
     def _compat_load_wanted_ids(self, session: Session, current_user_id: int | None, item_ids: list[int]) -> set[int]:
         if current_user_id is None or not item_ids:
