@@ -131,6 +131,7 @@ def test_agent_memory_context_aggregates_platform_and_current_user_only() -> Non
             years=("2024",),
             question_types=("计算题",),
             knowledge_signals=("调制",),
+            chapter_signals=("第2章 调制解调",),
             question_numbers=("第3题",),
             source_type="past_exam",
             score_points=(10,),
@@ -164,6 +165,7 @@ def test_agent_memory_context_aggregates_platform_and_current_user_only() -> Non
         "title": "通信原理四年真题解析",
         "page": 3,
         "question_numbers": ["第3题"],
+        "chapter_signals": ["第2章 调制解调"],
         "score_points": [10],
         "difficulty_signals": ["综合"],
         "visual_signals": ["公式"],
@@ -173,6 +175,7 @@ def test_agent_memory_context_aggregates_platform_and_current_user_only() -> Non
     } in platform["pdf_evidence_pages"]
     assert platform["pdf_year_signals"] == [{"value": "2024", "count": 1}]
     assert platform["pdf_question_type_signals"] == [{"value": "计算题", "count": 1}]
+    assert platform["pdf_chapter_signals"] == [{"value": "第2章 调制解调", "count": 1}]
     assert platform["pdf_question_number_signals"] == [{"value": "第3题", "count": 1}]
     assert platform["pdf_score_point_signals"] == [{"value": "10", "count": 1}]
     assert platform["pdf_difficulty_signals"] == [{"value": "综合", "count": 1}]

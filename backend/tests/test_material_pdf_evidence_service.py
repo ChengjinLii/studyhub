@@ -75,7 +75,7 @@ def test_extract_pdf_page_texts_uses_safe_literal_fallback_for_simple_pdf_bytes(
 
 def test_build_pdf_page_chunks_extracts_year_question_type_and_knowledge_signals() -> None:
     chunks = build_pdf_page_chunks(
-        "%PDF-1.4\n1 0 obj << /Type /Page >> stream (2024 通信原理 真题 第3题 计算题 10分 综合题 较难 公式 推导 如图 表格 调制 解调 误码率) endstream".encode(),
+        "%PDF-1.4\n1 0 obj << /Type /Page >> stream (第2章 调制解调。2024 通信原理 真题 第3题 计算题 10分 综合题 较难 公式 推导 如图 表格 调制 解调 误码率) endstream".encode(),
         max_pages=2,
     )
 
@@ -85,6 +85,7 @@ def test_build_pdf_page_chunks_extracts_year_question_type_and_knowledge_signals
     assert "计算题" in chunks[0].question_types
     assert "调制" in chunks[0].knowledge_signals
     assert chunks[0].question_numbers == ("第3题",)
+    assert chunks[0].chapter_signals == ("第2章 调制解调",)
     assert chunks[0].source_type == "past_exam"
     assert chunks[0].score_points == (10,)
     assert chunks[0].difficulty_signals == ("综合", "偏难")

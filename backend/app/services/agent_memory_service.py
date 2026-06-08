@@ -114,6 +114,7 @@ class AgentMemoryService:
         study_strategy_counter: Counter[str] = Counter()
         year_counter: Counter[str] = Counter()
         question_type_counter: Counter[str] = Counter()
+        chapter_counter: Counter[str] = Counter()
         question_number_counter: Counter[str] = Counter()
         score_point_counter: Counter[str] = Counter()
         difficulty_counter: Counter[str] = Counter()
@@ -136,6 +137,7 @@ class AgentMemoryService:
             signal_counter.update(_signal_terms(item.text))
             year_counter.update(item.years)
             question_type_counter.update(item.question_types)
+            chapter_counter.update(item.chapter_signals)
             question_number_counter.update(item.question_numbers)
             score_point_counter.update(str(value) for value in item.score_points)
             difficulty_counter.update(item.difficulty_signals)
@@ -167,6 +169,7 @@ class AgentMemoryService:
             "material_risk_signals": _counter_items(material_risk_counter, limit=8),
             "pdf_year_signals": _counter_items(year_counter, limit=6),
             "pdf_question_type_signals": _counter_items(question_type_counter, limit=6),
+            "pdf_chapter_signals": _counter_items(chapter_counter, limit=8),
             "pdf_question_number_signals": _counter_items(question_number_counter, limit=8),
             "pdf_score_point_signals": _counter_items(score_point_counter, limit=8),
             "pdf_difficulty_signals": _counter_items(difficulty_counter, limit=5),
@@ -337,6 +340,8 @@ def _evidence_page_payload(item: MaterialPageEvidence) -> dict[str, Any]:
         payload["difficulty_signals"] = list(item.difficulty_signals)
     if item.visual_signals:
         payload["visual_signals"] = list(item.visual_signals)
+    if item.chapter_signals:
+        payload["chapter_signals"] = list(item.chapter_signals)
     if item.anchor_terms:
         payload["anchor_terms"] = list(item.anchor_terms)
     if item.anchor_text:

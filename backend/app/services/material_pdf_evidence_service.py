@@ -104,6 +104,7 @@ class MaterialPageChunk:
     years: tuple[str, ...]
     question_types: tuple[str, ...]
     knowledge_signals: tuple[str, ...]
+    chapter_signals: tuple[str, ...]
     question_numbers: tuple[str, ...]
     source_type: str
     score_points: tuple[int, ...]
@@ -121,6 +122,7 @@ class MaterialPageEvidence:
     years: tuple[str, ...] = ()
     question_types: tuple[str, ...] = ()
     knowledge_signals: tuple[str, ...] = ()
+    chapter_signals: tuple[str, ...] = ()
     question_numbers: tuple[str, ...] = ()
     source_type: str = "unknown"
     score_points: tuple[int, ...] = ()
@@ -142,6 +144,8 @@ class MaterialPageEvidence:
             payload["question_types"] = list(self.question_types)
         if self.knowledge_signals:
             payload["knowledge_signals"] = list(self.knowledge_signals)
+        if self.chapter_signals:
+            payload["chapter_signals"] = list(self.chapter_signals)
         if self.question_numbers:
             payload["question_numbers"] = list(self.question_numbers)
         if self.source_type != "unknown":
@@ -247,6 +251,7 @@ class MaterialPdfEvidenceService:
                     years=chunk.years,
                     question_types=chunk.question_types,
                     knowledge_signals=chunk.knowledge_signals,
+                    chapter_signals=chunk.chapter_signals,
                     question_numbers=chunk.question_numbers,
                     source_type=chunk.source_type,
                     score_points=chunk.score_points,
@@ -315,6 +320,7 @@ def build_pdf_page_chunks(pdf_bytes: bytes, *, max_pages: int) -> list[MaterialP
                 years=tuple(_extract_years(compact)),
                 question_types=tuple(_extract_question_types(compact)),
                 knowledge_signals=tuple(_extract_knowledge_signals(compact)),
+                chapter_signals=tuple(_extract_chapter_signals(compact)),
                 question_numbers=tuple(_extract_question_numbers(compact)),
                 source_type=_classify_source_type(compact),
                 score_points=tuple(_extract_score_points(compact)),
@@ -411,6 +417,7 @@ def _score_page(chunk: MaterialPageChunk, query_terms: list[str]) -> int:
     score += len(chunk.question_types) * 3
     score += len(chunk.years) * 2
     score += len(chunk.knowledge_signals)
+    score += len(chunk.chapter_signals)
     score += len(chunk.question_numbers) * 2
     score += len(chunk.score_points) * 2
     score += len(chunk.difficulty_signals)
@@ -449,6 +456,23 @@ def _extract_knowledge_signals(text: str) -> list[str]:
         if term.lower() in normalized and term not in result:
             result.append(term)
     return result[:8]
+
+
+def _extract_chapter_signals(text: str) -> list[str]:
+    result: list[str] = []
+    patterns = (
+        r"第\s*[0-9一二三四五六七八九十]{1,4}\s*[章节]\s*[\u4e00-\u9fffA-Za-z0-9（）()、:：·\-]{0,24}",
+        r"(?:模块|专题|单元)\s*[0-9一二三四五六七八九十]{1,4}\s*[\u4e00-\u9fffA-Za-z0-9（）()、:：·\-]{0,24}",
+        r"\b(?:chapter|section|unit)\s*[0-9]{1,3}[A-Za-z0-9 .:_-]{0,24}",
+    )
+    for pattern in patterns:
+        for match in re.findall(pattern, text, flags=re.IGNORECASE):
+            cleaned = _compact_text(str(match), max_chars=36).strip(" :：、-")
+            if cleaned and cleaned not in result:
+                result.append(cleaned)
+            if len(result) >= 6:
+                return result
+    return result
 
 
 def _extract_question_numbers(text: str) -> list[str]:
@@ -523,6 +547,7 @@ def _anchor_terms(chunk: MaterialPageChunk, query_terms: list[str]) -> list[str]
         chunk.question_types,
         chunk.years,
         chunk.knowledge_signals,
+        chunk.chapter_signals,
         tuple(f"{value}分" for value in chunk.score_points),
         chunk.difficulty_signals,
         chunk.visual_signals,

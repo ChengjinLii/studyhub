@@ -48,6 +48,7 @@ def _evidence() -> MaterialPageEvidence:
         years=("2024",),
         question_types=("计算题",),
         knowledge_signals=("调制", "解调", "误码率"),
+        chapter_signals=("第2章 调制解调",),
         question_numbers=("第3题",),
         source_type="past_exam",
         score_points=(10,),
@@ -273,6 +274,7 @@ def test_agent_exam_trend_closed_loop_prompt_and_response_contract(monkeypatch) 
     assert "aggregate_question_type_signals" in prompt["query_plan"]["evidence_tasks"]
     assert prompt["pdf_evidence"][0]["page"] == 3
     assert prompt["pdf_evidence"][0]["question_numbers"] == ["第3题"]
+    assert prompt["pdf_evidence"][0]["chapter_signals"] == ["第2章 调制解调"]
     assert prompt["pdf_evidence"][0]["source_type"] == "past_exam"
     assert prompt["pdf_evidence"][0]["score_points"] == [10]
     assert prompt["pdf_evidence"][0]["difficulty_signals"] == ["综合", "偏难"]
@@ -288,6 +290,7 @@ def test_agent_exam_trend_closed_loop_prompt_and_response_contract(monkeypatch) 
     assert "risk_signals" in prompt["candidate_materials"][0]
     assert "已读取 PDF 第 3 页证据" in prompt["candidate_materials"][0]["reason"]
     assert "题型信号：计算题" in prompt["candidate_materials"][0]["reason"]
+    assert "章节/模块信号：第2章 调制解调" in prompt["candidate_materials"][0]["reason"]
     assert "题号信号：第3题" in prompt["candidate_materials"][0]["reason"]
     assert "分值信号：10分" in prompt["candidate_materials"][0]["reason"]
     assert "难度信号：综合、偏难" in prompt["candidate_materials"][0]["reason"]
@@ -300,9 +303,11 @@ def test_agent_exam_trend_closed_loop_prompt_and_response_contract(monkeypatch) 
     assert prompt["course_memory_card"]["evidence_coverage"]["pdf_evidence_page_count"] == 1
     assert prompt["course_memory_card"]["confidence_assessment"]["level"] == "medium"
     assert prompt["course_memory_card"]["page_references"][0]["question_numbers"] == ["第3题"]
+    assert prompt["course_memory_card"]["page_references"][0]["chapter_signals"] == ["第2章 调制解调"]
     assert prompt["course_memory_card"]["page_references"][0]["anchor_terms"] == ["第3题", "计算题"]
     assert prompt["course_memory_card"]["page_references"][0]["anchor_text"] == "2024 通信原理第3题计算题考调制、解调和误码率。"
     assert prompt["course_memory_card"]["score_point_distribution"] == [{"value": "10", "count": 1}]
+    assert prompt["course_memory_card"]["chapter_distribution"] == [{"value": "第2章 调制解调", "count": 1}]
     assert prompt["course_memory_card"]["difficulty_distribution"] == [{"value": "综合", "count": 1}, {"value": "偏难", "count": 1}]
     assert prompt["course_memory_card"]["visual_signal_distribution"] == [{"value": "公式", "count": 1}, {"value": "图示", "count": 1}]
 
@@ -428,6 +433,7 @@ def test_agent_local_pdf_summary_uses_intent_specific_evidence(monkeypatch) -> N
 
     assert "资料内容结构" in body["answer"]
     assert "资料类型偏向 往年真题" in body["answer"]
+    assert "章节/模块信号 第2章 调制解调" in body["answer"]
     assert "涉及知识点 调制、解调、误码率" in body["answer"]
     assert "出现分值 10分" in body["answer"]
     assert "难度信号 综合、偏难" in body["answer"]
@@ -503,6 +509,7 @@ def test_agent_local_material_fit_assessment_uses_evidence_and_profile(monkeypat
 
     assert "适合度判断" in body["answer"]
     assert "用途偏向 往年真题" in body["answer"]
+    assert "章节/模块覆盖 第2章 调制解调" in body["answer"]
     assert "它更适合考前刷题和题型复盘" in body["answer"]
     assert "如果基础还不稳，建议先读引用页确认难度" in body["answer"]
     assert "可先从《通信原理四年真题解析》第 3 页开始" in body["answer"]
@@ -723,6 +730,7 @@ def test_agent_local_problem_tutoring_uses_intent_specific_evidence(monkeypatch)
     assert "先按你提到的卡点处理：计算步骤" in body["answer"]
     assert "题号边界：第3题" in body["answer"]
     assert "先判断题型：计算题" in body["answer"]
+    assert "先定位章节/模块：第2章 调制解调" in body["answer"]
     assert "再抓核心知识点：调制、解调、误码率" in body["answer"]
     assert "按分值投入时间：10分" in body["answer"]
     assert "预估难度：综合、偏难" in body["answer"]
@@ -790,6 +798,7 @@ def test_agent_model_failure_uses_structured_local_exam_trend_fallback(monkeypat
     body = json.loads(str(response["output"]).removeprefix("<json>").removesuffix("</json>"))
 
     assert "年份信号包括 2024" in body["answer"]
+    assert "章节/模块信号包括 第2章 调制解调" in body["answer"]
     assert "题型集中在 计算题" in body["answer"]
     assert "高频知识点包括 调制、解调、误码率" in body["answer"]
     assert "分值信号包括 10分" in body["answer"]

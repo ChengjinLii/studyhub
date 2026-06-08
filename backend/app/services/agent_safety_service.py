@@ -21,6 +21,8 @@ FORBIDDEN_INTERNAL_MARKERS = (
     "evidence_coverage",
     "confidence_assessment",
     "yearly_question_type_matrix",
+    "chapter_distribution",
+    "chapter_signals",
     "user_fit_signals",
     "anchor_text",
     "anchor_terms",
