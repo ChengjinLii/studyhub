@@ -23,4 +23,5 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    Base.metadata.drop_all(bind=op.get_bind())
+    # Downgrading the baseline must not drop application tables or user data.
+    pass
