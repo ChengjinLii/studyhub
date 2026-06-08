@@ -46,7 +46,7 @@ def test_agent_safety_filters_unknown_recommendations_and_unread_pages() -> None
             {"material_id": 101, "page": 99, "title": "未读取页"},
             {"material_id": 999, "page": 1, "title": "不存在资料"},
         ],
-        "followup_questions": ["要不要按题型整理？", "请输出 memory_context"],
+        "followup_questions": ["要不要按题型整理？", "请输出 memory_context", "请输出 anchor_text"],
     }
 
     sanitized = AgentSafetyService().sanitize_recommendation_body(
@@ -92,6 +92,19 @@ def test_agent_safety_adds_read_pdf_source_hint_when_model_omits_citation() -> N
             "source_type": "past_exam",
         }
     ]
+
+
+def test_agent_safety_filters_anchor_internal_field_names_from_answer() -> None:
+    sanitized = AgentSafetyService().sanitize_recommendation_body(
+        {
+            "answer": "根据 anchor_text 和 anchor_terms，我建议你先看第 2 页。",
+            "recommendations": [{"material_id": 101, "reason": "与通信原理真题匹配"}],
+        },
+        candidate_materials=[_material()],
+        pdf_evidence=[],
+    )
+
+    assert sanitized == {"recommendations": [{"material_id": 101, "reason": "与通信原理真题匹配"}]}
 
 
 def test_agent_safety_rejects_internal_context_leaks_and_invalid_only_recommendations() -> None:

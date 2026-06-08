@@ -429,7 +429,7 @@ class AiService:
             "但不能把用户个人记忆写入或表述成平台集体结论。"
             "如果提供了 query_plan，你必须按照该意图和 evidence_tasks 组织回答；"
             "如果提供了 course_memory_card，你可以用它总结课程级年份、题型、知识点和推荐顺序；"
-            "不要输出 memory_context、query_plan、candidate_materials、pdf_evidence 或 privacy_boundary 等内部字段名。"
+            "不要输出 memory_context、query_plan、candidate_materials、pdf_evidence、anchor_text、anchor_terms 或 privacy_boundary 等内部字段名。"
             "必须输出严格 JSON，不要输出 Markdown，不要包裹代码块。"
         )
         user_prompt = {

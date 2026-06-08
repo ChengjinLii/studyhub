@@ -16,6 +16,8 @@ FORBIDDEN_INTERNAL_MARKERS = (
     "pdf_evidence",
     "query_plan",
     "course_memory_card",
+    "anchor_text",
+    "anchor_terms",
 )
 
 
