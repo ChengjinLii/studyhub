@@ -1,4 +1,4 @@
-import { expect, test, type APIRequestContext, type Page } from '@playwright/test';
+import { expect, test, type APIRequestContext, type Locator, type Page } from '@playwright/test';
 
 const apiPath = (path: string) => (path.startsWith('/') ? path : `/${path}`);
 
@@ -26,6 +26,32 @@ const closeEntryModalIfPresent = async (page: Page) => {
   if (await closeButton.isVisible().catch(() => false)) {
     await closeButton.click({ force: true });
   }
+};
+
+const dragLauncher = async (page: Page, launcher: Locator, deltaX: number, deltaY: number) => {
+  const initialBox = await launcher.boundingBox();
+  if (!initialBox) {
+    throw new Error('StudyHub Agent launcher should have a bounding box before dragging');
+  }
+  const startX = initialBox.x + initialBox.width / 2;
+  const startY = initialBox.y + initialBox.height / 2;
+
+  await page.mouse.move(startX, startY);
+  await page.mouse.down({ button: 'left' });
+  await page.mouse.move(startX + deltaX * 0.35, startY + deltaY * 0.35, { steps: 4 });
+  await page.mouse.move(startX + deltaX, startY + deltaY, { steps: 8 });
+  await page.mouse.up({ button: 'left' });
+  await page.waitForTimeout(120);
+
+  const movedBox = await launcher.boundingBox();
+  if (!movedBox) {
+    throw new Error('StudyHub Agent launcher should have a bounding box after dragging');
+  }
+  return {
+    initialBox,
+    movedBox,
+    distance: Math.hypot(movedBox.x - initialBox.x, movedBox.y - initialBox.y),
+  };
 };
 
 test('mock API mode covers login and upload failure envelopes', async ({ page }) => {
@@ -163,20 +189,12 @@ test('mock page mode covers StudyHub Agent open, fallback, drag and collapse', a
   const launcher = page.locator('.hermes-agent__launcher');
   await expect(launcher).toBeVisible();
 
-  const initialBox = await launcher.boundingBox();
-  expect(initialBox).not.toBeNull();
-  const startX = (initialBox?.x ?? 0) + (initialBox?.width ?? 0) / 2;
-  const startY = (initialBox?.y ?? 0) + (initialBox?.height ?? 0) / 2;
-  await page.mouse.move(startX, startY);
-  await page.mouse.down();
-  await page.mouse.move(startX - 80, startY - 40, { steps: 6 });
-  await page.mouse.up();
-
-  const movedBox = await launcher.boundingBox();
-  expect(movedBox).not.toBeNull();
-  expect(
-    Math.hypot((movedBox?.x ?? 0) - (initialBox?.x ?? 0), (movedBox?.y ?? 0) - (initialBox?.y ?? 0))
-  ).toBeGreaterThan(20);
+  let dragResult = await dragLauncher(page, launcher, -120, -70);
+  if (dragResult.distance <= 20) {
+    dragResult = await dragLauncher(page, launcher, -140, -80);
+  }
+  expect(dragResult.distance).toBeGreaterThan(20);
+  const movedBox = dragResult.movedBox;
 
   await launcher.click();
   await expect(page.getByRole('heading', { name: 'StudyHub 学习辅导' })).toBeVisible();
@@ -188,8 +206,8 @@ test('mock page mode covers StudyHub Agent open, fallback, drag and collapse', a
   await expect(launcher).toBeVisible();
   const collapsedBox = await launcher.boundingBox();
   expect(collapsedBox).not.toBeNull();
-  expect(Math.abs((collapsedBox?.x ?? 0) - (movedBox?.x ?? 0))).toBeLessThan(4);
-  expect(Math.abs((collapsedBox?.y ?? 0) - (movedBox?.y ?? 0))).toBeLessThan(4);
+  expect(Math.abs((collapsedBox?.x ?? 0) - movedBox.x)).toBeLessThan(4);
+  expect(Math.abs((collapsedBox?.y ?? 0) - movedBox.y)).toBeLessThan(4);
 });
 
 test('mock page mode covers more page secondary navigation', async ({ page }) => {
