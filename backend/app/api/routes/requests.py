@@ -242,3 +242,7 @@ def request_contribution_deadline(
 
 def _invalidate_request_read_caches() -> None:
     invalidate_prefixes(get_public_read_cache(), "requests")
+    service = get_requests_service()
+    invalidate = getattr(service, "invalidate_request_read_cache", None)
+    if callable(invalidate):
+        invalidate()

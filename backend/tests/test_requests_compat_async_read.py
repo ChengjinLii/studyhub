@@ -2,14 +2,43 @@ from __future__ import annotations
 
 import asyncio
 from types import SimpleNamespace
+from typing import Any
 
 from app.services.requests_service import RequestsService
+
+
+class _RowsResult:
+    def __init__(self, rows: list[dict[str, Any]]) -> None:
+        self.rows = rows
+
+    def mappings(self):
+        return self
+
+    def all(self) -> list[dict[str, Any]]:
+        return self.rows
+
+
+class _LeaderboardSession:
+    def __init__(self) -> None:
+        self.queries = 0
+
+    def execute(self, statement, params=None):
+        del statement
+        assert params == {"max_amount": 50000, "limit": 6}
+        self.queries += 1
+        return _RowsResult([_request_row(501)])
+
+
+class _AsyncLeaderboardSession(_LeaderboardSession):
+    async def execute(self, statement, params=None):
+        return super().execute(statement, params)
 
 
 def _build_service() -> RequestsService:
     fake_settings = SimpleNamespace(
         requires_private_env_file=True,
         async_read_db_enabled=True,
+        public_read_cache_ttl_seconds=30,
     )
     return RequestsService(fake_settings, read_repo=None, auth_repo=None, material_repo=None, request_repo=None)
 
@@ -150,3 +179,37 @@ def test_async_legacy_request_leaderboard_skips_responded_load_for_anonymous_rea
     assert [item["id"] for item in data] == [501]
     assert data[0]["owner"] is False
     assert data[0]["responded"] is False
+
+
+def test_compat_request_leaderboard_cache_reuses_query_until_invalidated() -> None:
+    service = _build_service()
+    session = _LeaderboardSession()
+
+    first = service._compat_load_leaderboard_rows(session, 6)
+    first[0]["id"] = 999
+    second = service._compat_load_leaderboard_rows(session, 6)
+
+    assert second[0]["id"] == 501
+    assert session.queries == 1
+
+    service.invalidate_request_read_cache()
+    service._compat_load_leaderboard_rows(session, 6)
+
+    assert session.queries == 2
+
+
+def test_async_compat_request_leaderboard_cache_reuses_query_until_invalidated() -> None:
+    service = _build_service()
+    session = _AsyncLeaderboardSession()
+
+    first = asyncio.run(service._compat_load_leaderboard_rows_async(session, 6))
+    first[0]["id"] = 999
+    second = asyncio.run(service._compat_load_leaderboard_rows_async(session, 6))
+
+    assert second[0]["id"] == 501
+    assert session.queries == 1
+
+    service.invalidate_request_read_cache()
+    asyncio.run(service._compat_load_leaderboard_rows_async(session, 6))
+
+    assert session.queries == 2

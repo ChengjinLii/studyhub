@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from threading import RLock
+from time import monotonic
 from typing import Any
 
 from fastapi import HTTPException, status
@@ -30,6 +32,46 @@ SUCCESS_REFUND_STATUS = "SUCCESS"
 
 
 class RequestsCompatMixin:
+    def invalidate_request_read_cache(self) -> None:
+        cache, lock = self._request_read_cache_state()
+        with lock:
+            cache.clear()
+
+    def _request_read_cache_state(self):
+        cache = getattr(self, "_request_read_cache", None)
+        lock = getattr(self, "_request_read_cache_lock", None)
+        if cache is None or lock is None:
+            cache = {}
+            lock = RLock()
+            self._request_read_cache = cache
+            self._request_read_cache_lock = lock
+        return cache, lock
+
+    def _request_read_cache_ttl_seconds(self) -> int:
+        return max(1, int(getattr(self.settings, "public_read_cache_ttl_seconds", 30) or 30))
+
+    def _request_read_cache_get(self, key: tuple[Any, ...]) -> list[dict[str, Any]] | None:
+        cache, lock = self._request_read_cache_state()
+        now = monotonic()
+        with lock:
+            entry = cache.get(key)
+            if entry is None:
+                return None
+            expires_at, value = entry
+            if expires_at <= now:
+                cache.pop(key, None)
+                return None
+            return self._request_read_cache_clone(value)
+
+    def _request_read_cache_set(self, key: tuple[Any, ...], value: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        cache, lock = self._request_read_cache_state()
+        with lock:
+            cache[key] = (monotonic() + self._request_read_cache_ttl_seconds(), self._request_read_cache_clone(value))
+        return value
+
+    def _request_read_cache_clone(self, rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        return [dict(row) for row in rows]
+
     def _compat_list_requests(self, session: Session, viewer_id: int | None, *, sort: str | None, limit: int | None) -> list[dict[str, Any]]:
         rows = self._compat_load_open_requests(session)
         visible_rows = self._compat_exclude_hidden_early_exit_requests(session, rows)
@@ -43,47 +85,7 @@ class RequestsCompatMixin:
 
     def _compat_list_leaderboard(self, session: Session, viewer_id: int | None, *, limit: int | None) -> list[dict[str, Any]]:
         safe_limit = max(1, min(limit or 10, 50))
-        rows = [
-            dict(row)
-            for row in session.execute(
-                text(
-                    """
-                    SELECT
-                        mr.id,
-                        mr.requester_id,
-                        mr.course,
-                        mr.keyword,
-                        mr.school,
-                        mr.college,
-                        mr.major,
-                        mr.budget,
-                        mr.funded_amount,
-                        mr.contribution_count,
-                        mr.deadline,
-                        mr.urgency_tier,
-                        mr.creator_floor,
-                        mr.preview_requirement,
-                        mr.anonymous,
-                        mr.response_count,
-                        mr.accepted_response_id,
-                        mr.status,
-                        mr.created_at,
-                        u.username AS requester_username,
-                        u.nickname AS requester_nickname,
-                        mr.max_contribution_amount
-                    FROM material_requests mr
-                    LEFT JOIN users u ON u.id = mr.requester_id
-                    WHERE mr.status = 'OPEN'
-                      AND mr.funded_amount IS NOT NULL
-                      AND mr.funded_amount > 0
-                      AND (mr.max_contribution_amount IS NULL OR mr.max_contribution_amount <= :max_amount)
-                    ORDER BY mr.funded_amount DESC, mr.created_at DESC
-                    LIMIT :limit
-                    """
-                ),
-                {"max_amount": LEADERBOARD_MAX_CONTRIBUTION_AMOUNT, "limit": safe_limit},
-            ).mappings().all()
-        ]
+        rows = self._compat_load_leaderboard_rows(session, safe_limit)
         visible_rows = self._compat_exclude_hidden_early_exit_requests(session, rows)
         responded_ids = self._compat_load_responded_request_ids(session, viewer_id, [int(row["id"]) for row in visible_rows])
         return [self._compat_to_request_item(row, viewer_id, int(row["id"]) in responded_ids) for row in visible_rows]
@@ -266,7 +268,59 @@ class RequestsCompatMixin:
         ).mappings().all()
         return [dict(row) for row in rows]
 
+    def _compat_load_leaderboard_rows(self, session: Session, safe_limit: int) -> list[dict[str, Any]]:
+        cache_key = ("request_leaderboard_rows", int(safe_limit))
+        cached = self._request_read_cache_get(cache_key)
+        if cached is not None:
+            return cached
+        rows = [
+            dict(row)
+            for row in session.execute(
+                text(
+                    """
+                    SELECT
+                        mr.id,
+                        mr.requester_id,
+                        mr.course,
+                        mr.keyword,
+                        mr.school,
+                        mr.college,
+                        mr.major,
+                        mr.budget,
+                        mr.funded_amount,
+                        mr.contribution_count,
+                        mr.deadline,
+                        mr.urgency_tier,
+                        mr.creator_floor,
+                        mr.preview_requirement,
+                        mr.anonymous,
+                        mr.response_count,
+                        mr.accepted_response_id,
+                        mr.status,
+                        mr.created_at,
+                        u.username AS requester_username,
+                        u.nickname AS requester_nickname,
+                        mr.max_contribution_amount
+                    FROM material_requests mr
+                    LEFT JOIN users u ON u.id = mr.requester_id
+                    WHERE mr.status = 'OPEN'
+                      AND mr.funded_amount IS NOT NULL
+                      AND mr.funded_amount > 0
+                      AND (mr.max_contribution_amount IS NULL OR mr.max_contribution_amount <= :max_amount)
+                    ORDER BY mr.funded_amount DESC, mr.created_at DESC
+                    LIMIT :limit
+                    """
+                ),
+                {"max_amount": LEADERBOARD_MAX_CONTRIBUTION_AMOUNT, "limit": safe_limit},
+            ).mappings().all()
+        ]
+        return self._request_read_cache_set(cache_key, rows)
+
     async def _compat_load_leaderboard_rows_async(self, session, safe_limit: int) -> list[dict[str, Any]]:
+        cache_key = ("request_leaderboard_rows", int(safe_limit))
+        cached = self._request_read_cache_get(cache_key)
+        if cached is not None:
+            return cached
         rows = (
             await session.execute(
                 text(
@@ -307,7 +361,7 @@ class RequestsCompatMixin:
                 {"max_amount": LEADERBOARD_MAX_CONTRIBUTION_AMOUNT, "limit": safe_limit},
             )
         ).mappings().all()
-        return [dict(row) for row in rows]
+        return self._request_read_cache_set(cache_key, [dict(row) for row in rows])
 
     def _compat_load_request_row(self, session: Session, request_id: int) -> dict[str, Any]:
         row = session.execute(

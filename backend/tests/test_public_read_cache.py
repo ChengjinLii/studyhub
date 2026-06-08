@@ -15,6 +15,7 @@ from app.api.routes import admin as admin_routes
 from app.api.routes import comments as comment_routes
 from app.api.routes import market as market_routes
 from app.api.routes import materials as material_routes
+from app.api.routes import requests as request_routes
 from app.core.config import Settings
 from app.core.public_read_cache import PublicReadCache, cache_if_anonymous, invalidate_prefixes
 from app.core.observability import get_runtime_metrics
@@ -254,6 +255,29 @@ def test_market_engagement_invalidation_preserves_list_cache(monkeypatch) -> Non
 
     assert ("market:list", (None, None, 1, 20)) in cache._entries
     assert ("market:detail", (301,)) not in cache._entries
+
+
+def test_request_invalidation_clears_public_and_service_caches(monkeypatch) -> None:
+    cache = _build_cache()
+    cache.get_or_set("requests:list", ("hot", 10), lambda: {"kind": "list"})
+    cache.get_or_set("requests:leaderboard", (10,), lambda: {"kind": "leaderboard"})
+    cache.get_or_set("materials:list", ("page", 1), lambda: {"kind": "materials"})
+    request_invalidations = 0
+
+    class FakeRequestsService:
+        def invalidate_request_read_cache(self):
+            nonlocal request_invalidations
+            request_invalidations += 1
+
+    monkeypatch.setattr(request_routes, "get_public_read_cache", lambda: cache)
+    monkeypatch.setattr(request_routes, "get_requests_service", lambda: FakeRequestsService())
+
+    request_routes._invalidate_request_read_caches()
+
+    assert ("requests:list", ("hot", 10)) not in cache._entries
+    assert ("requests:leaderboard", (10,)) not in cache._entries
+    assert ("materials:list", ("page", 1)) in cache._entries
+    assert request_invalidations == 1
 
 
 def test_public_read_cache_supports_redis_backend(monkeypatch) -> None:
