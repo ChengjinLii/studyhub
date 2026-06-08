@@ -10,6 +10,7 @@ import pytest
 from app.core.config import Settings, get_settings
 from app.core.db import reset_database_runtime
 from app.ops.db_admin import (
+    _ensure_backup_target_available,
     _validate_backup_file,
     _migration_plan_token,
     _require_production_plan_token,
@@ -317,6 +318,18 @@ def test_validate_backup_file_rejects_empty_file(tmp_path: Path) -> None:
 
     with pytest.raises(RuntimeError, match="备份文件为空"):
         _validate_backup_file(backup_file)
+
+
+def test_backup_target_rejects_existing_paths(tmp_path: Path) -> None:
+    backup_file = tmp_path / "backup.sql.gz"
+    backup_file.write_bytes(b"existing backup")
+
+    with pytest.raises(RuntimeError, match="拒绝覆盖"):
+        _ensure_backup_target_available(backup_file)
+    with pytest.raises(RuntimeError, match="拒绝覆盖"):
+        _ensure_backup_target_available(tmp_path)
+
+    _ensure_backup_target_available(tmp_path / "new-backup.sql.gz")
 
 
 def test_production_migrate_requires_explicit_only_scope() -> None:

@@ -85,6 +85,11 @@ def _validate_backup_file(path: Path) -> int:
     return size_bytes
 
 
+def _ensure_backup_target_available(path: Path) -> None:
+    if path.exists():
+        raise RuntimeError(f"备份目标已存在，拒绝覆盖：{path}")
+
+
 def command_describe(settings: Settings) -> int:
     url = make_url(settings.resolved_database_url)
     payload = {
@@ -155,6 +160,7 @@ def command_init_schema(settings: Settings, *, allow_preview: bool) -> int:
 def command_backup(settings: Settings, *, output: Path | None) -> int:
     url = _require_mysql_url(settings)
     target = output or _default_backup_path(settings)
+    _ensure_backup_target_available(target)
     target.parent.mkdir(parents=True, exist_ok=True)
     mysqldump = shutil.which("mysqldump")
     if not mysqldump:
