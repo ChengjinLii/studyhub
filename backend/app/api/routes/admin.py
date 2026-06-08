@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import (
     get_admin_user_service,
+    get_leaderboard_read_service,
     get_materials_service,
     get_public_read_cache,
     require_auth_context,
@@ -205,3 +206,7 @@ def batch_restore_materials_for_admin(
 
 def _invalidate_admin_material_read_caches() -> None:
     invalidate_prefixes(get_public_read_cache(), "materials", "leaderboard")
+    service = get_leaderboard_read_service()
+    invalidate = getattr(service, "invalidate_contributor_cache", None)
+    if callable(invalidate):
+        invalidate()

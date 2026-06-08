@@ -141,7 +141,15 @@ def test_material_view_invalidation_preserves_list_caches(monkeypatch) -> None:
     cache.get_or_set("materials:recommendations", ("limit", 6), lambda: {"kind": "recommendations"})
     cache.get_or_set("materials:detail", (101,), lambda: {"kind": "detail"})
     cache.get_or_set("leaderboard:contributors", ("all", 6), lambda: {"kind": "leaderboard"})
+    leaderboard_invalidations = 0
+
+    class FakeLeaderboardService:
+        def invalidate_contributor_cache(self):
+            nonlocal leaderboard_invalidations
+            leaderboard_invalidations += 1
+
     monkeypatch.setattr(material_routes, "get_public_read_cache", lambda: cache)
+    monkeypatch.setattr(material_routes, "get_leaderboard_read_service", lambda: FakeLeaderboardService())
 
     material_routes._invalidate_material_detail_caches()
 
@@ -149,6 +157,7 @@ def test_material_view_invalidation_preserves_list_caches(monkeypatch) -> None:
     assert ("materials:recommendations", ("limit", 6)) in cache._entries
     assert ("leaderboard:contributors", ("all", 6)) in cache._entries
     assert ("materials:detail", (101,)) not in cache._entries
+    assert leaderboard_invalidations == 0
 
 
 def test_material_download_invalidation_preserves_material_list_caches(monkeypatch) -> None:
@@ -157,7 +166,15 @@ def test_material_download_invalidation_preserves_material_list_caches(monkeypat
     cache.get_or_set("materials:recommendations", ("limit", 6), lambda: {"kind": "recommendations"})
     cache.get_or_set("materials:detail", (101,), lambda: {"kind": "detail"})
     cache.get_or_set("leaderboard:contributors", ("all", 6), lambda: {"kind": "leaderboard"})
+    leaderboard_invalidations = 0
+
+    class FakeLeaderboardService:
+        def invalidate_contributor_cache(self):
+            nonlocal leaderboard_invalidations
+            leaderboard_invalidations += 1
+
     monkeypatch.setattr(material_routes, "get_public_read_cache", lambda: cache)
+    monkeypatch.setattr(material_routes, "get_leaderboard_read_service", lambda: FakeLeaderboardService())
 
     material_routes._invalidate_material_download_caches()
 
@@ -165,6 +182,7 @@ def test_material_download_invalidation_preserves_material_list_caches(monkeypat
     assert ("materials:recommendations", ("limit", 6)) in cache._entries
     assert ("materials:detail", (101,)) not in cache._entries
     assert ("leaderboard:contributors", ("all", 6)) not in cache._entries
+    assert leaderboard_invalidations == 1
 
 
 def test_admin_material_invalidation_clears_public_material_and_leaderboard_caches(monkeypatch) -> None:
@@ -173,7 +191,15 @@ def test_admin_material_invalidation_clears_public_material_and_leaderboard_cach
     cache.get_or_set("materials:detail", (101,), lambda: {"kind": "detail"})
     cache.get_or_set("leaderboard:contributors", ("all", 6), lambda: {"kind": "leaderboard"})
     cache.get_or_set("market:list", ("page", 1), lambda: {"kind": "market"})
+    leaderboard_invalidations = 0
+
+    class FakeLeaderboardService:
+        def invalidate_contributor_cache(self):
+            nonlocal leaderboard_invalidations
+            leaderboard_invalidations += 1
+
     monkeypatch.setattr(admin_routes, "get_public_read_cache", lambda: cache)
+    monkeypatch.setattr(admin_routes, "get_leaderboard_read_service", lambda: FakeLeaderboardService())
 
     admin_routes._invalidate_admin_material_read_caches()
 
@@ -181,6 +207,7 @@ def test_admin_material_invalidation_clears_public_material_and_leaderboard_cach
     assert ("materials:detail", (101,)) not in cache._entries
     assert ("leaderboard:contributors", ("all", 6)) not in cache._entries
     assert ("market:list", ("page", 1)) in cache._entries
+    assert leaderboard_invalidations == 1
 
 
 def test_comment_content_invalidation_preserves_material_list_caches(monkeypatch) -> None:

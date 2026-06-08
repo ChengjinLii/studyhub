@@ -10,6 +10,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from sqlalchemy.orm import Session
 
 from app.api.deps import (
+    get_leaderboard_read_service,
     get_materials_column_service,
     get_public_read_cache,
     get_materials_service,
@@ -409,6 +410,7 @@ def _coerce_upload_list(values: list[object]) -> list[UploadFile]:
 
 def _invalidate_material_read_caches() -> None:
     invalidate_prefixes(get_public_read_cache(), "materials", "leaderboard")
+    _invalidate_contributor_leaderboard_cache()
 
 
 def _invalidate_material_detail_caches() -> None:
@@ -417,6 +419,14 @@ def _invalidate_material_detail_caches() -> None:
 
 def _invalidate_material_download_caches() -> None:
     invalidate_prefixes(get_public_read_cache(), "materials:detail", "leaderboard")
+    _invalidate_contributor_leaderboard_cache()
+
+
+def _invalidate_contributor_leaderboard_cache() -> None:
+    service = get_leaderboard_read_service()
+    invalidate = getattr(service, "invalidate_contributor_cache", None)
+    if callable(invalidate):
+        invalidate()
 
 
 def _placeholder_download_response(file_type: str, filename: str) -> Response:
