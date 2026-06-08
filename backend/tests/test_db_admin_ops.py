@@ -12,6 +12,7 @@ import pytest
 from app.core.config import Settings, get_settings
 from app.core.db import reset_database_runtime
 from app.ops.db_admin import (
+    _backup_max_age_seconds,
     _ensure_backup_target_available,
     _file_sha256,
     _publish_backup_file,
@@ -517,6 +518,13 @@ def test_production_migrate_requires_matching_plan_token() -> None:
         _require_production_plan_token(settings, expected="abc123", confirmed="wrong")
 
     _require_production_plan_token(settings, expected="abc123", confirmed="abc123")
+
+
+def test_backup_max_age_seconds_requires_positive_integer() -> None:
+    assert _backup_max_age_seconds(120) == 120 * 60
+
+    with pytest.raises(RuntimeError, match="大于 0"):
+        _backup_max_age_seconds(0)
 
 
 def test_production_migrate_records_backup_metadata(

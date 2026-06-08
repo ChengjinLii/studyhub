@@ -24,6 +24,11 @@ if [[ -z "$SCHEMA_COLUMNS" ]]; then
   exit 2
 fi
 
+if ! [[ "$BACKUP_MAX_AGE_MINUTES" =~ ^[1-9][0-9]*$ ]]; then
+  echo "STUDYHUB_BACKUP_MAX_AGE_MINUTES must be a positive integer; got $BACKUP_MAX_AGE_MINUTES"
+  exit 2
+fi
+
 if [[ -z "$PLAN_TOKEN" ]]; then
   echo "missing STUDYHUB_P0_PLAN_TOKEN; run scripts/db/db-plan-p0-schema.sh and copy planToken first"
   exit 2

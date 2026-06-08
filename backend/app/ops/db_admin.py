@@ -291,6 +291,13 @@ def _require_production_plan_token(settings: Settings, *, expected: str, confirm
         raise RuntimeError("production migrate-additive --yes 的 --confirm-plan-token 与当前计划不匹配。")
 
 
+def _backup_max_age_seconds(backup_max_age_minutes: int) -> int:
+    minutes = int(backup_max_age_minutes)
+    if minutes < 1:
+        raise RuntimeError("--backup-max-age-minutes 必须是大于 0 的整数。")
+    return minutes * 60
+
+
 def command_migrate_additive(
     settings: Settings,
     *,
@@ -336,7 +343,7 @@ def command_migrate_additive(
         backup_file = require_recent_nonempty_backup(
             settings.private_dir,
             settings.environment,
-            max_age_seconds=max(60, int(backup_max_age_minutes) * 60),
+            max_age_seconds=_backup_max_age_seconds(backup_max_age_minutes),
         )
         payload["backupFile"] = str(backup_file)
         payload["backupSizeBytes"] = _validate_backup_file(backup_file)
