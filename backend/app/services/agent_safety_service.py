@@ -20,6 +20,7 @@ FORBIDDEN_INTERNAL_MARKERS = (
     "course_memory_card",
     "evidence_coverage",
     "confidence_assessment",
+    "yearly_question_type_matrix",
     "user_fit_signals",
     "anchor_text",
     "anchor_terms",

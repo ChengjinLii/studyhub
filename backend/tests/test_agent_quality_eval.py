@@ -667,6 +667,7 @@ def test_agent_local_exam_trend_handles_multi_material_scope(monkeypatch) -> Non
     body = json.loads(str(response["output"]).removeprefix("<json>").removesuffix("</json>"))
 
     assert "我会按多份资料对比处理，当前已读证据覆盖 2 份资料" in body["answer"]
+    assert "年份题型对应 2024: 计算题、2023: 简答题" in body["answer"]
     assert "题型集中在 计算题、简答题" in body["answer"]
     assert "《通信原理六年期末题》第 5 页" in body["answer"]
     assert "material_scope" not in json.dumps(body, ensure_ascii=False)

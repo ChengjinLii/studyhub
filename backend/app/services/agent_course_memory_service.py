@@ -28,6 +28,7 @@ class CourseMemoryCard:
     difficulty_distribution: tuple[dict[str, Any], ...]
     visual_signal_distribution: tuple[dict[str, Any], ...]
     source_type_distribution: tuple[dict[str, Any], ...]
+    yearly_question_type_matrix: tuple[dict[str, Any], ...]
     study_strategy_distribution: tuple[dict[str, Any], ...]
     high_signal_materials: tuple[dict[str, Any], ...]
     experience_materials: tuple[dict[str, Any], ...]
@@ -51,6 +52,7 @@ class CourseMemoryCard:
             "difficulty_distribution": list(self.difficulty_distribution),
             "visual_signal_distribution": list(self.visual_signal_distribution),
             "source_type_distribution": list(self.source_type_distribution),
+            "yearly_question_type_matrix": list(self.yearly_question_type_matrix),
             "study_strategy_distribution": list(self.study_strategy_distribution),
             "high_signal_materials": list(self.high_signal_materials),
             "experience_materials": list(self.experience_materials),
@@ -87,6 +89,7 @@ class AgentCourseMemoryService:
         difficulty_signals = _counter_payload(_difficulty_counter(pdf_evidence), limit=5)
         visual_signals = _counter_payload(_visual_counter(pdf_evidence), limit=5)
         source_types = _counter_payload(_source_type_counter(pdf_evidence, memory_context), limit=5)
+        yearly_matrix = _yearly_question_type_matrix(pdf_evidence)
         study_strategies = _counter_payload(_study_strategy_counter(memory_context), limit=8)
         experience_materials = _experience_materials(memory_context)
         version_basis = _version_basis(
@@ -112,6 +115,7 @@ class AgentCourseMemoryService:
             difficulty_distribution=tuple(difficulty_signals),
             visual_signal_distribution=tuple(visual_signals),
             source_type_distribution=tuple(source_types),
+            yearly_question_type_matrix=tuple(yearly_matrix),
             study_strategy_distribution=tuple(study_strategies),
             high_signal_materials=tuple(_high_signal_materials(materials)),
             experience_materials=tuple(experience_materials),
@@ -216,6 +220,49 @@ def _source_type_counter(
         if isinstance(item, dict) and item.get("value"):
             counter[str(item["value"])] += int(item.get("count") or 1)
     return counter
+
+
+def _yearly_question_type_matrix(pdf_evidence: list[MaterialPageEvidence]) -> list[dict[str, Any]]:
+    buckets: dict[str, dict[str, Any]] = {}
+    for evidence in pdf_evidence:
+        for year in evidence.years:
+            cleaned_year = _clean_text(year, max_chars=16)
+            if not cleaned_year:
+                continue
+            bucket = buckets.setdefault(
+                cleaned_year,
+                {
+                    "question_types": Counter(),
+                    "knowledge_signals": Counter(),
+                    "question_numbers": [],
+                    "page_references": [],
+                },
+            )
+            bucket["question_types"].update(evidence.question_types)
+            bucket["knowledge_signals"].update(evidence.knowledge_signals)
+            for number in evidence.question_numbers:
+                cleaned_number = _clean_text(number, max_chars=24)
+                if cleaned_number and cleaned_number not in bucket["question_numbers"]:
+                    bucket["question_numbers"].append(cleaned_number)
+            page_ref = {
+                "material_id": int(evidence.material_id),
+                "title": _clean_text(evidence.title),
+                "page": int(evidence.page),
+            }
+            if page_ref not in bucket["page_references"]:
+                bucket["page_references"].append(page_ref)
+    matrix: list[dict[str, Any]] = []
+    for year in sorted(buckets, reverse=True)[:8]:
+        bucket = buckets[year]
+        payload: dict[str, Any] = {
+            "year": year,
+            "question_types": _counter_payload(bucket["question_types"], limit=5),
+            "knowledge_signals": _counter_payload(bucket["knowledge_signals"], limit=6),
+            "question_numbers": bucket["question_numbers"][:6],
+            "page_references": bucket["page_references"][:4],
+        }
+        matrix.append({key: value for key, value in payload.items() if value not in (None, [], {}, "")})
+    return matrix
 
 
 def _study_strategy_counter(memory_context: AgentMemoryContext | None) -> Counter[str]:

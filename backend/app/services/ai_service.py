@@ -441,10 +441,10 @@ class AiService:
             "如果提供了 query_plan，你必须按照该意图和 evidence_tasks 组织回答；"
             "如果 query_plan 提供了 material_scope，应按单份或多份资料范围组织证据和结论；"
             "如果 query_plan 提供了 problem_context，应先按卡点类型、题号和知识点拆解问题；"
-            "如果提供了 course_memory_card，你可以用它总结课程级年份、题型、知识点、经验策略和推荐顺序，"
+            "如果提供了 course_memory_card，你可以用它总结课程级年份、逐年题型、知识点、经验策略和推荐顺序，"
             "并根据 evidence_coverage 和 confidence_assessment 避免过度概括。"
             "不要输出 memory_context、query_plan、problem_context、candidate_materials、user_fit_signals、"
-            "pdf_evidence、course_memory_card、material_scope、evidence_coverage、confidence_assessment、study_strategy_distribution、"
+            "pdf_evidence、course_memory_card、material_scope、evidence_coverage、confidence_assessment、yearly_question_type_matrix、study_strategy_distribution、"
             "experience_materials、anchor_text、anchor_terms 或 privacy_boundary 等内部字段名。"
             "必须输出严格 JSON，不要输出 Markdown，不要包裹代码块。"
         )
@@ -633,9 +633,12 @@ class AiService:
         score_points = _course_card_values(course_memory_card, "score_point_distribution") or _evidence_values(pdf_evidence, "score_points")
         difficulty_signals = _course_card_values(course_memory_card, "difficulty_distribution") or _evidence_values(pdf_evidence, "difficulty_signals")
         visual_signals = _course_card_values(course_memory_card, "visual_signal_distribution") or _evidence_values(pdf_evidence, "visual_signals")
+        yearly_summary = _course_card_yearly_question_type_summary(course_memory_card)
         parts: list[str] = []
         if years:
             parts.append(f"年份信号包括 {_join_values(years)}")
+        if yearly_summary:
+            parts.append(f"年份题型对应 {_join_values(yearly_summary)}")
         if question_types:
             parts.append(f"题型集中在 {_join_values(question_types)}")
         if knowledge_signals:
@@ -1311,6 +1314,35 @@ def _course_card_values(course_memory_card: CourseMemoryCard | None, field: str)
         if len(values) >= 6:
             break
     return values
+
+
+def _course_card_yearly_question_type_summary(course_memory_card: CourseMemoryCard | None) -> list[str]:
+    if course_memory_card is None:
+        return []
+    raw_items = getattr(course_memory_card, "yearly_question_type_matrix", ())
+    if not isinstance(raw_items, tuple):
+        return []
+    summaries: list[str] = []
+    for item in raw_items:
+        if not isinstance(item, dict):
+            continue
+        year = str(item.get("year") or "").strip()
+        question_types = []
+        raw_question_types = item.get("question_types")
+        if isinstance(raw_question_types, list):
+            for raw_value in raw_question_types:
+                if not isinstance(raw_value, dict):
+                    continue
+                value = str(raw_value.get("value") or "").strip()
+                if value and value not in question_types:
+                    question_types.append(value)
+                if len(question_types) >= 3:
+                    break
+        if year and question_types:
+            summaries.append(f"{year}: {_join_values(question_types)}")
+        if len(summaries) >= 4:
+            break
+    return summaries
 
 
 def _join_values(values: list[str]) -> str:

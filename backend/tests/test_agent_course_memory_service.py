@@ -123,6 +123,15 @@ def test_course_memory_card_summarizes_current_request_collective_signals() -> N
     assert payload["difficulty_distribution"] == [{"value": "综合", "count": 1}, {"value": "偏难", "count": 1}]
     assert payload["visual_signal_distribution"] == [{"value": "公式", "count": 1}, {"value": "图示", "count": 1}]
     assert payload["source_type_distribution"] == [{"value": "past_exam", "count": 1}]
+    assert payload["yearly_question_type_matrix"] == [
+        {
+            "year": "2024",
+            "question_types": [{"value": "计算题", "count": 1}],
+            "knowledge_signals": [{"value": "调制", "count": 1}, {"value": "解调", "count": 1}],
+            "question_numbers": ["第3题"],
+            "page_references": [{"material_id": 101, "title": "通信原理四年真题解析", "page": 3}],
+        }
+    ]
     assert payload["page_references"][0]["question_numbers"] == ["第3题"]
     assert payload["page_references"][0]["score_points"] == [10]
     assert payload["page_references"][0]["difficulty_signals"] == ["综合", "偏难"]
@@ -197,6 +206,56 @@ def test_course_memory_card_includes_collective_strategy_and_experience_signals(
     version_basis_text = json.dumps(payload["version_basis"], ensure_ascii=False).lower()
     assert "不应进入课程集体记忆" not in version_basis_text
     assert "profile" not in version_basis_text
+
+
+def test_course_memory_card_builds_yearly_question_type_matrix() -> None:
+    plan = AgentQueryPlan(
+        intent="exam_trend_analysis",
+        confidence=0.9,
+        course_terms=("通信原理",),
+        resource_types=("past_exam",),
+        years=("2024", "2023"),
+        search_terms=("通信原理", "真题"),
+        evidence_tasks=("aggregate_year_signals", "aggregate_question_type_signals"),
+        response_guidance=("优先输出常考题型",),
+    )
+    second_evidence = MaterialPageEvidence(
+        material_id=202,
+        title="通信原理六年期末题",
+        page=5,
+        text="2023 通信原理第5题简答题考判决。",
+        score=35,
+        years=("2023",),
+        question_types=("简答题",),
+        knowledge_signals=("判决",),
+        question_numbers=("第5题",),
+        source_type="past_exam",
+    )
+
+    card = AgentCourseMemoryService().build_card(
+        materials=[_material(), _material(202, title="通信原理六年期末题", downloads=30)],
+        pdf_evidence=[_evidence(), second_evidence],
+        memory_context=AgentMemoryContext(platform={}, user=None),
+        query_plan=plan,
+    )
+
+    assert card is not None
+    assert card.to_prompt_payload()["yearly_question_type_matrix"] == [
+        {
+            "year": "2024",
+            "question_types": [{"value": "计算题", "count": 1}],
+            "knowledge_signals": [{"value": "调制", "count": 1}, {"value": "解调", "count": 1}],
+            "question_numbers": ["第3题"],
+            "page_references": [{"material_id": 101, "title": "通信原理四年真题解析", "page": 3}],
+        },
+        {
+            "year": "2023",
+            "question_types": [{"value": "简答题", "count": 1}],
+            "knowledge_signals": [{"value": "判决", "count": 1}],
+            "question_numbers": ["第5题"],
+            "page_references": [{"material_id": 202, "title": "通信原理六年期末题", "page": 5}],
+        },
+    ]
 
 
 def test_course_memory_card_version_is_stable_and_changes_with_sources() -> None:
