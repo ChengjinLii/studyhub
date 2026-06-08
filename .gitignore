@@ -9,6 +9,7 @@ __pycache__/
 .pytest_cache/
 .mypy_cache/
 .coverage
+.DS_Store
 *.pyc
 *.egg-info/
 build/
