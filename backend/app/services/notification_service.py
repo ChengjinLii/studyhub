@@ -31,7 +31,7 @@ class NotificationService:
 
     def get_summary(self, session: Session, user_id: int) -> dict[str, object]:
         user = self._require_user(session, user_id)
-        notifications = self._visible_notifications(session, user_id)
+        notifications = self._visible_notifications(session, user_id, limit=1)
         latest_notification = notifications[0] if notifications else None
         market_events = self.market_repo.wants_for_seller(session, user_id)
         latest_market_event = market_events[0] if market_events else None
@@ -60,7 +60,7 @@ class NotificationService:
                 "sender": self._resolve_sender(session, entity.admin_user_id),
                 "createdAt": serialize_datetime(entity.created_at),
             }
-            for entity in self._visible_notifications(session, user_id)[:50]
+            for entity in self._visible_notifications(session, user_id, limit=50)
         ]
         market_items = []
         for entity in self.market_repo.wants_for_seller(session, user_id)[:50]:
@@ -83,9 +83,13 @@ class NotificationService:
         self.auth_repo.save_user(session, user)
         session.commit()
 
-    def _visible_notifications(self, session: Session, user_id: int) -> list[NotificationRecord]:
+    def _visible_notifications(self, session: Session, user_id: int, *, limit: int | None = None) -> list[NotificationRecord]:
+        loader = getattr(self.community_repo, "list_notifications_for_user", None)
+        if callable(loader):
+            return loader(session, user_id, limit=limit)
         entities = self.community_repo.list_notifications(session)
-        return [entity for entity in entities if entity.user_id is None or entity.user_id == user_id]
+        visible = [entity for entity in entities if entity.user_id is None or entity.user_id == user_id]
+        return visible[:limit] if limit is not None else visible
 
     def _market_message(self, session: Session, item_id: int) -> str:
         item = self.market_repo.get_item(session, item_id)

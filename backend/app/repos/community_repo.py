@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from app.models.community import FeedbackRecord, NotificationRecord, ReportRecord, VolunteerApplicationRecord
@@ -64,6 +64,16 @@ class CommunityRepository:
 
     def list_notifications(self, session: Session) -> list[NotificationRecord]:
         stmt = select(NotificationRecord).order_by(NotificationRecord.created_at.desc(), NotificationRecord.id.desc())
+        return list(session.scalars(stmt))
+
+    def list_notifications_for_user(self, session: Session, user_id: int, *, limit: int | None = None) -> list[NotificationRecord]:
+        stmt = (
+            select(NotificationRecord)
+            .where(or_(NotificationRecord.user_id.is_(None), NotificationRecord.user_id == user_id))
+            .order_by(NotificationRecord.created_at.desc(), NotificationRecord.id.desc())
+        )
+        if limit is not None:
+            stmt = stmt.limit(max(1, int(limit)))
         return list(session.scalars(stmt))
 
     def save_report(self, session: Session, entity: ReportRecord) -> ReportRecord:
