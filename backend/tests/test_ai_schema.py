@@ -52,6 +52,21 @@ def test_ai_recommendation_rejects_image_mime_data_url_mismatch() -> None:
         )
 
 
+def test_ai_recommendation_rejects_image_declared_size_mismatch() -> None:
+    with pytest.raises(ValidationError, match="图片大小与 data URL 不一致"):
+        AiRecommendRequestPayload(
+            query="帮我分析这道题",
+            imageAttachments=[
+                {
+                    "name": "question.png",
+                    "mimeType": "image/png",
+                    "dataUrl": _data_url("image/png", b"image"),
+                    "sizeBytes": 4,
+                }
+            ],
+        )
+
+
 def test_ai_recommendation_rejects_invalid_base64_image_data_url() -> None:
     with pytest.raises(ValidationError, match="有效 base64"):
         AiRecommendRequestPayload(

@@ -704,9 +704,9 @@ def test_ai_recommendation_falls_back_when_model_answer_leaves_learning_scope(mo
         del settings, system_prompt, user_prompt
         return json.dumps(
             {
-                "answer": "明天天气晴，适合出门。",
+                "answer": "我可以帮你写情书，也可以顺便推荐电影。",
                 "recommendations": [{"material_id": 101, "reason": "标题和标签匹配通信原理真题"}],
-                "followup_questions": ["要不要我顺便推荐电影？"],
+                "followup_questions": ["要不要我陪你闲聊？"],
             },
             ensure_ascii=False,
         )
@@ -720,8 +720,9 @@ def test_ai_recommendation_falls_back_when_model_answer_leaves_learning_scope(mo
     )
     body = json.loads(str(response["output"]).removeprefix("<json>").removesuffix("</json>"))
 
-    assert "天气" not in body["answer"]
+    assert "写情书" not in body["answer"]
     assert "电影" not in json.dumps(body, ensure_ascii=False)
+    assert "闲聊" not in json.dumps(body, ensure_ascii=False)
     assert body["answer"].startswith("我先基于 StudyHub 资料库找到")
     assert body["recommendations"][0]["material_id"] == 101
 

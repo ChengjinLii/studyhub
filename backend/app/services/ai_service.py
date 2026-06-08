@@ -184,6 +184,10 @@ class AiService:
         course_memory_card: CourseMemoryCard | None = None
         try:
             image_attachments = _agent_image_attachments(getattr(payload, "imageAttachments", []))
+            if _is_agent_greeting_query(payload.query):
+                status = "scope_greeting"
+                body = _learning_scope_greeting_body()
+                return {"output": f"<json>{json.dumps(body, ensure_ascii=False, separators=(',', ':'))}</json>"}
             if not _is_learning_related_agent_query(
                 payload.query,
                 context_query=getattr(payload, "contextQuery", None),
@@ -1590,9 +1594,25 @@ def _is_agent_greeting(normalized_query: str) -> bool:
     return normalized_query in {"你好", "您好", "hi", "hello", "hey", "在吗"}
 
 
+def _is_agent_greeting_query(query: str) -> bool:
+    normalized_query = re.sub(r"\s+", "", str(query or "")).lower()
+    return _is_agent_greeting(normalized_query)
+
+
 def _image_query_has_learning_intent(normalized_query: str) -> bool:
     image_learning_markers = ("学习", "课程", "题", "作业", "公式", "答案", "解析", "考点", "知识点")
     return any(marker in normalized_query for marker in image_learning_markers)
+
+
+def _learning_scope_greeting_body() -> dict[str, Any]:
+    return {
+        "answer": "你好，我是 StudyHub 学习辅导。你可以问课程学习、资料检索、题目分析、复习规划，或把题目截图发给我，我会优先结合平台资料回答。",
+        "followup_questions": [
+            "要不要帮你找某门课的资料？",
+            "要不要分析一份真题或题目截图？",
+            "要不要制定一份复习计划？",
+        ],
+    }
 
 
 def _learning_scope_block_body() -> dict[str, Any]:

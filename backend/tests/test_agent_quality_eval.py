@@ -1378,6 +1378,28 @@ def test_agent_blocks_non_learning_query_before_retrieval(monkeypatch) -> None:
     assert "recommendations" not in body
 
 
+def test_agent_greeting_stops_before_retrieval(monkeypatch) -> None:
+    settings = Settings(ai_agent_provider="local")
+    monkeypatch.setattr("app.services.ai_service.get_settings", lambda: settings)
+    service = AiService(read_repo=None, material_repo=None)  # type: ignore[arg-type]
+
+    def fail_rank_materials(session: object, query: str, filters: dict[str, Any]) -> list[MaterialRecord]:
+        del session, query, filters
+        raise AssertionError("greeting should not trigger retrieval")
+
+    monkeypatch.setattr(service, "_rank_materials", fail_rank_materials)
+
+    response = service.recommend(
+        object(),  # type: ignore[arg-type]
+        SimpleNamespace(query="你好", filters={}, imageAttachments=[]),
+        current_user_id=7,
+    )
+    body = json.loads(str(response["output"]).removeprefix("<json>").removesuffix("</json>"))
+
+    assert "StudyHub 学习辅导" in body["answer"]
+    assert "recommendations" not in body
+
+
 def test_agent_blocks_non_learning_query_even_with_learning_context(monkeypatch) -> None:
     settings = Settings(ai_agent_provider="local")
     monkeypatch.setattr("app.services.ai_service.get_settings", lambda: settings)
@@ -1402,6 +1424,40 @@ def test_agent_blocks_non_learning_query_even_with_learning_context(monkeypatch)
     body = json.loads(str(response["output"]).removeprefix("<json>").removesuffix("</json>"))
 
     assert "只处理课程学习" in body["answer"]
+    assert "recommendations" not in body
+
+
+def test_agent_blocks_non_learning_image_query_before_retrieval(monkeypatch) -> None:
+    settings = Settings(ai_agent_provider="local")
+    monkeypatch.setattr("app.services.ai_service.get_settings", lambda: settings)
+    service = AiService(read_repo=None, material_repo=None)  # type: ignore[arg-type]
+
+    def fail_rank_materials(session: object, query: str, filters: dict[str, Any]) -> list[MaterialRecord]:
+        del session, query, filters
+        raise AssertionError("non-learning image query should not trigger retrieval")
+
+    monkeypatch.setattr(service, "_rank_materials", fail_rank_materials)
+
+    response = service.recommend(
+        object(),  # type: ignore[arg-type]
+        SimpleNamespace(
+            query="这张图里的穿搭好看吗",
+            filters={},
+            imageAttachments=[
+                {
+                    "name": "outfit.png",
+                    "mimeType": "image/png",
+                    "dataUrl": "data:image/png;base64,aW1hZ2U=",
+                    "sizeBytes": 5,
+                }
+            ],
+        ),
+        current_user_id=7,
+    )
+    body = json.loads(str(response["output"]).removeprefix("<json>").removesuffix("</json>"))
+
+    assert "只处理课程学习" in body["answer"]
+    assert "穿搭" not in body["answer"]
     assert "recommendations" not in body
 
 

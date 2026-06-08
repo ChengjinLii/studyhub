@@ -57,9 +57,11 @@ class AiImageAttachmentPayload(BaseModel):
 
     @model_validator(mode="after")
     def validate_data_url_matches_mime_type(self) -> "AiImageAttachmentPayload":
-        media_type, _ = _decode_image_data_url(self.dataUrl)
+        media_type, decoded_size = _decode_image_data_url(self.dataUrl)
         if media_type != self.mimeType:
             raise ValueError("图片 MIME 与 data URL 不一致")
+        if decoded_size != self.sizeBytes:
+            raise ValueError("图片大小与 data URL 不一致")
         return self
 
 
