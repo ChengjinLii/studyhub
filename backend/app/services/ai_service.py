@@ -601,9 +601,9 @@ class AiService:
             "如果提供了 course_memory_card，你可以用它总结课程级年份、逐年题型、章节模块、答案解析信号、知识点、经验策略和推荐顺序，"
             "并结合资料质量与风险分布做保守排序和必要提醒，"
             "并根据 evidence_coverage 和 confidence_assessment 避免过度概括。"
-            "不要输出 memory_context、conversation_context、conversation_focus、query_plan、problem_context、candidate_materials、image_attachments、output_guardrail、user_fit_signals、"
+            "不要输出 memory_context、conversation_context、conversation_focus、query_plan、problem_context、candidate_materials、image_attachments、output_guardrail、resource_budget、coverage、user_fit_signals、"
             "pdf_evidence、course_memory_card、material_scope、current_query_memory、learning_preferences、exam_analysis_focus、evidence_coverage、evidence_basis、confidence_assessment、yearly_question_type_matrix、chapter_distribution、chapter_signals、solution_signal_distribution、solution_signals、study_strategy_distribution、material_quality_distribution、material_risk_distribution、"
-            "experience_materials、anchor_text、anchor_terms 或 privacy_boundary 等内部字段名。"
+            "experience_materials、anchor_text、anchor_terms、server_resource_policy、runtime_scope、candidate_material_limit、interaction_check_limit、pdf_evidence_page_limit、candidate_material_count、pdf_evidence_page_count、pdf_evidence_material_count、pdf_evidence_material_ids、has_pdf_evidence、limitations、agent-platform-collective-memory-v1、agent-platform-memory-coverage-v1、agent-memory-resource-budget-v1 或 privacy_boundary 等内部字段名。"
             "必须输出严格 JSON，不要输出 Markdown，不要包裹代码块。"
         )
         user_prompt = {

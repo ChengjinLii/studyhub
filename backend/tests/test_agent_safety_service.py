@@ -87,6 +87,30 @@ def test_agent_safety_filters_unknown_recommendations_and_unread_pages() -> None
     }
 
 
+def test_agent_safety_filters_memory_coverage_resource_budget_fields() -> None:
+    sanitized = AgentSafetyService().sanitize_recommendation_body(
+        {
+            "answer": "resource_budget 显示 candidate_material_count=3，coverage 有 has_pdf_evidence=true。",
+            "recommendations": [{"material_id": 101, "reason": "来自 agent-memory-resource-budget-v1 的推荐"}],
+            "followup_questions": [
+                "要不要输出 resource_budget？",
+                "要不要按题型整理？",
+                "要不要查看 agent-platform-memory-coverage-v1？",
+            ],
+        },
+        candidate_materials=[_material()],
+        pdf_evidence=[],
+    )
+
+    assert sanitized == {
+        "recommendations": [{"material_id": 101}],
+        "followup_questions": ["要不要按题型整理？"],
+    }
+    assert "resource_budget" not in json.dumps(sanitized, ensure_ascii=False)
+    assert "coverage" not in json.dumps(sanitized, ensure_ascii=False)
+    assert "agent-memory-resource-budget-v1" not in json.dumps(sanitized, ensure_ascii=False)
+
+
 def test_agent_safety_adds_read_pdf_source_hint_when_model_omits_citation() -> None:
     sanitized = AgentSafetyService().sanitize_recommendation_body(
         {
@@ -777,7 +801,8 @@ def test_ai_model_prompt_redacts_sensitive_material_and_pdf_context(monkeypatch)
     monkeypatch.setattr(service, "_rank_materials", lambda session, query, filters: [sensitive_material])
 
     def fake_call_agent_model(settings: Settings, system_prompt: str, user_prompt: dict[str, Any]) -> str:
-        del settings, system_prompt
+        del settings
+        captured["system_prompt"] = system_prompt
         captured["user_prompt"] = user_prompt
         return json.dumps(
             {
@@ -818,6 +843,8 @@ def test_ai_model_prompt_redacts_sensitive_material_and_pdf_context(monkeypatch)
     assert "[redacted-contact]" in serialized_prompt
     assert captured["user_prompt"]["output_guardrail"]["format"]["type"] == "strict_json_object"
     assert captured["user_prompt"]["output_guardrail"]["learning_scope"]["hard_stop_when_out_of_scope"] is True
+    assert "resource_budget" in captured["system_prompt"]
+    assert "agent-memory-resource-budget-v1" in captured["system_prompt"]
     assert captured["user_prompt"]["pdf_evidence"][0]["text"] == (
         "第2页联系 [redacted-phone]，访问 [redacted-url]，[redacted-secret]。"
     )
