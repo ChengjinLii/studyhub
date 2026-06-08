@@ -110,6 +110,8 @@ STUDYHUB_ENVIRONMENT=preview bash scripts/db/db-backup.sh
 STUDYHUB_ENVIRONMENT=production bash scripts/db/db-backup.sh private/backups/manual-prod.sql.gz
 ```
 
+`db-backup.sh` 的输出路径如果是相对路径，会按仓库根目录解析；上面的示例会写入 `/data/studyhub/private/backups/manual-prod.sql.gz`。
+
 恢复 preview：
 
 ```bash
@@ -117,6 +119,8 @@ YES_PREVIEW_DB_RESTORE=I_UNDERSTAND_RESTORE \
 STUDYHUB_ENVIRONMENT=preview \
 bash scripts/db/db-restore-preview.sh /path/to/preview-backup.sql.gz
 ```
+
+`db-restore-preview.sh` 的输入路径如果是相对路径，也会按仓库根目录解析。
 
 ## 使用约束
 

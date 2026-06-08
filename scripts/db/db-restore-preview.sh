@@ -11,6 +11,10 @@ if [[ -z "$INPUT_PATH" ]]; then
   exit 1
 fi
 
+if [[ "$INPUT_PATH" != /* ]]; then
+  INPUT_PATH="$ROOT_DIR/$INPUT_PATH"
+fi
+
 if [[ "$ENVIRONMENT" == "production" ]]; then
   echo "production 环境禁止通过该脚本恢复数据库。"
   exit 1

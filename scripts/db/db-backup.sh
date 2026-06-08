@@ -6,6 +6,10 @@ PRIVATE_DIR="${STUDYHUB_PRIVATE_DIR_PATH:-$ROOT_DIR/private}"
 ENVIRONMENT="${STUDYHUB_ENVIRONMENT:-preview}"
 OUTPUT_PATH="${1:-}"
 
+if [[ -n "$OUTPUT_PATH" && "$OUTPUT_PATH" != /* ]]; then
+  OUTPUT_PATH="$ROOT_DIR/$OUTPUT_PATH"
+fi
+
 if [[ "$ENVIRONMENT" == "preview" && ! -f "$PRIVATE_DIR/.env.preview" ]]; then
   echo "missing preview env file: $PRIVATE_DIR/.env.preview"
   exit 1
