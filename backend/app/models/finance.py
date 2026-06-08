@@ -69,6 +69,7 @@ class SettlementRecord(TimestampMixin, Base):
     platform_fee: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     payout_amount: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     status: Mapped[str] = mapped_column(String(32), nullable=False, default="PENDING")
+    payout_transfer_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
     policy_version: Mapped[str | None] = mapped_column(String(64), nullable=True)
     policy_id: Mapped[str | None] = mapped_column(String(32), nullable=True)
     source_type: Mapped[str] = mapped_column(String(32), nullable=False)

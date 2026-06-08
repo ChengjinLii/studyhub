@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 import uuid
 
-from sqlalchemy import Select, func, select
+from sqlalchemy import Select, func, select, update
 from sqlalchemy.orm import Session
 
 from app.models.finance import (
@@ -131,6 +131,66 @@ class FinanceRepository:
             .order_by(SettlementRecord.created_at.asc(), SettlementRecord.id.asc())
         )
         return list(session.scalars(stmt))
+
+    def list_claimable_due_settlements_for_uploader(self, session: Session, uploader_id: int, now: datetime) -> list[SettlementRecord]:
+        stmt = (
+            select(SettlementRecord)
+            .where(
+                SettlementRecord.uploader_id == uploader_id,
+                SettlementRecord.status == "PENDING",
+                SettlementRecord.payout_transfer_id.is_(None),
+                SettlementRecord.scheduled_payout_at.is_not(None),
+                SettlementRecord.scheduled_payout_at <= now,
+            )
+            .order_by(SettlementRecord.created_at.asc(), SettlementRecord.id.asc())
+        )
+        return list(session.scalars(stmt))
+
+    def list_settlements_for_transfer(self, session: Session, transfer_id: int) -> list[SettlementRecord]:
+        stmt = (
+            select(SettlementRecord)
+            .where(SettlementRecord.payout_transfer_id == transfer_id)
+            .order_by(SettlementRecord.created_at.asc(), SettlementRecord.id.asc())
+        )
+        return list(session.scalars(stmt))
+
+    def claim_due_settlements_for_transfer(
+        self, session: Session, uploader_id: int, transfer_id: int, now: datetime
+    ) -> list[SettlementRecord]:
+        """Atomically bind every claimable-due settlement to ``transfer_id``.
+
+        The conditional ``payout_transfer_id IS NULL`` UPDATE is the claim: a concurrent
+        transaction cannot bind the same row to a second transfer, so each settlement is
+        paid out exactly once. Returns the rows actually claimed by this transfer.
+        """
+        stmt = (
+            update(SettlementRecord)
+            .where(
+                SettlementRecord.uploader_id == uploader_id,
+                SettlementRecord.status == "PENDING",
+                SettlementRecord.payout_transfer_id.is_(None),
+                SettlementRecord.scheduled_payout_at.is_not(None),
+                SettlementRecord.scheduled_payout_at <= now,
+            )
+            .values(payout_transfer_id=transfer_id)
+        )
+        session.execute(stmt)
+        session.flush()
+        return self.list_settlements_for_transfer(session, transfer_id)
+
+    def unbind_pending_settlements_from_transfer(self, session: Session, transfer_id: int) -> int:
+        """Release still-PENDING settlements bound to a failed transfer back to claimable."""
+        stmt = (
+            update(SettlementRecord)
+            .where(
+                SettlementRecord.payout_transfer_id == transfer_id,
+                SettlementRecord.status == "PENDING",
+            )
+            .values(payout_transfer_id=None)
+        )
+        result = session.execute(stmt)
+        session.flush()
+        return int(result.rowcount or 0)
 
     def list_pending_transfers(self, session: Session) -> list[PayoutTransferRecord]:
         stmt = (
