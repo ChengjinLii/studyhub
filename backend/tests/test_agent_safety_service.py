@@ -22,10 +22,10 @@ def _material(material_id: int = 101) -> MaterialRecord:
     )
 
 
-def _evidence() -> MaterialPageEvidence:
+def _evidence(title: str = "通信原理四年真题解析") -> MaterialPageEvidence:
     return MaterialPageEvidence(
         material_id=101,
-        title="通信原理四年真题解析",
+        title=title,
         page=2,
         text="第 2 页包含通信原理计算题。",
         score=30,
@@ -167,6 +167,46 @@ def test_agent_safety_filters_internal_field_names_from_recommendation_reasons()
     ]
     assert "query_plan" not in json.dumps(sanitized, ensure_ascii=False)
     assert "memory_context" not in json.dumps(sanitized, ensure_ascii=False)
+
+
+def test_agent_safety_redacts_sensitive_public_output() -> None:
+    sensitive_title = "通信原理 alice@example.com 13812345678"
+    sanitized = AgentSafetyService().sanitize_recommendation_body(
+        {
+            "answer": (
+                "这份资料适合复盘，联系 13812345678 alice@example.com，"
+                "访问 https://example.test，api_key=secret-value，"
+                "学号 2023123456，身份证 11010119900307561X，卡号 6222021234567890123。"
+            ),
+            "recommendations": [
+                {"material_id": 101, "reason": "来源 QQ 123456789 token=secret-token，邮箱 bob@example.com"}
+            ],
+            "evidence_sources": [{"material_id": 101, "page": 2, "title": "模型标题会被替换"}],
+            "followup_questions": ["要不要发到 bob@example.com？", "电话 13812345678 继续吗？"],
+        },
+        candidate_materials=[_material()],
+        pdf_evidence=[_evidence(sensitive_title)],
+    )
+
+    assert sanitized is not None
+    serialized = json.dumps(sanitized, ensure_ascii=False)
+    assert "13812345678" not in serialized
+    assert "alice@example.com" not in serialized
+    assert "bob@example.com" not in serialized
+    assert "https://example.test" not in serialized
+    assert "secret-value" not in serialized
+    assert "secret-token" not in serialized
+    assert "2023123456" not in serialized
+    assert "11010119900307561X" not in serialized
+    assert "6222021234567890123" not in serialized
+    assert "[redacted-phone]" in serialized
+    assert "[redacted-email]" in serialized
+    assert "[redacted-url]" in serialized
+    assert "[redacted-secret]" in serialized
+    assert "[redacted-id]" in serialized
+    assert "[redacted-id-card]" in serialized
+    assert "[redacted-number]" in serialized
+    assert "[redacted-contact]" in serialized
 
 
 def test_agent_safety_rejects_internal_context_leaks_and_invalid_only_recommendations() -> None:

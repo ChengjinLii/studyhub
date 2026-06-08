@@ -104,11 +104,8 @@ class AgentSafetyService:
     def _sanitize_answer(self, value: Any) -> str:
         if not isinstance(value, str):
             return ""
-        answer = _clean_text(value, max_chars=1800)
+        answer = _clean_public_text(value, max_chars=1800)
         if not answer:
-            return ""
-        lowered = answer.lower()
-        if any(marker in lowered for marker in FORBIDDEN_INTERNAL_MARKERS):
             return ""
         return answer
 
@@ -134,7 +131,11 @@ class AgentSafetyService:
                 continue
             seen_sources.add(source_key)
             evidence = allowed[(material_id, page)]
-            source: dict[str, Any] = {"material_id": material_id, "title": evidence.title, "page": page}
+            source: dict[str, Any] = {
+                "material_id": material_id,
+                "title": _clean_public_title(evidence.title, max_chars=120),
+                "page": page,
+            }
             if evidence.question_numbers:
                 source["question_numbers"] = list(evidence.question_numbers)
             if evidence.source_type != "unknown":
@@ -149,7 +150,7 @@ class AgentSafetyService:
         for evidence in pdf_evidence[:6]:
             source: dict[str, Any] = {
                 "material_id": int(evidence.material_id),
-                "title": evidence.title,
+                "title": _clean_public_title(evidence.title, max_chars=120),
                 "page": int(evidence.page),
             }
             if evidence.question_numbers:
@@ -183,7 +184,7 @@ class AgentSafetyService:
         questions: list[str] = []
         seen_questions: set[str] = set()
         for item in value:
-            question = _clean_text(item, max_chars=80)
+            question = _clean_public_text(item, max_chars=80)
             if not question:
                 continue
             lowered = question.lower()
@@ -212,7 +213,7 @@ def _clean_text(value: Any, *, max_chars: int) -> str:
 
 
 def _clean_public_text(value: Any, *, max_chars: int) -> str:
-    text = _clean_text(value, max_chars=max_chars)
+    text = _redact_public_sensitive_text(_clean_text(value, max_chars=max_chars))[:max_chars]
     if not text:
         return ""
     lowered = text.lower()
@@ -221,10 +222,71 @@ def _clean_public_text(value: Any, *, max_chars: int) -> str:
     return text
 
 
+def _clean_public_title(value: Any, *, max_chars: int) -> str:
+    text = _redact_public_sensitive_text(_clean_text(value, max_chars=max_chars))[:max_chars]
+    if not text:
+        return "资料"
+    lowered = text.lower()
+    if any(marker in lowered for marker in FORBIDDEN_INTERNAL_MARKERS):
+        return "资料"
+    return text
+
+
+def _redact_public_sensitive_text(text: str) -> str:
+    if not text:
+        return ""
+    text = re.sub(
+        r"https?://[^\s,;，；。]+|www\.[^\s,;，；。]+",
+        "[redacted-url]",
+        text,
+        flags=re.IGNORECASE,
+    )
+    text = re.sub(r"[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}", "[redacted-email]", text)
+    text = re.sub(r"(?<!\d)1[3-9]\d{9}(?!\d)", "[redacted-phone]", text)
+    text = re.sub(
+        r"(?i)(api[_-]?key|token|secret|authorization|bearer)\s*[:=]\s*[^\s,;，；。]+",
+        "[redacted-secret]",
+        text,
+    )
+    text = re.sub(
+        r"(?i)(?<![A-Za-z0-9_-])(?:sk|tp)-[A-Za-z0-9_-]{16,}(?![A-Za-z0-9_-])",
+        "[redacted-secret]",
+        text,
+    )
+    text = _redact_identity_numbers(text)
+    text = _redact_labeled_ids(text)
+    text = _redact_messenger_handles(text)
+    return re.sub(r"(?<!\d)\d{12,24}(?!\d)", "[redacted-number]", text)
+
+
+def _redact_identity_numbers(text: str) -> str:
+    return re.sub(
+        r"(?<![A-Za-z0-9])\d{6}(?:18|19|20)\d{2}(?:0[1-9]|1[0-2])(?:0[1-9]|[12]\d|3[01])\d{3}[\dXx](?![A-Za-z0-9])",
+        "[redacted-id-card]",
+        text,
+    )
+
+
+def _redact_labeled_ids(text: str) -> str:
+    pattern = re.compile(
+        r"(?i)(学号|工号|student[_ -]?id|employee[_ -]?id)\s*[:：=]?\s*[A-Za-z0-9_-]{5,24}"
+    )
+    return pattern.sub(lambda match: f"{match.group(1)}=[redacted-id]", text)
+
+
+def _redact_messenger_handles(text: str) -> str:
+    latin_pattern = re.compile(
+        r"(?i)(?<![A-Za-z0-9_])(qq|wechat|weixin|wx|vx)(?![A-Za-z0-9_])\s*[:：=]?\s*[A-Za-z0-9_-]{5,32}"
+    )
+    text = latin_pattern.sub(lambda match: f"{match.group(1)}=[redacted-contact]", text)
+    chinese_pattern = re.compile(r"(微信|微信号|微 信)\s*[:：=]?\s*[A-Za-z0-9_-]{5,32}")
+    return chinese_pattern.sub(lambda match: f"{match.group(1)}=[redacted-contact]", text)
+
+
 def _answer_mentions_source(answer: str, evidence_sources: list[dict[str, Any]]) -> bool:
     normalized = answer.lower()
     for source in evidence_sources:
-        title = _clean_text(source.get("title"), max_chars=120)
+        title = _clean_public_title(source.get("title"), max_chars=120)
         page = _safe_int(source.get("page"))
         if title and title.lower() in normalized:
             return True
@@ -250,7 +312,7 @@ def _answer_mentions_low_evidence_boundary(answer: str) -> bool:
 def _source_hint(evidence_sources: list[dict[str, Any]]) -> str:
     parts: list[str] = []
     for source in evidence_sources[:3]:
-        title = _clean_text(source.get("title"), max_chars=80)
+        title = _clean_public_title(source.get("title"), max_chars=80)
         page = _safe_int(source.get("page"))
         if not title or page is None:
             continue
