@@ -102,6 +102,14 @@ def test_ai_feedback_builds_redacted_user_and_platform_memory_candidates(client,
     assert data["memoryCandidates"][0]["schema"] == "agent-feedback-memory-candidate-v1"
     assert data["memoryCandidates"][0]["writeMode"] == "deferred_not_persisted"
     assert data["memoryCandidates"][0]["privacy"] == "current_user_private_candidate"
+    assert data["memoryCandidates"][0]["lifecycle"] == {
+        "persistence": "not_persisted",
+        "writeMode": "deferred_not_persisted",
+        "requiresExplicitFutureWritePath": True,
+        "deleteWithPersonalMemory": True,
+        "platformEligible": False,
+        "rawNotePersisted": False,
+    }
     assert data["memoryCandidates"][0]["version"].startswith("feedback-candidate-v1-")
     assert len(data["memoryCandidates"][0]["versionFingerprint"]) == 16
     assert data["memoryCandidates"][0]["signalBasis"] == {
@@ -133,6 +141,14 @@ def test_ai_feedback_builds_redacted_user_and_platform_memory_candidates(client,
     assert data["memoryCandidates"][1]["privacy"] == "anonymous_aggregate_candidate"
     assert data["memoryCandidates"][1]["schema"] == "agent-feedback-memory-candidate-v1"
     assert data["memoryCandidates"][1]["writeMode"] == "deferred_not_persisted"
+    assert data["memoryCandidates"][1]["lifecycle"] == {
+        "persistence": "not_persisted",
+        "writeMode": "deferred_not_persisted",
+        "requiresAnonymousAggregation": True,
+        "deleteWithPersonalMemory": False,
+        "rawNotePersisted": False,
+        "rawUserIdentityPersisted": False,
+    }
     assert data["memoryCandidates"][1]["version"].startswith("feedback-candidate-v1-")
     assert len(data["memoryCandidates"][1]["versionFingerprint"]) == 16
     assert data["memoryCandidates"][1]["signalBasis"] == {

@@ -165,6 +165,7 @@ class AgentFeedbackService:
                     scope="user",
                 ),
                 "privacy": "current_user_private_candidate",
+                "lifecycle": _candidate_lifecycle("user"),
             }
             if derived_signals:
                 user_candidate["derivedSignals"] = derived_signals
@@ -195,6 +196,7 @@ class AgentFeedbackService:
                     "rawUserIdentityPersisted": False,
                     "personalMemoryMixedIntoPlatform": False,
                 },
+                "lifecycle": _candidate_lifecycle("platform"),
             }
             if derived_signals:
                 platform_candidate["aggregateSignals"] = derived_signals
@@ -379,6 +381,26 @@ def _signal_basis(
     }
 
 
+def _candidate_lifecycle(scope: str) -> dict[str, Any]:
+    if scope == "user":
+        return {
+            "persistence": "not_persisted",
+            "writeMode": "deferred_not_persisted",
+            "requiresExplicitFutureWritePath": True,
+            "deleteWithPersonalMemory": True,
+            "platformEligible": False,
+            "rawNotePersisted": False,
+        }
+    return {
+        "persistence": "not_persisted",
+        "writeMode": "deferred_not_persisted",
+        "requiresAnonymousAggregation": True,
+        "deleteWithPersonalMemory": False,
+        "rawNotePersisted": False,
+        "rawUserIdentityPersisted": False,
+    }
+
+
 def _attach_candidate_version(candidate: dict[str, Any]) -> None:
     basis = {
         "schema": candidate.get("schema"),
@@ -389,6 +411,7 @@ def _attach_candidate_version(candidate: dict[str, Any]) -> None:
         "derivedSignals": candidate.get("derivedSignals") or candidate.get("aggregateSignals") or {},
         "selectedMaterialSignals": candidate.get("selectedMaterialSignals") or {},
         "signalBasis": candidate.get("signalBasis") or {},
+        "lifecycle": candidate.get("lifecycle") or {},
     }
     fingerprint = _stable_feedback_fingerprint(basis)
     candidate["versionFingerprint"] = fingerprint
