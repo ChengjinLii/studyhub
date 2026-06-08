@@ -12,6 +12,7 @@ from app.api.deps import (
     get_public_read_cache,
 )
 from app.api.routes import comments as comment_routes
+from app.api.routes import market as market_routes
 from app.api.routes import materials as material_routes
 from app.core.public_read_cache import PublicReadCache, cache_if_anonymous, invalidate_prefixes
 from app.core.observability import get_runtime_metrics
@@ -189,6 +190,18 @@ def test_comment_thread_invalidation_preserves_material_caches(monkeypatch) -> N
     assert ("comments:replies", (9001, 0, 20)) not in cache._entries
     assert ("materials:list", ("page", 1)) in cache._entries
     assert ("materials:detail", (101,)) in cache._entries
+
+
+def test_market_engagement_invalidation_preserves_list_cache(monkeypatch) -> None:
+    cache = _build_cache()
+    cache.get_or_set("market:list", (None, None, 1, 20), lambda: {"kind": "list"})
+    cache.get_or_set("market:detail", (301,), lambda: {"kind": "detail"})
+    monkeypatch.setattr(market_routes, "get_public_read_cache", lambda: cache)
+
+    market_routes._invalidate_market_engagement_caches()
+
+    assert ("market:list", (None, None, 1, 20)) in cache._entries
+    assert ("market:detail", (301,)) not in cache._entries
 
 
 def test_public_read_cache_supports_redis_backend(monkeypatch) -> None:

@@ -145,7 +145,7 @@ def want_market_item(
     service: MarketService = Depends(get_market_service),
 ) -> dict[str, object]:
     data = service.want_item(session, id, auth.user_id or 0)
-    _invalidate_market_read_caches()
+    _invalidate_market_engagement_caches()
     return api_ok(data)
 
 
@@ -157,7 +157,7 @@ def cancel_want_market_item(
     service: MarketService = Depends(get_market_service),
 ) -> dict[str, object]:
     data = service.cancel_want_item(session, id, auth.user_id or 0)
-    _invalidate_market_read_caches()
+    _invalidate_market_engagement_caches()
     return api_ok(data)
 
 
@@ -244,3 +244,7 @@ def _coerce_upload_list(values: list[object]) -> list[UploadFile]:
 
 def _invalidate_market_read_caches() -> None:
     invalidate_prefixes(get_public_read_cache(), "market")
+
+
+def _invalidate_market_engagement_caches() -> None:
+    invalidate_prefixes(get_public_read_cache(), "market:detail")
