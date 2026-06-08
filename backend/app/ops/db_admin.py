@@ -90,6 +90,12 @@ def _ensure_backup_target_available(path: Path) -> None:
         raise RuntimeError(f"备份目标已存在，拒绝覆盖：{path}")
 
 
+def _temporary_backup_path(target: Path) -> Path:
+    suffix = target.suffix
+    stem = target.name[: -len(suffix)] if suffix else target.name
+    return target.with_name(f".{stem}.tmp-{os.getpid()}{suffix}")
+
+
 def command_describe(settings: Settings) -> int:
     url = make_url(settings.resolved_database_url)
     payload = {
@@ -162,6 +168,8 @@ def command_backup(settings: Settings, *, output: Path | None) -> int:
     target = output or _default_backup_path(settings)
     _ensure_backup_target_available(target)
     target.parent.mkdir(parents=True, exist_ok=True)
+    temp_target = _temporary_backup_path(target)
+    _ensure_backup_target_available(temp_target)
     mysqldump = shutil.which("mysqldump")
     if not mysqldump:
         raise RuntimeError("未找到 mysqldump，请先安装 MySQL 客户端。")
@@ -180,25 +188,32 @@ def command_backup(settings: Settings, *, output: Path | None) -> int:
     process_env = None
     if password_env:
         process_env = {**os.environ, **password_env}
-    with target.open("wb") as raw_file:
-        sink: BinaryIO
-        if target.suffix == ".gz":
-            sink = gzip.GzipFile(fileobj=raw_file, mode="wb")
-        else:
-            sink = raw_file
-        try:
-            with subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=process_env) as process:
-                assert process.stdout is not None
-                assert process.stderr is not None
-                shutil.copyfileobj(process.stdout, sink)
-                stderr = process.stderr.read().decode("utf-8", errors="replace")
-                return_code = process.wait()
-                if return_code != 0:
-                    raise RuntimeError(f"mysqldump 失败：{stderr.strip() or f'退出码 {return_code}'}")
-        finally:
-            if sink is not raw_file:
-                sink.close()
-    size_bytes = _validate_backup_file(target)
+    try:
+        with temp_target.open("wb") as raw_file:
+            sink: BinaryIO
+            if temp_target.suffix == ".gz":
+                sink = gzip.GzipFile(fileobj=raw_file, mode="wb")
+            else:
+                sink = raw_file
+            try:
+                with subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=process_env) as process:
+                    assert process.stdout is not None
+                    assert process.stderr is not None
+                    shutil.copyfileobj(process.stdout, sink)
+                    stderr = process.stderr.read().decode("utf-8", errors="replace")
+                    return_code = process.wait()
+                    if return_code != 0:
+                        raise RuntimeError(f"mysqldump 失败：{stderr.strip() or f'退出码 {return_code}'}")
+            finally:
+                if sink is not raw_file:
+                    sink.close()
+        size_bytes = _validate_backup_file(temp_target)
+        _ensure_backup_target_available(target)
+        temp_target.rename(target)
+    except Exception:
+        if temp_target.exists():
+            temp_target.unlink()
+        raise
     print(
         json.dumps(
             {

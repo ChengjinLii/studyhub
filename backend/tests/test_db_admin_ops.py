@@ -11,6 +11,7 @@ from app.core.config import Settings, get_settings
 from app.core.db import reset_database_runtime
 from app.ops.db_admin import (
     _ensure_backup_target_available,
+    _temporary_backup_path,
     _validate_backup_file,
     _migration_plan_token,
     _require_production_plan_token,
@@ -330,6 +331,53 @@ def test_backup_target_rejects_existing_paths(tmp_path: Path) -> None:
         _ensure_backup_target_available(tmp_path)
 
     _ensure_backup_target_available(tmp_path / "new-backup.sql.gz")
+
+
+def test_temporary_backup_path_preserves_compression_suffix(tmp_path: Path) -> None:
+    gzip_target = tmp_path / "studyhub-production.sql.gz"
+    plain_target = tmp_path / "studyhub-production.sql"
+
+    assert _temporary_backup_path(gzip_target).suffix == ".gz"
+    assert _temporary_backup_path(plain_target).suffix == ".sql"
+    assert _temporary_backup_path(gzip_target).name.startswith(".studyhub-production.sql.tmp-")
+
+
+def test_db_admin_backup_cleans_temporary_file_on_mysqldump_failure(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import io
+
+    from app.ops import db_admin as db_admin_module
+
+    class FailedDumpProcess:
+        def __init__(self, *args: object, **kwargs: object) -> None:
+            self.stdout = io.BytesIO(b"partial backup")
+            self.stderr = io.BytesIO(b"dump failed")
+
+        def __enter__(self) -> "FailedDumpProcess":
+            return self
+
+        def __exit__(self, *args: object) -> None:
+            return None
+
+        def wait(self) -> int:
+            return 1
+
+    settings = Settings(
+        environment="local-dev",
+        database_url="mysql+pymysql://backup_user:backup_pass@127.0.0.1:3306/studyhub_test",
+    )
+    target = tmp_path / "manual.sql.gz"
+
+    monkeypatch.setattr(db_admin_module.shutil, "which", lambda name: "/usr/bin/mysqldump")
+    monkeypatch.setattr(db_admin_module.subprocess, "Popen", FailedDumpProcess)
+
+    with pytest.raises(RuntimeError, match="mysqldump 失败"):
+        command_backup(settings, output=target)
+
+    assert not target.exists()
+    assert list(tmp_path.iterdir()) == []
 
 
 def test_production_migrate_requires_explicit_only_scope() -> None:
