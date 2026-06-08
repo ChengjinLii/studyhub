@@ -11,6 +11,11 @@ if [[ ! -f "$PRIVATE_DIR/.env.production" ]]; then
   exit 1
 fi
 
+if [[ -n "$SCHEMA_CHECK_COLUMNS" && -z "${SCHEMA_CHECK_COLUMNS//[[:space:]]/}" ]]; then
+  echo "STUDYHUB_PRODUCTION_SCHEMA_CHECK_COLUMNS must be empty for a full schema check or contain table.column values; got whitespace only"
+  exit 2
+fi
+
 cd "$ROOT_DIR/backend"
 export STUDYHUB_ENVIRONMENT=production
 export STUDYHUB_PRIVATE_DIR_PATH="$PRIVATE_DIR"
