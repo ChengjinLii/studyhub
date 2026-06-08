@@ -495,3 +495,61 @@ def test_agent_retrieval_query_distills_long_context_to_stable_anchors() -> None
     assert "2021" in retrieval_query
     assert "真题" in retrieval_query
     assert "无关闲聊" not in retrieval_query
+
+
+def test_ai_prompt_receives_conversation_focus_for_long_followup_context(monkeypatch) -> None:
+    captured: dict[str, Any] = {}
+    settings = _settings(
+        ai_agent_provider="openai-compatible",
+        ai_agent_base_url="https://example.test/v1",
+        ai_agent_api_key="test-key",
+        ai_agent_model="demo-model",
+    )
+    monkeypatch.setattr("app.services.ai_service.get_settings", lambda: settings)
+
+    service = AiService(read_repo=None, material_repo=None)  # type: ignore[arg-type]
+    material = _material(
+        302,
+        title="ESD-电子系统设计-2021年真题及答案",
+        tags=["电子系统设计", "真题"],
+        description="电子系统设计 2021 年真题和样卷答案",
+    )
+    monkeypatch.setattr(service, "_rank_materials", lambda session, query, filters: [material])
+
+    def fake_call_agent_model(settings: Settings, system_prompt: str, user_prompt: dict[str, Any]) -> str:
+        captured["system_prompt"] = system_prompt
+        captured["user_prompt"] = user_prompt
+        return json.dumps(
+            {
+                "answer": "我会基于《ESD-电子系统设计-2021年真题及答案》保守分析考题风格。",
+                "recommendations": [{"material_id": 302, "reason": "匹配电子系统设计真题"}],
+            },
+            ensure_ascii=False,
+        )
+
+    monkeypatch.setattr(service, "_call_agent_model", fake_call_agent_model)
+    noisy_context = "\n".join(
+        [
+            "早期上下文摘要：课程/关键词：电子系统设计。曾推荐资料：ESD-电子系统设计-2021年真题及答案；ESD样卷答案。",
+            *[f"后续无关闲聊 {index}：只是占位，不应进入聚焦字段。" for index in range(80)],
+        ]
+    )
+
+    response = service.recommend(
+        object(),  # type: ignore[arg-type]
+        SimpleNamespace(
+            query="考题风格帮我分析一下",
+            contextQuery=noisy_context,
+            filters={},
+        ),
+        current_user_id=7,
+    )
+    body = json.loads(str(response["output"]).removeprefix("<json>").removesuffix("</json>"))
+    prompt = captured["user_prompt"]
+
+    assert "conversation_focus" in captured["system_prompt"]
+    assert "电子系统设计" in prompt["conversation_focus"]
+    assert "ESD-电子系统设计-2021年真题及答案" in prompt["conversation_focus"]
+    assert "ESD样卷答案" in prompt["conversation_focus"]
+    assert "后续无关闲聊" not in prompt["conversation_focus"]
+    assert body["recommendations"][0]["material_id"] == 302

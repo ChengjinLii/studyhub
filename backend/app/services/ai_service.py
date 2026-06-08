@@ -506,6 +506,8 @@ class AiService:
             "不要编造不存在的资料。用户可能需要资料推荐、真题讲解思路、复习规划或错题辅导。"
             "如果候选资料不足，要明确说明并追问课程范围。"
             "如果提供了 conversation_context，只能用来补全当前问题省略的课程、资料和上一轮学习目标，回答必须以 user_query 为准。"
+            "如果提供了 conversation_focus，优先用它识别当前追问省略的课程、年份、资料标题和资源类型，"
+            "但回答仍必须以 user_query、candidate_materials、pdf_evidence 和 course_memory_card 为准。"
             "如果提供了 pdf_evidence，你必须优先基于这些页级证据总结，并在关键结论中引用资料名和页码。"
             "如果 pdf_evidence 提供了 anchor_text 或 anchor_terms，应优先用它们定位页内关键片段。"
             "如果候选资料提供了 quality_signals 或 risk_signals，你可以用它们辅助排序和提示，但不能把风险提示夸大成确定违规。"
@@ -521,7 +523,7 @@ class AiService:
             "如果提供了 course_memory_card，你可以用它总结课程级年份、逐年题型、章节模块、答案解析信号、知识点、经验策略和推荐顺序，"
             "并结合资料质量与风险分布做保守排序和必要提醒，"
             "并根据 evidence_coverage 和 confidence_assessment 避免过度概括。"
-            "不要输出 memory_context、conversation_context、query_plan、problem_context、candidate_materials、user_fit_signals、"
+            "不要输出 memory_context、conversation_context、conversation_focus、query_plan、problem_context、candidate_materials、user_fit_signals、"
             "pdf_evidence、course_memory_card、material_scope、current_query_memory、learning_preferences、evidence_coverage、confidence_assessment、yearly_question_type_matrix、chapter_distribution、chapter_signals、solution_signal_distribution、solution_signals、study_strategy_distribution、material_quality_distribution、material_risk_distribution、"
             "experience_materials、anchor_text、anchor_terms 或 privacy_boundary 等内部字段名。"
             "必须输出严格 JSON，不要输出 Markdown，不要包裹代码块。"
@@ -529,6 +531,7 @@ class AiService:
         user_prompt = {
             "user_query": query,
             "conversation_context": _compact_agent_context(conversation_context),
+            "conversation_focus": _agent_context_retrieval_focus(_compact_agent_context(conversation_context)),
             "query_plan": query_plan.to_prompt_payload() if query_plan else {},
             "candidate_materials": candidates,
             "pdf_evidence": [item.to_prompt_payload() for item in pdf_evidence],

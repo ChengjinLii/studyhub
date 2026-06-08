@@ -12,6 +12,7 @@ FORBIDDEN_INTERNAL_MARKERS = (
     "user_personal_memory",
     "platform_collective_memory",
     "conversation_context",
+    "conversation_focus",
     "privacy_boundary",
     "candidate_materials",
     "pdf_evidence",
@@ -49,6 +50,7 @@ PROMPT_TEXT_FIELD_LIMITS = {
     "reason": 260,
     "title": 120,
     "answer": 1200,
+    "conversation_focus": 650,
 }
 
 PROMPT_DEFAULT_TEXT_LIMIT = 500
