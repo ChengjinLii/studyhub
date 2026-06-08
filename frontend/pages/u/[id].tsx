@@ -26,14 +26,18 @@ interface UserProfilePageProps {
 const formatMarkdown = (value: string) => value.replace(/\r?\n/g, '  \n');
 const EXPERIENCE_TAGS = new Set(['经验分享', '保研面经', '求职面经', '考研攻略', '留学指南', '考研心得', '留学心得']);
 
+const normalizeUploadTags = (tags: UploadItem['tags']): string[] | null => {
+  if (!Array.isArray(tags)) return null;
+  return tags.filter((tag): tag is string => typeof tag === 'string' && tag.length > 0);
+};
+
 const isExperienceUpload = (item: UploadItem) => {
   const extended = item as UploadItem & {
-    tags?: string[] | null;
     isExperience?: boolean;
     type?: string | null;
     contentType?: string | null;
   };
-  const tags = Array.isArray(extended.tags) ? extended.tags.filter(Boolean) : [];
+  const tags = normalizeUploadTags(item.tags) ?? [];
   if (tags.some((tag) => EXPERIENCE_TAGS.has(tag))) return true;
   if (extended.isExperience === true) return true;
   if (typeof extended.type === 'string' && /experience/i.test(extended.type)) return true;
@@ -186,9 +190,21 @@ export default function UserProfilePage({ user, profile }: UserProfilePageProps)
 
   useEffect(() => {
     if (!uploads.length) return;
-    const pendingIds = uploads
-      .map((item) => item.materialId)
-      .filter((id) => Number.isFinite(id) && uploadTagMap[id] === undefined);
+    const tagsFromUploads: Record<number, string[]> = {};
+    const pendingIds: number[] = [];
+    uploads.forEach((item) => {
+      const materialId = item.materialId;
+      if (!Number.isFinite(materialId) || uploadTagMap[materialId] !== undefined) return;
+      const tags = normalizeUploadTags(item.tags);
+      if (tags !== null) {
+        tagsFromUploads[materialId] = tags;
+        return;
+      }
+      pendingIds.push(materialId);
+    });
+    if (Object.keys(tagsFromUploads).length > 0) {
+      setUploadTagMap((prev) => ({ ...prev, ...tagsFromUploads }));
+    }
     if (!pendingIds.length) return;
 
     let cancelled = false;

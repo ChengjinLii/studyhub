@@ -25,6 +25,7 @@ export interface UploadItem {
   createdAt: string;
   commentCount?: number;
   likeCount?: number;
+  tags?: string[] | null;
 }
 
 export interface AdminNote {

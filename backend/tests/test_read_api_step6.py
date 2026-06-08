@@ -92,6 +92,7 @@ def test_step6_authenticated_read_endpoints_follow_expected_shapes(
     assert profile_data["uploadCount"] == 3
     assert profile_data["marketCount"] == 1
     assert [item["materialId"] for item in profile_data["recentUploads"]] == [101, 103, 102]
+    assert profile_data["recentUploads"][0]["tags"] == ["期末真题", "期末答案（自制解析）"]
 
     uploads_response = client.get("/api/users/2/uploads", params={"limit": 1}, headers=alice_headers)
     assert uploads_response.status_code == 200
@@ -107,6 +108,7 @@ def test_step6_authenticated_read_endpoints_follow_expected_shapes(
             "createdAt": "2026-03-18T18:00:00+08:00",
             "commentCount": 2,
             "likeCount": 31,
+            "tags": ["期末真题", "期末答案（自制解析）"],
         }
     ]
 

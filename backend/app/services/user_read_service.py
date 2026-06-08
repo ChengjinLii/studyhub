@@ -6,7 +6,7 @@ from decimal import Decimal, ROUND_HALF_UP
 from typing import Any
 
 from fastapi import HTTPException, status
-from sqlalchemy import text
+from sqlalchemy import bindparam, inspect, text
 from sqlalchemy.orm import Session
 
 from app.core.profile_metadata import DEFAULT_FREE_DOWNLOAD_QUOTA, resolve_free_download_quota
@@ -17,6 +17,7 @@ from app.repos.finance_repo import FinanceRepository
 from app.repos.market_repo import MarketRepository
 from app.repos.material_repo import MaterialRepository
 from app.repos.read_api_repo import ReadApiRepository
+from app.services.materials_serializers import load_json_list
 from app.services.read_support import (
     DEFAULT_OUTPUT_TIMEZONE,
     ROLE_ADMIN,
@@ -31,6 +32,42 @@ from app.services.read_support import (
     unlimited_free_download,
 )
 from app.services.user_follow_service import UserFollowService
+
+
+_TABLE_NAME_CACHE: dict[str, set[str]] = {}
+_TABLE_COLUMN_CACHE: dict[tuple[str, str], set[str]] = {}
+
+
+def _bind_cache_key(session: Session) -> str:
+    bind = session.get_bind()
+    try:
+        return bind.engine.url.render_as_string(hide_password=True)
+    except Exception:
+        return str(bind)
+
+
+def _table_names(session: Session) -> set[str]:
+    cache_key = _bind_cache_key(session)
+    cached = _TABLE_NAME_CACHE.get(cache_key)
+    if cached is not None:
+        return cached
+    table_names = set(inspect(session.get_bind()).get_table_names())
+    _TABLE_NAME_CACHE[cache_key] = table_names
+    return table_names
+
+
+def _table_columns(session: Session, table_name: str) -> set[str]:
+    cache_key = (_bind_cache_key(session), table_name)
+    cached = _TABLE_COLUMN_CACHE.get(cache_key)
+    if cached is not None:
+        return cached
+    column_names = {column["name"] for column in inspect(session.get_bind()).get_columns(table_name)}
+    _TABLE_COLUMN_CACHE[cache_key] = column_names
+    return column_names
+
+
+def _table_has_column(session: Session, table_name: str, column_name: str) -> bool:
+    return table_name in _table_names(session) and column_name in _table_columns(session, table_name)
 
 
 class UserReadService:
@@ -220,8 +257,9 @@ class UserReadService:
             return self._compat_get_user_uploads(session, target_user_id, limit)
         self._bootstrap_content(session)
         safe_limit = clamp_limit(limit, max_value=100)
+        include_tags = _table_has_column(session, "materials", "tags_json")
         items = [
-            self._to_upload_record(material)
+            self._to_upload_record(material, include_tags=include_tags)
             for material in self.material_repo.list_visible_materials_for_uploader(session, target_user_id, limit=safe_limit)
         ]
         return items[:safe_limit] if safe_limit else items
@@ -434,10 +472,11 @@ class UserReadService:
             "createdAt": material.get("createdAt"),
             "commentCount": int(material.get("commentCount", 0)),
             "likeCount": int(material.get("likeCount", 0)),
+            "tags": list(material.get("tags") or []),
         }
 
-    def _to_upload_record(self, material) -> dict[str, Any]:
-        return {
+    def _to_upload_record(self, material, *, include_tags: bool) -> dict[str, Any]:
+        item = {
             "materialId": material.id,
             "title": material.title,
             "status": material.status,
@@ -449,6 +488,9 @@ class UserReadService:
             "commentCount": int(material.comment_count or 0),
             "likeCount": int(material.like_count or 0),
         }
+        if include_tags:
+            item["tags"] = load_json_list(material.tags_json)
+        return item
 
     def _to_market_sell_item(self, item: dict[str, Any]) -> dict[str, Any]:
         return {
@@ -596,21 +638,53 @@ class UserReadService:
             sql += "\nLIMIT :limit"
             params["limit"] = safe_limit
         rows = session.execute(text(sql), params).mappings().all()
+        material_ids = [int(row["id"]) for row in rows]
+        tags_by_material = self._compat_load_upload_tags(session, material_ids)
         return [
-            {
-                "materialId": int(row["id"]),
-                "title": row["title"],
-                "status": row["status"],
-                "free": bool(row["is_free"]),
-                "price": int(row["price"] or 0) / 100.0,
-                "salesCount": int(row["sales_count"] or 0),
-                "downloadCount": int(row["download_count"] or 0),
-                "createdAt": compat_serialize_datetime(row["created_at"]),
-                "commentCount": 0,
-                "likeCount": int(row["like_count"] or 0),
-            }
+            self._compat_upload_row_to_item(
+                row,
+                tags=tags_by_material.get(int(row["id"])) if tags_by_material is not None else None,
+            )
             for row in rows
         ]
+
+    def _compat_load_upload_tags(self, session: Session, material_ids: list[int]) -> dict[int, list[str]] | None:
+        if not material_ids:
+            return {}
+        if "material_tags" not in _table_names(session):
+            return None
+        stmt = text(
+            """
+            SELECT material_id, tag
+            FROM material_tags
+            WHERE material_id IN :material_ids
+            ORDER BY id ASC
+            """
+        ).bindparams(bindparam("material_ids", expanding=True))
+        rows = session.execute(stmt, {"material_ids": material_ids}).mappings().all()
+        result: dict[int, list[str]] = {material_id: [] for material_id in material_ids}
+        for row in rows:
+            tag = row["tag"]
+            if isinstance(tag, str) and tag.strip():
+                result.setdefault(int(row["material_id"]), []).append(tag)
+        return result
+
+    def _compat_upload_row_to_item(self, row: Any, *, tags: list[str] | None) -> dict[str, Any]:
+        item = {
+            "materialId": int(row["id"]),
+            "title": row["title"],
+            "status": row["status"],
+            "free": bool(row["is_free"]),
+            "price": int(row["price"] or 0) / 100.0,
+            "salesCount": int(row["sales_count"] or 0),
+            "downloadCount": int(row["download_count"] or 0),
+            "createdAt": compat_serialize_datetime(row["created_at"]),
+            "commentCount": 0,
+            "likeCount": int(row["like_count"] or 0),
+        }
+        if tags is not None:
+            item["tags"] = tags
+        return item
 
     def _compat_get_user_market_listings(self, session: Session, target_user_id: int, limit: int | None) -> list[dict[str, Any]]:
         safe_limit = clamp_limit(limit, max_value=100)
