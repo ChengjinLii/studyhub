@@ -53,21 +53,25 @@ class NotificationService:
 
     def list_recent(self, session: Session, user_id: int) -> list[dict[str, object]]:
         self._require_user(session, user_id)
+        notifications = self._visible_notifications(session, user_id, limit=50)
+        senders = self._resolve_senders(session, [entity.admin_user_id for entity in notifications])
         base_items = [
             {
                 "id": entity.id,
                 "message": entity.message,
-                "sender": self._resolve_sender(session, entity.admin_user_id),
+                "sender": senders.get(entity.admin_user_id) if entity.admin_user_id is not None else None,
                 "createdAt": serialize_datetime(entity.created_at),
             }
-            for entity in self._visible_notifications(session, user_id, limit=50)
+            for entity in notifications
         ]
+        market_events = self.market_repo.wants_for_seller(session, user_id, limit=50)
+        market_messages = self._market_messages(session, [int(entity.item_id) for entity in market_events])
         market_items = []
-        for entity in self.market_repo.wants_for_seller(session, user_id, limit=50):
+        for entity in market_events:
             market_items.append(
                 {
                     "id": -entity.id,
-                    "message": self._market_message(session, entity.item_id),
+                    "message": market_messages.get(int(entity.item_id), self._format_market_message(None)),
                     "sender": "想要提醒",
                     "createdAt": serialize_datetime(entity.created_at),
                 }
@@ -93,10 +97,36 @@ class NotificationService:
 
     def _market_message(self, session: Session, item_id: int) -> str:
         item = self.market_repo.get_item(session, item_id)
+        return self._format_market_message(item)
+
+    def _market_messages(self, session: Session, item_ids: list[int]) -> dict[int, str]:
+        if not item_ids:
+            return {}
+        loader = getattr(self.market_repo, "list_items_by_ids", None)
+        if not callable(loader):
+            return {item_id: self._market_message(session, item_id) for item_id in sorted(set(item_ids))}
+        return {int(item.id): self._format_market_message(item) for item in loader(session, sorted(set(item_ids)))}
+
+    def _format_market_message(self, item) -> str:
         title = item.title if item is not None else "我的校园好物"
         want_count = item.want_count if item is not None else None
         count_text = str(want_count) if want_count is not None else "有人"
         return f"你的好物「{title}」有 {count_text} 人想要"
+
+    def _resolve_senders(self, session: Session, admin_user_ids: list[int | None]) -> dict[int, str]:
+        ids = sorted({int(user_id) for user_id in admin_user_ids if user_id is not None})
+        if not ids:
+            return {}
+        loader = getattr(self.auth_repo, "find_users_by_ids", None)
+        if not callable(loader):
+            return {user_id: self._resolve_sender(session, user_id) or "管理员" for user_id in ids}
+        users_by_id = {int(user.id): user for user in loader(session, ids)}
+        return {
+            user_id: (users_by_id[user_id].nickname or users_by_id[user_id].username or "管理员")
+            if user_id in users_by_id
+            else "管理员"
+            for user_id in ids
+        }
 
     def _resolve_sender(self, session: Session, admin_user_id: int | None) -> str | None:
         if admin_user_id is None:
