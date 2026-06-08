@@ -220,6 +220,41 @@ def test_agent_memory_context_can_be_disabled_and_limits_interaction_checks() ->
     assert material_repo.checked_downloads == [101]
 
 
+def test_agent_memory_context_derives_current_query_private_memory() -> None:
+    service = AgentMemoryService(_settings(), _FakeAuthRepo(), _FakeMaterialRepo())  # type: ignore[arg-type]
+
+    context = service.collect(
+        object(),  # type: ignore[arg-type]
+        query="我两周后考试，目标85分，每天2小时，调制和误码率很薄弱，第3题公式推导看不懂，想速成刷题",
+        materials=[_material(101, title="通信原理期末速成笔记", tags=["通信原理", "速成"])],
+        current_user_id=7,
+        pdf_evidence=[],
+    )
+    prompt = context.to_prompt_payload()
+
+    current_query_memory = prompt["user_personal_memory"]["current_query_memory"]
+    assert current_query_memory == {
+        "study_constraints": {
+            "time_horizon": "两周",
+            "days_until_exam": 14,
+            "target_score": 85,
+            "daily_available_hours": 2.0,
+            "weak_points": ["调制", "误码率"],
+        },
+        "problem_context": {
+            "focus_areas": ["概念理解", "公式推导"],
+            "question_numbers": ["第3题"],
+            "knowledge_points": ["调制", "误码率"],
+        },
+        "learning_preferences": ["补基础优先", "考前冲刺", "刷题优先", "查漏补缺"],
+        "scope": "current_request_only",
+        "persistence": "not_persisted",
+    }
+    assert "current_query_memory" not in json.dumps(prompt["platform_collective_memory"], ensure_ascii=False)
+    assert "private@example.com" not in json.dumps(current_query_memory, ensure_ascii=False)
+    assert "第3题公式推导看不懂" not in json.dumps(current_query_memory, ensure_ascii=False)
+
+
 def test_ai_recommendation_prompt_receives_memory_context(monkeypatch) -> None:
     captured: dict[str, Any] = {}
 
@@ -284,6 +319,7 @@ def test_ai_recommendation_prompt_receives_memory_context(monkeypatch) -> None:
     assert captured["user_prompt"]["candidate_materials"][0]["user_fit_signals"] == ["已收藏过", "已下载过", "你给过 5 分", "专业匹配"]
     assert "与你已有学习行为匹配：已收藏过、已下载过、你给过 5 分、专业匹配" in captured["user_prompt"]["candidate_materials"][0]["reason"]
     assert "用户个人记忆" in captured["system_prompt"]
+    assert "current_query_memory" in captured["system_prompt"]
     assert body["answer"] == "已结合记忆上下文推荐通信原理真题。"
 
 

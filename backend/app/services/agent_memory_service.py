@@ -49,6 +49,56 @@ STUDY_STRATEGY_PATTERNS: tuple[tuple[str, tuple[str, ...]], ...] = (
     ("经验参考", ("经验分享", "经验贴", "攻略", "面经", "避坑")),
 )
 
+QUERY_WEAKNESS_TERMS = (
+    "调制",
+    "解调",
+    "频谱",
+    "带宽",
+    "误码率",
+    "匹配滤波",
+    "判决",
+    "信噪比",
+    "傅里叶",
+    "卷积",
+    "链表",
+    "二叉树",
+    "排序",
+    "积分",
+    "微分",
+    "极限",
+    "概率",
+    "分布",
+)
+
+QUERY_STUDY_TIME_PHRASES: tuple[tuple[str, int], ...] = (
+    ("明天", 1),
+    ("后天", 2),
+    ("半个月", 15),
+    ("一周", 7),
+    ("二周", 14),
+    ("两周", 14),
+    ("三周", 21),
+    ("四周", 28),
+    ("一个月", 30),
+    ("一月", 30),
+)
+
+QUERY_PROBLEM_FOCUS_PATTERNS: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("概念理解", ("概念", "为什么", "不懂", "理解不了", "看不懂")),
+    ("公式推导", ("公式", "推导", "证明", "怎么推", "推不出")),
+    ("计算步骤", ("计算", "步骤", "怎么算", "怎么做", "代入", "求解", "不会做")),
+    ("读题定位", ("题干", "条件", "读题", "问什么", "看不懂题")),
+    ("答案复盘", ("解析", "答案", "错题", "哪里错", "对答案")),
+)
+
+QUERY_LEARNING_PREFERENCE_PATTERNS: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("补基础优先", ("基础差", "零基础", "基础不好", "基础不太好", "基础弱", "看不懂", "听不懂", "入门", "从零开始")),
+    ("考前冲刺", ("速成", "冲刺", "考前", "短期", "来不及", "临时抱佛脚")),
+    ("刷题优先", ("刷题", "真题", "练习", "做题", "套卷", "题海")),
+    ("详细解析", ("详细解析", "一步步", "讲清楚", "讲明白", "细讲", "详细讲", "详细说明")),
+    ("查漏补缺", ("查漏补缺", "错题", "薄弱", "短板", "弱项", "不会的地方")),
+)
+
 
 @dataclass(slots=True)
 class AgentMemoryContext:
@@ -94,7 +144,7 @@ class AgentMemoryService:
             return AgentMemoryContext(platform={}, user=None)
         limited_materials = materials[: max(0, int(self.settings.ai_agent_memory_max_materials or 0))]
         platform = self._build_platform_memory(query, limited_materials, pdf_evidence)
-        user = self._build_user_memory(session, limited_materials, current_user_id)
+        user = self._build_user_memory(session, query, limited_materials, current_user_id)
         return AgentMemoryContext(platform=platform, user=user)
 
     def _build_platform_memory(
@@ -191,6 +241,7 @@ class AgentMemoryService:
     def _build_user_memory(
         self,
         session: Session,
+        query: str,
         materials: list[MaterialRecord],
         current_user_id: int | None,
     ) -> dict[str, Any] | None:
@@ -206,8 +257,10 @@ class AgentMemoryService:
         matched_candidates = self._matched_candidate_payloads(materials, profile)
         interactions = self._candidate_interaction_payloads(session, materials, current_user_id)
         preferences = self._preference_payload(materials, interactions)
+        current_query_memory = _current_query_memory_payload(query)
         payload: dict[str, Any] = {
             "profile": profile,
+            "current_query_memory": current_query_memory,
             "matched_candidate_materials": matched_candidates,
             "candidate_interactions": interactions,
             "inferred_preferences": preferences,
@@ -401,6 +454,129 @@ def _looks_like_experience_material(material: MaterialRecord) -> bool:
     if any(tag in {"经验", "经验分享", "攻略", "面经"} for tag in tags):
         return True
     return bool({"经验参考", "复盘错题", "冲刺速成"} & set(_study_strategy_terms(text)))
+
+
+def _current_query_memory_payload(query: str) -> dict[str, Any]:
+    normalized = query.strip().lower()
+    constraints = _query_study_constraints(normalized)
+    problem_context = _query_problem_context(normalized)
+    preferences = _query_learning_preferences(normalized)
+    if not constraints and not problem_context and not preferences:
+        return {}
+    payload: dict[str, Any] = {
+        "study_constraints": constraints,
+        "problem_context": problem_context,
+        "learning_preferences": preferences,
+        "scope": "current_request_only",
+        "persistence": "not_persisted",
+    }
+    return {key: value for key, value in payload.items() if value not in (None, [], {}, "")}
+
+
+def _query_study_constraints(normalized_query: str) -> dict[str, Any]:
+    payload: dict[str, Any] = {}
+    horizon = _query_study_horizon(normalized_query)
+    if horizon:
+        payload.update(horizon)
+    target_score = _query_target_score(normalized_query)
+    if target_score is not None:
+        payload["target_score"] = target_score
+    daily_hours = _query_daily_hours(normalized_query)
+    if daily_hours is not None:
+        payload["daily_available_hours"] = daily_hours
+    weak_points = _query_weak_points(normalized_query)
+    if weak_points:
+        payload["weak_points"] = weak_points
+    return payload
+
+
+def _query_study_horizon(normalized_query: str) -> dict[str, Any]:
+    for phrase, days in QUERY_STUDY_TIME_PHRASES:
+        if phrase in normalized_query:
+            return {"time_horizon": phrase, "days_until_exam": days}
+    day_match = re.search(r"(?<!\d)(\d{1,3})\s*(?:天|日)\s*后", normalized_query)
+    if day_match:
+        days = max(0, min(180, int(day_match.group(1))))
+        return {"time_horizon": f"{days}天后", "days_until_exam": days}
+    week_match = re.search(r"(?<!\d)(\d{1,2})\s*(?:周|星期)\s*后", normalized_query)
+    if week_match:
+        weeks = max(0, min(26, int(week_match.group(1))))
+        return {"time_horizon": f"{weeks}周后", "days_until_exam": weeks * 7}
+    month_match = re.search(r"(?<!\d)(\d{1,2})\s*个?月\s*后", normalized_query)
+    if month_match:
+        months = max(0, min(6, int(month_match.group(1))))
+        return {"time_horizon": f"{months}个月后", "days_until_exam": months * 30}
+    return {}
+
+
+def _query_target_score(normalized_query: str) -> int | None:
+    for pattern in (
+        r"(?:目标|考到|想考|希望|争取).{0,8}?(\d{2,3})\s*分?",
+        r"(\d{2,3})\s*分",
+    ):
+        match = re.search(pattern, normalized_query)
+        if not match:
+            continue
+        score = int(match.group(1))
+        if 1 <= score <= 100:
+            return score
+    return None
+
+
+def _query_daily_hours(normalized_query: str) -> float | None:
+    match = re.search(r"(?:每天|每日|一天).{0,8}?(\d{1,2}(?:\.\d)?)\s*(?:小时|h)", normalized_query)
+    if not match:
+        return None
+    hours = float(match.group(1))
+    if 0 < hours <= 16:
+        return hours
+    return None
+
+
+def _query_weak_points(normalized_query: str) -> list[str]:
+    if not any(marker in normalized_query for marker in ("薄弱", "不会", "不懂", "不熟", "不太会", "卡住", "看不懂")):
+        return []
+    return [term for term in QUERY_WEAKNESS_TERMS if term.lower() in normalized_query][:6]
+
+
+def _query_problem_context(normalized_query: str) -> dict[str, Any]:
+    focus_areas = []
+    for label, aliases in QUERY_PROBLEM_FOCUS_PATTERNS:
+        if any(alias.lower() in normalized_query for alias in aliases) and label not in focus_areas:
+            focus_areas.append(label)
+    question_numbers = _query_question_numbers(normalized_query)
+    knowledge_points = [term for term in QUERY_WEAKNESS_TERMS if term.lower() in normalized_query][:6]
+    payload: dict[str, Any] = {
+        "focus_areas": focus_areas[:4],
+        "question_numbers": question_numbers,
+        "knowledge_points": knowledge_points,
+    }
+    return {key: value for key, value in payload.items() if value}
+
+
+def _query_question_numbers(normalized_query: str) -> list[str]:
+    patterns = (
+        r"第\s*([0-9一二三四五六七八九十]{1,3})\s*[题問问]",
+        r"\b[Qq]\s*([0-9]{1,2})\b",
+        r"[Qq]uestion\s*([0-9]{1,2})",
+    )
+    result: list[str] = []
+    for pattern in patterns:
+        for match in re.findall(pattern, normalized_query):
+            label = f"第{str(match).strip()}题"
+            if label not in result:
+                result.append(label)
+            if len(result) >= 6:
+                return result
+    return result
+
+
+def _query_learning_preferences(normalized_query: str) -> list[str]:
+    result: list[str] = []
+    for label, aliases in QUERY_LEARNING_PREFERENCE_PATTERNS:
+        if any(alias.lower() in normalized_query for alias in aliases) and label not in result:
+            result.append(label)
+    return result[:6]
 
 
 def _compact_query_focus(query: str) -> list[str]:

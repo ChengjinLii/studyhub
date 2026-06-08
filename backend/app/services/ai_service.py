@@ -435,6 +435,7 @@ class AiService:
             "如果 pdf_evidence 提供了 anchor_text 或 anchor_terms，应优先用它们定位页内关键片段。"
             "如果候选资料提供了 quality_signals 或 risk_signals，你可以用它们辅助排序和提示，但不能把风险提示夸大成确定违规。"
             "如果提供了 memory_context，你可以用平台集体记忆增强课程/题型判断，用用户个人记忆做个性化建议；"
+            "如果用户个人记忆提供了 current_query_memory，只能用它理解本次问题中的目标、薄弱点、题号、卡点和偏好；"
             "如果平台集体记忆里有经验或复习策略聚合信号，可以用来辅助学习路径和资料使用顺序；"
             "但不能把用户个人记忆写入或表述成平台集体结论。"
             "如果候选资料提供了 user_fit_signals，可以用它解释当前用户为什么更适合先看该资料；"
@@ -445,7 +446,7 @@ class AiService:
             "如果提供了 course_memory_card，你可以用它总结课程级年份、逐年题型、章节模块、答案解析信号、知识点、经验策略和推荐顺序，"
             "并根据 evidence_coverage 和 confidence_assessment 避免过度概括。"
             "不要输出 memory_context、query_plan、problem_context、candidate_materials、user_fit_signals、"
-            "pdf_evidence、course_memory_card、material_scope、learning_preferences、evidence_coverage、confidence_assessment、yearly_question_type_matrix、chapter_distribution、chapter_signals、solution_signal_distribution、solution_signals、study_strategy_distribution、"
+            "pdf_evidence、course_memory_card、material_scope、current_query_memory、learning_preferences、evidence_coverage、confidence_assessment、yearly_question_type_matrix、chapter_distribution、chapter_signals、solution_signal_distribution、solution_signals、study_strategy_distribution、"
             "experience_materials、anchor_text、anchor_terms 或 privacy_boundary 等内部字段名。"
             "必须输出严格 JSON，不要输出 Markdown，不要包裹代码块。"
         )
