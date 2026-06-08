@@ -143,7 +143,7 @@ def test_step11_payout_schedule_qr_application_gateway_and_monthly_overview(
     assert schedule_update.status_code == 200, schedule_update.text
 
     finance_repo = get_finance_repo()
-    paid_at = datetime.now(UTC) - timedelta(days=8)
+    paid_at = datetime(2026, 5, 20, 12, 0, tzinfo=UTC)
     with session_scope() as session:
         order = finance_repo.find_order_by_out_trade_no(session, out_trade_no)
         assert order is not None

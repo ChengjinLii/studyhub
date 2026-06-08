@@ -23,6 +23,7 @@ const internalApiBase = process.env.API_BASE_INTERNAL
   : apiBase && /^https?:\/\//i.test(apiBase)
     ? apiBase
     : undefined;
+const internalBackendBase = internalApiBase ? internalApiBase.replace(/\/api$/i, '') : undefined;
 if (apiBase) {
   process.env.NEXT_PUBLIC_API_BASE = apiBase;
   if (apiOrigin) {
@@ -114,6 +115,14 @@ const nextConfig = {
       return [];
     }
     return [
+      {
+        source: '/.well-known/oauth-protected-resource',
+        destination: `${internalBackendBase}/.well-known/oauth-protected-resource`,
+      },
+      {
+        source: '/mcp',
+        destination: `${internalBackendBase}/mcp`,
+      },
       {
         source: '/api/:path*',
         destination: `${internalApiBase}/:path*`,
