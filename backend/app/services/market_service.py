@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import asyncio
 import json
+from threading import RLock
+from time import monotonic
 from typing import Any
 
 from fastapi import HTTPException, UploadFile, status
@@ -63,6 +65,53 @@ class MarketService:
         self.market_repo = market_repo
         self.asset_store = asset_store
 
+    def invalidate_market_summary_cache(self) -> None:
+        cache, lock = self._market_summary_cache_state()
+        with lock:
+            cache.clear()
+
+    def _market_summary_cache_state(self):
+        cache = getattr(self, "_market_summary_cache", None)
+        lock = getattr(self, "_market_summary_cache_lock", None)
+        if cache is None or lock is None:
+            cache = {}
+            lock = RLock()
+            self._market_summary_cache = cache
+            self._market_summary_cache_lock = lock
+        return cache, lock
+
+    def _market_summary_cache_ttl_seconds(self) -> int:
+        return max(1, int(getattr(self.settings, "public_read_cache_ttl_seconds", 30) or 30))
+
+    def _market_summary_cache_get(self, key: tuple[Any, ...]) -> Any | None:
+        cache, lock = self._market_summary_cache_state()
+        now = monotonic()
+        with lock:
+            entry = cache.get(key)
+            if entry is None:
+                return None
+            expires_at, value = entry
+            if expires_at <= now:
+                cache.pop(key, None)
+                return None
+            return self._market_summary_cache_clone(value)
+
+    def _market_summary_cache_set(self, key: tuple[Any, ...], value: Any) -> Any:
+        cache, lock = self._market_summary_cache_state()
+        with lock:
+            cache[key] = (
+                monotonic() + self._market_summary_cache_ttl_seconds(),
+                self._market_summary_cache_clone(value),
+            )
+        return value
+
+    def _market_summary_cache_clone(self, value: Any) -> Any:
+        if isinstance(value, dict):
+            return dict(value)
+        if isinstance(value, list):
+            return list(value)
+        return value
+
     def list_market(
         self,
         session: Session,
@@ -104,20 +153,10 @@ class MarketService:
             if current_user_id is not None
             else set()
         )
-        active_count, sold_count = session.execute(
-            select(
-                func.coalesce(func.sum(case((MarketItemRecord.status == "SALE", 1), else_=0)), 0),
-                func.coalesce(func.sum(case((MarketItemRecord.status == "SOLD", 1), else_=0)), 0),
-            )
-        ).one()
         return {
             "items": [self._to_list_item(item, item.id in wanted_ids) for item in items],
             "meta": {"page": safe_page, "size": safe_size, "total": total},
-            "stats": {
-                "active": int(active_count or 0),
-                "sold": int(sold_count or 0),
-                "userCount": self._user_count_with_seed_fallback(session),
-            },
+            "stats": self._load_market_stats(session),
         }
 
     async def list_market_async(
@@ -175,6 +214,26 @@ class MarketService:
 
     def _user_count_with_seed_fallback(self, session: Session) -> int:
         return count_users_with_seed_fallback(session, self.auth_repo, self.read_repo)
+
+    def _load_market_stats(self, session: Session) -> dict[str, int]:
+        cache_key = ("market_stats", "orm")
+        cached = self._market_summary_cache_get(cache_key)
+        if cached is not None:
+            return cached
+        active_count, sold_count = session.execute(
+            select(
+                func.coalesce(func.sum(case((MarketItemRecord.status == "SALE", 1), else_=0)), 0),
+                func.coalesce(func.sum(case((MarketItemRecord.status == "SOLD", 1), else_=0)), 0),
+            )
+        ).one()
+        return self._market_summary_cache_set(
+            cache_key,
+            {
+                "active": int(active_count or 0),
+                "sold": int(sold_count or 0),
+                "userCount": self._user_count_with_seed_fallback(session),
+            },
+        )
 
     def get_detail(self, session: Session, current_user_id: int | None, item_id: int) -> dict[str, Any]:
         if self.settings.requires_private_env_file:
@@ -262,6 +321,7 @@ class MarketService:
         self._assign_images(item, keys)
         self.market_repo.save_item(session, item)
         session.commit()
+        self.invalidate_market_summary_cache()
         return self._to_detail_item(item, wanted=False, is_owner=True)
 
     def want_item(self, session: Session, item_id: int, user_id: int) -> dict[str, Any]:
@@ -296,6 +356,7 @@ class MarketService:
         item.status = self._normalize_user_status(payload.status)
         self.market_repo.save_item(session, item)
         session.commit()
+        self.invalidate_market_summary_cache()
         return self._to_detail_item(item, wanted=True, is_owner=True)
 
     def delete_item(self, session: Session, item_id: int, seller_id: int) -> None:
@@ -305,12 +366,14 @@ class MarketService:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="无权删除该商品")
         self._delete_item(session, item)
         session.commit()
+        self.invalidate_market_summary_cache()
 
     def remove_by_admin(self, session: Session, item_id: int) -> None:
         self._bootstrap(session)
         item = self._require_item(session, item_id)
         self._delete_item(session, item)
         session.commit()
+        self.invalidate_market_summary_cache()
 
     def list_for_admin(
         self,
@@ -393,6 +456,8 @@ class MarketService:
                 self.market_repo.save_item(session, item)
                 updated += 1
         session.commit()
+        if updated:
+            self.invalidate_market_summary_cache()
         return {"updated": updated, "requested": len(payload.itemIds), "missingIds": missing_ids}
 
     def batch_delete(self, session: Session, payload: AdminMarketBatchDeletePayload) -> dict[str, Any]:
@@ -407,6 +472,8 @@ class MarketService:
             self._delete_item(session, item)
             deleted += 1
         session.commit()
+        if deleted:
+            self.invalidate_market_summary_cache()
         return {"deleted": deleted, "requested": len(payload.itemIds), "failedIds": failed_ids}
 
     def resolve_public_image(self, session: Session, item_id: int, index: int) -> tuple[MarketItemRecord, str]:
@@ -854,6 +921,10 @@ class MarketService:
         return [dict(row) for row in rows]
 
     def _compat_load_market_stats(self, session: Session) -> dict[str, int]:
+        cache_key = ("market_stats", "compat")
+        cached = self._market_summary_cache_get(cache_key)
+        if cached is not None:
+            return cached
         market_stats = session.execute(
             text(
                 """
@@ -865,13 +936,20 @@ class MarketService:
             )
         ).mappings().first()
         user_count = int(session.execute(text("SELECT COUNT(*) FROM users")).scalar() or 0)
-        return {
-            "active": int(market_stats["active"] if market_stats is not None else 0),
-            "sold": int(market_stats["sold"] if market_stats is not None else 0),
-            "userCount": user_count,
-        }
+        return self._market_summary_cache_set(
+            cache_key,
+            {
+                "active": int(market_stats["active"] if market_stats is not None else 0),
+                "sold": int(market_stats["sold"] if market_stats is not None else 0),
+                "userCount": user_count,
+            },
+        )
 
     async def _compat_load_market_stats_async(self, session) -> dict[str, int]:
+        cache_key = ("market_stats", "compat")
+        cached = self._market_summary_cache_get(cache_key)
+        if cached is not None:
+            return cached
         market_result = await session.execute(
             text(
                 """
@@ -884,11 +962,14 @@ class MarketService:
         )
         market_stats = market_result.mappings().first()
         user_count = int((await session.execute(text("SELECT COUNT(*) FROM users"))).scalar() or 0)
-        return {
-            "active": int(market_stats["active"] if market_stats is not None else 0),
-            "sold": int(market_stats["sold"] if market_stats is not None else 0),
-            "userCount": user_count,
-        }
+        return self._market_summary_cache_set(
+            cache_key,
+            {
+                "active": int(market_stats["active"] if market_stats is not None else 0),
+                "sold": int(market_stats["sold"] if market_stats is not None else 0),
+                "userCount": user_count,
+            },
+        )
 
     def _compat_load_wanted_ids(self, session: Session, current_user_id: int | None, item_ids: list[int]) -> set[int]:
         if current_user_id is None or not item_ids:

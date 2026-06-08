@@ -67,6 +67,26 @@ def test_legacy_market_stats_uses_single_market_items_aggregate_query() -> None:
     assert session.user_queries == 1
 
 
+def test_legacy_market_summary_cache_reuses_stats_until_invalidated() -> None:
+    service = _build_service()
+    session = _StatsSession()
+
+    first = service._compat_load_market_stats(session)  # type: ignore[arg-type]
+    first["active"] = 999
+    second = service._compat_load_market_stats(session)  # type: ignore[arg-type]
+
+    assert second == {"active": 7, "sold": 3, "userCount": 5}
+    assert session.market_queries == 1
+    assert session.user_queries == 1
+
+    service.invalidate_market_summary_cache()
+    refreshed = service._compat_load_market_stats(session)  # type: ignore[arg-type]
+
+    assert refreshed["active"] == 7
+    assert session.market_queries == 2
+    assert session.user_queries == 2
+
+
 def test_async_legacy_market_stats_uses_single_market_items_aggregate_query() -> None:
     service = _build_service()
     session = _AsyncStatsSession()
@@ -74,6 +94,18 @@ def test_async_legacy_market_stats_uses_single_market_items_aggregate_query() ->
     data = asyncio.run(service._compat_load_market_stats_async(session))
 
     assert data == {"active": 7, "sold": 3, "userCount": 5}
+    assert session.market_queries == 1
+    assert session.user_queries == 1
+
+
+def test_async_legacy_market_stats_reuses_summary_cache() -> None:
+    service = _build_service()
+    session = _AsyncStatsSession()
+
+    first = asyncio.run(service._compat_load_market_stats_async(session))
+    second = asyncio.run(service._compat_load_market_stats_async(session))
+
+    assert first == second
     assert session.market_queries == 1
     assert session.user_queries == 1
 
