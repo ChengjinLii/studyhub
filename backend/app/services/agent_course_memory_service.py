@@ -265,9 +265,10 @@ def _source_type_counter(
     if pdf_evidence:
         return counter
     platform = memory_context.platform if memory_context else {}
-    for item in platform.get("pdf_source_type_signals") or []:
-        if isinstance(item, dict) and item.get("value"):
-            counter[str(item["value"])] += int(item.get("count") or 1)
+    for source_key in ("pdf_source_type_signals", "material_source_type_signals"):
+        for item in platform.get(source_key) or []:
+            if isinstance(item, dict) and item.get("value"):
+                counter[str(item["value"])] += int(item.get("count") or 1)
     return counter
 
 

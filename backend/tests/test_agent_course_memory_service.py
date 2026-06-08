@@ -227,6 +227,46 @@ def test_course_memory_card_includes_collective_strategy_and_experience_signals(
     assert "profile" not in version_basis_text
 
 
+def test_course_memory_card_uses_material_source_types_without_pdf_evidence() -> None:
+    plan = AgentQueryPlan(
+        intent="exam_trend_analysis",
+        confidence=0.8,
+        course_terms=("通信原理",),
+        resource_types=("past_exam",),
+        years=(),
+        search_terms=("通信原理", "真题"),
+        evidence_tasks=("rank_candidate_materials",),
+        response_guidance=("保守分析候选资料",),
+    )
+    memory = AgentMemoryContext(
+        platform={
+            "material_source_type_signals": [
+                {"value": "past_exam", "count": 2},
+                {"value": "answer_explanation", "count": 1},
+                {"value": "study_outline", "count": 1},
+            ]
+        },
+        user=None,
+    )
+
+    card = AgentCourseMemoryService().build_card(
+        materials=[_material(), _material(102, title="通信原理期末速成", downloads=20)],
+        pdf_evidence=[],
+        memory_context=memory,
+        query_plan=plan,
+    )
+
+    assert card is not None
+    payload = card.to_prompt_payload()
+    assert payload["source_type_distribution"] == [
+        {"value": "past_exam", "count": 2},
+        {"value": "answer_explanation", "count": 1},
+        {"value": "study_outline", "count": 1},
+    ]
+    assert "material_source_type_signals" in payload["version_basis"]["platform_signal_keys"]
+    assert payload["confidence_assessment"]["limitations"][0] == "缺少 PDF 页级证据"
+
+
 def test_course_memory_card_builds_yearly_question_type_matrix() -> None:
     plan = AgentQueryPlan(
         intent="exam_trend_analysis",

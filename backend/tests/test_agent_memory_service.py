@@ -156,6 +156,11 @@ def test_agent_memory_context_aggregates_platform_and_current_user_only() -> Non
     assert platform["candidate_count"] == 3
     assert {"value": "通信原理", "count": 3} in platform["top_tags"]
     assert {"value": "经验分享", "count": 1} in platform["top_tags"]
+    assert {"value": "通信原理", "count": 3} in platform["course_signals"]
+    assert {"value": "past_exam", "count": 3} in platform["material_source_type_signals"]
+    assert {"value": "answer_explanation", "count": 2} in platform["material_source_type_signals"]
+    assert {"value": "study_outline", "count": 2} in platform["material_source_type_signals"]
+    assert {"value": "experience", "count": 1} in platform["material_source_type_signals"]
     assert {"value": "先建立知识框架", "count": 1} in platform["study_strategy_signals"]
     assert {"value": "刷真题", "count": 1} in platform["study_strategy_signals"]
     assert {"value": "复盘错题", "count": 1} in platform["study_strategy_signals"]

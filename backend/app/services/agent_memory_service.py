@@ -99,6 +99,23 @@ QUERY_LEARNING_PREFERENCE_PATTERNS: tuple[tuple[str, tuple[str, ...]], ...] = (
     ("查漏补缺", ("查漏补缺", "错题", "薄弱", "短板", "弱项", "不会的地方")),
 )
 
+MATERIAL_COURSE_PATTERNS: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("电子系统设计", ("电子系统设计", "esd")),
+    ("通信原理", ("通信原理", "cps")),
+    ("信号与系统", ("信号与系统", "signals", "signal")),
+    ("数据结构", ("数据结构",)),
+    ("高等数学", ("高等数学", "高数", "微积分")),
+    ("概率论", ("概率论",)),
+)
+
+MATERIAL_SOURCE_TYPE_PATTERNS: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("past_exam", ("真题", "往年", "历年", "试卷", "期末题", "样卷", "考题")),
+    ("answer_explanation", ("解析", "答案", "标答", "参考答案", "讲解")),
+    ("lecture_notes", ("笔记", "讲义", "导图", "课件")),
+    ("study_outline", ("速成", "提纲", "复习", "冲刺")),
+    ("experience", ("经验", "经验分享", "经验贴", "攻略", "面经")),
+)
+
 
 @dataclass(slots=True)
 class AgentMemoryContext:
@@ -161,6 +178,7 @@ class AgentMemoryService:
         signal_counter: Counter[str] = Counter()
         material_quality_counter: Counter[str] = Counter()
         material_risk_counter: Counter[str] = Counter()
+        material_source_type_counter: Counter[str] = Counter()
         study_strategy_counter: Counter[str] = Counter()
         year_counter: Counter[str] = Counter()
         question_type_counter: Counter[str] = Counter()
@@ -183,6 +201,8 @@ class AgentMemoryService:
                     school_counter.update([cleaned_school])
             material_text = _material_text(material)
             signal_counter.update(_signal_terms(material_text))
+            course_counter.update(_material_course_terms(material_text))
+            material_source_type_counter.update(_material_source_type_terms(material_text))
             study_strategy_counter.update(_study_strategy_terms(material_text))
             material_signals = build_material_signals(material)
             material_quality_counter.update(material_signals.quality_signals)
@@ -222,6 +242,7 @@ class AgentMemoryService:
             "study_strategy_signals": _counter_items(study_strategy_counter, limit=8),
             "material_quality_signals": _counter_items(material_quality_counter, limit=8),
             "material_risk_signals": _counter_items(material_risk_counter, limit=8),
+            "material_source_type_signals": _counter_items(material_source_type_counter, limit=6),
             "pdf_year_signals": _counter_items(year_counter, limit=6),
             "pdf_question_type_signals": _counter_items(question_type_counter, limit=6),
             "pdf_chapter_signals": _counter_items(chapter_counter, limit=8),
@@ -444,6 +465,16 @@ def _material_text(material: MaterialRecord) -> str:
 def _signal_terms(text: str) -> list[str]:
     normalized = text.lower()
     return [term for term in MEMORY_SIGNAL_TERMS if term.lower() in normalized]
+
+
+def _material_course_terms(text: str) -> list[str]:
+    normalized = text.lower()
+    return [label for label, aliases in MATERIAL_COURSE_PATTERNS if any(alias.lower() in normalized for alias in aliases)]
+
+
+def _material_source_type_terms(text: str) -> list[str]:
+    normalized = text.lower()
+    return [label for label, aliases in MATERIAL_SOURCE_TYPE_PATTERNS if any(alias.lower() in normalized for alias in aliases)]
 
 
 def _study_strategy_terms(text: str) -> list[str]:
