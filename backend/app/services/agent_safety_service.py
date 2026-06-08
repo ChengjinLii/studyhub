@@ -17,6 +17,7 @@ FORBIDDEN_INTERNAL_MARKERS = (
     "query_plan",
     "problem_context",
     "material_scope",
+    "learning_preferences",
     "course_memory_card",
     "evidence_coverage",
     "confidence_assessment",

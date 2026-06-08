@@ -109,6 +109,39 @@ MULTI_MATERIAL_MARKERS = (
     "共同",
 )
 
+LEARNING_PREFERENCE_RULES: tuple[tuple[str, str, str, tuple[str, ...]], ...] = (
+    (
+        "foundation_first",
+        "补基础优先",
+        "先补课程框架、核心概念和基础例题，再进入真题训练。",
+        ("基础差", "零基础", "基础不好", "基础不太好", "基础弱", "看不懂", "听不懂", "入门", "从零开始"),
+    ),
+    (
+        "crash_course",
+        "考前冲刺",
+        "优先抓高频题型、分值高的考点和可快速复盘的资料页。",
+        ("速成", "冲刺", "考前", "短期", "来不及", "临时抱佛脚"),
+    ),
+    (
+        "practice_first",
+        "刷题优先",
+        "按题型刷真题或练习，再回查不会的知识点和解析页。",
+        ("刷题", "真题", "练习", "做题", "套卷", "题海"),
+    ),
+    (
+        "explanation_first",
+        "详细解析",
+        "优先选择带答案、解析和步骤的资料，按概念、公式、步骤拆开讲。",
+        ("详细解析", "一步步", "讲清楚", "讲明白", "细讲", "详细讲", "详细说明"),
+    ),
+    (
+        "weak_point_review",
+        "查漏补缺",
+        "围绕薄弱点和错题建立清单，用同类题复盘收束。",
+        ("查漏补缺", "错题", "薄弱", "短板", "弱项", "不会的地方"),
+    ),
+)
+
 
 @dataclass(slots=True)
 class AgentQueryPlan:
@@ -123,6 +156,7 @@ class AgentQueryPlan:
     study_constraints: dict[str, Any] = field(default_factory=dict)
     problem_context: dict[str, Any] = field(default_factory=dict)
     material_scope: dict[str, Any] = field(default_factory=dict)
+    learning_preferences: dict[str, Any] = field(default_factory=dict)
 
     def to_prompt_payload(self) -> dict[str, Any]:
         payload = {
@@ -141,6 +175,8 @@ class AgentQueryPlan:
             payload["problem_context"] = self.problem_context
         if self.material_scope:
             payload["material_scope"] = self.material_scope
+        if self.learning_preferences:
+            payload["learning_preferences"] = self.learning_preferences
         return payload
 
 
@@ -169,7 +205,15 @@ class AgentQueryPlannerService:
         study_constraints = _extract_study_constraints(normalized)
         problem_context = _extract_problem_context(normalized, pdf_evidence, intent)
         material_scope = _extract_material_scope(normalized, materials, pdf_evidence)
-        evidence_tasks = _build_evidence_tasks(intent, pdf_evidence, memory_context, problem_context, material_scope)
+        learning_preferences = _extract_learning_preferences(normalized)
+        evidence_tasks = _build_evidence_tasks(
+            intent,
+            pdf_evidence,
+            memory_context,
+            problem_context,
+            material_scope,
+            learning_preferences,
+        )
         response_guidance = _build_response_guidance(
             intent,
             bool(pdf_evidence),
@@ -177,6 +221,7 @@ class AgentQueryPlannerService:
             bool(study_constraints),
             bool(problem_context),
             material_scope,
+            bool(learning_preferences),
         )
         return AgentQueryPlan(
             intent=intent,
@@ -190,6 +235,7 @@ class AgentQueryPlannerService:
             study_constraints=study_constraints,
             problem_context=problem_context,
             material_scope=material_scope,
+            learning_preferences=learning_preferences,
         )
 
 
@@ -412,12 +458,38 @@ def _extract_material_scope(
     return payload
 
 
+def _extract_learning_preferences(normalized_query: str) -> dict[str, Any]:
+    modes: list[str] = []
+    labels: list[str] = []
+    guidance: list[str] = []
+    matched_terms: list[str] = []
+    for mode, label, hint, aliases in LEARNING_PREFERENCE_RULES:
+        hits = [alias for alias in aliases if alias.lower() in normalized_query]
+        if not hits:
+            continue
+        modes.append(mode)
+        labels.append(label)
+        guidance.append(hint)
+        matched_terms.extend(hits[:2])
+        if len(modes) >= 5:
+            break
+    if not modes:
+        return {}
+    return {
+        "modes": modes,
+        "labels": labels,
+        "guidance": guidance,
+        "matched_terms": _dedupe(matched_terms)[:8],
+    }
+
+
 def _build_evidence_tasks(
     intent: str,
     pdf_evidence: list[MaterialPageEvidence],
     memory_context: AgentMemoryContext | None,
     problem_context: dict[str, Any] | None = None,
     material_scope: dict[str, Any] | None = None,
+    learning_preferences: dict[str, Any] | None = None,
 ) -> list[str]:
     tasks = ["rank_candidate_materials"]
     if intent in {"exam_trend_analysis", "pdf_summary", "problem_tutoring", "material_fit_assessment"}:
@@ -446,6 +518,8 @@ def _build_evidence_tasks(
         tasks.extend(["compare_across_materials", "aggregate_cross_material_question_types"])
         if int(material_scope.get("pdf_evidence_material_count") or 0) >= 2:
             tasks.append("cite_each_material_sources")
+    if learning_preferences:
+        tasks.append("adapt_to_learning_preferences")
     if pdf_evidence:
         tasks.append("cite_material_pages")
     if any(item.question_numbers for item in pdf_evidence):
@@ -464,6 +538,7 @@ def _build_response_guidance(
     has_study_constraints: bool,
     has_problem_context: bool,
     material_scope: dict[str, Any] | None = None,
+    has_learning_preferences: bool = False,
 ) -> list[str]:
     guidance = ["只基于候选资料、PDF 证据和记忆上下文回答，不编造平台外资料。"]
     if intent == "exam_trend_analysis":
@@ -486,6 +561,8 @@ def _build_response_guidance(
         guidance.append("如果 problem_context 中有卡点类型、题号或知识点，必须先按这些边界拆解。")
     if material_scope and material_scope.get("mode") == "multi_material":
         guidance.append("如果 material_scope 指向多份资料，必须优先做跨资料共同题型、差异点和证据覆盖说明。")
+    if has_learning_preferences:
+        guidance.append("如果 learning_preferences 中有学习偏好，只能用于调整解释深度、复习顺序和资料使用建议，不要输出内部字段名。")
     if has_memory_context:
         guidance.append("用户个人记忆只能用于当前用户个性化建议，不能写成平台集体结论。")
     return guidance

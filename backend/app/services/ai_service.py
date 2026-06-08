@@ -441,10 +441,11 @@ class AiService:
             "如果提供了 query_plan，你必须按照该意图和 evidence_tasks 组织回答；"
             "如果 query_plan 提供了 material_scope，应按单份或多份资料范围组织证据和结论；"
             "如果 query_plan 提供了 problem_context，应先按卡点类型、题号和知识点拆解问题；"
+            "如果 query_plan 提供了 learning_preferences，应只用它调整解释深度、复习顺序和资料使用建议；"
             "如果提供了 course_memory_card，你可以用它总结课程级年份、逐年题型、章节模块、答案解析信号、知识点、经验策略和推荐顺序，"
             "并根据 evidence_coverage 和 confidence_assessment 避免过度概括。"
             "不要输出 memory_context、query_plan、problem_context、candidate_materials、user_fit_signals、"
-            "pdf_evidence、course_memory_card、material_scope、evidence_coverage、confidence_assessment、yearly_question_type_matrix、chapter_distribution、chapter_signals、solution_signal_distribution、solution_signals、study_strategy_distribution、"
+            "pdf_evidence、course_memory_card、material_scope、learning_preferences、evidence_coverage、confidence_assessment、yearly_question_type_matrix、chapter_distribution、chapter_signals、solution_signal_distribution、solution_signals、study_strategy_distribution、"
             "experience_materials、anchor_text、anchor_terms 或 privacy_boundary 等内部字段名。"
             "必须输出严格 JSON，不要输出 Markdown，不要包裹代码块。"
         )
@@ -601,18 +602,20 @@ class AiService:
             return f"我没有在平台资料库里找到足够贴近「{query}」的候选。你可以补充课程名、考试范围、题型或学校专业，我再帮你缩小检索。"
         titles = "、".join(f"《{item.get('title') or '资料'}》" for item in recommendations)
         profile_hint = self._local_profile_hint(memory_context)
+        preference_hint = self._local_learning_preference_hint(query_plan)
         if pdf_evidence:
             sources = "；".join(f"《{item.title}》第 {item.page} 页" for item in pdf_evidence[:3])
             evidence_summary = self._local_evidence_summary(pdf_evidence, course_memory_card, query_plan)
             sequence_hint = self._local_sequence_hint(query_plan, course_memory_card)
+            preference_tail = "" if query_plan and query_plan.intent == "study_plan" else preference_hint
             return (
                 f"我先基于 StudyHub 资料库找到 {titles}，并读取到相关 PDF 页级证据：{sources}。"
-                f"{evidence_summary}{profile_hint}{sequence_hint}"
+                f"{evidence_summary}{profile_hint}{sequence_hint}{preference_tail}"
             )
         study_plan_hint = self._local_study_plan_hint(query_plan)
         if study_plan_hint:
             return f"我先基于 StudyHub 资料库找到 {titles}。{profile_hint}{study_plan_hint}"
-        return f"我先基于 StudyHub 资料库找到 {titles}。{profile_hint}建议先用最匹配的资料建立知识框架，再结合真题或经验内容做查漏补缺。"
+        return f"我先基于 StudyHub 资料库找到 {titles}。{profile_hint}建议先用最匹配的资料建立知识框架，再结合真题或经验内容做查漏补缺。{preference_hint}"
 
     def _local_evidence_summary(
         self,
@@ -888,14 +891,36 @@ class AiService:
         if weak_points:
             boundary_parts.append(f"薄弱点先放在 {_join_values(weak_points[:3])}")
         if not boundary_parts:
-            return "建议先建立知识框架，再刷真题或例题，最后复盘错题和薄弱点。"
+            return f"建议先建立知识框架，再刷真题或例题，最后复盘错题和薄弱点。{self._local_learning_preference_hint(query_plan)}"
         if days is not None and days <= 7:
             sequence = "优先用最匹配资料补核心框架，随后集中刷真题和错题，最后只复盘高频薄弱点"
         elif days is not None and days <= 21:
             sequence = "前段建立知识框架，中段用真题或例题按题型训练，最后集中复盘错题和薄弱点"
         else:
             sequence = "先系统过一轮知识框架，再按题型推进真题训练，最后按错题和高频考点收束"
-        return f"结合你提到的{'、'.join(boundary_parts)}，建议{sequence}。"
+        return f"结合你提到的{'、'.join(boundary_parts)}，建议{sequence}。{self._local_learning_preference_hint(query_plan)}"
+
+    def _local_learning_preference_hint(self, query_plan: AgentQueryPlan | None) -> str:
+        preferences = getattr(query_plan, "learning_preferences", {}) if query_plan else {}
+        if not isinstance(preferences, dict):
+            return ""
+        modes = _safe_text_list(preferences.get("modes"))
+        if not modes:
+            return ""
+        parts: list[str] = []
+        if "foundation_first" in modes:
+            parts.append("你提到基础偏弱，先补课程框架和核心例题，再进入真题")
+        if "crash_course" in modes:
+            parts.append("你偏向短期冲刺，优先抓高频题型、分值高的考点和可快速复盘的资料页")
+        if "practice_first" in modes:
+            parts.append("你偏向刷题训练，按题型刷真题，错题再回查对应解析")
+        if "explanation_first" in modes:
+            parts.append("你需要更细的解释，先看带答案、解析和步骤的资料")
+        if "weak_point_review" in modes:
+            parts.append("你偏向查漏补缺，把薄弱点列清单后用同类题复盘")
+        if not parts:
+            return ""
+        return f"结合你的学习偏好，{_join_values(parts[:3])}。"
 
     def _local_profile_hint(self, memory_context: AgentMemoryContext | None) -> str:
         if not memory_context or not memory_context.user:

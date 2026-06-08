@@ -392,6 +392,45 @@ def test_agent_local_study_plan_uses_structured_query_constraints(monkeypatch) -
     metrics.clear()
 
 
+def test_agent_local_study_plan_uses_query_learning_preferences(monkeypatch) -> None:
+    metrics = get_runtime_metrics()
+    metrics.clear()
+    settings = Settings(ai_agent_provider="local")
+    monkeypatch.setattr("app.services.ai_service.get_settings", lambda: settings)
+
+    service = AiService(
+        read_repo=None,
+        material_repo=None,
+        query_planner_service=AgentQueryPlannerService(),
+    )  # type: ignore[arg-type]
+    monkeypatch.setattr(
+        service,
+        "_rank_materials",
+        lambda session, query, filters: [
+            _material(
+                101,
+                title="通信原理期末速成讲义",
+                description="通信原理高频考点、速成提纲和例题解析",
+                downloads=90,
+            )
+        ],
+    )
+
+    response = service.recommend(
+        object(),  # type: ignore[arg-type]
+        SimpleNamespace(query="我基础差，想考前速成，多刷真题，但要一步步讲清楚，通信原理怎么复习？", filters={}),
+        current_user_id=7,
+    )
+    body = json.loads(str(response["output"]).removeprefix("<json>").removesuffix("</json>"))
+
+    assert "结合你的学习偏好" in body["answer"]
+    assert "基础偏弱" in body["answer"]
+    assert "短期冲刺" in body["answer"]
+    assert "刷题训练" in body["answer"]
+    assert "learning_preferences" not in json.dumps(body, ensure_ascii=False)
+    metrics.clear()
+
+
 def test_agent_local_pdf_summary_uses_intent_specific_evidence(monkeypatch) -> None:
     metrics = get_runtime_metrics()
     metrics.clear()

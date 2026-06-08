@@ -106,6 +106,37 @@ def test_query_planner_detects_study_plan_without_extra_io() -> None:
     assert any("study_constraints" in item for item in plan.response_guidance)
 
 
+def test_query_planner_detects_learning_preferences_without_extra_io() -> None:
+    plan = AgentQueryPlannerService().build_plan(
+        "我基础差，想考前速成，多刷真题，但要一步步讲清楚，通信原理怎么复习？",
+        materials=[_material()],
+        pdf_evidence=[],
+        memory_context=None,
+    )
+    payload = plan.to_prompt_payload()
+
+    assert plan.intent == "study_plan"
+    assert plan.learning_preferences == {
+        "modes": ["foundation_first", "crash_course", "practice_first", "explanation_first"],
+        "labels": ["补基础优先", "考前冲刺", "刷题优先", "详细解析"],
+        "guidance": [
+            "先补课程框架、核心概念和基础例题，再进入真题训练。",
+            "优先抓高频题型、分值高的考点和可快速复盘的资料页。",
+            "按题型刷真题或练习，再回查不会的知识点和解析页。",
+            "优先选择带答案、解析和步骤的资料，按概念、公式、步骤拆开讲。",
+        ],
+        "matched_terms": ["基础差", "速成", "考前", "真题", "一步步", "讲清楚"],
+    }
+    assert payload["learning_preferences"]["modes"] == [
+        "foundation_first",
+        "crash_course",
+        "practice_first",
+        "explanation_first",
+    ]
+    assert "adapt_to_learning_preferences" in plan.evidence_tasks
+    assert any("learning_preferences" in item for item in plan.response_guidance)
+
+
 def test_query_planner_extracts_problem_context_without_extra_io() -> None:
     evidence = [
         MaterialPageEvidence(
