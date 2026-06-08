@@ -325,10 +325,6 @@ class PayoutService:
             item["payoutAmount"] += int(order.creator_payable_amount or max(0, int(order.amount or 0) - int(order.platform_fee_amount or 0)))
 
         marks = {mark.uploader_id: mark for mark in self.finance_repo.list_monthly_payout_marks(session, month_key)}
-        for uploader_id, item in grouped.items():
-            self._hydrate_monthly_user_fields(session, item, uploader_id)
-            self._apply_monthly_mark(session, item, marks.get(uploader_id))
-
         for mark in marks.values():
             if mark.uploader_id in grouped:
                 continue
@@ -345,9 +341,9 @@ class PayoutService:
                 "markedByName": None,
                 "markedAmountSnapshot": None,
             }
-            self._hydrate_monthly_user_fields(session, item, int(mark.uploader_id))
-            self._apply_monthly_mark(session, item, mark)
             grouped[int(mark.uploader_id)] = item
+
+        self._hydrate_monthly_overview_items(session, grouped, marks)
 
         items = sorted(
             grouped.values(),
@@ -796,8 +792,31 @@ class PayoutService:
             "status": entity.status,
         }
 
-    def _hydrate_monthly_user_fields(self, session: Session, item: dict[str, Any], uploader_id: int) -> None:
-        user = self.auth_repo.find_user_by_id(session, uploader_id)
+    def _hydrate_monthly_overview_items(
+        self,
+        session: Session,
+        grouped: dict[int, dict[str, Any]],
+        marks: dict[int, AdminMonthlyPayoutMarkRecord],
+    ) -> None:
+        user_ids = list(grouped.keys())
+        reviewer_ids = [int(mark.marked_by_id) for mark in marks.values() if mark.marked_by_id is not None]
+        users_by_id = {
+            int(user.id): user
+            for user in self.auth_repo.find_users_by_ids(session, user_ids + reviewer_ids)
+        }
+        for uploader_id, item in grouped.items():
+            self._hydrate_monthly_user_fields(session, item, uploader_id, users_by_id=users_by_id)
+            self._apply_monthly_mark(session, item, marks.get(uploader_id), users_by_id=users_by_id)
+
+    def _hydrate_monthly_user_fields(
+        self,
+        session: Session,
+        item: dict[str, Any],
+        uploader_id: int,
+        *,
+        users_by_id: dict[int, Any] | None = None,
+    ) -> None:
+        user = users_by_id.get(int(uploader_id)) if users_by_id is not None else self.auth_repo.find_user_by_id(session, uploader_id)
         if user is None:
             item["uploaderUsername"] = item.get("uploaderUsername") or f"user-{uploader_id}"
             item["uploaderNickname"] = item.get("uploaderNickname")
@@ -812,13 +831,20 @@ class PayoutService:
         session: Session,
         item: dict[str, Any],
         mark: AdminMonthlyPayoutMarkRecord | None,
+        *,
+        users_by_id: dict[int, Any] | None = None,
     ) -> None:
         if mark is None:
             return
         item["markedPaid"] = mark.status.upper() == "PAID"
         item["markedAt"] = mark.marked_at.isoformat() if mark.marked_at else None
         item["markedById"] = mark.marked_by_id
-        reviewer = self.auth_repo.find_user_by_id(session, mark.marked_by_id) if mark.marked_by_id is not None else None
+        if mark.marked_by_id is None:
+            reviewer = None
+        elif users_by_id is not None:
+            reviewer = users_by_id.get(int(mark.marked_by_id))
+        else:
+            reviewer = self.auth_repo.find_user_by_id(session, mark.marked_by_id)
         item["markedByName"] = self._display_name(reviewer) if reviewer else None
         item["markedAmountSnapshot"] = mark.amount_snapshot
 
