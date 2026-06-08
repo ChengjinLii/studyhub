@@ -59,6 +59,8 @@ cd "$ROOT_DIR"
 
 run "shell script syntax" bash "$ROOT_DIR/scripts/check-shell-scripts.sh"
 
+run "sensitive file guard" bash "$ROOT_DIR/scripts/security/check-sensitive-files.sh"
+
 run "clean generated artifacts" bash "$ROOT_DIR/scripts/clean-generated.sh" "--$GENERATED_CLEAN_MODE"
 
 section "git working tree"
