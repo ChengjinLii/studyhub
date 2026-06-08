@@ -30,6 +30,14 @@ bash scripts/db/db-init-schema.sh
 STUDYHUB_ENVIRONMENT=preview bash scripts/db/db-migrate.sh
 ```
 
+`db-migrate.sh` 在 production 默认拒绝直接执行 Alembic upgrade，避免绕过备份、计划 token 和 additive SQL 限制。生产 P0 schema 修复优先使用下面的 `db-prepare-p0-schema.sh` 与 `db-apply-p0-schema.sh`。确需在 production 执行 Alembic 时，必须额外设置：
+
+```bash
+YES_PRODUCTION_ALEMBIC_MIGRATION=I_UNDERSTAND_ALEMBIC_PRODUCTION \
+STUDYHUB_ENVIRONMENT=production \
+bash scripts/db/db-migrate.sh
+```
+
 生成生产 additive 迁移计划时，先只选定已确认的缺字段，不会执行 SQL：
 
 ```bash
@@ -106,5 +114,6 @@ bash scripts/db/db-restore-preview.sh /path/to/preview-backup.sql.gz
 
 - 默认以只读检查和备份为主
 - production 不允许通过该目录下脚本直接恢复数据库
+- production 直接 Alembic migration 默认禁用，P0 字段修复走受保护的 additive 脚本
 - preview 恢复和建表都需要显式确认环境变量
 - migration 需要显式执行，不会在 Web 服务启动时自动修改 schema
