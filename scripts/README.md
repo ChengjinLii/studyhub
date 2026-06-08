@@ -18,10 +18,13 @@
 - 生产运行：`bash scripts/runtime/production-up.sh`
 - 清理源码缓存：`bash scripts/clean-generated.sh --source`
 - 清理全部生成物并准备重新构建前端：`bash scripts/clean-generated.sh --all`
+- 检查 shell 脚本语法：`bash scripts/check-shell-scripts.sh`
 - 发布前检查：`bash scripts/predeploy-check.sh`
 - 浏览器加载性能预算：`npm --prefix frontend run test:perf`
 
-`predeploy-check.sh` 会串起后端测试、前端检查、前端单测、Playwright critical tests、代码体积检查和生产预检。只想在本地跑代码质量门禁时，可以临时跳过生产环境检查：
+`check-shell-scripts.sh` 只执行 `bash -n`，不会运行脚本主体，也不会连接数据库或修改运行态。
+
+`predeploy-check.sh` 会串起 shell 脚本语法、后端测试、前端检查、前端单测、Playwright critical tests、代码体积检查和生产预检。只想在本地跑代码质量门禁时，可以临时跳过生产环境检查：
 
 ```bash
 STUDYHUB_PREDEPLOY_PRODUCTION_CHECKS=0 bash scripts/predeploy-check.sh
