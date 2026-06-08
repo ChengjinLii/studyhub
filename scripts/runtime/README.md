@@ -34,6 +34,7 @@ bash scripts/runtime/production-down.sh
 ## 使用约束
 
 - 运行前需要准备好 `private/.env.preview` 或 `private/.env.production`
+- `preview-up.sh` 启动前默认运行只读 `db_admin check-schema`，避免带缺字段的 preview 服务启动
 - `preview-smoke.sh` / `production-smoke.sh` 的 curl 默认使用 5 秒连接超时和 20 秒总超时，可用 `STUDYHUB_CURL_CONNECT_TIMEOUT` / `STUDYHUB_CURL_MAX_TIME` 调整
 - `production-up.sh` 默认先跑 `production-preflight.sh` 检查证书路径、数据库网络连通性和 P0 schema 缺字段；紧急场景可设置 `STUDYHUB_PRODUCTION_UP_PREFLIGHT=0` 显式跳过
 - `production-preflight.sh` 默认检查 `market_items.source orders.uploader_id`，可用 `STUDYHUB_PRODUCTION_SCHEMA_CHECK_COLUMNS` 覆盖；设为空字符串时执行全量 schema 检查

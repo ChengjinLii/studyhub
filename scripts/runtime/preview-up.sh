@@ -55,7 +55,7 @@ fi
   cd "$ROOT_DIR/backend"
   export STUDYHUB_ENVIRONMENT=preview
   export STUDYHUB_PRIVATE_DIR_PATH="$PRIVATE_DIR"
-  "$ROOT_DIR/.venv/bin/python" -m app.ops.db_admin check >/dev/null
+  "$ROOT_DIR/.venv/bin/python" -m app.ops.db_admin check-schema >/dev/null
 )
 
 if [[ ! -f "$ROOT_DIR/frontend/.next/BUILD_ID" ]]; then
