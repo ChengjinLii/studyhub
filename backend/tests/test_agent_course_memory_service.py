@@ -129,6 +129,15 @@ def test_course_memory_card_summarizes_current_request_collective_signals() -> N
     assert payload["difficulty_distribution"] == [{"value": "综合", "count": 1}, {"value": "偏难", "count": 1}]
     assert payload["visual_signal_distribution"] == [{"value": "公式", "count": 1}, {"value": "图示", "count": 1}]
     assert payload["source_type_distribution"] == [{"value": "past_exam", "count": 1}]
+    assert payload["material_quality_distribution"] == [
+        {"value": "标签较完整", "count": 2},
+        {"value": "下载量较高", "count": 1},
+        {"value": "已有下载反馈", "count": 1},
+    ]
+    assert payload["material_risk_distribution"] == [
+        {"value": "简介较短", "count": 2},
+        {"value": "交付信息缺失", "count": 2},
+    ]
     assert payload["yearly_question_type_matrix"] == [
         {
             "year": "2024",
@@ -211,6 +220,8 @@ def test_course_memory_card_includes_collective_strategy_and_experience_signals(
     ]
     assert payload["version_basis"]["strategy_refs"] == ["先建立知识框架", "刷真题"]
     assert payload["version_basis"]["experience_material_ids"] == [202]
+    assert "quality_refs" in payload["version_basis"]
+    assert "risk_refs" in payload["version_basis"]
     version_basis_text = json.dumps(payload["version_basis"], ensure_ascii=False).lower()
     assert "不应进入课程集体记忆" not in version_basis_text
     assert "profile" not in version_basis_text
@@ -366,6 +377,9 @@ def test_ai_prompt_receives_course_memory_card(monkeypatch) -> None:
     assert captured["user_prompt"]["course_memory_card"]["page_references"][0]["page"] == 3
     assert captured["user_prompt"]["course_memory_card"]["evidence_coverage"]["pdf_evidence_page_count"] == 1
     assert captured["user_prompt"]["course_memory_card"]["confidence_assessment"]["level"] == "low"
+    assert captured["user_prompt"]["course_memory_card"]["material_quality_distribution"]
+    assert captured["user_prompt"]["course_memory_card"]["material_risk_distribution"]
     assert "course_memory_card" in captured["system_prompt"]
     assert "confidence_assessment" in captured["system_prompt"]
+    assert "material_quality_distribution" in captured["system_prompt"]
     assert body["answer"] == "已结合课程记忆卡片分析通信原理真题。 来源：《通信原理四年真题解析》第 3 页（第3题）。"

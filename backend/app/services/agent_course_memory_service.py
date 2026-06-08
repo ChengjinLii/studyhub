@@ -8,6 +8,7 @@ from typing import Any
 
 from app.models.materials import MaterialRecord
 from app.services.agent_memory_service import AgentMemoryContext
+from app.services.agent_material_signal_service import build_material_signals
 from app.services.agent_query_planner_service import AgentQueryPlan
 from app.services.material_pdf_evidence_service import MaterialPageEvidence
 
@@ -30,6 +31,8 @@ class CourseMemoryCard:
     difficulty_distribution: tuple[dict[str, Any], ...]
     visual_signal_distribution: tuple[dict[str, Any], ...]
     source_type_distribution: tuple[dict[str, Any], ...]
+    material_quality_distribution: tuple[dict[str, Any], ...]
+    material_risk_distribution: tuple[dict[str, Any], ...]
     yearly_question_type_matrix: tuple[dict[str, Any], ...]
     study_strategy_distribution: tuple[dict[str, Any], ...]
     high_signal_materials: tuple[dict[str, Any], ...]
@@ -56,6 +59,8 @@ class CourseMemoryCard:
             "difficulty_distribution": list(self.difficulty_distribution),
             "visual_signal_distribution": list(self.visual_signal_distribution),
             "source_type_distribution": list(self.source_type_distribution),
+            "material_quality_distribution": list(self.material_quality_distribution),
+            "material_risk_distribution": list(self.material_risk_distribution),
             "yearly_question_type_matrix": list(self.yearly_question_type_matrix),
             "study_strategy_distribution": list(self.study_strategy_distribution),
             "high_signal_materials": list(self.high_signal_materials),
@@ -95,6 +100,8 @@ class AgentCourseMemoryService:
         difficulty_signals = _counter_payload(_difficulty_counter(pdf_evidence), limit=5)
         visual_signals = _counter_payload(_visual_counter(pdf_evidence), limit=5)
         source_types = _counter_payload(_source_type_counter(pdf_evidence, memory_context), limit=5)
+        material_quality = _counter_payload(_material_quality_counter(materials, memory_context), limit=8)
+        material_risk = _counter_payload(_material_risk_counter(materials, memory_context), limit=8)
         yearly_matrix = _yearly_question_type_matrix(pdf_evidence)
         study_strategies = _counter_payload(_study_strategy_counter(memory_context), limit=8)
         experience_materials = _experience_materials(memory_context)
@@ -123,6 +130,8 @@ class AgentCourseMemoryService:
             difficulty_distribution=tuple(difficulty_signals),
             visual_signal_distribution=tuple(visual_signals),
             source_type_distribution=tuple(source_types),
+            material_quality_distribution=tuple(material_quality),
+            material_risk_distribution=tuple(material_risk),
             yearly_question_type_matrix=tuple(yearly_matrix),
             study_strategy_distribution=tuple(study_strategies),
             high_signal_materials=tuple(_high_signal_materials(materials)),
@@ -257,6 +266,34 @@ def _source_type_counter(
         return counter
     platform = memory_context.platform if memory_context else {}
     for item in platform.get("pdf_source_type_signals") or []:
+        if isinstance(item, dict) and item.get("value"):
+            counter[str(item["value"])] += int(item.get("count") or 1)
+    return counter
+
+
+def _material_quality_counter(
+    materials: list[MaterialRecord],
+    memory_context: AgentMemoryContext | None,
+) -> Counter[str]:
+    counter: Counter[str] = Counter()
+    for material in materials:
+        counter.update(build_material_signals(material).quality_signals)
+    platform = memory_context.platform if memory_context else {}
+    for item in platform.get("material_quality_signals") or []:
+        if isinstance(item, dict) and item.get("value"):
+            counter[str(item["value"])] += int(item.get("count") or 1)
+    return counter
+
+
+def _material_risk_counter(
+    materials: list[MaterialRecord],
+    memory_context: AgentMemoryContext | None,
+) -> Counter[str]:
+    counter: Counter[str] = Counter()
+    for material in materials:
+        counter.update(build_material_signals(material).risk_signals)
+    platform = memory_context.platform if memory_context else {}
+    for item in platform.get("material_risk_signals") or []:
         if isinstance(item, dict) and item.get("value"):
             counter[str(item["value"])] += int(item.get("count") or 1)
     return counter
@@ -510,6 +547,8 @@ def _version_basis(
         "query_plan": _query_plan_basis(query_plan),
         "strategy_refs": _strategy_ref_basis(memory_context),
         "experience_material_ids": [item["material_id"] for item in _experience_materials(memory_context)],
+        "quality_refs": _quality_ref_basis(materials, memory_context),
+        "risk_refs": _risk_ref_basis(materials, memory_context),
         "platform_signal_keys": sorted(str(key) for key, value in platform.items() if value not in (None, [], {}, "")),
     }
 
@@ -560,6 +599,22 @@ def _strategy_ref_basis(memory_context: AgentMemoryContext | None) -> list[str]:
     return [
         item["value"]
         for item in _counter_payload(_study_strategy_counter(memory_context), limit=8)
+        if isinstance(item.get("value"), str)
+    ]
+
+
+def _quality_ref_basis(materials: list[MaterialRecord], memory_context: AgentMemoryContext | None) -> list[str]:
+    return [
+        item["value"]
+        for item in _counter_payload(_material_quality_counter(materials, memory_context), limit=8)
+        if isinstance(item.get("value"), str)
+    ]
+
+
+def _risk_ref_basis(materials: list[MaterialRecord], memory_context: AgentMemoryContext | None) -> list[str]:
+    return [
+        item["value"]
+        for item in _counter_payload(_material_risk_counter(materials, memory_context), limit=8)
         if isinstance(item.get("value"), str)
     ]
 

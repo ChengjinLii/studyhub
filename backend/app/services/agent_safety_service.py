@@ -28,6 +28,8 @@ FORBIDDEN_INTERNAL_MARKERS = (
     "solution_signal_distribution",
     "solution_signals",
     "user_fit_signals",
+    "material_quality_distribution",
+    "material_risk_distribution",
     "anchor_text",
     "anchor_terms",
     "study_strategy_signals",
