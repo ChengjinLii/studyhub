@@ -435,6 +435,7 @@ class AiService:
             "如果 pdf_evidence 提供了 anchor_text 或 anchor_terms，应优先用它们定位页内关键片段。"
             "如果候选资料提供了 quality_signals 或 risk_signals，你可以用它们辅助排序和提示，但不能把风险提示夸大成确定违规。"
             "如果提供了 memory_context，你可以用平台集体记忆增强课程/题型判断，用用户个人记忆做个性化建议；"
+            "如果平台集体记忆里有经验或复习策略聚合信号，可以用来辅助学习路径和资料使用顺序；"
             "但不能把用户个人记忆写入或表述成平台集体结论。"
             "如果候选资料提供了 user_fit_signals，可以用它解释当前用户为什么更适合先看该资料；"
             "如果提供了 query_plan，你必须按照该意图和 evidence_tasks 组织回答；"

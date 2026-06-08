@@ -29,8 +29,24 @@ MEMORY_SIGNAL_TERMS = (
     "笔记",
     "讲义",
     "复习",
+    "经验",
+    "经验分享",
+    "攻略",
+    "面经",
+    "刷题",
+    "错题",
     "实验",
     "报告",
+)
+
+STUDY_STRATEGY_PATTERNS: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("先建立知识框架", ("知识框架", "建立框架", "先看课件", "先看讲义", "先过一遍")),
+    ("按题型训练", ("按题型", "题型整理", "题型归纳", "分类刷题")),
+    ("刷真题", ("刷真题", "做真题", "往年题", "历年题", "期末题")),
+    ("对答案解析", ("对答案", "看解析", "答案解析", "自制解析", "参考答案")),
+    ("复盘错题", ("错题", "复盘", "错因", "查漏补缺")),
+    ("冲刺速成", ("速成", "冲刺", "考前", "提纲", "重点背诵")),
+    ("经验参考", ("经验分享", "经验贴", "攻略", "面经", "避坑")),
 )
 
 
@@ -95,6 +111,7 @@ class AgentMemoryService:
         signal_counter: Counter[str] = Counter()
         material_quality_counter: Counter[str] = Counter()
         material_risk_counter: Counter[str] = Counter()
+        study_strategy_counter: Counter[str] = Counter()
         year_counter: Counter[str] = Counter()
         question_type_counter: Counter[str] = Counter()
         question_number_counter: Counter[str] = Counter()
@@ -109,7 +126,9 @@ class AgentMemoryService:
                     course_counter.update([str(value).strip()])
             if material.school:
                 school_counter.update([material.school.strip()])
-            signal_counter.update(_signal_terms(_material_text(material)))
+            material_text = _material_text(material)
+            signal_counter.update(_signal_terms(material_text))
+            study_strategy_counter.update(_study_strategy_terms(material_text))
             material_signals = build_material_signals(material)
             material_quality_counter.update(material_signals.quality_signals)
             material_risk_counter.update(material_signals.risk_signals)
@@ -143,6 +162,7 @@ class AgentMemoryService:
             "course_signals": _counter_items(course_counter, limit=5),
             "school_signals": _counter_items(school_counter, limit=3),
             "question_type_signals": _counter_items(signal_counter, limit=6),
+            "study_strategy_signals": _counter_items(study_strategy_counter, limit=8),
             "material_quality_signals": _counter_items(material_quality_counter, limit=8),
             "material_risk_signals": _counter_items(material_risk_counter, limit=8),
             "pdf_year_signals": _counter_items(year_counter, limit=6),
@@ -153,6 +173,7 @@ class AgentMemoryService:
             "pdf_visual_signals": _counter_items(visual_counter, limit=5),
             "pdf_source_type_signals": _counter_items(source_type_counter, limit=5),
             "high_signal_materials": top_materials,
+            "experience_materials": _experience_material_payloads(materials),
             "pdf_evidence_pages": [
                 _evidence_page_payload(item)
                 for item in pdf_evidence[: max(0, int(self.settings.ai_agent_pdf_evidence_max_pages or 0))]
@@ -268,6 +289,34 @@ def _high_signal_material_payload(material: MaterialRecord) -> dict[str, Any]:
     return payload
 
 
+def _experience_material_payloads(materials: list[MaterialRecord]) -> list[dict[str, Any]]:
+    matched = [material for material in materials if _looks_like_experience_material(material)]
+    matched.sort(
+        key=lambda item: (
+            -build_material_signals(item).quality_score,
+            -int(item.download_count or 0),
+            -float(item.rating_avg or 0),
+            -int(item.like_count or 0),
+            int(item.id),
+        )
+    )
+    payloads: list[dict[str, Any]] = []
+    for material in matched[:4]:
+        material_signals = build_material_signals(material)
+        payload: dict[str, Any] = {
+            "material_id": int(material.id),
+            "title": material.title,
+            "tags": _json_string_list(material.tags_json)[:4],
+        }
+        strategy_terms = _study_strategy_terms(_material_text(material))
+        if strategy_terms:
+            payload["study_strategy_signals"] = strategy_terms[:4]
+        if material_signals.quality_signals:
+            payload["quality_signals"] = list(material_signals.quality_signals[:3])
+        payloads.append(payload)
+    return payloads
+
+
 def _user_profile_payload(user: Any) -> dict[str, str]:
     payload = {
         "school": _clean_text(getattr(user, "school", None)),
@@ -325,6 +374,23 @@ def _material_text(material: MaterialRecord) -> str:
 def _signal_terms(text: str) -> list[str]:
     normalized = text.lower()
     return [term for term in MEMORY_SIGNAL_TERMS if term.lower() in normalized]
+
+
+def _study_strategy_terms(text: str) -> list[str]:
+    normalized = text.lower()
+    result: list[str] = []
+    for label, aliases in STUDY_STRATEGY_PATTERNS:
+        if any(alias.lower() in normalized for alias in aliases) and label not in result:
+            result.append(label)
+    return result[:8]
+
+
+def _looks_like_experience_material(material: MaterialRecord) -> bool:
+    text = _material_text(material)
+    tags = _json_string_list(material.tags_json)
+    if any(tag in {"经验", "经验分享", "攻略", "面经"} for tag in tags):
+        return True
+    return bool({"经验参考", "复盘错题", "冲刺速成"} & set(_study_strategy_terms(text)))
 
 
 def _compact_query_focus(query: str) -> list[str]:

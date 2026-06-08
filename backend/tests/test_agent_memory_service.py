@@ -111,6 +111,15 @@ def test_agent_memory_context_aggregates_platform_and_current_user_only() -> Non
             rating_count=5,
         ),
         _material(102, title="通信原理期末速成笔记", tags=["通信原理", "速成"], downloads=40, rating_avg=4.5),
+        _material(
+            103,
+            title="通信原理考前复习经验分享",
+            tags=["经验分享", "通信原理"],
+            description="复习攻略：先建立知识框架，再刷真题，最后复盘错题查漏补缺。",
+            downloads=30,
+            rating_avg=4.9,
+            rating_count=3,
+        ),
     ]
     evidence = [
         MaterialPageEvidence(
@@ -142,8 +151,14 @@ def test_agent_memory_context_aggregates_platform_and_current_user_only() -> Non
     prompt = context.to_prompt_payload()
 
     platform = prompt["platform_collective_memory"]
-    assert platform["candidate_count"] == 2
-    assert {"value": "通信原理", "count": 2} in platform["top_tags"]
+    assert platform["candidate_count"] == 3
+    assert {"value": "通信原理", "count": 3} in platform["top_tags"]
+    assert {"value": "经验分享", "count": 1} in platform["top_tags"]
+    assert {"value": "先建立知识框架", "count": 1} in platform["study_strategy_signals"]
+    assert {"value": "刷真题", "count": 1} in platform["study_strategy_signals"]
+    assert {"value": "复盘错题", "count": 1} in platform["study_strategy_signals"]
+    assert platform["experience_materials"][0]["material_id"] == 103
+    assert platform["experience_materials"][0]["study_strategy_signals"] == ["先建立知识框架", "刷真题", "复盘错题", "冲刺速成"]
     assert {
         "material_id": 101,
         "title": "通信原理四年真题解析",
@@ -163,8 +178,8 @@ def test_agent_memory_context_aggregates_platform_and_current_user_only() -> Non
     assert platform["pdf_difficulty_signals"] == [{"value": "综合", "count": 1}]
     assert platform["pdf_visual_signals"] == [{"value": "公式", "count": 1}]
     assert platform["pdf_source_type_signals"] == [{"value": "past_exam", "count": 1}]
-    assert {"value": "交付信息可用", "count": 2} in platform["material_quality_signals"]
-    assert {"value": "高评分资料", "count": 1} in platform["material_quality_signals"]
+    assert {"value": "交付信息可用", "count": 3} in platform["material_quality_signals"]
+    assert {"value": "高评分资料", "count": 2} in platform["material_quality_signals"]
     assert platform["material_risk_signals"] == [{"value": "简介较短", "count": 1}]
     assert platform["high_signal_materials"][0]["quality_score"] > 0
     assert "quality_signals" in platform["high_signal_materials"][0]

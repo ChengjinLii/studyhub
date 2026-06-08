@@ -22,6 +22,8 @@ FORBIDDEN_INTERNAL_MARKERS = (
     "user_fit_signals",
     "anchor_text",
     "anchor_terms",
+    "study_strategy_signals",
+    "experience_materials",
 )
 
 
