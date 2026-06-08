@@ -439,11 +439,12 @@ class AiService:
             "但不能把用户个人记忆写入或表述成平台集体结论。"
             "如果候选资料提供了 user_fit_signals，可以用它解释当前用户为什么更适合先看该资料；"
             "如果提供了 query_plan，你必须按照该意图和 evidence_tasks 组织回答；"
+            "如果 query_plan 提供了 material_scope，应按单份或多份资料范围组织证据和结论；"
             "如果 query_plan 提供了 problem_context，应先按卡点类型、题号和知识点拆解问题；"
             "如果提供了 course_memory_card，你可以用它总结课程级年份、题型、知识点、经验策略和推荐顺序，"
             "并根据 evidence_coverage 和 confidence_assessment 避免过度概括。"
             "不要输出 memory_context、query_plan、problem_context、candidate_materials、user_fit_signals、"
-            "pdf_evidence、course_memory_card、evidence_coverage、confidence_assessment、study_strategy_distribution、"
+            "pdf_evidence、course_memory_card、material_scope、evidence_coverage、confidence_assessment、study_strategy_distribution、"
             "experience_materials、anchor_text、anchor_terms 或 privacy_boundary 等内部字段名。"
             "必须输出严格 JSON，不要输出 Markdown，不要包裹代码块。"
         )
@@ -625,6 +626,7 @@ class AiService:
             return self._local_problem_tutoring_summary(pdf_evidence, course_memory_card, query_plan)
         if query_plan and query_plan.intent == "material_fit_assessment":
             return self._local_material_fit_summary(pdf_evidence, course_memory_card)
+        scope_hint = self._local_material_scope_hint(pdf_evidence, query_plan)
         years = _evidence_values(pdf_evidence, "years")
         question_types = _course_card_values(course_memory_card, "question_type_distribution") or _evidence_values(pdf_evidence, "question_types")
         knowledge_signals = _course_card_values(course_memory_card, "knowledge_signals") or _evidence_values(pdf_evidence, "knowledge_signals")
@@ -645,8 +647,21 @@ class AiService:
         if visual_signals:
             parts.append(f"需关注的公式/图表信号包括 {_join_values(visual_signals)}")
         if not parts:
-            return "这些页面可以先用来确认题型和高频知识点。"
-        return f"从这些页面看，{'；'.join(parts)}。"
+            return f"{scope_hint}这些页面可以先用来确认题型和高频知识点。"
+        return f"{scope_hint}从这些页面看，{'；'.join(parts)}。"
+
+    def _local_material_scope_hint(
+        self,
+        pdf_evidence: list[MaterialPageEvidence],
+        query_plan: AgentQueryPlan | None,
+    ) -> str:
+        material_scope = getattr(query_plan, "material_scope", {}) if query_plan else {}
+        if not isinstance(material_scope, dict) or material_scope.get("mode") != "multi_material":
+            return ""
+        material_count = len({int(item.material_id) for item in pdf_evidence})
+        if material_count >= 2:
+            return f"我会按多份资料对比处理，当前已读证据覆盖 {material_count} 份资料。"
+        return "你问的是多份资料对比，但当前可读 PDF 证据主要来自单份资料，跨资料结论需要继续补充可读页。"
 
     def _local_pdf_summary(
         self,

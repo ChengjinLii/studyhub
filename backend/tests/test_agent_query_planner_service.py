@@ -174,6 +174,48 @@ def test_query_planner_detects_material_fit_assessment() -> None:
     assert any("适合用户当前阶段" in item for item in plan.response_guidance)
 
 
+def test_query_planner_detects_multi_material_exam_scope_without_extra_io() -> None:
+    evidence = [
+        MaterialPageEvidence(
+            material_id=101,
+            title="通信原理四年真题解析",
+            page=3,
+            text="2024 通信原理计算题常考调制解调。",
+            score=42,
+            question_types=("计算题",),
+            source_type="past_exam",
+        ),
+        MaterialPageEvidence(
+            material_id=202,
+            title="通信原理六年期末题",
+            page=5,
+            text="2023 通信原理简答题常考系统框图。",
+            score=35,
+            question_types=("简答题",),
+            source_type="past_exam",
+        ),
+    ]
+
+    plan = AgentQueryPlannerService().build_plan(
+        "帮我分析这几份通信原理真题的关键题型",
+        materials=[_material(101), _material(202, title="通信原理六年期末题")],
+        pdf_evidence=evidence,
+        memory_context=None,
+    )
+    payload = plan.to_prompt_payload()
+
+    assert plan.intent == "exam_trend_analysis"
+    assert payload["material_scope"] == {
+        "mode": "multi_material",
+        "candidate_material_count": 2,
+        "pdf_evidence_material_count": 2,
+    }
+    assert "compare_across_materials" in plan.evidence_tasks
+    assert "aggregate_cross_material_question_types" in plan.evidence_tasks
+    assert "cite_each_material_sources" in plan.evidence_tasks
+    assert any("跨资料共同题型" in item for item in plan.response_guidance)
+
+
 def test_ai_prompt_receives_query_plan(monkeypatch) -> None:
     captured: dict[str, Any] = {}
 

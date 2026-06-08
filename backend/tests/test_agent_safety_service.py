@@ -102,7 +102,7 @@ def test_agent_safety_adds_read_pdf_source_hint_when_model_omits_citation() -> N
 def test_agent_safety_filters_anchor_internal_field_names_from_answer() -> None:
     sanitized = AgentSafetyService().sanitize_recommendation_body(
         {
-            "answer": "根据 problem_context、confidence_assessment、anchor_text、anchor_terms、study_strategy_signals、study_strategy_distribution、experience_materials、experience_material_ids 和 strategy_refs，我建议你先看第 2 页。",
+            "answer": "根据 problem_context、material_scope、confidence_assessment、anchor_text、anchor_terms、study_strategy_signals、study_strategy_distribution、experience_materials、experience_material_ids 和 strategy_refs，我建议你先看第 2 页。",
             "recommendations": [{"material_id": 101, "reason": "与通信原理真题匹配"}],
         },
         candidate_materials=[_material()],

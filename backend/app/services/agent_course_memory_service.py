@@ -448,13 +448,17 @@ def _evidence_ref_basis(item: MaterialPageEvidence) -> dict[str, Any]:
 def _query_plan_basis(query_plan: AgentQueryPlan | None) -> dict[str, Any]:
     if query_plan is None:
         return {}
-    return {
+    payload: dict[str, Any] = {
         "intent": query_plan.intent,
         "course_terms": list(query_plan.course_terms),
         "resource_types": list(query_plan.resource_types),
         "years": list(query_plan.years),
         "evidence_tasks": list(query_plan.evidence_tasks),
     }
+    material_scope = getattr(query_plan, "material_scope", {})
+    if isinstance(material_scope, dict) and material_scope:
+        payload["material_scope"] = material_scope
+    return payload
 
 
 def _strategy_ref_basis(memory_context: AgentMemoryContext | None) -> list[str]:

@@ -93,6 +93,22 @@ PROBLEM_FOCUS_RULES: tuple[tuple[str, tuple[str, ...]], ...] = (
     ("答案复盘", ("解析", "答案", "错题", "哪里错", "对答案")),
 )
 
+MULTI_MATERIAL_MARKERS = (
+    "这几份",
+    "这几套",
+    "多份",
+    "多套",
+    "几份",
+    "几套",
+    "这些",
+    "全部",
+    "所有",
+    "一起",
+    "对比",
+    "比较",
+    "共同",
+)
+
 
 @dataclass(slots=True)
 class AgentQueryPlan:
@@ -106,6 +122,7 @@ class AgentQueryPlan:
     response_guidance: tuple[str, ...]
     study_constraints: dict[str, Any] = field(default_factory=dict)
     problem_context: dict[str, Any] = field(default_factory=dict)
+    material_scope: dict[str, Any] = field(default_factory=dict)
 
     def to_prompt_payload(self) -> dict[str, Any]:
         payload = {
@@ -122,6 +139,8 @@ class AgentQueryPlan:
             payload["study_constraints"] = self.study_constraints
         if self.problem_context:
             payload["problem_context"] = self.problem_context
+        if self.material_scope:
+            payload["material_scope"] = self.material_scope
         return payload
 
 
@@ -149,13 +168,15 @@ class AgentQueryPlannerService:
         search_terms = _extract_search_terms(normalized, course_terms, resource_types)
         study_constraints = _extract_study_constraints(normalized)
         problem_context = _extract_problem_context(normalized, pdf_evidence, intent)
-        evidence_tasks = _build_evidence_tasks(intent, pdf_evidence, memory_context, problem_context)
+        material_scope = _extract_material_scope(normalized, materials, pdf_evidence)
+        evidence_tasks = _build_evidence_tasks(intent, pdf_evidence, memory_context, problem_context, material_scope)
         response_guidance = _build_response_guidance(
             intent,
             bool(pdf_evidence),
             memory_context is not None,
             bool(study_constraints),
             bool(problem_context),
+            material_scope,
         )
         return AgentQueryPlan(
             intent=intent,
@@ -168,6 +189,7 @@ class AgentQueryPlannerService:
             response_guidance=tuple(response_guidance),
             study_constraints=study_constraints,
             problem_context=problem_context,
+            material_scope=material_scope,
         )
 
 
@@ -372,11 +394,30 @@ def _extract_problem_question_numbers(normalized_query: str) -> list[str]:
     return result
 
 
+def _extract_material_scope(
+    normalized_query: str,
+    materials: list[MaterialRecord],
+    pdf_evidence: list[MaterialPageEvidence],
+) -> dict[str, Any]:
+    if not any(marker.lower() in normalized_query for marker in MULTI_MATERIAL_MARKERS):
+        return {}
+    pdf_material_count = len({int(item.material_id) for item in pdf_evidence})
+    payload: dict[str, Any] = {
+        "mode": "multi_material",
+        "candidate_material_count": len(materials),
+        "pdf_evidence_material_count": pdf_material_count,
+    }
+    if pdf_material_count <= 1:
+        payload["limitation"] = "cross_material_evidence_limited"
+    return payload
+
+
 def _build_evidence_tasks(
     intent: str,
     pdf_evidence: list[MaterialPageEvidence],
     memory_context: AgentMemoryContext | None,
     problem_context: dict[str, Any] | None = None,
+    material_scope: dict[str, Any] | None = None,
 ) -> list[str]:
     tasks = ["rank_candidate_materials"]
     if intent in {"exam_trend_analysis", "pdf_summary", "problem_tutoring", "material_fit_assessment"}:
@@ -401,6 +442,10 @@ def _build_evidence_tasks(
             tasks.append("track_mentioned_question_numbers")
     if intent == "material_fit_assessment":
         tasks.extend(["assess_material_fit", "rank_by_quality_and_risk"])
+    if material_scope and material_scope.get("mode") == "multi_material":
+        tasks.extend(["compare_across_materials", "aggregate_cross_material_question_types"])
+        if int(material_scope.get("pdf_evidence_material_count") or 0) >= 2:
+            tasks.append("cite_each_material_sources")
     if pdf_evidence:
         tasks.append("cite_material_pages")
     if any(item.question_numbers for item in pdf_evidence):
@@ -418,6 +463,7 @@ def _build_response_guidance(
     has_memory_context: bool,
     has_study_constraints: bool,
     has_problem_context: bool,
+    material_scope: dict[str, Any] | None = None,
 ) -> list[str]:
     guidance = ["只基于候选资料、PDF 证据和记忆上下文回答，不编造平台外资料。"]
     if intent == "exam_trend_analysis":
@@ -438,6 +484,8 @@ def _build_response_guidance(
         guidance.append("如果 study_constraints 中有考试倒计时、目标分数、每日可用时间或薄弱点，必须把它们作为复习计划边界。")
     if has_problem_context:
         guidance.append("如果 problem_context 中有卡点类型、题号或知识点，必须先按这些边界拆解。")
+    if material_scope and material_scope.get("mode") == "multi_material":
+        guidance.append("如果 material_scope 指向多份资料，必须优先做跨资料共同题型、差异点和证据覆盖说明。")
     if has_memory_context:
         guidance.append("用户个人记忆只能用于当前用户个性化建议，不能写成平台集体结论。")
     return guidance

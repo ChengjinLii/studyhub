@@ -601,6 +601,79 @@ def test_agent_local_exam_trend_uses_collective_strategy_sequence(monkeypatch) -
     metrics.clear()
 
 
+def test_agent_local_exam_trend_handles_multi_material_scope(monkeypatch) -> None:
+    metrics = get_runtime_metrics()
+    metrics.clear()
+    settings = Settings(ai_agent_provider="local")
+    monkeypatch.setattr("app.services.ai_service.get_settings", lambda: settings)
+    second_evidence = MaterialPageEvidence(
+        material_id=202,
+        title="通信原理六年期末题",
+        page=5,
+        text="2023 通信原理第5题简答题考系统框图和判决。",
+        score=45,
+        years=("2023",),
+        question_types=("简答题",),
+        knowledge_signals=("判决",),
+        question_numbers=("第5题",),
+        source_type="past_exam",
+        score_points=(8,),
+        difficulty_signals=("中等",),
+        visual_signals=("图示",),
+    )
+
+    class FakePdfEvidenceService:
+        def collect_for_materials(
+            self,
+            materials: list[MaterialRecord],
+            query: str,
+            *,
+            current_user_id: int | None,
+        ) -> list[MaterialPageEvidence]:
+            del materials, query, current_user_id
+            return [_evidence(), second_evidence]
+
+    service = AiService(
+        read_repo=None,
+        material_repo=None,
+        pdf_evidence_service=FakePdfEvidenceService(),
+        query_planner_service=AgentQueryPlannerService(),
+        course_memory_service=AgentCourseMemoryService(),
+    )  # type: ignore[arg-type]
+    monkeypatch.setattr(
+        service,
+        "_rank_materials",
+        lambda session, query, filters: [
+            _material(
+                101,
+                title="通信原理四年真题解析",
+                description="2021-2024 通信原理期末真题和答案解析",
+                downloads=90,
+            ),
+            _material(
+                202,
+                title="通信原理六年期末题",
+                description="2018-2023 通信原理期末题型整理",
+                downloads=70,
+            ),
+        ],
+    )
+
+    response = service.recommend(
+        object(),  # type: ignore[arg-type]
+        SimpleNamespace(query="帮我分析这几份通信原理真题的关键题型", filters={}),
+        current_user_id=7,
+    )
+    body = json.loads(str(response["output"]).removeprefix("<json>").removesuffix("</json>"))
+
+    assert "我会按多份资料对比处理，当前已读证据覆盖 2 份资料" in body["answer"]
+    assert "题型集中在 计算题、简答题" in body["answer"]
+    assert "《通信原理六年期末题》第 5 页" in body["answer"]
+    assert "material_scope" not in json.dumps(body, ensure_ascii=False)
+    assert body["evidence_sources"][1]["material_id"] == 202
+    metrics.clear()
+
+
 def test_agent_local_problem_tutoring_uses_intent_specific_evidence(monkeypatch) -> None:
     metrics = get_runtime_metrics()
     metrics.clear()
