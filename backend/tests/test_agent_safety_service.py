@@ -144,6 +144,28 @@ def test_agent_safety_filters_anchor_internal_field_names_from_answer() -> None:
     assert sanitized == {"recommendations": [{"material_id": 101, "reason": "与通信原理真题匹配"}]}
 
 
+def test_agent_safety_filters_internal_field_names_from_recommendation_reasons() -> None:
+    sanitized = AgentSafetyService().sanitize_recommendation_body(
+        {
+            "answer": "我只能基于候选资料元数据给出保守建议。",
+            "recommendations": [
+                {"material_id": 101, "reason": "根据 query_plan 和 memory_context 推荐这份资料"},
+                {"material_id": 102, "reason": "标题和标签匹配通信原理真题"},
+            ],
+        },
+        candidate_materials=[_material(), _material(102)],
+        pdf_evidence=[],
+    )
+
+    assert sanitized is not None
+    assert sanitized["recommendations"] == [
+        {"material_id": 101},
+        {"material_id": 102, "reason": "标题和标签匹配通信原理真题"},
+    ]
+    assert "query_plan" not in json.dumps(sanitized, ensure_ascii=False)
+    assert "memory_context" not in json.dumps(sanitized, ensure_ascii=False)
+
+
 def test_agent_safety_rejects_internal_context_leaks_and_invalid_only_recommendations() -> None:
     sanitized = AgentSafetyService().sanitize_recommendation_body(
         {

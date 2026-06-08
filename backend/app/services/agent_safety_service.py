@@ -88,7 +88,7 @@ class AgentSafetyService:
             material_id = _safe_int(raw_item.get("material_id") or raw_item.get("materialId") or raw_item.get("id"))
             if material_id is None or material_id not in allowed_material_ids:
                 continue
-            reason = _clean_text(raw_item.get("reason"), max_chars=180)
+            reason = _clean_public_text(raw_item.get("reason"), max_chars=180)
             item: dict[str, Any] = {"material_id": material_id}
             if reason:
                 item["reason"] = reason
@@ -196,6 +196,16 @@ def _clean_text(value: Any, *, max_chars: int) -> str:
     if value is None:
         return ""
     return re.sub(r"\s+", " ", str(value)).strip()[:max_chars]
+
+
+def _clean_public_text(value: Any, *, max_chars: int) -> str:
+    text = _clean_text(value, max_chars=max_chars)
+    if not text:
+        return ""
+    lowered = text.lower()
+    if any(marker in lowered for marker in FORBIDDEN_INTERNAL_MARKERS):
+        return ""
+    return text
 
 
 def _answer_mentions_source(answer: str, evidence_sources: list[dict[str, Any]]) -> bool:
