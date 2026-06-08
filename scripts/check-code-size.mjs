@@ -92,8 +92,14 @@ for (const [file, maxLines] of lineBudgets) {
 const pageJsonMatches = listFiles('frontend/pages', (absolutePath) => absolutePath.endsWith('.tsx')).filter(
   (absolutePath) => readFileSync(absolutePath, 'utf8').includes('.json(')
 );
-if (pageJsonMatches.length > pageJsonBudget) {
-  failures.push(`frontend/pages direct resp.json(): ${pageJsonMatches.length} exceeds ${pageJsonBudget}`);
+
+let pageJsonCalls = 0;
+for (const absolutePath of pageJsonMatches) {
+  const contents = readFileSync(absolutePath, 'utf8');
+  pageJsonCalls += contents.match(/\.json\(/g)?.length || 0;
+}
+if (pageJsonCalls > pageJsonBudget) {
+  failures.push(`frontend/pages direct resp.json(): ${pageJsonCalls} exceeds ${pageJsonBudget}`);
 }
 
 for (const dir of forbiddenDirs) {
@@ -117,4 +123,4 @@ if (failures.length) {
   process.exit(1);
 }
 
-console.log(`Code size check passed (${lineBudgets.length} file budgets, ${pageJsonMatches.length} page json calls).`);
+console.log(`Code size check passed (${lineBudgets.length} file budgets, ${pageJsonCalls} page json calls).`);
