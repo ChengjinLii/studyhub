@@ -2,6 +2,9 @@ from __future__ import annotations
 
 import asyncio
 from datetime import UTC, datetime, timedelta
+from threading import RLock
+from time import monotonic
+from typing import Any
 from zoneinfo import ZoneInfo
 
 from sqlalchemy import text
@@ -20,20 +23,61 @@ class LeaderboardReadService:
         self.settings = settings
         self.repo = repo
 
+    def invalidate_contributor_cache(self) -> None:
+        cache, lock = self._contributor_cache_state()
+        with lock:
+            cache.clear()
+
+    def _contributor_cache_state(self):
+        cache = getattr(self, "_contributor_cache", None)
+        lock = getattr(self, "_contributor_cache_lock", None)
+        if cache is None or lock is None:
+            cache = {}
+            lock = RLock()
+            self._contributor_cache = cache
+            self._contributor_cache_lock = lock
+        return cache, lock
+
+    def _contributor_cache_ttl_seconds(self) -> int:
+        return max(1, int(getattr(self.settings, "public_read_cache_ttl_seconds", 30) or 30))
+
+    def _contributor_cache_get(self, key: tuple[Any, ...]) -> list[dict] | None:
+        cache, lock = self._contributor_cache_state()
+        now = monotonic()
+        with lock:
+            entry = cache.get(key)
+            if entry is None:
+                return None
+            expires_at, value = entry
+            if expires_at <= now:
+                cache.pop(key, None)
+                return None
+            return self._clone_contributor_rows(value)
+
+    def _contributor_cache_set(self, key: tuple[Any, ...], value: list[dict]) -> list[dict]:
+        cache, lock = self._contributor_cache_state()
+        with lock:
+            cache[key] = (monotonic() + self._contributor_cache_ttl_seconds(), self._clone_contributor_rows(value))
+        return value
+
+    def _clone_contributor_rows(self, rows: list[dict]) -> list[dict]:
+        return [dict(row) for row in rows]
+
     def get_contributors(self, session: Session, limit: int, period: str | None) -> list[dict]:
-        if self.settings.requires_private_env_file:
-            return self._compat_get_contributors(session=session, limit=limit, period=period)
-        seed = self.repo.load_seed()
-        normalized = (period or "all").strip().lower()
-        if normalized in {"weekly", "week"}:
-            normalized = "week"
-        elif normalized in {"monthly", "month"}:
-            normalized = "month"
-        else:
-            normalized = "all"
-        entries = list((seed.get("leaderboard") or {}).get(normalized, []))
         safe_limit = max(1, min(limit, 100))
-        return entries[:safe_limit]
+        normalized = self._compat_normalize_period(period)
+        cache_key = ("contributors", "compat" if self.settings.requires_private_env_file else "seed", safe_limit, normalized)
+        cached = self._contributor_cache_get(cache_key)
+        if cached is not None:
+            return cached
+        if self.settings.requires_private_env_file:
+            return self._contributor_cache_set(
+                cache_key,
+                self._compat_get_contributors(session=session, limit=safe_limit, period=normalized),
+            )
+        seed = self.repo.load_seed()
+        entries = list((seed.get("leaderboard") or {}).get(normalized, []))
+        return self._contributor_cache_set(cache_key, entries[:safe_limit])
 
     async def get_contributors_async(self, session: Session, limit: int, period: str | None) -> list[dict]:
         if not (self.settings.requires_private_env_file and self.settings.async_read_db_enabled):
@@ -96,6 +140,10 @@ class LeaderboardReadService:
     async def _compat_get_contributors_async(self, session, limit: int, period: str | None) -> list[dict]:
         safe_limit = max(1, min(limit, 100))
         normalized_period = self._compat_normalize_period(period)
+        cache_key = ("contributors", "compat", safe_limit, normalized_period)
+        cached = self._contributor_cache_get(cache_key)
+        if cached is not None:
+            return cached
         params: dict[str, object] = {"limit": safe_limit}
         where_clauses = [
             "m.deleted_at IS NULL",
@@ -137,7 +185,7 @@ class LeaderboardReadService:
                 params,
             )
         ).mappings().all()
-        return [
+        return self._contributor_cache_set(cache_key, [
             {
                 "userId": int(row["user_id"]),
                 "username": row["username"],
@@ -145,7 +193,7 @@ class LeaderboardReadService:
                 "roleMask": int(row["role_mask"]),
             }
             for row in rows
-        ]
+        ])
 
     def _compat_normalize_period(self, raw: str | None) -> str:
         if not raw:
