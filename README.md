@@ -61,6 +61,25 @@ StudyHub 后端以 RESTful 风格作为公开 API 的主要设计约定，便于
 - [frontend/README.md](frontend/README.md)
 - [scripts/README.md](scripts/README.md)
 
+## 提交前检查
+
+本地提交前至少运行：
+
+```bash
+bash scripts/check-shell-scripts.sh
+/data/studyhub/.venv/bin/python -m pytest backend/tests
+npm --prefix frontend run check
+npm --prefix frontend run test:unit
+```
+
+发布前使用完整门禁：
+
+```bash
+bash scripts/predeploy-check.sh
+```
+
+`predeploy-check.sh` 会额外运行前端 critical path、代码体积检查和可选生产 preflight；更多环境变量和生产机器注意事项见 [scripts/README.md](scripts/README.md)。
+
 ## 参与贡献
 
 欢迎通过 Issue 和 Pull Request 参与项目改进。
