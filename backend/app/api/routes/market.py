@@ -13,7 +13,7 @@ from app.api.deps import (
     require_privileged_auth_context,
 )
 from app.core.db import get_db_session
-from app.core.public_read_cache import PublicReadCache, cache_if_anonymous, cache_if_anonymous_async, invalidate_prefixes
+from app.core.public_read_cache import PublicReadCache, cache_if_anonymous_async, invalidate_prefixes
 from app.core.response import api_ok
 from app.core.security import AuthContext
 from app.integrations.market_asset_store import MarketAssetStore
@@ -38,7 +38,7 @@ def _call_service_method(service, async_name: str, sync_name: str, *args, **kwar
 
 
 @router.get("/api/market")
-def list_market(
+async def list_market(
     keyword: str | None = None,
     category: str | None = None,
     page: int = 1,
@@ -49,12 +49,15 @@ def list_market(
     service: MarketService = Depends(get_market_service),
 ) -> dict[str, object]:
     current_user_id = auth.user_id if auth else None
-    data = cache_if_anonymous(
+    data = await cache_if_anonymous_async(
         cache,
         current_user_id=current_user_id,
         namespace="market:list",
         key=(keyword, category, page, size),
-        factory=lambda: service.list_market(
+        factory=lambda: _call_service_method(
+            service,
+            "list_market_async",
+            "list_market",
             session,
             current_user_id,
             keyword=keyword,

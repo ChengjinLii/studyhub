@@ -102,6 +102,53 @@ class MarketService:
             },
         }
 
+    async def list_market_async(
+        self,
+        session: Session,
+        current_user_id: int | None,
+        *,
+        keyword: str | None,
+        category: str | None,
+        page: int,
+        size: int,
+    ) -> dict[str, Any]:
+        if not (self.settings.requires_private_env_file and self.settings.async_read_db_enabled):
+            return await asyncio.to_thread(
+                self.list_market,
+                session,
+                current_user_id,
+                keyword=keyword,
+                category=category,
+                page=page,
+                size=size,
+            )
+
+        safe_page = max(page, 1)
+        safe_size = max(1, min(size, 50))
+        offset = (safe_page - 1) * safe_size
+        total, rows, stats = await asyncio.gather(
+            self._call_with_new_async_session(
+                self._compat_count_market_rows_async,
+                keyword=keyword,
+                category=category,
+            ),
+            self._call_with_new_async_session(
+                self._compat_load_market_rows_async,
+                keyword=keyword,
+                category=category,
+                limit=safe_size,
+                offset=offset,
+            ),
+            self._call_with_new_async_session(self._compat_load_market_stats_async),
+        )
+        item_ids = [int(row["id"]) for row in rows]
+        wanted_ids = await self._call_with_new_async_session(self._compat_load_wanted_ids_async, current_user_id, item_ids)
+        return {
+            "items": [self._compat_to_list_item(row, wanted=int(row["id"]) in wanted_ids) for row in rows],
+            "meta": {"page": safe_page, "size": safe_size, "total": total},
+            "stats": stats,
+        }
+
     def get_wanted_ids(self, session: Session, current_user_id: int | None) -> list[int]:
         self._bootstrap(session)
         if current_user_id is None:
@@ -588,6 +635,24 @@ class MarketService:
             "stats": self._compat_load_market_stats(session),
         }
 
+    def _compat_market_filter_parts(
+        self,
+        *,
+        keyword: str | None,
+        category: str | None,
+    ) -> tuple[list[str], dict[str, Any]]:
+        where_clauses = ["mi.status = 'SALE'"]
+        params: dict[str, Any] = {}
+        if self._compat_has_text(keyword):
+            params["keyword"] = f"%{keyword.strip().lower()}%"
+            where_clauses.append(
+                "(LOWER(COALESCE(mi.title, '')) LIKE :keyword OR LOWER(COALESCE(mi.description, '')) LIKE :keyword)"
+            )
+        if self._compat_has_text(category):
+            params["category"] = category.strip().upper()
+            where_clauses.append("UPPER(mi.category) = :category")
+        return where_clauses, params
+
     def _compat_get_detail(self, session: Session, current_user_id: int | None, item_id: int) -> dict[str, Any]:
         row = session.execute(
             text(
@@ -681,10 +746,71 @@ class MarketService:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="商品不存在")
         return dict(row)
 
+    async def _compat_count_market_rows_async(
+        self,
+        session,
+        *,
+        keyword: str | None,
+        category: str | None,
+    ) -> int:
+        where_clauses, params = self._compat_market_filter_parts(keyword=keyword, category=category)
+        total = (
+            await session.execute(
+                text(f"SELECT COUNT(*) FROM market_items mi WHERE {' AND '.join(where_clauses)}"),
+                params,
+            )
+        ).scalar()
+        return int(total or 0)
+
+    async def _compat_load_market_rows_async(
+        self,
+        session,
+        *,
+        keyword: str | None,
+        category: str | None,
+        limit: int,
+        offset: int,
+    ) -> list[dict[str, Any]]:
+        where_clauses, params = self._compat_market_filter_parts(keyword=keyword, category=category)
+        params.update({"limit": max(1, int(limit)), "offset": max(0, int(offset))})
+        rows = (
+            await session.execute(
+                text(
+                    f"""
+                    SELECT
+                        mi.id,
+                        mi.seller_id,
+                        u.username AS seller_username,
+                        u.nickname AS seller_nickname,
+                        mi.title,
+                        mi.price,
+                        mi.category,
+                        mi.images_json,
+                        mi.want_count,
+                        mi.school,
+                        mi.created_at
+                    FROM market_items mi
+                    LEFT JOIN users u ON u.id = mi.seller_id
+                    WHERE {' AND '.join(where_clauses)}
+                    ORDER BY mi.created_at DESC, mi.id DESC
+                    LIMIT :limit OFFSET :offset
+                    """
+                ),
+                params,
+            )
+        ).mappings().all()
+        return [dict(row) for row in rows]
+
     def _compat_load_market_stats(self, session: Session) -> dict[str, int]:
         active = int(session.execute(text("SELECT COUNT(*) FROM market_items WHERE status = 'SALE'")).scalar() or 0)
         sold = int(session.execute(text("SELECT COUNT(*) FROM market_items WHERE status = 'SOLD'")).scalar() or 0)
         user_count = int(session.execute(text("SELECT COUNT(*) FROM users")).scalar() or 0)
+        return {"active": active, "sold": sold, "userCount": user_count}
+
+    async def _compat_load_market_stats_async(self, session) -> dict[str, int]:
+        active = int((await session.execute(text("SELECT COUNT(*) FROM market_items WHERE status = 'SALE'"))).scalar() or 0)
+        sold = int((await session.execute(text("SELECT COUNT(*) FROM market_items WHERE status = 'SOLD'"))).scalar() or 0)
+        user_count = int((await session.execute(text("SELECT COUNT(*) FROM users"))).scalar() or 0)
         return {"active": active, "sold": sold, "userCount": user_count}
 
     def _compat_load_wanted_ids(self, session: Session, current_user_id: int | None, item_ids: list[int]) -> set[int]:
