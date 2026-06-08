@@ -40,6 +40,7 @@ bash scripts/runtime/production-down.sh
 - `production-preflight.sh` 默认检查 `market_items.source orders.uploader_id`，可用 `STUDYHUB_PRODUCTION_SCHEMA_CHECK_COLUMNS` 覆盖；值必须是空格分隔的 `table.column` 标识符，设为空字符串时执行全量 schema 检查，全空白值会被视为配置错误
 - `production-preflight.sh` 的网络连通性检查默认 5 秒超时，可用 `STUDYHUB_PREFLIGHT_TIMEOUT_SECONDS` 调整
 - `PREVIEW_BACKEND_PORT`、`PREVIEW_FRONTEND_PORT`、`PRODUCTION_BACKEND_PORT`、`PRODUCTION_FRONTEND_PORT` 必须是 1-65535 的 TCP 端口号
+- `preview-up.sh` / `production-up.sh` 只会把正整数 pid 文件视为已有进程
 - `preview-down.sh` / `production-down.sh` 只会对正整数 pid 文件执行 `kill`，无效 pid 文件会被当作损坏状态处理
 - preview / production 不应隐式回退到 SQLite 或本地 fake provider
 - 生产环境相关操作应保持显式、保守、可回滚

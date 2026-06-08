@@ -50,11 +50,15 @@ fi
 
 if [[ -f "$PID_FILE" ]]; then
   pid="$(cat "$PID_FILE")"
-  if [[ -n "${pid:-}" ]] && kill -0 "$pid" 2>/dev/null; then
+  if ! [[ "$pid" =~ ^[1-9][0-9]*$ ]]; then
+    echo "worker: invalid pid file removed"
+    rm -f "$PID_FILE"
+  elif [[ -n "${pid:-}" ]] && kill -0 "$pid" 2>/dev/null; then
     echo "worker already running (pid=$pid)"
     exit 0
+  else
+    rm -f "$PID_FILE"
   fi
-  rm -f "$PID_FILE"
 fi
 
 if command -v setsid >/dev/null 2>&1; then

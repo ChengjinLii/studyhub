@@ -36,6 +36,9 @@ is_running() {
   if [[ -f "$pid_file" ]]; then
     local pid
     pid="$(cat "$pid_file")"
+    if ! [[ "$pid" =~ ^[1-9][0-9]*$ ]]; then
+      return 1
+    fi
     [[ -n "$pid" ]] && kill -0 "$pid" 2>/dev/null
     return
   fi
