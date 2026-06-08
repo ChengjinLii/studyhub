@@ -1,16 +1,32 @@
 import { useCallback, useEffect, useState } from 'react';
 import { fetchOptionalSessionUser } from '../../lib/sessionApi';
-import { fetchStudyHubAgentMaterial, requestStudyHubAgentRecommendations } from '../../lib/studyHubAgentApi';
-import { SessionUser } from '../../types/user';
 import {
-  STUDYHUB_AGENT_INITIAL_MESSAGES,
-  STUDYHUB_AGENT_MESSAGES_STORAGE_KEY,
-} from './constants';
+  fetchStudyHubAgentMaterial,
+  requestStudyHubAgentRecommendations,
+} from '../../lib/studyHubAgentApi';
+import { SessionUser } from '../../types/user';
+import { STUDYHUB_AGENT_INITIAL_MESSAGES, STUDYHUB_AGENT_MESSAGES_STORAGE_KEY } from './constants';
 import {
   StudyHubAgentMaterialDetails,
   StudyHubAgentMessage,
   StudyHubAgentRecommendation,
 } from './types';
+
+const STORED_CONTEXT_MESSAGE_LIMIT = 24;
+const RECENT_CONTEXT_MESSAGE_LIMIT = 8;
+const EARLIER_CONTEXT_MESSAGE_SCAN_LIMIT = 16;
+const CONTEXT_QUERY_MAX_CHARS = 1000;
+const CONTEXT_LINE_MAX_CHARS = 220;
+const EARLIER_CONTEXT_SUMMARY_MAX_CHARS = 360;
+
+const COURSE_CONTEXT_HINTS: { label: string; aliases: string[] }[] = [
+  { label: '电子系统设计', aliases: ['电子系统设计', 'ESD'] },
+  { label: '通信原理', aliases: ['通信原理', 'CPS'] },
+  { label: '信号与系统', aliases: ['信号与系统', 'signals', 'signal'] },
+  { label: '数据结构', aliases: ['数据结构'] },
+  { label: '高等数学', aliases: ['高等数学', '高数', '微积分'] },
+  { label: '概率论', aliases: ['概率论'] },
+];
 
 export const useStudyHubAgentChat = () => {
   const [loading, setLoading] = useState(false);
@@ -33,7 +49,10 @@ export const useStudyHubAgentChat = () => {
 
   useEffect(() => {
     try {
-      window.localStorage.setItem(STUDYHUB_AGENT_MESSAGES_STORAGE_KEY, JSON.stringify(messages.slice(-12)));
+      window.localStorage.setItem(
+        STUDYHUB_AGENT_MESSAGES_STORAGE_KEY,
+        JSON.stringify(messages.slice(-STORED_CONTEXT_MESSAGE_LIMIT))
+      );
     } catch {
       // ignore storage errors
     }
@@ -77,7 +96,8 @@ export const useStudyHubAgentChat = () => {
           {
             id: makeMessageId(),
             role: 'assistant',
-            content: 'StudyHub 学习辅导需要登录后读取你的平台会话，才能基于平台资料给出推荐。请先登录后再试。',
+            content:
+              'StudyHub 学习辅导需要登录后读取你的平台会话，才能基于平台资料给出推荐。请先登录后再试。',
           },
         ]);
         return;
@@ -89,9 +109,10 @@ export const useStudyHubAgentChat = () => {
         const parsed = parseRecommendationOutput(data.output);
         const recommendations = normalizeRecommendations(parsed.recommendations);
         await Promise.all(recommendations.map((item) => loadMaterialDetail(item.materialId)));
-        const answer = typeof parsed.answer === 'string' && parsed.answer.trim()
-          ? parsed.answer.trim()
-          : buildStudyHubAgentAnswer(query, recommendations);
+        const answer =
+          typeof parsed.answer === 'string' && parsed.answer.trim()
+            ? parsed.answer.trim()
+            : buildStudyHubAgentAnswer(query, recommendations);
         setMessages((prev) => [
           ...prev,
           {
@@ -108,7 +129,10 @@ export const useStudyHubAgentChat = () => {
           {
             id: makeMessageId(),
             role: 'assistant',
-            content: error instanceof Error ? error.message : 'StudyHub 学习辅导暂时无法回答，请稍后重试。',
+            content:
+              error instanceof Error
+                ? error.message
+                : 'StudyHub 学习辅导暂时无法回答，请稍后重试。',
           },
         ]);
       } finally {
@@ -151,7 +175,9 @@ function normalizeRecommendations(value: unknown): StudyHubAgentRecommendation[]
       return {
         materialId,
         title: typeof record.title === 'string' ? record.title : undefined,
-        tags: Array.isArray(record.tags) ? record.tags.filter((tag): tag is string => typeof tag === 'string') : undefined,
+        tags: Array.isArray(record.tags)
+          ? record.tags.filter((tag): tag is string => typeof tag === 'string')
+          : undefined,
         reason: pickText(record.reason, record.explain, record.match_reason, record.note),
         summary: typeof record.summary === 'string' ? record.summary : undefined,
       };
@@ -162,38 +188,52 @@ function normalizeRecommendations(value: unknown): StudyHubAgentRecommendation[]
 
 function normalizeFollowups(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
-  return value.filter((item): item is string => typeof item === 'string' && item.trim().length > 0).slice(0, 3);
+  return value
+    .filter((item): item is string => typeof item === 'string' && item.trim().length > 0)
+    .slice(0, 3);
 }
 
 function pickText(...values: unknown[]) {
-  return values.find((value): value is string => typeof value === 'string' && value.trim().length > 0);
+  return values.find(
+    (value): value is string => typeof value === 'string' && value.trim().length > 0
+  );
 }
 
 function buildStudyHubAgentAnswer(query: string, recommendations: StudyHubAgentRecommendation[]) {
   if (recommendations.length === 0) {
     return `我没有在平台资料库里找到足够贴近「${query}」的候选。你可以补充课程名、考试范围、题型或学校专业，我再帮你缩小检索。`;
   }
-  const titles = recommendations.map((item) => `《${item.title || `资料 #${item.materialId}`}》`).join('、');
+  const titles = recommendations
+    .map((item) => `《${item.title || `资料 #${item.materialId}`}》`)
+    .join('、');
   return `我先基于 StudyHub 资料库找到 ${titles}。建议先用最匹配的资料建立知识框架，再结合真题或经验内容做查漏补缺；如果你告诉我考试时间和基础水平，我可以继续帮你拆成复习步骤。`;
 }
 
-function buildStudyHubAgentContext(messages: StudyHubAgentMessage[], query: string) {
+export function buildStudyHubAgentContext(messages: StudyHubAgentMessage[], query: string) {
   const currentQuery = query.trim();
-  const lines = messages
+  const contextMessages = messages
     .filter((message) => message.content.trim() && message.content.trim() !== currentQuery)
-    .slice(-8)
-    .map((message) => {
-      const role = message.role === 'user' ? '用户' : '助手';
-      const content = redactStudyHubAgentContextText(message.content).slice(0, 220);
-      const titles = (message.recommendations || [])
-        .map((item) => (item.title ? redactStudyHubAgentContextText(item.title) : undefined))
-        .filter((title): title is string => Boolean(title && title.trim()))
-        .slice(0, 3);
-      const titleHint = titles.length > 0 ? ` 推荐资料：${titles.join('；')}` : '';
-      return `${role}：${content}${titleHint}`;
-    })
-    .filter((line) => line.trim().length > 0);
-  return lines.join('\n').slice(-1000);
+    .slice(-STORED_CONTEXT_MESSAGE_LIMIT);
+  const recentMessages = contextMessages.slice(-RECENT_CONTEXT_MESSAGE_LIMIT);
+  const earlierMessages = contextMessages.slice(
+    0,
+    Math.max(0, contextMessages.length - recentMessages.length)
+  );
+  const earlierSummary = buildStudyHubAgentEarlierContextSummary(earlierMessages);
+  const recentContext = recentMessages
+    .map(formatStudyHubAgentContextLine)
+    .filter(Boolean)
+    .join('\n');
+
+  if (!earlierSummary) {
+    return recentContext.slice(-CONTEXT_QUERY_MAX_CHARS);
+  }
+  const recentBudget = Math.max(0, CONTEXT_QUERY_MAX_CHARS - earlierSummary.length - 1);
+  const trimmedRecentContext = recentContext.slice(-recentBudget);
+  return [earlierSummary, trimmedRecentContext]
+    .filter(Boolean)
+    .join('\n')
+    .slice(0, CONTEXT_QUERY_MAX_CHARS);
 }
 
 function redactStudyHubAgentContextText(value: string) {
@@ -201,7 +241,78 @@ function redactStudyHubAgentContextText(value: string) {
     .replace(/https?:\/\/[^\s,;，；。]+|www\.[^\s,;，；。]+/gi, '[redacted-url]')
     .replace(/[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}/g, '[redacted-email]')
     .replace(/(^|[^\d])(1[3-9]\d{9})(?!\d)/g, '$1[redacted-phone]')
-    .replace(/(api[_-]?key|token|secret|authorization|bearer)\s*[:=]\s*[^\s,;，；。]+/gi, '[redacted-secret]');
+    .replace(
+      /(api[_-]?key|token|secret|authorization|bearer)\s*[:=]\s*[^\s,;，；。]+/gi,
+      '[redacted-secret]'
+    );
+}
+
+function formatStudyHubAgentContextLine(message: StudyHubAgentMessage) {
+  const role = message.role === 'user' ? '用户' : '助手';
+  const content = redactStudyHubAgentContextText(message.content).slice(0, CONTEXT_LINE_MAX_CHARS);
+  const titles = collectRecommendationTitles([message], 3);
+  const titleHint = titles.length > 0 ? ` 推荐资料：${titles.join('；')}` : '';
+  return `${role}：${content}${titleHint}`;
+}
+
+function buildStudyHubAgentEarlierContextSummary(messages: StudyHubAgentMessage[]) {
+  if (messages.length === 0) return '';
+  const scannedMessages = messages.slice(-EARLIER_CONTEXT_MESSAGE_SCAN_LIMIT);
+  const courseHints = collectCourseHints(scannedMessages);
+  const titles = collectRecommendationTitles(scannedMessages, 4);
+  const userGoals = scannedMessages
+    .filter((message) => message.role === 'user')
+    .map((message) => redactStudyHubAgentContextText(message.content).trim())
+    .filter((content) => content.length >= 2)
+    .slice(-2);
+
+  const parts: string[] = [];
+  if (courseHints.length > 0) {
+    parts.push(`课程/关键词：${courseHints.join('、')}`);
+  }
+  if (titles.length > 0) {
+    parts.push(`曾推荐资料：${titles.join('；')}`);
+  }
+  if (userGoals.length > 0) {
+    parts.push(`早期用户目标：${userGoals.join('；')}`);
+  }
+  if (parts.length === 0) return '';
+  return `早期上下文摘要：${parts.join('。')}`.slice(0, EARLIER_CONTEXT_SUMMARY_MAX_CHARS);
+}
+
+function collectCourseHints(messages: StudyHubAgentMessage[]) {
+  const haystack = messages
+    .flatMap((message) => [
+      message.content,
+      ...(message.recommendations || []).flatMap((item) => [
+        item.title || '',
+        item.summary || '',
+        ...(item.tags || []),
+      ]),
+    ])
+    .map(redactStudyHubAgentContextText)
+    .join(' ');
+  const normalizedHaystack = haystack.toLowerCase();
+  const hints: string[] = [];
+  COURSE_CONTEXT_HINTS.forEach((item) => {
+    if (item.aliases.some((alias) => normalizedHaystack.includes(alias.toLowerCase()))) {
+      hints.push(item.label);
+    }
+  });
+  return hints.slice(0, 4);
+}
+
+function collectRecommendationTitles(messages: StudyHubAgentMessage[], limit: number) {
+  const titles: string[] = [];
+  messages.forEach((message) => {
+    (message.recommendations || []).forEach((item) => {
+      const title = item.title ? redactStudyHubAgentContextText(item.title).trim() : '';
+      if (title && !titles.includes(title)) {
+        titles.push(title);
+      }
+    });
+  });
+  return titles.slice(-limit);
 }
 
 function makeMessageId() {

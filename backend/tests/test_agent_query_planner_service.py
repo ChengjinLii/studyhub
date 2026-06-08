@@ -83,6 +83,27 @@ def test_query_planner_detects_exam_trend_plan_from_query_and_evidence() -> None
     assert any("分值结构" in item and "公式/图表页提示" in item for item in plan.response_guidance)
 
 
+def test_query_planner_detects_esd_exam_style_plan() -> None:
+    plan = AgentQueryPlannerService().build_plan(
+        "ESD 考题风格帮我分析一下",
+        materials=[
+            _material(
+                201,
+                title="ESD-电子系统设计-2021年真题及答案",
+                description="电子系统设计样卷答案和期末考题整理",
+            )
+        ],
+        pdf_evidence=[],
+        memory_context=None,
+    )
+
+    assert plan.intent == "exam_trend_analysis"
+    assert plan.course_terms == ("电子系统设计",)
+    assert "past_exam" in plan.resource_types
+    assert any(term.lower() == "esd" for term in plan.search_terms)
+    assert any("出题风格" in item for item in plan.response_guidance)
+
+
 def test_query_planner_detects_study_plan_without_extra_io() -> None:
     plan = AgentQueryPlannerService().build_plan(
         "我两周后考试，目标85分，每天2小时，调制和误码率很薄弱，应该怎么复习通信原理？",

@@ -1,0 +1,53 @@
+import { describe, expect, it } from 'vitest';
+import { buildStudyHubAgentContext } from '../../components/studyHubAgent/useStudyHubAgentChat';
+import { StudyHubAgentMessage } from '../../components/studyHubAgent/types';
+
+const message = (
+  id: number,
+  role: StudyHubAgentMessage['role'],
+  content: string,
+  recommendations: StudyHubAgentMessage['recommendations'] = []
+): StudyHubAgentMessage => ({
+  id: String(id),
+  role,
+  content,
+  recommendations,
+});
+
+describe('studyHubAgentContext', () => {
+  it('keeps an early course and material summary for long follow-up conversations', () => {
+    const messages: StudyHubAgentMessage[] = [
+      message(1, 'user', '我想复习 ESD，也就是电子系统设计'),
+      message(2, 'assistant', '可以先看这两份资料', [
+        { materialId: 201, title: 'ESD-电子系统设计-2021年真题及答案' },
+      ]),
+      ...Array.from({ length: 18 }, (_, index) =>
+        message(index + 3, index % 2 === 0 ? 'user' : 'assistant', `后续讨论 ${index}`)
+      ),
+    ];
+
+    const context = buildStudyHubAgentContext(messages, '考题风格帮我分析一下');
+
+    expect(context.length).toBeLessThanOrEqual(1000);
+    expect(context).toContain('早期上下文摘要');
+    expect(context).toContain('电子系统设计');
+    expect(context).toContain('ESD-电子系统设计-2021年真题及答案');
+    expect(context).not.toContain('考题风格帮我分析一下');
+  });
+
+  it('redacts private values before sending compact context', () => {
+    const messages: StudyHubAgentMessage[] = [
+      message(1, 'user', '我的 token: demo-secret-value，邮箱是 test@example.com'),
+      message(2, 'assistant', '手机号 13800138000 不应该出现在上下文'),
+    ];
+
+    const context = buildStudyHubAgentContext(messages, '继续');
+
+    expect(context).toContain('[redacted-secret]');
+    expect(context).toContain('[redacted-email]');
+    expect(context).toContain('[redacted-phone]');
+    expect(context).not.toContain('demo-secret-value');
+    expect(context).not.toContain('test@example.com');
+    expect(context).not.toContain('13800138000');
+  });
+});

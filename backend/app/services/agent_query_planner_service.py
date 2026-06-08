@@ -10,6 +10,7 @@ from app.services.material_pdf_evidence_service import MaterialPageEvidence
 
 
 COURSE_ALIASES: dict[str, tuple[str, ...]] = {
+    "电子系统设计": ("电子系统设计", "esd"),
     "通信原理": ("通信原理", "cps"),
     "信号与系统": ("信号与系统", "signals", "signal"),
     "数据结构": ("数据结构",),
@@ -18,7 +19,7 @@ COURSE_ALIASES: dict[str, tuple[str, ...]] = {
 }
 
 INTENT_RULES: tuple[tuple[str, tuple[str, ...]], ...] = (
-    ("exam_trend_analysis", ("常考", "往年", "历年", "真题", "题型", "考点", "期末题")),
+    ("exam_trend_analysis", ("常考", "往年", "历年", "真题", "题型", "考点", "期末题", "考题", "考题风格", "出题风格", "试卷", "样卷")),
     ("study_plan", ("复习计划", "怎么复习", "两周", "一周", "考试", "规划", "速成")),
     ("problem_tutoring", ("错题", "不会", "怎么做", "讲解", "解析一下", "为什么")),
     ("material_fit_assessment", ("适合我", "适合", "适不适合", "该不该看", "值得看", "能不能看", "先看这份")),
@@ -27,7 +28,7 @@ INTENT_RULES: tuple[tuple[str, tuple[str, ...]], ...] = (
 )
 
 RESOURCE_TYPE_RULES: tuple[tuple[str, tuple[str, ...]], ...] = (
-    ("past_exam", ("真题", "往年", "历年", "试卷", "期末题")),
+    ("past_exam", ("真题", "往年", "历年", "试卷", "期末题", "考题", "样卷")),
     ("answer_explanation", ("解析", "答案", "标答", "讲解")),
     ("notes", ("笔记", "讲义", "导图")),
     ("crash_course", ("速成", "提纲", "复习")),
@@ -542,7 +543,7 @@ def _build_response_guidance(
 ) -> list[str]:
     guidance = ["只基于候选资料、PDF 证据和记忆上下文回答，不编造平台外资料。"]
     if intent == "exam_trend_analysis":
-        guidance.append("优先输出常考题型、高频知识点、年份趋势、分值结构、难度信号、公式/图表页提示、推荐资料和复习顺序。")
+        guidance.append("优先输出出题风格、常考题型、高频知识点、年份趋势、分值结构、难度信号、公式/图表页提示、推荐资料和复习顺序。")
     elif intent == "study_plan":
         guidance.append("优先输出阶段化复习顺序、资料使用顺序和下一步学习动作。")
     elif intent == "pdf_summary":
