@@ -386,52 +386,59 @@ class MaterialsService(MaterialsCompatMixin):
             "downloadCount": self._compat_as_int(row["download_count"]),
             "salesCount": self._compat_as_int(row["sales_count"]),
         }
-        tags_map = await self._call_with_new_async_session(self._compat_load_tags_map_async, [material_id])
-        comment_counts = await self._call_with_new_async_session(self._compat_load_comment_counts_async, [material_id])
-        versions = await self._call_with_new_async_session(self._compat_load_versions_async, material_id)
-        reviews = await self._call_with_new_async_session(self._compat_load_reviews_async, material_id)
         favorited = False
         liked = False
         my_rating = None
         purchased = False
+        auxiliary_calls = [
+            self._call_with_new_async_session(self._compat_load_tags_map_async, [material_id]),
+            self._call_with_new_async_session(self._compat_load_comment_counts_async, [material_id]),
+            self._call_with_new_async_session(self._compat_load_versions_async, material_id),
+            self._call_with_new_async_session(self._compat_load_reviews_async, material_id),
+        ]
         if current_user_id is not None:
-            favorited = bool(
-                await self._call_with_new_async_session(
-                    self._compat_material_relation_exists_async,
-                    """
-                    SELECT 1
-                    FROM favorites
-                    WHERE material_id = :material_id AND user_id = :user_id
-                    LIMIT 1
-                    """,
-                    material_id,
-                    current_user_id,
-                )
+            auxiliary_calls.extend(
+                [
+                    self._call_with_new_async_session(
+                        self._compat_material_relation_exists_async,
+                        """
+                        SELECT 1
+                        FROM favorites
+                        WHERE material_id = :material_id AND user_id = :user_id
+                        LIMIT 1
+                        """,
+                        material_id,
+                        current_user_id,
+                    ),
+                    self._call_with_new_async_session(
+                        self._compat_material_relation_exists_async,
+                        """
+                        SELECT 1
+                        FROM material_likes
+                        WHERE material_id = :material_id AND user_id = :user_id
+                        LIMIT 1
+                        """,
+                        material_id,
+                        current_user_id,
+                    ),
+                    self._call_with_new_async_session(self._compat_load_my_rating_async, material_id, current_user_id),
+                    self._call_with_new_async_session(self._compat_has_paid_access_async, material_id, current_user_id),
+                    self._compat_build_custom_preview_urls_async(
+                        material_id,
+                        self._compat_json_loads(row["custom_preview_images"]),
+                    ),
+                ]
             )
-            liked = bool(
-                await self._call_with_new_async_session(
-                    self._compat_material_relation_exists_async,
-                    """
-                    SELECT 1
-                    FROM material_likes
-                    WHERE material_id = :material_id AND user_id = :user_id
-                    LIMIT 1
-                    """,
-                    material_id,
-                    current_user_id,
-                )
-            )
-            my_rating = await self._call_with_new_async_session(self._compat_load_my_rating_async, material_id, current_user_id)
-            purchased = bool(await self._call_with_new_async_session(self._compat_has_paid_access_async, material_id, current_user_id))
+        auxiliary_results = await asyncio.gather(*auxiliary_calls)
+        tags_map, comment_counts, versions, reviews = auxiliary_results[:4]
+        custom_preview_images = []
+        if current_user_id is not None:
+            favorited = bool(auxiliary_results[4])
+            liked = bool(auxiliary_results[5])
+            my_rating = auxiliary_results[6]
+            purchased = bool(auxiliary_results[7])
+            custom_preview_images = auxiliary_results[8]
         netdisk_accessible = detail_base["hasNetdisk"] and (detail_base["free"] or purchased or can_manage_all or is_owner)
-        custom_preview_images = (
-            await self._compat_build_custom_preview_urls_async(
-                material_id,
-                self._compat_json_loads(row["custom_preview_images"]),
-            )
-            if current_user_id is not None
-            else []
-        )
         detail_base.update(
             {
                 "tags": tags_map.get(material_id, []),
