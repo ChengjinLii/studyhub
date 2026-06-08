@@ -20,7 +20,33 @@ COURSE_ALIASES: dict[str, tuple[str, ...]] = {
 }
 
 INTENT_RULES: tuple[tuple[str, tuple[str, ...]], ...] = (
-    ("exam_trend_analysis", ("常考", "往年", "历年", "真题", "题型", "考点", "期末题", "考题", "考题风格", "出题风格", "试卷", "样卷")),
+    (
+        "exam_trend_analysis",
+        (
+            "常考",
+            "往年",
+            "历年",
+            "真题",
+            "题型",
+            "考点",
+            "期末题",
+            "考题",
+            "考题风格",
+            "出题风格",
+            "试卷",
+            "样卷",
+            "趋势",
+            "变化",
+            "分布",
+            "分值",
+            "难度",
+            "高频知识点",
+            "知识点分布",
+            "近几年",
+            "近三年",
+            "近五年",
+        ),
+    ),
     ("study_plan", ("复习计划", "怎么复习", "两周", "一周", "考试", "规划", "速成")),
     ("problem_tutoring", ("错题", "不会", "怎么做", "讲解", "解析一下", "为什么")),
     ("material_fit_assessment", ("适合我", "适合", "适不适合", "该不该看", "值得看", "能不能看", "先看这份")),
@@ -29,11 +55,50 @@ INTENT_RULES: tuple[tuple[str, tuple[str, ...]], ...] = (
 )
 
 RESOURCE_TYPE_RULES: tuple[tuple[str, tuple[str, ...]], ...] = (
-    ("past_exam", ("真题", "往年", "历年", "试卷", "期末题", "考题", "样卷")),
+    ("past_exam", ("真题", "往年", "历年", "试卷", "期末题", "考题", "样卷", "出题", "考法", "分值", "难度", "近几年")),
     ("answer_explanation", ("解析", "答案", "标答", "讲解")),
     ("notes", ("笔记", "讲义", "导图")),
     ("crash_course", ("速成", "提纲", "复习")),
     ("experience", ("经验", "经验贴", "攻略")),
+)
+
+EXAM_ANALYSIS_FOCUS_RULES: tuple[tuple[str, str, str, tuple[str, ...]], ...] = (
+    (
+        "year_trend",
+        "年份趋势",
+        "按年份对比常考题型、知识点和变化方向。",
+        ("年份", "近几年", "近三年", "近五年", "趋势", "变化", "每年", "逐年"),
+    ),
+    (
+        "question_type_distribution",
+        "题型分布",
+        "优先聚合选择、填空、计算、证明、简答等题型信号。",
+        ("题型", "题目类型", "题类", "题型分布", "考法", "出题风格", "考题风格"),
+    ),
+    (
+        "knowledge_distribution",
+        "高频知识点",
+        "优先聚合高频知识点、章节模块和反复出现的概念。",
+        ("知识点", "高频知识点", "考点", "重点", "章节", "模块"),
+    ),
+    (
+        "score_distribution",
+        "分值结构",
+        "优先提取分值、占比和高投入产出题型。",
+        ("分值", "分数", "占比", "分值结构", "多少分"),
+    ),
+    (
+        "difficulty_trend",
+        "难度信号",
+        "优先标出基础、综合、偏难等难度变化和复习投入建议。",
+        ("难度", "难不难", "偏难", "简单", "综合", "难度变化"),
+    ),
+    (
+        "visual_formula_pages",
+        "公式/图表页",
+        "保留公式、图表、框图和视觉题页码引用。",
+        ("公式", "图表", "框图", "图示", "推导"),
+    ),
 )
 
 LOW_VALUE_TERMS = {
@@ -165,6 +230,7 @@ class AgentQueryPlan:
     problem_context: dict[str, Any] = field(default_factory=dict)
     material_scope: dict[str, Any] = field(default_factory=dict)
     learning_preferences: dict[str, Any] = field(default_factory=dict)
+    exam_analysis_focus: dict[str, Any] = field(default_factory=dict)
 
     def to_prompt_payload(self) -> dict[str, Any]:
         payload = {
@@ -185,6 +251,8 @@ class AgentQueryPlan:
             payload["material_scope"] = self.material_scope
         if self.learning_preferences:
             payload["learning_preferences"] = self.learning_preferences
+        if self.exam_analysis_focus:
+            payload["exam_analysis_focus"] = self.exam_analysis_focus
         return payload
 
 
@@ -214,6 +282,7 @@ class AgentQueryPlannerService:
         problem_context = _extract_problem_context(normalized, pdf_evidence, intent)
         material_scope = _extract_material_scope(normalized, materials, pdf_evidence)
         learning_preferences = _extract_learning_preferences(normalized)
+        exam_analysis_focus = _extract_exam_analysis_focus(normalized, intent)
         evidence_tasks = _build_evidence_tasks(
             intent,
             pdf_evidence,
@@ -221,6 +290,7 @@ class AgentQueryPlannerService:
             problem_context,
             material_scope,
             learning_preferences,
+            exam_analysis_focus,
         )
         response_guidance = _build_response_guidance(
             intent,
@@ -230,6 +300,7 @@ class AgentQueryPlannerService:
             bool(problem_context),
             material_scope,
             bool(learning_preferences),
+            bool(exam_analysis_focus),
         )
         return AgentQueryPlan(
             intent=intent,
@@ -244,6 +315,7 @@ class AgentQueryPlannerService:
             problem_context=problem_context,
             material_scope=material_scope,
             learning_preferences=learning_preferences,
+            exam_analysis_focus=exam_analysis_focus,
         )
 
 
@@ -501,6 +573,37 @@ def _extract_learning_preferences(normalized_query: str) -> dict[str, Any]:
     }
 
 
+def _extract_exam_analysis_focus(normalized_query: str, intent: str) -> dict[str, Any]:
+    if intent != "exam_trend_analysis":
+        return {}
+    modes: list[str] = []
+    labels: list[str] = []
+    guidance: list[str] = []
+    matched_terms: list[str] = []
+    for mode, label, hint, aliases in EXAM_ANALYSIS_FOCUS_RULES:
+        hits = [alias for alias in aliases if alias.lower() in normalized_query]
+        if not hits:
+            continue
+        modes.append(mode)
+        labels.append(label)
+        guidance.append(hint)
+        matched_terms.extend(hits[:2])
+    if not modes:
+        modes = ["year_trend", "question_type_distribution", "knowledge_distribution"]
+        labels = ["年份趋势", "题型分布", "高频知识点"]
+        guidance = [
+            "按年份对比常考题型、知识点和变化方向。",
+            "优先聚合选择、填空、计算、证明、简答等题型信号。",
+            "优先聚合高频知识点、章节模块和反复出现的概念。",
+        ]
+    return {
+        "modes": modes[:6],
+        "labels": labels[:6],
+        "guidance": guidance[:6],
+        "matched_terms": _dedupe(matched_terms)[:8],
+    }
+
+
 def _build_evidence_tasks(
     intent: str,
     pdf_evidence: list[MaterialPageEvidence],
@@ -508,17 +611,19 @@ def _build_evidence_tasks(
     problem_context: dict[str, Any] | None = None,
     material_scope: dict[str, Any] | None = None,
     learning_preferences: dict[str, Any] | None = None,
+    exam_analysis_focus: dict[str, Any] | None = None,
 ) -> list[str]:
     tasks = ["rank_candidate_materials"]
     if intent in {"exam_trend_analysis", "pdf_summary", "problem_tutoring", "material_fit_assessment"}:
         tasks.append("read_relevant_pdf_pages")
     if intent == "exam_trend_analysis":
-        tasks.extend(["aggregate_year_signals", "aggregate_question_type_signals"])
-        if any(item.score_points for item in pdf_evidence):
+        focus_modes = set(_safe_string_list((exam_analysis_focus or {}).get("modes")))
+        tasks.extend(["aggregate_year_signals", "aggregate_question_type_signals", "aggregate_knowledge_signals"])
+        if "score_distribution" in focus_modes or any(item.score_points for item in pdf_evidence):
             tasks.append("aggregate_score_point_signals")
-        if any(item.difficulty_signals for item in pdf_evidence):
+        if "difficulty_trend" in focus_modes or any(item.difficulty_signals for item in pdf_evidence):
             tasks.append("aggregate_difficulty_signals")
-        if any(item.visual_signals for item in pdf_evidence):
+        if "visual_formula_pages" in focus_modes or any(item.visual_signals for item in pdf_evidence):
             tasks.append("preserve_formula_or_visual_page_refs")
         if any(item.anchor_text for item in pdf_evidence):
             tasks.append("cite_anchor_snippets")
@@ -538,6 +643,8 @@ def _build_evidence_tasks(
             tasks.append("cite_each_material_sources")
     if learning_preferences:
         tasks.append("adapt_to_learning_preferences")
+    if exam_analysis_focus:
+        tasks.append("adapt_to_exam_analysis_focus")
     if pdf_evidence:
         tasks.append("cite_material_pages")
     if any(item.question_numbers for item in pdf_evidence):
@@ -557,6 +664,7 @@ def _build_response_guidance(
     has_problem_context: bool,
     material_scope: dict[str, Any] | None = None,
     has_learning_preferences: bool = False,
+    has_exam_analysis_focus: bool = False,
 ) -> list[str]:
     guidance = ["只基于候选资料、PDF 证据和记忆上下文回答，不编造平台外资料。"]
     if intent == "exam_trend_analysis":
@@ -581,9 +689,22 @@ def _build_response_guidance(
         guidance.append("如果 material_scope 指向多份资料，必须优先做跨资料共同题型、差异点和证据覆盖说明。")
     if has_learning_preferences:
         guidance.append("如果 learning_preferences 中有学习偏好，只能用于调整解释深度、复习顺序和资料使用建议，不要输出内部字段名。")
+    if has_exam_analysis_focus:
+        guidance.append("如果 exam_analysis_focus 中有用户指定的分析维度，必须优先覆盖这些维度并避免输出内部字段名。")
     if has_memory_context:
         guidance.append("用户个人记忆只能用于当前用户个性化建议，不能写成平台集体结论。")
     return guidance
+
+
+def _safe_string_list(value: Any) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    result: list[str] = []
+    for item in value:
+        cleaned = str(item).strip()
+        if cleaned and cleaned not in result:
+            result.append(cleaned)
+    return result[:12]
 
 
 def _dedupe(values: list[str]) -> list[str]:

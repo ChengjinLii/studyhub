@@ -24,6 +24,7 @@ FORBIDDEN_INTERNAL_MARKERS = (
     "material_scope",
     "current_query_memory",
     "learning_preferences",
+    "exam_analysis_focus",
     "course_memory_card",
     "evidence_coverage",
     "evidence_basis",

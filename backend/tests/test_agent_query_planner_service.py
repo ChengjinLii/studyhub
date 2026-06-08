@@ -104,6 +104,46 @@ def test_query_planner_detects_esd_exam_style_plan() -> None:
     assert any("出题风格" in item for item in plan.response_guidance)
 
 
+def test_query_planner_detects_exam_analysis_focus_dimensions() -> None:
+    evidence = [
+        MaterialPageEvidence(
+            material_id=101,
+            title="通信原理四年真题解析",
+            page=3,
+            text="2024 通信原理计算题常考调制解调。",
+            score=42,
+            years=("2024",),
+            question_types=("计算题",),
+            knowledge_signals=("调制", "解调"),
+            score_points=(10,),
+            difficulty_signals=("综合", "偏难"),
+            visual_signals=("公式",),
+            source_type="past_exam",
+        )
+    ]
+
+    plan = AgentQueryPlannerService().build_plan(
+        "通信原理近几年分值结构、难度变化和高频知识点怎么分布？",
+        materials=[_material()],
+        pdf_evidence=evidence,
+        memory_context=None,
+    )
+    payload = plan.to_prompt_payload()
+
+    assert plan.intent == "exam_trend_analysis"
+    assert payload["exam_analysis_focus"]["modes"] == [
+        "year_trend",
+        "knowledge_distribution",
+        "score_distribution",
+        "difficulty_trend",
+    ]
+    assert "aggregate_knowledge_signals" in plan.evidence_tasks
+    assert "aggregate_score_point_signals" in plan.evidence_tasks
+    assert "aggregate_difficulty_signals" in plan.evidence_tasks
+    assert "adapt_to_exam_analysis_focus" in plan.evidence_tasks
+    assert any("exam_analysis_focus" in item for item in plan.response_guidance)
+
+
 def test_query_planner_detects_study_plan_without_extra_io() -> None:
     plan = AgentQueryPlannerService().build_plan(
         "我两周后考试，目标85分，每天2小时，调制和误码率很薄弱，应该怎么复习通信原理？",
