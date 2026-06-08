@@ -231,7 +231,18 @@ def _redact_note(value: str | None) -> str:
     text = re.sub(r"https?://\S+|www\.\S+", "[redacted-url]", text, flags=re.IGNORECASE)
     text = re.sub(r"[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}", "[redacted-email]", text)
     text = re.sub(r"(?<!\d)1[3-9]\d{9}(?!\d)", "[redacted-phone]", text)
-    text = re.sub(r"(?i)(api[_-]?key|token|secret)\s*[:=]\s*\S+", r"\1=[redacted-secret]", text)
+    text = re.sub(r"(?i)(?<![A-Za-z0-9_-])authorization\s*[:=]?\s*bearer\s+\S+", "[redacted-secret]", text)
+    text = re.sub(r"(?i)(?<![A-Za-z0-9_-])bearer\s+\S+", "[redacted-secret]", text)
+    text = re.sub(
+        r"(?i)(?<![A-Za-z0-9_-])(?:sk|tp)-[A-Za-z0-9_-]{16,}(?![A-Za-z0-9_-])",
+        "[redacted-secret]",
+        text,
+    )
+    text = re.sub(
+        r"(?i)(?<![A-Za-z0-9_-])(?:api[_-]?key|token|secret|authorization)(?![A-Za-z0-9_-])\s*[:=]\s*\S+",
+        "[redacted-secret]",
+        text,
+    )
     text = _redact_identity_numbers(text)
     text = _redact_labeled_ids(text)
     text = _redact_messenger_handles(text)

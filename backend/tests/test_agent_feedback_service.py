@@ -62,8 +62,9 @@ def test_ai_feedback_builds_redacted_user_and_platform_memory_candidates(client,
             "hook": "useful",
             "selectedMaterialIds": [780, 781, 999, 780],
             "note": (
-                "真题解析有帮助，但我基础差，希望以后多给一步步详细解析和刷题顺序，"
-                "联系我 13812345678 alice@example.com api_key=secret-value "
+                "真题解析有帮助，基础差，希望以后多给一步步详细解析和刷题顺序。"
+                "13812345678 alice@example.com api_key=secret-value "
+                "Authorization Bearer sk-testsecret1234567890 tp-testsecret1234567890 "
                 "https://example.test QQ 123456789 微信 studyhub_user 学号 2023123456 "
                 "身份证 11010119900307561X 卡号 6222021234567890123"
             ),
@@ -80,6 +81,8 @@ def test_ai_feedback_builds_redacted_user_and_platform_memory_candidates(client,
     assert "13812345678" not in serialized
     assert "alice@example.com" not in serialized
     assert "secret-value" not in serialized
+    assert "sk-testsecret1234567890" not in serialized
+    assert "tp-testsecret1234567890" not in serialized
     assert "https://example.test" not in serialized
     assert "123456789" not in serialized
     assert "studyhub_user" not in serialized
