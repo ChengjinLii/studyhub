@@ -1,8 +1,14 @@
 from __future__ import annotations
 
+import base64
+import binascii
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+
+
+AGENT_IMAGE_MAX_BYTES = 786_432
+AGENT_IMAGE_MIME_TYPES = {"image/png", "image/jpeg", "image/webp"}
 
 
 class AiChatMessagePayload(BaseModel):
@@ -33,22 +39,28 @@ class AiImageAttachmentPayload(BaseModel):
     name: str | None = Field(default=None, max_length=120)
     mimeType: str = Field(min_length=1, max_length=64)
     dataUrl: str = Field(min_length=1, max_length=1_100_000)
-    sizeBytes: int = Field(ge=1, le=786_432)
+    sizeBytes: int = Field(ge=1, le=AGENT_IMAGE_MAX_BYTES)
 
     @field_validator("mimeType")
     @classmethod
     def validate_mime_type(cls, value: str) -> str:
         normalized = value.strip().lower()
-        if normalized not in {"image/png", "image/jpeg", "image/webp"}:
+        if normalized not in AGENT_IMAGE_MIME_TYPES:
             raise ValueError("仅支持 PNG、JPG 或 WEBP 图片")
         return normalized
 
     @field_validator("dataUrl")
     @classmethod
     def validate_data_url(cls, value: str) -> str:
-        if not value.startswith("data:image/") or ";base64," not in value[:80]:
-            raise ValueError("图片必须使用 base64 data URL")
+        _decode_image_data_url(value)
         return value
+
+    @model_validator(mode="after")
+    def validate_data_url_matches_mime_type(self) -> "AiImageAttachmentPayload":
+        media_type, _ = _decode_image_data_url(self.dataUrl)
+        if media_type != self.mimeType:
+            raise ValueError("图片 MIME 与 data URL 不一致")
+        return self
 
 
 class AiRecommendRequestPayload(BaseModel):
@@ -90,3 +102,22 @@ class AiFeedbackPayload(BaseModel):
             if len(deduped) >= 10:
                 break
         return deduped
+
+
+def _decode_image_data_url(value: str) -> tuple[str, int]:
+    header, separator, encoded = value.partition(",")
+    normalized_header = header.strip().lower()
+    if separator != "," or not normalized_header.startswith("data:") or not normalized_header.endswith(";base64"):
+        raise ValueError("图片必须使用 base64 data URL")
+    media_type = normalized_header.removeprefix("data:").removesuffix(";base64")
+    if media_type not in AGENT_IMAGE_MIME_TYPES:
+        raise ValueError("仅支持 PNG、JPG 或 WEBP 图片")
+    try:
+        decoded = base64.b64decode(encoded, validate=True)
+    except (binascii.Error, ValueError) as exc:
+        raise ValueError("图片必须使用有效 base64 data URL") from exc
+    if not decoded:
+        raise ValueError("图片内容不能为空")
+    if len(decoded) > AGENT_IMAGE_MAX_BYTES:
+        raise ValueError("图片不能超过 768KB")
+    return media_type, len(decoded)
