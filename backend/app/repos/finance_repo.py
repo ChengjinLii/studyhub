@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 import uuid
 
-from sqlalchemy import Select, func, select, update
+from sqlalchemy import Select, case, func, select, update
 from sqlalchemy.orm import Session
 
 from app.models.finance import (
@@ -118,6 +118,53 @@ class FinanceRepository:
             .order_by(SettlementRecord.created_at.desc(), SettlementRecord.id.desc())
         )
         return list(session.scalars(stmt))
+
+    def summarize_settlements_for_uploaders(
+        self,
+        session: Session,
+        uploader_ids: list[int],
+        now: datetime,
+    ) -> dict[int, dict[str, int]]:
+        if not uploader_ids:
+            return {}
+        normalized_ids = sorted({int(uploader_id) for uploader_id in uploader_ids})
+        pending_condition = SettlementRecord.status == "PENDING"
+        available_condition = (
+            pending_condition
+            & SettlementRecord.payout_transfer_id.is_(None)
+            & SettlementRecord.scheduled_payout_at.is_not(None)
+            & (SettlementRecord.scheduled_payout_at <= now)
+        )
+        stmt = (
+            select(
+                SettlementRecord.uploader_id,
+                func.count(SettlementRecord.id).label("order_count"),
+                func.coalesce(func.sum(SettlementRecord.gross_amount), 0).label("gross_amount"),
+                func.coalesce(func.sum(SettlementRecord.platform_fee), 0).label("platform_fee"),
+                func.coalesce(
+                    func.sum(case((pending_condition, SettlementRecord.payout_amount), else_=0)),
+                    0,
+                ).label("pending_total"),
+                func.coalesce(
+                    func.sum(case((available_condition, SettlementRecord.payout_amount), else_=0)),
+                    0,
+                ).label("available"),
+            )
+            .where(SettlementRecord.uploader_id.in_(normalized_ids))
+            .group_by(SettlementRecord.uploader_id)
+        )
+        rows = session.execute(stmt).mappings().all()
+        return {
+            int(row["uploader_id"]): {
+                "grossAmount": int(row["gross_amount"] or 0),
+                "platformFee": int(row["platform_fee"] or 0),
+                "payoutAmount": int(row["available"] or 0),
+                "orderCount": int(row["order_count"] or 0),
+                "unclaimedPayoutTotal": int(row["pending_total"] or 0),
+            }
+            for row in rows
+            if row["uploader_id"] is not None
+        }
 
     def list_pending_due_settlements_for_uploader(self, session: Session, uploader_id: int, now: datetime) -> list[SettlementRecord]:
         stmt = (

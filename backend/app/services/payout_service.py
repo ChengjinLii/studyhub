@@ -198,8 +198,23 @@ class PayoutService:
         items, total = self.finance_repo.list_payout_applications(session, page=page, size=size)
         safe_page = max(page, 0)
         safe_size = max(1, min(size, 100))
+        user_ids = [int(item.user_id) for item in items]
+        reviewer_ids = [int(item.reviewer_id) for item in items if item.reviewer_id is not None]
+        users_by_id = {
+            int(user.id): user
+            for user in self.auth_repo.find_users_by_ids(session, user_ids + reviewer_ids)
+        }
+        earnings_by_user_id = self._build_earnings_by_user_ids(session, user_ids)
         return {
-            "items": [self._to_application_payload(session, item) for item in items],
+            "items": [
+                self._to_application_payload(
+                    session,
+                    item,
+                    earnings=earnings_by_user_id.get(int(item.user_id)),
+                    users_by_id=users_by_id,
+                )
+                for item in items
+            ],
             "page": safe_page,
             "size": safe_size,
             "total": total,
@@ -588,6 +603,21 @@ class PayoutService:
             "unclaimedPayoutTotal": pending_total,
         }
 
+    def _build_earnings_by_user_ids(self, session: Session, user_ids: list[int]) -> dict[int, dict[str, Any]]:
+        normalized_ids = sorted({int(user_id) for user_id in user_ids})
+        summaries = self.finance_repo.summarize_settlements_for_uploaders(session, normalized_ids, datetime.now(UTC))
+        empty = {
+            "grossAmount": 0,
+            "platformFee": 0,
+            "payoutAmount": 0,
+            "orderCount": 0,
+            "unclaimedPayoutTotal": 0,
+        }
+        return {
+            user_id: dict(summaries.get(user_id) or empty)
+            for user_id in normalized_ids
+        }
+
     def _resolve_current_cycle(self, session: Session, *, allow_default: bool) -> dict[str, Any]:
         schedule = self.finance_repo.get_payout_schedule(session)
         if schedule is None or schedule.launch_date is None:
@@ -704,9 +734,16 @@ class PayoutService:
         entity: CreatorPayoutApplicationRecord,
         *,
         earnings: dict[str, Any] | None = None,
+        users_by_id: dict[int, Any] | None = None,
     ) -> dict[str, Any]:
-        user = self._require_user(session, entity.user_id)
-        reviewer = self.auth_repo.find_user_by_id(session, entity.reviewer_id) if entity.reviewer_id is not None else None
+        if users_by_id is None:
+            user = self._require_user(session, entity.user_id)
+            reviewer = self.auth_repo.find_user_by_id(session, entity.reviewer_id) if entity.reviewer_id is not None else None
+        else:
+            user = users_by_id.get(int(entity.user_id))
+            if user is None:
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="用户不存在")
+            reviewer = users_by_id.get(int(entity.reviewer_id)) if entity.reviewer_id is not None else None
         alipay_account = entity.alipay_account
         if alipay_account and "*" not in alipay_account and not entity.alipay_account_encrypted:
             alipay_account = self._mask_account(alipay_account)
