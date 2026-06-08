@@ -337,6 +337,7 @@ class AiService:
             "scope": "current_browser",
             "affectedScopes": ["current_browser_personal_memory"],
             "retainedScopes": ["platform_collective_memory", "source_material_records"],
+            "memoryLifecycle": _agent_memory_lifecycle_payload(),
             "privacyBoundary": "This preference only controls whether the StudyHub Agent uses derived personal memory for this browser session.",
         }
 
@@ -350,6 +351,7 @@ class AiService:
             "persistence": "not_persisted",
             "affectedScopes": ["current_browser_personal_memory"],
             "retainedScopes": ["platform_collective_memory", "source_material_records", "account_profile", "material_interactions"],
+            "memoryLifecycle": _agent_memory_lifecycle_payload(),
             "deleteExplanation": "当前 StudyHub Agent 个人记忆为只读派生上下文，尚未持久化保存用户对话记忆；本次操作已关闭当前浏览器继续使用派生个人记忆。",
             "privacyBoundary": "No persisted Agent personal memory was deleted because this phase stores no dedicated Agent memory records. Platform collective memory is not affected.",
         }
@@ -373,6 +375,7 @@ class AiService:
             "sourceTypes": ["account_profile", "candidate_material_interactions", "visible_material_metadata"],
             "controls": controls,
             "memoryExplanation": _agent_memory_explanation(),
+            "memoryLifecycle": _agent_memory_lifecycle_payload(),
             "memorySnapshot": None,
             "privacyBoundary": "Only the current authenticated user's derived profile and material interaction signals are shown; private memory is not mixed into platform collective memory.",
         }
@@ -2026,6 +2029,35 @@ def _agent_memory_explanation() -> dict[str, Any]:
     }
 
 
+def _agent_memory_lifecycle_payload() -> dict[str, Any]:
+    return {
+        "schema": "agent-memory-lifecycle-v1",
+        "mode": "read_only_derived",
+        "persistence": "not_persisted",
+        "personalMemory": {
+            "scope": "current_authenticated_user",
+            "source": "account_profile_and_current_user_material_interactions",
+            "writeMode": "read_only_derived",
+            "currentBrowserDisable": True,
+            "deleteWithCurrentBrowserPreference": True,
+            "dedicatedAgentMemoryRecordsPersisted": False,
+            "futureExplicitWritePathRequired": True,
+        },
+        "platformMemory": {
+            "scope": "anonymous_platform_aggregate",
+            "source": "visible_material_metadata_and_current_request_pdf_evidence",
+            "writeMode": "read_only_derived",
+            "deleteWithPersonalMemory": False,
+            "rawPersonalDataAllowed": False,
+            "requiresAnonymousAggregationForUserFeedback": True,
+        },
+        "privacyBoundary": (
+            "Current Agent memory is derived at request time. Personal memory is private to the current user, "
+            "and platform memory must only contain anonymous aggregate signals."
+        ),
+    }
+
+
 def _agent_memory_snapshot_payload(
     memory_context: AgentMemoryContext | None,
     *,
@@ -2047,6 +2079,7 @@ def _agent_memory_snapshot_payload(
         "schema": "agent-memory-preview-v1",
         "version": f"read-only-derived-v1-{fingerprint[:12]}",
         "versionFingerprint": fingerprint,
+        "lifecycleSchema": "agent-memory-lifecycle-v1",
         "sourceCounts": {
             "candidateMaterialCount": int(candidate_material_count),
             "personalMemorySections": len(personal_payload),
