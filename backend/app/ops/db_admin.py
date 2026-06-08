@@ -280,6 +280,11 @@ def command_migrate_additive(
     statements = list(payload["additiveStatements"])
     for sql in statements:
         assert_additive_sql(sql)
+    statement_columns = {
+        str(item["sql"]): (str(item["table"]), str(item["column"]))
+        for item in payload["missingColumns"]
+        if item.get("autoMigratable") and item.get("sql") in statements
+    }
     payload["planToken"] = _migration_plan_token(payload)
 
     if plan:
@@ -304,9 +309,30 @@ def command_migrate_additive(
         from app.core.db import get_engine
 
         engine = get_engine()
+        statement_verifications = []
         with engine.begin() as connection:
             for sql in statements:
                 connection.execute(text(sql.rstrip(";")))
+                target_column = statement_columns.get(sql)
+                if target_column is None:
+                    continue
+                verification = build_scoped_schema_audit_payload(only_columns={target_column})
+                verified = bool(verification["ready"])
+                statement_verifications.append(
+                    {
+                        "table": target_column[0],
+                        "column": target_column[1],
+                        "ready": verified,
+                    }
+                )
+                if not verified:
+                    raise RuntimeError(
+                        "migrate-additive statement verification failed for "
+                        f"{target_column[0]}.{target_column[1]}"
+                    )
+        payload["statementVerifications"] = statement_verifications
+    else:
+        payload["statementVerifications"] = []
 
     after = (
         build_scoped_schema_audit_payload(only_columns=only_columns)

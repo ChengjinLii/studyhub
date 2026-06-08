@@ -385,6 +385,87 @@ def test_migrate_additive_yes_uses_scoped_after_check_for_only_columns(
     assert seen_only_columns == {"plan": expected_only_columns, "after": expected_only_columns}
 
 
+def test_migrate_additive_yes_verifies_each_executed_statement(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    from app.ops import db_admin as db_admin_module
+
+    settings = Settings(environment="local-dev")
+    sql = "ALTER TABLE `market_items` ADD COLUMN `source` VARCHAR(16) NOT NULL DEFAULT 'local';"
+    executed_sql: list[str] = []
+    audit_calls: list[set[tuple[str, str]]] = []
+
+    class FakeConnection:
+        def execute(self, statement: object) -> None:
+            executed_sql.append(str(statement))
+
+    class FakeBegin:
+        def __enter__(self) -> FakeConnection:
+            return FakeConnection()
+
+        def __exit__(self, *args: object) -> None:
+            return None
+
+    class FakeEngine:
+        def begin(self) -> FakeBegin:
+            return FakeBegin()
+
+    def fake_plan_payload(*, only_columns: set[tuple[str, str]] | None) -> dict[str, object]:
+        return {
+            "scope": "selected",
+            "onlyColumns": ["market_items.source"],
+            "missingTables": [],
+            "missingColumns": [
+                {
+                    "table": "market_items",
+                    "column": "source",
+                    "autoMigratable": True,
+                    "sql": sql,
+                }
+            ],
+            "manualReviewColumns": [],
+            "unknownRequestedColumns": [],
+            "alreadyPresentColumns": [],
+            "additiveStatements": [sql],
+            "executable": True,
+            "ready": False,
+            "statementCount": 1,
+            "readyAfterMigration": True,
+        }
+
+    def fake_after_payload(*, only_columns: set[tuple[str, str]] | None) -> dict[str, object]:
+        audit_calls.append(set(only_columns or set()))
+        return {
+            "scope": "selected",
+            "onlyColumns": ["market_items.source"],
+            "missingTables": [],
+            "missingColumns": [],
+            "manualReviewColumns": [],
+            "unknownRequestedColumns": [],
+            "alreadyPresentColumns": [{"table": "market_items", "column": "source"}],
+            "additiveStatements": [],
+            "executable": True,
+            "ready": True,
+        }
+
+    monkeypatch.setattr(db_admin_module, "_ensure_sqlite_parent_dir", lambda settings: None)
+    monkeypatch.setattr(db_admin_module, "check_database", lambda: None)
+    monkeypatch.setattr("app.core.db.get_engine", lambda: FakeEngine())
+    monkeypatch.setattr(db_admin_module, "build_scoped_additive_migration_payload", fake_plan_payload)
+    monkeypatch.setattr(db_admin_module, "build_scoped_schema_audit_payload", fake_after_payload)
+
+    assert command_migrate_additive(settings, plan=False, yes=True, only=["market_items.source"]) == 0
+
+    payload = json.loads(capsys.readouterr().out)
+    assert len(executed_sql) == 1
+    assert "ADD COLUMN `source`" in executed_sql[0]
+    assert audit_calls == [{("market_items", "source")}, {("market_items", "source")}]
+    assert payload["statementVerifications"] == [
+        {"table": "market_items", "column": "source", "ready": True}
+    ]
+
+
 def test_db_admin_backup_rejects_sqlite(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("STUDYHUB_ENVIRONMENT", "local-dev")
     monkeypatch.setenv("STUDYHUB_LOCAL_DEV_ROOT_DIR", str(tmp_path / ".local-dev"))
