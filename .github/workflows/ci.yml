@@ -46,6 +46,10 @@ jobs:
       - name: Install frontend dependencies
         working-directory: frontend
         run: npm ci
+      - name: Report production dependency advisories
+        working-directory: frontend
+        continue-on-error: true
+        run: npm audit --omit=dev --audit-level=high
       - name: Run frontend checks
         working-directory: frontend
         run: npm run check
