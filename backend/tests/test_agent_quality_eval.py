@@ -105,6 +105,59 @@ def test_agent_ranking_uses_material_quality_as_tie_breaker() -> None:
     assert [item.id for item in ranked] == [301, 302]
 
 
+def test_agent_ranking_matches_natural_study_search_aliases() -> None:
+    exam_material = MaterialRecord(
+        id=401,
+        title="通信原理期末试卷高频重点题型整理",
+        description="包含选择题、计算题和参考答案讲解",
+        tags_json=json.dumps(["通信原理", "题型"], ensure_ascii=False),
+        download_count=8,
+        rating_avg=4.4,
+        rating_count=2,
+        is_free=True,
+    )
+    plan_material = MaterialRecord(
+        id=402,
+        title="通信原理备考计划与冲刺安排",
+        description="按两周学习计划整理章节重点和刷题顺序",
+        tags_json=json.dumps(["通信原理", "复习"], ensure_ascii=False),
+        download_count=5,
+        rating_avg=4.2,
+        rating_count=2,
+        is_free=True,
+    )
+    generic_material = MaterialRecord(
+        id=403,
+        title="通信原理课堂资料汇总",
+        description="基础课程资料",
+        tags_json=json.dumps(["通信原理"], ensure_ascii=False),
+        download_count=80,
+        rating_avg=4.9,
+        rating_count=10,
+        is_free=True,
+    )
+
+    class FakeReadRepo:
+        def load_seed(self) -> dict[str, Any]:
+            return {}
+
+    class FakeMaterialRepo:
+        def ensure_seed_bootstrap(self, session: object, seed: dict[str, Any]) -> None:
+            del session, seed
+
+        def list_visible_materials(self, session: object) -> list[MaterialRecord]:
+            del session
+            return [generic_material, plan_material, exam_material]
+
+    service = AiService(read_repo=FakeReadRepo(), material_repo=FakeMaterialRepo())  # type: ignore[arg-type]
+
+    exam_ranked = service._rank_materials(object(), "通信原理往年题常考什么", {})  # type: ignore[arg-type]
+    plan_ranked = service._rank_materials(object(), "通信原理复习计划", {})  # type: ignore[arg-type]
+
+    assert exam_ranked[0].id == 401
+    assert plan_ranked[0].id == 402
+
+
 def test_agent_exam_trend_closed_loop_prompt_and_response_contract(monkeypatch) -> None:
     captured: dict[str, Any] = {}
     metrics = get_runtime_metrics()
