@@ -122,7 +122,7 @@ STUDYHUB_ENVIRONMENT=preview \
 bash scripts/db/db-restore-preview.sh /path/to/preview-backup.sql.gz
 ```
 
-`db-restore-preview.sh` 的输入路径如果是相对路径，也会按仓库根目录解析。
+`db-restore-preview.sh` 的输入路径如果是相对路径，也会按仓库根目录解析；输入路径不能是全空白。
 
 ## 使用约束
 

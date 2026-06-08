@@ -11,6 +11,11 @@ if [[ -z "$INPUT_PATH" ]]; then
   exit 1
 fi
 
+if [[ -z "${INPUT_PATH//[[:space:]]/}" ]]; then
+  echo "backup input path must not be whitespace only"
+  exit 2
+fi
+
 if [[ "$INPUT_PATH" != /* ]]; then
   INPUT_PATH="$ROOT_DIR/$INPUT_PATH"
 fi
