@@ -15,6 +15,15 @@ from app.main import create_app
 from tests.test_mcp_protocol import MCP_HEADERS
 
 
+def assert_error_envelope(response, code: str, message: str) -> None:
+    payload = response.json()
+    assert payload["ok"] is False
+    assert payload["error"] == {"code": code, "message": message}
+    assert payload["msg"] == message
+    assert "detail" not in payload
+    assert response.headers["x-request-id"]
+
+
 @pytest.fixture()
 def strict_security_client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> TestClient:
     db_path = tmp_path / "studyhub-fastapi-test.sqlite3"
@@ -67,7 +76,7 @@ def test_write_origin_protection_rejects_cross_site_write(strict_security_client
     response = strict_security_client.post("/api/session", headers={"Origin": "https://evil.example"}, json={})
 
     assert response.status_code == 403
-    assert response.json()["detail"] == "Write request origin is not allowed"
+    assert_error_envelope(response, "ORIGIN_FORBIDDEN", "Write request origin is not allowed")
     assert response.headers["x-content-type-options"] == "nosniff"
 
 
@@ -85,7 +94,7 @@ def test_login_rate_limit_returns_429(strict_security_client: TestClient) -> Non
     response = strict_security_client.post("/api/session", json=payload)
 
     assert response.status_code == 429
-    assert response.json()["detail"] == "Too many login requests"
+    assert_error_envelope(response, "RATE_LIMITED", "Too many login requests")
 
 
 def test_captcha_rate_limit_returns_429(strict_security_client: TestClient) -> None:
@@ -95,7 +104,7 @@ def test_captcha_rate_limit_returns_429(strict_security_client: TestClient) -> N
     response = strict_security_client.get("/api/captchas")
 
     assert response.status_code == 429
-    assert response.json()["detail"] == "Too many captcha requests"
+    assert_error_envelope(response, "RATE_LIMITED", "Too many captcha requests")
 
 
 def test_mcp_rate_limit_returns_429(strict_security_client: TestClient) -> None:
@@ -112,7 +121,7 @@ def test_mcp_rate_limit_returns_429(strict_security_client: TestClient) -> None:
     response = strict_security_client.post("/mcp", headers=MCP_HEADERS, json=payload)
 
     assert response.status_code == 429
-    assert response.json()["detail"] == "Too many mcp requests"
+    assert_error_envelope(response, "RATE_LIMITED", "Too many mcp requests")
 
 
 def test_material_upload_rate_limit_returns_429(strict_security_client: TestClient) -> None:
@@ -122,7 +131,7 @@ def test_material_upload_rate_limit_returns_429(strict_security_client: TestClie
     response = strict_security_client.post("/api/materials")
 
     assert response.status_code == 429
-    assert response.json()["detail"] == "Too many upload requests"
+    assert_error_envelope(response, "RATE_LIMITED", "Too many upload requests")
 
 
 def test_market_publish_rate_limit_returns_429_from_same_bucket(strict_security_client: TestClient) -> None:
@@ -132,7 +141,7 @@ def test_market_publish_rate_limit_returns_429_from_same_bucket(strict_security_
     response = strict_security_client.post("/api/market")
 
     assert response.status_code == 429
-    assert response.json()["detail"] == "Too many upload requests"
+    assert_error_envelope(response, "RATE_LIMITED", "Too many upload requests")
 
 
 def test_registration_verification_rate_limit_returns_429(strict_security_client: TestClient) -> None:
@@ -144,7 +153,7 @@ def test_registration_verification_rate_limit_returns_429(strict_security_client
     response = strict_security_client.post("/api/registration-verifications", json=payload)
 
     assert response.status_code == 429
-    assert response.json()["detail"] == "Too many email-verification requests"
+    assert_error_envelope(response, "RATE_LIMITED", "Too many email-verification requests")
 
 
 def test_password_reset_rate_limit_returns_429(strict_security_client: TestClient) -> None:
@@ -156,4 +165,4 @@ def test_password_reset_rate_limit_returns_429(strict_security_client: TestClien
     response = strict_security_client.post("/api/password-resets", json=payload)
 
     assert response.status_code == 429
-    assert response.json()["detail"] == "Too many email-verification requests"
+    assert_error_envelope(response, "RATE_LIMITED", "Too many email-verification requests")

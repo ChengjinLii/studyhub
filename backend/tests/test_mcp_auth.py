@@ -14,6 +14,15 @@ from app.mcp.auth import origin_allowed
 from tests.test_mcp_search_fetch import call_tool
 
 
+def assert_middleware_error(response, code: str, message: str) -> None:
+    payload = response.json()
+    assert payload["ok"] is False
+    assert payload["error"] == {"code": code, "message": message}
+    assert payload["msg"] == message
+    assert "detail" not in payload
+    assert response.headers["x-request-id"]
+
+
 @pytest.fixture()
 def origin_locked_client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> TestClient:
     db_path = tmp_path / "studyhub-fastapi-test.sqlite3"
@@ -143,6 +152,7 @@ def test_mcp_rejects_invalid_origin_when_origin_validation_enabled(origin_locked
     )
 
     assert response.status_code == 403
+    assert_middleware_error(response, "MCP_FORBIDDEN", "MCP Origin is not allowed")
 
 
 def test_mcp_rejects_browser_origin_by_default_in_production() -> None:
@@ -163,6 +173,7 @@ def test_mcp_require_auth_rejects_anonymous_requests(auth_required_client: TestC
     response = call_tool(auth_required_client, "health.ready")
 
     assert response.status_code == 403
+    assert_middleware_error(response, "MCP_FORBIDDEN", "MCP authentication required")
 
 
 def test_mcp_require_auth_accepts_configured_bearer_token(auth_required_client: TestClient) -> None:
@@ -187,7 +198,7 @@ def test_mcp_scoped_read_token_rejects_registered_admin_tool(scoped_mcp_client: 
     response = call_tool(scoped_mcp_client, "admin.users.search", {"query": "alice"}, headers={"Authorization": "Bearer read-token"})
 
     assert response.status_code == 403
-    assert response.json()["detail"] == "MCP scope is not allowed"
+    assert_middleware_error(response, "MCP_FORBIDDEN", "MCP scope is not allowed")
 
 
 def test_mcp_scoped_token_without_read_scope_rejects_tools_list(scoped_mcp_client: TestClient) -> None:
@@ -202,7 +213,7 @@ def test_mcp_scoped_token_without_read_scope_rejects_tools_list(scoped_mcp_clien
     )
 
     assert response.status_code == 403
-    assert response.json()["detail"] == "MCP scope is not allowed"
+    assert_middleware_error(response, "MCP_FORBIDDEN", "MCP scope is not allowed")
 
 
 def test_mcp_scoped_admin_token_reaches_registered_admin_tool_policy(scoped_mcp_client: TestClient) -> None:

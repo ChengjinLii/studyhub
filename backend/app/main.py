@@ -20,6 +20,7 @@ from app.core.logging import bind_request_id, configure_logging, reset_request_i
 from app.core.observability import get_runtime_metrics
 from app.core.origin_guard import write_origin_allowed
 from app.core.rate_limit import rate_limit_allowed
+from app.core.response import api_fail
 from app.core.security_headers import apply_security_headers
 from app.mcp.auth import mcp_request_allowed
 from app.mcp.server import create_studyhub_mcp
@@ -99,24 +100,44 @@ def create_app() -> FastAPI:
         response = None
         status_code = 500
         route_path = request.url.path
+
+        def middleware_error_response(code: str, message: str, status: int) -> JSONResponse:
+            error_response = JSONResponse(api_fail(code, message), status_code=status)
+            error_response.headers["x-request-id"] = request_id
+            apply_security_headers(settings, error_response.headers)
+            return error_response
+
         try:
             rate_allowed, rate_error = rate_limit_allowed(settings, request)
             if not rate_allowed:
                 status_code = 429
-                response = JSONResponse({"detail": rate_error or "Too many requests"}, status_code=status_code)
-                apply_security_headers(settings, response.headers)
+                response = middleware_error_response(
+                    "RATE_LIMITED",
+                    rate_error or "Too many requests",
+                    status_code,
+                )
                 return response
             origin_allowed, origin_error = write_origin_allowed(settings, request)
             if not origin_allowed:
                 status_code = 403
-                response = JSONResponse({"detail": origin_error or "Write request origin is not allowed"}, status_code=status_code)
-                apply_security_headers(settings, response.headers)
+                response = middleware_error_response(
+                    "ORIGIN_FORBIDDEN",
+                    origin_error or "Write request origin is not allowed",
+                    status_code,
+                )
                 return response
-            mcp_allowed, mcp_error = await mcp_request_allowed(settings, request) if route_path.startswith("/mcp") else (True, None)
+            mcp_allowed, mcp_error = (
+                await mcp_request_allowed(settings, request)
+                if route_path.startswith("/mcp")
+                else (True, None)
+            )
             if not mcp_allowed:
                 status_code = 403
-                response = JSONResponse({"detail": mcp_error or "MCP request is not allowed"}, status_code=status_code)
-                apply_security_headers(settings, response.headers)
+                response = middleware_error_response(
+                    "MCP_FORBIDDEN",
+                    mcp_error or "MCP request is not allowed",
+                    status_code,
+                )
                 return response
             response = await call_next(request)
             status_code = response.status_code
