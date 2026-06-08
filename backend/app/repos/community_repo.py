@@ -20,6 +20,20 @@ class CommunityRepository:
         stmt = select(FeedbackRecord).order_by(FeedbackRecord.created_at.desc(), FeedbackRecord.id.desc())
         return list(session.scalars(stmt))
 
+    def list_feedbacks_for_admin(
+        self,
+        session: Session,
+        *,
+        type_value: str | None,
+        status_value: str | None,
+    ) -> list[FeedbackRecord]:
+        stmt = (
+            select(FeedbackRecord)
+            .where(*self._feedback_admin_filters(type_value=type_value, status_value=status_value))
+            .order_by(FeedbackRecord.created_at.desc(), FeedbackRecord.id.desc())
+        )
+        return list(session.scalars(stmt))
+
     def save_volunteer(self, session: Session, entity: VolunteerApplicationRecord) -> VolunteerApplicationRecord:
         session.add(entity)
         session.flush()
@@ -31,6 +45,15 @@ class CommunityRepository:
 
     def list_volunteers(self, session: Session) -> list[VolunteerApplicationRecord]:
         stmt = select(VolunteerApplicationRecord).order_by(VolunteerApplicationRecord.created_at.desc(), VolunteerApplicationRecord.id.desc())
+        return list(session.scalars(stmt))
+
+    def list_volunteers_for_admin(self, session: Session, *, status_value: str | None) -> list[VolunteerApplicationRecord]:
+        filters = (VolunteerApplicationRecord.status == status_value,) if status_value else ()
+        stmt = (
+            select(VolunteerApplicationRecord)
+            .where(*filters)
+            .order_by(VolunteerApplicationRecord.created_at.desc(), VolunteerApplicationRecord.id.desc())
+        )
         return list(session.scalars(stmt))
 
     def save_notification(self, session: Session, entity: NotificationRecord) -> NotificationRecord:
@@ -130,4 +153,12 @@ class CommunityRepository:
             filters.append(ReportRecord.status == status_value)
         if target_type:
             filters.append(ReportRecord.target_type == target_type)
+        return tuple(filters)
+
+    def _feedback_admin_filters(self, *, type_value: str | None, status_value: str | None):
+        filters = []
+        if type_value:
+            filters.append(FeedbackRecord.type == type_value)
+        if status_value:
+            filters.append(FeedbackRecord.status == status_value)
         return tuple(filters)

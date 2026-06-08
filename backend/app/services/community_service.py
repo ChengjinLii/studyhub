@@ -48,14 +48,14 @@ class CommunityService:
         return self._to_volunteer(entity)
 
     def list_feedbacks(self, session: Session, type_value: str | None, status_value: str | None) -> list[dict[str, Any]]:
-        items = self.repo.list_feedbacks(session)
         normalized_type = self._normalize_feedback_type(type_value) if type_value else None
         normalized_status = self._normalize_feedback_status(status_value) if status_value else None
-        return [
-            self._to_feedback(item)
-            for item in items
-            if (normalized_type is None or item.type == normalized_type) and (normalized_status is None or item.status == normalized_status)
-        ]
+        items = self.repo.list_feedbacks_for_admin(
+            session,
+            type_value=normalized_type,
+            status_value=normalized_status,
+        )
+        return [self._to_feedback(item) for item in items]
 
     def update_feedback_status(self, session: Session, feedback_id: int, payload: UpdateStatusPayload) -> dict[str, Any]:
         entity = self.repo.get_feedback(session, feedback_id)
@@ -67,9 +67,9 @@ class CommunityService:
         return self._to_feedback(entity)
 
     def list_volunteers(self, session: Session, status_value: str | None) -> list[dict[str, Any]]:
-        items = self.repo.list_volunteers(session)
         normalized_status = self._normalize_volunteer_status(status_value) if status_value else None
-        return [self._to_volunteer(item) for item in items if normalized_status is None or item.status == normalized_status]
+        items = self.repo.list_volunteers_for_admin(session, status_value=normalized_status)
+        return [self._to_volunteer(item) for item in items]
 
     def update_volunteer_status(self, session: Session, volunteer_id: int, payload: UpdateStatusPayload) -> dict[str, Any]:
         entity = self.repo.get_volunteer(session, volunteer_id)
