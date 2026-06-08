@@ -68,10 +68,10 @@ class ReportService:
             status="PENDING",
         )
         self.community_repo.save_report(session, entity)
-        active_count = sum(
-            1
-            for report in self.community_repo.list_reports(session)
-            if report.target_type == normalized_target_type and report.target_id == target_id and report.status != "REJECTED"
+        active_count = self.community_repo.count_active_reports_for_target(
+            session,
+            target_type=normalized_target_type,
+            target_id=target_id,
         )
         if active_count >= AUTO_HIDE_THRESHOLD:
             self._apply_auto_hide(session, normalized_target_type, target_id)
@@ -124,9 +124,11 @@ class ReportService:
         self.market_repo.ensure_seed_bootstrap(session, seed)
 
     def _exists_duplicate(self, target_type: str, target_id: int, reporter_id: int, session: Session) -> bool:
-        return any(
-            report.target_type == target_type and report.target_id == target_id and report.reporter_id == reporter_id
-            for report in self.community_repo.list_reports(session)
+        return self.community_repo.report_exists_for_target(
+            session,
+            target_type=target_type,
+            target_id=target_id,
+            reporter_id=reporter_id,
         )
 
     def _normalize_target_type(self, raw: str) -> str:

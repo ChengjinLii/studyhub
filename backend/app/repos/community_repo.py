@@ -56,6 +56,44 @@ class CommunityRepository:
         stmt = select(ReportRecord).order_by(ReportRecord.created_at.desc(), ReportRecord.id.desc())
         return list(session.scalars(stmt))
 
+    def report_exists_for_target(
+        self,
+        session: Session,
+        *,
+        target_type: str,
+        target_id: int,
+        reporter_id: int,
+    ) -> bool:
+        stmt = (
+            select(1)
+            .select_from(ReportRecord)
+            .where(
+                ReportRecord.target_type == target_type,
+                ReportRecord.target_id == target_id,
+                ReportRecord.reporter_id == reporter_id,
+            )
+            .limit(1)
+        )
+        return session.scalar(stmt) is not None
+
+    def count_active_reports_for_target(
+        self,
+        session: Session,
+        *,
+        target_type: str,
+        target_id: int,
+    ) -> int:
+        stmt = (
+            select(func.count())
+            .select_from(ReportRecord)
+            .where(
+                ReportRecord.target_type == target_type,
+                ReportRecord.target_id == target_id,
+                ReportRecord.status != "REJECTED",
+            )
+        )
+        return int(session.scalar(stmt) or 0)
+
     def count_reports_for_admin(
         self,
         session: Session,

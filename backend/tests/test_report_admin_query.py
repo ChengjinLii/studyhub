@@ -22,9 +22,16 @@ class _DummySeedRepo:
 
 
 class _DummyAuthRepo:
+    def __init__(self) -> None:
+        self.saved_users = []
+
     def find_user_by_id(self, session: Session, user_id: int):
         del session
         return SimpleNamespace(id=user_id, username=f"user-{user_id}", nickname=f"User {user_id}", status="active")
+
+    def save_user(self, session: Session, user) -> None:
+        del session
+        self.saved_users.append(user)
 
 
 class _NoFullListCommunityRepo(CommunityRepository):
@@ -33,11 +40,11 @@ class _NoFullListCommunityRepo(CommunityRepository):
         raise AssertionError("admin report list should not load all reports")
 
 
-def _service() -> ReportService:
+def _service(auth_repo: _DummyAuthRepo | None = None) -> ReportService:
     seed_repo = _DummySeedRepo()
     return ReportService(
         read_repo=_DummyReadRepo(),  # type: ignore[arg-type]
-        auth_repo=_DummyAuthRepo(),  # type: ignore[arg-type]
+        auth_repo=auth_repo or _DummyAuthRepo(),  # type: ignore[arg-type]
         material_repo=seed_repo,  # type: ignore[arg-type]
         comment_repo=seed_repo,  # type: ignore[arg-type]
         market_repo=seed_repo,  # type: ignore[arg-type]
@@ -58,6 +65,7 @@ def _add_report(
     status: str,
     target_type: str = "USER",
     target_id: int,
+    reporter_id: int = 1,
     created_at: datetime,
 ) -> None:
     session.add(
@@ -65,7 +73,7 @@ def _add_report(
             id=report_id,
             target_type=target_type,
             target_id=target_id,
-            reporter_id=1,
+            reporter_id=reporter_id,
             reason="疑似违规",
             status=status,
             created_at=created_at,
@@ -124,3 +132,25 @@ def test_admin_report_list_combines_status_and_target_type_filters() -> None:
 
     assert data["meta"] == {"page": 0, "size": 20, "total": 1}
     assert [item["id"] for item in data["items"]] == [1]
+
+
+def test_submit_report_counts_active_reports_without_loading_all_reports() -> None:
+    auth_repo = _DummyAuthRepo()
+    service = _service(auth_repo=auth_repo)
+    base = datetime(2026, 1, 1, tzinfo=UTC)
+    with _session() as session:
+        _add_report(session, report_id=1, status="PENDING", target_id=99, reporter_id=4, created_at=base)
+        _add_report(session, report_id=2, status="PENDING", target_id=99, reporter_id=5, created_at=base)
+        session.commit()
+
+        entity = service.submit_report(
+            session,
+            reporter_id=6,
+            target_type="user",
+            target_id=99,
+            reason="第三次举报",
+        )
+        created_report = (entity.target_type, entity.target_id, entity.reporter_id)
+
+    assert created_report == ("USER", 99, 6)
+    assert [(user.id, user.status) for user in auth_repo.saved_users] == [(99, "hidden")]
