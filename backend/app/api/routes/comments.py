@@ -10,7 +10,7 @@ from app.api.deps import (
     require_auth_context,
 )
 from app.core.db import get_db_session
-from app.core.public_read_cache import PublicReadCache, cache_if_anonymous, invalidate_prefixes
+from app.core.public_read_cache import PublicReadCache, cache_if_anonymous_async, invalidate_prefixes
 from app.core.response import api_ok
 from app.core.security import AuthContext
 from app.schemas.comments import CommentCreatePayload, CommentReportPayload, CommentUpdatePayload
@@ -20,8 +20,15 @@ from app.services.comments_service import CommentsService
 router = APIRouter(tags=["comments"])
 
 
+def _call_service_method(service, async_name: str, sync_name: str, *args, **kwargs):
+    method = getattr(service, async_name, None)
+    if method is not None:
+        return method(*args, **kwargs)
+    return getattr(service, sync_name)(*args, **kwargs)
+
+
 @router.get("/api/comments")
-def list_comments(
+async def list_comments(
     materialId: int,
     sort: str = "latest",
     page: int = 0,
@@ -32,12 +39,15 @@ def list_comments(
     service: CommentsService = Depends(get_comments_service),
 ) -> dict[str, object]:
     current_user_id = auth.user_id if auth else None
-    data = cache_if_anonymous(
+    data = await cache_if_anonymous_async(
         cache,
         current_user_id=current_user_id,
         namespace="comments:list",
         key=(materialId, sort, page, size),
-        factory=lambda: service.list_comments(
+        factory=lambda: _call_service_method(
+            service,
+            "list_comments_async",
+            "list_comments",
             session,
             materialId,
             sort=sort,
@@ -50,7 +60,7 @@ def list_comments(
 
 
 @router.get("/api/comments/{id}/replies")
-def comment_replies(
+async def comment_replies(
     id: int,
     page: int = 0,
     size: int = 20,
@@ -60,12 +70,21 @@ def comment_replies(
     service: CommentsService = Depends(get_comments_service),
 ) -> dict[str, object]:
     current_user_id = auth.user_id if auth else None
-    data = cache_if_anonymous(
+    data = await cache_if_anonymous_async(
         cache,
         current_user_id=current_user_id,
         namespace="comments:replies",
         key=(id, page, size),
-        factory=lambda: service.list_replies(session, id, page=page, size=size, current_user_id=current_user_id),
+        factory=lambda: _call_service_method(
+            service,
+            "list_replies_async",
+            "list_replies",
+            session,
+            id,
+            page=page,
+            size=size,
+            current_user_id=current_user_id,
+        ),
     )
     return api_ok(data)
 

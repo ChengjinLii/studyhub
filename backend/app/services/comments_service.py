@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import asyncio
 from typing import Any
 
 from fastapi import HTTPException, status
 from sqlalchemy import bindparam, text
 from sqlalchemy.orm import Session
 
+from app.core.async_db import async_session_scope
 from app.core.config import Settings
 from app.models.comments import CommentRecord
 from app.repos.auth_repo import AuthRepository
@@ -54,6 +56,49 @@ class CommentsService:
         items, meta = paginate_zero_based(comments, page=page, size=size)
         return {"items": items, "meta": meta}
 
+    async def list_comments_async(
+        self,
+        session: Session,
+        material_id: int,
+        *,
+        sort: str,
+        page: int,
+        size: int,
+        current_user_id: int | None,
+    ) -> dict[str, Any]:
+        if not (self.settings.requires_private_env_file and self.settings.async_read_db_enabled):
+            return await asyncio.to_thread(
+                self.list_comments,
+                session,
+                material_id,
+                sort=sort,
+                page=page,
+                size=size,
+                current_user_id=current_user_id,
+            )
+
+        await self._call_with_new_async_session(self._compat_ensure_material_exists_async, material_id)
+        total, rows = await asyncio.gather(
+            self._call_with_new_async_session(self._compat_count_comments_async, material_id=material_id, parent_id=None),
+            self._call_with_new_async_session(
+                self._compat_load_comment_rows_async,
+                material_id=material_id,
+                parent_id=None,
+                sort=sort,
+                page=page,
+                size=size,
+            ),
+        )
+        liked_ids = await self._call_with_new_async_session(
+            self._compat_load_liked_ids_async,
+            current_user_id,
+            [int(row["id"]) for row in rows],
+        )
+        items = [self._compat_to_comment_item(row, int(row["id"]) in liked_ids) for row in rows]
+        _, meta = paginate_zero_based(list(range(total)), page=page, size=size)
+        meta["total"] = total
+        return {"items": items, "meta": meta}
+
     def list_replies(self, session: Session, parent_id: int, *, page: int, size: int, current_user_id: int | None) -> dict[str, Any]:
         if self.settings.requires_private_env_file:
             return self._compat_list_replies(
@@ -76,6 +121,47 @@ class CommentsService:
         )
         replies.sort(key=lambda item: parse_iso_datetime(item.get("createdAt")))
         items, meta = paginate_zero_based(replies, page=page, size=size)
+        return {"items": items, "meta": meta}
+
+    async def list_replies_async(
+        self,
+        session: Session,
+        parent_id: int,
+        *,
+        page: int,
+        size: int,
+        current_user_id: int | None,
+    ) -> dict[str, Any]:
+        if not (self.settings.requires_private_env_file and self.settings.async_read_db_enabled):
+            return await asyncio.to_thread(
+                self.list_replies,
+                session,
+                parent_id,
+                page=page,
+                size=size,
+                current_user_id=current_user_id,
+            )
+
+        parent = await self._call_with_new_async_session(self._compat_load_comment_parent_async, parent_id)
+        total, rows = await asyncio.gather(
+            self._call_with_new_async_session(self._compat_count_comments_async, material_id=None, parent_id=parent_id),
+            self._call_with_new_async_session(
+                self._compat_load_comment_rows_async,
+                material_id=int(parent["material_id"]),
+                parent_id=parent_id,
+                sort="oldest",
+                page=page,
+                size=size,
+            ),
+        )
+        liked_ids = await self._call_with_new_async_session(
+            self._compat_load_liked_ids_async,
+            current_user_id,
+            [int(row["id"]) for row in rows],
+        )
+        items = [self._compat_to_comment_item(row, int(row["id"]) in liked_ids) for row in rows]
+        _, meta = paginate_zero_based(list(range(total)), page=page, size=size)
+        meta["total"] = total
         return {"items": items, "meta": meta}
 
     def create(self, session: Session, payload: CommentCreatePayload, user_id: int) -> dict[str, Any]:
@@ -358,6 +444,77 @@ class CommentsService:
         if exists is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="资料不存在")
 
+    async def _call_with_new_async_session(self, loader, *args, **kwargs):
+        async with async_session_scope() as session:
+            return await loader(session, *args, **kwargs)
+
+    async def _compat_ensure_material_exists_async(self, session, material_id: int) -> None:
+        exists = (
+            await session.execute(
+                text(
+                    """
+                    SELECT 1
+                    FROM materials
+                    WHERE id = :material_id
+                    LIMIT 1
+                    """
+                ),
+                {"material_id": material_id},
+            )
+        ).scalar()
+        if exists is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="资料不存在")
+
+    async def _compat_load_comment_parent_async(self, session, parent_id: int) -> dict[str, Any]:
+        parent = (
+            await session.execute(
+                text(
+                    """
+                    SELECT id, material_id
+                    FROM comments
+                    WHERE id = :parent_id
+                    LIMIT 1
+                    """
+                ),
+                {"parent_id": parent_id},
+            )
+        ).mappings().first()
+        if parent is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="评论不存在")
+        return dict(parent)
+
+    async def _compat_count_comments_async(self, session, *, material_id: int | None, parent_id: int | None) -> int:
+        if parent_id is None:
+            total = (
+                await session.execute(
+                    text(
+                        """
+                        SELECT COUNT(*)
+                        FROM comments
+                        WHERE material_id = :material_id
+                          AND parent_id IS NULL
+                          AND status = 'visible'
+                        """
+                    ),
+                    {"material_id": material_id},
+                )
+            ).scalar()
+            return int(total or 0)
+        total = (
+            await session.execute(
+                text(
+                    """
+                    SELECT COUNT(*)
+                    FROM comments
+                    WHERE parent_id = :parent_id
+                      AND status = 'visible'
+                    """
+                ),
+                {"parent_id": parent_id},
+            )
+        ).scalar()
+        return int(total or 0)
+
     def _compat_load_comment_rows(
         self,
         session: Session,
@@ -423,6 +580,73 @@ class CommentsService:
         ).mappings().all()
         return [dict(row) for row in rows]
 
+    async def _compat_load_comment_rows_async(
+        self,
+        session,
+        *,
+        material_id: int,
+        parent_id: int | None,
+        sort: str,
+        page: int,
+        size: int,
+    ) -> list[dict[str, Any]]:
+        safe_page = max(page, 0)
+        safe_size = max(1, min(size, 100))
+        params: dict[str, Any] = {
+            "material_id": material_id,
+            "limit": safe_size,
+            "offset": safe_page * safe_size,
+        }
+        if parent_id is None:
+            parent_filter = "c.parent_id IS NULL"
+        else:
+            parent_filter = "c.parent_id = :parent_id"
+            params["parent_id"] = parent_id
+        if (sort or "latest").lower() == "hottest":
+            order_clause = "c.like_count DESC, c.created_at DESC"
+        elif (sort or "").lower() == "oldest":
+            order_clause = "c.created_at ASC, c.id ASC"
+        else:
+            order_clause = "c.created_at DESC, c.id DESC"
+        rows = (
+            await session.execute(
+                text(
+                    f"""
+                    SELECT
+                        c.id,
+                        c.material_id,
+                        c.parent_id,
+                        c.user_id,
+                        c.content,
+                        c.like_count,
+                        c.reply_count,
+                        c.status,
+                        c.is_edited,
+                        c.created_at,
+                        c.updated_at,
+                        u.nickname AS user_nickname,
+                        u.username AS user_username,
+                        u.avatar AS user_avatar,
+                        m.uploader_id,
+                        r.rating
+                    FROM comments c
+                    LEFT JOIN users u ON u.id = c.user_id
+                    LEFT JOIN materials m ON m.id = c.material_id
+                    LEFT JOIN reviews r
+                      ON r.material_id = c.material_id
+                     AND r.user_id = c.user_id
+                    WHERE c.material_id = :material_id
+                      AND {parent_filter}
+                      AND c.status = 'visible'
+                    ORDER BY {order_clause}
+                    LIMIT :limit OFFSET :offset
+                    """
+                ),
+                params,
+            )
+        ).mappings().all()
+        return [dict(row) for row in rows]
+
     def _compat_load_liked_ids(self, session: Session, current_user_id: int | None, comment_ids: list[int]) -> set[int]:
         if current_user_id is None or not comment_ids:
             return set()
@@ -435,6 +659,20 @@ class CommentsService:
             """
         ).bindparams(bindparam("comment_ids", expanding=True))
         rows = session.execute(stmt, {"user_id": current_user_id, "comment_ids": comment_ids}).scalars().all()
+        return {int(value) for value in rows}
+
+    async def _compat_load_liked_ids_async(self, session, current_user_id: int | None, comment_ids: list[int]) -> set[int]:
+        if current_user_id is None or not comment_ids:
+            return set()
+        stmt = text(
+            """
+            SELECT comment_id
+            FROM comment_likes
+            WHERE user_id = :user_id
+              AND comment_id IN :comment_ids
+            """
+        ).bindparams(bindparam("comment_ids", expanding=True))
+        rows = (await session.execute(stmt, {"user_id": current_user_id, "comment_ids": comment_ids})).scalars().all()
         return {int(value) for value in rows}
 
     def _compat_to_comment_item(self, row: dict[str, Any], has_liked: bool) -> dict[str, Any]:
