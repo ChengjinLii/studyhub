@@ -831,6 +831,9 @@ class AiService:
         if not parts:
             return f"{scope_hint}这些页面可以先用来确认题型和高频知识点。"
         ordered_parts = _prioritize_exam_summary_parts(parts, query_plan)
+        cross_material_summary = self._local_cross_material_summary(pdf_evidence, query_plan)
+        if cross_material_summary:
+            ordered_parts.insert(0, cross_material_summary)
         return f"{scope_hint}从这些页面看，{'；'.join(ordered_parts)}。"
 
     def _local_material_scope_hint(
@@ -845,6 +848,51 @@ class AiService:
         if material_count >= 2:
             return f"我会按多份资料对比处理，当前已读证据覆盖 {material_count} 份资料。"
         return "你问的是多份资料对比，但当前可读 PDF 证据主要来自单份资料，跨资料结论需要继续补充可读页。"
+
+    def _local_cross_material_summary(
+        self,
+        pdf_evidence: list[MaterialPageEvidence],
+        query_plan: AgentQueryPlan | None,
+    ) -> str:
+        material_scope = getattr(query_plan, "material_scope", {}) if query_plan else {}
+        if not isinstance(material_scope, dict) or material_scope.get("mode") != "multi_material":
+            return ""
+        grouped: dict[int, list[MaterialPageEvidence]] = {}
+        for item in pdf_evidence:
+            grouped.setdefault(int(item.material_id), []).append(item)
+        if len(grouped) < 2:
+            return ""
+        question_type_sets: list[set[str]] = []
+        for items in grouped.values():
+            question_types = _material_evidence_values(items, "question_types")
+            if question_types:
+                question_type_sets.append(set(question_types))
+        common_question_types = sorted(set.intersection(*question_type_sets)) if len(question_type_sets) >= 2 else []
+        common_hint = (
+            f"跨资料共同题型包括 {_join_values(common_question_types[:3])}"
+            if common_question_types
+            else "跨资料共同题型暂未在已读页中重合"
+        )
+        material_hints: list[str] = []
+        for items in list(grouped.values())[:3]:
+            first = items[0]
+            pages = _evidence_pages(items)
+            question_types = _material_evidence_values(items, "question_types")
+            knowledge = _material_evidence_values(items, "knowledge_signals")
+            years = _material_evidence_values(items, "years")
+            detail_parts: list[str] = []
+            if question_types:
+                detail_parts.append(f"题型 {_join_values(question_types[:3])}")
+            if knowledge:
+                detail_parts.append(f"知识点 {_join_values(knowledge[:3])}")
+            if years:
+                detail_parts.append(f"年份 {_join_values(years[:3])}")
+            page_hint = f"第 {_join_values(pages)} 页" if pages else "已读页"
+            detail = "、".join(detail_parts) if detail_parts else "可读信号有限"
+            material_hints.append(f"《{first.title}》{page_hint}偏向{detail}")
+        if not material_hints:
+            return common_hint
+        return f"{common_hint}；资料差异包括 {'；'.join(material_hints)}"
 
     def _local_pdf_summary(
         self,
