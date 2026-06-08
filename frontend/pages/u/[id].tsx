@@ -1,6 +1,6 @@
 import { GetServerSideProps } from 'next';
 import Link from 'next/link';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/router';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -67,7 +67,6 @@ export default function UserProfilePage({ user, profile }: UserProfilePageProps)
   const [shareSheetOpen, setShareSheetOpen] = useState(false);
   const [shareSheetText, setShareSheetText] = useState('');
   const [shareSheetUrl, setShareSheetUrl] = useState('');
-  const [uploadTagMap, setUploadTagMap] = useState<Record<number, string[]>>({});
 
   useEffect(() => {
     setUploads(profile?.recentUploads ?? []);
@@ -81,7 +80,6 @@ export default function UserProfilePage({ user, profile }: UserProfilePageProps)
     setFollowNotice(null);
     setReportNotice(null);
     setShareNotice(null);
-    setUploadTagMap({});
   }, [profile]);
 
   const displayName = useMemo(() => {
@@ -121,20 +119,13 @@ export default function UserProfilePage({ user, profile }: UserProfilePageProps)
       return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
     });
   }, [listings]);
-  const isExperienceByTags = useCallback((item: UploadItem) => {
-    const detailTags = uploadTagMap[item.materialId];
-    if (Array.isArray(detailTags)) {
-      return detailTags.some((tag) => EXPERIENCE_TAGS.has(tag));
-    }
-    return isExperienceUpload(item);
-  }, [uploadTagMap]);
   const sortedExperienceUploads = useMemo(
-    () => sortedUploads.filter((item) => isExperienceByTags(item)),
-    [sortedUploads, isExperienceByTags]
+    () => sortedUploads.filter((item) => isExperienceUpload(item)),
+    [sortedUploads]
   );
   const sortedMaterialUploads = useMemo(
-    () => sortedUploads.filter((item) => !isExperienceByTags(item)),
-    [sortedUploads, isExperienceByTags]
+    () => sortedUploads.filter((item) => !isExperienceUpload(item)),
+    [sortedUploads]
   );
   const visibleUploads = materialsExpanded ? sortedMaterialUploads : sortedMaterialUploads.slice(0, 5);
   const visibleExperienceUploads = experienceExpanded ? sortedExperienceUploads : sortedExperienceUploads.slice(0, 5);
@@ -187,54 +178,6 @@ export default function UserProfilePage({ user, profile }: UserProfilePageProps)
       cancelled = true;
     };
   }, [profile?.id]);
-
-  useEffect(() => {
-    if (!uploads.length) return;
-    const tagsFromUploads: Record<number, string[]> = {};
-    const pendingIds: number[] = [];
-    uploads.forEach((item) => {
-      const materialId = item.materialId;
-      if (!Number.isFinite(materialId) || uploadTagMap[materialId] !== undefined) return;
-      const tags = normalizeUploadTags(item.tags);
-      if (tags !== null) {
-        tagsFromUploads[materialId] = tags;
-        return;
-      }
-      pendingIds.push(materialId);
-    });
-    if (Object.keys(tagsFromUploads).length > 0) {
-      setUploadTagMap((prev) => ({ ...prev, ...tagsFromUploads }));
-    }
-    if (!pendingIds.length) return;
-
-    let cancelled = false;
-    const loadTags = async () => {
-      const pairs = await Promise.all(
-        pendingIds.map(async (materialId) => {
-          try {
-            const resp = await fetchBackend(`/materials/${materialId}`);
-            const json = await resp.json();
-            const tags = Array.isArray(json?.data?.tags) ? (json.data.tags as string[]) : [];
-            return [materialId, tags] as const;
-          } catch {
-            return [materialId, [] as string[]] as const;
-          }
-        })
-      );
-      if (cancelled) return;
-      setUploadTagMap((prev) => {
-        const next = { ...prev };
-        pairs.forEach(([id, tags]) => {
-          next[id] = tags;
-        });
-        return next;
-      });
-    };
-    loadTags();
-    return () => {
-      cancelled = true;
-    };
-  }, [uploads, uploadTagMap]);
 
   const handleToggleMaterials = () => setMaterialsExpanded((prev) => !prev);
   const handleToggleExperience = () => setExperienceExpanded((prev) => !prev);
