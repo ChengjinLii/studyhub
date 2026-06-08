@@ -80,3 +80,23 @@ def test_agent_material_signals_flag_content_moderation_risks_without_extra_io()
     assert "外部联系方式需复核" in signals.risk_signals
     assert "疑似违规交易风险" in signals.risk_signals
     assert "疑似版权或来源风险" in signals.risk_signals
+
+
+def test_agent_material_signals_tolerate_unloaded_compatibility_columns() -> None:
+    material = MaterialRecord(
+        id=904,
+        title="ESD-电子系统设计-2021年真题及答案",
+        description="电子系统设计 2021 年真题、样卷答案和期末考题风格整理",
+        file_type="pdf",
+        is_free=True,
+        download_count=12,
+        rating_avg=4.5,
+        rating_count=3,
+    )
+    for field in ("tags_json", "file_storage_key", "preview_status", "copyright_owner"):
+        material.__dict__.pop(field, None)
+
+    signals = build_material_signals(material)
+
+    assert signals.quality_score >= 1
+    assert "简介完整" in signals.quality_signals

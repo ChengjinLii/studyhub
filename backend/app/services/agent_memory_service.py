@@ -12,7 +12,7 @@ from app.core.config import Settings
 from app.models.materials import MaterialRecord
 from app.repos.auth_repo import AuthRepository
 from app.repos.material_repo import MaterialRepository
-from app.services.agent_material_signal_service import build_material_signals
+from app.services.agent_material_signal_service import build_material_signals, safe_material_value
 from app.services.material_pdf_evidence_service import MaterialPageEvidence
 
 
@@ -190,13 +190,19 @@ class AgentMemoryService:
         visual_counter: Counter[str] = Counter()
         source_type_counter: Counter[str] = Counter()
         for material in materials:
-            tag_counter.update(_json_string_list(material.tags_json))
-            for value in (material.major, material.college, material.course_category, material.grade_value):
+            tag_counter.update(_json_string_list(safe_material_value(material, "tags_json")))
+            for value in (
+                safe_material_value(material, "major"),
+                safe_material_value(material, "college"),
+                safe_material_value(material, "course_category"),
+                safe_material_value(material, "grade_value"),
+            ):
                 cleaned = _clean_memory_text(value)
                 if cleaned:
                     course_counter.update([cleaned])
-            if material.school:
-                cleaned_school = _clean_memory_text(material.school)
+            school = safe_material_value(material, "school")
+            if school:
+                cleaned_school = _clean_memory_text(school)
                 if cleaned_school:
                     school_counter.update([cleaned_school])
             material_text = _material_text(material)
@@ -224,10 +230,10 @@ class AgentMemoryService:
             for material in sorted(
                 materials,
                 key=lambda item: (
-                    -int(item.download_count or 0),
+                    -_safe_int(safe_material_value(item, "download_count")),
                     -build_material_signals(item).quality_score,
-                    -float(item.rating_avg or 0),
-                    -int(item.like_count or 0),
+                    -_safe_float(safe_material_value(item, "rating_avg")),
+                    -_safe_int(safe_material_value(item, "like_count")),
                     int(item.id),
                 ),
             )[:3]
@@ -296,15 +302,22 @@ class AgentMemoryService:
         matched: list[dict[str, Any]] = []
         for material in materials:
             fields = []
-            if profile.get("school") and material.school == profile["school"]:
+            if profile.get("school") and safe_material_value(material, "school") == profile["school"]:
                 fields.append("school")
-            if profile.get("college") and material.college == profile["college"]:
+            if profile.get("college") and safe_material_value(material, "college") == profile["college"]:
                 fields.append("college")
-            if profile.get("major") and material.major and profile["major"] in material.major:
+            material_major = _clean_memory_text(safe_material_value(material, "major"))
+            if profile.get("major") and material_major and profile["major"] in material_major:
                 fields.append("major")
             if not fields:
                 continue
-            matched.append({"material_id": int(material.id), "title": _clean_memory_text(material.title, max_chars=120), "matched_fields": fields})
+            matched.append(
+                {
+                    "material_id": int(material.id),
+                    "title": _clean_memory_text(safe_material_value(material, "title"), max_chars=120),
+                    "matched_fields": fields,
+                }
+            )
             if len(matched) >= 5:
                 break
         return matched
@@ -330,10 +343,16 @@ class AgentMemoryService:
                 rating = None
             if rating is not None:
                 flags.append(f"rated_{int(rating.rating)}")
-            if int(material.uploader_id or 0) == current_user_id:
+            if _safe_int(safe_material_value(material, "uploader_id")) == current_user_id:
                 flags.append("uploaded_by_user")
             if flags:
-                interactions.append({"material_id": int(material.id), "title": _clean_memory_text(material.title, max_chars=120), "signals": flags})
+                interactions.append(
+                    {
+                        "material_id": int(material.id),
+                        "title": _clean_memory_text(safe_material_value(material, "title"), max_chars=120),
+                        "signals": flags,
+                    }
+                )
         return interactions
 
     def _preference_payload(self, materials: list[MaterialRecord], interactions: list[dict[str, Any]]) -> dict[str, Any]:
@@ -345,7 +364,7 @@ class AgentMemoryService:
         for material in materials:
             if int(material.id) not in interacted_ids:
                 continue
-            tag_counter.update(_json_string_list(material.tags_json))
+            tag_counter.update(_json_string_list(safe_material_value(material, "tags_json")))
             type_counter.update(_signal_terms(_material_text(material)))
         payload = {
             "preferred_tags_from_existing_actions": _counter_items(tag_counter, limit=5),
@@ -358,10 +377,10 @@ def _high_signal_material_payload(material: MaterialRecord) -> dict[str, Any]:
     material_signals = build_material_signals(material)
     payload: dict[str, Any] = {
         "material_id": int(material.id),
-        "title": _clean_memory_text(material.title, max_chars=120),
-        "downloads": int(material.download_count or 0),
-        "rating_avg": float(material.rating_avg or 0),
-        "tags": _json_string_list(material.tags_json)[:4],
+        "title": _clean_memory_text(safe_material_value(material, "title"), max_chars=120),
+        "downloads": _safe_int(safe_material_value(material, "download_count")),
+        "rating_avg": _safe_float(safe_material_value(material, "rating_avg")),
+        "tags": _json_string_list(safe_material_value(material, "tags_json"))[:4],
     }
     if material_signals.quality_score:
         payload["quality_score"] = material_signals.quality_score
@@ -377,9 +396,9 @@ def _experience_material_payloads(materials: list[MaterialRecord]) -> list[dict[
     matched.sort(
         key=lambda item: (
             -build_material_signals(item).quality_score,
-            -int(item.download_count or 0),
-            -float(item.rating_avg or 0),
-            -int(item.like_count or 0),
+            -_safe_int(safe_material_value(item, "download_count")),
+            -_safe_float(safe_material_value(item, "rating_avg")),
+            -_safe_int(safe_material_value(item, "like_count")),
             int(item.id),
         )
     )
@@ -388,8 +407,8 @@ def _experience_material_payloads(materials: list[MaterialRecord]) -> list[dict[
         material_signals = build_material_signals(material)
         payload: dict[str, Any] = {
             "material_id": int(material.id),
-            "title": _clean_memory_text(material.title, max_chars=120),
-            "tags": _json_string_list(material.tags_json)[:4],
+            "title": _clean_memory_text(safe_material_value(material, "title"), max_chars=120),
+            "tags": _json_string_list(safe_material_value(material, "tags_json"))[:4],
         }
         strategy_terms = _study_strategy_terms(_material_text(material))
         if strategy_terms:
@@ -449,14 +468,28 @@ def _json_string_list(value: str | None) -> list[str]:
     return [cleaned for item in parsed if (cleaned := _clean_memory_text(item))]
 
 
+def _safe_int(value: Any, default: int = 0) -> int:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _safe_float(value: Any, default: float = 0.0) -> float:
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+
 def _material_text(material: MaterialRecord) -> str:
     return " ".join(
         value
         for value in [
-            _clean_memory_text(material.title),
-            _clean_memory_text(material.description),
-            _clean_memory_text(material.keywords),
-            " ".join(_json_string_list(material.tags_json)),
+            _clean_memory_text(safe_material_value(material, "title")),
+            _clean_memory_text(safe_material_value(material, "description")),
+            _clean_memory_text(safe_material_value(material, "keywords")),
+            " ".join(_json_string_list(safe_material_value(material, "tags_json"))),
         ]
         if value
     )
@@ -488,7 +521,7 @@ def _study_strategy_terms(text: str) -> list[str]:
 
 def _looks_like_experience_material(material: MaterialRecord) -> bool:
     text = _material_text(material)
-    tags = _json_string_list(material.tags_json)
+    tags = _json_string_list(safe_material_value(material, "tags_json"))
     if any(tag in {"经验", "经验分享", "攻略", "面经"} for tag in tags):
         return True
     return bool({"经验参考", "复盘错题", "冲刺速成"} & set(_study_strategy_terms(text)))

@@ -10,7 +10,7 @@ from app.core.observability import get_runtime_metrics
 from app.models.materials import MaterialRecord
 from app.repos.material_repo import MaterialRepository
 from app.schemas.ai import AiFeedbackPayload
-from app.services.agent_material_signal_service import build_material_signals
+from app.services.agent_material_signal_service import build_material_signals, safe_material_value
 
 
 ALLOWED_FEEDBACK_HOOKS = {
@@ -276,19 +276,19 @@ def _selected_material_signals(materials: list[MaterialRecord]) -> dict[str, lis
 
 def _material_feedback_text(material: MaterialRecord) -> str:
     values = [
-        material.title,
-        material.description,
-        material.keywords,
-        material.school,
-        material.college,
-        material.major,
+        safe_material_value(material, "title"),
+        safe_material_value(material, "description"),
+        safe_material_value(material, "keywords"),
+        safe_material_value(material, "school"),
+        safe_material_value(material, "college"),
+        safe_material_value(material, "major"),
         *_material_tags(material),
     ]
     return " ".join(_clean_signal_text(value) for value in values if value)
 
 
 def _material_tags(material: MaterialRecord) -> list[str]:
-    raw = getattr(material, "tags_json", None)
+    raw = safe_material_value(material, "tags_json")
     if not raw:
         return []
     try:

@@ -9,6 +9,7 @@ from typing import Any
 from app.core.config import Settings
 from app.integrations.material_asset_store import MaterialAssetStore
 from app.models.materials import MaterialRecord
+from app.services.agent_material_signal_service import safe_material_value
 
 
 PDF_EVIDENCE_QUERY_TERMS = (
@@ -221,7 +222,13 @@ class MaterialPdfEvidenceService:
             if not self._can_read_pdf_material(material, current_user_id):
                 continue
             scanned += 1
-            all_evidence.extend(self.collect_for_material(material, query, cacheable=bool(material.is_free)))
+            all_evidence.extend(
+                self.collect_for_material(
+                    material,
+                    query,
+                    cacheable=bool(safe_material_value(material, "is_free", True)),
+                )
+            )
         all_evidence.sort(key=lambda item: (-item.score, item.material_id, item.page))
         return all_evidence[: max(1, self.settings.ai_agent_pdf_evidence_max_pages)]
 
@@ -232,10 +239,10 @@ class MaterialPdfEvidenceService:
         *,
         cacheable: bool | None = None,
     ) -> list[MaterialPageEvidence]:
-        key = (material.file_storage_key or "").strip()
+        key = str(safe_material_value(material, "file_storage_key") or "").strip()
         if not key:
             return []
-        should_cache = bool(material.is_free) if cacheable is None else cacheable
+        should_cache = bool(safe_material_value(material, "is_free", True)) if cacheable is None else cacheable
         chunks = self._load_page_chunks(key, cacheable=should_cache)
         if not chunks:
             return []
@@ -248,7 +255,7 @@ class MaterialPdfEvidenceService:
             evidence.append(
                 MaterialPageEvidence(
                     material_id=int(material.id),
-                    title=material.title or f"资料 #{material.id}",
+                    title=str(safe_material_value(material, "title") or f"资料 #{material.id}"),
                     page=chunk.page,
                     text=chunk.text,
                     score=_score_page(chunk, query_terms),
@@ -297,9 +304,9 @@ class MaterialPdfEvidenceService:
     def _can_read_pdf_material(self, material: MaterialRecord, current_user_id: int | None) -> bool:
         if not _looks_like_pdf(material):
             return False
-        if bool(material.is_free):
+        if bool(safe_material_value(material, "is_free", True)):
             return True
-        return current_user_id is not None and int(material.uploader_id or 0) == current_user_id
+        return current_user_id is not None and _safe_int(safe_material_value(material, "uploader_id")) == current_user_id
 
 
 def extract_pdf_page_texts(pdf_bytes: bytes, *, max_pages: int) -> list[tuple[int, str]]:
@@ -402,10 +409,17 @@ def _decode_pdf_literal(value: str) -> str:
 
 
 def _looks_like_pdf(material: MaterialRecord) -> bool:
-    file_type = (material.file_type or "").strip().lower()
-    filename = (material.original_filename or "").strip().lower()
-    key = (material.file_storage_key or "").strip().lower()
+    file_type = str(safe_material_value(material, "file_type") or "").strip().lower()
+    filename = str(safe_material_value(material, "original_filename") or "").strip().lower()
+    key = str(safe_material_value(material, "file_storage_key") or "").strip().lower()
     return file_type == "pdf" or filename.endswith(".pdf") or key.endswith(".pdf")
+
+
+def _safe_int(value: Any, default: int = 0) -> int:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
 
 
 def _query_terms(query: str) -> list[str]:

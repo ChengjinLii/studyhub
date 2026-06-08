@@ -160,6 +160,62 @@ def test_agent_ranking_matches_natural_study_search_aliases() -> None:
     assert plan_ranked[0].id == 402
 
 
+def test_agent_ranking_handles_esd_query_with_unloaded_compatibility_columns() -> None:
+    esd_material = SimpleNamespace(
+        id=501,
+        title="ESD-电子系统设计-2021年真题及答案",
+        description="电子系统设计样卷答案和期末考题整理",
+        school="电子科技大学",
+        college="自动化",
+        major="电子系统设计",
+        course_category="MAJOR",
+        grade_value="大三",
+        file_type="pdf",
+        is_free=True,
+        download_count=12,
+        rating_avg=4.6,
+        rating_count=3,
+        like_count=2,
+        created_at=None,
+    )
+    cps_material = SimpleNamespace(
+        id=502,
+        title="CPS 通信原理四年真题解析",
+        description="通信原理期末真题和答案解析",
+        school="电子科技大学",
+        college="信通",
+        major="通信工程",
+        course_category="MAJOR",
+        grade_value="大三",
+        file_type="pdf",
+        is_free=True,
+        download_count=100,
+        rating_avg=4.9,
+        rating_count=10,
+        like_count=20,
+        created_at=None,
+    )
+
+    class FakeReadRepo:
+        def load_seed(self) -> dict[str, Any]:
+            return {}
+
+    class FakeMaterialRepo:
+        def ensure_seed_bootstrap(self, session: object, seed: dict[str, Any]) -> None:
+            del session, seed
+
+        def list_visible_materials(self, session: object) -> list[Any]:
+            del session
+            return [cps_material, esd_material]
+
+    service = AiService(read_repo=FakeReadRepo(), material_repo=FakeMaterialRepo())  # type: ignore[arg-type]
+
+    ranked = service._rank_materials(object(), "esd考题风格帮我分析一下", {})  # type: ignore[arg-type]
+
+    assert ranked[0].id == 501
+    assert "电子系统设计" in ranked[0].title
+
+
 def test_agent_exam_trend_closed_loop_prompt_and_response_contract(monkeypatch) -> None:
     captured: dict[str, Any] = {}
     metrics = get_runtime_metrics()
@@ -945,4 +1001,69 @@ def test_agent_model_failure_uses_structured_local_exam_trend_fallback(monkeypat
         'studyhub_ai_agent_runs_total{provider="openai-compatible",status="model_fallback",'
         'pdf_evidence="yes",memory_context="no",course_memory_card="yes"} 1'
     ) in metrics_text
+    metrics.clear()
+
+
+def test_agent_replaces_model_no_candidate_answer_when_local_materials_exist(monkeypatch) -> None:
+    metrics = get_runtime_metrics()
+    metrics.clear()
+    settings = Settings(
+        ai_agent_provider="openai-compatible",
+        ai_agent_base_url="https://example.test/v1",
+        ai_agent_api_key="test-key",
+        ai_agent_model="demo-model",
+    )
+    monkeypatch.setattr("app.services.ai_service.get_settings", lambda: settings)
+
+    service = AiService(
+        read_repo=None,
+        material_repo=None,
+        query_planner_service=AgentQueryPlannerService(),
+        course_memory_service=AgentCourseMemoryService(),
+    )  # type: ignore[arg-type]
+    monkeypatch.setattr(
+        service,
+        "_rank_materials",
+        lambda session, query, filters: [
+            MaterialRecord(
+                id=501,
+                title="ESD-电子系统设计-2021年真题及答案",
+                description="电子系统设计 2021 年真题、样卷答案和期末考题整理",
+                tags_json=json.dumps(["电子系统设计", "真题", "答案"], ensure_ascii=False),
+                school="电子科技大学",
+                college="自动化",
+                major="电子系统设计",
+                file_type="pdf",
+                is_free=True,
+                download_count=30,
+                rating_avg=4.6,
+                rating_count=4,
+            )
+        ],
+    )
+
+    def fake_no_candidate_answer(settings: Settings, system_prompt: str, user_prompt: dict[str, Any]) -> str:
+        del settings, system_prompt, user_prompt
+        return json.dumps(
+            {
+                "answer": "目前我这边没有收到任何 ESD 的候选资料，所以不能基于指定资料直接分析考题风格。",
+                "followup_questions": ["你可以把真题发给我吗？"],
+            },
+            ensure_ascii=False,
+        )
+
+    monkeypatch.setattr(service, "_call_agent_model", fake_no_candidate_answer)
+
+    response = service.recommend(
+        object(),  # type: ignore[arg-type]
+        SimpleNamespace(query="esd考题风格帮我分析一下", filters={}),
+        current_user_id=7,
+    )
+    body = json.loads(str(response["output"]).removeprefix("<json>").removesuffix("</json>"))
+
+    assert "没有收到任何" not in body["answer"]
+    assert "StudyHub 资料库找到" in body["answer"]
+    assert "ESD-电子系统设计-2021年真题及答案" in body["answer"]
+    assert body["recommendations"][0]["material_id"] == 501
+    assert "电子系统设计" in body["recommendations"][0]["title"]
     metrics.clear()

@@ -6,6 +6,7 @@ from typing import Any
 
 from app.models.materials import MaterialRecord
 from app.services.agent_memory_service import AgentMemoryContext
+from app.services.agent_material_signal_service import safe_material_value
 from app.services.material_pdf_evidence_service import MaterialPageEvidence
 
 
@@ -261,7 +262,11 @@ def _extract_course_terms(normalized_query: str, materials: list[MaterialRecord]
     if found:
         return found[:4]
     for material in materials[:5]:
-        for value in (material.major, material.college, material.course_category):
+        for value in (
+            safe_material_value(material, "major"),
+            safe_material_value(material, "college"),
+            safe_material_value(material, "course_category"),
+        ):
             if value and str(value).strip() not in found:
                 found.append(str(value).strip())
                 break
@@ -273,7 +278,13 @@ def _extract_resource_types(normalized_query: str, materials: list[MaterialRecor
     if found:
         return found[:5]
     haystack = " ".join(
-        " ".join([material.title or "", material.description or "", material.keywords or ""]).lower()
+        " ".join(
+            [
+                str(safe_material_value(material, "title") or ""),
+                str(safe_material_value(material, "description") or ""),
+                str(safe_material_value(material, "keywords") or ""),
+            ]
+        ).lower()
         for material in materials[:5]
     )
     for label, aliases in RESOURCE_TYPE_RULES:

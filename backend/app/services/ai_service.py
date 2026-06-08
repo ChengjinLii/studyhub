@@ -229,18 +229,30 @@ class AiService:
                 recommendations=recommendations,
                 memory_context=memory_context,
             )
-            body = {
-                "recommendations": recommendations,
-                "answer": llm_body.get("answer")
-                if llm_body
-                else self._build_local_answer(
+            answer = ""
+            if llm_body:
+                answer = str(llm_body.get("answer") or "").strip()
+                if _llm_answer_denies_available_candidates(answer, materials, recommendations):
+                    answer = self._build_local_answer(
+                        payload.query,
+                        recommendations,
+                        pdf_evidence,
+                        memory_context,
+                        query_plan=query_plan,
+                        course_memory_card=course_memory_card,
+                    )
+            else:
+                answer = self._build_local_answer(
                     payload.query,
                     recommendations,
                     pdf_evidence,
                     memory_context,
                     query_plan=query_plan,
                     course_memory_card=course_memory_card,
-                ),
+                )
+            body = {
+                "recommendations": recommendations,
+                "answer": answer,
                 "followup_questions": followup_questions,
             }
             if pdf_evidence:
@@ -1309,6 +1321,29 @@ def _agent_retrieval_query(query: str, context_query: str | None) -> str:
     if not context:
         return current
     return f"{current}\n最近上下文：{context}"[:1600]
+
+
+def _llm_answer_denies_available_candidates(
+    answer: str,
+    materials: list[MaterialRecord],
+    recommendations: list[dict[str, Any]],
+) -> bool:
+    if not answer or not (materials or recommendations):
+        return False
+    normalized = re.sub(r"\s+", "", answer).lower()
+    denial_markers = (
+        "没有收到任何",
+        "没有收到可用",
+        "没有可用的studyhub候选资料",
+        "没有可用studyhub候选资料",
+        "没有候选资料",
+        "没有studyhub候选资料",
+        "不能基于指定资料",
+        "无法基于指定资料",
+        "没有匹配到相关资料",
+        "候选资料不足",
+    )
+    return any(marker in normalized for marker in denial_markers)
 
 
 def _agent_context_for_query(query: str, context_query: str | None) -> str:
