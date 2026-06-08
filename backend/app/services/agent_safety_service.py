@@ -40,21 +40,34 @@ FORBIDDEN_INTERNAL_MARKERS = (
     "strategy_refs",
 )
 
+PROMPT_TEXT_FIELD_LIMITS = {
+    "text": 700,
+    "anchor_text": 240,
+    "excerpt": 240,
+    "description": 240,
+    "summary": 240,
+    "reason": 260,
+    "title": 120,
+    "answer": 1200,
+}
+
+PROMPT_DEFAULT_TEXT_LIMIT = 500
+
 
 class AgentSafetyService:
     """Post-process external Agent output before it reaches the API response."""
 
-    def sanitize_prompt_payload(self, value: Any) -> Any:
+    def sanitize_prompt_payload(self, value: Any, *, field_name: str | None = None) -> Any:
         """Redact sensitive string values before sending context to a model."""
 
         if isinstance(value, dict):
-            return {key: self.sanitize_prompt_payload(item) for key, item in value.items()}
+            return {key: self.sanitize_prompt_payload(item, field_name=str(key)) for key, item in value.items()}
         if isinstance(value, list):
-            return [self.sanitize_prompt_payload(item) for item in value]
+            return [self.sanitize_prompt_payload(item, field_name=field_name) for item in value]
         if isinstance(value, tuple):
-            return [self.sanitize_prompt_payload(item) for item in value]
+            return [self.sanitize_prompt_payload(item, field_name=field_name) for item in value]
         if isinstance(value, str):
-            return _redact_public_sensitive_text(value)
+            return _clean_prompt_text(value, field_name=field_name)
         return value
 
     def sanitize_recommendation_body(
@@ -353,6 +366,11 @@ def _clean_public_title(value: Any, *, max_chars: int) -> str:
     if any(marker in lowered for marker in FORBIDDEN_INTERNAL_MARKERS):
         return "资料"
     return text
+
+
+def _clean_prompt_text(value: str, *, field_name: str | None) -> str:
+    limit = PROMPT_TEXT_FIELD_LIMITS.get(str(field_name or "").lower(), PROMPT_DEFAULT_TEXT_LIMIT)
+    return _redact_public_sensitive_text(_clean_text(value, max_chars=max(limit * 2, limit)))[:limit]
 
 
 def _clean_public_tags(value: Any) -> list[str]:

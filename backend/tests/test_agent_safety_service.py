@@ -414,6 +414,48 @@ def test_ai_model_prompt_redacts_sensitive_material_and_pdf_context(monkeypatch)
     assert body["recommendations"][0]["material_id"] == 101
 
 
+def test_agent_safety_compacts_prompt_text_fields_without_dropping_structure() -> None:
+    long_text = "通信原理" * 400 + " alice@example.com 13812345678 token=secret-value"
+    payload = {
+        "user_query": long_text,
+        "candidate_materials": [
+            {
+                "material_id": 101,
+                "title": long_text,
+                "summary": long_text,
+                "reason": long_text,
+            }
+        ],
+        "pdf_evidence": [
+            {
+                "material_id": 101,
+                "page": 2,
+                "text": long_text,
+                "anchor_text": long_text,
+            }
+        ],
+        "course_memory_card": {
+            "page_references": [{"material_id": 101, "page": 2, "anchor_text": long_text}],
+        },
+    }
+
+    sanitized = AgentSafetyService().sanitize_prompt_payload(payload)
+    serialized = json.dumps(sanitized, ensure_ascii=False)
+
+    assert sanitized["candidate_materials"][0]["material_id"] == 101
+    assert sanitized["pdf_evidence"][0]["page"] == 2
+    assert len(sanitized["user_query"]) <= 500
+    assert len(sanitized["candidate_materials"][0]["title"]) <= 120
+    assert len(sanitized["candidate_materials"][0]["summary"]) <= 240
+    assert len(sanitized["candidate_materials"][0]["reason"]) <= 260
+    assert len(sanitized["pdf_evidence"][0]["text"]) <= 700
+    assert len(sanitized["pdf_evidence"][0]["anchor_text"]) <= 240
+    assert len(sanitized["course_memory_card"]["page_references"][0]["anchor_text"]) <= 240
+    assert "alice@example.com" not in serialized
+    assert "13812345678" not in serialized
+    assert "secret-value" not in serialized
+
+
 def test_ai_local_recommendation_redacts_sensitive_material_metadata(monkeypatch) -> None:
     monkeypatch.setattr("app.services.ai_service.get_settings", lambda: Settings(ai_agent_provider="local"))
 
