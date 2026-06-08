@@ -25,6 +25,15 @@ require_tcp_port() {
 require_tcp_port "PRODUCTION_BACKEND_PORT" "$BACKEND_PORT"
 require_tcp_port "PRODUCTION_FRONTEND_PORT" "$FRONTEND_PORT"
 
+case "$RUN_PREFLIGHT" in
+  0|1|false|true)
+    ;;
+  *)
+    echo "STUDYHUB_PRODUCTION_UP_PREFLIGHT must be one of: 1, true, 0, false; got $RUN_PREFLIGHT"
+    exit 2
+    ;;
+esac
+
 mkdir -p "$RUN_DIR" "$LOG_DIR" "$RUNTIME_ROOT"
 
 if [[ ! -f "$ENV_FILE" ]]; then

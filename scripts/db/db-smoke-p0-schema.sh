@@ -20,6 +20,14 @@ require_positive_duration() {
 
 require_positive_duration "STUDYHUB_CURL_CONNECT_TIMEOUT" "$CURL_CONNECT_TIMEOUT"
 require_positive_duration "STUDYHUB_CURL_MAX_TIME" "$CURL_MAX_TIME"
+case "$RUN_WORKER_ONCE" in
+  0|1|false|true)
+    ;;
+  *)
+    echo "STUDYHUB_P0_RUN_WORKER_ONCE must be one of: 1, true, 0, false; got $RUN_WORKER_ONCE"
+    exit 2
+    ;;
+esac
 CURL_ARGS=(--fail --silent --show-error --connect-timeout "$CURL_CONNECT_TIMEOUT" --max-time "$CURL_MAX_TIME")
 
 if [[ "$ENVIRONMENT" == "preview" && ! -f "$PRIVATE_DIR/.env.preview" ]]; then

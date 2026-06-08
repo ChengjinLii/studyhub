@@ -17,6 +17,15 @@ if ! [[ "$INTERVAL_SECONDS" =~ ^[1-9][0-9]*$ ]]; then
   exit 2
 fi
 
+case "$RUN_SCHEMA_PREFLIGHT" in
+  0|1|false|true)
+    ;;
+  *)
+    echo "STUDYHUB_WORKER_SCHEMA_PREFLIGHT must be one of: 1, true, 0, false; got $RUN_SCHEMA_PREFLIGHT"
+    exit 2
+    ;;
+esac
+
 mkdir -p "$RUN_DIR" "$LOG_DIR"
 
 if [[ "$ENVIRONMENT" == "production" && ! -f "$PRIVATE_DIR/.env.production" ]]; then
