@@ -487,6 +487,7 @@ class UserReadService:
             "createdAt": serialize_datetime(material.created_at),
             "commentCount": int(material.comment_count or 0),
             "likeCount": int(material.like_count or 0),
+            "tags": [],
         }
         if include_tags:
             item["tags"] = load_json_list(material.tags_json)
@@ -681,9 +682,8 @@ class UserReadService:
             "createdAt": compat_serialize_datetime(row["created_at"]),
             "commentCount": 0,
             "likeCount": int(row["like_count"] or 0),
+            "tags": tags or [],
         }
-        if tags is not None:
-            item["tags"] = tags
         return item
 
     def _compat_get_user_market_listings(self, session: Session, target_user_id: int, limit: int | None) -> list[dict[str, Any]]:

@@ -266,4 +266,5 @@ def test_user_read_service_builds_public_profile_against_legacy_users_schema() -
         assert profile["marketCount"] == 1
         assert profile["saleCount"] == 1
         assert profile["recentUploads"][0]["title"] == "通信原理笔记"
+        assert profile["recentUploads"][0]["tags"] == []
         assert profile["recentMarketListings"][0]["title"] == "二手示波器"
