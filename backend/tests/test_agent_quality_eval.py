@@ -15,7 +15,7 @@ from app.repos.material_repo import MaterialRepository
 from app.services.agent_course_memory_service import AgentCourseMemoryService
 from app.services.agent_memory_service import AgentMemoryContext
 from app.services.agent_query_planner_service import AgentQueryPlannerService
-from app.services.ai_service import AiService
+from app.services.ai_service import AGENT_RANKING_CANDIDATE_LIMIT, AiService
 from app.services.material_pdf_evidence_service import MaterialPageEvidence
 
 
@@ -193,6 +193,35 @@ def test_agent_ranking_prefilters_candidates_without_loading_all_materials() -> 
         ranked = service._rank_materials(session, "通信原理真题", {})
 
     assert [item.id for item in ranked] == [810]
+
+
+def test_agent_ranking_limits_prefiltered_candidate_count() -> None:
+    class FakeReadRepo:
+        def load_seed(self) -> dict[str, Any]:
+            return {}
+
+    engine = create_engine("sqlite+pysqlite:///:memory:", future=True)
+    MaterialRecord.__table__.create(bind=engine)
+    base = datetime(2026, 1, 1, tzinfo=UTC)
+    with Session(engine) as session:
+        for index in range(100):
+            session.add(
+                _db_material(
+                    900 + index,
+                    title=f"通信原理真题解析 {index}",
+                    description="期末试卷、常考题型和参考答案",
+                    downloads=index,
+                    created_at=base + timedelta(minutes=index),
+                )
+            )
+        session.commit()
+
+        service = AiService(read_repo=FakeReadRepo(), material_repo=MaterialRepository())  # type: ignore[arg-type]
+        ranked = service._rank_materials(session, "通信原理真题", {})
+
+    assert len(ranked) == AGENT_RANKING_CANDIDATE_LIMIT
+    assert ranked[0].id == 999
+    assert 900 not in {item.id for item in ranked}
 
 
 def test_agent_ranking_demotes_high_risk_material_when_relevance_ties() -> None:

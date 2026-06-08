@@ -277,6 +277,7 @@ class MaterialRepository:
         match_values: list[str],
         school: str | None,
         major: str | None,
+        limit: int | None = None,
     ) -> list[MaterialRecord]:
         search_filters = self._material_text_match_filters(
             session,
@@ -285,6 +286,8 @@ class MaterialRepository:
             major=major,
         )
         if not search_filters:
+            if limit is not None:
+                return self.list_visible_materials_for_agent_memory(session, limit=limit)
             return self.list_visible_materials(session)
         stmt = (
             select(MaterialRecord)
@@ -302,6 +305,8 @@ class MaterialRepository:
                 MaterialRecord.id.desc(),
             )
         )
+        if limit is not None:
+            stmt = stmt.limit(max(1, int(limit)))
         return list(session.scalars(stmt))
 
     def list_visible_materials_for_uploader(

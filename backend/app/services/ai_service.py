@@ -93,6 +93,8 @@ LOW_VALUE_QUERY_TERMS = {
     "助手",
 }
 
+AGENT_RANKING_CANDIDATE_LIMIT = 80
+
 CONTEXT_DEPENDENT_QUERY_MARKERS = (
     "这门课",
     "这门",
@@ -1356,6 +1358,7 @@ class AiService:
                 match_values=match_values,
                 school=school,
                 major=major,
+                limit=AGENT_RANKING_CANDIDATE_LIMIT,
             )
             if matched:
                 return matched
