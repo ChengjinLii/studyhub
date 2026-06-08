@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import re
 from typing import Any
 
@@ -9,6 +10,7 @@ from app.core.observability import get_runtime_metrics
 from app.models.materials import MaterialRecord
 from app.repos.material_repo import MaterialRepository
 from app.schemas.ai import AiFeedbackPayload
+from app.services.agent_material_signal_service import build_material_signals
 
 
 ALLOWED_FEEDBACK_HOOKS = {
@@ -46,6 +48,23 @@ FEEDBACK_NOTE_SIGNAL_PATTERNS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
     ("content_issues", "解析质量风险", ("解析错误", "答案不对", "讲错", "不准确")),
 )
 
+MATERIAL_COURSE_SIGNAL_PATTERNS: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("电子系统设计", ("电子系统设计", "esd")),
+    ("通信原理", ("通信原理", "cps")),
+    ("信号与系统", ("信号与系统", "signals", "signal")),
+    ("数据结构", ("数据结构",)),
+    ("高等数学", ("高等数学", "高数", "微积分")),
+    ("概率论", ("概率论",)),
+)
+
+MATERIAL_SOURCE_SIGNAL_PATTERNS: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("往年真题", ("真题", "往年", "历年", "试卷", "期末题", "样卷", "考题")),
+    ("答案解析", ("解析", "答案", "标答", "参考答案", "讲解")),
+    ("讲义笔记", ("笔记", "讲义", "导图", "课件")),
+    ("复习速成", ("速成", "提纲", "复习", "冲刺")),
+    ("经验分享", ("经验", "经验贴", "攻略")),
+)
+
 
 class AgentFeedbackService:
     """Builds privacy-safe memory candidates from explicit Agent feedback.
@@ -66,7 +85,8 @@ class AgentFeedbackService:
         personal_memory_enabled: bool,
     ) -> dict[str, Any]:
         hook = payload.hook.strip().lower()
-        accepted_material_ids = self._visible_material_ids(session, payload.selectedMaterialIds)
+        accepted_materials = self._visible_materials(session, payload.selectedMaterialIds)
+        accepted_material_ids = [int(material.id) for material in accepted_materials]
         redacted_note = _redact_note(payload.note)
         if hook not in ALLOWED_FEEDBACK_HOOKS:
             result = {
@@ -85,7 +105,7 @@ class AgentFeedbackService:
         candidates = self._memory_candidates(
             hook=hook,
             redacted_note=redacted_note,
-            selected_material_ids=accepted_material_ids,
+            selected_materials=accepted_materials,
             personal_memory_enabled=personal_memory_enabled,
         )
         result = {
@@ -101,13 +121,15 @@ class AgentFeedbackService:
         self._record_feedback_metric(hook=hook, status="accepted", personal_memory_enabled=personal_memory_enabled, selected=bool(accepted_material_ids))
         return result
 
-    def _visible_material_ids(self, session: Session, selected_material_ids: list[int]) -> list[int]:
-        accepted: list[int] = []
+    def _visible_materials(self, session: Session, selected_material_ids: list[int]) -> list[MaterialRecord]:
+        accepted: list[MaterialRecord] = []
+        seen: set[int] = set()
         for material_id in selected_material_ids:
             material = self.material_repo.get_material(session, int(material_id))
-            if material is None or not _is_visible_material(material):
+            if material is None or not _is_visible_material(material) or int(material.id) in seen:
                 continue
-            accepted.append(int(material.id))
+            seen.add(int(material.id))
+            accepted.append(material)
         return accepted
 
     def _memory_candidates(
@@ -115,11 +137,13 @@ class AgentFeedbackService:
         *,
         hook: str,
         redacted_note: str,
-        selected_material_ids: list[int],
+        selected_materials: list[MaterialRecord],
         personal_memory_enabled: bool,
     ) -> list[dict[str, Any]]:
         candidates: list[dict[str, Any]] = []
+        selected_material_ids = [int(material.id) for material in selected_materials]
         derived_signals = _feedback_derived_signals(hook, redacted_note)
+        selected_material_signals = _selected_material_signals(selected_materials)
         if personal_memory_enabled:
             user_candidate: dict[str, Any] = {
                 "scope": "user",
@@ -131,6 +155,8 @@ class AgentFeedbackService:
             }
             if derived_signals:
                 user_candidate["derivedSignals"] = derived_signals
+            if selected_material_signals:
+                user_candidate["selectedMaterialSignals"] = selected_material_signals
             candidates.append(user_candidate)
         if selected_material_ids:
             platform_candidate: dict[str, Any] = {
@@ -144,6 +170,8 @@ class AgentFeedbackService:
             }
             if derived_signals:
                 platform_candidate["aggregateSignals"] = derived_signals
+            if selected_material_signals:
+                platform_candidate["selectedMaterialSignals"] = selected_material_signals
             candidates.append(platform_candidate)
         return candidates
 
@@ -225,6 +253,55 @@ def _feedback_memory_summary(hook: str, derived_signals: dict[str, list[str]]) -
     if labels:
         summary = f"{summary} 反馈信号：{'、'.join(labels[:8])}。"
     return summary[:240]
+
+
+def _selected_material_signals(materials: list[MaterialRecord]) -> dict[str, list[str]]:
+    signals: dict[str, list[str]] = {}
+    for material in materials[:10]:
+        text = _material_feedback_text(material)
+        normalized_text = text.lower()
+        for label, aliases in MATERIAL_COURSE_SIGNAL_PATTERNS:
+            if any(alias.lower() in normalized_text for alias in aliases):
+                _append_signal(signals, "courses", label)
+        for label, aliases in MATERIAL_SOURCE_SIGNAL_PATTERNS:
+            if any(alias.lower() in normalized_text for alias in aliases):
+                _append_signal(signals, "sourceTypes", label)
+        material_signals = build_material_signals(material)
+        for label in material_signals.quality_signals[:4]:
+            _append_signal(signals, "qualitySignals", label)
+        for label in material_signals.risk_signals[:4]:
+            _append_signal(signals, "riskSignals", label)
+    return {key: values[:8] for key, values in signals.items() if values}
+
+
+def _material_feedback_text(material: MaterialRecord) -> str:
+    values = [
+        material.title,
+        material.description,
+        material.keywords,
+        material.school,
+        material.college,
+        material.major,
+        *_material_tags(material),
+    ]
+    return " ".join(_clean_signal_text(value) for value in values if value)
+
+
+def _material_tags(material: MaterialRecord) -> list[str]:
+    raw = getattr(material, "tags_json", None)
+    if not raw:
+        return []
+    try:
+        parsed = json.loads(str(raw))
+    except json.JSONDecodeError:
+        return []
+    if not isinstance(parsed, list):
+        return []
+    return [_clean_signal_text(item) for item in parsed if _clean_signal_text(item)]
+
+
+def _clean_signal_text(value: Any) -> str:
+    return re.sub(r"\s+", " ", str(value)).strip()[:80]
 
 
 def _append_signal(signals: dict[str, list[str]], category: str, label: str) -> None:

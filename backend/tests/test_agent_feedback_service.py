@@ -105,11 +105,18 @@ def test_ai_feedback_builds_redacted_user_and_platform_memory_candidates(client,
         "positive_feedback": ["有帮助"],
         "learning_preferences": ["补基础优先", "刷题优先", "详细解析"],
     }
+    assert data["memoryCandidates"][0]["selectedMaterialSignals"] == {
+        "courses": ["通信原理"],
+        "sourceTypes": ["往年真题", "答案解析"],
+        "qualitySignals": ["标签较完整", "审核通过", "已有下载反馈"],
+        "riskSignals": ["简介较短", "交付信息缺失"],
+    }
     assert data["memoryCandidates"][1]["privacy"] == "anonymous_aggregate_candidate"
     assert data["memoryCandidates"][1]["aggregateSignals"] == {
         "positive_feedback": ["有帮助"],
         "learning_preferences": ["补基础优先", "刷题优先", "详细解析"],
     }
+    assert data["memoryCandidates"][1]["selectedMaterialSignals"] == data["memoryCandidates"][0]["selectedMaterialSignals"]
     metrics = get_runtime_metrics().render_prometheus(get_settings())
     assert (
         'studyhub_ai_agent_feedback_total{hook="useful",status="accepted",'
@@ -139,6 +146,7 @@ def test_ai_feedback_respects_disabled_personal_memory_cookie(client, auth_servi
         "difficulty_feedback": ["偏困难"],
         "learning_preferences": ["补基础优先", "详细解析"],
     }
+    assert data["memoryCandidates"][0]["selectedMaterialSignals"]["courses"] == ["通信原理"]
 
 
 def test_ai_feedback_rejects_unknown_hooks_without_memory_candidates(client, auth_service) -> None:
