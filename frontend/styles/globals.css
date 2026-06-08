@@ -5896,15 +5896,6 @@ main {
   margin-top: -6px;
 }
 
-.home-page .home-dual-panel,
-.home-page .filter-card,
-.home-page .leaderboard-card,
-.home-page .support-card {
-  content-visibility: auto;
-  contain-intrinsic-size: auto 560px;
-}
-
-
 .home-page .card-title {
   display: inline-flex;
   align-items: center;
