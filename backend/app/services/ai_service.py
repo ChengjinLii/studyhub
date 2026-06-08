@@ -1320,7 +1320,78 @@ def _agent_retrieval_query(query: str, context_query: str | None) -> str:
     context = _compact_agent_context(context_query)
     if not context:
         return current
-    return f"{current}\n最近上下文：{context}"[:1600]
+    context_focus = _agent_context_retrieval_focus(context)
+    if not context_focus:
+        return current
+    return f"{current}\n最近上下文关键词：{context_focus}"[:900]
+
+
+def _agent_context_retrieval_focus(context: str) -> str:
+    normalized = context.strip().lower()
+    if not normalized:
+        return ""
+    focus_terms: list[str] = []
+
+    def add(value: str, *, max_chars: int = 120) -> None:
+        cleaned = re.sub(r"\s+", " ", str(value or "")).strip()[:max_chars]
+        if not cleaned:
+            return
+        dedupe_key = cleaned.lower()
+        if dedupe_key not in {item.lower() for item in focus_terms}:
+            focus_terms.append(cleaned)
+
+    for term in COURSE_QUERY_TERMS:
+        aliases = QUERY_TERM_ALIASES.get(term, (term,))
+        if any(alias.lower() in normalized for alias in aliases):
+            add(term, max_chars=32)
+
+    for title in _agent_context_material_titles(context):
+        add(title)
+
+    for year in re.findall(r"(?<!\d)(20[0-3]\d)(?!\d)", context):
+        add(year, max_chars=8)
+
+    for term in (
+        "真题",
+        "往年题",
+        "历年",
+        "期末",
+        "期中",
+        "考题",
+        "考题风格",
+        "出题风格",
+        "题型",
+        "解析",
+        "答案",
+        "笔记",
+        "速成",
+        "复习计划",
+    ):
+        aliases = QUERY_TERM_ALIASES.get(term, (term,))
+        if any(alias.lower() in normalized for alias in aliases):
+            add(term, max_chars=24)
+
+    if focus_terms:
+        return " ".join(focus_terms[:18])[:650]
+    return context[-500:]
+
+
+def _agent_context_material_titles(context: str) -> list[str]:
+    titles: list[str] = []
+
+    def add_title(raw_value: str) -> None:
+        title = re.sub(r"\s+", " ", raw_value).strip(" ；;，,。")
+        if 2 <= len(title) <= 120 and title not in titles:
+            titles.append(title)
+
+    for title in re.findall(r"《([^》]{2,120})》", context):
+        add_title(title)
+
+    for segment in re.findall(r"(?:推荐资料|曾推荐资料)[:：]([^。\n]+)", context):
+        for title in re.split(r"[；;]", segment):
+            add_title(title)
+
+    return titles[:6]
 
 
 def _llm_answer_denies_available_candidates(
@@ -1413,7 +1484,33 @@ def _compact_agent_context(value: str | None) -> str:
     )
     text = re.sub(r"(微信|微信号|微 信)\s*[:：=]?\s*[A-Za-z0-9_-]{5,32}", lambda match: f"{match.group(1)}=[redacted-contact]", text)
     text = re.sub(r"(?<!\d)\d{12,24}(?!\d)", "[redacted-number]", text)
-    return text[-1200:]
+    if len(text) <= 1200:
+        return text
+    return _preserve_agent_context_early_summary(text, max_chars=1200)
+
+
+def _preserve_agent_context_early_summary(text: str, *, max_chars: int) -> str:
+    marker_match = re.search(r"早期上下文摘要[:：]", text)
+    if not marker_match:
+        return text[-max_chars:]
+    start = marker_match.start()
+    boundary_candidates = [
+        index
+        for index in (
+            text.find(" 用户：", start + 1),
+            text.find(" 助手：", start + 1),
+        )
+        if index > start
+    ]
+    end = min(boundary_candidates) if boundary_candidates else min(len(text), start + 420)
+    summary = text[start:end].strip()
+    if not summary:
+        return text[-max_chars:]
+    tail_budget = max(0, max_chars - len(summary) - 1)
+    if tail_budget <= 0:
+        return summary[:max_chars]
+    tail = text[-tail_budget:].strip()
+    return f"{summary} {tail}".strip()[:max_chars]
 
 
 def _evidence_values(pdf_evidence: list[MaterialPageEvidence], field: str) -> list[str]:

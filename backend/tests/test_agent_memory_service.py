@@ -7,7 +7,7 @@ from typing import Any
 from app.core.config import Settings
 from app.models.materials import MaterialRecord
 from app.services.agent_memory_service import AgentMemoryContext, AgentMemoryService
-from app.services.ai_service import AiService
+from app.services.ai_service import AiService, _agent_retrieval_query
 from app.services.material_pdf_evidence_service import MaterialPageEvidence
 
 
@@ -475,3 +475,23 @@ def test_ai_recommendation_uses_bounded_context_query_for_followups(monkeypatch)
 
     assert switched_body["recommendations"][0]["material_id"] == 301
     assert "通信原理" in switched_body["recommendations"][0]["title"]
+
+
+def test_agent_retrieval_query_distills_long_context_to_stable_anchors() -> None:
+    noisy_context = "\n".join(
+        [
+            "早期上下文摘要：课程/关键词：电子系统设计。曾推荐资料：ESD-电子系统设计-2021年真题及答案；ESD样卷答案。早期用户目标：ESD 考题风格。",
+            *[f"后续无关闲聊 {index}：今天先不聊资料，只是占位。" for index in range(80)],
+        ]
+    )
+
+    retrieval_query = _agent_retrieval_query("考题风格帮我分析一下", noisy_context)
+
+    assert len(retrieval_query) < 900
+    assert "最近上下文关键词" in retrieval_query
+    assert "电子系统设计" in retrieval_query
+    assert "ESD-电子系统设计-2021年真题及答案" in retrieval_query
+    assert "ESD样卷答案" in retrieval_query
+    assert "2021" in retrieval_query
+    assert "真题" in retrieval_query
+    assert "无关闲聊" not in retrieval_query
