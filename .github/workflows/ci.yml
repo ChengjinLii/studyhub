@@ -64,3 +64,9 @@ jobs:
       - name: Run frontend unit tests
         working-directory: frontend
         run: npm run test:unit
+      - name: Install Playwright browsers
+        working-directory: frontend
+        run: npx playwright install --with-deps chromium
+      - name: Run frontend critical tests
+        working-directory: frontend
+        run: npm run test:critical
