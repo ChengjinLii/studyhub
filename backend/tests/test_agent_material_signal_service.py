@@ -59,3 +59,24 @@ def test_agent_material_signals_flag_bounded_review_and_copyright_risks() -> Non
     assert "审核状态需复核" in signals.risk_signals
     assert "版权归属未标注" in signals.risk_signals
     assert "评分偏低" in signals.risk_signals
+
+
+def test_agent_material_signals_flag_content_moderation_risks_without_extra_io() -> None:
+    material = MaterialRecord(
+        id=903,
+        title="通信原理资料包",
+        description="资料含内部泄题和保过服务，加微信 studyhub_user 领取。",
+        tags_json=json.dumps(["通信原理", "资料"], ensure_ascii=False),
+        file_storage_key="materials/risky.pdf",
+        file_type="pdf",
+        preview_status="done",
+        review_status="APPROVED",
+        is_free=True,
+        download_count=2,
+    )
+
+    signals = build_material_signals(material)
+
+    assert "外部联系方式需复核" in signals.risk_signals
+    assert "疑似违规交易风险" in signals.risk_signals
+    assert "疑似版权或来源风险" in signals.risk_signals

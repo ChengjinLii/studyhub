@@ -90,6 +90,8 @@ def build_material_signals(material: MaterialRecord) -> AgentMaterialSignals:
         quality_score += 1
         quality_signals.append("点赞反馈较多")
 
+    risk_signals.extend(_content_risk_signals(material))
+
     return AgentMaterialSignals(
         quality_score=quality_score,
         quality_signals=tuple(_dedupe(quality_signals)[:8]),
@@ -110,6 +112,34 @@ def _looks_like_pdf(material: MaterialRecord) -> bool:
     filename = _clean_text(getattr(material, "original_filename", None), max_chars=255).lower()
     key = _clean_text(getattr(material, "file_storage_key", None), max_chars=512).lower()
     return file_type == "pdf" or filename.endswith(".pdf") or key.endswith(".pdf")
+
+
+def _content_risk_signals(material: MaterialRecord) -> list[str]:
+    text = _material_text(material)
+    normalized = text.lower()
+    signals: list[str] = []
+    if _contains_any(normalized, ("加微信", "微信号", "qq", "vx", "联系方式", "联系我", "群号")):
+        signals.append("外部联系方式需复核")
+    if _contains_any(normalized, ("代考", "代写", "枪手", "保过", "包过", "买卖答案", "出售答案")):
+        signals.append("疑似违规交易风险")
+    if _contains_any(normalized, ("盗版", "破解", "泄露", "未授权转载", "内部泄题", "原题泄露")):
+        signals.append("疑似版权或来源风险")
+    return signals
+
+
+def _material_text(material: MaterialRecord) -> str:
+    values = [
+        getattr(material, "title", None),
+        getattr(material, "description", None),
+        getattr(material, "keywords", None),
+        getattr(material, "custom_preview_text", None),
+        " ".join(_json_string_list(getattr(material, "tags_json", None))),
+    ]
+    return " ".join(_clean_text(value, max_chars=400) for value in values if value).lower()
+
+
+def _contains_any(text: str, needles: tuple[str, ...]) -> bool:
+    return any(needle.lower() in text for needle in needles)
 
 
 def _json_string_list(value: str | None) -> list[str]:
