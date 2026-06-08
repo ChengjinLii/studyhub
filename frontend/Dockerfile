@@ -1,3 +1,6 @@
+# Development-oriented Next.js image for local/dev validation.
+# Production deployments should provide NEXT_PUBLIC_API_BASE explicitly and avoid
+# treating this Dockerfile as the source of runtime environment policy.
 FROM node:20-alpine AS deps
 WORKDIR /app
 COPY package.json package-lock.json* ./

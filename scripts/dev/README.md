@@ -5,6 +5,8 @@
 - `docker-dev-*`：推荐的长期开发方式，使用 Docker Compose、本地 MySQL 和完整依赖
 - `local-dev-*`：更轻的 shell quickstart，适合快速看页面、改样式或做短链路调试
 
+仓库内 `backend/Dockerfile` 和 `frontend/Dockerfile` 面向本地/开发验证；preview / production 运行优先使用 `scripts/runtime/` 下的显式脚本和 `private/.env.*` 配置。
+
 ## 推荐方式：Docker Local Dev
 
 启动：

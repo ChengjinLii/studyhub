@@ -1,3 +1,6 @@
+# Development image for docker-compose local-dev.
+# Production should use scripts/runtime/production-up.sh or a dedicated runtime image;
+# this file intentionally installs dev extras and runs uvicorn with --reload.
 FROM python:3.11-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
