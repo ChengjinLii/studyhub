@@ -243,6 +243,8 @@ class AiService:
             "personalMemoryEnabled": enabled,
             "mode": "read_only_derived",
             "scope": "current_browser",
+            "affectedScopes": ["current_browser_personal_memory"],
+            "retainedScopes": ["platform_collective_memory", "source_material_records"],
             "privacyBoundary": "This preference only controls whether the StudyHub Agent uses derived personal memory for this browser session.",
         }
 
@@ -254,6 +256,8 @@ class AiService:
             "deletedPersistedMemory": False,
             "disabledCurrentBrowserMemory": True,
             "persistence": "not_persisted",
+            "affectedScopes": ["current_browser_personal_memory"],
+            "retainedScopes": ["platform_collective_memory", "source_material_records", "account_profile", "material_interactions"],
             "deleteExplanation": "当前 StudyHub Agent 个人记忆为只读派生上下文，尚未持久化保存用户对话记忆；本次操作已关闭当前浏览器继续使用派生个人记忆。",
             "privacyBoundary": "No persisted Agent personal memory was deleted because this phase stores no dedicated Agent memory records. Platform collective memory is not affected.",
         }
@@ -276,6 +280,7 @@ class AiService:
             "mode": "read_only_derived",
             "sourceTypes": ["account_profile", "candidate_material_interactions", "visible_material_metadata"],
             "controls": controls,
+            "memoryExplanation": _agent_memory_explanation(),
             "privacyBoundary": "Only the current authenticated user's derived profile and material interaction signals are shown; private memory is not mixed into platform collective memory.",
         }
         if not settings.ai_agent_memory_context_enabled or not self.memory_service:
@@ -1353,6 +1358,45 @@ def _material_fit_targets(source_types: list[str], question_types: list[str], di
     if any(value in {"综合", "偏难"} for value in difficulty_signals):
         targets.append("有一定基础后强化")
     return targets[:4]
+
+
+def _agent_memory_explanation() -> dict[str, Any]:
+    return {
+        "personalMemory": [
+            {
+                "field": "profile",
+                "source": "account_profile",
+                "scope": "current_authenticated_user",
+                "persistence": "existing_account_fields",
+            },
+            {
+                "field": "candidate_interactions",
+                "source": "favorites_downloads_purchases_ratings_for_candidate_materials",
+                "scope": "current_authenticated_user",
+                "persistence": "read_only_derived",
+            },
+            {
+                "field": "inferred_preferences",
+                "source": "current_candidate_material_interactions",
+                "scope": "current_authenticated_user",
+                "persistence": "read_only_derived",
+            },
+        ],
+        "platformMemoryPreview": [
+            {
+                "field": "top_tags_course_quality_risk_and_pdf_signals",
+                "source": "visible_material_metadata_and_current_request_pdf_evidence",
+                "scope": "anonymous_platform_aggregate",
+                "persistence": "read_only_derived",
+            }
+        ],
+        "deleteBehavior": {
+            "currentBrowserDisable": True,
+            "dedicatedAgentMemoryRecordsDeleted": False,
+            "platformCollectiveMemoryAffected": False,
+        },
+        "privacyBoundary": "Personal memory fields are derived for the current user only and are not copied into platform collective memory.",
+    }
 
 
 def _course_card_values(course_memory_card: CourseMemoryCard | None, field: str) -> list[str]:

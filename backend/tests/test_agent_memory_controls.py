@@ -65,6 +65,17 @@ def test_ai_memory_preview_shows_current_user_derived_memory(client, auth_servic
         "title": "通信原理真题解析记忆预览",
         "signals": ["favorited"],
     }
+    assert data["memoryExplanation"]["personalMemory"][0] == {
+        "field": "profile",
+        "source": "account_profile",
+        "scope": "current_authenticated_user",
+        "persistence": "existing_account_fields",
+    }
+    assert data["memoryExplanation"]["deleteBehavior"] == {
+        "currentBrowserDisable": True,
+        "dedicatedAgentMemoryRecordsDeleted": False,
+        "platformCollectiveMemoryAffected": False,
+    }
     assert data["controls"]["canDisableCurrentBrowser"] is True
     assert data["controls"]["canDeletePersistedMemory"] is False
     assert "alice@example.com" not in serialized
@@ -88,6 +99,9 @@ def test_ai_memory_preference_cookie_disables_preview(client, auth_service) -> N
     assert data["personalMemoryEnabled"] is False
     assert data["disabledReason"] == "user_preference"
     assert data["personalMemory"] is None
+    assert preference_response.json()["data"]["affectedScopes"] == ["current_browser_personal_memory"]
+    assert "platform_collective_memory" in preference_response.json()["data"]["retainedScopes"]
+    assert data["memoryExplanation"]["deleteBehavior"]["platformCollectiveMemoryAffected"] is False
 
 
 def test_ai_memory_delete_disables_current_browser_without_persisted_delete(client, auth_service) -> None:
@@ -108,6 +122,13 @@ def test_ai_memory_delete_disables_current_browser_without_persisted_delete(clie
     assert delete_data["deletedPersistedMemory"] is False
     assert delete_data["disabledCurrentBrowserMemory"] is True
     assert delete_data["persistence"] == "not_persisted"
+    assert delete_data["affectedScopes"] == ["current_browser_personal_memory"]
+    assert delete_data["retainedScopes"] == [
+        "platform_collective_memory",
+        "source_material_records",
+        "account_profile",
+        "material_interactions",
+    ]
     assert "Platform collective memory is not affected" in delete_data["privacyBoundary"]
 
     preview_data = preview_response.json()["data"]
