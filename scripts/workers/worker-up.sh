@@ -10,6 +10,7 @@ LOG_DIR="$RUNTIME_ROOT/logs"
 PID_FILE="$RUN_DIR/worker.pid"
 JOB_NAME="${WORKER_JOB:-all}"
 INTERVAL_SECONDS="${WORKER_INTERVAL_SECONDS:-60}"
+RUN_SCHEMA_PREFLIGHT="${STUDYHUB_WORKER_SCHEMA_PREFLIGHT:-1}"
 
 mkdir -p "$RUN_DIR" "$LOG_DIR"
 
@@ -21,6 +22,16 @@ fi
 if [[ "$ENVIRONMENT" == "preview" && ! -f "$PRIVATE_DIR/.env.preview" ]]; then
   echo "missing preview env file: $PRIVATE_DIR/.env.preview"
   exit 1
+fi
+
+if [[ "$ENVIRONMENT" == "production" ]]; then
+  if [[ "$RUN_SCHEMA_PREFLIGHT" == "0" || "$RUN_SCHEMA_PREFLIGHT" == "false" ]]; then
+    echo "worker schema preflight skipped: STUDYHUB_WORKER_SCHEMA_PREFLIGHT=$RUN_SCHEMA_PREFLIGHT"
+  else
+    STUDYHUB_ENVIRONMENT="$ENVIRONMENT" \
+    STUDYHUB_PRIVATE_DIR_PATH="$PRIVATE_DIR" \
+    bash "$ROOT_DIR/scripts/db/db-verify-p0-schema.sh"
+  fi
 fi
 
 if [[ -f "$PID_FILE" ]]; then
