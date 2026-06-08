@@ -99,6 +99,38 @@ def test_agent_safety_adds_read_pdf_source_hint_when_model_omits_citation() -> N
     ]
 
 
+def test_agent_safety_downgrades_answer_without_pdf_evidence() -> None:
+    sanitized = AgentSafetyService().sanitize_recommendation_body(
+        {
+            "answer": "通信原理近年常考计算题，建议优先刷题型。",
+            "recommendations": [{"material_id": 101, "reason": "标题和标签匹配通信原理真题"}],
+        },
+        candidate_materials=[_material()],
+        pdf_evidence=[],
+    )
+
+    assert sanitized is not None
+    assert sanitized["answer"] == (
+        "通信原理近年常考计算题，建议优先刷题型。 "
+        "说明：当前没有可用 PDF 页级证据，这里仅基于候选资料元数据和可见记忆信号给出保守建议。"
+    )
+    assert sanitized["recommendations"] == [{"material_id": 101, "reason": "标题和标签匹配通信原理真题"}]
+
+
+def test_agent_safety_does_not_repeat_low_evidence_caveat() -> None:
+    sanitized = AgentSafetyService().sanitize_recommendation_body(
+        {
+            "answer": "我只能基于候选资料元数据给出保守建议，建议先确认课程范围。",
+            "recommendations": [{"material_id": 101, "reason": "标题和标签匹配通信原理真题"}],
+        },
+        candidate_materials=[_material()],
+        pdf_evidence=[],
+    )
+
+    assert sanitized is not None
+    assert sanitized["answer"] == "我只能基于候选资料元数据给出保守建议，建议先确认课程范围。"
+
+
 def test_agent_safety_filters_anchor_internal_field_names_from_answer() -> None:
     sanitized = AgentSafetyService().sanitize_recommendation_body(
         {

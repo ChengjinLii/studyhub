@@ -320,7 +320,10 @@ def test_ai_recommendation_prompt_receives_memory_context(monkeypatch) -> None:
     assert "与你已有学习行为匹配：已收藏过、已下载过、你给过 5 分、专业匹配" in captured["user_prompt"]["candidate_materials"][0]["reason"]
     assert "用户个人记忆" in captured["system_prompt"]
     assert "current_query_memory" in captured["system_prompt"]
-    assert body["answer"] == "已结合记忆上下文推荐通信原理真题。"
+    assert body["answer"] == (
+        "已结合记忆上下文推荐通信原理真题。 "
+        "说明：当前没有可用 PDF 页级证据，这里仅基于候选资料元数据和可见记忆信号给出保守建议。"
+    )
 
 
 def test_ai_local_recommendation_reason_uses_current_user_memory_signals(monkeypatch) -> None:

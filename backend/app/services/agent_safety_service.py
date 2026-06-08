@@ -62,6 +62,8 @@ class AgentSafetyService:
             if not evidence_sources:
                 evidence_sources = self._fallback_evidence_sources(pdf_evidence)
             answer = self._ensure_answer_has_source_hint(answer, evidence_sources)
+        elif answer:
+            answer = self._ensure_low_evidence_caveat(answer)
         if not answer and not recommendations:
             return None
 
@@ -158,6 +160,14 @@ class AgentSafetyService:
         trimmed_answer = answer[: max(0, max_chars - len(hint) - 1)].rstrip()
         return f"{trimmed_answer} {hint}".strip()
 
+    def _ensure_low_evidence_caveat(self, answer: str) -> str:
+        if not answer or _answer_mentions_low_evidence_boundary(answer):
+            return answer
+        caveat = "说明：当前没有可用 PDF 页级证据，这里仅基于候选资料元数据和可见记忆信号给出保守建议。"
+        max_chars = 1800
+        trimmed_answer = answer[: max(0, max_chars - len(caveat) - 1)].rstrip()
+        return f"{trimmed_answer} {caveat}".strip()
+
     def _sanitize_followups(self, value: Any) -> list[str]:
         if not isinstance(value, list):
             return []
@@ -198,6 +208,20 @@ def _answer_mentions_source(answer: str, evidence_sources: list[dict[str, Any]])
         if page is not None and (f"第 {page} 页" in answer or f"第{page}页" in answer):
             return True
     return False
+
+
+def _answer_mentions_low_evidence_boundary(answer: str) -> bool:
+    markers = (
+        "没有可用 pdf",
+        "缺少 pdf",
+        "未读取 pdf",
+        "候选资料元数据",
+        "基于候选资料",
+        "基于 studyhub 资料库",
+        "保守建议",
+    )
+    normalized = answer.lower()
+    return any(marker in normalized for marker in markers)
 
 
 def _source_hint(evidence_sources: list[dict[str, Any]]) -> str:

@@ -289,4 +289,7 @@ def test_ai_prompt_receives_query_plan(monkeypatch) -> None:
     assert captured["user_prompt"]["query_plan"]["intent"] == "exam_trend_analysis"
     assert "aggregate_year_signals" in captured["user_prompt"]["query_plan"]["evidence_tasks"]
     assert "query_plan" in captured["system_prompt"]
-    assert body["answer"] == "已按检索计划分析通信原理往年题。"
+    assert body["answer"] == (
+        "已按检索计划分析通信原理往年题。 "
+        "说明：当前没有可用 PDF 页级证据，这里仅基于候选资料元数据和可见记忆信号给出保守建议。"
+    )
