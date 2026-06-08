@@ -226,11 +226,17 @@ class PayoutService:
         entity.review_notes = review_notes or entity.review_notes
 
         if status_value == PAYOUT_STATUS_APPROVED:
-            earnings = self._build_earnings(session, entity.user_id)
-            if int(earnings["payoutAmount"]) < self.settings.payout_min_amount_cents:
-                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="可提现金额不足 10 元")
+            existing_transfer = self.finance_repo.find_transfer_by_application(session, entity.id)
+            if existing_transfer is None:
+                # First approval: enforce the minimum on the currently-claimable amount.
+                earnings = self._build_earnings(session, entity.user_id)
+                if int(earnings["payoutAmount"]) < self.settings.payout_min_amount_cents:
+                    raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="可提现金额不足 10 元")
             entity.status = PAYOUT_STATUS_APPROVED
-            self._ensure_transfer(session, entity)
+            if self._ensure_transfer(session, entity) is None:
+                # Nothing left to claim (e.g. a concurrent approval took it) — do not persist
+                # an APPROVED application with no payout behind it.
+                raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="暂无可结算的到期金额")
         else:
             entity.status = PAYOUT_STATUS_REJECTED
 
@@ -242,8 +248,14 @@ class PayoutService:
         entity = self.finance_repo.get_payout_application(session, application_id)
         if entity is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="申请不存在")
-        now = datetime.now(UTC)
-        items = self.finance_repo.list_pending_due_settlements_for_uploader(session, entity.user_id, now)
+        transfer = self.finance_repo.find_transfer_by_application(session, entity.id)
+        if transfer is not None:
+            # Once a transfer exists, show exactly the settlements it pays — not whatever
+            # happens to be due now (which may include rows belonging to a later transfer).
+            items = self.finance_repo.list_settlements_for_transfer(session, transfer.id)
+        else:
+            now = datetime.now(UTC)
+            items = self.finance_repo.list_claimable_due_settlements_for_uploader(session, entity.user_id, now)
         return [self._to_settlement_detail(item) for item in items]
 
     def get_schedule(self, session: Session) -> dict[str, Any]:
@@ -474,23 +486,27 @@ class PayoutService:
         if transfer is not None:
             return transfer
         now = datetime.now(UTC)
-        claimable = self.finance_repo.list_claimable_due_settlements_for_uploader(session, entity.user_id, now)
-        if not claimable:
+        if not self.finance_repo.list_claimable_due_settlements_for_uploader(session, entity.user_id, now):
             return None
-        amount_cents = sum(int(item.payout_amount or 0) for item in claimable)
         transfer = PayoutTransferRecord(
             payout_application_id=entity.id,
             uploader_id=entity.user_id,
             out_biz_no=self.finance_repo.build_out_biz_no(),
-            amount=amount_cents,
+            amount=0,
             payee_account=self._resolve_payee_account(entity),
             payee_name=self._resolve_payee_name(entity),
             status=TRANSFER_STATUS_SUBMITTED,
         )
         transfer = self.finance_repo.save_payout_transfer(session, transfer)
-        for settlement in claimable:
-            settlement.payout_transfer_id = transfer.id
-            self.finance_repo.save_settlement(session, settlement)
+        claimed = self.finance_repo.claim_due_settlements_for_transfer(session, entity.user_id, transfer.id, now)
+        if not claimed:
+            # Lost the claim race to a concurrent approval — void the empty transfer.
+            transfer.status = TRANSFER_STATUS_FAILED
+            transfer.failure_reason = "无可认领的到期结算单"
+            self.finance_repo.save_payout_transfer(session, transfer)
+            return None
+        transfer.amount = sum(int(item.payout_amount or 0) for item in claimed)
+        transfer = self.finance_repo.save_payout_transfer(session, transfer)
         self._apply_transfer_provider_result(session, transfer, self.transfer_provider.submit_transfer(transfer))
         return transfer
 
@@ -507,7 +523,12 @@ class PayoutService:
         if normalized in {"FAIL", TRANSFER_STATUS_FAILED}:
             transfer.status = TRANSFER_STATUS_FAILED
             transfer.failure_reason = result.failure_reason or transfer.failure_reason or "支付宝转账失败"
-        elif normalized in {"SUBMITTED", TRANSFER_STATUS_SUBMITTED}:
+            self.finance_repo.save_payout_transfer(session, transfer)
+            # Release still-PENDING settlements so the money returns to claimable and is
+            # picked up by a later payout instead of being stranded behind a dead transfer.
+            self.finance_repo.unbind_pending_settlements_from_transfer(session, transfer.id)
+            return
+        if normalized in {"SUBMITTED", TRANSFER_STATUS_SUBMITTED}:
             transfer.status = TRANSFER_STATUS_SUBMITTED
         else:
             transfer.status = TRANSFER_STATUS_PENDING
@@ -525,8 +546,9 @@ class PayoutService:
         bound = self.finance_repo.list_settlements_for_transfer(session, transfer.id)
         if not bound:
             # 遗留兼容：部署前提交的在途转账没有绑定记录，按旧口径认领当前到期结算单。
+            # 仅认领未被任何转账绑定的到期结算单，避免抢走其他在途转账已绑定的单子；
             # 认领即盖章，因此重复回调不会再次进入该分支。
-            bound = self.finance_repo.list_pending_due_settlements_for_uploader(session, application.user_id, now)
+            bound = self.finance_repo.list_claimable_due_settlements_for_uploader(session, application.user_id, now)
             for settlement in bound:
                 settlement.payout_transfer_id = transfer.id
                 self.finance_repo.save_settlement(session, settlement)

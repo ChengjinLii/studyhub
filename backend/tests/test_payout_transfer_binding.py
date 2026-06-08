@@ -124,17 +124,21 @@ def _approve_application(client: TestClient, admin_headers: dict[str, str], appl
     assert review.json()["data"]["status"] == "APPROVED"
 
 
-def _gateway_success(client: TestClient, out_biz_no: str) -> None:
+def _gateway_status(client: TestClient, out_biz_no: str, status_value: str) -> None:
     gateway = client.post(
         "/api/pay/alipay/gateway",
         data={
             "biz_type": "alipay.fund.trans.order.changed",
             "out_biz_no": out_biz_no,
-            "status": "SUCCESS",
+            "status": status_value,
         },
     )
     assert gateway.status_code == 200
     assert gateway.text == "success"
+
+
+def _gateway_success(client: TestClient, out_biz_no: str) -> None:
+    _gateway_status(client, out_biz_no, "SUCCESS")
 
 
 def test_success_callback_settles_only_settlements_bound_at_approval(
@@ -270,3 +274,120 @@ def test_legacy_unbound_transfer_falls_back_and_repeat_callback_is_idempotent(
         # 幂等关键断言：已盖章的转账重复回调不得再认领新结算单
         assert s2.status == "PENDING"
         assert s2.payout_transfer_id is None
+
+
+def test_failed_transfer_releases_settlements_back_to_claimable(
+    client: TestClient,
+    auth_service: AuthService,
+) -> None:
+    """终态失败恢复：转账 FAILED 时，已绑定的 PENDING 结算单必须解绑并恢复可提现，避免资金搁浅。"""
+    seed_read_users(auth_service, with_follow_graph=True)
+    alice_headers = build_auth_headers(1, 1)
+    baishan_headers = build_auth_headers(2, 2)
+    admin_headers = build_auth_headers(3, 8)
+    finance_repo = get_finance_repo()
+
+    material_id = _create_paid_material(client, baishan_headers, title="失败恢复资料", price_cents=2000)
+    out_trade_no, order_id = _pay_order(client, alice_headers, material_id, total_amount="20.00")
+    _make_settlement_due(out_trade_no)
+
+    application_id = _create_payout_application(client, baishan_headers)
+    _approve_application(client, admin_headers, application_id)
+
+    with session_scope() as session:
+        transfer = finance_repo.find_transfer_by_application(session, application_id)
+        assert transfer is not None
+        out_biz_no = transfer.out_biz_no
+
+    # 支付宝网关回调转账失败
+    _gateway_status(client, out_biz_no, "FAILED")
+
+    with session_scope() as session:
+        settlements = finance_repo.list_settlements_for_uploader(session, 2)
+        s1 = next(item for item in settlements if item.order_id == order_id)
+        # 关键断言：结算单解绑并恢复 PENDING，资金不再搁浅
+        assert s1.status == "PENDING"
+        assert s1.payout_transfer_id is None
+
+    # 解绑后资金重新计入可提现，可被后续提现认领
+    latest = client.get("/api/creator-payout-applications/me", headers=baishan_headers)
+    assert latest.status_code == 200
+    assert latest.json()["data"]["earnings"]["payoutAmount"] == 1400
+
+
+def test_multiple_due_settlements_sum_into_single_transfer(
+    client: TestClient,
+    auth_service: AuthService,
+) -> None:
+    """多结算单求和：批准时所有到期结算单合并为一笔转账，金额为各自之和，SUCCESS 后全部 PAID。"""
+    seed_read_users(auth_service, with_follow_graph=True)
+    alice_headers = build_auth_headers(1, 1)
+    baishan_headers = build_auth_headers(2, 2)
+    admin_headers = build_auth_headers(3, 8)
+    finance_repo = get_finance_repo()
+
+    material_1 = _create_paid_material(client, baishan_headers, title="合并资料一", price_cents=2000)
+    out_trade_no_1, order_id_1 = _pay_order(client, alice_headers, material_1, total_amount="20.00")
+    _make_settlement_due(out_trade_no_1)
+
+    material_2 = _create_paid_material(client, baishan_headers, title="合并资料二", price_cents=1000)
+    out_trade_no_2, order_id_2 = _pay_order(client, alice_headers, material_2, total_amount="10.00")
+    _make_settlement_due(out_trade_no_2)
+
+    application_id = _create_payout_application(client, baishan_headers)
+    _approve_application(client, admin_headers, application_id)
+
+    with session_scope() as session:
+        transfer = finance_repo.find_transfer_by_application(session, application_id)
+        assert transfer is not None
+        transfer_id = int(transfer.id)
+        out_biz_no = transfer.out_biz_no
+        # 两笔结算单（1400 + 700）合并到同一笔转账
+        assert int(transfer.amount) == 2100
+        bound = finance_repo.list_settlements_for_transfer(session, transfer_id)
+        assert {item.order_id for item in bound} == {order_id_1, order_id_2}
+
+    _gateway_success(client, out_biz_no)
+
+    with session_scope() as session:
+        bound = finance_repo.list_settlements_for_transfer(session, transfer_id)
+        assert len(bound) == 2
+        assert all(item.status == "PAID" for item in bound)
+
+
+def test_reapproving_application_is_idempotent(
+    client: TestClient,
+    auth_service: AuthService,
+) -> None:
+    """重复批准幂等：再次批准已批准申请不得报错、不得重复提交转账、绑定保持稳定。"""
+    seed_read_users(auth_service, with_follow_graph=True)
+    alice_headers = build_auth_headers(1, 1)
+    baishan_headers = build_auth_headers(2, 2)
+    admin_headers = build_auth_headers(3, 8)
+    finance_repo = get_finance_repo()
+
+    material_id = _create_paid_material(client, baishan_headers, title="重复批准资料", price_cents=2000)
+    out_trade_no, _ = _pay_order(client, alice_headers, material_id, total_amount="20.00")
+    _make_settlement_due(out_trade_no)
+
+    application_id = _create_payout_application(client, baishan_headers)
+    _approve_application(client, admin_headers, application_id)
+
+    with session_scope() as session:
+        first = finance_repo.find_transfer_by_application(session, application_id)
+        assert first is not None
+        first_transfer_id = int(first.id)
+
+    # 第二次批准（管理员重复点击）：必须成功且不产生新转账
+    second = client.patch(
+        f"/api/admin/creator-payout-applications?id={application_id}",
+        headers=admin_headers,
+        json={"status": "APPROVED", "reviewNotes": "再次审核"},
+    )
+    assert second.status_code == 200, second.text
+    assert second.json()["data"]["status"] == "APPROVED"
+
+    with session_scope() as session:
+        again = finance_repo.find_transfer_by_application(session, application_id)
+        assert again is not None
+        assert int(again.id) == first_transfer_id  # 同一笔转账，未重复创建
