@@ -26,6 +26,8 @@ from app.services.read_support import parse_iso_datetime
 
 
 QUERY_TERM_ALIASES: dict[str, tuple[str, ...]] = {
+    "电子系统设计": ("电子系统设计", "esd"),
+    "esd": ("esd", "电子系统设计"),
     "通信原理": ("通信原理", "cps"),
     "cps": ("通信原理", "cps"),
     "信号与系统": ("信号与系统", "signals", "signal"),
@@ -42,6 +44,9 @@ QUERY_TERM_ALIASES: dict[str, tuple[str, ...]] = {
     "期末": ("期末", "期末考", "期末考试"),
     "期中": ("期中", "期中考"),
     "常考": ("常考", "高频", "考点", "重点", "题型"),
+    "考题": ("考题", "题目", "真题", "试卷", "样卷"),
+    "考题风格": ("考题风格", "出题风格", "题型", "真题", "试卷", "样卷"),
+    "出题风格": ("出题风格", "考题风格", "题型", "真题", "试卷", "样卷"),
     "题型": ("题型", "题目类型", "题类", "选择题", "填空题", "计算题", "证明题", "简答题"),
     "解析": ("解析", "答案", "标答", "参考答案", "讲解"),
     "答案": ("答案", "解析", "标答", "参考答案"),
@@ -51,6 +56,8 @@ QUERY_TERM_ALIASES: dict[str, tuple[str, ...]] = {
 }
 
 COURSE_QUERY_TERMS = {
+    "电子系统设计",
+    "esd",
     "通信原理",
     "cps",
     "信号与系统",
@@ -133,12 +140,14 @@ class AiService:
         memory_context: AgentMemoryContext | None = None
         course_memory_card: CourseMemoryCard | None = None
         try:
-            materials = self._rank_materials(session, payload.query, payload.filters or {})
-            pdf_evidence = self._collect_pdf_evidence(materials, payload.query, current_user_id=current_user_id)
+            context_query = getattr(payload, "contextQuery", None)
+            retrieval_query = _agent_retrieval_query(payload.query, context_query)
+            materials = self._rank_materials(session, retrieval_query, payload.filters or {})
+            pdf_evidence = self._collect_pdf_evidence(materials, retrieval_query, current_user_id=current_user_id)
             memory_context = (
                 self._collect_memory_context(
                     session,
-                    query=payload.query,
+                    query=retrieval_query,
                     materials=materials,
                     current_user_id=current_user_id,
                     pdf_evidence=pdf_evidence,
@@ -147,7 +156,7 @@ class AiService:
                 else None
             )
             query_plan = self._build_query_plan(
-                payload.query,
+                retrieval_query,
                 materials=materials,
                 pdf_evidence=pdf_evidence,
                 memory_context=memory_context,
@@ -159,12 +168,13 @@ class AiService:
                 query_plan=query_plan,
             )
             recommendations = [
-                self._recommendation_payload(material, payload.query, pdf_evidence, memory_context)
+                self._recommendation_payload(material, retrieval_query, pdf_evidence, memory_context)
                 for material in materials[:3]
             ]
             llm_body = self._generate_agent_recommendation(
                 payload.query,
                 materials,
+                conversation_context=context_query,
                 pdf_evidence=pdf_evidence,
                 memory_context=memory_context,
                 query_plan=query_plan,
@@ -421,6 +431,7 @@ class AiService:
         query: str,
         materials: list[MaterialRecord],
         *,
+        conversation_context: str | None = None,
         pdf_evidence: list[MaterialPageEvidence],
         memory_context: AgentMemoryContext | None,
         query_plan: AgentQueryPlan | None,
@@ -439,6 +450,7 @@ class AiService:
             "你是 StudyHub 学习辅导 Agent。你只能基于给定的 StudyHub 候选资料回答，"
             "不要编造不存在的资料。用户可能需要资料推荐、真题讲解思路、复习规划或错题辅导。"
             "如果候选资料不足，要明确说明并追问课程范围。"
+            "如果提供了 conversation_context，只能用来补全当前问题省略的课程、资料和上一轮学习目标，回答必须以 user_query 为准。"
             "如果提供了 pdf_evidence，你必须优先基于这些页级证据总结，并在关键结论中引用资料名和页码。"
             "如果 pdf_evidence 提供了 anchor_text 或 anchor_terms，应优先用它们定位页内关键片段。"
             "如果候选资料提供了 quality_signals 或 risk_signals，你可以用它们辅助排序和提示，但不能把风险提示夸大成确定违规。"
@@ -454,13 +466,14 @@ class AiService:
             "如果提供了 course_memory_card，你可以用它总结课程级年份、逐年题型、章节模块、答案解析信号、知识点、经验策略和推荐顺序，"
             "并结合资料质量与风险分布做保守排序和必要提醒，"
             "并根据 evidence_coverage 和 confidence_assessment 避免过度概括。"
-            "不要输出 memory_context、query_plan、problem_context、candidate_materials、user_fit_signals、"
+            "不要输出 memory_context、conversation_context、query_plan、problem_context、candidate_materials、user_fit_signals、"
             "pdf_evidence、course_memory_card、material_scope、current_query_memory、learning_preferences、evidence_coverage、confidence_assessment、yearly_question_type_matrix、chapter_distribution、chapter_signals、solution_signal_distribution、solution_signals、study_strategy_distribution、material_quality_distribution、material_risk_distribution、"
             "experience_materials、anchor_text、anchor_terms 或 privacy_boundary 等内部字段名。"
             "必须输出严格 JSON，不要输出 Markdown，不要包裹代码块。"
         )
         user_prompt = {
             "user_query": query,
+            "conversation_context": _compact_agent_context(conversation_context),
             "query_plan": query_plan.to_prompt_payload() if query_plan else {},
             "candidate_materials": candidates,
             "pdf_evidence": [item.to_prompt_payload() for item in pdf_evidence],
@@ -1203,6 +1216,53 @@ class AiService:
         except json.JSONDecodeError:
             return []
         return [str(item) for item in parsed if isinstance(item, (str, int, float))]
+
+
+def _agent_retrieval_query(query: str, context_query: str | None) -> str:
+    current = re.sub(r"\s+", " ", str(query or "")).strip()
+    context = _compact_agent_context(context_query)
+    if not context:
+        return current
+    return f"{current}\n最近上下文：{context}"[:1600]
+
+
+def _compact_agent_context(value: str | None) -> str:
+    if not value:
+        return ""
+    text = re.sub(r"\s+", " ", str(value)).strip()
+    if not text:
+        return ""
+    text = re.sub(r"https?://[^\s,;，；。]+|www\.[^\s,;，；。]+", "[redacted-url]", text, flags=re.IGNORECASE)
+    text = re.sub(r"[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}", "[redacted-email]", text)
+    text = re.sub(r"(?<!\d)1[3-9]\d{9}(?!\d)", "[redacted-phone]", text)
+    text = re.sub(
+        r"(?i)(api[_-]?key|token|secret|authorization|bearer)\s*[:=]\s*[^\s,;，；。]+",
+        "[redacted-secret]",
+        text,
+    )
+    text = re.sub(
+        r"(?i)(?<![A-Za-z0-9_-])(?:sk|tp)-[A-Za-z0-9_-]{16,}(?![A-Za-z0-9_-])",
+        "[redacted-secret]",
+        text,
+    )
+    text = re.sub(
+        r"(?<![A-Za-z0-9])\d{6}(?:18|19|20)\d{2}(?:0[1-9]|1[0-2])(?:0[1-9]|[12]\d|3[01])\d{3}[\dXx](?![A-Za-z0-9])",
+        "[redacted-id-card]",
+        text,
+    )
+    text = re.sub(
+        r"(?i)(学号|工号|student[_ -]?id|employee[_ -]?id)\s*[:：=]?\s*[A-Za-z0-9_-]{5,24}",
+        lambda match: f"{match.group(1)}=[redacted-id]",
+        text,
+    )
+    text = re.sub(
+        r"(?i)(?<![A-Za-z0-9_])(qq|wechat|weixin|wx|vx)(?![A-Za-z0-9_])\s*[:：=]?\s*[A-Za-z0-9_-]{5,32}",
+        lambda match: f"{match.group(1)}=[redacted-contact]",
+        text,
+    )
+    text = re.sub(r"(微信|微信号|微 信)\s*[:：=]?\s*[A-Za-z0-9_-]{5,32}", lambda match: f"{match.group(1)}=[redacted-contact]", text)
+    text = re.sub(r"(?<!\d)\d{12,24}(?!\d)", "[redacted-number]", text)
+    return text[-1200:]
 
 
 def _evidence_values(pdf_evidence: list[MaterialPageEvidence], field: str) -> list[str]:

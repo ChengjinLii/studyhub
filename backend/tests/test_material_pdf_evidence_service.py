@@ -196,7 +196,7 @@ def test_ai_recommendation_response_includes_pdf_evidence_sources(monkeypatch) -
     monkeypatch.setattr(
         service,
         "_generate_agent_recommendation",
-        lambda query, materials, *, pdf_evidence, memory_context, query_plan, course_memory_card: None,
+        lambda query, materials, *, conversation_context, pdf_evidence, memory_context, query_plan, course_memory_card: None,
     )
 
     response = service.recommend(object(), SimpleNamespace(query="通信原理往年题常考什么", filters={}), current_user_id=7)  # type: ignore[arg-type]

@@ -31,6 +31,7 @@ class AiRecommendRequestPayload(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
     query: str = Field(min_length=1)
+    contextQuery: str | None = Field(default=None, max_length=1200)
     filters: dict[str, Any] | None = None
 
 

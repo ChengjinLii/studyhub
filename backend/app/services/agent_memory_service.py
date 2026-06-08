@@ -174,10 +174,13 @@ class AgentMemoryService:
         for material in materials:
             tag_counter.update(_json_string_list(material.tags_json))
             for value in (material.major, material.college, material.course_category, material.grade_value):
-                if value:
-                    course_counter.update([str(value).strip()])
+                cleaned = _clean_memory_text(value)
+                if cleaned:
+                    course_counter.update([cleaned])
             if material.school:
-                school_counter.update([material.school.strip()])
+                cleaned_school = _clean_memory_text(material.school)
+                if cleaned_school:
+                    school_counter.update([cleaned_school])
             material_text = _material_text(material)
             signal_counter.update(_signal_terms(material_text))
             study_strategy_counter.update(_study_strategy_terms(material_text))
@@ -185,17 +188,17 @@ class AgentMemoryService:
             material_quality_counter.update(material_signals.quality_signals)
             material_risk_counter.update(material_signals.risk_signals)
         for item in pdf_evidence:
-            signal_counter.update(_signal_terms(item.text))
-            year_counter.update(item.years)
-            question_type_counter.update(item.question_types)
-            chapter_counter.update(item.chapter_signals)
-            solution_counter.update(item.solution_signals)
-            question_number_counter.update(item.question_numbers)
-            score_point_counter.update(str(value) for value in item.score_points)
-            difficulty_counter.update(item.difficulty_signals)
-            visual_counter.update(item.visual_signals)
+            signal_counter.update(_signal_terms(_clean_memory_text(item.text, max_chars=240)))
+            year_counter.update(_memory_values(item.years))
+            question_type_counter.update(_memory_values(item.question_types))
+            chapter_counter.update(_memory_values(item.chapter_signals))
+            solution_counter.update(_memory_values(item.solution_signals))
+            question_number_counter.update(_memory_values(item.question_numbers))
+            score_point_counter.update(_memory_values(str(value) for value in item.score_points))
+            difficulty_counter.update(_memory_values(item.difficulty_signals))
+            visual_counter.update(_memory_values(item.visual_signals))
             if item.source_type != "unknown":
-                source_type_counter.update([item.source_type])
+                source_type_counter.update(_memory_values([item.source_type]))
         top_materials = [
             _high_signal_material_payload(material)
             for material in sorted(
@@ -280,7 +283,7 @@ class AgentMemoryService:
                 fields.append("major")
             if not fields:
                 continue
-            matched.append({"material_id": int(material.id), "title": material.title, "matched_fields": fields})
+            matched.append({"material_id": int(material.id), "title": _clean_memory_text(material.title, max_chars=120), "matched_fields": fields})
             if len(matched) >= 5:
                 break
         return matched
@@ -309,7 +312,7 @@ class AgentMemoryService:
             if int(material.uploader_id or 0) == current_user_id:
                 flags.append("uploaded_by_user")
             if flags:
-                interactions.append({"material_id": int(material.id), "title": material.title, "signals": flags})
+                interactions.append({"material_id": int(material.id), "title": _clean_memory_text(material.title, max_chars=120), "signals": flags})
         return interactions
 
     def _preference_payload(self, materials: list[MaterialRecord], interactions: list[dict[str, Any]]) -> dict[str, Any]:
@@ -334,7 +337,7 @@ def _high_signal_material_payload(material: MaterialRecord) -> dict[str, Any]:
     material_signals = build_material_signals(material)
     payload: dict[str, Any] = {
         "material_id": int(material.id),
-        "title": material.title,
+        "title": _clean_memory_text(material.title, max_chars=120),
         "downloads": int(material.download_count or 0),
         "rating_avg": float(material.rating_avg or 0),
         "tags": _json_string_list(material.tags_json)[:4],
@@ -364,7 +367,7 @@ def _experience_material_payloads(materials: list[MaterialRecord]) -> list[dict[
         material_signals = build_material_signals(material)
         payload: dict[str, Any] = {
             "material_id": int(material.id),
-            "title": material.title,
+            "title": _clean_memory_text(material.title, max_chars=120),
             "tags": _json_string_list(material.tags_json)[:4],
         }
         strategy_terms = _study_strategy_terms(_material_text(material))
@@ -378,34 +381,38 @@ def _experience_material_payloads(materials: list[MaterialRecord]) -> list[dict[
 
 def _user_profile_payload(user: Any) -> dict[str, str]:
     payload = {
-        "school": _clean_text(getattr(user, "school", None)),
-        "college": _clean_text(getattr(user, "college", None)),
-        "major": _clean_text(getattr(user, "major", None)),
-        "grade_stages": _clean_text(getattr(user, "grade_stages", None)),
+        "school": _clean_memory_text(getattr(user, "school", None)),
+        "college": _clean_memory_text(getattr(user, "college", None)),
+        "major": _clean_memory_text(getattr(user, "major", None)),
+        "grade_stages": _clean_memory_text(getattr(user, "grade_stages", None)),
     }
     return {key: value for key, value in payload.items() if value}
 
 
 def _evidence_page_payload(item: MaterialPageEvidence) -> dict[str, Any]:
-    payload: dict[str, Any] = {"material_id": item.material_id, "title": item.title, "page": item.page}
+    payload: dict[str, Any] = {
+        "material_id": item.material_id,
+        "title": _clean_memory_text(item.title, max_chars=120),
+        "page": item.page,
+    }
     if item.question_numbers:
-        payload["question_numbers"] = list(item.question_numbers)
+        payload["question_numbers"] = _memory_values(item.question_numbers)
     if item.score_points:
         payload["score_points"] = list(item.score_points)
     if item.difficulty_signals:
-        payload["difficulty_signals"] = list(item.difficulty_signals)
+        payload["difficulty_signals"] = _memory_values(item.difficulty_signals)
     if item.visual_signals:
-        payload["visual_signals"] = list(item.visual_signals)
+        payload["visual_signals"] = _memory_values(item.visual_signals)
     if item.chapter_signals:
-        payload["chapter_signals"] = list(item.chapter_signals)
+        payload["chapter_signals"] = _memory_values(item.chapter_signals)
     if item.solution_signals:
-        payload["solution_signals"] = list(item.solution_signals)
+        payload["solution_signals"] = _memory_values(item.solution_signals)
     if item.anchor_terms:
-        payload["anchor_terms"] = list(item.anchor_terms)
+        payload["anchor_terms"] = _memory_values(item.anchor_terms)
     if item.anchor_text:
-        payload["anchor_text"] = item.anchor_text
+        payload["anchor_text"] = _clean_memory_text(item.anchor_text, max_chars=240)
     if item.source_type != "unknown":
-        payload["source_type"] = item.source_type
+        payload["source_type"] = _clean_memory_text(item.source_type)
     return payload
 
 
@@ -418,16 +425,16 @@ def _json_string_list(value: str | None) -> list[str]:
         return []
     if not isinstance(parsed, list):
         return []
-    return [_clean_text(item) for item in parsed if _clean_text(item)]
+    return [cleaned for item in parsed if (cleaned := _clean_memory_text(item))]
 
 
 def _material_text(material: MaterialRecord) -> str:
     return " ".join(
         value
         for value in [
-            _clean_text(material.title),
-            _clean_text(material.description),
-            _clean_text(material.keywords),
+            _clean_memory_text(material.title),
+            _clean_memory_text(material.description),
+            _clean_memory_text(material.keywords),
             " ".join(_json_string_list(material.tags_json)),
         ]
         if value
@@ -580,9 +587,11 @@ def _query_learning_preferences(normalized_query: str) -> list[str]:
 
 
 def _compact_query_focus(query: str) -> list[str]:
-    terms = [_clean_text(item) for item in re.findall(r"[\u4e00-\u9fffA-Za-z0-9]+", query)]
+    terms = [_clean_memory_text(item) for item in re.findall(r"[\u4e00-\u9fffA-Za-z0-9]+", _redact_memory_sensitive_text(query))]
     result: list[str] = []
     for term in terms:
+        if term.startswith("redacted"):
+            continue
         if len(term) < 2 or term in result:
             continue
         result.append(term)
@@ -599,3 +608,73 @@ def _clean_text(value: Any, *, max_chars: int = 80) -> str:
     if value is None:
         return ""
     return re.sub(r"\s+", " ", str(value)).strip()[:max_chars]
+
+
+def _clean_memory_text(value: Any, *, max_chars: int = 80) -> str:
+    if value is None:
+        return ""
+    normalized = re.sub(r"\s+", " ", str(value)).strip()
+    return _redact_memory_sensitive_text(normalized)[:max_chars]
+
+
+def _memory_values(values: Any, *, limit: int = 8, max_chars: int = 80) -> list[str]:
+    result: list[str] = []
+    iterable = (values,) if isinstance(values, (str, int, float)) else values or ()
+    for value in iterable:
+        cleaned = _clean_memory_text(value, max_chars=max_chars)
+        if cleaned and cleaned not in result:
+            result.append(cleaned)
+        if len(result) >= limit:
+            break
+    return result
+
+
+def _redact_memory_sensitive_text(text: str) -> str:
+    if not text:
+        return ""
+    text = re.sub(
+        r"https?://[^\s,;，；。]+|www\.[^\s,;，；。]+",
+        "[redacted-url]",
+        text,
+        flags=re.IGNORECASE,
+    )
+    text = re.sub(r"[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}", "[redacted-email]", text)
+    text = re.sub(r"(?<!\d)1[3-9]\d{9}(?!\d)", "[redacted-phone]", text)
+    text = re.sub(
+        r"(?i)(api[_-]?key|token|secret|authorization|bearer)\s*[:=]\s*[^\s,;，；。]+",
+        "[redacted-secret]",
+        text,
+    )
+    text = re.sub(
+        r"(?i)(?<![A-Za-z0-9_-])(?:sk|tp)-[A-Za-z0-9_-]{16,}(?![A-Za-z0-9_-])",
+        "[redacted-secret]",
+        text,
+    )
+    text = _redact_memory_identity_numbers(text)
+    text = _redact_memory_labeled_ids(text)
+    text = _redact_memory_messenger_handles(text)
+    return re.sub(r"(?<!\d)\d{12,24}(?!\d)", "[redacted-number]", text)
+
+
+def _redact_memory_identity_numbers(text: str) -> str:
+    return re.sub(
+        r"(?<![A-Za-z0-9])\d{6}(?:18|19|20)\d{2}(?:0[1-9]|1[0-2])(?:0[1-9]|[12]\d|3[01])\d{3}[\dXx](?![A-Za-z0-9])",
+        "[redacted-id-card]",
+        text,
+    )
+
+
+def _redact_memory_labeled_ids(text: str) -> str:
+    pattern = re.compile(
+        r"(?i)(学号|工号|student[_ -]?id|employee[_ -]?id)\s*[:：=]?\s*[A-Za-z0-9_-]{5,24}"
+    )
+    return pattern.sub(lambda match: f"{match.group(1)}=[redacted-id]", text)
+
+
+def _redact_memory_messenger_handles(text: str) -> str:
+    latin_pattern = re.compile(
+        r"(?i)(?<![A-Za-z0-9_])(qq|wechat|weixin|wx|vx)(?![A-Za-z0-9_])\s*[:：=]?\s*[A-Za-z0-9_-]{5,32}"
+    )
+    text = latin_pattern.sub(lambda match: f"{match.group(1)}=[redacted-contact]", text)
+    chinese_pattern = re.compile(r"(微信|微信号|微 信)\s*[:：=]?\s*[A-Za-z0-9_-]{5,32}")
+    return chinese_pattern.sub(lambda match: f"{match.group(1)}=[redacted-contact]", text)

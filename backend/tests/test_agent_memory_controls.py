@@ -173,12 +173,13 @@ def test_ai_recommendation_skips_memory_collection_when_personal_memory_disabled
         query: str,
         materials: list[MaterialRecord],
         *,
+        conversation_context: str | None,
         pdf_evidence: list[Any],
         memory_context: Any,
         query_plan: Any,
         course_memory_card: Any,
     ) -> None:
-        del query, materials, pdf_evidence, query_plan, course_memory_card
+        del query, materials, conversation_context, pdf_evidence, query_plan, course_memory_card
         captured["memory_context"] = memory_context
         return None
 

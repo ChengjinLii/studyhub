@@ -199,6 +199,59 @@ def test_agent_memory_context_aggregates_platform_and_current_user_only() -> Non
     assert user_memory["candidate_interactions"][1]["signals"] == ["downloaded", "rated_5"]
 
 
+def test_agent_memory_context_redacts_sensitive_prompt_payload() -> None:
+    service = AgentMemoryService(_settings(), _FakeAuthRepo(), _FakeMaterialRepo())  # type: ignore[arg-type]
+    materials = [
+        _material(
+            201,
+            title="电子系统设计 alice@example.com 13812345678",
+            tags=["ESD", "微信 studyhub_user"],
+            description="ESD 真题解析 token=secret-value 学号 2023123456",
+        )
+    ]
+    evidence = [
+        MaterialPageEvidence(
+            material_id=201,
+            title="电子系统设计 alice@example.com 13812345678",
+            page=1,
+            text="联系 13812345678，身份证 11010119900307561X，卡号 6222021234567890123。",
+            score=20,
+            anchor_text=(
+                "答案解析见 https://example.test，QQ 123456789，学号 2023123456，"
+                "身份证 11010119900307561X，卡号 6222021234567890123，api_key=secret-value。"
+            ),
+            source_type="past_exam",
+        )
+    ]
+
+    context = service.collect(
+        object(),  # type: ignore[arg-type]
+        query="ESD 考题风格，联系 13812345678 token=secret-value",
+        materials=materials,
+        current_user_id=7,
+        pdf_evidence=evidence,
+    )
+    serialized = json.dumps(context.to_prompt_payload(), ensure_ascii=False)
+
+    assert "13812345678" not in serialized
+    assert "alice@example.com" not in serialized
+    assert "studyhub_user" not in serialized
+    assert "secret-value" not in serialized
+    assert "2023123456" not in serialized
+    assert "11010119900307561X" not in serialized
+    assert "6222021234567890123" not in serialized
+    assert "https://example.test" not in serialized
+    assert "123456789" not in serialized
+    assert "[redacted-phone]" in serialized
+    assert "[redacted-email]" in serialized
+    assert "[redacted-contact]" in serialized
+    assert "[redacted-secret]" in serialized
+    assert "[redacted-id]" in serialized
+    assert "[redacted-id-card]" in serialized
+    assert "[redacted-number]" in serialized
+    assert "[redacted-url]" in serialized
+
+
 def test_agent_memory_context_can_be_disabled_and_limits_interaction_checks() -> None:
     material_repo = _FakeMaterialRepo()
     disabled = AgentMemoryService(_settings(ai_agent_memory_context_enabled=False), _FakeAuthRepo(), material_repo)  # type: ignore[arg-type]
@@ -358,3 +411,48 @@ def test_ai_local_recommendation_reason_uses_current_user_memory_signals(monkeyp
 
     assert "user_fit_signals" not in body["recommendations"][0]
     assert "与你已有学习行为匹配：已收藏过、专业匹配" in body["recommendations"][0]["reason"]
+
+
+def test_ai_recommendation_uses_bounded_context_query_for_followups(monkeypatch) -> None:
+    class FakeReadRepo:
+        def load_seed(self) -> dict[str, Any]:
+            return {}
+
+    class FakeMaterialRepo:
+        def ensure_seed_bootstrap(self, session: object, seed: dict[str, Any]) -> None:
+            del session, seed
+
+        def list_visible_materials(self, session: object) -> list[MaterialRecord]:
+            del session
+            return [
+                _material(
+                    301,
+                    title="CPS 通信原理四年真题解析",
+                    tags=["通信原理", "真题"],
+                    downloads=100,
+                ),
+                _material(
+                    302,
+                    title="ESD-电子系统设计-2021年真题及答案",
+                    tags=["电子系统设计", "真题"],
+                    description="电子系统设计 2021 年真题和样卷答案",
+                    downloads=5,
+                ),
+            ]
+
+    monkeypatch.setattr("app.services.ai_service.get_settings", lambda: _settings(ai_agent_provider="local"))
+
+    service = AiService(read_repo=FakeReadRepo(), material_repo=FakeMaterialRepo())  # type: ignore[arg-type]
+    response = service.recommend(
+        object(),  # type: ignore[arg-type]
+        SimpleNamespace(
+            query="考题风格帮我分析一下",
+            contextQuery="用户上一轮在问 ESD，也就是电子系统设计，想看 2021 年真题及答案。",
+            filters={},
+        ),
+        current_user_id=7,
+    )
+    body = json.loads(str(response["output"]).removeprefix("<json>").removesuffix("</json>"))
+
+    assert body["recommendations"][0]["material_id"] == 302
+    assert "电子系统设计" in body["recommendations"][0]["title"]

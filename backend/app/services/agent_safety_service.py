@@ -11,6 +11,7 @@ FORBIDDEN_INTERNAL_MARKERS = (
     "memory_context",
     "user_personal_memory",
     "platform_collective_memory",
+    "conversation_context",
     "privacy_boundary",
     "candidate_materials",
     "pdf_evidence",

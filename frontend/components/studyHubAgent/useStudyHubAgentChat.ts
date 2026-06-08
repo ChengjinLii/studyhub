@@ -84,7 +84,8 @@ export const useStudyHubAgentChat = () => {
       }
       setLoading(true);
       try {
-        const data = await requestStudyHubAgentRecommendations(query);
+        const contextQuery = buildStudyHubAgentContext(messages, query);
+        const data = await requestStudyHubAgentRecommendations(query, contextQuery);
         const parsed = parseRecommendationOutput(data.output);
         const recommendations = normalizeRecommendations(parsed.recommendations);
         await Promise.all(recommendations.map((item) => loadMaterialDetail(item.materialId)));
@@ -114,7 +115,7 @@ export const useStudyHubAgentChat = () => {
         setLoading(false);
       }
     },
-    [loadMaterialDetail, loading, user]
+    [loadMaterialDetail, loading, messages, user]
   );
 
   return {
@@ -174,6 +175,33 @@ function buildStudyHubAgentAnswer(query: string, recommendations: StudyHubAgentR
   }
   const titles = recommendations.map((item) => `《${item.title || `资料 #${item.materialId}`}》`).join('、');
   return `我先基于 StudyHub 资料库找到 ${titles}。建议先用最匹配的资料建立知识框架，再结合真题或经验内容做查漏补缺；如果你告诉我考试时间和基础水平，我可以继续帮你拆成复习步骤。`;
+}
+
+function buildStudyHubAgentContext(messages: StudyHubAgentMessage[], query: string) {
+  const currentQuery = query.trim();
+  const lines = messages
+    .filter((message) => message.content.trim() && message.content.trim() !== currentQuery)
+    .slice(-8)
+    .map((message) => {
+      const role = message.role === 'user' ? '用户' : '助手';
+      const content = redactStudyHubAgentContextText(message.content).slice(0, 220);
+      const titles = (message.recommendations || [])
+        .map((item) => (item.title ? redactStudyHubAgentContextText(item.title) : undefined))
+        .filter((title): title is string => Boolean(title && title.trim()))
+        .slice(0, 3);
+      const titleHint = titles.length > 0 ? ` 推荐资料：${titles.join('；')}` : '';
+      return `${role}：${content}${titleHint}`;
+    })
+    .filter((line) => line.trim().length > 0);
+  return lines.join('\n').slice(-1000);
+}
+
+function redactStudyHubAgentContextText(value: string) {
+  return value
+    .replace(/https?:\/\/[^\s,;，；。]+|www\.[^\s,;，；。]+/gi, '[redacted-url]')
+    .replace(/[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}/g, '[redacted-email]')
+    .replace(/(^|[^\d])(1[3-9]\d{9})(?!\d)/g, '$1[redacted-phone]')
+    .replace(/(api[_-]?key|token|secret|authorization|bearer)\s*[:=]\s*[^\s,;，；。]+/gi, '[redacted-secret]');
 }
 
 function makeMessageId() {

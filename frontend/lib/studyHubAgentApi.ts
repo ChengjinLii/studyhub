@@ -6,11 +6,15 @@ interface AiRecommendationPayload {
   output?: string | null;
 }
 
-export const requestStudyHubAgentRecommendations = async (query: string) => {
+export const requestStudyHubAgentRecommendations = async (query: string, contextQuery?: string) => {
+  const body: { query: string; contextQuery?: string } = { query };
+  if (contextQuery && contextQuery.trim()) {
+    body.contextQuery = contextQuery.trim().slice(-1000);
+  }
   const response = await fetchBackend('/ai-recommendations', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ query }),
+    body: JSON.stringify(body),
   });
   return unwrapApiResponse<AiRecommendationPayload>(response, 'StudyHub 学习辅导暂时无法连接资料推荐服务');
 };
