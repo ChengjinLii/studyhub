@@ -13,6 +13,7 @@
 
 ## 常用入口
 
+- 本地环境诊断：`bash scripts/dev/doctor.sh`
 - 本地开发：`bash scripts/dev/docker-dev-up.sh`
 - 轻量启动：`bash scripts/dev/local-dev-up.sh`
 - 预发布运行：`bash scripts/runtime/preview-up.sh`
@@ -26,6 +27,8 @@
 - 浏览器加载性能预算：`npm --prefix frontend run test:perf`
 
 `check-shell-scripts.sh` 只执行 `bash -n`，不会运行脚本主体，也不会连接数据库或修改运行态。
+
+`scripts/dev/doctor.sh` 是只读诊断脚本，用来检查 Docker local-dev 和 shell quickstart 至少有一条路径是否可用；它不会启动服务、连接数据库、读取 private env 内容或修改运行态。
 
 `ci-check.sh` 面向 PR / CI / 本地代码质量门禁，包含 shell 语法、敏感文件、后端测试、前端 check、前端 unit、Playwright critical 和代码体积检查；它不会运行 production preflight、nginx 检查或 systemd 状态检查。
 

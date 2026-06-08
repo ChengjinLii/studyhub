@@ -9,6 +9,14 @@
 
 ## 推荐方式：Docker Local Dev
 
+开始前可以先运行只读诊断：
+
+```bash
+bash scripts/dev/doctor.sh
+```
+
+它会检查 Docker Compose、Node/npm、根目录 `.venv`、前端依赖、本地 pid 文件和默认端口响应情况；不会启动服务、连接数据库或读取 private env 内容。
+
 启动：
 
 ```bash
