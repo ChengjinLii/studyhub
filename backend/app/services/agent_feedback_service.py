@@ -27,6 +27,25 @@ USER_MEMORY_FEEDBACK_SUMMARIES = {
     "not_relevant": "用户认为这次推荐与需求不够相关。",
 }
 
+HOOK_DERIVED_SIGNALS: dict[str, tuple[str, str]] = {
+    "useful": ("positive_feedback", "有帮助"),
+    "not_useful": ("content_issues", "帮助不足"),
+    "too_easy": ("difficulty_feedback", "偏简单"),
+    "too_hard": ("difficulty_feedback", "偏困难"),
+    "not_relevant": ("content_issues", "相关性不足"),
+}
+
+FEEDBACK_NOTE_SIGNAL_PATTERNS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
+    ("learning_preferences", "补基础优先", ("基础差", "基础弱", "零基础", "看不懂", "听不懂")),
+    ("learning_preferences", "考前冲刺", ("速成", "冲刺", "考前", "来不及", "短期")),
+    ("learning_preferences", "刷题优先", ("刷题", "真题", "练习", "套卷", "做题")),
+    ("learning_preferences", "详细解析", ("详细解析", "一步步", "讲清楚", "讲明白", "解析更细")),
+    ("learning_preferences", "查漏补缺", ("查漏补缺", "错题", "薄弱", "短板")),
+    ("content_issues", "相关性不足", ("不相关", "没关系", "跑题", "不是这门课")),
+    ("content_issues", "证据不足", ("找不到", "没有来源", "页码不对", "引用不对", "资料不存在")),
+    ("content_issues", "解析质量风险", ("解析错误", "答案不对", "讲错", "不准确")),
+)
+
 
 class AgentFeedbackService:
     """Builds privacy-safe memory candidates from explicit Agent feedback.
@@ -100,32 +119,35 @@ class AgentFeedbackService:
         personal_memory_enabled: bool,
     ) -> list[dict[str, Any]]:
         candidates: list[dict[str, Any]] = []
+        derived_signals = _feedback_derived_signals(hook, redacted_note)
         if personal_memory_enabled:
             value = USER_MEMORY_FEEDBACK_SUMMARIES[hook]
             if redacted_note:
                 value = f"{value} 用户补充：{redacted_note}"
-            candidates.append(
-                {
-                    "scope": "user",
-                    "key": "agent_feedback_preference",
-                    "value": value[:240],
-                    "source": "agent_feedback",
-                    "confidence": _feedback_confidence(hook),
-                    "materialIds": selected_material_ids,
-                }
-            )
+            user_candidate: dict[str, Any] = {
+                "scope": "user",
+                "key": "agent_feedback_preference",
+                "value": value[:240],
+                "source": "agent_feedback",
+                "confidence": _feedback_confidence(hook),
+                "materialIds": selected_material_ids,
+            }
+            if derived_signals:
+                user_candidate["derivedSignals"] = derived_signals
+            candidates.append(user_candidate)
         if selected_material_ids:
-            candidates.append(
-                {
-                    "scope": "platform",
-                    "key": "recommendation_feedback_signal",
-                    "value": hook,
-                    "source": "agent_feedback_aggregate",
-                    "confidence": 0.5,
-                    "materialIds": selected_material_ids,
-                    "privacy": "anonymous_aggregate_candidate",
-                }
-            )
+            platform_candidate: dict[str, Any] = {
+                "scope": "platform",
+                "key": "recommendation_feedback_signal",
+                "value": hook,
+                "source": "agent_feedback_aggregate",
+                "confidence": 0.5,
+                "materialIds": selected_material_ids,
+                "privacy": "anonymous_aggregate_candidate",
+            }
+            if derived_signals:
+                platform_candidate["aggregateSignals"] = derived_signals
+            candidates.append(platform_candidate)
         return candidates
 
     def _record_feedback_metric(
@@ -185,6 +207,25 @@ def _redact_messenger_handles(text: str) -> str:
     text = latin_pattern.sub(lambda match: f"{match.group(1)}=[redacted-contact]", text)
     chinese_pattern = re.compile(r"(微信|微信号|微 信)\s*[:：=]?\s*[A-Za-z0-9_-]{5,32}")
     return chinese_pattern.sub(lambda match: f"{match.group(1)}=[redacted-contact]", text)
+
+
+def _feedback_derived_signals(hook: str, redacted_note: str) -> dict[str, list[str]]:
+    signals: dict[str, list[str]] = {}
+    hook_signal = HOOK_DERIVED_SIGNALS.get(hook)
+    if hook_signal:
+        _append_signal(signals, hook_signal[0], hook_signal[1])
+    normalized_note = redacted_note.lower()
+    if normalized_note:
+        for category, label, aliases in FEEDBACK_NOTE_SIGNAL_PATTERNS:
+            if any(alias.lower() in normalized_note for alias in aliases):
+                _append_signal(signals, category, label)
+    return {key: values[:6] for key, values in signals.items() if values}
+
+
+def _append_signal(signals: dict[str, list[str]], category: str, label: str) -> None:
+    values = signals.setdefault(category, [])
+    if label not in values:
+        values.append(label)
 
 
 def _feedback_confidence(hook: str) -> float:

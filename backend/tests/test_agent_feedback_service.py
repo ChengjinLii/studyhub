@@ -62,7 +62,8 @@ def test_ai_feedback_builds_redacted_user_and_platform_memory_candidates(client,
             "hook": "useful",
             "selectedMaterialIds": [780, 781, 999, 780],
             "note": (
-                "真题解析有帮助，联系我 13812345678 alice@example.com api_key=secret-value "
+                "真题解析有帮助，但我基础差，希望以后多给一步步详细解析和刷题顺序，"
+                "联系我 13812345678 alice@example.com api_key=secret-value "
                 "https://example.test QQ 123456789 微信 studyhub_user 学号 2023123456 "
                 "身份证 11010119900307561X 卡号 6222021234567890123"
             ),
@@ -95,7 +96,15 @@ def test_ai_feedback_builds_redacted_user_and_platform_memory_candidates(client,
     assert "[redacted-number]" in data["redactedNote"]
     assert [item["scope"] for item in data["memoryCandidates"]] == ["user", "platform"]
     assert data["memoryCandidates"][0]["key"] == "agent_feedback_preference"
+    assert data["memoryCandidates"][0]["derivedSignals"] == {
+        "positive_feedback": ["有帮助"],
+        "learning_preferences": ["补基础优先", "刷题优先", "详细解析"],
+    }
     assert data["memoryCandidates"][1]["privacy"] == "anonymous_aggregate_candidate"
+    assert data["memoryCandidates"][1]["aggregateSignals"] == {
+        "positive_feedback": ["有帮助"],
+        "learning_preferences": ["补基础优先", "刷题优先", "详细解析"],
+    }
     metrics = get_runtime_metrics().render_prometheus(get_settings())
     assert (
         'studyhub_ai_agent_feedback_total{hook="useful",status="accepted",'
@@ -113,7 +122,7 @@ def test_ai_feedback_respects_disabled_personal_memory_cookie(client, auth_servi
     response = client.post(
         "/api/ai/feedback",
         headers=headers,
-        json={"hook": "too_hard", "selectedMaterialIds": [780], "note": "这个计划有点难"},
+        json={"hook": "too_hard", "selectedMaterialIds": [780], "note": "这个计划有点难，基础差，需要一步步讲清楚"},
     )
 
     assert response.status_code == 200
@@ -121,6 +130,10 @@ def test_ai_feedback_respects_disabled_personal_memory_cookie(client, auth_servi
     assert data["accepted"] is True
     assert data["personalMemoryEnabled"] is False
     assert [item["scope"] for item in data["memoryCandidates"]] == ["platform"]
+    assert data["memoryCandidates"][0]["aggregateSignals"] == {
+        "difficulty_feedback": ["偏困难"],
+        "learning_preferences": ["补基础优先", "详细解析"],
+    }
 
 
 def test_ai_feedback_rejects_unknown_hooks_without_memory_candidates(client, auth_service) -> None:
