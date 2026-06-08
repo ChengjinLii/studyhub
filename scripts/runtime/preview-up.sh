@@ -12,6 +12,18 @@ FRONTEND_PORT="${PREVIEW_FRONTEND_PORT:-3200}"
 BACKEND_PID_FILE="$RUN_DIR/backend.pid"
 FRONTEND_PID_FILE="$RUN_DIR/frontend.pid"
 
+require_tcp_port() {
+  local name="$1"
+  local value="$2"
+  if ! [[ "$value" =~ ^[1-9][0-9]*$ ]] || (( value > 65535 )); then
+    echo "$name must be a TCP port between 1 and 65535; got $value"
+    exit 2
+  fi
+}
+
+require_tcp_port "PREVIEW_BACKEND_PORT" "$BACKEND_PORT"
+require_tcp_port "PREVIEW_FRONTEND_PORT" "$FRONTEND_PORT"
+
 mkdir -p "$RUN_DIR" "$LOG_DIR" "$RUNTIME_ROOT"
 
 if [[ ! -f "$ENV_FILE" ]]; then
