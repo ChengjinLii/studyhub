@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from fastapi import HTTPException, status
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.models.community import ReportRecord
@@ -150,7 +151,7 @@ class ReportService:
                 raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="资料不存在")
             return
         if target_type == "COMMENT":
-            if self.comment_repo.get_comment(session, target_id) is None:
+            if not self._comment_exists(session, target_id):
                 raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="评论不存在")
             return
         if target_type == "MARKET_ITEM":
@@ -171,10 +172,7 @@ class ReportService:
                 self.material_repo.save_material(session, entity)
             return
         if target_type == "COMMENT":
-            entity = self.comment_repo.get_comment(session, target_id)
-            if entity is not None:
-                entity.status = "hidden"
-                self.comment_repo.save_comment(session, entity)
+            session.execute(text("UPDATE comments SET status = 'hidden', updated_at = CURRENT_TIMESTAMP WHERE id = :target_id"), {"target_id": target_id})
             return
         if target_type == "MARKET_ITEM":
             entity = self.market_repo.get_item(session, target_id)
@@ -195,10 +193,17 @@ class ReportService:
                 self.material_repo.save_material(session, entity)
             return
         if target_type == "COMMENT":
-            entity = self.comment_repo.get_comment(session, target_id)
-            if entity is not None and entity.status == "hidden":
-                entity.status = "visible"
-                self.comment_repo.save_comment(session, entity)
+            session.execute(
+                text(
+                    """
+                    UPDATE comments
+                    SET status = 'visible',
+                        updated_at = CURRENT_TIMESTAMP
+                    WHERE id = :target_id AND status = 'hidden'
+                    """
+                ),
+                {"target_id": target_id},
+            )
             return
         if target_type == "MARKET_ITEM":
             entity = self.market_repo.get_item(session, target_id)
@@ -243,6 +248,20 @@ class ReportService:
         if not callable(loader):
             return {}
         return {int(item.id): item for item in loader(session, ids)}
+
+    def _comment_exists(self, session: Session, comment_id: int) -> bool:
+        row = session.execute(
+            text(
+                """
+                SELECT 1
+                FROM comments
+                WHERE id = :comment_id
+                LIMIT 1
+                """
+            ),
+            {"comment_id": comment_id},
+        ).first()
+        return row is not None
 
     def _to_admin_item(self, session: Session, entity: ReportRecord, *, lookups: dict[str, dict[int, Any]] | None = None) -> dict[str, Any]:
         target_label, target_status, target_url = self._resolve_target_info(session, entity.target_type, entity.target_id, lookups=lookups)

@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 128" role="img" aria-label="Wizard hat">
+  <path d="M63 8c-1 31-11 58-31 86 19 9 45 9 64-1C78 65 68 37 63 8Z" fill="#4338ca"/>
+  <path d="M31 94c19 9 46 9 66-1 10 2 18 7 18 13 0 9-25 16-55 16S5 115 5 106c0-6 14-11 26-12Z" fill="#312e81"/>
+  <path d="m47 63 8-4 7-15 6 15 15 5-14 6-6 15-8-15-14-6 6-1Z" fill="#facc15"/>
+  <circle cx="53" cy="31" r="4" fill="#a5b4fc"/>
+  <circle cx="76" cy="83" r="3.5" fill="#c4b5fd"/>
+  <path d="M42 102c13 4 34 4 48 0" fill="none" stroke="#818cf8" stroke-width="3" stroke-linecap="round"/>
+</svg>

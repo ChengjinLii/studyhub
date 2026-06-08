@@ -672,6 +672,8 @@ class MaterialsService(MaterialsCompatMixin):
         size: int,
         status_value: str | None,
     ) -> dict[str, Any]:
+        if getattr(self.settings, "requires_private_env_file", False):
+            return self._compat_list_for_admin(session, page=page, size=size, status_value=status_value)
         self._bootstrap(session)
         safe_page = max(page, 0)
         safe_size = max(1, min(size, 100))
@@ -685,6 +687,92 @@ class MaterialsService(MaterialsCompatMixin):
         return {
             "items": [admin_material_item(item) for item in items],
             "meta": {"page": safe_page, "size": safe_size, "total": total},
+        }
+
+    def _compat_list_for_admin(
+        self,
+        session: Session,
+        *,
+        page: int,
+        size: int,
+        status_value: str | None,
+    ) -> dict[str, Any]:
+        safe_page = max(page, 0)
+        safe_size = max(1, min(size, 100))
+        offset = safe_page * safe_size
+        normalized_status = (status_value or "").strip().lower()
+        params: dict[str, Any] = {"limit": safe_size, "offset": offset}
+        if normalized_status:
+            where_sql = "LOWER(TRIM(COALESCE(m.status, ''))) = :status"
+            params["status"] = normalized_status
+        else:
+            where_sql = "LOWER(TRIM(COALESCE(m.status, ''))) != 'removed'"
+
+        total = int(session.execute(text(f"SELECT COUNT(*) FROM materials m WHERE {where_sql}"), params).scalar() or 0)
+        order_sql = "m.deleted_at DESC, m.created_at DESC, m.id DESC" if normalized_status == "removed" else "m.created_at DESC, m.id DESC"
+        rows = session.execute(
+            text(
+                f"""
+                SELECT
+                    m.id,
+                    m.title,
+                    m.school,
+                    m.college,
+                    m.major,
+                    m.grade_value,
+                    m.grade_type,
+                    m.course_category,
+                    m.price,
+                    m.is_free,
+                    m.status,
+                    m.review_status,
+                    m.uploader_id,
+                    u.username AS uploader_username,
+                    u.nickname AS uploader_nickname,
+                    m.download_count,
+                    m.sales_count,
+                    m.created_at,
+                    m.updated_at,
+                    m.deleted_at
+                FROM materials m
+                LEFT JOIN users u ON u.id = m.uploader_id
+                WHERE {where_sql}
+                ORDER BY {order_sql}
+                LIMIT :limit OFFSET :offset
+                """
+            ),
+            params,
+        ).mappings().all()
+        material_ids = [int(row["id"]) for row in rows]
+        tags_map = self._compat_load_tags_map(session, material_ids)
+        return {
+            "items": [self._compat_admin_material_item(dict(row), tags_map.get(int(row["id"]), [])) for row in rows],
+            "meta": {"page": safe_page, "size": safe_size, "total": total},
+        }
+
+    def _compat_admin_material_item(self, row: dict[str, Any], tags: list[str]) -> dict[str, Any]:
+        return {
+            "id": int(row["id"]),
+            "title": row["title"],
+            "school": row["school"],
+            "college": row["college"],
+            "major": row["major"],
+            "gradeValue": row["grade_value"],
+            "gradeType": row["grade_type"],
+            "courseCategory": row["course_category"],
+            "tags": tags,
+            "price": self._compat_cents_to_price(row["price"]),
+            "free": self._compat_to_bool(row["is_free"]),
+            "status": row["status"],
+            "reviewStatus": row["review_status"],
+            "uploaderId": self._compat_as_int(row["uploader_id"]),
+            "uploaderUsername": row["uploader_username"],
+            "uploaderNickname": row["uploader_nickname"],
+            "downloadCount": self._compat_as_int(row["download_count"]),
+            "salesCount": self._compat_as_int(row["sales_count"]),
+            "createdAt": self._compat_serialize_datetime(row["created_at"]),
+            "updatedAt": self._compat_serialize_datetime(row["updated_at"]),
+            "deletedAt": self._compat_serialize_datetime(row["deleted_at"]),
         }
 
     def batch_update_materials(self, session: Session, payload: AdminMaterialBatchUpdatePayload) -> dict[str, Any]:

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import Link from 'next/link';
 import { hasRole, readSession } from '../lib/auth';
 import { formatDateTime } from '../lib/format';
@@ -22,12 +23,28 @@ type AiRecommendation = {
 };
 
 const POS_STORAGE_KEY = 'floating-sidebar-pos';
+const HAT_STORAGE_KEY = 'studyhub-bot-hat';
+const BOT_HAT_IDS = ['santa', 'graduation', 'party', 'wizard', 'none'] as const;
+type BotHat = (typeof BOT_HAT_IDS)[number];
+const BOT_HATS: { id: BotHat; label: string; previewClass: string }[] = [
+  { id: 'santa', label: '圣诞帽', previewClass: 'hat-preview-santa' },
+  { id: 'graduation', label: '学士帽', previewClass: 'hat-preview-graduation' },
+  { id: 'party', label: '派对帽', previewClass: 'hat-preview-party' },
+  { id: 'wizard', label: '魔法帽', previewClass: 'hat-preview-wizard' },
+  { id: 'none', label: '不佩戴', previewClass: 'hat-preview-none' },
+];
+
+function isBotHat(value: string | null): value is BotHat {
+  return BOT_HAT_IDS.includes(value as BotHat);
+}
 
 export default function FloatingSidebar() {
   const { user: sessionUser } = readSession();
   const [user, setUser] = useState<SessionUser | null>(sessionUser);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [wardrobeOpen, setWardrobeOpen] = useState(false);
   const [sidebarPosition, setSidebarPosition] = useState({ x: 60, y: 220 });
+  const [selectedHat, setSelectedHat] = useState<BotHat>('santa');
   const sidebarRef = useRef<HTMLDivElement>(null);
   const bubbleRef = useRef<HTMLButtonElement>(null);
   const draggingRef = useRef(false);
@@ -77,6 +94,18 @@ export default function FloatingSidebar() {
     const panelHeight = sidebarRef.current?.offsetHeight ?? 320;
     setSidebarPosition((pos) => clampSidebarPosition(pos.x, pos.y, panelWidth, panelHeight));
   }, [clampSidebarPosition]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      const saved = window.localStorage.getItem(HAT_STORAGE_KEY);
+      if (isBotHat(saved)) {
+        setSelectedHat(saved);
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
 
   useEffect(() => {
     setSidebarPosition((pos) =>
@@ -364,6 +393,15 @@ export default function FloatingSidebar() {
 
   const formatNoteTime = (value: string) => formatDateTime(value) || value;
 
+  const selectHat = useCallback((hat: BotHat) => {
+    setSelectedHat(hat);
+    try {
+      window.localStorage.setItem(HAT_STORAGE_KEY, hat);
+    } catch {
+      // ignore
+    }
+  }, []);
+
   const eyeStyle = {
     ['--eye-x' as React.CSSProperties['animation']]: `${eyeTrackingEnabled ? eyeOffset.x : 0}px`,
     ['--eye-y' as React.CSSProperties['animation']]: `${eyeTrackingEnabled ? eyeOffset.y : 0}px`,
@@ -371,169 +409,235 @@ export default function FloatingSidebar() {
 
   const loginLink = { pathname: '/login' };
   const registerLink = { pathname: '/login', query: { mode: 'register' } };
+  const selectedHatLabel = BOT_HATS.find((hat) => hat.id === selectedHat)?.label || '圣诞帽';
+  const wardrobeModal = wardrobeOpen ? (
+    <div
+      className="floating-wardrobe-mask"
+      role="presentation"
+      onPointerDown={(event) => event.stopPropagation()}
+      onClick={() => setWardrobeOpen(false)}
+    >
+      <div
+        className="floating-wardrobe-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-label="StudyHub Bot 衣帽间"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="floating-wardrobe-modal__header">
+          <div>
+            <span className="floating-wardrobe-modal__eyebrow">StudyHub Bot</span>
+            <h3>衣帽间</h3>
+          </div>
+          <button
+            type="button"
+            className="floating-wardrobe-modal__close"
+            aria-label="关闭衣帽间"
+            onClick={() => setWardrobeOpen(false)}
+          >
+            ×
+          </button>
+        </div>
+        <div className="sidebar-hat-options" role="radiogroup" aria-label="StudyHub Bot 帽子">
+          {BOT_HATS.map((hat) => (
+            <button
+              key={hat.id}
+              type="button"
+              className={`sidebar-hat-option ${selectedHat === hat.id ? 'is-active' : ''}`}
+              role="radio"
+              aria-checked={selectedHat === hat.id}
+              onClick={() => selectHat(hat.id)}
+            >
+              <span className={`sidebar-hat-option__preview ${hat.previewClass}`} aria-hidden="true" />
+              <span>{hat.label}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  ) : null;
 
   return (
-    <aside
-      ref={sidebarRef}
-      className={`floating-sidebar ${sidebarOpen ? 'open' : ''}`}
-      style={{
-        left: sidebarPosition.x,
-        top: sidebarPosition.y,
-      }}
-    >
-      <button
-        ref={bubbleRef}
-        type="button"
-        className={`floating-sidebar__bubble mood-${bubbleMood}`}
-        aria-expanded={sidebarOpen}
-        aria-label={sidebarOpen ? '收起浮窗' : '打开浮窗'}
-        style={eyeStyle}
-        onPointerDown={startSidebarDrag}
-        onClick={() => {
-          if (suppressClickRef.current) return;
-          setSidebarOpen((prev) => !prev);
+    <>
+      <aside
+        ref={sidebarRef}
+        className={`floating-sidebar ${sidebarOpen ? 'open' : ''} hat-${selectedHat}`}
+        style={{
+          left: sidebarPosition.x,
+          top: sidebarPosition.y,
         }}
       >
-        <span className="floating-sidebar__hat" aria-hidden="true" />
-        <span className="floating-face" aria-hidden="true" />
-      </button>
-      {sidebarOpen && (
-        <div className="floating-sidebar__panel">
-          <div className="floating-sidebar__header" onPointerDown={startSidebarDrag} role="presentation">
-            <span>我的浮窗</span>
-            <button
-              type="button"
-              className="floating-sidebar__close"
-              onPointerDown={(event) => event.stopPropagation()}
-              onClick={() => setSidebarOpen(false)}
-              aria-label="收起浮窗"
-            >
-              ×
-            </button>
-          </div>
-          <div className="sidebar-body">
-            <div className="sidebar-section">
-              {user ? (
-                <>
-                  <div className="sidebar-profile">
-                    <div className="sidebar-avatar" aria-hidden="true">
-                      {(user.nickname || user.username || '用户').charAt(0).toUpperCase()}
-                    </div>
-                    <div>
-                      <strong>{user.nickname}</strong>
-                      {user.username && <span className="sidebar-username">@{user.username}</span>}
-                    </div>
-                  </div>
-                  {userRoleBadges.length > 0 && (
-                    <div className="sidebar-roles">
-                      {userRoleBadges.map((role) => (
-                        <span key={role}>{role}</span>
-                      ))}
-                    </div>
-                  )}
-                  <p className="sidebar-muted">可在“我的”中查看投稿、购买记录与校园集市状态。</p>
-                  <Link className="button ghost small full-width" href="/me">
-                    打开我的页面
-                  </Link>
-                </>
-              ) : (
-                <>
-                  <div className="sidebar-profile">
-                    <div className="sidebar-avatar" aria-hidden="true">
-                      {(user?.nickname || user?.username || '用户').charAt(0).toUpperCase()}
-                    </div>
-                    <div>
-                      <strong>未登录</strong>
-                      <span className="sidebar-username">
-                        <Link className="login-link" href="/login">登录</Link>后解锁个人中心
-                      </span>
-                    </div>
-                  </div>
-                  <p className="sidebar-muted">
-                    <Link className="login-link" href="/login">登录</Link>后可同步购买、投稿、批量下载记录。
-                  </p>
-                  <div className="sidebar-auth-actions">
-                    <Link className="button primary small" href={loginLink}>
-                      登录
-                    </Link>
-                    <Link className="button ghost small" href={registerLink}>
-                      注册
-                    </Link>
-                  </div>
-                </>
-              )}
+        <button
+          ref={bubbleRef}
+          type="button"
+          className={`floating-sidebar__bubble mood-${bubbleMood}`}
+          aria-expanded={sidebarOpen}
+          aria-label={sidebarOpen ? '收起浮窗' : '打开浮窗'}
+          style={eyeStyle}
+          onPointerDown={startSidebarDrag}
+          onClick={() => {
+            if (suppressClickRef.current) return;
+            setSidebarOpen((prev) => !prev);
+          }}
+        >
+          <span className="floating-sidebar__hat" aria-hidden="true" />
+          <span className="floating-face" aria-hidden="true" />
+        </button>
+        {sidebarOpen && (
+          <div className="floating-sidebar__panel">
+            <div className="floating-sidebar__header" onPointerDown={startSidebarDrag} role="presentation">
+              <span>StudyHub Bot</span>
+              <button
+                type="button"
+                className="floating-sidebar__close"
+                onPointerDown={(event) => event.stopPropagation()}
+                onClick={() => setSidebarOpen(false)}
+                aria-label="收起浮窗"
+              >
+                ×
+              </button>
             </div>
-            <div className="sidebar-section sidebar-chat">
-              <h4 className="sidebar-section-title">AI 资料推荐</h4>
-              <p className="sidebar-muted">输入关键词，AI 只会推荐资料库内的内容。</p>
-              {chatError && <p className="sidebar-chat__error">{chatError}</p>}
-              {aiRecommendations.length > 0 && (
-                <ul className="sidebar-ai-list">
-                  {aiRecommendations.map((rec) => {
-                    const detail = aiDetails[rec.material_id];
-                    const title = detail?.title || rec.title || `资料 #${rec.material_id}`;
-                    const reason = pickRecommendationReason(rec);
-                    const link = materialPath(rec.material_id, detail?.title || rec.title);
-                    const tags = detail?.tags || rec.tags || [];
-                    return (
-                      <li key={rec.material_id} className="sidebar-ai-card">
-                        <div className="sidebar-ai-title">
-                          <Link href={link}>{title}</Link>
-                        </div>
-                        <div className="sidebar-ai-meta">
-                          <span>{detail?.school || 'StudyHub'}</span>
-                          {detail?.gradeValue && <span>· {detail.gradeValue}</span>}
-                          {detail && (
-                            <span className="sidebar-ai-price">
-                              {detail.free ? '免费' : `¥${detail.price?.toFixed(2)}`}
-                            </span>
-                          )}
-                        </div>
-                        {tags.length > 0 && (
-                          <div className="sidebar-ai-tags">
-                            {tags.slice(0, 4).map((tag) => (
-                              <span key={tag} className="sidebar-ai-pill">{tag}</span>
-                            ))}
-                          </div>
-                        )}
-                        {reason && <p className="sidebar-ai-reason">{reason}</p>}
-                      </li>
-                    );
-                  })}
-                </ul>
-              )}
-              {aiFollowups.length > 0 && (
-                <div className="sidebar-ai-followups">
-                  <span>可以补充：</span>
-                  {aiFollowups.map((item, index) => (
+            <div className="sidebar-body">
+              <div className="sidebar-section">
+                {user ? (
+                  <>
+                    <div className="sidebar-profile">
+                      <div className="sidebar-avatar" aria-hidden="true">
+                        {(user.nickname || user.username || '用户').charAt(0).toUpperCase()}
+                      </div>
+                      <div>
+                        <strong>{user.nickname}</strong>
+                        {user.username && <span className="sidebar-username">@{user.username}</span>}
+                      </div>
+                    </div>
+                    {userRoleBadges.length > 0 && (
+                      <div className="sidebar-roles">
+                        {userRoleBadges.map((role) => (
+                          <span key={role}>{role}</span>
+                        ))}
+                      </div>
+                    )}
+                    <p className="sidebar-muted">可在“我的”中查看投稿、购买记录与校园集市状态。</p>
                     <button
-                      key={`${item}-${index}`}
                       type="button"
-                      className="sidebar-ai-followup"
-                      onClick={() => setChatQuery(item)}
+                      className="button ghost small full-width sidebar-wardrobe-button"
+                      onPointerDown={(event) => event.stopPropagation()}
+                      onClick={() => setWardrobeOpen(true)}
                     >
-                      {item}
+                      衣帽间 · {selectedHatLabel}
                     </button>
-                  ))}
-                </div>
-              )}
-              <form className="sidebar-chat__form" onSubmit={handleAiSubmit}>
-                <input
-                  className="sidebar-chat__input"
-                  value={chatQuery}
-                  onChange={(event) => setChatQuery(event.target.value)}
-                  placeholder={user ? '例如：信号与系统 期末 真题' : '登录后可使用'}
-                  disabled={!user || chatLoading}
-                />
-                <button type="submit" className="button primary small" disabled={!user || chatLoading || !chatQuery.trim()}>
-                  {chatLoading ? '推荐中' : '推荐'}
-                </button>
-              </form>
+                    <Link className="button ghost small full-width" href="/me">
+                      打开我的页面
+                    </Link>
+                  </>
+                ) : (
+                  <>
+                    <div className="sidebar-profile">
+                      <div className="sidebar-avatar" aria-hidden="true">
+                        {(user?.nickname || user?.username || '用户').charAt(0).toUpperCase()}
+                      </div>
+                      <div>
+                        <strong>未登录</strong>
+                        <span className="sidebar-username">
+                          <Link className="login-link" href="/login">登录</Link>后解锁个人中心
+                        </span>
+                      </div>
+                    </div>
+                    <p className="sidebar-muted">
+                      <Link className="login-link" href="/login">登录</Link>后可同步购买、投稿、批量下载记录。
+                    </p>
+                    <div className="sidebar-auth-actions">
+                      <Link className="button primary small" href={loginLink}>
+                        登录
+                      </Link>
+                      <Link className="button ghost small" href={registerLink}>
+                        注册
+                      </Link>
+                    </div>
+                    <button
+                      type="button"
+                      className="button ghost small full-width sidebar-wardrobe-button"
+                      onPointerDown={(event) => event.stopPropagation()}
+                      onClick={() => setWardrobeOpen(true)}
+                    >
+                      衣帽间 · {selectedHatLabel}
+                    </button>
+                  </>
+                )}
+              </div>
+              <div className="sidebar-section sidebar-chat">
+                <h4 className="sidebar-section-title">AI 资料推荐</h4>
+                <p className="sidebar-muted">输入关键词，AI 只会推荐资料库内的内容。</p>
+                {chatError && <p className="sidebar-chat__error">{chatError}</p>}
+                {aiRecommendations.length > 0 && (
+                  <ul className="sidebar-ai-list">
+                    {aiRecommendations.map((rec) => {
+                      const detail = aiDetails[rec.material_id];
+                      const title = detail?.title || rec.title || `资料 #${rec.material_id}`;
+                      const reason = pickRecommendationReason(rec);
+                      const link = materialPath(rec.material_id, detail?.title || rec.title);
+                      const tags = detail?.tags || rec.tags || [];
+                      return (
+                        <li key={rec.material_id} className="sidebar-ai-card">
+                          <div className="sidebar-ai-title">
+                            <Link href={link}>{title}</Link>
+                          </div>
+                          <div className="sidebar-ai-meta">
+                            <span>{detail?.school || 'StudyHub'}</span>
+                            {detail?.gradeValue && <span>· {detail.gradeValue}</span>}
+                            {detail && (
+                              <span className="sidebar-ai-price">
+                                {detail.free ? '免费' : `¥${detail.price?.toFixed(2)}`}
+                              </span>
+                            )}
+                          </div>
+                          {tags.length > 0 && (
+                            <div className="sidebar-ai-tags">
+                              {tags.slice(0, 4).map((tag) => (
+                                <span key={tag} className="sidebar-ai-pill">{tag}</span>
+                              ))}
+                            </div>
+                          )}
+                          {reason && <p className="sidebar-ai-reason">{reason}</p>}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+                {aiFollowups.length > 0 && (
+                  <div className="sidebar-ai-followups">
+                    <span>可以补充：</span>
+                    {aiFollowups.map((item, index) => (
+                      <button
+                        key={`${item}-${index}`}
+                        type="button"
+                        className="sidebar-ai-followup"
+                        onClick={() => setChatQuery(item)}
+                      >
+                        {item}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                <form className="sidebar-chat__form" onSubmit={handleAiSubmit}>
+                  <input
+                    className="sidebar-chat__input"
+                    value={chatQuery}
+                    onChange={(event) => setChatQuery(event.target.value)}
+                    placeholder={user ? '例如：信号与系统 期末 真题' : '登录后可使用'}
+                    disabled={!user || chatLoading}
+                  />
+                  <button type="submit" className="button primary small" disabled={!user || chatLoading || !chatQuery.trim()}>
+                    {chatLoading ? '推荐中' : '推荐'}
+                  </button>
+                </form>
+              </div>
             </div>
           </div>
-        </div>
-      )}
-    </aside>
+        )}
+      </aside>
+      {wardrobeModal && typeof document !== 'undefined' ? createPortal(wardrobeModal, document.body) : null}
+    </>
   );
 }
 

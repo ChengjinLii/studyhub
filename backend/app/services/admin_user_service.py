@@ -7,9 +7,8 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from app.models.admin import UserNoteRecord
-from app.models.auth import AuthUser
 from app.repos.admin_repo import AdminRepository
-from app.repos.auth_repo import AuthRepository
+from app.repos.auth_repo import AuthRepository, AuthUserModel, resolve_user_model
 from app.repos.read_api_repo import ReadApiRepository
 from app.schemas.admin import AdminCreateUserNotePayload, AdminCreateUserPayload
 from app.services.auth_service import AuthService
@@ -30,15 +29,16 @@ class AdminUserService:
         self.auth_service = auth_service
 
     def list_users(self, session: Session, *, keyword: str | None) -> list[dict[str, Any]]:
-        stmt = select(AuthUser).order_by(AuthUser.created_at.desc(), AuthUser.id.desc())
+        user_model = resolve_user_model(session)
+        stmt = select(user_model).order_by(user_model.created_at.desc(), user_model.id.desc())
         if keyword:
             normalized = keyword.strip().lower()
             if normalized:
                 pattern = f"%{_escape_like(normalized)}%"
                 stmt = stmt.where(
                     or_(
-                        func.lower(AuthUser.username).like(pattern, escape="\\"),
-                        func.lower(AuthUser.nickname).like(pattern, escape="\\"),
+                        func.lower(user_model.username).like(pattern, escape="\\"),
+                        func.lower(user_model.nickname).like(pattern, escape="\\"),
                     )
                 )
         users = list(session.scalars(stmt.limit(200)))
@@ -94,13 +94,13 @@ class AdminUserService:
         if wants_developer and not has_role(operator_role_mask, ROLE_DEVELOPER):
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="仅超级管理员可以创建或授权超级管理员账号")
 
-    def _require_user(self, session: Session, user_id: int, *, label: str = "用户") -> AuthUser:
+    def _require_user(self, session: Session, user_id: int, *, label: str = "用户") -> AuthUserModel:
         user = self.auth_repo.find_user_by_id(session, user_id)
         if user is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"{label}不存在")
         return user
 
-    def _to_summary(self, user: AuthUser, *, seed: dict[str, Any] | None = None) -> dict[str, Any]:
+    def _to_summary(self, user: AuthUserModel, *, seed: dict[str, Any] | None = None) -> dict[str, Any]:
         if seed is None:
             seed = self.read_repo.load_seed()
         total_earnings = float((((seed.get("profileSummary") or {}).get(str(user.id), {}) or {}).get("totals") or {}).get("totalEarnings", 0))

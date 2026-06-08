@@ -385,6 +385,15 @@ class MarketService:
         category: str | None,
         status_value: str | None,
     ) -> dict[str, Any]:
+        if self.settings.requires_private_env_file:
+            return self._compat_list_for_admin(
+                session,
+                page=page,
+                size=size,
+                keyword=keyword,
+                category=category,
+                status_value=status_value,
+            )
         self._bootstrap(session)
         normalized_category = self._normalize_category(category) if category else None
         normalized_status = self._normalize_admin_status(status_value) if status_value else None
@@ -920,6 +929,67 @@ class MarketService:
         ).mappings().all()
         return [dict(row) for row in rows]
 
+    def _compat_list_for_admin(
+        self,
+        session: Session,
+        *,
+        page: int,
+        size: int,
+        keyword: str | None,
+        category: str | None,
+        status_value: str | None,
+    ) -> dict[str, Any]:
+        safe_page = max(page, 1)
+        safe_size = max(1, min(size, 100))
+        offset = (safe_page - 1) * safe_size
+        where_clauses = ["1 = 1"]
+        params: dict[str, Any] = {"limit": safe_size, "offset": offset}
+        if self._compat_has_text(keyword):
+            params["keyword"] = f"%{_escape_like(keyword.strip().lower())}%"
+            where_clauses.append(
+                "(LOWER(COALESCE(mi.title, '')) LIKE :keyword ESCAPE '\\' OR LOWER(COALESCE(mi.description, '')) LIKE :keyword ESCAPE '\\')"
+            )
+        if self._compat_has_text(category):
+            params["category"] = self._normalize_category(category)
+            where_clauses.append("UPPER(mi.category) = :category")
+        if self._compat_has_text(status_value):
+            params["status"] = self._normalize_admin_status(status_value)
+            where_clauses.append("UPPER(mi.status) = :status")
+
+        where_sql = " AND ".join(where_clauses)
+        total = int(session.execute(text(f"SELECT COUNT(*) FROM market_items mi WHERE {where_sql}"), params).scalar() or 0)
+        rows = session.execute(
+            text(
+                f"""
+                SELECT
+                    mi.id,
+                    mi.seller_id,
+                    u.username AS seller_username,
+                    u.nickname AS seller_nickname,
+                    mi.title,
+                    mi.price,
+                    mi.category,
+                    mi.images_json,
+                    mi.want_count,
+                    mi.school,
+                    mi.status,
+                    mi.contact_type,
+                    mi.contact_value,
+                    mi.created_at
+                FROM market_items mi
+                LEFT JOIN users u ON u.id = mi.seller_id
+                WHERE {where_sql}
+                ORDER BY mi.created_at DESC, mi.id DESC
+                LIMIT :limit OFFSET :offset
+                """
+            ),
+            params,
+        ).mappings().all()
+        return {
+            "items": [self._compat_to_admin_item(dict(row)) for row in rows],
+            "meta": {"page": safe_page, "size": safe_size, "total": total},
+        }
+
     def _compat_load_market_stats(self, session: Session) -> dict[str, int]:
         cache_key = ("market_stats", "compat")
         cached = self._market_summary_cache_get(cache_key)
@@ -1014,6 +1084,28 @@ class MarketService:
             "school": row["school"],
             "createdAt": self._compat_serialize_datetime(row["created_at"]),
             "sellerName": row["seller_nickname"] or row["seller_username"],
+        }
+
+    def _compat_to_admin_item(self, row: dict[str, Any]) -> dict[str, Any]:
+        images = self._compat_parse_images(row["images_json"])
+        thumbnail_key = images[0] if images else PLACEHOLDER_IMAGE
+        item_id = int(row["id"])
+        price = self._compat_cents_to_price(row["price"])
+        return {
+            "id": item_id,
+            "title": row["title"] or "",
+            "price": price,
+            "priceText": f"¥{price:.2f}",
+            "category": row["category"],
+            "status": row["status"],
+            "wantCount": self._compat_as_int(row["want_count"]),
+            "school": row["school"],
+            "createdAt": self._compat_serialize_datetime(row["created_at"]),
+            "sellerId": self._compat_as_int(row["seller_id"]),
+            "sellerName": row["seller_nickname"] or row["seller_username"],
+            "contactType": row["contact_type"],
+            "contactValue": row["contact_value"],
+            "thumbnail": self._compat_build_thumb_url(item_id, 1, thumbnail_key),
         }
 
     def _compat_build_thumb_url(self, item_id: int, index: int, key: str) -> str:

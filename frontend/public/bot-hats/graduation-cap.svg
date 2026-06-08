@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 84" role="img" aria-label="Graduation cap">
+  <path d="M8 30 64 6l56 24-56 24L8 30Z" fill="#111827"/>
+  <path d="M24 38v16c0 9 18 18 40 18s40-9 40-18V38L64 55 24 38Z" fill="#1f2937"/>
+  <path d="M64 6v24l42 18" fill="none" stroke="#374151" stroke-width="3" stroke-linecap="round"/>
+  <path d="M106 48v17" fill="none" stroke="#f59e0b" stroke-width="4" stroke-linecap="round"/>
+  <circle cx="106" cy="68" r="6" fill="#fbbf24"/>
+  <path d="M34 56c7 6 18 9 30 9s23-3 30-9" fill="none" stroke="#4b5563" stroke-width="3" stroke-linecap="round"/>
+</svg>

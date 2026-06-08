@@ -28,7 +28,11 @@ _MATERIAL_MAPPED_COLUMNS = tuple(MaterialRecord.__table__.columns)
 def _bind_cache_key(session: Session) -> str:
     bind = session.get_bind()
     try:
-        return bind.engine.url.render_as_string(hide_password=True)
+        url = bind.engine.url
+        rendered = url.render_as_string(hide_password=True)
+        if url.database in {None, ":memory:"}:
+            return f"{rendered}:{id(bind)}"
+        return rendered
     except Exception:
         return str(bind)
 

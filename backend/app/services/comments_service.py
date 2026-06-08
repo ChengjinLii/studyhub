@@ -175,6 +175,8 @@ class CommentsService:
         return {"items": items, "meta": meta}
 
     def create(self, session: Session, payload: CommentCreatePayload, user_id: int) -> dict[str, Any]:
+        if self.settings.requires_private_env_file:
+            return self._compat_create_comment(session, payload, user_id)
         material = self._ensure_material(session, payload.materialId)
         user = self._require_user(session, user_id)
         parent = None
@@ -207,6 +209,8 @@ class CommentsService:
         )[0]
 
     def update(self, session: Session, comment_id: int, payload: CommentUpdatePayload, *, user_id: int, can_moderate: bool) -> dict[str, Any]:
+        if self.settings.requires_private_env_file:
+            return self._compat_update_comment(session, comment_id, payload, user_id=user_id, can_moderate=can_moderate)
         self._bootstrap(session)
         entity = self.comment_repo.get_comment(session, comment_id)
         if entity is None:
@@ -226,6 +230,9 @@ class CommentsService:
         )[0]
 
     def delete(self, session: Session, comment_id: int, *, user_id: int, can_moderate: bool) -> None:
+        if self.settings.requires_private_env_file:
+            self._compat_delete_comment(session, comment_id, user_id=user_id, can_moderate=can_moderate)
+            return
         self._bootstrap(session)
         entity = self.comment_repo.get_comment(session, comment_id)
         if entity is None:
@@ -243,6 +250,8 @@ class CommentsService:
         session.commit()
 
     def like(self, session: Session, comment_id: int, user_id: int) -> int:
+        if self.settings.requires_private_env_file:
+            return self._compat_like_comment(session, comment_id, user_id)
         self._bootstrap(session)
         entity = self.comment_repo.get_comment(session, comment_id)
         if entity is None:
@@ -251,12 +260,15 @@ class CommentsService:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="已点赞")
         self._require_user(session, user_id)
         self.comment_repo.add_like(session, comment_id=comment_id, user_id=user_id)
-        entity.like_count = int(entity.like_count or 0) + 1
+        next_like_count = int(entity.like_count or 0) + 1
+        entity.like_count = next_like_count
         self.comment_repo.save_comment(session, entity)
         session.commit()
-        return int(entity.like_count or 0)
+        return next_like_count
 
     def unlike(self, session: Session, comment_id: int, user_id: int) -> int:
+        if self.settings.requires_private_env_file:
+            return self._compat_unlike_comment(session, comment_id, user_id)
         self._bootstrap(session)
         entity = self.comment_repo.get_comment(session, comment_id)
         if entity is None:
@@ -265,14 +277,254 @@ class CommentsService:
         if like is None:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="尚未点赞")
         self.comment_repo.remove_like(session, like)
-        entity.like_count = max(0, int(entity.like_count or 0) - 1)
+        next_like_count = max(0, int(entity.like_count or 0) - 1)
+        entity.like_count = next_like_count
         self.comment_repo.save_comment(session, entity)
         session.commit()
-        return int(entity.like_count or 0)
+        return next_like_count
 
     def report(self, session: Session, comment_id: int, user_id: int, payload: CommentReportPayload) -> None:
         self._bootstrap(session)
         self.report_service.submit_report(session, reporter_id=user_id, target_type="COMMENT", target_id=comment_id, reason=payload.reason)
+
+    def _compat_create_comment(self, session: Session, payload: CommentCreatePayload, user_id: int) -> dict[str, Any]:
+        self._compat_ensure_material_exists(session, payload.materialId)
+        self._require_user(session, user_id)
+        parent = None
+        if payload.parentId is not None:
+            parent = self._compat_get_comment_base(session, payload.parentId)
+            if parent is None:
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="目标评论不存在")
+            if int(parent["material_id"]) != int(payload.materialId):
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="评论不属于当前资料")
+        result = session.execute(
+            text(
+                """
+                INSERT INTO comments (
+                    material_id, user_id, parent_id, content, like_count, reply_count,
+                    status, is_edited, created_at, updated_at
+                )
+                VALUES (
+                    :material_id, :user_id, :parent_id, :content, 0, 0,
+                    'visible', 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+                )
+                """
+            ),
+            {
+                "material_id": int(payload.materialId),
+                "user_id": int(user_id),
+                "parent_id": int(payload.parentId) if payload.parentId is not None else None,
+                "content": payload.content.strip(),
+            },
+        )
+        comment_id = int(result.lastrowid)
+        if parent is not None:
+            session.execute(
+                text(
+                    """
+                    UPDATE comments
+                    SET reply_count = COALESCE(reply_count, 0) + 1,
+                        updated_at = CURRENT_TIMESTAMP
+                    WHERE id = :parent_id
+                    """
+                ),
+                {"parent_id": int(parent["id"])},
+            )
+        row = self._compat_load_comment_row(session, comment_id)
+        session.commit()
+        return self._compat_to_comment_item(row, has_liked=False)
+
+    def _compat_update_comment(
+        self,
+        session: Session,
+        comment_id: int,
+        payload: CommentUpdatePayload,
+        *,
+        user_id: int,
+        can_moderate: bool,
+    ) -> dict[str, Any]:
+        row = self._compat_get_comment_base(session, comment_id)
+        if row is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="评论不存在")
+        if int(row["user_id"]) != int(user_id) and not can_moderate:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="无权编辑该评论")
+        session.execute(
+            text(
+                """
+                UPDATE comments
+                SET content = :content,
+                    is_edited = 1,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = :comment_id
+                """
+            ),
+            {"comment_id": comment_id, "content": payload.content.strip()},
+        )
+        updated = self._compat_load_comment_row(session, comment_id)
+        liked = self._compat_comment_liked(session, comment_id, user_id)
+        session.commit()
+        return self._compat_to_comment_item(updated, has_liked=liked)
+
+    def _compat_delete_comment(self, session: Session, comment_id: int, *, user_id: int, can_moderate: bool) -> None:
+        row = self._compat_get_comment_base(session, comment_id)
+        if row is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="评论不存在")
+        if int(row["user_id"]) != int(user_id) and not can_moderate:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="无权删除评论")
+        session.execute(
+            text(
+                """
+                UPDATE comments
+                SET status = 'deleted',
+                    content = '',
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = :comment_id
+                """
+            ),
+            {"comment_id": comment_id},
+        )
+        if row["parent_id"] is not None:
+            session.execute(
+                text(
+                    """
+                    UPDATE comments
+                    SET reply_count = CASE
+                            WHEN COALESCE(reply_count, 0) > 0 THEN COALESCE(reply_count, 0) - 1
+                            ELSE 0
+                        END,
+                        updated_at = CURRENT_TIMESTAMP
+                    WHERE id = :parent_id
+                    """
+                ),
+                {"parent_id": int(row["parent_id"])},
+            )
+        session.commit()
+
+    def _compat_like_comment(self, session: Session, comment_id: int, user_id: int) -> int:
+        row = self._compat_get_comment_base(session, comment_id)
+        if row is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="评论不存在")
+        if self._compat_comment_liked(session, comment_id, user_id):
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="已点赞")
+        self._require_user(session, user_id)
+        next_like_count = int(row["like_count"] or 0) + 1
+        session.execute(
+            text(
+                """
+                INSERT INTO comment_likes (comment_id, user_id, created_at)
+                VALUES (:comment_id, :user_id, CURRENT_TIMESTAMP)
+                """
+            ),
+            {"comment_id": comment_id, "user_id": user_id},
+        )
+        session.execute(
+            text(
+                """
+                UPDATE comments
+                SET like_count = :like_count,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = :comment_id
+                """
+            ),
+            {"comment_id": comment_id, "like_count": next_like_count},
+        )
+        session.commit()
+        return next_like_count
+
+    def _compat_unlike_comment(self, session: Session, comment_id: int, user_id: int) -> int:
+        row = self._compat_get_comment_base(session, comment_id)
+        if row is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="评论不存在")
+        if not self._compat_comment_liked(session, comment_id, user_id):
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="尚未点赞")
+        next_like_count = max(0, int(row["like_count"] or 0) - 1)
+        session.execute(
+            text(
+                """
+                DELETE FROM comment_likes
+                WHERE comment_id = :comment_id AND user_id = :user_id
+                """
+            ),
+            {"comment_id": comment_id, "user_id": user_id},
+        )
+        session.execute(
+            text(
+                """
+                UPDATE comments
+                SET like_count = :like_count,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = :comment_id
+                """
+            ),
+            {"comment_id": comment_id, "like_count": next_like_count},
+        )
+        session.commit()
+        return next_like_count
+
+    def _compat_get_comment_base(self, session: Session, comment_id: int) -> dict[str, Any] | None:
+        row = session.execute(
+            text(
+                """
+                SELECT id, material_id, parent_id, user_id, like_count, reply_count, status
+                FROM comments
+                WHERE id = :comment_id
+                LIMIT 1
+                """
+            ),
+            {"comment_id": comment_id},
+        ).mappings().first()
+        return dict(row) if row is not None else None
+
+    def _compat_comment_liked(self, session: Session, comment_id: int, user_id: int) -> bool:
+        row = session.execute(
+            text(
+                """
+                SELECT 1
+                FROM comment_likes
+                WHERE comment_id = :comment_id AND user_id = :user_id
+                LIMIT 1
+                """
+            ),
+            {"comment_id": comment_id, "user_id": user_id},
+        ).first()
+        return row is not None
+
+    def _compat_load_comment_row(self, session: Session, comment_id: int) -> dict[str, Any]:
+        row = session.execute(
+            text(
+                """
+                SELECT
+                    c.id,
+                    c.material_id,
+                    c.parent_id,
+                    c.user_id,
+                    c.content,
+                    c.like_count,
+                    c.reply_count,
+                    c.status,
+                    c.is_edited,
+                    c.created_at,
+                    c.updated_at,
+                    u.nickname AS user_nickname,
+                    u.username AS user_username,
+                    u.avatar AS user_avatar,
+                    m.uploader_id,
+                    r.rating
+                FROM comments c
+                LEFT JOIN users u ON u.id = c.user_id
+                LEFT JOIN materials m ON m.id = c.material_id
+                LEFT JOIN reviews r
+                  ON r.material_id = c.material_id
+                 AND r.user_id = c.user_id
+                WHERE c.id = :comment_id
+                LIMIT 1
+                """
+            ),
+            {"comment_id": comment_id},
+        ).mappings().first()
+        if row is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="评论不存在")
+        return dict(row)
 
     def _bootstrap(self, session: Session) -> None:
         seed = self.read_repo.load_seed()
