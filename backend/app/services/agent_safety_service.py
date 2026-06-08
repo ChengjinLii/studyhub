@@ -94,6 +94,8 @@ class AgentSafetyService:
             answer = ""
         if answer and candidate_materials and _answer_denies_candidate_materials(answer):
             return None
+        if answer and _text_is_obviously_non_learning(answer):
+            return None
         if answer and _answer_mentions_unscoped_material_title(answer, candidate_materials, pdf_evidence):
             return None
         if answer and not pdf_evidence and _answer_overclaims_pdf_evidence(answer):
@@ -354,6 +356,8 @@ class AgentSafetyService:
             lowered = question.lower()
             if any(marker in lowered for marker in FORBIDDEN_INTERNAL_MARKERS):
                 continue
+            if _text_is_obviously_non_learning(question):
+                continue
             if has_candidate_materials and _followup_requests_external_material(question):
                 continue
             if lowered in seen_questions:
@@ -513,6 +517,88 @@ def _answer_denies_candidate_materials(answer: str) -> bool:
         "没有匹配到相关资料",
     )
     return any(marker in normalized for marker in markers)
+
+
+def _text_is_obviously_non_learning(value: str) -> bool:
+    normalized = re.sub(r"\s+", "", str(value or "")).lower()
+    if not normalized:
+        return False
+    if any(marker in normalized for marker in _LEARNING_SCOPE_MARKERS):
+        return False
+    return any(marker in normalized for marker in _OBVIOUS_NON_LEARNING_MARKERS)
+
+
+_LEARNING_SCOPE_MARKERS = (
+    "学习",
+    "复习",
+    "考试",
+    "期末",
+    "期中",
+    "真题",
+    "往年题",
+    "历年题",
+    "题目",
+    "题型",
+    "考题",
+    "考点",
+    "作业",
+    "课程",
+    "资料",
+    "笔记",
+    "讲义",
+    "答案",
+    "解析",
+    "错题",
+    "知识点",
+    "公式",
+    "推导",
+    "计算题",
+    "证明题",
+    "pdf",
+    "课件",
+    "专业",
+    "学院",
+    "studyhub",
+    "esd",
+    "cps",
+    "通信原理",
+    "电子系统设计",
+    "信号与系统",
+    "数据结构",
+    "高数",
+    "高等数学",
+    "微积分",
+    "概率论",
+)
+
+
+_OBVIOUS_NON_LEARNING_MARKERS = (
+    "天气",
+    "几度",
+    "股票",
+    "炒股",
+    "投资建议",
+    "彩票",
+    "电影",
+    "电视剧",
+    "游戏攻略",
+    "笑话",
+    "段子",
+    "菜谱",
+    "外卖",
+    "旅游攻略",
+    "星座",
+    "八卦",
+    "恋爱",
+    "医疗诊断",
+    "看病",
+    "法律咨询",
+    "律师",
+    "房价",
+    "买房",
+    "健身计划",
+    "减肥计划",
+)
 
 
 def _answer_mentions_unscoped_material_title(
