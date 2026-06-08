@@ -80,7 +80,7 @@ def _validate_backup_file(path: Path) -> int:
             with gzip.open(path, "rb") as source:
                 while source.read(1024 * 1024):
                     pass
-        except OSError as exc:
+        except (OSError, EOFError) as exc:
             raise RuntimeError(f"备份 gzip 校验失败：{path}: {exc}") from exc
     return size_bytes
 

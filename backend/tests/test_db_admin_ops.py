@@ -325,6 +325,19 @@ def test_require_recent_backup_rejects_corrupt_gzip_backup(tmp_path: Path) -> No
         require_recent_nonempty_backup(tmp_path, "production", max_age_seconds=120 * 60, now=now)
 
 
+def test_require_recent_backup_rejects_truncated_gzip_backup(tmp_path: Path) -> None:
+    backup_root = tmp_path / "backups" / "production"
+    backup_root.mkdir(parents=True)
+    backup_file = backup_root / "studyhub-production-truncated.sql.gz"
+    backup_file.write_bytes(b"\x1f\x8b\x08\x00truncated")
+    now = datetime(2026, 6, 8, 12, 0, tzinfo=UTC)
+    fresh_ts = (now - timedelta(minutes=30)).timestamp()
+    os.utime(backup_file, (fresh_ts, fresh_ts))
+
+    with pytest.raises(RuntimeError, match="gzip 校验失败"):
+        require_recent_nonempty_backup(tmp_path, "production", max_age_seconds=120 * 60, now=now)
+
+
 def test_validate_backup_file_accepts_readable_gzip(tmp_path: Path) -> None:
     backup_file = tmp_path / "backup.sql.gz"
     with gzip.open(backup_file, "wb") as target:
@@ -336,6 +349,14 @@ def test_validate_backup_file_accepts_readable_gzip(tmp_path: Path) -> None:
 def test_validate_backup_file_rejects_corrupt_gzip(tmp_path: Path) -> None:
     backup_file = tmp_path / "backup.sql.gz"
     backup_file.write_bytes(b"not gzip")
+
+    with pytest.raises(RuntimeError, match="gzip 校验失败"):
+        _validate_backup_file(backup_file)
+
+
+def test_validate_backup_file_rejects_truncated_gzip(tmp_path: Path) -> None:
+    backup_file = tmp_path / "backup.sql.gz"
+    backup_file.write_bytes(b"\x1f\x8b\x08\x00truncated")
 
     with pytest.raises(RuntimeError, match="gzip 校验失败"):
         _validate_backup_file(backup_file)

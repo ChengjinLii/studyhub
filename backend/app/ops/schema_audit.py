@@ -312,7 +312,7 @@ def ensure_readable_backup_file(path: Path) -> None:
         with gzip.open(path, "rb") as source:
             while source.read(1024 * 1024):
                 pass
-    except OSError as exc:
+    except (OSError, EOFError) as exc:
         raise RuntimeError(f"production migrate-additive --yes 需要可读取的数据库备份；gzip 校验失败：{path}") from exc
 
 
