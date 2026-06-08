@@ -15,6 +15,11 @@ if ! command -v journalctl >/dev/null 2>&1; then
   exit 2
 fi
 
+if [[ -z "${LOG_SERVICES//[[:space:]]/}" ]]; then
+  echo "STUDYHUB_P0_LOG_SERVICES must contain at least one systemd service name"
+  exit 2
+fi
+
 log_file="$(mktemp)"
 trap 'rm -f "$log_file"' EXIT
 
