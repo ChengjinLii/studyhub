@@ -95,6 +95,10 @@ def test_schema_audit_reports_known_production_drift_columns() -> None:
     assert missing[("orders", "uploader_id")]["autoMigratable"] is True
     assert "ADD COLUMN" in missing[("orders", "uploader_id")]["sql"]
     assert payload["destructiveChanges"] == []
+    assert payload["missingColumnCount"] == 2
+    assert payload["manualReviewColumnCount"] == 0
+    assert payload["destructiveChangeCount"] == 0
+    assert payload["additiveStatementCount"] == 2
     assert payload["ready"] is False
     assert payload["executable"] is True
 
@@ -107,8 +111,10 @@ def test_schema_audit_reports_known_production_drift_columns() -> None:
     assert scoped["scope"] == "selected"
     assert scoped["onlyColumns"] == ["market_items.source"]
     assert scoped["allMissingColumnCount"] == 2
+    assert scoped["missingColumnCount"] == 1
     assert [(item["table"], item["column"]) for item in scoped["missingColumns"]] == [("market_items", "source")]
     assert scoped["additiveStatements"] == [missing[("market_items", "source")]["sql"]]
+    assert scoped["additiveStatementCount"] == 1
     assert scoped["executable"] is True
 
 
@@ -146,6 +152,8 @@ def test_schema_audit_reports_type_and_nullable_warnings_separately() -> None:
         ("market_items", "source", "default"),
     }
     assert payload["missingColumns"] == []
+    assert payload["missingColumnCount"] == 0
+    assert payload["columnWarningCount"] == 3
     assert payload["destructiveChanges"] == []
     assert payload["ready"] is True
 
@@ -203,8 +211,10 @@ def test_scoped_schema_audit_blocks_requested_column_when_table_is_missing() -> 
     assert payload["ready"] is False
     assert payload["executable"] is False
     assert payload["missingTables"] == ["market_items"]
+    assert payload["missingTableCount"] == 1
     assert payload["alreadyPresentColumns"] == []
     assert payload["additiveStatements"] == []
+    assert payload["additiveStatementCount"] == 0
 
 
 def test_scoped_schema_audit_reports_selected_missing_indexes_separately() -> None:
@@ -235,6 +245,7 @@ def test_scoped_schema_audit_reports_selected_missing_indexes_separately() -> No
     assert scoped["ready"] is True
     assert scoped["missingColumns"] == []
     assert scoped["allMissingIndexCount"] == 1
+    assert scoped["missingIndexCount"] == 1
     assert scoped["missingIndexes"] == [
         {
             "table": "orders",

@@ -112,13 +112,21 @@ def compare_metadata_schema(
     return {
         "expectedTableCount": len(expected_tables),
         "actualTableCount": len(actual_tables),
+        "missingTableCount": len(missing_tables),
         "missingTables": missing_tables,
+        "legacyCompatibleTableCount": len(legacy_compatible_tables),
         "legacyCompatibleTables": legacy_compatible_tables,
+        "missingColumnCount": len(missing_columns),
         "missingColumns": missing_columns,
+        "manualReviewColumnCount": len(manual_review_columns),
         "manualReviewColumns": manual_review_columns,
+        "columnWarningCount": len(column_warnings),
         "columnWarnings": column_warnings,
+        "missingIndexCount": len(missing_indexes),
         "missingIndexes": missing_indexes,
+        "destructiveChangeCount": 0,
         "destructiveChanges": [],
+        "additiveStatementCount": len(statements),
         "additiveStatements": statements,
         "executable": not missing_tables and not manual_review_columns,
         "ready": ready,
@@ -220,24 +228,32 @@ def select_additive_migration_scope(
     payload["onlyColumns"] = [f"{table}.{column}" for table, column in sorted(only_columns)]
     payload["allMissingTableCount"] = len(payload["missingTables"])
     payload["missingTables"] = selected_missing_tables
+    payload["missingTableCount"] = len(selected_missing_tables)
     payload["allMissingColumnCount"] = len(payload["missingColumns"])
     payload["missingColumns"] = selected_missing
+    payload["missingColumnCount"] = len(selected_missing)
     payload["manualReviewColumns"] = selected_manual
+    payload["manualReviewColumnCount"] = len(selected_manual)
     payload["allColumnWarningCount"] = len(payload.get("columnWarnings", []))
     payload["columnWarnings"] = [
         item
         for item in payload.get("columnWarnings", [])
         if (item["table"], item["column"]) in only_columns
     ]
+    payload["columnWarningCount"] = len(payload["columnWarnings"])
     payload["allMissingIndexCount"] = len(payload["missingIndexes"])
     payload["unknownRequestedColumns"] = unknown_requested
+    payload["unknownRequestedColumnCount"] = len(unknown_requested)
     payload["alreadyPresentColumns"] = already_present
+    payload["alreadyPresentColumnCount"] = len(already_present)
     payload["missingIndexes"] = [
         item
         for item in payload["missingIndexes"]
         if any((item["table"], column) in only_columns for column in item["columns"])
     ]
+    payload["missingIndexCount"] = len(payload["missingIndexes"])
     payload["additiveStatements"] = [item["sql"] for item in selected_missing if item["autoMigratable"]]
+    payload["additiveStatementCount"] = len(payload["additiveStatements"])
     payload["executable"] = not selected_missing_tables and not selected_manual and not unknown_requested
     return payload
 
