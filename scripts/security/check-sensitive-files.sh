@@ -6,28 +6,43 @@ cd "$ROOT_DIR"
 
 violations=()
 
-while IFS= read -r path; do
+check_path() {
+  local path="$1"
+  local scope="$2"
+
   case "$path" in
     .env.example|*/.env.example)
-      continue
+      return
       ;;
   esac
 
   case "$path" in
     .env|*/.env|.env.*|*/.env.*)
-      violations+=("$path: tracked env file")
+      violations+=("$path: $scope env file")
       ;;
     private|private/*|*/private|*/private/*)
-      violations+=("$path: tracked private path")
+      violations+=("$path: $scope private path")
       ;;
     *.pem|*.key|*.p12|*.pfx|*.crt|*.cer)
-      violations+=("$path: tracked key or certificate file")
+      violations+=("$path: $scope key or certificate file")
       ;;
     *id_rsa*|*id_ed25519*|*.npmrc)
-      violations+=("$path: tracked credential-like file")
+      violations+=("$path: $scope credential-like file")
       ;;
   esac
+}
+
+while IFS= read -r path; do
+  check_path "$path" "tracked"
 done < <(git ls-files)
+
+while IFS= read -r object_and_path; do
+  path="${object_and_path#* }"
+  if [[ "$path" == "$object_and_path" || -z "$path" ]]; then
+    continue
+  fi
+  check_path "$path" "historical"
+done < <(git rev-list --objects --all)
 
 if [[ "${#violations[@]}" -gt 0 ]]; then
   echo "Sensitive file check failed:"
