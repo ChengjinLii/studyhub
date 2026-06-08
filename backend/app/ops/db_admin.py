@@ -339,6 +339,8 @@ def command_migrate_additive(
             max_age_seconds=max(60, int(backup_max_age_minutes) * 60),
         )
         payload["backupFile"] = str(backup_file)
+        payload["backupSizeBytes"] = _validate_backup_file(backup_file)
+        payload["backupSha256"] = _file_sha256(backup_file)
 
     if not payload["executable"]:
         print(json.dumps(payload, ensure_ascii=False, indent=2))

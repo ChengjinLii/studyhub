@@ -478,6 +478,65 @@ def test_production_migrate_requires_matching_plan_token() -> None:
     _require_production_plan_token(settings, expected="abc123", confirmed="abc123")
 
 
+def test_production_migrate_records_backup_metadata(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    from app.ops import db_admin as db_admin_module
+
+    backup_root = tmp_path / "backups" / "production"
+    backup_root.mkdir(parents=True)
+    backup_file = backup_root / "studyhub-production-fresh.sql.gz"
+    with gzip.open(backup_file, "wb") as target:
+        target.write(b"CREATE TABLE example (id int);\n")
+
+    settings = Settings(
+        environment="production",
+        private_dir_path=str(tmp_path),
+        database_url="mysql+pymysql://prod_user:prod_pass@127.0.0.1:3306/studyhub_prod",
+    )
+    plan_payload = {
+        "scope": "selected",
+        "onlyColumns": ["market_items.source"],
+        "missingTables": ["market_items"],
+        "missingColumns": [],
+        "manualReviewColumns": [],
+        "unknownRequestedColumns": [],
+        "alreadyPresentColumns": [],
+        "additiveStatements": [],
+        "executable": False,
+        "ready": False,
+        "statementCount": 0,
+        "readyAfterMigration": False,
+    }
+    plan_token = _migration_plan_token(plan_payload)
+
+    monkeypatch.setattr(db_admin_module, "_ensure_sqlite_parent_dir", lambda settings: None)
+    monkeypatch.setattr(db_admin_module, "check_database", lambda: None)
+    monkeypatch.setattr(
+        db_admin_module,
+        "build_scoped_additive_migration_payload",
+        lambda *, only_columns: plan_payload,
+    )
+
+    assert (
+        command_migrate_additive(
+            settings,
+            plan=False,
+            yes=True,
+            only=["market_items.source"],
+            confirm_plan_token=plan_token,
+        )
+        == 2
+    )
+
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["backupFile"] == str(backup_file)
+    assert payload["backupSizeBytes"] == backup_file.stat().st_size
+    assert payload["backupSha256"] == _file_sha256(backup_file)
+
+
 def test_migrate_additive_yes_uses_scoped_after_check_for_only_columns(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
