@@ -131,6 +131,15 @@ class MarketRepository:
         stmt = select(MarketWantRecord.item_id).where(MarketWantRecord.user_id == user_id)
         return [int(value) for value in session.scalars(stmt)]
 
+    def wanted_ids_for_user_in_items(self, session: Session, user_id: int, item_ids: list[int]) -> list[int]:
+        if not item_ids:
+            return []
+        stmt = select(MarketWantRecord.item_id).where(
+            MarketWantRecord.user_id == user_id,
+            MarketWantRecord.item_id.in_(item_ids),
+        )
+        return [int(value) for value in session.scalars(stmt)]
+
     def wants_for_seller(self, session: Session, seller_id: int) -> list[MarketWantRecord]:
         item_ids = select(MarketItemRecord.id).where(MarketItemRecord.seller_id == seller_id)
         stmt = select(MarketWantRecord).where(MarketWantRecord.item_id.in_(item_ids)).order_by(MarketWantRecord.created_at.desc(), MarketWantRecord.id.desc())

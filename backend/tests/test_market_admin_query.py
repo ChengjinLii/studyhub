@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
+from types import SimpleNamespace
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
-from app.models.market import MarketItemRecord
+from app.models.market import MarketItemRecord, MarketWantRecord
+from app.repos.market_repo import MarketRepository
 from app.services.market_service import MarketService
 
 
@@ -14,7 +16,13 @@ class _DummyReadRepo:
         return {}
 
 
-class _NoFullListMarketRepo:
+class _DummyAuthRepo:
+    def count_users(self, session: Session) -> int:
+        del session
+        return 0
+
+
+class _NoFullListMarketRepo(MarketRepository):
     def ensure_seed_bootstrap(self, session: Session, seed: dict) -> None:
         del session, seed
 
@@ -25,10 +33,10 @@ class _NoFullListMarketRepo:
 
 def _service() -> MarketService:
     return MarketService(
-        settings=object(),  # type: ignore[arg-type]
+        settings=SimpleNamespace(requires_private_env_file=False),  # type: ignore[arg-type]
         read_repo=_DummyReadRepo(),  # type: ignore[arg-type]
-        auth_repo=None,  # type: ignore[arg-type]
-        market_repo=_NoFullListMarketRepo(),  # type: ignore[arg-type]
+        auth_repo=_DummyAuthRepo(),  # type: ignore[arg-type]
+        market_repo=_NoFullListMarketRepo(),
         asset_store=None,  # type: ignore[arg-type]
     )
 
@@ -36,6 +44,7 @@ def _service() -> MarketService:
 def _session() -> Session:
     engine = create_engine("sqlite+pysqlite:///:memory:", future=True)
     MarketItemRecord.__table__.create(bind=engine)
+    MarketWantRecord.__table__.create(bind=engine)
     return Session(engine)
 
 
@@ -104,3 +113,27 @@ def test_admin_market_list_treats_like_wildcards_as_literal_keyword_text() -> No
 
     assert [item["id"] for item in percent_data["items"]] == [2]
     assert [item["id"] for item in underscore_data["items"]] == [3]
+
+
+def test_public_market_list_filters_before_pagination_without_loading_all_items() -> None:
+    service = _service()
+    base = datetime(2026, 1, 1, tzinfo=UTC)
+    with _session() as session:
+        for index in range(5):
+            _add_item(
+                session,
+                item_id=100 + index,
+                title=f"Recent item {index}",
+                description="普通商品",
+                created_at=base + timedelta(minutes=index),
+            )
+        _add_item(session, item_id=10, title="Target router", description="target match", created_at=base - timedelta(days=1))
+        _add_item(session, item_id=9, title="Target sold", description="target match", status="SOLD", created_at=base - timedelta(days=2))
+        session.add(MarketWantRecord(item_id=10, user_id=7, created_at=base, updated_at=base))
+        session.commit()
+
+        data = service.list_market(session, current_user_id=7, page=1, size=1, keyword="target", category=None)
+
+    assert data["meta"] == {"page": 1, "size": 1, "total": 2}
+    assert data["stats"] == {"active": 6, "sold": 1, "userCount": 0}
+    assert [(item["id"], item["wanted"]) for item in data["items"]] == [(10, True)]

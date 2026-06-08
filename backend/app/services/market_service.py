@@ -5,7 +5,7 @@ import json
 from typing import Any
 
 from fastapi import HTTPException, UploadFile, status
-from sqlalchemy import bindparam, func, or_, select, text
+from sqlalchemy import bindparam, case, func, or_, select, text
 from sqlalchemy.orm import Session
 
 from app.core.async_db import async_session_scope
@@ -30,7 +30,6 @@ from app.services.read_support import (
     compat_json_list_loads,
     compat_serialize_datetime,
     count_users_with_seed_fallback,
-    parse_iso_datetime,
     serialize_datetime,
 )
 
@@ -84,20 +83,39 @@ class MarketService:
                 size=size,
             )
         self._bootstrap(session)
-        wanted_ids = set(self.get_wanted_ids(session, current_user_id)) if current_user_id is not None else set()
-        all_items = self.market_repo.list_items(session)
-        items = [item for item in all_items if item.status in {"SALE", "SOLD"} and self._matches(item, keyword, category)]
-        items.sort(key=lambda item: -parse_iso_datetime(self._serialize_dt(item.created_at)).timestamp())
         safe_page = max(page, 1)
         safe_size = max(1, min(size, 50))
         start = (safe_page - 1) * safe_size
-        end = start + safe_size
+        normalized_category = self._normalize_category(category) if category else None
+        filters = self._public_market_filters(keyword=keyword, normalized_category=normalized_category)
+        total = int(session.scalar(select(func.count()).select_from(MarketItemRecord).where(*filters)) or 0)
+        items = list(
+            session.scalars(
+                select(MarketItemRecord)
+                .where(*filters)
+                .order_by(MarketItemRecord.created_at.desc(), MarketItemRecord.id.desc())
+                .limit(safe_size)
+                .offset(start)
+            )
+        )
+        item_ids = [int(item.id) for item in items]
+        wanted_ids = (
+            set(self.market_repo.wanted_ids_for_user_in_items(session, current_user_id, item_ids))
+            if current_user_id is not None
+            else set()
+        )
+        active_count, sold_count = session.execute(
+            select(
+                func.coalesce(func.sum(case((MarketItemRecord.status == "SALE", 1), else_=0)), 0),
+                func.coalesce(func.sum(case((MarketItemRecord.status == "SOLD", 1), else_=0)), 0),
+            )
+        ).one()
         return {
-            "items": [self._to_list_item(item, item.id in wanted_ids) for item in items[start:end]],
-            "meta": {"page": safe_page, "size": safe_size, "total": len(items)},
+            "items": [self._to_list_item(item, item.id in wanted_ids) for item in items],
+            "meta": {"page": safe_page, "size": safe_size, "total": total},
             "stats": {
-                "active": sum(1 for item in all_items if item.status == "SALE"),
-                "sold": sum(1 for item in all_items if item.status == "SOLD"),
+                "active": int(active_count or 0),
+                "sold": int(sold_count or 0),
                 "userCount": self._user_count_with_seed_fallback(session),
             },
         }
@@ -481,6 +499,15 @@ class MarketService:
             filters.append(MarketItemRecord.category == normalized_category)
         if normalized_status:
             filters.append(MarketItemRecord.status == normalized_status)
+        return filters
+
+    def _public_market_filters(self, *, keyword: str | None, normalized_category: str | None) -> list[Any]:
+        filters = self._admin_market_filters(
+            keyword=keyword,
+            normalized_category=normalized_category,
+            normalized_status=None,
+        )
+        filters.append(MarketItemRecord.status.in_(("SALE", "SOLD")))
         return filters
 
     def _assign_images(self, item: MarketItemRecord, keys: list[str]) -> None:
