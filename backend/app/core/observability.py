@@ -8,7 +8,7 @@ import time
 from app.core.config import Settings
 
 
-HTTP_DURATION_BUCKETS_SECONDS = (0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0)
+DURATION_BUCKETS_SECONDS = (0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0)
 
 
 def _sanitize_label(value: str) -> str:
@@ -24,16 +24,23 @@ class _Aggregate:
     count: int = 0
     total_seconds: float = 0.0
     max_seconds: float = 0.0
-    bucket_counts: dict[float, int] = field(default_factory=lambda: {bucket: 0 for bucket in HTTP_DURATION_BUCKETS_SECONDS})
+    bucket_counts: dict[float, int] = field(default_factory=lambda: {bucket: 0 for bucket in DURATION_BUCKETS_SECONDS})
 
     def observe(self, duration_seconds: float) -> None:
         bounded = max(0.0, float(duration_seconds))
         self.count += 1
         self.total_seconds += bounded
         self.max_seconds = max(self.max_seconds, bounded)
-        for bucket in HTTP_DURATION_BUCKETS_SECONDS:
+        for bucket in DURATION_BUCKETS_SECONDS:
             if bounded <= bucket:
                 self.bucket_counts[bucket] += 1
+
+
+def _append_duration_buckets(lines: list[str], *, metric_name: str, labels: str, aggregate: _Aggregate) -> None:
+    for bucket in DURATION_BUCKETS_SECONDS:
+        bucket_labels = f'{labels},le="{_format_bucket(bucket)}"'
+        lines.append(f"{metric_name}_bucket{{{bucket_labels}}} {aggregate.bucket_counts[bucket]}")
+    lines.append(f'{metric_name}_bucket{{{labels},le="+Inf"}} {aggregate.count}')
 
 
 class RuntimeMetrics:
@@ -199,10 +206,12 @@ class RuntimeMetrics:
             )
             for (method, route), aggregate in sorted(self._http_request_durations.items()):
                 labels = 'method="%s",route="%s"' % (_sanitize_label(method), _sanitize_label(route))
-                for bucket in HTTP_DURATION_BUCKETS_SECONDS:
-                    bucket_labels = f'{labels},le="{_format_bucket(bucket)}"'
-                    lines.append(f"studyhub_http_request_duration_seconds_bucket{{{bucket_labels}}} {aggregate.bucket_counts[bucket]}")
-                lines.append(f'studyhub_http_request_duration_seconds_bucket{{{labels},le="+Inf"}} {aggregate.count}')
+                _append_duration_buckets(
+                    lines,
+                    metric_name="studyhub_http_request_duration_seconds",
+                    labels=labels,
+                    aggregate=aggregate,
+                )
                 lines.append(f"studyhub_http_request_duration_seconds_count{{{labels}}} {aggregate.count}")
                 lines.append(f"studyhub_http_request_duration_seconds_sum{{{labels}}} {aggregate.total_seconds:.6f}")
                 lines.append(f"studyhub_http_request_duration_seconds_max{{{labels}}} {aggregate.max_seconds:.6f}")
@@ -210,32 +219,40 @@ class RuntimeMetrics:
                 [
                     "# HELP studyhub_worker_jobs_total Worker jobs executed by name and status.",
                     "# TYPE studyhub_worker_jobs_total counter",
-                    "# HELP studyhub_worker_job_duration_seconds_count Worker job count by name and status.",
-                    "# TYPE studyhub_worker_job_duration_seconds_count counter",
-                    "# HELP studyhub_worker_job_duration_seconds_sum Worker job duration sum by name and status.",
-                    "# TYPE studyhub_worker_job_duration_seconds_sum counter",
+                    "# HELP studyhub_worker_job_duration_seconds Worker job duration histogram by name and status.",
+                    "# TYPE studyhub_worker_job_duration_seconds histogram",
                 ]
             )
             for (job, status), count in sorted(self._worker_jobs_total.items()):
                 labels = 'job="%s",status="%s"' % (_sanitize_label(job), _sanitize_label(status))
                 lines.append(f"studyhub_worker_jobs_total{{{labels}}} {count}")
                 aggregate = self._worker_job_durations[(job, status)]
+                _append_duration_buckets(
+                    lines,
+                    metric_name="studyhub_worker_job_duration_seconds",
+                    labels=labels,
+                    aggregate=aggregate,
+                )
                 lines.append(f"studyhub_worker_job_duration_seconds_count{{{labels}}} {aggregate.count}")
                 lines.append(f"studyhub_worker_job_duration_seconds_sum{{{labels}}} {aggregate.total_seconds:.6f}")
             lines.extend(
                 [
                     "# HELP studyhub_mcp_tool_calls_total MCP tool calls by tool and status.",
                     "# TYPE studyhub_mcp_tool_calls_total counter",
-                    "# HELP studyhub_mcp_tool_duration_seconds_count MCP tool call count by tool and status.",
-                    "# TYPE studyhub_mcp_tool_duration_seconds_count counter",
-                    "# HELP studyhub_mcp_tool_duration_seconds_sum MCP tool call duration sum by tool and status.",
-                    "# TYPE studyhub_mcp_tool_duration_seconds_sum counter",
+                    "# HELP studyhub_mcp_tool_duration_seconds MCP tool call duration histogram by tool and status.",
+                    "# TYPE studyhub_mcp_tool_duration_seconds histogram",
                 ]
             )
             for (tool, status), count in sorted(self._mcp_tool_calls_total.items()):
                 labels = 'tool="%s",status="%s"' % (_sanitize_label(tool), _sanitize_label(status))
                 lines.append(f"studyhub_mcp_tool_calls_total{{{labels}}} {count}")
                 aggregate = self._mcp_tool_durations[(tool, status)]
+                _append_duration_buckets(
+                    lines,
+                    metric_name="studyhub_mcp_tool_duration_seconds",
+                    labels=labels,
+                    aggregate=aggregate,
+                )
                 lines.append(f"studyhub_mcp_tool_duration_seconds_count{{{labels}}} {aggregate.count}")
                 lines.append(f"studyhub_mcp_tool_duration_seconds_sum{{{labels}}} {aggregate.total_seconds:.6f}")
             lines.extend(
@@ -264,10 +281,8 @@ class RuntimeMetrics:
                 [
                     "# HELP studyhub_ai_agent_runs_total StudyHub Agent recommendation runs by provider, status, and bounded context usage.",
                     "# TYPE studyhub_ai_agent_runs_total counter",
-                    "# HELP studyhub_ai_agent_run_duration_seconds_count StudyHub Agent run count by provider, status, and bounded context usage.",
-                    "# TYPE studyhub_ai_agent_run_duration_seconds_count counter",
-                    "# HELP studyhub_ai_agent_run_duration_seconds_sum StudyHub Agent run duration sum by provider, status, and bounded context usage.",
-                    "# TYPE studyhub_ai_agent_run_duration_seconds_sum counter",
+                    "# HELP studyhub_ai_agent_run_duration_seconds StudyHub Agent run duration histogram by provider, status, and bounded context usage.",
+                    "# TYPE studyhub_ai_agent_run_duration_seconds histogram",
                     "# HELP studyhub_ai_agent_run_duration_seconds_max StudyHub Agent run max duration by provider, status, and bounded context usage.",
                     "# TYPE studyhub_ai_agent_run_duration_seconds_max gauge",
                 ]
@@ -284,6 +299,12 @@ class RuntimeMetrics:
                 )
                 lines.append(f"studyhub_ai_agent_runs_total{{{labels}}} {count}")
                 aggregate = self._ai_agent_run_durations[(provider, status, pdf_evidence, memory_context, course_memory_card)]
+                _append_duration_buckets(
+                    lines,
+                    metric_name="studyhub_ai_agent_run_duration_seconds",
+                    labels=labels,
+                    aggregate=aggregate,
+                )
                 lines.append(f"studyhub_ai_agent_run_duration_seconds_count{{{labels}}} {aggregate.count}")
                 lines.append(f"studyhub_ai_agent_run_duration_seconds_sum{{{labels}}} {aggregate.total_seconds:.6f}")
                 lines.append(f"studyhub_ai_agent_run_duration_seconds_max{{{labels}}} {aggregate.max_seconds:.6f}")
