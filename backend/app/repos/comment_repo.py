@@ -62,6 +62,12 @@ class CommentRepository:
     def get_comment(self, session: Session, comment_id: int) -> CommentRecord | None:
         return session.get(CommentRecord, comment_id)
 
+    def list_comments_by_ids(self, session: Session, comment_ids: list[int]) -> list[CommentRecord]:
+        if not comment_ids:
+            return []
+        stmt = select(CommentRecord).where(CommentRecord.id.in_(sorted(set(comment_ids))))
+        return list(session.scalars(stmt))
+
     def save_comment(self, session: Session, entity: CommentRecord) -> CommentRecord:
         session.add(entity)
         session.flush()

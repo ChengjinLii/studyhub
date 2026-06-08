@@ -431,6 +431,16 @@ class MaterialRepository:
     def get_material(self, session: Session, material_id: int) -> MaterialRecord | None:
         return session.get(MaterialRecord, material_id)
 
+    def list_materials_by_ids(self, session: Session, material_ids: list[int]) -> list[MaterialRecord]:
+        if not material_ids:
+            return []
+        stmt = (
+            select(MaterialRecord)
+            .options(*_material_record_load_options(session))
+            .where(MaterialRecord.id.in_(sorted(set(material_ids))))
+        )
+        return list(session.scalars(stmt))
+
     def next_material_id(self, session: Session, seed: dict[str, Any]) -> int:
         seed_max = max((int(item["id"]) for item in seed.get("materials") or []), default=0)
         db_max = int(session.scalar(select(func.max(MaterialRecord.id))) or 0)

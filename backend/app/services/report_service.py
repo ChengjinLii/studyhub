@@ -96,8 +96,9 @@ class ReportService:
             limit=safe_size,
             offset=safe_page * safe_size,
         )
+        lookups = self._build_report_lookups(session, items)
         return {
-            "items": [self._to_admin_item(session, item) for item in items],
+            "items": [self._to_admin_item(session, item, lookups=lookups) for item in items],
             "meta": {"page": safe_page, "size": safe_size, "total": total},
         }
 
@@ -210,9 +211,44 @@ class ReportService:
             user.status = "active"
             self.auth_repo.save_user(session, user)
 
-    def _to_admin_item(self, session: Session, entity: ReportRecord) -> dict[str, Any]:
-        target_label, target_status, target_url = self._resolve_target_info(session, entity.target_type, entity.target_id)
-        reporter = self.auth_repo.find_user_by_id(session, entity.reporter_id)
+    def _build_report_lookups(self, session: Session, items: list[ReportRecord]) -> dict[str, dict[int, Any]]:
+        lookups = {
+            "users": self._load_users_by_id(
+                session,
+                [
+                    *[int(item.reporter_id) for item in items],
+                    *[int(item.target_id) for item in items if item.target_type == "USER"],
+                ],
+            ),
+            "materials": self._load_records_by_id(self.material_repo, "list_materials_by_ids", session, [int(item.target_id) for item in items if item.target_type == "MATERIAL"]),
+            "comments": self._load_records_by_id(self.comment_repo, "list_comments_by_ids", session, [int(item.target_id) for item in items if item.target_type == "COMMENT"]),
+            "market_items": self._load_records_by_id(self.market_repo, "list_items_by_ids", session, [int(item.target_id) for item in items if item.target_type == "MARKET_ITEM"]),
+        }
+        return lookups
+
+    def _load_users_by_id(self, session: Session, user_ids: list[int]) -> dict[int, Any]:
+        ids = sorted(set(user_ids))
+        if not ids:
+            return {}
+        loader = getattr(self.auth_repo, "find_users_by_ids", None)
+        if not callable(loader):
+            return {}
+        return {int(user.id): user for user in loader(session, ids)}
+
+    def _load_records_by_id(self, repo, method_name: str, session: Session, record_ids: list[int]) -> dict[int, Any]:
+        ids = sorted(set(record_ids))
+        if not ids:
+            return {}
+        loader = getattr(repo, method_name, None)
+        if not callable(loader):
+            return {}
+        return {int(item.id): item for item in loader(session, ids)}
+
+    def _to_admin_item(self, session: Session, entity: ReportRecord, *, lookups: dict[str, dict[int, Any]] | None = None) -> dict[str, Any]:
+        target_label, target_status, target_url = self._resolve_target_info(session, entity.target_type, entity.target_id, lookups=lookups)
+        reporter = (lookups or {}).get("users", {}).get(int(entity.reporter_id))
+        if reporter is None:
+            reporter = self.auth_repo.find_user_by_id(session, entity.reporter_id)
         reporter_name = (reporter.nickname or reporter.username) if reporter is not None else None
         return {
             "id": entity.id,
@@ -229,14 +265,25 @@ class ReportService:
             "createdAt": serialize_datetime(entity.created_at),
         }
 
-    def _resolve_target_info(self, session: Session, target_type: str, target_id: int) -> tuple[str | None, str | None, str | None]:
+    def _resolve_target_info(
+        self,
+        session: Session,
+        target_type: str,
+        target_id: int,
+        *,
+        lookups: dict[str, dict[int, Any]] | None = None,
+    ) -> tuple[str | None, str | None, str | None]:
         if target_type == "MATERIAL":
-            entity = self.material_repo.get_material(session, target_id)
+            entity = (lookups or {}).get("materials", {}).get(int(target_id))
+            if entity is None:
+                entity = self.material_repo.get_material(session, target_id)
             if entity is None:
                 return "资料已删除", None, None
             return entity.title, entity.status, f"/materials/{entity.id}"
         if target_type == "COMMENT":
-            entity = self.comment_repo.get_comment(session, target_id)
+            entity = (lookups or {}).get("comments", {}).get(int(target_id))
+            if entity is None:
+                entity = self.comment_repo.get_comment(session, target_id)
             if entity is None:
                 return "评论已删除", None, None
             label = (entity.content or "评论内容为空").strip() or "评论内容为空"
@@ -244,11 +291,15 @@ class ReportService:
                 label = f"{label[:64]}..."
             return label, entity.status, f"/materials/{entity.material_id}#comment-{entity.id}"
         if target_type == "MARKET_ITEM":
-            entity = self.market_repo.get_item(session, target_id)
+            entity = (lookups or {}).get("market_items", {}).get(int(target_id))
+            if entity is None:
+                entity = self.market_repo.get_item(session, target_id)
             if entity is None:
                 return "商品已删除", None, None
             return entity.title, entity.status, f"/market/{entity.id}"
-        entity = self.auth_repo.find_user_by_id(session, target_id)
+        entity = (lookups or {}).get("users", {}).get(int(target_id))
+        if entity is None:
+            entity = self.auth_repo.find_user_by_id(session, target_id)
         if entity is None:
             return "用户已删除", None, None
         return entity.nickname or entity.username, entity.status, f"/u/{entity.id}"

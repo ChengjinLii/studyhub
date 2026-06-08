@@ -34,6 +34,47 @@ class _DummyAuthRepo:
         self.saved_users.append(user)
 
 
+class _BulkAuthRepo(_DummyAuthRepo):
+    def __init__(self, users_by_id: dict[int, object]) -> None:
+        super().__init__()
+        self.users_by_id = users_by_id
+        self.bulk_queries: list[list[int]] = []
+        self.single_queries: list[int] = []
+
+    def find_user_by_id(self, session: Session, user_id: int):
+        del session
+        self.single_queries.append(user_id)
+        return self.users_by_id.get(user_id)
+
+    def find_users_by_ids(self, session: Session, user_ids: list[int]):
+        del session
+        normalized = sorted(set(user_ids))
+        self.bulk_queries.append(normalized)
+        return [self.users_by_id[user_id] for user_id in normalized if user_id in self.users_by_id]
+
+
+class _BulkTargetRepo:
+    def __init__(self, records_by_id: dict[int, object], method_name: str) -> None:
+        self.records_by_id = records_by_id
+        self.method_name = method_name
+        self.bulk_queries: list[list[int]] = []
+
+    def ensure_seed_bootstrap(self, session: Session, seed: dict) -> None:
+        del session, seed
+
+    def __getattr__(self, name: str):
+        if name != self.method_name:
+            raise AttributeError(name)
+
+        def load(session: Session, record_ids: list[int]):
+            del session
+            normalized = sorted(set(record_ids))
+            self.bulk_queries.append(normalized)
+            return [self.records_by_id[record_id] for record_id in normalized if record_id in self.records_by_id]
+
+        return load
+
+
 class _NoFullListCommunityRepo(CommunityRepository):
     def list_reports(self, session: Session):
         del session
@@ -48,6 +89,23 @@ def _service(auth_repo: _DummyAuthRepo | None = None) -> ReportService:
         material_repo=seed_repo,  # type: ignore[arg-type]
         comment_repo=seed_repo,  # type: ignore[arg-type]
         market_repo=seed_repo,  # type: ignore[arg-type]
+        community_repo=_NoFullListCommunityRepo(),
+    )
+
+
+def _service_with_targets(
+    *,
+    auth_repo,
+    material_repo,
+    comment_repo,
+    market_repo,
+) -> ReportService:
+    return ReportService(
+        read_repo=_DummyReadRepo(),  # type: ignore[arg-type]
+        auth_repo=auth_repo,  # type: ignore[arg-type]
+        material_repo=material_repo,  # type: ignore[arg-type]
+        comment_repo=comment_repo,  # type: ignore[arg-type]
+        market_repo=market_repo,  # type: ignore[arg-type]
         community_repo=_NoFullListCommunityRepo(),
     )
 
@@ -154,3 +212,76 @@ def test_submit_report_counts_active_reports_without_loading_all_reports() -> No
 
     assert created_report == ("USER", 99, 6)
     assert [(user.id, user.status) for user in auth_repo.saved_users] == [(99, "hidden")]
+
+
+def test_admin_report_list_batches_reporters_and_target_info() -> None:
+    auth_repo = _BulkAuthRepo(
+        {
+            1: SimpleNamespace(id=1, username="reporter-a", nickname="Reporter A", status="active"),
+            2: SimpleNamespace(id=2, username="reporter-b", nickname="Reporter B", status="active"),
+            50: SimpleNamespace(id=50, username="target-user", nickname="Target User", status="active"),
+        }
+    )
+    material_repo = _BulkTargetRepo(
+        {301: SimpleNamespace(id=301, title="资料标题", status="VISIBLE")},
+        "list_materials_by_ids",
+    )
+    comment_repo = _BulkTargetRepo(
+        {401: SimpleNamespace(id=401, material_id=301, content="评论内容", status="visible")},
+        "list_comments_by_ids",
+    )
+    market_repo = _BulkTargetRepo(
+        {501: SimpleNamespace(id=501, title="商品标题", status="SALE")},
+        "list_items_by_ids",
+    )
+    service = _service_with_targets(
+        auth_repo=auth_repo,
+        material_repo=material_repo,
+        comment_repo=comment_repo,
+        market_repo=market_repo,
+    )
+    base = datetime(2026, 1, 1, tzinfo=UTC)
+    with _session() as session:
+        _add_report(session, report_id=1, status="PENDING", target_type="USER", target_id=50, reporter_id=1, created_at=base)
+        _add_report(
+            session,
+            report_id=2,
+            status="PENDING",
+            target_type="MATERIAL",
+            target_id=301,
+            reporter_id=2,
+            created_at=base + timedelta(minutes=1),
+        )
+        _add_report(
+            session,
+            report_id=3,
+            status="PENDING",
+            target_type="COMMENT",
+            target_id=401,
+            reporter_id=1,
+            created_at=base + timedelta(minutes=2),
+        )
+        _add_report(
+            session,
+            report_id=4,
+            status="PENDING",
+            target_type="MARKET_ITEM",
+            target_id=501,
+            reporter_id=2,
+            created_at=base + timedelta(minutes=3),
+        )
+        session.commit()
+
+        data = service.list_for_admin(session, page=0, size=20, status_value="pending", target_type=None)
+
+    assert auth_repo.bulk_queries == [[1, 2, 50]]
+    assert auth_repo.single_queries == []
+    assert material_repo.bulk_queries == [[301]]
+    assert comment_repo.bulk_queries == [[401]]
+    assert market_repo.bulk_queries == [[501]]
+    assert [(item["targetLabel"], item["reporterName"]) for item in data["items"]] == [
+        ("商品标题", "Reporter B"),
+        ("评论内容", "Reporter A"),
+        ("资料标题", "Reporter B"),
+        ("Target User", "Reporter A"),
+    ]
