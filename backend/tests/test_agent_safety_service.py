@@ -136,6 +136,32 @@ def test_agent_safety_does_not_repeat_low_evidence_caveat() -> None:
     assert sanitized["answer"] == "我只能基于候选资料元数据给出保守建议，建议先确认课程范围。"
 
 
+def test_agent_safety_rejects_candidate_denial_when_candidates_exist() -> None:
+    sanitized = AgentSafetyService().sanitize_recommendation_body(
+        {
+            "answer": "目前我这边没有收到任何 ESD 的候选资料，所以不能基于指定资料直接分析考题风格。",
+            "followup_questions": ["你可以把真题发给我吗？"],
+        },
+        candidate_materials=[_material()],
+        pdf_evidence=[],
+    )
+
+    assert sanitized is None
+
+
+def test_agent_safety_rejects_pdf_page_overclaim_without_pdf_evidence() -> None:
+    sanitized = AgentSafetyService().sanitize_recommendation_body(
+        {
+            "answer": "我看了《通信原理四年真题解析》第 3 页，近年常考计算题。",
+            "recommendations": [{"material_id": 101, "reason": "标题和标签匹配通信原理真题"}],
+        },
+        candidate_materials=[_material()],
+        pdf_evidence=[],
+    )
+
+    assert sanitized is None
+
+
 def test_agent_safety_filters_anchor_internal_field_names_from_answer() -> None:
     sanitized = AgentSafetyService().sanitize_recommendation_body(
         {
@@ -314,6 +340,42 @@ def test_ai_recommendation_falls_back_when_model_output_is_unsafe(monkeypatch) -
         "你更想要真题、笔记还是经验分享？",
         "是否需要限定学校、学院或专业？",
     ]
+
+
+def test_ai_recommendation_falls_back_when_model_overclaims_pdf_pages(monkeypatch) -> None:
+    settings = Settings(
+        ai_agent_provider="openai-compatible",
+        ai_agent_base_url="https://example.test/v1",
+        ai_agent_api_key="test-key",
+        ai_agent_model="demo-model",
+    )
+    monkeypatch.setattr("app.services.ai_service.get_settings", lambda: settings)
+
+    service = AiService(read_repo=None, material_repo=None)  # type: ignore[arg-type]
+    monkeypatch.setattr(service, "_rank_materials", lambda session, query, filters: [_material()])
+
+    def fake_call_agent_model(settings: Settings, system_prompt: str, user_prompt: dict[str, Any]) -> str:
+        del settings, system_prompt, user_prompt
+        return json.dumps(
+            {
+                "answer": "我看了《通信原理四年真题解析》第 3 页，通信原理近年常考计算题。",
+                "recommendations": [{"material_id": 101, "reason": "标题和标签匹配通信原理真题"}],
+            },
+            ensure_ascii=False,
+        )
+
+    monkeypatch.setattr(service, "_call_agent_model", fake_call_agent_model)
+
+    response = service.recommend(
+        object(),  # type: ignore[arg-type]
+        SimpleNamespace(query="通信原理往年题常考什么", filters={}),
+        current_user_id=7,
+    )
+    body = json.loads(str(response["output"]).removeprefix("<json>").removesuffix("</json>"))
+
+    assert "第 3 页" not in body["answer"]
+    assert body["answer"].startswith("我先基于 StudyHub 资料库找到")
+    assert body["recommendations"][0]["material_id"] == 101
 
 
 def test_ai_model_prompt_redacts_sensitive_material_and_pdf_context(monkeypatch) -> None:

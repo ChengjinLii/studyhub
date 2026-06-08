@@ -88,6 +88,10 @@ class AgentSafetyService:
 
         if had_recommendation_list and not recommendations:
             answer = ""
+        if answer and candidate_materials and _answer_denies_candidate_materials(answer):
+            return None
+        if answer and not pdf_evidence and _answer_overclaims_pdf_evidence(answer):
+            return None
         if answer and pdf_evidence:
             if not evidence_sources:
                 evidence_sources = self._fallback_evidence_sources(pdf_evidence)
@@ -468,6 +472,43 @@ def _answer_mentions_low_evidence_boundary(answer: str) -> bool:
     )
     normalized = answer.lower()
     return any(marker in normalized for marker in markers)
+
+
+def _answer_denies_candidate_materials(answer: str) -> bool:
+    normalized = re.sub(r"\s+", "", answer).lower()
+    markers = (
+        "没有收到任何",
+        "没有收到可用",
+        "没有可用的studyhub候选资料",
+        "没有可用studyhub候选资料",
+        "没有候选资料",
+        "没有studyhub候选资料",
+        "不能基于指定资料",
+        "无法基于指定资料",
+        "没有匹配到相关资料",
+    )
+    return any(marker in normalized for marker in markers)
+
+
+def _answer_overclaims_pdf_evidence(answer: str) -> bool:
+    normalized = re.sub(r"\s+", "", answer).lower()
+    markers = (
+        "已读取pdf",
+        "读取到相关pdf",
+        "读到相关pdf",
+        "看了pdf",
+        "pdf页级证据",
+        "已读取页码",
+        "已读页面",
+        "引用页",
+    )
+    if any(marker in normalized for marker in markers):
+        return True
+    if re.search(r"第\d{1,4}页", normalized):
+        return True
+    if re.search(r"来源[:：]?《[^》]{1,120}》第\d{1,4}页", normalized):
+        return True
+    return False
 
 
 def _source_hint(evidence_sources: list[dict[str, Any]]) -> str:
