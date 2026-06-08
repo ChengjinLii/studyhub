@@ -355,6 +355,21 @@ def _column_warning_payloads(
                 "reason": "existing column nullable flag differs from SQLAlchemy metadata",
             }
         )
+
+    expected_default = _default_sql(column, dialect)
+    if expected_default is not None:
+        actual_default = _actual_default_sql(actual_column)
+        if _normalize_default_sql(actual_default) != _normalize_default_sql(expected_default):
+            warnings.append(
+                {
+                    "table": table.name,
+                    "column": column.name,
+                    "kind": "default",
+                    "expectedDefault": expected_default,
+                    "actualDefault": actual_default,
+                    "reason": "existing column default differs from SQLAlchemy metadata",
+                }
+            )
     return warnings
 
 
@@ -421,6 +436,35 @@ def _normalize_column_type_sql(value: str) -> str:
         return "INTEGER"
     if normalized in {"BOOL", "BOOLEAN"}:
         return "BOOLEAN"
+    return normalized
+
+
+def _actual_default_sql(actual_column: Mapping[str, Any]) -> str | None:
+    value = actual_column.get("default")
+    if value is None:
+        return None
+    return str(value)
+
+
+def _normalize_default_sql(value: str | None) -> str | None:
+    if value is None:
+        return None
+    normalized = " ".join(str(value).strip().split())
+    if normalized.upper().startswith("DEFAULT "):
+        normalized = normalized[8:].strip()
+    while normalized.startswith("(") and normalized.endswith(")") and len(normalized) >= 2:
+        normalized = normalized[1:-1].strip()
+    if (
+        len(normalized) >= 2
+        and normalized[0] == normalized[-1]
+        and normalized[0] in {"'", '"'}
+    ):
+        normalized = normalized[1:-1]
+    upper = normalized.upper()
+    if upper in {"NOW()", "CURRENT_TIMESTAMP()"}:
+        return "CURRENT_TIMESTAMP"
+    if upper in {"TRUE", "FALSE"}:
+        return "1" if upper == "TRUE" else "0"
     return normalized
 
 

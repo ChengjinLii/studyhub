@@ -126,7 +126,7 @@ def test_schema_audit_reports_type_and_nullable_warnings_separately() -> None:
         actual_columns_by_table={"market_items": {"id", "source", "enabled"}},
         actual_column_details_by_table={
             "market_items": {
-                "source": {"name": "source", "type": String(32), "nullable": True},
+                "source": {"name": "source", "type": String(32), "nullable": True, "default": "'legacy'"},
                 "enabled": {"name": "enabled", "type": mysql.TINYINT(display_width=1), "nullable": True},
             }
         },
@@ -138,6 +138,7 @@ def test_schema_audit_reports_type_and_nullable_warnings_separately() -> None:
     assert warning_keys == {
         ("market_items", "source", "type"),
         ("market_items", "source", "nullable"),
+        ("market_items", "source", "default"),
     }
     assert payload["missingColumns"] == []
     assert payload["destructiveChanges"] == []
