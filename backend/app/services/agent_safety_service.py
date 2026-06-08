@@ -240,6 +240,13 @@ class AgentSafetyService:
                 "title": _clean_public_title(evidence.title, max_chars=120),
                 "page": page,
             }
+            excerpt = _clean_public_text(evidence.text, max_chars=240)
+            if excerpt:
+                source["excerpt"] = excerpt
+            if evidence.years:
+                source["years"] = list(evidence.years[:6])
+            if evidence.question_types:
+                source["question_types"] = list(evidence.question_types[:6])
             if evidence.question_numbers:
                 source["question_numbers"] = list(evidence.question_numbers)
             if evidence.source_type != "unknown":
@@ -276,15 +283,13 @@ class AgentSafetyService:
                 "title": _clean_public_title(evidence.title, max_chars=120),
                 "page": page,
             }
-            excerpt = _clean_public_text(raw_item.get("excerpt"), max_chars=240)
+            excerpt = _clean_public_text(evidence.text, max_chars=240)
             if excerpt:
                 source["excerpt"] = excerpt
-            years = _clean_public_list(raw_item.get("years"), limit=6, max_chars=16)
-            if years:
-                source["years"] = years
-            question_types = _clean_public_list(raw_item.get("question_types"), limit=6, max_chars=40)
-            if question_types:
-                source["question_types"] = question_types
+            if evidence.years:
+                source["years"] = list(evidence.years[:6])
+            if evidence.question_types:
+                source["question_types"] = list(evidence.question_types[:6])
             if evidence.question_numbers:
                 source["question_numbers"] = list(evidence.question_numbers)
             if evidence.source_type != "unknown":
@@ -303,6 +308,13 @@ class AgentSafetyService:
                 "title": _clean_public_title(evidence.title, max_chars=120),
                 "page": int(evidence.page),
             }
+            excerpt = _clean_public_text(evidence.text, max_chars=240)
+            if excerpt:
+                source["excerpt"] = excerpt
+            if evidence.years:
+                source["years"] = list(evidence.years[:6])
+            if evidence.question_types:
+                source["question_types"] = list(evidence.question_types[:6])
             if evidence.question_numbers:
                 source["question_numbers"] = list(evidence.question_numbers)
             if evidence.source_type != "unknown":

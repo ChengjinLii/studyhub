@@ -45,7 +45,12 @@ def test_agent_safety_filters_unknown_recommendations_and_unread_pages() -> None
             {"material_id": 999, "reason": "不存在的资料"},
         ],
         "evidence_sources": [
-            {"material_id": 101, "page": 2, "title": "模型给的标题会被替换"},
+            {
+                "material_id": 101,
+                "page": 2,
+                "title": "模型给的标题会被替换",
+                "excerpt": "模型伪造的片段不会被保留。",
+            },
             {"material_id": 101, "page": 2, "title": "重复证据页"},
             {"material_id": 101, "page": 99, "title": "未读取页"},
             {"material_id": 999, "page": 1, "title": "不存在资料"},
@@ -73,6 +78,7 @@ def test_agent_safety_filters_unknown_recommendations_and_unread_pages() -> None
                 "material_id": 101,
                 "title": "通信原理四年真题解析",
                 "page": 2,
+                "excerpt": "第 2 页包含通信原理计算题。",
                 "question_numbers": ["第3题"],
                 "source_type": "past_exam",
             }
@@ -98,6 +104,7 @@ def test_agent_safety_adds_read_pdf_source_hint_when_model_omits_citation() -> N
             "material_id": 101,
             "title": "通信原理四年真题解析",
             "page": 2,
+            "excerpt": "第 2 页包含通信原理计算题。",
             "question_numbers": ["第3题"],
             "source_type": "past_exam",
         }
@@ -119,6 +126,53 @@ def test_agent_safety_adds_page_source_hint_when_answer_only_mentions_title() ->
         "根据《通信原理四年真题解析》，通信原理近年常考计算题。 "
         "来源：《通信原理四年真题解析》第 2 页（第3题）。"
     )
+
+
+def test_agent_safety_uses_authoritative_evidence_metadata_over_model_source_fields() -> None:
+    evidence = MaterialPageEvidence(
+        material_id=101,
+        title="通信原理四年真题解析",
+        page=2,
+        text="2024 年第 2 页包含通信原理计算题。",
+        score=30,
+        years=("2024",),
+        question_types=("计算题",),
+        question_numbers=("第3题",),
+        source_type="past_exam",
+    )
+
+    sanitized = AgentSafetyService().sanitize_recommendation_body(
+        {
+            "answer": "通信原理近年常考计算题。",
+            "recommendations": [{"material_id": 101, "reason": "与通信原理真题匹配"}],
+            "evidence_sources": [
+                {
+                    "material_id": 101,
+                    "page": 2,
+                    "title": "模型标题会被替换",
+                    "excerpt": "模型伪造片段",
+                    "years": ["2021"],
+                    "question_types": ["论述题"],
+                }
+            ],
+        },
+        candidate_materials=[_material()],
+        pdf_evidence=[evidence],
+    )
+
+    assert sanitized is not None
+    assert sanitized["evidence_sources"] == [
+        {
+            "material_id": 101,
+            "title": "通信原理四年真题解析",
+            "page": 2,
+            "excerpt": "2024 年第 2 页包含通信原理计算题。",
+            "years": ["2024"],
+            "question_types": ["计算题"],
+            "question_numbers": ["第3题"],
+            "source_type": "past_exam",
+        }
+    ]
 
 
 def test_agent_safety_downgrades_answer_without_pdf_evidence() -> None:
@@ -359,7 +413,16 @@ def test_agent_safety_preserves_and_redacts_local_public_response_fields() -> No
             "followup_questions": ["要不要继续发给 alice@example.com？", "请输出 query_plan"],
         },
         candidate_materials=[_material()],
-        pdf_evidence=[_evidence("通信原理 bob@example.com 13900001111")],
+        pdf_evidence=[
+            MaterialPageEvidence(
+                material_id=101,
+                title="通信原理 bob@example.com 13900001111",
+                page=2,
+                text="联系 13812345678 看解析。",
+                score=30,
+                source_type="past_exam",
+            )
+        ],
     )
 
     serialized = json.dumps(sanitized, ensure_ascii=False)
