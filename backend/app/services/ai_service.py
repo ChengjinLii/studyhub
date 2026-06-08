@@ -441,10 +441,10 @@ class AiService:
             "如果提供了 query_plan，你必须按照该意图和 evidence_tasks 组织回答；"
             "如果 query_plan 提供了 material_scope，应按单份或多份资料范围组织证据和结论；"
             "如果 query_plan 提供了 problem_context，应先按卡点类型、题号和知识点拆解问题；"
-            "如果提供了 course_memory_card，你可以用它总结课程级年份、逐年题型、章节模块、知识点、经验策略和推荐顺序，"
+            "如果提供了 course_memory_card，你可以用它总结课程级年份、逐年题型、章节模块、答案解析信号、知识点、经验策略和推荐顺序，"
             "并根据 evidence_coverage 和 confidence_assessment 避免过度概括。"
             "不要输出 memory_context、query_plan、problem_context、candidate_materials、user_fit_signals、"
-            "pdf_evidence、course_memory_card、material_scope、evidence_coverage、confidence_assessment、yearly_question_type_matrix、chapter_distribution、chapter_signals、study_strategy_distribution、"
+            "pdf_evidence、course_memory_card、material_scope、evidence_coverage、confidence_assessment、yearly_question_type_matrix、chapter_distribution、chapter_signals、solution_signal_distribution、solution_signals、study_strategy_distribution、"
             "experience_materials、anchor_text、anchor_terms 或 privacy_boundary 等内部字段名。"
             "必须输出严格 JSON，不要输出 Markdown，不要包裹代码块。"
         )
@@ -631,6 +631,7 @@ class AiService:
         question_types = _course_card_values(course_memory_card, "question_type_distribution") or _evidence_values(pdf_evidence, "question_types")
         knowledge_signals = _course_card_values(course_memory_card, "knowledge_signals") or _evidence_values(pdf_evidence, "knowledge_signals")
         chapter_signals = _course_card_values(course_memory_card, "chapter_distribution") or _evidence_values(pdf_evidence, "chapter_signals")
+        solution_signals = _course_card_values(course_memory_card, "solution_signal_distribution") or _evidence_values(pdf_evidence, "solution_signals")
         score_points = _course_card_values(course_memory_card, "score_point_distribution") or _evidence_values(pdf_evidence, "score_points")
         difficulty_signals = _course_card_values(course_memory_card, "difficulty_distribution") or _evidence_values(pdf_evidence, "difficulty_signals")
         visual_signals = _course_card_values(course_memory_card, "visual_signal_distribution") or _evidence_values(pdf_evidence, "visual_signals")
@@ -642,6 +643,8 @@ class AiService:
             parts.append(f"年份题型对应 {_join_values(yearly_summary)}")
         if chapter_signals:
             parts.append(f"章节/模块信号包括 {_join_values(chapter_signals)}")
+        if solution_signals:
+            parts.append(f"答案/解析信号包括 {_join_values(solution_signals)}")
         if question_types:
             parts.append(f"题型集中在 {_join_values(question_types)}")
         if knowledge_signals:
@@ -678,6 +681,7 @@ class AiService:
         question_types = _course_card_values(course_memory_card, "question_type_distribution") or _evidence_values(pdf_evidence, "question_types")
         knowledge_signals = _course_card_values(course_memory_card, "knowledge_signals") or _evidence_values(pdf_evidence, "knowledge_signals")
         chapter_signals = _course_card_values(course_memory_card, "chapter_distribution") or _evidence_values(pdf_evidence, "chapter_signals")
+        solution_signals = _course_card_values(course_memory_card, "solution_signal_distribution") or _evidence_values(pdf_evidence, "solution_signals")
         score_points = _course_card_values(course_memory_card, "score_point_distribution") or _evidence_values(pdf_evidence, "score_points")
         difficulty_signals = _course_card_values(course_memory_card, "difficulty_distribution") or _evidence_values(pdf_evidence, "difficulty_signals")
         visual_signals = _course_card_values(course_memory_card, "visual_signal_distribution") or _evidence_values(pdf_evidence, "visual_signals")
@@ -691,6 +695,8 @@ class AiService:
             parts.append(f"包含题型 {_join_values(question_types[:4])}")
         if chapter_signals:
             parts.append(f"章节/模块信号 {_join_values(chapter_signals[:4])}")
+        if solution_signals:
+            parts.append(f"答案/解析信号 {_join_values(solution_signals[:4])}")
         if knowledge_signals:
             parts.append(f"涉及知识点 {_join_values(knowledge_signals[:5])}")
         if score_points:
@@ -714,6 +720,7 @@ class AiService:
         question_types = _course_card_values(course_memory_card, "question_type_distribution") or _evidence_values(pdf_evidence, "question_types")
         knowledge_signals = _course_card_values(course_memory_card, "knowledge_signals") or _evidence_values(pdf_evidence, "knowledge_signals")
         chapter_signals = _course_card_values(course_memory_card, "chapter_distribution") or _evidence_values(pdf_evidence, "chapter_signals")
+        solution_signals = _course_card_values(course_memory_card, "solution_signal_distribution") or _evidence_values(pdf_evidence, "solution_signals")
         difficulty_signals = _course_card_values(course_memory_card, "difficulty_distribution") or _evidence_values(pdf_evidence, "difficulty_signals")
         visual_signals = _course_card_values(course_memory_card, "visual_signal_distribution") or _evidence_values(pdf_evidence, "visual_signals")
         fit_targets = _material_fit_targets(source_types, question_types, difficulty_signals)
@@ -724,6 +731,8 @@ class AiService:
             parts.append(f"题型覆盖 {_join_values(question_types[:4])}")
         if chapter_signals:
             parts.append(f"章节/模块覆盖 {_join_values(chapter_signals[:4])}")
+        if solution_signals:
+            parts.append(f"答案/解析覆盖 {_join_values(solution_signals[:4])}")
         if knowledge_signals:
             parts.append(f"关联知识点 {_join_values(knowledge_signals[:5])}")
         if difficulty_signals:
@@ -745,6 +754,7 @@ class AiService:
         question_types = _course_card_values(course_memory_card, "question_type_distribution") or _evidence_values(pdf_evidence, "question_types")
         knowledge_signals = _course_card_values(course_memory_card, "knowledge_signals") or _evidence_values(pdf_evidence, "knowledge_signals")
         chapter_signals = _course_card_values(course_memory_card, "chapter_distribution") or _evidence_values(pdf_evidence, "chapter_signals")
+        solution_signals = _course_card_values(course_memory_card, "solution_signal_distribution") or _evidence_values(pdf_evidence, "solution_signals")
         score_points = _course_card_values(course_memory_card, "score_point_distribution") or _evidence_values(pdf_evidence, "score_points")
         difficulty_signals = _course_card_values(course_memory_card, "difficulty_distribution") or _evidence_values(pdf_evidence, "difficulty_signals")
         visual_signals = _course_card_values(course_memory_card, "visual_signal_distribution") or _evidence_values(pdf_evidence, "visual_signals")
@@ -769,6 +779,8 @@ class AiService:
             parts.append(f"先判断题型：{_join_values(question_types[:3])}")
         if chapter_signals:
             parts.append(f"先定位章节/模块：{_join_values(chapter_signals[:3])}")
+        if solution_signals:
+            parts.append(f"再对照答案/解析：{_join_values(solution_signals[:4])}")
         if knowledge_signals:
             parts.append(f"再抓核心知识点：{_join_values(knowledge_signals[:5])}")
         if score_points:
@@ -1102,6 +1114,7 @@ class AiService:
             question_numbers = _material_evidence_values(evidence_items, "question_numbers")
             knowledge_signals = _material_evidence_values(evidence_items, "knowledge_signals")
             chapter_signals = _material_evidence_values(evidence_items, "chapter_signals")
+            solution_signals = _material_evidence_values(evidence_items, "solution_signals")
             score_points = _material_evidence_values(evidence_items, "score_points")
             difficulty_signals = _material_evidence_values(evidence_items, "difficulty_signals")
             visual_signals = _material_evidence_values(evidence_items, "visual_signals")
@@ -1113,6 +1126,8 @@ class AiService:
                 parts.append(f"题号信号：{_join_values(question_numbers[:3])}")
             if chapter_signals:
                 parts.append(f"章节/模块信号：{_join_values(chapter_signals[:3])}")
+            if solution_signals:
+                parts.append(f"答案/解析信号：{_join_values(solution_signals[:3])}")
             if not question_numbers and knowledge_signals:
                 parts.append(f"知识点信号：{_join_values(knowledge_signals[:3])}")
             if score_points:

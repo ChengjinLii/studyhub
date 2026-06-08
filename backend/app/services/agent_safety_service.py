@@ -23,6 +23,8 @@ FORBIDDEN_INTERNAL_MARKERS = (
     "yearly_question_type_matrix",
     "chapter_distribution",
     "chapter_signals",
+    "solution_signal_distribution",
+    "solution_signals",
     "user_fit_signals",
     "anchor_text",
     "anchor_terms",

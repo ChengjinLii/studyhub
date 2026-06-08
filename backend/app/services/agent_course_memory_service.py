@@ -25,6 +25,7 @@ class CourseMemoryCard:
     question_type_distribution: tuple[dict[str, Any], ...]
     knowledge_signals: tuple[dict[str, Any], ...]
     chapter_distribution: tuple[dict[str, Any], ...]
+    solution_signal_distribution: tuple[dict[str, Any], ...]
     score_point_distribution: tuple[dict[str, Any], ...]
     difficulty_distribution: tuple[dict[str, Any], ...]
     visual_signal_distribution: tuple[dict[str, Any], ...]
@@ -50,6 +51,7 @@ class CourseMemoryCard:
             "question_type_distribution": list(self.question_type_distribution),
             "knowledge_signals": list(self.knowledge_signals),
             "chapter_distribution": list(self.chapter_distribution),
+            "solution_signal_distribution": list(self.solution_signal_distribution),
             "score_point_distribution": list(self.score_point_distribution),
             "difficulty_distribution": list(self.difficulty_distribution),
             "visual_signal_distribution": list(self.visual_signal_distribution),
@@ -88,6 +90,7 @@ class AgentCourseMemoryService:
         question_types = _counter_payload(_question_type_counter(pdf_evidence, memory_context), limit=6)
         knowledge_signals = _counter_payload(_knowledge_counter(pdf_evidence), limit=8)
         chapter_signals = _counter_payload(_chapter_counter(pdf_evidence, memory_context), limit=8)
+        solution_signals = _counter_payload(_solution_signal_counter(pdf_evidence, memory_context), limit=8)
         score_points = _counter_payload(_score_point_counter(pdf_evidence), limit=8)
         difficulty_signals = _counter_payload(_difficulty_counter(pdf_evidence), limit=5)
         visual_signals = _counter_payload(_visual_counter(pdf_evidence), limit=5)
@@ -115,6 +118,7 @@ class AgentCourseMemoryService:
             question_type_distribution=tuple(question_types),
             knowledge_signals=tuple(knowledge_signals),
             chapter_distribution=tuple(chapter_signals),
+            solution_signal_distribution=tuple(solution_signals),
             score_point_distribution=tuple(score_points),
             difficulty_distribution=tuple(difficulty_signals),
             visual_signal_distribution=tuple(visual_signals),
@@ -199,6 +203,22 @@ def _chapter_counter(
         return counter
     platform = memory_context.platform if memory_context else {}
     for item in platform.get("pdf_chapter_signals") or []:
+        if isinstance(item, dict) and item.get("value"):
+            counter[str(item["value"])] += int(item.get("count") or 1)
+    return counter
+
+
+def _solution_signal_counter(
+    pdf_evidence: list[MaterialPageEvidence],
+    memory_context: AgentMemoryContext | None,
+) -> Counter[str]:
+    counter: Counter[str] = Counter()
+    for evidence in pdf_evidence:
+        counter.update(evidence.solution_signals)
+    if pdf_evidence:
+        return counter
+    platform = memory_context.platform if memory_context else {}
+    for item in platform.get("pdf_solution_signals") or []:
         if isinstance(item, dict) and item.get("value"):
             counter[str(item["value"])] += int(item.get("count") or 1)
     return counter
@@ -417,6 +437,8 @@ def _page_references(pdf_evidence: list[MaterialPageEvidence]) -> list[dict[str,
             payload["question_numbers"] = list(evidence.question_numbers)
         if evidence.chapter_signals:
             payload["chapter_signals"] = list(evidence.chapter_signals)
+        if evidence.solution_signals:
+            payload["solution_signals"] = list(evidence.solution_signals)
         if evidence.score_points:
             payload["score_points"] = list(evidence.score_points)
         if evidence.difficulty_signals:
@@ -503,6 +525,8 @@ def _evidence_ref_basis(item: MaterialPageEvidence) -> dict[str, Any]:
     }
     if item.chapter_signals:
         payload["chapter_signals"] = list(item.chapter_signals)
+    if item.solution_signals:
+        payload["solution_signals"] = list(item.solution_signals)
     if item.score_points:
         payload["score_points"] = list(item.score_points)
     if item.difficulty_signals:

@@ -46,6 +46,7 @@ def _evidence() -> MaterialPageEvidence:
         question_types=("计算题",),
         knowledge_signals=("调制", "解调"),
         chapter_signals=("第2章 调制解调",),
+        solution_signals=("参考答案", "解题步骤"),
         question_numbers=("第3题",),
         source_type="past_exam",
         score_points=(10,),
@@ -93,6 +94,7 @@ def test_course_memory_card_summarizes_current_request_collective_signals() -> N
         "years": ["2024"],
         "question_types": ["计算题"],
         "chapter_signals": ["第2章 调制解调"],
+        "solution_signals": ["参考答案", "解题步骤"],
         "question_numbers": ["第3题"],
         "source_type": "past_exam",
         "score_points": [10],
@@ -122,6 +124,7 @@ def test_course_memory_card_summarizes_current_request_collective_signals() -> N
     assert payload["question_type_distribution"] == [{"value": "计算题", "count": 1}]
     assert payload["knowledge_signals"] == [{"value": "调制", "count": 1}, {"value": "解调", "count": 1}]
     assert payload["chapter_distribution"] == [{"value": "第2章 调制解调", "count": 1}]
+    assert payload["solution_signal_distribution"] == [{"value": "参考答案", "count": 1}, {"value": "解题步骤", "count": 1}]
     assert payload["score_point_distribution"] == [{"value": "10", "count": 1}]
     assert payload["difficulty_distribution"] == [{"value": "综合", "count": 1}, {"value": "偏难", "count": 1}]
     assert payload["visual_signal_distribution"] == [{"value": "公式", "count": 1}, {"value": "图示", "count": 1}]
@@ -137,6 +140,7 @@ def test_course_memory_card_summarizes_current_request_collective_signals() -> N
     ]
     assert payload["page_references"][0]["question_numbers"] == ["第3题"]
     assert payload["page_references"][0]["chapter_signals"] == ["第2章 调制解调"]
+    assert payload["page_references"][0]["solution_signals"] == ["参考答案", "解题步骤"]
     assert payload["page_references"][0]["score_points"] == [10]
     assert payload["page_references"][0]["difficulty_signals"] == ["综合", "偏难"]
     assert payload["page_references"][0]["visual_signals"] == ["公式", "图示"]
