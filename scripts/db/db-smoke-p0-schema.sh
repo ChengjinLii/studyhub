@@ -17,21 +17,21 @@ if [[ "$ENVIRONMENT" == "production" && ! -f "$PRIVATE_DIR/.env.production" ]]; 
   exit 1
 fi
 
-echo "[1/6] verify P0 schema columns"
+echo "[1/7] verify P0 schema columns"
 STUDYHUB_ENVIRONMENT="$ENVIRONMENT" \
 STUDYHUB_PRIVATE_DIR_PATH="$PRIVATE_DIR" \
 bash "$ROOT_DIR/scripts/db/db-verify-p0-schema.sh"
 
-echo "[2/6] backend healthz"
+echo "[2/7] backend healthz"
 curl --fail --silent --show-error "${BACKEND_BASE%/}/api/healthz" >/dev/null
 
-echo "[3/6] backend readyz"
+echo "[3/7] backend readyz"
 curl --fail --silent --show-error "${BACKEND_BASE%/}/api/readyz" >/dev/null
 
-echo "[4/6] backend metrics"
+echo "[4/7] backend metrics"
 curl --fail --silent --show-error "${BACKEND_BASE%/}/api/metrics" | grep -q "studyhub_app_info"
 
-echo "[5/6] key readonly APIs"
+echo "[5/7] key readonly APIs"
 curl --fail --silent --show-error "${BACKEND_BASE%/}/api/materials?page=1&pageSize=3" >/dev/null
 curl --fail --silent --show-error "${BACKEND_BASE%/}/api/requests?sort=hot&limit=3" >/dev/null
 
