@@ -613,6 +613,7 @@ class MaterialsService(MaterialsCompatMixin):
         self.material_repo.save_material(session, material)
         self.material_repo.add_version(session, material_id=material.id, version_label="v1.0")
         session.commit()
+        self.invalidate_material_summary_cache()
         return self.get_detail(session, uploader_id, material.id)
 
     def update_material(
@@ -636,6 +637,7 @@ class MaterialsService(MaterialsCompatMixin):
         self.material_repo.add_version(session, material_id=material.id, version_label=f"v{version_index}.0")
         self.material_repo.save_material(session, material)
         session.commit()
+        self.invalidate_material_summary_cache()
         return self.get_detail(session, operator_id, material.id, can_manage_all)
 
     def delete_material(self, session: Session, material_id: int, *, operator_id: int, can_manage_all: bool) -> None:
@@ -645,6 +647,7 @@ class MaterialsService(MaterialsCompatMixin):
         material.deleted_at = datetime.now(UTC)
         self.material_repo.save_material(session, material)
         session.commit()
+        self.invalidate_material_summary_cache()
 
     def restore_material(self, session: Session, material_id: int, *, can_manage_all: bool) -> dict[str, Any]:
         self._bootstrap(session)
@@ -655,6 +658,7 @@ class MaterialsService(MaterialsCompatMixin):
         material.deleted_at = None
         self.material_repo.save_material(session, material)
         session.commit()
+        self.invalidate_material_summary_cache()
         return admin_material_item(material)
 
     def list_for_admin(
@@ -727,6 +731,8 @@ class MaterialsService(MaterialsCompatMixin):
                 self.material_repo.save_material(session, material)
                 updated += 1
         session.commit()
+        if updated:
+            self.invalidate_material_summary_cache()
         return {"updated": updated, "requested": len(payload.materialIds), "missingIds": missing_ids}
 
     def batch_delete_materials(self, session: Session, material_ids: list[int]) -> dict[str, Any]:
@@ -744,6 +750,8 @@ class MaterialsService(MaterialsCompatMixin):
                 self.material_repo.save_material(session, material)
             deleted += 1
         session.commit()
+        if deleted:
+            self.invalidate_material_summary_cache()
         return {"deleted": deleted, "requested": len(material_ids), "failedIds": failed_ids}
 
     def batch_restore_materials(self, session: Session, material_ids: list[int]) -> dict[str, Any]:
@@ -760,6 +768,8 @@ class MaterialsService(MaterialsCompatMixin):
             self.material_repo.save_material(session, material)
             restored += 1
         session.commit()
+        if restored:
+            self.invalidate_material_summary_cache()
         return {"restored": restored, "requested": len(material_ids), "failedIds": failed_ids}
 
     def add_favorite(self, session: Session, material_id: int, user_id: int) -> None:
@@ -852,6 +862,7 @@ class MaterialsService(MaterialsCompatMixin):
         self._consume_quota_if_needed(session, material, user_id, role_mask)
         self._register_download(session, material, user_id)
         session.commit()
+        self.invalidate_material_summary_cache()
         if self._has_file(material):
             url, expires_at = self.asset_store.build_download_url(material_id=material.id, key=material.file_storage_key or "", filename=material.original_filename)
             return {"url": url, "expiresAt": expires_at}
@@ -904,6 +915,7 @@ class MaterialsService(MaterialsCompatMixin):
                     }
                 )
         session.commit()
+        self.invalidate_material_summary_cache()
         return results
 
     def resolve_download_asset(self, session: Session, material_id: int, token: str) -> tuple[MaterialRecord, Path | None, str]:

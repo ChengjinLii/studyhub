@@ -11,6 +11,7 @@ from app.api.deps import (
     get_optional_auth_context,
     get_public_read_cache,
 )
+from app.api.routes import admin as admin_routes
 from app.api.routes import comments as comment_routes
 from app.api.routes import market as market_routes
 from app.api.routes import materials as material_routes
@@ -164,6 +165,22 @@ def test_material_download_invalidation_preserves_material_list_caches(monkeypat
     assert ("materials:recommendations", ("limit", 6)) in cache._entries
     assert ("materials:detail", (101,)) not in cache._entries
     assert ("leaderboard:contributors", ("all", 6)) not in cache._entries
+
+
+def test_admin_material_invalidation_clears_public_material_and_leaderboard_caches(monkeypatch) -> None:
+    cache = _build_cache()
+    cache.get_or_set("materials:list", ("page", 1), lambda: {"kind": "list"})
+    cache.get_or_set("materials:detail", (101,), lambda: {"kind": "detail"})
+    cache.get_or_set("leaderboard:contributors", ("all", 6), lambda: {"kind": "leaderboard"})
+    cache.get_or_set("market:list", ("page", 1), lambda: {"kind": "market"})
+    monkeypatch.setattr(admin_routes, "get_public_read_cache", lambda: cache)
+
+    admin_routes._invalidate_admin_material_read_caches()
+
+    assert ("materials:list", ("page", 1)) not in cache._entries
+    assert ("materials:detail", (101,)) not in cache._entries
+    assert ("leaderboard:contributors", ("all", 6)) not in cache._entries
+    assert ("market:list", ("page", 1)) in cache._entries
 
 
 def test_comment_content_invalidation_preserves_material_list_caches(monkeypatch) -> None:

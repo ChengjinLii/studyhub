@@ -6,10 +6,12 @@ from sqlalchemy.orm import Session
 from app.api.deps import (
     get_admin_user_service,
     get_materials_service,
+    get_public_read_cache,
     require_auth_context,
     require_privileged_auth_context,
 )
 from app.core.db import get_db_session
+from app.core.public_read_cache import invalidate_prefixes
 from app.core.response import api_ok
 from app.core.security import AuthContext
 from app.schemas.admin import (
@@ -132,6 +134,7 @@ def delete_material_for_admin(
     service: MaterialsService = Depends(get_materials_service),
 ) -> dict[str, object]:
     service.delete_material(session, id, operator_id=0, can_manage_all=True)
+    _invalidate_admin_material_read_caches()
     return api_ok()
 
 
@@ -144,6 +147,7 @@ def restore_material_for_admin(
     service: MaterialsService = Depends(get_materials_service),
 ) -> dict[str, object]:
     service.restore_material(session, id, can_manage_all=True)
+    _invalidate_admin_material_read_caches()
     return api_ok()
 
 
@@ -156,6 +160,7 @@ def update_material_status_for_admin(
     service: MaterialsService = Depends(get_materials_service),
 ) -> dict[str, object]:
     service.restore_material(session, id, can_manage_all=True)
+    _invalidate_admin_material_read_caches()
     return api_ok()
 
 
@@ -167,7 +172,9 @@ def batch_update_materials_for_admin(
     session: Session = Depends(get_db_session),
     service: MaterialsService = Depends(get_materials_service),
 ) -> dict[str, object]:
-    return api_ok(service.batch_update_materials(session, payload))
+    data = service.batch_update_materials(session, payload)
+    _invalidate_admin_material_read_caches()
+    return api_ok(data)
 
 
 @router.post("/api/admin/materials/batch-delete", include_in_schema=False)
@@ -178,7 +185,9 @@ def batch_delete_materials_for_admin(
     session: Session = Depends(get_db_session),
     service: MaterialsService = Depends(get_materials_service),
 ) -> dict[str, object]:
-    return api_ok(service.batch_delete_materials(session, payload.materialIds))
+    data = service.batch_delete_materials(session, payload.materialIds)
+    _invalidate_admin_material_read_caches()
+    return api_ok(data)
 
 
 @router.post("/api/admin/materials/batch-restore", include_in_schema=False)
@@ -189,4 +198,10 @@ def batch_restore_materials_for_admin(
     session: Session = Depends(get_db_session),
     service: MaterialsService = Depends(get_materials_service),
 ) -> dict[str, object]:
-    return api_ok(service.batch_restore_materials(session, payload.materialIds))
+    data = service.batch_restore_materials(session, payload.materialIds)
+    _invalidate_admin_material_read_caches()
+    return api_ok(data)
+
+
+def _invalidate_admin_material_read_caches() -> None:
+    invalidate_prefixes(get_public_read_cache(), "materials", "leaderboard")

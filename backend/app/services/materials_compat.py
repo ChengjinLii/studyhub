@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import asyncio
 import json
+from threading import RLock
+from time import monotonic
 from typing import Any
 
 from fastapi import HTTPException, status
@@ -37,6 +39,53 @@ VISIBLE_MATERIAL_STATUS_SQL = "(m.status IS NULL OR LOWER(m.status) NOT IN ('hid
 
 
 class MaterialsCompatMixin:
+    def invalidate_material_summary_cache(self) -> None:
+        cache, lock = self._compat_summary_cache_state()
+        with lock:
+            cache.clear()
+
+    def _compat_summary_cache_state(self):
+        cache = getattr(self, "_compat_summary_cache", None)
+        lock = getattr(self, "_compat_summary_cache_lock", None)
+        if cache is None or lock is None:
+            cache = {}
+            lock = RLock()
+            self._compat_summary_cache = cache
+            self._compat_summary_cache_lock = lock
+        return cache, lock
+
+    def _compat_summary_cache_ttl_seconds(self) -> int:
+        return max(1, int(getattr(self.settings, "public_read_cache_ttl_seconds", 30) or 30))
+
+    def _compat_summary_cache_get(self, key: tuple[Any, ...]) -> Any | None:
+        cache, lock = self._compat_summary_cache_state()
+        now = monotonic()
+        with lock:
+            entry = cache.get(key)
+            if entry is None:
+                return None
+            expires_at, value = entry
+            if expires_at <= now:
+                cache.pop(key, None)
+                return None
+            return self._compat_summary_cache_clone(value)
+
+    def _compat_summary_cache_set(self, key: tuple[Any, ...], value: Any) -> Any:
+        cache, lock = self._compat_summary_cache_state()
+        with lock:
+            cache[key] = (
+                monotonic() + self._compat_summary_cache_ttl_seconds(),
+                self._compat_summary_cache_clone(value),
+            )
+        return value
+
+    def _compat_summary_cache_clone(self, value: Any) -> Any:
+        if isinstance(value, dict):
+            return dict(value)
+        if isinstance(value, list):
+            return list(value)
+        return value
+
     def _compat_list_materials(
         self,
         session: Session,
@@ -533,6 +582,10 @@ class MaterialsCompatMixin:
         return {int(row["material_id"]): int(row["total"]) for row in rows}
 
     def _compat_load_material_stats(self, session: Session) -> dict[str, int]:
+        cache_key = ("material_stats",)
+        cached = self._compat_summary_cache_get(cache_key)
+        if cached is not None:
+            return cached
         material_stats = session.execute(
             text(
                 """
@@ -545,14 +598,21 @@ class MaterialsCompatMixin:
             )
         ).mappings().first()
         user_count = int(session.execute(text("SELECT COUNT(*) FROM users")).scalar() or 0)
-        return {
-            "totalMaterials": int(material_stats["total_materials"] if material_stats is not None else 0),
-            "freeMaterials": int(material_stats["free_materials"] if material_stats is not None else 0),
-            "totalDownloads": int(material_stats["total_downloads"] if material_stats is not None else 0),
-            "userCount": user_count,
-        }
+        return self._compat_summary_cache_set(
+            cache_key,
+            {
+                "totalMaterials": int(material_stats["total_materials"] if material_stats is not None else 0),
+                "freeMaterials": int(material_stats["free_materials"] if material_stats is not None else 0),
+                "totalDownloads": int(material_stats["total_downloads"] if material_stats is not None else 0),
+                "userCount": user_count,
+            },
+        )
 
     async def _compat_load_material_stats_async(self, session) -> dict[str, int]:
+        cache_key = ("material_stats",)
+        cached = self._compat_summary_cache_get(cache_key)
+        if cached is not None:
+            return cached
         material_result = await session.execute(
             text(
                 """
@@ -566,14 +626,21 @@ class MaterialsCompatMixin:
         )
         material_stats = material_result.mappings().first()
         users_result = await session.execute(text("SELECT COUNT(*) FROM users"))
-        return {
-            "totalMaterials": int(material_stats["total_materials"] if material_stats is not None else 0),
-            "freeMaterials": int(material_stats["free_materials"] if material_stats is not None else 0),
-            "totalDownloads": int(material_stats["total_downloads"] if material_stats is not None else 0),
-            "userCount": int(users_result.scalar() or 0),
-        }
+        return self._compat_summary_cache_set(
+            cache_key,
+            {
+                "totalMaterials": int(material_stats["total_materials"] if material_stats is not None else 0),
+                "freeMaterials": int(material_stats["free_materials"] if material_stats is not None else 0),
+                "totalDownloads": int(material_stats["total_downloads"] if material_stats is not None else 0),
+                "userCount": int(users_result.scalar() or 0),
+            },
+        )
 
     def _compat_load_available_tags(self, session: Session, limit: int = 30) -> list[str]:
+        cache_key = ("available_tags", int(limit))
+        cached = self._compat_summary_cache_get(cache_key)
+        if cached is not None:
+            return cached
         rows = session.execute(
             text(
                 """
@@ -587,9 +654,16 @@ class MaterialsCompatMixin:
             ),
             {"limit": limit},
         ).mappings().all()
-        return [str(row["tag"]) for row in rows if self._compat_has_text(row["tag"])]
+        return self._compat_summary_cache_set(
+            cache_key,
+            [str(row["tag"]) for row in rows if self._compat_has_text(row["tag"])],
+        )
 
     async def _compat_load_available_tags_async(self, session, limit: int = 30) -> list[str]:
+        cache_key = ("available_tags", int(limit))
+        cached = self._compat_summary_cache_get(cache_key)
+        if cached is not None:
+            return cached
         rows = (
             await session.execute(
                 text(
@@ -605,7 +679,10 @@ class MaterialsCompatMixin:
                 {"limit": limit},
             )
         ).mappings().all()
-        return [str(row["tag"]) for row in rows if self._compat_has_text(row["tag"])]
+        return self._compat_summary_cache_set(
+            cache_key,
+            [str(row["tag"]) for row in rows if self._compat_has_text(row["tag"])],
+        )
 
     def _compat_load_versions(self, session: Session, material_id: int) -> list[dict[str, Any]]:
         rows = session.execute(

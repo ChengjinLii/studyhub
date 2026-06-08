@@ -18,6 +18,17 @@ class _MappingResult:
         return self.row
 
 
+class _RowsResult:
+    def __init__(self, rows: list[dict[str, Any]]) -> None:
+        self.rows = rows
+
+    def mappings(self):
+        return self
+
+    def all(self) -> list[dict[str, Any]]:
+        return self.rows
+
+
 class _ScalarResult:
     def __init__(self, value: int) -> None:
         self.value = value
@@ -46,6 +57,19 @@ class _StatsSession:
 class _AsyncStatsSession(_StatsSession):
     async def execute(self, statement, params=None):
         return super().execute(statement, params)
+
+
+class _TagsSession:
+    def __init__(self) -> None:
+        self.tag_queries = 0
+
+    def execute(self, statement, params=None):
+        assert params == {"limit": 30}
+        sql = " ".join(str(statement).lower().split())
+        if "from material_tags" in sql:
+            self.tag_queries += 1
+            return _RowsResult([{"tag": "真题"}, {"tag": "解析"}])
+        raise AssertionError(f"unexpected SQL: {statement}")
 
 
 def _build_service() -> MaterialsService:
@@ -77,6 +101,42 @@ def test_legacy_material_stats_uses_single_materials_aggregate_query() -> None:
     assert session.user_queries == 1
 
 
+def test_legacy_material_summary_cache_reuses_stats_until_invalidated() -> None:
+    service = _build_service()
+    session = _StatsSession()
+
+    first = service._compat_load_material_stats(session)  # type: ignore[arg-type]
+    first["totalMaterials"] = 999
+    second = service._compat_load_material_stats(session)  # type: ignore[arg-type]
+
+    assert second == {"totalMaterials": 4, "freeMaterials": 2, "totalDownloads": 17, "userCount": 3}
+    assert session.material_queries == 1
+    assert session.user_queries == 1
+
+    service.invalidate_material_summary_cache()
+    refreshed = service._compat_load_material_stats(session)  # type: ignore[arg-type]
+
+    assert refreshed["totalMaterials"] == 4
+    assert session.material_queries == 2
+    assert session.user_queries == 2
+
+
+def test_legacy_material_summary_cache_reuses_available_tags_until_invalidated() -> None:
+    service = _build_service()
+    session = _TagsSession()
+
+    first = service._compat_load_available_tags(session)  # type: ignore[arg-type]
+    first.append("污染")
+    second = service._compat_load_available_tags(session)  # type: ignore[arg-type]
+
+    assert second == ["真题", "解析"]
+    assert session.tag_queries == 1
+
+    service.invalidate_material_summary_cache()
+    assert service._compat_load_available_tags(session) == ["真题", "解析"]  # type: ignore[arg-type]
+    assert session.tag_queries == 2
+
+
 def test_async_legacy_material_stats_uses_single_materials_aggregate_query() -> None:
     service = _build_service()
     session = _AsyncStatsSession()
@@ -84,6 +144,18 @@ def test_async_legacy_material_stats_uses_single_materials_aggregate_query() -> 
     data = asyncio.run(service._compat_load_material_stats_async(session))
 
     assert data == {"totalMaterials": 4, "freeMaterials": 2, "totalDownloads": 17, "userCount": 3}
+    assert session.material_queries == 1
+    assert session.user_queries == 1
+
+
+def test_async_legacy_material_stats_reuses_summary_cache() -> None:
+    service = _build_service()
+    session = _AsyncStatsSession()
+
+    first = asyncio.run(service._compat_load_material_stats_async(session))
+    second = asyncio.run(service._compat_load_material_stats_async(session))
+
+    assert first == second
     assert session.material_queries == 1
     assert session.user_queries == 1
 
