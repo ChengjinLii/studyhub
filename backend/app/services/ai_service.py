@@ -428,8 +428,9 @@ class AiService:
             "如果提供了 memory_context，你可以用平台集体记忆增强课程/题型判断，用用户个人记忆做个性化建议；"
             "但不能把用户个人记忆写入或表述成平台集体结论。"
             "如果提供了 query_plan，你必须按照该意图和 evidence_tasks 组织回答；"
+            "如果 query_plan 提供了 problem_context，应先按卡点类型、题号和知识点拆解问题；"
             "如果提供了 course_memory_card，你可以用它总结课程级年份、题型、知识点和推荐顺序；"
-            "不要输出 memory_context、query_plan、candidate_materials、pdf_evidence、anchor_text、anchor_terms 或 privacy_boundary 等内部字段名。"
+            "不要输出 memory_context、query_plan、problem_context、candidate_materials、pdf_evidence、anchor_text、anchor_terms 或 privacy_boundary 等内部字段名。"
             "必须输出严格 JSON，不要输出 Markdown，不要包裹代码块。"
         )
         user_prompt = {
@@ -602,7 +603,7 @@ class AiService:
         if query_plan and query_plan.intent == "pdf_summary":
             return self._local_pdf_summary(pdf_evidence, course_memory_card)
         if query_plan and query_plan.intent == "problem_tutoring":
-            return self._local_problem_tutoring_summary(pdf_evidence, course_memory_card)
+            return self._local_problem_tutoring_summary(pdf_evidence, course_memory_card, query_plan)
         years = _evidence_values(pdf_evidence, "years")
         question_types = _course_card_values(course_memory_card, "question_type_distribution") or _evidence_values(pdf_evidence, "question_types")
         knowledge_signals = _course_card_values(course_memory_card, "knowledge_signals") or _evidence_values(pdf_evidence, "knowledge_signals")
@@ -663,17 +664,30 @@ class AiService:
         self,
         pdf_evidence: list[MaterialPageEvidence],
         course_memory_card: CourseMemoryCard | None,
+        query_plan: AgentQueryPlan | None,
     ) -> str:
         question_types = _course_card_values(course_memory_card, "question_type_distribution") or _evidence_values(pdf_evidence, "question_types")
         knowledge_signals = _course_card_values(course_memory_card, "knowledge_signals") or _evidence_values(pdf_evidence, "knowledge_signals")
         score_points = _course_card_values(course_memory_card, "score_point_distribution") or _evidence_values(pdf_evidence, "score_points")
         difficulty_signals = _course_card_values(course_memory_card, "difficulty_distribution") or _evidence_values(pdf_evidence, "difficulty_signals")
         visual_signals = _course_card_values(course_memory_card, "visual_signal_distribution") or _evidence_values(pdf_evidence, "visual_signals")
+        problem_context = getattr(query_plan, "problem_context", {}) if query_plan else {}
+        if not isinstance(problem_context, dict):
+            problem_context = {}
+        focus_areas = _safe_text_list(problem_context.get("focus_areas"))
+        mentioned_questions = _safe_text_list(problem_context.get("question_numbers"))
+        mentioned_knowledge = _safe_text_list(problem_context.get("knowledge_points"))
         anchors = []
         for item in pdf_evidence[:3]:
             question_hint = f"（{_join_values(list(item.question_numbers)[:2])}）" if item.question_numbers else ""
             anchors.append(f"《{item.title}》第 {item.page} 页{question_hint}")
         parts: list[str] = []
+        if focus_areas:
+            parts.append(f"先按你提到的卡点处理：{_join_values(focus_areas[:3])}")
+        if mentioned_questions:
+            parts.append(f"题号边界：{_join_values(mentioned_questions[:3])}")
+        if mentioned_knowledge:
+            parts.append(f"围绕你提到的知识点：{_join_values(mentioned_knowledge[:4])}")
         if question_types:
             parts.append(f"先判断题型：{_join_values(question_types[:3])}")
         if knowledge_signals:

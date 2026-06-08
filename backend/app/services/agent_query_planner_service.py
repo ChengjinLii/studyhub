@@ -82,6 +82,16 @@ STUDY_TIME_PHRASES: tuple[tuple[str, int], ...] = (
     ("一月", 30),
 )
 
+PROBLEM_CONTEXT_MARKERS = ("错题", "不会", "怎么做", "讲解", "解析一下", "为什么", "不懂", "卡住", "看不懂")
+
+PROBLEM_FOCUS_RULES: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("概念理解", ("概念", "为什么", "不懂", "理解不了", "看不懂")),
+    ("公式推导", ("公式", "推导", "证明", "怎么推", "推不出")),
+    ("计算步骤", ("计算", "步骤", "怎么算", "怎么做", "代入", "求解", "不会做")),
+    ("读题定位", ("题干", "条件", "读题", "问什么", "看不懂题")),
+    ("答案复盘", ("解析", "答案", "错题", "哪里错", "对答案")),
+)
+
 
 @dataclass(slots=True)
 class AgentQueryPlan:
@@ -94,6 +104,7 @@ class AgentQueryPlan:
     evidence_tasks: tuple[str, ...]
     response_guidance: tuple[str, ...]
     study_constraints: dict[str, Any] = field(default_factory=dict)
+    problem_context: dict[str, Any] = field(default_factory=dict)
 
     def to_prompt_payload(self) -> dict[str, Any]:
         payload = {
@@ -108,6 +119,8 @@ class AgentQueryPlan:
         }
         if self.study_constraints:
             payload["study_constraints"] = self.study_constraints
+        if self.problem_context:
+            payload["problem_context"] = self.problem_context
         return payload
 
 
@@ -134,12 +147,14 @@ class AgentQueryPlannerService:
         years = _extract_years(normalized, pdf_evidence, memory_context)
         search_terms = _extract_search_terms(normalized, course_terms, resource_types)
         study_constraints = _extract_study_constraints(normalized)
-        evidence_tasks = _build_evidence_tasks(intent, pdf_evidence, memory_context)
+        problem_context = _extract_problem_context(normalized, pdf_evidence, intent)
+        evidence_tasks = _build_evidence_tasks(intent, pdf_evidence, memory_context, problem_context)
         response_guidance = _build_response_guidance(
             intent,
             bool(pdf_evidence),
             memory_context is not None,
             bool(study_constraints),
+            bool(problem_context),
         )
         return AgentQueryPlan(
             intent=intent,
@@ -151,6 +166,7 @@ class AgentQueryPlannerService:
             evidence_tasks=tuple(evidence_tasks),
             response_guidance=tuple(response_guidance),
             study_constraints=study_constraints,
+            problem_context=problem_context,
         )
 
 
@@ -307,10 +323,59 @@ def _extract_weak_points(normalized_query: str) -> list[str]:
     return weak_points
 
 
+def _extract_problem_context(
+    normalized_query: str,
+    pdf_evidence: list[MaterialPageEvidence],
+    intent: str,
+) -> dict[str, Any]:
+    has_problem_marker = intent == "problem_tutoring" or any(marker in normalized_query for marker in PROBLEM_CONTEXT_MARKERS)
+    if not has_problem_marker:
+        return {}
+    focus_areas = _extract_problem_focus_areas(normalized_query)
+    question_numbers = _extract_problem_question_numbers(normalized_query)
+    for item in pdf_evidence[:3]:
+        for number in item.question_numbers:
+            if number not in question_numbers:
+                question_numbers.append(number)
+    knowledge_points = [term for term in STUDY_WEAKNESS_TERMS if term.lower() in normalized_query]
+    payload: dict[str, Any] = {
+        "focus_areas": focus_areas[:4],
+        "question_numbers": question_numbers[:6],
+        "knowledge_points": knowledge_points[:6],
+    }
+    return {key: value for key, value in payload.items() if value}
+
+
+def _extract_problem_focus_areas(normalized_query: str) -> list[str]:
+    focus_areas: list[str] = []
+    for label, aliases in PROBLEM_FOCUS_RULES:
+        if any(alias.lower() in normalized_query for alias in aliases) and label not in focus_areas:
+            focus_areas.append(label)
+    return focus_areas[:4]
+
+
+def _extract_problem_question_numbers(normalized_query: str) -> list[str]:
+    patterns = (
+        r"第\s*([0-9一二三四五六七八九十]{1,3})\s*[题問问]",
+        r"\b[Qq]\s*([0-9]{1,2})\b",
+        r"[Qq]uestion\s*([0-9]{1,2})",
+    )
+    result: list[str] = []
+    for pattern in patterns:
+        for match in re.findall(pattern, normalized_query):
+            label = f"第{str(match).strip()}题"
+            if label not in result:
+                result.append(label)
+            if len(result) >= 6:
+                return result
+    return result
+
+
 def _build_evidence_tasks(
     intent: str,
     pdf_evidence: list[MaterialPageEvidence],
     memory_context: AgentMemoryContext | None,
+    problem_context: dict[str, Any] | None = None,
 ) -> list[str]:
     tasks = ["rank_candidate_materials"]
     if intent in {"exam_trend_analysis", "pdf_summary", "problem_tutoring"}:
@@ -327,6 +392,12 @@ def _build_evidence_tasks(
             tasks.append("cite_anchor_snippets")
     if intent == "study_plan":
         tasks.extend(["choose_study_sequence", "adapt_to_user_profile"])
+    if intent == "problem_tutoring":
+        tasks.extend(["identify_problem_focus", "explain_step_by_step"])
+        if problem_context:
+            tasks.append("adapt_tutoring_to_problem_context")
+        if problem_context and problem_context.get("question_numbers"):
+            tasks.append("track_mentioned_question_numbers")
     if pdf_evidence:
         tasks.append("cite_material_pages")
     if any(item.question_numbers for item in pdf_evidence):
@@ -343,6 +414,7 @@ def _build_response_guidance(
     has_pdf_evidence: bool,
     has_memory_context: bool,
     has_study_constraints: bool,
+    has_problem_context: bool,
 ) -> list[str]:
     guidance = ["只基于候选资料、PDF 证据和记忆上下文回答，不编造平台外资料。"]
     if intent == "exam_trend_analysis":
@@ -359,6 +431,8 @@ def _build_response_guidance(
         guidance.append("关键结论尽量引用资料名、页码和片段锚点。")
     if has_study_constraints:
         guidance.append("如果 study_constraints 中有考试倒计时、目标分数、每日可用时间或薄弱点，必须把它们作为复习计划边界。")
+    if has_problem_context:
+        guidance.append("如果 problem_context 中有卡点类型、题号或知识点，必须先按这些边界拆解。")
     if has_memory_context:
         guidance.append("用户个人记忆只能用于当前用户个性化建议，不能写成平台集体结论。")
     return guidance

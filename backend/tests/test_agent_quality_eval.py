@@ -430,6 +430,8 @@ def test_agent_local_problem_tutoring_uses_intent_specific_evidence(monkeypatch)
     body = json.loads(str(response["output"]).removeprefix("<json>").removesuffix("</json>"))
 
     assert "这类问题可以先定位到 《通信原理四年真题解析》第 3 页（第3题）" in body["answer"]
+    assert "先按你提到的卡点处理：计算步骤" in body["answer"]
+    assert "题号边界：第3题" in body["answer"]
     assert "先判断题型：计算题" in body["answer"]
     assert "再抓核心知识点：调制、解调、误码率" in body["answer"]
     assert "按分值投入时间：10分" in body["answer"]

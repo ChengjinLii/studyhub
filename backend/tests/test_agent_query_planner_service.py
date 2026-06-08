@@ -106,6 +106,41 @@ def test_query_planner_detects_study_plan_without_extra_io() -> None:
     assert any("study_constraints" in item for item in plan.response_guidance)
 
 
+def test_query_planner_extracts_problem_context_without_extra_io() -> None:
+    evidence = [
+        MaterialPageEvidence(
+            material_id=101,
+            title="通信原理四年真题解析",
+            page=3,
+            text="2024 通信原理第3题公式推导与调制计算。",
+            score=42,
+            question_numbers=("第3题",),
+            knowledge_signals=("调制",),
+        )
+    ]
+
+    plan = AgentQueryPlannerService().build_plan(
+        "通信原理第3题公式推导看不懂，调制怎么做",
+        materials=[_material()],
+        pdf_evidence=evidence,
+        memory_context=None,
+    )
+
+    assert plan.intent == "problem_tutoring"
+    assert plan.problem_context == {
+        "focus_areas": ["概念理解", "公式推导", "计算步骤"],
+        "question_numbers": ["第3题"],
+        "knowledge_points": ["调制"],
+    }
+    payload = plan.to_prompt_payload()
+    assert payload["problem_context"]["focus_areas"] == ["概念理解", "公式推导", "计算步骤"]
+    assert "identify_problem_focus" in plan.evidence_tasks
+    assert "explain_step_by_step" in plan.evidence_tasks
+    assert "adapt_tutoring_to_problem_context" in plan.evidence_tasks
+    assert "track_mentioned_question_numbers" in plan.evidence_tasks
+    assert any("problem_context" in item for item in plan.response_guidance)
+
+
 def test_ai_prompt_receives_query_plan(monkeypatch) -> None:
     captured: dict[str, Any] = {}
 
