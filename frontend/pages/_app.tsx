@@ -310,11 +310,6 @@ export default function MyApp({ Component, pageProps }: AppProps) {
                   <span className="footer-info__label">核心贡献者</span>
                   <span className="footer-info__value">李承锦、曾逸帆</span>
                 </div>
-                <span className="footer-divider">|</span>
-                <div className="footer-info__item">
-                  <span className="footer-info__label">其他贡献者</span>
-                  <span className="footer-info__value">xiaji</span>
-                </div>
               </div>
             </div>
             <div className="footer-hairline" />

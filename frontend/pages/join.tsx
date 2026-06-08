@@ -8,7 +8,6 @@ import { SessionUser } from '../types/user';
 const COMMUNITY_QQ = '245934740';
 const CONTACT_EMAIL = 'chengjinli@std.uestc.edu.cn';
 const CORE_CONTRIBUTORS = '李承锦、曾逸帆';
-const OTHER_CONTRIBUTORS = 'xiaji';
 
 const ABOUT_POINTS = [
   {
@@ -177,10 +176,6 @@ export default function JoinPage({ user }: JoinPageProps) {
                   <span>
                     <strong>核心贡献者：</strong>
                     {CORE_CONTRIBUTORS}
-                  </span>
-                  <span>
-                    <strong>其他贡献者：</strong>
-                    {OTHER_CONTRIBUTORS}
                   </span>
                 </div>
               </section>
