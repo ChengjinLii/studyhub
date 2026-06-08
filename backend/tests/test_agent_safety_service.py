@@ -6,6 +6,8 @@ from typing import Any
 
 from app.core.config import Settings
 from app.models.materials import MaterialRecord
+from app.services.agent_course_memory_service import AgentCourseMemoryService
+from app.services.agent_query_planner_service import AgentQueryPlannerService
 from app.services.agent_safety_service import AgentSafetyService
 from app.services.ai_service import AiService
 from app.services.material_pdf_evidence_service import MaterialPageEvidence
@@ -312,6 +314,104 @@ def test_ai_recommendation_falls_back_when_model_output_is_unsafe(monkeypatch) -
         "你更想要真题、笔记还是经验分享？",
         "是否需要限定学校、学院或专业？",
     ]
+
+
+def test_ai_model_prompt_redacts_sensitive_material_and_pdf_context(monkeypatch) -> None:
+    captured: dict[str, Any] = {}
+    settings = Settings(
+        ai_agent_provider="openai-compatible",
+        ai_agent_base_url="https://example.test/v1",
+        ai_agent_api_key="test-key",
+        ai_agent_model="demo-model",
+    )
+    monkeypatch.setattr("app.services.ai_service.get_settings", lambda: settings)
+
+    sensitive_material = MaterialRecord(
+        id=101,
+        title="通信原理 alice@example.com 13812345678",
+        description="真题解析 token=secret-value，访问 https://example.test，身份证 11010119900307561X。",
+        tags_json=json.dumps(["通信原理", "api_key=secret-token"], ensure_ascii=False),
+        download_count=80,
+        is_free=True,
+    )
+    sensitive_evidence = MaterialPageEvidence(
+        material_id=101,
+        title="通信原理 bob@example.com 13900001111",
+        page=2,
+        text="第2页联系 13812345678，访问 https://example.test，api_key=secret-value。",
+        score=30,
+        question_numbers=("第3题",),
+        source_type="past_exam",
+        anchor_text="QQ 123456789，身份证 11010119900307561X，token=secret-value。",
+    )
+
+    class FakePdfEvidenceService:
+        def collect_for_materials(
+            self,
+            materials: list[MaterialRecord],
+            query: str,
+            *,
+            current_user_id: int | None,
+        ) -> list[MaterialPageEvidence]:
+            del materials, query, current_user_id
+            return [sensitive_evidence]
+
+    service = AiService(
+        read_repo=None,
+        material_repo=None,
+        pdf_evidence_service=FakePdfEvidenceService(),
+        query_planner_service=AgentQueryPlannerService(),
+        course_memory_service=AgentCourseMemoryService(),
+    )  # type: ignore[arg-type]
+    monkeypatch.setattr(service, "_rank_materials", lambda session, query, filters: [sensitive_material])
+
+    def fake_call_agent_model(settings: Settings, system_prompt: str, user_prompt: dict[str, Any]) -> str:
+        del settings, system_prompt
+        captured["user_prompt"] = user_prompt
+        return json.dumps(
+            {
+                "answer": "我看了《通信原理》第 2 页，建议先复盘第3题。",
+                "recommendations": [{"material_id": 101, "reason": "匹配通信原理真题"}],
+                "evidence_sources": [{"material_id": 101, "page": 2, "title": "通信原理"}],
+            },
+            ensure_ascii=False,
+        )
+
+    monkeypatch.setattr(service, "_call_agent_model", fake_call_agent_model)
+
+    response = service.recommend(
+        object(),  # type: ignore[arg-type]
+        SimpleNamespace(
+            query="通信原理真题 联系 13812345678 alice@example.com token=secret-value",
+            filters={},
+        ),
+        current_user_id=7,
+    )
+    body = json.loads(str(response["output"]).removeprefix("<json>").removesuffix("</json>"))
+    serialized_prompt = json.dumps(captured["user_prompt"], ensure_ascii=False)
+
+    assert "13812345678" not in serialized_prompt
+    assert "13900001111" not in serialized_prompt
+    assert "alice@example.com" not in serialized_prompt
+    assert "bob@example.com" not in serialized_prompt
+    assert "secret-value" not in serialized_prompt
+    assert "secret-token" not in serialized_prompt
+    assert "https://example.test" not in serialized_prompt
+    assert "11010119900307561X" not in serialized_prompt
+    assert "123456789" not in serialized_prompt
+    assert "[redacted-phone]" in serialized_prompt
+    assert "[redacted-email]" in serialized_prompt
+    assert "[redacted-secret]" in serialized_prompt
+    assert "[redacted-url]" in serialized_prompt
+    assert "[redacted-id-card]" in serialized_prompt
+    assert "[redacted-contact]" in serialized_prompt
+    assert captured["user_prompt"]["pdf_evidence"][0]["text"] == (
+        "第2页联系 [redacted-phone]，访问 [redacted-url]，[redacted-secret]。"
+    )
+    assert captured["user_prompt"]["course_memory_card"]["page_references"][0]["anchor_text"] == (
+        "QQ=[redacted-contact]，身份证 [redacted-id-card]，[redacted-secret]。"
+    )
+    assert body["recommendations"][0]["material_id"] == 101
 
 
 def test_ai_local_recommendation_redacts_sensitive_material_metadata(monkeypatch) -> None:

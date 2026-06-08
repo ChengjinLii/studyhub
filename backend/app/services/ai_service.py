@@ -534,6 +534,7 @@ class AiService:
                 "followup_questions": ["最多 3 个追问或下一步学习动作"],
             },
         }
+        user_prompt = self.safety_service.sanitize_prompt_payload(user_prompt)
         try:
             content = self._call_agent_model(settings, system_prompt, user_prompt)
         except Exception:

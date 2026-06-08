@@ -44,6 +44,19 @@ FORBIDDEN_INTERNAL_MARKERS = (
 class AgentSafetyService:
     """Post-process external Agent output before it reaches the API response."""
 
+    def sanitize_prompt_payload(self, value: Any) -> Any:
+        """Redact sensitive string values before sending context to a model."""
+
+        if isinstance(value, dict):
+            return {key: self.sanitize_prompt_payload(item) for key, item in value.items()}
+        if isinstance(value, list):
+            return [self.sanitize_prompt_payload(item) for item in value]
+        if isinstance(value, tuple):
+            return [self.sanitize_prompt_payload(item) for item in value]
+        if isinstance(value, str):
+            return _redact_public_sensitive_text(value)
+        return value
+
     def sanitize_recommendation_body(
         self,
         body: dict[str, Any],
