@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import socket
 from dataclasses import dataclass
 from pathlib import Path
@@ -41,7 +42,22 @@ def _check_tcp(name: str, host: str | None, port: int | None, *, timeout_seconds
         return CheckResult(name, False, f"{host}:{port} unreachable: {exc}")
 
 
+def _require_positive_timeout_seconds(timeout_seconds: float) -> float:
+    value = float(timeout_seconds)
+    if not math.isfinite(value) or value <= 0:
+        raise RuntimeError("preflight timeout_seconds 必须是大于 0 的数字。")
+    return value
+
+
+def _timeout_seconds_argument(value: str) -> float:
+    try:
+        return _require_positive_timeout_seconds(float(value))
+    except (RuntimeError, ValueError) as exc:
+        raise argparse.ArgumentTypeError("must be a positive number") from exc
+
+
 def build_checks(settings: Settings, *, check_network: bool, timeout_seconds: float) -> list[CheckResult]:
+    timeout_seconds = _require_positive_timeout_seconds(timeout_seconds)
     checks = [
         CheckResult("private-env", settings.private_env_file is None or settings.private_env_file.exists(), str(settings.private_env_file or "not required")),
     ]
@@ -88,7 +104,7 @@ def run_preflight(settings: Settings, *, check_network: bool, timeout_seconds: f
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="StudyHub deployment preflight checks")
     parser.add_argument("--network", action="store_true", help="also check outbound TCP connectivity")
-    parser.add_argument("--timeout-seconds", type=float, default=5.0)
+    parser.add_argument("--timeout-seconds", type=_timeout_seconds_argument, default=5.0)
     return parser
 
 
@@ -97,7 +113,7 @@ def main(argv: list[str] | None = None) -> int:
     payload = run_preflight(
         get_settings(),
         check_network=bool(args.network),
-        timeout_seconds=max(0.5, float(args.timeout_seconds)),
+        timeout_seconds=float(args.timeout_seconds),
     )
     print(json.dumps(payload, ensure_ascii=False, indent=2))
     return 0 if payload["ok"] else 2
