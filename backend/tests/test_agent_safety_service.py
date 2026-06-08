@@ -816,6 +816,8 @@ def test_ai_model_prompt_redacts_sensitive_material_and_pdf_context(monkeypatch)
     assert "[redacted-url]" in serialized_prompt
     assert "[redacted-id-card]" in serialized_prompt
     assert "[redacted-contact]" in serialized_prompt
+    assert captured["user_prompt"]["output_guardrail"]["format"]["type"] == "strict_json_object"
+    assert captured["user_prompt"]["output_guardrail"]["learning_scope"]["hard_stop_when_out_of_scope"] is True
     assert captured["user_prompt"]["pdf_evidence"][0]["text"] == (
         "第2页联系 [redacted-phone]，访问 [redacted-url]，[redacted-secret]。"
     )

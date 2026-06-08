@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import type { ClipboardEvent, DragEvent } from 'react';
 import StudyHubAgentMessageList from './studyHubAgent/StudyHubAgentMessageList';
 import {
   STUDYHUB_AGENT_POSITION_STORAGE_KEY,
@@ -87,6 +88,20 @@ export default function HermesAgentWidget() {
     reader.readAsDataURL(file);
   };
 
+  const handleImagePaste = (event: ClipboardEvent<HTMLFormElement>) => {
+    const file = findImageFile(event.clipboardData.files);
+    if (!file) return;
+    event.preventDefault();
+    handleImageChange(file);
+  };
+
+  const handleImageDrop = (event: DragEvent<HTMLFormElement>) => {
+    const file = findImageFile(event.dataTransfer.files);
+    if (!file) return;
+    event.preventDefault();
+    handleImageChange(file);
+  };
+
   return (
     <section
       ref={widgetRef}
@@ -152,6 +167,13 @@ export default function HermesAgentWidget() {
           )}
           <form
             className="hermes-agent__form"
+            onPaste={handleImagePaste}
+            onDragOver={(event) => {
+              if (findImageFile(event.dataTransfer.files)) {
+                event.preventDefault();
+              }
+            }}
+            onDrop={handleImageDrop}
             onSubmit={(event) => {
               event.preventDefault();
               submitAndClear(input);
@@ -185,6 +207,8 @@ export default function HermesAgentWidget() {
               type="button"
               disabled={loading}
               onClick={() => imageInputRef.current?.click()}
+              aria-label="添加题目图片"
+              title="添加题目图片"
             >
               图片
             </button>
@@ -211,4 +235,9 @@ export default function HermesAgentWidget() {
       )}
     </section>
   );
+}
+
+function findImageFile(files: FileList | null) {
+  if (!files) return undefined;
+  return Array.from(files).find((file) => file.type.startsWith('image/'));
 }

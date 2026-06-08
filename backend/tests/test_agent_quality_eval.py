@@ -1427,6 +1427,34 @@ def test_agent_blocks_non_learning_query_even_with_learning_context(monkeypatch)
     assert "recommendations" not in body
 
 
+def test_agent_blocks_obvious_non_learning_followup_even_with_context(monkeypatch) -> None:
+    settings = Settings(ai_agent_provider="local")
+    monkeypatch.setattr("app.services.ai_service.get_settings", lambda: settings)
+    service = AiService(read_repo=None, material_repo=None)  # type: ignore[arg-type]
+
+    def fail_rank_materials(session: object, query: str, filters: dict[str, Any]) -> list[MaterialRecord]:
+        del session, query, filters
+        raise AssertionError("obvious non-learning follow-up should not reuse learning context")
+
+    monkeypatch.setattr(service, "_rank_materials", fail_rank_materials)
+
+    response = service.recommend(
+        object(),  # type: ignore[arg-type]
+        SimpleNamespace(
+            query="继续聊股票投资建议",
+            contextQuery="用户：通信原理往年题常考什么 助手：推荐资料：《通信原理四年真题解析》",
+            filters={},
+            imageAttachments=[],
+        ),
+        current_user_id=7,
+    )
+    body = json.loads(str(response["output"]).removeprefix("<json>").removesuffix("</json>"))
+
+    assert "只处理课程学习" in body["answer"]
+    assert "股票" not in body["answer"]
+    assert "recommendations" not in body
+
+
 def test_agent_blocks_non_learning_image_query_before_retrieval(monkeypatch) -> None:
     settings = Settings(ai_agent_provider="local")
     monkeypatch.setattr("app.services.ai_service.get_settings", lambda: settings)
@@ -1459,6 +1487,49 @@ def test_agent_blocks_non_learning_image_query_before_retrieval(monkeypatch) -> 
     assert "只处理课程学习" in body["answer"]
     assert "穿搭" not in body["answer"]
     assert "recommendations" not in body
+
+
+def test_agent_allows_generic_learning_image_query(monkeypatch) -> None:
+    settings = Settings(ai_agent_provider="local")
+    monkeypatch.setattr("app.services.ai_service.get_settings", lambda: settings)
+    service = AiService(read_repo=None, material_repo=None)  # type: ignore[arg-type]
+    captured: dict[str, Any] = {}
+
+    def fake_rank_materials(session: object, query: str, filters: dict[str, Any]) -> list[MaterialRecord]:
+        del session, filters
+        captured["rank_query"] = query
+        return [
+            _material(
+                703,
+                title="通信原理题目解析",
+                description="通信原理题目、答案和解析",
+                downloads=18,
+            )
+        ]
+
+    monkeypatch.setattr(service, "_rank_materials", fake_rank_materials)
+
+    response = service.recommend(
+        object(),  # type: ignore[arg-type]
+        SimpleNamespace(
+            query="这张图怎么做",
+            filters={},
+            imageAttachments=[
+                {
+                    "name": "question.png",
+                    "mimeType": "image/png",
+                    "dataUrl": "data:image/png;base64,aW1hZ2U=",
+                    "sizeBytes": 5,
+                }
+            ],
+        ),
+        current_user_id=7,
+    )
+    body = json.loads(str(response["output"]).removeprefix("<json>").removesuffix("</json>"))
+
+    assert captured["rank_query"] == "这张图怎么做"
+    assert body["answer"].startswith("我已收到你发的图片")
+    assert body["recommendations"][0]["material_id"] == 703
 
 
 def test_agent_allows_context_dependent_learning_followup(monkeypatch) -> None:
