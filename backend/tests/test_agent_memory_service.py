@@ -456,3 +456,17 @@ def test_ai_recommendation_uses_bounded_context_query_for_followups(monkeypatch)
 
     assert body["recommendations"][0]["material_id"] == 302
     assert "电子系统设计" in body["recommendations"][0]["title"]
+
+    switched_response = service.recommend(
+        object(),  # type: ignore[arg-type]
+        SimpleNamespace(
+            query="通信原理考题风格帮我分析一下",
+            contextQuery="用户上一轮在问 ESD，也就是电子系统设计，想看 2021 年真题及答案。",
+            filters={},
+        ),
+        current_user_id=7,
+    )
+    switched_body = json.loads(str(switched_response["output"]).removeprefix("<json>").removesuffix("</json>"))
+
+    assert switched_body["recommendations"][0]["material_id"] == 301
+    assert "通信原理" in switched_body["recommendations"][0]["title"]

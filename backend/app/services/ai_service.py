@@ -87,6 +87,43 @@ LOW_VALUE_QUERY_TERMS = {
     "更有效",
 }
 
+CONTEXT_DEPENDENT_QUERY_MARKERS = (
+    "这门课",
+    "这门",
+    "这个课",
+    "这科",
+    "这个资料",
+    "这份资料",
+    "这些资料",
+    "这些题",
+    "这套题",
+    "上面",
+    "上一轮",
+    "刚才",
+    "刚刚",
+    "继续",
+    "接着",
+    "它",
+    "这个",
+    "这些",
+)
+
+CONTEXT_DEPENDENT_TASK_MARKERS = (
+    "考题风格",
+    "出题风格",
+    "常考",
+    "高频",
+    "题型",
+    "重点",
+    "考点",
+    "分析一下",
+    "帮我分析",
+    "讲一下",
+    "怎么做",
+    "怎么答",
+    "复习框架",
+)
+
 CHAT_COMPLETIONS_AGENT_PROVIDERS = {"custom", "openai-compatible", "openai_compatible"}
 SUB2API_AGENT_PROVIDERS = {"sub2api", "codex-sub2api", "codex_sub2api"}
 
@@ -141,7 +178,8 @@ class AiService:
         course_memory_card: CourseMemoryCard | None = None
         try:
             context_query = getattr(payload, "contextQuery", None)
-            retrieval_query = _agent_retrieval_query(payload.query, context_query)
+            effective_context_query = _agent_context_for_query(payload.query, context_query)
+            retrieval_query = _agent_retrieval_query(payload.query, effective_context_query)
             materials = self._rank_materials(session, retrieval_query, payload.filters or {})
             pdf_evidence = self._collect_pdf_evidence(materials, retrieval_query, current_user_id=current_user_id)
             memory_context = (
@@ -174,7 +212,7 @@ class AiService:
             llm_body = self._generate_agent_recommendation(
                 payload.query,
                 materials,
-                conversation_context=context_query,
+                conversation_context=effective_context_query,
                 pdf_evidence=pdf_evidence,
                 memory_context=memory_context,
                 query_plan=query_plan,
@@ -1224,6 +1262,37 @@ def _agent_retrieval_query(query: str, context_query: str | None) -> str:
     if not context:
         return current
     return f"{current}\n最近上下文：{context}"[:1600]
+
+
+def _agent_context_for_query(query: str, context_query: str | None) -> str:
+    context = _compact_agent_context(context_query)
+    if not context:
+        return ""
+    current = re.sub(r"\s+", " ", str(query or "")).strip()
+    if not _should_use_agent_context(current):
+        return ""
+    return context
+
+
+def _should_use_agent_context(query: str) -> bool:
+    normalized = query.strip().lower()
+    if not normalized:
+        return False
+    if _query_has_course_anchor(normalized):
+        return False
+    if any(marker.lower() in normalized for marker in CONTEXT_DEPENDENT_QUERY_MARKERS):
+        return True
+    if len(normalized) <= 18 and any(marker.lower() in normalized for marker in CONTEXT_DEPENDENT_TASK_MARKERS):
+        return True
+    return False
+
+
+def _query_has_course_anchor(normalized_query: str) -> bool:
+    for term in COURSE_QUERY_TERMS:
+        aliases = QUERY_TERM_ALIASES.get(term, (term,))
+        if any(alias.lower() in normalized_query for alias in aliases):
+            return True
+    return False
 
 
 def _compact_agent_context(value: str | None) -> str:
