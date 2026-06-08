@@ -230,6 +230,85 @@ class RequestsCompatMixin:
         ).mappings().all()
         return [dict(row) for row in rows]
 
+    async def _compat_load_open_requests_async(self, session) -> list[dict[str, Any]]:
+        rows = (
+            await session.execute(
+                text(
+                    """
+                    SELECT
+                        mr.id,
+                        mr.requester_id,
+                        mr.course,
+                        mr.keyword,
+                        mr.school,
+                        mr.college,
+                        mr.major,
+                        mr.budget,
+                        mr.funded_amount,
+                        mr.contribution_count,
+                        mr.deadline,
+                        mr.urgency_tier,
+                        mr.creator_floor,
+                        mr.preview_requirement,
+                        mr.anonymous,
+                        mr.response_count,
+                        mr.accepted_response_id,
+                        mr.status,
+                        mr.created_at,
+                        u.username AS requester_username,
+                        u.nickname AS requester_nickname
+                    FROM material_requests mr
+                    LEFT JOIN users u ON u.id = mr.requester_id
+                    WHERE mr.status = 'OPEN'
+                    """
+                )
+            )
+        ).mappings().all()
+        return [dict(row) for row in rows]
+
+    async def _compat_load_leaderboard_rows_async(self, session, safe_limit: int) -> list[dict[str, Any]]:
+        rows = (
+            await session.execute(
+                text(
+                    """
+                    SELECT
+                        mr.id,
+                        mr.requester_id,
+                        mr.course,
+                        mr.keyword,
+                        mr.school,
+                        mr.college,
+                        mr.major,
+                        mr.budget,
+                        mr.funded_amount,
+                        mr.contribution_count,
+                        mr.deadline,
+                        mr.urgency_tier,
+                        mr.creator_floor,
+                        mr.preview_requirement,
+                        mr.anonymous,
+                        mr.response_count,
+                        mr.accepted_response_id,
+                        mr.status,
+                        mr.created_at,
+                        u.username AS requester_username,
+                        u.nickname AS requester_nickname,
+                        mr.max_contribution_amount
+                    FROM material_requests mr
+                    LEFT JOIN users u ON u.id = mr.requester_id
+                    WHERE mr.status = 'OPEN'
+                      AND mr.funded_amount IS NOT NULL
+                      AND mr.funded_amount > 0
+                      AND (mr.max_contribution_amount IS NULL OR mr.max_contribution_amount <= :max_amount)
+                    ORDER BY mr.funded_amount DESC, mr.created_at DESC
+                    LIMIT :limit
+                    """
+                ),
+                {"max_amount": LEADERBOARD_MAX_CONTRIBUTION_AMOUNT, "limit": safe_limit},
+            )
+        ).mappings().all()
+        return [dict(row) for row in rows]
+
     def _compat_load_request_row(self, session: Session, request_id: int) -> dict[str, Any]:
         row = session.execute(
             text(
@@ -295,6 +374,53 @@ class RequestsCompatMixin:
             success_refund_status=SUCCESS_REFUND_STATUS,
         )
 
+    async def _compat_load_hidden_early_exit_request_ids_async(self, session, request_ids: list[int]) -> set[int]:
+        if not request_ids:
+            return set()
+        paid_stmt = text(
+            """
+            SELECT request_id, COUNT(*) AS cnt
+            FROM material_request_contributions
+            WHERE request_id IN :request_ids
+              AND status IN :statuses
+            GROUP BY request_id
+            """
+        ).bindparams(
+            bindparam("request_ids", expanding=True),
+            bindparam("statuses", expanding=True),
+        )
+        refund_stmt = text(
+            """
+            SELECT request_id, COUNT(*) AS cnt
+            FROM material_request_refunds
+            WHERE request_id IN :request_ids
+              AND refund_type = :refund_type
+              AND status = :status
+            GROUP BY request_id
+            """
+        ).bindparams(bindparam("request_ids", expanding=True))
+        paid_rows = (
+            await session.execute(
+                paid_stmt,
+                {"request_ids": request_ids, "statuses": list(COMPAT_PAID_CONTRIBUTION_STATUSES)},
+            )
+        ).mappings().all()
+        refund_rows = (
+            await session.execute(
+                refund_stmt,
+                {"request_ids": request_ids, "refund_type": EARLY_EXIT_REFUND_TYPE, "status": SUCCESS_REFUND_STATUS},
+            )
+        ).mappings().all()
+        paid_counts = {int(row["request_id"]): int(row["cnt"] or 0) for row in paid_rows}
+        refund_counts = {int(row["request_id"]): int(row["cnt"] or 0) for row in refund_rows}
+        hidden_ids: set[int] = set()
+        for request_id in request_ids:
+            total_paid = paid_counts.get(request_id, 0)
+            early_exit = refund_counts.get(request_id, 0)
+            if total_paid > 0 and early_exit >= total_paid:
+                hidden_ids.add(request_id)
+        return hidden_ids
+
     def _compat_load_viewer_profile(self, session: Session, viewer_id: int | None) -> dict[str, str | None] | None:
         if viewer_id is None:
             return None
@@ -313,6 +439,26 @@ class RequestsCompatMixin:
             return None
         return {"school": row["school"], "college": row["college"], "major": row["major"]}
 
+    async def _compat_load_viewer_profile_async(self, session, viewer_id: int | None) -> dict[str, str | None] | None:
+        if viewer_id is None:
+            return None
+        row = (
+            await session.execute(
+                text(
+                    """
+                    SELECT school, college, major
+                    FROM users
+                    WHERE id = :viewer_id
+                    LIMIT 1
+                    """
+                ),
+                {"viewer_id": viewer_id},
+            )
+        ).mappings().first()
+        if row is None:
+            return None
+        return {"school": row["school"], "college": row["college"], "major": row["major"]}
+
     def _compat_load_responded_request_ids(self, session: Session, viewer_id: int | None, request_ids: list[int]) -> set[int]:
         if viewer_id is None or not request_ids:
             return set()
@@ -325,6 +471,20 @@ class RequestsCompatMixin:
             """
         ).bindparams(bindparam("request_ids", expanding=True))
         rows = session.execute(stmt, {"viewer_id": viewer_id, "request_ids": request_ids}).scalars().all()
+        return {int(value) for value in rows}
+
+    async def _compat_load_responded_request_ids_async(self, session, viewer_id: int | None, request_ids: list[int]) -> set[int]:
+        if viewer_id is None or not request_ids:
+            return set()
+        stmt = text(
+            """
+            SELECT request_id
+            FROM material_request_responses
+            WHERE responder_id = :viewer_id
+              AND request_id IN :request_ids
+            """
+        ).bindparams(bindparam("request_ids", expanding=True))
+        rows = (await session.execute(stmt, {"viewer_id": viewer_id, "request_ids": request_ids})).scalars().all()
         return {int(value) for value in rows}
 
     def _compat_request_has_response_from_user(self, session: Session, request_id: int, viewer_id: int | None) -> bool:

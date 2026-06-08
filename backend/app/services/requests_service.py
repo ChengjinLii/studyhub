@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
@@ -7,6 +8,7 @@ from fastapi import HTTPException, status
 from sqlalchemy import bindparam, text
 from sqlalchemy.orm import Session
 
+from app.core.async_db import async_session_scope
 from app.core.config import Settings
 from app.models.materials import MaterialRecord
 from app.models.requests import (
@@ -119,10 +121,44 @@ class RequestsService(RequestsCompatMixin):
             for item in sliced
         ]
 
+    async def list_requests_async(self, session: Session, viewer_id: int | None, *, sort: str | None, limit: int | None) -> list[dict[str, Any]]:
+        if not (self.settings.requires_private_env_file and self.settings.async_read_db_enabled):
+            return await asyncio.to_thread(self.list_requests, session, viewer_id, sort=sort, limit=limit)
+
+        rows, profile = await asyncio.gather(
+            self._call_with_new_async_session(self._compat_load_open_requests_async),
+            self._call_with_new_async_session(self._compat_load_viewer_profile_async, viewer_id),
+        )
+        visible_rows = await self._compat_exclude_hidden_early_exit_requests_async(rows)
+        responded_ids = await self._call_with_new_async_session(
+            self._compat_load_responded_request_ids_async,
+            viewer_id,
+            [int(row["id"]) for row in visible_rows],
+        )
+        ordered = self._compat_sort_requests(visible_rows, sort=sort, profile=profile)
+        normalized_limit = self._compat_normalize_list_limit(limit)
+        if normalized_limit is not None:
+            ordered = ordered[:normalized_limit]
+        return [self._compat_to_request_item(row, viewer_id, int(row["id"]) in responded_ids) for row in ordered]
+
     def list_leaderboard(self, session: Session, viewer_id: int | None, *, limit: int | None) -> list[dict[str, Any]]:
         if self.settings.requires_private_env_file:
             return self._compat_list_leaderboard(session, viewer_id, limit=limit)
         return self.list_requests(session, viewer_id, sort="hot", limit=limit or 10)
+
+    async def list_leaderboard_async(self, session: Session, viewer_id: int | None, *, limit: int | None) -> list[dict[str, Any]]:
+        if not (self.settings.requires_private_env_file and self.settings.async_read_db_enabled):
+            return await asyncio.to_thread(self.list_leaderboard, session, viewer_id, limit=limit)
+
+        safe_limit = max(1, min(limit or 10, 50))
+        rows = await self._call_with_new_async_session(self._compat_load_leaderboard_rows_async, safe_limit)
+        visible_rows = await self._compat_exclude_hidden_early_exit_requests_async(rows)
+        responded_ids = await self._call_with_new_async_session(
+            self._compat_load_responded_request_ids_async,
+            viewer_id,
+            [int(row["id"]) for row in visible_rows],
+        )
+        return [self._compat_to_request_item(row, viewer_id, int(row["id"]) in responded_ids) for row in visible_rows]
 
     def get_detail(self, session: Session, viewer_id: int, viewer_role_mask: int | None, request_id: int) -> dict[str, Any]:
         if self.settings.requires_private_env_file:
@@ -154,6 +190,19 @@ class RequestsService(RequestsCompatMixin):
         items = [item for item in self.request_repo.list_contributions(session, request_id) if item.status in CONTRIBUTION_VISIBLE_STATUSES]
         items.sort(key=lambda item: -self._created_ts(item))
         return [request_contribution_item(item) for item in items]
+
+    async def _call_with_new_async_session(self, loader, *args, **kwargs):
+        async with async_session_scope() as session:
+            return await loader(session, *args, **kwargs)
+
+    async def _compat_exclude_hidden_early_exit_requests_async(self, rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        if not rows:
+            return []
+        hidden_ids = await self._call_with_new_async_session(
+            self._compat_load_hidden_early_exit_request_ids_async,
+            [int(row["id"]) for row in rows],
+        )
+        return [row for row in rows if int(row["id"]) not in hidden_ids]
 
     def create_request(self, session: Session, user_id: int, payload: RequestCreatePayload) -> dict[str, Any]:
         seed = self._bootstrap(session)

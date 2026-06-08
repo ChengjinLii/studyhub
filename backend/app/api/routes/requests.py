@@ -11,7 +11,7 @@ from app.api.deps import (
     require_privileged_auth_context,
 )
 from app.core.db import get_db_session
-from app.core.public_read_cache import PublicReadCache, cache_if_anonymous, invalidate_prefixes
+from app.core.public_read_cache import PublicReadCache, cache_if_anonymous_async, invalidate_prefixes
 from app.core.response import api_ok
 from app.core.security import AuthContext
 from app.schemas.requests import (
@@ -30,8 +30,15 @@ from app.services.requests_service import RequestsService
 router = APIRouter(tags=["requests"])
 
 
+def _call_service_method(service, async_name: str, sync_name: str, *args, **kwargs):
+    method = getattr(service, async_name, None)
+    if method is not None:
+        return method(*args, **kwargs)
+    return getattr(service, sync_name)(*args, **kwargs)
+
+
 @router.get("/api/requests")
-def list_requests(
+async def list_requests(
     sort: str | None = None,
     limit: int | None = None,
     auth: AuthContext | None = Depends(get_optional_auth_context),
@@ -40,18 +47,18 @@ def list_requests(
     service: RequestsService = Depends(get_requests_service),
 ) -> dict[str, object]:
     current_user_id = auth.user_id if auth else None
-    data = cache_if_anonymous(
+    data = await cache_if_anonymous_async(
         cache,
         current_user_id=current_user_id,
         namespace="requests:list",
         key=(sort, limit),
-        factory=lambda: service.list_requests(session, current_user_id, sort=sort, limit=limit),
+        factory=lambda: _call_service_method(service, "list_requests_async", "list_requests", session, current_user_id, sort=sort, limit=limit),
     )
     return api_ok(data)
 
 
 @router.get("/api/requests/leaderboard")
-def request_leaderboard(
+async def request_leaderboard(
     limit: int | None = None,
     auth: AuthContext | None = Depends(get_optional_auth_context),
     session: Session = Depends(get_db_session),
@@ -59,12 +66,12 @@ def request_leaderboard(
     service: RequestsService = Depends(get_requests_service),
 ) -> dict[str, object]:
     current_user_id = auth.user_id if auth else None
-    data = cache_if_anonymous(
+    data = await cache_if_anonymous_async(
         cache,
         current_user_id=current_user_id,
         namespace="requests:leaderboard",
         key=(limit,),
-        factory=lambda: service.list_leaderboard(session, current_user_id, limit=limit),
+        factory=lambda: _call_service_method(service, "list_leaderboard_async", "list_leaderboard", session, current_user_id, limit=limit),
     )
     return api_ok(data)
 
