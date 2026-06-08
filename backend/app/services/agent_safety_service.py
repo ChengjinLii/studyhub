@@ -17,6 +17,7 @@ FORBIDDEN_INTERNAL_MARKERS = (
     "query_plan",
     "problem_context",
     "course_memory_card",
+    "user_fit_signals",
     "anchor_text",
     "anchor_terms",
 )

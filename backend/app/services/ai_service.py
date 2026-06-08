@@ -152,7 +152,10 @@ class AiService:
                 memory_context=memory_context,
                 query_plan=query_plan,
             )
-            recommendations = [self._recommendation_payload(material, payload.query, pdf_evidence) for material in materials[:3]]
+            recommendations = [
+                self._recommendation_payload(material, payload.query, pdf_evidence, memory_context)
+                for material in materials[:3]
+            ]
             llm_body = self._generate_agent_recommendation(
                 payload.query,
                 materials,
@@ -309,12 +312,13 @@ class AiService:
         material: MaterialRecord,
         query: str,
         pdf_evidence: list[MaterialPageEvidence] | None = None,
+        memory_context: AgentMemoryContext | None = None,
     ) -> dict[str, Any]:
         return {
             "material_id": material.id,
             "title": self._safe_text(material, "title"),
             "tags": self._loads(self._safe_text(material, "tags_json")),
-            "reason": self._build_reason(material, query, pdf_evidence),
+            "reason": self._build_reason(material, query, pdf_evidence, memory_context),
             "summary": self._safe_text(material, "description"),
         }
 
@@ -415,7 +419,7 @@ class AiService:
 
         context_materials = materials[: min(3, max(1, settings.ai_agent_max_context_materials))]
         candidates = [
-            self._compact_recommendation_payload(material, query, pdf_evidence)
+            self._compact_recommendation_payload(material, query, pdf_evidence, memory_context)
             for material in context_materials
         ]
         system_prompt = (
@@ -427,10 +431,11 @@ class AiService:
             "如果候选资料提供了 quality_signals 或 risk_signals，你可以用它们辅助排序和提示，但不能把风险提示夸大成确定违规。"
             "如果提供了 memory_context，你可以用平台集体记忆增强课程/题型判断，用用户个人记忆做个性化建议；"
             "但不能把用户个人记忆写入或表述成平台集体结论。"
+            "如果候选资料提供了 user_fit_signals，可以用它解释当前用户为什么更适合先看该资料；"
             "如果提供了 query_plan，你必须按照该意图和 evidence_tasks 组织回答；"
             "如果 query_plan 提供了 problem_context，应先按卡点类型、题号和知识点拆解问题；"
             "如果提供了 course_memory_card，你可以用它总结课程级年份、题型、知识点和推荐顺序；"
-            "不要输出 memory_context、query_plan、problem_context、candidate_materials、pdf_evidence、anchor_text、anchor_terms 或 privacy_boundary 等内部字段名。"
+            "不要输出 memory_context、query_plan、problem_context、candidate_materials、user_fit_signals、pdf_evidence、anchor_text、anchor_terms 或 privacy_boundary 等内部字段名。"
             "必须输出严格 JSON，不要输出 Markdown，不要包裹代码块。"
         )
         user_prompt = {
@@ -536,15 +541,20 @@ class AiService:
         material: MaterialRecord,
         query: str,
         pdf_evidence: list[MaterialPageEvidence] | None = None,
+        memory_context: AgentMemoryContext | None = None,
     ) -> dict[str, Any]:
         description = self._safe_text(material, "description").replace("\n", " ").strip()
-        return {
+        user_fit_signals = _user_fit_signals(memory_context, material)
+        payload: dict[str, Any] = {
             "material_id": material.id,
             "title": self._safe_text(material, "title"),
-            "reason": self._build_reason(material, query, pdf_evidence),
+            "reason": self._build_reason(material, query, pdf_evidence, memory_context),
             "summary": description[:180],
             **build_material_signals(material).to_prompt_payload(),
         }
+        if user_fit_signals:
+            payload["user_fit_signals"] = user_fit_signals
+        return payload
 
     def _merge_llm_recommendations(self, body: dict[str, Any], fallback: list[dict[str, Any]]) -> list[dict[str, Any]]:
         by_id = {int(item["material_id"]): dict(item) for item in fallback if item.get("material_id") is not None}
@@ -998,9 +1008,13 @@ class AiService:
         material: MaterialRecord,
         query: str,
         pdf_evidence: list[MaterialPageEvidence] | None = None,
+        memory_context: AgentMemoryContext | None = None,
     ) -> str:
         parts = []
         material_signals = build_material_signals(material)
+        user_fit_signals = _user_fit_signals(memory_context, material)
+        if user_fit_signals:
+            parts.append(f"与你已有学习行为匹配：{_join_values(user_fit_signals[:4])}")
         evidence_items = _evidence_for_material(pdf_evidence or [], material)
         if evidence_items:
             pages = _evidence_pages(evidence_items)
@@ -1074,6 +1088,71 @@ def _evidence_values(pdf_evidence: list[MaterialPageEvidence], field: str) -> li
             if len(values) >= 6:
                 return values
     return values
+
+
+def _user_fit_signals(memory_context: AgentMemoryContext | None, material: MaterialRecord) -> list[str]:
+    if memory_context is None or not memory_context.user:
+        return []
+    try:
+        material_id = int(material.id)
+    except (TypeError, ValueError):
+        return []
+    user_payload = memory_context.user
+    signals: list[str] = []
+    for item in user_payload.get("candidate_interactions") or []:
+        if not isinstance(item, dict) or _safe_payload_int(item.get("material_id")) != material_id:
+            continue
+        raw_signals = item.get("signals")
+        if not isinstance(raw_signals, list):
+            continue
+        for raw_signal in raw_signals:
+            label = _user_interaction_signal_label(str(raw_signal))
+            if label and label not in signals:
+                signals.append(label)
+    for item in user_payload.get("matched_candidate_materials") or []:
+        if not isinstance(item, dict) or _safe_payload_int(item.get("material_id")) != material_id:
+            continue
+        raw_fields = item.get("matched_fields")
+        if not isinstance(raw_fields, list):
+            continue
+        for raw_field in raw_fields:
+            label = _matched_profile_field_label(str(raw_field))
+            if label and label not in signals:
+                signals.append(label)
+    return signals[:6]
+
+
+def _user_interaction_signal_label(value: str) -> str:
+    normalized = value.strip().lower()
+    labels = {
+        "favorited": "已收藏过",
+        "downloaded": "已下载过",
+        "purchased": "已购买过",
+        "uploaded_by_user": "你上传过",
+    }
+    if normalized in labels:
+        return labels[normalized]
+    if normalized.startswith("rated_"):
+        score = _safe_payload_int(normalized.removeprefix("rated_"))
+        if score is not None and 1 <= score <= 5:
+            return f"你给过 {score} 分"
+    return ""
+
+
+def _matched_profile_field_label(value: str) -> str:
+    labels = {
+        "school": "学校匹配",
+        "college": "学院匹配",
+        "major": "专业匹配",
+    }
+    return labels.get(value.strip().lower(), "")
+
+
+def _safe_payload_int(value: Any) -> int | None:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
 
 
 def _evidence_for_material(

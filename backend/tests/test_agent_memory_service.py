@@ -216,7 +216,15 @@ def test_ai_recommendation_prompt_receives_memory_context(monkeypatch) -> None:
             captured["memory_user_id"] = current_user_id
             return AgentMemoryContext(
                 platform={"top_tags": [{"value": "通信原理", "count": 2}]},
-                user={"profile": {"school": "电子科技大学", "major": "通信"}},
+                user={
+                    "profile": {"school": "电子科技大学", "major": "通信"},
+                    "candidate_interactions": [
+                        {"material_id": 101, "title": "通信原理四年真题解析", "signals": ["favorited", "downloaded", "rated_5"]},
+                    ],
+                    "matched_candidate_materials": [
+                        {"material_id": 101, "title": "通信原理四年真题解析", "matched_fields": ["major"]},
+                    ],
+                },
             )
 
     settings = _settings(
@@ -252,5 +260,41 @@ def test_ai_recommendation_prompt_receives_memory_context(monkeypatch) -> None:
     assert "memory_context" in captured["user_prompt"]
     assert captured["user_prompt"]["memory_context"]["platform_collective_memory"]["top_tags"][0]["value"] == "通信原理"
     assert captured["user_prompt"]["memory_context"]["user_personal_memory"]["profile"]["major"] == "通信"
+    assert captured["user_prompt"]["candidate_materials"][0]["user_fit_signals"] == ["已收藏过", "已下载过", "你给过 5 分", "专业匹配"]
+    assert "与你已有学习行为匹配：已收藏过、已下载过、你给过 5 分、专业匹配" in captured["user_prompt"]["candidate_materials"][0]["reason"]
     assert "用户个人记忆" in captured["system_prompt"]
     assert body["answer"] == "已结合记忆上下文推荐通信原理真题。"
+
+
+def test_ai_local_recommendation_reason_uses_current_user_memory_signals(monkeypatch) -> None:
+    class FakeMemoryService:
+        def collect(
+            self,
+            session: object,
+            *,
+            query: str,
+            materials: list[MaterialRecord],
+            current_user_id: int | None,
+            pdf_evidence: list[MaterialPageEvidence],
+        ) -> AgentMemoryContext:
+            del session, query, materials, current_user_id, pdf_evidence
+            return AgentMemoryContext(
+                platform={},
+                user={
+                    "candidate_interactions": [{"material_id": 101, "title": "通信原理四年真题解析", "signals": ["favorited"]}],
+                    "matched_candidate_materials": [{"material_id": 101, "title": "通信原理四年真题解析", "matched_fields": ["major"]}],
+                },
+            )
+
+    settings = _settings(ai_agent_provider="local")
+    monkeypatch.setattr("app.services.ai_service.get_settings", lambda: settings)
+
+    service = AiService(read_repo=None, material_repo=None, memory_service=FakeMemoryService())  # type: ignore[arg-type]
+    material = _material(101, title="通信原理四年真题解析", tags=["通信原理", "真题"])
+    monkeypatch.setattr(service, "_rank_materials", lambda session, query, filters: [material])
+
+    response = service.recommend(object(), SimpleNamespace(query="通信原理往年题常考什么", filters={}), current_user_id=7)  # type: ignore[arg-type]
+    body = json.loads(str(response["output"]).removeprefix("<json>").removesuffix("</json>"))
+
+    assert "user_fit_signals" not in body["recommendations"][0]
+    assert "与你已有学习行为匹配：已收藏过、专业匹配" in body["recommendations"][0]["reason"]
