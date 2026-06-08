@@ -629,7 +629,8 @@ export const getServerSideProps: GetServerSideProps<DetailPageProps> = async (ct
     if (id !== canonicalId) {
       const resolvedUrl = ctx.resolvedUrl || '';
       const queryString = resolvedUrl.includes('?') ? resolvedUrl.split('?')[1] : '';
-      const destination = queryString ? `/market/${canonicalId}?${queryString}` : `/market/${canonicalId}`;
+      const encodedCanonicalId = encodeURIComponent(canonicalId);
+      const destination = queryString ? `/market/${encodedCanonicalId}?${queryString}` : `/market/${encodedCanonicalId}`;
       return {
         redirect: {
           destination,

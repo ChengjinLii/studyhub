@@ -74,6 +74,18 @@ def _escape_like(value: str) -> str:
 
 
 class MaterialRepository:
+    def _uses_legacy_material_likes(self, session: Session) -> bool:
+        table_names = _table_names(session)
+        return "material_likes" in table_names and not _has_table_column(session, "material_likes", "updated_at")
+
+    def _uses_legacy_material_views(self, session: Session) -> bool:
+        table_names = _table_names(session)
+        return "material_views" in table_names and _has_table_column(session, "material_views", "viewed_at")
+
+    def _uses_legacy_material_downloads(self, session: Session) -> bool:
+        table_names = _table_names(session)
+        return "material_downloads" in table_names and not _has_table_column(session, "material_downloads", "updated_at")
+
     def _uses_legacy_reviews(self, session: Session) -> bool:
         table_names = _table_names(session)
         return "material_reviews" not in table_names and "reviews" in table_names
@@ -429,7 +441,13 @@ class MaterialRepository:
         return (status_value or "").strip().lower() or None
 
     def get_material(self, session: Session, material_id: int) -> MaterialRecord | None:
-        return session.get(MaterialRecord, material_id)
+        stmt = (
+            select(MaterialRecord)
+            .options(*_material_record_load_options(session))
+            .where(MaterialRecord.id == material_id)
+            .limit(1)
+        )
+        return session.scalar(stmt)
 
     def list_materials_by_ids(self, session: Session, material_ids: list[int]) -> list[MaterialRecord]:
         if not material_ids:
@@ -449,7 +467,13 @@ class MaterialRepository:
     def save_material(self, session: Session, material: MaterialRecord) -> MaterialRecord:
         session.add(material)
         session.flush()
-        session.refresh(material)
+        existing_columns = _table_columns(session, "materials")
+        if all(column.name in existing_columns for column in _MATERIAL_MAPPED_COLUMNS):
+            session.refresh(material)
+            return material
+        refreshable_columns = [column.name for column in _MATERIAL_MAPPED_COLUMNS if column.name in existing_columns]
+        if refreshable_columns:
+            session.refresh(material, attribute_names=refreshable_columns)
         return material
 
     def list_versions(self, session: Session, material_id: int) -> list[MaterialVersionRecord]:
@@ -569,10 +593,50 @@ class MaterialRepository:
         return entity
 
     def find_like(self, session: Session, material_id: int, user_id: int) -> MaterialLikeRecord | None:
+        if self._uses_legacy_material_likes(session):
+            row = session.execute(
+                text(
+                    """
+                    SELECT id, material_id, user_id, created_at
+                    FROM material_likes
+                    WHERE material_id = :material_id AND user_id = :user_id
+                    LIMIT 1
+                    """
+                ),
+                {"material_id": material_id, "user_id": user_id},
+            ).mappings().first()
+            if row is None:
+                return None
+            return MaterialLikeRecord(
+                id=int(row["id"]),
+                material_id=int(row["material_id"]),
+                user_id=int(row["user_id"]),
+                created_at=row["created_at"],
+                updated_at=row["created_at"],
+            )
         stmt = select(MaterialLikeRecord).where(MaterialLikeRecord.material_id == material_id, MaterialLikeRecord.user_id == user_id)
         return session.scalar(stmt)
 
     def add_like(self, session: Session, *, material_id: int, user_id: int) -> MaterialLikeRecord:
+        if self._uses_legacy_material_likes(session):
+            timestamp = datetime.now(UTC)
+            result = session.execute(
+                text(
+                    """
+                    INSERT INTO material_likes (material_id, user_id, created_at)
+                    VALUES (:material_id, :user_id, :created_at)
+                    """
+                ),
+                {"material_id": material_id, "user_id": user_id, "created_at": timestamp},
+            )
+            like_id = int(result.lastrowid) if result.lastrowid is not None else 0
+            return MaterialLikeRecord(
+                id=like_id or None,
+                material_id=material_id,
+                user_id=user_id,
+                created_at=timestamp,
+                updated_at=timestamp,
+            )
         entity = MaterialLikeRecord(material_id=material_id, user_id=user_id)
         session.add(entity)
         session.flush()
@@ -580,6 +644,15 @@ class MaterialRepository:
         return entity
 
     def remove_like(self, session: Session, entity: MaterialLikeRecord) -> None:
+        if self._uses_legacy_material_likes(session):
+            if entity.id is not None:
+                session.execute(text("DELETE FROM material_likes WHERE id = :id"), {"id": int(entity.id)})
+            else:
+                session.execute(
+                    text("DELETE FROM material_likes WHERE material_id = :material_id AND user_id = :user_id"),
+                    {"material_id": int(entity.material_id), "user_id": int(entity.user_id)},
+                )
+            return
         session.delete(entity)
 
     def find_favorite(self, session: Session, material_id: int, user_id: int) -> MaterialFavoriteRecord | None:
@@ -646,28 +719,121 @@ class MaterialRepository:
         session.delete(entity)
 
     def find_view_by_user(self, session: Session, material_id: int, user_id: int) -> MaterialViewRecord | None:
+        if self._uses_legacy_material_views(session):
+            row = session.execute(
+                text(
+                    """
+                    SELECT id, material_id, user_id, viewer_token_hash, viewed_at
+                    FROM material_views
+                    WHERE material_id = :material_id AND user_id = :user_id
+                    LIMIT 1
+                    """
+                ),
+                {"material_id": material_id, "user_id": user_id},
+            ).mappings().first()
+            return self._legacy_view_record(row)
         stmt = select(MaterialViewRecord).where(MaterialViewRecord.material_id == material_id, MaterialViewRecord.user_id == user_id)
         return session.scalar(stmt)
 
     def find_view_by_token_hash(self, session: Session, material_id: int, viewer_token_hash: str) -> MaterialViewRecord | None:
+        if self._uses_legacy_material_views(session):
+            row = session.execute(
+                text(
+                    """
+                    SELECT id, material_id, user_id, viewer_token_hash, viewed_at
+                    FROM material_views
+                    WHERE material_id = :material_id AND viewer_token_hash = :viewer_token_hash
+                    LIMIT 1
+                    """
+                ),
+                {"material_id": material_id, "viewer_token_hash": viewer_token_hash},
+            ).mappings().first()
+            return self._legacy_view_record(row)
         stmt = select(MaterialViewRecord).where(
             MaterialViewRecord.material_id == material_id,
             MaterialViewRecord.viewer_token_hash == viewer_token_hash,
         )
         return session.scalar(stmt)
 
+    def bind_view_to_user(self, session: Session, entity: MaterialViewRecord, user_id: int) -> None:
+        if self._uses_legacy_material_views(session):
+            if entity.id is not None:
+                session.execute(
+                    text("UPDATE material_views SET user_id = :user_id WHERE id = :id AND user_id IS NULL"),
+                    {"id": int(entity.id), "user_id": user_id},
+                )
+            return
+        entity.user_id = user_id
+        session.add(entity)
+
     def add_view(self, session: Session, *, material_id: int, user_id: int | None, viewer_token_hash: str | None) -> MaterialViewRecord:
+        if self._uses_legacy_material_views(session):
+            timestamp = datetime.now(UTC)
+            result = session.execute(
+                text(
+                    """
+                    INSERT INTO material_views (material_id, user_id, viewer_token_hash, viewed_at)
+                    VALUES (:material_id, :user_id, :viewer_token_hash, :viewed_at)
+                    """
+                ),
+                {
+                    "material_id": material_id,
+                    "user_id": user_id,
+                    "viewer_token_hash": viewer_token_hash,
+                    "viewed_at": timestamp,
+                },
+            )
+            view_id = int(result.lastrowid) if result.lastrowid is not None else 0
+            return MaterialViewRecord(
+                id=view_id or None,
+                material_id=material_id,
+                user_id=user_id,
+                viewer_token_hash=viewer_token_hash,
+                created_at=timestamp,
+                updated_at=timestamp,
+            )
         entity = MaterialViewRecord(material_id=material_id, user_id=user_id, viewer_token_hash=viewer_token_hash)
         session.add(entity)
         session.flush()
         session.refresh(entity)
         return entity
 
+    def _legacy_view_record(self, row: Any) -> MaterialViewRecord | None:
+        if row is None:
+            return None
+        return MaterialViewRecord(
+            id=int(row["id"]),
+            material_id=int(row["material_id"]),
+            user_id=None if row["user_id"] is None else int(row["user_id"]),
+            viewer_token_hash=row["viewer_token_hash"],
+            created_at=row["viewed_at"],
+            updated_at=row["viewed_at"],
+        )
+
     def has_download(self, session: Session, material_id: int, user_id: int) -> bool:
         stmt = select(MaterialDownloadRecord.id).where(MaterialDownloadRecord.material_id == material_id, MaterialDownloadRecord.user_id == user_id)
         return session.scalar(stmt) is not None
 
     def add_download(self, session: Session, *, material_id: int, user_id: int) -> MaterialDownloadRecord:
+        if self._uses_legacy_material_downloads(session):
+            timestamp = datetime.now(UTC)
+            result = session.execute(
+                text(
+                    """
+                    INSERT INTO material_downloads (material_id, user_id, created_at)
+                    VALUES (:material_id, :user_id, :created_at)
+                    """
+                ),
+                {"material_id": material_id, "user_id": user_id, "created_at": timestamp},
+            )
+            download_id = int(result.lastrowid) if result.lastrowid is not None else 0
+            return MaterialDownloadRecord(
+                id=download_id or None,
+                material_id=material_id,
+                user_id=user_id,
+                created_at=timestamp,
+                updated_at=timestamp,
+            )
         entity = MaterialDownloadRecord(material_id=material_id, user_id=user_id)
         session.add(entity)
         session.flush()

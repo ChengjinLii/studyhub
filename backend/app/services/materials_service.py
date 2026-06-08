@@ -503,32 +503,35 @@ class MaterialsService(MaterialsCompatMixin):
     ) -> int:
         self._bootstrap(session)
         material = self._load_accessible_material(session, material_id, user_id, can_manage_all)
+        current_view_count = int(material.view_count or 0)
         token_hash = self._hash_viewer_token(viewer_token)
         if user_id is not None:
             existing = self.material_repo.find_view_by_user(session, material_id, user_id)
             if existing is not None:
-                return int(material.view_count or 0)
+                return current_view_count
             if token_hash:
                 existing_by_token = self.material_repo.find_view_by_token_hash(session, material_id, token_hash)
                 if existing_by_token is not None:
                     if existing_by_token.user_id is None:
-                        existing_by_token.user_id = user_id
-                        session.add(existing_by_token)
+                        self.material_repo.bind_view_to_user(session, existing_by_token, user_id)
                         session.commit()
-                    return int(material.view_count or 0)
+                    return current_view_count
             self.material_repo.add_view(session, material_id=material_id, user_id=user_id, viewer_token_hash=token_hash)
         elif token_hash:
             if self.material_repo.find_view_by_token_hash(session, material_id, token_hash) is not None:
-                return int(material.view_count or 0)
+                return current_view_count
             self.material_repo.add_view(session, material_id=material_id, user_id=None, viewer_token_hash=token_hash)
         else:
-            return int(material.view_count or 0)
-        material.view_count = int(material.view_count or 0) + 1
+            return current_view_count
+        next_view_count = current_view_count + 1
+        material.view_count = next_view_count
         self.material_repo.save_material(session, material)
         session.commit()
-        return int(material.view_count or 0)
+        return next_view_count
 
     def get_preview(self, session: Session, material_id: int, user_id: int, can_manage_all: bool) -> dict[str, Any]:
+        if self.settings.requires_private_env_file:
+            return self._compat_get_preview(session, material_id, user_id, can_manage_all)
         self._bootstrap(session)
         material = self._load_accessible_material(session, material_id, user_id, can_manage_all)
         if material.preview_source == "MANUAL":
@@ -793,25 +796,29 @@ class MaterialsService(MaterialsCompatMixin):
     def like(self, session: Session, material_id: int, user_id: int) -> int:
         self._bootstrap(session)
         material = self._ensure_material_exists(session, material_id)
+        current_like_count = int(material.like_count or 0)
         if self.material_repo.find_like(session, material_id, user_id) is not None:
-            return int(material.like_count or 0)
+            return current_like_count
         self.material_repo.add_like(session, material_id=material_id, user_id=user_id)
-        material.like_count = int(material.like_count or 0) + 1
+        next_like_count = current_like_count + 1
+        material.like_count = next_like_count
         self.material_repo.save_material(session, material)
         session.commit()
-        return int(material.like_count or 0)
+        return next_like_count
 
     def unlike(self, session: Session, material_id: int, user_id: int) -> int:
         self._bootstrap(session)
         material = self._ensure_material_exists(session, material_id)
+        current_like_count = int(material.like_count or 0)
         entity = self.material_repo.find_like(session, material_id, user_id)
         if entity is None:
-            return int(material.like_count or 0)
+            return current_like_count
         self.material_repo.remove_like(session, entity)
-        material.like_count = max(0, int(material.like_count or 0) - 1)
+        next_like_count = max(0, current_like_count - 1)
+        material.like_count = next_like_count
         self.material_repo.save_material(session, material)
         session.commit()
-        return int(material.like_count or 0)
+        return next_like_count
 
     def rate_material(self, session: Session, material_id: int, user_id: int, rating: int) -> dict[str, Any]:
         self._bootstrap(session)
@@ -831,11 +838,13 @@ class MaterialsService(MaterialsCompatMixin):
             self.material_repo.save_rating(session, entity)
             next_count = count
             next_avg = ((avg * count) - previous + rating) / count if count else float(rating)
+        rounded_avg = round(next_avg, 2)
+        reviewer_name = user.nickname
         material.rating_count = next_count
-        material.rating_avg = round(next_avg, 2)
+        material.rating_avg = rounded_avg
         self.material_repo.save_material(session, material)
         session.commit()
-        return {"ratingAvg": material.rating_avg, "ratingCount": material.rating_count, "rating": rating, "reviewer": user.nickname}
+        return {"ratingAvg": rounded_avg, "ratingCount": next_count, "rating": rating, "reviewer": reviewer_name}
 
     def add_review(self, session: Session, material_id: int, user_id: int, payload: ReviewPayload) -> None:
         self._bootstrap(session)
@@ -856,6 +865,8 @@ class MaterialsService(MaterialsCompatMixin):
         session.commit()
 
     def generate_download(self, session: Session, material_id: int, *, user_id: int, role_mask: int | None) -> dict[str, Any]:
+        if self.settings.requires_private_env_file:
+            return self._compat_generate_download(session, material_id, user_id=user_id, role_mask=role_mask)
         self._bootstrap(session)
         material = self._load_accessible_material(session, material_id, user_id, self._is_privileged(role_mask))
         self._assert_can_download(session, material, user_id, role_mask)
@@ -871,6 +882,8 @@ class MaterialsService(MaterialsCompatMixin):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="资料缺少有效的下载方式")
 
     def generate_batch_downloads(self, session: Session, material_ids: list[int], *, user_id: int, role_mask: int | None) -> list[dict[str, Any]]:
+        if self.settings.requires_private_env_file:
+            return self._compat_generate_batch_downloads(session, material_ids, user_id=user_id, role_mask=role_mask)
         self._bootstrap(session)
         if not material_ids:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="请选择需要下载的资料")

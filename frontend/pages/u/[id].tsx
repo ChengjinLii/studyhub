@@ -591,7 +591,8 @@ export const getServerSideProps: GetServerSideProps<UserProfilePageProps> = asyn
     const canonicalId = slug ? `${profile.id}-${slug}` : String(profile.id);
     if (rawId !== canonicalId) {
       const queryString = resolvedUrl.includes('?') ? resolvedUrl.split('?')[1] : '';
-      const destination = queryString ? `/u/${canonicalId}?${queryString}` : `/u/${canonicalId}`;
+      const encodedCanonicalId = encodeURIComponent(canonicalId);
+      const destination = queryString ? `/u/${encodedCanonicalId}?${queryString}` : `/u/${encodedCanonicalId}`;
       return {
         redirect: {
           destination,

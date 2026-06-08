@@ -1,8 +1,12 @@
 from __future__ import annotations
 
 import asyncio
+import json
 from types import SimpleNamespace
 from typing import Any
+
+from sqlalchemy import create_engine, text
+from sqlalchemy.orm import Session
 
 from app.services.materials_service import MaterialsService
 
@@ -77,12 +81,19 @@ def _build_service() -> MaterialsService:
     fake_asset_store = SimpleNamespace(
         storage_provider=fake_storage,
         build_public_custom_preview_url=lambda **kwargs: "/preview.png",
+        build_preview_url=lambda **kwargs: (
+            f"/preview/{kwargs['material_id']}/{kwargs['index']}/"
+            f"{'placeholder' if kwargs.get('placeholder') else 'image'}/{kwargs.get('key') or 'none'}"
+        ),
+        build_download_url=lambda **kwargs: (f"/download/{kwargs['material_id']}/{kwargs['key']}", "expires"),
     )
     fake_settings = SimpleNamespace(
         requires_private_env_file=True,
         async_read_db_enabled=True,
         resolved_material_asset_dir="/tmp/materials",
         material_signed_url_ttl_seconds=900,
+        material_preview_pages_large=5,
+        material_preview_pages_small=3,
         oss_public_base_url=None,
         oss_endpoint=None,
         oss_bucket=None,
@@ -99,6 +110,147 @@ def test_legacy_material_stats_uses_single_materials_aggregate_query() -> None:
     assert data == {"totalMaterials": 4, "freeMaterials": 2, "totalDownloads": 17, "userCount": 3}
     assert session.material_queries == 1
     assert session.user_queries == 1
+
+
+def test_compat_preview_uses_legacy_file_key_without_new_material_columns() -> None:
+    service = _build_service()
+    engine = create_engine("sqlite+pysqlite:///:memory:", future=True)
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                """
+                CREATE TABLE materials (
+                    id INTEGER PRIMARY KEY,
+                    uploader_id INTEGER NULL,
+                    title VARCHAR(80) NOT NULL,
+                    file_type VARCHAR(32) NULL,
+                    file_key VARCHAR(512) NULL,
+                    preview_source VARCHAR(16) NOT NULL DEFAULT 'AUTO',
+                    preview_manifest TEXT NULL,
+                    custom_preview_images TEXT NULL,
+                    status VARCHAR(16) NOT NULL DEFAULT 'VISIBLE'
+                )
+                """
+            )
+        )
+        connection.execute(
+            text(
+                """
+                INSERT INTO materials (
+                    id, uploader_id, title, file_type, file_key, preview_source,
+                    preview_manifest, custom_preview_images, status
+                )
+                VALUES (
+                    41, 7, 'Legacy PDF', 'pdf', 'files/legacy.pdf', 'AUTO',
+                    :manifest, '[]', 'VISIBLE'
+                )
+                """
+            ),
+            {
+                "manifest": json.dumps(
+                    {
+                        "pageCount": 5,
+                        "previewPages": 3,
+                        "pages": [
+                            {"key": "materials/41/preview/p001.jpg", "index": 1, "width": 900, "height": 506},
+                            {"key": "materials/41/preview/p002.jpg", "index": 2, "width": 900, "height": 506},
+                            {"key": "materials/41/preview/p003.jpg", "index": 3, "width": 900, "height": 506},
+                        ],
+                    },
+                    ensure_ascii=False,
+                )
+            },
+        )
+
+    with Session(engine) as session:
+        preview = service.get_preview(session, 41, user_id=1, can_manage_all=False)
+
+    assert preview["status"] == "done"
+    assert preview["pageCount"] == 5
+    assert preview["previewPages"] == 3
+    assert [image["img"]["src"] for image in preview["images"]] == [
+        "/preview/41/1/image/materials/41/preview/p001.jpg",
+        "/preview/41/2/image/materials/41/preview/p002.jpg",
+        "/preview/41/3/image/materials/41/preview/p003.jpg",
+    ]
+    assert preview["images"][0]["width"] == 900
+    assert preview["images"][0]["height"] == 506
+
+
+def test_compat_download_uses_legacy_file_key_and_download_columns() -> None:
+    service = _build_service()
+    engine = create_engine("sqlite+pysqlite:///:memory:", future=True)
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                """
+                CREATE TABLE materials (
+                    id INTEGER PRIMARY KEY,
+                    uploader_id INTEGER NULL,
+                    title VARCHAR(80) NOT NULL,
+                    original_filename VARCHAR(255) NULL,
+                    file_type VARCHAR(32) NULL,
+                    file_size INTEGER NULL,
+                    file_key VARCHAR(512) NULL,
+                    is_free INTEGER NOT NULL DEFAULT 1,
+                    netdisk_url TEXT NULL,
+                    netdisk_password VARCHAR(64) NULL,
+                    netdisk_expired_at DATE NULL,
+                    status VARCHAR(16) NOT NULL DEFAULT 'VISIBLE',
+                    download_count INTEGER NOT NULL DEFAULT 0,
+                    updated_at DATETIME NULL
+                )
+                """
+            )
+        )
+        connection.execute(
+            text(
+                """
+                CREATE TABLE users (
+                    id INTEGER PRIMARY KEY,
+                    role_mask INTEGER NOT NULL DEFAULT 1,
+                    free_download_quota INTEGER NOT NULL DEFAULT 200,
+                    updated_at DATETIME NULL
+                )
+                """
+            )
+        )
+        connection.execute(
+            text(
+                """
+                CREATE TABLE material_downloads (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER NOT NULL,
+                    material_id INTEGER NOT NULL,
+                    created_at DATETIME NULL
+                )
+                """
+            )
+        )
+        connection.execute(
+            text(
+                """
+                INSERT INTO materials (
+                    id, uploader_id, title, original_filename, file_type, file_size, file_key,
+                    is_free, netdisk_url, netdisk_password, netdisk_expired_at, status, download_count
+                )
+                VALUES (41, 7, 'Legacy PDF', 'legacy.pdf', 'pdf', 1024, 'materials/41/file.pdf', 1, NULL, NULL, NULL, 'VISIBLE', 0)
+                """
+            )
+        )
+        connection.execute(text("INSERT INTO users (id, role_mask, free_download_quota) VALUES (1, 1, 200)"))
+
+    with Session(engine) as session:
+        payload = service.generate_download(session, 41, user_id=1, role_mask=1)
+
+    assert payload == {"url": "/download/41/materials/41/file.pdf", "expiresAt": "expires"}
+    with engine.connect() as connection:
+        downloads = connection.execute(text("SELECT COUNT(*) FROM material_downloads")).scalar_one()
+        download_count = connection.execute(text("SELECT download_count FROM materials WHERE id = 41")).scalar_one()
+        quota = connection.execute(text("SELECT free_download_quota FROM users WHERE id = 1")).scalar_one()
+    assert downloads == 1
+    assert download_count == 1
+    assert quota == 199
 
 
 def test_legacy_material_summary_cache_reuses_stats_until_invalidated() -> None:

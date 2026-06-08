@@ -328,6 +328,267 @@ class MaterialsCompatMixin:
             "reviews": reviews,
         }
 
+    def _compat_get_preview(self, session: Session, material_id: int, user_id: int | None, can_manage_all: bool) -> dict[str, Any]:
+        row = session.execute(
+            text(
+                """
+                SELECT
+                    m.id,
+                    m.uploader_id,
+                    m.title,
+                    m.file_type,
+                    m.file_key,
+                    m.preview_source,
+                    m.preview_manifest,
+                    m.custom_preview_images,
+                    m.status
+                FROM materials m
+                WHERE m.id = :material_id
+                LIMIT 1
+                """
+            ),
+            {"material_id": material_id},
+        ).mappings().first()
+        if row is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="资料不存在")
+
+        is_owner = user_id is not None and int(row["uploader_id"] or 0) == int(user_id)
+        if not (can_manage_all or is_owner) and self._compat_is_hidden_material(row["status"]):
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="资料不存在")
+
+        preview_source = str(row["preview_source"] or "AUTO").upper()
+        custom_preview_keys = self._compat_json_loads(row["custom_preview_images"])
+        if preview_source == "MANUAL":
+            if custom_preview_keys:
+                urls = self._compat_build_custom_preview_urls(material_id, custom_preview_keys)
+                return {
+                    "status": "done",
+                    "pageCount": len(urls),
+                    "previewPages": len(urls),
+                    "message": None,
+                    "images": [
+                        {
+                            "index": index + 1,
+                            "width": None,
+                            "height": None,
+                            "img": {"src": url, "srcSet": None, "sizes": None},
+                            "webp": None,
+                            "avif": None,
+                            "lqip": None,
+                        }
+                        for index, url in enumerate(urls)
+                    ],
+                }
+            return {"status": "failed", "pageCount": None, "previewPages": None, "message": "预览资源缺失", "images": []}
+
+        if str(row["file_type"] or "").lower() == "pdf" and self._compat_has_text(row["file_key"]):
+            manifest = self._compat_preview_manifest_payload(row["preview_manifest"])
+            page_count = self._compat_preview_page_count(manifest)
+            preview_pages = self._compat_preview_pages(manifest, page_count)
+            pages = manifest.get("pages")
+            manifest_pages = pages if isinstance(pages, list) else []
+            return {
+                "status": "done",
+                "pageCount": page_count,
+                "previewPages": preview_pages,
+                "message": None,
+                "images": self._compat_preview_images_from_manifest(material_id, manifest_pages, preview_pages),
+            }
+
+        return {"status": "unsupported", "pageCount": None, "previewPages": None, "message": "当前资料暂不支持预览。", "images": []}
+
+    def _compat_generate_download(self, session: Session, material_id: int, *, user_id: int, role_mask: int | None) -> dict[str, Any]:
+        row = self._compat_load_download_material_row(session, material_id)
+        self._compat_assert_download_access(session, row, user_id, role_mask)
+        if self._compat_should_consume_download_quota(row, user_id, role_mask):
+            self._compat_consume_download_quota(session, user_id, 1)
+        self._compat_register_download(session, material_id, user_id)
+        session.commit()
+        self.invalidate_material_summary_cache()
+        return self._compat_download_payload(row)
+
+    def _compat_generate_batch_downloads(
+        self,
+        session: Session,
+        material_ids: list[int],
+        *,
+        user_id: int,
+        role_mask: int | None,
+    ) -> list[dict[str, Any]]:
+        if not material_ids:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="请选择需要下载的资料")
+        unique_ids = list(dict.fromkeys(material_ids))
+        rows = [self._compat_load_download_material_row(session, material_id) for material_id in unique_ids]
+        for row in rows:
+            self._compat_assert_download_access(session, row, user_id, role_mask)
+        quota_needed = sum(1 for row in rows if self._compat_should_consume_download_quota(row, user_id, role_mask))
+        if quota_needed:
+            self._compat_consume_download_quota(session, user_id, quota_needed)
+        for row in rows:
+            self._compat_register_download(session, int(row["id"]), user_id)
+        session.commit()
+        self.invalidate_material_summary_cache()
+        return [self._compat_batch_download_payload(row) for row in rows]
+
+    def _compat_load_download_material_row(self, session: Session, material_id: int) -> dict[str, Any]:
+        row = session.execute(
+            text(
+                """
+                SELECT
+                    id,
+                    uploader_id,
+                    title,
+                    original_filename,
+                    file_type,
+                    file_size,
+                    file_key,
+                    is_free,
+                    netdisk_url,
+                    netdisk_password,
+                    netdisk_expired_at,
+                    status
+                FROM materials
+                WHERE id = :material_id
+                LIMIT 1
+                """
+            ),
+            {"material_id": material_id},
+        ).mappings().first()
+        if row is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="资料不存在")
+        return dict(row)
+
+    def _compat_assert_download_access(self, session: Session, row: dict[str, Any], user_id: int, role_mask: int | None) -> None:
+        is_owner_or_admin = self._compat_is_owner_or_admin(row, user_id, role_mask)
+        if self._compat_is_hidden_material(row["status"]) and not is_owner_or_admin:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="资料不存在")
+        if is_owner_or_admin:
+            return
+        if not self._compat_to_bool(row["is_free"]) and not self._compat_has_paid_access(session, int(row["id"]), user_id):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="请先购买后再下载")
+
+    def _compat_is_owner_or_admin(self, row: dict[str, Any], user_id: int, role_mask: int | None) -> bool:
+        return self._compat_as_int(row["uploader_id"], default=0) == int(user_id) or self._is_privileged(role_mask)
+
+    def _compat_should_consume_download_quota(self, row: dict[str, Any], user_id: int, role_mask: int | None) -> bool:
+        if self._is_privileged(role_mask):
+            return False
+        return self._compat_as_int(row["uploader_id"], default=0) != int(user_id)
+
+    def _compat_consume_download_quota(self, session: Session, user_id: int, count: int) -> None:
+        row = session.execute(
+            text(
+                """
+                SELECT id, role_mask, free_download_quota
+                FROM users
+                WHERE id = :user_id
+                LIMIT 1
+                """
+            ),
+            {"user_id": user_id},
+        ).mappings().first()
+        if row is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="用户不存在")
+        if self._is_privileged(self._compat_as_int(row["role_mask"], default=0)):
+            return
+        current_quota = self._compat_as_int(row["free_download_quota"], default=200)
+        if current_quota < count:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="DOWNLOAD_QUOTA_EXHAUSTED")
+        session.execute(
+            text(
+                """
+                UPDATE users
+                SET free_download_quota = :next_quota, updated_at = CURRENT_TIMESTAMP
+                WHERE id = :user_id
+                """
+            ),
+            {"next_quota": current_quota - count, "user_id": user_id},
+        )
+
+    def _compat_register_download(self, session: Session, material_id: int, user_id: int) -> None:
+        existing = session.execute(
+            text(
+                """
+                SELECT 1
+                FROM material_downloads
+                WHERE material_id = :material_id AND user_id = :user_id
+                LIMIT 1
+                """
+            ),
+            {"material_id": material_id, "user_id": user_id},
+        ).first()
+        if existing is not None:
+            return
+        session.execute(
+            text(
+                """
+                INSERT INTO material_downloads (material_id, user_id, created_at)
+                VALUES (:material_id, :user_id, CURRENT_TIMESTAMP)
+                """
+            ),
+            {"material_id": material_id, "user_id": user_id},
+        )
+        session.execute(
+            text(
+                """
+                UPDATE materials
+                SET download_count = COALESCE(download_count, 0) + 1,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = :material_id
+                """
+            ),
+            {"material_id": material_id},
+        )
+
+    def _compat_download_payload(self, row: dict[str, Any]) -> dict[str, Any]:
+        material_id = int(row["id"])
+        file_key = self._compat_normalize_text(row["file_key"])
+        if file_key:
+            url, expires_at = self.asset_store.build_download_url(
+                material_id=material_id,
+                key=file_key,
+                filename=row["original_filename"],
+            )
+            return {"url": url, "expiresAt": expires_at}
+        if self._compat_has_text(row["netdisk_url"]):
+            expires_at = row["netdisk_expired_at"].isoformat() if row["netdisk_expired_at"] is not None else None
+            return {"url": row["netdisk_url"], "expiresAt": expires_at}
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="资料缺少有效的下载方式")
+
+    def _compat_batch_download_payload(self, row: dict[str, Any]) -> dict[str, Any]:
+        material_id = int(row["id"])
+        file_key = self._compat_normalize_text(row["file_key"])
+        if file_key:
+            url, expires_at = self.asset_store.build_download_url(
+                material_id=material_id,
+                key=file_key,
+                filename=row["original_filename"],
+            )
+            return {
+                "materialId": material_id,
+                "deliveryType": "FILE",
+                "url": url,
+                "expiresAt": expires_at,
+                "originalFilename": row["original_filename"],
+                "fileType": row["file_type"],
+                "fileSize": row["file_size"],
+                "netdiskUrl": None,
+                "netdiskPassword": None,
+                "netdiskExpiredAt": None,
+            }
+        return {
+            "materialId": material_id,
+            "deliveryType": "NETDISK",
+            "url": None,
+            "expiresAt": None,
+            "originalFilename": row["original_filename"],
+            "fileType": row["file_type"],
+            "fileSize": row["file_size"],
+            "netdiskUrl": row["netdisk_url"],
+            "netdiskPassword": row["netdisk_password"],
+            "netdiskExpiredAt": row["netdisk_expired_at"].isoformat() if row["netdisk_expired_at"] else None,
+        }
+
     def _compat_load_material_rows(
         self,
         session: Session,
@@ -1184,6 +1445,54 @@ class MaterialsCompatMixin:
         if isinstance(value, str):
             return value
         return json.dumps(value, ensure_ascii=False)
+
+    def _compat_preview_manifest_payload(self, value: Any) -> dict[str, Any]:
+        if isinstance(value, dict):
+            return value
+        if not isinstance(value, str) or not value.strip():
+            return {}
+        try:
+            parsed = json.loads(value)
+        except (TypeError, ValueError):
+            return {}
+        return parsed if isinstance(parsed, dict) else {}
+
+    def _compat_preview_page_count(self, manifest: dict[str, Any]) -> int:
+        explicit_count = self._compat_as_int(manifest.get("pageCount"), default=0)
+        if explicit_count > 0:
+            return explicit_count
+        pages = manifest.get("pages")
+        if isinstance(pages, list) and pages:
+            return len(pages)
+        return int(getattr(self.settings, "material_preview_pages_large", 5) or 5)
+
+    def _compat_preview_pages(self, manifest: dict[str, Any], page_count: int) -> int:
+        explicit_pages = self._compat_as_int(manifest.get("previewPages"), default=0)
+        if explicit_pages > 0:
+            return min(explicit_pages, max(1, page_count))
+        pages = manifest.get("pages")
+        if isinstance(pages, list) and pages:
+            return min(len(pages), max(1, page_count))
+        configured_pages = int(getattr(self.settings, "material_preview_pages_small", 3) or 3)
+        return min(max(1, configured_pages), max(1, page_count))
+
+    def _compat_preview_images_from_manifest(self, material_id: int, pages: list[Any], preview_pages: int) -> list[dict[str, Any]]:
+        images: list[dict[str, Any]] = []
+        for position in range(preview_pages):
+            page = pages[position] if position < len(pages) and isinstance(pages[position], dict) else {}
+            index = self._compat_as_int(page.get("index"), default=position + 1) if page else position + 1
+            if index <= 0:
+                index = position + 1
+            key = self._compat_normalize_text(page.get("key")) if page else None
+            image = self._preview_image_payload(material_id, index, key=key, placeholder=not bool(key))
+            width = self._compat_as_int(page.get("width"), default=0) if page else 0
+            height = self._compat_as_int(page.get("height"), default=0) if page else 0
+            if width > 0:
+                image["width"] = width
+            if height > 0:
+                image["height"] = height
+            images.append(image)
+        return images
 
     def _compat_serialize_datetime(self, value: Any) -> str | None:
         return compat_serialize_datetime(value)

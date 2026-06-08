@@ -385,9 +385,16 @@ def material_preview_asset(
 ) -> Response:
     material, claims = service.resolve_preview_asset(session, id, index, token)
     if claims.get("kind") == "preview-image" and claims.get("key"):
-        path = service.asset_store.resolve_path(str(claims["key"]))
-        if path.exists():
-            return FileResponse(path, media_type=service.asset_store.guess_media_type(path.name, default="image/png"))
+        key = str(claims["key"])
+        try:
+            content = service.asset_store.read_bytes(key, max_size_bytes=service.settings.material_preview_image_max_size_bytes)
+            return Response(
+                content=content,
+                media_type=service.asset_store.guess_media_type(key, default="image/png"),
+                headers={"Cache-Control": "private, max-age=300"},
+            )
+        except Exception:
+            pass
     svg = _build_preview_placeholder_svg(material.title, index, material.preview_watermark_enabled)
     return Response(content=svg, media_type="image/svg+xml")
 

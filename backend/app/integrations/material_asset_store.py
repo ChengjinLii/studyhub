@@ -79,16 +79,6 @@ class MaterialAssetStore:
         return await asyncio.to_thread(self.build_download_url, material_id=material_id, key=key, filename=filename)
 
     def build_preview_url(self, *, material_id: int, index: int, key: str | None, placeholder: bool) -> str:
-        if key and not placeholder:
-            direct_url = self.storage_provider.build_signed_download_url(
-                root=self.settings.resolved_material_asset_dir,
-                key=key,
-                filename=Path(key).name,
-                ttl_seconds=self.settings.material_signed_url_ttl_seconds,
-                content_type=self.guess_media_type(key, default="image/png"),
-            )
-            if direct_url is not None:
-                return direct_url[0]
         token = self.token_codec.encode(
             {
                 "sub": f"material-preview:{material_id}:{index}",
@@ -102,16 +92,6 @@ class MaterialAssetStore:
         return f"/api/materials/{material_id}/preview/images/{index}?token={token}"
 
     async def build_preview_url_async(self, *, material_id: int, index: int, key: str | None, placeholder: bool) -> str:
-        if key and not placeholder:
-            direct_url = await self.storage_provider.build_signed_download_url_async(
-                root=self.settings.resolved_material_asset_dir,
-                key=key,
-                filename=Path(key).name,
-                ttl_seconds=self.settings.material_signed_url_ttl_seconds,
-                content_type=self.guess_media_type(key, default="image/png"),
-            )
-            if direct_url is not None:
-                return direct_url[0]
         return await asyncio.to_thread(
             self.build_preview_url,
             material_id=material_id,

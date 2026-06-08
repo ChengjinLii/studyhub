@@ -266,99 +266,96 @@ export default function MaterialDetailPage({ material, user }: MaterialDetailPag
                     </div>
                   </div>
                 ) : (
-                  <>
-                    <p className="breadcrumb">
-                      {material.school} / {courseBreadcrumb}
-                    </p>
-                    <h1>{material.title}</h1>
-                    <p className="material-meta">
-                      发布者：
-                      {material?.uploaderId ? (
-                        <Link className="text-button" href={userPath(material.uploaderId, uploaderLabel)}>
-                          {uploaderLabel}
-                        </Link>
-                      ) : (
-                        uploaderLabel
-                      )}
-                    </p>
-                    {copyrightOwner && (
-                      <p className="material-meta">版权持有者：{copyrightOwner}</p>
-                    )}
-                  </>
-                )}
-                {!isExperienceMaterial &&
-                  (material.description ? (
-                    <div className="material-desc markdown-body">
-                      <ReactMarkdown remarkPlugins={[remarkGfm]}>{material.description}</ReactMarkdown>
+                  <div className="detail-main__surface">
+                    <div className="detail-main__header">
+                      <p className="breadcrumb">
+                        {material.school} / {courseBreadcrumb}
+                      </p>
+                      <h1>{material.title}</h1>
+                      <div className="detail-main__byline">
+                        <span>
+                          发布者：
+                          {material?.uploaderId ? (
+                            <Link className="text-button" href={userPath(material.uploaderId, uploaderLabel)}>
+                              {uploaderLabel}
+                            </Link>
+                          ) : (
+                            uploaderLabel
+                          )}
+                        </span>
+                        {copyrightOwner && <span>版权持有者：{copyrightOwner}</span>}
+                      </div>
                     </div>
-                  ) : (
-                    <p className="material-desc">投稿者暂无详细描述。</p>
-                  ))}
-                {!isExperienceMaterial && (
-                  <div className="material-tags">
-                    {resolvedCategory !== 'MAJOR' && <span className="badge badge-ghost">{courseCategoryLabel}</span>}
-                    {material.gradeValue && <span className="badge">{material.gradeValue}</span>}
-                    {material.tags?.map((tag) => (
-                      <Link key={tag} className="badge badge-outline" href={`/?tag=${encodeURIComponent(tag)}`}>
-                        #{tag}
-                      </Link>
-                    ))}
-                  </div>
-                )}
-                {!isExperienceMaterial && (
-                  <div className="rating-widget">
-                    <StarRating
-                      value={myRating ?? 0}
-                      onChange={handleRatingChange}
-                      readOnly={ratingSubmitting}
-                      size={30}
-                    />
-                    <p>
-                      平均 {formattedRatingAvg} / 5（{ratingCount} 人评分）{myRating ? ` · 我的评分 ${myRating} 星` : ''}
-                    </p>
-                  </div>
-                )}
-                {!isExperienceMaterial && (
-                  <div className="detail-share">
-                    <button className="button ghost small" type="button" onClick={handleShare}>
-                      <span className="button-icon" aria-hidden="true">
-                        <svg viewBox="0 0 24 24" aria-hidden="true">
-                          <path
-                            d="M7 12.5L16.6 7.8M7 11.5L16.6 16.2"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="1.6"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                          />
-                          <circle
-                            cx="6"
-                            cy="12"
-                            r="2.5"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="1.6"
-                          />
-                          <circle
-                            cx="18"
-                            cy="6"
-                            r="2.5"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="1.6"
-                          />
-                          <circle
-                            cx="18"
-                            cy="18"
-                            r="2.5"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="1.6"
-                          />
-                        </svg>
-                      </span>
-                      分享链接
-                    </button>
+                    {material.description ? (
+                      <div className="material-desc markdown-body">
+                        <ReactMarkdown remarkPlugins={[remarkGfm]}>{material.description}</ReactMarkdown>
+                      </div>
+                    ) : (
+                      <p className="material-desc">投稿者暂无详细描述。</p>
+                    )}
+                    <div className="material-tags">
+                      {resolvedCategory !== 'MAJOR' && <span className="badge badge-ghost">{courseCategoryLabel}</span>}
+                      {material.gradeValue && <span className="badge">{material.gradeValue}</span>}
+                      {material.tags?.map((tag) => (
+                        <Link key={tag} className="badge badge-outline" href={`/?tag=${encodeURIComponent(tag)}`}>
+                          #{tag}
+                        </Link>
+                      ))}
+                    </div>
+                    <div className="detail-main__footer">
+                      <div className="rating-widget">
+                        <StarRating
+                          value={myRating ?? 0}
+                          onChange={handleRatingChange}
+                          readOnly={ratingSubmitting}
+                          size={30}
+                        />
+                        <p>
+                          平均 {formattedRatingAvg} / 5（{ratingCount} 人评分）{myRating ? ` · 我的评分 ${myRating} 星` : ''}
+                        </p>
+                      </div>
+                      <div className="detail-share">
+                        <button className="button ghost small" type="button" onClick={handleShare}>
+                          <span className="button-icon" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" aria-hidden="true">
+                              <path
+                                d="M7 12.5L16.6 7.8M7 11.5L16.6 16.2"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="1.6"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                              />
+                              <circle
+                                cx="6"
+                                cy="12"
+                                r="2.5"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="1.6"
+                              />
+                              <circle
+                                cx="18"
+                                cy="6"
+                                r="2.5"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="1.6"
+                              />
+                              <circle
+                                cx="18"
+                                cy="18"
+                                r="2.5"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="1.6"
+                              />
+                            </svg>
+                          </span>
+                          分享链接
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 )}
                 {isExperienceMaterial && (
@@ -435,81 +432,68 @@ export default function MaterialDetailPage({ material, user }: MaterialDetailPag
               </div>
               {!isExperienceMaterial && (
                 <div className="detail-price-card">
-                  <span className="price-tag detail">{material.free ? '免费' : `¥${material.price.toFixed(2)}`}</span>
-                  <p>
-                    下载：{material.downloadCount ?? 0} · 点赞：{likeCount} · 评论：
-                    {material.commentCount ?? material.reviews.length}
-                  </p>
+                  <div className="detail-price-card__summary">
+                    <div className="detail-price-card__price-group">
+                      <span className="detail-price-card__eyebrow">{material.free ? '公开资料' : '付费资料'}</span>
+                      <span className={`price-tag detail${material.free ? ' free' : ''}`}>
+                        {material.free ? '免费' : `¥${material.price.toFixed(2)}`}
+                      </span>
+                    </div>
+                    <span className="detail-price-card__type">{material.hasFile ? '站内文件' : '网盘资料'}</span>
+                  </div>
+                  <div className="detail-price-card__stats" aria-label="资料数据">
+                    <span className="detail-price-card__stat">
+                      <strong>{material.downloadCount ?? 0}</strong>
+                      <span>下载</span>
+                    </span>
+                    <span className="detail-price-card__stat">
+                      <strong>{likeCount}</strong>
+                      <span>点赞</span>
+                    </span>
+                    <span className="detail-price-card__stat">
+                      <strong>{material.commentCount ?? material.reviews.length}</strong>
+                      <span>评论</span>
+                    </span>
+                  </div>
                   {material.hasFile ? (
-                    <p className="material-meta">
-                      文件：{material.originalFilename || '未知'} · 大小：{formatFileSize(material.fileSize)} · 类型：
-                      {material.fileType?.toUpperCase() || 'ZIP/PDF/Office 等'}
-                    </p>
+                    <div className="detail-price-card__file">
+                      <span className="detail-price-card__file-label">文件</span>
+                      <p>{material.originalFilename || '未知'}</p>
+                      <span className="material-meta">
+                        {formatFileSize(material.fileSize)} · {material.fileType?.toUpperCase() || 'ZIP/PDF/Office 等'}
+                      </span>
+                    </div>
                   ) : (
-                    <p className="material-meta">该资料通过网盘链接提供，购买后可查看链接。</p>
+                    <div className="detail-price-card__file">
+                      <span className="detail-price-card__file-label">网盘</span>
+                      <p>购买后可查看链接。</p>
+                    </div>
                   )}
-                  {!material.free && !canManage && (
-                    <button className="button primary" type="button" onClick={handlePurchase} disabled={ordering || purchased}>
-                      {purchased ? '已下单' : ordering ? '下单中...' : '立即下单'}
-                    </button>
+                  {((!material.free && !canManage) || material.hasFile) && (
+                    <div className="detail-price-card__actions">
+	                      {!material.free && !canManage && (
+	                        <button className="button primary detail-action-order" type="button" onClick={handlePurchase} disabled={ordering || purchased}>
+	                          {purchased ? '已下单' : ordering ? '下单中...' : '立即下单'}
+	                        </button>
+	                      )}
+	                      {material.hasFile && (
+	                        <button
+	                          className={`button detail-action-download ${material.free || canManage || purchased ? 'primary' : 'ghost'}`}
+	                          type="button"
+	                          onClick={handleDownload}
+	                          disabled={downloading}
+                        >
+                          {downloading ? '生成链接中...' : material.free ? '获取免费链接' : '获取下载链接'}
+                        </button>
+                      )}
+                    </div>
                   )}
-                  {material.hasFile && (
-                    <button className="button ghost" type="button" onClick={handleDownload} disabled={downloading}>
-                      {downloading ? '生成链接中...' : material.free ? '获取免费链接' : '获取下载链接'}
-                    </button>
-                  )}
-                  <button className="button ghost" type="button" onClick={handleToggleLike}>
-                    <span className="button-icon" aria-hidden="true">
-                      <svg viewBox="0 0 24 24" aria-hidden="true">
-                        <path
-                          d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3z"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="1.6"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        />
-                        <path
-                          d="M7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="1.6"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        />
-                      </svg>
-                    </span>
-                    {liked ? '已点赞' : '点赞'}
-                  </button>
-                  <button className="button ghost" type="button" onClick={handleReport}>
-                    <span className="button-icon" aria-hidden="true">
-                      <svg viewBox="0 0 24 24" aria-hidden="true">
-                        <path
-                          d="M12 3l9 16H3l9-16z"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="1.6"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        />
-                        <path
-                          d="M12 9v4"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="1.6"
-                          strokeLinecap="round"
-                        />
-                        <circle cx="12" cy="17" r="1" fill="currentColor" />
-                      </svg>
-                    </span>
-                    举报
-                  </button>
-                  {canManage && material && (
-                    <Link className="button ghost" href={`/upload?materialId=${material.id}`}>
+                  <div className="detail-price-card__secondary-actions">
+	                    <button className={`button ghost detail-action-like${liked ? ' is-active' : ''}`} type="button" onClick={handleToggleLike}>
                       <span className="button-icon" aria-hidden="true">
                         <svg viewBox="0 0 24 24" aria-hidden="true">
                           <path
-                            d="M4 20l4-1 11-11-3-3-11 11-1 4z"
+                            d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3z"
                             fill="none"
                             stroke="currentColor"
                             strokeWidth="1.6"
@@ -517,7 +501,7 @@ export default function MaterialDetailPage({ material, user }: MaterialDetailPag
                             strokeLinejoin="round"
                           />
                           <path
-                            d="M14 6l3 3"
+                            d="M7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"
                             fill="none"
                             stroke="currentColor"
                             strokeWidth="1.6"
@@ -526,18 +510,65 @@ export default function MaterialDetailPage({ material, user }: MaterialDetailPag
                           />
                         </svg>
                       </span>
-                      编辑资料
-                    </Link>
-                  )}
+                      {liked ? '已点赞' : '点赞'}
+                    </button>
+	                    <button className="button ghost detail-action-report" type="button" onClick={handleReport}>
+                      <span className="button-icon" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                          <path
+                            d="M12 3l9 16H3l9-16z"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="1.6"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                          <path
+                            d="M12 9v4"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="1.6"
+                            strokeLinecap="round"
+                          />
+                          <circle cx="12" cy="17" r="1" fill="currentColor" />
+                        </svg>
+                      </span>
+                      举报
+                    </button>
+                    {canManage && material && (
+	                      <Link className="button ghost detail-action-edit" href={`/upload?materialId=${material.id}`}>
+                        <span className="button-icon" aria-hidden="true">
+                          <svg viewBox="0 0 24 24" aria-hidden="true">
+                            <path
+                              d="M4 20l4-1 11-11-3-3-11 11-1 4z"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="1.6"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            />
+                            <path
+                              d="M14 6l3 3"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="1.6"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            />
+                          </svg>
+                        </span>
+                        编辑资料
+                      </Link>
+                    )}
+                  </div>
                   {!user && (
-                    <p className="help-text">
+                    <p className="help-text detail-price-card__note">
                       提示：<a className="login-link" href={`/login?next=${encodeURIComponent(router.asPath)}`}>登录</a>后可收藏、评分、下单与下载。
                     </p>
                   )}
-                  {isAdmin && <p className="help-text">超级管理员可直接下载所有资料，无需支付。</p>}
                   {info && <p className="success-text">{info}</p>}
                   {downloadUrl && (
-                    <p className="help-text">
+                    <p className="help-text detail-price-card__note">
                       如果浏览器未自动开始下载，可
                       <a href={downloadUrl} target="_blank" rel="noopener noreferrer">
                         点击此处
@@ -754,9 +785,10 @@ export const getServerSideProps: GetServerSideProps<MaterialDetailPageProps> = a
     if (id !== canonicalId) {
       const resolvedUrl = ctx.resolvedUrl || '';
       const queryString = resolvedUrl.includes('?') ? resolvedUrl.split('?')[1] : '';
+      const encodedCanonicalId = encodeURIComponent(canonicalId);
       const destination = queryString
-        ? `/materials/${canonicalId}?${queryString}`
-        : `/materials/${canonicalId}`;
+        ? `/materials/${encodedCanonicalId}?${queryString}`
+        : `/materials/${encodedCanonicalId}`;
       return {
         redirect: {
           destination,
