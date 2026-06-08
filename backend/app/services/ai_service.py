@@ -1202,25 +1202,32 @@ class AiService:
         for item in self.material_repo.list_visible_materials(session):
             score = self._score(item, query_terms, normalized_query, school=school, major=major)
             course_score = self._course_score(item, query_terms)
-            quality_score = build_material_signals(item).quality_score
-            scored_items.append((score, course_score, quality_score, item))
-        course_items = [(score, quality_score, item) for score, course_score, quality_score, item in scored_items if course_score > 0]
+            material_signals = build_material_signals(item)
+            quality_score = material_signals.quality_score
+            risk_score = _agent_material_risk_score(material_signals.risk_signals)
+            scored_items.append((score, course_score, quality_score, risk_score, item))
+        course_items = [
+            (score, risk_score, quality_score, item)
+            for score, course_score, quality_score, risk_score, item in scored_items
+            if course_score > 0
+        ]
         if course_items:
             items = course_items
         else:
-            items = [(score, quality_score, item) for score, _, quality_score, item in scored_items]
-        positive_items = [(score, quality_score, item) for score, quality_score, item in items if score > 0]
+            items = [(score, risk_score, quality_score, item) for score, _, quality_score, risk_score, item in scored_items]
+        positive_items = [(score, risk_score, quality_score, item) for score, risk_score, quality_score, item in items if score > 0]
         items = positive_items or items
         items.sort(
             key=lambda scored_item: (
                 -scored_item[0],
-                -scored_item[1],
-                -int(scored_item[2].download_count or 0),
-                -parse_iso_datetime(scored_item[2].created_at.isoformat() if scored_item[2].created_at else None).timestamp(),
+                scored_item[1],
+                -scored_item[2],
+                -int(scored_item[3].download_count or 0),
+                -parse_iso_datetime(scored_item[3].created_at.isoformat() if scored_item[3].created_at else None).timestamp(),
             )
         )
         if positive_items:
-            return [item for _, _, item in items]
+            return [item for _, _, _, item in items]
         return []
 
     def _score(self, material: MaterialRecord, query_terms: list[str], query: str, *, school: str | None, major: str | None) -> int:
@@ -1373,6 +1380,18 @@ def _agent_retrieval_query(query: str, context_query: str | None) -> str:
     if not context_focus:
         return current
     return f"{current}\n最近上下文关键词：{context_focus}"[:900]
+
+
+def _agent_material_risk_score(risk_signals: tuple[str, ...]) -> int:
+    score = 0
+    for signal in risk_signals:
+        if signal in {"疑似违规交易风险", "疑似版权或来源风险"}:
+            score += 4
+        elif signal in {"审核状态需复核", "版权归属未标注", "外部联系方式需复核"}:
+            score += 2
+        else:
+            score += 1
+    return score
 
 
 def _agent_image_attachments(value: Any) -> list[dict[str, Any]]:

@@ -107,6 +107,57 @@ def test_agent_ranking_uses_material_quality_as_tie_breaker() -> None:
     assert [item.id for item in ranked] == [301, 302]
 
 
+def test_agent_ranking_demotes_high_risk_material_when_relevance_ties() -> None:
+    safe_material = MaterialRecord(
+        id=303,
+        title="通信原理真题资料",
+        description="通信原理期末真题、详细答案解析、常考题型和复习建议整理",
+        tags_json=json.dumps(["通信原理", "真题", "解析"], ensure_ascii=False),
+        file_storage_key="materials/safe.pdf",
+        file_type="pdf",
+        preview_status="done",
+        review_status="APPROVED",
+        copyright_owner="课程组",
+        download_count=12,
+        rating_avg=4.5,
+        rating_count=3,
+        is_free=True,
+    )
+    risky_material = MaterialRecord(
+        id=304,
+        title="通信原理真题资料",
+        description="通信原理期末真题、解析和内部泄题资料，联系我买卖答案，原题泄露。",
+        tags_json=json.dumps(["通信原理", "真题", "解析"], ensure_ascii=False),
+        file_storage_key="materials/risky.pdf",
+        file_type="pdf",
+        preview_status="done",
+        review_status="APPROVED",
+        copyright_owner="课程组",
+        download_count=200,
+        rating_avg=4.9,
+        rating_count=20,
+        is_free=True,
+    )
+
+    class FakeReadRepo:
+        def load_seed(self) -> dict[str, Any]:
+            return {}
+
+    class FakeMaterialRepo:
+        def ensure_seed_bootstrap(self, session: object, seed: dict[str, Any]) -> None:
+            del session, seed
+
+        def list_visible_materials(self, session: object) -> list[MaterialRecord]:
+            del session
+            return [risky_material, safe_material]
+
+    service = AiService(read_repo=FakeReadRepo(), material_repo=FakeMaterialRepo())  # type: ignore[arg-type]
+
+    ranked = service._rank_materials(object(), "通信原理真题", {})  # type: ignore[arg-type]
+
+    assert [item.id for item in ranked] == [303, 304]
+
+
 def test_agent_ranking_matches_natural_study_search_aliases() -> None:
     exam_material = MaterialRecord(
         id=401,
