@@ -24,6 +24,14 @@ if [[ -z "${SCHEMA_COLUMNS//[[:space:]]/}" ]]; then
   exit 2
 fi
 
+read -r -a SCHEMA_COLUMN_ITEMS <<< "$SCHEMA_COLUMNS"
+for column in "${SCHEMA_COLUMN_ITEMS[@]}"; do
+  if ! [[ "$column" =~ ^[A-Za-z_][A-Za-z0-9_]*[.][A-Za-z_][A-Za-z0-9_]*$ ]]; then
+    echo "STUDYHUB_P0_SCHEMA_COLUMNS entries must use table.column identifiers; got $column"
+    exit 2
+  fi
+done
+
 if ! [[ "$BACKUP_MAX_AGE_MINUTES" =~ ^[1-9][0-9]*$ ]]; then
   echo "STUDYHUB_BACKUP_MAX_AGE_MINUTES must be a positive integer; got $BACKUP_MAX_AGE_MINUTES"
   exit 2
@@ -50,7 +58,7 @@ command_args=(
   --backup-max-age-minutes "$BACKUP_MAX_AGE_MINUTES"
   --confirm-plan-token "$PLAN_TOKEN"
 )
-for column in $SCHEMA_COLUMNS; do
+for column in "${SCHEMA_COLUMN_ITEMS[@]}"; do
   command_args+=(--only "$column")
 done
 

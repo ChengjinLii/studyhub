@@ -21,8 +21,16 @@ if [[ -z "${SCHEMA_COLUMNS//[[:space:]]/}" ]]; then
   exit 2
 fi
 
+read -r -a SCHEMA_COLUMN_ITEMS <<< "$SCHEMA_COLUMNS"
+for column in "${SCHEMA_COLUMN_ITEMS[@]}"; do
+  if ! [[ "$column" =~ ^[A-Za-z_][A-Za-z0-9_]*[.][A-Za-z_][A-Za-z0-9_]*$ ]]; then
+    echo "STUDYHUB_P0_SCHEMA_COLUMNS entries must use table.column identifiers; got $column"
+    exit 2
+  fi
+done
+
 command_args=("$ROOT_DIR/.venv/bin/python" -m app.ops.db_admin migrate-additive --plan)
-for column in $SCHEMA_COLUMNS; do
+for column in "${SCHEMA_COLUMN_ITEMS[@]}"; do
   command_args+=(--only "$column")
 done
 

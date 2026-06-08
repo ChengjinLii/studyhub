@@ -16,13 +16,24 @@ if [[ -n "$SCHEMA_CHECK_COLUMNS" && -z "${SCHEMA_CHECK_COLUMNS//[[:space:]]/}" ]
   exit 2
 fi
 
+SCHEMA_CHECK_COLUMN_ITEMS=()
+if [[ -n "$SCHEMA_CHECK_COLUMNS" ]]; then
+  read -r -a SCHEMA_CHECK_COLUMN_ITEMS <<< "$SCHEMA_CHECK_COLUMNS"
+  for column in "${SCHEMA_CHECK_COLUMN_ITEMS[@]}"; do
+    if ! [[ "$column" =~ ^[A-Za-z_][A-Za-z0-9_]*[.][A-Za-z_][A-Za-z0-9_]*$ ]]; then
+      echo "STUDYHUB_PRODUCTION_SCHEMA_CHECK_COLUMNS entries must use table.column identifiers; got $column"
+      exit 2
+    fi
+  done
+fi
+
 cd "$ROOT_DIR/backend"
 export STUDYHUB_ENVIRONMENT=production
 export STUDYHUB_PRIVATE_DIR_PATH="$PRIVATE_DIR"
 "$ROOT_DIR/.venv/bin/python" -m app.ops.preflight --network --timeout-seconds "$PREFLIGHT_TIMEOUT_SECONDS"
 schema_check_command=("$ROOT_DIR/.venv/bin/python" -m app.ops.db_admin check-schema)
-if [[ -n "$SCHEMA_CHECK_COLUMNS" ]]; then
-  for column in $SCHEMA_CHECK_COLUMNS; do
+if [[ "${#SCHEMA_CHECK_COLUMN_ITEMS[@]}" -gt 0 ]]; then
+  for column in "${SCHEMA_CHECK_COLUMN_ITEMS[@]}"; do
     schema_check_command+=(--only "$column")
   done
 fi
