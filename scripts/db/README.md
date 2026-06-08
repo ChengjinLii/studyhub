@@ -62,7 +62,7 @@ STUDYHUB_ENVIRONMENT=production bash scripts/db/db-verify-p0-schema.sh
 
 该脚本只执行 `check-schema --only`，不会修改数据库。字段缺失时返回非 0，字段补齐后返回 0。
 
-确认备份、SQL 和 `planToken` 后才允许执行 `--yes`。production 执行时必须保留相同字段范围，并传入计划输出里的 token：
+确认备份、SQL 和 `planToken` 后才允许执行 `--yes`。production 执行时必须保留相同字段范围，并传入计划输出里的 16 位十六进制 token：
 
 ```bash
 STUDYHUB_ENVIRONMENT=production \

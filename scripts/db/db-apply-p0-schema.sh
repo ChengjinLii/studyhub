@@ -34,6 +34,11 @@ if [[ -z "$PLAN_TOKEN" ]]; then
   exit 2
 fi
 
+if ! [[ "$PLAN_TOKEN" =~ ^[0-9a-f]{16}$ ]]; then
+  echo "STUDYHUB_P0_PLAN_TOKEN must be the 16-character hex planToken from db-plan-p0-schema.sh; got $PLAN_TOKEN"
+  exit 2
+fi
+
 if [[ "$CONFIRM" != "I_UNDERSTAND_ADD_COLUMNS" ]]; then
   echo "set YES_PRODUCTION_SCHEMA_ADD_COLUMNS=I_UNDERSTAND_ADD_COLUMNS to execute additive production DDL"
   exit 2
