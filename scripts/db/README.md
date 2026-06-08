@@ -88,7 +88,7 @@ HTTP 检查默认使用 5 秒连接超时和 20 秒总超时，可用 `STUDYHUB_
 STUDYHUB_ENVIRONMENT=production bash scripts/db/db-log-p0-schema.sh
 ```
 
-默认检查 `studyhub-backend.service studyhub-worker.service` 最近 30 分钟日志中的 `market_items.source` 和 `orders.uploader_id` 缺字段错误。可用 `STUDYHUB_P0_LOG_SERVICES`、`STUDYHUB_BACKEND_SERVICE`、`STUDYHUB_WORKER_SERVICE` 和 `STUDYHUB_P0_LOG_SINCE` 调整服务名和时间窗口。
+默认检查 `studyhub-backend.service studyhub-worker.service` 最近 30 分钟日志中的 `market_items.source` 和 `orders.uploader_id` 缺字段错误。可用 `STUDYHUB_P0_LOG_SERVICES`、`STUDYHUB_BACKEND_SERVICE`、`STUDYHUB_WORKER_SERVICE` 和 `STUDYHUB_P0_LOG_SINCE` 调整服务名和时间窗口；`STUDYHUB_P0_LOG_SINCE` 不能为空白。
 
 如果目标库已经由旧流程建好表，只需要记录当前迁移版本：
 

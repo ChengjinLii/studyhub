@@ -20,6 +20,11 @@ if [[ -z "${LOG_SERVICES//[[:space:]]/}" ]]; then
   exit 2
 fi
 
+if [[ -z "${LOG_SINCE//[[:space:]]/}" ]]; then
+  echo "STUDYHUB_P0_LOG_SINCE must contain a journalctl --since value"
+  exit 2
+fi
+
 log_file="$(mktemp)"
 trap 'rm -f "$log_file"' EXIT
 
