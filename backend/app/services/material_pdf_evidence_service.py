@@ -2,7 +2,9 @@ from __future__ import annotations
 
 from collections import OrderedDict
 from dataclasses import dataclass
+import hashlib
 from io import BytesIO
+import json
 import re
 from typing import Any
 
@@ -97,6 +99,8 @@ SOURCE_TYPE_ANCHOR_TERMS: dict[str, tuple[str, ...]] = {
     "exercise": ("习题", "练习", "例题", "作业"),
 }
 
+PDF_EVIDENCE_SCHEMA = "material-page-evidence-v1"
+
 
 @dataclass(frozen=True, slots=True)
 class MaterialPageChunk:
@@ -136,10 +140,17 @@ class MaterialPageEvidence:
 
     def to_prompt_payload(self) -> dict[str, Any]:
         payload: dict[str, Any] = {
+            "schema": PDF_EVIDENCE_SCHEMA,
+            "evidence_id": self.evidence_id(),
             "material_id": self.material_id,
             "title": self.title,
             "page": self.page,
             "text": self.text,
+            "provenance": {
+                "source": "pdf_page_chunk",
+                "persistence": "not_persisted",
+                "cacheScope": "bounded_in_memory_for_free_materials",
+            },
         }
         if self.years:
             payload["years"] = list(self.years)
@@ -183,6 +194,29 @@ class MaterialPageEvidence:
         if self.source_type != "unknown":
             payload["source_type"] = self.source_type
         return payload
+
+    def evidence_id(self) -> str:
+        fingerprint_basis = {
+            "schema": PDF_EVIDENCE_SCHEMA,
+            "material_id": int(self.material_id),
+            "title": self.title,
+            "page": int(self.page),
+            "text": self.text,
+            "years": list(self.years),
+            "question_types": list(self.question_types),
+            "knowledge_signals": list(self.knowledge_signals),
+            "chapter_signals": list(self.chapter_signals),
+            "solution_signals": list(self.solution_signals),
+            "question_numbers": list(self.question_numbers),
+            "source_type": self.source_type,
+            "score_points": list(self.score_points),
+            "difficulty_signals": list(self.difficulty_signals),
+            "visual_signals": list(self.visual_signals),
+            "anchor_terms": list(self.anchor_terms),
+            "anchor_text": self.anchor_text,
+        }
+        serialized = json.dumps(fingerprint_basis, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+        return hashlib.sha256(serialized.encode("utf-8")).hexdigest()[:16]
 
 
 class MaterialPdfEvidenceService:

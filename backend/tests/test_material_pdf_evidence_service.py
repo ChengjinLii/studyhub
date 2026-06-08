@@ -158,6 +158,65 @@ def test_pdf_evidence_allows_paid_material_uploaded_by_current_user() -> None:
     assert store.read_keys == ["materials/demo.pdf"]
 
 
+def test_pdf_evidence_prompt_payload_has_stable_internal_provenance() -> None:
+    evidence = MaterialPageEvidence(
+        material_id=1,
+        title="通信原理往年真题解析",
+        page=2,
+        text="通信原理真题第 2 页包含调制解调常考题。",
+        score=20,
+        years=("2024",),
+        question_types=("计算题",),
+        knowledge_signals=("调制", "解调"),
+        question_numbers=("第3题",),
+        source_type="past_exam",
+        anchor_terms=("第3题", "计算题"),
+        anchor_text="第 2 页包含调制解调常考题。",
+    )
+    same = MaterialPageEvidence(
+        material_id=1,
+        title="通信原理往年真题解析",
+        page=2,
+        text="通信原理真题第 2 页包含调制解调常考题。",
+        score=99,
+        years=("2024",),
+        question_types=("计算题",),
+        knowledge_signals=("调制", "解调"),
+        question_numbers=("第3题",),
+        source_type="past_exam",
+        anchor_terms=("第3题", "计算题"),
+        anchor_text="第 2 页包含调制解调常考题。",
+    )
+    changed = MaterialPageEvidence(
+        material_id=1,
+        title="通信原理往年真题解析",
+        page=3,
+        text="通信原理真题第 3 页包含误码率常考题。",
+        score=20,
+        years=("2024",),
+        question_types=("计算题",),
+        knowledge_signals=("误码率",),
+        question_numbers=("第4题",),
+        source_type="past_exam",
+    )
+
+    payload = evidence.to_prompt_payload()
+
+    assert payload["schema"] == "material-page-evidence-v1"
+    assert len(payload["evidence_id"]) == 16
+    assert payload["evidence_id"] == same.to_prompt_payload()["evidence_id"]
+    assert payload["evidence_id"] != changed.to_prompt_payload()["evidence_id"]
+    assert payload["provenance"] == {
+        "source": "pdf_page_chunk",
+        "persistence": "not_persisted",
+        "cacheScope": "bounded_in_memory_for_free_materials",
+    }
+    source_payload = evidence.to_source_payload()
+    assert "schema" not in source_payload
+    assert "evidence_id" not in source_payload
+    assert "provenance" not in source_payload
+
+
 def test_ai_recommendation_response_includes_pdf_evidence_sources(monkeypatch) -> None:
     captured: dict[str, Any] = {}
 
