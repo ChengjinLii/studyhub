@@ -121,13 +121,10 @@ class AgentFeedbackService:
         candidates: list[dict[str, Any]] = []
         derived_signals = _feedback_derived_signals(hook, redacted_note)
         if personal_memory_enabled:
-            value = USER_MEMORY_FEEDBACK_SUMMARIES[hook]
-            if redacted_note:
-                value = f"{value} 用户补充：{redacted_note}"
             user_candidate: dict[str, Any] = {
                 "scope": "user",
                 "key": "agent_feedback_preference",
-                "value": value[:240],
+                "value": _feedback_memory_summary(hook, derived_signals),
                 "source": "agent_feedback",
                 "confidence": _feedback_confidence(hook),
                 "materialIds": selected_material_ids,
@@ -220,6 +217,14 @@ def _feedback_derived_signals(hook: str, redacted_note: str) -> dict[str, list[s
             if any(alias.lower() in normalized_note for alias in aliases):
                 _append_signal(signals, category, label)
     return {key: values[:6] for key, values in signals.items() if values}
+
+
+def _feedback_memory_summary(hook: str, derived_signals: dict[str, list[str]]) -> str:
+    summary = USER_MEMORY_FEEDBACK_SUMMARIES[hook]
+    labels = [label for values in derived_signals.values() for label in values]
+    if labels:
+        summary = f"{summary} 反馈信号：{'、'.join(labels[:8])}。"
+    return summary[:240]
 
 
 def _append_signal(signals: dict[str, list[str]], category: str, label: str) -> None:

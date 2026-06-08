@@ -96,6 +96,11 @@ def test_ai_feedback_builds_redacted_user_and_platform_memory_candidates(client,
     assert "[redacted-number]" in data["redactedNote"]
     assert [item["scope"] for item in data["memoryCandidates"]] == ["user", "platform"]
     assert data["memoryCandidates"][0]["key"] == "agent_feedback_preference"
+    user_memory_value = data["memoryCandidates"][0]["value"]
+    assert "用户补充" not in user_memory_value
+    assert "[redacted-" not in user_memory_value
+    assert "基础差" not in user_memory_value
+    assert "反馈信号：有帮助、补基础优先、刷题优先、详细解析。" in user_memory_value
     assert data["memoryCandidates"][0]["derivedSignals"] == {
         "positive_feedback": ["有帮助"],
         "learning_preferences": ["补基础优先", "刷题优先", "详细解析"],
