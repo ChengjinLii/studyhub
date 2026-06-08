@@ -23,7 +23,10 @@ FORBIDDEN_INTERNAL_MARKERS = (
     "anchor_text",
     "anchor_terms",
     "study_strategy_signals",
+    "study_strategy_distribution",
     "experience_materials",
+    "experience_material_ids",
+    "strategy_refs",
 )
 
 

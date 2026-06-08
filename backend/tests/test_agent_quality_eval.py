@@ -516,6 +516,91 @@ def test_agent_local_material_fit_assessment_uses_evidence_and_profile(monkeypat
     metrics.clear()
 
 
+def test_agent_local_exam_trend_uses_collective_strategy_sequence(monkeypatch) -> None:
+    metrics = get_runtime_metrics()
+    metrics.clear()
+    settings = Settings(ai_agent_provider="local")
+    monkeypatch.setattr("app.services.ai_service.get_settings", lambda: settings)
+
+    class FakePdfEvidenceService:
+        def collect_for_materials(
+            self,
+            materials: list[MaterialRecord],
+            query: str,
+            *,
+            current_user_id: int | None,
+        ) -> list[MaterialPageEvidence]:
+            del materials, query, current_user_id
+            return [_evidence()]
+
+    class FakeMemoryService:
+        def collect(
+            self,
+            session: object,
+            *,
+            query: str,
+            materials: list[MaterialRecord],
+            current_user_id: int | None,
+            pdf_evidence: list[MaterialPageEvidence],
+        ) -> AgentMemoryContext:
+            del session, query, materials, current_user_id, pdf_evidence
+            return AgentMemoryContext(
+                platform={
+                    "study_strategy_signals": [
+                        {"value": "先建立知识框架", "count": 2},
+                        {"value": "刷真题", "count": 2},
+                    ],
+                    "experience_materials": [
+                        {
+                            "material_id": 202,
+                            "title": "通信原理考前复习经验分享",
+                            "study_strategy_signals": ["先建立知识框架", "刷真题"],
+                        }
+                    ],
+                },
+                user=None,
+            )
+
+    service = AiService(
+        read_repo=None,
+        material_repo=None,
+        pdf_evidence_service=FakePdfEvidenceService(),
+        memory_service=FakeMemoryService(),
+        query_planner_service=AgentQueryPlannerService(),
+        course_memory_service=AgentCourseMemoryService(),
+    )  # type: ignore[arg-type]
+    monkeypatch.setattr(
+        service,
+        "_rank_materials",
+        lambda session, query, filters: [
+            _material(
+                101,
+                title="通信原理四年真题解析",
+                description="2021-2024 通信原理期末真题和答案解析",
+                downloads=90,
+            ),
+            _material(
+                202,
+                title="通信原理考前复习经验分享",
+                description="先建立知识框架，再刷真题。",
+                downloads=30,
+            ),
+        ],
+    )
+
+    response = service.recommend(
+        object(),  # type: ignore[arg-type]
+        SimpleNamespace(query="通信原理往年题常考什么", filters={}),
+        current_user_id=7,
+    )
+    body = json.loads(str(response["output"]).removeprefix("<json>").removesuffix("</json>"))
+
+    assert "建议按这个顺序处理：先看高频题型、再核对年份趋势、最后按页码打开真题资料查漏补缺、先建立知识框架、刷真题" in body["answer"]
+    assert "study_strategy_distribution" not in json.dumps(body, ensure_ascii=False)
+    assert "experience_materials" not in json.dumps(body, ensure_ascii=False)
+    metrics.clear()
+
+
 def test_agent_local_problem_tutoring_uses_intent_specific_evidence(monkeypatch) -> None:
     metrics = get_runtime_metrics()
     metrics.clear()

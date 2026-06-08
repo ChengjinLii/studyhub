@@ -133,6 +133,72 @@ def test_course_memory_card_summarizes_current_request_collective_signals() -> N
     assert payload["limitations"] == ["该卡片为当前请求的只读临时汇总，尚未持久化为平台正式课程记忆。"]
 
 
+def test_course_memory_card_includes_collective_strategy_and_experience_signals() -> None:
+    plan = AgentQueryPlan(
+        intent="exam_trend_analysis",
+        confidence=0.9,
+        course_terms=("通信原理",),
+        resource_types=("past_exam",),
+        years=("2024",),
+        search_terms=("通信原理", "真题"),
+        evidence_tasks=("aggregate_year_signals",),
+        response_guidance=("优先输出常考题型",),
+    )
+    memory = AgentMemoryContext(
+        platform={
+            "study_strategy_signals": [
+                {"value": "先建立知识框架", "count": 2},
+                {"value": "刷真题", "count": 2},
+            ],
+            "experience_materials": [
+                {
+                    "material_id": 202,
+                    "title": "通信原理考前复习经验分享",
+                    "tags": ["经验分享", "通信原理"],
+                    "study_strategy_signals": ["先建立知识框架", "刷真题"],
+                    "quality_signals": ["高评分资料"],
+                }
+            ],
+        },
+        user={"profile": {"major": "不应进入课程集体记忆"}},
+    )
+
+    card = AgentCourseMemoryService().build_card(
+        materials=[_material(), _material(202, title="通信原理考前复习经验分享", downloads=30)],
+        pdf_evidence=[_evidence()],
+        memory_context=memory,
+        query_plan=plan,
+    )
+
+    assert card is not None
+    payload = card.to_prompt_payload()
+    assert payload["study_strategy_distribution"] == [
+        {"value": "先建立知识框架", "count": 2},
+        {"value": "刷真题", "count": 2},
+    ]
+    assert payload["experience_materials"] == [
+        {
+            "material_id": 202,
+            "title": "通信原理考前复习经验分享",
+            "tags": ["经验分享", "通信原理"],
+            "study_strategy_signals": ["先建立知识框架", "刷真题"],
+            "quality_signals": ["高评分资料"],
+        }
+    ]
+    assert payload["recommended_sequence"] == [
+        "先看高频题型",
+        "再核对年份趋势",
+        "最后按页码打开真题资料查漏补缺",
+        "先建立知识框架",
+        "刷真题",
+    ]
+    assert payload["version_basis"]["strategy_refs"] == ["先建立知识框架", "刷真题"]
+    assert payload["version_basis"]["experience_material_ids"] == [202]
+    version_basis_text = json.dumps(payload["version_basis"], ensure_ascii=False).lower()
+    assert "不应进入课程集体记忆" not in version_basis_text
+    assert "profile" not in version_basis_text
+
+
 def test_course_memory_card_version_is_stable_and_changes_with_sources() -> None:
     plan = AgentQueryPlan(
         intent="exam_trend_analysis",

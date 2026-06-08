@@ -28,7 +28,9 @@ class CourseMemoryCard:
     difficulty_distribution: tuple[dict[str, Any], ...]
     visual_signal_distribution: tuple[dict[str, Any], ...]
     source_type_distribution: tuple[dict[str, Any], ...]
+    study_strategy_distribution: tuple[dict[str, Any], ...]
     high_signal_materials: tuple[dict[str, Any], ...]
+    experience_materials: tuple[dict[str, Any], ...]
     page_references: tuple[dict[str, Any], ...]
     recommended_sequence: tuple[str, ...]
     limitations: tuple[str, ...]
@@ -49,7 +51,9 @@ class CourseMemoryCard:
             "difficulty_distribution": list(self.difficulty_distribution),
             "visual_signal_distribution": list(self.visual_signal_distribution),
             "source_type_distribution": list(self.source_type_distribution),
+            "study_strategy_distribution": list(self.study_strategy_distribution),
             "high_signal_materials": list(self.high_signal_materials),
+            "experience_materials": list(self.experience_materials),
             "page_references": list(self.page_references),
             "recommended_sequence": list(self.recommended_sequence),
             "limitations": list(self.limitations),
@@ -83,6 +87,8 @@ class AgentCourseMemoryService:
         difficulty_signals = _counter_payload(_difficulty_counter(pdf_evidence), limit=5)
         visual_signals = _counter_payload(_visual_counter(pdf_evidence), limit=5)
         source_types = _counter_payload(_source_type_counter(pdf_evidence, memory_context), limit=5)
+        study_strategies = _counter_payload(_study_strategy_counter(memory_context), limit=8)
+        experience_materials = _experience_materials(memory_context)
         version_basis = _version_basis(
             course=course,
             materials=materials,
@@ -106,9 +112,11 @@ class AgentCourseMemoryService:
             difficulty_distribution=tuple(difficulty_signals),
             visual_signal_distribution=tuple(visual_signals),
             source_type_distribution=tuple(source_types),
+            study_strategy_distribution=tuple(study_strategies),
             high_signal_materials=tuple(_high_signal_materials(materials)),
+            experience_materials=tuple(experience_materials),
             page_references=tuple(_page_references(pdf_evidence)),
-            recommended_sequence=tuple(_recommended_sequence(query_plan, bool(pdf_evidence))),
+            recommended_sequence=tuple(_recommended_sequence(query_plan, bool(pdf_evidence), study_strategies)),
             limitations=tuple(_limitations(materials, pdf_evidence)),
         )
 
@@ -208,6 +216,41 @@ def _source_type_counter(
         if isinstance(item, dict) and item.get("value"):
             counter[str(item["value"])] += int(item.get("count") or 1)
     return counter
+
+
+def _study_strategy_counter(memory_context: AgentMemoryContext | None) -> Counter[str]:
+    counter: Counter[str] = Counter()
+    platform = memory_context.platform if memory_context else {}
+    for item in platform.get("study_strategy_signals") or []:
+        if isinstance(item, dict) and item.get("value"):
+            counter[str(item["value"])] += int(item.get("count") or 1)
+    return counter
+
+
+def _experience_materials(memory_context: AgentMemoryContext | None) -> list[dict[str, Any]]:
+    platform = memory_context.platform if memory_context else {}
+    result: list[dict[str, Any]] = []
+    for item in platform.get("experience_materials") or []:
+        if not isinstance(item, dict):
+            continue
+        material_id = _safe_int(item.get("material_id"))
+        title = _clean_text(item.get("title"))
+        if material_id is None or not title:
+            continue
+        payload: dict[str, Any] = {"material_id": material_id, "title": title}
+        tags = _clean_text_list(item.get("tags"), limit=4)
+        strategies = _clean_text_list(item.get("study_strategy_signals"), limit=4)
+        quality = _clean_text_list(item.get("quality_signals"), limit=3)
+        if tags:
+            payload["tags"] = tags
+        if strategies:
+            payload["study_strategy_signals"] = strategies
+        if quality:
+            payload["quality_signals"] = quality
+        result.append(payload)
+        if len(result) >= 4:
+            break
+    return result
 
 
 def _high_signal_materials(materials: list[MaterialRecord]) -> list[dict[str, Any]]:
@@ -321,14 +364,28 @@ def _page_references(pdf_evidence: list[MaterialPageEvidence]) -> list[dict[str,
     return references
 
 
-def _recommended_sequence(query_plan: AgentQueryPlan | None, has_pdf_evidence: bool) -> list[str]:
+def _recommended_sequence(
+    query_plan: AgentQueryPlan | None,
+    has_pdf_evidence: bool,
+    study_strategies: list[dict[str, Any]],
+) -> list[str]:
     if query_plan and query_plan.intent == "exam_trend_analysis":
-        return ["先看高频题型", "再核对年份趋势", "最后按页码打开真题资料查漏补缺"]
-    if query_plan and query_plan.intent == "study_plan":
-        return ["先建立知识框架", "再刷真题或例题", "最后复盘错题和薄弱点"]
-    if has_pdf_evidence:
-        return ["先读已引用页码", "再看推荐资料全文", "最后根据追问细化题型"]
-    return ["先确认课程范围", "再筛选最相关资料", "最后补充题型或年份要求"]
+        base = ["先看高频题型", "再核对年份趋势", "最后按页码打开真题资料查漏补缺"]
+    elif query_plan and query_plan.intent == "study_plan":
+        base = ["先建立知识框架", "再刷真题或例题", "最后复盘错题和薄弱点"]
+    elif has_pdf_evidence:
+        base = ["先读已引用页码", "再看推荐资料全文", "最后根据追问细化题型"]
+    else:
+        base = ["先确认课程范围", "再筛选最相关资料", "最后补充题型或年份要求"]
+    for item in study_strategies:
+        if not isinstance(item, dict):
+            continue
+        value = _clean_text(item.get("value"))
+        if value and value not in base:
+            base.append(value)
+        if len(base) >= 6:
+            break
+    return base
 
 
 def _limitations(materials: list[MaterialRecord], pdf_evidence: list[MaterialPageEvidence]) -> list[str]:
@@ -360,6 +417,8 @@ def _version_basis(
             for item in sorted(pdf_evidence[:12], key=lambda evidence: (int(evidence.material_id), int(evidence.page)))
         ],
         "query_plan": _query_plan_basis(query_plan),
+        "strategy_refs": _strategy_ref_basis(memory_context),
+        "experience_material_ids": [item["material_id"] for item in _experience_materials(memory_context)],
         "platform_signal_keys": sorted(str(key) for key, value in platform.items() if value not in (None, [], {}, "")),
     }
 
@@ -398,6 +457,14 @@ def _query_plan_basis(query_plan: AgentQueryPlan | None) -> dict[str, Any]:
     }
 
 
+def _strategy_ref_basis(memory_context: AgentMemoryContext | None) -> list[str]:
+    return [
+        item["value"]
+        for item in _counter_payload(_study_strategy_counter(memory_context), limit=8)
+        if isinstance(item.get("value"), str)
+    ]
+
+
 def _version_fingerprint(version_basis: dict[str, Any]) -> str:
     payload = json.dumps(version_basis, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()[:16]
@@ -411,6 +478,26 @@ def _clean_text(value: Any, *, max_chars: int = 120) -> str:
     if value is None:
         return ""
     return " ".join(str(value).split())[:max_chars]
+
+
+def _clean_text_list(value: Any, *, limit: int) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    result: list[str] = []
+    for item in value:
+        cleaned = _clean_text(item)
+        if cleaned and cleaned not in result:
+            result.append(cleaned)
+        if len(result) >= limit:
+            break
+    return result
+
+
+def _safe_int(value: Any) -> int | None:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
 
 
 def _dedupe(values: list[str]) -> list[str]:
