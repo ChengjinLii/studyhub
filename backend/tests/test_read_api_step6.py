@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import asyncio
+
 from fastapi.testclient import TestClient
 
 from app.api.deps import get_user_read_service
@@ -200,3 +202,84 @@ def test_public_profile_counts_do_not_load_full_collections(client: TestClient, 
 
     assert profile["uploadCount"] == 3
     assert profile["marketCount"] == 1
+
+
+def test_async_public_profile_groups_resource_summary_reads(client: TestClient, monkeypatch) -> None:
+    _ = client
+    service = get_user_read_service()
+    calls: list[str] = []
+
+    def call_direct(loader, *args, **kwargs):
+        return loader(object(), *args, **kwargs)
+
+    def base_loader(_session, viewer_id, viewer_role_mask, target_user_id):
+        calls.append("base")
+        assert (viewer_id, viewer_role_mask, target_user_id) == (1, 1, 2)
+        return {
+            "id": 2,
+            "username": "baishan",
+            "nickname": "白山",
+            "signature": None,
+            "school": None,
+            "college": None,
+            "major": None,
+            "gradeStages": [],
+            "avatar": None,
+            "email": None,
+            "emailVisible": False,
+            "payoutQrUrl": None,
+            "legendaryContributorUntil": None,
+            "purchaseCount": 0,
+        }
+
+    def material_summary_loader(_session, viewer_id, viewer_role_mask, target_user_id):
+        calls.append("material_summary")
+        assert (viewer_id, viewer_role_mask, target_user_id) == (1, 1, 2)
+        return {
+            "recentUploads": [{"materialId": 101}],
+            "uploadCount": 7,
+            "saleCount": 3,
+        }
+
+    def market_summary_loader(_session, viewer_id, viewer_role_mask, target_user_id):
+        calls.append("market_summary")
+        assert (viewer_id, viewer_role_mask, target_user_id) == (1, 1, 2)
+        return {
+            "recentMarketListings": [{"itemId": 201}],
+            "marketCount": 4,
+        }
+
+    def relationships_loader(_session, viewer_id, target_user_id):
+        calls.append("relationships")
+        assert (viewer_id, target_user_id) == (1, 2)
+        return {
+            "followersCount": 5,
+            "followingCount": 6,
+            "isFollowing": True,
+        }
+
+    def fail_separate_loader(*_args, **_kwargs):
+        raise AssertionError("async public profile should use grouped summary loaders")
+
+    monkeypatch.setattr(service, "_allows_concurrent_profile_reads", lambda: True)
+    monkeypatch.setattr(service, "_call_with_new_session", call_direct)
+    monkeypatch.setattr(service, "_load_public_profile_base", base_loader)
+    monkeypatch.setattr(service, "_load_public_profile_material_summary", material_summary_loader)
+    monkeypatch.setattr(service, "_load_public_profile_market_summary", market_summary_loader)
+    monkeypatch.setattr(service, "_load_public_profile_relationships", relationships_loader)
+    monkeypatch.setattr(service, "get_user_uploads", fail_separate_loader)
+    monkeypatch.setattr(service, "get_user_market_listings", fail_separate_loader)
+    monkeypatch.setattr(service, "_count_user_uploads", fail_separate_loader)
+    monkeypatch.setattr(service, "_count_user_market_listings", fail_separate_loader)
+
+    profile = asyncio.run(service.get_public_profile_async(1, 1, 2))
+
+    assert profile["recentUploads"] == [{"materialId": 101}]
+    assert profile["recentMarketListings"] == [{"itemId": 201}]
+    assert profile["uploadCount"] == 7
+    assert profile["marketCount"] == 4
+    assert profile["saleCount"] == 3
+    assert profile["followersCount"] == 5
+    assert profile["followingCount"] == 6
+    assert profile["isFollowing"] is True
+    assert sorted(calls) == ["base", "market_summary", "material_summary", "relationships"]

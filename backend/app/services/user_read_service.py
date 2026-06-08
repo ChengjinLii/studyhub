@@ -197,49 +197,41 @@ class UserReadService:
             viewer_role_mask,
             target_user_id,
         )
-        recent_uploads_task = asyncio.to_thread(
+        material_summary_task = asyncio.to_thread(
             self._call_with_new_session,
-            self.get_user_uploads,
+            self._load_public_profile_material_summary,
             viewer_id,
-            target_user_id,
             viewer_role_mask,
-            5,
+            target_user_id,
         )
-        recent_market_listings_task = asyncio.to_thread(
+        market_summary_task = asyncio.to_thread(
             self._call_with_new_session,
-            self.get_user_market_listings,
+            self._load_public_profile_market_summary,
             viewer_id,
-            target_user_id,
             viewer_role_mask,
-            5,
+            target_user_id,
         )
-        upload_count_task = asyncio.to_thread(self._call_with_new_session, self._count_user_uploads, target_user_id)
-        market_count_task = asyncio.to_thread(self._call_with_new_session, self._count_user_market_listings, target_user_id)
         relationship_task = asyncio.to_thread(
             self._call_with_new_session,
             self._load_public_profile_relationships,
             viewer_id,
             target_user_id,
         )
-        sale_count_task = asyncio.to_thread(self._call_with_new_session, self._load_public_profile_sale_count, target_user_id)
-        recent_uploads, recent_market_listings, upload_count, market_count, relationships, sale_count = await asyncio.gather(
-            recent_uploads_task,
-            recent_market_listings_task,
-            upload_count_task,
-            market_count_task,
+        material_summary, market_summary, relationships = await asyncio.gather(
+            material_summary_task,
+            market_summary_task,
             relationship_task,
-            sale_count_task,
         )
         base.update(
             {
-                "uploadCount": upload_count,
-                "marketCount": market_count,
-                "saleCount": sale_count,
+                "uploadCount": material_summary["uploadCount"],
+                "marketCount": market_summary["marketCount"],
+                "saleCount": material_summary["saleCount"],
                 "followersCount": relationships["followersCount"],
                 "followingCount": relationships["followingCount"],
                 "isFollowing": relationships["isFollowing"],
-                "recentUploads": recent_uploads,
-                "recentMarketListings": recent_market_listings,
+                "recentUploads": material_summary["recentUploads"],
+                "recentMarketListings": market_summary["recentMarketListings"],
             }
         )
         return base
@@ -585,8 +577,32 @@ class UserReadService:
             "isFollowing": self._is_following(session, seed, viewer_id, target_user_id),
         }
 
-    def _load_public_profile_sale_count(self, session: Session, target_user_id: int) -> int:
-        return self._sale_count(session, self.repo.load_seed(), target_user_id)
+    def _load_public_profile_material_summary(
+        self,
+        session: Session,
+        viewer_id: int,
+        viewer_role_mask: int | None,
+        target_user_id: int,
+    ) -> dict[str, Any]:
+        seed = self.repo.load_seed()
+        return {
+            "recentUploads": self.get_user_uploads(session, viewer_id, target_user_id, viewer_role_mask, 5, seed=seed),
+            "uploadCount": self._count_user_uploads(session, target_user_id, seed=seed),
+            "saleCount": self._sale_count(session, seed, target_user_id),
+        }
+
+    def _load_public_profile_market_summary(
+        self,
+        session: Session,
+        viewer_id: int,
+        viewer_role_mask: int | None,
+        target_user_id: int,
+    ) -> dict[str, Any]:
+        seed = self.repo.load_seed()
+        return {
+            "recentMarketListings": self.get_user_market_listings(session, viewer_id, target_user_id, viewer_role_mask, 5, seed=seed),
+            "marketCount": self._count_user_market_listings(session, target_user_id, seed=seed),
+        }
 
     def _count_user_uploads(self, session: Session, target_user_id: int, *, seed: dict[str, Any] | None = None) -> int:
         if self._uses_legacy_user_table(session):
