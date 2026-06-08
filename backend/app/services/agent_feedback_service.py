@@ -24,6 +24,7 @@ ALLOWED_FEEDBACK_HOOKS = {
 
 FEEDBACK_MEMORY_CANDIDATE_SCHEMA = "agent-feedback-memory-candidate-v1"
 FEEDBACK_CANDIDATE_LIFECYCLE_SCHEMA = "agent-feedback-candidate-lifecycle-v1"
+FEEDBACK_AGGREGATION_POLICY_SCHEMA = "agent-feedback-aggregation-policy-v1"
 
 USER_MEMORY_FEEDBACK_SUMMARIES = {
     "useful": "用户认为这次推荐或学习建议有帮助。",
@@ -199,6 +200,10 @@ class AgentFeedbackService:
                     "rawUserIdentityPersisted": False,
                     "personalMemoryMixedIntoPlatform": False,
                 },
+                "aggregationPolicy": _platform_aggregation_policy(
+                    redacted_note=redacted_note,
+                    selected_material_signals=selected_material_signals,
+                ),
                 "lifecycle": _candidate_lifecycle("platform"),
             }
             if derived_signals:
@@ -319,6 +324,44 @@ def _selected_material_signals(materials: list[MaterialRecord]) -> dict[str, lis
     return {key: values[:8] for key, values in signals.items() if values}
 
 
+def _platform_aggregation_policy(
+    *,
+    redacted_note: str,
+    selected_material_signals: dict[str, list[str]],
+) -> dict[str, Any]:
+    note_signal_keys = _feedback_note_signal_keys(redacted_note)
+    return {
+        "schema": FEEDBACK_AGGREGATION_POLICY_SCHEMA,
+        "candidateOnly": True,
+        "persistence": "not_persisted",
+        "allowedImmediateSignalSources": ["feedback_hook", "selected_material_metadata"],
+        "selectedMaterialSignalKeys": sorted(selected_material_signals),
+        "freeformNoteSignalKeys": note_signal_keys,
+        "freeformNoteSignalsRequireAnonymousAggregation": bool(note_signal_keys),
+        "minDistinctUsersBeforeWrite": 5,
+        "rawNotePersisted": False,
+        "rawUserIdentityPersisted": False,
+        "personalMemoryMixedIntoPlatform": False,
+        "privacyBoundary": (
+            "Free-form feedback note signals are platform candidates only after anonymous aggregation; "
+            "raw note text and user identity must not be persisted into platform collective memory."
+        ),
+    }
+
+
+def _feedback_note_signal_keys(redacted_note: str) -> list[str]:
+    normalized_note = redacted_note.lower()
+    if not normalized_note:
+        return []
+    keys: list[str] = []
+    for category, _label, aliases in FEEDBACK_NOTE_SIGNAL_PATTERNS:
+        if category in keys:
+            continue
+        if any(alias.lower() in normalized_note for alias in aliases):
+            keys.append(category)
+    return sorted(keys)
+
+
 def _material_feedback_text(material: MaterialRecord) -> str:
     values = [
         safe_material_value(material, "title"),
@@ -416,6 +459,7 @@ def _attach_candidate_version(candidate: dict[str, Any]) -> None:
         "derivedSignals": candidate.get("derivedSignals") or candidate.get("aggregateSignals") or {},
         "selectedMaterialSignals": candidate.get("selectedMaterialSignals") or {},
         "signalBasis": candidate.get("signalBasis") or {},
+        "aggregationPolicy": candidate.get("aggregationPolicy") or {},
         "lifecycle": candidate.get("lifecycle") or {},
     }
     fingerprint = _stable_feedback_fingerprint(basis)

@@ -170,6 +170,23 @@ def test_ai_feedback_builds_redacted_user_and_platform_memory_candidates(client,
         "rawUserIdentityPersisted": False,
         "personalMemoryMixedIntoPlatform": False,
     }
+    assert data["memoryCandidates"][1]["aggregationPolicy"] == {
+        "schema": "agent-feedback-aggregation-policy-v1",
+        "candidateOnly": True,
+        "persistence": "not_persisted",
+        "allowedImmediateSignalSources": ["feedback_hook", "selected_material_metadata"],
+        "selectedMaterialSignalKeys": ["courses", "qualitySignals", "riskSignals", "sourceTypes"],
+        "freeformNoteSignalKeys": ["learning_preferences"],
+        "freeformNoteSignalsRequireAnonymousAggregation": True,
+        "minDistinctUsersBeforeWrite": 5,
+        "rawNotePersisted": False,
+        "rawUserIdentityPersisted": False,
+        "personalMemoryMixedIntoPlatform": False,
+        "privacyBoundary": (
+            "Free-form feedback note signals are platform candidates only after anonymous aggregation; "
+            "raw note text and user identity must not be persisted into platform collective memory."
+        ),
+    }
     assert data["memoryCandidates"][1]["aggregateSignals"] == {
         "positive_feedback": ["有帮助"],
         "learning_preferences": ["补基础优先", "刷题优先", "详细解析"],
@@ -206,6 +223,11 @@ def test_ai_feedback_respects_disabled_personal_memory_cookie(client, auth_servi
     }
     assert data["memoryCandidates"][0]["signalBasis"]["scope"] == "platform"
     assert data["memoryCandidates"][0]["anonymization"]["personalMemoryMixedIntoPlatform"] is False
+    assert data["memoryCandidates"][0]["aggregationPolicy"]["freeformNoteSignalKeys"] == [
+        "learning_preferences"
+    ]
+    assert data["memoryCandidates"][0]["aggregationPolicy"]["freeformNoteSignalsRequireAnonymousAggregation"] is True
+    assert data["memoryCandidates"][0]["aggregationPolicy"]["minDistinctUsersBeforeWrite"] == 5
     assert data["memoryCandidates"][0]["selectedMaterialSignals"]["courses"] == ["通信原理"]
 
 
