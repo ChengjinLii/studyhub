@@ -104,11 +104,15 @@ class LocalFileStorageProvider:
     def delete_key(self, *, root: Path, key: str | None) -> None:
         if not key or key.startswith("http://") or key.startswith("https://"):
             return
-        path = root / key
+        try:
+            path = self.resolve_path(root=root, key=key, invalid_detail="无效的文件路径")
+        except HTTPException:
+            return
         if path.exists():
             path.unlink()
         parent = path.parent
-        while parent != root and parent.exists():
+        root_resolved = root.resolve()
+        while parent != root_resolved and parent.exists():
             if any(parent.iterdir()):
                 break
             parent.rmdir()
