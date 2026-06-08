@@ -6,12 +6,14 @@ const message = (
   id: number,
   role: StudyHubAgentMessage['role'],
   content: string,
-  recommendations: StudyHubAgentMessage['recommendations'] = []
+  recommendations: StudyHubAgentMessage['recommendations'] = [],
+  imageAttachments: StudyHubAgentMessage['imageAttachments'] = []
 ): StudyHubAgentMessage => ({
   id: String(id),
   role,
   content,
   recommendations,
+  imageAttachments,
 });
 
 describe('studyHubAgentContext', () => {
@@ -49,5 +51,25 @@ describe('studyHubAgentContext', () => {
     expect(context).not.toContain('demo-secret-value');
     expect(context).not.toContain('test@example.com');
     expect(context).not.toContain('13800138000');
+  });
+
+  it('keeps image attachment metadata out of compact context data urls', () => {
+    const messages: StudyHubAgentMessage[] = [
+      message(1, 'user', '帮我看这张题目截图', [], [
+        {
+          id: 'img-1',
+          name: 'question.png',
+          mimeType: 'image/png',
+          dataUrl: 'data:image/png;base64,secret-image-data',
+          sizeBytes: 128,
+        },
+      ]),
+    ];
+
+    const context = buildStudyHubAgentContext(messages, '这题怎么做');
+
+    expect(context).toContain('question.png(image/png, 128B)');
+    expect(context).not.toContain('secret-image-data');
+    expect(context).not.toContain('data:image/png');
   });
 });

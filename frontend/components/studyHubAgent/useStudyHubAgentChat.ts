@@ -7,6 +7,7 @@ import {
 import { SessionUser } from '../../types/user';
 import { STUDYHUB_AGENT_INITIAL_MESSAGES, STUDYHUB_AGENT_MESSAGES_STORAGE_KEY } from './constants';
 import {
+  StudyHubAgentImageAttachment,
   StudyHubAgentMaterialDetails,
   StudyHubAgentMessage,
   StudyHubAgentRecommendation,
@@ -18,6 +19,7 @@ const EARLIER_CONTEXT_MESSAGE_SCAN_LIMIT = 16;
 const CONTEXT_QUERY_MAX_CHARS = 1000;
 const CONTEXT_LINE_MAX_CHARS = 220;
 const EARLIER_CONTEXT_SUMMARY_MAX_CHARS = 360;
+const IMAGE_ONLY_QUERY = '请根据这张图片帮我分析学习问题';
 
 const COURSE_CONTEXT_HINTS: { label: string; aliases: string[] }[] = [
   { label: '电子系统设计', aliases: ['电子系统设计', 'ESD'] },
@@ -51,7 +53,7 @@ export const useStudyHubAgentChat = () => {
     try {
       window.localStorage.setItem(
         STUDYHUB_AGENT_MESSAGES_STORAGE_KEY,
-        JSON.stringify(messages.slice(-STORED_CONTEXT_MESSAGE_LIMIT))
+        JSON.stringify(serializeMessagesForStorage(messages.slice(-STORED_CONTEXT_MESSAGE_LIMIT)))
       );
     } catch {
       // ignore storage errors
@@ -86,10 +88,14 @@ export const useStudyHubAgentChat = () => {
   );
 
   const submitQuery = useCallback(
-    async (rawQuery: string) => {
-      const query = rawQuery.trim();
-      if (!query || loading) return;
-      setMessages((prev) => [...prev, { id: makeMessageId(), role: 'user', content: query }]);
+    async (rawQuery: string, imageAttachments: StudyHubAgentImageAttachment[] = []) => {
+      const query = rawQuery.trim() || (imageAttachments.length > 0 ? IMAGE_ONLY_QUERY : '');
+      const attachments = imageAttachments.slice(0, 1);
+      if ((!query && attachments.length === 0) || loading) return;
+      setMessages((prev) => [
+        ...prev,
+        { id: makeMessageId(), role: 'user', content: query, imageAttachments: attachments },
+      ]);
       if (!user) {
         setMessages((prev) => [
           ...prev,
@@ -105,7 +111,7 @@ export const useStudyHubAgentChat = () => {
       setLoading(true);
       try {
         const contextQuery = buildStudyHubAgentContext(messages, query);
-        const data = await requestStudyHubAgentRecommendations(query, contextQuery);
+        const data = await requestStudyHubAgentRecommendations(query, contextQuery, attachments);
         const parsed = parseRecommendationOutput(data.output);
         const recommendations = normalizeRecommendations(parsed.recommendations);
         await Promise.all(recommendations.map((item) => loadMaterialDetail(item.materialId)));
@@ -193,6 +199,18 @@ function normalizeFollowups(value: unknown): string[] {
     .slice(0, 3);
 }
 
+function serializeMessagesForStorage(messages: StudyHubAgentMessage[]) {
+  return messages.map((message) => ({
+    ...message,
+    imageAttachments: message.imageAttachments?.map((item) => ({
+      id: item.id,
+      name: item.name,
+      mimeType: item.mimeType,
+      sizeBytes: item.sizeBytes,
+    })),
+  }));
+}
+
 function pickText(...values: unknown[]) {
   return values.find(
     (value): value is string => typeof value === 'string' && value.trim().length > 0
@@ -251,8 +269,10 @@ function formatStudyHubAgentContextLine(message: StudyHubAgentMessage) {
   const role = message.role === 'user' ? '用户' : '助手';
   const content = redactStudyHubAgentContextText(message.content).slice(0, CONTEXT_LINE_MAX_CHARS);
   const titles = collectRecommendationTitles([message], 3);
+  const imageHint = collectImageAttachmentHints([message], 2);
   const titleHint = titles.length > 0 ? ` 推荐资料：${titles.join('；')}` : '';
-  return `${role}：${content}${titleHint}`;
+  const attachmentHint = imageHint.length > 0 ? ` 图片：${imageHint.join('；')}` : '';
+  return `${role}：${content}${titleHint}${attachmentHint}`;
 }
 
 function buildStudyHubAgentEarlierContextSummary(messages: StudyHubAgentMessage[]) {
@@ -313,6 +333,20 @@ function collectRecommendationTitles(messages: StudyHubAgentMessage[], limit: nu
     });
   });
   return titles.slice(-limit);
+}
+
+function collectImageAttachmentHints(messages: StudyHubAgentMessage[], limit: number) {
+  const hints: string[] = [];
+  messages.forEach((message) => {
+    (message.imageAttachments || []).forEach((item) => {
+      const name = redactStudyHubAgentContextText(item.name || '学习图片').trim();
+      const hint = `${name || '学习图片'}(${item.mimeType}, ${item.sizeBytes}B)`;
+      if (!hints.includes(hint)) {
+        hints.push(hint);
+      }
+    });
+  });
+  return hints.slice(-limit);
 }
 
 function makeMessageId() {

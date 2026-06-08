@@ -10,10 +10,19 @@ export type StudyHubAgentRecommendation = {
   summary?: string;
 };
 
+export type StudyHubAgentImageAttachment = {
+  id: string;
+  name: string;
+  mimeType: string;
+  dataUrl?: string;
+  sizeBytes: number;
+};
+
 export type StudyHubAgentMessage = {
   id: string;
   role: StudyHubAgentRole;
   content: string;
+  imageAttachments?: StudyHubAgentImageAttachment[];
   recommendations?: StudyHubAgentRecommendation[];
   followups?: string[];
 };

@@ -6,10 +6,17 @@ import {
 } from './studyHubAgent/constants';
 import { useFloatingPanelPosition } from './studyHubAgent/useFloatingPanelPosition';
 import { useStudyHubAgentChat } from './studyHubAgent/useStudyHubAgentChat';
+import type { StudyHubAgentImageAttachment } from './studyHubAgent/types';
+
+const AGENT_IMAGE_MAX_BYTES = 786_432;
+const AGENT_IMAGE_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp']);
 
 export default function HermesAgentWidget() {
   const [input, setInput] = useState('');
+  const [imageAttachment, setImageAttachment] = useState<StudyHubAgentImageAttachment | null>(null);
+  const [imageError, setImageError] = useState('');
   const listRef = useRef<HTMLDivElement>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
   const {
     open,
     closePanel,
@@ -38,11 +45,46 @@ export default function HermesAgentWidget() {
 
   const hasConversation = useMemo(() => messages.length > 1, [messages.length]);
 
-  const submitAndClear = (value: string) => {
+  const submitAndClear = (value: string, attachment: StudyHubAgentImageAttachment | null = imageAttachment) => {
     const query = value.trim();
-    if (!query || loading) return;
+    if ((!query && !attachment) || loading) return;
     setInput('');
-    void submitQuery(query);
+    setImageAttachment(null);
+    setImageError('');
+    if (imageInputRef.current) {
+      imageInputRef.current.value = '';
+    }
+    void submitQuery(query, attachment ? [attachment] : []);
+  };
+
+  const handleImageChange = (file: File | undefined) => {
+    setImageError('');
+    if (!file) return;
+    if (!AGENT_IMAGE_TYPES.has(file.type)) {
+      setImageError('仅支持 PNG、JPG 或 WEBP 图片');
+      return;
+    }
+    if (file.size > AGENT_IMAGE_MAX_BYTES) {
+      setImageError('图片不能超过 768KB');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = typeof reader.result === 'string' ? reader.result : '';
+      if (!dataUrl) {
+        setImageError('图片读取失败');
+        return;
+      }
+      setImageAttachment({
+        id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+        name: file.name || '学习图片',
+        mimeType: file.type,
+        dataUrl,
+        sizeBytes: file.size,
+      });
+    };
+    reader.onerror = () => setImageError('图片读取失败');
+    reader.readAsDataURL(file);
   };
 
   return (
@@ -115,6 +157,45 @@ export default function HermesAgentWidget() {
               submitAndClear(input);
             }}
           >
+            {(imageAttachment || imageError) && (
+              <div className="hermes-agent__attachment-row">
+                {imageAttachment && (
+                  <div className="hermes-agent__attachment-preview">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    {imageAttachment.dataUrl && <img src={imageAttachment.dataUrl} alt={imageAttachment.name} />}
+                    <span>{imageAttachment.name}</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setImageAttachment(null);
+                        if (imageInputRef.current) {
+                          imageInputRef.current.value = '';
+                        }
+                      }}
+                    >
+                      移除
+                    </button>
+                  </div>
+                )}
+                {imageError && <span className="hermes-agent__attachment-error">{imageError}</span>}
+              </div>
+            )}
+            <button
+              className="hermes-agent__image-button"
+              type="button"
+              disabled={loading}
+              onClick={() => imageInputRef.current?.click()}
+            >
+              图片
+            </button>
+            <input
+              ref={imageInputRef}
+              className="hermes-agent__file-input"
+              type="file"
+              accept="image/png,image/jpeg,image/webp"
+              disabled={loading}
+              onChange={(event) => handleImageChange(event.target.files?.[0])}
+            />
             <input
               value={input}
               onChange={(event) => setInput(event.target.value)}
@@ -122,7 +203,7 @@ export default function HermesAgentWidget() {
               aria-label="StudyHub 学习辅导输入"
               disabled={loading}
             />
-            <button type="submit" disabled={loading || !input.trim()}>
+            <button type="submit" disabled={loading || (!input.trim() && !imageAttachment)}>
               发送
             </button>
           </form>

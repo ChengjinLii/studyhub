@@ -177,6 +177,15 @@ class AiService:
         memory_context: AgentMemoryContext | None = None
         course_memory_card: CourseMemoryCard | None = None
         try:
+            image_attachments = _agent_image_attachments(getattr(payload, "imageAttachments", []))
+            if not _is_learning_related_agent_query(
+                payload.query,
+                context_query=getattr(payload, "contextQuery", None),
+                has_image=bool(image_attachments),
+            ):
+                status = "scope_blocked"
+                body = _learning_scope_block_body()
+                return {"output": f"<json>{json.dumps(body, ensure_ascii=False, separators=(',', ':'))}</json>"}
             context_query = getattr(payload, "contextQuery", None)
             effective_context_query = _agent_context_for_query(payload.query, context_query)
             retrieval_query = _agent_retrieval_query(payload.query, effective_context_query)
@@ -209,14 +218,19 @@ class AiService:
                 self._recommendation_payload(material, retrieval_query, pdf_evidence, memory_context)
                 for material in materials[:3]
             ]
+            generate_kwargs: dict[str, Any] = {
+                "conversation_context": effective_context_query,
+                "pdf_evidence": pdf_evidence,
+                "memory_context": memory_context,
+                "query_plan": query_plan,
+                "course_memory_card": course_memory_card,
+            }
+            if image_attachments:
+                generate_kwargs["image_attachments"] = image_attachments
             llm_body = self._generate_agent_recommendation(
                 payload.query,
                 materials,
-                conversation_context=effective_context_query,
-                pdf_evidence=pdf_evidence,
-                memory_context=memory_context,
-                query_plan=query_plan,
-                course_memory_card=course_memory_card,
+                **generate_kwargs,
             )
             if llm_body:
                 status = "model_success"
@@ -240,6 +254,7 @@ class AiService:
                         memory_context,
                         query_plan=query_plan,
                         course_memory_card=course_memory_card,
+                        image_attachments=image_attachments,
                     )
             else:
                 answer = self._build_local_answer(
@@ -249,6 +264,7 @@ class AiService:
                     memory_context,
                     query_plan=query_plan,
                     course_memory_card=course_memory_card,
+                    image_attachments=image_attachments,
                 )
             body = {
                 "recommendations": recommendations,
@@ -491,6 +507,7 @@ class AiService:
         memory_context: AgentMemoryContext | None,
         query_plan: AgentQueryPlan | None,
         course_memory_card: CourseMemoryCard | None,
+        image_attachments: list[dict[str, Any]] | None = None,
     ) -> dict[str, Any] | None:
         settings = get_settings()
         if not self._is_agent_model_configured(settings):
@@ -504,7 +521,10 @@ class AiService:
         system_prompt = (
             "你是 StudyHub 学习辅导 Agent。你只能基于给定的 StudyHub 候选资料回答，"
             "不要编造不存在的资料。用户可能需要资料推荐、真题讲解思路、复习规划或错题辅导。"
+            "输出围栏：只回答课程学习、资料检索、题目分析、复习规划、平台学习资料使用相关内容；"
+            "如果问题明显不属于学习场景，应简短说明只能处理学习相关问题，不要展开闲聊或平台外建议。"
             "如果候选资料不足，要明确说明并追问课程范围。"
+            "如果提供了图片附件，只能把图片用于识别题目、截图或学习资料内容，不要推断与学习无关的个人隐私。"
             "如果提供了 conversation_context，只能用来补全当前问题省略的课程、资料和上一轮学习目标，回答必须以 user_query 为准。"
             "如果提供了 conversation_focus，优先用它识别当前追问省略的课程、年份、资料标题和资源类型，"
             "但回答仍必须以 user_query、candidate_materials、pdf_evidence 和 course_memory_card 为准。"
@@ -523,7 +543,7 @@ class AiService:
             "如果提供了 course_memory_card，你可以用它总结课程级年份、逐年题型、章节模块、答案解析信号、知识点、经验策略和推荐顺序，"
             "并结合资料质量与风险分布做保守排序和必要提醒，"
             "并根据 evidence_coverage 和 confidence_assessment 避免过度概括。"
-            "不要输出 memory_context、conversation_context、conversation_focus、query_plan、problem_context、candidate_materials、user_fit_signals、"
+            "不要输出 memory_context、conversation_context、conversation_focus、query_plan、problem_context、candidate_materials、image_attachments、output_guardrail、user_fit_signals、"
             "pdf_evidence、course_memory_card、material_scope、current_query_memory、learning_preferences、evidence_coverage、evidence_basis、confidence_assessment、yearly_question_type_matrix、chapter_distribution、chapter_signals、solution_signal_distribution、solution_signals、study_strategy_distribution、material_quality_distribution、material_risk_distribution、"
             "experience_materials、anchor_text、anchor_terms 或 privacy_boundary 等内部字段名。"
             "必须输出严格 JSON，不要输出 Markdown，不要包裹代码块。"
@@ -534,6 +554,7 @@ class AiService:
             "conversation_focus": _agent_context_retrieval_focus(_compact_agent_context(conversation_context)),
             "query_plan": query_plan.to_prompt_payload() if query_plan else {},
             "candidate_materials": candidates,
+            "image_attachments": _agent_image_attachment_metadata(image_attachments or []),
             "pdf_evidence": [item.to_prompt_payload() for item in pdf_evidence],
             "memory_context": memory_context.to_prompt_payload() if memory_context else {},
             "course_memory_card": course_memory_card.to_prompt_payload() if course_memory_card else {},
@@ -550,6 +571,10 @@ class AiService:
             },
         }
         user_prompt = self.safety_service.sanitize_prompt_payload(user_prompt)
+        if image_attachments:
+            user_prompt["_image_attachment_data_urls"] = [
+                item["data_url"] for item in image_attachments if item.get("data_url")
+            ]
         try:
             content = self._call_agent_model(settings, system_prompt, user_prompt)
         except Exception:
@@ -577,6 +602,14 @@ class AiService:
         return self._call_chat_completions_api(settings, system_prompt, user_prompt)
 
     def _call_chat_completions_api(self, settings: Any, system_prompt: str, user_prompt: dict[str, Any]) -> str:
+        prompt_payload, image_urls = _split_prompt_image_payload(user_prompt)
+        user_text = json.dumps(prompt_payload, ensure_ascii=False)
+        user_content: str | list[dict[str, Any]]
+        if image_urls:
+            user_content = [{"type": "text", "text": user_text}]
+            user_content.extend({"type": "image_url", "image_url": {"url": image_url}} for image_url in image_urls)
+        else:
+            user_content = user_text
         with httpx.Client(timeout=max(10.0, settings.ai_agent_timeout_seconds), trust_env=False) as client:
             response = client.post(
                 f"{settings.ai_agent_base_url.rstrip('/')}/chat/completions",
@@ -589,7 +622,7 @@ class AiService:
                     "thinking": {"type": "disabled"},
                     "messages": [
                         {"role": "system", "content": system_prompt},
-                        {"role": "user", "content": json.dumps(user_prompt, ensure_ascii=False)},
+                        {"role": "user", "content": user_content},
                     ],
                 },
             )
@@ -597,6 +630,14 @@ class AiService:
             return self._extract_chat_content(response.json())
 
     def _call_sub2api_responses_api(self, settings: Any, system_prompt: str, user_prompt: dict[str, Any]) -> str:
+        prompt_payload, image_urls = _split_prompt_image_payload(user_prompt)
+        response_content: list[dict[str, Any]] = [
+            {
+                "type": "input_text",
+                "text": json.dumps(prompt_payload, ensure_ascii=False),
+            }
+        ]
+        response_content.extend({"type": "input_image", "image_url": image_url} for image_url in image_urls)
         with httpx.Client(timeout=max(10.0, settings.ai_agent_timeout_seconds), trust_env=False) as client:
             response = client.post(
                 f"{settings.ai_agent_base_url.rstrip('/')}/responses",
@@ -607,12 +648,7 @@ class AiService:
                     "input": [
                         {
                             "role": "user",
-                            "content": [
-                                {
-                                    "type": "input_text",
-                                    "text": json.dumps(user_prompt, ensure_ascii=False),
-                                }
-                            ],
+                            "content": response_content,
                         }
                     ],
                     "max_output_tokens": 900,
@@ -679,8 +715,12 @@ class AiService:
         memory_context: AgentMemoryContext | None = None,
         query_plan: AgentQueryPlan | None = None,
         course_memory_card: CourseMemoryCard | None = None,
+        image_attachments: list[dict[str, Any]] | None = None,
     ) -> str:
+        image_hint = "我已收到你发的图片；当前会结合图片上下文、你的文字和平台资料一起判断。" if image_attachments else ""
         if not recommendations:
+            if image_attachments:
+                return f"{image_hint}我没有在平台资料库里找到足够贴近「{query}」的候选。你可以补充课程名、考试范围或题目文字，我再帮你缩小检索。"
             return f"我没有在平台资料库里找到足够贴近「{query}」的候选。你可以补充课程名、考试范围、题型或学校专业，我再帮你缩小检索。"
         titles = "、".join(f"《{item.get('title') or '资料'}》" for item in recommendations)
         profile_hint = self._local_profile_hint(memory_context)
@@ -691,18 +731,18 @@ class AiService:
             sequence_hint = self._local_sequence_hint(query_plan, course_memory_card)
             preference_tail = "" if query_plan and query_plan.intent == "study_plan" else preference_hint
             return (
-                f"我先基于 StudyHub 资料库找到 {titles}，并读取到相关 PDF 页级证据：{sources}。"
+                f"{image_hint}我先基于 StudyHub 资料库找到 {titles}，并读取到相关 PDF 页级证据：{sources}。"
                 f"{evidence_summary}{profile_hint}{sequence_hint}{preference_tail}"
             )
         course_memory_hint = self._local_course_memory_hint(course_memory_card)
         if course_memory_hint:
             sequence_hint = self._local_sequence_hint(query_plan, course_memory_card)
             preference_tail = "" if query_plan and query_plan.intent == "study_plan" else preference_hint
-            return f"我先基于 StudyHub 资料库找到 {titles}。{course_memory_hint}{profile_hint}{sequence_hint}{preference_tail}"
+            return f"{image_hint}我先基于 StudyHub 资料库找到 {titles}。{course_memory_hint}{profile_hint}{sequence_hint}{preference_tail}"
         study_plan_hint = self._local_study_plan_hint(query_plan)
         if study_plan_hint:
-            return f"我先基于 StudyHub 资料库找到 {titles}。{profile_hint}{study_plan_hint}"
-        return f"我先基于 StudyHub 资料库找到 {titles}。{profile_hint}建议先用最匹配的资料建立知识框架，再结合真题或经验内容做查漏补缺。{preference_hint}"
+            return f"{image_hint}我先基于 StudyHub 资料库找到 {titles}。{profile_hint}{study_plan_hint}"
+        return f"{image_hint}我先基于 StudyHub 资料库找到 {titles}。{profile_hint}建议先用最匹配的资料建立知识框架，再结合真题或经验内容做查漏补缺。{preference_hint}"
 
     def _local_course_memory_hint(self, course_memory_card: CourseMemoryCard | None) -> str:
         if course_memory_card is None:
@@ -1327,6 +1367,130 @@ def _agent_retrieval_query(query: str, context_query: str | None) -> str:
     if not context_focus:
         return current
     return f"{current}\n最近上下文关键词：{context_focus}"[:900]
+
+
+def _agent_image_attachments(value: Any) -> list[dict[str, Any]]:
+    if not isinstance(value, list):
+        return []
+    attachments: list[dict[str, Any]] = []
+    for item in value[:1]:
+        data_url = str(_payload_field(item, "dataUrl") or "").strip()
+        mime_type = str(_payload_field(item, "mimeType") or "").strip().lower()
+        if not data_url or not mime_type:
+            continue
+        attachments.append(
+            {
+                "name": str(_payload_field(item, "name") or "学习图片")[:120],
+                "mime_type": mime_type,
+                "size_bytes": int(_payload_field(item, "sizeBytes") or 0),
+                "data_url": data_url,
+            }
+        )
+    return attachments
+
+
+def _payload_field(item: Any, field: str) -> Any:
+    if isinstance(item, dict):
+        return item.get(field)
+    return getattr(item, field, None)
+
+
+def _agent_image_attachment_metadata(attachments: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    metadata: list[dict[str, Any]] = []
+    for item in attachments[:1]:
+        metadata.append(
+            {
+                "name": str(item.get("name") or "学习图片")[:120],
+                "mime_type": str(item.get("mime_type") or "image"),
+                "size_bytes": int(item.get("size_bytes") or 0),
+                "purpose": "user_provided_learning_image",
+            }
+        )
+    return metadata
+
+
+def _split_prompt_image_payload(user_prompt: dict[str, Any]) -> tuple[dict[str, Any], list[str]]:
+    image_urls = [
+        str(item)
+        for item in user_prompt.get("_image_attachment_data_urls", [])
+        if isinstance(item, str) and item.startswith("data:image/")
+    ][:1]
+    prompt_payload = {key: value for key, value in user_prompt.items() if key != "_image_attachment_data_urls"}
+    return prompt_payload, image_urls
+
+
+def _is_learning_related_agent_query(query: str, *, context_query: str | None, has_image: bool) -> bool:
+    text = f"{query} {context_query or ''}".strip().lower()
+    normalized = re.sub(r"\s+", "", text)
+    if not normalized:
+        return False
+    if _is_agent_greeting(normalized):
+        return True
+    if has_image and _image_query_has_learning_intent(normalized):
+        return True
+    learning_markers = (
+        "学习",
+        "复习",
+        "考试",
+        "期末",
+        "期中",
+        "真题",
+        "往年题",
+        "历年题",
+        "题目",
+        "题型",
+        "考题",
+        "考点",
+        "作业",
+        "课程",
+        "资料",
+        "笔记",
+        "讲义",
+        "答案",
+        "解析",
+        "错题",
+        "知识点",
+        "公式",
+        "推导",
+        "计算题",
+        "证明题",
+        "pdf",
+        "课件",
+        "专业",
+        "学院",
+        "studyhub",
+        "esd",
+        "cps",
+        "通信原理",
+        "电子系统设计",
+        "信号与系统",
+        "数据结构",
+        "高数",
+        "高等数学",
+        "微积分",
+        "概率论",
+    )
+    return any(marker.lower() in normalized for marker in learning_markers)
+
+
+def _is_agent_greeting(normalized_query: str) -> bool:
+    return normalized_query in {"你好", "您好", "hi", "hello", "hey", "在吗"}
+
+
+def _image_query_has_learning_intent(normalized_query: str) -> bool:
+    image_learning_markers = ("学习", "课程", "题", "作业", "公式", "答案", "解析", "考点", "知识点")
+    return any(marker in normalized_query for marker in image_learning_markers)
+
+
+def _learning_scope_block_body() -> dict[str, Any]:
+    return {
+        "answer": "StudyHub 学习辅导只处理课程学习、资料检索、题目分析、复习规划和平台学习资料使用相关问题。这个问题不属于学习场景，我先停止回答；你可以换成课程、资料、考试或题目相关的问题。",
+        "followup_questions": [
+            "要不要帮你找某门课的资料？",
+            "要不要分析一份真题或题目截图？",
+            "要不要制定一份复习计划？",
+        ],
+    }
 
 
 def _agent_context_retrieval_focus(context: str) -> str:

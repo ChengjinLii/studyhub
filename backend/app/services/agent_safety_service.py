@@ -15,7 +15,10 @@ FORBIDDEN_INTERNAL_MARKERS = (
     "conversation_focus",
     "privacy_boundary",
     "candidate_materials",
+    "image_attachments",
+    "_image_attachment_data_urls",
     "pdf_evidence",
+    "output_guardrail",
     "query_plan",
     "problem_context",
     "material_scope",
@@ -84,7 +87,7 @@ class AgentSafetyService:
         recommendations, had_recommendation_list = self._sanitize_recommendations(body.get("recommendations"), allowed_material_ids)
         answer = self._sanitize_answer(body.get("answer"))
         evidence_sources = self._sanitize_evidence_sources(body.get("evidence_sources"), pdf_evidence)
-        followup_questions = self._sanitize_followups(body.get("followup_questions"))
+        followup_questions = self._sanitize_followups(body.get("followup_questions"), candidate_materials=candidate_materials)
 
         if had_recommendation_list and not recommendations:
             answer = ""
@@ -127,7 +130,7 @@ class AgentSafetyService:
         recommendations = self._sanitize_public_recommendations(body.get("recommendations"), allowed_material_ids)
         answer = self._sanitize_answer(body.get("answer"))
         evidence_sources = self._sanitize_public_evidence_sources(body.get("evidence_sources"), pdf_evidence)
-        followup_questions = self._sanitize_followups(body.get("followup_questions"))
+        followup_questions = self._sanitize_followups(body.get("followup_questions"), candidate_materials=candidate_materials)
 
         if answer and pdf_evidence:
             if not evidence_sources:
@@ -323,17 +326,20 @@ class AgentSafetyService:
         trimmed_answer = answer[: max(0, max_chars - len(caveat) - 1)].rstrip()
         return f"{trimmed_answer} {caveat}".strip()
 
-    def _sanitize_followups(self, value: Any) -> list[str]:
+    def _sanitize_followups(self, value: Any, *, candidate_materials: list[MaterialRecord] | None = None) -> list[str]:
         if not isinstance(value, list):
             return []
         questions: list[str] = []
         seen_questions: set[str] = set()
+        has_candidate_materials = bool(candidate_materials)
         for item in value:
             question = _clean_public_text(item, max_chars=80)
             if not question:
                 continue
             lowered = question.lower()
             if any(marker in lowered for marker in FORBIDDEN_INTERNAL_MARKERS):
+                continue
+            if has_candidate_materials and _followup_requests_external_material(question):
                 continue
             if lowered in seen_questions:
                 continue
@@ -512,6 +518,35 @@ def _answer_mentions_unscoped_material_title(
     allowed_titles.extend(_clean_public_title(item.title, max_chars=160) for item in pdf_evidence)
     allowed_titles = [title for title in allowed_titles if title and title != "资料"]
     return any(not _title_matches_allowed_scope(title, allowed_titles) for title in material_like_titles)
+
+
+def _followup_requests_external_material(question: str) -> bool:
+    normalized = re.sub(r"\s+", "", question).lower()
+    request_markers = (
+        "发给我",
+        "发我",
+        "发一下",
+        "上传",
+        "传一下",
+        "提供",
+        "给我",
+        "贴一下",
+    )
+    material_markers = (
+        "资料",
+        "真题",
+        "往年题",
+        "历年题",
+        "试卷",
+        "样卷",
+        "讲义",
+        "笔记",
+        "pdf",
+        "文件",
+    )
+    return any(marker in normalized for marker in request_markers) and any(
+        marker in normalized for marker in material_markers
+    )
 
 
 def _looks_like_material_title(title: str) -> bool:

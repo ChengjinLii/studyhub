@@ -1067,3 +1067,65 @@ def test_agent_replaces_model_no_candidate_answer_when_local_materials_exist(mon
     assert body["recommendations"][0]["material_id"] == 501
     assert "电子系统设计" in body["recommendations"][0]["title"]
     metrics.clear()
+
+
+def test_agent_blocks_non_learning_query_before_retrieval(monkeypatch) -> None:
+    settings = Settings(ai_agent_provider="local")
+    monkeypatch.setattr("app.services.ai_service.get_settings", lambda: settings)
+    service = AiService(read_repo=None, material_repo=None)  # type: ignore[arg-type]
+
+    def fail_rank_materials(session: object, query: str, filters: dict[str, Any]) -> list[MaterialRecord]:
+        del session, query, filters
+        raise AssertionError("non-learning query should not trigger retrieval")
+
+    monkeypatch.setattr(service, "_rank_materials", fail_rank_materials)
+
+    response = service.recommend(
+        object(),  # type: ignore[arg-type]
+        SimpleNamespace(query="明天天气怎么样", filters={}, imageAttachments=[]),
+        current_user_id=7,
+    )
+    body = json.loads(str(response["output"]).removeprefix("<json>").removesuffix("</json>"))
+
+    assert "只处理课程学习" in body["answer"]
+    assert "明天天气" not in body["answer"]
+    assert "recommendations" not in body
+
+
+def test_agent_image_attachment_local_fallback_keeps_learning_boundary(monkeypatch) -> None:
+    settings = Settings(ai_agent_provider="local")
+    monkeypatch.setattr("app.services.ai_service.get_settings", lambda: settings)
+    service = AiService(read_repo=None, material_repo=None)  # type: ignore[arg-type]
+    monkeypatch.setattr(
+        service,
+        "_rank_materials",
+        lambda session, query, filters: [
+            _material(
+                701,
+                title="通信原理题型解析",
+                description="通信原理期末题型、答案和解析",
+                downloads=20,
+            )
+        ],
+    )
+
+    response = service.recommend(
+        object(),  # type: ignore[arg-type]
+        SimpleNamespace(
+            query="帮我分析这张题目截图",
+            filters={},
+            imageAttachments=[
+                {
+                    "name": "question.png",
+                    "mimeType": "image/png",
+                    "dataUrl": "data:image/png;base64,aW1hZ2U=",
+                    "sizeBytes": 128,
+                }
+            ],
+        ),
+        current_user_id=7,
+    )
+    body = json.loads(str(response["output"]).removeprefix("<json>").removesuffix("</json>"))
+
+    assert body["answer"].startswith("我已收到你发的图片")
+    assert body["recommendations"][0]["material_id"] == 701

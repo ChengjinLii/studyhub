@@ -152,6 +152,40 @@ def test_agent_safety_allows_quoted_course_name_without_material_marker() -> Non
     )
 
 
+def test_agent_safety_filters_material_upload_followups_when_candidates_exist() -> None:
+    sanitized = AgentSafetyService().sanitize_recommendation_body(
+        {
+            "answer": "我先基于候选资料给你分析。",
+            "recommendations": [{"material_id": 101, "reason": "标题和标签匹配通信原理真题"}],
+            "followup_questions": [
+                "你可以把真题发给我吗？",
+                "要不要我按年份整理题型？",
+                "能不能上传 PDF 资料？",
+            ],
+        },
+        candidate_materials=[_material()],
+        pdf_evidence=[],
+    )
+
+    assert sanitized is not None
+    assert sanitized["followup_questions"] == ["要不要我按年份整理题型？"]
+
+
+def test_agent_safety_keeps_problem_screenshot_followup_with_candidates() -> None:
+    sanitized = AgentSafetyService().sanitize_recommendation_body(
+        {
+            "answer": "我先基于候选资料给你分析。",
+            "recommendations": [{"material_id": 101, "reason": "标题和标签匹配通信原理真题"}],
+            "followup_questions": ["你可以把具体题目截图发我吗？"],
+        },
+        candidate_materials=[_material()],
+        pdf_evidence=[],
+    )
+
+    assert sanitized is not None
+    assert sanitized["followup_questions"] == ["你可以把具体题目截图发我吗？"]
+
+
 def test_agent_safety_does_not_repeat_low_evidence_caveat() -> None:
     sanitized = AgentSafetyService().sanitize_recommendation_body(
         {
@@ -442,6 +476,48 @@ def test_ai_recommendation_falls_back_when_model_mentions_non_candidate_material
     assert "不存在的通信原理真题解析" not in body["answer"]
     assert body["answer"].startswith("我先基于 StudyHub 资料库找到")
     assert body["recommendations"][0]["material_id"] == 101
+
+
+def test_ai_recommendation_uses_local_followups_when_model_asks_for_existing_materials(monkeypatch) -> None:
+    settings = Settings(
+        ai_agent_provider="openai-compatible",
+        ai_agent_base_url="https://example.test/v1",
+        ai_agent_api_key="test-key",
+        ai_agent_model="demo-model",
+    )
+    monkeypatch.setattr("app.services.ai_service.get_settings", lambda: settings)
+
+    service = AiService(
+        read_repo=None,
+        material_repo=None,
+        query_planner_service=AgentQueryPlannerService(),
+    )  # type: ignore[arg-type]
+    monkeypatch.setattr(service, "_rank_materials", lambda session, query, filters: [_material()])
+
+    def fake_call_agent_model(settings: Settings, system_prompt: str, user_prompt: dict[str, Any]) -> str:
+        del settings, system_prompt, user_prompt
+        return json.dumps(
+            {
+                "answer": "我会基于当前候选资料分析通信原理真题趋势。",
+                "recommendations": [{"material_id": 101, "reason": "标题和标签匹配通信原理真题"}],
+                "followup_questions": ["你可以把真题发给我吗？"],
+            },
+            ensure_ascii=False,
+        )
+
+    monkeypatch.setattr(service, "_call_agent_model", fake_call_agent_model)
+
+    response = service.recommend(
+        object(),  # type: ignore[arg-type]
+        SimpleNamespace(query="通信原理往年题常考什么", filters={}),
+        current_user_id=7,
+    )
+    body = json.loads(str(response["output"]).removeprefix("<json>").removesuffix("</json>"))
+
+    assert body["followup_questions"] == [
+        "要不要我按年份整理常考题型？",
+        "是否需要把这些资料整理成两周复习顺序？",
+    ]
 
 
 def test_ai_model_prompt_redacts_sensitive_material_and_pdf_context(monkeypatch) -> None:

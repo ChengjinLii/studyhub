@@ -1161,6 +1161,31 @@ main {
   margin: 0;
 }
 
+.hermes-agent__message-images {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.hermes-agent__message-images img {
+  width: min(170px, 100%);
+  max-height: 150px;
+  object-fit: contain;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.42);
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.hermes-agent__message--assistant .hermes-agent__message-images img {
+  border-color: #e2e8f0;
+  background: #f8fafc;
+}
+
+.hermes-agent__message-images span {
+  font-size: 0.72rem;
+  opacity: 0.84;
+}
+
 .hermes-agent__message--assistant {
   align-self: flex-start;
   background: #ffffff;
@@ -1249,10 +1274,68 @@ main {
 
 .hermes-agent__form {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   padding: 12px 14px 14px;
   border-top: 1px solid #e2e8f0;
   background: #ffffff;
+}
+
+.hermes-agent__attachment-row {
+  flex: 0 0 100%;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.hermes-agent__attachment-preview {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 6px 8px;
+  border-radius: 12px;
+  border: 1px solid #dbeafe;
+  background: #eff6ff;
+}
+
+.hermes-agent__attachment-preview img {
+  width: 36px;
+  height: 36px;
+  flex: 0 0 auto;
+  border-radius: 8px;
+  object-fit: cover;
+  background: #ffffff;
+}
+
+.hermes-agent__attachment-preview span {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #1e293b;
+  font-size: 0.75rem;
+}
+
+.hermes-agent__attachment-preview button {
+  flex: 0 0 auto;
+  border: none;
+  background: transparent;
+  color: #1d4ed8;
+  font-size: 0.74rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.hermes-agent__attachment-error {
+  color: #b91c1c;
+  font-size: 0.74rem;
+}
+
+.hermes-agent__file-input {
+  display: none;
 }
 
 .hermes-agent__form input {
@@ -1267,7 +1350,11 @@ main {
   font-size: 0.84rem;
 }
 
-.hermes-agent__form button {
+.hermes-agent__form .hermes-agent__file-input {
+  display: none;
+}
+
+.hermes-agent__form > button {
   width: 64px;
   height: 38px;
   border: none;
@@ -1276,6 +1363,12 @@ main {
   color: #ffffff;
   font-weight: 700;
   cursor: pointer;
+}
+
+.hermes-agent__form > .hermes-agent__image-button {
+  width: 52px;
+  background: #e0f2fe;
+  color: #075985;
 }
 
 .hermes-agent__form button:disabled,

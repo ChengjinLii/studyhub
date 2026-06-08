@@ -22,6 +22,18 @@ export default function StudyHubAgentMessageList({
       {messages.map((message) => (
         <article key={message.id} className={`hermes-agent__message hermes-agent__message--${message.role}`}>
           <p>{message.content}</p>
+          {message.imageAttachments && message.imageAttachments.length > 0 && (
+            <div className="hermes-agent__message-images">
+              {message.imageAttachments.slice(0, 1).map((item) => (
+                item.dataUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img key={item.id} src={item.dataUrl} alt={item.name || '学习图片'} />
+                ) : (
+                  <span key={item.id}>{item.name || '学习图片'}</span>
+                )
+              ))}
+            </div>
+          )}
           {message.recommendations && message.recommendations.length > 0 && (
             <StudyHubAgentMaterialCards
               recommendations={message.recommendations}
