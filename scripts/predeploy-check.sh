@@ -78,6 +78,8 @@ run "backend pytest with coverage report" "$PYTHON_BIN" -m pytest "$BACKEND_DIR/
 
 run "frontend typecheck and lint" npm --prefix "$FRONTEND_DIR" run check
 
+run "frontend strict typecheck subset" npm --prefix "$FRONTEND_DIR" run typecheck:strict
+
 run "frontend unit tests" npm --prefix "$FRONTEND_DIR" run test:unit
 
 run "frontend critical mock tests" npm --prefix "$FRONTEND_DIR" run test:critical

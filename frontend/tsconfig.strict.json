@@ -1,0 +1,26 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "allowJs": false,
+    "incremental": false,
+    "strict": true
+  },
+  "include": [
+    "next-env.d.ts",
+    "types/**/*.ts",
+    "lib/apiBase.ts",
+    "lib/apiEnvelope.ts",
+    "lib/auth.ts",
+    "lib/authApi.ts",
+    "lib/cookies.ts",
+    "lib/errors.ts",
+    "lib/format.ts",
+    "lib/safePaymentForm.ts",
+    "lib/serverApiBase.ts",
+    "lib/sessionApi.ts",
+    "lib/share.ts",
+    "lib/slug.ts",
+    "components/SafeMarkdown.tsx"
+  ],
+  "exclude": ["node_modules"]
+}

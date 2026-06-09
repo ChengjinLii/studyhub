@@ -8,7 +8,7 @@ const PLACEHOLDER_PATHS = {
   generic: '/placeholders/generic-asset.svg',
 } as const;
 
-const isSampleStaticUrl = (value: string) => {
+const isSampleStaticUrl = (value: string): boolean => {
   try {
     return new URL(value).hostname === SAMPLE_STATIC_HOST;
   } catch {
@@ -16,9 +16,9 @@ const isSampleStaticUrl = (value: string) => {
   }
 };
 
-const isPlaceholderPath = (value: string) => value.startsWith('/placeholders/');
+const isPlaceholderPath = (value: string): boolean => value.startsWith('/placeholders/');
 
-const resolvePlaceholderPath = (pathname: string) => {
+const resolvePlaceholderPath = (pathname: string): string => {
   if (pathname.startsWith('/avatar/')) return PLACEHOLDER_PATHS.avatar;
   if (pathname.startsWith('/market/')) return PLACEHOLDER_PATHS.market;
   if (pathname.startsWith('/materials/')) return PLACEHOLDER_PATHS.material;
@@ -26,7 +26,7 @@ const resolvePlaceholderPath = (pathname: string) => {
   return PLACEHOLDER_PATHS.generic;
 };
 
-const normalizeSampleStaticUrl = (value: string) => {
+const normalizeSampleStaticUrl = (value: string): string => {
   if (!value.includes(SAMPLE_STATIC_HOST)) return value;
   if (value.includes(',')) {
     return value
@@ -35,7 +35,7 @@ const normalizeSampleStaticUrl = (value: string) => {
         const trimmed = part.trim();
         if (!trimmed) return trimmed;
         const [rawUrl, ...descriptors] = trimmed.split(/\s+/);
-        const mapped = normalizeSampleStaticUrl(rawUrl);
+        const mapped: string = normalizeSampleStaticUrl(rawUrl);
         return [mapped, ...descriptors].join(' ');
       })
       .join(', ');
@@ -45,7 +45,7 @@ const normalizeSampleStaticUrl = (value: string) => {
   return resolvePlaceholderPath(parsed.pathname);
 };
 
-const normalizeVariantLikeObject = (value: Record<string, unknown>) => {
+const normalizeVariantLikeObject = (value: Record<string, unknown>): Record<string, unknown> => {
   const next: Record<string, unknown> = { ...value };
   const normalizedSrc = typeof next.src === 'string' ? normalizeSampleStaticUrl(next.src) : next.src;
   if (typeof normalizedSrc === 'string') {
@@ -64,7 +64,7 @@ const normalizeVariantLikeObject = (value: Record<string, unknown>) => {
   return next;
 };
 
-const normalizePreviewImageObject = (value: Record<string, unknown>) => {
+const normalizePreviewImageObject = (value: Record<string, unknown>): Record<string, unknown> => {
   const next: Record<string, unknown> = { ...value };
   if (next.img && typeof next.img === 'object' && !Array.isArray(next.img)) {
     next.img = normalizeVariantLikeObject(next.img as Record<string, unknown>);

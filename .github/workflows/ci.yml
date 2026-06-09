@@ -62,6 +62,9 @@ jobs:
       - name: Run frontend checks
         working-directory: frontend
         run: npm run check
+      - name: Run frontend strict typecheck subset
+        working-directory: frontend
+        run: npm run typecheck:strict
       - name: Run frontend unit tests
         working-directory: frontend
         run: npm run test:unit
