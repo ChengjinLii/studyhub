@@ -2,6 +2,7 @@ import { GetServerSideProps } from 'next';
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import AppImage from '../../components/AppImage';
+import { useAppDialog } from '../../components/AppDialogProvider';
 import NavBar from '../../components/NavBar';
 import { readSession } from '../../lib/auth';
 import { fetchMaterialPreview } from '../../lib/api';
@@ -32,6 +33,7 @@ const parseApiResponse = async (resp: Response) => {
 };
 
 export default function RequestDetailPage({ user, request, responses, contributions }: RequestDetailProps) {
+  const dialog = useAppDialog();
   const [requestState, setRequestState] = useState(request);
   const [acceptLoadingId, setAcceptLoadingId] = useState<number | null>(null);
   const [acceptNotice, setAcceptNotice] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
@@ -88,10 +90,12 @@ export default function RequestDetailPage({ user, request, responses, contributi
   const handleAccept = async (responseId: number) => {
     if (!requestState?.id) return;
     if (acceptLoadingId) return;
-    if (typeof window !== 'undefined') {
-      const confirmed = window.confirm('确认采纳该应答并进入结算吗？');
-      if (!confirmed) return;
-    }
+    const confirmed = await dialog.confirm({
+      title: '采纳应答',
+      message: '确认采纳该应答并进入结算吗？',
+      confirmText: '确认采纳',
+    });
+    if (!confirmed) return;
     setAcceptNotice(null);
     setAcceptLoadingId(responseId);
     try {
@@ -117,34 +121,38 @@ export default function RequestDetailPage({ user, request, responses, contributi
   const handleDispute = async (responseId: number) => {
     if (!requestState?.id) return;
     if (disputeLoadingId) return;
-    if (typeof window !== 'undefined') {
-      const reason = window.prompt('请输入不收货理由（至少 10 字）', '');
-      if (!reason) return;
-      const trimmedReason = reason.trim();
-      if (trimmedReason.length < 10) {
-        setDisputeNotice({ type: 'error', text: '不收货理由需至少 10 字。' });
-        return;
+    const reason = await dialog.prompt({
+      title: '提交不收货理由',
+      message: '请输入不收货理由，至少 10 个字。',
+      placeholder: '说明资料与需求不符的具体原因',
+      multiline: true,
+      confirmText: '提交仲裁',
+    });
+    if (!reason) return;
+    const trimmedReason = reason.trim();
+    if (trimmedReason.length < 10) {
+      setDisputeNotice({ type: 'error', text: '不收货理由需至少 10 字。' });
+      return;
+    }
+    setDisputeNotice(null);
+    setDisputeLoadingId(responseId);
+    try {
+      const resp = await fetchBackend(`/requests/${requestState.id}/disputes`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ responseId, reason: trimmedReason }),
+      });
+      const json = await parseApiResponse(resp);
+      if (!resp.ok || !json?.ok) {
+        throw new Error(json?.msg || `提交失败（${resp.status}）`);
       }
-      setDisputeNotice(null);
-      setDisputeLoadingId(responseId);
-      try {
-        const resp = await fetchBackend(`/requests/${requestState.id}/disputes`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ responseId, reason: trimmedReason }),
-        });
-        const json = await parseApiResponse(resp);
-        if (!resp.ok || !json?.ok) {
-          throw new Error(json?.msg || `提交失败（${resp.status}）`);
-        }
-        const nextRequest = json.data as MaterialRequestItem;
-        setRequestState(nextRequest);
-        setDisputeNotice({ type: 'success', text: '已提交仲裁申请，等待管理员处理。' });
-      } catch (error: unknown) {
-        setDisputeNotice({ type: 'error', text: toErrorMessage(error, '提交失败') });
-      } finally {
-        setDisputeLoadingId(null);
-      }
+      const nextRequest = json.data as MaterialRequestItem;
+      setRequestState(nextRequest);
+      setDisputeNotice({ type: 'success', text: '已提交仲裁申请，等待管理员处理。' });
+    } catch (error: unknown) {
+      setDisputeNotice({ type: 'error', text: toErrorMessage(error, '提交失败') });
+    } finally {
+      setDisputeLoadingId(null);
     }
   };
 
@@ -198,40 +206,46 @@ export default function RequestDetailPage({ user, request, responses, contributi
 
   const handleUpdateDeadline = async (item: MaterialRequestContributionItem) => {
     if (!item.id) return;
-    if (typeof window !== 'undefined') {
-      const choice = window.prompt('选择新的期限档位（24H/WEEK/MONTH/FLEX）', item.deadlineTier || 'FLEX');
-      if (!choice) return;
-      const normalized = choice.trim().toUpperCase();
-      if (!normalized) return;
-      setContributionNotice(null);
-      setContributionActionLoading((prev) => ({ ...prev, [item.id]: true }));
-      try {
-        const resp = await fetchBackend(`/requests/contributions/${item.id}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ deadlineTier: normalized }),
-        });
-        const json = await parseApiResponse(resp);
-        if (!resp.ok || !json?.ok) {
-          throw new Error(json?.msg || `修改失败（${resp.status}）`);
-        }
-        const next = json.data as MaterialRequestContributionItem;
-        setContributionState((prev) => prev.map((entry) => (entry.id === next.id ? next : entry)));
-        setContributionNotice({ type: 'success', text: '已更新期限。' });
-      } catch (error: unknown) {
-        setContributionNotice({ type: 'error', text: toErrorMessage(error, '修改失败') });
-      } finally {
-        setContributionActionLoading((prev) => ({ ...prev, [item.id]: false }));
+    const choice = await dialog.prompt({
+      title: '修改贡献期限',
+      message: '选择新的期限档位：24H、WEEK、MONTH 或 FLEX。',
+      defaultValue: item.deadlineTier || 'FLEX',
+      confirmText: '更新期限',
+    });
+    if (!choice) return;
+    const normalized = choice.trim().toUpperCase();
+    if (!normalized) return;
+    setContributionNotice(null);
+    setContributionActionLoading((prev) => ({ ...prev, [item.id]: true }));
+    try {
+      const resp = await fetchBackend(`/requests/contributions/${item.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ deadlineTier: normalized }),
+      });
+      const json = await parseApiResponse(resp);
+      if (!resp.ok || !json?.ok) {
+        throw new Error(json?.msg || `修改失败（${resp.status}）`);
       }
+      const next = json.data as MaterialRequestContributionItem;
+      setContributionState((prev) => prev.map((entry) => (entry.id === next.id ? next : entry)));
+      setContributionNotice({ type: 'success', text: '已更新期限。' });
+    } catch (error: unknown) {
+      setContributionNotice({ type: 'error', text: toErrorMessage(error, '修改失败') });
+    } finally {
+      setContributionActionLoading((prev) => ({ ...prev, [item.id]: false }));
     }
   };
 
   const handleCancelContribution = async (item: MaterialRequestContributionItem) => {
     if (!item.id) return;
-    if (typeof window !== 'undefined') {
-      const confirmed = window.confirm('确定要提前结束该贡献吗？将收取 3% 手续费。');
-      if (!confirmed) return;
-    }
+    const confirmed = await dialog.confirm({
+      title: '提前结束贡献',
+      message: '确定要提前结束该贡献吗？将收取 3% 手续费。',
+      confirmText: '结束贡献',
+      danger: true,
+    });
+    if (!confirmed) return;
     setContributionNotice(null);
     setContributionActionLoading((prev) => ({ ...prev, [item.id]: true }));
     try {

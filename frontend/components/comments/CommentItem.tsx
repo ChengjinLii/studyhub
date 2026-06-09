@@ -13,6 +13,7 @@ import {
 import { toErrorMessage } from '../../lib/errors';
 import { formatDateTime } from '../../lib/format';
 import AppImage from '../AppImage';
+import { useAppDialog } from '../AppDialogProvider';
 import CommentInput from './CommentInput';
 import StarRating from '../StarRating';
 
@@ -33,6 +34,7 @@ export default function CommentItem({
   onDeleted,
   onUpdated,
 }: CommentItemProps) {
+  const dialog = useAppDialog();
   const [local, setLocal] = useState(comment);
   const [replies, setReplies] = useState<Comment[]>(comment.replies ?? []);
   const [repliesMeta, setRepliesMeta] = useState<CommentListResponse['meta'] | null>(null);
@@ -83,7 +85,13 @@ export default function CommentItem({
 
   const handleDelete = async () => {
     if (!requireLogin()) return;
-    if (!confirm('确定删除该评论？')) return;
+    const confirmed = await dialog.confirm({
+      title: '删除评论',
+      message: '确定删除该评论？',
+      confirmText: '删除评论',
+      danger: true,
+    });
+    if (!confirmed) return;
     setActionError('');
     try {
       await deleteComment(local.id);
@@ -127,12 +135,20 @@ export default function CommentItem({
 
   const handleReport = async () => {
     if (!requireLogin()) return;
-    const reason = prompt('请输入举报理由（示例：广告、辱骂等）')?.trim();
+    const reason = (
+      await dialog.prompt({
+        title: '举报评论',
+        message: '请输入举报理由。',
+        placeholder: '示例：广告、辱骂等',
+        multiline: true,
+        confirmText: '提交举报',
+      })
+    )?.trim();
     if (!reason) return;
     setActionError('');
     try {
       await reportComment(local.id, reason, '');
-      alert('感谢反馈，我们会尽快处理。');
+      await dialog.alert({ title: '举报已提交', message: '感谢反馈，我们会尽快处理。' });
     } catch (err: unknown) {
       setActionError(toErrorMessage(err, '举报失败'));
     }

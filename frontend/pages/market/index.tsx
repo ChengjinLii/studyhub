@@ -2,6 +2,7 @@ import { GetServerSideProps } from 'next';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { CSSProperties, useCallback, useEffect, useMemo, useState } from 'react';
+import { useAppDialog } from '../../components/AppDialogProvider';
 import NavBar from '../../components/NavBar';
 import PaginationBar from '../../components/PaginationBar';
 import { readSession, hasRole } from '../../lib/auth';
@@ -66,6 +67,7 @@ const fetchWantedIds = async () => {
 };
 
 export default function MarketPage({ user, items, meta, filters, stats }: MarketPageProps) {
+  const dialog = useAppDialog();
   const router = useRouter();
   const isAdmin = Boolean(user && hasRole(user.roleMask, RoleMask.ADMIN));
   const canViewImages = Boolean(user);
@@ -230,7 +232,13 @@ export default function MarketPage({ user, items, meta, filters, stats }: Market
 
   const handleAdminDelete = async (itemId: number) => {
     if (!isAdmin || itemId < 0) return;
-    if (!window.confirm('确定要删除该商品吗？此操作不可撤销。')) {
+    const confirmed = await dialog.confirm({
+      title: '删除商品',
+      message: '确定要删除该商品吗？此操作不可撤销。',
+      confirmText: '删除商品',
+      danger: true,
+    });
+    if (!confirmed) {
       return;
     }
     setDeletingId(itemId);

@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/router';
 import AppImage from '../../components/AppImage';
+import { useAppDialog } from '../../components/AppDialogProvider';
 import NavBar from '../../components/NavBar';
 import SafeMarkdown from '../../components/SafeMarkdown';
 import ShareSheet from '../../components/ShareSheet';
@@ -45,6 +46,7 @@ const isExperienceUpload = (item: UploadItem) => {
 };
 
 export default function UserProfilePage({ user, profile }: UserProfilePageProps) {
+  const dialog = useAppDialog();
   const router = useRouter();
   const [activeSection, setActiveSection] = useState<
     'profile-overview' | 'profile-detail' | 'profile-materials' | 'profile-experience' | 'profile-market'
@@ -207,7 +209,15 @@ export default function UserProfilePage({ user, profile }: UserProfilePageProps)
       setReportNotice({ type: 'error', text: '不能举报自己。' });
       return;
     }
-    const reason = prompt('请输入举报理由（示例：不当言论、冒充等）')?.trim();
+    const reason = (
+      await dialog.prompt({
+        title: '举报用户',
+        message: '请输入举报理由。',
+        placeholder: '示例：不当言论、冒充等',
+        multiline: true,
+        confirmText: '提交举报',
+      })
+    )?.trim();
     if (!reason) return;
     setReportNotice(null);
     try {

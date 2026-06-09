@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { CSSProperties, useEffect, useState } from 'react';
 import AppImage from '../../components/AppImage';
+import { useAppDialog } from '../../components/AppDialogProvider';
 import NavBar from '../../components/NavBar';
 import ShareSheet from '../../components/ShareSheet';
 import { readSession, hasRole } from '../../lib/auth';
@@ -42,6 +43,7 @@ type MarketResponsiveImage = {
 };
 
 export default function MarketDetailPage({ user, item }: DetailPageProps) {
+  const dialog = useAppDialog();
   const router = useRouter();
   const [state, setState] = useState(item);
   const [submitting, setSubmitting] = useState(false);
@@ -216,7 +218,13 @@ export default function MarketDetailPage({ user, item }: DetailPageProps) {
 
   const handleDelete = async () => {
     if (!state || state.id < 0 || removing) return;
-    if (!window.confirm('确定要删除该商品吗？此操作不可撤销？')) {
+    const confirmed = await dialog.confirm({
+      title: '删除商品',
+      message: '确定要删除该商品吗？此操作不可撤销。',
+      confirmText: '删除商品',
+      danger: true,
+    });
+    if (!confirmed) {
       return;
     }
     setRemoving(true);
@@ -244,7 +252,15 @@ export default function MarketDetailPage({ user, item }: DetailPageProps) {
       router.push({ pathname: '/login', query: { next: router.asPath } });
       return;
     }
-    const reason = prompt('请输入举报理由（示例：违规售卖、虚假信息等）')?.trim();
+    const reason = (
+      await dialog.prompt({
+        title: '举报商品',
+        message: '请输入举报理由。',
+        placeholder: '示例：违规售卖、虚假信息等',
+        multiline: true,
+        confirmText: '提交举报',
+      })
+    )?.trim();
     if (!reason) return;
     setError('');
     try {

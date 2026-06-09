@@ -7,6 +7,7 @@ import { toErrorMessage } from './errors';
 import { materialPath } from './slug';
 import { copyToClipboard, isLikelyMobile, tryNativeShare } from './share';
 import { getOrCreateViewerId, hasRecordedMaterialView, markMaterialViewRecorded } from './viewer';
+import { useAppDialog } from '../components/AppDialogProvider';
 import { MaterialDetail } from '../types/material';
 import { SessionUser } from '../types/user';
 
@@ -18,11 +19,6 @@ interface UseMaterialActionsOptions {
   router: NextRouter;
 }
 
-const notifyQuotaLimit = (message?: string) => {
-  if (typeof window === 'undefined') return;
-  window.alert(message || '下载次数已用完，如需继续下载请联系管理员重置额度。');
-};
-
 export const useMaterialActions = ({
   material,
   user,
@@ -30,6 +26,7 @@ export const useMaterialActions = ({
   isSuperAdmin,
   router,
 }: UseMaterialActionsOptions) => {
+  const dialog = useAppDialog();
   const [purchased, setPurchased] = useState(
     material ? material.free || material.purchased || canManage : false
   );
@@ -126,13 +123,16 @@ export const useMaterialActions = ({
       }
     } catch (err: unknown) {
       if (err instanceof ApiError && err.code === 'DOWNLOAD_QUOTA_EXHAUSTED') {
-        notifyQuotaLimit(err.message);
+        void dialog.alert({
+          title: '下载次数已用完',
+          message: err.message || '下载次数已用完，如需继续下载请联系管理员重置额度。',
+        });
       }
       setError(toErrorMessage(err, '下载失败'));
     } finally {
       setDownloading(false);
     }
-  }, [ensureLoggedIn, material, purchased]);
+  }, [dialog, ensureLoggedIn, material, purchased]);
 
   const handlePurchase = useCallback(async () => {
     if (!material) return;
@@ -198,7 +198,15 @@ export const useMaterialActions = ({
   const handleReport = useCallback(async () => {
     if (!material) return;
     if (!ensureLoggedIn()) return;
-    const reason = prompt('请输入举报理由（示例：侵权、广告、内容不实等）')?.trim();
+    const reason = (
+      await dialog.prompt({
+        title: '举报资料',
+        message: '请输入举报理由。',
+        placeholder: '示例：侵权、广告、内容不实等',
+        multiline: true,
+        confirmText: '提交举报',
+      })
+    )?.trim();
     if (!reason) return;
     setError('');
     setInfo('');
@@ -208,7 +216,7 @@ export const useMaterialActions = ({
     } catch (err: unknown) {
       setError(toErrorMessage(err, '举报失败'));
     }
-  }, [ensureLoggedIn, material]);
+  }, [dialog, ensureLoggedIn, material]);
 
   const handleShare = useCallback(async () => {
     if (!material) return;

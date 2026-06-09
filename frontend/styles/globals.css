@@ -3328,6 +3328,60 @@ main {
   outline-offset: 2px;
 }
 
+.app-dialog-mask {
+  background: rgba(15, 23, 42, 0.42);
+  backdrop-filter: blur(8px);
+}
+
+.app-dialog {
+  width: min(520px, calc(100vw - 32px));
+  padding: 24px;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  box-shadow: 0 28px 70px rgba(15, 23, 42, 0.22);
+}
+
+.app-dialog__close {
+  top: 14px;
+  right: 14px;
+}
+
+.app-dialog__body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding-right: 32px;
+}
+
+.app-dialog__body h2 {
+  margin: 0;
+  font-size: 1.25rem;
+  color: #0f172a;
+}
+
+.app-dialog__body p {
+  margin: 0;
+  color: #475569;
+  line-height: 1.65;
+  white-space: pre-line;
+}
+
+.app-dialog__textarea {
+  min-height: 112px;
+  padding-top: 12px;
+  resize: vertical;
+}
+
+.app-dialog__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 22px;
+}
+
+.app-dialog--danger {
+  border-color: rgba(217, 48, 37, 0.22);
+}
+
 @media (max-width: 600px) {
   .modal-card {
     padding: 12px;
@@ -5475,6 +5529,19 @@ main {
   box-shadow: 0 6px 16px rgba(15, 23, 42, 0.14);
 }
 
+.material-card__overlay-link {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  border-radius: inherit;
+  text-decoration: none;
+}
+
+.material-card__overlay-link:focus-visible {
+  outline: 3px solid rgba(37, 99, 235, 0.35);
+  outline-offset: 3px;
+}
+
 .material-card.selectable {
   padding-left: 48px;
 }
@@ -5620,6 +5687,7 @@ main {
 
 .material-card__selector {
   position: absolute;
+  z-index: 2;
   top: 16px;
   left: 16px;
   width: 22px;
@@ -5655,6 +5723,13 @@ main {
   justify-content: space-between;
   gap: 16px;
   align-items: flex-start;
+}
+
+.material-card .text-button,
+.material-card .badge[href],
+.material-card__cta {
+  position: relative;
+  z-index: 2;
 }
 
 .material-card__header h3 {

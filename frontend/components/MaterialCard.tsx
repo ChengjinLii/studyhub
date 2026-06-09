@@ -1,6 +1,5 @@
 import type React from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/router';
 import { MaterialListItem } from '../types/material';
 import { COURSE_CATEGORY_LABELS, CourseCategoryValue, normalizeCourseCategory } from '../constants/metadata';
 import { formatMajorDisplay } from '../lib/major';
@@ -41,14 +40,6 @@ const MaterialStatIcon = ({ name }: { name: 'like' | 'comment' | 'view' | 'downl
   </svg>
 );
 
-const isNestedInteractiveTarget = (target: EventTarget | null, container: HTMLElement) => {
-  if (!(target instanceof HTMLElement)) {
-    return false;
-  }
-  const interactiveTarget = target.closest('a,button,input,select,textarea,label,[role="button"],[role="link"]');
-  return Boolean(interactiveTarget && interactiveTarget !== container);
-};
-
 export default function MaterialCard({
   material,
   selectable,
@@ -57,7 +48,6 @@ export default function MaterialCard({
   variant = 'grid',
   orderLabel,
 }: Props) {
-  const router = useRouter();
   const displayTitle = formatTitleForDisplay(material.title);
   const normalizedCategory: CourseCategoryValue = normalizeCourseCategory(
     material.courseCategory,
@@ -80,34 +70,14 @@ export default function MaterialCard({
   const displayedTags = filteredTags.slice(0, 3);
   const extraTagCount = Math.max(filteredTags.length - displayedTags.length, 0);
   const materialHref = materialPath(material.id, material.title);
+  const publisherHref = publisherId ? userPath(publisherId, publisherName) : '';
+  const overlayLabel = isExperienceTag ? `阅读《${material.title}》` : `查看资料《${material.title}》`;
   const handleToggle = (event: React.MouseEvent | React.ChangeEvent) => {
     event.stopPropagation();
     event.preventDefault();
     if (onToggle) {
       onToggle(material.id, !checked);
     }
-  };
-
-  const handlePublisherClick = (event: React.MouseEvent) => {
-    if (!publisherId) return;
-    event.preventDefault();
-    event.stopPropagation();
-    void router.push(userPath(publisherId, publisherName));
-  };
-
-  const handleCardClick = (event: React.MouseEvent<HTMLLIElement>) => {
-    if (isNestedInteractiveTarget(event.target, event.currentTarget)) {
-      return;
-    }
-    void router.push(materialHref);
-  };
-
-  const handleCardKeyDown = (event: React.KeyboardEvent<HTMLLIElement>) => {
-    if (event.currentTarget !== event.target || (event.key !== 'Enter' && event.key !== ' ')) {
-      return;
-    }
-    event.preventDefault();
-    void router.push(materialHref);
   };
 
   const listItemClasses = [
@@ -123,13 +93,8 @@ export default function MaterialCard({
 
   if (variant === 'list') {
     return (
-      <li
-        className={listItemClasses}
-        role="button"
-        tabIndex={0}
-        onClick={handleCardClick}
-        onKeyDown={handleCardKeyDown}
-      >
+      <li className={listItemClasses}>
+        <Link className="material-card__overlay-link" href={materialHref} aria-label={overlayLabel} prefetch={false} />
         {selectable && (
           <button
             type="button"
@@ -142,7 +107,7 @@ export default function MaterialCard({
           </button>
         )}
         <div className="material-list-row">
-          <Link href={materialHref} className="material-list-link" prefetch={false}>
+          <div className="material-list-link">
             <div className="material-list-title">
               {orderLabel && <span className="order-label">{orderLabel}</span>}
               {isExperienceTag ? (
@@ -161,9 +126,9 @@ export default function MaterialCard({
             <p className="material-meta small">
               发布者：
               {publisherId ? (
-                <button type="button" className="text-button" onClick={handlePublisherClick}>
+                <Link href={publisherHref} className="text-button" prefetch={false}>
                   {publisherName}
-                </button>
+                </Link>
               ) : (
                 publisherName
               )}
@@ -184,7 +149,7 @@ export default function MaterialCard({
               ))}
               {extraTagCount > 0 && <span className="badge badge-outline">+{extraTagCount}</span>}
             </div>
-          </Link>
+          </div>
           <div className="material-list-meta">
             {isExperienceTag ? (
               <>
@@ -207,11 +172,8 @@ export default function MaterialCard({
       className={`material-card material-card-clickable ${isExperienceTag ? 'material-card--experience' : ''} ${checked ? 'selected' : ''} ${
         selectable ? 'selectable' : ''
       }`}
-      role="button"
-      tabIndex={0}
-      onClick={handleCardClick}
-      onKeyDown={handleCardKeyDown}
     >
+      <Link className="material-card__overlay-link" href={materialHref} aria-label={overlayLabel} prefetch={false} />
       {selectable && (
         <button
           type="button"
@@ -240,9 +202,9 @@ export default function MaterialCard({
           <p className="material-meta">
             发布者：
             {publisherId ? (
-              <button type="button" className="text-button" onClick={handlePublisherClick}>
+              <Link href={publisherHref} className="text-button" prefetch={false}>
                 {publisherName}
-              </button>
+              </Link>
             ) : (
               publisherName
             )}

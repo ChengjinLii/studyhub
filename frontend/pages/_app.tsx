@@ -6,6 +6,7 @@ import { useEffect, useState } from 'react';
 import { fetchBackend } from '../lib/apiBase';
 import '../styles/globals.css';
 import AppImage from '../components/AppImage';
+import { AppDialogProvider } from '../components/AppDialogProvider';
 
 const FloatingSidebar = dynamic(() => import('../components/FloatingSidebar'), { ssr: false });
 const HermesAgentWidget = dynamic(() => import('../components/HermesAgentWidget'), { ssr: false });
@@ -146,6 +147,7 @@ export default function MyApp({ Component, pageProps }: AppProps) {
         <meta name="apple-mobile-web-app-title" content="StudyHub·学汇" />
         <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
       </Head>
+      <AppDialogProvider>
       <div className="page-with-footer">
         {globalChromeReady && (
           <>
@@ -359,6 +361,7 @@ export default function MyApp({ Component, pageProps }: AppProps) {
           </div>
         )}
       </div>
+      </AppDialogProvider>
     </>
   );
 }

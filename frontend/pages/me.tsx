@@ -6,6 +6,7 @@ import MeAccountSections from '../components/me/MeAccountSections';
 import MeContentSections from '../components/me/MeContentSections';
 import MePayoutSection from '../components/me/MePayoutSection';
 import MeSecuritySection from '../components/me/MeSecuritySection';
+import { useAppDialog } from '../components/AppDialogProvider';
 import NavBar from '../components/NavBar';
 import ProfileCard from '../components/ProfileCard';
 import { readSession } from '../lib/auth';
@@ -60,6 +61,7 @@ const ME_NAV_GROUPS = [
 ];
 
 export default function MePage({ user, summary, account }: MePageProps) {
+  const dialog = useAppDialog();
   const router = useRouter();
   const defaultIdentifier = user?.email || user?.username || '';
   const [accountProfile, setAccountProfile] = useState<UserAccountProfile | null>(account);
@@ -212,8 +214,10 @@ export default function MePage({ user, summary, account }: MePageProps) {
 
   const freeDownloadsLeft = freeStatus?.unlimited ? '无限' : freeStatus?.remaining ?? 0;
   const notifyQuotaLimit = (message?: string) => {
-    if (typeof window === 'undefined') return;
-    window.alert(message || '下载次数已用完，如需继续下载请联系管理员重置额度。');
+    void dialog.alert({
+      title: '下载次数已用完',
+      message: message || '下载次数已用完，如需继续下载请联系管理员重置额度。',
+    });
   };
 
   const handleDownload = async (materialId: number) => {
@@ -573,7 +577,13 @@ export default function MePage({ user, summary, account }: MePageProps) {
   };
 
   const handleDeleteUpload = async (materialId: number) => {
-    if (!window.confirm('确定删除该资料吗？删除后将从列表隐藏，管理员可协助恢复。')) return;
+    const confirmed = await dialog.confirm({
+      title: '删除资料',
+      message: '确定删除该资料吗？删除后将从列表隐藏，管理员可协助恢复。',
+      confirmText: '删除资料',
+      danger: true,
+    });
+    if (!confirmed) return;
     setToast(null);
     setDeletingMaterialId(materialId);
     try {
@@ -589,7 +599,13 @@ export default function MePage({ user, summary, account }: MePageProps) {
   };
 
   const handleDeleteListing = async (itemId: number) => {
-    if (!window.confirm('确定删除该商品吗？删除后不可恢复。')) return;
+    const confirmed = await dialog.confirm({
+      title: '删除商品',
+      message: '确定删除该商品吗？删除后不可恢复。',
+      confirmText: '删除商品',
+      danger: true,
+    });
+    if (!confirmed) return;
     setToast(null);
     setDeletingListingId(itemId);
     try {

@@ -3,6 +3,7 @@ import { FormEvent, useEffect, useMemo, useState } from 'react';
 import AdminMarketPanel from '../../components/admin/AdminMarketPanel';
 import AdminMaterialsPanel from '../../components/admin/AdminMaterialsPanel';
 import AdminPayoutQrModal from '../../components/admin/AdminPayoutQrModal';
+import { useAppDialog } from '../../components/AppDialogProvider';
 import NavBar from '../../components/NavBar';
 import PaginationBar from '../../components/PaginationBar';
 import { readSession, hasRole } from '../../lib/auth';
@@ -128,6 +129,7 @@ export default function AdminPage({
   reports: initialReports,
   reportsMeta: initialReportsMeta,
 }: AdminPageProps) {
+  const dialog = useAppDialog();
   const [users, setUsers] = useState<UserSummary[]>(initialUsers);
   const [feedbacks, setFeedbacks] = useState<FeedbackEntry[]>(initialFeedbacks);
   const [volunteers, setVolunteers] = useState<VolunteerApplicationEntry[]>(initialVolunteers);
@@ -338,7 +340,8 @@ export default function AdminPage({
 
   const handleRestoreMaterial = async (materialId: number) => {
     if (!materialId) return;
-    if (!window.confirm('确定恢复该资料？')) return;
+    const confirmed = await dialog.confirm({ title: '恢复资料', message: '确定恢复该资料？', confirmText: '恢复资料' });
+    if (!confirmed) return;
     setRestoringMaterialId(materialId);
     setBatchMessage(null);
     try {

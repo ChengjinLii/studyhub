@@ -14,6 +14,7 @@ import {
 } from './adminApi';
 import { toErrorMessage } from './errors';
 import { parseMajorList, serializeMajorList } from './major';
+import { useAppDialog } from '../components/AppDialogProvider';
 import { AdminMaterial, AdminMarketItem } from '../types/admin';
 
 type AlertMessage = { type: 'success' | 'error'; text: string } | null;
@@ -37,6 +38,7 @@ export const useAdminBatchActions = ({
   loadMaterials,
   loadMarketItems,
 }: UseAdminBatchActionsOptions) => {
+  const dialog = useAppDialog();
   const [selectedMaterialIds, setSelectedMaterialIds] = useState<number[]>([]);
   const [selectedMarketIds, setSelectedMarketIds] = useState<number[]>([]);
   const [batchForm, setBatchForm] = useState<MaterialBatchFormState>({
@@ -135,7 +137,13 @@ export const useAdminBatchActions = ({
       setBatchMessage({ type: 'error', text: '请先选择至少一条资料' });
       return;
     }
-    if (!window.confirm(`确定删除选中的 ${selectedMaterialIds.length} 条资料？管理员可在后台恢复。`)) {
+    const confirmed = await dialog.confirm({
+      title: '批量删除资料',
+      message: `确定删除选中的 ${selectedMaterialIds.length} 条资料？管理员可在后台恢复。`,
+      confirmText: '删除资料',
+      danger: true,
+    });
+    if (!confirmed) {
       return;
     }
     setBatchDeleting(true);
@@ -166,7 +174,12 @@ export const useAdminBatchActions = ({
       setBatchMessage({ type: 'error', text: '请先选择至少一条资料' });
       return;
     }
-    if (!window.confirm(`确定恢复选中的 ${selectedMaterialIds.length} 条资料？`)) {
+    const confirmed = await dialog.confirm({
+      title: '批量恢复资料',
+      message: `确定恢复选中的 ${selectedMaterialIds.length} 条资料？`,
+      confirmText: '恢复资料',
+    });
+    if (!confirmed) {
       return;
     }
     setBatchRestoring(true);
@@ -232,7 +245,13 @@ export const useAdminBatchActions = ({
       setMarketBatchMessage({ type: 'error', text: '请先选择至少一条商品' });
       return;
     }
-    if (!window.confirm(`确定删除选中的 ${selectedMarketIds.length} 条商品？该操作不可恢复。`)) {
+    const confirmed = await dialog.confirm({
+      title: '批量删除商品',
+      message: `确定删除选中的 ${selectedMarketIds.length} 条商品？该操作不可恢复。`,
+      confirmText: '删除商品',
+      danger: true,
+    });
+    if (!confirmed) {
       return;
     }
     setMarketBatchDeleting(true);

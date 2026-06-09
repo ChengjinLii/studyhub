@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { GetServerSideProps } from 'next';
+import { useAppDialog } from '../components/AppDialogProvider';
 import AppImage from '../components/AppImage';
 import NavBar from '../components/NavBar';
 import { readSession } from '../lib/auth';
@@ -82,6 +83,7 @@ interface JoinPageProps {
 }
 
 export default function JoinPage({ user }: JoinPageProps) {
+  const dialog = useAppDialog();
   const [copied, setCopied] = useState(false);
   const [emailCopied, setEmailCopied] = useState(false);
   const [activeSection, setActiveSection] = useState('overview');
@@ -96,7 +98,10 @@ export default function JoinPage({ user }: JoinPageProps) {
     } catch {
       // ignore
     }
-    window.prompt('请使用 Ctrl+C 复制内容', text);
+    await dialog.alert({
+      title: '手动复制',
+      message: `请手动复制以下内容：\n${text}`,
+    });
   };
 
   const handleCopyQq = async () => {
