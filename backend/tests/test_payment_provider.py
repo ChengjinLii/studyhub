@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+from urllib.parse import parse_qsl
+
+from OpenSSL import crypto
 from Cryptodome.PublicKey import RSA
 
 from app.core.config import Settings
 from app.models.finance import OrderRecord
-from app.providers.alipay_support import load_key_material, load_key_material_from_pem_text
+from app.providers.alipay_support import build_alipay_client, load_key_material, load_key_material_from_pem_text
 from app.providers.payment import AlipayPagePaymentProvider
 
 
@@ -71,3 +74,66 @@ def test_alipay_cert_public_key_loader_preserves_extracted_pem() -> None:
 
     assert loaded == public_pem.strip() + "\n"
     assert not RSA.import_key(loaded).has_private()
+
+
+def test_alipay_client_uses_certificate_mode_when_certificates_are_configured(tmp_path) -> None:
+    app_key = _generate_pkey()
+    alipay_key = _generate_pkey()
+    root_key = _generate_pkey()
+    app_private_key_path = tmp_path / "app_private_key.pem"
+    app_cert_path = tmp_path / "app_cert.crt"
+    alipay_cert_path = tmp_path / "alipay_public_cert.crt"
+    root_cert_path = tmp_path / "alipay_root_cert.crt"
+
+    app_private_key_path.write_bytes(crypto.dump_privatekey(crypto.FILETYPE_PEM, app_key))
+    app_cert_path.write_bytes(_dump_self_signed_cert(app_key, common_name="2088000000000000", serial=1001))
+    alipay_cert_path.write_bytes(_dump_self_signed_cert(alipay_key, common_name="alipay-public", serial=1002))
+    root_cert_path.write_bytes(_dump_self_signed_cert(root_key, common_name="alipay-root", serial=1003))
+
+    client = build_alipay_client(
+        Settings(
+            alipay_env="production",
+            alipay_app_id="app123",
+            alipay_notify_url="https://study-hub.cn/api/alipay-payment-notifications",
+            alipay_return_url="https://study-hub.cn/pay/result",
+            alipay_app_private_key_path=str(app_private_key_path),
+            alipay_app_cert_path=str(app_cert_path),
+            alipay_public_cert_path=str(alipay_cert_path),
+            alipay_root_cert_path=str(root_cert_path),
+        )
+    )
+
+    order_string = client.api_alipay_trade_page_pay(
+        out_trade_no="SH202606090001",
+        total_amount="1.00",
+        subject="StudyHub",
+        return_url="https://study-hub.cn/pay/result",
+        notify_url="https://study-hub.cn/api/alipay-payment-notifications",
+    )
+    fields = dict(parse_qsl(order_string, keep_blank_values=True))
+
+    assert fields["app_cert_sn"]
+    assert fields["alipay_root_cert_sn"]
+    assert fields["sign"]
+
+
+def _generate_pkey() -> crypto.PKey:
+    key = crypto.PKey()
+    key.generate_key(crypto.TYPE_RSA, 1024)
+    return key
+
+
+def _dump_self_signed_cert(key: crypto.PKey, *, common_name: str, serial: int) -> bytes:
+    cert = crypto.X509()
+    subject = cert.get_subject()
+    subject.C = "CN"
+    subject.O = "StudyHub Test"
+    subject.OU = "Alipay"
+    subject.CN = common_name
+    cert.set_serial_number(serial)
+    cert.gmtime_adj_notBefore(0)
+    cert.gmtime_adj_notAfter(365 * 24 * 60 * 60)
+    cert.set_issuer(subject)
+    cert.set_pubkey(key)
+    cert.sign(key, "sha256")
+    return crypto.dump_certificate(crypto.FILETYPE_PEM, cert)

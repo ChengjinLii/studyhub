@@ -14,9 +14,20 @@ def gateway_url_for_env(alipay_env: str) -> str:
 
 def build_alipay_client(settings: Settings):
     try:
-        from alipay import AliPay  # type: ignore[import-not-found]
+        from alipay import AliPay, DCAliPay  # type: ignore[import-not-found]
     except Exception as exc:  # noqa: BLE001
         raise RuntimeError("Alipay provider 依赖缺失，请安装 python-alipay-sdk。") from exc
+    if settings.alipay_app_cert_path and settings.alipay_public_cert_path and settings.alipay_root_cert_path:
+        return DCAliPay(
+            appid=settings.alipay_app_id,
+            app_notify_url=settings.alipay_notify_url,
+            app_private_key_string=load_key_material(settings.alipay_app_private_key_path, pem_label="PRIVATE KEY"),
+            app_public_key_cert_string=load_cert_material(settings.alipay_app_cert_path),
+            alipay_public_key_cert_string=load_cert_material(settings.alipay_public_cert_path),
+            alipay_root_cert_string=load_cert_material(settings.alipay_root_cert_path),
+            sign_type=settings.alipay_sign_type,
+            debug=settings.alipay_env.strip().lower() not in {"prod", "production"},
+        )
     return AliPay(
         appid=settings.alipay_app_id,
         app_notify_url=settings.alipay_notify_url,
@@ -43,6 +54,15 @@ def load_key_material(path: str | None, *, pem_label: str) -> str:
         raise RuntimeError("缺少支付宝密钥文件路径配置。")
     content = open(path, "r", encoding="utf-8").read().strip()
     return normalize_pem_material(content, pem_label=pem_label)
+
+
+def load_cert_material(path: str | None) -> str:
+    if not path:
+        raise RuntimeError("缺少支付宝证书文件路径配置。")
+    content = open(path, "r", encoding="utf-8").read().strip()
+    if not content:
+        raise RuntimeError("支付宝证书文件内容为空。")
+    return content + "\n"
 
 
 def extract_public_key_from_cert(path: str) -> str:
