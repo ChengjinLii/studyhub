@@ -1198,6 +1198,108 @@ main {
   border: 1px solid #e2e8f0;
 }
 
+.hermes-agent__message--thinking {
+  width: min(292px, 92%);
+  min-height: 76px;
+  padding: 12px;
+  border-color: #bfdbfe;
+  background: #f8fbff;
+  box-shadow: 0 10px 22px rgba(15, 23, 42, 0.07);
+}
+
+.hermes-agent__thinking {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.hermes-agent__thinking-orb {
+  position: relative;
+  width: 38px;
+  height: 38px;
+  flex: 0 0 38px;
+  border: 1px solid #bfdbfe;
+  border-radius: 14px;
+  background: #eff6ff;
+  box-shadow: inset 0 0 0 4px rgba(255, 255, 255, 0.74);
+  overflow: hidden;
+}
+
+.hermes-agent__thinking-orb::after {
+  content: '';
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: 9px;
+  height: 2px;
+  border-radius: 999px;
+  background: #93c5fd;
+  animation: hermes-thinking-scan 1.6s ease-in-out infinite;
+}
+
+.hermes-agent__thinking-orb span {
+  position: absolute;
+  top: 13px;
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: #2563eb;
+  animation: hermes-thinking-dot 1.15s ease-in-out infinite;
+}
+
+.hermes-agent__thinking-orb span:nth-child(1) {
+  left: 9px;
+}
+
+.hermes-agent__thinking-orb span:nth-child(2) {
+  left: 16px;
+  animation-delay: 0.15s;
+}
+
+.hermes-agent__thinking-orb span:nth-child(3) {
+  left: 23px;
+  animation-delay: 0.3s;
+  background: #0f766e;
+}
+
+.hermes-agent__thinking-copy {
+  min-width: 0;
+  flex: 1;
+}
+
+.hermes-agent__thinking-copy p {
+  margin: 0;
+  color: #0f172a;
+  font-weight: 700;
+}
+
+.hermes-agent__thinking-steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 7px;
+}
+
+.hermes-agent__thinking-steps span {
+  padding: 3px 7px;
+  border: 1px solid #dbeafe;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #475569;
+  font-size: 0.68rem;
+  line-height: 1.2;
+  animation: hermes-thinking-step 2.4s ease-in-out infinite;
+}
+
+.hermes-agent__thinking-steps span:nth-child(2) {
+  animation-delay: 0.28s;
+}
+
+.hermes-agent__thinking-steps span:nth-child(3) {
+  animation-delay: 0.56s;
+}
+
 .hermes-agent__message--user {
   align-self: flex-end;
   background: #2563eb;
@@ -1402,6 +1504,39 @@ main {
 @keyframes panel-pop {
   0% { opacity: 0; transform: scale(0.96); }
   100% { opacity: 1; transform: scale(1); }
+}
+
+@keyframes hermes-thinking-dot {
+  0%, 100% {
+    opacity: 0.42;
+    transform: translateY(3px) scale(0.84);
+  }
+  45% {
+    opacity: 1;
+    transform: translateY(-3px) scale(1.08);
+  }
+}
+
+@keyframes hermes-thinking-scan {
+  0%, 100% {
+    opacity: 0.36;
+    transform: translateX(-6px);
+  }
+  50% {
+    opacity: 0.9;
+    transform: translateX(6px);
+  }
+}
+
+@keyframes hermes-thinking-step {
+  0%, 100% {
+    border-color: #dbeafe;
+    color: #64748b;
+  }
+  38% {
+    border-color: #93c5fd;
+    color: #1d4ed8;
+  }
 }
 
 @keyframes eye-blink {
@@ -10774,6 +10909,12 @@ main {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .hermes-agent__thinking-orb::after,
+  .hermes-agent__thinking-orb span,
+  .hermes-agent__thinking-steps span {
+    animation: none;
+  }
+
   .profile-card,
   .profile-intro,
   .profile-panel,

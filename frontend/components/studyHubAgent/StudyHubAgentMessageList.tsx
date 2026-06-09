@@ -52,8 +52,25 @@ export default function StudyHubAgentMessageList({
         </article>
       ))}
       {loading && (
-        <article className="hermes-agent__message hermes-agent__message--assistant">
-          <p>StudyHub 正在检索平台资料...</p>
+        <article
+          className="hermes-agent__message hermes-agent__message--assistant hermes-agent__message--thinking"
+          aria-label="StudyHub 正在思考"
+        >
+          <div className="hermes-agent__thinking">
+            <span className="hermes-agent__thinking-orb" aria-hidden="true">
+              <span />
+              <span />
+              <span />
+            </span>
+            <div className="hermes-agent__thinking-copy">
+              <p>StudyHub 正在思考</p>
+              <div className="hermes-agent__thinking-steps" aria-hidden="true">
+                <span>理解问题</span>
+                <span>检索资料</span>
+                <span>整理答案</span>
+              </div>
+            </div>
+          </div>
         </article>
       )}
     </div>
