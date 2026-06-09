@@ -1,6 +1,6 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { safeMarkdownImageUrl, safeMarkdownUrl } from '../../components/SafeMarkdown';
-import { resolveTrustedPaymentAction } from '../../lib/safePaymentForm';
+import { navigateTrustedPaymentUrl, resolveTrustedPaymentAction } from '../../lib/safePaymentForm';
 
 describe('security helpers', () => {
   it('allows only trusted payment form actions', () => {
@@ -13,6 +13,29 @@ describe('security helpers', () => {
     );
     expect(() => resolveTrustedPaymentAction('/api/admin/users', 'https://study-hub.cn')).toThrow('不受信任');
     expect(() => resolveTrustedPaymentAction('https://evil.example/pay', 'https://study-hub.cn')).toThrow('不受信任');
+  });
+
+  it('navigates only to trusted payment gateway urls', () => {
+    const originalWindow = globalThis.window;
+    const assign = vi.fn();
+    Object.defineProperty(globalThis, 'window', {
+      configurable: true,
+      value: {
+        location: {
+          origin: 'https://study-hub.cn',
+          assign,
+        },
+      },
+    });
+
+    navigateTrustedPaymentUrl('https://openapi.alipay.com/gateway.do?out_trade_no=ORDER1');
+    expect(assign).toHaveBeenCalledWith('https://openapi.alipay.com/gateway.do?out_trade_no=ORDER1');
+    expect(() => navigateTrustedPaymentUrl('https://evil.example/pay')).toThrow('不受信任');
+
+    Object.defineProperty(globalThis, 'window', {
+      configurable: true,
+      value: originalWindow,
+    });
   });
 
   it('filters unsafe markdown urls', () => {

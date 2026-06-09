@@ -11,6 +11,7 @@ export interface PaymentStatusResult {
 export interface AlipayPaymentResult {
   status?: string;
   form?: string | null;
+  gatewayUrl?: string | null;
 }
 
 const fetchPaymentStatus = async (endpoint: string) => {

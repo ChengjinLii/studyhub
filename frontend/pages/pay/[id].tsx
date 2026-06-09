@@ -8,7 +8,7 @@ import { getRequestOrigin } from '../../lib/apiBase';
 import { fetchMaterialDetail } from '../../lib/api';
 import { createAlipayPayment } from '../../lib/paymentApi';
 import { toErrorMessage } from '../../lib/errors';
-import { submitTrustedPaymentForm } from '../../lib/safePaymentForm';
+import { navigateTrustedPaymentUrl, submitTrustedPaymentForm } from '../../lib/safePaymentForm';
 import { materialPath, userPath } from '../../lib/slug';
 import { SessionUser, RoleMask } from '../../types/user';
 import { MaterialDetail } from '../../types/material';
@@ -41,9 +41,14 @@ export default function PayPage({ user, material }: PayPageProps) {
         await router.push(`${materialPath(material.id, material.title)}?autoDownload=1`);
         return;
       }
+      if (data.gatewayUrl) {
+        navigateTrustedPaymentUrl(String(data.gatewayUrl));
+        return;
+      }
       if (!data.form) {
         throw new Error('支付表单获取失败');
       }
+      setFormHtml('');
       setFormHtml(data.form as string);
     } catch (err: unknown) {
       setError(toErrorMessage(err, '发起支付失败'));

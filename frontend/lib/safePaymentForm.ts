@@ -2,6 +2,14 @@ const ALLOWED_PAYMENT_METHODS = new Set(['GET', 'POST']);
 const ALIPAY_GATEWAY_HOSTS = new Set(['openapi.alipay.com', 'openapi-sandbox.dl.alipaydev.com']);
 const LOCAL_PAYMENT_PATHS = new Set(['/pay/result']);
 
+export function navigateTrustedPaymentUrl(rawUrl: string) {
+  if (typeof window === 'undefined') {
+    throw new Error('当前环境无法跳转支付页面');
+  }
+  const url = resolveTrustedPaymentAction(rawUrl, window.location.origin);
+  window.location.assign(url.href);
+}
+
 export function submitTrustedPaymentForm(container: HTMLElement, formHtml: string) {
   if (typeof window === 'undefined') {
     throw new Error('当前环境无法拉起支付表单');
@@ -40,7 +48,7 @@ export function submitTrustedPaymentForm(container: HTMLElement, formHtml: strin
   }
 
   container.replaceChildren(form);
-  form.submit();
+  HTMLFormElement.prototype.submit.call(form);
 }
 
 export function resolveTrustedPaymentAction(action: string, baseOrigin?: string) {
