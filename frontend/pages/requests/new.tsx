@@ -5,6 +5,7 @@ import NavBar from '../../components/NavBar';
 import { readSession } from '../../lib/auth';
 import { createMaterialRequest } from '../../lib/requestsApi';
 import { toErrorMessage } from '../../lib/errors';
+import { submitTrustedPaymentForm } from '../../lib/safePaymentForm';
 import { SessionUser } from '../../types/user';
 import { SUPPORTED_SCHOOL, SUPPORTED_COLLEGES, SUPPORTED_MAJORS } from '../../constants/metadata';
 import { REQUEST_TIERS, RequestTierValue } from '../../constants/request';
@@ -43,10 +44,10 @@ export default function RequestNewPage({ user }: RequestNewProps) {
 
   useEffect(() => {
     if (!payFormHtml || !formContainerRef.current) return;
-    formContainerRef.current.innerHTML = payFormHtml;
-    const form = formContainerRef.current.querySelector('form') as HTMLFormElement | null;
-    if (form) {
-      form.submit();
+    try {
+      submitTrustedPaymentForm(formContainerRef.current, payFormHtml);
+    } catch (error: unknown) {
+      setStatus({ type: 'error', text: toErrorMessage(error, '支付表单校验失败') });
     }
   }, [payFormHtml]);
 

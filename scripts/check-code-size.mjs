@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { relative, resolve } from 'node:path';
 
-const root = resolve(new URL('..', import.meta.url).pathname);
+const root = resolve(fileURLToPath(new URL('..', import.meta.url)));
 const allowFrontendBuild = ['1', 'true', 'yes'].includes(
   String(process.env.STUDYHUB_CODE_SIZE_ALLOW_FRONTEND_BUILD || '').toLowerCase()
 );

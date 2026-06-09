@@ -8,6 +8,7 @@ import { getRequestOrigin } from '../../lib/apiBase';
 import { fetchMaterialDetail } from '../../lib/api';
 import { createAlipayPayment } from '../../lib/paymentApi';
 import { toErrorMessage } from '../../lib/errors';
+import { submitTrustedPaymentForm } from '../../lib/safePaymentForm';
 import { materialPath, userPath } from '../../lib/slug';
 import { SessionUser, RoleMask } from '../../types/user';
 import { MaterialDetail } from '../../types/material';
@@ -59,10 +60,10 @@ export default function PayPage({ user, material }: PayPageProps) {
 
   useEffect(() => {
     if (!formHtml || !formContainerRef.current) return;
-    formContainerRef.current.innerHTML = formHtml;
-    const form = formContainerRef.current.querySelector('form') as HTMLFormElement | null;
-    if (form) {
-      form.submit();
+    try {
+      submitTrustedPaymentForm(formContainerRef.current, formHtml);
+    } catch (err: unknown) {
+      setError(toErrorMessage(err, '支付表单校验失败'));
     }
   }, [formHtml]);
 

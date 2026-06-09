@@ -50,6 +50,9 @@ class Settings(BaseSettings):
     smtp_timeout_seconds: int = 15
     cors_allowed_origins: str | None = None
     cors_allow_origin_regex: str | None = None
+    trusted_hosts: str | None = None
+    trusted_proxy_ips: str | None = None
+    docs_enabled: bool | None = None
     database_url: str | None = None
     database_auto_create: bool | None = None
     database_pool_size: int = 10
@@ -251,6 +254,12 @@ class Settings(BaseSettings):
         raw = self.access_log_skip_paths or ""
         return {item.strip() for item in raw.split(",") if item.strip()}
 
+    @staticmethod
+    def _split_csv(value: str | None) -> list[str]:
+        if not value:
+            return []
+        return [item.strip() for item in value.split(",") if item.strip()]
+
     @property
     def private_dir(self) -> Path:
         if self.private_dir_path:
@@ -365,9 +374,7 @@ class Settings(BaseSettings):
 
     @property
     def resolved_cors_allowed_origins(self) -> list[str]:
-        if not self.cors_allowed_origins:
-            return []
-        return [origin.strip() for origin in self.cors_allowed_origins.split(",") if origin.strip()]
+        return self._split_csv(self.cors_allowed_origins)
 
     @property
     def resolved_cors_allow_origin_regex(self) -> str | None:
@@ -379,9 +386,7 @@ class Settings(BaseSettings):
 
     @property
     def resolved_mcp_allowed_origins(self) -> list[str]:
-        if not self.mcp_allowed_origins:
-            return []
-        return [origin.strip() for origin in self.mcp_allowed_origins.split(",") if origin.strip()]
+        return self._split_csv(self.mcp_allowed_origins)
 
     @property
     def resolved_mcp_enabled(self) -> bool:
@@ -394,6 +399,35 @@ class Settings(BaseSettings):
         if self.mcp_require_auth is not None:
             return bool(self.mcp_require_auth)
         return self.is_preview or self.is_production
+
+    @property
+    def resolved_docs_enabled(self) -> bool:
+        if self.docs_enabled is not None:
+            return bool(self.docs_enabled)
+        return not (self.is_preview or self.is_production)
+
+    @property
+    def resolved_openapi_url(self) -> str | None:
+        return "/openapi.json" if self.resolved_docs_enabled else None
+
+    @property
+    def resolved_docs_url(self) -> str | None:
+        return "/docs" if self.resolved_docs_enabled else None
+
+    @property
+    def resolved_redoc_url(self) -> str | None:
+        return "/redoc" if self.resolved_docs_enabled else None
+
+    @property
+    def resolved_trusted_hosts(self) -> list[str]:
+        return self._split_csv(self.trusted_hosts)
+
+    @property
+    def resolved_trusted_proxy_ips(self) -> list[str]:
+        configured = self._split_csv(self.trusted_proxy_ips)
+        if configured:
+            return configured
+        return ["127.0.0.1", "::1"]
 
     @property
     def resolved_public_site_base_url(self) -> str:
@@ -415,7 +449,7 @@ class Settings(BaseSettings):
     def resolved_trusted_site_origins(self) -> set[str]:
         origins = set(self.resolved_cors_allowed_origins)
         if self.trusted_site_origins:
-            origins.update(origin.strip() for origin in self.trusted_site_origins.split(",") if origin.strip())
+            origins.update(self._split_csv(self.trusted_site_origins))
         public_base = self.resolved_public_site_base_url
         if public_base:
             origins.add(public_base)

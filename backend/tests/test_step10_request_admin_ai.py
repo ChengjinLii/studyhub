@@ -7,6 +7,7 @@ import zipfile
 
 from fastapi.testclient import TestClient
 
+from app.core.db import session_scope
 from app.services.auth_service import AuthService
 from tests.support import build_auth_headers, seed_read_users
 
@@ -182,7 +183,18 @@ def test_step10_arbitration_admin_materials_and_ai_flow(
     alice_headers = build_auth_headers(1, 1)
     baishan_headers = build_auth_headers(2, 2)
     admin_headers = build_auth_headers(3, 8)
-    developer_headers = build_auth_headers(3, 24)
+    with session_scope() as session:
+        developer = auth_service.create_local_user(
+            session,
+            username="step10developer",
+            password="secret123",
+            email="step10developer@example.com",
+            verified=True,
+            nickname="Step10 Developer",
+            role_mask=24,
+        )
+        developer_id = developer.id
+    developer_headers = build_auth_headers(developer_id, 24)
 
     create_request = client.post(
         "/api/requests",

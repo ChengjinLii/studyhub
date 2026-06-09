@@ -2,12 +2,11 @@ import { GetServerSideProps } from 'next';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { useEffect, useMemo, useState } from 'react';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
 import AppImage from '../../components/AppImage';
 import ExperienceImageModal from '../../components/materials/ExperienceImageModal';
 import MaterialPreviewPanel from '../../components/materials/MaterialPreviewPanel';
 import NavBar from '../../components/NavBar';
+import SafeMarkdown from '../../components/SafeMarkdown';
 import ShareSheet from '../../components/ShareSheet';
 import CommentSection from '../../components/comments/CommentSection';
 import StarRating from '../../components/StarRating';
@@ -288,7 +287,7 @@ export default function MaterialDetailPage({ material, user }: MaterialDetailPag
                     </div>
                     {material.description ? (
                       <div className="material-desc markdown-body">
-                        <ReactMarkdown remarkPlugins={[remarkGfm]}>{material.description}</ReactMarkdown>
+                        <SafeMarkdown>{material.description}</SafeMarkdown>
                       </div>
                     ) : (
                       <p className="material-desc">投稿者暂无详细描述。</p>
@@ -597,7 +596,7 @@ export default function MaterialDetailPage({ material, user }: MaterialDetailPag
                   </div>
                   {material.description ? (
                     <div className="experience-post__text markdown-body">
-                      <ReactMarkdown remarkPlugins={[remarkGfm]}>{material.description}</ReactMarkdown>
+                      <SafeMarkdown>{material.description}</SafeMarkdown>
                     </div>
                   ) : (
                     <p className="help-text">投稿者暂无详细描述。</p>

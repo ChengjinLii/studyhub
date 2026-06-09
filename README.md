@@ -67,7 +67,7 @@ StudyHub 后端以 RESTful 风格作为公开 API 的主要设计约定，便于
 
 ```bash
 bash scripts/check-shell-scripts.sh
-/data/studyhub/.venv/bin/python -m pytest backend/tests
+${STUDYHUB_PYTHON_BIN:-.venv/bin/python} -m pytest backend/tests
 npm --prefix frontend run check
 npm --prefix frontend run test:unit
 ```
@@ -85,6 +85,12 @@ bash scripts/ci-check.sh
 ```
 
 `predeploy-check.sh` 会额外运行可选生产 preflight、nginx 和 systemd 状态检查；更多环境变量和生产机器注意事项见 [scripts/README.md](scripts/README.md)。
+
+## 生产安全配置
+
+生产或预览环境默认关闭 FastAPI `/docs`、`/redoc` 和 `/openapi.json`；如需临时开放，可显式设置 `STUDYHUB_DOCS_ENABLED=true`。
+
+建议在生产环境按实际域名配置 `STUDYHUB_TRUSTED_HOSTS`，例如 `study-hub.cn,www.study-hub.cn`。如果后端位于 Nginx、Cloudflare 或负载均衡之后，只有在直连来源属于 `STUDYHUB_TRUSTED_PROXY_IPS` 时才会信任 `X-Forwarded-For`，例如 `127.0.0.1,::1,10.0.0.0/8`。
 
 ## 参与贡献
 

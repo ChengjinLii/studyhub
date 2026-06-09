@@ -2,10 +2,9 @@ import { GetServerSideProps } from 'next';
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/router';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
 import AppImage from '../../components/AppImage';
 import NavBar from '../../components/NavBar';
+import SafeMarkdown from '../../components/SafeMarkdown';
 import ShareSheet from '../../components/ShareSheet';
 import { readSession } from '../../lib/auth';
 import { fetchUserProfile, reportTarget } from '../../lib/api';
@@ -433,7 +432,7 @@ export default function UserProfilePage({ user, profile }: UserProfilePageProps)
                 <span className="profile-info__label">个性签名</span>
                 {signatureText ? (
                   <div className="profile-info__value profile-info__markdown profile-markdown">
-                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{signatureMarkdown}</ReactMarkdown>
+                    <SafeMarkdown>{signatureMarkdown}</SafeMarkdown>
                   </div>
                 ) : (
                   <div className="profile-info__value muted">这个人还没有写签名。</div>

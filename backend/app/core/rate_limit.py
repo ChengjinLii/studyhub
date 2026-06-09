@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections import defaultdict, deque
 from dataclasses import dataclass
+from ipaddress import ip_address, ip_network
 from time import monotonic
 
 from fastapi import Request
@@ -43,11 +44,33 @@ def get_rate_limiter() -> InMemoryRateLimiter:
     return _RATE_LIMITER
 
 
-def _client_key(request: Request) -> str:
+def _is_trusted_proxy(settings: Settings, host: str | None) -> bool:
+    if not host:
+        return False
+    try:
+        remote_addr = ip_address(host)
+    except ValueError:
+        return False
+    for raw_network in settings.resolved_trusted_proxy_ips:
+        try:
+            network = ip_network(raw_network, strict=False)
+        except ValueError:
+            continue
+        if remote_addr in network:
+            return True
+    return False
+
+
+def _client_key(settings: Settings, request: Request) -> str:
+    remote_host = request.client.host if request.client else None
     forwarded = request.headers.get("x-forwarded-for")
-    if forwarded:
-        return forwarded.split(",", 1)[0].strip()
-    return request.client.host if request.client else "unknown"
+    if forwarded and _is_trusted_proxy(settings, remote_host):
+        forwarded_host = forwarded.split(",", 1)[0].strip()
+        try:
+            return str(ip_address(forwarded_host))
+        except ValueError:
+            return forwarded_host or (remote_host or "unknown")
+    return remote_host or "unknown"
 
 
 def _rule_for_request(settings: Settings, request: Request) -> RateLimitRule | None:
@@ -72,7 +95,7 @@ def rate_limit_allowed(settings: Settings, request: Request) -> tuple[bool, str 
     rule = _rule_for_request(settings, request)
     if rule is None:
         return True, None
-    key = f"{rule.name}:{_client_key(request)}"
+    key = f"{rule.name}:{_client_key(settings, request)}"
     allowed = get_rate_limiter().check(key, limit=rule.limit, window_seconds=settings.rate_limit_window_seconds)
     if allowed:
         return True, None

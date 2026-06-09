@@ -407,12 +407,13 @@ def get_optional_auth_context(
     except Exception:  # noqa: BLE001
         return None
 
-    role_mask = claims.get("roleMask")
-    if role_mask is None:
-        user = get_auth_repo().find_user_by_id(session, user_id)
-        role_mask = None if user is None else user.role_mask
-    elif not isinstance(role_mask, int):
-        role_mask = int(role_mask)
+    user = get_auth_repo().find_user_by_id(session, user_id)
+    if user is not None:
+        role_mask = user.role_mask
+    else:
+        role_mask = claims.get("roleMask")
+        if role_mask is not None and not isinstance(role_mask, int):
+            role_mask = int(role_mask)
 
     return AuthContext(
         user_id=user_id,

@@ -1,8 +1,7 @@
 import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
 import AppImage from './AppImage';
+import SafeMarkdown from './SafeMarkdown';
 import { toErrorMessage } from '../lib/errors';
 import { formatDate } from '../lib/format';
 import {
@@ -342,7 +341,7 @@ export default function ProfileCard({
                 <div className="follow-list__school">{schoolText}</div>
                 {signatureValue ? (
                   <div className="follow-list__signature profile-markdown">
-                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{signatureMarkdown}</ReactMarkdown>
+                    <SafeMarkdown>{signatureMarkdown}</SafeMarkdown>
                   </div>
                 ) : (
                   <div className="follow-list__signature follow-list__muted">这个人还没有签名。</div>
@@ -464,7 +463,7 @@ export default function ProfileCard({
         </div>
       ) : signatureDisplay ? (
         <div className="profile-card__signature-preview profile-markdown">
-          <ReactMarkdown remarkPlugins={[remarkGfm]}>{signatureMarkdown}</ReactMarkdown>
+          <SafeMarkdown>{signatureMarkdown}</SafeMarkdown>
         </div>
       ) : (
         <div className="profile-card__signature-empty">这个人还没有写签名。</div>

@@ -5,6 +5,7 @@ import NavBar from '../../../components/NavBar';
 import { readSession } from '../../../lib/auth';
 import { fetchBackend, getRequestOrigin } from '../../../lib/apiBase';
 import { toErrorMessage } from '../../../lib/errors';
+import { submitTrustedPaymentForm } from '../../../lib/safePaymentForm';
 import { formatDate } from '../../../lib/format';
 import { REQUEST_TIERS, RequestTierValue, getTierLabel } from '../../../constants/request';
 import { MaterialRequestItem } from '../../../types/request';
@@ -32,10 +33,10 @@ export default function RequestFollowPage({ user, request }: RequestFollowProps)
 
   useEffect(() => {
     if (!followFormHtml || !followFormRef.current) return;
-    followFormRef.current.innerHTML = followFormHtml;
-    const form = followFormRef.current.querySelector('form') as HTMLFormElement | null;
-    if (form) {
-      form.submit();
+    try {
+      submitTrustedPaymentForm(followFormRef.current, followFormHtml);
+    } catch (error: unknown) {
+      setFollowNotice({ type: 'error', text: toErrorMessage(error, '支付表单校验失败') });
     }
   }, [followFormHtml]);
 

@@ -10,6 +10,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
+from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from app.api.deps import get_auth_service
 from app.api.main import api_router
@@ -75,7 +76,12 @@ def create_app() -> FastAPI:
         title=settings.app_name,
         version="0.1.0",
         lifespan=lifespan,
+        docs_url=settings.resolved_docs_url,
+        redoc_url=settings.resolved_redoc_url,
+        openapi_url=settings.resolved_openapi_url,
     )
+    if settings.resolved_trusted_hosts:
+        app.add_middleware(TrustedHostMiddleware, allowed_hosts=settings.resolved_trusted_hosts)
     if settings.resolved_cors_allowed_origins or settings.resolved_cors_allow_origin_regex:
         app.add_middleware(
             CORSMiddleware,
