@@ -71,7 +71,10 @@ if [[ ! -x "$PYTHON_BIN" ]]; then
   exit 1
 fi
 
-run "backend pytest" "$PYTHON_BIN" -m pytest "$BACKEND_DIR/tests"
+run "backend ruff" "$PYTHON_BIN" -m ruff check "$BACKEND_DIR/app" "$BACKEND_DIR/tests"
+
+mkdir -p "$ROOT_DIR/reports/coverage"
+run "backend pytest with coverage report" "$PYTHON_BIN" -m pytest "$BACKEND_DIR/tests" --cov="$BACKEND_DIR/app" --cov-report=term-missing --cov-report=xml:"$ROOT_DIR/reports/coverage/backend-coverage.xml"
 
 run "frontend typecheck and lint" npm --prefix "$FRONTEND_DIR" run check
 

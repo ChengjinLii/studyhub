@@ -67,6 +67,7 @@ StudyHub 后端以 RESTful 风格作为公开 API 的主要设计约定，便于
 
 ```bash
 bash scripts/check-shell-scripts.sh
+${STUDYHUB_PYTHON_BIN:-.venv/bin/python} -m ruff check backend/app backend/tests
 ${STUDYHUB_PYTHON_BIN:-.venv/bin/python} -m pytest backend/tests
 npm --prefix frontend run check
 npm --prefix frontend run test:unit

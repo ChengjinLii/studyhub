@@ -37,9 +37,10 @@ jobs:
           python-version: "3.11"
       - name: Install backend dependencies
         run: python -m pip install -e 'backend[dev]'
+      - name: Run backend ruff
+        run: python -m ruff check backend/app backend/tests
       - name: Run backend tests
-        working-directory: backend
-        run: pytest
+        run: mkdir -p reports/coverage && python -m pytest backend/tests --cov=backend/app --cov-report=term-missing --cov-report=xml:reports/coverage/backend-coverage.xml
 
   frontend:
     runs-on: ubuntu-latest
