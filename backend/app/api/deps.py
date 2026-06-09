@@ -408,12 +408,9 @@ def get_optional_auth_context(
         return None
 
     user = get_auth_repo().find_user_by_id(session, user_id)
-    if user is not None:
-        role_mask = user.role_mask
-    else:
-        role_mask = claims.get("roleMask")
-        if role_mask is not None and not isinstance(role_mask, int):
-            role_mask = int(role_mask)
+    if user is None:
+        return None
+    role_mask = user.role_mask
 
     return AuthContext(
         user_id=user_id,

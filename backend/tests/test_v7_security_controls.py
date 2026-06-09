@@ -84,6 +84,14 @@ def test_auth_uses_current_database_role_over_token_claim(client: TestClient, au
     assert response.status_code == 403
 
 
+def test_auth_rejects_token_for_missing_database_user(client: TestClient) -> None:
+    missing_user_headers = build_auth_headers(999_999, 8)
+
+    response = client.get("/api/admin/users", headers=missing_user_headers)
+
+    assert response.status_code == 401
+
+
 def test_write_origin_protection_rejects_cross_site_write(strict_security_client: TestClient) -> None:
     response = strict_security_client.post("/api/session", headers={"Origin": "https://evil.example"}, json={})
 

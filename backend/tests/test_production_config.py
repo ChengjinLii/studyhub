@@ -416,3 +416,49 @@ def test_production_allows_db_row_lock_but_rejects_local_kyc_and_transfer_provid
         get_settings()
 
     _reset_runtime_state()
+
+
+def test_production_requires_trusted_hosts(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    mock_private_key = PRIVATE_FIXTURE_DIR / "mock-alipay-private.pem"
+    mock_public_key = PRIVATE_FIXTURE_DIR / "mock-alipay-public.pem"
+    private_dir = _write_private_env(
+        tmp_path,
+        "production",
+        f"""
+        STUDYHUB_ENVIRONMENT=production
+        STUDYHUB_DATABASE_URL=mysql+pymysql://prod_user:prod_pass@127.0.0.1:3306/studyhub_prod
+        STUDYHUB_JWT_SECRET=prod-secret-abcdefghijklmnopqrstuvwxyz
+        STUDYHUB_MAIL_PROVIDER=smtp
+        STUDYHUB_SMTP_HOST=smtp.prod.example.com
+        STUDYHUB_SMTP_PORT=587
+        STUDYHUB_SMTP_FROM_EMAIL=noreply@example.com
+        STUDYHUB_SMTP_STARTTLS=true
+        STUDYHUB_STORAGE_PROVIDER=oss
+        STUDYHUB_OSS_ENDPOINT=oss-cn-hangzhou.aliyuncs.com
+        STUDYHUB_OSS_BUCKET=studyhub-prod
+        STUDYHUB_OSS_ACCESS_KEY_ID=prod-ak
+        STUDYHUB_OSS_ACCESS_KEY_SECRET=prod-sk
+        STUDYHUB_PAYMENT_PROVIDER=alipay_page
+        STUDYHUB_ALIPAY_APP_ID=2021000000000000
+        STUDYHUB_ALIPAY_APP_PRIVATE_KEY_PATH={mock_private_key}
+        STUDYHUB_ALIPAY_PUBLIC_KEY_PATH={mock_public_key}
+        STUDYHUB_LOCK_PROVIDER=redis
+        STUDYHUB_REDIS_URL=redis://127.0.0.1:6379/0
+        STUDYHUB_KYC_PROVIDER=aliyun_cloud_auth
+        STUDYHUB_ALIBABA_CLOUD_ACCESS_KEY_ID=aliyun-ak
+        STUDYHUB_ALIBABA_CLOUD_ACCESS_KEY_SECRET=aliyun-sk
+        STUDYHUB_PAYOUT_TRANSFER_PROVIDER=alipay_transfer
+        """,
+    )
+    monkeypatch.setenv("STUDYHUB_ENVIRONMENT", "production")
+    monkeypatch.setenv("STUDYHUB_PRIVATE_DIR_PATH", str(private_dir))
+
+    _reset_runtime_state()
+
+    with pytest.raises(RuntimeError, match="STUDYHUB_TRUSTED_HOSTS"):
+        get_settings()
+
+    _reset_runtime_state()

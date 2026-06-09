@@ -90,7 +90,7 @@ bash scripts/ci-check.sh
 
 生产或预览环境默认关闭 FastAPI `/docs`、`/redoc` 和 `/openapi.json`；如需临时开放，可显式设置 `STUDYHUB_DOCS_ENABLED=true`。
 
-建议在生产环境按实际域名配置 `STUDYHUB_TRUSTED_HOSTS`，例如 `study-hub.cn,www.study-hub.cn`。如果后端位于 Nginx、Cloudflare 或负载均衡之后，只有在直连来源属于 `STUDYHUB_TRUSTED_PROXY_IPS` 时才会信任 `X-Forwarded-For`，例如 `127.0.0.1,::1,10.0.0.0/8`。
+生产环境必须按实际域名配置 `STUDYHUB_TRUSTED_HOSTS`，例如 `study-hub.cn,www.study-hub.cn`。如果后端位于 Nginx、Cloudflare 或负载均衡之后，只有在直连来源属于 `STUDYHUB_TRUSTED_PROXY_IPS` 时才会信任 `X-Forwarded-For`，例如 `127.0.0.1,::1,10.0.0.0/8`。
 
 ## 参与贡献
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { safeMarkdownUrl } from '../../components/SafeMarkdown';
+import { safeMarkdownImageUrl, safeMarkdownUrl } from '../../components/SafeMarkdown';
 import { resolveTrustedPaymentAction } from '../../lib/safePaymentForm';
 
 describe('security helpers', () => {
@@ -23,5 +23,12 @@ describe('security helpers', () => {
     expect(safeMarkdownUrl('//evil.example/path')).toBe('');
     expect(safeMarkdownUrl('javascript:alert(1)')).toBe('');
     expect(safeMarkdownUrl('data:text/html;base64,PGgxPkJvb208L2gxPg==')).toBe('');
+  });
+
+  it('allows only same-site markdown images', () => {
+    expect(safeMarkdownImageUrl('/uploads/preview.png')).toBe('/uploads/preview.png');
+    expect(safeMarkdownImageUrl('//evil.example/track.png')).toBe('');
+    expect(safeMarkdownImageUrl('https://example.com/track.png')).toBe('');
+    expect(safeMarkdownImageUrl('data:image/png;base64,AAAA')).toBe('');
   });
 });

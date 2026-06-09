@@ -56,16 +56,20 @@ export default function SafeMarkdown({ children }: SafeMarkdownProps) {
             />
           );
         },
-        img: ({ node: _node, src, alt, ...props }) => (
-          <img
-            {...props}
-            src={typeof src === 'string' ? src : undefined}
-            alt={typeof alt === 'string' ? alt : ''}
-            loading="lazy"
-            decoding="async"
-            referrerPolicy="no-referrer"
-          />
-        ),
+        img: ({ node: _node, src, alt, ...props }) => {
+          const safeSrc = typeof src === 'string' ? safeMarkdownImageUrl(src) : '';
+          if (!safeSrc) return null;
+          return (
+            <img
+              {...props}
+              src={safeSrc}
+              alt={typeof alt === 'string' ? alt : ''}
+              loading="lazy"
+              decoding="async"
+              referrerPolicy="no-referrer"
+            />
+          );
+        },
       }}
     >
       {children}
@@ -85,6 +89,14 @@ export function safeMarkdownUrl(value: string) {
   } catch {
     return '';
   }
+}
+
+export function safeMarkdownImageUrl(value: string) {
+  const trimmed = value.trim();
+  if (!trimmed) return '';
+  if (trimmed.startsWith('//')) return '';
+  if (trimmed.startsWith('/') && !trimmed.startsWith('//')) return trimmed;
+  return '';
 }
 
 function isExternalUrl(value: string) {

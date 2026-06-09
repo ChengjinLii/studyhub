@@ -94,6 +94,7 @@ def test_production_disables_seed_loading(
         STUDYHUB_ENVIRONMENT=production
         STUDYHUB_DATABASE_URL=mysql+pymysql://prod_user:prod_pass@127.0.0.1:3306/studyhub_prod
         STUDYHUB_JWT_SECRET=prod-secret-abcdefghijklmnopqrstuvwxyz
+        STUDYHUB_TRUSTED_HOSTS=study-hub.cn,www.study-hub.cn
         STUDYHUB_MAIL_PROVIDER=smtp
         STUDYHUB_SMTP_HOST=smtp.prod.example.com
         STUDYHUB_SMTP_FROM_EMAIL=prod@example.com

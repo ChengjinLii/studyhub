@@ -127,3 +127,5 @@ def _validate_production_providers(settings: Any) -> None:
         raise RuntimeError("production 模式禁止使用 mock_local KYC provider。")
     if settings.payout_transfer_provider in LOCAL_TRANSFER_PROVIDERS:
         raise RuntimeError("production 模式禁止使用 local_transfer 提现 provider。")
+    if not settings.resolved_trusted_hosts:
+        raise RuntimeError("production 模式必须配置 STUDYHUB_TRUSTED_HOSTS。")
