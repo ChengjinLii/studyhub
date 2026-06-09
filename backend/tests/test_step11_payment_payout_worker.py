@@ -6,11 +6,15 @@ from io import BytesIO
 import json
 import zipfile
 
+import pytest
+from fastapi import HTTPException
 from fastapi.testclient import TestClient
 
-from app.api.deps import get_finance_repo, get_worker_service
+from app.api.deps import get_finance_repo, get_payment_service, get_worker_service
+from app.core.config import Settings
 from app.core.db import session_scope
 from app.repos.request_repo import RequestRepository
+from app.services.payment_service import PaymentService
 from app.services.auth_service import AuthService
 from tests.support import build_auth_headers, seed_read_users
 
@@ -81,6 +85,60 @@ def _notify_order_paid(client: TestClient, out_trade_no: str, *, total_amount: s
     assert response.status_code == 200, response.text
     assert response.text == "success"
     assert response.headers["content-type"].startswith("text/plain")
+
+
+def _production_payment_service() -> PaymentService:
+    base = get_payment_service()
+    return PaymentService(
+        Settings(environment="production", payment_provider="alipay_page"),
+        base.read_repo,
+        base.auth_repo,
+        base.material_repo,
+        base.finance_repo,
+        base.requests_service,
+        base.payment_provider,
+    )
+
+
+def test_step11_production_rejects_simulated_payment_shortcuts(client: TestClient, auth_service: AuthService) -> None:
+    seed_read_users(auth_service, with_follow_graph=True)
+    alice_headers = build_auth_headers(1, 1)
+    baishan_headers = build_auth_headers(2, 2)
+    material_id = _create_paid_material(client, baishan_headers, title="Step 11 生产支付绕过防护")
+    service = _production_payment_service()
+
+    with session_scope() as session:
+        with pytest.raises(HTTPException) as exc_info:
+            service.create_order(session, 1, material_id=material_id, channel="simulated")
+        assert exc_info.value.status_code == 403
+        assert service.material_repo.has_purchase(session, material_id, 1) is False
+
+    order_response = client.post("/api/orders", headers=alice_headers, json={"materialId": material_id, "channel": "alipay_page"})
+    assert order_response.status_code == 200
+    order_id = int(order_response.json()["data"]["orderId"])
+
+    with session_scope() as session:
+        with pytest.raises(HTTPException) as exc_info:
+            service.confirm_order(session, order_id, 1)
+        assert exc_info.value.status_code == 403
+        order = service.finance_repo.get_order(session, order_id)
+        assert order is not None
+        assert order.status == "CREATED"
+        assert service.material_repo.has_purchase(session, material_id, 1) is False
+
+
+def test_step11_local_simulated_payment_shortcut_still_marks_paid(client: TestClient, auth_service: AuthService) -> None:
+    seed_read_users(auth_service, with_follow_graph=True)
+    alice_headers = build_auth_headers(1, 1)
+    baishan_headers = build_auth_headers(2, 2)
+    material_id = _create_paid_material(client, baishan_headers, title="Step 11 本地模拟支付")
+
+    response = client.post("/api/orders", headers=alice_headers, json={"materialId": material_id, "channel": "simulated"})
+
+    assert response.status_code == 200
+    assert response.json()["data"]["status"] == "PAID"
+    with session_scope() as session:
+        assert get_payment_service().material_repo.has_purchase(session, material_id, 1) is True
 
 
 def test_step11_payment_query_download_and_creator_metrics(client: TestClient, auth_service: AuthService) -> None:

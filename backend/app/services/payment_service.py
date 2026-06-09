@@ -58,6 +58,9 @@ class PaymentService:
         material = self._require_material(session, material_id)
         if material.uploader_id == user_id:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="不能购买自己的资料")
+        already_purchased = self.material_repo.has_purchase(session, material.id, user_id)
+        if channel == "simulated" and not material.is_free and not already_purchased and not self._allows_simulated_payment():
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="模拟支付仅限本地开发环境")
 
         existing = self.finance_repo.find_latest_order_for_user_material(session, user_id, material_id)
         if existing is not None and existing.status in PAID_ORDER_STATUSES:
@@ -73,7 +76,7 @@ class PaymentService:
             existing.platform_fee_amount, existing.creator_payable_amount, existing.commission_rate = self._split_amount(existing.amount)
         self.finance_repo.save_order(session, existing)
 
-        if material.is_free or self.material_repo.has_purchase(session, material.id, user_id) or channel == "simulated":
+        if material.is_free or already_purchased or (channel == "simulated" and self._allows_simulated_payment()):
             self._mark_order_paid(session, existing, pay_channel=channel, trade_no=None, paid_at=datetime.now(UTC))
 
         session.commit()
@@ -93,6 +96,8 @@ class PaymentService:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="订单不存在")
         if order.user_id != user_id:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="无权操作该订单")
+        if not self._allows_simulated_payment():
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="订单手动确认仅限本地模拟支付")
         self._mark_order_paid(session, order, pay_channel=order.channel or "simulated", trade_no=None, paid_at=datetime.now(UTC))
         order.confirmed_at = datetime.now(UTC)
         self.finance_repo.save_order(session, order)
@@ -351,6 +356,9 @@ class PaymentService:
         platform_fee = int((gross * rate).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
         creator_payable = max(0, amount_cents - platform_fee)
         return platform_fee, creator_payable, float(rate)
+
+    def _allows_simulated_payment(self) -> bool:
+        return not self.settings.is_production and self.payment_provider.provider_name == "local_alipay"
 
     def _to_order_payload(self, order: OrderRecord) -> dict[str, Any]:
         return {
