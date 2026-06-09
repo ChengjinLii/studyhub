@@ -5,6 +5,7 @@ from datetime import UTC, datetime
 from decimal import Decimal, ROUND_HALF_UP
 import html
 from typing import Any, Mapping, Protocol
+from urllib.parse import parse_qsl
 
 from app.core.config import Settings
 from app.models.finance import OrderRecord, PaymentRecord
@@ -132,11 +133,13 @@ class AlipayPagePaymentProvider:
             notify_url=self.settings.alipay_notify_url,
         )
         action = self._gateway_url()
-        escaped_query = html.escape(order_string, quote=True)
+        fields = "".join(
+            f"<input type=\"hidden\" name=\"{html.escape(name, quote=True)}\" value=\"{html.escape(value, quote=True)}\"/>"
+            for name, value in parse_qsl(order_string, keep_blank_values=True)
+        )
         form = (
             f"<form id=\"studyhub-alipay-form\" method=\"GET\" action=\"{html.escape(action, quote=True)}\">"
-            f"<input type=\"hidden\" name=\"query\" value=\"{escaped_query}\"/>"
-            "<script>location.href='" + html.escape(action, quote=True) + "?" + escaped_query + "';</script>"
+            f"{fields}"
             "</form>"
         )
         return {

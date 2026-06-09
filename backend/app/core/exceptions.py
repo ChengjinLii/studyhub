@@ -37,6 +37,25 @@ def translate_reason(code: str, reason: str | None) -> str:
     return translations.get(code, reason or "请求处理失败")
 
 
+def _validation_error_message(error: dict[str, Any]) -> str:
+    loc = tuple(str(part) for part in error.get("loc", ()))
+    error_type = str(error.get("type", ""))
+    field = loc[-1] if loc else ""
+    if field == "username":
+        if error_type == "string_pattern_mismatch":
+            return "用户名仅支持中文、英文、数字、下划线或短横线"
+        return "用户名长度需为 3-32 个字符"
+    if field in {"captchaCode", "captchaId"}:
+        return "图形验证码不合法，请重新输入"
+    if field == "code":
+        return "邮箱验证码不合法，请检查后重新输入"
+    if field == "email":
+        return "邮箱格式不正确"
+    if field in {"password", "newPassword"}:
+        return "密码长度需为 6-64 个字符"
+    return str(error.get("msg", "请求参数不合法"))
+
+
 def _extract_http_error(ex: HTTPException) -> tuple[str, str]:
     if isinstance(ex.detail, str):
         code = ex.detail
@@ -53,7 +72,7 @@ def install_exception_handlers(app: FastAPI) -> None:
     @app.exception_handler(RequestValidationError)
     async def handle_request_validation(_: Request, ex: RequestValidationError) -> JSONResponse:
         first_error = ex.errors()[0] if ex.errors() else {}
-        message = str(first_error.get("msg", "请求参数不合法"))
+        message = _validation_error_message(first_error)
         logger.info("Validation failed: %s", message)
         return JSONResponse(status_code=400, content=api_fail("VALIDATION_ERROR", message))
 

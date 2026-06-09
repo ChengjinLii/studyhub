@@ -57,6 +57,44 @@ def _register_and_verify(
     assert verify_response.status_code == 200
 
 
+def test_register_validation_uses_user_facing_username_message(client: TestClient) -> None:
+    response = client.post(
+        "/api/auth/register",
+        json={
+            "username": "bad name!",
+            "email": "bad-name@example.com",
+            "password": "secret123",
+            "captchaId": "captcha-id",
+            "captchaCode": "1234",
+        },
+    )
+
+    assert response.status_code == 400
+    payload = response.json()
+    assert payload["error"]["code"] == "VALIDATION_ERROR"
+    assert payload["msg"] == "用户名仅支持中文、英文、数字、下划线或短横线"
+    assert "String should match pattern" not in payload["msg"]
+
+
+def test_register_accepts_trimmed_hyphenated_username(
+    client: TestClient,
+    captcha_service: CaptchaService,
+    auth_service: AuthService,
+) -> None:
+    _register_and_verify(
+        client,
+        captcha_service,
+        auth_service,
+        username="  user-name  ",
+        email="hyphen-user@example.com",
+        password="secret123",
+    )
+
+    session_response = client.get("/api/session")
+    assert session_response.status_code == 200
+    assert session_response.json()["data"]["user"]["username"] == "user-name"
+
+
 def test_login_logout_and_session_restore(
     client: TestClient,
     captcha_service: CaptchaService,

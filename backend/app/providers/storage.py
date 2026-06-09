@@ -327,9 +327,10 @@ class AliyunOssStorageProvider:
         params = {}
         final_filename = filename or Path(normalized_key).name
         params["response-content-disposition"] = self._build_content_disposition(final_filename)
-        if content_type:
-            params["response-content-type"] = content_type
-        auth = self._import_oss2()
+        # Some Aliyun OSS buckets reject signed URLs that override Content-Type.
+        # The object metadata already carries Content-Type from upload time; keep
+        # signed download URLs limited to Content-Disposition.
+        del content_type
         url = self._bucket().sign_url(
             "GET",
             normalized_key,

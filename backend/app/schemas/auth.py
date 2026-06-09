@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from enum import Enum
 
-from pydantic import AliasChoices, BaseModel, ConfigDict, EmailStr, Field
+from pydantic import AliasChoices, BaseModel, ConfigDict, EmailStr, Field, field_validator
 
 
 class VerificationPurpose(str, Enum):
@@ -39,11 +39,16 @@ class LoginRequestPayload(BaseModel):
 class RegisterRequestPayload(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
-    username: str = Field(..., min_length=3, max_length=32, pattern=r"[A-Za-z0-9_\u4e00-\u9fa5]+")
+    username: str = Field(..., min_length=3, max_length=32, pattern=r"^[A-Za-z0-9_\-\u4e00-\u9fa5]+$")
     email: EmailStr
     password: str = Field(..., min_length=6, max_length=64)
     captchaId: str = Field(..., min_length=1)
     captchaCode: str = Field(..., min_length=1)
+
+    @field_validator("username", "captchaId", "captchaCode", mode="before")
+    @classmethod
+    def strip_register_strings(cls, value: object) -> object:
+        return value.strip() if isinstance(value, str) else value
 
 
 class VerifyEmailRequestPayload(BaseModel):
@@ -52,6 +57,11 @@ class VerifyEmailRequestPayload(BaseModel):
     email: EmailStr
     code: str = Field(..., min_length=4, max_length=10)
     purpose: VerificationPurpose = VerificationPurpose.REGISTER
+
+    @field_validator("code", mode="before")
+    @classmethod
+    def strip_code(cls, value: object) -> object:
+        return value.strip() if isinstance(value, str) else value
 
 
 class PasswordChangeRequestPayload(BaseModel):
