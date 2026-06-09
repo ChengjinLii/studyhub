@@ -129,7 +129,7 @@ def delete_comment(
 
 
 @router.put("/api/comments/{id}/like")
-@router.post("/api/comments/{id}/like", include_in_schema=False)
+@router.post("/api/comments/{id}/like")
 def like_comment(
     id: int,
     auth: AuthContext = Depends(require_auth_context),
@@ -154,7 +154,7 @@ def unlike_comment(
 
 
 @router.post("/api/comments/{id}/reports")
-@router.post("/api/comments/{id}/report", include_in_schema=False)
+@router.post("/api/comments/{id}/report")
 def report_comment(
     id: int,
     payload: CommentReportPayload,

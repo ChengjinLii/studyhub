@@ -16,7 +16,7 @@ router = APIRouter(tags=["ai"])
 
 
 @router.post("/api/ai-chats")
-@router.post("/api/ai/chat", include_in_schema=False)
+@router.post("/api/ai/chat")
 def ai_chat(
     payload: AiChatRequestPayload,
     _: AuthContext = Depends(require_auth_context),
@@ -26,7 +26,7 @@ def ai_chat(
 
 
 @router.post("/api/ai-recommendations")
-@router.post("/api/ai/recommend", include_in_schema=False)
+@router.post("/api/ai/recommend")
 def ai_recommend(
     payload: AiRecommendRequestPayload,
     request: Request,

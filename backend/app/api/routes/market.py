@@ -137,7 +137,7 @@ async def create_market_item(
 
 
 @router.put("/api/market/{id}/want")
-@router.post("/api/market/{id}/want", include_in_schema=False)
+@router.post("/api/market/{id}/want")
 def want_market_item(
     id: int,
     auth: AuthContext = Depends(require_auth_context),

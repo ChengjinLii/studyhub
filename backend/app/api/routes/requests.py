@@ -99,7 +99,7 @@ def create_request(
 
 
 @router.post("/api/requests/{id}/contributions")
-@router.post("/api/requests/{id}/follow", include_in_schema=False)
+@router.post("/api/requests/{id}/follow")
 def follow_request(
     id: int,
     payload: RequestContributionCreatePayload,
@@ -144,7 +144,7 @@ def request_contribution_status(
 
 
 @router.post("/api/requests/{id}/responses")
-@router.post("/api/requests/{id}/respond", include_in_schema=False)
+@router.post("/api/requests/{id}/respond")
 def request_respond(
     id: int,
     payload: RequestRespondPayload | None = None,
@@ -158,7 +158,7 @@ def request_respond(
 
 
 @router.put("/api/requests/{id}/accepted-response")
-@router.post("/api/requests/{id}/accept", include_in_schema=False)
+@router.post("/api/requests/{id}/accept")
 def request_accept(
     id: int,
     payload: RequestAcceptPayload,
@@ -172,7 +172,7 @@ def request_accept(
 
 
 @router.post("/api/requests/{id}/preview-views")
-@router.post("/api/requests/{id}/preview-view", include_in_schema=False)
+@router.post("/api/requests/{id}/preview-view")
 def request_preview_view(
     id: int,
     payload: RequestPreviewViewPayload,
@@ -186,7 +186,7 @@ def request_preview_view(
 
 
 @router.post("/api/requests/{id}/disputes")
-@router.post("/api/requests/{id}/dispute", include_in_schema=False)
+@router.post("/api/requests/{id}/dispute")
 def request_dispute(
     id: int,
     payload: RequestDisputePayload,
@@ -214,7 +214,7 @@ def request_arbitration_decision(
 
 
 @router.delete("/api/requests/contributions/{id}")
-@router.post("/api/requests/contributions/{id}/cancel", include_in_schema=False)
+@router.post("/api/requests/contributions/{id}/cancel")
 def request_contribution_cancel(
     id: int,
     auth: AuthContext = Depends(require_auth_context),
@@ -227,7 +227,7 @@ def request_contribution_cancel(
 
 
 @router.patch("/api/requests/contributions/{id}")
-@router.put("/api/requests/contributions/{id}/deadline", include_in_schema=False)
+@router.put("/api/requests/contributions/{id}/deadline")
 def request_contribution_deadline(
     id: int,
     payload: RequestContributionDeadlinePayload,

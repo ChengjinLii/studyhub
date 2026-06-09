@@ -24,7 +24,7 @@ def notifications_summary(
 
 
 @router.get("/api/notifications")
-@router.get("/api/notifications/list", include_in_schema=False)
+@router.get("/api/notifications/list")
 def notifications_list(
     auth: AuthContext = Depends(require_auth_context),
     session: Session = Depends(get_db_session),
@@ -34,7 +34,7 @@ def notifications_list(
 
 
 @router.patch("/api/notifications")
-@router.post("/api/notifications/read", include_in_schema=False)
+@router.post("/api/notifications/read")
 def mark_notifications_read(
     auth: AuthContext = Depends(require_auth_context),
     session: Session = Depends(get_db_session),

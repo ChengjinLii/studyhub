@@ -46,7 +46,7 @@ def get_order(
 
 
 @router.put("/api/orders/{id}/confirmation")
-@router.post("/api/orders/{id}/confirm", include_in_schema=False)
+@router.post("/api/orders/{id}/confirm")
 def confirm_order(
     id: int,
     auth: AuthContext = Depends(require_auth_context),

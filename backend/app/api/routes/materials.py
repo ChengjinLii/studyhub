@@ -162,7 +162,7 @@ async def material_detail(
 
 
 @router.post("/api/materials/{id}/views")
-@router.post("/api/materials/{id}/view", include_in_schema=False)
+@router.post("/api/materials/{id}/view")
 async def record_view(
     id: int,
     request: Request,
@@ -271,7 +271,7 @@ def rate_material(
 
 
 @router.post("/api/materials/{id}/reviews")
-@router.post("/api/materials/{id}/review", include_in_schema=False)
+@router.post("/api/materials/{id}/review")
 def review_material(
     id: int,
     payload: ReviewPayload,
@@ -285,7 +285,7 @@ def review_material(
 
 
 @router.put("/api/materials/{id}/favorite")
-@router.post("/api/materials/{id}/favorite", include_in_schema=False)
+@router.post("/api/materials/{id}/favorite")
 def favorite_material(
     id: int,
     auth: AuthContext = Depends(require_auth_context),
@@ -308,7 +308,7 @@ def unfavorite_material(
 
 
 @router.put("/api/materials/{id}/like")
-@router.post("/api/materials/{id}/like", include_in_schema=False)
+@router.post("/api/materials/{id}/like")
 def like_material(
     id: int,
     auth: AuthContext = Depends(require_auth_context),
@@ -333,7 +333,7 @@ def unlike_material(
 
 
 @router.post("/api/materials/{id}/downloads")
-@router.get("/api/materials/{id}/download", include_in_schema=False)
+@router.get("/api/materials/{id}/download")
 def download_material(
     id: int,
     auth: AuthContext = Depends(require_auth_context),
@@ -346,7 +346,7 @@ def download_material(
 
 
 @router.post("/api/material-downloads")
-@router.post("/api/materials/downloads/batch", include_in_schema=False)
+@router.post("/api/materials/downloads/batch")
 def batch_download(
     payload: BatchDownloadPayload,
     auth: AuthContext = Depends(require_auth_context),

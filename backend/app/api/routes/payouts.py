@@ -37,7 +37,7 @@ def create_payout_application(
 
 
 @router.get("/api/me/creator-payout-application")
-@router.get("/api/creator-payout-applications/me", include_in_schema=False)
+@router.get("/api/creator-payout-applications/me")
 def get_my_payout_application(
     auth: AuthContext = Depends(require_auth_context),
     session: Session = Depends(get_db_session),

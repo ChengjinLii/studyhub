@@ -20,7 +20,7 @@ def read_session(
 
 
 @router.delete("/api/session")
-@router.post("/api/logout", include_in_schema=False)
+@router.post("/api/logout")
 def logout(
     response: Response,
     service: SessionService = Depends(get_session_service),
