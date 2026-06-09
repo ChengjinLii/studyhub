@@ -2448,22 +2448,22 @@ main {
 
 .floating-sidebar.hat-graduation {
   --hat-image: url('/bot-hats/graduation-cap.svg');
-  --hat-scale: 1.08;
-  --hat-x: -59%;
-  --hat-y: -78%;
-  --hat-rot: -5deg;
-  --hat-width: 122%;
-  --hat-height: 68%;
-  --hat-origin: 52% 88%;
+  --hat-scale: 1;
+  --hat-x: -54%;
+  --hat-y: -112%;
+  --hat-rot: -3deg;
+  --hat-width: 128%;
+  --hat-height: 66%;
+  --hat-origin: 52% 92%;
 }
 
 .floating-sidebar.hat-party {
   --hat-image: url('/bot-hats/party-hat.svg');
-  --hat-scale: 0.86;
-  --hat-x: -52%;
-  --hat-y: -112%;
-  --hat-rot: -8deg;
-  --hat-width: 98%;
+  --hat-scale: 0.82;
+  --hat-x: -58%;
+  --hat-y: -101%;
+  --hat-rot: -10deg;
+  --hat-width: 104%;
   --hat-height: 126%;
   --hat-origin: 52% 92%;
 }
