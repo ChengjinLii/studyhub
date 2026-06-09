@@ -77,6 +77,9 @@ export default function MyApp({ Component, pageProps }: AppProps) {
     if (typeof window === 'undefined') {
       return;
     }
+    if (window.location.pathname !== '/') {
+      return;
+    }
     const hostname = window.location.hostname.toLowerCase();
     if (hostname === 'study-hub.store' || hostname.endsWith('.study-hub.store')) {
       setEntryModalVariant('stable');
@@ -248,7 +251,7 @@ export default function MyApp({ Component, pageProps }: AppProps) {
                     type="button"
                     onClick={() => setEntryModalVariant(null)}
                   >
-                    {isStableEntryModal ? '留在当前版本' : '开始浏览'}
+                    {isStableEntryModal ? '留在当前版本' : '关闭窗口'}
                   </button>
                 </div>
               </div>
