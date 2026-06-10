@@ -468,21 +468,29 @@ export default function MaterialDetailPage({ material, user }: MaterialDetailPag
                       <p>购买后可查看链接。</p>
                     </div>
                   )}
-                  {((!material.free && !canManage) || material.hasFile) && (
+                  {((!material.free && !canManage) || material.hasFile || material.hasNetdisk) && (
                     <div className="detail-price-card__actions">
 	                      {!material.free && !canManage && (
 	                        <button className="button primary detail-action-order" type="button" onClick={handlePurchase} disabled={ordering || purchased}>
 	                          {purchased ? '已下单' : ordering ? '下单中...' : '立即下单'}
 	                        </button>
 	                      )}
-	                      {material.hasFile && (
+	                      {(material.hasFile || material.hasNetdisk) && (
 	                        <button
 	                          className={`button detail-action-download ${material.free || canManage || purchased ? 'primary' : 'ghost'}`}
 	                          type="button"
 	                          onClick={handleDownload}
-	                          disabled={downloading}
+	                          disabled={downloading || (material.hasNetdisk && !canViewNetdisk)}
                         >
-                          {downloading ? '生成链接中...' : material.free ? '获取免费链接' : '获取下载链接'}
+                          {downloading
+                            ? material.hasNetdisk
+                              ? '处理中...'
+                              : '生成链接中...'
+                            : material.hasNetdisk
+                              ? '获取网盘链接'
+                              : material.free
+                                ? '获取免费链接'
+                                : '获取下载链接'}
                         </button>
                       )}
                     </div>
@@ -657,12 +665,7 @@ export default function MaterialDetailPage({ material, user }: MaterialDetailPag
                 <h2>网盘资源</h2>
                 {canViewNetdisk ? (
                   <>
-                    {!showNetdiskLink && (
-                      <button className="button primary" type="button" onClick={handleDownload} disabled={downloading}>
-                        {downloading ? '处理中...' : '获取网盘链接'}
-                      </button>
-                    )}
-                    {showNetdiskLink && (
+                    {showNetdiskLink ? (
                       <div className="netdisk-info">
                         <p className="netdisk-link">
                           链接：{downloadUrl || material.netdiskUrl || '暂无链接'}
@@ -692,6 +695,8 @@ export default function MaterialDetailPage({ material, user }: MaterialDetailPag
                           <p className="help-text">投稿者备注提醒：{material.netdiskReminderAt}</p>
                         )}
                       </div>
+                    ) : (
+                      <p className="help-text">点击右侧操作区的“获取网盘链接”后查看链接与提取码。</p>
                     )}
                   </>
                 ) : (

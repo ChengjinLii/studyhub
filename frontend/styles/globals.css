@@ -10346,7 +10346,14 @@ main {
   padding: 12px;
   display: grid;
   gap: 6px;
+  cursor: pointer;
   transition: border-color 0.18s ease, background-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.profile-card__payout-dropzone.has-preview {
+  justify-items: center;
+  background: #fff;
+  cursor: default;
 }
 
 .profile-card__payout-dropzone.is-dragover {
@@ -10371,6 +10378,7 @@ main {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
+  justify-content: center;
 }
 
 .profile-card__payout-preview-link {
@@ -11547,13 +11555,25 @@ main {
 }
 
 .upload-course-type-chip {
-  min-height: 0;
-  padding: 10px 14px;
-  border-radius: 14px;
+  min-height: 54px;
+  padding: 13px 16px;
+  border: 1px solid #d6dde8;
+  border-radius: 8px;
+  background: #fff;
+  color: #334155;
   justify-content: center;
   align-items: center;
   text-align: center;
   flex: initial;
+  box-shadow: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease, color 0.2s ease;
+}
+
+.upload-course-type-chip.active {
+  border-color: #2563eb;
+  background: #f8fbff;
+  color: #1d4ed8;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
 }
 
 .upload-course-type-chip strong {

@@ -561,9 +561,9 @@ export default function UploadPage({ user, token, account }: UploadPageProps) {
       isRequestResponse,
       isEditing,
       manualPreviewFiles,
-      customPreviewText,
+      customPreviewText: allowCustomPreview ? customPreviewText : '',
       isQuickMode,
-      customPreviewFiles,
+      customPreviewFiles: allowCustomPreview ? customPreviewFiles : [],
       customPreviewLabel,
       effectiveTitle,
       descriptionLimit,
@@ -1017,7 +1017,7 @@ export default function UploadPage({ user, token, account }: UploadPageProps) {
               <div className="form-item full">
                 <SectionLabel htmlFor="zip" text="资料文件（总大小≤50MB，支持多文件）" />
                 <div className="file-field drop-zone" onDragOver={(e) => e.preventDefault()} onDrop={handleZipDrop}>
-                  <span className="file-trigger">选择文件</span>
+                  <span className="file-trigger">选择 / 拖拽 文件</span>
                   <span className="file-name">
                     {zipPreparing
                       ? '正在打包文件...'
@@ -1055,27 +1055,31 @@ export default function UploadPage({ user, token, account }: UploadPageProps) {
                 <p className="help-text">将文件拖拽到此区域或点击选择，总大小不超过 50MB，多文件将自动打包为 zip。</p>
               </div>
             )}
-            <div className="form-item full">
-              <SectionLabel htmlFor="netdiskUrl" text="网盘链接" optional={deliveryMethod !== 'NETDISK'} />
-              <input
-                id="netdiskUrl"
-                type="text"
-                value={netdiskUrl}
-                onChange={(e) => setNetdiskUrl(e.target.value)}
-                placeholder="可粘贴任何网盘/私有链接或说明"
-                required={deliveryMethod === 'NETDISK'}
-              />
-              <p className="help-text">请确保链接长期可用，如有更新请及时维护。</p>
-            </div>
-            <div className="form-item">
-              <SectionLabel htmlFor="netdiskPassword" text="提取码" optional />
-              <input
-                id="netdiskPassword"
-                value={netdiskPassword}
-                onChange={(e) => setNetdiskPassword(e.target.value)}
-                placeholder="如有则填写"
-              />
-            </div>
+            {deliveryMethod === 'NETDISK' && (
+              <>
+                <div className="form-item full">
+                  <SectionLabel htmlFor="netdiskUrl" text="网盘链接" />
+                  <input
+                    id="netdiskUrl"
+                    type="text"
+                    value={netdiskUrl}
+                    onChange={(e) => setNetdiskUrl(e.target.value)}
+                    placeholder="可粘贴任何网盘/私有链接或说明"
+                    required
+                  />
+                  <p className="help-text">请确保链接长期可用，如有更新请及时维护。</p>
+                </div>
+                <div className="form-item">
+                  <SectionLabel htmlFor="netdiskPassword" text="提取码" optional />
+                  <input
+                    id="netdiskPassword"
+                    value={netdiskPassword}
+                    onChange={(e) => setNetdiskPassword(e.target.value)}
+                    placeholder="如有则填写"
+                  />
+                </div>
+              </>
+            )}
             </div>
           </section>
         </div>

@@ -769,7 +769,7 @@ export default function ProfileCard({
                   onChange={(e) => handleUploadPayoutQr(e.target.files?.[0] ?? null)}
                 />
                 <div
-                  className={`profile-card__payout-dropzone ${dragOverPayoutQr ? 'is-dragover' : ''}`}
+                  className={`profile-card__payout-dropzone ${dragOverPayoutQr ? 'is-dragover' : ''} ${payoutQrUrl ? 'has-preview' : ''}`}
                   onDragOver={(e) => {
                     e.preventDefault();
                     setDragOverPayoutQr(true);
@@ -780,33 +780,58 @@ export default function ProfileCard({
                     setDragOverPayoutQr(false);
                     handleUploadPayoutQr(e.dataTransfer.files?.[0] ?? null);
                   }}
+                  onClick={() => {
+                    if (!payoutQrUrl && !uploadingPayoutQr) {
+                      payoutQrInputRef.current?.click();
+                    }
+                  }}
+                  onKeyDown={(event) => {
+                    if (!payoutQrUrl && !uploadingPayoutQr && (event.key === 'Enter' || event.key === ' ')) {
+                      event.preventDefault();
+                      payoutQrInputRef.current?.click();
+                    }
+                  }}
+                  role={!payoutQrUrl ? 'button' : undefined}
+                  tabIndex={!payoutQrUrl ? 0 : undefined}
                 >
-                  <div className="profile-card__payout-drop-title">拖拽收款码到这里，或点击选择图片</div>
-                  <div className="profile-card__payout-drop-subtitle">支持 PNG/JPG/WEBP，最大 5MB</div>
-                  <div className="profile-card__payout-actions">
-                    <button
-                      className="button ghost small"
-                      type="button"
-                      onClick={() => payoutQrInputRef.current?.click()}
-                      disabled={uploadingPayoutQr}
-                    >
-                      {uploadingPayoutQr ? '上传中...' : '选择收款码'}
-                    </button>
-                    {payoutQrUrl && (
+                  {payoutQrUrl ? (
+                    <>
+                      <a
+                        href={payoutQrUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="profile-card__payout-preview-link"
+                        title="点击查看大图"
+                        onClick={(event) => event.stopPropagation()}
+                      >
+                        <AppImage className="profile-card__payout-preview" src={payoutQrUrl} alt="个人收款码" loading="lazy" />
+                      </a>
+                      <div className="profile-card__payout-actions">
                       <button
                         className="button ghost small"
                         type="button"
-                        onClick={handleClearPayoutQr}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          handleClearPayoutQr();
+                        }}
                         disabled={uploadingPayoutQr}
                       >
                         删除
                       </button>
-                    )}
-                  </div>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="profile-card__payout-drop-title">
+                        {uploadingPayoutQr ? '上传中...' : '拖拽收款码到这里，或点击选择图片'}
+                      </div>
+                      <div className="profile-card__payout-drop-subtitle">支持 PNG/JPG/WEBP，最大 5MB</div>
+                    </>
+                  )}
                 </div>
               </>
             )}
-            {payoutQrUrl ? (
+            {!editable && payoutQrUrl ? (
               <a
                 href={payoutQrUrl}
                 target="_blank"
@@ -816,9 +841,9 @@ export default function ProfileCard({
               >
                 <AppImage className="profile-card__payout-preview" src={payoutQrUrl} alt="个人收款码" loading="lazy" />
               </a>
-            ) : (
+            ) : !payoutQrUrl ? (
               <div className="profile-card__payout-empty">尚未上传收款码</div>
-            )}
+            ) : null}
           </div>
         )}
       </div>
