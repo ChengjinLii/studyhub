@@ -2147,6 +2147,18 @@ main {
   justify-content: center;
 }
 
+.payment-cancel-button {
+  border-color: rgba(148, 163, 184, 0.45);
+  color: #475569;
+  background: #ffffff;
+}
+
+.payment-cancel-button:hover {
+  border-color: rgba(239, 68, 68, 0.45);
+  color: #b91c1c;
+  background: #fef2f2;
+}
+
 .pay-confirm-button {
   font-size: 1.05rem;
   padding: 14px 32px;
@@ -5478,6 +5490,25 @@ main {
 
 .recommend-item a:hover {
   color: var(--brand-primary);
+}
+
+.recommend-expand {
+  display: flex;
+  justify-content: center;
+  padding-top: 2px;
+}
+
+.recommend-expand .button {
+  min-width: 148px;
+  border-color: rgba(37, 99, 235, 0.24);
+  color: #2563eb;
+  background: #eff6ff;
+}
+
+.recommend-expand .button:hover {
+  border-color: rgba(37, 99, 235, 0.42);
+  color: #1d4ed8;
+  background: #dbeafe;
 }
 
 .recommend-meta {

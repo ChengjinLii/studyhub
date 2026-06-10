@@ -24,14 +24,21 @@ export default function PayPage({ user, material }: PayPageProps) {
   const [error, setError] = useState('');
   const [formHtml, setFormHtml] = useState('');
   const startedRef = useRef(false);
+  const cancelledRef = useRef(false);
+  const abortControllerRef = useRef<AbortController | null>(null);
   const formContainerRef = useRef<HTMLDivElement | null>(null);
 
   const startPayment = useCallback(async () => {
     if (!material) return;
+    cancelledRef.current = false;
+    abortControllerRef.current?.abort();
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
     setLoading(true);
     setError('');
     try {
-      const result = await createAlipayPayment(material.id);
+      const result = await createAlipayPayment(material.id, controller.signal);
+      if (cancelledRef.current) return;
       if (result.unauthorized) {
         router.push({ pathname: '/login', query: { next: router.asPath } });
         return;
@@ -51,11 +58,26 @@ export default function PayPage({ user, material }: PayPageProps) {
       setFormHtml('');
       setFormHtml(data.form as string);
     } catch (err: unknown) {
+      if (cancelledRef.current || (err instanceof DOMException && err.name === 'AbortError')) {
+        return;
+      }
       setError(toErrorMessage(err, '发起支付失败'));
     } finally {
-      setLoading(false);
+      if (!cancelledRef.current) {
+        setLoading(false);
+      }
     }
   }, [material, router]);
+
+  const cancelPayment = useCallback(() => {
+    cancelledRef.current = true;
+    abortControllerRef.current?.abort();
+    abortControllerRef.current = null;
+    setFormHtml('');
+    setError('');
+    setLoading(false);
+    void router.push(materialPath(material.id, material.title));
+  }, [material.id, material.title, router]);
 
   useEffect(() => {
     if (startedRef.current) return;
@@ -65,12 +87,18 @@ export default function PayPage({ user, material }: PayPageProps) {
 
   useEffect(() => {
     if (!formHtml || !formContainerRef.current) return;
+    if (cancelledRef.current) return;
     try {
       submitTrustedPaymentForm(formContainerRef.current, formHtml);
     } catch (err: unknown) {
       setError(toErrorMessage(err, '支付表单校验失败'));
     }
   }, [formHtml]);
+
+  useEffect(() => () => {
+    cancelledRef.current = true;
+    abortControllerRef.current?.abort();
+  }, []);
 
   return (
     <>
@@ -112,6 +140,9 @@ export default function PayPage({ user, material }: PayPageProps) {
           <div className="payment-actions">
             <button className="button primary" type="button" onClick={startPayment} disabled={loading}>
               {loading ? '正在拉起…' : '重新拉起支付'}
+            </button>
+            <button className="button ghost payment-cancel-button" type="button" onClick={cancelPayment}>
+              取消支付
             </button>
           </div>
           <div ref={formContainerRef} style={{ display: 'none' }} />

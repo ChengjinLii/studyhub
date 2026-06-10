@@ -955,7 +955,8 @@ export const getServerSideProps: GetServerSideProps<HomeProps> = async (ctx) => 
     : Promise.resolve(null);
   const recommendationsPromise: Promise<MaterialListItem[]> = fetchRecommendations(
     session.token || undefined,
-    origin
+    origin,
+    18
   ).catch((error) => {
     // eslint-disable-next-line no-console
     console.warn('Failed to fetch recommendations', error);

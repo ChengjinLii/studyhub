@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { ReactNode } from 'react';
+import { ReactNode, useMemo, useState } from 'react';
 import { MaterialListItem } from '../../types/material';
 import { MaterialRequestItem } from '../../types/request';
 import { formatMajorDisplay } from '../../lib/major';
@@ -30,6 +30,14 @@ export default function HomeRequestPanels({
   buildUploadLink,
   onFollowRequest,
 }: HomeRequestPanelsProps) {
+  const [recommendExpanded, setRecommendExpanded] = useState(false);
+  const collapsedRecommendCount = 6;
+  const visibleRecommendedItems = useMemo(
+    () => (recommendExpanded ? recommendedItems : recommendedItems.slice(0, collapsedRecommendCount)),
+    [recommendExpanded, recommendedItems]
+  );
+  const hasMoreRecommendations = recommendedItems.length > collapsedRecommendCount;
+
   return (
     <div className="home-dual-panel">
       <section className="card request-card">
@@ -139,22 +147,31 @@ export default function HomeRequestPanels({
         {recommendedItems.length === 0 ? (
           <div className="empty-state">{recommendationEmpty}</div>
         ) : (
-          <ul className="recommend-list">
-            {recommendedItems.map((item) => {
-              const majorLabel = formatMajorDisplay(item.major);
-              return (
-                <li key={item.id} className="recommend-item">
-                  <Link href={materialPath(item.id, item.title)}>{item.title}</Link>
-                  <div className="recommend-meta">
-                    <span className="recommend-meta__school">
-                      {(item.school || '未知学校') + (item.college ? ` · ${item.college}` : '') + (majorLabel ? ` · ${majorLabel}` : '')}
-                    </span>
-                    <span className="recommend-meta__downloads">下载 {item.downloadCount ?? 0}</span>
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
+          <>
+            <ul className="recommend-list">
+              {visibleRecommendedItems.map((item) => {
+                const majorLabel = formatMajorDisplay(item.major);
+                return (
+                  <li key={item.id} className="recommend-item">
+                    <Link href={materialPath(item.id, item.title)}>{item.title}</Link>
+                    <div className="recommend-meta">
+                      <span className="recommend-meta__school">
+                        {(item.school || '未知学校') + (item.college ? ` · ${item.college}` : '') + (majorLabel ? ` · ${majorLabel}` : '')}
+                      </span>
+                      <span className="recommend-meta__downloads">下载 {item.downloadCount ?? 0}</span>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+            {hasMoreRecommendations ? (
+              <div className="recommend-expand">
+                <button className="button ghost small" type="button" onClick={() => setRecommendExpanded((value) => !value)}>
+                  {recommendExpanded ? '收起推荐' : `展开全部 ${recommendedItems.length} 条`}
+                </button>
+              </div>
+            ) : null}
+          </>
         )}
       </section>
     </div>

@@ -38,11 +38,12 @@ export const fetchOrderStatus = async (orderNo: string, forceCheck = false) => {
   return { unauthorized: false, data: result.json.data || {} };
 };
 
-export const createAlipayPayment = async (materialId: number) => {
+export const createAlipayPayment = async (materialId: number, signal?: AbortSignal) => {
   const response = await fetchBackend('/alipay-payments', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ materialId }),
+    signal,
   });
   if (response.status === 401) {
     return { unauthorized: true, data: null };
