@@ -544,6 +544,7 @@ export default function UploadPage({ user, token, account }: UploadPageProps) {
         : isQuickMode
           ? PREVIEW_SOURCE_AUTO
           : previewSource;
+    const allowCustomPreview = !isExperience && !isQuickMode && effectivePreviewSource === PREVIEW_SOURCE_MANUAL;
     const validation = validateUploadSubmitInput({
       token,
       isExperience,
@@ -590,7 +591,7 @@ export default function UploadPage({ user, token, account }: UploadPageProps) {
       setUploadProgress(isExperience || zipFile ? 0 : null);
       const trimmedTitle = effectiveTitle;
       const trimmedDescription = description.trim();
-      const trimmedCustomPreviewText = isExperience || isQuickMode ? '' : customPreviewText.trim();
+      const trimmedCustomPreviewText = allowCustomPreview ? customPreviewText.trim() : '';
       const payload = buildUploadPayload({
         title: trimmedTitle,
         description: trimmedDescription,
@@ -634,7 +635,7 @@ export default function UploadPage({ user, token, account }: UploadPageProps) {
       if (!isExperience && !isQuickMode && effectivePreviewSource === PREVIEW_SOURCE_MANUAL) {
         manualPreviewFiles.forEach((file) => formData.append('previews', file));
       }
-      if (!isQuickMode && customPreviewFiles.length > 0) {
+      if (allowCustomPreview && customPreviewFiles.length > 0) {
         customPreviewFiles.forEach((file) => formData.append('customPreviews', file));
       }
       const endpoint = isEditing ? `${apiBase}/materials/${editingId}` : `${apiBase}/materials`;
@@ -784,8 +785,8 @@ export default function UploadPage({ user, token, account }: UploadPageProps) {
             <div className="form-grid upload-section-grid">
             <div className="form-item full">
               <SectionLabel text="资料交付方式" />
-              <div className="inline-group wrap delivery-toggle">
-                <label className={`choice-pill ${deliveryMethod === 'FILE' ? 'active' : ''}`}>
+              <div className="delivery-method-options" role="radiogroup" aria-label="资料交付方式">
+                <label className={`delivery-method-card ${deliveryMethod === 'FILE' ? 'active' : ''}`}>
                   <input
                     type="radio"
                     name="deliveryMethod"
@@ -793,9 +794,10 @@ export default function UploadPage({ user, token, account }: UploadPageProps) {
                     checked={deliveryMethod === 'FILE'}
                     onChange={() => setDeliveryMethod('FILE')}
                   />
-                  <span>上传文件（≤50MB）</span>
+                  <span className="delivery-method-card__title">站内文件交付</span>
+                  <span className="delivery-method-card__desc">后续在下方选择文件，单次总大小不超过 50MB。</span>
                 </label>
-                <label className={`choice-pill ${deliveryMethod === 'NETDISK' ? 'active' : ''}`}>
+                <label className={`delivery-method-card ${deliveryMethod === 'NETDISK' ? 'active' : ''}`}>
                   <input
                     type="radio"
                     name="deliveryMethod"
@@ -803,7 +805,8 @@ export default function UploadPage({ user, token, account }: UploadPageProps) {
                     checked={deliveryMethod === 'NETDISK'}
                     onChange={() => setDeliveryMethod('NETDISK')}
                   />
-                  <span>使用网盘链接</span>
+                  <span className="delivery-method-card__title">网盘链接交付</span>
+                  <span className="delivery-method-card__desc">适合超过 50MB 或需要外部维护的资料。</span>
                 </label>
               </div>
               <p className="help-text">
@@ -928,7 +931,7 @@ export default function UploadPage({ user, token, account }: UploadPageProps) {
                 </label>
               </div>
             )}
-            {!isQuickMode && (
+            {!isQuickMode && (isRequestResponse || previewSource === PREVIEW_SOURCE_MANUAL) && (
               <div className="form-item full">
               <SectionLabel text={customPreviewTitle} optional />
               <p className="help-text">{customPreviewHint}</p>

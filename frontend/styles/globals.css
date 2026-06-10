@@ -6026,6 +6026,54 @@ main {
   font-weight: 600;
 }
 
+.delivery-method-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.delivery-method-card {
+  border: 1px solid #d6dde8;
+  border-radius: 8px;
+  padding: 14px 16px;
+  background: #fff;
+  color: #334155;
+  cursor: pointer;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+}
+
+.delivery-method-card input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.delivery-method-card__title {
+  display: block;
+  color: #0f172a;
+  font-size: 0.98rem;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.delivery-method-card__desc {
+  display: block;
+  margin-top: 4px;
+  color: #64748b;
+  font-size: 0.86rem;
+  line-height: 1.5;
+}
+
+.delivery-method-card.active {
+  border-color: #2563eb;
+  background: #f8fbff;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+}
+
+.delivery-method-card.active .delivery-method-card__title {
+  color: #1d4ed8;
+}
+
 .material-meta,
 .material-stats {
   color: #64748b;
@@ -6180,6 +6228,10 @@ main {
   main.container {
     padding-left: 14px;
     padding-right: 14px;
+  }
+
+  .delivery-method-options {
+    grid-template-columns: 1fr;
   }
 
   .page-grid {
