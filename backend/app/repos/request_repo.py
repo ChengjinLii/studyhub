@@ -4,8 +4,9 @@ from datetime import date, datetime
 import uuid
 from typing import Any
 
-from sqlalchemy import case, func, select
-from sqlalchemy.orm import Session
+from sqlalchemy import MetaData, Table, case, func, insert, inspect, select
+from sqlalchemy.orm import Session, load_only
+from sqlalchemy.orm.attributes import set_committed_value
 
 from app.models.requests import (
     RequestArbitrationRecord,
@@ -14,6 +15,70 @@ from app.models.requests import (
     RequestRecord,
     RequestResponseRecord,
 )
+
+
+_TABLE_COLUMN_CACHE: dict[tuple[str, str], set[str]] = {}
+_ARBITRATION_MAPPED_COLUMNS = tuple(RequestArbitrationRecord.__table__.columns)
+
+
+def _bind_cache_key(session: Session) -> str:
+    bind = session.get_bind()
+    try:
+        url = bind.engine.url
+        rendered = url.render_as_string(hide_password=True)
+        if url.database in {None, ":memory:"}:
+            return f"{rendered}:{id(bind)}"
+        return rendered
+    except Exception:
+        return str(bind)
+
+
+def _table_columns(session: Session, table_name: str) -> set[str]:
+    cache_key = (_bind_cache_key(session), table_name)
+    cached = _TABLE_COLUMN_CACHE.get(cache_key)
+    if cached is not None:
+        return cached
+    inspector = inspect(session.get_bind())
+    column_names = {column["name"] for column in inspector.get_columns(table_name)}
+    _TABLE_COLUMN_CACHE[cache_key] = column_names
+    return column_names
+
+
+def _has_table_column(session: Session, table_name: str, column_name: str) -> bool:
+    return column_name in _table_columns(session, table_name)
+
+
+def _arbitration_load_options(session: Session):
+    existing_columns = _table_columns(session, "material_request_arbitrations")
+    if all(column.name in existing_columns for column in _ARBITRATION_MAPPED_COLUMNS):
+        return ()
+    mapped_existing_columns = tuple(
+        getattr(RequestArbitrationRecord, column.name)
+        for column in _ARBITRATION_MAPPED_COLUMNS
+        if column.name in existing_columns
+    )
+    return (load_only(*mapped_existing_columns),)
+
+
+def _apply_legacy_arbitration_defaults(session: Session, records: list[RequestArbitrationRecord]) -> list[RequestArbitrationRecord]:
+    if _has_table_column(session, "material_request_arbitrations", "source"):
+        return records
+    for record in records:
+        set_committed_value(record, "source", "local")
+    return records
+
+
+def _refresh_arbitration(session: Session, entity: RequestArbitrationRecord) -> RequestArbitrationRecord:
+    existing_columns = _table_columns(session, "material_request_arbitrations")
+    if all(column.name in existing_columns for column in _ARBITRATION_MAPPED_COLUMNS):
+        session.refresh(entity)
+        return entity
+    refresh_columns = [column.name for column in _ARBITRATION_MAPPED_COLUMNS if column.name in existing_columns]
+    if refresh_columns:
+        session.refresh(entity, attribute_names=refresh_columns)
+    if "source" not in existing_columns:
+        set_committed_value(entity, "source", "local")
+    return entity
 
 
 class RequestRepository:
@@ -265,27 +330,42 @@ class RequestRepository:
 
     def list_arbitrations(self, session: Session, request_id: int | None = None) -> list[RequestArbitrationRecord]:
         stmt = select(RequestArbitrationRecord)
+        options = _arbitration_load_options(session)
+        if options:
+            stmt = stmt.options(*options)
         if request_id is not None:
             stmt = stmt.where(RequestArbitrationRecord.request_id == request_id)
         stmt = stmt.order_by(RequestArbitrationRecord.created_at.desc(), RequestArbitrationRecord.id.desc())
-        return list(session.scalars(stmt))
+        return _apply_legacy_arbitration_defaults(session, list(session.scalars(stmt)))
 
     def get_arbitration(self, session: Session, arbitration_id: int) -> RequestArbitrationRecord | None:
-        return session.get(RequestArbitrationRecord, arbitration_id)
+        entity = session.get(RequestArbitrationRecord, arbitration_id, options=_arbitration_load_options(session))
+        if entity is None:
+            return None
+        return _apply_legacy_arbitration_defaults(session, [entity])[0]
 
     def find_pending_arbitration(self, session: Session, request_id: int) -> RequestArbitrationRecord | None:
         stmt = select(RequestArbitrationRecord).where(
             RequestArbitrationRecord.request_id == request_id,
             RequestArbitrationRecord.status == "PENDING",
         )
-        return session.scalar(stmt)
+        options = _arbitration_load_options(session)
+        if options:
+            stmt = stmt.options(*options)
+        entity = session.scalar(stmt)
+        if entity is None:
+            return None
+        return _apply_legacy_arbitration_defaults(session, [entity])[0]
 
     def list_timed_out_pending_arbitrations(self, session: Session, threshold: datetime) -> list[RequestArbitrationRecord]:
         stmt = select(RequestArbitrationRecord).where(
             RequestArbitrationRecord.status == "PENDING",
             RequestArbitrationRecord.created_at <= threshold,
         )
-        return list(session.scalars(stmt))
+        options = _arbitration_load_options(session)
+        if options:
+            stmt = stmt.options(*options)
+        return _apply_legacy_arbitration_defaults(session, list(session.scalars(stmt)))
 
     def list_timed_out_unanswered_requests(self, session: Session, *, created_before: datetime) -> list[RequestRecord]:
         stmt = (
@@ -333,10 +413,27 @@ class RequestRepository:
         return list(session.scalars(stmt))
 
     def save_arbitration(self, session: Session, entity: RequestArbitrationRecord) -> RequestArbitrationRecord:
+        existing_columns = _table_columns(session, "material_request_arbitrations")
+        state = inspect(entity)
+        if "source" not in existing_columns and (state.transient or state.pending):
+            values: dict[str, object] = {}
+            for column in _ARBITRATION_MAPPED_COLUMNS:
+                if column.name not in existing_columns:
+                    continue
+                values[column.name] = getattr(entity, column.name)
+            now = datetime.now()
+            if "created_at" in existing_columns and values.get("created_at") is None:
+                values["created_at"] = now
+            if "updated_at" in existing_columns and values.get("updated_at") is None:
+                values["updated_at"] = now
+            legacy_table = Table("material_request_arbitrations", MetaData(), autoload_with=session.get_bind())
+            session.execute(insert(legacy_table).values(**values))
+            session.flush()
+            saved = self.get_arbitration(session, int(entity.id))
+            return saved or entity
         session.add(entity)
         session.flush()
-        session.refresh(entity)
-        return entity
+        return _refresh_arbitration(session, entity)
 
     def next_arbitration_id(self, session: Session) -> int:
         db_max = int(session.scalar(select(func.max(RequestArbitrationRecord.id))) or 0)
