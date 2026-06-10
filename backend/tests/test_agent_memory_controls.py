@@ -45,10 +45,10 @@ def _seed_memory_material(user_id: int = 1) -> None:
 
 def test_ai_memory_preview_shows_current_user_derived_memory(client, auth_service) -> None:
     seed_read_users(auth_service)
-    _seed_memory_material(user_id=1)
+    _seed_memory_material(user_id=3)
 
-    response = client.get("/api/ai/memory", headers=build_auth_headers(1, 1))
-    second_response = client.get("/api/ai/memory", headers=build_auth_headers(1, 1))
+    response = client.get("/api/ai/memory", headers=build_auth_headers(3, 8))
+    second_response = client.get("/api/ai/memory", headers=build_auth_headers(3, 8))
 
     assert response.status_code == 200
     data = response.json()["data"]
@@ -59,8 +59,8 @@ def test_ai_memory_preview_shows_current_user_derived_memory(client, auth_servic
     assert data["personalMemory"]["profile"] == {
         "school": "电子科技大学",
         "college": "信通",
-        "major": "通信",
-        "grade_stages": "大三",
+        "major": "电工",
+        "grade_stages": "研究生",
     }
     assert data["personalMemory"]["candidate_interactions"][0] == {
         "material_id": 770,
@@ -116,14 +116,14 @@ def test_ai_memory_preview_shows_current_user_derived_memory(client, auth_servic
     assert data["memorySnapshot"]["persistence"] == "not_persisted"
     assert data["controls"]["canDisableCurrentBrowser"] is True
     assert data["controls"]["canDeletePersistedMemory"] is False
-    assert "alice@example.com" not in serialized
-    assert "Alice Chen" not in serialized
+    assert "admin@example.com" not in serialized
+    assert "超级管理员" not in serialized
 
 
 def test_ai_memory_preference_cookie_disables_preview(client, auth_service) -> None:
     seed_read_users(auth_service)
-    _seed_memory_material(user_id=1)
-    headers = build_auth_headers(1, 1)
+    _seed_memory_material(user_id=3)
+    headers = build_auth_headers(3, 8)
 
     preference_response = client.put("/api/ai/memory-preferences", headers=headers, json={"enabled": False})
     preview_response = client.get("/api/ai/memory", headers=headers)
@@ -147,8 +147,8 @@ def test_ai_memory_preference_cookie_disables_preview(client, auth_service) -> N
 
 def test_ai_memory_delete_disables_current_browser_without_persisted_delete(client, auth_service) -> None:
     seed_read_users(auth_service)
-    _seed_memory_material(user_id=1)
-    headers = build_auth_headers(1, 1)
+    _seed_memory_material(user_id=3)
+    headers = build_auth_headers(3, 8)
 
     delete_response = client.delete("/api/ai/memory", headers=headers)
     preview_response = client.get("/api/ai/memory", headers=headers)

@@ -160,7 +160,7 @@ test('mock page mode covers StudyHub Agent open, fallback, drag and collapse', a
       contentType: 'application/json',
       body: JSON.stringify({
         ok: true,
-        data: { user: { id: 1, username: 'mock-user', nickname: 'Mock User', roleMask: 1 } },
+        data: { user: { id: 3, username: 'mock-admin', nickname: 'Mock Admin', roleMask: 8 } },
       }),
     });
   });
@@ -213,6 +213,35 @@ test('mock page mode covers StudyHub Agent open, fallback, drag and collapse', a
   expect(collapsedBox).not.toBeNull();
   expect(Math.abs((collapsedBox?.x ?? 0) - movedBox.x)).toBeLessThan(4);
   expect(Math.abs((collapsedBox?.y ?? 0) - movedBox.y)).toBeLessThan(4);
+});
+
+test('mock page mode hides StudyHub Agent from non-admin users', async ({ page }) => {
+  await page.route('**/api/session', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        ok: true,
+        data: { user: { id: 1, username: 'mock-user', nickname: 'Mock User', roleMask: 1 } },
+      }),
+    });
+  });
+  await page.route('**/api/**', async (route) => {
+    if (route.request().url().includes('/api/session')) {
+      await route.fallback();
+      return;
+    }
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ ok: true, data: {} }),
+    });
+  });
+
+  await page.goto('/more');
+  await closeEntryModalIfPresent(page);
+  await expect(page.getByRole('heading', { name: '其他功能' })).toBeVisible();
+  await expect(page.locator('.hermes-agent__launcher')).toHaveCount(0, { timeout: 3000 });
 });
 
 test('mock page mode covers more page secondary navigation', async ({ page }) => {

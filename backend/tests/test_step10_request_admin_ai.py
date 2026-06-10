@@ -345,7 +345,7 @@ def test_step10_arbitration_admin_materials_and_ai_flow(
 
     ai_chat = client.post(
         "/api/ai/chat",
-        headers=alice_headers,
+        headers=admin_headers,
         json={"messages": [{"role": "user", "content": "帮我总结一下 Step 10 现在做了什么？"}]},
     )
     assert ai_chat.status_code == 200
@@ -353,7 +353,7 @@ def test_step10_arbitration_admin_materials_and_ai_flow(
 
     ai_recommend = client.post(
         "/api/ai/recommend",
-        headers=alice_headers,
+        headers=admin_headers,
         json={"query": "期末真题"},
     )
     assert ai_recommend.status_code == 200

@@ -4,9 +4,12 @@ import Head from 'next/head';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { fetchBackend } from '../lib/apiBase';
+import { hasRole } from '../lib/auth';
+import { fetchOptionalSessionUser } from '../lib/sessionApi';
 import '../styles/globals.css';
 import AppImage from '../components/AppImage';
 import { AppDialogProvider } from '../components/AppDialogProvider';
+import { RoleMask, SessionUser } from '../types/user';
 
 const FloatingSidebar = dynamic(() => import('../components/FloatingSidebar'), { ssr: false });
 const HermesAgentWidget = dynamic(() => import('../components/HermesAgentWidget'), { ssr: false });
@@ -54,6 +57,7 @@ export default function MyApp({ Component, pageProps }: AppProps) {
   const [entryModalVariant, setEntryModalVariant] = useState<EntryModalVariant>(null);
   const [runtimeInfo, setRuntimeInfo] = useState<RuntimeInfo | null>(null);
   const [globalChromeReady, setGlobalChromeReady] = useState(false);
+  const [agentUser, setAgentUser] = useState<SessionUser | null>(null);
 
   useEffect(() => {
     if (!('serviceWorker' in navigator)) {
@@ -125,11 +129,33 @@ export default function MyApp({ Component, pageProps }: AppProps) {
     };
   }, []);
 
+  useEffect(() => {
+    if (!globalChromeReady || typeof window === 'undefined') {
+      return undefined;
+    }
+    let active = true;
+    const loadAgentSession = async () => {
+      const nextUser = await fetchOptionalSessionUser();
+      if (active) {
+        setAgentUser(nextUser);
+      }
+    };
+    void loadAgentSession();
+    window.addEventListener('focus', loadAgentSession);
+    return () => {
+      active = false;
+      window.removeEventListener('focus', loadAgentSession);
+    };
+  }, [globalChromeReady]);
+
   const showLocalDevBadge = runtimeInfo?.environment === 'local-dev' && runtimeInfo.localDev?.enabled;
   const localDevLabel = runtimeInfo?.localDev?.developerUsername
     ? `Local Dev · ${runtimeInfo.localDev.developerUsername}`
     : 'Local Dev';
   const isStableEntryModal = entryModalVariant === 'stable';
+  const canShowAiAgent =
+    agentUser !== null &&
+    (hasRole(agentUser.roleMask, RoleMask.ADMIN) || hasRole(agentUser.roleMask, RoleMask.DEVELOPER));
 
   return (
     <>
@@ -155,7 +181,7 @@ export default function MyApp({ Component, pageProps }: AppProps) {
         {globalChromeReady && (
           <>
             <FloatingSidebar />
-            <HermesAgentWidget />
+            {canShowAiAgent && <HermesAgentWidget />}
           </>
         )}
         {showLocalDevBadge && <div className="runtime-environment-badge">{localDevLabel}</div>}

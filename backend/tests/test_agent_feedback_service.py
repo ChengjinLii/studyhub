@@ -57,7 +57,7 @@ def test_ai_feedback_builds_redacted_user_and_platform_memory_candidates(client,
 
     response = client.post(
         "/api/ai/feedback",
-        headers=build_auth_headers(1, 1),
+        headers=build_auth_headers(3, 8),
         json={
             "hook": "useful",
             "selectedMaterialIds": [780, 781, 999, 780],
@@ -209,7 +209,7 @@ def test_ai_feedback_builds_redacted_user_and_platform_memory_candidates(client,
 def test_ai_feedback_respects_disabled_personal_memory_cookie(client, auth_service) -> None:
     seed_read_users(auth_service)
     _seed_feedback_materials()
-    headers = build_auth_headers(1, 1)
+    headers = build_auth_headers(3, 8)
     assert client.put("/api/ai/memory-preferences", headers=headers, json={"enabled": False}).status_code == 200
 
     response = client.post(
@@ -257,7 +257,7 @@ def test_ai_feedback_rejects_unknown_hooks_without_memory_candidates(client, aut
 
     response = client.post(
         "/api/ai/feedback",
-        headers=build_auth_headers(1, 1),
+        headers=build_auth_headers(3, 8),
         json={"hook": "dump_memory_context", "selectedMaterialIds": [780]},
     )
 

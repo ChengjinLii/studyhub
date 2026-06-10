@@ -3,7 +3,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, Request, Response
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_agent_feedback_service, get_ai_service, require_auth_context
+from app.api.deps import get_agent_feedback_service, get_ai_service, require_privileged_auth_context
 from app.core.db import get_db_session
 from app.core.response import api_ok
 from app.core.security import AuthContext
@@ -19,7 +19,7 @@ router = APIRouter(tags=["ai"])
 @router.post("/api/ai/chat")
 def ai_chat(
     payload: AiChatRequestPayload,
-    _: AuthContext = Depends(require_auth_context),
+    _: AuthContext = Depends(require_privileged_auth_context),
     service: AiService = Depends(get_ai_service),
 ) -> dict[str, object]:
     return api_ok(service.chat(payload))
@@ -30,7 +30,7 @@ def ai_chat(
 def ai_recommend(
     payload: AiRecommendRequestPayload,
     request: Request,
-    auth: AuthContext = Depends(require_auth_context),
+    auth: AuthContext = Depends(require_privileged_auth_context),
     session: Session = Depends(get_db_session),
     service: AiService = Depends(get_ai_service),
 ) -> dict[str, object]:
@@ -50,7 +50,7 @@ def ai_recommend(
 @router.get("/api/ai/memory")
 def ai_memory_preview(
     request: Request,
-    auth: AuthContext = Depends(require_auth_context),
+    auth: AuthContext = Depends(require_privileged_auth_context),
     session: Session = Depends(get_db_session),
     service: AiService = Depends(get_ai_service),
 ) -> dict[str, object]:
@@ -70,7 +70,7 @@ def ai_memory_preview(
 def update_ai_memory_preferences(
     payload: AiMemoryPreferencePayload,
     response: Response,
-    _: AuthContext = Depends(require_auth_context),
+    _: AuthContext = Depends(require_privileged_auth_context),
     service: AiService = Depends(get_ai_service),
 ) -> dict[str, object]:
     service.write_personal_memory_preference_cookie(response, enabled=payload.enabled)
@@ -80,7 +80,7 @@ def update_ai_memory_preferences(
 @router.delete("/api/ai/memory")
 def delete_ai_memory(
     response: Response,
-    _: AuthContext = Depends(require_auth_context),
+    _: AuthContext = Depends(require_privileged_auth_context),
     service: AiService = Depends(get_ai_service),
 ) -> dict[str, object]:
     service.write_personal_memory_preference_cookie(response, enabled=False)
@@ -91,7 +91,7 @@ def delete_ai_memory(
 def create_ai_feedback(
     payload: AiFeedbackPayload,
     request: Request,
-    _: AuthContext = Depends(require_auth_context),
+    _: AuthContext = Depends(require_privileged_auth_context),
     session: Session = Depends(get_db_session),
     service: AiService = Depends(get_ai_service),
     feedback_service: AgentFeedbackService = Depends(get_agent_feedback_service),
