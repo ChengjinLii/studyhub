@@ -37,7 +37,14 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     settings = get_settings()
-    configure_logging(settings.log_level, log_format=settings.log_format, access_log_enabled=settings.access_log_enabled)
+    configure_logging(
+        settings.log_level,
+        log_format=settings.log_format,
+        access_log_enabled=settings.access_log_enabled,
+        service_name="studyhub-worker",
+        environment=settings.environment,
+        build_git_sha=settings.resolved_build_git_sha,
+    )
     prepare_database_runtime()
     clear_dependency_caches()
     worker_service = get_worker_service()

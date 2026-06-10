@@ -17,7 +17,7 @@ from app.api.main import api_router
 from app.core.config import get_settings
 from app.core.db import prepare_database_runtime, session_scope
 from app.core.exceptions import install_exception_handlers
-from app.core.logging import bind_request_id, configure_logging, reset_request_id
+from app.core.logging import bind_request_context, configure_logging, reset_request_context, sanitize_request_id
 from app.core.observability import get_runtime_metrics
 from app.core.origin_guard import write_origin_allowed
 from app.core.rate_limit import rate_limit_allowed
@@ -48,7 +48,14 @@ def _ensure_runtime_directories() -> None:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     settings = get_settings()
-    configure_logging(settings.log_level, log_format=settings.log_format, access_log_enabled=settings.access_log_enabled)
+    configure_logging(
+        settings.log_level,
+        log_format=settings.log_format,
+        access_log_enabled=settings.access_log_enabled,
+        service_name="studyhub-backend",
+        environment=settings.environment,
+        build_git_sha=settings.resolved_build_git_sha,
+    )
     _ensure_runtime_directories()
     prepare_database_runtime()
     if settings.is_local_dev and settings.local_dev_bootstrap_user:
@@ -101,8 +108,8 @@ def create_app() -> FastAPI:
     @app.middleware("http")
     async def record_http_observability(request: Request, call_next):
         started_at = perf_counter()
-        request_id = request.headers.get("x-request-id") or uuid4().hex[:16]
-        token = bind_request_id(request_id)
+        request_id = sanitize_request_id(request.headers.get("x-request-id") or uuid4().hex[:16])
+        context_tokens = bind_request_context(request_id=request_id, method=request.method, path=request.url.path)
         response = None
         status_code = 500
         route_path = request.url.path
@@ -188,7 +195,7 @@ def create_app() -> FastAPI:
                         "client_ip": request.client.host if request.client else None,
                     },
                 )
-            reset_request_id(token)
+            reset_request_context(context_tokens)
 
     install_exception_handlers(app)
 

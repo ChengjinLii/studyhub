@@ -2,12 +2,15 @@ from __future__ import annotations
 
 from pathlib import Path
 from types import SimpleNamespace
+import json
+import logging
 
 from fastapi.testclient import TestClient
 
 from app.api.deps import clear_dependency_caches
 from app.core.config import get_settings
 from app.core.db import reset_database_runtime
+from app.core.logging import JsonFormatter, bind_request_context, configure_logging, reset_request_context, sanitize_request_id
 from app.core.observability import get_runtime_metrics
 from app.main import create_app
 
@@ -81,3 +84,57 @@ def test_http_metrics_include_duration_histogram_buckets() -> None:
         'pdf_evidence="yes",memory_context="no",course_memory_card="yes",le="2.5"} 1'
     ) in rendered
     metrics.clear()
+
+
+def test_json_formatter_emits_stable_structured_context() -> None:
+    configure_logging(
+        "INFO",
+        log_format="json",
+        service_name="studyhub-test",
+        environment="test",
+        build_git_sha="abc1234",
+    )
+    tokens = bind_request_context(request_id="rid-1", method="POST", path="/api/session")
+    try:
+        record = logging.getLogger("studyhub.test").makeRecord(
+            "studyhub.test",
+            logging.INFO,
+            __file__,
+            1,
+            "Login attempt",
+            (),
+            None,
+            extra={
+                "event": "auth_login",
+                "status_code": 401,
+                "duration_ms": 12.5,
+                "client_ip": "203.0.113.10",
+                "token": "should-not-leak",
+            },
+        )
+        formatter = JsonFormatter()
+        payload = json.loads(formatter.format(record))
+    finally:
+        reset_request_context(tokens)
+
+    assert payload["service.name"] == "studyhub-test"
+    assert payload["service.version"] == "abc1234"
+    assert payload["deployment.environment"] == "test"
+    assert payload["severityText"] == "INFO"
+    assert payload["request.id"] == "rid-1"
+    assert payload["http.request.method"] == "POST"
+    assert payload["url.path"] == "/api/session"
+    assert payload["http.response.status_code"] == 401
+    assert payload["duration.ms"] == 12.5
+    assert payload["client.address"] == "203.0.113.10"
+    assert payload["attributes"]["token"] == "[REDACTED]"
+
+
+def test_request_id_header_is_sanitized_in_response(tmp_path: Path, monkeypatch) -> None:
+    with _build_client(tmp_path, monkeypatch) as client:
+        response = client.get("/api/healthz", headers={"x-request-id": "bad id\nwith spaces and a very long suffix" * 5})
+
+    assert response.status_code == 200
+    assert response.headers["x-request-id"] == sanitize_request_id("bad id\nwith spaces and a very long suffix" * 5)
+    assert "\n" not in response.headers["x-request-id"]
+    assert len(response.headers["x-request-id"]) <= 96
