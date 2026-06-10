@@ -12,6 +12,7 @@ import CommentSection from '../../components/comments/CommentSection';
 import StarRating from '../../components/StarRating';
 import { readSession, hasRole } from '../../lib/auth';
 import { fetchMaterialDetail } from '../../lib/api';
+import { getRequestOrigin } from '../../lib/apiBase';
 import { formatDateTime } from '../../lib/format';
 import { formatMajorDisplay } from '../../lib/major';
 import { materialPath, parseMaterialId, slugifyTitle, userPath } from '../../lib/slug';
@@ -778,7 +779,7 @@ export const getServerSideProps: GetServerSideProps<MaterialDetailPageProps> = a
   }
   let material: MaterialDetail | null = null;
   try {
-    material = await fetchMaterialDetail(materialId, session.token || undefined);
+    material = await fetchMaterialDetail(materialId, session.token || undefined, getRequestOrigin(ctx.req));
   } catch (error) {
     // eslint-disable-next-line no-console
     console.warn('Failed to fetch material detail', error);
