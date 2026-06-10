@@ -449,8 +449,19 @@ class AliyunOssStorageProvider:
         return normalized
 
     def _build_content_disposition(self, filename: str) -> str:
-        quoted = quote(filename)
-        return f"attachment; filename=\"{filename}\"; filename*=UTF-8''{quoted}"
+        fallback = self._ascii_content_disposition_filename(filename)
+        quoted = quote(filename, safe="")
+        return f"attachment; filename=\"{fallback}\"; filename*=UTF-8''{quoted}"
+
+    def _ascii_content_disposition_filename(self, filename: str) -> str:
+        candidate = Path(filename or "download").name.replace("\\", "_").replace('"', "_")
+        suffix = Path(candidate).suffix if Path(candidate).suffix.isascii() else ""
+        stem = Path(candidate).stem or candidate
+        ascii_stem = stem.encode("ascii", "ignore").decode("ascii")
+        ascii_stem = re.sub(r"[^A-Za-z0-9_-]+", "_", ascii_stem).strip("_-")
+        if not ascii_stem:
+            ascii_stem = "download"
+        return f"{ascii_stem}{suffix}" if suffix else ascii_stem
 
     def _import_oss2(self):
         try:
