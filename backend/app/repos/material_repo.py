@@ -489,6 +489,9 @@ class MaterialRepository:
         return list(session.scalars(stmt))
 
     def add_version(self, session: Session, *, material_id: int, version_label: str, created_at: datetime | None = None) -> MaterialVersionRecord:
+        existing_columns = _table_columns(session, "material_versions")
+        if "file_key" in existing_columns:
+            return self._add_legacy_version(session, material_id=material_id, version_label=version_label, created_at=created_at)
         entity = MaterialVersionRecord(material_id=material_id, version_label=version_label)
         if created_at is not None:
             entity.created_at = created_at
@@ -497,6 +500,49 @@ class MaterialRepository:
         session.flush()
         session.refresh(entity)
         return entity
+
+    def _add_legacy_version(
+        self,
+        session: Session,
+        *,
+        material_id: int,
+        version_label: str,
+        created_at: datetime | None = None,
+    ) -> MaterialVersionRecord:
+        existing_columns = _table_columns(session, "material_versions")
+        material = self.get_material(session, material_id)
+        now = created_at or datetime.now(UTC)
+        values: dict[str, Any] = {
+            "material_id": material_id,
+            "version_label": version_label,
+            "changelog": None,
+            "file_key": (material.file_storage_key if material else None) or "",
+            "md_key": None,
+            "encryption_password": None,
+            "file_type": (material.file_type if material else None) or "zip",
+            "created_at": now,
+            "updated_at": now,
+        }
+        insert_columns = [name for name in values if name in existing_columns]
+        placeholders = ", ".join(f":{name}" for name in insert_columns)
+        columns_sql = ", ".join(insert_columns)
+        result = session.execute(
+            text(f"INSERT INTO material_versions ({columns_sql}) VALUES ({placeholders})"),
+            {name: values[name] for name in insert_columns},
+        )
+        session.flush()
+        version_id = getattr(result, "lastrowid", None)
+        if version_id:
+            loaded = session.get(MaterialVersionRecord, int(version_id))
+            if loaded is not None:
+                return loaded
+        return MaterialVersionRecord(
+            id=int(version_id or 0),
+            material_id=material_id,
+            version_label=version_label,
+            created_at=now,
+            updated_at=now,
+        )
 
     def list_reviews(self, session: Session, material_id: int) -> list[MaterialReviewRecord]:
         if self._uses_legacy_reviews(session):

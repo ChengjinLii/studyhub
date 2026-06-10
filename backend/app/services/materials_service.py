@@ -1136,14 +1136,14 @@ class MaterialsService(MaterialsCompatMixin):
         elif is_create and delivery_method == "NETDISK":
             material.file_storage_key = None
             material.original_filename = None
-            material.file_size = None
-            material.file_type = None
+            material.file_size = 0
+            material.file_type = "netdisk"
 
         if delivery_method == "NETDISK":
             material.file_storage_key = None
             material.original_filename = None if material.original_filename is None and not self._has_file(material) else material.original_filename
-            material.file_size = None if material.file_storage_key is None else material.file_size
-            material.file_type = None if material.file_storage_key is None else material.file_type
+            material.file_size = 0 if material.file_storage_key is None else material.file_size
+            material.file_type = "netdisk" if material.file_storage_key is None else material.file_type
 
         if previews:
             for existing_key in self._loads(material.manual_preview_keys_json):
@@ -1179,7 +1179,18 @@ class MaterialsService(MaterialsCompatMixin):
             material.preview_status = "unsupported"
             material.preview_page_count = None
             material.preview_pages = None
-        material.preview_manifest = f"materials/{material.id}/preview/manifest.json"
+        material.preview_manifest = self._json_dumps(
+            {
+                "status": material.preview_status,
+                "pageCount": material.preview_page_count,
+                "previewPages": material.preview_pages,
+                "pages": [
+                    {"index": index + 1, "key": key}
+                    for index, key in enumerate(manual_keys)
+                    if isinstance(key, str) and key.strip()
+                ],
+            }
+        )
 
         if delivery_method == "FILE" and not self._has_file(material):
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="资料缺少有效的下载方式")
