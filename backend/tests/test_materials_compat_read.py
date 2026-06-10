@@ -8,6 +8,7 @@ from typing import Any
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import Session
 
+from app.repos.material_repo import MaterialRepository
 from app.services.materials_service import MaterialsService
 
 
@@ -98,7 +99,7 @@ def _build_service() -> MaterialsService:
         oss_endpoint=None,
         oss_bucket=None,
     )
-    return MaterialsService(fake_settings, read_repo=None, auth_repo=None, material_repo=None, asset_store=fake_asset_store)
+    return MaterialsService(fake_settings, read_repo=None, auth_repo=None, material_repo=MaterialRepository(), asset_store=fake_asset_store)
 
 
 def test_legacy_material_stats_uses_single_materials_aggregate_query() -> None:
@@ -251,6 +252,51 @@ def test_compat_download_uses_legacy_file_key_and_download_columns() -> None:
     assert downloads == 1
     assert download_count == 1
     assert quota == 199
+
+
+def test_compat_record_view_accepts_legacy_visible_material_status() -> None:
+    service = _build_service()
+    engine = create_engine("sqlite+pysqlite:///:memory:", future=True)
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                """
+                CREATE TABLE materials (
+                    id INTEGER PRIMARY KEY,
+                    title VARCHAR(80) NOT NULL,
+                    status VARCHAR(16) NOT NULL DEFAULT 'PUBLISHED',
+                    view_count INTEGER NOT NULL DEFAULT 0
+                )
+                """
+            )
+        )
+        connection.execute(
+            text(
+                """
+                CREATE TABLE material_views (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    material_id INTEGER NOT NULL,
+                    user_id INTEGER NULL,
+                    viewer_token_hash VARCHAR(128) NULL,
+                    viewed_at DATETIME NULL
+                )
+                """
+            )
+        )
+        connection.execute(text("INSERT INTO materials (id, title, status, view_count) VALUES (41, 'Legacy PDF', 'PUBLISHED', 5)"))
+
+    with Session(engine) as session:
+        first = service.record_view(session, 41, user_id=None, can_manage_all=False, viewer_token="viewer-a")
+        second = service.record_view(session, 41, user_id=None, can_manage_all=False, viewer_token="viewer-a")
+
+    with engine.connect() as connection:
+        view_count = connection.execute(text("SELECT view_count FROM materials WHERE id = 41")).scalar_one()
+        records = connection.execute(text("SELECT COUNT(*) FROM material_views WHERE material_id = 41")).scalar_one()
+
+    assert first == 6
+    assert second == 6
+    assert view_count == 6
+    assert records == 1
 
 
 def test_legacy_material_summary_cache_reuses_stats_until_invalidated() -> None:

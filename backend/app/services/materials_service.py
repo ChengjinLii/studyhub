@@ -501,6 +501,8 @@ class MaterialsService(MaterialsCompatMixin):
         can_manage_all: bool,
         viewer_token: str | None,
     ) -> int:
+        if self.settings.requires_private_env_file:
+            return self._compat_record_view(session, material_id, user_id, can_manage_all, viewer_token)
         self._bootstrap(session)
         material = self._load_accessible_material(session, material_id, user_id, can_manage_all)
         current_view_count = int(material.view_count or 0)

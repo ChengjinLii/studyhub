@@ -7,7 +7,7 @@ from time import monotonic
 from typing import Any
 
 from fastapi import HTTPException, status
-from sqlalchemy import bindparam, text
+from sqlalchemy import bindparam, inspect, text
 from sqlalchemy.orm import Session
 
 from app.core.async_db import async_session_scope
@@ -39,10 +39,76 @@ VISIBLE_MATERIAL_STATUS_SQL = "(m.status IS NULL OR LOWER(m.status) NOT IN ('hid
 
 
 class MaterialsCompatMixin:
+    def _compat_file_key_sql(self, session: Session, table_alias: str | None = "m") -> str:
+        prefix = f"{table_alias}." if table_alias else ""
+        try:
+            bind = session.get_bind()
+            if hasattr(bind, "sync_engine"):
+                bind = bind.sync_engine
+            columns = {column["name"] for column in inspect(bind).get_columns("materials")}
+        except Exception:
+            columns = {"file_key", "file_storage_key"}
+        if "file_storage_key" in columns:
+            return f"COALESCE({prefix}file_storage_key, {prefix}file_key) AS file_key"
+        return f"{prefix}file_key"
+
     def invalidate_material_summary_cache(self) -> None:
         cache, lock = self._compat_summary_cache_state()
         with lock:
             cache.clear()
+
+    def _compat_record_view(
+        self,
+        session: Session,
+        material_id: int,
+        user_id: int | None,
+        can_manage_all: bool,
+        viewer_token: str | None,
+    ) -> int:
+        del can_manage_all
+        row = session.execute(
+            text(
+                f"""
+                SELECT id, view_count
+                FROM materials m
+                WHERE m.id = :material_id
+                  AND {VISIBLE_MATERIAL_STATUS_SQL}
+                LIMIT 1
+                """
+            ),
+            {"material_id": material_id},
+        ).mappings().first()
+        if row is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="资料不存在")
+
+        current_view_count = int(row["view_count"] or 0)
+        token_hash = self._hash_viewer_token(viewer_token)
+        if user_id is not None:
+            existing = self.material_repo.find_view_by_user(session, material_id, user_id)
+            if existing is not None:
+                return current_view_count
+            if token_hash:
+                existing_by_token = self.material_repo.find_view_by_token_hash(session, material_id, token_hash)
+                if existing_by_token is not None:
+                    if existing_by_token.user_id is None:
+                        self.material_repo.bind_view_to_user(session, existing_by_token, user_id)
+                        session.commit()
+                    return current_view_count
+            self.material_repo.add_view(session, material_id=material_id, user_id=user_id, viewer_token_hash=token_hash)
+        elif token_hash:
+            if self.material_repo.find_view_by_token_hash(session, material_id, token_hash) is not None:
+                return current_view_count
+            self.material_repo.add_view(session, material_id=material_id, user_id=None, viewer_token_hash=token_hash)
+        else:
+            return current_view_count
+
+        next_view_count = current_view_count + 1
+        session.execute(
+            text("UPDATE materials SET view_count = :view_count WHERE id = :material_id"),
+            {"material_id": material_id, "view_count": next_view_count},
+        )
+        session.commit()
+        return next_view_count
 
     def _compat_summary_cache_state(self):
         cache = getattr(self, "_compat_summary_cache", None)
@@ -181,9 +247,10 @@ class MaterialsCompatMixin:
         ]
 
     def _compat_get_detail(self, session: Session, current_user_id: int | None, material_id: int, can_manage_all: bool) -> dict[str, Any]:
+        file_key_sql = self._compat_file_key_sql(session)
         row = session.execute(
             text(
-                """
+                f"""
                 SELECT
                     m.id,
                     m.uploader_id,
@@ -218,7 +285,7 @@ class MaterialsCompatMixin:
                     m.view_count,
                     m.download_count,
                     m.sales_count,
-                    COALESCE(m.file_storage_key, m.file_key) AS file_key,
+                    {file_key_sql},
                     m.keywords,
                     m.status
                 FROM materials m
@@ -329,15 +396,16 @@ class MaterialsCompatMixin:
         }
 
     def _compat_get_preview(self, session: Session, material_id: int, user_id: int | None, can_manage_all: bool) -> dict[str, Any]:
+        file_key_sql = self._compat_file_key_sql(session)
         row = session.execute(
             text(
-                """
+                f"""
                 SELECT
                     m.id,
                     m.uploader_id,
                     m.title,
                     m.file_type,
-                    COALESCE(m.file_storage_key, m.file_key) AS file_key,
+                    {file_key_sql},
                     m.preview_source,
                     m.preview_manifest,
                     m.custom_preview_images,
@@ -431,9 +499,10 @@ class MaterialsCompatMixin:
         return [self._compat_batch_download_payload(row) for row in rows]
 
     def _compat_load_download_material_row(self, session: Session, material_id: int) -> dict[str, Any]:
+        file_key_sql = self._compat_file_key_sql(session, table_alias=None)
         row = session.execute(
             text(
-                """
+                f"""
                 SELECT
                     id,
                     uploader_id,
@@ -441,7 +510,7 @@ class MaterialsCompatMixin:
                     original_filename,
                     file_type,
                     file_size,
-                    COALESCE(file_storage_key, file_key) AS file_key,
+                    {file_key_sql},
                     is_free,
                     netdisk_url,
                     netdisk_password,
@@ -633,6 +702,7 @@ class MaterialsCompatMixin:
                 paging_sql = "\n            LIMIT :limit"
             params["offset"] = safe_offset
             paging_sql += "\n            OFFSET :offset"
+        file_key_sql = self._compat_file_key_sql(session)
 
         sql = f"""
             SELECT
@@ -659,7 +729,7 @@ class MaterialsCompatMixin:
                 m.download_count,
                 m.sales_count,
                 m.created_at,
-                COALESCE(m.file_storage_key, m.file_key) AS file_key,
+                {file_key_sql},
                 m.netdisk_url,
                 {recommendation_score_sql} AS recommendation_score
             FROM materials m
@@ -1298,6 +1368,7 @@ class MaterialsCompatMixin:
                 paging_sql = "\n            LIMIT :limit"
             params["offset"] = safe_offset
             paging_sql += "\n            OFFSET :offset"
+        file_key_sql = self._compat_file_key_sql(session)
         rows = (
             await session.execute(
                 text(
@@ -1326,7 +1397,7 @@ class MaterialsCompatMixin:
                         m.download_count,
                         m.sales_count,
                         m.created_at,
-                        COALESCE(m.file_storage_key, m.file_key) AS file_key,
+                        {file_key_sql},
                         m.netdisk_url,
                         {recommendation_score_sql} AS recommendation_score
                     FROM materials m
@@ -1342,10 +1413,11 @@ class MaterialsCompatMixin:
         return [dict(row) for row in rows]
 
     async def _compat_load_material_detail_row_async(self, session, material_id: int) -> dict[str, Any]:
+        file_key_sql = self._compat_file_key_sql(session)
         row = (
             await session.execute(
                 text(
-                    """
+                    f"""
                     SELECT
                         m.id,
                         m.uploader_id,
@@ -1380,7 +1452,7 @@ class MaterialsCompatMixin:
                         m.view_count,
                         m.download_count,
                         m.sales_count,
-                        COALESCE(m.file_storage_key, m.file_key) AS file_key,
+                        {file_key_sql},
                         m.keywords,
                         m.status
                     FROM materials m

@@ -57,8 +57,10 @@ jobs:
         run: npm ci
       - name: Report production dependency advisories
         working-directory: frontend
-        continue-on-error: true
-        run: npm audit --omit=dev --audit-level=high
+        run: |
+          if ! npm audit --omit=dev --audit-level=high; then
+            echo "::warning::Production dependency advisories were reported. Review npm audit output above; this report-only step does not block CI."
+          fi
       - name: Run frontend checks
         working-directory: frontend
         run: npm run check

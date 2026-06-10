@@ -211,8 +211,13 @@ test('mock page mode covers StudyHub Agent open, fallback, drag and collapse', a
   await expect(launcher).toBeVisible();
   const collapsedBox = await launcher.boundingBox();
   expect(collapsedBox).not.toBeNull();
-  expect(Math.abs((collapsedBox?.x ?? 0) - movedBox.x)).toBeLessThan(4);
-  expect(Math.abs((collapsedBox?.y ?? 0) - movedBox.y)).toBeLessThan(4);
+  const movedCenter = { x: movedBox.x + movedBox.width / 2, y: movedBox.y + movedBox.height / 2 };
+  const collapsedCenter = {
+    x: (collapsedBox?.x ?? 0) + (collapsedBox?.width ?? 0) / 2,
+    y: (collapsedBox?.y ?? 0) + (collapsedBox?.height ?? 0) / 2,
+  };
+  expect(Math.abs(collapsedCenter.x - movedCenter.x)).toBeLessThan(4);
+  expect(Math.abs(collapsedCenter.y - movedCenter.y)).toBeLessThan(4);
 });
 
 test('mock page mode hides StudyHub Agent from non-admin users', async ({ page }) => {
