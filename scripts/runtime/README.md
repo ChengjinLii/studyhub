@@ -38,6 +38,7 @@ bash scripts/runtime/production-down.sh
 - `preview-smoke.sh` / `production-smoke.sh` 的 curl 默认使用 5 秒连接超时和 20 秒总超时，可用 `STUDYHUB_CURL_CONNECT_TIMEOUT` / `STUDYHUB_CURL_MAX_TIME` 调整，值必须是大于 0 的秒数
 - `production-smoke.sh` 默认只检查本机 backend / frontend；上线前可以设置 `STUDYHUB_PUBLIC_SMOKE_BASES="https://study-hub.cn https://study-hub.store"` 额外检查公网入口，并用 `STUDYHUB_SMOKE_EXPECTED_GIT_SHA="$(git rev-parse --short HEAD)"` 校验 `/api/healthz` 返回的后端版本，避免域名、CDN 或反代仍指向旧服务
 - `production-up.sh` 默认先跑 `production-preflight.sh` 检查证书路径、数据库网络连通性和 P0 schema 缺字段；紧急场景可设置 `STUDYHUB_PRODUCTION_UP_PREFLIGHT=0` 显式跳过，该开关只接受 `1` / `true` / `0` / `false`
+- `production-up.sh` 默认不会在前端进程仍运行且 `.next/BUILD_ID` 存在时重建前端，避免覆盖运行中 Next.js 进程使用的构建目录；如已停掉前端或确认要强制重建，可设置 `STUDYHUB_PRODUCTION_REBUILD_FRONTEND=1`
 - `production-preflight.sh` 默认检查 `market_items.source orders.uploader_id`，可用 `STUDYHUB_PRODUCTION_SCHEMA_CHECK_COLUMNS` 覆盖；值必须是空格分隔的 `table.column` 标识符，设为空字符串时执行全量 schema 检查，全空白值会被视为配置错误
 - `production-preflight.sh` 的网络连通性检查默认 5 秒超时，可用 `STUDYHUB_PREFLIGHT_TIMEOUT_SECONDS` 调整
 - `PREVIEW_BACKEND_PORT`、`PREVIEW_FRONTEND_PORT`、`PRODUCTION_BACKEND_PORT`、`PRODUCTION_FRONTEND_PORT` 必须是 1-65535 的 TCP 端口号，启动和状态脚本都会校验

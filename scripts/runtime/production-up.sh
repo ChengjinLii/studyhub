@@ -12,6 +12,7 @@ FRONTEND_PORT="${PRODUCTION_FRONTEND_PORT:-3300}"
 BACKEND_PID_FILE="$RUN_DIR/backend.pid"
 FRONTEND_PID_FILE="$RUN_DIR/frontend.pid"
 RUN_PREFLIGHT="${STUDYHUB_PRODUCTION_UP_PREFLIGHT:-1}"
+REBUILD_FRONTEND="${STUDYHUB_PRODUCTION_REBUILD_FRONTEND:-auto}"
 
 require_tcp_port() {
   local name="$1"
@@ -30,6 +31,14 @@ case "$RUN_PREFLIGHT" in
     ;;
   *)
     echo "STUDYHUB_PRODUCTION_UP_PREFLIGHT must be one of: 1, true, 0, false; got $RUN_PREFLIGHT"
+    exit 2
+    ;;
+esac
+case "$REBUILD_FRONTEND" in
+  auto|0|1|false|true)
+    ;;
+  *)
+    echo "STUDYHUB_PRODUCTION_REBUILD_FRONTEND must be one of: auto, 1, true, 0, false; got $REBUILD_FRONTEND"
     exit 2
     ;;
 esac
@@ -84,7 +93,15 @@ fi
 
 (
   cd "$ROOT_DIR/frontend"
-  NEXT_PUBLIC_API_BASE="${NEXT_PUBLIC_API_BASE:-/api}" npm run build >/dev/null
+  if [[ "$REBUILD_FRONTEND" == "1" || "$REBUILD_FRONTEND" == "true" ]]; then
+    NEXT_PUBLIC_API_BASE="${NEXT_PUBLIC_API_BASE:-/api}" npm run build >/dev/null
+  elif [[ "$REBUILD_FRONTEND" == "0" || "$REBUILD_FRONTEND" == "false" ]]; then
+    echo "frontend build skipped: STUDYHUB_PRODUCTION_REBUILD_FRONTEND=$REBUILD_FRONTEND"
+  elif is_running "$FRONTEND_PID_FILE" && [[ -f "$ROOT_DIR/frontend/.next/BUILD_ID" ]]; then
+    echo "frontend build skipped: running frontend is using the active .next build"
+  else
+    NEXT_PUBLIC_API_BASE="${NEXT_PUBLIC_API_BASE:-/api}" npm run build >/dev/null
+  fi
 )
 
 if ! is_running "$BACKEND_PID_FILE"; then
