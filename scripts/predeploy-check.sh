@@ -8,6 +8,7 @@ PYTHON_BIN="${STUDYHUB_PYTHON_BIN:-$ROOT_DIR/.venv/bin/python}"
 RUN_RUNTIME_CHECKS="${STUDYHUB_PREDEPLOY_RUNTIME_CHECKS:-auto}"
 RUN_PRODUCTION_CHECKS="${STUDYHUB_PREDEPLOY_PRODUCTION_CHECKS:-auto}"
 GENERATED_CLEAN_MODE="${STUDYHUB_PREDEPLOY_CLEAN_MODE:-source}"
+REQUIRED_SYSTEMD_SERVICES="${STUDYHUB_PREDEPLOY_REQUIRED_SYSTEMD_SERVICES:-studyhub-backend.service studyhub-frontend.service studyhub-worker.service}"
 
 validate_bool_auto() {
   local name="$1"
@@ -32,6 +33,12 @@ case "$GENERATED_CLEAN_MODE" in
 esac
 validate_bool_auto "STUDYHUB_PREDEPLOY_RUNTIME_CHECKS" "$RUN_RUNTIME_CHECKS"
 validate_bool_auto "STUDYHUB_PREDEPLOY_PRODUCTION_CHECKS" "$RUN_PRODUCTION_CHECKS"
+for service in $REQUIRED_SYSTEMD_SERVICES; do
+  if ! [[ "$service" =~ ^[A-Za-z0-9_.@-]+[.]service$ ]]; then
+    echo "STUDYHUB_PREDEPLOY_REQUIRED_SYSTEMD_SERVICES entries must be systemd .service names; got $service"
+    exit 2
+  fi
+done
 
 section() {
   printf '\n[%s] %s\n' "$(date '+%H:%M:%S')" "$1"
@@ -110,15 +117,35 @@ else
   echo "skipped: nginx command is not available"
 fi
 
-if command -v systemctl >/dev/null 2>&1; then
+if [[ "$RUN_RUNTIME_CHECKS" == "0" || "$RUN_RUNTIME_CHECKS" == "false" ]]; then
   section "systemd service status"
+  echo "skipped: STUDYHUB_PREDEPLOY_RUNTIME_CHECKS=$RUN_RUNTIME_CHECKS"
+elif command -v systemctl >/dev/null 2>&1; then
+  section "systemd service status"
+  systemd_failures=0
   for service in studyhub-backend.service studyhub-frontend.service studyhub-worker.service studyhub-scheduler.service; do
     if systemctl list-unit-files "$service" >/dev/null 2>&1; then
-      systemctl is-active "$service" || true
+      status_value="$(systemctl is-active "$service" || true)"
+      echo "$service: $status_value"
+      for required_service in $REQUIRED_SYSTEMD_SERVICES; do
+        if [[ "$service" == "$required_service" && "$status_value" != "active" ]]; then
+          echo "required systemd service is not active: $service"
+          systemd_failures=$((systemd_failures + 1))
+        fi
+      done
     else
       echo "$service: not installed"
+      for required_service in $REQUIRED_SYSTEMD_SERVICES; do
+        if [[ "$service" == "$required_service" ]]; then
+          echo "required systemd service is not installed: $service"
+          systemd_failures=$((systemd_failures + 1))
+        fi
+      done
     fi
   done
+  if (( systemd_failures > 0 )); then
+    exit 1
+  fi
 else
   section "systemd service status"
   echo "skipped: systemctl command is not available"

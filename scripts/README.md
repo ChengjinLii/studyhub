@@ -38,6 +38,18 @@
 STUDYHUB_PREDEPLOY_PRODUCTION_CHECKS=0 bash scripts/predeploy-check.sh
 ```
 
+生产机器上，`predeploy-check.sh` 默认要求 `studyhub-backend.service`、`studyhub-frontend.service` 和 `studyhub-worker.service` 均为 active，避免后台结算、退款和维护任务在上线前被漏掉。只做本地代码门禁时可以跳过运行时检查：
+
+```bash
+STUDYHUB_PREDEPLOY_RUNTIME_CHECKS=0 STUDYHUB_PREDEPLOY_PRODUCTION_CHECKS=0 bash scripts/predeploy-check.sh
+```
+
+如某个部署形态确实不需要 worker，可以显式覆盖必需服务列表：
+
+```bash
+STUDYHUB_PREDEPLOY_REQUIRED_SYSTEMD_SERVICES="studyhub-backend.service studyhub-frontend.service" bash scripts/predeploy-check.sh
+```
+
 `predeploy-check.sh` 默认使用 `--source` 清理源码缓存和测试产物，并保留当前运行可能依赖的 Next.js 构建产物。若在本地或 CI 中准备重新构建前端，可以显式改用全量清理：
 
 ```bash
