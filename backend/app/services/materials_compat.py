@@ -218,7 +218,7 @@ class MaterialsCompatMixin:
                     m.view_count,
                     m.download_count,
                     m.sales_count,
-                    m.file_key,
+                    COALESCE(m.file_storage_key, m.file_key) AS file_key,
                     m.keywords,
                     m.status
                 FROM materials m
@@ -337,7 +337,7 @@ class MaterialsCompatMixin:
                     m.uploader_id,
                     m.title,
                     m.file_type,
-                    m.file_key,
+                    COALESCE(m.file_storage_key, m.file_key) AS file_key,
                     m.preview_source,
                     m.preview_manifest,
                     m.custom_preview_images,
@@ -441,7 +441,7 @@ class MaterialsCompatMixin:
                     original_filename,
                     file_type,
                     file_size,
-                    file_key,
+                    COALESCE(file_storage_key, file_key) AS file_key,
                     is_free,
                     netdisk_url,
                     netdisk_password,
@@ -659,7 +659,7 @@ class MaterialsCompatMixin:
                 m.download_count,
                 m.sales_count,
                 m.created_at,
-                m.file_key,
+                COALESCE(m.file_storage_key, m.file_key) AS file_key,
                 m.netdisk_url,
                 {recommendation_score_sql} AS recommendation_score
             FROM materials m
@@ -1326,7 +1326,7 @@ class MaterialsCompatMixin:
                         m.download_count,
                         m.sales_count,
                         m.created_at,
-                        m.file_key,
+                        COALESCE(m.file_storage_key, m.file_key) AS file_key,
                         m.netdisk_url,
                         {recommendation_score_sql} AS recommendation_score
                     FROM materials m
@@ -1380,7 +1380,7 @@ class MaterialsCompatMixin:
                         m.view_count,
                         m.download_count,
                         m.sales_count,
-                        m.file_key,
+                        COALESCE(m.file_storage_key, m.file_key) AS file_key,
                         m.keywords,
                         m.status
                     FROM materials m
