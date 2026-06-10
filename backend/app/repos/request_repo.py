@@ -18,6 +18,7 @@ from app.models.requests import (
 
 
 _TABLE_COLUMN_CACHE: dict[tuple[str, str], set[str]] = {}
+_REQUEST_MAPPED_COLUMNS = tuple(RequestRecord.__table__.columns)
 _ARBITRATION_MAPPED_COLUMNS = tuple(RequestArbitrationRecord.__table__.columns)
 
 
@@ -60,6 +61,26 @@ def _arbitration_load_options(session: Session):
     return (load_only(*mapped_existing_columns),)
 
 
+def _request_load_options(session: Session):
+    existing_columns = _table_columns(session, "material_requests")
+    if all(column.name in existing_columns for column in _REQUEST_MAPPED_COLUMNS):
+        return ()
+    mapped_existing_columns = tuple(
+        getattr(RequestRecord, column.name)
+        for column in _REQUEST_MAPPED_COLUMNS
+        if column.name in existing_columns
+    )
+    return (load_only(*mapped_existing_columns),)
+
+
+def _apply_legacy_request_defaults(session: Session, records: list[RequestRecord]) -> list[RequestRecord]:
+    if _has_table_column(session, "material_requests", "source"):
+        return records
+    for record in records:
+        set_committed_value(record, "source", "local")
+    return records
+
+
 def _apply_legacy_arbitration_defaults(session: Session, records: list[RequestArbitrationRecord]) -> list[RequestArbitrationRecord]:
     if _has_table_column(session, "material_request_arbitrations", "source"):
         return records
@@ -81,9 +102,24 @@ def _refresh_arbitration(session: Session, entity: RequestArbitrationRecord) -> 
     return entity
 
 
+def _refresh_request(session: Session, entity: RequestRecord) -> RequestRecord:
+    existing_columns = _table_columns(session, "material_requests")
+    if all(column.name in existing_columns for column in _REQUEST_MAPPED_COLUMNS):
+        session.refresh(entity)
+        return entity
+    refresh_columns = [column.name for column in _REQUEST_MAPPED_COLUMNS if column.name in existing_columns]
+    if refresh_columns:
+        session.refresh(entity, attribute_names=refresh_columns)
+    if "source" not in existing_columns:
+        set_committed_value(entity, "source", "local")
+    return entity
+
+
 class RequestRepository:
     def ensure_seed_bootstrap(self, session: Session, seed: dict[str, Any]) -> None:
         if not seed:
+            return
+        if not _has_table_column(session, "material_requests", "source"):
             return
         items = seed.get("requests") or []
         seed_count = int(session.scalar(select(func.count()).select_from(RequestRecord).where(RequestRecord.source == "seed")) or 0)
@@ -167,14 +203,20 @@ class RequestRepository:
 
     def list_requests(self, session: Session) -> list[RequestRecord]:
         stmt = select(RequestRecord).order_by(RequestRecord.created_at.desc(), RequestRecord.id.desc())
-        return list(session.scalars(stmt))
+        options = _request_load_options(session)
+        if options:
+            stmt = stmt.options(*options)
+        return _apply_legacy_request_defaults(session, list(session.scalars(stmt)))
 
     def list_public_requests(self, session: Session, *, sort: str | None, limit: int | None = None) -> list[RequestRecord]:
         stmt = select(RequestRecord).where(RequestRecord.status == "OPEN")
+        options = _request_load_options(session)
+        if options:
+            stmt = stmt.options(*options)
         stmt = self._order_public_requests(stmt, sort)
         if limit is not None:
             stmt = stmt.limit(limit)
-        return list(session.scalars(stmt))
+        return _apply_legacy_request_defaults(session, list(session.scalars(stmt)))
 
     def list_visible_public_requests(self, session: Session, *, sort: str | None, limit: int | None = None) -> list[RequestRecord]:
         hidden_ids = (
@@ -186,10 +228,13 @@ class RequestRepository:
             )
         )
         stmt = select(RequestRecord).where(RequestRecord.status == "OPEN", RequestRecord.id.not_in(hidden_ids))
+        options = _request_load_options(session)
+        if options:
+            stmt = stmt.options(*options)
         stmt = self._order_public_requests(stmt, sort)
         if limit is not None:
             stmt = stmt.limit(limit)
-        return list(session.scalars(stmt))
+        return _apply_legacy_request_defaults(session, list(session.scalars(stmt)))
 
     def _order_public_requests(self, stmt, sort: str | None):
         normalized = (sort or "latest").lower()
@@ -228,7 +273,10 @@ class RequestRepository:
         return {int(value) for value in session.scalars(stmt)}
 
     def get_request(self, session: Session, request_id: int) -> RequestRecord | None:
-        return session.get(RequestRecord, request_id)
+        entity = session.get(RequestRecord, request_id, options=_request_load_options(session))
+        if entity is None:
+            return None
+        return _apply_legacy_request_defaults(session, [entity])[0]
 
     def next_request_id(self, session: Session, seed: dict[str, Any]) -> int:
         seed_max = max((int(item["id"]) for item in seed.get("requests") or []), default=0)
@@ -236,10 +284,27 @@ class RequestRepository:
         return max(seed_max, db_max) + 1
 
     def save_request(self, session: Session, entity: RequestRecord) -> RequestRecord:
+        existing_columns = _table_columns(session, "material_requests")
+        state = inspect(entity)
+        if "source" not in existing_columns and (state.transient or state.pending):
+            values: dict[str, object] = {}
+            for column in _REQUEST_MAPPED_COLUMNS:
+                if column.name not in existing_columns:
+                    continue
+                values[column.name] = getattr(entity, column.name)
+            now = datetime.now()
+            if "created_at" in existing_columns and values.get("created_at") is None:
+                values["created_at"] = now
+            if "updated_at" in existing_columns and values.get("updated_at") is None:
+                values["updated_at"] = now
+            legacy_table = Table("material_requests", MetaData(), autoload_with=session.get_bind())
+            session.execute(insert(legacy_table).values(**values))
+            session.flush()
+            saved = self.get_request(session, int(entity.id))
+            return saved or entity
         session.add(entity)
         session.flush()
-        session.refresh(entity)
-        return entity
+        return _refresh_request(session, entity)
 
     def list_responses(self, session: Session, request_id: int) -> list[RequestResponseRecord]:
         stmt = select(RequestResponseRecord).where(RequestResponseRecord.request_id == request_id).order_by(RequestResponseRecord.created_at.desc(), RequestResponseRecord.id.desc())
@@ -368,18 +433,19 @@ class RequestRepository:
         return _apply_legacy_arbitration_defaults(session, list(session.scalars(stmt)))
 
     def list_timed_out_unanswered_requests(self, session: Session, *, created_before: datetime) -> list[RequestRecord]:
-        stmt = (
-            select(RequestRecord)
-            .where(
-                RequestRecord.source != "seed",
-                RequestRecord.accepted_response_id.is_(None),
-                RequestRecord.status.in_(("OPEN", "REFUNDING")),
-                RequestRecord.response_count == 0,
-                RequestRecord.created_at <= created_before,
-            )
-            .order_by(RequestRecord.created_at.asc(), RequestRecord.id.asc())
-        )
-        return list(session.scalars(stmt))
+        conditions = [
+            RequestRecord.accepted_response_id.is_(None),
+            RequestRecord.status.in_(("OPEN", "REFUNDING")),
+            RequestRecord.response_count == 0,
+            RequestRecord.created_at <= created_before,
+        ]
+        if _has_table_column(session, "material_requests", "source"):
+            conditions.append(RequestRecord.source != "seed")
+        stmt = select(RequestRecord).where(*conditions).order_by(RequestRecord.created_at.asc(), RequestRecord.id.asc())
+        options = _request_load_options(session)
+        if options:
+            stmt = stmt.options(*options)
+        return _apply_legacy_request_defaults(session, list(session.scalars(stmt)))
 
     def list_requests_with_expired_delivery_window(
         self,
@@ -399,18 +465,23 @@ class RequestRepository:
             .group_by(RequestContributionRecord.request_id)
             .subquery()
         )
+        conditions = [
+            RequestRecord.accepted_response_id.is_(None),
+            RequestRecord.status.in_(("OPEN", "REFUNDING")),
+            deadline_subquery.c.latest_deadline <= latest_deadline_before,
+        ]
+        if _has_table_column(session, "material_requests", "source"):
+            conditions.append(RequestRecord.source != "seed")
         stmt = (
             select(RequestRecord)
             .join(deadline_subquery, deadline_subquery.c.request_id == RequestRecord.id)
-            .where(
-                RequestRecord.source != "seed",
-                RequestRecord.accepted_response_id.is_(None),
-                RequestRecord.status.in_(("OPEN", "REFUNDING")),
-                deadline_subquery.c.latest_deadline <= latest_deadline_before,
-            )
+            .where(*conditions)
             .order_by(deadline_subquery.c.latest_deadline.asc(), RequestRecord.id.asc())
         )
-        return list(session.scalars(stmt))
+        options = _request_load_options(session)
+        if options:
+            stmt = stmt.options(*options)
+        return _apply_legacy_request_defaults(session, list(session.scalars(stmt)))
 
     def save_arbitration(self, session: Session, entity: RequestArbitrationRecord) -> RequestArbitrationRecord:
         existing_columns = _table_columns(session, "material_request_arbitrations")
