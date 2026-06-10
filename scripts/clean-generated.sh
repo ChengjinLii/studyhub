@@ -48,6 +48,8 @@ fi
 rm -rf \
   frontend/test-results \
   frontend/playwright-report \
+  frontend/.next-playwright-dev \
+  frontend/.next-playwright-prod \
   backend/.pytest_cache \
   .pytest_cache
 

@@ -105,7 +105,7 @@ bash scripts/ci-check.sh
 ## 其他贡献者
 
 - [@JoeyLam2005](https://github.com/JoeyLam2005)（林俊宇）
-- [@xiaji](https://github.com/xiaji)
+- [@xiaji](https://github.com/xiaji)（季文君）
 
 
 ## 相关项目

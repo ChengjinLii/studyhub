@@ -17,6 +17,7 @@ const extractOrigin = (value) => {
 
 const rawBase = process.env.NEXT_PUBLIC_API_BASE || process.env.API_BASE_URL;
 const apiBase = rawBase ? normalizeApiBase(rawBase) : undefined;
+const nextDistDir = (process.env.NEXT_DIST_DIR || '').trim();
 const apiOrigin = apiBase ? extractOrigin(apiBase) : undefined;
 const internalApiBase = process.env.API_BASE_INTERNAL
   ? normalizeApiBase(process.env.API_BASE_INTERNAL)
@@ -34,6 +35,7 @@ if (apiBase) {
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   compress: true,
+  ...(nextDistDir ? { distDir: nextDistDir } : {}),
   poweredByHeader: false,
   reactStrictMode: true,
   env: {

@@ -6,8 +6,8 @@ const serverMode = (process.env.PLAYWRIGHT_SERVER_MODE || process.env.SMOKE_SERV
 const useProductionServer = serverMode === 'production' || serverMode === 'prod';
 const shouldStartLocalServer = !process.env.SMOKE_BASE_URL || /^http:\/\/(127\.0\.0\.1|localhost):3100\/?$/i.test(baseURL);
 const localServerCommand = useProductionServer
-  ? 'npm run build && npm run start -- --hostname 127.0.0.1 --port 3100'
-  : 'npm run dev -- --hostname 127.0.0.1 --port 3100';
+  ? 'rm -rf .next-playwright-prod && NEXT_DIST_DIR=.next-playwright-prod npm run build && NEXT_DIST_DIR=.next-playwright-prod npm run start -- --hostname 127.0.0.1 --port 3100'
+  : 'NEXT_DIST_DIR=.next-playwright-dev npm run dev -- --hostname 127.0.0.1 --port 3100';
 
 export default defineConfig({
   use: {
