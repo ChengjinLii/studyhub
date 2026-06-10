@@ -1,7 +1,16 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { readSession } from './auth';
 
-const DEFAULT_API_BASE = 'http://127.0.0.1:8111/api';
+const resolveDefaultApiBase = () =>
+  process.env.NODE_ENV === 'production' ? 'http://127.0.0.1:8311/api' : 'http://127.0.0.1:8111/api';
+
+const normalizeApiBase = (base: string) => {
+  const trimmed = base.replace(/\/+$/, '');
+  if (/\/api$/i.test(trimmed)) {
+    return trimmed;
+  }
+  return `${trimmed}/api`;
+};
 
 type CookieAwareHeaders = Headers & {
   getSetCookie?: () => string[];
@@ -31,7 +40,9 @@ const getSetCookies = (headers: Headers): string[] => {
 };
 
 export const resolveBackendApiBase = () =>
-  process.env.API_BASE_INTERNAL || process.env.NEXT_PUBLIC_API_BASE || DEFAULT_API_BASE;
+  normalizeApiBase(
+    process.env.API_BASE_INTERNAL || process.env.API_BASE_URL || process.env.NEXT_PUBLIC_API_BASE || resolveDefaultApiBase()
+  );
 
 export const extractQueryString = (req: NextApiRequest) => {
   const url = req.url || '';

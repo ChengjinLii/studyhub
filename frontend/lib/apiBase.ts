@@ -11,10 +11,12 @@ const normalizeApiBase = (value: string) => {
 };
 
 const isLoopbackBase = (value: string) => /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?/i.test(value);
+const DEFAULT_DEV_API_BASE = 'http://127.0.0.1:8111/api';
+const DEFAULT_PRODUCTION_INTERNAL_API_BASE = 'http://127.0.0.1:8311/api';
 
 export const resolveApiBase = (origin?: string) => {
   const isBrowser = typeof window !== 'undefined';
-  const serverBase = process.env.API_BASE_URL;
+  const serverBase = process.env.API_BASE_INTERNAL || process.env.API_BASE_URL;
   const publicBase = process.env.NEXT_PUBLIC_API_BASE;
   if (!isBrowser && serverBase) {
     return normalizeApiBase(serverBase);
@@ -45,7 +47,7 @@ export const resolveApiBase = (origin?: string) => {
   }
   if (origin) {
     if (isLoopbackBase(origin)) {
-      const devFallback = process.env.NEXT_PUBLIC_DEV_API_BASE || 'http://127.0.0.1:8111/api';
+      const devFallback = process.env.NEXT_PUBLIC_DEV_API_BASE || DEFAULT_DEV_API_BASE;
       return normalizeApiBase(devFallback);
     }
     return normalizeApiBase(origin);
@@ -56,7 +58,8 @@ export const resolveApiBase = (origin?: string) => {
   if (process.env.VERCEL_URL) {
     return normalizeApiBase(`https://${process.env.VERCEL_URL}`);
   }
-  const fallbackOrigin = process.env.NODE_ENV === 'production' ? 'https://study-hub.store' : 'http://127.0.0.1:8111';
+  const fallbackOrigin =
+    process.env.NODE_ENV === 'production' ? DEFAULT_PRODUCTION_INTERNAL_API_BASE : DEFAULT_DEV_API_BASE;
   return normalizeApiBase(fallbackOrigin);
 };
 
