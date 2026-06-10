@@ -57,8 +57,8 @@ if [[ "$MODE" == "--all" ]]; then
   rm -rf frontend/.next
 fi
 
-find backend ai_platform -type d -name '__pycache__' -prune -exec rm -rf {} +
-find backend ai_platform -type f -name '*.pyc' -delete
+find backend -type d -name '__pycache__' -prune -exec rm -rf {} +
+find backend -type f -name '*.pyc' -delete
 
 if [[ "$MODE" == "--all" ]]; then
   echo "Generated caches, test artifacts, and frontend build output cleaned."

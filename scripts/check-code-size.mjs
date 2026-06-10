@@ -109,7 +109,7 @@ for (const dir of forbiddenDirs) {
   }
 }
 
-const pycache = ['backend', 'ai_platform'].flatMap((dir) => listDirectories(dir, '__pycache__'));
+const pycache = ['backend'].flatMap((dir) => listDirectories(dir, '__pycache__'));
 if (pycache.length) {
   failures.push(`__pycache__ directories present:\n${pycache.join('\n')}`);
 }
