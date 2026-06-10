@@ -19,6 +19,8 @@ from app.models.requests import (
 
 _TABLE_COLUMN_CACHE: dict[tuple[str, str], set[str]] = {}
 _REQUEST_MAPPED_COLUMNS = tuple(RequestRecord.__table__.columns)
+_RESPONSE_MAPPED_COLUMNS = tuple(RequestResponseRecord.__table__.columns)
+_CONTRIBUTION_MAPPED_COLUMNS = tuple(RequestContributionRecord.__table__.columns)
 _ARBITRATION_MAPPED_COLUMNS = tuple(RequestArbitrationRecord.__table__.columns)
 
 
@@ -73,8 +75,48 @@ def _request_load_options(session: Session):
     return (load_only(*mapped_existing_columns),)
 
 
+def _response_load_options(session: Session):
+    existing_columns = _table_columns(session, "material_request_responses")
+    if all(column.name in existing_columns for column in _RESPONSE_MAPPED_COLUMNS):
+        return ()
+    mapped_existing_columns = tuple(
+        getattr(RequestResponseRecord, column.name)
+        for column in _RESPONSE_MAPPED_COLUMNS
+        if column.name in existing_columns
+    )
+    return (load_only(*mapped_existing_columns),)
+
+
+def _contribution_load_options(session: Session):
+    existing_columns = _table_columns(session, "material_request_contributions")
+    if all(column.name in existing_columns for column in _CONTRIBUTION_MAPPED_COLUMNS):
+        return ()
+    mapped_existing_columns = tuple(
+        getattr(RequestContributionRecord, column.name)
+        for column in _CONTRIBUTION_MAPPED_COLUMNS
+        if column.name in existing_columns
+    )
+    return (load_only(*mapped_existing_columns),)
+
+
 def _apply_legacy_request_defaults(session: Session, records: list[RequestRecord]) -> list[RequestRecord]:
     if _has_table_column(session, "material_requests", "source"):
+        return records
+    for record in records:
+        set_committed_value(record, "source", "local")
+    return records
+
+
+def _apply_legacy_response_defaults(session: Session, records: list[RequestResponseRecord]) -> list[RequestResponseRecord]:
+    if _has_table_column(session, "material_request_responses", "source"):
+        return records
+    for record in records:
+        set_committed_value(record, "source", "local")
+    return records
+
+
+def _apply_legacy_contribution_defaults(session: Session, records: list[RequestContributionRecord]) -> list[RequestContributionRecord]:
+    if _has_table_column(session, "material_request_contributions", "source"):
         return records
     for record in records:
         set_committed_value(record, "source", "local")
@@ -95,6 +137,32 @@ def _refresh_arbitration(session: Session, entity: RequestArbitrationRecord) -> 
         session.refresh(entity)
         return entity
     refresh_columns = [column.name for column in _ARBITRATION_MAPPED_COLUMNS if column.name in existing_columns]
+    if refresh_columns:
+        session.refresh(entity, attribute_names=refresh_columns)
+    if "source" not in existing_columns:
+        set_committed_value(entity, "source", "local")
+    return entity
+
+
+def _refresh_response(session: Session, entity: RequestResponseRecord) -> RequestResponseRecord:
+    existing_columns = _table_columns(session, "material_request_responses")
+    if all(column.name in existing_columns for column in _RESPONSE_MAPPED_COLUMNS):
+        session.refresh(entity)
+        return entity
+    refresh_columns = [column.name for column in _RESPONSE_MAPPED_COLUMNS if column.name in existing_columns]
+    if refresh_columns:
+        session.refresh(entity, attribute_names=refresh_columns)
+    if "source" not in existing_columns:
+        set_committed_value(entity, "source", "local")
+    return entity
+
+
+def _refresh_contribution(session: Session, entity: RequestContributionRecord) -> RequestContributionRecord:
+    existing_columns = _table_columns(session, "material_request_contributions")
+    if all(column.name in existing_columns for column in _CONTRIBUTION_MAPPED_COLUMNS):
+        session.refresh(entity)
+        return entity
+    refresh_columns = [column.name for column in _CONTRIBUTION_MAPPED_COLUMNS if column.name in existing_columns]
     if refresh_columns:
         session.refresh(entity, attribute_names=refresh_columns)
     if "source" not in existing_columns:
@@ -308,20 +376,49 @@ class RequestRepository:
 
     def list_responses(self, session: Session, request_id: int) -> list[RequestResponseRecord]:
         stmt = select(RequestResponseRecord).where(RequestResponseRecord.request_id == request_id).order_by(RequestResponseRecord.created_at.desc(), RequestResponseRecord.id.desc())
-        return list(session.scalars(stmt))
+        options = _response_load_options(session)
+        if options:
+            stmt = stmt.options(*options)
+        return _apply_legacy_response_defaults(session, list(session.scalars(stmt)))
 
     def get_response(self, session: Session, response_id: int) -> RequestResponseRecord | None:
-        return session.get(RequestResponseRecord, response_id)
+        entity = session.get(RequestResponseRecord, response_id, options=_response_load_options(session))
+        if entity is None:
+            return None
+        return _apply_legacy_response_defaults(session, [entity])[0]
 
     def find_response_by_request_and_responder(self, session: Session, request_id: int, responder_id: int) -> RequestResponseRecord | None:
         stmt = select(RequestResponseRecord).where(RequestResponseRecord.request_id == request_id, RequestResponseRecord.responder_id == responder_id)
-        return session.scalar(stmt)
+        options = _response_load_options(session)
+        if options:
+            stmt = stmt.options(*options)
+        entity = session.scalar(stmt)
+        if entity is None:
+            return None
+        return _apply_legacy_response_defaults(session, [entity])[0]
 
     def save_response(self, session: Session, entity: RequestResponseRecord) -> RequestResponseRecord:
+        existing_columns = _table_columns(session, "material_request_responses")
+        state = inspect(entity)
+        if "source" not in existing_columns and (state.transient or state.pending):
+            values: dict[str, object] = {}
+            for column in _RESPONSE_MAPPED_COLUMNS:
+                if column.name not in existing_columns:
+                    continue
+                values[column.name] = getattr(entity, column.name)
+            now = datetime.now()
+            if "created_at" in existing_columns and values.get("created_at") is None:
+                values["created_at"] = now
+            if "updated_at" in existing_columns and values.get("updated_at") is None:
+                values["updated_at"] = now
+            legacy_table = Table("material_request_responses", MetaData(), autoload_with=session.get_bind())
+            session.execute(insert(legacy_table).values(**values))
+            session.flush()
+            saved = self.get_response(session, int(entity.id))
+            return saved or entity
         session.add(entity)
         session.flush()
-        session.refresh(entity)
-        return entity
+        return _refresh_response(session, entity)
 
     def next_response_id(self, session: Session, seed: dict[str, Any]) -> int:
         seed_max = max(
@@ -333,7 +430,10 @@ class RequestRepository:
 
     def list_contributions(self, session: Session, request_id: int) -> list[RequestContributionRecord]:
         stmt = select(RequestContributionRecord).where(RequestContributionRecord.request_id == request_id).order_by(RequestContributionRecord.created_at.desc(), RequestContributionRecord.id.desc())
-        return list(session.scalars(stmt))
+        options = _contribution_load_options(session)
+        if options:
+            stmt = stmt.options(*options)
+        return _apply_legacy_contribution_defaults(session, list(session.scalars(stmt)))
 
     def list_paid_like_contributions(self, session: Session, request_id: int) -> list[RequestContributionRecord]:
         stmt = (
@@ -344,20 +444,49 @@ class RequestRepository:
             )
             .order_by(RequestContributionRecord.created_at.desc(), RequestContributionRecord.id.desc())
         )
-        return list(session.scalars(stmt))
+        options = _contribution_load_options(session)
+        if options:
+            stmt = stmt.options(*options)
+        return _apply_legacy_contribution_defaults(session, list(session.scalars(stmt)))
 
     def get_contribution(self, session: Session, contribution_id: int) -> RequestContributionRecord | None:
-        return session.get(RequestContributionRecord, contribution_id)
+        entity = session.get(RequestContributionRecord, contribution_id, options=_contribution_load_options(session))
+        if entity is None:
+            return None
+        return _apply_legacy_contribution_defaults(session, [entity])[0]
 
     def find_contribution_by_out_trade_no(self, session: Session, out_trade_no: str) -> RequestContributionRecord | None:
         stmt = select(RequestContributionRecord).where(RequestContributionRecord.out_trade_no == out_trade_no)
-        return session.scalar(stmt)
+        options = _contribution_load_options(session)
+        if options:
+            stmt = stmt.options(*options)
+        entity = session.scalar(stmt)
+        if entity is None:
+            return None
+        return _apply_legacy_contribution_defaults(session, [entity])[0]
 
     def save_contribution(self, session: Session, entity: RequestContributionRecord) -> RequestContributionRecord:
+        existing_columns = _table_columns(session, "material_request_contributions")
+        state = inspect(entity)
+        if "source" not in existing_columns and (state.transient or state.pending):
+            values: dict[str, object] = {}
+            for column in _CONTRIBUTION_MAPPED_COLUMNS:
+                if column.name not in existing_columns:
+                    continue
+                values[column.name] = getattr(entity, column.name)
+            now = datetime.now()
+            if "created_at" in existing_columns and values.get("created_at") is None:
+                values["created_at"] = now
+            if "updated_at" in existing_columns and values.get("updated_at") is None:
+                values["updated_at"] = now
+            legacy_table = Table("material_request_contributions", MetaData(), autoload_with=session.get_bind())
+            session.execute(insert(legacy_table).values(**values))
+            session.flush()
+            saved = self.get_contribution(session, int(entity.id))
+            return saved or entity
         session.add(entity)
         session.flush()
-        session.refresh(entity)
-        return entity
+        return _refresh_contribution(session, entity)
 
     def next_contribution_id(self, session: Session, seed: dict[str, Any]) -> int:
         seed_max = max(

@@ -5,7 +5,7 @@ from datetime import UTC, datetime, timedelta
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import Session
 
-from app.models.requests import RequestArbitrationRecord, RequestRecord
+from app.models.requests import RequestArbitrationRecord, RequestContributionRecord, RequestRecord, RequestResponseRecord
 from app.repos import request_repo as request_repo_module
 from app.repos.request_repo import RequestRepository
 
@@ -67,6 +67,60 @@ def _create_legacy_material_requests_schema():
                     accepted_at DATETIME NULL,
                     settled_at DATETIME NULL,
                     status VARCHAR(32) NOT NULL DEFAULT 'OPEN',
+                    created_at DATETIME NOT NULL,
+                    updated_at DATETIME NOT NULL
+                )
+                """
+            )
+        )
+    return engine
+
+
+def _create_legacy_request_responses_schema():
+    request_repo_module._TABLE_COLUMN_CACHE.clear()
+    engine = create_engine("sqlite+pysqlite:///:memory:", future=True)
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                """
+                CREATE TABLE material_request_responses (
+                    id INTEGER PRIMARY KEY,
+                    request_id INTEGER NOT NULL,
+                    responder_id INTEGER NOT NULL,
+                    responder_name VARCHAR(128) NULL,
+                    message TEXT NULL,
+                    material_id INTEGER NULL,
+                    revision_count INTEGER NOT NULL DEFAULT 0,
+                    created_at DATETIME NOT NULL,
+                    updated_at DATETIME NOT NULL
+                )
+                """
+            )
+        )
+    return engine
+
+
+def _create_legacy_request_contributions_schema():
+    request_repo_module._TABLE_COLUMN_CACHE.clear()
+    engine = create_engine("sqlite+pysqlite:///:memory:", future=True)
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                """
+                CREATE TABLE material_request_contributions (
+                    id INTEGER PRIMARY KEY,
+                    request_id INTEGER NOT NULL,
+                    contributor_id INTEGER NULL,
+                    contributor_name VARCHAR(128) NULL,
+                    type VARCHAR(16) NOT NULL,
+                    amount_cents INTEGER NOT NULL,
+                    status VARCHAR(32) NOT NULL DEFAULT 'CREATED',
+                    deadline_tier VARCHAR(16) NULL,
+                    deadline_at DATETIME NULL,
+                    out_trade_no VARCHAR(64) NULL,
+                    trade_no VARCHAR(64) NULL,
+                    pay_channel VARCHAR(32) NULL,
+                    paid_at DATETIME NULL,
                     created_at DATETIME NOT NULL,
                     updated_at DATETIME NOT NULL
                 )
@@ -247,3 +301,111 @@ def test_save_request_inserts_legacy_table_without_source_column() -> None:
     with engine.connect() as connection:
         row = connection.execute(text("SELECT course, keyword, status FROM material_requests WHERE id = 11")).mappings().one()
     assert row == {"course": "ESD", "keyword": "exam style", "status": "OPEN"}
+
+
+def test_response_queries_tolerate_legacy_table_without_source_column() -> None:
+    engine = _create_legacy_request_responses_schema()
+    created_at = datetime.now(UTC) - timedelta(days=1)
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                """
+                INSERT INTO material_request_responses (
+                    id, request_id, responder_id, responder_name, message,
+                    material_id, revision_count, created_at, updated_at
+                )
+                VALUES (30, 10, 8, 'Bob', 'preview available', NULL, 0, :created_at, :created_at)
+                """
+            ),
+            {"created_at": created_at},
+        )
+
+    repo = RequestRepository()
+    with Session(engine) as session:
+        responses = repo.list_responses(session, 10)
+        found = repo.find_response_by_request_and_responder(session, 10, 8)
+
+    assert [item.id for item in responses] == [30]
+    assert responses[0].source == "local"
+    assert found is not None
+    assert found.source == "local"
+
+
+def test_save_response_inserts_legacy_table_without_source_column() -> None:
+    engine = _create_legacy_request_responses_schema()
+    repo = RequestRepository()
+    with Session(engine) as session:
+        saved = repo.save_response(
+            session,
+            RequestResponseRecord(
+                id=31,
+                source="local",
+                request_id=10,
+                responder_id=8,
+                responder_name="Bob",
+                message="preview available",
+                revision_count=0,
+            ),
+        )
+        assert saved.source == "local"
+        session.commit()
+
+    with engine.connect() as connection:
+        row = connection.execute(text("SELECT request_id, responder_id, message FROM material_request_responses WHERE id = 31")).mappings().one()
+    assert row == {"request_id": 10, "responder_id": 8, "message": "preview available"}
+
+
+def test_contribution_queries_tolerate_legacy_table_without_source_column() -> None:
+    engine = _create_legacy_request_contributions_schema()
+    created_at = datetime.now(UTC) - timedelta(days=1)
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                """
+                INSERT INTO material_request_contributions (
+                    id, request_id, contributor_id, contributor_name, type,
+                    amount_cents, status, out_trade_no, created_at, updated_at
+                )
+                VALUES (40, 10, 9, 'Carol', 'FOLLOWER', 1200, 'PAID', 'RQLEGACY', :created_at, :created_at)
+                """
+            ),
+            {"created_at": created_at},
+        )
+
+    repo = RequestRepository()
+    with Session(engine) as session:
+        contributions = repo.list_contributions(session, 10)
+        paid_like = repo.list_paid_like_contributions(session, 10)
+        found = repo.find_contribution_by_out_trade_no(session, "RQLEGACY")
+
+    assert [item.id for item in contributions] == [40]
+    assert [item.id for item in paid_like] == [40]
+    assert contributions[0].source == "local"
+    assert found is not None
+    assert found.source == "local"
+
+
+def test_save_contribution_inserts_legacy_table_without_source_column() -> None:
+    engine = _create_legacy_request_contributions_schema()
+    repo = RequestRepository()
+    with Session(engine) as session:
+        saved = repo.save_contribution(
+            session,
+            RequestContributionRecord(
+                id=41,
+                source="local",
+                request_id=10,
+                contributor_id=9,
+                contributor_name="Carol",
+                type="FOLLOWER",
+                amount_cents=1200,
+                status="PAID",
+                out_trade_no="RQNEW",
+            ),
+        )
+        assert saved.source == "local"
+        session.commit()
+
+    with engine.connect() as connection:
+        row = connection.execute(text("SELECT request_id, amount_cents, status FROM material_request_contributions WHERE id = 41")).mappings().one()
+    assert row == {"request_id": 10, "amount_cents": 1200, "status": "PAID"}
