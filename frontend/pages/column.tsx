@@ -16,8 +16,6 @@ const COLUMN_SCROLL_STATE_KEY = 'studyhub:column:scroll-state';
 const COLUMN_NAV_ITEMS = [
   { id: 'column-overview', label: '专栏总览' },
   { id: 'column-latest', label: '最新内容' },
-  { id: 'column-editorial', label: '进阶入口' },
-  { id: 'column-roadmap', label: '栏目规划' },
 ] as const;
 
 const COLUMN_ENTRIES = [
@@ -56,47 +54,12 @@ const COLUMN_ENTRIES = [
     tag: '留学指南',
     type: 'community',
   },
-  {
-    key: 'leetcode',
-    title: 'LeetCode 解析',
-    status: '独立更新',
-    tag: 'LeetCode解析',
-    type: 'editorial',
-  },
-  {
-    key: 'llm',
-    title: 'LLM 入门',
-    status: '独立更新',
-    tag: 'LLM入门',
-    type: 'editorial',
-  },
 ] as const;
 
 type ColumnEntry = (typeof COLUMN_ENTRIES)[number];
 type ColumnTopicKey = ColumnEntry['key'];
 const DEFAULT_COLUMN_TOPIC: ColumnTopicKey = 'experience';
 const COMMUNITY_ENTRIES = COLUMN_ENTRIES.filter((entry) => entry.type === 'community');
-const EDITORIAL_ENTRIES = COLUMN_ENTRIES.filter((entry) => entry.type === 'editorial');
-
-const COLUMN_TRACKS: Array<{
-  key: string;
-  title: string;
-  status: string;
-  description: string;
-}> = [
-  {
-    key: 'guide',
-    title: '学习攻略',
-    status: '筹备中',
-    description: '适合放复习路线、课程避坑、选课建议、工具教程与成长路径。',
-  },
-  {
-    key: 'campus',
-    title: '校园专题',
-    status: '筹备中',
-    description: '可进一步承接竞赛备赛、实验复盘、课程项目与校内资源整合。',
-  },
-] as const;
 
 interface ColumnPageProps {
   user: SessionUser | null;
@@ -150,7 +113,6 @@ const ColumnListSkeleton = () => (
 export default function ColumnPage({ user, posts, meta, initialTopic }: ColumnPageProps) {
   const router = useRouter();
   const [activeSection, setActiveSection] = useState<string>('column-overview');
-  const [comingSoonEntry, setComingSoonEntry] = useState<ColumnEntry | null>(null);
   const [selectedTopic, setSelectedTopic] = useState<ColumnTopicKey>(normalizeTopicKey(initialTopic));
   const [topicData, setTopicData] = useState<TopicDataMap>({
     [normalizeTopicKey(initialTopic)]: { posts, meta },
@@ -323,10 +285,6 @@ export default function ColumnPage({ user, posts, meta, initialTopic }: ColumnPa
     );
   };
 
-  const openComingSoonModal = (entry: ColumnEntry) => {
-    setComingSoonEntry(entry);
-  };
-
   return (
     <>
       <NavBar user={user} />
@@ -425,69 +383,8 @@ export default function ColumnPage({ user, posts, meta, initialTopic }: ColumnPa
               )}
             </section>
 
-            <section className="card column-section-card" id="column-editorial">
-              <div className="materials-header">
-                <div>
-                  <p className="column-section-overline">EDITORIAL ENTRIES</p>
-                  <h2 className="card-title">
-                    进阶入口
-                    <svg className="title-icon" viewBox="0 0 24 24" aria-hidden="true">
-                      <path
-                        d="M4 7h16M4 12h16M4 17h10"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="1.6"
-                        strokeLinecap="round"
-                      />
-                    </svg>
-                  </h2>
-                </div>
-              </div>
-              <div className="column-editorial-grid">
-                {EDITORIAL_ENTRIES.map((entry) => (
-                  <article key={entry.key} className="column-editorial-card">
-                    <div className="column-editorial-card__status">{entry.status}</div>
-                    <h3>{entry.title}</h3>
-                    <p>独立内容线，适合持续沉淀题解笔记与入门专题。</p>
-                    <button type="button" className="button ghost small" onClick={() => openComingSoonModal(entry)}>
-                      查看入口
-                    </button>
-                  </article>
-                ))}
-              </div>
-            </section>
-
-            <section className="card column-section-card" id="column-roadmap">
-              <div className="materials-header">
-                <div>
-                  <p className="column-section-overline">ROADMAP</p>
-                  <h2 className="card-title">
-                    栏目规划
-                    <svg className="title-icon" viewBox="0 0 24 24" aria-hidden="true">
-                      <path
-                        d="M4 7h16M4 12h10M4 17h7"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="1.6"
-                        strokeLinecap="round"
-                      />
-                    </svg>
-                  </h2>
-                  <p className="help-text">这一页不仅是经验内容入口，也会逐步承接更多偏阅读、偏沉淀、偏图文的学习内容。</p>
-                </div>
-              </div>
-
-              <div className="column-track-grid">
-                {COLUMN_TRACKS.map((track) => (
-                  <article key={track.key} className={`column-track-card ${track.status === '已开放' ? 'active' : ''}`}>
-                    <div className="column-track-card__status">{track.status}</div>
-                    <h3>{track.title}</h3>
-                    <p>{track.description}</p>
-                  </article>
-                ))}
-              </div>
-
-              {topTags.length > 0 && (
+            {topTags.length > 0 && (
+              <section className="card column-section-card">
                 <div className="column-tag-panel">
                   <div className="column-tag-panel__label">当前内容高频标签</div>
                   <div className="column-tag-cloud">
@@ -499,30 +396,11 @@ export default function ColumnPage({ user, posts, meta, initialTopic }: ColumnPa
                     ))}
                   </div>
                 </div>
-              )}
-            </section>
+              </section>
+            )}
           </div>
         </div>
       </main>
-      {comingSoonEntry && (
-        <div className="modal-mask" onClick={() => setComingSoonEntry(null)}>
-          <div
-            className="modal-card column-coming-modal"
-            role="dialog"
-            aria-modal="true"
-            aria-label={`${comingSoonEntry.title} 筹备中`}
-            onClick={(event) => event.stopPropagation()}
-          >
-            <h2>{comingSoonEntry.title}</h2>
-            <p>该入口正在筹备中，内容整理完成后会在这里开放。</p>
-            <div className="column-coming-modal__actions">
-              <button type="button" className="button primary" onClick={() => setComingSoonEntry(null)}>
-                我知道了
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </>
   );
 }

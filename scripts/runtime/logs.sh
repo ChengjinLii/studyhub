@@ -110,48 +110,55 @@ runtime_log_for() {
   esac
 }
 
-build_filter() {
-  local filter=""
-  if [[ -n "$REQUEST_ID" ]]; then
-    filter="$REQUEST_ID"
-  fi
-  if [[ -n "$LEVEL" ]]; then
-    if [[ -n "$filter" ]]; then
-      filter="$filter|$LEVEL"
-    else
-      filter="$LEVEL"
-    fi
-  fi
-  echo "$filter"
-}
-
 filter_stream() {
-  local filter="$1"
-  if [[ -z "$filter" ]]; then
-    cat
-  elif command -v rg >/dev/null 2>&1; then
-    rg --line-buffered "$filter"
+  if command -v rg >/dev/null 2>&1; then
+    if [[ -n "$REQUEST_ID" && -n "$LEVEL" ]]; then
+      rg --line-buffered -F "$REQUEST_ID" | rg --line-buffered -F "$LEVEL"
+    elif [[ -n "$REQUEST_ID" ]]; then
+      rg --line-buffered -F "$REQUEST_ID"
+    elif [[ -n "$LEVEL" ]]; then
+      rg --line-buffered -F "$LEVEL"
+    else
+      cat
+    fi
   else
-    grep -E --line-buffered "$filter"
+    if [[ -n "$REQUEST_ID" && -n "$LEVEL" ]]; then
+      grep -F --line-buffered "$REQUEST_ID" | grep -F --line-buffered "$LEVEL"
+    elif [[ -n "$REQUEST_ID" ]]; then
+      grep -F --line-buffered "$REQUEST_ID"
+    elif [[ -n "$LEVEL" ]]; then
+      grep -F --line-buffered "$LEVEL"
+    else
+      cat
+    fi
   fi
 }
 
 filter_file() {
-  local filter="$1"
-  local file="$2"
-  if [[ -z "$filter" ]]; then
+  local file="$1"
+  if [[ -z "$REQUEST_ID" && -z "$LEVEL" ]]; then
     tail -n 200 "$file"
   elif command -v rg >/dev/null 2>&1; then
-    rg "$filter" "$file"
+    if [[ -n "$REQUEST_ID" && -n "$LEVEL" ]]; then
+      rg -F "$REQUEST_ID" "$file" | rg -F "$LEVEL"
+    elif [[ -n "$REQUEST_ID" ]]; then
+      rg -F "$REQUEST_ID" "$file"
+    else
+      rg -F "$LEVEL" "$file"
+    fi
   else
-    grep -E "$filter" "$file"
+    if [[ -n "$REQUEST_ID" && -n "$LEVEL" ]]; then
+      grep -F "$REQUEST_ID" "$file" | grep -F "$LEVEL"
+    elif [[ -n "$REQUEST_ID" ]]; then
+      grep -F "$REQUEST_ID" "$file"
+    else
+      grep -F "$LEVEL" "$file"
+    fi
   fi
 }
 
 stream_one() {
   local service="$1"
-  local filter
-  filter="$(build_filter)"
   if command -v journalctl >/dev/null 2>&1; then
     local unit
     unit="$(systemd_unit_for "$service")"
@@ -159,7 +166,7 @@ stream_one() {
     if [[ "$FOLLOW" == "1" ]]; then
       args+=(-f)
     fi
-    journalctl "${args[@]}" | filter_stream "$filter"
+    journalctl "${args[@]}" | filter_stream
     return
   fi
 
@@ -170,9 +177,9 @@ stream_one() {
     exit 1
   fi
   if [[ "$FOLLOW" == "1" ]]; then
-    tail -n 200 -f "$log_file" | filter_stream "$filter"
+    tail -n 200 -f "$log_file" | filter_stream
   else
-    filter_file "$filter" "$log_file"
+    filter_file "$log_file"
   fi
 }
 
