@@ -1,5 +1,6 @@
 import Link from 'next/link';
-import { ReactNode, useMemo, useState } from 'react';
+import type { ReactNode, UIEvent } from 'react';
+import { useCallback, useState } from 'react';
 import { MaterialListItem } from '../../types/material';
 import { MaterialRequestItem } from '../../types/request';
 import { formatMajorDisplay } from '../../lib/major';
@@ -30,13 +31,12 @@ export default function HomeRequestPanels({
   buildUploadLink,
   onFollowRequest,
 }: HomeRequestPanelsProps) {
-  const [recommendExpanded, setRecommendExpanded] = useState(false);
-  const collapsedRecommendCount = 6;
-  const visibleRecommendedItems = useMemo(
-    () => (recommendExpanded ? recommendedItems : recommendedItems.slice(0, collapsedRecommendCount)),
-    [recommendExpanded, recommendedItems]
-  );
-  const hasMoreRecommendations = recommendedItems.length > collapsedRecommendCount;
+  const [recommendListAtEnd, setRecommendListAtEnd] = useState(false);
+  const handleRecommendationScroll = useCallback((event: UIEvent<HTMLUListElement>) => {
+    const target = event.currentTarget;
+    const atEnd = target.scrollTop + target.clientHeight >= target.scrollHeight - 8;
+    setRecommendListAtEnd(atEnd);
+  }, []);
 
   return (
     <div className="home-dual-panel">
@@ -148,8 +148,8 @@ export default function HomeRequestPanels({
           <div className="empty-state">{recommendationEmpty}</div>
         ) : (
           <>
-            <ul className="recommend-list">
-              {visibleRecommendedItems.map((item) => {
+            <ul className="recommend-list" onScroll={handleRecommendationScroll}>
+              {recommendedItems.map((item) => {
                 const majorLabel = formatMajorDisplay(item.major);
                 return (
                   <li key={item.id} className="recommend-item">
@@ -164,11 +164,11 @@ export default function HomeRequestPanels({
                 );
               })}
             </ul>
-            {hasMoreRecommendations ? (
+            {recommendListAtEnd ? (
               <div className="recommend-expand">
-                <button className="button ghost small" type="button" onClick={() => setRecommendExpanded((value) => !value)}>
-                  {recommendExpanded ? '收起推荐' : `展开全部 ${recommendedItems.length} 条`}
-                </button>
+                <Link className="button ghost small" href="#materials-list">
+                  查看更多资料
+                </Link>
               </div>
             ) : null}
           </>

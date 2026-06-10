@@ -31,20 +31,20 @@ const ABOUT_POINTS = [
 
 const ENGINEERING_STATUS_CARDS = [
   {
-    title: '仓库定位',
-    body: 'StudyHub 是一个面向高校场景的知识共享与校园互助平台，提供资料共享、经验分享、求购协作与校园集市等功能，官网为 https://study-hub.cn。',
+    title: '产品主线',
+    body: 'StudyHub 面向高校学习资料共享和校园互助场景，主线能力包括资料发布与检索、经验内容、求购协作、创作者结算、校园集市和个人主页。',
   },
   {
-    title: '核心功能',
-    body: '当前主线能力集中在资料共享、经验分享、求购协作与校园集市四块，目标是在一个站内完成找资料、看内容、发布与互动。',
+    title: '前端技术栈',
+    body: '前端使用 Next.js 14、React、TypeScript 与 Playwright/Vitest 组织页面渲染、组件交互、关键路径测试和单元测试。',
   },
   {
-    title: '技术栈',
-    body: '后端基于 FastAPI、SQLAlchemy、Pydantic Settings 与 Uvicorn，前端基于 Next.js 14、React 与 TypeScript，并围绕 MySQL、OSS、Redis、worker 与脚本化部署组织工程。',
+    title: '后端技术栈',
+    body: '后端使用 FastAPI、SQLAlchemy、Pydantic Settings、Uvicorn、pytest 与 Alembic，围绕认证、资料、支付、结算、MCP 和 AI Agent 提供 API 能力。',
   },
   {
-    title: '相关项目',
-    body: '初版 SpringBoot 实现仍保留为相关项目；当前仓库聚焦 FastAPI 主线，并持续把开发、预览与生产环境说明收敛为适合开源协作的形式。',
+    title: '运行与存储',
+    body: '生产侧以 MySQL、OSS、systemd、Nginx、worker 与脚本化预检为核心，日志、健康检查和 Prometheus 指标用于支撑排障与稳定性观察。',
   },
 ];
 
@@ -72,10 +72,10 @@ const ENGINEERING_STRUCTURE_CARDS = [
 ];
 
 const ENGINEERING_FUTURE_ITEMS = [
-  '资料审核：逐步完善资料审核、版权风险识别与异常内容处理流程，提升平台内容质量与合规性。',
-  '语义搜索：为资料、经验分享和求购内容提供更自然的检索体验，减少关键词命中不足的问题。',
-  'MCP 接口：开放面向智能体和开发工具的标准化能力入口，便于后续接入更丰富的自动化工作流。',
-  '检索与推荐：继续增强资料推荐、贡献榜与校园集市的排序策略，让首页内容更贴近用户当前需求。',
+  '内容系统：继续完善资料发布、预览、下载、举报和审核流程，保证用户能稳定提交和获取资料。',
+  '推荐检索：围绕标签、学校学院专业、下载互动和 Agent 语义理解改进推荐与搜索体验。',
+  '开放能力：通过 MCP 和公开只读能力，让外部 Agent 可以推荐平台资料链接，但不绕过站内下载和权限规则。',
+  '工程质量：持续收紧类型检查、关键路径测试、日志观测、部署预检和安全基线，降低线上回归风险。',
 ];
 
 interface JoinPageProps {

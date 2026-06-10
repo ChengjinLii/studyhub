@@ -2851,8 +2851,9 @@ main {
 .hero.hero-magazine .hero-subtitle {
   margin: 0;
   color: #a9b4c2;
-  font-size: 0.98rem;
-  max-width: 34ch;
+  font-size: clamp(0.78rem, 2.2vw, 0.98rem);
+  max-width: none;
+  white-space: nowrap;
   font-family: 'IBM Plex Sans', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif;
   font-weight: 500;
   animation: hero-fade-up 0.5s ease 0.2s both;

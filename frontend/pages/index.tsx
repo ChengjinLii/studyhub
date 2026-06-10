@@ -748,7 +748,7 @@ export default function Home({
           onSubmit={handleFilterSubmit}
         />
 
-        <section className="card" ref={materialsRef} style={{ gridColumn: '1 / -1' }}>
+        <section className="card" id="materials-list" ref={materialsRef} style={{ gridColumn: '1 / -1' }}>
           <div className="materials-header">
             <div>
               <h2 className="card-title">
