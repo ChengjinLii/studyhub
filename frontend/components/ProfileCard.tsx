@@ -581,7 +581,7 @@ export default function ProfileCard({
                 </span>
               </div>
             ) : (
-              <div className={`profile-card__value ${schoolDisplay ? '' : 'muted'}`}>
+              <div className={`profile-card__value profile-card__info-value ${schoolDisplay ? '' : 'muted'}`}>
                 {schoolDisplay || '未填写'}
               </div>
             )}
@@ -620,7 +620,7 @@ export default function ProfileCard({
                 </span>
               </div>
             ) : (
-              <div className={`profile-card__value ${collegeDisplay ? '' : 'muted'}`}>
+              <div className={`profile-card__value profile-card__info-value ${collegeDisplay ? '' : 'muted'}`}>
                 {collegeDisplay || '未填写'}
               </div>
             )}
@@ -659,7 +659,7 @@ export default function ProfileCard({
                 </span>
               </div>
             ) : (
-              <div className={`profile-card__value ${majorDisplay ? '' : 'muted'}`}>
+              <div className={`profile-card__value profile-card__info-value ${majorDisplay ? '' : 'muted'}`}>
                 {majorDisplay || '未填写'}
               </div>
             )}
@@ -718,7 +718,7 @@ export default function ProfileCard({
                 ))}
               </div>
             ) : (
-              <div className="profile-card__value muted">未填写</div>
+              <div className="profile-card__value profile-card__info-value muted">未填写</div>
             )}
           </div>
         </div>

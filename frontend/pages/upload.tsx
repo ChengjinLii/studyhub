@@ -544,7 +544,7 @@ export default function UploadPage({ user, token, account }: UploadPageProps) {
         : isQuickMode
           ? PREVIEW_SOURCE_AUTO
           : previewSource;
-    const allowCustomPreview = !isExperience && !isQuickMode && effectivePreviewSource === PREVIEW_SOURCE_MANUAL;
+    const allowCustomPreview = isExperience;
     const validation = validateUploadSubmitInput({
       token,
       isExperience,
@@ -929,88 +929,6 @@ export default function UploadPage({ user, token, account }: UploadPageProps) {
                   />
                   <span>预览图加水印（单张≤5MB）</span>
                 </label>
-              </div>
-            )}
-            {!isQuickMode && (isRequestResponse || previewSource === PREVIEW_SOURCE_MANUAL) && (
-              <div className="form-item full">
-              <SectionLabel text={customPreviewTitle} optional />
-              <p className="help-text">{customPreviewHint}</p>
-              <textarea
-                rows={5}
-                value={customPreviewText}
-                maxLength={MAX_CUSTOM_PREVIEW_TEXT}
-                placeholder="写下这份资料的亮点、目录或适用场景（可选）"
-                onChange={(e) => {
-                  setCustomPreviewText(e.target.value);
-                  setCustomPreviewClear(false);
-                }}
-              />
-              <div className="help-text">已输入 {customPreviewText.length}/{MAX_CUSTOM_PREVIEW_TEXT}</div>
-              <div
-                className="file-field drop-zone"
-                onDragOver={(e) => e.preventDefault()}
-                onDrop={(e) => {
-                  e.preventDefault();
-                  handleCustomPreviewSelection(e.dataTransfer.files);
-                }}
-              >
-                <span className="file-trigger">选择{customPreviewLabel}</span>
-                <span className="file-name">
-                  {customPreviewFiles.length
-                    ? `已选择 ${customPreviewFiles.length} 张预览图`
-                    : `单张 ≤ 5MB，最多 ${MAX_CUSTOM_PREVIEW_IMAGES} 张`}
-                </span>
-                {customPreviewFiles.length > 0 && (
-                  <button
-                    type="button"
-                    className="file-clear"
-                    onClick={clearCustomPreviewFiles}
-                    aria-label="清空自定义预览图"
-                  >
-                    x
-                  </button>
-                )}
-                <input
-                  type="file"
-                  ref={customPreviewInputRef}
-                  accept="image/*"
-                  multiple
-                  onChange={(e) => handleCustomPreviewSelection(e.target.files)}
-                />
-              </div>
-              {customPreviewFiles.length > 0 && (
-                <div className="inline-group wrap" style={{ marginTop: 8 }}>
-                  {customPreviewFiles.map((file, index) => (
-                    <span key={`${file.name}-${index}`} className="badge-outline">
-                      {file.name}
-                      <button
-                        type="button"
-                        className="file-clear"
-                        onClick={() => removeCustomPreviewFile(index)}
-                        aria-label={`移除 ${file.name}`}
-                      >
-                        ×
-                      </button>
-                    </span>
-                  ))}
-                </div>
-              )}
-              {customPreviewNotice && <p className="error-text">{customPreviewNotice}</p>}
-              {existingCustomPreviewImages.length > 0 && customPreviewFiles.length === 0 && (
-                <div className="custom-preview-existing">
-                  <p className="help-text">已存在 {existingCustomPreviewImages.length} 张自定义预览图。</p>
-                  <div className="custom-preview-existing__grid">
-                    {existingCustomPreviewImages.map((url, index) => (
-                      <AppImage key={`${url}-${index}`} src={url} alt={`已上传预览图 ${index + 1}`} loading="lazy" />
-                    ))}
-                  </div>
-                </div>
-              )}
-              {(customPreviewText.trim() || customPreviewFiles.length > 0 || existingCustomPreviewImages.length > 0) && (
-                <button type="button" className="text-button" onClick={clearCustomPreviewAll}>
-                  清空自定义预览
-                </button>
-              )}
               </div>
             )}
             {deliveryMethod === 'FILE' && (
