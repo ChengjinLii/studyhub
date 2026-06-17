@@ -40,7 +40,30 @@ jobs:
       - name: Run backend ruff
         run: python -m ruff check backend/app backend/tests
       - name: Run backend tests
-        run: mkdir -p reports/coverage && python -m pytest backend/tests --cov=backend/app --cov-report=term-missing --cov-report=xml:reports/coverage/backend-coverage.xml
+        shell: bash
+        run: |
+          set -o pipefail
+          mkdir -p reports/coverage
+          if ! python -m pytest -vv --maxfail=1 backend/tests --cov=backend/app --cov-report=term-missing --cov-report=xml:reports/coverage/backend-coverage.xml 2>&1 | tee reports/coverage/backend-test.log; then
+            {
+              echo "Backend tests failed on GitHub Actions."
+              echo
+              echo "Python:"
+              python --version
+              echo
+              echo "Last backend test output:"
+              tail -n 80 reports/coverage/backend-test.log
+            } > reports/coverage/backend-test-summary.log
+            summary="$(python - <<'PY'
+from pathlib import Path
+text = Path("reports/coverage/backend-test-summary.log").read_text(encoding="utf-8", errors="replace")
+text = text[-7000:]
+print(text.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A"))
+PY
+)"
+            echo "::error file=backend-tests::${summary}"
+            exit 1
+          fi
 
   frontend:
     runs-on: ubuntu-latest
