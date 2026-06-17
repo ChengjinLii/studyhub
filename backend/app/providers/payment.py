@@ -20,6 +20,14 @@ class PaymentNotification:
     sign_verified: bool = True
 
 
+@dataclass(slots=True)
+class RefundResult:
+    success: bool
+    refund_trade_no: str | None = None
+    error_code: str | None = None
+    error_message: str | None = None
+
+
 class PaymentGatewayProvider(Protocol):
     provider_name: str
     channel_name: str
@@ -35,6 +43,8 @@ class PaymentGatewayProvider(Protocol):
     def success_response_text(self) -> str: ...
 
     def probe(self, *, deep: bool = False) -> dict[str, Any]: ...
+
+    def refund(self, *, out_trade_no: str, trade_no: str | None, refund_amount_cents: int, out_request_no: str) -> RefundResult: ...
 
 
 class LocalAlipayPaymentProvider:
@@ -92,6 +102,9 @@ class LocalAlipayPaymentProvider:
             "channel": self.channel_name,
             "mode": "local-simulated",
         }
+
+    def refund(self, *, out_trade_no: str, trade_no: str | None, refund_amount_cents: int, out_request_no: str) -> RefundResult:
+        return RefundResult(success=True, refund_trade_no=f"REFUND-LOCAL-{out_request_no[-8:]}")
 
     def _build_pay_form(self, out_trade_no: str) -> str:
         escaped = html.escape(out_trade_no, quote=True)
@@ -209,6 +222,29 @@ class AlipayPagePaymentProvider:
             payload["clientReady"] = True
             self._client()
         return payload
+
+    def refund(self, *, out_trade_no: str, trade_no: str | None, refund_amount_cents: int, out_request_no: str) -> RefundResult:
+        client = self._client()
+        refund_amount = self._cents_to_amount(refund_amount_cents)
+        try:
+            result = client.api_alipay_trade_refund(
+                refund_amount=refund_amount,
+                out_trade_no=out_trade_no,
+                trade_no=trade_no,
+                out_request_no=out_request_no,
+            )
+        except Exception as exc:  # noqa: BLE001
+            return RefundResult(success=False, error_code="SDK_ERROR", error_message=str(exc)[:200])
+        if not isinstance(result, dict):
+            return RefundResult(success=False, error_code="INVALID_RESPONSE", error_message="non-dict response")
+        code = str(result.get("code") or "")
+        if code == "10000":
+            return RefundResult(success=True, refund_trade_no=str(result.get("trade_no") or "") or None)
+        return RefundResult(
+            success=False,
+            error_code=code,
+            error_message=str(result.get("sub_msg") or result.get("msg") or "")[:200],
+        )
 
     def _client(self):
         return build_alipay_client(self.settings)

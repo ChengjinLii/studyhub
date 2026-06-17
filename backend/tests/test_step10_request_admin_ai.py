@@ -7,6 +7,7 @@ import zipfile
 
 from fastapi.testclient import TestClient
 
+from app.api.deps import get_finance_repo
 from app.core.db import session_scope
 from app.services.auth_service import AuthService
 from tests.support import build_auth_headers, seed_read_users
@@ -164,8 +165,25 @@ def test_step10_request_flow_covers_create_follow_deadline_cancel_upload_preview
     )
     assert accept_response.status_code == 200
     accepted = accept_response.json()["data"]
-    assert accepted["status"] == "FULFILLED"
+    assert accepted["status"] == "ACCEPTED"
     assert accepted["acceptedResponseId"] == response_id
+    with session_scope() as session:
+        assert get_finance_repo().find_settlement_by_source(session, "REQUEST", request_id) is None
+
+    confirm_response = client.post(
+        f"/api/requests/{request_id}/confirm-acceptance",
+        headers=alice_headers,
+    )
+    assert confirm_response.status_code == 200
+    confirmed = confirm_response.json()["data"]
+    assert confirmed["status"] == "FULFILLED"
+    assert confirmed["acceptedResponseId"] == response_id
+    with session_scope() as session:
+        settlement = get_finance_repo().find_settlement_by_source(session, "REQUEST", request_id)
+        assert settlement is not None
+        assert settlement.gross_amount == 2000
+        assert settlement.platform_fee == 100
+        assert settlement.payout_amount == 1900
 
     contributions_response = client.get(f"/api/requests/{request_id}/contributions", headers=alice_headers)
     assert contributions_response.status_code == 200

@@ -311,7 +311,15 @@ def get_notification_service() -> NotificationService:
 
 @lru_cache(maxsize=1)
 def get_requests_service() -> RequestsService:
-    return RequestsService(get_settings(), get_read_api_repo(), get_auth_repo(), get_material_repo(), get_request_repo())
+    return RequestsService(
+        get_settings(),
+        get_read_api_repo(),
+        get_auth_repo(),
+        get_material_repo(),
+        get_request_repo(),
+        get_finance_repo(),
+        get_payment_provider(),
+    )
 
 
 @lru_cache(maxsize=1)

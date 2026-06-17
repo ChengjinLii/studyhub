@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from datetime import UTC, datetime, timedelta
+from decimal import Decimal, ROUND_HALF_UP
 from typing import Any
 
 from fastapi import HTTPException, status
@@ -10,7 +12,10 @@ from sqlalchemy.orm import Session
 
 from app.core.async_db import async_session_scope
 from app.core.config import Settings
+from app.models.finance import SettlementRecord
 from app.models.materials import MaterialRecord
+from app.providers.payment import PaymentGatewayProvider, RefundResult
+from app.repos.finance_repo import FinanceRepository
 from app.models.requests import (
     RequestArbitrationRecord,
     RequestContributionRecord,
@@ -53,7 +58,9 @@ from app.services.read_support import (
 )
 
 
-REQUEST_STATUS_OPEN, REQUEST_STATUS_CLOSED, REQUEST_STATUS_PENDING_PAYMENT, REQUEST_STATUS_FULFILLED, REQUEST_STATUS_REFUNDING, REQUEST_STATUS_REFUNDED, REQUEST_STATUS_DISPUTED, REQUEST_STATUS_REVISION_REQUIRED = "OPEN", "CLOSED", "PENDING_PAYMENT", "FULFILLED", "REFUNDING", "REFUNDED", "DISPUTED", "REVISION_REQUIRED"
+logger = logging.getLogger(__name__)
+
+REQUEST_STATUS_OPEN, REQUEST_STATUS_CLOSED, REQUEST_STATUS_PENDING_PAYMENT, REQUEST_STATUS_ACCEPTED, REQUEST_STATUS_FULFILLED, REQUEST_STATUS_REFUNDING, REQUEST_STATUS_REFUNDED, REQUEST_STATUS_DISPUTED, REQUEST_STATUS_REVISION_REQUIRED = "OPEN", "CLOSED", "PENDING_PAYMENT", "ACCEPTED", "FULFILLED", "REFUNDING", "REFUNDED", "DISPUTED", "REVISION_REQUIRED"
 CONTRIBUTION_STATUS_CREATED, CONTRIBUTION_STATUS_PAID, CONTRIBUTION_STATUS_REFUNDING, CONTRIBUTION_STATUS_REFUNDED = "CREATED", "PAID", "REFUNDING", "REFUNDED"
 ARBITRATION_STATUS_PENDING, ARBITRATION_STATUS_APPROVED, ARBITRATION_STATUS_REVISION, ARBITRATION_STATUS_REFUNDING, ARBITRATION_STATUS_REFUNDED = "PENDING", "APPROVED", "REVISION", "REFUNDING", "REFUNDED"
 TYPE_OWNER, TYPE_FOLLOWER = "OWNER", "FOLLOWER"
@@ -79,12 +86,16 @@ class RequestsService(RequestsCompatMixin):
         auth_repo: AuthRepository,
         material_repo: MaterialRepository,
         request_repo: RequestRepository,
+        finance_repo: FinanceRepository | None = None,
+        payment_provider: PaymentGatewayProvider | None = None,
     ) -> None:
         self.settings = settings
         self.read_repo = read_repo
         self.auth_repo = auth_repo
         self.material_repo = material_repo
         self.request_repo = request_repo
+        self.finance_repo = finance_repo
+        self.payment_provider = payment_provider
 
     def list_requests(self, session: Session, viewer_id: int | None, *, sort: str | None, limit: int | None) -> list[dict[str, Any]]:
         if self.settings.requires_private_env_file:
@@ -365,6 +376,20 @@ class RequestsService(RequestsCompatMixin):
         session.commit()
         return self._to_request_item(session, request, user_id, viewer_role_mask)
 
+    def confirm_acceptance(self, session: Session, request_id: int, user_id: int, viewer_role_mask: int | None) -> dict[str, Any]:
+        self._bootstrap(session)
+        request = self._require_request(session, request_id)
+        owner = request.requester_id == user_id
+        can_manage_all = self._can_manage_all(viewer_role_mask)
+        if not owner and not can_manage_all:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="无权操作该求购")
+        if request.status != REQUEST_STATUS_ACCEPTED or request.accepted_response_id is None:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="当前求购不可确认验收")
+        response = self._require_response_for_request(session, request.id, int(request.accepted_response_id))
+        self._finalize_acceptance(session, request, response)
+        session.commit()
+        return self._to_request_item(session, request, user_id, viewer_role_mask)
+
     def record_preview_view(self, session: Session, request_id: int, user_id: int, payload: RequestPreviewViewPayload) -> None:
         self._bootstrap(session)
         request = self._require_request(session, request_id)
@@ -390,16 +415,15 @@ class RequestsService(RequestsCompatMixin):
         request = self._require_request(session, request_id)
         if request.requester_id != user_id:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="无权操作该求购")
-        if request.status != REQUEST_STATUS_OPEN:
+        if request.status not in {REQUEST_STATUS_OPEN, REQUEST_STATUS_ACCEPTED}:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="当前求购不可仲裁")
-        if request.accepted_response_id is not None:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="该求购已采纳")
         if self.request_repo.find_pending_arbitration(session, request_id) is not None:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="仲裁处理中，请耐心等待")
-        response = self._require_response_for_request(session, request_id, payload.responseId)
+        response_id = int(request.accepted_response_id or payload.responseId)
+        response = self._require_response_for_request(session, request_id, response_id)
         if response.material_id is None:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="应答需关联资料")
-        if not self.request_repo.has_preview_view(session, request_id, payload.responseId, user_id, min_loaded_count=2):
+        if not self.request_repo.has_preview_view(session, request_id, response.id, user_id, min_loaded_count=2):
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="请先查看前两张预览图")
         entity = RequestArbitrationRecord(
             id=self.request_repo.next_arbitration_id(session),
@@ -428,7 +452,9 @@ class RequestsService(RequestsCompatMixin):
         response = self._require_response_for_request(session, request.id, arbitration.response_id)
         decision = payload.decision.strip().upper()
         if decision == "APPROVE":
-            self._apply_acceptance(session, request, response)
+            if request.accepted_response_id is None:
+                self._apply_acceptance(session, request, response)
+            self._finalize_acceptance(session, request, response)
             arbitration.status = ARBITRATION_STATUS_APPROVED
         elif decision == "REFUND":
             request.status = REQUEST_STATUS_REFUNDING
@@ -463,9 +489,13 @@ class RequestsService(RequestsCompatMixin):
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="求购当前不可结束贡献")
         contribution.status = CONTRIBUTION_STATUS_REFUNDING
         self.request_repo.save_contribution(session, contribution)
-        contribution.status = CONTRIBUTION_STATUS_REFUNDED
-        self.request_repo.save_contribution(session, contribution)
-        self._apply_refund_to_request(request, contribution.amount_cents)
+        refund_ok = self._execute_refund(session, contribution, reason="用户主动取消")
+        if refund_ok:
+            contribution.status = CONTRIBUTION_STATUS_REFUNDED
+            self.request_repo.save_contribution(session, contribution)
+            self._apply_refund_to_request(request, contribution.amount_cents)
+        else:
+            raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="退款请求失败，请稍后重试")
         session.commit()
         return request_contribution_item(contribution)
 
@@ -640,12 +670,49 @@ class RequestsService(RequestsCompatMixin):
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="该求购已采纳")
         request.accepted_response_id = response.id
         request.accepted_at = datetime.now(UTC)
-        request.status = REQUEST_STATUS_FULFILLED
-        request.settled_at = request.accepted_at
+        request.status = REQUEST_STATUS_ACCEPTED
+        request.settled_at = None
         self.request_repo.save_request(session, request)
 
+    def _finalize_acceptance(self, session: Session, request: RequestRecord, response: RequestResponseRecord) -> None:
+        if request.accepted_response_id != response.id:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="验收应答不匹配")
+        if request.status == REQUEST_STATUS_FULFILLED:
+            return
+        request.status = REQUEST_STATUS_FULFILLED
+        request.settled_at = datetime.now(UTC)
+        self.request_repo.save_request(session, request)
+        self._create_request_settlement(session, request, response)
+
+    def _create_request_settlement(self, session: Session, request: RequestRecord, response: RequestResponseRecord) -> None:
+        if self.finance_repo is None:
+            return
+        funded = int(request.funded_amount_cents or 0)
+        if funded <= 0 or response.responder_id is None:
+            return
+        if self.finance_repo.find_settlement_by_source(session, "REQUEST", request.id) is not None:
+            return
+        rate = Decimal(str(self.settings.request_commission_rate))
+        platform_fee = int((Decimal(funded) * rate).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
+        payout = max(0, funded - platform_fee)
+        settlement = SettlementRecord(
+            order_id=None,
+            material_id=response.material_id,
+            material_title=None,
+            uploader_id=response.responder_id,
+            gross_amount=funded,
+            platform_fee=platform_fee,
+            payout_amount=payout,
+            status="PENDING",
+            policy_version=self.settings.settlement_policy_version,
+            policy_id="REQUEST",
+            source_type="REQUEST",
+            source_id=request.id,
+            scheduled_payout_at=request.accepted_at,
+        )
+        self.finance_repo.save_settlement(session, settlement)
+
     def _refund_request_contributions(self, session: Session, request: RequestRecord, *, reason: str) -> None:
-        _ = reason
         contributions = self.request_repo.list_contributions(session, request.id)
         active = [item for item in contributions if item.status in {CONTRIBUTION_STATUS_PAID, CONTRIBUTION_STATUS_REFUNDING}]
         if not active:
@@ -657,13 +724,15 @@ class RequestsService(RequestsCompatMixin):
         for contribution in active:
             contribution.status = CONTRIBUTION_STATUS_REFUNDING
             self.request_repo.save_contribution(session, contribution)
-            contribution.status = CONTRIBUTION_STATUS_REFUNDED
-            self.request_repo.save_contribution(session, contribution)
-            self._apply_refund_to_request(request, contribution.amount_cents)
-            if contribution.status != CONTRIBUTION_STATUS_REFUNDED:
+            refund_ok = self._execute_refund(session, contribution, reason=reason)
+            if refund_ok:
+                contribution.status = CONTRIBUTION_STATUS_REFUNDED
+                self.request_repo.save_contribution(session, contribution)
+                self._apply_refund_to_request(request, contribution.amount_cents)
+            else:
                 all_refunded = False
         request.status = REQUEST_STATUS_REFUNDED if all_refunded else REQUEST_STATUS_REFUNDING
-        request.settled_at = datetime.now(UTC)
+        request.settled_at = datetime.now(UTC) if all_refunded else None
         self.request_repo.save_request(session, request)
 
     def _apply_refund_to_request(self, request: RequestRecord, amount_cents: int | None) -> None:
@@ -671,6 +740,34 @@ class RequestsService(RequestsCompatMixin):
         request.contribution_count = max(0, int(request.contribution_count or 0) - 1)
         if request.contribution_count == 0:
             request.max_contribution_amount_cents = 0
+
+    def _execute_refund(self, session: Session, contribution: RequestContributionRecord, *, reason: str) -> bool:
+        if getattr(contribution, "refund_status", None) == "SUCCESS":
+            return True
+        if self.payment_provider is None:
+            return True
+        out_trade_no = contribution.out_trade_no
+        amount_cents = int(contribution.amount_cents or 0)
+        if not out_trade_no or amount_cents <= 0:
+            return True
+        contribution.refund_status = "PENDING"
+        self.request_repo.save_contribution(session, contribution)
+        result = self.payment_provider.refund(
+            out_trade_no=out_trade_no,
+            trade_no=contribution.trade_no,
+            refund_amount_cents=amount_cents,
+            out_request_no=out_trade_no,
+        )
+        if result.success:
+            contribution.refund_status = "SUCCESS"
+            contribution.refund_trade_no = result.refund_trade_no
+            contribution.refunded_at = datetime.now(UTC)
+            self.request_repo.save_contribution(session, contribution)
+            return True
+        contribution.refund_status = "FAILED"
+        self.request_repo.save_contribution(session, contribution)
+        logger.warning("Refund failed for contribution %s: %s %s", contribution.id, result.error_code, result.error_message)
+        return False
 
     def _create_contribution(
         self,

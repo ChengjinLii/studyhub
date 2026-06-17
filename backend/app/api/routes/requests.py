@@ -171,6 +171,19 @@ def request_accept(
     return api_ok(data)
 
 
+@router.post("/api/requests/{id}/confirm-acceptance")
+@router.post("/api/requests/{id}/confirm")
+def request_confirm_acceptance(
+    id: int,
+    auth: AuthContext = Depends(require_auth_context),
+    session: Session = Depends(get_db_session),
+    service: RequestsService = Depends(get_requests_service),
+) -> dict[str, object]:
+    data = service.confirm_acceptance(session, id, auth.user_id or 0, auth.role_mask)
+    _invalidate_request_read_caches()
+    return api_ok(data)
+
+
 @router.post("/api/requests/{id}/preview-views")
 @router.post("/api/requests/{id}/preview-view")
 def request_preview_view(

@@ -34,5 +34,7 @@ def request_contribution_item(item: RequestContributionRecord) -> dict[str, Any]
         "status": item.status,
         "deadlineTier": item.deadline_tier,
         "deadlineAt": serialize_datetime(item.deadline_at),
+        "refundStatus": getattr(item, "refund_status", None),
+        "refundedAt": serialize_datetime(getattr(item, "refunded_at", None)),
         "createdAt": serialize_datetime(item.created_at),
     }

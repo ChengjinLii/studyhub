@@ -179,9 +179,9 @@ def _seed_payment_contract_rows(session, finance_repo: FinanceRepository) -> Non
         channel="alipay_page",
         pay_channel="alipay_page",
         out_trade_no="ODSTEP12PAY0001",
-        commission_rate=0.3,
-        platform_fee_amount=30,
-        creator_payable_amount=70,
+        commission_rate=0.1,
+        platform_fee_amount=10,
+        creator_payable_amount=90,
         policy_version="MARKET_FASTAPI_V1",
     )
     finance_repo.save_order(session, order)

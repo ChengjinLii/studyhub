@@ -246,7 +246,7 @@ def test_step11_payout_schedule_qr_application_gateway_and_monthly_overview(
     application_payload = create_application.json()["data"]
     assert application_payload["status"] == "PENDING"
     assert application_payload["kycStatus"] == "VERIFIED"
-    assert application_payload["earnings"]["payoutAmount"] == 1400
+    assert application_payload["earnings"]["payoutAmount"] == 1800
     application_id = int(application_payload["id"])
 
     admin_list = client.get("/api/admin/creator-payout-applications", headers=admin_headers)
@@ -294,7 +294,7 @@ def test_step11_payout_schedule_qr_application_gateway_and_monthly_overview(
     assert monthly_payload["creatorCount"] >= 1
     first_item = next(item for item in monthly_payload["items"] if int(item["uploaderId"]) == 2)
     assert first_item["hasPayoutQr"] is True
-    assert first_item["payoutAmount"] == 1400
+    assert first_item["payoutAmount"] == 1800
 
     admin_qr = client.get("/api/admin/monthly-payout-overview/users/2/payout-qr", headers=admin_headers)
     assert admin_qr.status_code == 200

@@ -67,6 +67,9 @@ class RequestContributionRecord(TimestampMixin, Base):
     trade_no: Mapped[str | None] = mapped_column(String(64), nullable=True)
     pay_channel: Mapped[str | None] = mapped_column(String(32), nullable=True)
     paid_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    refund_status: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    refund_trade_no: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    refunded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 class RequestPreviewViewRecord(TimestampMixin, Base):

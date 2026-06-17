@@ -181,7 +181,8 @@ class Settings(BaseSettings):
 
     default_role_mask: int = 1
     initial_download_quota: int = 200
-    platform_commission_rate: float = 0.30
+    platform_commission_rate: float = 0.10
+    request_commission_rate: float = 0.05
     settlement_payout_delay_days: int = 7
     settlement_policy_version: str = "MARKET_FASTAPI_V1"
     payout_min_amount_cents: int = 1000

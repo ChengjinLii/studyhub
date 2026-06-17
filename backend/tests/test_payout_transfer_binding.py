@@ -152,7 +152,7 @@ def test_success_callback_settles_only_settlements_bound_at_approval(
     admin_headers = build_auth_headers(3, 8)
     finance_repo = get_finance_repo()
 
-    # S1: 2000 分订单 → 结算单 payout 1400，到期可提现
+    # S1: 2000 分订单 → 结算单 payout 1800（10% 抽成），到期可提现
     material_1 = _create_paid_material(client, baishan_headers, title="绑定回归资料一", price_cents=2000)
     out_trade_no_1, order_id_1 = _pay_order(client, alice_headers, material_1, total_amount="20.00")
     _make_settlement_due(out_trade_no_1)
@@ -164,7 +164,7 @@ def test_success_callback_settles_only_settlements_bound_at_approval(
         transfer = finance_repo.find_transfer_by_application(session, application_id)
         assert transfer is not None
         assert transfer.status == "SUBMITTED"
-        assert int(transfer.amount) == 1400
+        assert int(transfer.amount) == 1800
         transfer_id = int(transfer.id)
         out_biz_no = transfer.out_biz_no
         settlements = finance_repo.list_settlements_for_uploader(session, 2)
@@ -209,14 +209,14 @@ def test_in_flight_settlements_excluded_from_withdrawable_earnings(
 
     application_id = _create_payout_application(client, baishan_headers)
     before = client.get("/api/creator-payout-applications/me", headers=baishan_headers)
-    assert before.json()["data"]["earnings"]["payoutAmount"] == 1400
+    assert before.json()["data"]["earnings"]["payoutAmount"] == 1800
 
     _approve_application(client, admin_headers, application_id)
 
     after = client.get("/api/creator-payout-applications/me", headers=baishan_headers)
     earnings = after.json()["data"]["earnings"]
     assert earnings["payoutAmount"] == 0  # S1 在途，不可重复提现
-    assert earnings["unclaimedPayoutTotal"] == 1400  # 仍是 PENDING，未结总额口径不变
+    assert earnings["unclaimedPayoutTotal"] == 1800  # 仍是 PENDING，未结总额口径不变
 
 
 def test_legacy_unbound_transfer_falls_back_and_repeat_callback_is_idempotent(
@@ -312,7 +312,7 @@ def test_failed_transfer_releases_settlements_back_to_claimable(
     # 解绑后资金重新计入可提现，可被后续提现认领
     latest = client.get("/api/creator-payout-applications/me", headers=baishan_headers)
     assert latest.status_code == 200
-    assert latest.json()["data"]["earnings"]["payoutAmount"] == 1400
+    assert latest.json()["data"]["earnings"]["payoutAmount"] == 1800
 
 
 def test_multiple_due_settlements_sum_into_single_transfer(
@@ -342,8 +342,8 @@ def test_multiple_due_settlements_sum_into_single_transfer(
         assert transfer is not None
         transfer_id = int(transfer.id)
         out_biz_no = transfer.out_biz_no
-        # 两笔结算单（1400 + 700）合并到同一笔转账
-        assert int(transfer.amount) == 2100
+        # 两笔结算单（1800 + 900）合并到同一笔转账
+        assert int(transfer.amount) == 2700
         bound = finance_repo.list_settlements_for_transfer(session, transfer_id)
         assert {item.order_id for item in bound} == {order_id_1, order_id_2}
 

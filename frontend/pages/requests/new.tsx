@@ -250,7 +250,7 @@ export default function RequestNewPage({ user }: RequestNewProps) {
 
               <div className="request-form-section full" id="request-budget">
                 <div className="request-form-section__title">预算与期限</div>
-                <p className="request-form-section__hint">预算越合理，求购曝光与应答效率通常越高。</p>
+                <p className="request-form-section__hint">预算越合理，求购曝光与应答效率通常越高。求购被采纳后，平台收取 5% 服务费，剩余金额支付给应答者。</p>
               </div>
             <div className="form-item">
               <label htmlFor="request-budget-input">预算（元，可选，当前档位最低 {activeTier.ownerMin} 元）</label>

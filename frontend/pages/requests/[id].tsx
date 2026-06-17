@@ -36,6 +36,7 @@ export default function RequestDetailPage({ user, request, responses, contributi
   const dialog = useAppDialog();
   const [requestState, setRequestState] = useState(request);
   const [acceptLoadingId, setAcceptLoadingId] = useState<number | null>(null);
+  const [confirmAcceptanceLoading, setConfirmAcceptanceLoading] = useState(false);
   const [acceptNotice, setAcceptNotice] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [disputeLoadingId, setDisputeLoadingId] = useState<number | null>(null);
   const [disputeNotice, setDisputeNotice] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
@@ -92,7 +93,7 @@ export default function RequestDetailPage({ user, request, responses, contributi
     if (acceptLoadingId) return;
     const confirmed = await dialog.confirm({
       title: '采纳应答',
-      message: '确认采纳该应答并进入结算吗？',
+      message: '确认采纳该应答并进入验收吗？确认验收后平台将收取 5% 服务费。',
       confirmText: '确认采纳',
     });
     if (!confirmed) return;
@@ -110,11 +111,38 @@ export default function RequestDetailPage({ user, request, responses, contributi
       }
       const nextRequest = json.data as MaterialRequestItem;
       setRequestState(nextRequest);
-      setAcceptNotice({ type: 'success', text: '已采纳该应答，进入结算流程。' });
+      setAcceptNotice({ type: 'success', text: '已采纳该应答，请验收后确认。' });
     } catch (error: unknown) {
       setAcceptNotice({ type: 'error', text: toErrorMessage(error, '采纳失败') });
     } finally {
       setAcceptLoadingId(null);
+    }
+  };
+
+  const handleConfirmAcceptance = async () => {
+    if (!requestState?.id) return;
+    if (confirmAcceptanceLoading) return;
+    const confirmed = await dialog.confirm({
+      title: '确认验收',
+      message: '确认资料符合求购需求并进入结算吗？平台将收取 5% 服务费，剩余金额支付给应答者。',
+      confirmText: '确认验收',
+    });
+    if (!confirmed) return;
+    setAcceptNotice(null);
+    setConfirmAcceptanceLoading(true);
+    try {
+      const resp = await fetchBackend(`/requests/${requestState.id}/confirm-acceptance`, { method: 'POST' });
+      const json = await parseApiResponse(resp);
+      if (!resp.ok || !json?.ok) {
+        throw new Error(json?.msg || `验收失败（${resp.status}）`);
+      }
+      const nextRequest = json.data as MaterialRequestItem;
+      setRequestState(nextRequest);
+      setAcceptNotice({ type: 'success', text: '已确认验收，进入结算流程。' });
+    } catch (error: unknown) {
+      setAcceptNotice({ type: 'error', text: toErrorMessage(error, '验收失败') });
+    } finally {
+      setConfirmAcceptanceLoading(false);
     }
   };
 
@@ -241,7 +269,7 @@ export default function RequestDetailPage({ user, request, responses, contributi
     if (!item.id) return;
     const confirmed = await dialog.confirm({
       title: '提前结束贡献',
-      message: '确定要提前结束该贡献吗？将收取 3% 手续费。',
+      message: '确定要提前结束该贡献吗？退款将原路返回。',
       confirmText: '结束贡献',
       danger: true,
     });
@@ -298,7 +326,10 @@ export default function RequestDetailPage({ user, request, responses, contributi
   const ownerLabel = requestState.requesterName || '匿名同学';
   const acceptedResponseId = requestState.acceptedResponseId ?? null;
   const canAccept = Boolean(requestState.owner && requestState.status === 'OPEN' && !acceptedResponseId);
-  const canDispute = Boolean(requestState.owner && requestState.status === 'OPEN' && !acceptedResponseId);
+  const canConfirmAcceptance = Boolean(requestState.owner && requestState.status === 'ACCEPTED' && acceptedResponseId);
+  const canDispute = Boolean(
+    requestState.owner && ((requestState.status === 'OPEN' && !acceptedResponseId) || (requestState.status === 'ACCEPTED' && acceptedResponseId))
+  );
   const canFollow = Boolean(!requestState.owner && requestState.status === 'OPEN');
   const canRespond = Boolean(requestState.responded || (requestState.responseCount ?? 0) === 0);
 
@@ -445,7 +476,29 @@ export default function RequestDetailPage({ user, request, responses, contributi
                       )}
                       {acceptedResponseId === response.id ? (
                         <div className="request-response-footer">
-                          <span className="badge badge-success">已采纳</span>
+                          <span className="badge badge-success">
+                            {requestState.status === 'ACCEPTED' ? '已采纳，待验收' : '已验收'}
+                          </span>
+                          {canConfirmAcceptance && (
+                            <button
+                              className="button primary small"
+                              type="button"
+                              onClick={handleConfirmAcceptance}
+                              disabled={confirmAcceptanceLoading}
+                            >
+                              {confirmAcceptanceLoading ? '处理中...' : '确认验收'}
+                            </button>
+                          )}
+                          {canDispute && (
+                            <button
+                              className="button ghost small"
+                              type="button"
+                              onClick={() => handleDispute(response.id)}
+                              disabled={Boolean(disputeLoadingId)}
+                            >
+                              {disputeLoadingId === response.id ? '处理中...' : '不收货'}
+                            </button>
+                          )}
                         </div>
                       ) : canAccept && response.materialId ? (
                         <div className="request-response-footer">
@@ -455,7 +508,7 @@ export default function RequestDetailPage({ user, request, responses, contributi
                             onClick={() => handleAccept(response.id)}
                             disabled={Boolean(acceptLoadingId) || !previewReady[response.id]}
                           >
-                            {acceptLoadingId === response.id ? '处理中...' : '采纳并结算'}
+                            {acceptLoadingId === response.id ? '处理中...' : '采纳应答'}
                           </button>
                           {canDispute && (
                             <button
