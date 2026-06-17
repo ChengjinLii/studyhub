@@ -3274,8 +3274,8 @@ main {
 
 .stable-version-modal {
   width: min(1040px, calc(100vw - 40px));
-  width: min(1040px, calc(100vw - 40px), calc(155vh - 403px));
-  width: min(1040px, calc(100vw - 40px), calc(155dvh - 403px));
+  width: min(1040px, calc(100vw - 40px), calc(135vh - 310px));
+  width: min(1040px, calc(100vw - 40px), calc(135dvh - 310px));
   max-height: calc(100vh - 32px);
   max-height: calc(100dvh - 32px);
   padding: 0;
@@ -3293,7 +3293,6 @@ main {
   width: 100%;
   flex: 0 0 auto;
   aspect-ratio: 16 / 9;
-  max-height: min(54dvh, 540px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -3304,9 +3303,9 @@ main {
 .stable-version-modal__media img {
   display: block;
   width: 100%;
-  height: 100%;
+  height: auto;
   aspect-ratio: 16 / 9;
-  object-fit: cover;
+  object-fit: contain;
   box-shadow: none;
 }
 
@@ -3314,8 +3313,8 @@ main {
   display: flex;
   flex-direction: column;
   justify-content: center;
-  gap: clamp(7px, 1vh, 11px);
-  padding: clamp(14px, 2vh, 22px) clamp(20px, 2.8vw, 32px) clamp(16px, 2.2vh, 26px);
+  gap: clamp(6px, 0.9vh, 10px);
+  padding: clamp(12px, 1.7vh, 20px) clamp(18px, 2.6vw, 30px) clamp(14px, 2vh, 24px);
 }
 
 .stable-version-modal__eyebrow {
@@ -3544,14 +3543,14 @@ main {
 @media (max-width: 840px) {
   .stable-version-modal {
     padding: 0;
-    width: min(560px, calc(100vw - 24px));
+    width: min(560px, calc(100vw - 24px), calc(128vh - 260px));
+    width: min(560px, calc(100vw - 24px), calc(128dvh - 260px));
     max-height: calc(100vh - 24px);
     max-height: calc(100dvh - 24px);
   }
 
   .stable-version-modal__media {
     min-height: 0;
-    max-height: 42dvh;
     border-bottom: 1px solid rgba(148, 163, 184, 0.16);
   }
 
