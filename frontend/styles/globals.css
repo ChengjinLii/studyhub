@@ -3274,8 +3274,8 @@ main {
 
 .stable-version-modal {
   width: min(1040px, calc(100vw - 40px));
-  width: min(1040px, calc(100vw - 40px), calc(135vh - 310px));
-  width: min(1040px, calc(100vw - 40px), calc(135dvh - 310px));
+  width: min(1040px, calc(100vw - 40px), calc(132vh - 310px));
+  width: min(1040px, calc(100vw - 40px), calc(132dvh - 310px));
   max-height: calc(100vh - 32px);
   max-height: calc(100dvh - 32px);
   padding: 0;
@@ -3543,8 +3543,8 @@ main {
 @media (max-width: 840px) {
   .stable-version-modal {
     padding: 0;
-    width: min(560px, calc(100vw - 24px), calc(128vh - 260px));
-    width: min(560px, calc(100vw - 24px), calc(128dvh - 260px));
+    width: min(560px, calc(100vw - 24px), calc(124vh - 260px));
+    width: min(560px, calc(100vw - 24px), calc(124dvh - 260px));
     max-height: calc(100vh - 24px);
     max-height: calc(100dvh - 24px);
   }
