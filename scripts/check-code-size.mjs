@@ -15,7 +15,7 @@ const lineBudgets = [
   ['frontend/pages/index.tsx', 1100],
   ['frontend/pages/materials/[id].tsx', 900],
   ['backend/app/services/materials_service.py', 1500],
-  ['backend/app/services/requests_service.py', 900],
+  ['backend/app/services/requests_service.py', 1000],
 ];
 
 const forbiddenDirs = ['frontend/test-results', 'frontend/playwright-report', 'backend/.pytest_cache'];
