@@ -93,6 +93,19 @@ export default function MyApp({ Component, pageProps }: AppProps) {
   }, []);
 
   useEffect(() => {
+    if (!entryModalVariant || typeof window === 'undefined') {
+      return undefined;
+    }
+    const handleEntryModalKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setEntryModalVariant(null);
+      }
+    };
+    window.addEventListener('keydown', handleEntryModalKeyDown);
+    return () => window.removeEventListener('keydown', handleEntryModalKeyDown);
+  }, [entryModalVariant]);
+
+  useEffect(() => {
     let active = true;
     const fetchRuntimeInfo = async () => {
       try {
