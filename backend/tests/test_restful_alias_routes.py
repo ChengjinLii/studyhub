@@ -1,9 +1,23 @@
 from __future__ import annotations
 
+from fastapi.routing import APIRoute
 from fastapi.testclient import TestClient
 
+from app.main import create_app
 
-def test_restful_alias_routes_are_registered(client: TestClient) -> None:
+
+def _registered_routes() -> set[tuple[str, str]]:
+    app = create_app()
+    return {
+        (method, route.path)
+        for route in app.routes
+        if isinstance(route, APIRoute)
+        for method in (route.methods or set())
+        if method not in {"HEAD", "OPTIONS"}
+    }
+
+
+def test_restful_alias_routes_are_registered() -> None:
     wanted = {
         ("POST", "/api/session"),
         ("POST", "/api/dev-session"),
@@ -58,14 +72,9 @@ def test_restful_alias_routes_are_registered(client: TestClient) -> None:
         ("PUT", "/api/ai/memory-preferences"),
         ("GET", "/api/free-download"),
     }
-    registered = {
-        (method, route.path)
-        for route in client.app.routes
-        for method in (getattr(route, "methods", set()) or set())
-        if method not in {"HEAD", "OPTIONS"}
-    }
+    registered = _registered_routes()
 
-    assert wanted <= registered
+    assert wanted <= registered, f"Missing RESTful aliases: {sorted(wanted - registered)}"
 
 
 def test_restful_collection_routes_are_not_shadowed_by_id_routes(client: TestClient) -> None:

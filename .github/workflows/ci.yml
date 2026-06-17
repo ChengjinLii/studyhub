@@ -92,4 +92,4 @@ jobs:
         run: npx playwright install --with-deps chromium
       - name: Run frontend critical tests
         working-directory: frontend
-        run: npm run test:critical
+        run: npm run test:critical -- --reporter=line
