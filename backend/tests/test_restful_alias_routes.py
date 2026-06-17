@@ -3,14 +3,49 @@ from __future__ import annotations
 from fastapi.routing import APIRoute
 from fastapi.testclient import TestClient
 
-from app.main import create_app
+from app.api.routes import (
+    admin,
+    ai,
+    auth,
+    comments,
+    community,
+    free_download,
+    market,
+    materials,
+    notifications,
+    orders,
+    payments,
+    payouts,
+    profile,
+    requests,
+    session,
+)
+
+
+ROUTE_MODULES = (
+    admin,
+    ai,
+    auth,
+    comments,
+    community,
+    free_download,
+    market,
+    materials,
+    notifications,
+    orders,
+    payments,
+    payouts,
+    profile,
+    requests,
+    session,
+)
 
 
 def _registered_routes() -> set[tuple[str, str]]:
-    app = create_app()
     return {
         (method, route.path)
-        for route in app.routes
+        for module in ROUTE_MODULES
+        for route in module.router.routes
         if isinstance(route, APIRoute)
         for method in (route.methods or set())
         if method not in {"HEAD", "OPTIONS"}
