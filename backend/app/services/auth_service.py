@@ -355,7 +355,11 @@ class AuthService:
     def _log_login_failure(self, identifier: str, reason: str, *, user_id: int | None = None) -> None:
         identifier_digest = hashlib.sha256(identifier.encode("utf-8")).hexdigest()[:16] if identifier else "-"
         logger.info(
-            "Login authentication failed",
+            "Login authentication failed: reason=%s identifier_type=%s identifier_digest=%s user_id=%s",
+            reason,
+            "email" if "@" in identifier else "username",
+            identifier_digest,
+            user_id or "-",
             extra={
                 "event": "auth_login_failed",
                 "failure_reason": reason,
