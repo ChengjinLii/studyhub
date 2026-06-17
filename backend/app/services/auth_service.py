@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
+import hashlib
+import logging
 import secrets
 
 import bcrypt
@@ -25,6 +27,9 @@ from app.schemas.auth import (
 )
 from app.services.auth_cookie_service import AuthCookieService
 from app.services.captcha_service import CaptchaService
+
+
+logger = logging.getLogger(__name__)
 
 
 class AuthService:
@@ -312,22 +317,53 @@ class AuthService:
         return None if verification is None else verification.code
 
     def _authenticate_local_user(self, session: Session, identifier: str, raw_password: str) -> AuthUser:
-        normalized = identifier.strip().lower()
-        user = self.repo.find_user_by_identifier(session, normalized)
+        normalized = self._normalize_login_identifier(identifier)
+        user = self._find_user_by_login_identifier(session, normalized)
         if user is None or not user.password_hash:
+            self._log_login_failure(normalized, "user_not_found" if user is None else "missing_password_hash")
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="用户名或密码错误")
         if not bcrypt.checkpw(raw_password.encode("utf-8"), user.password_hash.encode("utf-8")):
+            self._log_login_failure(normalized, "password_mismatch", user_id=user.id)
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="用户名或密码错误")
         if "@" in normalized and user.verified is False:
+            self._log_login_failure(normalized, "email_unverified", user_id=user.id)
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="邮箱未验证")
         return user
 
     def _find_identifier_or_404(self, session: Session, identifier: str) -> AuthUser:
-        normalized = identifier.strip().lower()
-        user = self.repo.find_user_by_identifier(session, normalized)
+        normalized = self._normalize_login_identifier(identifier)
+        user = self._find_user_by_login_identifier(session, normalized)
         if user is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="账号不存在")
         return user
+
+    def _normalize_login_identifier(self, identifier: str) -> str:
+        normalized = identifier.strip()
+        if "@" in normalized:
+            return normalized.lower()
+        return normalized
+
+    def _find_user_by_login_identifier(self, session: Session, identifier: str) -> AuthUser | None:
+        user = self.repo.find_user_by_identifier(session, identifier)
+        if user is not None or "@" in identifier:
+            return user
+        lowered = identifier.lower()
+        if lowered == identifier:
+            return None
+        return self.repo.find_user_by_username(session, lowered)
+
+    def _log_login_failure(self, identifier: str, reason: str, *, user_id: int | None = None) -> None:
+        identifier_digest = hashlib.sha256(identifier.encode("utf-8")).hexdigest()[:16] if identifier else "-"
+        logger.info(
+            "Login authentication failed",
+            extra={
+                "event": "auth_login_failed",
+                "failure_reason": reason,
+                "user_id": user_id,
+                "identifier_digest": identifier_digest,
+                "identifier_type": "email" if "@" in identifier else "username",
+            },
+        )
 
     def _create_verification(
         self,

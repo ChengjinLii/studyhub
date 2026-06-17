@@ -143,6 +143,35 @@ def test_login_logout_and_session_restore(
     assert client.get("/api/session").status_code == 401
 
 
+def test_login_preserves_username_case_for_identifier_lookup(
+    client: TestClient,
+    captcha_service: CaptchaService,
+    auth_service: AuthService,
+) -> None:
+    _register_and_verify(
+        client,
+        captcha_service,
+        auth_service,
+        username="CaseUser",
+        email="case-user@example.com",
+        password="secret123",
+    )
+
+    client.cookies.clear()
+    captcha_id, captcha_code = _issue_captcha(client, captcha_service)
+    login_response = client.post(
+        "/api/auth/login",
+        json={
+            "identifier": "CaseUser",
+            "password": "secret123",
+            "captchaId": captcha_id,
+            "captchaCode": captcha_code,
+        },
+    )
+
+    assert login_response.status_code == 200
+
+
 def test_me_account_patch_refreshes_cookies(
     client: TestClient,
     captcha_service: CaptchaService,
