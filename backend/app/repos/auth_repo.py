@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from sqlalchemy import func, inspect, select
+from sqlalchemy import func, inspect, select, text
 from sqlalchemy.orm import Session
 
 from app.models.auth import AuthUser, EmailVerification, LegacyAuthUser
@@ -28,14 +28,23 @@ def resolve_user_model(session: Session) -> type[AuthUser] | type[LegacyAuthUser
     if cached is not None:
         return cached
     inspector = inspect(session.get_bind())
-    if inspector.has_table("auth_users"):
+    has_auth_users = inspector.has_table("auth_users")
+    has_legacy_users = inspector.has_table("users")
+    if has_auth_users and has_legacy_users and _table_row_count(session, "auth_users") == 0 and _table_row_count(session, "users") > 0:
+        model = LegacyAuthUser
+    elif has_auth_users:
         model: type[AuthUser] | type[LegacyAuthUser] = AuthUser
-    elif inspector.has_table("users"):
+    elif has_legacy_users:
         model = LegacyAuthUser
     else:
         model = AuthUser
     _USER_MODEL_CACHE[cache_key] = model
     return model
+
+
+def _table_row_count(session: Session, table_name: str) -> int:
+    quoted = session.get_bind().dialect.identifier_preparer.quote(table_name)
+    return int(session.execute(text(f"SELECT COUNT(*) FROM {quoted}")).scalar() or 0)
 
 
 class AuthRepository:

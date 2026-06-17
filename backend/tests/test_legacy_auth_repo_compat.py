@@ -8,6 +8,7 @@ from app.repos.market_repo import MarketRepository
 from app.repos.material_repo import MaterialRepository
 from app.services.user_read_service import UserReadService
 from app.repos.auth_repo import AuthRepository
+from app.models.auth import AuthUser
 from app.repos.read_api_repo import ReadApiRepository
 from app.repos.user_follow_repo import UserFollowRepository
 from app.services.user_follow_service import UserFollowService
@@ -212,6 +213,16 @@ def test_auth_repository_uses_legacy_users_table_when_auth_users_is_missing() ->
         session.commit()
         assert charlie.id is not None
         assert repo.find_user_by_username(session, "charlie") is not None
+
+
+def test_auth_repository_uses_populated_legacy_users_when_auth_users_is_empty() -> None:
+    repo = AuthRepository()
+    with _build_legacy_session() as session:
+        AuthUser.__table__.create(bind=session.get_bind())
+
+        assert repo.count_users(session) == 2
+        assert repo.find_user_by_username(session, "alice") is not None
+        assert repo.find_user_by_email(session, "baishan@example.com") is not None
 
 
 def test_user_follow_service_works_with_legacy_users_table() -> None:

@@ -54,13 +54,7 @@ jobs:
               echo "Last backend test output:"
               tail -n 80 reports/coverage/backend-test.log
             } > reports/coverage/backend-test-summary.log
-            summary="$(python - <<'PY'
-from pathlib import Path
-text = Path("reports/coverage/backend-test-summary.log").read_text(encoding="utf-8", errors="replace")
-text = text[-7000:]
-print(text.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A"))
-PY
-)"
+            summary="$(python -c 'from pathlib import Path; text = Path("reports/coverage/backend-test-summary.log").read_text(encoding="utf-8", errors="replace")[-7000:]; print(text.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A"))')"
             echo "::error file=backend-tests::${summary}"
             exit 1
           fi
