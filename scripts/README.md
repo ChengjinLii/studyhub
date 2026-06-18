@@ -22,6 +22,7 @@
 - 清理全部生成物并准备重新构建前端：`bash scripts/clean-generated.sh --all`
 - 检查 shell 脚本语法：`bash scripts/check-shell-scripts.sh`
 - 检查敏感文件误提交：`bash scripts/security/check-sensitive-files.sh`
+- 推送前快速门禁：`bash scripts/pre-push-check.sh`
 - 非生产 CI 检查：`bash scripts/ci-check.sh`
 - 发布前检查：`bash scripts/predeploy-check.sh`
 - 浏览器加载性能预算：`npm --prefix frontend run test:perf`
@@ -31,6 +32,12 @@
 `scripts/dev/doctor.sh` 是只读诊断脚本，用来检查 Docker local-dev 和 shell quickstart 至少有一条路径是否可用；它不会启动服务、连接数据库、读取 private env 内容或修改运行态。
 
 `ci-check.sh` 面向 PR / CI / 本地代码质量门禁，包含 shell 语法、敏感文件、后端测试、前端 check、前端 unit、Playwright critical 和代码体积检查；它不会运行 production preflight、nginx 检查或 systemd 状态检查。
+
+`pre-push-check.sh` 是推送 GitHub 前的固定入口，按当前 GitHub CI 的阻断项组织：仓库卫生、敏感文件、代码体积、后端 ruff/pytest、前端 check、strict typecheck、unit tests 和 Playwright critical tests。它不连接生产数据库、不执行迁移、不重启服务；若本机没有 `.venv`，会明确跳过后端本地检查并继续跑前端门禁。建议每次 `git push` 前先运行：
+
+```bash
+bash scripts/pre-push-check.sh
+```
 
 `predeploy-check.sh` 会串起 shell 脚本语法、后端测试、前端检查、前端单测、Playwright critical tests、代码体积检查和生产预检。只想在本地跑代码质量门禁时，可以临时跳过生产环境检查：
 

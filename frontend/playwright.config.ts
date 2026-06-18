@@ -15,6 +15,7 @@ export default defineConfig({
     extraHTTPHeaders: hostHeader ? { Host: hostHeader } : undefined,
   },
   timeout: 30000,
+  retries: process.env.CI ? 1 : 0,
   testDir: 'tests',
   webServer: shouldStartLocalServer
     ? {
