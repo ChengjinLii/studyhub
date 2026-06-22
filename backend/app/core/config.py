@@ -107,6 +107,7 @@ class Settings(BaseSettings):
     write_origin_require_header: bool | None = None
     trusted_site_origins: str | None = None
     rate_limit_enabled: bool = True
+    rate_limit_backend: str = "auto"
     rate_limit_window_seconds: int = 60
     rate_limit_login: int = 1000
     rate_limit_captcha: int = 1000

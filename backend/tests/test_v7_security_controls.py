@@ -11,7 +11,7 @@ from app.api.deps import clear_dependency_caches
 from app.core.async_db import reset_async_database_runtime
 from app.core.config import Settings, get_settings
 from app.core.db import reset_database_runtime
-from app.core.rate_limit import _client_key, get_rate_limiter
+from app.core.rate_limit import _client_key, get_rate_limiter, get_redis_rate_limiter, rate_limit_allowed
 from app.main import create_app
 from app.services.auth_service import AuthService
 from tests.test_mcp_protocol import MCP_HEADERS
@@ -252,6 +252,62 @@ def test_rate_limit_accepts_forwarded_for_from_trusted_proxy() -> None:
     request = _request_with_client("10.0.0.8", "198.51.100.7, 10.0.0.8")
 
     assert _client_key(settings, request) == "198.51.100.7"
+
+
+def test_rate_limit_supports_redis_backend(monkeypatch: pytest.MonkeyPatch) -> None:
+    class FakeRedis:
+        def __init__(self) -> None:
+            self.hits: dict[str, list[float]] = {}
+
+        def eval(self, script: str, numkeys: int, key: str, now: float, window: int, limit: int, member: str) -> int:
+            del script, numkeys, member
+            bucket = [hit for hit in self.hits.get(key, []) if hit >= now - window]
+            if len(bucket) >= limit:
+                self.hits[key] = bucket
+                return 0
+            bucket.append(now)
+            self.hits[key] = bucket
+            return 1
+
+    fake_redis = FakeRedis()
+    limiter = get_redis_rate_limiter()
+    limiter.clear()
+    monkeypatch.setattr(limiter, "_client", lambda settings: fake_redis)
+    settings = Settings(
+        rate_limit_backend="redis",
+        redis_url="redis://cache",
+        rate_limit_login=2,
+        rate_limit_window_seconds=60,
+    )
+    request = _request_with_client("203.0.113.9")
+
+    assert rate_limit_allowed(settings, request) == (True, None)
+    assert rate_limit_allowed(settings, request) == (True, None)
+    assert rate_limit_allowed(settings, request) == (False, "Too many login requests")
+    assert any(key.startswith("studyhub-fastapi:rate-limit:login:") for key in fake_redis.hits)
+
+
+def test_rate_limit_falls_back_to_local_when_redis_fails(monkeypatch: pytest.MonkeyPatch) -> None:
+    limiter = get_redis_rate_limiter()
+    limiter.clear()
+
+    def raise_redis_error(settings: Settings):
+        del settings
+        raise RuntimeError("redis unavailable")
+
+    monkeypatch.setattr(limiter, "_client", raise_redis_error)
+    get_rate_limiter().clear()
+    settings = Settings(
+        rate_limit_backend="redis",
+        redis_url="redis://cache",
+        rate_limit_login=2,
+        rate_limit_window_seconds=60,
+    )
+    request = _request_with_client("203.0.113.10")
+
+    assert rate_limit_allowed(settings, request) == (True, None)
+    assert rate_limit_allowed(settings, request) == (True, None)
+    assert rate_limit_allowed(settings, request) == (False, "Too many login requests")
 
 
 def test_docs_can_be_disabled_by_configuration(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

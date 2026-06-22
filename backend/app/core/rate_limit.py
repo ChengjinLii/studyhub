@@ -3,7 +3,9 @@ from __future__ import annotations
 from collections import defaultdict, deque
 from dataclasses import dataclass
 from ipaddress import ip_address, ip_network
-from time import monotonic
+import secrets
+from time import monotonic, time
+from typing import Any
 
 from fastapi import Request
 
@@ -37,11 +39,74 @@ class InMemoryRateLimiter:
         return True
 
 
+class RedisRateLimiter:
+    _CHECK_SCRIPT = """
+local key = KEYS[1]
+local now = tonumber(ARGV[1])
+local window = tonumber(ARGV[2])
+local limit = tonumber(ARGV[3])
+local member = ARGV[4]
+redis.call('ZREMRANGEBYSCORE', key, '-inf', now - window)
+local count = redis.call('ZCARD', key)
+if count >= limit then
+  redis.call('EXPIRE', key, math.ceil(window))
+  return 0
+end
+redis.call('ZADD', key, now, member)
+redis.call('EXPIRE', key, math.ceil(window))
+return 1
+"""
+
+    def __init__(self) -> None:
+        self._redis_client: Any | None = None
+
+    def clear(self) -> None:
+        self._redis_client = None
+
+    def check(self, settings: Settings, key: str, *, limit: int, window_seconds: int) -> bool:
+        if limit <= 0:
+            return True
+        client = self._client(settings)
+        window = max(1, int(window_seconds))
+        redis_key = f"{settings.redis_namespace.strip(':') or 'studyhub-fastapi'}:rate-limit:{key}"
+        member = f"{time():.9f}:{secrets.token_hex(4)}"
+        result = client.eval(self._CHECK_SCRIPT, 1, redis_key, time(), window, int(limit), member)
+        return int(result) == 1
+
+    def _client(self, settings: Settings):
+        if self._redis_client is not None:
+            return self._redis_client
+        if not settings.redis_url:
+            raise RuntimeError("Redis rate limit backend requires redis_url")
+        import redis  # type: ignore[import-not-found]
+
+        self._redis_client = redis.Redis.from_url(
+            settings.redis_url,
+            socket_timeout=settings.redis_socket_timeout_seconds,
+            socket_connect_timeout=settings.redis_connect_timeout_seconds,
+        )
+        return self._redis_client
+
+
 _RATE_LIMITER = InMemoryRateLimiter()
+_REDIS_RATE_LIMITER = RedisRateLimiter()
 
 
 def get_rate_limiter() -> InMemoryRateLimiter:
     return _RATE_LIMITER
+
+
+def get_redis_rate_limiter() -> RedisRateLimiter:
+    return _REDIS_RATE_LIMITER
+
+
+def _rate_limit_backend(settings: Settings) -> str:
+    backend = (settings.rate_limit_backend or "auto").strip().lower()
+    if backend == "auto":
+        return "redis" if settings.redis_url else "local"
+    if backend == "redis" and not settings.redis_url:
+        return "local"
+    return backend if backend in {"local", "redis"} else "local"
 
 
 def _is_trusted_proxy(settings: Settings, host: str | None) -> bool:
@@ -98,7 +163,13 @@ def rate_limit_allowed(settings: Settings, request: Request) -> tuple[bool, str 
     if rule is None:
         return True, None
     key = f"{rule.name}:{_client_key(settings, request)}"
-    allowed = get_rate_limiter().check(key, limit=rule.limit, window_seconds=settings.rate_limit_window_seconds)
+    if _rate_limit_backend(settings) == "redis":
+        try:
+            allowed = get_redis_rate_limiter().check(settings, key, limit=rule.limit, window_seconds=settings.rate_limit_window_seconds)
+        except Exception:
+            allowed = get_rate_limiter().check(key, limit=rule.limit, window_seconds=settings.rate_limit_window_seconds)
+    else:
+        allowed = get_rate_limiter().check(key, limit=rule.limit, window_seconds=settings.rate_limit_window_seconds)
     if allowed:
         return True, None
     return False, f"Too many {rule.name} requests"
