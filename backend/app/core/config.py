@@ -103,6 +103,7 @@ class Settings(BaseSettings):
     security_permissions_policy: str = "camera=(), microphone=(), geolocation=()"
     security_csp_report_only: str | None = None
     write_origin_protection_enabled: bool | None = None
+    write_origin_require_header: bool | None = None
     trusted_site_origins: str | None = None
     rate_limit_enabled: bool = True
     rate_limit_window_seconds: int = 60
@@ -446,6 +447,12 @@ class Settings(BaseSettings):
     def resolved_write_origin_protection_enabled(self) -> bool:
         if self.write_origin_protection_enabled is not None:
             return bool(self.write_origin_protection_enabled)
+        return self.is_preview or self.is_production
+
+    @property
+    def resolved_write_origin_require_header(self) -> bool:
+        if self.write_origin_require_header is not None:
+            return bool(self.write_origin_require_header)
         return self.is_preview or self.is_production
 
     @property

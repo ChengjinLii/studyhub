@@ -40,6 +40,7 @@ def strict_security_client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> T
     monkeypatch.setenv("STUDYHUB_MAIL_OUTBOX_DIR", str(tmp_path / "outbox" / "mail"))
     monkeypatch.setenv("STUDYHUB_LOCAL_DEV_BOOTSTRAP_USER", "false")
     monkeypatch.setenv("STUDYHUB_WRITE_ORIGIN_PROTECTION_ENABLED", "true")
+    monkeypatch.setenv("STUDYHUB_WRITE_ORIGIN_REQUIRE_HEADER", "true")
     monkeypatch.setenv("STUDYHUB_TRUSTED_SITE_ORIGINS", "https://study-hub.cn")
     monkeypatch.setenv("STUDYHUB_RATE_LIMIT_WINDOW_SECONDS", "60")
     monkeypatch.setenv("STUDYHUB_RATE_LIMIT_LOGIN", "2")
@@ -105,6 +106,28 @@ def test_write_origin_protection_allows_trusted_origin(strict_security_client: T
     response = strict_security_client.post("/api/session", headers={"Origin": "https://study-hub.cn"}, json={})
 
     assert response.status_code == 400
+
+
+def test_write_origin_protection_rejects_missing_origin_for_cookie_writes(strict_security_client: TestClient) -> None:
+    response = strict_security_client.post("/api/session", headers={"Cookie": "studyhub_token=stale-token"}, json={})
+
+    assert response.status_code == 403
+    assert_error_envelope(response, "ORIGIN_FORBIDDEN", "Write request origin is required")
+
+
+def test_write_origin_protection_allows_missing_origin_without_cookie(strict_security_client: TestClient) -> None:
+    response = strict_security_client.post("/api/session", json={})
+
+    assert response.status_code == 400
+
+
+def test_write_origin_protection_allows_bearer_writes_without_origin(strict_security_client: TestClient) -> None:
+    response = strict_security_client.post(
+        "/api/materials",
+        headers={"Authorization": "Bearer invalid-token"},
+    )
+
+    assert response.status_code in {401, 422}
 
 
 def test_login_rate_limit_returns_429(strict_security_client: TestClient) -> None:
