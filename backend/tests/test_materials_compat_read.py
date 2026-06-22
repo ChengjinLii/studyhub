@@ -5,6 +5,8 @@ import json
 from types import SimpleNamespace
 from typing import Any
 
+import pytest
+from fastapi import HTTPException
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import Session
 
@@ -252,6 +254,83 @@ def test_compat_download_uses_legacy_file_key_and_download_columns() -> None:
     assert downloads == 1
     assert download_count == 1
     assert quota == 199
+
+
+def test_compat_download_quota_update_does_not_overdraw() -> None:
+    service = _build_service()
+    engine = create_engine("sqlite+pysqlite:///:memory:", future=True)
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                """
+                CREATE TABLE materials (
+                    id INTEGER PRIMARY KEY,
+                    uploader_id INTEGER NULL,
+                    title VARCHAR(80) NOT NULL,
+                    original_filename VARCHAR(255) NULL,
+                    file_type VARCHAR(20) NULL,
+                    file_size INTEGER NULL,
+                    file_key VARCHAR(255) NULL,
+                    is_free BOOLEAN NOT NULL DEFAULT 1,
+                    netdisk_url VARCHAR(500) NULL,
+                    netdisk_password VARCHAR(50) NULL,
+                    netdisk_expired_at DATE NULL,
+                    status VARCHAR(16) NOT NULL DEFAULT 'PUBLISHED',
+                    download_count INTEGER NOT NULL DEFAULT 0
+                )
+                """
+            )
+        )
+        connection.execute(
+            text(
+                """
+                CREATE TABLE users (
+                    id INTEGER PRIMARY KEY,
+                    role_mask INTEGER NOT NULL DEFAULT 1,
+                    free_download_quota INTEGER NOT NULL DEFAULT 200,
+                    updated_at DATETIME NULL
+                )
+                """
+            )
+        )
+        connection.execute(
+            text(
+                """
+                CREATE TABLE material_downloads (
+                    id INTEGER PRIMARY KEY,
+                    material_id INTEGER NOT NULL,
+                    user_id INTEGER NOT NULL,
+                    created_at DATETIME NULL
+                )
+                """
+            )
+        )
+        connection.execute(
+            text(
+                """
+                INSERT INTO materials (
+                    id, uploader_id, title, original_filename, file_type, file_size, file_key,
+                    is_free, netdisk_url, netdisk_password, netdisk_expired_at, status, download_count
+                )
+                VALUES (41, 7, 'Legacy PDF', 'legacy.pdf', 'pdf', 1024, 'materials/41/file.pdf', 1, NULL, NULL, NULL, 'VISIBLE', 0)
+                """
+            )
+        )
+        connection.execute(text("INSERT INTO users (id, role_mask, free_download_quota) VALUES (1, 1, 0)"))
+
+    with Session(engine) as session:
+        with pytest.raises(HTTPException) as exc:
+            service.generate_download(session, 41, user_id=1, role_mask=1)
+        assert exc.value.status_code == 403
+        assert exc.value.detail == "DOWNLOAD_QUOTA_EXHAUSTED"
+
+    with engine.connect() as connection:
+        downloads = connection.execute(text("SELECT COUNT(*) FROM material_downloads")).scalar_one()
+        download_count = connection.execute(text("SELECT download_count FROM materials WHERE id = 41")).scalar_one()
+        quota = connection.execute(text("SELECT free_download_quota FROM users WHERE id = 1")).scalar_one()
+    assert downloads == 0
+    assert download_count == 0
+    assert quota == 0
 
 
 def test_compat_record_view_accepts_legacy_visible_material_status() -> None:

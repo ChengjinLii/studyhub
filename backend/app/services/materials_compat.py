@@ -545,6 +545,8 @@ class MaterialsCompatMixin:
         return self._compat_as_int(row["uploader_id"], default=0) != int(user_id)
 
     def _compat_consume_download_quota(self, session: Session, user_id: int, count: int) -> None:
+        if count <= 0:
+            return
         row = session.execute(
             text(
                 """
@@ -560,19 +562,20 @@ class MaterialsCompatMixin:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="用户不存在")
         if self._is_privileged(self._compat_as_int(row["role_mask"], default=0)):
             return
-        current_quota = self._compat_as_int(row["free_download_quota"], default=200)
-        if current_quota < count:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="DOWNLOAD_QUOTA_EXHAUSTED")
-        session.execute(
+        result = session.execute(
             text(
                 """
                 UPDATE users
-                SET free_download_quota = :next_quota, updated_at = CURRENT_TIMESTAMP
+                SET free_download_quota = COALESCE(free_download_quota, 200) - :count,
+                    updated_at = CURRENT_TIMESTAMP
                 WHERE id = :user_id
+                  AND COALESCE(free_download_quota, 200) >= :count
                 """
             ),
-            {"next_quota": current_quota - count, "user_id": user_id},
+            {"count": count, "user_id": user_id},
         )
+        if result.rowcount != 1:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="DOWNLOAD_QUOTA_EXHAUSTED")
 
     def _compat_register_download(self, session: Session, material_id: int, user_id: int) -> None:
         existing = session.execute(

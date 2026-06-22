@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import HTTPException, UploadFile, status
-from sqlalchemy import bindparam, text
+from sqlalchemy import bindparam, func, text, update
 from sqlalchemy.orm import Session
 
 from app.core.async_db import async_session_scope
@@ -1331,14 +1331,24 @@ class MaterialsService(MaterialsCompatMixin):
         return material.uploader_id != user_id
 
     def _consume_download_quota(self, session: Session, user_id: int, count: int) -> None:
+        if count <= 0:
+            return
         user = self._require_user(session, user_id)
         if self._is_privileged(user.role_mask):
             return
-        current = DEFAULT_FREE_DOWNLOAD_QUOTA if user.free_download_quota is None else int(user.free_download_quota)
-        if current < count:
+        quota_value = func.coalesce(AuthUser.free_download_quota, DEFAULT_FREE_DOWNLOAD_QUOTA)
+        result = session.execute(
+            update(AuthUser)
+            .where(AuthUser.id == user_id, quota_value >= count)
+            .values(
+                free_download_quota=quota_value - count,
+                updated_at=datetime.now(UTC),
+            )
+            .execution_options(synchronize_session=False)
+        )
+        if result.rowcount != 1:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="DOWNLOAD_QUOTA_EXHAUSTED")
-        user.free_download_quota = current - count
-        self.auth_repo.save_user(session, user)
+        session.expire(user, ["free_download_quota"])
 
     def _register_download(self, session: Session, material: MaterialRecord, user_id: int) -> None:
         if self.material_repo.has_download(session, material.id, user_id):

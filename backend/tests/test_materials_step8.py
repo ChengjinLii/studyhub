@@ -222,3 +222,25 @@ def test_step8_download_permissions_and_quota_boundaries_match_current_rules(
     paid_response = client.get("/api/materials/104/download", headers=baishan_headers)
     assert paid_response.status_code == 403
     assert paid_response.json()["msg"] == "请先购买后再下载"
+
+
+def test_batch_download_does_not_overdraw_free_quota(
+    client: TestClient,
+    auth_service: AuthService,
+) -> None:
+    seed_read_users(auth_service, with_follow_graph=True)
+
+    with session_scope() as session:
+        user = auth_service.repo.find_user_by_id(session, 1)
+        assert user is not None
+        user.free_download_quota = 1
+
+    alice_headers = build_auth_headers(1, 1)
+    response = client.post("/api/materials/downloads/batch", json={"materialIds": [101, 103]}, headers=alice_headers)
+
+    assert response.status_code == 403
+    assert response.json()["error"]["code"] == "DOWNLOAD_QUOTA_EXHAUSTED"
+    with session_scope() as session:
+        user = session.get(AuthUser, 1)
+        assert user is not None
+        assert user.free_download_quota == 1
