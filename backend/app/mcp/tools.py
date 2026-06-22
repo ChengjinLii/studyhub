@@ -65,7 +65,7 @@ def _call_tool(tool_name: str, handler, *args, **kwargs) -> dict[str, Any]:
         )
 
 
-def register_tools(mcp: FastMCP) -> None:
+def register_tools(mcp: FastMCP, *, include_ops_tools: bool = False) -> None:
     @mcp.tool(name="search", title="Search StudyHub", annotations=READ_ONLY, structured_output=True)
     def search(query: str, limit: int | None = 9) -> dict[str, Any]:
         """Use this when a user wants to search StudyHub materials, requests, and campus market items."""
@@ -143,7 +143,8 @@ def register_tools(mcp: FastMCP) -> None:
         """Use this when a user wants StudyHub contributor rankings."""
         return _call_tool("leaderboard.contributors", contributor_leaderboard, limit, period)
 
-    @mcp.tool(name="health.ready", title="StudyHub Readiness", annotations=READ_ONLY, structured_output=True)
-    def health_ready_tool() -> dict[str, Any]:
-        """Use this when a user wants to check StudyHub backend readiness."""
-        return _call_tool("health.ready", health_ready)
+    if include_ops_tools:
+        @mcp.tool(name="health.ready", title="StudyHub Readiness", annotations=READ_ONLY, structured_output=True)
+        def health_ready_tool() -> dict[str, Any]:
+            """Use this for internal operations to check StudyHub backend readiness."""
+            return _call_tool("health.ready", health_ready)

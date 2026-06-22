@@ -16,7 +16,7 @@ def create_studyhub_mcp() -> FastMCP:
     mcp.settings.transport_security.allowed_hosts = sorted(allowed_hosts)
     if settings.resolved_mcp_allowed_origins:
         mcp.settings.transport_security.allowed_origins = settings.resolved_mcp_allowed_origins
-    register_tools(mcp)
+    register_tools(mcp, include_ops_tools=settings.mcp_expose_ops_tools)
     register_resources(mcp)
     register_prompts(mcp)
     return mcp

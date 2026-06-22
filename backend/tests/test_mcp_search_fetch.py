@@ -242,12 +242,12 @@ def test_mcp_contributor_leaderboard_uses_fixed_public_schema(client: TestClient
 
 
 def test_mcp_tool_call_records_safe_metrics(client: TestClient) -> None:
-    response = call_tool(client, "health.ready")
+    response = call_tool(client, "materials.discover", {"query": "数据结构", "limit": 1})
 
     assert response.status_code == 200
     metrics = client.get("/api/metrics")
     assert metrics.status_code == 200
-    assert 'studyhub_mcp_tool_calls_total{tool="health.ready",status="ok"}' in metrics.text
+    assert 'studyhub_mcp_tool_calls_total{tool="materials.discover",status="ok"}' in metrics.text
 
 
 def test_mcp_public_urls_use_configured_site_base_url(monkeypatch) -> None:

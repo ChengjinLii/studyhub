@@ -77,6 +77,7 @@ class Settings(BaseSettings):
     mcp_read_scope: str = "studyhub.read"
     mcp_write_scope: str = "studyhub.write"
     mcp_admin_scope: str = "studyhub.admin"
+    mcp_expose_ops_tools: bool = False
     ai_agent_provider: str = "local"
     ai_agent_base_url: str | None = None
     ai_agent_api_key: str | None = None

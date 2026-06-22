@@ -132,7 +132,48 @@ def scoped_mcp_client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> TestCl
 
 
 def test_mcp_allows_anonymous_read_tools_in_local_test(client: TestClient) -> None:
+    response = call_tool(client, "materials.discover", {"query": "数据结构", "limit": 1})
+
+    assert response.status_code == 200
+    assert "items" in response.json()["result"]["structuredContent"]
+
+
+def test_mcp_hides_ops_tools_by_default(client: TestClient) -> None:
     response = call_tool(client, "health.ready")
+
+    assert response.status_code == 200
+    assert response.json()["result"]["isError"] is True
+    assert "Unknown tool" in response.json()["result"]["content"][0]["text"]
+
+
+def test_mcp_exposes_ops_tools_only_when_enabled(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    db_path = tmp_path / "studyhub-fastapi-test.sqlite3"
+    monkeypatch.setenv("STUDYHUB_ENVIRONMENT", "test")
+    monkeypatch.setenv("STUDYHUB_DATABASE_URL", f"sqlite+pysqlite:///{db_path}")
+    monkeypatch.setenv("STUDYHUB_JWT_SECRET", "studyhub-fastapi-test-secret-1234567890abcdefghijkl")
+    monkeypatch.setenv("STUDYHUB_CONTRACT_REPORT_DIR", str(tmp_path / "artifacts"))
+    monkeypatch.setenv("STUDYHUB_MATERIAL_ASSET_DIR", str(tmp_path / "materials"))
+    monkeypatch.setenv("STUDYHUB_MARKET_ASSET_DIR", str(tmp_path / "market"))
+    monkeypatch.setenv("STUDYHUB_PAYOUT_QR_ASSET_DIR", str(tmp_path / "payout-qr"))
+    monkeypatch.setenv("STUDYHUB_MAIL_OUTBOX_DIR", str(tmp_path / "outbox" / "mail"))
+    monkeypatch.setenv("STUDYHUB_LOCAL_DEV_BOOTSTRAP_USER", "false")
+    monkeypatch.setenv("STUDYHUB_MCP_EXPOSE_OPS_TOOLS", "true")
+
+    get_settings.cache_clear()
+    clear_dependency_caches()
+    reset_database_runtime()
+    import asyncio
+
+    asyncio.run(reset_async_database_runtime())
+
+    app = create_app()
+    with TestClient(app) as test_client:
+        response = call_tool(test_client, "health.ready")
+
+    clear_dependency_caches()
+    reset_database_runtime()
+    asyncio.run(reset_async_database_runtime())
+    get_settings.cache_clear()
 
     assert response.status_code == 200
     assert response.json()["result"]["structuredContent"]["status"] == "ok"
@@ -180,7 +221,7 @@ def test_mcp_is_disabled_by_default_in_production_settings() -> None:
 
 
 def test_mcp_require_auth_rejects_anonymous_requests(auth_required_client: TestClient) -> None:
-    response = call_tool(auth_required_client, "health.ready")
+    response = call_tool(auth_required_client, "materials.discover", {"query": "数据结构", "limit": 1})
 
     assert response.status_code == 401
     assert_middleware_error(response, "MCP_UNAUTHORIZED", "MCP authentication required")
@@ -191,7 +232,8 @@ def test_mcp_require_auth_rejects_anonymous_requests(auth_required_client: TestC
 def test_mcp_require_auth_rejects_invalid_bearer_token(auth_required_client: TestClient) -> None:
     response = call_tool(
         auth_required_client,
-        "health.ready",
+        "materials.discover",
+        {"query": "数据结构", "limit": 1},
         headers={"Authorization": "Bearer wrong-token"},
     )
 
@@ -204,19 +246,25 @@ def test_mcp_require_auth_rejects_invalid_bearer_token(auth_required_client: Tes
 def test_mcp_require_auth_accepts_configured_bearer_token(auth_required_client: TestClient) -> None:
     response = call_tool(
         auth_required_client,
-        "health.ready",
+        "materials.discover",
+        {"query": "数据结构", "limit": 1},
         headers={"Authorization": "Bearer test-mcp-token"},
     )
 
     assert response.status_code == 200
-    assert response.json()["result"]["structuredContent"]["status"] == "ok"
+    assert "items" in response.json()["result"]["structuredContent"]
 
 
 def test_mcp_scoped_read_token_allows_read_tool(scoped_mcp_client: TestClient) -> None:
-    response = call_tool(scoped_mcp_client, "health.ready", headers={"Authorization": "Bearer read-token"})
+    response = call_tool(
+        scoped_mcp_client,
+        "materials.discover",
+        {"query": "数据结构", "limit": 1},
+        headers={"Authorization": "Bearer read-token"},
+    )
 
     assert response.status_code == 200
-    assert response.json()["result"]["structuredContent"]["status"] == "ok"
+    assert "items" in response.json()["result"]["structuredContent"]
 
 
 def test_mcp_scoped_discovery_token_allows_discovery_tool(scoped_mcp_client: TestClient) -> None:

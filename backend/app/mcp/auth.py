@@ -41,7 +41,7 @@ def _public_leaderboard_scopes(settings: Settings) -> tuple[str, ...]:
 
 
 def _tool_access_registry(settings: Settings) -> dict[str, McpToolAccess]:
-    return {
+    registry = {
         "search": McpToolAccess("search", _public_discovery_scopes(settings), mutating=False),
         "fetch": McpToolAccess("fetch", _public_summary_scopes(settings), mutating=False),
         "materials.search": McpToolAccess("materials.search", _public_discovery_scopes(settings), mutating=False),
@@ -64,12 +64,14 @@ def _tool_access_registry(settings: Settings) -> dict[str, McpToolAccess]:
             _public_leaderboard_scopes(settings),
             mutating=False,
         ),
-        "health.ready": McpToolAccess("health.ready", (settings.mcp_read_scope, MCP_OPS_SCOPE), mutating=False),
         "comments.create": McpToolAccess("comments.create", (settings.mcp_write_scope,), mutating=True),
         "requests.create": McpToolAccess("requests.create", (settings.mcp_write_scope,), mutating=True),
         "admin.users.search": McpToolAccess("admin.users.search", (settings.mcp_admin_scope,), mutating=False, admin=True),
         "admin.reports.search": McpToolAccess("admin.reports.search", (settings.mcp_admin_scope,), mutating=False, admin=True),
     }
+    if settings.mcp_expose_ops_tools:
+        registry["health.ready"] = McpToolAccess("health.ready", (MCP_OPS_SCOPE,), mutating=False)
+    return registry
 
 
 def required_scopes_for_tool(settings: Settings, tool_name: str) -> set[str] | None:

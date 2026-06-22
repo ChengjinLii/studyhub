@@ -79,8 +79,8 @@ def test_mcp_tools_list_exposes_v0_read_tools(client: TestClient) -> None:
         "market.search",
         "market.get",
         "leaderboard.contributors",
-        "health.ready",
     }.issubset(names)
+    assert "health.ready" not in names
     assert "materials.preview" not in names
     assert "comments.create" not in names
     assert "admin.users.search" not in names
