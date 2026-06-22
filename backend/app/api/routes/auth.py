@@ -75,7 +75,11 @@ def dev_login(
 
 
 @router.post("/api/auth/logout")
-def auth_logout() -> dict[str, object]:
+def auth_logout(
+    response: Response,
+    service: AuthService = Depends(get_auth_service),
+) -> dict[str, object]:
+    service.auth_cookie_service.clear_auth_cookies(response)
     return api_ok()
 
 

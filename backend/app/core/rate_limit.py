@@ -86,6 +86,8 @@ def _rule_for_request(settings: Settings, request: Request) -> RateLimitRule | N
         return RateLimitRule("email-verification", settings.rate_limit_email_verification)
     if method == "POST" and path in {"/api/materials", "/api/market"}:
         return RateLimitRule("upload", settings.rate_limit_upload)
+    if method == "POST" and path.startswith("/api/materials/") and path.endswith(("/view", "/views")):
+        return RateLimitRule("view", settings.rate_limit_view)
     return None
 
 

@@ -46,6 +46,7 @@ def strict_security_client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> T
     monkeypatch.setenv("STUDYHUB_RATE_LIMIT_CAPTCHA", "2")
     monkeypatch.setenv("STUDYHUB_RATE_LIMIT_EMAIL_VERIFICATION", "2")
     monkeypatch.setenv("STUDYHUB_RATE_LIMIT_UPLOAD", "2")
+    monkeypatch.setenv("STUDYHUB_RATE_LIMIT_VIEW", "2")
     monkeypatch.setenv("STUDYHUB_RATE_LIMIT_MCP", "2")
 
     get_settings.cache_clear()
@@ -152,6 +153,17 @@ def test_material_upload_rate_limit_returns_429(strict_security_client: TestClie
 
     assert response.status_code == 429
     assert_error_envelope(response, "RATE_LIMITED", "Too many upload requests")
+
+
+def test_material_view_rate_limit_returns_429(strict_security_client: TestClient) -> None:
+    for index in range(2):
+        response = strict_security_client.post("/api/materials/101/view", json={"viewerToken": f"viewer-{index}"})
+        assert response.status_code == 200
+
+    response = strict_security_client.post("/api/materials/101/view", json={"viewerToken": "viewer-over-limit"})
+
+    assert response.status_code == 429
+    assert_error_envelope(response, "RATE_LIMITED", "Too many view requests")
 
 
 def test_market_publish_rate_limit_returns_429_from_same_bucket(strict_security_client: TestClient) -> None:

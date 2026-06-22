@@ -133,8 +133,23 @@ def test_login_logout_and_session_restore(
 
     auth_logout = client.post("/api/auth/logout")
     assert auth_logout.status_code == 200
-    assert client.get("/api/session").status_code == 200
+    auth_cleared_headers = auth_logout.headers.get_list("set-cookie")
+    assert any("studyhub_token=" in header and "Max-Age=0" in header for header in auth_cleared_headers)
+    assert any("studyhub_user=" in header and "Max-Age=0" in header for header in auth_cleared_headers)
+    assert client.get("/api/session").status_code == 401
 
+    captcha_id, captcha_code = _issue_captcha(client, captcha_service)
+    login_again_response = client.post(
+        "/api/auth/login",
+        json={
+            "identifier": "compat@example.com",
+            "password": "secret123",
+            "captchaId": captcha_id,
+            "captchaCode": captcha_code,
+            "rememberMe": True,
+        },
+    )
+    assert login_again_response.status_code == 200
     session_logout = client.post("/api/logout")
     assert session_logout.status_code == 200
     cleared_headers = session_logout.headers.get_list("set-cookie")

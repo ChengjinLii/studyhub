@@ -110,6 +110,7 @@ class Settings(BaseSettings):
     rate_limit_captcha: int = 1000
     rate_limit_email_verification: int = 1000
     rate_limit_upload: int = 1000
+    rate_limit_view: int = 1000
     rate_limit_mcp: int = 1000
 
     lock_provider: str = "db_row"
