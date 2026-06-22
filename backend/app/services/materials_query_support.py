@@ -3,6 +3,7 @@ from __future__ import annotations
 import re
 from typing import Any
 
+from app.services.materials_search import MaterialSearchQuery, parse_material_search_query
 from app.services.read_support import compat_as_int, compat_normalize_text, compat_timestamp
 
 
@@ -91,10 +92,75 @@ def compat_sort_material_rows(
     return ordered
 
 
+def _compat_keyword_fields() -> tuple[str, ...]:
+    return (
+        "LOWER(COALESCE(m.title, ''))",
+        "LOWER(COALESCE(m.description, ''))",
+        "LOWER(COALESCE(m.keywords, ''))",
+    )
+
+
+def _compat_like_group_sql(
+    *,
+    terms: tuple[str, ...],
+    param_prefix: str,
+    params: dict[str, Any],
+) -> str:
+    term_clauses: list[str] = []
+    fields = _compat_keyword_fields()
+    for term_index, term in enumerate(terms):
+        param_name = f"{param_prefix}_{term_index}"
+        params[param_name] = f"%{term}%"
+        field_clauses = [f"{field} LIKE :{param_name}" for field in fields]
+        term_clauses.append(f"({' OR '.join(field_clauses)})")
+    return f"({' OR '.join(term_clauses)})" if term_clauses else "1 = 1"
+
+
+def _compat_keyword_filter_clauses(
+    query: MaterialSearchQuery,
+    params: dict[str, Any],
+) -> list[str]:
+    if not query.has_terms:
+        return []
+    clauses: list[str] = []
+    if query.required_groups:
+        for group_index, group in enumerate(query.required_groups):
+            clauses.append(_compat_like_group_sql(terms=group, param_prefix=f"keyword_core_{group_index}", params=params))
+        return clauses
+    for term_index, term in enumerate(query.boost_terms):
+        clauses.append(_compat_like_group_sql(terms=(term,), param_prefix=f"keyword_aux_{term_index}", params=params))
+    return clauses
+
+
+def _compat_keyword_score_sql(
+    query: MaterialSearchQuery,
+    params: dict[str, Any],
+) -> str:
+    if not query.has_terms:
+        return "0"
+    parts: list[str] = []
+    all_groups = list(query.required_groups) + [(term,) for term in query.boost_terms]
+    weighted_fields = (
+        ("LOWER(COALESCE(m.title, ''))", 50),
+        ("LOWER(COALESCE(m.keywords, ''))", 35),
+        ("LOWER(COALESCE(m.description, ''))", 12),
+    )
+    for group_index, group in enumerate(all_groups):
+        for term_index, term in enumerate(group):
+            param_name = f"keyword_score_{group_index}_{term_index}"
+            params[param_name] = f"%{term}%"
+            for field_sql, weight in weighted_fields:
+                parts.append(f"(CASE WHEN {field_sql} LIKE :{param_name} THEN {weight} ELSE 0 END)")
+    if not parts:
+        return "0"
+    return " + ".join(parts)
+
+
 def compat_material_order_clause(
     *,
     sort: str | None,
     profile: dict[str, Any] | None,
+    keyword: str | None = None,
 ) -> tuple[str, dict[str, Any], str]:
     normalized_sort = (sort or "latest").strip().lower()
     if normalized_sort == "price":
@@ -134,11 +200,11 @@ def compat_material_order_clause(
             END
         )
     """
-    return (
-        "recommendation_score DESC, COALESCE(m.download_count, 0) DESC, m.created_at DESC, m.id DESC",
-        params,
-        recommendation_score_sql,
-    )
+    search_query = parse_material_search_query(keyword)
+    if search_query.has_terms:
+        search_score_sql = _compat_keyword_score_sql(search_query, params)
+        recommendation_score_sql = f"(({recommendation_score_sql}) + ({search_score_sql}))"
+    return "recommendation_score DESC, COALESCE(m.download_count, 0) DESC, m.created_at DESC, m.id DESC", params, recommendation_score_sql
 
 
 def compat_material_filter_parts(
@@ -155,11 +221,8 @@ def compat_material_filter_parts(
 ) -> tuple[list[str], dict[str, Any]]:
     where_clauses = ["m.deleted_at IS NULL", visible_material_status_sql]
     params: dict[str, Any] = {}
-    if compat_normalize_text(keyword):
-        params["keyword"] = f"%{keyword.strip().lower()}%"
-        where_clauses.append(
-            "(LOWER(COALESCE(m.title, '')) LIKE :keyword OR LOWER(COALESCE(m.description, '')) LIKE :keyword OR LOWER(COALESCE(m.keywords, '')) LIKE :keyword)"
-        )
+    search_query = parse_material_search_query(keyword)
+    where_clauses.extend(_compat_keyword_filter_clauses(search_query, params))
     if compat_normalize_text(school):
         params["school"] = school.strip()
         where_clauses.append("m.school = :school")

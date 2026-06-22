@@ -32,6 +32,7 @@ from app.services.materials_query_support import (
     compat_recommendation_score,
     compat_sort_material_rows,
 )
+from app.services.materials_search import material_matches_search, material_search_score, parse_material_search_query
 from app.services.materials_compat import MaterialsCompatMixin
 from app.services.materials_serializers import admin_material_item, load_json_list, material_has_file, material_list_item
 from app.services.read_support import (
@@ -109,11 +110,25 @@ class MaterialsService(MaterialsCompatMixin):
             )
         self._bootstrap(session)
         current_user = self._resolve_current_user(session, current_user_id)
+        search_query = parse_material_search_query(keyword)
         visible_materials = self.material_repo.list_visible_materials(session)
-        items = [material for material in visible_materials if self._matches_material(material, keyword, school, college, major, tag, grade_value, course_category, price)]
+        items = [
+            material
+            for material in visible_materials
+            if self._matches_material(material, search_query, school, college, major, tag, grade_value, course_category, price)
+        ]
 
         if (sort or "").lower() == "price":
             items.sort(key=lambda material: (material.price, -self._material_created_ts(material)))
+        elif search_query.has_terms:
+            items.sort(
+                key=lambda material: (
+                    -material_search_score(material, search_query, self._loads),
+                    -self._recommendation_score(material, current_user),
+                    -int(material.download_count or 0),
+                    -self._material_created_ts(material),
+                )
+            )
         else:
             items.sort(
                 key=lambda material: (
@@ -1217,7 +1232,7 @@ class MaterialsService(MaterialsCompatMixin):
     def _matches_material(
         self,
         material: MaterialRecord,
-        keyword: str | None,
+        search_query,
         school: str | None,
         college: str | None,
         major: str | None,
@@ -1226,17 +1241,8 @@ class MaterialsService(MaterialsCompatMixin):
         course_category: str | None,
         price: str | None,
     ) -> bool:
-        if keyword:
-            haystack = " ".join(
-                [
-                    material.title or "",
-                    material.description or "",
-                    material.original_filename or "",
-                    " ".join(self._loads(material.tags_json)),
-                ]
-            ).lower()
-            if keyword.strip().lower() not in haystack:
-                return False
+        if not material_matches_search(material, search_query, self._loads):
+            return False
         if school and material.school != school:
             return False
         if college and material.college != college:

@@ -67,9 +67,10 @@ export default function HomeFilterCard({
                 name="keyword"
                 value={filtersState.keyword}
                 onChange={(event) => onFilterChange('keyword', event.target.value)}
-                placeholder="课程名 / 知识点 / 讲义"
+                placeholder="课程名 / 知识点 / 资料类型"
               />
             </div>
+            <p className="help-text">多个关键词可以用空格分开。</p>
           </div>
           <div className="filter-actions quick">
             <button type="button" className="button ghost small" onClick={onToggleAdvancedFilters} aria-expanded={showAdvanced}>

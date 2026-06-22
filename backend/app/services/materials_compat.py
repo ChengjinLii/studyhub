@@ -687,7 +687,7 @@ class MaterialsCompatMixin:
         )
         if where_clauses == ["1 = 0"]:
             return []
-        order_sql, order_params, recommendation_score_sql = self._compat_material_order_clause(sort=sort, profile=profile)
+        order_sql, order_params, recommendation_score_sql = self._compat_material_order_clause(sort=sort, profile=profile, keyword=keyword)
         params.update(order_params)
         paging_sql = ""
         safe_limit = max(1, int(limit)) if limit is not None else None
@@ -802,8 +802,8 @@ class MaterialsCompatMixin:
             visible_material_status_sql=VISIBLE_MATERIAL_STATUS_SQL,
         )
 
-    def _compat_material_order_clause(self, *, sort: str | None, profile: dict[str, Any] | None) -> tuple[str, dict[str, Any], str]:
-        return compat_material_order_clause(sort=sort, profile=profile)
+    def _compat_material_order_clause(self, *, sort: str | None, profile: dict[str, Any] | None, keyword: str | None = None) -> tuple[str, dict[str, Any], str]:
+        return compat_material_order_clause(sort=sort, profile=profile, keyword=keyword)
 
     def _compat_load_user_profile(self, session: Session, user_id: int | None) -> dict[str, Any] | None:
         if user_id is None:
@@ -1353,7 +1353,7 @@ class MaterialsCompatMixin:
         )
         if where_clauses == ["1 = 0"]:
             return []
-        order_sql, order_params, recommendation_score_sql = self._compat_material_order_clause(sort=sort, profile=profile)
+        order_sql, order_params, recommendation_score_sql = self._compat_material_order_clause(sort=sort, profile=profile, keyword=keyword)
         params.update(order_params)
         paging_sql = ""
         safe_limit = max(1, int(limit)) if limit is not None else None

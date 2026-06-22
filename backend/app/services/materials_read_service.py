@@ -7,6 +7,11 @@ from sqlalchemy.orm import Session
 
 from app.repos.auth_repo import AuthRepository
 from app.repos.read_api_repo import ReadApiRepository
+from app.services.materials_search import (
+    material_mapping_matches_search,
+    material_mapping_search_score,
+    parse_material_search_query,
+)
 from app.services.read_support import clamp_limit, parse_iso_datetime, serialize_user_snapshot
 
 
@@ -39,10 +44,20 @@ class MaterialsReadService:
             for material in seed.get("materials", [])
             if material.get("status", "VISIBLE") not in {"REMOVED", "HIDDEN"}
         ]
-        items = [material for material in items if self._matches_material(material, keyword, school, college, major, tag, grade_value, course_category, price)]
+        search_query = parse_material_search_query(keyword)
+        items = [material for material in items if self._matches_material(material, search_query, school, college, major, tag, grade_value, course_category, price)]
 
         if (sort or "").lower() == "price":
             items.sort(key=lambda material: (float(material.get("price", 0)), -parse_iso_datetime(material.get("createdAt")).timestamp()))
+        elif search_query.has_terms:
+            items.sort(
+                key=lambda material: (
+                    -material_mapping_search_score(material, search_query),
+                    -self._recommendation_score(material, current_user),
+                    -(material.get("downloadCount") or 0),
+                    -parse_iso_datetime(material.get("createdAt")).timestamp(),
+                )
+            )
         else:
             items.sort(
                 key=lambda material: (
@@ -130,7 +145,7 @@ class MaterialsReadService:
     def _matches_material(
         self,
         material: dict[str, Any],
-        keyword: str | None,
+        search_query,
         school: str | None,
         college: str | None,
         major: str | None,
@@ -139,17 +154,8 @@ class MaterialsReadService:
         course_category: str | None,
         price: str | None,
     ) -> bool:
-        if keyword:
-            haystack = " ".join(
-                [
-                    str(material.get("title") or ""),
-                    str(material.get("description") or ""),
-                    str(material.get("originalFilename") or ""),
-                    " ".join(material.get("tags", [])),
-                ]
-            ).lower()
-            if keyword.strip().lower() not in haystack:
-                return False
+        if not material_mapping_matches_search(material, search_query):
+            return False
         if school and material.get("school") != school:
             return False
         if college and material.get("college") != college:
