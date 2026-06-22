@@ -8,13 +8,15 @@ import zipfile
 import pytest
 from fastapi import HTTPException, UploadFile
 from fastapi.testclient import TestClient
+from starlette.datastructures import Headers
 
-from app.core.upload_validation import validate_file_size
+from app.core.config import Settings
+from app.core.upload_validation import validate_file_size, validate_image_upload, validate_material_upload
 from app.services.auth_service import AuthService
 from tests.support import build_auth_headers, seed_read_users
 
 
-PNG_1X1 = base64.b64decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+c86sAAAAASUVORK5CYII=")
+PNG_1X1 = base64.b64decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4//8/AwAI/AL+p5qgoAAAAABJRU5ErkJggg==")
 SVG_BYTES = b"<svg xmlns='http://www.w3.org/2000/svg'><script>alert(1)</script></svg>"
 
 
@@ -160,3 +162,68 @@ def test_file_size_validator_rejects_oversized_material_upload() -> None:
             max_size_bytes=10,
             too_large_detail="资料文件不能超过 50MB",
         )
+
+
+def test_image_validator_rejects_spoofed_image_content() -> None:
+    upload = UploadFile(filename="fake.png", file=BytesIO(b"not really a png"), headers=Headers({"content-type": "image/png"}))
+
+    with pytest.raises(HTTPException) as exc:
+        validate_image_upload(
+            upload,
+            settings=Settings(),
+            max_size_bytes=1024,
+            missing_detail="请上传有效的预览图片",
+            invalid_type_detail="预览图片仅支持 PNG、JPG、WEBP、GIF、BMP、AVIF、HEIC、HEIF 格式",
+            too_large_detail="预览图片不能超过 5MB",
+        )
+
+    assert exc.value.status_code == 400
+    assert "仅支持" in str(exc.value.detail)
+
+
+def test_material_validator_rejects_spoofed_pdf_content() -> None:
+    upload = UploadFile(filename="fake.pdf", file=BytesIO(b"not really a pdf"))
+
+    with pytest.raises(HTTPException) as exc:
+        validate_material_upload(
+            upload,
+            max_size_bytes=1024,
+            missing_detail="请上传有效的资料文件",
+            invalid_type_detail="资料文件内容与文件类型不匹配",
+            too_large_detail="资料文件不能超过 50MB",
+        )
+
+    assert exc.value.status_code == 400
+    assert exc.value.detail == "资料文件内容与文件类型不匹配"
+
+
+def test_material_validator_rejects_zip_path_traversal() -> None:
+    content = _zip_bytes("../escape.txt", "unsafe")
+    upload = UploadFile(filename="unsafe.zip", file=BytesIO(content))
+
+    with pytest.raises(HTTPException) as exc:
+        validate_material_upload(
+            upload,
+            max_size_bytes=1024,
+            missing_detail="请上传有效的资料文件",
+            invalid_type_detail="资料文件内容与文件类型不匹配",
+            too_large_detail="资料文件不能超过 50MB",
+        )
+
+    assert exc.value.status_code == 400
+    assert exc.value.detail == "资料文件内容与文件类型不匹配"
+
+
+def test_material_validator_preserves_file_position_for_storage() -> None:
+    content = _zip_bytes("readme.txt", "safe")
+    upload = UploadFile(filename="safe.zip", file=BytesIO(content))
+
+    validate_material_upload(
+        upload,
+        max_size_bytes=1024,
+        missing_detail="请上传有效的资料文件",
+        invalid_type_detail="资料文件内容与文件类型不匹配",
+        too_large_detail="资料文件不能超过 50MB",
+    )
+
+    assert upload.file.read() == content

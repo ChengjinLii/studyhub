@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 from app.core.async_db import async_session_scope
 from app.core.config import Settings
 from app.core.profile_metadata import DEFAULT_FREE_DOWNLOAD_QUOTA
-from app.core.upload_validation import validate_file_size, validate_image_upload
+from app.core.upload_validation import validate_image_upload, validate_material_upload
 from app.integrations.material_asset_store import MaterialAssetStore
 from app.models.auth import AuthUser
 from app.models.materials import MaterialFavoriteRecord, MaterialRatingRecord, MaterialRecord
@@ -1087,9 +1087,11 @@ class MaterialsService(MaterialsCompatMixin):
         is_create: bool,
     ) -> None:
         if file_upload is not None:
-            validate_file_size(
+            validate_material_upload(
                 file_upload,
                 max_size_bytes=self.settings.material_file_max_size_bytes,
+                missing_detail="请上传有效的资料文件",
+                invalid_type_detail="资料文件内容与文件类型不匹配",
                 too_large_detail="资料文件不能超过 50MB",
             )
         if len(previews) > self.settings.material_manual_preview_max_images:
