@@ -101,6 +101,7 @@ class Settings(BaseSettings):
     security_frame_options: str = "DENY"
     security_referrer_policy: str = "strict-origin-when-cross-origin"
     security_permissions_policy: str = "camera=(), microphone=(), geolocation=()"
+    security_csp: str | None = None
     security_csp_report_only: str | None = None
     write_origin_protection_enabled: bool | None = None
     write_origin_require_header: bool | None = None

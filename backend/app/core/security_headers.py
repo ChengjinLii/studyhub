@@ -12,6 +12,8 @@ def apply_security_headers(settings: Settings, headers: MutableHeaders) -> None:
     headers.setdefault("x-frame-options", settings.security_frame_options)
     headers.setdefault("referrer-policy", settings.security_referrer_policy)
     headers.setdefault("permissions-policy", settings.security_permissions_policy)
+    if settings.security_csp:
+        headers.setdefault("content-security-policy", settings.security_csp)
     if settings.security_csp_report_only:
         headers.setdefault("content-security-policy-report-only", settings.security_csp_report_only)
     if settings.resolved_security_hsts_enabled:

@@ -26,6 +26,7 @@ def csp_client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> TestClient:
     monkeypatch.setenv("STUDYHUB_PAYOUT_QR_ASSET_DIR", str(tmp_path / "payout-qr"))
     monkeypatch.setenv("STUDYHUB_MAIL_OUTBOX_DIR", str(tmp_path / "outbox" / "mail"))
     monkeypatch.setenv("STUDYHUB_LOCAL_DEV_BOOTSTRAP_USER", "false")
+    monkeypatch.setenv("STUDYHUB_SECURITY_CSP", "default-src 'self'; object-src 'none'; base-uri 'self'")
     monkeypatch.setenv("STUDYHUB_SECURITY_CSP_REPORT_ONLY", "default-src 'self'; report-uri /api/security/csp-reports")
 
     get_settings.cache_clear()
@@ -49,6 +50,7 @@ def test_csp_report_only_header_is_configurable(csp_client: TestClient) -> None:
     response = csp_client.get("/api/healthz")
 
     assert response.status_code == 200
+    assert response.headers["content-security-policy"] == "default-src 'self'; object-src 'none'; base-uri 'self'"
     assert response.headers["content-security-policy-report-only"] == "default-src 'self'; report-uri /api/security/csp-reports"
 
 
