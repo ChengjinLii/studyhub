@@ -277,7 +277,7 @@ export default function Login({ user }: LoginPageProps) {
         captchaCode: resetCaptchaCode,
       });
       setResetCooldown(result?.resendAfterSeconds ?? 60);
-      setResetMsg({ type: 'success', text: '验证码已发送，请查收邮箱' });
+      setResetMsg({ type: 'success', text: '如果该账号存在且已绑定邮箱，验证码会发送到对应邮箱。' });
     } catch (err: unknown) {
       setResetMsg({ type: 'error', text: toErrorMessage(err, '发送验证码失败') });
     } finally {

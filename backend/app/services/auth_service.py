@@ -121,8 +121,15 @@ class AuthService:
             raise BizException("CAPTCHA_REQUIRED", "请先完成验证码验证")
         self.captcha_service.validate(payload.captchaId, payload.captchaCode)
 
-        user = self._find_identifier_or_404(session, payload.identifier)
+        try:
+            user = self._find_identifier_or_404(session, payload.identifier)
+        except HTTPException as exc:
+            if exc.status_code == status.HTTP_404_NOT_FOUND and self.settings.resolved_password_reset_hide_unknown_account:
+                return self._generic_reset_send_response()
+            raise
         if not user.email:
+            if self.settings.resolved_password_reset_hide_unknown_account:
+                return self._generic_reset_send_response()
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="该账号未绑定邮箱，无法重置密码")
 
         verification = self._create_verification(
@@ -336,6 +343,13 @@ class AuthService:
         if user is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="账号不存在")
         return user
+
+    def _generic_reset_send_response(self) -> VerificationSendResponsePayload:
+        return VerificationSendResponsePayload(
+            email="no-reply@study-hub.cn",
+            expiresInSeconds=self.settings.verification_ttl_seconds,
+            resendAfterSeconds=self.settings.verification_resend_after_seconds,
+        )
 
     def _normalize_login_identifier(self, identifier: str) -> str:
         normalized = identifier.strip()

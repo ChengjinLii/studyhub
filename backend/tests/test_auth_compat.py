@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import pytest
 from fastapi import Response
 from fastapi.testclient import TestClient
 
@@ -383,6 +384,38 @@ def test_bind_email_and_reset_password_flow(
         },
     )
     assert relogin.status_code == 200
+
+
+def test_password_reset_can_hide_unknown_account_in_production_mode(
+    client: TestClient,
+    captcha_service: CaptchaService,
+    auth_service: AuthService,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(auth_service.settings, "password_reset_hide_unknown_account", True)
+    captcha_id, captcha_code = _issue_captcha(client, captcha_service)
+
+    response = client.post(
+        "/api/password-resets",
+        json={
+            "identifier": "missing_user",
+            "newPassword": "renew123",
+            "captchaId": captcha_id,
+            "captchaCode": captcha_code,
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()["data"]
+    assert payload["email"] == "no-reply@study-hub.cn"
+    assert payload["expiresInSeconds"] == auth_service.settings.verification_ttl_seconds
+    with session_scope() as session:
+        reset_code = auth_service.peek_latest_verification_code_for_testing(
+            session,
+            email="no-reply@study-hub.cn",
+            purpose=VerificationPurpose.RESET,
+        )
+    assert reset_code is None
 
 
 def test_change_password_clears_cookies(

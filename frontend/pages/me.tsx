@@ -320,7 +320,7 @@ export default function MePage({ user, summary, account }: MePageProps) {
       });
       const json = await ensureApiSuccess<{ resendAfterSeconds?: number }>(resp, '发送验证码失败');
       setEmailResetCooldown(json.data?.resendAfterSeconds ?? 60);
-      setEmailResetMessage({ type: 'success', message: '验证码已发送至邮箱，请在 5 分钟内完成验证。' });
+      setEmailResetMessage({ type: 'success', message: '如果该账号存在且已绑定邮箱，验证码会发送到对应邮箱，请在 5 分钟内完成验证。' });
     } catch (error: unknown) {
       setEmailResetMessage({ type: 'error', message: toErrorMessage(error, '发送验证码失败') });
     } finally {
