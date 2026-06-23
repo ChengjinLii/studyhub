@@ -20,6 +20,7 @@ from app.api.deps import (
 )
 from app.core.db import get_db_session
 from app.core.public_read_cache import PublicReadCache, cache_if_anonymous_async, invalidate_prefixes
+from app.core.rate_limit import client_key_for_request
 from app.core.response import api_ok
 from app.core.security import AuthContext
 from app.schemas.materials import (
@@ -172,7 +173,18 @@ async def record_view(
 ) -> dict[str, object]:
     payload_dict = await request.json() if request.headers.get("content-type", "").startswith("application/json") else {}
     payload = MaterialViewPayload.model_validate(payload_dict or {})
-    view_count = service.record_view(session, id, auth.user_id if auth else None, bool(auth and auth.role_mask and auth.role_mask & 24), payload.viewerToken)
+    viewer_context = {
+        "client": client_key_for_request(service.settings, request),
+        "userAgent": request.headers.get("user-agent", ""),
+    }
+    view_count = service.record_view(
+        session,
+        id,
+        auth.user_id if auth else None,
+        bool(auth and auth.role_mask and auth.role_mask & 24),
+        payload.viewerToken,
+        viewer_context=viewer_context,
+    )
     _invalidate_material_detail_caches()
     return api_ok({"viewCount": view_count})
 

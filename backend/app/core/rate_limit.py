@@ -138,6 +138,10 @@ def _client_key(settings: Settings, request: Request) -> str:
     return remote_host or "unknown"
 
 
+def client_key_for_request(settings: Settings, request: Request) -> str:
+    return _client_key(settings, request)
+
+
 def _rule_for_request(settings: Settings, request: Request) -> RateLimitRule | None:
     path = request.url.path
     method = request.method.upper()

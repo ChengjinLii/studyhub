@@ -64,6 +64,7 @@ class MaterialsCompatMixin:
         user_id: int | None,
         can_manage_all: bool,
         viewer_token: str | None,
+        viewer_context: dict[str, str] | None = None,
     ) -> int:
         del can_manage_all
         row = session.execute(
@@ -83,22 +84,24 @@ class MaterialsCompatMixin:
 
         current_view_count = int(row["view_count"] or 0)
         token_hash = self._hash_viewer_token(viewer_token)
+        context_hash = self._hash_viewer_context(material_id, viewer_context)
+        anonymous_hash = context_hash or token_hash
         if user_id is not None:
             existing = self.material_repo.find_view_by_user(session, material_id, user_id)
             if existing is not None:
                 return current_view_count
-            if token_hash:
-                existing_by_token = self.material_repo.find_view_by_token_hash(session, material_id, token_hash)
+            for candidate_hash in self._dedupe_hash_candidates(context_hash, token_hash):
+                existing_by_token = self.material_repo.find_view_by_token_hash(session, material_id, candidate_hash)
                 if existing_by_token is not None:
                     if existing_by_token.user_id is None:
                         self.material_repo.bind_view_to_user(session, existing_by_token, user_id)
                         session.commit()
                     return current_view_count
-            self.material_repo.add_view(session, material_id=material_id, user_id=user_id, viewer_token_hash=token_hash)
-        elif token_hash:
-            if self.material_repo.find_view_by_token_hash(session, material_id, token_hash) is not None:
+            self.material_repo.add_view(session, material_id=material_id, user_id=user_id, viewer_token_hash=token_hash or context_hash)
+        elif anonymous_hash:
+            if self.material_repo.find_view_by_token_hash(session, material_id, anonymous_hash) is not None:
                 return current_view_count
-            self.material_repo.add_view(session, material_id=material_id, user_id=None, viewer_token_hash=token_hash)
+            self.material_repo.add_view(session, material_id=material_id, user_id=None, viewer_token_hash=anonymous_hash)
         else:
             return current_view_count
 

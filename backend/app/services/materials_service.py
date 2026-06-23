@@ -515,29 +515,32 @@ class MaterialsService(MaterialsCompatMixin):
         user_id: int | None,
         can_manage_all: bool,
         viewer_token: str | None,
+        viewer_context: dict[str, str] | None = None,
     ) -> int:
         if self.settings.requires_private_env_file:
-            return self._compat_record_view(session, material_id, user_id, can_manage_all, viewer_token)
+            return self._compat_record_view(session, material_id, user_id, can_manage_all, viewer_token, viewer_context=viewer_context)
         self._bootstrap(session)
         material = self._load_accessible_material(session, material_id, user_id, can_manage_all)
         current_view_count = int(material.view_count or 0)
         token_hash = self._hash_viewer_token(viewer_token)
+        context_hash = self._hash_viewer_context(material_id, viewer_context)
+        anonymous_hash = context_hash or token_hash
         if user_id is not None:
             existing = self.material_repo.find_view_by_user(session, material_id, user_id)
             if existing is not None:
                 return current_view_count
-            if token_hash:
-                existing_by_token = self.material_repo.find_view_by_token_hash(session, material_id, token_hash)
+            for candidate_hash in self._dedupe_hash_candidates(context_hash, token_hash):
+                existing_by_token = self.material_repo.find_view_by_token_hash(session, material_id, candidate_hash)
                 if existing_by_token is not None:
                     if existing_by_token.user_id is None:
                         self.material_repo.bind_view_to_user(session, existing_by_token, user_id)
                         session.commit()
                     return current_view_count
-            self.material_repo.add_view(session, material_id=material_id, user_id=user_id, viewer_token_hash=token_hash)
-        elif token_hash:
-            if self.material_repo.find_view_by_token_hash(session, material_id, token_hash) is not None:
+            self.material_repo.add_view(session, material_id=material_id, user_id=user_id, viewer_token_hash=token_hash or context_hash)
+        elif anonymous_hash:
+            if self.material_repo.find_view_by_token_hash(session, material_id, anonymous_hash) is not None:
                 return current_view_count
-            self.material_repo.add_view(session, material_id=material_id, user_id=None, viewer_token_hash=token_hash)
+            self.material_repo.add_view(session, material_id=material_id, user_id=None, viewer_token_hash=anonymous_hash)
         else:
             return current_view_count
         next_view_count = current_view_count + 1
@@ -1434,6 +1437,25 @@ class MaterialsService(MaterialsCompatMixin):
         if not viewer_token or not viewer_token.strip():
             return None
         return hashlib.sha256(viewer_token.strip().encode("utf-8")).hexdigest()
+
+    def _hash_viewer_context(self, material_id: int, viewer_context: dict[str, str] | None) -> str | None:
+        if not viewer_context:
+            return None
+        client = (viewer_context.get("client") or "").strip()
+        user_agent = (viewer_context.get("userAgent") or "").strip()
+        if not client and not user_agent:
+            return None
+        window = datetime.now(UTC).date().isoformat()
+        user_agent_hash = hashlib.sha256(user_agent[:256].encode("utf-8")).hexdigest()[:24]
+        raw = f"viewer-context:v1:{material_id}:{client}:{user_agent_hash}:{window}"
+        return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
+    def _dedupe_hash_candidates(self, *values: str | None) -> list[str]:
+        result: list[str] = []
+        for value in values:
+            if value and value not in result:
+                result.append(value)
+        return result
 
     def _is_external_url(self, value: str | None) -> bool:
         return bool(value and (value.startswith("http://") or value.startswith("https://")))

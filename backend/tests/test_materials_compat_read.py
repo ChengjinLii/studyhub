@@ -365,8 +365,9 @@ def test_compat_record_view_accepts_legacy_visible_material_status() -> None:
         connection.execute(text("INSERT INTO materials (id, title, status, view_count) VALUES (41, 'Legacy PDF', 'PUBLISHED', 5)"))
 
     with Session(engine) as session:
-        first = service.record_view(session, 41, user_id=None, can_manage_all=False, viewer_token="viewer-a")
-        second = service.record_view(session, 41, user_id=None, can_manage_all=False, viewer_token="viewer-a")
+        viewer_context = {"client": "203.0.113.10", "userAgent": "StudyHub Test Browser"}
+        first = service.record_view(session, 41, user_id=None, can_manage_all=False, viewer_token="viewer-a", viewer_context=viewer_context)
+        second = service.record_view(session, 41, user_id=None, can_manage_all=False, viewer_token="viewer-b", viewer_context=viewer_context)
 
     with engine.connect() as connection:
         view_count = connection.execute(text("SELECT view_count FROM materials WHERE id = 41")).scalar_one()

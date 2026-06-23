@@ -47,6 +47,9 @@ def test_step8_existing_material_flow_supports_view_preview_download_and_interac
     second_view = client.post("/api/materials/101/view", json={"viewerToken": "viewer-a"})
     assert second_view.status_code == 200
     assert second_view.json()["data"]["viewCount"] == 246
+    rotated_viewer_token = client.post("/api/materials/101/view", json={"viewerToken": "viewer-b"})
+    assert rotated_viewer_token.status_code == 200
+    assert rotated_viewer_token.json()["data"]["viewCount"] == 246
 
     preview_response = client.get("/api/materials/101/preview", headers=alice_headers)
     assert preview_response.status_code == 200
