@@ -14,6 +14,20 @@ from fastapi import HTTPException, UploadFile, status
 from app.core.config import Settings
 
 
+UPLOAD_STREAM_CHUNK_SIZE = 1024 * 1024
+
+
+class _CountingReader:
+    def __init__(self, raw_file: Any) -> None:
+        self.raw_file = raw_file
+        self.bytes_read = 0
+
+    def read(self, size: int = -1) -> bytes:
+        chunk = self.raw_file.read(size)
+        self.bytes_read += len(chunk)
+        return chunk
+
+
 class StorageProvider(Protocol):
     provider_name: str
 
@@ -81,9 +95,19 @@ class LocalFileStorageProvider:
         relative_key = relative_dir / f"{secrets.token_hex(8)}-{safe_name}"
         target = root / relative_key
         target.parent.mkdir(parents=True, exist_ok=True)
-        content = upload.file.read()
-        target.write_bytes(content)
-        return relative_key.as_posix(), len(content)
+        size = 0
+        try:
+            with target.open("wb") as output:
+                while True:
+                    chunk = upload.file.read(UPLOAD_STREAM_CHUNK_SIZE)
+                    if not chunk:
+                        break
+                    output.write(chunk)
+                    size += len(chunk)
+        except Exception:
+            target.unlink(missing_ok=True)
+            raise
+        return relative_key.as_posix(), size
 
     async def save_upload_async(
         self,
@@ -236,15 +260,15 @@ class AliyunOssStorageProvider:
     def save_upload(self, *, root: Path, relative_dir: Path, upload: UploadFile, fallback_name: str) -> tuple[str, int]:
         safe_name = self._sanitize_filename(upload.filename or fallback_name, fallback_name=fallback_name)
         relative_key = self._build_relative_key(root, relative_dir / f"{secrets.token_hex(8)}-{safe_name}")
-        content = upload.file.read()
         metadata_headers = {
             "Content-Type": upload.content_type or self.guess_media_type(safe_name),
         }
         if metadata_headers["Content-Type"].startswith("image/"):
             metadata_headers["Cache-Control"] = "public, max-age=2592000, immutable"
         metadata_headers["Content-Disposition"] = self._build_content_disposition(safe_name)
+        content = _CountingReader(upload.file)
         self._bucket().put_object(relative_key, content, headers=metadata_headers)
-        return relative_key, len(content)
+        return relative_key, content.bytes_read
 
     async def save_upload_async(
         self,

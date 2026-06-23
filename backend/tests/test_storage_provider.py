@@ -7,6 +7,16 @@ from app.core.config import Settings
 from app.providers.storage import AliyunOssStorageProvider, LocalFileStorageProvider
 
 
+class TrackingBytesIO(BytesIO):
+    def __init__(self, value: bytes) -> None:
+        super().__init__(value)
+        self.read_sizes: list[int] = []
+
+    def read(self, size: int = -1) -> bytes:
+        self.read_sizes.append(size)
+        return super().read(size)
+
+
 def test_local_delete_key_removes_file_and_empty_parent(tmp_path):
     root = tmp_path / "assets"
     target = root / "materials" / "demo.txt"
@@ -31,6 +41,24 @@ def test_local_delete_key_ignores_paths_outside_root(tmp_path):
     provider.delete_key(root=root, key=str(outside))
 
     assert outside.read_text(encoding="utf-8") == "keep"
+
+
+def test_local_save_upload_streams_to_disk_in_chunks(tmp_path):
+    provider = LocalFileStorageProvider()
+    content = b"x" * (1024 * 1024 + 17)
+    file_obj = TrackingBytesIO(content)
+
+    key, size = provider.save_upload(
+        root=tmp_path / "assets",
+        relative_dir=Path("materials/101/file"),
+        upload=UploadFile(filename="demo.pdf", file=file_obj),
+        fallback_name="file.bin",
+    )
+
+    assert size == len(content)
+    assert (tmp_path / "assets" / key).read_bytes() == content
+    assert file_obj.read_sizes[:2] == [1024 * 1024, 1024 * 1024]
+    assert -1 not in file_obj.read_sizes
 
 
 def test_oss_signed_download_url_does_not_override_content_type(monkeypatch):
@@ -79,7 +107,14 @@ def test_oss_upload_uses_ascii_content_disposition_fallback_for_chinese_filename
 
     class FakeBucket:
         def put_object(self, key, content, *, headers):
+            uploaded = bytearray()
+            while True:
+                chunk = content.read(4)
+                if not chunk:
+                    break
+                uploaded.extend(chunk)
             captured.update({"key": key, "content": content, "headers": headers})
+            captured["uploaded"] = bytes(uploaded)
 
     provider = AliyunOssStorageProvider(
         Settings(
@@ -101,6 +136,8 @@ def test_oss_upload_uses_ascii_content_disposition_fallback_for_chinese_filename
     headers = captured["headers"]
     assert key.endswith(".pdf")
     assert size == len(b"pdf-bytes")
+    assert not isinstance(captured["content"], bytes)
+    assert captured["uploaded"] == b"pdf-bytes"
     assert headers["Content-Disposition"].encode("latin-1")
     assert 'filename="download.pdf"' in headers["Content-Disposition"]
     assert "filename*=UTF-8''%E6%A6%82%E7%8E%87%E8%AE%BA%E7%9C%9F%E9%A2%98.pdf" in headers["Content-Disposition"]
