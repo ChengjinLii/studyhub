@@ -36,7 +36,7 @@ bash scripts/runtime/production-down.sh
 - 运行前需要准备好 `private/.env.preview` 或 `private/.env.production`
 - `preview-up.sh` 启动前默认运行只读 `db_admin check-schema`，避免带缺字段的 preview 服务启动
 - `preview-smoke.sh` / `production-smoke.sh` 的 curl 默认使用 5 秒连接超时和 20 秒总超时，可用 `STUDYHUB_CURL_CONNECT_TIMEOUT` / `STUDYHUB_CURL_MAX_TIME` 调整，值必须是大于 0 的秒数
-- `production-smoke.sh` 默认只检查本机 backend / frontend；上线前可以设置 `STUDYHUB_PUBLIC_SMOKE_BASES="https://study-hub.cn https://study-hub.store"` 额外检查公网入口，并用 `STUDYHUB_SMOKE_EXPECTED_GIT_SHA="$(git rev-parse --short HEAD)"` 校验 `/api/healthz` 返回的后端版本，避免域名、CDN 或反代仍指向旧服务
+- `production-smoke.sh` 默认检查本机 backend / frontend，并会从 `private/.env.production` 的 `STUDYHUB_PUBLIC_SITE_BASE_URL`、`STUDYHUB_TRUSTED_SITE_ORIGINS` 自动派生公网域名做 health/root smoke；默认用当前 git short SHA 校验 `/api/healthz`，避免域名、CDN 或反代仍指向旧服务。可用 `STUDYHUB_PUBLIC_SMOKE_BASES="https://study-hub.cn https://study-hub.store"` 显式覆盖，或设为 `none` / `off` 临时关闭公网入口检查
 - `production-up.sh` 默认先跑 `production-preflight.sh` 检查证书路径、数据库网络连通性和 P0 schema 缺字段；紧急场景可设置 `STUDYHUB_PRODUCTION_UP_PREFLIGHT=0` 显式跳过，该开关只接受 `1` / `true` / `0` / `false`
 - `production-preflight.sh` 会输出 `site-origin-consistency`，用于提示主站、可信来源和支付宝回跳是否混用多个公网域名；该项为 warning，不会阻断当前服务启动，但正式切换主域名前应收敛为单一主站 origin
 - `production-up.sh` 默认不会在前端进程仍运行且 `.next/BUILD_ID` 存在时重建前端，避免覆盖运行中 Next.js 进程使用的构建目录；如已停掉前端或确认要强制重建，可设置 `STUDYHUB_PRODUCTION_REBUILD_FRONTEND=1`

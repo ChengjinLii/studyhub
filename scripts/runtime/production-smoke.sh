@@ -1,13 +1,16 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+PRIVATE_DIR="${STUDYHUB_PRIVATE_DIR_PATH:-$ROOT_DIR/private}"
+ENV_FILE="$PRIVATE_DIR/.env.production"
 BACKEND_BASE="${1:-http://127.0.0.1:8311}"
 FRONTEND_BASE="${2:-http://127.0.0.1:3300}"
 CURL_CONNECT_TIMEOUT="${STUDYHUB_CURL_CONNECT_TIMEOUT:-5}"
 CURL_MAX_TIME="${STUDYHUB_CURL_MAX_TIME:-20}"
-PUBLIC_SMOKE_BASES="${STUDYHUB_PUBLIC_SMOKE_BASES:-}"
-EXPECTED_GIT_SHA="${STUDYHUB_SMOKE_EXPECTED_GIT_SHA:-}"
 PYTHON_BIN="${STUDYHUB_PYTHON_BIN:-python3}"
+PUBLIC_SMOKE_BASES_MODE="${STUDYHUB_PUBLIC_SMOKE_BASES-__auto__}"
+EXPECTED_GIT_SHA="${STUDYHUB_SMOKE_EXPECTED_GIT_SHA:-$(git -C "$ROOT_DIR" rev-parse --short HEAD 2>/dev/null || true)}"
 
 require_positive_duration() {
   local name="$1"
@@ -21,6 +24,47 @@ require_positive_duration() {
 require_positive_duration "STUDYHUB_CURL_CONNECT_TIMEOUT" "$CURL_CONNECT_TIMEOUT"
 require_positive_duration "STUDYHUB_CURL_MAX_TIME" "$CURL_MAX_TIME"
 CURL_ARGS=(--fail --silent --show-error --connect-timeout "$CURL_CONNECT_TIMEOUT" --max-time "$CURL_MAX_TIME")
+
+derive_public_smoke_bases() {
+  if [[ ! -f "$ENV_FILE" ]]; then
+    return
+  fi
+  "$PYTHON_BIN" - "$ENV_FILE" <<'PY'
+from __future__ import annotations
+
+import sys
+from pathlib import Path
+from urllib.parse import urlparse
+
+env_file = Path(sys.argv[1])
+values: dict[str, str] = {}
+for raw_line in env_file.read_text(encoding="utf-8").splitlines():
+    line = raw_line.strip()
+    if not line or line.startswith("#") or "=" not in line:
+        continue
+    key, value = line.split("=", 1)
+    values[key.strip()] = value.strip().strip('"').strip("'")
+
+origins: list[str] = []
+for item in [values.get("STUDYHUB_PUBLIC_SITE_BASE_URL"), *values.get("STUDYHUB_TRUSTED_SITE_ORIGINS", "").split(",")]:
+    candidate = (item or "").strip().rstrip("/")
+    if not candidate:
+        continue
+    parsed = urlparse(candidate)
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        continue
+    host = parsed.hostname or ""
+    if host in {"localhost", "127.0.0.1", "::1"}:
+        continue
+    if all(part.isdigit() for part in host.split(".") if part):
+        continue
+    origin = f"{parsed.scheme}://{parsed.netloc}"
+    if origin not in origins:
+        origins.append(origin)
+
+print(" ".join(origins))
+PY
+}
 
 extract_health_git_sha() {
   "$PYTHON_BIN" -c 'import json, sys; payload=json.load(sys.stdin); print(((payload.get("data") or {}).get("build") or {}).get("gitSha") or "")'
@@ -55,6 +99,14 @@ curl "${CURL_ARGS[@]}" "${BACKEND_BASE%/}/api/materials?page=1&pageSize=1" >/dev
 
 echo "[5/5] frontend root"
 curl "${CURL_ARGS[@]}" "${FRONTEND_BASE%/}/" >/dev/null
+
+if [[ "$PUBLIC_SMOKE_BASES_MODE" == "__auto__" ]]; then
+  PUBLIC_SMOKE_BASES="$(derive_public_smoke_bases)"
+elif [[ "$PUBLIC_SMOKE_BASES_MODE" == "none" || "$PUBLIC_SMOKE_BASES_MODE" == "off" ]]; then
+  PUBLIC_SMOKE_BASES=""
+else
+  PUBLIC_SMOKE_BASES="$PUBLIC_SMOKE_BASES_MODE"
+fi
 
 if [[ -n "$PUBLIC_SMOKE_BASES" ]]; then
   echo "[public] configured public entrypoints"
