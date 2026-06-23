@@ -82,7 +82,9 @@ class AuthCookieService:
     def write_auth_cookies_for_user(self, response: Response, user: AuthUser, remember_me: bool) -> dict[str, Any]:
         payload = self.build_auth_response(user, remember_me)
         self.write_auth_cookies(response, payload, remember_me)
-        return payload
+        if self.settings.resolved_auth_response_include_token:
+            return payload
+        return {"user": payload["user"]}
 
     def clear_auth_cookies(self, response: Response) -> None:
         response.headers.append(

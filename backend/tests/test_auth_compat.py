@@ -1,9 +1,14 @@
 from __future__ import annotations
 
+from fastapi import Response
 from fastapi.testclient import TestClient
 
+from app.core.config import Settings
 from app.core.db import session_scope
+from app.core.security import JwtTokenCodec
+from app.models.auth import AuthUser
 from app.schemas.auth import VerificationPurpose
+from app.services.auth_cookie_service import AuthCookieService
 from app.services.auth_service import AuthService
 from app.services.captcha_service import CaptchaService
 
@@ -156,6 +161,57 @@ def test_login_logout_and_session_restore(
     assert any("studyhub_token=" in header and "Max-Age=0" in header for header in cleared_headers)
     assert any("studyhub_user=" in header and "Max-Age=0" in header for header in cleared_headers)
     assert client.get("/api/session").status_code == 401
+
+
+def test_auth_response_hides_token_by_default_in_production() -> None:
+    settings = Settings(
+        environment="production",
+        jwt_secret="studyhub-fastapi-test-secret-1234567890abcdefghijkl",
+    )
+    service = AuthCookieService(settings, JwtTokenCodec(settings.jwt_secret, settings.jwt_algorithm))
+    response = Response()
+    user = AuthUser(
+        id=1,
+        username="alice",
+        email="alice@example.com",
+        password_hash="hash",
+        nickname="Alice",
+        role_mask=1,
+        verified=True,
+        free_download_quota=7,
+    )
+
+    payload = service.write_auth_cookies_for_user(response, user, remember_me=False)
+
+    assert payload == {"user": service.build_user_payload(user)}
+    assert "token" not in payload
+    set_cookie_headers = response.headers.getlist("set-cookie")
+    assert any("studyhub_token=" in header and "HttpOnly" in header for header in set_cookie_headers)
+
+
+def test_auth_response_can_include_token_for_compatibility() -> None:
+    settings = Settings(
+        environment="production",
+        auth_response_include_token=True,
+        jwt_secret="studyhub-fastapi-test-secret-1234567890abcdefghijkl",
+    )
+    service = AuthCookieService(settings, JwtTokenCodec(settings.jwt_secret, settings.jwt_algorithm))
+    response = Response()
+    user = AuthUser(
+        id=1,
+        username="alice",
+        email="alice@example.com",
+        password_hash="hash",
+        nickname="Alice",
+        role_mask=1,
+        verified=True,
+        free_download_quota=7,
+    )
+
+    payload = service.write_auth_cookies_for_user(response, user, remember_me=False)
+
+    assert isinstance(payload.get("token"), str)
+    assert payload["user"]["username"] == "alice"
 
 
 def test_login_preserves_username_case_for_identifier_lookup(

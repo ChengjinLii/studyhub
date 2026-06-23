@@ -171,6 +171,7 @@ class Settings(BaseSettings):
     cookie_secure: bool | None = None
     auth_cookie_ttl_seconds: int = 86400
     remember_cookie_ttl_seconds: int = 604800
+    auth_response_include_token: bool | None = None
 
     jwt_secret: str = DEFAULT_DEV_JWT_SECRET
     jwt_algorithm: str = "HS256"
@@ -475,6 +476,12 @@ class Settings(BaseSettings):
         if self.cookie_secure is not None:
             return bool(self.cookie_secure)
         return self.is_preview or self.is_production
+
+    @property
+    def resolved_auth_response_include_token(self) -> bool:
+        if self.auth_response_include_token is not None:
+            return bool(self.auth_response_include_token)
+        return not (self.is_preview or self.is_production)
 
     @property
     def resolved_safe_image_mime_types(self) -> set[str]:
