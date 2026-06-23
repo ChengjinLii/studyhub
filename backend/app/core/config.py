@@ -177,6 +177,7 @@ class Settings(BaseSettings):
     jwt_ttl_seconds: int = 86400
     bcrypt_rounds: int = 10
 
+    captcha_backend: str = "auto"
     captcha_ttl_seconds: int = 60
     captcha_code_length: int = 4
     verification_ttl_seconds: int = 300
