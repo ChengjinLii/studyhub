@@ -50,6 +50,42 @@ def test_preflight_reports_missing_alipay_private_key(tmp_path: Path) -> None:
     assert "file not found" in private_key_check.message
 
 
+def test_preflight_reports_multiple_external_site_origins_as_warning() -> None:
+    settings = Settings(
+        environment="local-dev",
+        public_site_base_url="https://study-hub.store",
+        trusted_site_origins="https://study-hub.cn,https://study-hub.store",
+        alipay_return_url="https://study-hub.store/pay/result",
+        alipay_notify_url="https://study-hub.store/api/pay/alipay/notify",
+    )
+
+    checks = build_checks(settings, check_network=False, timeout_seconds=0.5)
+    origin_check = next(item for item in checks if item.name == "site-origin-consistency")
+
+    assert origin_check.ok is True
+    assert origin_check.level == "warning"
+    assert "multiple external site origins configured" in origin_check.message
+    assert "https://study-hub.cn" in origin_check.message
+    assert "https://study-hub.store" in origin_check.message
+
+
+def test_preflight_accepts_single_external_site_origin() -> None:
+    settings = Settings(
+        environment="local-dev",
+        public_site_base_url="https://study-hub.cn",
+        trusted_site_origins="https://study-hub.cn",
+        alipay_return_url="https://study-hub.cn/pay/result",
+        alipay_notify_url="https://study-hub.cn/api/pay/alipay/notify",
+    )
+
+    checks = build_checks(settings, check_network=False, timeout_seconds=0.5)
+    origin_check = next(item for item in checks if item.name == "site-origin-consistency")
+
+    assert origin_check.ok is True
+    assert origin_check.level == "info"
+    assert "https://study-hub.cn" in origin_check.message
+
+
 def test_preflight_timeout_seconds_must_be_positive() -> None:
     settings = Settings(environment="local-dev")
 

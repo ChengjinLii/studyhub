@@ -38,6 +38,7 @@ bash scripts/runtime/production-down.sh
 - `preview-smoke.sh` / `production-smoke.sh` 的 curl 默认使用 5 秒连接超时和 20 秒总超时，可用 `STUDYHUB_CURL_CONNECT_TIMEOUT` / `STUDYHUB_CURL_MAX_TIME` 调整，值必须是大于 0 的秒数
 - `production-smoke.sh` 默认只检查本机 backend / frontend；上线前可以设置 `STUDYHUB_PUBLIC_SMOKE_BASES="https://study-hub.cn https://study-hub.store"` 额外检查公网入口，并用 `STUDYHUB_SMOKE_EXPECTED_GIT_SHA="$(git rev-parse --short HEAD)"` 校验 `/api/healthz` 返回的后端版本，避免域名、CDN 或反代仍指向旧服务
 - `production-up.sh` 默认先跑 `production-preflight.sh` 检查证书路径、数据库网络连通性和 P0 schema 缺字段；紧急场景可设置 `STUDYHUB_PRODUCTION_UP_PREFLIGHT=0` 显式跳过，该开关只接受 `1` / `true` / `0` / `false`
+- `production-preflight.sh` 会输出 `site-origin-consistency`，用于提示主站、可信来源和支付宝回跳是否混用多个公网域名；该项为 warning，不会阻断当前服务启动，但正式切换主域名前应收敛为单一主站 origin
 - `production-up.sh` 默认不会在前端进程仍运行且 `.next/BUILD_ID` 存在时重建前端，避免覆盖运行中 Next.js 进程使用的构建目录；如已停掉前端或确认要强制重建，可设置 `STUDYHUB_PRODUCTION_REBUILD_FRONTEND=1`
 - 不要在生产服务目录直接运行 `next dev`、未隔离的 Playwright 或会写 `.next` 的前端命令；运行中的 `next start` 会读取当前 `.next`，中途覆盖会导致 `Cannot find module` / `MissingStaticPage`。仓库的 Playwright 配置默认使用 `.next-playwright-dev` / `.next-playwright-prod`，如手动执行类似命令也应设置 `NEXT_DIST_DIR` 到隔离目录
 - 前端重启或生产构建后可运行 `bash scripts/runtime/frontend-build-integrity.sh`，确认 `.next` 关键产物、首页和 404 页面正常

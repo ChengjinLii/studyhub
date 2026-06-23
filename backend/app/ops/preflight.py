@@ -7,6 +7,7 @@ import socket
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlparse
 
 from sqlalchemy.engine import make_url
 
@@ -18,9 +19,10 @@ class CheckResult:
     name: str
     ok: bool
     message: str
+    level: str = "error"
 
     def as_dict(self) -> dict[str, object]:
-        return {"name": self.name, "ok": self.ok, "message": self.message}
+        return {"name": self.name, "ok": self.ok, "level": self.level, "message": self.message}
 
 
 def _check_file(name: str, path_value: str | None, *, required: bool) -> CheckResult:
@@ -56,10 +58,57 @@ def _timeout_seconds_argument(value: str) -> float:
         raise argparse.ArgumentTypeError("must be a positive number") from exc
 
 
+def _url_origin(value: str | None) -> str | None:
+    if not value:
+        return None
+    parsed = urlparse(value.strip())
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        return None
+    return f"{parsed.scheme}://{parsed.netloc}".rstrip("/")
+
+
+def _is_external_site_origin(origin: str) -> bool:
+    host = urlparse(origin).hostname or ""
+    if host in {"localhost", "127.0.0.1", "::1", "testserver"}:
+        return False
+    if all(part.isdigit() for part in host.split(".") if part):
+        return False
+    return True
+
+
+def _check_site_origin_consistency(settings: Settings) -> CheckResult:
+    public_origin = _url_origin(settings.resolved_public_site_base_url)
+    trusted_origins = {_url_origin(item) for item in settings.resolved_trusted_site_origins}
+    trusted_origins.discard(None)
+    payment_origins = {
+        _url_origin(settings.alipay_return_url),
+        _url_origin(settings.alipay_notify_url),
+    }
+    payment_origins.discard(None)
+    configured_origins = {origin for origin in [public_origin, *trusted_origins, *payment_origins] if origin}
+    external_origins = sorted(origin for origin in configured_origins if _is_external_site_origin(origin))
+    warnings: list[str] = []
+
+    if public_origin and public_origin not in trusted_origins:
+        warnings.append(f"public site origin {public_origin} is not included in trusted site origins")
+
+    missing_payment_origins = sorted(origin for origin in payment_origins if origin and origin not in trusted_origins and origin != public_origin)
+    if missing_payment_origins:
+        warnings.append(f"payment callback origins are not trusted: {', '.join(missing_payment_origins)}")
+
+    if len(external_origins) > 1:
+        warnings.append(f"multiple external site origins configured: {', '.join(external_origins)}")
+
+    if warnings:
+        return CheckResult("site-origin-consistency", True, "warning: " + "; ".join(warnings), level="warning")
+    return CheckResult("site-origin-consistency", True, f"public origin {public_origin or 'not configured'}", level="info")
+
+
 def build_checks(settings: Settings, *, check_network: bool, timeout_seconds: float) -> list[CheckResult]:
     timeout_seconds = _require_positive_timeout_seconds(timeout_seconds)
     checks = [
         CheckResult("private-env", settings.private_env_file is None or settings.private_env_file.exists(), str(settings.private_env_file or "not required")),
+        _check_site_origin_consistency(settings),
     ]
 
     if settings.payment_provider == "alipay_page" or settings.payout_transfer_provider == "alipay_transfer":
