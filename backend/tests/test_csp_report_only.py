@@ -5,12 +5,14 @@ from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
+from starlette.datastructures import MutableHeaders
 
 from app.api.deps import clear_dependency_caches
 from app.core.async_db import reset_async_database_runtime
-from app.core.config import get_settings
+from app.core.config import Settings, get_settings
 from app.core.db import reset_database_runtime
 from app.core.observability import get_runtime_metrics
+from app.core.security_headers import apply_security_headers
 from app.main import create_app
 
 
@@ -52,6 +54,17 @@ def test_csp_report_only_header_is_configurable(csp_client: TestClient) -> None:
     assert response.status_code == 200
     assert response.headers["content-security-policy"] == "default-src 'self'; object-src 'none'; base-uri 'self'"
     assert response.headers["content-security-policy-report-only"] == "default-src 'self'; report-uri /api/security/csp-reports"
+
+
+def test_production_defaults_to_csp_report_only() -> None:
+    headers = MutableHeaders()
+    apply_security_headers(Settings(environment="production"), headers)
+
+    assert "content-security-policy" not in headers
+    report_only = headers["content-security-policy-report-only"]
+    assert "default-src 'self'" in report_only
+    assert "object-src 'none'" in report_only
+    assert "report-uri /api/security/csp-reports" in report_only
 
 
 def test_csp_report_endpoint_records_sanitized_metric(csp_client: TestClient) -> None:

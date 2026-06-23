@@ -13,6 +13,19 @@ from app.core.config_validation import validate_runtime_configuration as validat
 BACKEND_ROOT = Path(__file__).resolve().parents[2]
 STACK_ROOT = BACKEND_ROOT.parent
 DEFAULT_DEV_JWT_SECRET = "studyhub-fastapi-dev-secret-change-in-private-env-20260326"
+DEFAULT_PRODUCTION_CSP_REPORT_ONLY = (
+    "default-src 'self'; "
+    "base-uri 'self'; "
+    "object-src 'none'; "
+    "frame-ancestors 'none'; "
+    "img-src 'self' data: blob: https:; "
+    "font-src 'self' data: https:; "
+    "style-src 'self' 'unsafe-inline'; "
+    "script-src 'self' 'unsafe-inline' 'unsafe-eval'; "
+    "connect-src 'self' https: wss:; "
+    "form-action 'self' https://openapi.alipay.com https://openapi-sandbox.dl.alipaydev.com; "
+    "report-uri /api/security/csp-reports"
+)
 
 
 class Settings(BaseSettings):
@@ -483,6 +496,14 @@ class Settings(BaseSettings):
         if self.auth_response_include_token is not None:
             return bool(self.auth_response_include_token)
         return not (self.is_preview or self.is_production)
+
+    @property
+    def resolved_security_csp_report_only(self) -> str | None:
+        if self.security_csp_report_only:
+            return self.security_csp_report_only
+        if self.is_preview or self.is_production:
+            return DEFAULT_PRODUCTION_CSP_REPORT_ONLY
+        return None
 
     @property
     def resolved_password_reset_hide_unknown_account(self) -> bool:

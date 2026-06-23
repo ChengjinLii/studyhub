@@ -104,11 +104,31 @@ def _check_site_origin_consistency(settings: Settings) -> CheckResult:
     return CheckResult("site-origin-consistency", True, f"public origin {public_origin or 'not configured'}", level="info")
 
 
+def _check_csp_rollout(settings: Settings) -> CheckResult:
+    if settings.security_csp:
+        return CheckResult("csp-rollout", True, "enforced Content-Security-Policy is configured", level="info")
+    report_only = settings.resolved_security_csp_report_only
+    if report_only:
+        return CheckResult(
+            "csp-rollout",
+            True,
+            "warning: only Content-Security-Policy-Report-Only is active; review reports before enabling enforced CSP",
+            level="warning",
+        )
+    return CheckResult(
+        "csp-rollout",
+        True,
+        "warning: CSP is not configured",
+        level="warning",
+    )
+
+
 def build_checks(settings: Settings, *, check_network: bool, timeout_seconds: float) -> list[CheckResult]:
     timeout_seconds = _require_positive_timeout_seconds(timeout_seconds)
     checks = [
         CheckResult("private-env", settings.private_env_file is None or settings.private_env_file.exists(), str(settings.private_env_file or "not required")),
         _check_site_origin_consistency(settings),
+        _check_csp_rollout(settings),
     ]
 
     if settings.payment_provider == "alipay_page" or settings.payout_transfer_provider == "alipay_transfer":

@@ -86,6 +86,22 @@ def test_preflight_accepts_single_external_site_origin() -> None:
     assert "https://study-hub.cn" in origin_check.message
 
 
+def test_preflight_reports_csp_report_only_rollout_stage() -> None:
+    settings = Settings(
+        environment="production",
+        database_url="mysql+pymysql://user:pass@127.0.0.1:3306/studyhub",
+        jwt_secret="production-secret-abcdefghijklmnopqrstuvwxyz",
+        trusted_hosts="study-hub.cn",
+    )
+
+    checks = build_checks(settings, check_network=False, timeout_seconds=0.5)
+    csp_check = next(item for item in checks if item.name == "csp-rollout")
+
+    assert csp_check.ok is True
+    assert csp_check.level == "warning"
+    assert "Report-Only" in csp_check.message
+
+
 def test_preflight_timeout_seconds_must_be_positive() -> None:
     settings = Settings(environment="local-dev")
 
