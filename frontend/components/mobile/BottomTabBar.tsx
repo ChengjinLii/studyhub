@@ -29,7 +29,7 @@ const TABS: TabItem[] = [
   {
     key: 'requests',
     label: '求购',
-    href: '/#home-requests',
+    href: '/requests',
     active: (pathname) => pathname.startsWith('/requests'),
     iconPath: 'M5 6h14v11H8l-3 3V6Zm4 4h6M9 14h4',
   },
