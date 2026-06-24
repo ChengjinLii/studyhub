@@ -13250,14 +13250,12 @@ main {
     height: 24px;
   }
 
-  .mobile-home-stats,
   .mobile-stat-grid {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 10px;
   }
 
-  .mobile-home-stats div,
   .mobile-stat-grid div {
     min-width: 0;
     padding: 12px;
@@ -13266,7 +13264,6 @@ main {
     border: 1px solid #e2e8f0;
   }
 
-  .mobile-home-stats span,
   .mobile-stat-grid span {
     display: block;
     color: #64748b;
@@ -13274,7 +13271,6 @@ main {
     font-weight: 700;
   }
 
-  .mobile-home-stats strong,
   .mobile-stat-grid strong {
     display: block;
     margin-top: 4px;

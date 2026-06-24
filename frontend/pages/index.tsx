@@ -785,19 +785,6 @@ export default function Home({
               <span>更多</span>
             </Link>
           </div>
-          <div className="mobile-home-stats" aria-label="平台概览">
-            {[
-              { label: '已上架', value: statValues.total },
-              { label: '免费资料', value: statValues.free },
-              { label: '下载次数', value: statValues.downloads },
-              { label: '用户个数', value: statValues.users },
-            ].map((stat) => (
-              <div key={stat.label}>
-                <span>{stat.label}</span>
-                <strong>{formatNumber(Number(stat.value))}</strong>
-              </div>
-            ))}
-          </div>
         </section>
         <HomeRequestPanels
           requestItems={requestItems}
