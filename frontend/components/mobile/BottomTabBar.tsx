@@ -27,18 +27,18 @@ const TABS: TabItem[] = [
     iconPath: 'M6 4h9l3 3v13H6V4Zm8 0v4h4M9 12h6M9 16h6',
   },
   {
-    key: 'requests',
-    label: '求购',
-    href: '/requests',
-    active: (pathname) => pathname.startsWith('/requests'),
-    iconPath: 'M5 6h14v11H8l-3 3V6Zm4 4h6M9 14h4',
-  },
-  {
     key: 'upload',
     label: '投稿',
     href: '/upload',
     active: (pathname) => pathname === '/upload',
     iconPath: 'M12 5v10M8 9l4-4 4 4M5 19h14',
+  },
+  {
+    key: 'requests',
+    label: '求购',
+    href: '/requests',
+    active: (pathname) => pathname.startsWith('/requests'),
+    iconPath: 'M5 6h14v11H8l-3 3V6Zm4 4h6M9 14h4',
   },
   {
     key: 'me',
@@ -60,7 +60,7 @@ export default function BottomTabBar() {
         return (
           <Link
             key={item.key}
-            className={`mobile-bottom-nav__item${isActive ? ' is-active' : ''}`}
+            className={`mobile-bottom-nav__item mobile-bottom-nav__item--${item.key}${isActive ? ' is-active' : ''}`}
             href={item.href}
             aria-current={isActive ? 'page' : undefined}
             prefetch={false}

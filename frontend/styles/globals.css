@@ -13092,6 +13092,25 @@ main {
     background: #eff6ff;
   }
 
+  .mobile-bottom-nav__item--upload {
+    min-height: 56px;
+    margin-top: -8px;
+    border-radius: 18px;
+    background: #2563eb;
+    color: #ffffff;
+    box-shadow: 0 12px 24px rgba(37, 99, 235, 0.28);
+  }
+
+  .mobile-bottom-nav__item--upload svg {
+    width: 26px;
+    height: 26px;
+  }
+
+  .mobile-bottom-nav__item--upload.is-active {
+    color: #ffffff;
+    background: #1d4ed8;
+  }
+
   .mobile-bottom-nav__item span {
     display: block;
     max-width: 100%;
@@ -13319,26 +13338,39 @@ main {
     gap: 12px;
   }
 
-  .mobile-resource-list .material-card {
-    padding: 15px;
+  .materials-list.mobile-resource-list > .material-card {
+    padding: 17px;
     gap: 10px;
     border-radius: 16px;
+    overflow: hidden;
   }
 
   .mobile-resource-list .material-card__header {
-    flex-direction: row;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
     align-items: flex-start;
-    gap: 10px;
+    gap: 12px;
+  }
+
+  .mobile-resource-list .material-card__header > div,
+  .mobile-resource-list .material-title-row {
+    min-width: 0;
+    max-width: 100%;
   }
 
   .mobile-resource-list .material-card__header h3 {
     font-size: 1rem;
     line-height: 1.38;
+    max-width: 100%;
+    overflow-wrap: anywhere;
     word-break: break-word;
   }
 
   .mobile-resource-list .material-card__header .price-tag {
     font-size: 0.92rem;
+    justify-self: end;
+    max-width: 96px;
+    white-space: nowrap;
   }
 
   .mobile-resource-list .material-meta,
@@ -13346,6 +13378,14 @@ main {
     gap: 6px 10px;
     font-size: 0.82rem;
     line-height: 1.45;
+    min-width: 0;
+    max-width: 100%;
+    overflow-wrap: anywhere;
+  }
+
+  .mobile-resource-list .material-tags {
+    min-width: 0;
+    max-width: 100%;
   }
 
   .mobile-resource-list .badge {
