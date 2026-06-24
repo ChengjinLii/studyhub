@@ -39,7 +39,7 @@ export default function HomeRequestPanels({
   }, []);
 
   return (
-    <div className="home-dual-panel">
+    <div className="home-dual-panel" id="home-requests">
       <section className="card request-card">
         <div className="materials-header">
           <div>

@@ -9,6 +9,7 @@ import { fetchOptionalSessionUser } from '../lib/sessionApi';
 import '../styles/globals.css';
 import AppImage from '../components/AppImage';
 import { AppDialogProvider } from '../components/AppDialogProvider';
+import BottomTabBar from '../components/mobile/BottomTabBar';
 import { RoleMask, SessionUser } from '../types/user';
 
 const FloatingSidebar = dynamic(() => import('../components/FloatingSidebar'), { ssr: false });
@@ -175,7 +176,7 @@ export default function MyApp({ Component, pageProps }: AppProps) {
       <Head>
         <title>StudyHub·学汇</title>
         <link rel="icon" href="/favicon.png" />
-        <meta name="viewport" content="width=1100" />
+        <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
         {PUBLIC_API_ORIGIN ? (
           <>
             <link rel="preconnect" href={PUBLIC_API_ORIGIN} crossOrigin="anonymous" />
@@ -402,6 +403,7 @@ export default function MyApp({ Component, pageProps }: AppProps) {
             </div>
           </div>
         )}
+        <BottomTabBar />
       </div>
       </AppDialogProvider>
     </>

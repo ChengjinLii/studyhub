@@ -733,6 +733,44 @@ export default function MaterialDetailPage({ material, user }: MaterialDetailPag
           </>
         )}
       </main>
+      {material && !isExperienceMaterial && (
+        <div className="mobile-detail-action-bar" aria-label="资料快捷操作">
+          <button
+            className={`button ghost mobile-detail-action-bar__secondary${liked ? ' is-active' : ''}`}
+            type="button"
+            onClick={handleToggleLike}
+          >
+            {liked ? '已点赞' : '点赞'}
+          </button>
+          {!material.free && !canManage && !purchased ? (
+            <button
+              className="button primary mobile-detail-action-bar__primary"
+              type="button"
+              onClick={handlePurchase}
+              disabled={ordering}
+            >
+              {ordering ? '下单中...' : '立即下单'}
+            </button>
+          ) : (material.hasFile || material.hasNetdisk) ? (
+            <button
+              className="button primary mobile-detail-action-bar__primary"
+              type="button"
+              onClick={handleDownload}
+              disabled={downloading || (material.hasNetdisk && !canViewNetdisk)}
+            >
+              {downloading
+                ? material.hasNetdisk
+                  ? '处理中...'
+                  : '生成链接中...'
+                : material.hasNetdisk
+                  ? '获取网盘链接'
+                  : material.free
+                    ? '获取免费链接'
+                    : '获取下载链接'}
+            </button>
+          ) : null}
+        </div>
+      )}
       <ShareSheet
         open={shareSheetOpen}
         title={shareSheetTitle}

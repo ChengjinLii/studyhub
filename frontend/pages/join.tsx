@@ -10,6 +10,13 @@ const COMMUNITY_QQ = '245934740';
 const CONTACT_EMAIL = 'chengjinli@std.uestc.edu.cn';
 const CORE_CONTRIBUTORS = '李承锦、曾逸帆';
 
+const JOIN_TRUST_ITEMS = [
+  { label: '平台定位', value: '校园资料与学习互助' },
+  { label: '官方 QQ 群', value: COMMUNITY_QQ },
+  { label: '开源仓库', value: 'ChengjinLii/studyhub' },
+  { label: '内容版权', value: '归原作者所有' },
+];
+
 const ABOUT_POINTS = [
   {
     title: '平台定位',
@@ -119,7 +126,7 @@ export default function JoinPage({ user }: JoinPageProps) {
   };
 
   useEffect(() => {
-    const sections = ['overview', 'channels', 'engineering', 'summary']
+    const sections = ['overview', 'contact', 'channels', 'engineering', 'summary']
       .map((id) => document.getElementById(id))
       .filter((node): node is HTMLElement => Boolean(node));
     if (!sections.length) return;
@@ -182,6 +189,14 @@ export default function JoinPage({ user }: JoinPageProps) {
                     <strong>核心贡献者：</strong>
                     {CORE_CONTRIBUTORS}
                   </span>
+                </div>
+                <div className="join-trust-grid" aria-label="平台信息概览">
+                  {JOIN_TRUST_ITEMS.map((item) => (
+                    <div key={item.label} className="join-trust-item">
+                      <span>{item.label}</span>
+                      <strong>{item.value}</strong>
+                    </div>
+                  ))}
                 </div>
               </section>
             </section>

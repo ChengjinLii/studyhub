@@ -388,6 +388,18 @@ export default function MePage({ user, summary, account }: MePageProps) {
   };
 
   const formatPrice = (value: number) => `¥${value.toFixed(2)}`;
+  const accountAssetCards = [
+    { label: '剩余下载', value: `${freeDownloadsLeft}` },
+    { label: '我的投稿', value: `${uploads.length}` },
+    { label: '最近购买', value: `${purchases.length}` },
+    { label: '创作者收益', value: formatPrice(totalEarnings) },
+  ];
+  const accountQuickLinks = [
+    { href: '#uploads', label: '我的投稿', desc: '更新资料' },
+    { href: '#purchases', label: '最近购买', desc: '查看下载' },
+    { href: '#payout', label: '创作者收益', desc: '提现信息' },
+    { href: '#security', label: '安全设置', desc: '账号安全' },
+  ];
 
   const sendBindCode = async () => {
     setBindLoading(true);
@@ -702,6 +714,25 @@ export default function MePage({ user, summary, account }: MePageProps) {
                   <span>
                     <strong>{uniqueDownloaders}</strong> 被下载用户数 · <strong>{totalDownloads}</strong> 资料总下载次数
                   </span>
+                </div>
+                <div className="me-asset-grid" aria-label="个人资产概览">
+                  {accountAssetCards.map((item) => (
+                    <div key={item.label} className="me-asset-card">
+                      <span>{item.label}</span>
+                      <strong>{item.value}</strong>
+                    </div>
+                  ))}
+                </div>
+                <div className="me-quick-actions" aria-label="个人中心快捷入口">
+                  {accountQuickLinks.map((item) => (
+                    <a key={item.href} className="me-quick-action" href={item.href}>
+                      <span>
+                        <strong>{item.label}</strong>
+                        <em>{item.desc}</em>
+                      </span>
+                      <b aria-hidden="true">›</b>
+                    </a>
+                  ))}
                 </div>
               </>
             ) : (

@@ -21,11 +21,7 @@ const priceText = (material: MaterialListItem) => {
 };
 
 const formatTitleForDisplay = (title?: string | null) => {
-  if (!title) return '';
-  if (title.length <= 22) {
-    return title;
-  }
-  return `${title.slice(0, 21)}…`;
+  return title || '';
 };
 
 const cardActionLabel = (material: MaterialListItem, isExperience: boolean) => {

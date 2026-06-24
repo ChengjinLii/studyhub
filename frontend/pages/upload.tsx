@@ -711,7 +711,7 @@ export default function UploadPage({ user, token, account }: UploadPageProps) {
       : '资料投稿';
 
   const formContent = (
-    <form className="upload-stacked-form" onSubmit={handleSubmit}>
+    <form id="upload-form" className="upload-stacked-form" onSubmit={handleSubmit}>
       <UploadBasicSection
         isExperience={isExperience}
         isQuickMode={isQuickMode}
@@ -1042,7 +1042,7 @@ export default function UploadPage({ user, token, account }: UploadPageProps) {
               <div className="me-sidebar__group">
                 <div className="me-sidebar__label">页面导航</div>
                 <nav className="me-sidebar__items" aria-label="投稿页面导航">
-                  {uploadNavItems.map((item) => (
+                  {uploadNavItems.map((item, index) => (
                     <a
                       key={item.id}
                       href={`#${item.id}`}
@@ -1053,6 +1053,7 @@ export default function UploadPage({ user, token, account }: UploadPageProps) {
                       }}
                     >
                       <span className="me-sidebar__indicator" />
+                      <span className="me-sidebar__index">{String(index + 1).padStart(2, '0')}</span>
                       <span className="me-sidebar__text">{item.label}</span>
                     </a>
                   ))}

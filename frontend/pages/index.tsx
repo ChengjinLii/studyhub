@@ -117,6 +117,7 @@ export default function Home({
   const router = useRouter();
   const isAdmin = Boolean(user && hasRole(user.roleMask, RoleMask.ADMIN));
   const [materialList, setMaterialList] = useState(initialMaterials);
+  const [mobileSearch, setMobileSearch] = useState(initialFilters.keyword || '');
   const [pageMeta, setPageMeta] = useState(meta);
   const [statsState, setStatsState] = useState(stats);
   const [tagOptionsState, setTagOptionsState] = useState(tagOptions);
@@ -218,6 +219,8 @@ export default function Home({
     users: statSource?.userCount ?? 0,
   };
   const recommendedItems = useMemo(() => recommendations ?? [], [recommendations]);
+  const mobileRecommendedItems = useMemo(() => recommendedItems.slice(0, 4), [recommendedItems]);
+  const mobileLatestItems = useMemo(() => materialList.slice(0, 5), [materialList]);
   const recommendationHint = '';
   const recommendationEmpty = user
     ? '暂无推荐资料，先在“我的”里完善学校/学院/专业。'
@@ -647,6 +650,12 @@ export default function Home({
     await applyFilters(nextFilters, { scrollTarget: 'materials' });
   };
 
+  const handleMobileSearchSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const keyword = mobileSearch.trim();
+    void router.push(keyword ? `/materials?keyword=${encodeURIComponent(keyword)}` : '/materials');
+  };
+
   return (
     <>
       <MaterialIconSprite />
@@ -723,6 +732,73 @@ export default function Home({
             </div>
           </aside>
         </section>
+        <section className="card mobile-home-task-panel" aria-label="移动端快捷入口">
+          <div className="mobile-home-task-panel__head">
+            <span>StudyHub</span>
+            <h2>找资料、投稿、求购</h2>
+          </div>
+          <form className="mobile-home-search" onSubmit={handleMobileSearchSubmit}>
+            <input
+              value={mobileSearch}
+              onChange={(event) => setMobileSearch(event.target.value)}
+              placeholder="搜课程 / 老师 / 资料名"
+              aria-label="搜索资料"
+            />
+            <button className="button primary" type="submit">
+              搜索
+            </button>
+          </form>
+          <div className="mobile-home-actions">
+            <Link href="/materials" prefetch={false}>
+              <span className="mobile-home-action__icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24">
+                  <path d="M5 4h10a4 4 0 0 1 4 4v12H7a2 2 0 0 1-2-2V4z" fill="none" stroke="currentColor" strokeWidth="1.7" />
+                  <path d="M7 16h12M9 8h6M9 11h5" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+                </svg>
+              </span>
+              <span>找资料</span>
+            </Link>
+            <Link href="/upload" prefetch={false}>
+              <span className="mobile-home-action__icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24">
+                  <path d="M12 4v10M8 8l4-4 4 4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                  <path d="M5 14v4a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                </svg>
+              </span>
+              <span>去投稿</span>
+            </Link>
+            <Link href="/requests/new" prefetch={false}>
+              <span className="mobile-home-action__icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24">
+                  <path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                  <circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" strokeWidth="1.6" />
+                </svg>
+              </span>
+              <span>发求购</span>
+            </Link>
+            <Link href="/more" prefetch={false}>
+              <span className="mobile-home-action__icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24">
+                  <path d="M5 6h14M5 12h14M5 18h14" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                </svg>
+              </span>
+              <span>更多</span>
+            </Link>
+          </div>
+          <div className="mobile-home-stats" aria-label="平台概览">
+            {[
+              { label: '已上架', value: statValues.total },
+              { label: '免费资料', value: statValues.free },
+              { label: '下载次数', value: statValues.downloads },
+              { label: '用户个数', value: statValues.users },
+            ].map((stat) => (
+              <div key={stat.label}>
+                <span>{stat.label}</span>
+                <strong>{formatNumber(Number(stat.value))}</strong>
+              </div>
+            ))}
+          </div>
+        </section>
         <HomeRequestPanels
           requestItems={requestItems}
           requestLoading={requestLoading}
@@ -736,80 +812,124 @@ export default function Home({
           onFollowRequest={handleFollowRequest}
         />
 
-        <HomeFilterCard
-          filterRef={filterRef}
-          filtersState={filtersState}
-          showAdvanced={showAdvanced}
-          availableTagOptions={availableTagOptions}
-          onFilterChange={updateFilter}
-          onCourseCategoryChange={applyCourseCategory}
-          onToggleAdvancedFilters={toggleAdvancedFilters}
-          onResetFilters={handleResetFilters}
-          onSubmit={handleFilterSubmit}
-        />
-
-        <section className="card" id="materials-list" ref={materialsRef} style={{ gridColumn: '1 / -1' }}>
-          <div className="materials-header">
+        <section className="card mobile-home-preview" aria-label="移动端资料推荐">
+          <div className="mobile-section-head">
             <div>
-              <h2 className="card-title">
-                资料列表
-                <svg className="title-icon" viewBox="0 0 24 24" aria-hidden="true">
-                  <rect x="4" y="5" width="16" height="14" rx="2" fill="none" stroke="currentColor" strokeWidth="1.6" />
-                  <path d="M8 9h8M8 12h8M8 15h5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-                </svg>
-              </h2>
+              <span>Recommend</span>
+              <h2>为你推荐</h2>
             </div>
-            <div className="materials-header__actions">
-              <p className="help-text">
-                当前第 {pageMeta.page} / {totalPages} 页 · 每页 {pageSize} 条 · 共 {pageMeta.total} 条结果
-              </p>
-              <div className="view-toggle" role="group" aria-label="列表视图切换">
-                <button
-                  type="button"
-                  className={viewMode === 'grid' ? 'active' : ''}
-                  onClick={() => handleViewModeChange('grid')}
-                >
-                  卡片
-                </button>
-                <button
-                  type="button"
-                  className={viewMode === 'list' ? 'active' : ''}
-                  onClick={() => handleViewModeChange('list')}
-                >
-                  列表
-                </button>
-              </div>
-            </div>
+            <Link href="/materials" prefetch={false}>
+              更多
+            </Link>
           </div>
-          <PaginationBar
-            currentPage={currentPage}
-            totalItems={totalItems}
-            pageSize={pageSize}
-            loading={loadingPage}
-            onPageChange={handlePageChange}
-          />
-          {paginationError && <p className="error-text">{paginationError}</p>}
-          {paginationNotice && !paginationError && <p className="help-text">{paginationNotice}</p>}
-          {materialList.length === 0 ? (
-            <div className="empty-state">暂无符合筛选条件的资料。</div>
+          {mobileRecommendedItems.length > 0 ? (
+            <ul className="materials-list mobile-resource-list">
+              {mobileRecommendedItems.map((item) => (
+                <MaterialCard key={item.id} material={item} />
+              ))}
+            </ul>
           ) : (
-            <>
-              <ul className={`materials-list ${viewMode === 'grid' ? 'materials-grid' : 'list-view'}`}>
-                {materialList.map((item, idx) => (
-                  <MaterialCard
-                    key={item.id}
-                    material={item}
-                    selectable
-                    checked={selectedIds.includes(item.id)}
-                    onToggle={toggleSelection}
-                    variant={viewMode}
-                    orderLabel={viewMode === 'list' ? `${(currentPage - 1) * pageSize + idx + 1}` : undefined}
-                  />
-                ))}
-              </ul>
-            </>
+            <div className="empty-state">暂无推荐资料。</div>
           )}
         </section>
+
+        <section className="card mobile-home-preview" aria-label="移动端最新资料">
+          <div className="mobile-section-head">
+            <div>
+              <span>Latest</span>
+              <h2>最新资料</h2>
+            </div>
+            <Link href="/materials" prefetch={false}>
+              全部资料
+            </Link>
+          </div>
+          {mobileLatestItems.length > 0 ? (
+            <ul className="materials-list mobile-resource-list">
+              {mobileLatestItems.map((item) => (
+                <MaterialCard key={item.id} material={item} />
+              ))}
+            </ul>
+          ) : (
+            <div className="empty-state">暂无资料。</div>
+          )}
+        </section>
+
+        <div className="home-desktop-library">
+          <HomeFilterCard
+            filterRef={filterRef}
+            filtersState={filtersState}
+            showAdvanced={showAdvanced}
+            availableTagOptions={availableTagOptions}
+            onFilterChange={updateFilter}
+            onCourseCategoryChange={applyCourseCategory}
+            onToggleAdvancedFilters={toggleAdvancedFilters}
+            onResetFilters={handleResetFilters}
+            onSubmit={handleFilterSubmit}
+          />
+
+          <section className="card" id="materials-list" ref={materialsRef} style={{ gridColumn: '1 / -1' }}>
+            <div className="materials-header">
+              <div>
+                <h2 className="card-title">
+                  资料列表
+                  <svg className="title-icon" viewBox="0 0 24 24" aria-hidden="true">
+                    <rect x="4" y="5" width="16" height="14" rx="2" fill="none" stroke="currentColor" strokeWidth="1.6" />
+                    <path d="M8 9h8M8 12h8M8 15h5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+                  </svg>
+                </h2>
+              </div>
+              <div className="materials-header__actions">
+                <p className="help-text">
+                  当前第 {pageMeta.page} / {totalPages} 页 · 每页 {pageSize} 条 · 共 {pageMeta.total} 条结果
+                </p>
+                <div className="view-toggle" role="group" aria-label="列表视图切换">
+                  <button
+                    type="button"
+                    className={viewMode === 'grid' ? 'active' : ''}
+                    onClick={() => handleViewModeChange('grid')}
+                  >
+                    卡片
+                  </button>
+                  <button
+                    type="button"
+                    className={viewMode === 'list' ? 'active' : ''}
+                    onClick={() => handleViewModeChange('list')}
+                  >
+                    列表
+                  </button>
+                </div>
+              </div>
+            </div>
+            <PaginationBar
+              currentPage={currentPage}
+              totalItems={totalItems}
+              pageSize={pageSize}
+              loading={loadingPage}
+              onPageChange={handlePageChange}
+            />
+            {paginationError && <p className="error-text">{paginationError}</p>}
+            {paginationNotice && !paginationError && <p className="help-text">{paginationNotice}</p>}
+            {materialList.length === 0 ? (
+              <div className="empty-state">暂无符合筛选条件的资料。</div>
+            ) : (
+              <>
+                <ul className={`materials-list ${viewMode === 'grid' ? 'materials-grid' : 'list-view'}`}>
+                  {materialList.map((item, idx) => (
+                    <MaterialCard
+                      key={item.id}
+                      material={item}
+                      selectable
+                      checked={selectedIds.includes(item.id)}
+                      onToggle={toggleSelection}
+                      variant={viewMode}
+                      orderLabel={viewMode === 'list' ? `${(currentPage - 1) * pageSize + idx + 1}` : undefined}
+                    />
+                  ))}
+                </ul>
+              </>
+            )}
+          </section>
+        </div>
         <HomeLeaderboard
           user={user}
           topContributors={topContributors}
