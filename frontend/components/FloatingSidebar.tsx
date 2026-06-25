@@ -63,6 +63,15 @@ export default function FloatingSidebar() {
   const [aiFollowups, setAiFollowups] = useState<string[]>([]);
   const [aiDetails, setAiDetails] = useState<Record<number, MaterialListItem>>({});
 
+  const getMobileRestingPosition = useCallback(() => {
+    if (typeof window === 'undefined') return null;
+    if (window.innerWidth > 720) return null;
+    return {
+      x: 12,
+      y: Math.max(110, window.innerHeight - 128),
+    };
+  }, []);
+
   const clampSidebarPosition = useCallback((x: number, y: number, panelWidth?: number, panelHeight?: number) => {
     if (typeof window === 'undefined') return { x, y };
     const width = panelWidth ?? sidebarRef.current?.offsetWidth ?? 320;
@@ -77,23 +86,43 @@ export default function FloatingSidebar() {
     };
   }, []);
 
+  const getSidebarClampSize = useCallback(() => {
+    if (!sidebarOpen) {
+      return {
+        width: bubbleRef.current?.offsetWidth ?? 52,
+        height: bubbleRef.current?.offsetHeight ?? 52,
+      };
+    }
+    return {
+      width: sidebarRef.current?.offsetWidth ?? 320,
+      height: sidebarRef.current?.offsetHeight ?? 360,
+    };
+  }, [sidebarOpen]);
+
   useEffect(() => {
     if (typeof window === 'undefined') return;
+    const mobileRestingPosition = getMobileRestingPosition();
     try {
       const saved = window.localStorage.getItem(POS_STORAGE_KEY);
       if (saved) {
         const parsed = JSON.parse(saved);
         if (typeof parsed.x === 'number' && typeof parsed.y === 'number') {
-          setSidebarPosition((pos) => clampSidebarPosition(parsed.x, parsed.y));
+          const next =
+            mobileRestingPosition && parsed.y < mobileRestingPosition.y - 80 ? mobileRestingPosition : parsed;
+          const size = getSidebarClampSize();
+          setSidebarPosition(() => clampSidebarPosition(next.x, next.y, size.width, size.height));
+          return;
         }
       }
     } catch {
       // ignore
     }
-    const panelWidth = sidebarRef.current?.offsetWidth ?? 280;
-    const panelHeight = sidebarRef.current?.offsetHeight ?? 320;
-    setSidebarPosition((pos) => clampSidebarPosition(pos.x, pos.y, panelWidth, panelHeight));
-  }, [clampSidebarPosition]);
+    const size = getSidebarClampSize();
+    setSidebarPosition((pos) => {
+      const next = mobileRestingPosition ?? pos;
+      return clampSidebarPosition(next.x, next.y, size.width, size.height);
+    });
+  }, [clampSidebarPosition, getMobileRestingPosition, getSidebarClampSize]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -109,20 +138,21 @@ export default function FloatingSidebar() {
 
   useEffect(() => {
     setSidebarPosition((pos) =>
-      clampSidebarPosition(pos.x, pos.y, sidebarRef.current?.offsetWidth, sidebarRef.current?.offsetHeight)
+      clampSidebarPosition(pos.x, pos.y, getSidebarClampSize().width, getSidebarClampSize().height)
     );
-  }, [sidebarOpen, clampSidebarPosition]);
+  }, [sidebarOpen, clampSidebarPosition, getSidebarClampSize]);
 
   useEffect(() => {
     const handler = () => {
+      const size = getSidebarClampSize();
       setSidebarPosition((pos) =>
-        clampSidebarPosition(pos.x, pos.y, sidebarRef.current?.offsetWidth, sidebarRef.current?.offsetHeight)
+        clampSidebarPosition(pos.x, pos.y, size.width, size.height)
       );
     };
     if (typeof window === 'undefined') return undefined;
     window.addEventListener('resize', handler);
     return () => window.removeEventListener('resize', handler);
-  }, [clampSidebarPosition]);
+  }, [clampSidebarPosition, getSidebarClampSize]);
 
 
   useEffect(() => {

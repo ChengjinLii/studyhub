@@ -2406,7 +2406,8 @@ main {
   .floating-sidebar {
     position: fixed;
     left: 14px;
-    top: 90px;
+    top: auto;
+    bottom: calc(92px + env(safe-area-inset-bottom));
     --hat-scale: 1.5;
     --hat-x: -58%;
     --hat-y: -74%;
@@ -2419,8 +2420,8 @@ main {
   }
 
   .floating-sidebar__bubble {
-    width: 50px;
-    height: 50px;
+    width: 44px;
+    height: 44px;
     border-width: 2px;
     box-shadow:
       0 8px 16px rgba(15, 23, 42, 0.2),
@@ -2459,8 +2460,8 @@ main {
 @media (max-width: 640px) {
   .floating-sidebar__bubble {
     touch-action: none;
-    padding: 10px;
-    margin: -10px;
+    padding: 8px;
+    margin: -8px;
   }
 }
 
@@ -13121,31 +13122,33 @@ main {
   }
 
   .home-page {
-    gap: 16px;
-    padding-top: 14px;
+    gap: 14px;
+    padding-top: 12px;
   }
 
   .hero.hero-magazine {
     grid-template-columns: 1fr;
-    gap: 14px;
-    padding: 18px;
+    gap: 12px;
+    padding: 16px;
     min-height: auto;
-    border-radius: 18px;
+    border-radius: 16px;
   }
 
   .hero.hero-magazine .hero-copy {
-    padding-top: 14px;
+    gap: 8px;
+    padding-top: 12px;
   }
 
   .hero.hero-magazine h2 {
-    font-size: 1.7rem;
-    line-height: 1.12;
+    margin: 4px 0 2px;
+    font-size: 1.56rem;
+    line-height: 1.1;
   }
 
   .hero.hero-magazine .hero-subtitle {
     white-space: normal;
-    font-size: 0.95rem;
-    line-height: 1.55;
+    font-size: 0.9rem;
+    line-height: 1.45;
   }
 
   .hero.hero-magazine .hero-action-buttons {
@@ -13156,14 +13159,42 @@ main {
   }
 
   .hero.hero-magazine .button {
+    min-height: 38px;
+    height: 38px;
     min-width: 0;
     padding: 0 8px;
-    font-size: 0.86rem;
+    font-size: 0.84rem;
   }
 
   .hero.hero-magazine .hero-panel {
     width: 100%;
-    padding: 13px;
+    padding: 10px;
+  }
+
+  .hero.hero-magazine .hero-panel-title {
+    margin-bottom: 8px;
+    font-size: 11px;
+  }
+
+  .hero.hero-magazine .hero-stats {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .hero.hero-magazine .hero-stat {
+    padding: 7px 6px;
+    border-radius: 9px;
+  }
+
+  .hero.hero-magazine .hero-stat span {
+    font-size: 9px;
+    text-align: center;
+  }
+
+  .hero.hero-magazine .hero-stat strong {
+    margin-top: 2px;
+    font-size: 0.95rem;
+    text-align: center;
   }
 
   .mobile-home-task-panel,
@@ -13171,7 +13202,7 @@ main {
     grid-column: 1 / -1;
     display: flex;
     flex-direction: column;
-    gap: 14px;
+    gap: 12px;
     border: 1px solid rgba(226, 232, 240, 0.9);
     background: #ffffff;
   }
@@ -13200,7 +13231,7 @@ main {
   .mobile-library-list__header h2 {
     margin: 2px 0 0;
     color: #0f172a;
-    font-size: 1.2rem;
+    font-size: 1.12rem;
     line-height: 1.25;
   }
 
@@ -13221,9 +13252,9 @@ main {
 
   .mobile-home-search input,
   .mobile-library-search input {
-    min-height: 46px;
-    height: 46px;
-    border-radius: 16px;
+    min-height: 42px;
+    height: 42px;
+    border-radius: 14px;
     background: #f8fafc;
     border-color: #dbe3ef;
     font-size: 0.98rem;
@@ -13231,22 +13262,22 @@ main {
 
   .mobile-home-search .button,
   .mobile-library-search .button {
-    height: 46px;
-    min-height: 46px;
-    border-radius: 16px;
-    padding: 0 17px;
+    height: 42px;
+    min-height: 42px;
+    border-radius: 14px;
+    padding: 0 15px;
   }
 
   .mobile-home-actions {
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 10px;
+    gap: 8px;
   }
 
   .mobile-home-action {
     min-width: 0;
-    min-height: 78px;
-    padding: 11px 6px;
+    min-height: 68px;
+    padding: 9px 5px;
     border: 1px solid #dbe3ef;
     border-radius: 18px;
     background: #fbfdff;
@@ -13254,9 +13285,9 @@ main {
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 7px;
+    gap: 5px;
     color: #0f172a;
-    font-size: 0.88rem;
+    font-size: 0.84rem;
     font-weight: 800;
     text-decoration: none;
     box-shadow: 0 8px 18px rgba(15, 23, 42, 0.05);
@@ -13285,8 +13316,8 @@ main {
   }
 
   .mobile-home-action__icon {
-    width: 28px;
-    height: 28px;
+    width: 25px;
+    height: 25px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -13294,8 +13325,8 @@ main {
   }
 
   .mobile-home-action__icon svg {
-    width: 24px;
-    height: 24px;
+    width: 22px;
+    height: 22px;
   }
 
   .mobile-stat-grid {
@@ -13364,13 +13395,13 @@ main {
   }
 
   .materials-list.mobile-resource-list {
-    gap: 12px;
+    gap: 10px;
   }
 
   .materials-list.mobile-resource-list > .material-card {
-    padding: 17px;
-    gap: 10px;
-    border-radius: 16px;
+    padding: 14px;
+    gap: 8px;
+    border-radius: 14px;
     overflow: hidden;
   }
 
@@ -13378,7 +13409,7 @@ main {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
     align-items: flex-start;
-    gap: 12px;
+    gap: 10px;
   }
 
   .mobile-resource-list .material-card__header > div,
@@ -13388,39 +13419,56 @@ main {
   }
 
   .mobile-resource-list .material-card__header h3 {
-    font-size: 1rem;
-    line-height: 1.38;
+    display: -webkit-box;
+    font-size: 0.98rem;
+    line-height: 1.34;
     max-width: 100%;
     overflow-wrap: anywhere;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
     word-break: break-word;
   }
 
   .mobile-resource-list .material-card__header .price-tag {
-    font-size: 0.92rem;
+    font-size: 0.86rem;
     justify-self: end;
-    max-width: 96px;
+    max-width: 82px;
     white-space: nowrap;
   }
 
   .mobile-resource-list .material-meta,
   .mobile-resource-list .material-stats {
-    gap: 6px 10px;
-    font-size: 0.82rem;
-    line-height: 1.45;
+    gap: 5px 8px;
+    font-size: 0.78rem;
+    line-height: 1.36;
     min-width: 0;
     max-width: 100%;
     overflow-wrap: anywhere;
   }
 
+  .mobile-resource-list .material-card__header p.material-meta:nth-of-type(2) {
+    display: none;
+  }
+
+  .mobile-resource-list .material-stats__rating {
+    margin-top: 2px;
+  }
+
+  .mobile-resource-list .material-stats__actions {
+    margin-top: 0;
+  }
+
   .mobile-resource-list .material-tags {
+    gap: 6px;
     min-width: 0;
     max-width: 100%;
   }
 
   .mobile-resource-list .badge {
-    font-size: 0.72rem;
-    min-height: 24px;
-    padding: 0 9px;
+    font-size: 0.68rem;
+    min-height: 22px;
+    padding: 0 8px;
   }
 
   .mobile-materials-page {
