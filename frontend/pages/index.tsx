@@ -47,6 +47,7 @@ const MaterialCard = dynamic(() => import('../components/MaterialCard'));
 const HomeFilterCard = dynamic(() => import('../components/home/HomeFilterCard'));
 const HomeLeaderboard = dynamic(() => import('../components/home/HomeLeaderboard'));
 const HomeRequestPanels = dynamic(() => import('../components/home/HomeRequestPanels'));
+const MobileHomeSections = dynamic(() => import('../components/home/MobileHomeSections'));
 const ShareSheet = dynamic(() => import('../components/ShareSheet'), { ssr: false });
 
 const ROLE_LABELS = [
@@ -732,60 +733,13 @@ export default function Home({
             </div>
           </aside>
         </section>
-        <section className="card mobile-home-task-panel" aria-label="移动端快捷入口">
-          <div className="mobile-home-task-panel__head">
-            <span>StudyHub</span>
-            <h2>找资料、投稿、求购</h2>
-          </div>
-          <form className="mobile-home-search" onSubmit={handleMobileSearchSubmit}>
-            <input
-              value={mobileSearch}
-              onChange={(event) => setMobileSearch(event.target.value)}
-              placeholder="搜课程 / 老师 / 资料名"
-              aria-label="搜索资料"
-            />
-            <button className="button primary" type="submit">
-              搜索
-            </button>
-          </form>
-          <div className="mobile-home-actions">
-            <Link href="/materials" prefetch={false}>
-              <span className="mobile-home-action__icon" aria-hidden="true">
-                <svg viewBox="0 0 24 24">
-                  <path d="M5 4h10a4 4 0 0 1 4 4v12H7a2 2 0 0 1-2-2V4z" fill="none" stroke="currentColor" strokeWidth="1.7" />
-                  <path d="M7 16h12M9 8h6M9 11h5" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
-                </svg>
-              </span>
-              <span>找资料</span>
-            </Link>
-            <Link href="/upload" prefetch={false}>
-              <span className="mobile-home-action__icon" aria-hidden="true">
-                <svg viewBox="0 0 24 24">
-                  <path d="M12 4v10M8 8l4-4 4 4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-                  <path d="M5 14v4a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-                </svg>
-              </span>
-              <span>去投稿</span>
-            </Link>
-            <Link href="/requests/new" prefetch={false}>
-              <span className="mobile-home-action__icon" aria-hidden="true">
-                <svg viewBox="0 0 24 24">
-                  <path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-                  <circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" strokeWidth="1.6" />
-                </svg>
-              </span>
-              <span>发求购</span>
-            </Link>
-            <Link href="/more" prefetch={false}>
-              <span className="mobile-home-action__icon" aria-hidden="true">
-                <svg viewBox="0 0 24 24">
-                  <path d="M5 6h14M5 12h14M5 18h14" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-                </svg>
-              </span>
-              <span>更多</span>
-            </Link>
-          </div>
-        </section>
+        <MobileHomeSections
+          mobileSearch={mobileSearch}
+          recommendedItems={mobileRecommendedItems}
+          latestItems={mobileLatestItems}
+          onMobileSearchChange={setMobileSearch}
+          onMobileSearchSubmit={handleMobileSearchSubmit}
+        />
         <HomeRequestPanels
           requestItems={requestItems}
           requestLoading={requestLoading}
@@ -798,48 +752,6 @@ export default function Home({
           buildUploadLink={buildUploadLink}
           onFollowRequest={handleFollowRequest}
         />
-
-        <section className="card mobile-home-preview" aria-label="移动端资料推荐">
-          <div className="mobile-section-head">
-            <div>
-              <span>Recommend</span>
-              <h2>为你推荐</h2>
-            </div>
-            <Link href="/materials" prefetch={false}>
-              更多
-            </Link>
-          </div>
-          {mobileRecommendedItems.length > 0 ? (
-            <ul className="materials-list mobile-resource-list">
-              {mobileRecommendedItems.map((item) => (
-                <MaterialCard key={item.id} material={item} />
-              ))}
-            </ul>
-          ) : (
-            <div className="empty-state">暂无推荐资料。</div>
-          )}
-        </section>
-
-        <section className="card mobile-home-preview" aria-label="移动端最新资料">
-          <div className="mobile-section-head">
-            <div>
-              <span>Latest</span>
-              <h2>最新资料</h2>
-            </div>
-            <Link href="/materials" prefetch={false}>
-              全部资料
-            </Link>
-          </div>
-          {mobileLatestItems.length > 0 ? (
-            <ul className="materials-list mobile-resource-list">
-              {mobileLatestItems.map((item) => (
-                <MaterialCard key={item.id} material={item} />
-              ))}
-            </ul>
-          ) : (
-            <div className="empty-state">暂无资料。</div>
-          )}
-        </section>
 
         <div className="home-desktop-library">
           <HomeFilterCard

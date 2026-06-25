@@ -773,15 +773,9 @@ export default function MePage({ user, summary, account }: MePageProps) {
               <MeSecuritySection
                 userEmail={user.email}
                 adminQq={ADMIN_QQ}
-                passwordForm={passwordForm}
-                pwdLoading={pwdLoading}
-                pwdMessage={pwdMessage}
-                emailResetForm={emailResetForm}
-                resetCaptcha={resetCaptcha}
-                resetCaptchaCode={resetCaptchaCode}
-                emailResetLoading={emailResetLoading}
-                emailResetCooldown={emailResetCooldown}
-                emailResetMessage={emailResetMessage}
+                passwordForm={passwordForm} pwdLoading={pwdLoading} pwdMessage={pwdMessage}
+                emailResetForm={emailResetForm} resetCaptcha={resetCaptcha} resetCaptchaCode={resetCaptchaCode}
+                emailResetLoading={emailResetLoading} emailResetCooldown={emailResetCooldown} emailResetMessage={emailResetMessage}
                 onPasswordFormChange={(patch) => setPasswordForm((prev) => ({ ...prev, ...patch }))}
                 onEmailResetFormChange={(patch) => setEmailResetForm((prev) => ({ ...prev, ...patch }))}
                 onResetCaptchaCodeChange={setResetCaptchaCode}
@@ -792,13 +786,8 @@ export default function MePage({ user, summary, account }: MePageProps) {
               />
               <MeAccountSections
                 adminQq={ADMIN_QQ}
-                bindForm={bindForm}
-                bindVerified={bindVerified}
-                bindLoading={bindLoading}
-                bindCooldown={bindCooldown}
-                bindMessage={bindMessage}
-                currentEmail={user.email}
-                freeDownloadsLeft={freeDownloadsLeft}
+                bindForm={bindForm} bindVerified={bindVerified} bindLoading={bindLoading} bindCooldown={bindCooldown}
+                bindMessage={bindMessage} currentEmail={user.email} freeDownloadsLeft={freeDownloadsLeft}
                 onBindFormChange={(patch) => setBindForm((prev) => ({ ...prev, ...patch }))}
                 onSendBindCode={sendBindCode}
                 onConfirmBindEmail={confirmBindEmail}
