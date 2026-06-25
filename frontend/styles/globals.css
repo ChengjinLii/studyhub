@@ -13095,17 +13095,18 @@ main {
   }
 
   .mobile-bottom-nav__item--upload {
-    min-height: 58px;
-    margin: -10px 2px 0;
-    border-radius: 20px;
+    width: min(76px, calc(100% - 4px));
+    min-height: 54px;
+    margin: -6px auto 0;
+    border-radius: 16px;
     background: #1f5fd6;
     color: #ffffff;
     box-shadow: 0 14px 26px rgba(37, 99, 235, 0.3);
   }
 
   .mobile-bottom-nav__item--upload svg {
-    width: 26px;
-    height: 26px;
+    width: 29px;
+    height: 29px;
   }
 
   .mobile-bottom-nav__item--upload.is-active {
@@ -13493,35 +13494,47 @@ main {
   }
 
   .materials-list.mobile-resource-list > .material-card {
-    padding: 14px;
+    box-sizing: border-box;
+    width: 100%;
+    padding: 15px 16px;
     gap: 8px;
     border-radius: 14px;
     overflow: hidden;
   }
 
   .materials-list.mobile-home-resource-grid > .material-card {
+    box-sizing: border-box;
+    width: 100%;
     min-width: 0;
     min-height: 176px;
-    padding: 12px;
+    padding: 13px;
     gap: 7px;
     box-shadow: 0 8px 18px rgba(15, 23, 42, 0.05);
+    overflow: hidden;
   }
 
   .mobile-home-resource-grid .material-card__header {
     display: flex;
     flex-direction: column;
     gap: 7px;
+    min-width: 0;
+    max-width: 100%;
   }
 
   .mobile-home-resource-grid .material-card__header .price-tag {
     align-self: flex-start;
     max-width: 100%;
     font-size: 0.78rem;
+    white-space: normal;
+    overflow-wrap: anywhere;
   }
 
   .mobile-home-resource-grid .material-card__header h3 {
     font-size: 0.9rem;
     line-height: 1.28;
+    max-width: 100%;
+    overflow-wrap: anywhere;
+    word-break: break-word;
     -webkit-line-clamp: 2;
   }
 
@@ -13586,7 +13599,9 @@ main {
     font-size: 0.86rem;
     justify-self: end;
     max-width: 82px;
-    white-space: nowrap;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    text-align: right;
   }
 
   .mobile-resource-list .material-meta,
@@ -13621,6 +13636,9 @@ main {
     font-size: 0.68rem;
     min-height: 22px;
     padding: 0 8px;
+    max-width: 100%;
+    overflow-wrap: anywhere;
+    white-space: normal;
   }
 
   .mobile-materials-page {
