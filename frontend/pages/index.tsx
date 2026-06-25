@@ -42,6 +42,7 @@ import { ContributorRank, LeaderboardPeriod } from '../types/contributor';
 import { MaterialRequestItem } from '../types/request';
 
 const MATERIALS_PAGE_SIZE = 18;
+const HOME_REQUEST_PREVIEW_LIMIT = 8;
 const Snowfall = dynamic(() => import('react-snowfall'), { ssr: false });
 const MaterialCard = dynamic(() => import('../components/MaterialCard'));
 const HomeFilterCard = dynamic(() => import('../components/home/HomeFilterCard'));
@@ -982,7 +983,7 @@ export const getServerSideProps: GetServerSideProps<HomeProps> = async (ctx) => 
     return [] as MaterialListItem[];
   });
   const requestsPromise: Promise<MaterialRequestItem[]> = fetchMaterialRequests(
-    { sort: 'hot', limit: 0 },
+    { sort: 'hot', limit: HOME_REQUEST_PREVIEW_LIMIT },
     session.token || undefined,
     origin
   ).catch((error) => {

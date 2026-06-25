@@ -6,6 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "prewarm": "node scripts/prewarm-public-pages.mjs",
     "lint": "next lint",
     "typecheck": "tsc --noEmit --pretty false",
     "typecheck:strict": "tsc --project tsconfig.strict.json --pretty false",
