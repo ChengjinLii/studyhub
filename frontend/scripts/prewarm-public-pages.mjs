@@ -6,6 +6,7 @@ const paths = (process.env.STUDYHUB_PREWARM_PATHS || DEFAULT_PATHS.join(','))
   .split(',')
   .map((path) => path.trim())
   .filter(Boolean);
+const detailLinkLimit = Math.max(0, Number.parseInt(process.env.STUDYHUB_PREWARM_DETAIL_LINK_LIMIT || '8', 10) || 0);
 const maxAttempts = Math.max(1, Number.parseInt(process.env.STUDYHUB_PREWARM_ATTEMPTS || '12', 10) || 12);
 const retryDelayMs = Math.max(100, Number.parseInt(process.env.STUDYHUB_PREWARM_RETRY_DELAY_MS || '1000', 10) || 1000);
 const requestTimeoutMs = Math.max(500, Number.parseInt(process.env.STUDYHUB_PREWARM_TIMEOUT_MS || '2500', 10) || 2500);
@@ -50,7 +51,51 @@ const waitForServer = async () => {
   return false;
 };
 
-const prewarmPath = async (path) => {
+const normalizeInternalPath = (href) => {
+  if (!href || href.startsWith('#') || href.startsWith('javascript:')) {
+    return null;
+  }
+  try {
+    const parsed = new URL(href, baseUrl);
+    const base = new URL(baseUrl);
+    if (parsed.origin !== base.origin) {
+      return null;
+    }
+    return `${parsed.pathname}${parsed.search}`;
+  } catch {
+    return null;
+  }
+};
+
+const extractDetailLinks = (html) => {
+  const links = new Set();
+  const pattern = /href=["']([^"']+)["']/g;
+  let match = pattern.exec(html);
+  while (match && links.size < detailLinkLimit) {
+    const path = normalizeInternalPath(match[1]);
+    if (path && (/^\/materials\/\d+-.+/.test(path) || /^\/market\/\d+-.+/.test(path))) {
+      links.add(path);
+    }
+    match = pattern.exec(html);
+  }
+  const pathLikeHtml = html
+    .replace(/\\u0026/g, '&')
+    .replace(/%2F/gi, '/')
+    .replace(/&quot;/g, '"')
+    .replace(/&#x27;/g, "'");
+  const pathPattern = /\/(?:materials|market)\/\d+-[^"'<>\s\\]+/g;
+  match = pathPattern.exec(pathLikeHtml);
+  while (match && links.size < detailLinkLimit) {
+    const path = normalizeInternalPath(match[0]);
+    if (path) {
+      links.add(path);
+    }
+    match = pathPattern.exec(pathLikeHtml);
+  }
+  return Array.from(links);
+};
+
+const prewarmPath = async (path, options = {}) => {
   const url = buildUrl(path);
   const startedAt = Date.now();
   try {
@@ -61,9 +106,13 @@ const prewarmPath = async (path) => {
       return;
     }
     console.log(`[prewarm] ${path} ${elapsedMs}ms`);
+    if (options.readBody) {
+      return await response.text();
+    }
   } catch (error) {
     console.warn(`[prewarm] ${path} failed: ${error instanceof Error ? error.message : String(error)}`);
   }
+  return '';
 };
 
 const main = async () => {
@@ -71,7 +120,15 @@ const main = async () => {
   if (!ready) {
     return;
   }
+  const discoveredDetailLinks = new Set();
   for (const path of paths) {
+    const shouldReadLinks = detailLinkLimit > 0 && (path === '/materials' || path === '/market');
+    const html = await prewarmPath(path, { readBody: shouldReadLinks });
+    if (shouldReadLinks && html) {
+      extractDetailLinks(html).forEach((link) => discoveredDetailLinks.add(link));
+    }
+  }
+  for (const path of discoveredDetailLinks) {
     await prewarmPath(path);
   }
 };
