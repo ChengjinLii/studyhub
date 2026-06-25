@@ -67,8 +67,8 @@ export default function FloatingSidebar() {
     if (typeof window === 'undefined') return null;
     if (window.innerWidth > 720) return null;
     return {
-      x: 12,
-      y: Math.max(110, window.innerHeight - 128),
+      x: Math.max(16, window.innerWidth - 72),
+      y: Math.max(110, window.innerHeight - 92),
     };
   }, []);
 
@@ -108,7 +108,9 @@ export default function FloatingSidebar() {
         const parsed = JSON.parse(saved);
         if (typeof parsed.x === 'number' && typeof parsed.y === 'number') {
           const next =
-            mobileRestingPosition && parsed.y < mobileRestingPosition.y - 80 ? mobileRestingPosition : parsed;
+            mobileRestingPosition && (parsed.y < mobileRestingPosition.y - 80 || parsed.x < 80)
+              ? mobileRestingPosition
+              : parsed;
           const size = getSidebarClampSize();
           setSidebarPosition(() => clampSidebarPosition(next.x, next.y, size.width, size.height));
           return;

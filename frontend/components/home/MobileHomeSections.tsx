@@ -41,7 +41,7 @@ function MobileResourceSection({ title, eyebrow, hrefLabel, items }: { title: st
         <Link href="/materials" prefetch={false}>{hrefLabel}</Link>
       </div>
       {items.length > 0 ? (
-        <ul className="materials-list mobile-resource-list">
+        <ul className="materials-list mobile-resource-list mobile-home-resource-grid">
           {items.map((item) => <MaterialCard key={item.id} material={item} />)}
         </ul>
       ) : (
