@@ -3378,35 +3378,45 @@ main {
 
 .studyhub-popup-poster__snow {
   position: absolute;
-  inset: 22% 0 24%;
-  z-index: 3;
+  inset: 0;
+  z-index: 2;
   pointer-events: none;
   opacity: 0.62;
-  background-image:
-    radial-gradient(circle, rgba(255, 255, 255, 0.82) 0 1.1px, transparent 1.5px),
-    radial-gradient(circle, rgba(255, 255, 255, 0.56) 0 1px, transparent 1.4px),
-    radial-gradient(circle, rgba(120, 212, 207, 0.45) 0 1.2px, transparent 1.7px);
-  background-size: 86px 68px, 132px 92px, 180px 120px;
-  background-position: 12px 8px, 40px 26px, 80px 12px;
-  clip-path: polygon(0 31%, 100% 0, 100% 72%, 0 100%);
-  animation: stable-poster-snow 10s linear infinite;
+  clip-path: polygon(0 46%, 100% 11%, 100% 57%, 0 92%);
 }
 
-.studyhub-popup-poster__meteor {
+.studyhub-popup-poster__snow canvas {
   position: absolute;
-  z-index: 5;
+  inset: 0;
+}
+
+.studyhub-popup-poster__meteors {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
   pointer-events: none;
-  width: 132px;
+  clip-path: polygon(0 46%, 100% 11%, 100% 57%, 0 92%);
+}
+
+.studyhub-popup-poster__meteors .hero-meteor {
+  position: absolute;
+  width: 180px;
   height: 2px;
   border-radius: 999px;
-  background: linear-gradient(90deg, transparent, rgba(186, 255, 221, 0.24), rgba(226, 255, 246, 0.95));
-  filter: drop-shadow(0 0 6px rgba(120, 255, 200, 0.42));
-  transform: rotate(32deg);
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(186, 255, 221, 0.25) 45%,
+    rgba(210, 255, 238, 0.85) 85%,
+    rgba(255, 255, 255, 1) 100%
+  );
   opacity: 0;
-  animation: stable-poster-meteor 5.8s linear infinite;
+  transform: rotate(32deg);
+  filter: drop-shadow(0 0 5px rgba(120, 255, 200, 0.32));
+  animation: hero-meteor 12s linear infinite;
 }
 
-.studyhub-popup-poster__meteor::after {
+.studyhub-popup-poster__meteors .hero-meteor::after {
   content: '';
   position: absolute;
   right: -2px;
@@ -3414,51 +3424,14 @@ main {
   width: 7px;
   height: 7px;
   border-radius: 50%;
-  background: #f8fffd;
-  box-shadow: 0 0 12px rgba(130, 255, 210, 0.58);
-}
-
-.studyhub-popup-poster__meteor.meteor-a {
-  left: 54%;
-  top: 31%;
-}
-
-.studyhub-popup-poster__meteor.meteor-b {
-  left: 72%;
-  top: 40%;
-  animation-delay: 1.8s;
-  animation-duration: 6.6s;
-}
-
-.studyhub-popup-poster__meteor.meteor-c {
-  left: 36%;
-  top: 49%;
-  animation-delay: 3.4s;
-  animation-duration: 7.2s;
-}
-
-@keyframes stable-poster-snow {
-  to {
-    background-position: 12px 76px, 40px 118px, 80px 132px;
-  }
-}
-
-@keyframes stable-poster-meteor {
-  0% {
-    opacity: 0;
-    transform: translate(0, 0) rotate(32deg);
-  }
-  8% {
-    opacity: 0.95;
-  }
-  24% {
-    opacity: 0;
-    transform: translate(130px, 100px) rotate(32deg);
-  }
-  100% {
-    opacity: 0;
-    transform: translate(130px, 100px) rotate(32deg);
-  }
+  background: radial-gradient(
+    circle,
+    rgba(255, 255, 255, 1) 0%,
+    rgba(219, 255, 240, 0.9) 45%,
+    rgba(219, 255, 240, 0.15) 70%,
+    rgba(219, 255, 240, 0) 100%
+  );
+  box-shadow: 0 0 10px rgba(130, 255, 210, 0.45);
 }
 
 .studyhub-popup-poster__brand {
@@ -3891,7 +3864,7 @@ main {
   .stable-version-modal__eyebrow::after,
   .stable-version-modal__actions .button.primary.stable-version-modal__cta,
   .studyhub-popup-poster__snow,
-  .studyhub-popup-poster__meteor {
+  .studyhub-popup-poster__meteors .hero-meteor {
     animation-duration: 0.001ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.001ms !important;

@@ -14,6 +14,7 @@ import { RoleMask, SessionUser } from '../types/user';
 
 const FloatingSidebar = dynamic(() => import('../components/FloatingSidebar'), { ssr: false });
 const HermesAgentWidget = dynamic(() => import('../components/HermesAgentWidget'), { ssr: false });
+const Snowfall = dynamic(() => import('react-snowfall'), { ssr: false });
 
 const PUBLIC_API_ORIGIN = process.env.NEXT_PUBLIC_API_ORIGIN || '';
 const scheduleAfterFirstPaint = (task: () => void) => {
@@ -54,13 +55,39 @@ interface RuntimeInfo {
 type EntryModalVariant = 'stable' | 'welcome' | null;
 
 function StudyHubEntryPoster() {
+  const snowfallCanvasStyle = {
+    position: 'absolute' as const,
+    inset: 0,
+    width: '100%',
+    height: '100%',
+  };
+
   return (
     <div className="studyhub-popup-poster" aria-label="StudyHub 入口海报">
       <span className="studyhub-popup-poster__vignette" aria-hidden="true" />
-      <span className="studyhub-popup-poster__snow" aria-hidden="true" />
-      <span className="studyhub-popup-poster__meteor meteor-a" aria-hidden="true" />
-      <span className="studyhub-popup-poster__meteor meteor-b" aria-hidden="true" />
-      <span className="studyhub-popup-poster__meteor meteor-c" aria-hidden="true" />
+      <div className="xmas-snowfall studyhub-popup-poster__snow" aria-hidden="true">
+        <Snowfall
+          snowflakeCount={14}
+          color="rgba(243, 248, 255, 0.55)"
+          radius={[0.6, 2.2]}
+          speed={[0.6, 1.6]}
+          wind={[-0.2, 1.2]}
+          style={snowfallCanvasStyle}
+        />
+        <Snowfall
+          snowflakeCount={7}
+          color="rgba(255, 255, 255, 0.45)"
+          radius={[1.6, 3.4]}
+          speed={[1.2, 2.4]}
+          wind={[-0.4, 1.6]}
+          style={snowfallCanvasStyle}
+        />
+      </div>
+      <div className="hero-meteors studyhub-popup-poster__meteors" aria-hidden="true">
+        <span className="hero-meteor" style={{ top: '31%', left: '21%', animationDelay: '0.15s' }} />
+        <span className="hero-meteor" style={{ top: '24%', left: '54%', animationDelay: '1.1s' }} />
+        <span className="hero-meteor" style={{ top: '48%', left: '8%', animationDelay: '2.2s' }} />
+      </div>
       <svg className="studyhub-popup-poster__svg" viewBox="0 0 2048 1152" role="img" aria-labelledby="studyhub-popup-poster-title" xmlns="http://www.w3.org/2000/svg">
         <title id="studyhub-popup-poster-title">StudyHub 学汇入口海报</title>
         <rect width="2048" height="1152" fill="#ffffff" />
