@@ -14,7 +14,6 @@ import { RoleMask, SessionUser } from '../types/user';
 
 const FloatingSidebar = dynamic(() => import('../components/FloatingSidebar'), { ssr: false });
 const HermesAgentWidget = dynamic(() => import('../components/HermesAgentWidget'), { ssr: false });
-const Snowfall = dynamic(() => import('react-snowfall'), { ssr: false });
 
 const PUBLIC_API_ORIGIN = process.env.NEXT_PUBLIC_API_ORIGIN || '';
 const scheduleAfterFirstPaint = (task: () => void) => {
@@ -55,13 +54,6 @@ interface RuntimeInfo {
 type EntryModalVariant = 'stable' | 'welcome' | null;
 
 function StudyHubEntryPoster() {
-  const snowfallCanvasStyle = {
-    position: 'absolute' as const,
-    inset: 0,
-    width: '100%',
-    height: '100%',
-  };
-
   return (
     <div className="studyhub-popup-poster" aria-label="StudyHub 入口海报">
       <svg className="studyhub-popup-poster__svg" viewBox="0 0 2048 1152" role="img" aria-labelledby="studyhub-popup-poster-title" xmlns="http://www.w3.org/2000/svg">
@@ -102,24 +94,6 @@ function StudyHubEntryPoster() {
         <text className="studyhub-popup-poster__contact" x="1148" y="1112">核心贡献者</text>
         <text className="studyhub-popup-poster__contact" x="1390" y="1112">李承锦、曾逸帆</text>
       </svg>
-      <div className="xmas-snowfall studyhub-popup-poster__snow" aria-hidden="true">
-        <Snowfall
-          snowflakeCount={34}
-          color="rgba(243, 248, 255, 0.78)"
-          radius={[0.8, 2.8]}
-          speed={[0.7, 1.8]}
-          wind={[-0.2, 1.1]}
-          style={snowfallCanvasStyle}
-        />
-        <Snowfall
-          snowflakeCount={16}
-          color="rgba(255, 255, 255, 0.68)"
-          radius={[1.8, 4.2]}
-          speed={[1.2, 2.6]}
-          wind={[-0.4, 1.5]}
-          style={snowfallCanvasStyle}
-        />
-      </div>
       <div className="hero-meteors studyhub-popup-poster__meteors" aria-hidden="true">
         <span className="studyhub-popup-poster__meteor" style={{ top: '18%', left: '56%', animationDelay: '-0.9s' }} />
         <span className="studyhub-popup-poster__meteor" style={{ top: '31%', left: '34%', animationDelay: '0.7s' }} />
