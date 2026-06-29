@@ -216,6 +216,12 @@ export default function FloatingSidebar() {
       .filter((role) => role.label && hasRole(user.roleMask, role.mask))
       .map((role) => role.label);
   }, [user]);
+  const canShowAiRecommendations = useMemo(() => {
+    if (!user) return false;
+    return [RoleMask.CONTRIBUTOR, RoleMask.REVIEWER, RoleMask.ADMIN, RoleMask.DEVELOPER].some((role) =>
+      hasRole(user.roleMask, role)
+    );
+  }, [user]);
 
   const loadData = useCallback(async () => {
     try {
@@ -597,73 +603,75 @@ export default function FloatingSidebar() {
                   </>
                 )}
               </div>
-              <div className="sidebar-section sidebar-chat">
-                <h4 className="sidebar-section-title">AI 资料推荐</h4>
-                <p className="sidebar-muted">输入关键词，AI 只会推荐资料库内的内容。</p>
-                {chatError && <p className="sidebar-chat__error">{chatError}</p>}
-                {aiRecommendations.length > 0 && (
-                  <ul className="sidebar-ai-list">
-                    {aiRecommendations.map((rec) => {
-                      const detail = aiDetails[rec.material_id];
-                      const title = detail?.title || rec.title || `资料 #${rec.material_id}`;
-                      const reason = pickRecommendationReason(rec);
-                      const link = materialPath(rec.material_id, detail?.title || rec.title);
-                      const tags = detail?.tags || rec.tags || [];
-                      return (
-                        <li key={rec.material_id} className="sidebar-ai-card">
-                          <div className="sidebar-ai-title">
-                            <Link href={link}>{title}</Link>
-                          </div>
-                          <div className="sidebar-ai-meta">
-                            <span>{detail?.school || 'StudyHub'}</span>
-                            {detail?.gradeValue && <span>· {detail.gradeValue}</span>}
-                            {detail && (
-                              <span className="sidebar-ai-price">
-                                {detail.free ? '免费' : `¥${detail.price?.toFixed(2)}`}
-                              </span>
-                            )}
-                          </div>
-                          {tags.length > 0 && (
-                            <div className="sidebar-ai-tags">
-                              {tags.slice(0, 4).map((tag) => (
-                                <span key={tag} className="sidebar-ai-pill">{tag}</span>
-                              ))}
+              {canShowAiRecommendations && (
+                <div className="sidebar-section sidebar-chat">
+                  <h4 className="sidebar-section-title">AI 资料推荐</h4>
+                  <p className="sidebar-muted">输入关键词，AI 只会推荐资料库内的内容。</p>
+                  {chatError && <p className="sidebar-chat__error">{chatError}</p>}
+                  {aiRecommendations.length > 0 && (
+                    <ul className="sidebar-ai-list">
+                      {aiRecommendations.map((rec) => {
+                        const detail = aiDetails[rec.material_id];
+                        const title = detail?.title || rec.title || `资料 #${rec.material_id}`;
+                        const reason = pickRecommendationReason(rec);
+                        const link = materialPath(rec.material_id, detail?.title || rec.title);
+                        const tags = detail?.tags || rec.tags || [];
+                        return (
+                          <li key={rec.material_id} className="sidebar-ai-card">
+                            <div className="sidebar-ai-title">
+                              <Link href={link}>{title}</Link>
                             </div>
-                          )}
-                          {reason && <p className="sidebar-ai-reason">{reason}</p>}
-                        </li>
-                      );
-                    })}
-                  </ul>
-                )}
-                {aiFollowups.length > 0 && (
-                  <div className="sidebar-ai-followups">
-                    <span>可以补充：</span>
-                    {aiFollowups.map((item, index) => (
-                      <button
-                        key={`${item}-${index}`}
-                        type="button"
-                        className="sidebar-ai-followup"
-                        onClick={() => setChatQuery(item)}
-                      >
-                        {item}
-                      </button>
-                    ))}
-                  </div>
-                )}
-                <form className="sidebar-chat__form" onSubmit={handleAiSubmit}>
-                  <input
-                    className="sidebar-chat__input"
-                    value={chatQuery}
-                    onChange={(event) => setChatQuery(event.target.value)}
-                    placeholder={user ? '例如：信号与系统 期末 真题' : '登录后可使用'}
-                    disabled={!user || chatLoading}
-                  />
-                  <button type="submit" className="button primary small" disabled={!user || chatLoading || !chatQuery.trim()}>
-                    {chatLoading ? '推荐中' : '推荐'}
-                  </button>
-                </form>
-              </div>
+                            <div className="sidebar-ai-meta">
+                              <span>{detail?.school || 'StudyHub'}</span>
+                              {detail?.gradeValue && <span>· {detail.gradeValue}</span>}
+                              {detail && (
+                                <span className="sidebar-ai-price">
+                                  {detail.free ? '免费' : `¥${detail.price?.toFixed(2)}`}
+                                </span>
+                              )}
+                            </div>
+                            {tags.length > 0 && (
+                              <div className="sidebar-ai-tags">
+                                {tags.slice(0, 4).map((tag) => (
+                                  <span key={tag} className="sidebar-ai-pill">{tag}</span>
+                                ))}
+                              </div>
+                            )}
+                            {reason && <p className="sidebar-ai-reason">{reason}</p>}
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  )}
+                  {aiFollowups.length > 0 && (
+                    <div className="sidebar-ai-followups">
+                      <span>可以补充：</span>
+                      {aiFollowups.map((item, index) => (
+                        <button
+                          key={`${item}-${index}`}
+                          type="button"
+                          className="sidebar-ai-followup"
+                          onClick={() => setChatQuery(item)}
+                        >
+                          {item}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  <form className="sidebar-chat__form" onSubmit={handleAiSubmit}>
+                    <input
+                      className="sidebar-chat__input"
+                      value={chatQuery}
+                      onChange={(event) => setChatQuery(event.target.value)}
+                      placeholder="例如：信号与系统 期末 真题"
+                      disabled={chatLoading}
+                    />
+                    <button type="submit" className="button primary small" disabled={chatLoading || !chatQuery.trim()}>
+                      {chatLoading ? '推荐中' : '推荐'}
+                    </button>
+                  </form>
+                </div>
+              )}
             </div>
           </div>
         )}

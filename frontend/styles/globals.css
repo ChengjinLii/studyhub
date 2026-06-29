@@ -3385,6 +3385,19 @@ main {
   clip-path: polygon(0 46%, 100% 11%, 100% 57%, 0 92%);
 }
 
+.studyhub-popup-poster__snow::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image:
+    radial-gradient(circle, rgba(255, 255, 255, 0.48) 0 1px, transparent 1.5px),
+    radial-gradient(circle, rgba(243, 248, 255, 0.36) 0 1.4px, transparent 2px);
+  background-size: 118px 84px, 172px 126px;
+  background-position: 18px 8px, 64px 38px;
+  opacity: 0.35;
+  animation: studyhub-popup-snow-drift 8s linear infinite;
+}
+
 .studyhub-popup-poster__snow canvas {
   position: absolute;
   inset: 0;
@@ -3398,9 +3411,9 @@ main {
   clip-path: polygon(0 46%, 100% 11%, 100% 57%, 0 92%);
 }
 
-.studyhub-popup-poster__meteors .hero-meteor {
+.studyhub-popup-poster__meteor {
   position: absolute;
-  width: 180px;
+  width: 176px;
   height: 2px;
   border-radius: 999px;
   background: linear-gradient(
@@ -3413,10 +3426,10 @@ main {
   opacity: 0;
   transform: rotate(32deg);
   filter: drop-shadow(0 0 5px rgba(120, 255, 200, 0.32));
-  animation: hero-meteor 12s linear infinite;
+  animation: studyhub-popup-meteor 4.6s linear infinite;
 }
 
-.studyhub-popup-poster__meteors .hero-meteor::after {
+.studyhub-popup-poster__meteor::after {
   content: '';
   position: absolute;
   right: -2px;
@@ -3432,6 +3445,30 @@ main {
     rgba(219, 255, 240, 0) 100%
   );
   box-shadow: 0 0 10px rgba(130, 255, 210, 0.45);
+}
+
+@keyframes studyhub-popup-snow-drift {
+  to {
+    background-position: 18px 92px, 64px 164px;
+  }
+}
+
+@keyframes studyhub-popup-meteor {
+  0% {
+    opacity: 0;
+    transform: translate(0, 0) rotate(32deg);
+  }
+  7% {
+    opacity: 0.95;
+  }
+  28% {
+    opacity: 0;
+    transform: translate(260px, 204px) rotate(32deg);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(260px, 204px) rotate(32deg);
+  }
 }
 
 .studyhub-popup-poster__brand {
@@ -3864,7 +3901,8 @@ main {
   .stable-version-modal__eyebrow::after,
   .stable-version-modal__actions .button.primary.stable-version-modal__cta,
   .studyhub-popup-poster__snow,
-  .studyhub-popup-poster__meteors .hero-meteor {
+  .studyhub-popup-poster__snow::after,
+  .studyhub-popup-poster__meteor {
     animation-duration: 0.001ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.001ms !important;

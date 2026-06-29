@@ -84,9 +84,9 @@ function StudyHubEntryPoster() {
         />
       </div>
       <div className="hero-meteors studyhub-popup-poster__meteors" aria-hidden="true">
-        <span className="hero-meteor" style={{ top: '31%', left: '21%', animationDelay: '0.15s' }} />
-        <span className="hero-meteor" style={{ top: '24%', left: '54%', animationDelay: '1.1s' }} />
-        <span className="hero-meteor" style={{ top: '48%', left: '8%', animationDelay: '2.2s' }} />
+        <span className="studyhub-popup-poster__meteor" style={{ top: '28%', left: '15%', animationDelay: '0s' }} />
+        <span className="studyhub-popup-poster__meteor" style={{ top: '23%', left: '52%', animationDelay: '1.35s' }} />
+        <span className="studyhub-popup-poster__meteor" style={{ top: '45%', left: '4%', animationDelay: '2.7s' }} />
       </div>
       <svg className="studyhub-popup-poster__svg" viewBox="0 0 2048 1152" role="img" aria-labelledby="studyhub-popup-poster-title" xmlns="http://www.w3.org/2000/svg">
         <title id="studyhub-popup-poster-title">StudyHub 学汇入口海报</title>
