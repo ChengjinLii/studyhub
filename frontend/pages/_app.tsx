@@ -64,30 +64,6 @@ function StudyHubEntryPoster() {
 
   return (
     <div className="studyhub-popup-poster" aria-label="StudyHub 入口海报">
-      <span className="studyhub-popup-poster__vignette" aria-hidden="true" />
-      <div className="xmas-snowfall studyhub-popup-poster__snow" aria-hidden="true">
-        <Snowfall
-          snowflakeCount={14}
-          color="rgba(243, 248, 255, 0.55)"
-          radius={[0.6, 2.2]}
-          speed={[0.6, 1.6]}
-          wind={[-0.2, 1.2]}
-          style={snowfallCanvasStyle}
-        />
-        <Snowfall
-          snowflakeCount={7}
-          color="rgba(255, 255, 255, 0.45)"
-          radius={[1.6, 3.4]}
-          speed={[1.2, 2.4]}
-          wind={[-0.4, 1.6]}
-          style={snowfallCanvasStyle}
-        />
-      </div>
-      <div className="hero-meteors studyhub-popup-poster__meteors" aria-hidden="true">
-        <span className="studyhub-popup-poster__meteor" style={{ top: '28%', left: '15%', animationDelay: '0s' }} />
-        <span className="studyhub-popup-poster__meteor" style={{ top: '23%', left: '52%', animationDelay: '1.35s' }} />
-        <span className="studyhub-popup-poster__meteor" style={{ top: '45%', left: '4%', animationDelay: '2.7s' }} />
-      </div>
       <svg className="studyhub-popup-poster__svg" viewBox="0 0 2048 1152" role="img" aria-labelledby="studyhub-popup-poster-title" xmlns="http://www.w3.org/2000/svg">
         <title id="studyhub-popup-poster-title">StudyHub 学汇入口海报</title>
         <rect width="2048" height="1152" fill="#ffffff" />
@@ -126,6 +102,30 @@ function StudyHubEntryPoster() {
         <text className="studyhub-popup-poster__contact" x="1148" y="1112">核心贡献者</text>
         <text className="studyhub-popup-poster__contact" x="1390" y="1112">李承锦、曾逸帆</text>
       </svg>
+      <div className="xmas-snowfall studyhub-popup-poster__snow" aria-hidden="true">
+        <Snowfall
+          snowflakeCount={34}
+          color="rgba(243, 248, 255, 0.78)"
+          radius={[0.8, 2.8]}
+          speed={[0.7, 1.8]}
+          wind={[-0.2, 1.1]}
+          style={snowfallCanvasStyle}
+        />
+        <Snowfall
+          snowflakeCount={16}
+          color="rgba(255, 255, 255, 0.68)"
+          radius={[1.8, 4.2]}
+          speed={[1.2, 2.6]}
+          wind={[-0.4, 1.5]}
+          style={snowfallCanvasStyle}
+        />
+      </div>
+      <div className="hero-meteors studyhub-popup-poster__meteors" aria-hidden="true">
+        <span className="studyhub-popup-poster__meteor" style={{ top: '18%', left: '56%', animationDelay: '-0.9s' }} />
+        <span className="studyhub-popup-poster__meteor" style={{ top: '31%', left: '34%', animationDelay: '0.7s' }} />
+        <span className="studyhub-popup-poster__meteor" style={{ top: '43%', left: '6%', animationDelay: '2.1s' }} />
+      </div>
+      <span className="studyhub-popup-poster__vignette" aria-hidden="true" />
     </div>
   );
 }

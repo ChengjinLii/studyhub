@@ -3367,7 +3367,7 @@ main {
 .studyhub-popup-poster__vignette {
   position: absolute;
   inset: 0;
-  z-index: 4;
+  z-index: 6;
   pointer-events: none;
   background:
     radial-gradient(circle at 73% 31%, rgba(112, 208, 202, 0.16), transparent 19%),
@@ -3379,9 +3379,9 @@ main {
 .studyhub-popup-poster__snow {
   position: absolute;
   inset: 0;
-  z-index: 2;
+  z-index: 4;
   pointer-events: none;
-  opacity: 0.62;
+  opacity: 0.95;
   clip-path: polygon(0 46%, 100% 11%, 100% 57%, 0 92%);
 }
 
@@ -3390,12 +3390,12 @@ main {
   position: absolute;
   inset: 0;
   background-image:
-    radial-gradient(circle, rgba(255, 255, 255, 0.48) 0 1px, transparent 1.5px),
-    radial-gradient(circle, rgba(243, 248, 255, 0.36) 0 1.4px, transparent 2px);
-  background-size: 118px 84px, 172px 126px;
+    radial-gradient(circle, rgba(255, 255, 255, 0.9) 0 1.8px, transparent 2.6px),
+    radial-gradient(circle, rgba(211, 250, 247, 0.62) 0 2.4px, transparent 3.2px);
+  background-size: 70px 52px, 112px 84px;
   background-position: 18px 8px, 64px 38px;
-  opacity: 0.35;
-  animation: studyhub-popup-snow-drift 8s linear infinite;
+  opacity: 0.82;
+  animation: studyhub-popup-snow-drift 6s linear infinite;
 }
 
 .studyhub-popup-poster__snow canvas {
@@ -3406,27 +3406,27 @@ main {
 .studyhub-popup-poster__meteors {
   position: absolute;
   inset: 0;
-  z-index: 3;
+  z-index: 7;
   pointer-events: none;
   clip-path: polygon(0 46%, 100% 11%, 100% 57%, 0 92%);
 }
 
 .studyhub-popup-poster__meteor {
   position: absolute;
-  width: 176px;
-  height: 2px;
+  width: 300px;
+  height: 4px;
   border-radius: 999px;
   background: linear-gradient(
     90deg,
     rgba(255, 255, 255, 0) 0%,
-    rgba(186, 255, 221, 0.25) 45%,
-    rgba(210, 255, 238, 0.85) 85%,
+    rgba(186, 255, 221, 0.36) 42%,
+    rgba(210, 255, 238, 0.98) 84%,
     rgba(255, 255, 255, 1) 100%
   );
   opacity: 0;
   transform: rotate(32deg);
-  filter: drop-shadow(0 0 5px rgba(120, 255, 200, 0.32));
-  animation: studyhub-popup-meteor 4.6s linear infinite;
+  filter: drop-shadow(0 0 12px rgba(120, 255, 200, 0.78));
+  animation: studyhub-popup-meteor 3.8s linear infinite;
 }
 
 .studyhub-popup-poster__meteor::after {
@@ -3444,12 +3444,12 @@ main {
     rgba(219, 255, 240, 0.15) 70%,
     rgba(219, 255, 240, 0) 100%
   );
-  box-shadow: 0 0 10px rgba(130, 255, 210, 0.45);
+  box-shadow: 0 0 16px rgba(130, 255, 210, 0.72);
 }
 
 @keyframes studyhub-popup-snow-drift {
   to {
-    background-position: 18px 92px, 64px 164px;
+    background-position: 18px 74px, 64px 142px;
   }
 }
 
@@ -3458,10 +3458,13 @@ main {
     opacity: 0;
     transform: translate(0, 0) rotate(32deg);
   }
-  7% {
-    opacity: 0.95;
+  5% {
+    opacity: 1;
   }
-  28% {
+  42% {
+    opacity: 0.82;
+  }
+  54% {
     opacity: 0;
     transform: translate(260px, 204px) rotate(32deg);
   }
