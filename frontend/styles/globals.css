@@ -3208,7 +3208,7 @@ main {
   position: relative;
   width: min(480px, 92vw);
   max-height: 90vh;
-  overflow: auto;
+  overflow: hidden;
   background: #ffffff;
   border-radius: 18px;
   padding: 16px;
@@ -3337,7 +3337,7 @@ main {
   position: relative;
   width: 100%;
   flex: 0 0 auto;
-  aspect-ratio: 16 / 9;
+  height: min(46vw, 48dvh, 495px);
   overflow: hidden;
   background: #ffffff;
   border-radius: 30px 30px 10px 10px;
@@ -3425,8 +3425,8 @@ main {
   display: flex;
   flex-direction: column;
   justify-content: center;
-  gap: 10px;
-  padding: 20px 32px 22px;
+  gap: 8px;
+  padding: 16px 30px 18px;
 }
 
 .stable-version-modal__eyebrow {
@@ -3434,11 +3434,11 @@ main {
   align-self: flex-start;
   position: relative;
   overflow: hidden;
-  padding: 8px 17px;
+  padding: 7px 15px;
   border-radius: 999px;
   background: #050505;
   color: #ffffff;
-  font-size: 14px;
+  font-size: 12px;
   font-weight: 900;
   letter-spacing: 0.22em;
   text-transform: uppercase;
@@ -3471,7 +3471,7 @@ main {
 .stable-version-modal__title {
   margin: 0;
   color: #111827;
-  font-size: clamp(26px, 2.7vw, 36px);
+  font-size: clamp(24px, 2.4vw, 32px);
   line-height: 1.14;
   letter-spacing: -0.04em;
 }
@@ -3492,8 +3492,8 @@ main {
   margin: 0;
   max-width: 940px;
   color: #516074;
-  font-size: clamp(15px, 1.4vw, 18px);
-  line-height: 1.58;
+  font-size: clamp(14px, 1.2vw, 16px);
+  line-height: 1.46;
 }
 
 .stable-version-modal__text strong {
@@ -3518,7 +3518,7 @@ main {
   grid-template-columns: 120px 1fr;
   gap: 14px;
   align-items: baseline;
-  padding: 9px 0;
+  padding: 7px 0;
   border-bottom: 1px dashed #d8deea;
   border-radius: 14px;
   transition: background 160ms ease, padding-left 160ms ease;
@@ -3552,17 +3552,17 @@ main {
 .stable-version-modal__actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 14px;
+  gap: 12px;
   align-items: center;
   margin-top: 4px;
 }
 
 .stable-version-modal__cta,
 .stable-version-modal__stay {
-  min-height: 46px;
-  padding: 0 22px;
-  border-radius: 16px;
-  font-size: 16px;
+  min-height: 40px;
+  padding: 0 18px;
+  border-radius: 14px;
+  font-size: 15px;
   font-weight: 900;
 }
 
@@ -3725,13 +3725,14 @@ main {
   }
 
   .stable-version-modal__media {
+    height: min(50vw, 30dvh, 210px);
     border-radius: 24px 24px 8px 8px;
     min-height: 0;
   }
 
   .stable-version-modal__content {
-    padding: 18px 18px 20px;
-    gap: 8px;
+    padding: 12px 16px 14px;
+    gap: 6px;
   }
 
   .stable-version-modal__close {
@@ -3742,18 +3743,18 @@ main {
   }
 
   .stable-version-modal__eyebrow {
-    padding: 7px 13px;
-    font-size: 12px;
+    padding: 6px 11px;
+    font-size: 11px;
     letter-spacing: 0.16em;
   }
 
   .stable-version-modal__text {
-    font-size: 14px;
-    line-height: 1.48;
+    font-size: 13px;
+    line-height: 1.38;
   }
 
   .stable-version-modal__title {
-    font-size: 25px;
+    font-size: 21px;
     line-height: 1.1;
     white-space: nowrap;
   }
@@ -3763,31 +3764,31 @@ main {
   }
 
   .stable-version-modal__meta-row {
-    grid-template-columns: 82px 1fr;
-    gap: 8px;
-    padding: 8px 0;
+    grid-template-columns: 70px 1fr;
+    gap: 6px;
+    padding: 6px 0;
   }
 
   .stable-version-modal__meta-label,
   .stable-version-modal__meta-value,
   .stable-version-modal__meta-link {
-    font-size: 13px;
-    line-height: 1.35;
+    font-size: 12px;
+    line-height: 1.3;
   }
 
   .stable-version-modal__actions {
     display: grid;
     grid-template-columns: 1fr 1fr;
     align-items: stretch;
-    gap: 10px;
+    gap: 8px;
   }
 
   .stable-version-modal__cta,
   .stable-version-modal__stay {
     width: 100%;
-    min-height: 44px;
+    min-height: 40px;
     padding: 0 12px;
-    font-size: 14px;
+    font-size: 13px;
   }
 }
 
