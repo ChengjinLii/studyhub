@@ -53,6 +53,52 @@ interface RuntimeInfo {
 
 type EntryModalVariant = 'stable' | 'welcome' | null;
 
+function StudyHubEntryPoster() {
+  return (
+    <div className="studyhub-popup-poster" aria-label="StudyHub 入口海报">
+      <span className="studyhub-popup-poster__vignette" aria-hidden="true" />
+      <svg className="studyhub-popup-poster__svg" viewBox="0 0 2048 1152" role="img" aria-labelledby="studyhub-popup-poster-title" xmlns="http://www.w3.org/2000/svg">
+        <title id="studyhub-popup-poster-title">StudyHub 学汇入口海报</title>
+        <rect width="2048" height="1152" fill="#ffffff" />
+        <polygon points="0,535 2048,137 2048,660 0,1056" fill="#000000" />
+        <rect x="266" y="136" width="1445" height="144" rx="40" ry="40" fill="#4b494b" />
+        <circle cx="347" cy="208" r="21" fill="#ff6a60" />
+        <circle cx="423" cy="208" r="21" fill="#f5c64f" />
+        <circle cx="498" cy="208" r="21" fill="#62cd68" />
+        <text className="studyhub-popup-poster__url" x="1023" y="232" textAnchor="middle">https://study-hub.cn</text>
+        <text className="studyhub-popup-poster__brand" x="1250" y="122">STUDYHUB ·</text>
+        <text className="studyhub-popup-poster__brand-cn" x="1576" y="122">学汇</text>
+        <g fill="none" stroke="#ffffff" strokeLinecap="round" strokeLinejoin="round">
+          <circle cx="1530" cy="264" r="63" strokeWidth="10" />
+          <path d="M1501 238 C1520 223 1554 223 1578 243" strokeWidth="9" />
+          <path d="M1576 310 L1618 352" strokeWidth="10" />
+        </g>
+        <rect x="509" y="477" width="224" height="7" fill="#78cbc8" />
+        <rect x="750" y="477" width="388" height="7" fill="#252b33" />
+        <circle cx="290" cy="651" r="112" fill="#020612" stroke="#f5f6f8" strokeWidth="9" />
+        <rect x="272" y="613" width="26" height="76" rx="13" fill="#f7f7f8" />
+        <rect x="336" y="613" width="26" height="76" rx="13" fill="#f7f7f8" />
+        <text className="studyhub-popup-poster__title" x="503" y="734">StudyHub</text>
+        <g stroke="#111111" strokeWidth="4" strokeLinecap="round" strokeDasharray="1 9" fill="#ffffff">
+          <rect x="582" y="970" width="224" height="68" rx="3" />
+          <rect x="835" y="970" width="224" height="68" rx="3" />
+          <rect x="1090" y="970" width="224" height="68" rx="3" />
+          <rect x="1345" y="970" width="224" height="68" rx="3" />
+        </g>
+        <text className="studyhub-popup-poster__chip" x="694" y="1016" textAnchor="middle">贡献资料</text>
+        <text className="studyhub-popup-poster__chip" x="947" y="1016" textAnchor="middle">获取所需</text>
+        <text className="studyhub-popup-poster__chip" x="1202" y="1016" textAnchor="middle">经验分享</text>
+        <text className="studyhub-popup-poster__chip" x="1457" y="1016" textAnchor="middle">校园集市</text>
+        <text className="studyhub-popup-poster__contact" x="310" y="1112">联系邮箱</text>
+        <text className="studyhub-popup-poster__contact" x="515" y="1112">chengjinli@std.uestc.edu.cn</text>
+        <text className="studyhub-popup-poster__contact" x="1098" y="1112">|</text>
+        <text className="studyhub-popup-poster__contact" x="1148" y="1112">核心贡献者</text>
+        <text className="studyhub-popup-poster__contact" x="1390" y="1112">李承锦、曾逸帆</text>
+      </svg>
+    </div>
+  );
+}
+
 export default function MyApp({ Component, pageProps }: AppProps) {
   const [wechatModalOpen, setWechatModalOpen] = useState(false);
   const [entryModalVariant, setEntryModalVariant] = useState<EntryModalVariant>(null);
@@ -202,7 +248,9 @@ export default function MyApp({ Component, pageProps }: AppProps) {
         {entryModalVariant && (
           <div className="modal-mask stable-version-mask" onClick={() => setEntryModalVariant(null)}>
             <div
-              className="modal-card stable-version-modal"
+              className={`modal-card stable-version-modal ${
+                isStableEntryModal ? 'stable-version-modal--stable' : 'stable-version-modal--welcome'
+              }`}
               role="dialog"
               aria-modal="true"
               aria-label={isStableEntryModal ? 'StudyHub 稳定版提示' : '欢迎来到 StudyHub'}
@@ -217,12 +265,7 @@ export default function MyApp({ Component, pageProps }: AppProps) {
                 ×
               </button>
               <div className="stable-version-modal__media">
-                <AppImage
-                  src="/local/stable-version-poster.png"
-                  alt="StudyHub 稳定版海报"
-                  loading="lazy"
-                  decoding="async"
-                />
+                <StudyHubEntryPoster />
               </div>
               <div className="stable-version-modal__content">
                 <span className="stable-version-modal__eyebrow">
