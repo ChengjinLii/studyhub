@@ -53,43 +53,6 @@ interface RuntimeInfo {
 
 type EntryModalVariant = 'stable' | 'welcome' | null;
 
-function StudyHubPoster({ stable }: { stable: boolean }) {
-  return (
-    <div className={`studyhub-entry-poster ${stable ? 'studyhub-entry-poster--stable' : ''}`} aria-hidden="true">
-      <div className="studyhub-entry-poster__chrome">
-        <div className="studyhub-entry-poster__brand">STUDYHUB · 学汇</div>
-        <div className="studyhub-entry-poster__address">
-          <span className="studyhub-entry-poster__dot dot-red" />
-          <span className="studyhub-entry-poster__dot dot-yellow" />
-          <span className="studyhub-entry-poster__dot dot-green" />
-          <span className="studyhub-entry-poster__url">https://study-hub.cn</span>
-          <span className="studyhub-entry-poster__search" />
-        </div>
-      </div>
-      <div className="studyhub-entry-poster__stage">
-        <span className="studyhub-entry-poster__scan scan-a" />
-        <span className="studyhub-entry-poster__scan scan-b" />
-        <span className="studyhub-entry-poster__orb" />
-        <div className="studyhub-entry-poster__mark">
-          <span />
-          <span />
-        </div>
-        <div className="studyhub-entry-poster__title">{stable ? 'Stable' : 'StudyHub'}</div>
-      </div>
-      <div className="studyhub-entry-poster__chips">
-        <span>贡献资料</span>
-        <span>获取所需</span>
-        <span>经验分享</span>
-        <span>校园集市</span>
-      </div>
-      <div className="studyhub-entry-poster__terminal">
-        <span>status: connected</span>
-        <span>{stable ? 'stable gateway ready' : 'open-source campus hub'}</span>
-      </div>
-    </div>
-  );
-}
-
 export default function MyApp({ Component, pageProps }: AppProps) {
   const [wechatModalOpen, setWechatModalOpen] = useState(false);
   const [entryModalVariant, setEntryModalVariant] = useState<EntryModalVariant>(null);
@@ -254,7 +217,12 @@ export default function MyApp({ Component, pageProps }: AppProps) {
                 ×
               </button>
               <div className="stable-version-modal__media">
-                <StudyHubPoster stable={isStableEntryModal} />
+                <AppImage
+                  src="/local/stable-version-poster.png"
+                  alt="StudyHub 稳定版海报"
+                  loading="lazy"
+                  decoding="async"
+                />
               </div>
               <div className="stable-version-modal__content">
                 <span className="stable-version-modal__eyebrow">
