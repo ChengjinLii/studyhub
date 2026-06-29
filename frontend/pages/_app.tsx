@@ -57,6 +57,10 @@ function StudyHubEntryPoster() {
   return (
     <div className="studyhub-popup-poster" aria-label="StudyHub 入口海报">
       <span className="studyhub-popup-poster__vignette" aria-hidden="true" />
+      <span className="studyhub-popup-poster__snow" aria-hidden="true" />
+      <span className="studyhub-popup-poster__meteor meteor-a" aria-hidden="true" />
+      <span className="studyhub-popup-poster__meteor meteor-b" aria-hidden="true" />
+      <span className="studyhub-popup-poster__meteor meteor-c" aria-hidden="true" />
       <svg className="studyhub-popup-poster__svg" viewBox="0 0 2048 1152" role="img" aria-labelledby="studyhub-popup-poster-title" xmlns="http://www.w3.org/2000/svg">
         <title id="studyhub-popup-poster-title">StudyHub 学汇入口海报</title>
         <rect width="2048" height="1152" fill="#ffffff" />
@@ -271,11 +275,9 @@ export default function MyApp({ Component, pageProps }: AppProps) {
                 <span className="stable-version-modal__eyebrow">
                   {isStableEntryModal ? 'Stable Version 提示' : 'Welcome to StudyHub'}
                 </span>
-                <h2 className="stable-version-modal__title">
-                  {isStableEntryModal ? '建议使用正式稳定入口' : '欢迎来到 StudyHub · 学汇'}
-                </h2>
                 {isStableEntryModal ? (
                   <>
+                    <h2 className="stable-version-modal__title">建议使用正式稳定入口</h2>
                     <p className="stable-version-modal__text">
                       你当前访问的是 StudyHub 的更新预览站 <strong>https://study-hub.store</strong>。新功能和界面调整通常会先在这里上线，因此在版本更新期间，个别页面或交互可能出现短暂波动。
                     </p>
@@ -289,12 +291,6 @@ export default function MyApp({ Component, pageProps }: AppProps) {
                   </>
                 ) : (
                   <>
-                    <p className="stable-version-modal__text">
-                      欢迎访问 StudyHub。这里是一个面向高校场景的知识共享与校园互助平台，你可以在这里投稿资料、获取所需、经验分享，也可以浏览校园集市与社区内容。
-                    </p>
-                    <p className="stable-version-modal__text">
-                      如果你希望了解项目实现、部署方式或参与后续协作，也可以直接查看开源仓库。下面附上官方 QQ 群与仓库入口，方便你继续交流或跟进更新。
-                    </p>
                     <div className="stable-version-modal__meta">
                       <div className="stable-version-modal__meta-row">
                         <span className="stable-version-modal__meta-label">官方QQ群：</span>
