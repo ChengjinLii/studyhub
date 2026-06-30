@@ -55,18 +55,34 @@ type EntryModalVariant = 'stable' | 'welcome' | null;
 
 function StudyHubEntryPoster() {
   return (
-    <div className="studyhub-popup-poster" aria-label="StudyHub 入口海报">
-      <svg className="studyhub-popup-poster__svg" viewBox="0 0 2048 1152" role="img" aria-labelledby="studyhub-popup-poster-title" xmlns="http://www.w3.org/2000/svg">
-        <title id="studyhub-popup-poster-title">StudyHub 学汇入口海报</title>
+    <div className="studyhub-popup-poster" role="img" aria-label="StudyHub 学汇入口海报">
+      <svg className="studyhub-popup-poster__svg" viewBox="0 0 2048 1152" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <clipPath id="studyhub-popup-poster-band">
+            <polygon points="0,535 2048,137 2048,660 0,1056" />
+          </clipPath>
+          <linearGradient id="studyhub-popup-meteor-gradient" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" stopColor="rgba(255, 255, 255, 0)" />
+            <stop offset="42%" stopColor="rgba(186, 255, 221, 0.36)" />
+            <stop offset="84%" stopColor="rgba(210, 255, 238, 0.98)" />
+            <stop offset="100%" stopColor="#ffffff" />
+          </linearGradient>
+        </defs>
         <rect width="2048" height="1152" fill="#ffffff" />
         <polygon points="0,535 2048,137 2048,660 0,1056" fill="#000000" />
         <rect x="266" y="136" width="1445" height="144" rx="40" ry="40" fill="#4b494b" />
         <circle cx="347" cy="208" r="21" fill="#ff6a60" />
         <circle cx="423" cy="208" r="21" fill="#f5c64f" />
         <circle cx="498" cy="208" r="21" fill="#62cd68" />
-        <text className="studyhub-popup-poster__url" x="1023" y="232" textAnchor="middle">https://study-hub.cn</text>
-        <text className="studyhub-popup-poster__brand" x="1250" y="122">STUDYHUB ·</text>
-        <text className="studyhub-popup-poster__brand-cn" x="1576" y="122">学汇</text>
+        <g className="studyhub-popup-poster__hotspot">
+          <rect className="studyhub-popup-poster__hotspot-bg" x="590" y="150" width="865" height="104" rx="28" />
+          <text className="studyhub-popup-poster__url" x="1023" y="232" textAnchor="middle">https://study-hub.cn</text>
+        </g>
+        <g className="studyhub-popup-poster__hotspot">
+          <rect className="studyhub-popup-poster__hotspot-bg" x="1228" y="72" width="404" height="68" rx="20" />
+          <text className="studyhub-popup-poster__brand" x="1250" y="122">STUDYHUB ·</text>
+          <text className="studyhub-popup-poster__brand-cn" x="1576" y="122">学汇</text>
+        </g>
         <g fill="none" stroke="#ffffff" strokeLinecap="round" strokeLinejoin="round">
           <circle cx="1530" cy="264" r="63" strokeWidth="10" />
           <path d="M1501 238 C1520 223 1554 223 1578 243" strokeWidth="9" />
@@ -77,28 +93,68 @@ function StudyHubEntryPoster() {
         <circle cx="290" cy="651" r="112" fill="#020612" stroke="#f5f6f8" strokeWidth="9" />
         <rect x="272" y="613" width="26" height="76" rx="13" fill="#f7f7f8" />
         <rect x="336" y="613" width="26" height="76" rx="13" fill="#f7f7f8" />
-        <text className="studyhub-popup-poster__title" x="503" y="734">StudyHub</text>
-        <g stroke="#111111" strokeWidth="4" strokeLinecap="round" strokeDasharray="1 9" fill="#ffffff">
-          <rect x="582" y="970" width="224" height="68" rx="3" />
-          <rect x="835" y="970" width="224" height="68" rx="3" />
-          <rect x="1090" y="970" width="224" height="68" rx="3" />
-          <rect x="1345" y="970" width="224" height="68" rx="3" />
+        <g className="studyhub-popup-poster__hotspot">
+          <rect className="studyhub-popup-poster__hotspot-bg" x="486" y="520" width="892" height="230" rx="34" />
+          <text className="studyhub-popup-poster__title" x="503" y="734">StudyHub</text>
         </g>
-        <text className="studyhub-popup-poster__chip" x="694" y="1016" textAnchor="middle">贡献资料</text>
-        <text className="studyhub-popup-poster__chip" x="947" y="1016" textAnchor="middle">获取所需</text>
-        <text className="studyhub-popup-poster__chip" x="1202" y="1016" textAnchor="middle">经验分享</text>
-        <text className="studyhub-popup-poster__chip" x="1457" y="1016" textAnchor="middle">校园集市</text>
-        <text className="studyhub-popup-poster__contact" x="310" y="1112">联系邮箱</text>
-        <text className="studyhub-popup-poster__contact" x="515" y="1112">chengjinli@std.uestc.edu.cn</text>
+        {[
+          { x: 582, label: '贡献资料', textX: 694 },
+          { x: 835, label: '获取所需', textX: 947 },
+          { x: 1090, label: '经验分享', textX: 1202 },
+          { x: 1345, label: '校园集市', textX: 1457 },
+        ].map((item) => (
+          <g key={item.label} className="studyhub-popup-poster__hotspot studyhub-popup-poster__chip-hotspot">
+            <rect className="studyhub-popup-poster__chip-box" x={item.x} y="970" width="224" height="68" rx="3" />
+            <text className="studyhub-popup-poster__chip" x={item.textX} y="1016" textAnchor="middle">{item.label}</text>
+          </g>
+        ))}
+        <g className="studyhub-popup-poster__hotspot">
+          <rect className="studyhub-popup-poster__hotspot-bg" x="290" y="1065" width="190" height="62" rx="16" />
+          <text className="studyhub-popup-poster__contact" x="310" y="1112">联系邮箱</text>
+        </g>
+        <g className="studyhub-popup-poster__hotspot">
+          <rect className="studyhub-popup-poster__hotspot-bg" x="500" y="1065" width="560" height="62" rx="16" />
+          <text className="studyhub-popup-poster__contact" x="515" y="1112">chengjinli@std.uestc.edu.cn</text>
+        </g>
         <text className="studyhub-popup-poster__contact" x="1098" y="1112">|</text>
-        <text className="studyhub-popup-poster__contact" x="1148" y="1112">核心贡献者</text>
-        <text className="studyhub-popup-poster__contact" x="1390" y="1112">李承锦、曾逸帆</text>
+        <g className="studyhub-popup-poster__hotspot">
+          <rect className="studyhub-popup-poster__hotspot-bg" x="1130" y="1065" width="230" height="62" rx="16" />
+          <text className="studyhub-popup-poster__contact" x="1148" y="1112">核心贡献者</text>
+        </g>
+        <g className="studyhub-popup-poster__hotspot">
+          <rect className="studyhub-popup-poster__hotspot-bg" x="1372" y="1065" width="340" height="62" rx="16" />
+          <text className="studyhub-popup-poster__contact" x="1390" y="1112">李承锦、曾逸帆</text>
+        </g>
+        <g className="studyhub-popup-poster__svg-meteors" clipPath="url(#studyhub-popup-poster-band)">
+          {[
+            { x: 1160, y: 250, begin: '-0.9s' },
+            { x: 745, y: 410, begin: '0.7s' },
+            { x: 170, y: 565, begin: '2.1s' },
+          ].map((item) => (
+            <g key={`${item.x}-${item.y}`} className="studyhub-popup-poster__svg-meteor">
+              <animate
+                attributeName="opacity"
+                values="0;1;0.82;0;0"
+                keyTimes="0;0.05;0.42;0.54;1"
+                dur="3.8s"
+                begin={item.begin}
+                repeatCount="indefinite"
+              />
+              <animateTransform
+                attributeName="transform"
+                type="translate"
+                values={`${item.x} ${item.y};${item.x} ${item.y};${item.x + 260} ${item.y + 204};${item.x + 260} ${item.y + 204};${item.x + 260} ${item.y + 204}`}
+                keyTimes="0;0.05;0.42;0.54;1"
+                dur="3.8s"
+                begin={item.begin}
+                repeatCount="indefinite"
+              />
+              <line className="studyhub-popup-poster__svg-meteor-tail" x1="0" y1="0" x2="300" y2="188" />
+              <circle className="studyhub-popup-poster__svg-meteor-head" cx="300" cy="188" r="8" />
+            </g>
+          ))}
+        </g>
       </svg>
-      <div className="hero-meteors studyhub-popup-poster__meteors" aria-hidden="true">
-        <span className="studyhub-popup-poster__meteor" style={{ top: '18%', left: '56%', animationDelay: '-0.9s' }} />
-        <span className="studyhub-popup-poster__meteor" style={{ top: '31%', left: '34%', animationDelay: '0.7s' }} />
-        <span className="studyhub-popup-poster__meteor" style={{ top: '43%', left: '6%', animationDelay: '2.1s' }} />
-      </div>
       <span className="studyhub-popup-poster__vignette" aria-hidden="true" />
     </div>
   );

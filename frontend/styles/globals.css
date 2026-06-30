@@ -3269,6 +3269,7 @@ main {
 }
 
 .stable-version-mask {
+  overflow: hidden;
   backdrop-filter: blur(18px) saturate(1.1);
   background:
     radial-gradient(circle at 18% 18%, rgba(112, 208, 202, 0.18), transparent 32%),
@@ -3284,7 +3285,8 @@ main {
   display: flex;
   flex-shrink: 0;
   flex-direction: column;
-  overflow: auto;
+  overflow-x: hidden;
+  overflow-y: auto;
   border: 1px solid rgba(255, 255, 255, 0.78);
   border-radius: 30px;
   background:
@@ -3298,8 +3300,8 @@ main {
 .stable-version-modal::after {
   content: '';
   position: absolute;
-  left: -20%;
-  right: -20%;
+  left: 0;
+  right: 0;
   top: 0;
   z-index: 2;
   height: 220px;
@@ -3356,6 +3358,7 @@ main {
 
 .studyhub-popup-poster {
   position: relative;
+  overflow: hidden;
   background: #ffffff;
 }
 
@@ -3376,69 +3379,24 @@ main {
   mix-blend-mode: screen;
 }
 
-.studyhub-popup-poster__meteors {
-  position: absolute;
-  inset: 0;
-  z-index: 7;
+.studyhub-popup-poster__svg-meteors {
   pointer-events: none;
-  clip-path: polygon(0 46%, 100% 11%, 100% 57%, 0 92%);
 }
 
-.studyhub-popup-poster__meteor {
-  position: absolute;
-  width: 300px;
-  height: 4px;
-  border-radius: 999px;
-  background: linear-gradient(
-    90deg,
-    rgba(255, 255, 255, 0) 0%,
-    rgba(186, 255, 221, 0.36) 42%,
-    rgba(210, 255, 238, 0.98) 84%,
-    rgba(255, 255, 255, 1) 100%
-  );
+.studyhub-popup-poster__svg-meteor {
   opacity: 0;
-  transform: rotate(32deg);
   filter: drop-shadow(0 0 12px rgba(120, 255, 200, 0.78));
-  animation: studyhub-popup-meteor 3.8s linear infinite;
 }
 
-.studyhub-popup-poster__meteor::after {
-  content: '';
-  position: absolute;
-  right: -2px;
-  top: -3px;
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: radial-gradient(
-    circle,
-    rgba(255, 255, 255, 1) 0%,
-    rgba(219, 255, 240, 0.9) 45%,
-    rgba(219, 255, 240, 0.15) 70%,
-    rgba(219, 255, 240, 0) 100%
-  );
-  box-shadow: 0 0 16px rgba(130, 255, 210, 0.72);
+.studyhub-popup-poster__svg-meteor-tail {
+  stroke: url('#studyhub-popup-meteor-gradient');
+  stroke-width: 8;
+  stroke-linecap: round;
 }
 
-@keyframes studyhub-popup-meteor {
-  0% {
-    opacity: 0;
-    transform: translate(0, 0) rotate(32deg);
-  }
-  5% {
-    opacity: 1;
-  }
-  42% {
-    opacity: 0.82;
-  }
-  54% {
-    opacity: 0;
-    transform: translate(260px, 204px) rotate(32deg);
-  }
-  100% {
-    opacity: 0;
-    transform: translate(260px, 204px) rotate(32deg);
-  }
+.studyhub-popup-poster__svg-meteor-head {
+  fill: #ffffff;
+  filter: drop-shadow(0 0 16px rgba(130, 255, 210, 0.72));
 }
 
 .studyhub-popup-poster__brand {
@@ -3480,12 +3438,60 @@ main {
   fill: #060606;
 }
 
+.studyhub-popup-poster__chip-box {
+  fill: #ffffff;
+  stroke: #111111;
+  stroke-width: 4;
+  stroke-linecap: round;
+  stroke-dasharray: 1 9;
+  transition: fill 160ms ease, stroke 160ms ease, filter 160ms ease;
+}
+
 .studyhub-popup-poster__contact {
   font-family: 'Noto Serif CJK SC', 'Songti SC', SimSun, serif;
   font-size: 39px;
   font-weight: 700;
   letter-spacing: 2px;
   fill: #080808;
+}
+
+.studyhub-popup-poster__brand,
+.studyhub-popup-poster__brand-cn,
+.studyhub-popup-poster__url,
+.studyhub-popup-poster__title,
+.studyhub-popup-poster__chip,
+.studyhub-popup-poster__contact {
+  cursor: default;
+  pointer-events: none;
+  transition: fill 160ms ease, filter 160ms ease, opacity 160ms ease;
+}
+
+.studyhub-popup-poster__hotspot {
+  cursor: default;
+  pointer-events: all;
+}
+
+.studyhub-popup-poster__hotspot-bg {
+  fill: #63d5cf;
+  opacity: 0;
+  transition: opacity 160ms ease, filter 160ms ease;
+}
+
+g.studyhub-popup-poster__hotspot:hover > .studyhub-popup-poster__hotspot-bg {
+  opacity: 0.16 !important;
+  filter: drop-shadow(0 0 8px rgba(99, 213, 207, 0.35)) !important;
+}
+
+g.studyhub-popup-poster__chip-hotspot:hover > .studyhub-popup-poster__chip-box {
+  fill: rgba(232, 255, 253, 0.96) !important;
+  stroke: #63d5cf !important;
+  filter: drop-shadow(0 0 5px rgba(99, 213, 207, 0.48)) !important;
+}
+
+g.studyhub-popup-poster__hotspot:hover > text {
+  fill: #63d5cf !important;
+  filter: drop-shadow(0 0 6px rgba(99, 213, 207, 0.65)) !important;
+  opacity: 0.98 !important;
 }
 
 .stable-version-modal__content {
@@ -3870,10 +3876,14 @@ main {
   .stable-version-modal::after,
   .stable-version-modal__eyebrow::after,
   .stable-version-modal__actions .button.primary.stable-version-modal__cta,
-  .studyhub-popup-poster__meteor {
+  .studyhub-popup-poster__svg-meteors {
     animation-duration: 0.001ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.001ms !important;
+  }
+
+  .studyhub-popup-poster__svg-meteors {
+    display: none;
   }
 }
 
