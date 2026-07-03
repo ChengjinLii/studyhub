@@ -130,6 +130,60 @@ def test_chat_completions_provider_keeps_legacy_endpoint(monkeypatch) -> None:
     assert isinstance(body, dict)
     assert body["model"] == "demo-model"
     assert isinstance(body["messages"], list)
+    assert body["thinking"] == {"type": "disabled"}
+    assert body["chat_template_kwargs"] == {"enable_thinking": False}
+
+
+def test_chat_completions_provider_can_enable_thinking(monkeypatch) -> None:
+    captured: dict[str, object] = {}
+
+    class FakeChatResponse:
+        text = ""
+
+        def raise_for_status(self) -> None:
+            return None
+
+        def json(self) -> dict[str, object]:
+            return {"choices": [{"message": {"content": '{"ok":true}', "reasoning_content": "hidden"}}]}
+
+    class FakeClient:
+        def __init__(self, *args: object, **kwargs: object) -> None:
+            return None
+
+        def __enter__(self) -> "FakeClient":
+            return self
+
+        def __exit__(self, *args: object) -> None:
+            return None
+
+        def post(self, url: str, *, headers: dict[str, str], json: dict[str, object]) -> FakeChatResponse:
+            captured["url"] = url
+            captured["headers"] = headers
+            captured["json"] = json
+            return FakeChatResponse()
+
+    monkeypatch.setattr("app.services.ai_service.httpx.Client", FakeClient)
+
+    settings = Settings(
+        ai_agent_provider="custom",
+        ai_agent_base_url="https://api.deepseek.com",
+        ai_agent_api_key="test-key",
+        ai_agent_model="deepseek-v4-pro",
+        ai_agent_thinking_enabled=True,
+        ai_agent_reasoning_effort="max",
+    )
+
+    content = _service()._call_agent_model(settings, "system prompt", {"user_query": "ESD 考题风格"})
+
+    assert content == '{"ok":true}'
+    assert captured["url"] == "https://api.deepseek.com/chat/completions"
+    body = captured["json"]
+    assert isinstance(body, dict)
+    assert body["model"] == "deepseek-v4-pro"
+    assert body["thinking"] == {"type": "enabled"}
+    assert body["reasoning_effort"] == "max"
+    assert "temperature" not in body
+    assert "chat_template_kwargs" not in body
 
 
 def test_chat_completions_provider_sends_image_as_multimodal_content(monkeypatch) -> None:

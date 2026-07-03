@@ -671,24 +671,39 @@ class AiService:
             user_content.extend({"type": "image_url", "image_url": {"url": image_url}} for image_url in image_urls)
         else:
             user_content = user_text
+        request_body: dict[str, Any] = {
+            "model": settings.ai_agent_model,
+            "max_tokens": 900,
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_content},
+            ],
+        }
+        if bool(getattr(settings, "ai_agent_thinking_enabled", False)):
+            request_body["thinking"] = {"type": "enabled"}
+            request_body["reasoning_effort"] = self._normalized_reasoning_effort(
+                getattr(settings, "ai_agent_reasoning_effort", "high")
+            )
+        else:
+            request_body.update(
+                {
+                    "temperature": 0.2,
+                    "chat_template_kwargs": {"enable_thinking": False},
+                    "thinking": {"type": "disabled"},
+                }
+            )
         with httpx.Client(timeout=max(10.0, settings.ai_agent_timeout_seconds), trust_env=False) as client:
             response = client.post(
                 f"{settings.ai_agent_base_url.rstrip('/')}/chat/completions",
                 headers=self._agent_headers(settings.ai_agent_api_key),
-                json={
-                    "model": settings.ai_agent_model,
-                    "temperature": 0.2,
-                    "max_tokens": 900,
-                    "chat_template_kwargs": {"enable_thinking": False},
-                    "thinking": {"type": "disabled"},
-                    "messages": [
-                        {"role": "system", "content": system_prompt},
-                        {"role": "user", "content": user_content},
-                    ],
-                },
+                json=request_body,
             )
             response.raise_for_status()
             return self._extract_chat_content(response.json())
+
+    def _normalized_reasoning_effort(self, value: Any) -> str:
+        normalized = str(value or "high").strip().lower()
+        return normalized if normalized in {"high", "max"} else "high"
 
     def _call_sub2api_responses_api(self, settings: Any, system_prompt: str, user_prompt: dict[str, Any]) -> str:
         prompt_payload, image_urls = _split_prompt_image_payload(user_prompt)
