@@ -367,6 +367,7 @@ class AgentSafetyService:
         has_candidate_materials = bool(candidate_materials)
         for item in value:
             question = _clean_public_text(item, max_chars=80)
+            question = _normalize_followup_voice(question)
             if not question:
                 continue
             lowered = question.lower()
@@ -416,6 +417,35 @@ def _clean_public_title(value: Any, *, max_chars: int) -> str:
     if any(marker in lowered for marker in FORBIDDEN_INTERNAL_MARKERS):
         return "资料"
     return text
+
+
+def _normalize_followup_voice(value: str) -> str:
+    text = re.sub(r"\s+", " ", str(value or "")).strip(" ?？。")
+    if not text:
+        return ""
+    replacements = (
+        ("你可以把具体题目截图发我吗", "我把具体题目截图发你"),
+        ("要不要我按", "按"),
+        ("要不要我继续", "继续"),
+        ("要不要我基于", "基于"),
+        ("要不要我把", "把"),
+        ("要不要我", ""),
+        ("要不要按", "按"),
+        ("要不要把", "把"),
+        ("要不要", ""),
+        ("是否需要我把", "把"),
+        ("是否需要我", ""),
+        ("是否需要", ""),
+        ("你的考试日期和每天可复习时间是多少", "我的考试日期和每天可复习时间是"),
+        ("你的考试日期和每天可复习时间是", "我的考试日期和每天可复习时间是"),
+        ("你更想要", "我更想要"),
+        ("你的专业和年级", "我的专业和年级"),
+    )
+    for old, new in replacements:
+        if text.startswith(old):
+            text = f"{new}{text[len(old):]}".strip()
+            break
+    return re.sub(r"\s+", " ", text).strip(" ?？。")[:80]
 
 
 def _clean_prompt_text(value: str, *, field_name: str | None) -> str:

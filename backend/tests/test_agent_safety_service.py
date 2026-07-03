@@ -83,7 +83,7 @@ def test_agent_safety_filters_unknown_recommendations_and_unread_pages() -> None
                 "source_type": "past_exam",
             }
         ],
-        "followup_questions": ["要不要按题型整理？"],
+        "followup_questions": ["按题型整理"],
     }
 
 
@@ -104,7 +104,7 @@ def test_agent_safety_filters_memory_coverage_resource_budget_fields() -> None:
 
     assert sanitized == {
         "recommendations": [{"material_id": 101}],
-        "followup_questions": ["要不要按题型整理？"],
+        "followup_questions": ["按题型整理"],
     }
     assert "resource_budget" not in json.dumps(sanitized, ensure_ascii=False)
     assert "coverage" not in json.dumps(sanitized, ensure_ascii=False)
@@ -263,7 +263,7 @@ def test_agent_safety_filters_material_upload_followups_when_candidates_exist() 
     )
 
     assert sanitized is not None
-    assert sanitized["followup_questions"] == ["要不要我按年份整理题型？"]
+    assert sanitized["followup_questions"] == ["按年份整理题型"]
 
 
 def test_agent_safety_keeps_problem_screenshot_followup_with_candidates() -> None:
@@ -278,7 +278,7 @@ def test_agent_safety_keeps_problem_screenshot_followup_with_candidates() -> Non
     )
 
     assert sanitized is not None
-    assert sanitized["followup_questions"] == ["你可以把具体题目截图发我吗？"]
+    assert sanitized["followup_questions"] == ["我把具体题目截图发你"]
 
 
 def test_agent_safety_filters_obvious_non_learning_followups() -> None:
@@ -297,7 +297,7 @@ def test_agent_safety_filters_obvious_non_learning_followups() -> None:
     )
 
     assert sanitized is not None
-    assert sanitized["followup_questions"] == ["要不要按年份整理题型？"]
+    assert sanitized["followup_questions"] == ["按年份整理题型"]
 
 
 def test_agent_safety_does_not_repeat_low_evidence_caveat() -> None:
@@ -486,7 +486,7 @@ def test_agent_safety_preserves_and_redacts_local_public_response_fields() -> No
     assert "summary" in sanitized["recommendations"][0]
     assert sanitized["evidence_sources"][0]["title"] == "通信原理 [redacted-email] [redacted-phone]"
     assert sanitized["evidence_sources"][0]["excerpt"] == "联系 [redacted-phone] 看解析。"
-    assert sanitized["followup_questions"] == ["要不要继续发给 [redacted-email]？"]
+    assert sanitized["followup_questions"] == ["继续发给 [redacted-email]"]
 
 
 def test_agent_safety_rejects_internal_context_leaks_and_invalid_only_recommendations() -> None:
@@ -538,8 +538,8 @@ def test_ai_recommendation_falls_back_when_model_output_is_unsafe(monkeypatch) -
     assert body["answer"].startswith("我先基于 StudyHub 资料库找到")
     assert body["recommendations"][0]["material_id"] == 101
     assert body["followup_questions"] == [
-        "你更想要真题、笔记还是经验分享？",
-        "是否需要限定学校、学院或专业？",
+        "我更想要真题、笔记还是经验分享",
+        "限定学校、学院或专业",
     ]
 
 
@@ -707,8 +707,8 @@ def test_ai_recommendation_uses_local_followups_when_model_asks_for_existing_mat
     body = json.loads(str(response["output"]).removeprefix("<json>").removesuffix("</json>"))
 
     assert body["followup_questions"] == [
-        "要不要我按年份整理常考题型？",
-        "是否需要把这些资料整理成两周复习顺序？",
+        "按年份整理常考题型",
+        "把这些资料整理成两周复习顺序",
     ]
 
 

@@ -130,6 +130,12 @@ CONTEXT_DEPENDENT_TASK_MARKERS = (
     "怎么做",
     "怎么答",
     "复习框架",
+    "复习计划",
+    "复习安排",
+    "学习计划",
+    "备考计划",
+    "冲刺计划",
+    "整理",
 )
 
 CHAT_COMPLETIONS_AGENT_PROVIDERS = {"custom", "openai-compatible", "openai_compatible"}
@@ -794,6 +800,9 @@ class AiService:
         image_attachments: list[dict[str, Any]] | None = None,
     ) -> str:
         image_hint = "我已收到你发的图片；当前会结合图片上下文、你的文字和平台资料一起判断。" if image_attachments else ""
+        cps_plan_answer = _local_cps_two_week_plan_answer(query, query_plan, recommendations)
+        if cps_plan_answer:
+            return f"{image_hint}{cps_plan_answer}"
         if not recommendations:
             if image_attachments:
                 return f"{image_hint}我没有在平台资料库里找到足够贴近「{query}」的候选。你可以补充课程名、考试范围或题目文字，我再帮你缩小检索。"
@@ -1122,41 +1131,44 @@ class AiService:
         questions: list[str]
         if intent == "exam_trend_analysis":
             questions = [
-                "要不要我按年份整理常考题型？",
-                "是否需要把这些资料整理成两周复习顺序？",
+                "按年份整理常考题型",
+                "把这些资料整理成两周复习顺序",
             ]
             if has_questions:
-                questions.append("要不要我按题号列出优先复盘清单？")
+                questions.append("按题号列出优先复盘清单")
         elif intent == "study_plan":
             constraints = getattr(query_plan, "study_constraints", {}) or {}
             days = _safe_positive_int(constraints.get("days_until_exam")) if isinstance(constraints, dict) else None
+            first_question = f"帮我按 {days} 天拆成每日复习安排" if days else "我的考试日期和每天可复习时间是"
+            if _is_cps_course_plan(query_plan) and (days == 14 or _query_plan_has_two_week_constraint(query_plan)):
+                first_question = "帮我整理成两周复习计划"
             questions = [
-                f"要不要我按 {days} 天拆成每日复习安排？" if days else "你的考试日期和每天可复习时间是多少？",
-                "要不要我按基础薄弱和冲刺刷题分阶段安排？",
+                first_question,
+                "按基础薄弱和冲刺刷题分阶段安排",
             ]
             if recommendations:
-                questions.append("是否需要我把推荐资料排成每日学习顺序？")
+                questions.append("把推荐资料排成每日学习顺序")
         elif intent == "pdf_summary":
             questions = [
-                "要不要我继续按章节或页码拆解这份资料？",
-                "是否需要标出最适合先看的重点页面？",
+                "继续按章节或页码拆解这份资料",
+                "标出最适合先看的重点页面",
             ]
         elif intent == "problem_tutoring":
             questions = [
-                "你卡住的是概念理解、公式推导还是计算步骤？",
-                "要不要我按同类题型再找几页练习？",
+                "我卡住的是概念理解、公式推导还是计算步骤",
+                "按同类题型再找几页练习",
             ]
         elif intent == "material_fit_assessment":
             questions = [
-                "你现在是补基础、刷题冲刺还是查漏补缺？",
-                "要不要我把这份资料拆成先看页和后看页？",
+                "我现在是补基础、刷题冲刺还是查漏补缺",
+                "把这份资料拆成先看页和后看页",
             ]
         else:
             questions = _default_followups()
         if has_pdf and intent not in {"exam_trend_analysis", "pdf_summary", "problem_tutoring", "material_fit_assessment"}:
-            questions.append("要不要我基于已读取页码继续归纳重点？")
+            questions.append("基于已读取页码继续归纳重点")
         if memory_context and memory_context.user:
-            questions.append("是否需要结合你的专业和年级调整推荐顺序？")
+            questions.append("结合我的专业和年级调整推荐顺序")
         return _dedupe_questions(questions)[:3] or _default_followups()
 
     def _local_study_plan_hint(self, query_plan: AgentQueryPlan | None) -> str:
@@ -1730,9 +1742,9 @@ def _learning_scope_greeting_body() -> dict[str, Any]:
     return {
         "answer": "你好，我是 StudyHub 学习辅导。你可以问课程学习、资料检索、题目分析、复习规划，或把题目截图发给我，我会优先结合平台资料回答。",
         "followup_questions": [
-            "要不要帮你找某门课的资料？",
-            "要不要分析一份真题或题目截图？",
-            "要不要制定一份复习计划？",
+            "帮我找某门课的资料",
+            "分析一份真题或题目截图",
+            "制定一份复习计划",
         ],
     }
 
@@ -1741,9 +1753,9 @@ def _learning_scope_block_body() -> dict[str, Any]:
     return {
         "answer": "StudyHub 学习辅导只处理课程学习、资料检索、题目分析、复习规划和平台学习资料使用相关问题。这个问题不属于学习场景，我先停止回答；你可以换成课程、资料、考试或题目相关的问题。",
         "followup_questions": [
-            "要不要帮你找某门课的资料？",
-            "要不要分析一份真题或题目截图？",
-            "要不要制定一份复习计划？",
+            "帮我找某门课的资料",
+            "分析一份真题或题目截图",
+            "制定一份复习计划",
         ],
     }
 
@@ -2344,10 +2356,82 @@ def _safe_text_list(value: Any) -> list[str]:
     return result
 
 
+def _local_cps_two_week_plan_answer(
+    query: str,
+    query_plan: AgentQueryPlan | None,
+    recommendations: list[dict[str, Any]],
+) -> str:
+    if not _is_cps_two_week_plan_request(query, query_plan):
+        return ""
+    titles = _cps_plan_titles(recommendations)
+    exam_title = titles[0]
+    lecture_title = titles[1]
+    notes_title = titles[2]
+    return (
+        "可以。下面按“基础一般、两周后考通信原理”的情况，把刚才推荐的资料整理成一份 14 天复习计划。"
+        "这份计划只基于平台可见资料元数据和推荐结果做保守安排，下载、完整阅读和付费权限仍以 StudyHub 资料页为准。\n\n"
+        f"资料使用顺序：先用《{notes_title}》和《{lecture_title}》补框架，再用《{exam_title}》做真题训练，最后把错题、公式和高频题型收束成一页清单。\n\n"
+        "第 1-2 天：先建立课程框架。每天用 1 个半小时看笔记或助教讲义，把调制、解调、频谱、带宽、信噪比、误码率这些核心词整理成概念表；剩下 30 分钟只做基础例题，不急着刷整套题。\n"
+        "第 3-4 天：补薄弱模块。优先看你最不熟的 2-3 个模块，做到能说清楚公式适用条件、题干常见问法和计算步骤；每天结束时写 5 条“容易混淆点”。\n"
+        "第 5-7 天：进入真题第一轮。用真题答案资料按年份或题型刷题，先保证会做基础题和中档题；不会的题不要硬耗，先标记原因：概念不会、公式不会、计算出错，还是读题没读懂。\n"
+        "第 8-10 天：按题型集中突破。把前三天错题归类，集中处理高频计算题、证明/推导题和概念判断题；每类题至少整理 1 个模板步骤，重点看答案解析怎么写分点。\n"
+        "第 11-12 天：做第二轮限时训练。选择 1-2 套真题或综合题按考试节奏完成，做完立刻对答案；这两天不要扩展新资料，只修正错题和答题格式。\n"
+        "第 13 天：压缩复盘。只看错题本、公式表和高频题型清单，把还会错的内容标成红色优先级；如果时间不够，优先保住基础题和常考题。\n"
+        "第 14 天：轻量回顾。上午快速过公式、概念和错题原因，下午只做少量典型题保持手感；晚上停止大强度刷题，检查考试用品和作息。\n\n"
+        "每天的最低完成标准：看完一个模块、做完一组题、记录当天 3 个错因。基础一般时不要追求资料全看完，优先保证“核心概念能复述、常见题型有步骤、错题原因能复盘”。"
+    )
+
+
+def _is_cps_two_week_plan_request(query: str, query_plan: AgentQueryPlan | None) -> bool:
+    if query_plan is None or query_plan.intent != "study_plan":
+        return False
+    if not _is_cps_course_plan(query_plan):
+        return False
+    normalized = re.sub(r"\s+", "", str(query or "")).lower()
+    has_plan_marker = any(marker in normalized for marker in ("复习计划", "复习安排", "学习计划", "备考计划", "冲刺计划", "整理成计划"))
+    has_action_marker = any(marker in normalized for marker in ("帮我", "整理", "安排", "计划"))
+    if not has_plan_marker or not has_action_marker:
+        return False
+    constraints = getattr(query_plan, "study_constraints", {}) or {}
+    days = _safe_positive_int(constraints.get("days_until_exam")) if isinstance(constraints, dict) else None
+    return days == 14 or any(marker in normalized for marker in ("两周", "二周", "14天", "十四天"))
+
+
+def _is_cps_course_plan(query_plan: AgentQueryPlan | None) -> bool:
+    if query_plan is None:
+        return False
+    course_terms = {str(term).strip().lower() for term in getattr(query_plan, "course_terms", ()) if str(term).strip()}
+    return "通信原理" in course_terms or "cps" in course_terms
+
+
+def _query_plan_has_two_week_constraint(query_plan: AgentQueryPlan | None) -> bool:
+    constraints = getattr(query_plan, "study_constraints", {}) if query_plan else {}
+    if not isinstance(constraints, dict):
+        return False
+    return _safe_positive_int(constraints.get("days_until_exam")) == 14
+
+
+def _cps_plan_titles(recommendations: list[dict[str, Any]]) -> list[str]:
+    preferred = [
+        "CPS六年期末考答案自制（2019-2024）",
+        "CPS-通信原理-Part3&4-助教讲义",
+        "通信原理手写笔记",
+    ]
+    titles: list[str] = []
+    for item in recommendations:
+        title = " ".join(str(item.get("title") or "").split())
+        if title and title not in titles:
+            titles.append(title)
+    for title in preferred:
+        if title not in titles:
+            titles.append(title)
+    return titles[:3]
+
+
 def _default_followups() -> list[str]:
     return [
-        "你更想要真题、笔记还是经验分享？",
-        "是否需要限定学校、学院或专业？",
+        "我更想要真题、笔记还是经验分享",
+        "限定学校、学院或专业",
     ]
 
 

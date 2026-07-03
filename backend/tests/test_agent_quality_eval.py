@@ -637,7 +637,7 @@ def test_agent_exam_trend_closed_loop_prompt_and_response_contract(monkeypatch) 
     assert "visual_signals" not in body["evidence_sources"][0]
     assert "anchor_terms" not in body["evidence_sources"][0]
     assert "anchor_text" not in body["evidence_sources"][0]
-    assert body["followup_questions"] == ["要不要按年份整理题型？", "是否需要两周复习顺序？"]
+    assert body["followup_questions"] == ["按年份整理题型", "两周复习顺序"]
     assert "memory_context" not in json.dumps(body, ensure_ascii=False)
     assert "query_plan" not in json.dumps(body, ensure_ascii=False)
 
@@ -688,7 +688,68 @@ def test_agent_local_study_plan_uses_structured_query_constraints(monkeypatch) -
     assert "目标约 85 分" in body["answer"]
     assert "每天可用约 2 小时" in body["answer"]
     assert "薄弱点先放在 调制、误码率" in body["answer"]
-    assert body["followup_questions"][0] == "要不要我按 14 天拆成每日复习安排？"
+    assert body["followup_questions"][0] == "帮我整理成两周复习计划"
+    assert "query_plan" not in json.dumps(body, ensure_ascii=False)
+    metrics.clear()
+
+
+def test_agent_local_cps_context_followup_returns_two_week_plan(monkeypatch) -> None:
+    metrics = get_runtime_metrics()
+    metrics.clear()
+    settings = Settings(ai_agent_provider="local")
+    monkeypatch.setattr("app.services.ai_service.get_settings", lambda: settings)
+
+    service = AiService(
+        read_repo=None,
+        material_repo=None,
+        query_planner_service=AgentQueryPlannerService(),
+    )  # type: ignore[arg-type]
+    monkeypatch.setattr(
+        service,
+        "_rank_materials",
+        lambda session, query, filters: [
+            _material(
+                101,
+                title="CPS六年期末考答案自制（2019-2024）",
+                description="通信原理期末真题和答案解析",
+                downloads=120,
+            ),
+            _material(
+                102,
+                title="CPS-通信原理-Part3&4-助教讲义",
+                description="通信原理助教讲义和考点梳理",
+                downloads=80,
+            ),
+            _material(
+                103,
+                title="通信原理手写笔记",
+                description="通信原理日常学习笔记和期末速成",
+                downloads=70,
+            ),
+        ],
+    )
+
+    response = service.recommend(
+        object(),  # type: ignore[arg-type]
+        SimpleNamespace(
+            query="帮我整理成两周复习计划",
+            contextQuery=(
+                "用户：两周后考通信原理，基础一般，怎么复习？ "
+                "助手：推荐资料：《CPS六年期末考答案自制（2019-2024）》；"
+                "《CPS-通信原理-Part3&4-助教讲义》；《通信原理手写笔记》"
+            ),
+            filters={},
+        ),
+        current_user_id=7,
+    )
+    body = json.loads(str(response["output"]).removeprefix("<json>").removesuffix("</json>"))
+
+    assert "14 天复习计划" in body["answer"]
+    assert "CPS六年期末考答案自制（2019-2024）" in body["answer"]
+    assert "CPS-通信原理-Part3&4-助教讲义" in body["answer"]
+    assert "通信原理手写笔记" in body["answer"]
+    assert "第 14 天" in body["answer"]
+    assert "没有在平台资料库里找到" not in body["answer"]
     assert "query_plan" not in json.dumps(body, ensure_ascii=False)
     metrics.clear()
 
@@ -786,8 +847,8 @@ def test_agent_local_pdf_summary_uses_intent_specific_evidence(monkeypatch) -> N
     assert "公式/图表页信号 公式、图示" in body["answer"]
     assert "建议先读《通信原理四年真题解析》第 3 页建立概览" in body["answer"]
     assert body["followup_questions"] == [
-        "要不要我继续按章节或页码拆解这份资料？",
-        "是否需要标出最适合先看的重点页面？",
+        "继续按章节或页码拆解这份资料",
+        "标出最适合先看的重点页面",
     ]
     metrics.clear()
 
@@ -862,9 +923,9 @@ def test_agent_local_material_fit_assessment_uses_evidence_and_profile(monkeypat
     assert "可先从《通信原理四年真题解析》第 3 页开始" in body["answer"]
     assert "我会优先按你的电子科技大学/信通/通信工程背景来判断匹配度" in body["answer"]
     assert body["followup_questions"] == [
-        "你现在是补基础、刷题冲刺还是查漏补缺？",
-        "要不要我把这份资料拆成先看页和后看页？",
-        "是否需要结合你的专业和年级调整推荐顺序？",
+        "我现在是补基础、刷题冲刺还是查漏补缺",
+        "把这份资料拆成先看页和后看页",
+        "结合我的专业和年级调整推荐顺序",
     ]
     assert "query_plan" not in json.dumps(body, ensure_ascii=False)
     metrics.clear()
@@ -1160,8 +1221,8 @@ def test_agent_local_problem_tutoring_uses_intent_specific_evidence(monkeypatch)
     assert "预估难度：综合、偏难" in body["answer"]
     assert "注意公式/图表信息：公式、图示" in body["answer"]
     assert body["followup_questions"] == [
-        "你卡住的是概念理解、公式推导还是计算步骤？",
-        "要不要我按同类题型再找几页练习？",
+        "我卡住的是概念理解、公式推导还是计算步骤",
+        "按同类题型再找几页练习",
     ]
     metrics.clear()
 
@@ -1240,9 +1301,9 @@ def test_agent_model_failure_uses_structured_local_exam_trend_fallback(monkeypat
     assert "需留意：" in body["recommendations"][0]["reason"]
     assert body["evidence_sources"][0]["question_numbers"] == ["第3题"]
     assert body["followup_questions"] == [
-        "要不要我按年份整理常考题型？",
-        "是否需要把这些资料整理成两周复习顺序？",
-        "要不要我按题号列出优先复盘清单？",
+        "按年份整理常考题型",
+        "把这些资料整理成两周复习顺序",
+        "按题号列出优先复盘清单",
     ]
     metrics_text = metrics.render_prometheus(settings)
     assert (
