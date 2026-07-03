@@ -754,6 +754,73 @@ def test_agent_local_cps_context_followup_returns_two_week_plan(monkeypatch) -> 
     metrics.clear()
 
 
+def test_agent_local_cps_plan_filters_unrelated_context_recommendations(monkeypatch) -> None:
+    metrics = get_runtime_metrics()
+    metrics.clear()
+    settings = Settings(ai_agent_provider="local")
+    monkeypatch.setattr("app.services.ai_service.get_settings", lambda: settings)
+
+    service = AiService(
+        read_repo=None,
+        material_repo=None,
+        query_planner_service=AgentQueryPlannerService(),
+    )  # type: ignore[arg-type]
+    monkeypatch.setattr(
+        service,
+        "_rank_materials",
+        lambda session, query, filters: [
+            _material(
+                201,
+                title="微积分II期中考自制解析和复习视频",
+                description="微积分期中速成和期中真题解析",
+                downloads=130,
+            ),
+            _material(
+                202,
+                title="CPS-通信原理-四年真题及自制解析",
+                description="通信原理期末真题和自制解析",
+                downloads=120,
+            ),
+            _material(
+                203,
+                title="CPS-通信原理-Part3&4-助教讲义",
+                description="通信原理助教讲义和期末速成",
+                downloads=80,
+            ),
+        ],
+    )
+
+    response = service.recommend(
+        object(),  # type: ignore[arg-type]
+        SimpleNamespace(
+            query="帮我整理成两周复习计划",
+            contextQuery=(
+                "用户：两周后考通信原理，基础一般，怎么复习？ "
+                "助手：推荐资料：《CPS六年期末考答案自制（2019-2024）》；"
+                "《CPS-通信原理-Part3&4-助教讲义》；《通信原理手写笔记》。"
+                "资料类型偏向 往年真题、答案解析、讲义笔记；题型信号明显。"
+            ),
+            filters={},
+        ),
+        current_user_id=7,
+    )
+    body = json.loads(str(response["output"]).removeprefix("<json>").removesuffix("</json>"))
+    serialized_recommendations = json.dumps(body["recommendations"], ensure_ascii=False)
+
+    assert body["answer"].startswith("可以。下面按“基础一般、两周后考通信原理”")
+    assert "第 1 天" in body["answer"]
+    assert "第 14 天" in body["answer"]
+    assert "微积分" not in body["answer"]
+    assert "微积分" not in serialized_recommendations
+    assert "CPS-通信原理-四年真题及自制解析" in body["answer"]
+    assert body["followup_questions"] == [
+        "把第 1-7 天细化到每天两小时",
+        "把第 8-14 天改成冲刺刷题版",
+        "只看真题和讲义怎么安排",
+    ]
+    metrics.clear()
+
+
 def test_agent_local_study_plan_uses_query_learning_preferences(monkeypatch) -> None:
     metrics = get_runtime_metrics()
     metrics.clear()

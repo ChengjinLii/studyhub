@@ -300,6 +300,7 @@ class AiService:
             elif model_configured:
                 status = "model_fallback"
             followup_questions = self._local_followup_questions(
+                query=payload.query,
                 query_plan=query_plan,
                 pdf_evidence=pdf_evidence,
                 recommendations=recommendations,
@@ -341,6 +342,25 @@ class AiService:
                     for item in llm_body["followup_questions"]
                     if isinstance(item, (str, int, float)) and str(item).strip()
                 ][:3] or body["followup_questions"]
+            if _is_cps_two_week_plan_request(payload.query, query_plan):
+                cps_recommendations = _filter_cps_plan_recommendations(body.get("recommendations", []))
+                body["recommendations"] = cps_recommendations
+                body["answer"] = self._build_local_answer(
+                    payload.query,
+                    cps_recommendations,
+                    pdf_evidence,
+                    memory_context,
+                    query_plan=query_plan,
+                    course_memory_card=course_memory_card,
+                    image_attachments=image_attachments,
+                )
+                body["followup_questions"] = self._local_followup_questions(
+                    query=payload.query,
+                    query_plan=query_plan,
+                    pdf_evidence=pdf_evidence,
+                    recommendations=cps_recommendations,
+                    memory_context=memory_context,
+                )
             body = self.safety_service.sanitize_public_response_body(
                 body,
                 candidate_materials=materials,
@@ -1118,6 +1138,7 @@ class AiService:
     def _local_followup_questions(
         self,
         *,
+        query: str,
         query_plan: AgentQueryPlan | None,
         pdf_evidence: list[MaterialPageEvidence],
         recommendations: list[dict[str, Any]],
@@ -1129,6 +1150,12 @@ class AiService:
         has_questions = any(item.question_numbers for item in pdf_evidence)
         intent = query_plan.intent
         questions: list[str]
+        if _is_cps_two_week_plan_request(query, query_plan):
+            return [
+                "把第 1-7 天细化到每天两小时",
+                "把第 8-14 天改成冲刺刷题版",
+                "只看真题和讲义怎么安排",
+            ]
         if intent == "exam_trend_analysis":
             questions = [
                 "按年份整理常考题型",
@@ -2368,22 +2395,28 @@ def _local_cps_two_week_plan_answer(
     lecture_title = titles[1]
     notes_title = titles[2]
     return (
-        "可以。下面按“基础一般、两周后考通信原理”的情况，把刚才推荐的资料整理成一份 14 天复习计划。"
-        "这份计划只基于平台可见资料元数据和推荐结果做保守安排，下载、完整阅读和付费权限仍以 StudyHub 资料页为准。\n\n"
-        f"资料使用顺序：先用《{notes_title}》和《{lecture_title}》补框架，再用《{exam_title}》做真题训练，最后把错题、公式和高频题型收束成一页清单。\n\n"
-        "第 1-2 天：先建立课程框架。每天用 1 个半小时看笔记或助教讲义，把调制、解调、频谱、带宽、信噪比、误码率这些核心词整理成概念表；剩下 30 分钟只做基础例题，不急着刷整套题。\n"
-        "第 3-4 天：补薄弱模块。优先看你最不熟的 2-3 个模块，做到能说清楚公式适用条件、题干常见问法和计算步骤；每天结束时写 5 条“容易混淆点”。\n"
-        "第 5-7 天：进入真题第一轮。用真题答案资料按年份或题型刷题，先保证会做基础题和中档题；不会的题不要硬耗，先标记原因：概念不会、公式不会、计算出错，还是读题没读懂。\n"
-        "第 8-10 天：按题型集中突破。把前三天错题归类，集中处理高频计算题、证明/推导题和概念判断题；每类题至少整理 1 个模板步骤，重点看答案解析怎么写分点。\n"
-        "第 11-12 天：做第二轮限时训练。选择 1-2 套真题或综合题按考试节奏完成，做完立刻对答案；这两天不要扩展新资料，只修正错题和答题格式。\n"
-        "第 13 天：压缩复盘。只看错题本、公式表和高频题型清单，把还会错的内容标成红色优先级；如果时间不够，优先保住基础题和常考题。\n"
-        "第 14 天：轻量回顾。上午快速过公式、概念和错题原因，下午只做少量典型题保持手感；晚上停止大强度刷题，检查考试用品和作息。\n\n"
-        "每天的最低完成标准：看完一个模块、做完一组题、记录当天 3 个错因。基础一般时不要追求资料全看完，优先保证“核心概念能复述、常见题型有步骤、错题原因能复盘”。"
+        "可以。下面按“基础一般、两周后考通信原理”来排 14 天复习计划。"
+        f"资料只用通信原理相关内容：先看《{notes_title}》和《{lecture_title}》补框架，再用《{exam_title}》刷真题和核对解析；这里基于候选资料元数据给出保守建议。\n\n"
+        "第 1 天：搭框架。整理调制、解调、频谱、带宽、信噪比、误码率这些核心概念，先知道每章在考什么。\n"
+        "第 2 天：补基础公式。把常用公式、适用条件和单位写成一页表，配 3-5 道基础例题。\n"
+        "第 3 天：看助教讲义 Part3。重点标出题干常出现的关键词和公式入口。\n"
+        "第 4 天：看助教讲义 Part4。把不会的推导和计算步骤单独列成问题清单。\n"
+        "第 5 天：刷第一套真题。不限时，目标是看懂题型和答案解析，不追求速度。\n"
+        "第 6 天：复盘第一套真题。按“概念不会、公式选错、计算失误、读题偏差”分类错题。\n"
+        "第 7 天：补第一轮短板。只处理前 6 天暴露出的 2-3 个薄弱模块。\n"
+        "第 8 天：刷第二套真题。开始计时，先保证基础题和中档题稳定拿分。\n"
+        "第 9 天：按题型归纳。把高频计算题、证明/推导题、概念判断题各整理一个答题模板。\n"
+        "第 10 天：刷第三套真题。重点练答题步骤和书写格式，减少会做但丢分的问题。\n"
+        "第 11 天：集中复盘错题。每道错题写清楚错因、正确公式、下次识别信号。\n"
+        "第 12 天：做一次模拟。按考试时长完成一套题，做完立刻对答案并标出最后漏洞。\n"
+        "第 13 天：压缩资料。只看公式表、错题清单和高频题型，不再扩展新资料。\n"
+        "第 14 天：轻量回顾。上午过核心公式和错因，下午做少量典型题保持手感，晚上停止高强度刷题。\n\n"
+        "每天最低完成标准：看完一个模块、做完一组题、记录 3 个错因。基础一般时不要追求资料全看完，先保证核心概念能复述、常见题型有步骤、错题原因能复盘。"
     )
 
 
 def _is_cps_two_week_plan_request(query: str, query_plan: AgentQueryPlan | None) -> bool:
-    if query_plan is None or query_plan.intent != "study_plan":
+    if query_plan is None:
         return False
     if not _is_cps_course_plan(query_plan):
         return False
@@ -2412,20 +2445,43 @@ def _query_plan_has_two_week_constraint(query_plan: AgentQueryPlan | None) -> bo
 
 
 def _cps_plan_titles(recommendations: list[dict[str, Any]]) -> list[str]:
-    preferred = [
-        "CPS六年期末考答案自制（2019-2024）",
-        "CPS-通信原理-Part3&4-助教讲义",
-        "通信原理手写笔记",
+    recommendation_titles = [" ".join(str(item.get("title") or "").split()) for item in recommendations]
+
+    def pick(markers: tuple[str, ...], fallback: str) -> str:
+        for title in recommendation_titles:
+            normalized = title.lower()
+            if _is_cps_title(title) and any(marker.lower() in normalized for marker in markers):
+                return title
+        return fallback
+
+    return [
+        pick(("真题", "答案", "解析", "期末", "考"), "CPS六年期末考答案自制（2019-2024）"),
+        pick(("讲义", "part3", "part4", "助教"), "CPS-通信原理-Part3&4-助教讲义"),
+        pick(("笔记", "手写"), "通信原理手写笔记"),
     ]
-    titles: list[str] = []
+
+
+def _filter_cps_plan_recommendations(recommendations: Any) -> list[dict[str, Any]]:
+    if not isinstance(recommendations, list):
+        return []
+    filtered: list[dict[str, Any]] = []
     for item in recommendations:
-        title = " ".join(str(item.get("title") or "").split())
-        if title and title not in titles:
-            titles.append(title)
-    for title in preferred:
-        if title not in titles:
-            titles.append(title)
-    return titles[:3]
+        if not isinstance(item, dict):
+            continue
+        searchable = " ".join(
+            [
+                str(item.get("title") or ""),
+                str(item.get("summary") or ""),
+            ]
+        )
+        if _is_cps_title(searchable):
+            filtered.append(item)
+    return filtered[:3]
+
+
+def _is_cps_title(value: str) -> bool:
+    normalized = re.sub(r"\s+", "", str(value or "")).lower()
+    return "cps" in normalized or "通信原理" in normalized
 
 
 def _default_followups() -> list[str]:
