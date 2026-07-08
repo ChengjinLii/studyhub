@@ -1171,6 +1171,39 @@ main {
 .hermes-agent__markdown {
   display: grid;
   gap: 7px;
+  min-width: 0;
+}
+
+.hermes-agent__markdown :where(h1, h2, h3, h4) {
+  margin: 2px 0 0;
+  color: #0f172a;
+  font-weight: 800;
+  line-height: 1.25;
+  letter-spacing: 0;
+}
+
+.hermes-agent__markdown h1 {
+  font-size: 1rem;
+}
+
+.hermes-agent__markdown h2 {
+  font-size: 0.96rem;
+}
+
+.hermes-agent__markdown h3 {
+  font-size: 0.9rem;
+}
+
+.hermes-agent__markdown h4 {
+  font-size: 0.84rem;
+}
+
+.hermes-agent__markdown :where(strong) {
+  color: #0f172a;
+}
+
+.hermes-agent__message--user .hermes-agent__markdown :where(h1, h2, h3, h4, strong) {
+  color: #ffffff;
 }
 
 .hermes-agent__markdown :where(ul, ol) {
@@ -1180,6 +1213,23 @@ main {
 
 .hermes-agent__markdown :where(li + li) {
   margin-top: 4px;
+}
+
+.hermes-agent__markdown blockquote {
+  margin: 2px 0 0;
+  padding: 7px 9px;
+  border-left: 3px solid #93c5fd;
+  border-radius: 8px;
+  background: #eff6ff;
+  color: #475569;
+}
+
+.hermes-agent__markdown code {
+  border-radius: 5px;
+  background: #f1f5f9;
+  color: #0f172a;
+  padding: 1px 4px;
+  font-size: 0.78em;
 }
 
 .hermes-agent__message--user .hermes-agent__markdown a {

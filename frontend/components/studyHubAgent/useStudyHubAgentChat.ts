@@ -17,6 +17,7 @@ import {
   StudyHubAgentMessage,
   StudyHubAgentRecommendation,
 } from './types';
+import { resolveStudyHubAgentDemoTurn } from './demoScenarios';
 
 const STORED_CONTEXT_MESSAGE_LIMIT = 24;
 const RECENT_CONTEXT_MESSAGE_LIMIT = 8;
@@ -136,6 +137,22 @@ export const useStudyHubAgentChat = () => {
       setThinkingStages(['理解问题中']);
       setStreamingAnswer('');
       try {
+        const demoTurn = resolveStudyHubAgentDemoTurn(query, messages);
+        if (demoTurn) {
+          setThinkingStages([demoTurn.stage || '整理演示回答中']);
+          await Promise.all(demoTurn.recommendations.map((item) => loadMaterialDetail(item.materialId)));
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: makeMessageId(),
+              role: 'assistant',
+              content: demoTurn.answer,
+              recommendations: demoTurn.recommendations,
+              followups: normalizeFollowups(demoTurn.followups, query),
+            },
+          ]);
+          return;
+        }
         const contextQuery = buildStudyHubAgentContext(messages, query);
         const data = await requestStudyHubAgentRecommendationsStream(
           query,
