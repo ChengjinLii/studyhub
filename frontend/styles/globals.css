@@ -1738,12 +1738,61 @@ main {
   margin: 0;
 }
 
+.sidebar-ai-answer :where(h1, h2, h3, h4) {
+  margin: 2px 0 0;
+  color: #0f172a;
+  font-weight: 800;
+  line-height: 1.25;
+  letter-spacing: 0;
+}
+
+.sidebar-ai-answer h1 {
+  font-size: 1rem;
+}
+
+.sidebar-ai-answer h2 {
+  font-size: 0.96rem;
+}
+
+.sidebar-ai-answer h3 {
+  font-size: 0.9rem;
+}
+
+.sidebar-ai-answer h4 {
+  font-size: 0.84rem;
+}
+
+.sidebar-ai-answer strong {
+  color: #0f172a;
+}
+
 .sidebar-ai-answer :where(ul, ol) {
   margin: 0;
   padding-left: 18px;
 }
 
-.sidebar-ai-answer :where(p + p, p + ul, p + ol, ul + p, ol + p) {
+.sidebar-ai-answer :where(li + li) {
+  margin-top: 4px;
+}
+
+.sidebar-ai-answer blockquote {
+  margin: 2px 0 0;
+  padding: 7px 9px;
+  border-left: 3px solid #93c5fd;
+  border-radius: 8px;
+  background: #eff6ff;
+  color: #475569;
+}
+
+.sidebar-ai-answer code {
+  border-radius: 5px;
+  background: #f1f5f9;
+  color: #0f172a;
+  padding: 1px 4px;
+  font-size: 0.78em;
+}
+
+.sidebar-ai-answer :where(p + p, p + ul, p + ol, ul + p, ol + p, h2 + p, h3 + p, p + h3, ul + h3, ol + h3) {
   margin-top: 7px;
 }
 

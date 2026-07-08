@@ -9,6 +9,8 @@ import { fetchStudyHubAgentMaterial, requestStudyHubAgentRecommendations } from 
 import { RoleMask, SessionUser } from '../types/user';
 import { MaterialListItem } from '../types/material';
 import SafeMarkdown from './SafeMarkdown';
+import { resolveStudyHubAgentDemoTurn } from './studyHubAgent/demoScenarios';
+import type { StudyHubAgentMessage, StudyHubAgentRecommendation } from './studyHubAgent/types';
 
 type EyeOffset = { x: number; y: number };
 type AiRecommendation = {
@@ -301,6 +303,19 @@ export default function FloatingSidebar() {
       setChatLoading(true);
       setChatError(null);
       try {
+        const demoTurn = resolveStudyHubAgentDemoTurn(
+          currentQuery,
+          buildSidebarDemoMessages(aiContextQuery, aiAnswer, aiRecommendations)
+        );
+        if (demoTurn) {
+          const recs = toSidebarAiRecommendations(demoTurn.recommendations);
+          setAiAnswer(demoTurn.answer);
+          setAiRecommendations(recs);
+          setAiFollowups(normalizeAiFollowups(demoTurn.followups, currentQuery));
+          setAiContextQuery(buildSidebarAiContext(currentQuery, demoTurn.answer, recs));
+          await Promise.all(recs.map((rec) => loadMaterialDetail(rec.material_id)));
+          return;
+        }
         const data = await requestStudyHubAgentRecommendations(currentQuery, aiContextQuery);
         const output = data.output;
         if (!output || typeof output !== 'string') {
@@ -326,7 +341,7 @@ export default function FloatingSidebar() {
         setChatLoading(false);
       }
     },
-    [chatQuery, chatLoading, user, loadMaterialDetail, aiContextQuery]
+    [chatQuery, chatLoading, user, loadMaterialDetail, aiContextQuery, aiAnswer, aiRecommendations]
   );
 
   const pickRecommendationReason = (rec: AiRecommendation) =>
@@ -741,6 +756,43 @@ function buildSidebarAiContext(query: string, answer: string, recommendations: A
     .filter(Boolean)
     .join(' ')
     .slice(-1000);
+}
+
+function buildSidebarDemoMessages(
+  contextQuery: string,
+  answer: string,
+  recommendations: AiRecommendation[]
+): StudyHubAgentMessage[] {
+  const content = [contextQuery, answer].filter((item) => item.trim()).join('\n');
+  if (!content && recommendations.length === 0) return [];
+  return [
+    {
+      id: 'floating-sidebar-context',
+      role: 'assistant',
+      content,
+      recommendations: recommendations.map(toStudyHubAgentRecommendation),
+    },
+  ];
+}
+
+function toStudyHubAgentRecommendation(item: AiRecommendation): StudyHubAgentRecommendation {
+  return {
+    materialId: item.material_id,
+    title: item.title,
+    tags: item.tags,
+    reason: item.reason || item.explain || item.match_reason || item.note,
+    summary: item.summary,
+  };
+}
+
+function toSidebarAiRecommendations(items: StudyHubAgentRecommendation[]): AiRecommendation[] {
+  return items.map((item) => ({
+    material_id: item.materialId,
+    title: item.title,
+    tags: item.tags,
+    reason: item.reason,
+    summary: item.summary,
+  }));
 }
 
 function followupKey(value: string) {
