@@ -217,6 +217,19 @@ def test_agent_safety_downgrades_answer_without_pdf_evidence() -> None:
     assert sanitized["recommendations"] == [{"material_id": 101, "reason": "标题和标签匹配通信原理真题"}]
 
 
+def test_agent_safety_preserves_markdown_answer_line_breaks() -> None:
+    sanitized = AgentSafetyService().sanitize_public_response_body(
+        {
+            "answer": "可以。\n\n**第 1-3 天：补框架**\n- 第 1 天：整理课程范围。\n- 第 2 天：归纳题型。",
+        },
+        candidate_materials=[],
+        pdf_evidence=[],
+    )
+
+    assert sanitized["answer"].startswith("可以。\n\n**第 1-3 天：补框架**\n- 第 1 天")
+    assert "\n- 第 2 天：归纳题型。" in sanitized["answer"]
+
+
 def test_agent_safety_rejects_unscoped_quoted_material_title() -> None:
     sanitized = AgentSafetyService().sanitize_recommendation_body(
         {

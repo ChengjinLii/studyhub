@@ -237,7 +237,7 @@ class AgentSafetyService:
     def _sanitize_answer(self, value: Any) -> str:
         if not isinstance(value, str):
             return ""
-        answer = _clean_public_text(value, max_chars=1800)
+        answer = _clean_public_answer(value, max_chars=1800)
         if not answer:
             return ""
         return answer
@@ -423,6 +423,22 @@ def _clean_text(value: Any, *, max_chars: int) -> str:
 
 def _clean_public_text(value: Any, *, max_chars: int) -> str:
     text = _redact_public_sensitive_text(_clean_text(value, max_chars=max_chars))[:max_chars]
+    if not text:
+        return ""
+    lowered = text.lower()
+    if any(marker in lowered for marker in FORBIDDEN_INTERNAL_MARKERS):
+        return ""
+    return text
+
+
+def _clean_public_answer(value: Any, *, max_chars: int) -> str:
+    if value is None:
+        return ""
+    text = str(value).replace("\r\n", "\n").replace("\r", "\n")
+    text = re.sub(r"[ \t]+", " ", text)
+    text = re.sub(r"\n[ \t]+", "\n", text)
+    text = re.sub(r"\n{3,}", "\n\n", text).strip()[:max_chars]
+    text = _redact_public_sensitive_text(text)
     if not text:
         return ""
     lowered = text.lower()

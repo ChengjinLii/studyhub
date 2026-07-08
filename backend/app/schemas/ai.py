@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import base64
 import binascii
+import re
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -70,8 +71,21 @@ class AiRecommendRequestPayload(BaseModel):
 
     query: str = Field(min_length=1)
     contextQuery: str | None = Field(default=None, max_length=1200)
+    sessionId: str | None = Field(default=None, max_length=120)
     filters: dict[str, Any] | None = None
     imageAttachments: list[AiImageAttachmentPayload] = Field(default_factory=list)
+
+    @field_validator("sessionId")
+    @classmethod
+    def validate_session_id(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        cleaned = value.strip()
+        if not cleaned:
+            return None
+        if not re.fullmatch(r"studyhub-agent-[A-Za-z0-9_-]{12,96}", cleaned):
+            return None
+        return cleaned
 
     @field_validator("imageAttachments")
     @classmethod

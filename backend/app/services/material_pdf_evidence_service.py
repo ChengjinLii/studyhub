@@ -12,6 +12,7 @@ from app.core.config import Settings
 from app.integrations.material_asset_store import MaterialAssetStore
 from app.models.materials import MaterialRecord
 from app.services.agent_material_signal_service import safe_material_value
+from app.services.read_support import ROLE_ADMIN, ROLE_DEVELOPER, has_role
 
 
 PDF_EVIDENCE_QUERY_TERMS = (
@@ -242,6 +243,7 @@ class MaterialPdfEvidenceService:
         query: str,
         *,
         current_user_id: int | None,
+        current_user_role_mask: int | None = None,
     ) -> list[MaterialPageEvidence]:
         if not self.settings.ai_agent_pdf_evidence_enabled or not self.should_load_evidence(query):
             return []
@@ -253,7 +255,7 @@ class MaterialPdfEvidenceService:
         for material in materials:
             if scanned >= max_materials:
                 break
-            if not self._can_read_pdf_material(material, current_user_id):
+            if not self._can_read_pdf_material(material, current_user_id, current_user_role_mask):
                 continue
             scanned += 1
             all_evidence.extend(
@@ -335,9 +337,18 @@ class MaterialPdfEvidenceService:
                 self._chunk_cache.clear()
         return chunks
 
-    def _can_read_pdf_material(self, material: MaterialRecord, current_user_id: int | None) -> bool:
+    def _can_read_pdf_material(
+        self,
+        material: MaterialRecord,
+        current_user_id: int | None,
+        current_user_role_mask: int | None = None,
+    ) -> bool:
         if not _looks_like_pdf(material):
             return False
+        if not str(safe_material_value(material, "file_storage_key") or "").strip():
+            return False
+        if has_role(current_user_role_mask, ROLE_ADMIN) or has_role(current_user_role_mask, ROLE_DEVELOPER):
+            return True
         if bool(safe_material_value(material, "is_free", True)):
             return True
         return current_user_id is not None and _safe_int(safe_material_value(material, "uploader_id")) == current_user_id
@@ -357,7 +368,7 @@ def build_pdf_page_chunks(pdf_bytes: bytes, *, max_pages: int) -> list[MaterialP
     chunks: list[MaterialPageChunk] = []
     for page_number, text in extract_pdf_page_texts(pdf_bytes, max_pages=max_pages):
         compact = _compact_text(text)
-        if not compact:
+        if not compact or not _looks_like_readable_page_text(compact):
             continue
         chunks.append(
             MaterialPageChunk(
@@ -485,6 +496,24 @@ def _score_page(chunk: MaterialPageChunk, query_terms: list[str]) -> int:
 def _compact_text(text: str, *, max_chars: int = 700) -> str:
     compact = re.sub(r"\s+", " ", text).strip()
     return compact[:max_chars]
+
+
+def _looks_like_readable_page_text(text: str) -> bool:
+    compact = re.sub(r"\s+", "", text)
+    if len(compact) < 12:
+        return False
+    meaningful = sum(1 for char in compact if _is_cjk(char) or char.isascii() and char.isalnum())
+    other_letters = sum(1 for char in compact if char.isalpha() and not (_is_cjk(char) or char.isascii()))
+    punctuation = sum(1 for char in compact if not char.isalnum() and not _is_cjk(char))
+    if meaningful < 8:
+        return False
+    if other_letters > max(4, int(meaningful * 0.15)):
+        return False
+    return meaningful / max(1, len(compact) - min(punctuation, len(compact) // 3)) >= 0.34
+
+
+def _is_cjk(char: str) -> bool:
+    return "\u4e00" <= char <= "\u9fff"
 
 
 def _extract_years(text: str) -> list[str]:

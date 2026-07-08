@@ -801,6 +801,67 @@ def test_agent_local_cps_plan_filters_unrelated_context_recommendations(monkeypa
     metrics.clear()
 
 
+def test_agent_local_plan_summary_followup_uses_context_without_retrieval(monkeypatch) -> None:
+    metrics = get_runtime_metrics()
+    metrics.clear()
+    settings = Settings(ai_agent_provider="local")
+    monkeypatch.setattr("app.services.ai_service.get_settings", lambda: settings)
+    context_material = MaterialRecord(
+        id=701,
+        title="信号与系统期末真题解析",
+        description="信号与系统期末真题、题型和答案解析",
+        tags_json=json.dumps(["信号与系统", "真题", "解析"], ensure_ascii=False),
+        school="电子科技大学",
+        college="信通",
+        major="信号与系统",
+        file_type="pdf",
+        is_free=True,
+        status="VISIBLE",
+        review_status="APPROVED",
+        download_count=18,
+        rating_avg=4.6,
+        rating_count=3,
+    )
+
+    class FakeMaterialRepo:
+        def list_materials_by_ids(self, session: object, material_ids: list[int]) -> list[MaterialRecord]:
+            del session
+            return [context_material] if material_ids == [701] else []
+
+    service = AiService(
+        read_repo=None,
+        material_repo=FakeMaterialRepo(),
+        query_planner_service=AgentQueryPlannerService(),
+    )  # type: ignore[arg-type]
+
+    def fail_rank_materials(session: object, query: str, filters: dict[str, Any]) -> list[MaterialRecord]:
+        del session, query, filters
+        raise AssertionError("contextual plan summary follow-up should not trigger fresh material retrieval")
+
+    monkeypatch.setattr(service, "_rank_materials", fail_rank_materials)
+
+    response = service.recommend(
+        object(),  # type: ignore[arg-type]
+        SimpleNamespace(
+            query="给我总结一下两周复习计划。",
+            contextQuery=(
+                "用户：两周后考信号与系统，基础一般，怎么复习？ "
+                "助手：推荐资料：#701 信号与系统期末真题解析。"
+            ),
+            filters={},
+        ),
+        current_user_id=7,
+    )
+    body = json.loads(str(response["output"]).removeprefix("<json>").removesuffix("</json>"))
+
+    assert "不重新把这句话当关键词检索" in body["answer"]
+    assert "沿用上一轮 信号与系统" in body["answer"]
+    assert "**第 1-3 天：补框架**" in body["answer"]
+    assert "第 14 天" in body["answer"]
+    assert body["recommendations"][0]["material_id"] == 701
+    metrics.clear()
+
+
 def test_agent_explicit_v4_flash_validator_routes_plan_followup_without_retrieval(monkeypatch) -> None:
     settings = Settings(
         ai_agent_provider="local",
@@ -1196,7 +1257,8 @@ def test_agent_local_fallback_uses_collective_memory_without_pdf_evidence(monkey
     )
     body = json.loads(str(response["output"]).removeprefix("<json>").removesuffix("</json>"))
 
-    assert "当前暂缺可引用的 PDF 页级证据" in body["answer"]
+    assert "当前没有可引用的 PDF 页级证据" in body["answer"]
+    assert "网盘交付、历史资料缺少站内文件 key" in body["answer"]
     assert "年份信号包括 2021" in body["answer"]
     assert "资料类型偏向 往年真题" in body["answer"]
     assert "题型信号集中在 计算题、简答题" in body["answer"]

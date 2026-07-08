@@ -36,6 +36,7 @@ describe('studyHubAgentContext', () => {
     expect(context.length).toBeLessThanOrEqual(1000);
     expect(context).toContain('早期上下文摘要');
     expect(context).toContain('电子系统设计');
+    expect(context).toContain('#201');
     expect(context).toContain('ESD-电子系统设计-2021年真题及答案');
     expect(context).not.toContain('考题风格帮我分析一下');
   });

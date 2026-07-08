@@ -13,6 +13,21 @@ def _data_url(mime_type: str, body: bytes) -> str:
     return f"data:{mime_type};base64,{encoded}"
 
 
+def test_ai_recommendation_accepts_scoped_agent_session_id() -> None:
+    payload = AiRecommendRequestPayload(
+        query="帮我做复习计划",
+        sessionId="studyhub-agent-7-abcdef1234567890",
+    )
+
+    assert payload.sessionId == "studyhub-agent-7-abcdef1234567890"
+
+
+def test_ai_recommendation_ignores_invalid_agent_session_id() -> None:
+    payload = AiRecommendRequestPayload(query="帮我做复习计划", sessionId="../../other-user")
+
+    assert payload.sessionId is None
+
+
 def test_ai_recommendation_accepts_single_valid_image_attachment() -> None:
     payload = AiRecommendRequestPayload(
         query="帮我分析这道题",

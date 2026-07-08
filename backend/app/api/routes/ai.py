@@ -47,6 +47,7 @@ def ai_recommend(
             session,
             payload,
             current_user_id=auth.user_id,
+            current_user_role_mask=auth.role_mask,
             personal_memory_enabled=personal_memory_enabled,
         )
     )
@@ -80,6 +81,7 @@ def ai_recommend_stream(
                     session,
                     payload,
                     current_user_id=auth.user_id,
+                    current_user_role_mask=auth.role_mask,
                     personal_memory_enabled=personal_memory_enabled,
                     stage_callback=emit_stage,
                 )

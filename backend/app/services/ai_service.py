@@ -97,6 +97,7 @@ LOW_VALUE_QUERY_TERMS = {
 }
 
 AGENT_RANKING_CANDIDATE_LIMIT = 80
+AGENT_CONTEXT_MATERIAL_LIMIT = 8
 
 AgentStageCallback = Callable[[str], None]
 
@@ -248,6 +249,7 @@ class AiService:
         payload: AiRecommendRequestPayload,
         *,
         current_user_id: int | None = None,
+        current_user_role_mask: int | None = None,
         personal_memory_enabled: bool = True,
         stage_callback: AgentStageCallback | None = None,
     ) -> dict[str, Any]:
@@ -293,9 +295,14 @@ class AiService:
             materials = (
                 self._rank_materials(session, material_query, payload.filters or {})
                 if turn_route.should_search
-                else []
+                else self._context_materials(session, effective_context_query)
             )
-            pdf_evidence = self._collect_pdf_evidence(materials, retrieval_query, current_user_id=current_user_id)
+            pdf_evidence = self._collect_pdf_evidence(
+                materials,
+                retrieval_query,
+                current_user_id=current_user_id,
+                current_user_role_mask=current_user_role_mask,
+            )
             memory_context = (
                 self._collect_memory_context(
                     session,
@@ -695,6 +702,7 @@ class AiService:
         query: str,
         *,
         current_user_id: int | None,
+        current_user_role_mask: int | None = None,
     ) -> list[MaterialPageEvidence]:
         if not self.pdf_evidence_service:
             return []
@@ -703,7 +711,17 @@ class AiService:
                 materials,
                 query,
                 current_user_id=current_user_id,
+                current_user_role_mask=current_user_role_mask,
             )
+        except TypeError:
+            try:
+                return self.pdf_evidence_service.collect_for_materials(
+                    materials,
+                    query,
+                    current_user_id=current_user_id,
+                )
+            except Exception:
+                return []
         except Exception:
             return []
 
@@ -729,6 +747,24 @@ class AiService:
         except Exception:
             return None
         return None if context.is_empty() else context
+
+    def _context_materials(self, session: Session, context_query: str | None) -> list[MaterialRecord]:
+        material_ids = _agent_context_material_ids(context_query)
+        if not material_ids or not self.material_repo:
+            return []
+        list_by_ids = getattr(self.material_repo, "list_materials_by_ids", None)
+        if not callable(list_by_ids):
+            return []
+        try:
+            loaded = list_by_ids(session, material_ids[:AGENT_CONTEXT_MATERIAL_LIMIT])
+        except Exception:
+            return []
+        by_id = {
+            int(material.id): material
+            for material in loaded
+            if getattr(material, "id", None) is not None and _agent_context_material_is_visible(material)
+        }
+        return [by_id[material_id] for material_id in material_ids if material_id in by_id][:AGENT_CONTEXT_MATERIAL_LIMIT]
 
     def _build_query_plan(
         self,
@@ -820,10 +856,12 @@ class AiService:
             "followup_questions 必须是用户点击后会直接发送给助手的下一句请求，必须使用用户口吻。"
             "禁止输出助手口吻、询问用户意愿或半截填空句，例如不得使用“需要我帮你”“是否想”“是否需要”“要不要我”“你想”“你的复习笔记”“你的考试日期”等表达。"
             "应写成可执行请求，例如“分析 2020-2022 年真题中各类题型的分数占比”“重点突破计算题解题思路”“根据我的复习笔记定制题型专项复习计划”。"
+            "answer 字段允许使用安全 Markdown 来提升前台阅读体验，例如短段落、编号列表、项目符号、加粗重点和站内/可信链接；"
+            "但最外层响应必须仍然是严格 JSON 对象，不要在 JSON 外包裹 Markdown、代码块或任何额外说明。"
             "不要输出 memory_context、conversation_context、conversation_focus、query_plan、problem_context、candidate_materials、image_attachments、output_guardrail、resource_budget、coverage、user_fit_signals、"
             "pdf_evidence、course_memory_card、material_scope、current_query_memory、learning_preferences、exam_analysis_focus、evidence_coverage、evidence_basis、confidence_assessment、yearly_question_type_matrix、chapter_distribution、chapter_signals、solution_signal_distribution、solution_signals、study_strategy_distribution、material_quality_distribution、material_risk_distribution、"
             "experience_materials、anchor_text、anchor_terms、server_resource_policy、runtime_scope、candidate_material_limit、interaction_check_limit、pdf_evidence_page_limit、candidate_material_count、pdf_evidence_page_count、pdf_evidence_material_count、pdf_evidence_material_ids、has_pdf_evidence、limitations、agent-platform-collective-memory-v1、agent-platform-memory-coverage-v1、agent-memory-resource-budget-v1 或 privacy_boundary 等内部字段名。"
-            "必须输出严格 JSON，不要输出 Markdown，不要包裹代码块。"
+            "必须输出严格 JSON，不要包裹代码块。"
         )
         user_prompt = {
             "user_query": query,
@@ -837,7 +875,7 @@ class AiService:
             "course_memory_card": course_memory_card.to_prompt_payload() if course_memory_card else {},
             "output_guardrail": _agent_output_guardrail_payload(),
             "output_schema": {
-                "answer": "面向学生的自然语言回答，先遵循 query_plan 的意图与任务，再结合资料、PDF 证据、课程记忆卡片和可用记忆上下文说明下一步怎么学。",
+                "answer": "面向学生的 Markdown 文本。先遵循 query_plan 的意图与任务，再结合资料、PDF 证据、课程记忆卡片和可用记忆上下文说明下一步怎么学。优先使用短段落、列表和加粗重点，避免长篇堆叠。",
                 "recommendations": [
                     {
                         "material_id": "候选资料中的 material_id",
@@ -1019,7 +1057,7 @@ class AiService:
         if cps_plan_answer:
             return f"{image_hint}{cps_plan_answer}"
         contextual_answer = _local_contextual_followup_answer(query, conversation_context, query_plan)
-        if contextual_answer and not recommendations:
+        if contextual_answer:
             return f"{image_hint}{contextual_answer}"
         if not recommendations:
             if image_attachments:
@@ -1081,7 +1119,10 @@ class AiService:
         confidence_tail = ""
         if limitations:
             confidence_tail = f"由于{_join_values(limitations[:2])}，这些结论需要保持保守。"
-        return f"当前暂缺可引用的 PDF 页级证据，我会先按平台聚合信号和候选资料做保守判断：{'；'.join(parts)}。{confidence_tail}"
+        return (
+            "当前没有可引用的 PDF 页级证据，可能是候选资料为网盘交付、历史资料缺少站内文件 key，"
+            f"或 PDF 文本提取后不可读；我会先按平台聚合信号和候选资料做保守判断：{'；'.join(parts)}。{confidence_tail}"
+        )
 
     def _local_evidence_summary(
         self,
@@ -1867,8 +1908,10 @@ def _local_agent_turn_route(query: str, *, context_query: str | None, has_image:
 def _looks_like_study_plan_revision(normalized_query: str) -> bool:
     markers = (
         "两周复习计划",
+        "两周计划",
         "复习计划",
         "复习安排",
+        "备考计划",
         "学习顺序",
         "每日学习顺序",
         "每日复习",
@@ -1884,8 +1927,9 @@ def _looks_like_study_plan_revision(normalized_query: str) -> bool:
         "真题和讲义",
         "细化到每天",
         "改成冲刺",
+        "总结计划",
     )
-    action_markers = ("帮我", "把", "按", "只看", "改成", "细化", "整理", "安排")
+    action_markers = ("帮我", "给我", "把", "按", "只看", "改成", "细化", "整理", "安排", "总结")
     return any(marker in normalized_query for marker in markers) and any(
         marker in normalized_query for marker in action_markers
     )
@@ -2199,7 +2243,8 @@ def _agent_context_material_titles(context: str) -> list[str]:
     titles: list[str] = []
 
     def add_title(raw_value: str) -> None:
-        title = re.sub(r"\s+", " ", raw_value).strip(" ；;，,。")
+        title = re.sub(r"^#\s*\d+\s*", "", raw_value)
+        title = re.sub(r"\s+", " ", title).strip(" ；;，,。")
         if 2 <= len(title) <= 120 and title not in titles:
             titles.append(title)
 
@@ -2212,6 +2257,45 @@ def _agent_context_material_titles(context: str) -> list[str]:
             add_title(title)
 
     return titles[:6]
+
+
+def _agent_context_material_ids(context: str | None) -> list[int]:
+    text = _compact_agent_context(context)
+    if not text:
+        return []
+    ids: list[int] = []
+
+    def add_id(raw_value: str) -> None:
+        try:
+            material_id = int(raw_value)
+        except (TypeError, ValueError):
+            return
+        if material_id <= 0 or material_id in ids:
+            return
+        ids.append(material_id)
+
+    for segment in re.findall(r"(?:推荐资料|曾推荐资料)[:：]([^。\n]+)", text):
+        for raw_id in re.findall(r"#\s*(\d{1,10})(?=\s|$|[^\d])", _trim_agent_context_material_segment(segment)):
+            add_id(raw_id)
+
+    if ids:
+        return ids[:AGENT_CONTEXT_MATERIAL_LIMIT]
+
+    for raw_id in re.findall(r"(?:资料|material|mat)?#\s*(\d{1,10})(?=\s|$|[^\d])", text, flags=re.IGNORECASE):
+        add_id(raw_id)
+    return ids[:AGENT_CONTEXT_MATERIAL_LIMIT]
+
+
+def _agent_context_material_is_visible(material: MaterialRecord) -> bool:
+    status = str(getattr(material, "status", "") or "").strip().lower()
+    if status in {"hidden", "removed"}:
+        return False
+    if getattr(material, "deleted_at", None) is not None:
+        return False
+    review_status = str(getattr(material, "review_status", "") or "").strip().lower()
+    if review_status in {"rejected", "blocked"}:
+        return False
+    return True
 
 
 def _trim_agent_context_material_segment(segment: str) -> str:
@@ -2819,6 +2903,7 @@ def _local_contextual_followup_answer(
         return ""
     normalized = re.sub(r"\s+", "", str(query or "")).lower()
     is_cps_context = "通信原理" in context or "cps" in context.lower()
+    two_week_plan_markers = ("两周复习计划", "两周计划", "两周复习安排", "14天复习", "十四天复习", "复习计划", "备考计划")
     if is_cps_context and any(marker in normalized for marker in ("两周复习计划", "两周复习安排", "14天复习", "十四天复习")):
         return (
             "可以。下面按“基础一般、两周后考通信原理”来排 14 天复习计划。"
@@ -2839,6 +2924,8 @@ def _local_contextual_followup_answer(
             "第 14 天：轻量回顾核心公式和错因，少量典型题保持手感。\n\n"
             "每天最低完成标准：看完一个模块、做完一组题、记录 3 个错因。"
         )
+    if any(marker in normalized for marker in two_week_plan_markers):
+        return _local_contextual_two_week_plan_answer(context)
     if is_cps_context and any(marker in normalized for marker in ("第1-7天", "1-7天", "每天两小时", "每天2小时")):
         return (
             "可以。下面把前 7 天按“每天约 2 小时”细化，目标是先把通信原理框架搭起来，再进入真题。\n\n"
@@ -2894,6 +2981,53 @@ def _local_contextual_followup_answer(
             "可以。我会沿用上一轮 StudyHub 资料和回答继续细化，不重新把这句话当成独立关键词。"
             "建议按“先确认目标、再拆步骤、最后列检查项”的方式推进；如果上一轮已有推荐资料，就优先围绕那些资料安排阅读和复盘顺序。"
         )
+    return ""
+
+
+def _local_contextual_two_week_plan_answer(context: str) -> str:
+    course_label = _agent_context_course_label(context) or "这门课"
+    titles = _agent_context_material_titles(context)
+    if titles:
+        material_hint = f"资料使用顺序建议先看《{titles[0]}》"
+        if len(titles) >= 2:
+            material_hint += f"，再结合《{titles[1]}》"
+        if len(titles) >= 3:
+            material_hint += f"和《{titles[2]}》"
+        material_hint += "做题型训练和复盘。"
+    else:
+        material_hint = "资料使用顺序建议先用上一轮推荐资料补框架，再用真题、样卷或解析类资料训练。"
+    return (
+        f"可以。下面沿用上一轮 {course_label} 的资料上下文，不重新把这句话当关键词检索，"
+        "按“基础一般、两周后考试”排一个 14 天复习计划。"
+        f"{material_hint}\n\n"
+        "**第 1-3 天：补框架**\n"
+        "- 第 1 天：先过课程目录、考试范围和上一轮推荐资料的标题/简介，确认这门课主要考什么。\n"
+        "- 第 2 天：整理核心概念、常用公式或常见设计步骤，把不会的点列成问题清单。\n"
+        "- 第 3 天：用笔记、讲义或速成资料补基础，只记录能直接影响做题的知识入口。\n\n"
+        "**第 4-7 天：按题型训练**\n"
+        "- 第 4 天：从真题、样卷或解析资料里拆出常见题型，先看题型结构，不急着追求速度。\n"
+        "- 第 5 天：专项练最基础的一类题，要求能写清楚解题入口、步骤和结论。\n"
+        "- 第 6 天：专项练中档题，把卡住的知识点回查到对应讲义或笔记。\n"
+        "- 第 7 天：复盘前半周错因，整理一页“题型 -> 解题入口 -> 易错点”。\n\n"
+        "**第 8-12 天：真题/样卷冲刺**\n"
+        "- 第 8 天：限时做一套真题或样卷，先保证基础题和模板题稳定得分。\n"
+        "- 第 9 天：对照答案解析复盘，把错题按概念不会、入口选错、步骤不完整、粗心失误分类。\n"
+        "- 第 10 天：再做一套题，重点训练答题顺序和书写完整度。\n"
+        "- 第 11 天：集中处理反复出错的 2-3 个模块，不再大范围扩展新资料。\n"
+        "- 第 12 天：做一次完整模拟，严格计时，做完立刻标出最后漏洞。\n\n"
+        "**第 13-14 天：收束复盘**\n"
+        "- 第 13 天：只看错题清单、公式/模板表和高频题型，压缩复习范围。\n"
+        "- 第 14 天：轻量回顾核心概念和错因，少量典型题保持手感，晚上停止高强度刷题。\n\n"
+        "最低完成标准：每天完成一个模块复习、一组题型训练、三条错因记录。基础一般时不要追求资料全看完，先保证核心概念能复述、常见题型有步骤、错题原因能复盘。"
+    )
+
+
+def _agent_context_course_label(context: str) -> str:
+    normalized = context.lower()
+    for label in ("电子系统设计", "通信原理", "信号与系统", "数据结构", "概率论", "高数下", "高等数学", "微积分"):
+        aliases = QUERY_TERM_ALIASES.get(label, (label,))
+        if any(alias.lower() in normalized for alias in aliases):
+            return "高等数学" if label in {"高数下", "微积分"} else label
     return ""
 
 

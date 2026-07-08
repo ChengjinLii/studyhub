@@ -15,9 +15,10 @@ type AgentStreamHandlers = {
 export const requestStudyHubAgentRecommendations = async (
   query: string,
   contextQuery?: string,
-  imageAttachments: StudyHubAgentImageAttachment[] = []
+  imageAttachments: StudyHubAgentImageAttachment[] = [],
+  sessionId?: string
 ) => {
-  const body = buildAgentRecommendationBody(query, contextQuery, imageAttachments);
+  const body = buildAgentRecommendationBody(query, contextQuery, imageAttachments, sessionId);
   const response = await fetchBackend('/ai-recommendations', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -30,9 +31,10 @@ export const requestStudyHubAgentRecommendationsStream = async (
   query: string,
   contextQuery?: string,
   imageAttachments: StudyHubAgentImageAttachment[] = [],
+  sessionId?: string,
   handlers: AgentStreamHandlers = {}
 ) => {
-  const body = buildAgentRecommendationBody(query, contextQuery, imageAttachments);
+  const body = buildAgentRecommendationBody(query, contextQuery, imageAttachments, sessionId);
   const response = await fetch(buildBackendUrl('/ai-recommendations/stream'), {
     method: 'POST',
     headers: {
@@ -108,15 +110,20 @@ export const fetchStudyHubAgentMaterial = async (materialId: number) => {
 function buildAgentRecommendationBody(
   query: string,
   contextQuery?: string,
-  imageAttachments: StudyHubAgentImageAttachment[] = []
+  imageAttachments: StudyHubAgentImageAttachment[] = [],
+  sessionId?: string
 ) {
   const body: {
     query: string;
     contextQuery?: string;
+    sessionId?: string;
     imageAttachments?: Array<Pick<StudyHubAgentImageAttachment, 'name' | 'mimeType' | 'dataUrl' | 'sizeBytes'>>;
   } = { query };
   if (contextQuery && contextQuery.trim()) {
     body.contextQuery = contextQuery.trim().slice(-1000);
+  }
+  if (sessionId && /^studyhub-agent-[A-Za-z0-9_-]{12,96}$/.test(sessionId)) {
+    body.sessionId = sessionId;
   }
   const attachments = imageAttachments
     .filter((item) => item.dataUrl)

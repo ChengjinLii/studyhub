@@ -93,6 +93,20 @@ def test_build_pdf_page_chunks_extracts_year_question_type_and_knowledge_signals
     assert chunks[0].visual_signals == ("公式", "图示", "表格", "图片题")
 
 
+def test_build_pdf_page_chunks_filters_unreadable_extracted_text() -> None:
+    readable_chunks = build_pdf_page_chunks(
+        "%PDF-1.4\n1 0 obj << /Type /Page >> stream (2024 通信原理 真题 第3题 计算题 10分 参考答案 解题步骤) endstream".encode(),
+        max_pages=2,
+    )
+    garbled_chunks = build_pdf_page_chunks(
+        "%PDF-1.4\n1 0 obj << /Type /Page >> stream (ն࿐໾৘ཿᄝభ૫ճีඨ྽๭ཞჰ৘ҰѯᄸဢԮѬᄸဢᄝཌྷ໊ҵ৚ཁԛ่໕) endstream".encode(),
+        max_pages=2,
+    )
+
+    assert len(readable_chunks) == 1
+    assert garbled_chunks == []
+
+
 def test_pdf_evidence_only_loads_for_study_queries_and_respects_file_limit() -> None:
     store = _FakeAssetStore()
     service = MaterialPdfEvidenceService(_settings(ai_agent_pdf_evidence_max_bytes=32), store)  # type: ignore[arg-type]
@@ -144,6 +158,21 @@ def test_pdf_evidence_skips_paid_material_when_user_does_not_own_it() -> None:
     assert store.read_keys == []
 
 
+def test_pdf_evidence_allows_paid_material_for_admin_role() -> None:
+    store = _FakeAssetStore()
+    service = MaterialPdfEvidenceService(_settings(), store)  # type: ignore[arg-type]
+
+    evidence = service.collect_for_materials(
+        [_material(free=False, uploader_id=7)],
+        "通信原理真题常考什么",
+        current_user_id=8,
+        current_user_role_mask=8,
+    )
+
+    assert len(evidence) == 1
+    assert store.read_keys == ["materials/demo.pdf"]
+
+
 def test_pdf_evidence_allows_paid_material_uploaded_by_current_user() -> None:
     store = _FakeAssetStore()
     service = MaterialPdfEvidenceService(_settings(), store)  # type: ignore[arg-type]
@@ -156,6 +185,24 @@ def test_pdf_evidence_allows_paid_material_uploaded_by_current_user() -> None:
 
     assert len(evidence) == 1
     assert store.read_keys == ["materials/demo.pdf"]
+
+
+def test_pdf_evidence_missing_file_key_does_not_consume_scan_budget() -> None:
+    store = _FakeAssetStore()
+    service = MaterialPdfEvidenceService(_settings(ai_agent_pdf_evidence_max_materials=1), store)  # type: ignore[arg-type]
+
+    evidence = service.collect_for_materials(
+        [
+            _material(material_id=1, key=None),
+            _material(material_id=2, key="materials/second.pdf"),
+        ],
+        "通信原理真题常考什么",
+        current_user_id=7,
+    )
+
+    assert len(evidence) == 1
+    assert evidence[0].material_id == 2
+    assert store.read_keys == ["materials/second.pdf"]
 
 
 def test_pdf_evidence_prompt_payload_has_stable_internal_provenance() -> None:

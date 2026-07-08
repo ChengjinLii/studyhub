@@ -8,6 +8,7 @@ export const STUDYHUB_AGENT_STARTERS = [
 
 export const STUDYHUB_AGENT_MESSAGES_STORAGE_KEY = 'hermes-agent-messages';
 export const STUDYHUB_AGENT_POSITION_STORAGE_KEY = 'studyhub-agent-position';
+export const STUDYHUB_AGENT_SESSION_STORAGE_KEY = 'hermes-agent-session';
 
 export const STUDYHUB_AGENT_INITIAL_MESSAGES: StudyHubAgentMessage[] = [
   {

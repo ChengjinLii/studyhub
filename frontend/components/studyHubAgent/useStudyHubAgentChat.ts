@@ -6,7 +6,11 @@ import {
   requestStudyHubAgentRecommendationsStream,
 } from '../../lib/studyHubAgentApi';
 import { SessionUser } from '../../types/user';
-import { STUDYHUB_AGENT_INITIAL_MESSAGES, STUDYHUB_AGENT_MESSAGES_STORAGE_KEY } from './constants';
+import {
+  STUDYHUB_AGENT_INITIAL_MESSAGES,
+  STUDYHUB_AGENT_MESSAGES_STORAGE_KEY,
+  STUDYHUB_AGENT_SESSION_STORAGE_KEY,
+} from './constants';
 import {
   StudyHubAgentImageAttachment,
   StudyHubAgentMaterialDetails,
@@ -38,30 +42,8 @@ export const useStudyHubAgentChat = () => {
   const [user, setUser] = useState<SessionUser | null>(null);
   const [messages, setMessages] = useState<StudyHubAgentMessage[]>(STUDYHUB_AGENT_INITIAL_MESSAGES);
   const [materialDetails, setMaterialDetails] = useState<StudyHubAgentMaterialDetails>({});
-
-  useEffect(() => {
-    try {
-      const raw = window.localStorage.getItem(STUDYHUB_AGENT_MESSAGES_STORAGE_KEY);
-      if (!raw) return;
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        setMessages(parsed);
-      }
-    } catch {
-      // ignore invalid local state
-    }
-  }, []);
-
-  useEffect(() => {
-    try {
-      window.localStorage.setItem(
-        STUDYHUB_AGENT_MESSAGES_STORAGE_KEY,
-        JSON.stringify(serializeMessagesForStorage(messages.slice(-STORED_CONTEXT_MESSAGE_LIMIT)))
-      );
-    } catch {
-      // ignore storage errors
-    }
-  }, [messages]);
+  const [agentSessionId, setAgentSessionId] = useState('');
+  const [hydratedUserId, setHydratedUserId] = useState<number | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -76,6 +58,45 @@ export const useStudyHubAgentChat = () => {
       window.removeEventListener('focus', loadSession);
     };
   }, []);
+
+  useEffect(() => {
+    if (!user?.id) {
+      setMessages(STUDYHUB_AGENT_INITIAL_MESSAGES);
+      setAgentSessionId('');
+      setHydratedUserId(null);
+      return;
+    }
+    const userId = user.id;
+    try {
+      const sessionKey = buildUserScopedStorageKey(STUDYHUB_AGENT_SESSION_STORAGE_KEY, userId);
+      let nextSessionId = window.localStorage.getItem(sessionKey) || '';
+      if (!isValidAgentSessionId(nextSessionId)) {
+        nextSessionId = makeAgentSessionId(userId);
+        window.localStorage.setItem(sessionKey, nextSessionId);
+      }
+      const raw = window.localStorage.getItem(buildUserScopedStorageKey(STUDYHUB_AGENT_MESSAGES_STORAGE_KEY, userId));
+      const parsed = raw ? JSON.parse(raw) : null;
+      setMessages(Array.isArray(parsed) && parsed.length > 0 ? parsed : STUDYHUB_AGENT_INITIAL_MESSAGES);
+      setAgentSessionId(nextSessionId);
+      setHydratedUserId(userId);
+    } catch {
+      setMessages(STUDYHUB_AGENT_INITIAL_MESSAGES);
+      setAgentSessionId(makeAgentSessionId(userId));
+      setHydratedUserId(userId);
+    }
+  }, [user?.id]);
+
+  useEffect(() => {
+    if (!user?.id || hydratedUserId !== user.id) return;
+    try {
+      window.localStorage.setItem(
+        buildUserScopedStorageKey(STUDYHUB_AGENT_MESSAGES_STORAGE_KEY, user.id),
+        JSON.stringify(serializeMessagesForStorage(messages.slice(-STORED_CONTEXT_MESSAGE_LIMIT)))
+      );
+    } catch {
+      // ignore storage errors
+    }
+  }, [messages, hydratedUserId, user?.id]);
 
   const loadMaterialDetail = useCallback(
     async (materialId: number) => {
@@ -120,6 +141,7 @@ export const useStudyHubAgentChat = () => {
           query,
           contextQuery,
           attachments,
+          agentSessionId,
           {
             onStage: (stage) => {
               setThinkingStages((prev) => replaceThinkingStage(prev, stage));
@@ -130,7 +152,7 @@ export const useStudyHubAgentChat = () => {
           }
         ).catch(async () => {
           setThinkingStages((prev) => replaceThinkingStage(prev, '降级到普通请求'));
-          return requestStudyHubAgentRecommendations(query, contextQuery, attachments);
+          return requestStudyHubAgentRecommendations(query, contextQuery, attachments, agentSessionId);
         });
         const parsed = parseRecommendationOutput(data.output);
         const recommendations = normalizeRecommendations(parsed.recommendations);
@@ -167,7 +189,7 @@ export const useStudyHubAgentChat = () => {
         setStreamingAnswer('');
       }
     },
-    [loadMaterialDetail, loading, messages, user]
+    [agentSessionId, loadMaterialDetail, loading, messages, user]
   );
 
   return {
@@ -256,6 +278,22 @@ function replaceThinkingStage(stages: string[], stage: string) {
   if (!cleaned) return stages;
   if (stages.length === 1 && stages[0] === cleaned) return stages;
   return [cleaned];
+}
+
+function buildUserScopedStorageKey(baseKey: string, userId: number) {
+  return `${baseKey}:user:${userId}`;
+}
+
+function isValidAgentSessionId(value: string) {
+  return /^studyhub-agent-[A-Za-z0-9_-]{12,80}$/.test(value);
+}
+
+function makeAgentSessionId(userId: number) {
+  const randomPart =
+    typeof window !== 'undefined' && window.crypto && 'randomUUID' in window.crypto
+      ? window.crypto.randomUUID().replace(/-/g, '')
+      : `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 14)}`;
+  return `studyhub-agent-${userId}-${randomPart}`.slice(0, 96);
 }
 
 function followupKey(value: string) {
@@ -357,9 +395,9 @@ function redactStudyHubAgentContextText(value: string) {
 function formatStudyHubAgentContextLine(message: StudyHubAgentMessage) {
   const role = message.role === 'user' ? '用户' : '助手';
   const content = redactStudyHubAgentContextText(message.content).slice(0, CONTEXT_LINE_MAX_CHARS);
-  const titles = collectRecommendationTitles([message], 3);
+  const materialRefs = collectRecommendationReferences([message], 3);
   const imageHint = collectImageAttachmentHints([message], 2);
-  const titleHint = titles.length > 0 ? ` 推荐资料：${titles.join('；')}` : '';
+  const titleHint = materialRefs.length > 0 ? ` 推荐资料：${materialRefs.join('；')}` : '';
   const attachmentHint = imageHint.length > 0 ? ` 图片：${imageHint.join('；')}` : '';
   return `${role}：${content}${titleHint}${attachmentHint}`;
 }
@@ -379,7 +417,10 @@ function buildStudyHubAgentEarlierContextSummary(messages: StudyHubAgentMessage[
   if (courseHints.length > 0) {
     parts.push(`课程/关键词：${courseHints.join('、')}`);
   }
-  if (titles.length > 0) {
+  const materialRefs = collectRecommendationReferences(scannedMessages, 4);
+  if (materialRefs.length > 0) {
+    parts.push(`曾推荐资料：${materialRefs.join('；')}`);
+  } else if (titles.length > 0) {
     parts.push(`曾推荐资料：${titles.join('；')}`);
   }
   if (userGoals.length > 0) {
@@ -422,6 +463,22 @@ function collectRecommendationTitles(messages: StudyHubAgentMessage[], limit: nu
     });
   });
   return titles.slice(-limit);
+}
+
+function collectRecommendationReferences(messages: StudyHubAgentMessage[], limit: number) {
+  const refs: string[] = [];
+  messages.forEach((message) => {
+    (message.recommendations || []).forEach((item) => {
+      const materialId = Number(item.materialId);
+      if (!Number.isFinite(materialId) || materialId <= 0) return;
+      const title = item.title ? redactStudyHubAgentContextText(item.title).trim() : '';
+      const ref = title ? `#${materialId} ${title}` : `#${materialId}`;
+      if (!refs.includes(ref)) {
+        refs.push(ref);
+      }
+    });
+  });
+  return refs.slice(-limit);
 }
 
 function collectImageAttachmentHints(messages: StudyHubAgentMessage[], limit: number) {
