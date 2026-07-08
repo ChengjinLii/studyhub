@@ -1294,6 +1294,29 @@ main {
   font-weight: 700;
 }
 
+.hermes-agent__streaming-answer {
+  max-height: 120px;
+  overflow: hidden;
+  margin-top: 8px;
+  padding: 8px 9px;
+  border-radius: 10px;
+  background: #ffffff;
+  color: #334155;
+  font-size: 0.76rem;
+  line-height: 1.5;
+}
+
+.hermes-agent__streaming-answer p {
+  margin: 0;
+  color: inherit;
+  font-weight: 500;
+}
+
+.hermes-agent__streaming-answer :where(ul, ol) {
+  margin: 0;
+  padding-left: 16px;
+}
+
 .hermes-agent__thinking-steps {
   display: flex;
   flex-wrap: wrap;

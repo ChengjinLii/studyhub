@@ -8,6 +8,7 @@ interface StudyHubAgentMessageListProps {
   messages: StudyHubAgentMessage[];
   loading: boolean;
   thinkingStages: string[];
+  streamingAnswer: string;
   materialDetails: StudyHubAgentMaterialDetails;
   onFollowup: (value: string) => void;
 }
@@ -17,10 +18,11 @@ export default function StudyHubAgentMessageList({
   messages,
   loading,
   thinkingStages,
+  streamingAnswer,
   materialDetails,
   onFollowup,
 }: StudyHubAgentMessageListProps) {
-  const stages = thinkingStages.length > 0 ? thinkingStages : ['理解问题', '检索资料', '整理答案'];
+  const currentStage = thinkingStages[thinkingStages.length - 1] || '理解问题中';
   return (
     <div className="hermes-agent__messages" ref={listRef} role="log" aria-live="polite" aria-relevant="additions">
       {messages.map((message) => (
@@ -69,11 +71,14 @@ export default function StudyHubAgentMessageList({
               <span />
             </span>
             <div className="hermes-agent__thinking-copy">
-              <p>StudyHub 正在思考</p>
-              <div className="hermes-agent__thinking-steps" aria-hidden="true">
-                {stages.slice(-6).map((stage) => (
-                  <span key={stage}>{stage}</span>
-                ))}
+              <p>StudyHub 正在处理</p>
+              {streamingAnswer && (
+                <div className="hermes-agent__streaming-answer">
+                  <SafeMarkdown>{streamingAnswer}</SafeMarkdown>
+                </div>
+              )}
+              <div className="hermes-agent__thinking-steps" aria-live="polite">
+                <span>{currentStage}</span>
               </div>
             </div>
           </div>

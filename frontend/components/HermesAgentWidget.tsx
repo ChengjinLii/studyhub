@@ -34,6 +34,7 @@ export default function HermesAgentWidget() {
   const {
     loading,
     thinkingStages,
+    streamingAnswer,
     user,
     messages,
     materialDetails,
@@ -155,6 +156,7 @@ export default function HermesAgentWidget() {
             messages={messages}
             loading={loading}
             thinkingStages={thinkingStages}
+            streamingAnswer={streamingAnswer}
             materialDetails={materialDetails}
             onFollowup={submitAndClear}
           />

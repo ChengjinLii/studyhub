@@ -6,7 +6,7 @@ import re
 from dataclasses import dataclass
 from time import perf_counter
 from types import SimpleNamespace
-from typing import Any
+from typing import Any, Callable
 
 import httpx
 from sqlalchemy.orm import Session
@@ -97,6 +97,18 @@ LOW_VALUE_QUERY_TERMS = {
 }
 
 AGENT_RANKING_CANDIDATE_LIMIT = 80
+
+AgentStageCallback = Callable[[str], None]
+
+
+def _emit_agent_stage(callback: AgentStageCallback | None, stage: str) -> None:
+    if callback is None:
+        return
+    try:
+        callback(stage)
+    except Exception:
+        return
+
 
 CONTEXT_DEPENDENT_QUERY_MARKERS = (
     "这门课",
@@ -237,6 +249,7 @@ class AiService:
         *,
         current_user_id: int | None = None,
         personal_memory_enabled: bool = True,
+        stage_callback: AgentStageCallback | None = None,
     ) -> dict[str, Any]:
         started_at = perf_counter()
         settings = get_settings()
@@ -247,9 +260,11 @@ class AiService:
         memory_context: AgentMemoryContext | None = None
         course_memory_card: CourseMemoryCard | None = None
         try:
+            _emit_agent_stage(stage_callback, "理解问题中")
             image_attachments = _agent_image_attachments(getattr(payload, "imageAttachments", []))
             if _is_agent_greeting_query(payload.query):
                 status = "scope_greeting"
+                _emit_agent_stage(stage_callback, "整理答案中")
                 body = _learning_scope_greeting_body()
                 return {"output": _agent_json_output(body)}
             context_query = getattr(payload, "contextQuery", None)
@@ -264,6 +279,7 @@ class AiService:
                 has_image=bool(image_attachments),
             ) and not _route_has_learning_context(turn_route, context_query):
                 status = "scope_blocked"
+                _emit_agent_stage(stage_callback, "整理答案中")
                 body = _learning_scope_block_body()
                 return {"output": _agent_json_output(body)}
             effective_context_query = (
@@ -273,6 +289,7 @@ class AiService:
             )
             retrieval_query = _agent_retrieval_query(payload.query, effective_context_query)
             material_query = turn_route.search_query or retrieval_query
+            _emit_agent_stage(stage_callback, "检索资料中" if turn_route.should_search else "读取上下文中")
             materials = (
                 self._rank_materials(session, material_query, payload.filters or {})
                 if turn_route.should_search
@@ -315,6 +332,7 @@ class AiService:
             }
             if image_attachments:
                 generate_kwargs["image_attachments"] = image_attachments
+            _emit_agent_stage(stage_callback, "调用模型中" if model_configured else "生成本地回答中")
             llm_body = self._generate_agent_recommendation(
                 payload.query,
                 materials,
@@ -390,12 +408,14 @@ class AiService:
                     recommendations=cps_recommendations,
                     memory_context=memory_context,
                 )
+            _emit_agent_stage(stage_callback, "验证追问中")
             body["followup_questions"] = self._validate_followups_with_model(
                 query=payload.query,
                 body=body,
                 recommendations=body.get("recommendations", []),
                 route=turn_route,
             )
+            _emit_agent_stage(stage_callback, "整理答案中")
             body = self.safety_service.sanitize_public_response_body(
                 body,
                 candidate_materials=materials,

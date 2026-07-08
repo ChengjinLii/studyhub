@@ -970,3 +970,26 @@ def test_ai_local_recommendation_redacts_sensitive_material_metadata(monkeypatch
     assert "[redacted-url]" in serialized
     assert "[redacted-id-card]" in serialized
     assert body["recommendations"][0]["title"] == "通信原理 [redacted-email] [redacted-phone]"
+
+
+def test_ai_recommendation_emits_current_processing_stages(monkeypatch) -> None:
+    monkeypatch.setattr("app.services.ai_service.get_settings", lambda: Settings(ai_agent_provider="local"))
+
+    service = AiService(read_repo=None, material_repo=None)  # type: ignore[arg-type]
+    monkeypatch.setattr(service, "_rank_materials", lambda session, query, filters: [_material()])
+    stages: list[str] = []
+
+    service.recommend(
+        object(),  # type: ignore[arg-type]
+        SimpleNamespace(query="通信原理真题", filters={}),
+        current_user_id=7,
+        stage_callback=stages.append,
+    )
+
+    assert stages == [
+        "理解问题中",
+        "检索资料中",
+        "生成本地回答中",
+        "验证追问中",
+        "整理答案中",
+    ]

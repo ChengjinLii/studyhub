@@ -1,13 +1,15 @@
 from __future__ import annotations
 
 import json
+from queue import Queue
+from threading import Thread
 
 from fastapi import APIRouter, Depends, Request, Response
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_agent_feedback_service, get_ai_service, require_privileged_auth_context
-from app.core.db import get_db_session
+from app.core.db import get_db_session, get_session_factory
 from app.core.response import api_ok
 from app.core.security import AuthContext
 from app.schemas.ai import AiChatRequestPayload, AiFeedbackPayload, AiMemoryPreferencePayload, AiRecommendRequestPayload
@@ -56,7 +58,6 @@ def ai_recommend_stream(
     payload: AiRecommendRequestPayload,
     request: Request,
     auth: AuthContext = Depends(require_privileged_auth_context),
-    session: Session = Depends(get_db_session),
     service: AiService = Depends(get_ai_service),
 ) -> StreamingResponse:
     personal_memory_enabled = service.resolve_personal_memory_enabled(
@@ -64,22 +65,41 @@ def ai_recommend_stream(
     )
 
     def events():
-        try:
-            yield _sse_event("stage", {"stage": "理解问题中"})
-            yield _sse_event("stage", {"stage": "检索资料中"})
-            yield _sse_event("stage", {"stage": "调用工具中"})
-            result = service.recommend(
-                session,
-                payload,
-                current_user_id=auth.user_id,
-                personal_memory_enabled=personal_memory_enabled,
-            )
-            yield _sse_event("stage", {"stage": "总结答案中"})
-            yield _sse_event("stage", {"stage": "验证追问中"})
-            yield _sse_event("result", result)
-            yield _sse_event("stage", {"stage": "完成"})
-        except Exception as exc:
-            yield _sse_event("error", {"message": str(exc) or "StudyHub 学习辅导暂时无法回答"})
+        queue: Queue[tuple[str, dict[str, object]] | None] = Queue()
+
+        def emit(event: str, data: dict[str, object]) -> None:
+            queue.put((event, data))
+
+        def emit_stage(stage: str) -> None:
+            emit("stage", {"stage": stage})
+
+        def worker() -> None:
+            session = get_session_factory()()
+            try:
+                result = service.recommend(
+                    session,
+                    payload,
+                    current_user_id=auth.user_id,
+                    personal_memory_enabled=personal_memory_enabled,
+                    stage_callback=emit_stage,
+                )
+                answer_delta = _agent_answer_delta(result)
+                if answer_delta:
+                    emit("delta", {"delta": answer_delta})
+                emit("result", result)
+            except Exception as exc:
+                emit("error", {"message": str(exc) or "StudyHub 学习辅导暂时无法回答"})
+            finally:
+                session.close()
+                queue.put(None)
+
+        Thread(target=worker, daemon=True).start()
+        while True:
+            item = queue.get()
+            if item is None:
+                break
+            event, data = item
+            yield _sse_event(event, data)
 
     return StreamingResponse(events(), media_type="text/event-stream")
 
@@ -106,6 +126,23 @@ def ai_memory_preview(
 def _sse_event(event: str, payload: dict[str, object]) -> str:
     data = json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
     return f"event: {event}\ndata: {data}\n\n"
+
+
+def _agent_answer_delta(result: dict[str, object]) -> str:
+    output = result.get("output")
+    if not isinstance(output, str):
+        return ""
+    start = output.find("<json>")
+    end = output.find("</json>")
+    body = output[start + 6 : end].strip() if start >= 0 and end > start else output.strip()
+    try:
+        parsed = json.loads(body)
+    except json.JSONDecodeError:
+        return ""
+    if not isinstance(parsed, dict):
+        return ""
+    answer = parsed.get("answer")
+    return answer.strip() if isinstance(answer, str) else ""
 
 
 @router.put("/api/ai/memory-preferences")

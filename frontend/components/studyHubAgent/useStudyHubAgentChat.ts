@@ -34,6 +34,7 @@ const COURSE_CONTEXT_HINTS: { label: string; aliases: string[] }[] = [
 export const useStudyHubAgentChat = () => {
   const [loading, setLoading] = useState(false);
   const [thinkingStages, setThinkingStages] = useState<string[]>([]);
+  const [streamingAnswer, setStreamingAnswer] = useState('');
   const [user, setUser] = useState<SessionUser | null>(null);
   const [messages, setMessages] = useState<StudyHubAgentMessage[]>(STUDYHUB_AGENT_INITIAL_MESSAGES);
   const [materialDetails, setMaterialDetails] = useState<StudyHubAgentMaterialDetails>({});
@@ -112,6 +113,7 @@ export const useStudyHubAgentChat = () => {
       }
       setLoading(true);
       setThinkingStages(['理解问题中']);
+      setStreamingAnswer('');
       try {
         const contextQuery = buildStudyHubAgentContext(messages, query);
         const data = await requestStudyHubAgentRecommendationsStream(
@@ -120,11 +122,14 @@ export const useStudyHubAgentChat = () => {
           attachments,
           {
             onStage: (stage) => {
-              setThinkingStages((prev) => appendThinkingStage(prev, stage));
+              setThinkingStages((prev) => replaceThinkingStage(prev, stage));
+            },
+            onDelta: (delta) => {
+              setStreamingAnswer((prev) => `${prev}${delta}`);
             },
           }
         ).catch(async () => {
-          setThinkingStages((prev) => appendThinkingStage(prev, '降级到普通请求'));
+          setThinkingStages((prev) => replaceThinkingStage(prev, '降级到普通请求'));
           return requestStudyHubAgentRecommendations(query, contextQuery, attachments);
         });
         const parsed = parseRecommendationOutput(data.output);
@@ -159,6 +164,7 @@ export const useStudyHubAgentChat = () => {
       } finally {
         setLoading(false);
         setThinkingStages([]);
+        setStreamingAnswer('');
       }
     },
     [loadMaterialDetail, loading, messages, user]
@@ -167,6 +173,7 @@ export const useStudyHubAgentChat = () => {
   return {
     loading,
     thinkingStages,
+    streamingAnswer,
     user,
     messages,
     materialDetails,
@@ -244,11 +251,11 @@ function pickText(...values: unknown[]) {
   );
 }
 
-function appendThinkingStage(stages: string[], stage: string) {
+function replaceThinkingStage(stages: string[], stage: string) {
   const cleaned = stage.trim();
   if (!cleaned) return stages;
-  if (stages.includes(cleaned)) return stages;
-  return [...stages, cleaned].slice(-6);
+  if (stages.length === 1 && stages[0] === cleaned) return stages;
+  return [cleaned];
 }
 
 function followupKey(value: string) {
