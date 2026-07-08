@@ -318,6 +318,27 @@ def test_agent_safety_filters_duplicate_and_fill_in_followups() -> None:
     assert sanitized["followup_questions"] == ["把第 1-7 天细化到每天两小时"]
 
 
+def test_agent_safety_rewrites_assistant_voice_followups_to_user_requests() -> None:
+    sanitized = AgentSafetyService().sanitize_public_response_body(
+        {
+            "answer": "可以继续按真题题型分析。",
+            "followup_questions": [
+                "需要我帮你分析2020-2022年真题中各类题型的分数占比吗",
+                "是否想重点突破某一种题型（如计算题或设计题）的解题思路",
+                "根据你的复习笔记，定制一个题型专项复习计划",
+            ],
+        },
+        candidate_materials=[],
+        pdf_evidence=[],
+    )
+
+    assert sanitized["followup_questions"] == [
+        "分析2020-2022年真题中各类题型的分数占比",
+        "重点突破某一种题型（如计算题或设计题）的解题思路",
+        "根据我的复习笔记，定制一个题型专项复习计划",
+    ]
+
+
 def test_agent_safety_does_not_repeat_low_evidence_caveat() -> None:
     sanitized = AgentSafetyService().sanitize_recommendation_body(
         {

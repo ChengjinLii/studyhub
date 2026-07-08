@@ -447,10 +447,20 @@ def _normalize_followup_voice(value: str) -> str:
         return ""
     replacements = (
         ("你可以把具体题目截图发我吗", "我把具体题目截图发你"),
+        ("需要我帮你", ""),
+        ("需要我", ""),
+        ("我可以帮你", ""),
+        ("是否想", ""),
+        ("你是否想", ""),
+        ("想不想", ""),
+        ("你想不想", ""),
+        ("是否希望我", ""),
+        ("你希望我", ""),
         ("要不要我按", "按"),
         ("要不要我继续", "继续"),
         ("要不要我基于", "基于"),
         ("要不要我把", "把"),
+        ("要不要我帮你", ""),
         ("要不要我", ""),
         ("要不要按", "按"),
         ("要不要把", "把"),
@@ -465,6 +475,8 @@ def _normalize_followup_voice(value: str) -> str:
         if text.startswith(old):
             text = f"{new}{text[len(old):]}".strip()
             break
+    text = text.replace("你的", "我的").replace("帮你", "帮我")
+    text = text.strip(" ?？。吗")
     return re.sub(r"\s+", " ", text).strip(" ?？。")[:80]
 
 
@@ -485,6 +497,17 @@ def _followup_needs_user_fill(value: str) -> bool:
         "告诉我每天可复习时间",
     )
     if any(marker in normalized for marker in fill_markers):
+        return True
+    assistant_voice_markers = (
+        "需要我",
+        "我可以帮你",
+        "是否想",
+        "是否希望",
+        "你是否想",
+        "你想不想",
+        "你希望我",
+    )
+    if any(marker in normalized for marker in assistant_voice_markers):
         return True
     if normalized.endswith(("是多少", "是什么", "有哪些", "吗")) and any(
         marker in normalized for marker in ("你的", "你现在", "你想", "需要我", "要不要")

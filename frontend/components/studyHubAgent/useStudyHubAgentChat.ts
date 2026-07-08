@@ -214,7 +214,7 @@ export function normalizeFollowups(value: unknown, currentQuery = ''): string[] 
   const currentKey = followupKey(currentQuery);
   const seen = new Set<string>();
   return value
-    .map((item) => (typeof item === 'string' ? item.trim().replace(/\s+/g, ' ') : ''))
+    .map((item) => (typeof item === 'string' ? normalizeFollowupVoice(item) : ''))
     .filter((item): item is string => {
       if (!item) return false;
       const key = followupKey(item);
@@ -263,7 +263,40 @@ function isBadFollowupPrompt(value: string) {
     '考试日期和每天可复习时间是',
     '告诉我考试时间',
     '请补充课程名',
+    '需要我',
+    '我可以帮你',
+    '是否想',
+    '是否希望',
+    '你是否想',
+    '你想不想',
   ].some((marker) => normalized.includes(marker));
+}
+
+function normalizeFollowupVoice(value: string) {
+  let text = value.trim().replace(/\s+/g, ' ').replace(/[?？。]+$/g, '');
+  const replacements: Array<[string, string]> = [
+    ['需要我帮你', ''],
+    ['需要我', ''],
+    ['我可以帮你', ''],
+    ['是否想', ''],
+    ['你是否想', ''],
+    ['想不想', ''],
+    ['你想不想', ''],
+    ['是否希望我', ''],
+    ['你希望我', ''],
+    ['要不要我帮你', ''],
+    ['要不要我', ''],
+    ['是否需要我', ''],
+    ['是否需要', ''],
+  ];
+  for (const [from, to] of replacements) {
+    if (text.startsWith(from)) {
+      text = `${to}${text.slice(from.length)}`.trim();
+      break;
+    }
+  }
+  text = text.replace(/你的/g, '我的').replace(/帮你/g, '帮我').replace(/吗$/g, '');
+  return text.trim();
 }
 
 function buildStudyHubAgentAnswer(query: string, recommendations: StudyHubAgentRecommendation[]) {

@@ -797,6 +797,9 @@ class AiService:
             "如果提供了 course_memory_card，你可以用它总结课程级年份、逐年题型、章节模块、答案解析信号、知识点、经验策略和推荐顺序，"
             "并结合资料质量与风险分布做保守排序和必要提醒，"
             "并根据 evidence_coverage 和 confidence_assessment 避免过度概括。"
+            "followup_questions 必须是用户点击后会直接发送给助手的下一句请求，必须使用用户口吻。"
+            "禁止输出助手口吻、询问用户意愿或半截填空句，例如不得使用“需要我帮你”“是否想”“是否需要”“要不要我”“你想”“你的复习笔记”“你的考试日期”等表达。"
+            "应写成可执行请求，例如“分析 2020-2022 年真题中各类题型的分数占比”“重点突破计算题解题思路”“根据我的复习笔记定制题型专项复习计划”。"
             "不要输出 memory_context、conversation_context、conversation_focus、query_plan、problem_context、candidate_materials、image_attachments、output_guardrail、resource_budget、coverage、user_fit_signals、"
             "pdf_evidence、course_memory_card、material_scope、current_query_memory、learning_preferences、exam_analysis_focus、evidence_coverage、evidence_basis、confidence_assessment、yearly_question_type_matrix、chapter_distribution、chapter_signals、solution_signal_distribution、solution_signals、study_strategy_distribution、material_quality_distribution、material_risk_distribution、"
             "experience_materials、anchor_text、anchor_terms、server_resource_policy、runtime_scope、candidate_material_limit、interaction_check_limit、pdf_evidence_page_limit、candidate_material_count、pdf_evidence_page_count、pdf_evidence_material_count、pdf_evidence_material_ids、has_pdf_evidence、limitations、agent-platform-collective-memory-v1、agent-platform-memory-coverage-v1、agent-memory-resource-budget-v1 或 privacy_boundary 等内部字段名。"
@@ -822,7 +825,9 @@ class AiService:
                     }
                 ],
                 "evidence_sources": [{"material_id": "候选资料中的 material_id", "page": "页码", "title": "资料名"}],
-                "followup_questions": ["最多 3 个追问或下一步学习动作"],
+                "followup_questions": [
+                    "最多 3 个用户下一步会发送的请求；必须是用户口吻，不要助手口吻，不要反问用户意愿"
+                ],
             },
         }
         user_prompt = self.safety_service.sanitize_prompt_payload(user_prompt)
