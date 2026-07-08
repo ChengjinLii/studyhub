@@ -10,6 +10,7 @@ import { RoleMask, SessionUser } from '../types/user';
 import { MaterialListItem } from '../types/material';
 import SafeMarkdown from './SafeMarkdown';
 import { resolveStudyHubAgentDemoTurn } from './studyHubAgent/demoScenarios';
+import { runStudyHubAgentDemoWait } from './studyHubAgent/demoScenarios/timing';
 import type { StudyHubAgentMessage, StudyHubAgentRecommendation } from './studyHubAgent/types';
 
 type EyeOffset = { x: number; y: number };
@@ -61,6 +62,7 @@ export default function FloatingSidebar() {
   const lastFetchRef = useRef<number>(0);
   const [chatQuery, setChatQuery] = useState('');
   const [chatLoading, setChatLoading] = useState(false);
+  const [chatStage, setChatStage] = useState('');
   const [chatError, setChatError] = useState<string | null>(null);
   const [aiAnswer, setAiAnswer] = useState('');
   const [aiContextQuery, setAiContextQuery] = useState('');
@@ -301,6 +303,7 @@ export default function FloatingSidebar() {
       }
       const currentQuery = chatQuery.trim();
       setChatLoading(true);
+      setChatStage('检索资料中');
       setChatError(null);
       try {
         const demoTurn = resolveStudyHubAgentDemoTurn(
@@ -309,11 +312,14 @@ export default function FloatingSidebar() {
         );
         if (demoTurn) {
           const recs = toSidebarAiRecommendations(demoTurn.recommendations);
+          await Promise.all([
+            runStudyHubAgentDemoWait(setChatStage, demoTurn.stage),
+            Promise.all(recs.map((rec) => loadMaterialDetail(rec.material_id))),
+          ]);
           setAiAnswer(demoTurn.answer);
           setAiRecommendations(recs);
           setAiFollowups(normalizeAiFollowups(demoTurn.followups, currentQuery));
           setAiContextQuery(buildSidebarAiContext(currentQuery, demoTurn.answer, recs));
-          await Promise.all(recs.map((rec) => loadMaterialDetail(rec.material_id)));
           return;
         }
         const data = await requestStudyHubAgentRecommendations(currentQuery, aiContextQuery);
@@ -339,6 +345,7 @@ export default function FloatingSidebar() {
         setChatError(err instanceof Error ? err.message : '推荐失败，请稍后重试');
       } finally {
         setChatLoading(false);
+        setChatStage('');
       }
     },
     [chatQuery, chatLoading, user, loadMaterialDetail, aiContextQuery, aiAnswer, aiRecommendations]
@@ -628,6 +635,12 @@ export default function FloatingSidebar() {
                   <h4 className="sidebar-section-title">AI 资料推荐</h4>
                   <p className="sidebar-muted">输入关键词，AI 只会推荐资料库内的内容。</p>
                   {chatError && <p className="sidebar-chat__error">{chatError}</p>}
+                  {chatLoading && (
+                    <div className="sidebar-chat__loading" role="status" aria-live="polite">
+                      <span className="sidebar-chat__loading-dot" aria-hidden="true" />
+                      <span>{chatStage || '处理中'}</span>
+                    </div>
+                  )}
                   {aiAnswer && (
                     <div className="sidebar-ai-answer">
                       <SafeMarkdown>{aiAnswer}</SafeMarkdown>

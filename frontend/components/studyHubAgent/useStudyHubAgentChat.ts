@@ -18,6 +18,7 @@ import {
   StudyHubAgentRecommendation,
 } from './types';
 import { resolveStudyHubAgentDemoTurn } from './demoScenarios';
+import { runStudyHubAgentDemoWait } from './demoScenarios/timing';
 
 const STORED_CONTEXT_MESSAGE_LIMIT = 24;
 const RECENT_CONTEXT_MESSAGE_LIMIT = 8;
@@ -139,8 +140,10 @@ export const useStudyHubAgentChat = () => {
       try {
         const demoTurn = resolveStudyHubAgentDemoTurn(query, messages);
         if (demoTurn) {
-          setThinkingStages([demoTurn.stage || '整理演示回答中']);
-          await Promise.all(demoTurn.recommendations.map((item) => loadMaterialDetail(item.materialId)));
+          await Promise.all([
+            runStudyHubAgentDemoWait((stage) => setThinkingStages([stage]), demoTurn.stage),
+            Promise.all(demoTurn.recommendations.map((item) => loadMaterialDetail(item.materialId))),
+          ]);
           setMessages((prev) => [
             ...prev,
             {

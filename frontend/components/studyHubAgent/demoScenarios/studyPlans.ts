@@ -73,6 +73,37 @@ const ESD_PLAN_FOLLOWUPS = [
   '给我一份 ESD 考前 48 小时冲刺清单',
 ];
 
+const CPS_DIRECT_QUERIES = [
+  '两周后考通信原理基础一般怎么复习',
+  '两周后考CPS基础一般怎么复习',
+  '通信原理两周复习计划',
+  'CPS两周复习计划',
+  '通信原理常考题型和知识点',
+  'CPS常考题型和知识点',
+];
+
+const CPS_CONTEXT_FOLLOWUPS = [
+  ...CPS_FOLLOWUPS,
+  ...CPS_PLAN_FOLLOWUPS,
+  '把第 8-14 天改成冲刺刷题版',
+  '把第 8 到 14 天改成冲刺刷题版',
+];
+
+const ESD_DIRECT_QUERIES = [
+  '两周后考ESD基础一般怎么复习',
+  '两周后考电子系统设计基础一般怎么复习',
+  'ESD 有哪些常考题型和知识点',
+  '电子系统设计有哪些常考题型和知识点',
+  'ESD 两周复习计划',
+  '电子系统设计两周复习计划',
+];
+
+const ESD_CONTEXT_FOLLOWUPS = [
+  ...ESD_FOLLOWUPS,
+  ...ESD_PLAN_FOLLOWUPS,
+  '列一份 ESD 错题复盘清单',
+];
+
 export const STUDY_PLAN_DEMO_SCENARIOS: StudyHubAgentDemoScenario[] = [
   {
     id: 'cps-two-week-review',
@@ -101,7 +132,7 @@ export const STUDY_PLAN_DEMO_SCENARIOS: StudyHubAgentDemoScenario[] = [
         answer: CPS_OVERVIEW_ANSWER,
         followups: CPS_FOLLOWUPS,
         recommendations: CPS_RECOMMENDATIONS,
-        stage: '整理演示回答中',
+        stage: '整理答案中',
       };
     },
   },
@@ -132,7 +163,7 @@ export const STUDY_PLAN_DEMO_SCENARIOS: StudyHubAgentDemoScenario[] = [
         answer: ESD_OVERVIEW_ANSWER,
         followups: ESD_FOLLOWUPS,
         recommendations: ESD_RECOMMENDATIONS,
-        stage: '整理演示回答中',
+        stage: '整理答案中',
       };
     },
   },
@@ -143,10 +174,11 @@ export function inferScenarioFromContext(
   query: string,
   messages: StudyHubAgentMessage[]
 ) {
-  const text = normalizeDemoText(
-    [
-      query,
-      ...messages.slice(-8).flatMap((message) => [
+  const queryText = normalizeDemoText(query);
+  const contextText = normalizeDemoText(
+    messages
+      .slice(-8)
+      .flatMap((message) => [
         message.content,
         ...(message.recommendations || []).flatMap((item) => [
           item.title || '',
@@ -154,13 +186,25 @@ export function inferScenarioFromContext(
           item.reason || '',
           ...(item.tags || []),
         ]),
-      ]),
-    ].join(' ')
+      ])
+      .join(' ')
   );
 
-  return scenarios.find((scenario) =>
-    scenario.aliases.some((alias) => text.includes(normalizeDemoText(alias)))
+  const directScenario = scenarios.find((scenario) =>
+    scenario.aliases.some((alias) => queryText.includes(normalizeDemoText(alias)))
   );
+  if (directScenario && isAllowedDirectDemoQuery(directScenario.id, queryText)) {
+    return directScenario;
+  }
+
+  const contextScenario = scenarios.find((scenario) =>
+    scenario.aliases.some((alias) => contextText.includes(normalizeDemoText(alias)))
+  );
+  if (contextScenario && isAllowedDemoFollowup(contextScenario.id, queryText)) {
+    return contextScenario;
+  }
+
+  return undefined;
 }
 
 export function inferDemoIntent(query: string) {
@@ -188,6 +232,33 @@ export function normalizeDemoText(value: string) {
   return value.replace(/[^\u4e00-\u9fa5A-Za-z0-9]+/g, '').toLowerCase();
 }
 
+function isAllowedDirectDemoQuery(scenarioId: string, queryText: string) {
+  if (scenarioId === 'cps-two-week-review') {
+    return matchesDemoPhrase(queryText, CPS_DIRECT_QUERIES);
+  }
+  if (scenarioId === 'esd-two-week-review') {
+    return matchesDemoPhrase(queryText, ESD_DIRECT_QUERIES);
+  }
+  return false;
+}
+
+function isAllowedDemoFollowup(scenarioId: string, queryText: string) {
+  if (scenarioId === 'cps-two-week-review') {
+    return matchesDemoPhrase(queryText, CPS_CONTEXT_FOLLOWUPS);
+  }
+  if (scenarioId === 'esd-two-week-review') {
+    return matchesDemoPhrase(queryText, ESD_CONTEXT_FOLLOWUPS);
+  }
+  return false;
+}
+
+function matchesDemoPhrase(queryText: string, phrases: string[]) {
+  return phrases.some((phrase) => {
+    const normalized = normalizeDemoText(phrase);
+    return normalized.length >= 6 && queryText.includes(normalized);
+  });
+}
+
 const CPS_OVERVIEW_ANSWER = `## 通信原理：两周复习路线
 
 **结论：** 基础一般时，不建议一上来通读教材。先用助教讲义搭框架，再用真题答案校准题型，最后用手写笔记补公式和易错点。
@@ -208,9 +279,7 @@ const CPS_OVERVIEW_ANSWER = `## 通信原理：两周复习路线
 - **第 1-4 天：补框架。** 把 AM/FM/PM、ASK/PSK/QAM、信道与噪声这些核心模块先过一遍。
 - **第 5-10 天：按题型刷真题。** 每次只解决一类题，避免今天刷计算题、明天又忘框图题。
 - **第 11-13 天：错题回炉。** 把不会的题反查到讲义和笔记里，形成一页错题清单。
-- **第 14 天：轻量复盘。** 只看公式、易错点和高频题型，不再开新坑。
-
-> 演示口径：这里优先基于 StudyHub 平台资料标题、标签和可见元数据整理，下载、购买和完整文件仍回到资料详情页完成。`;
+- **第 14 天：轻量复盘。** 只看公式、易错点和高频题型，不再开新坑。`;
 
 const CPS_PLAN_ANSWER = `## 通信原理两周复习计划
 
@@ -276,9 +345,7 @@ const ESD_OVERVIEW_ANSWER = `## ESD：两周复习路线
 - **第 1-4 天：框架优先。** 先把电子系统设计中的模块、设计流程、关键指标和常见公式整理出来。
 - **第 5-9 天：样卷和真题识别题型。** 每天聚焦一种题型，记录标准作答步骤。
 - **第 10-13 天：限时训练和错题回查。** 按考试节奏做题，错题回到笔记里定位知识点。
-- **第 14 天：轻量复盘。** 只看错题、公式、题型模板和容易混淆的概念。
-
-> 说明：当前演示回答不直接展开受控文件内容，只根据平台可见资料信号生成复习路线；真实下载和权限校验仍在 StudyHub 资料页完成。`;
+- **第 14 天：轻量复盘。** 只看错题、公式、题型模板和容易混淆的概念。`;
 
 const ESD_TOPICS_ANSWER = `## ESD 常考题型和知识点
 

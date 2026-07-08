@@ -112,6 +112,8 @@ describe('studyHubAgentContext', () => {
     expect(turn?.answer).toContain('通信原理：两周复习路线');
     expect(turn?.answer).toContain('推荐资料顺序');
     expect(turn?.answer).not.toContain('| 天数 |');
+    expect(turn?.answer).not.toMatch(/\u6f14\u793a|\u6f14\u793a\u53e3\u5f84/);
+    expect(turn?.stage).toBe('整理答案中');
     expect(turn?.followups).toContain('帮我整理成两周复习计划');
     expect(turn?.recommendations.map((item) => item.materialId)).toEqual([209, 18, 168]);
   });
@@ -148,5 +150,18 @@ describe('studyHubAgentContext', () => {
     expect(planTurn?.answer).toContain('ESD 两周复习计划');
     expect(planTurn?.answer).toContain('第 14 天');
     expect(planTurn?.answer).not.toContain('| 天数 |');
+  });
+
+  it('keeps non-demo questions on the normal backend path', () => {
+    const messages = [
+      message(1, 'user', '两周后考通信原理，基础一般，怎么复习？'),
+      message(2, 'assistant', '可以先按 CPS 真题和助教讲义来复习', [
+        { materialId: 209, title: 'CPS六年期末考答案自制（2019-2024）' },
+      ]),
+    ];
+
+    expect(resolveStudyHubAgentDemoTurn('通信原理教材有哪些版本？', [])).toBeNull();
+    expect(resolveStudyHubAgentDemoTurn('傅里叶变换怎么理解？', messages)).toBeNull();
+    expect(resolveStudyHubAgentDemoTurn('给我总结一下两周复习计划', [])).toBeNull();
   });
 });
