@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import json
+
 from fastapi import APIRouter, Depends, Request, Response
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_agent_feedback_service, get_ai_service, require_privileged_auth_context
@@ -47,6 +50,40 @@ def ai_recommend(
     )
 
 
+@router.post("/api/ai-recommendations/stream")
+@router.post("/api/ai/recommend/stream")
+def ai_recommend_stream(
+    payload: AiRecommendRequestPayload,
+    request: Request,
+    auth: AuthContext = Depends(require_privileged_auth_context),
+    session: Session = Depends(get_db_session),
+    service: AiService = Depends(get_ai_service),
+) -> StreamingResponse:
+    personal_memory_enabled = service.resolve_personal_memory_enabled(
+        request.cookies.get(service.memory_cookie_name())
+    )
+
+    def events():
+        try:
+            yield _sse_event("stage", {"stage": "理解问题中"})
+            yield _sse_event("stage", {"stage": "检索资料中"})
+            yield _sse_event("stage", {"stage": "调用工具中"})
+            result = service.recommend(
+                session,
+                payload,
+                current_user_id=auth.user_id,
+                personal_memory_enabled=personal_memory_enabled,
+            )
+            yield _sse_event("stage", {"stage": "总结答案中"})
+            yield _sse_event("stage", {"stage": "验证追问中"})
+            yield _sse_event("result", result)
+            yield _sse_event("stage", {"stage": "完成"})
+        except Exception as exc:
+            yield _sse_event("error", {"message": str(exc) or "StudyHub 学习辅导暂时无法回答"})
+
+    return StreamingResponse(events(), media_type="text/event-stream")
+
+
 @router.get("/api/ai/memory")
 def ai_memory_preview(
     request: Request,
@@ -64,6 +101,11 @@ def ai_memory_preview(
             personal_memory_enabled=personal_memory_enabled,
         )
     )
+
+
+def _sse_event(event: str, payload: dict[str, object]) -> str:
+    data = json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
+    return f"event: {event}\ndata: {data}\n\n"
 
 
 @router.put("/api/ai/memory-preferences")

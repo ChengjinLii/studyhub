@@ -98,6 +98,11 @@ class Settings(BaseSettings):
     ai_agent_thinking_enabled: bool = False
     ai_agent_reasoning_effort: str = "none"
     ai_agent_timeout_seconds: float = 20.0
+    ai_agent_validator_provider: str | None = None
+    ai_agent_validator_base_url: str | None = None
+    ai_agent_validator_api_key: str | None = None
+    ai_agent_validator_model: str = "v4-flash"
+    ai_agent_validator_timeout_seconds: float = 8.0
     ai_agent_max_context_materials: int = 6
     ai_agent_pdf_evidence_enabled: bool = True
     ai_agent_pdf_evidence_max_materials: int = 2

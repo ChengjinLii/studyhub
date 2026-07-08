@@ -300,6 +300,24 @@ def test_agent_safety_filters_obvious_non_learning_followups() -> None:
     assert sanitized["followup_questions"] == ["按年份整理题型"]
 
 
+def test_agent_safety_filters_duplicate_and_fill_in_followups() -> None:
+    sanitized = AgentSafetyService().sanitize_public_response_body(
+        {
+            "answer": "可以按两周复习计划安排。",
+            "followup_questions": [
+                "帮我整理成两周复习计划",
+                "你的考试日期和每天可复习时间是多少？",
+                "把第 1-7 天细化到每天两小时",
+            ],
+        },
+        candidate_materials=[],
+        pdf_evidence=[],
+        current_query="帮我整理成两周复习计划",
+    )
+
+    assert sanitized["followup_questions"] == ["把第 1-7 天细化到每天两小时"]
+
+
 def test_agent_safety_does_not_repeat_low_evidence_caveat() -> None:
     sanitized = AgentSafetyService().sanitize_recommendation_body(
         {

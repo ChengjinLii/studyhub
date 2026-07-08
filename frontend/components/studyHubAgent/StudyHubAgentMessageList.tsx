@@ -1,4 +1,5 @@
 import { RefObject } from 'react';
+import SafeMarkdown from '../SafeMarkdown';
 import StudyHubAgentMaterialCards from './StudyHubAgentMaterialCards';
 import { StudyHubAgentMaterialDetails, StudyHubAgentMessage } from './types';
 
@@ -6,6 +7,7 @@ interface StudyHubAgentMessageListProps {
   listRef: RefObject<HTMLDivElement>;
   messages: StudyHubAgentMessage[];
   loading: boolean;
+  thinkingStages: string[];
   materialDetails: StudyHubAgentMaterialDetails;
   onFollowup: (value: string) => void;
 }
@@ -14,14 +16,18 @@ export default function StudyHubAgentMessageList({
   listRef,
   messages,
   loading,
+  thinkingStages,
   materialDetails,
   onFollowup,
 }: StudyHubAgentMessageListProps) {
+  const stages = thinkingStages.length > 0 ? thinkingStages : ['理解问题', '检索资料', '整理答案'];
   return (
     <div className="hermes-agent__messages" ref={listRef} role="log" aria-live="polite" aria-relevant="additions">
       {messages.map((message) => (
         <article key={message.id} className={`hermes-agent__message hermes-agent__message--${message.role}`}>
-          <p>{message.content}</p>
+          <div className="hermes-agent__markdown">
+            <SafeMarkdown>{message.content}</SafeMarkdown>
+          </div>
           {message.imageAttachments && message.imageAttachments.length > 0 && (
             <div className="hermes-agent__message-images">
               {message.imageAttachments.slice(0, 1).map((item) => (
@@ -65,9 +71,9 @@ export default function StudyHubAgentMessageList({
             <div className="hermes-agent__thinking-copy">
               <p>StudyHub 正在思考</p>
               <div className="hermes-agent__thinking-steps" aria-hidden="true">
-                <span>理解问题</span>
-                <span>检索资料</span>
-                <span>整理答案</span>
+                {stages.slice(-6).map((stage) => (
+                  <span key={stage}>{stage}</span>
+                ))}
               </div>
             </div>
           </div>

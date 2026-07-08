@@ -99,12 +99,17 @@ class AgentSafetyService:
         *,
         candidate_materials: list[MaterialRecord],
         pdf_evidence: list[MaterialPageEvidence],
+        current_query: str | None = None,
     ) -> dict[str, Any] | None:
         allowed_material_ids = {int(material.id) for material in candidate_materials}
         recommendations, had_recommendation_list = self._sanitize_recommendations(body.get("recommendations"), allowed_material_ids)
         answer = self._sanitize_answer(body.get("answer"))
         evidence_sources = self._sanitize_evidence_sources(body.get("evidence_sources"), pdf_evidence)
-        followup_questions = self._sanitize_followups(body.get("followup_questions"), candidate_materials=candidate_materials)
+        followup_questions = self._sanitize_followups(
+            body.get("followup_questions"),
+            candidate_materials=candidate_materials,
+            current_query=current_query,
+        )
 
         if had_recommendation_list and not recommendations:
             answer = ""
@@ -144,6 +149,7 @@ class AgentSafetyService:
         *,
         candidate_materials: list[MaterialRecord],
         pdf_evidence: list[MaterialPageEvidence],
+        current_query: str | None = None,
     ) -> dict[str, Any]:
         """Clean locally generated Agent output while preserving public fields."""
 
@@ -151,7 +157,11 @@ class AgentSafetyService:
         recommendations = self._sanitize_public_recommendations(body.get("recommendations"), allowed_material_ids)
         answer = self._sanitize_answer(body.get("answer"))
         evidence_sources = self._sanitize_public_evidence_sources(body.get("evidence_sources"), pdf_evidence)
-        followup_questions = self._sanitize_followups(body.get("followup_questions"), candidate_materials=candidate_materials)
+        followup_questions = self._sanitize_followups(
+            body.get("followup_questions"),
+            candidate_materials=candidate_materials,
+            current_query=current_query,
+        )
 
         if answer and pdf_evidence:
             if not evidence_sources:
@@ -359,16 +369,28 @@ class AgentSafetyService:
         trimmed_answer = answer[: max(0, max_chars - len(caveat) - 1)].rstrip()
         return f"{trimmed_answer} {caveat}".strip()
 
-    def _sanitize_followups(self, value: Any, *, candidate_materials: list[MaterialRecord] | None = None) -> list[str]:
+    def _sanitize_followups(
+        self,
+        value: Any,
+        *,
+        candidate_materials: list[MaterialRecord] | None = None,
+        current_query: str | None = None,
+    ) -> list[str]:
         if not isinstance(value, list):
             return []
         questions: list[str] = []
         seen_questions: set[str] = set()
         has_candidate_materials = bool(candidate_materials)
+        current_key = _followup_dedupe_key(current_query or "")
         for item in value:
             question = _clean_public_text(item, max_chars=80)
             question = _normalize_followup_voice(question)
             if not question:
+                continue
+            question_key = _followup_dedupe_key(question)
+            if current_key and question_key == current_key:
+                continue
+            if _followup_needs_user_fill(question):
                 continue
             lowered = question.lower()
             if any(marker in lowered for marker in FORBIDDEN_INTERNAL_MARKERS):
@@ -377,9 +399,9 @@ class AgentSafetyService:
                 continue
             if has_candidate_materials and _followup_requests_external_material(question):
                 continue
-            if lowered in seen_questions:
+            if question_key in seen_questions:
                 continue
-            seen_questions.add(lowered)
+            seen_questions.add(question_key)
             questions.append(question)
             if len(questions) >= 3:
                 break
@@ -436,8 +458,6 @@ def _normalize_followup_voice(value: str) -> str:
         ("是否需要我把", "把"),
         ("是否需要我", ""),
         ("是否需要", ""),
-        ("你的考试日期和每天可复习时间是多少", "我的考试日期和每天可复习时间是"),
-        ("你的考试日期和每天可复习时间是", "我的考试日期和每天可复习时间是"),
         ("你更想要", "我更想要"),
         ("你的专业和年级", "我的专业和年级"),
     )
@@ -446,6 +466,31 @@ def _normalize_followup_voice(value: str) -> str:
             text = f"{new}{text[len(old):]}".strip()
             break
     return re.sub(r"\s+", " ", text).strip(" ?？。")[:80]
+
+
+def _followup_dedupe_key(value: str) -> str:
+    return re.sub(r"[^\u4e00-\u9fffA-Za-z0-9]+", "", str(value or "")).lower()
+
+
+def _followup_needs_user_fill(value: str) -> bool:
+    normalized = re.sub(r"\s+", "", str(value or "")).lower()
+    if not normalized:
+        return True
+    fill_markers = (
+        "你的考试日期和每天可复习时间",
+        "我的考试日期和每天可复习时间是",
+        "考试日期和每天可复习时间是",
+        "请补充课程名",
+        "告诉我考试时间",
+        "告诉我每天可复习时间",
+    )
+    if any(marker in normalized for marker in fill_markers):
+        return True
+    if normalized.endswith(("是多少", "是什么", "有哪些", "吗")) and any(
+        marker in normalized for marker in ("你的", "你现在", "你想", "需要我", "要不要")
+    ):
+        return True
+    return False
 
 
 def _clean_prompt_text(value: str, *, field_name: str | None) -> str:

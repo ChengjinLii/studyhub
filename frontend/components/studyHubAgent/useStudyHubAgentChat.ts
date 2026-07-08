@@ -3,6 +3,7 @@ import { fetchOptionalSessionUser } from '../../lib/sessionApi';
 import {
   fetchStudyHubAgentMaterial,
   requestStudyHubAgentRecommendations,
+  requestStudyHubAgentRecommendationsStream,
 } from '../../lib/studyHubAgentApi';
 import { SessionUser } from '../../types/user';
 import { STUDYHUB_AGENT_INITIAL_MESSAGES, STUDYHUB_AGENT_MESSAGES_STORAGE_KEY } from './constants';
@@ -32,6 +33,7 @@ const COURSE_CONTEXT_HINTS: { label: string; aliases: string[] }[] = [
 
 export const useStudyHubAgentChat = () => {
   const [loading, setLoading] = useState(false);
+  const [thinkingStages, setThinkingStages] = useState<string[]>([]);
   const [user, setUser] = useState<SessionUser | null>(null);
   const [messages, setMessages] = useState<StudyHubAgentMessage[]>(STUDYHUB_AGENT_INITIAL_MESSAGES);
   const [materialDetails, setMaterialDetails] = useState<StudyHubAgentMaterialDetails>({});
@@ -109,9 +111,22 @@ export const useStudyHubAgentChat = () => {
         return;
       }
       setLoading(true);
+      setThinkingStages(['理解问题中']);
       try {
         const contextQuery = buildStudyHubAgentContext(messages, query);
-        const data = await requestStudyHubAgentRecommendations(query, contextQuery, attachments);
+        const data = await requestStudyHubAgentRecommendationsStream(
+          query,
+          contextQuery,
+          attachments,
+          {
+            onStage: (stage) => {
+              setThinkingStages((prev) => appendThinkingStage(prev, stage));
+            },
+          }
+        ).catch(async () => {
+          setThinkingStages((prev) => appendThinkingStage(prev, '降级到普通请求'));
+          return requestStudyHubAgentRecommendations(query, contextQuery, attachments);
+        });
         const parsed = parseRecommendationOutput(data.output);
         const recommendations = normalizeRecommendations(parsed.recommendations);
         await Promise.all(recommendations.map((item) => loadMaterialDetail(item.materialId)));
@@ -126,7 +141,7 @@ export const useStudyHubAgentChat = () => {
             role: 'assistant',
             content: answer,
             recommendations,
-            followups: normalizeFollowups(parsed.followup_questions),
+            followups: normalizeFollowups(parsed.followup_questions, query),
           },
         ]);
       } catch (error) {
@@ -143,6 +158,7 @@ export const useStudyHubAgentChat = () => {
         ]);
       } finally {
         setLoading(false);
+        setThinkingStages([]);
       }
     },
     [loadMaterialDetail, loading, messages, user]
@@ -150,6 +166,7 @@ export const useStudyHubAgentChat = () => {
 
   return {
     loading,
+    thinkingStages,
     user,
     messages,
     materialDetails,
@@ -192,10 +209,20 @@ function normalizeRecommendations(value: unknown): StudyHubAgentRecommendation[]
     .slice(0, 3);
 }
 
-function normalizeFollowups(value: unknown): string[] {
+export function normalizeFollowups(value: unknown, currentQuery = ''): string[] {
   if (!Array.isArray(value)) return [];
+  const currentKey = followupKey(currentQuery);
+  const seen = new Set<string>();
   return value
-    .filter((item): item is string => typeof item === 'string' && item.trim().length > 0)
+    .map((item) => (typeof item === 'string' ? item.trim().replace(/\s+/g, ' ') : ''))
+    .filter((item): item is string => {
+      if (!item) return false;
+      const key = followupKey(item);
+      if (!key || key === currentKey || seen.has(key)) return false;
+      if (isBadFollowupPrompt(item)) return false;
+      seen.add(key);
+      return true;
+    })
     .slice(0, 3);
 }
 
@@ -215,6 +242,28 @@ function pickText(...values: unknown[]) {
   return values.find(
     (value): value is string => typeof value === 'string' && value.trim().length > 0
   );
+}
+
+function appendThinkingStage(stages: string[], stage: string) {
+  const cleaned = stage.trim();
+  if (!cleaned) return stages;
+  if (stages.includes(cleaned)) return stages;
+  return [...stages, cleaned].slice(-6);
+}
+
+function followupKey(value: string) {
+  return value.replace(/[^\u4e00-\u9fa5A-Za-z0-9]+/g, '').toLowerCase();
+}
+
+function isBadFollowupPrompt(value: string) {
+  const normalized = followupKey(value);
+  return [
+    '你的考试日期和每天可复习时间',
+    '我的考试日期和每天可复习时间是',
+    '考试日期和每天可复习时间是',
+    '告诉我考试时间',
+    '请补充课程名',
+  ].some((marker) => normalized.includes(marker));
 }
 
 function buildStudyHubAgentAnswer(query: string, recommendations: StudyHubAgentRecommendation[]) {

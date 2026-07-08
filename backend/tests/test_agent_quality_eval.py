@@ -765,30 +765,12 @@ def test_agent_local_cps_plan_filters_unrelated_context_recommendations(monkeypa
         material_repo=None,
         query_planner_service=AgentQueryPlannerService(),
     )  # type: ignore[arg-type]
-    monkeypatch.setattr(
-        service,
-        "_rank_materials",
-        lambda session, query, filters: [
-            _material(
-                201,
-                title="微积分II期中考自制解析和复习视频",
-                description="微积分期中速成和期中真题解析",
-                downloads=130,
-            ),
-            _material(
-                202,
-                title="CPS-通信原理-四年真题及自制解析",
-                description="通信原理期末真题和自制解析",
-                downloads=120,
-            ),
-            _material(
-                203,
-                title="CPS-通信原理-Part3&4-助教讲义",
-                description="通信原理助教讲义和期末速成",
-                downloads=80,
-            ),
-        ],
-    )
+
+    def fail_rank_materials(session: object, query: str, filters: dict[str, Any]) -> list[MaterialRecord]:
+        del session, query, filters
+        raise AssertionError("contextual study-plan follow-up should not trigger fresh material retrieval")
+
+    monkeypatch.setattr(service, "_rank_materials", fail_rank_materials)
 
     response = service.recommend(
         object(),  # type: ignore[arg-type]
@@ -805,20 +787,91 @@ def test_agent_local_cps_plan_filters_unrelated_context_recommendations(monkeypa
         current_user_id=7,
     )
     body = json.loads(str(response["output"]).removeprefix("<json>").removesuffix("</json>"))
-    serialized_recommendations = json.dumps(body["recommendations"], ensure_ascii=False)
 
     assert body["answer"].startswith("可以。下面按“基础一般、两周后考通信原理”")
     assert "第 1 天" in body["answer"]
     assert "第 14 天" in body["answer"]
     assert "微积分" not in body["answer"]
-    assert "微积分" not in serialized_recommendations
-    assert "CPS-通信原理-四年真题及自制解析" in body["answer"]
+    assert "recommendations" not in body
     assert body["followup_questions"] == [
         "把第 1-7 天细化到每天两小时",
         "把第 8-14 天改成冲刺刷题版",
         "只看真题和讲义怎么安排",
     ]
     metrics.clear()
+
+
+def test_agent_explicit_v4_flash_validator_routes_plan_followup_without_retrieval(monkeypatch) -> None:
+    settings = Settings(
+        ai_agent_provider="local",
+        ai_agent_validator_provider="openai-compatible",
+        ai_agent_validator_base_url="https://validator.example.test/v1",
+        ai_agent_validator_api_key="validator-key",
+        ai_agent_validator_model="v4-flash",
+    )
+    monkeypatch.setattr("app.services.ai_service.get_settings", lambda: settings)
+
+    service = AiService(
+        read_repo=None,
+        material_repo=None,
+        query_planner_service=AgentQueryPlannerService(),
+    )  # type: ignore[arg-type]
+    validator_models: list[str] = []
+
+    def fake_call_agent_model(settings: Settings, system_prompt: str, user_prompt: dict[str, Any]) -> str:
+        del system_prompt
+        validator_models.append(settings.ai_agent_model)
+        if "allowed_routes" in user_prompt:
+            return json.dumps(
+                {
+                    "route": "revise_study_plan",
+                    "should_search": False,
+                    "use_context": True,
+                    "search_query": "",
+                    "reason": "plan follow-up",
+                },
+                ensure_ascii=False,
+            )
+        return json.dumps(
+            {
+                "valid_followups": [
+                    "把第 8-14 天改成冲刺刷题版",
+                    "只看真题和讲义怎么安排",
+                ],
+                "rejected_followups": ["你的考试日期和每天可复习时间是多少？"],
+            },
+            ensure_ascii=False,
+        )
+
+    def fail_rank_materials(session: object, query: str, filters: dict[str, Any]) -> list[MaterialRecord]:
+        del session, query, filters
+        raise AssertionError("validator-routed study-plan follow-up should not search materials")
+
+    monkeypatch.setattr(service, "_call_agent_model", fake_call_agent_model)
+    monkeypatch.setattr(service, "_rank_materials", fail_rank_materials)
+
+    response = service.recommend(
+        object(),  # type: ignore[arg-type]
+        SimpleNamespace(
+            query="把第 1-7 天细化到每天两小时",
+            contextQuery=(
+                "用户：两周后考通信原理，基础一般，怎么复习？ "
+                "助手：推荐资料：《CPS六年期末考答案自制（2019-2024）》；"
+                "《CPS-通信原理-Part3&4-助教讲义》；《通信原理手写笔记》"
+            ),
+            filters={},
+        ),
+        current_user_id=7,
+    )
+    body = json.loads(str(response["output"]).removeprefix("<json>").removesuffix("</json>"))
+
+    assert validator_models and set(validator_models) == {"v4-flash"}
+    assert "第 1 天" in body["answer"]
+    assert "recommendations" not in body
+    assert body["followup_questions"] == [
+        "把第 8-14 天改成冲刺刷题版",
+        "只看真题和讲义怎么安排",
+    ]
 
 
 def test_agent_local_study_plan_uses_query_learning_preferences(monkeypatch) -> None:
@@ -1693,21 +1746,12 @@ def test_agent_allows_context_dependent_learning_followup(monkeypatch) -> None:
     settings = Settings(ai_agent_provider="local")
     monkeypatch.setattr("app.services.ai_service.get_settings", lambda: settings)
     service = AiService(read_repo=None, material_repo=None)  # type: ignore[arg-type]
-    captured: dict[str, Any] = {}
 
-    def fake_rank_materials(session: object, query: str, filters: dict[str, Any]) -> list[MaterialRecord]:
+    def fail_rank_materials(session: object, query: str, filters: dict[str, Any]) -> list[MaterialRecord]:
         del session, filters
-        captured["rank_query"] = query
-        return [
-            _material(
-                702,
-                title="通信原理四年真题解析",
-                description="通信原理期末真题、答案和解析",
-                downloads=20,
-            )
-        ]
+        raise AssertionError(f"context refinement should not trigger fresh material retrieval: {query}")
 
-    monkeypatch.setattr(service, "_rank_materials", fake_rank_materials)
+    monkeypatch.setattr(service, "_rank_materials", fail_rank_materials)
 
     response = service.recommend(
         object(),  # type: ignore[arg-type]
@@ -1721,9 +1765,8 @@ def test_agent_allows_context_dependent_learning_followup(monkeypatch) -> None:
     )
     body = json.loads(str(response["output"]).removeprefix("<json>").removesuffix("</json>"))
 
-    assert "最近上下文关键词" in captured["rank_query"]
-    assert "通信原理" in captured["rank_query"]
-    assert body["recommendations"][0]["material_id"] == 702
+    assert "沿用上一轮 StudyHub 资料和回答继续细化" in body["answer"]
+    assert "recommendations" not in body
 
 
 def test_agent_image_attachment_local_fallback_keeps_learning_boundary(monkeypatch) -> None:

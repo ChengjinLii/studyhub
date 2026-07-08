@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { buildStudyHubAgentContext } from '../../components/studyHubAgent/useStudyHubAgentChat';
+import {
+  buildStudyHubAgentContext,
+  normalizeFollowups,
+} from '../../components/studyHubAgent/useStudyHubAgentChat';
 import { StudyHubAgentMessage } from '../../components/studyHubAgent/types';
 
 const message = (
@@ -71,5 +74,19 @@ describe('studyHubAgentContext', () => {
     expect(context).toContain('question.png(image/png, 128B)');
     expect(context).not.toContain('secret-image-data');
     expect(context).not.toContain('data:image/png');
+  });
+
+  it('filters duplicate and fill-in follow-up prompts', () => {
+    const followups = normalizeFollowups(
+      [
+        '帮我整理成两周复习计划',
+        '你的考试日期和每天可复习时间是多少？',
+        '把第 1-7 天细化到每天两小时',
+        '把第 1-7 天细化到每天两小时',
+      ],
+      '帮我整理成两周复习计划'
+    );
+
+    expect(followups).toEqual(['把第 1-7 天细化到每天两小时']);
   });
 });

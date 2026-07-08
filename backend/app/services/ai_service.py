@@ -3,7 +3,9 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+from dataclasses import dataclass
 from time import perf_counter
+from types import SimpleNamespace
 from typing import Any
 
 import httpx
@@ -21,6 +23,7 @@ from app.services.agent_material_signal_service import build_material_signals
 from app.services.agent_memory_service import AgentMemoryContext, AgentMemoryService
 from app.services.agent_query_planner_service import AgentQueryPlan, AgentQueryPlannerService
 from app.services.agent_safety_service import AgentSafetyService
+from app.services.materials_search import material_matches_search, material_search_score, parse_material_search_query
 from app.services.material_pdf_evidence_service import MaterialPageEvidence, MaterialPdfEvidenceService
 from app.services.read_support import parse_iso_datetime
 
@@ -186,6 +189,15 @@ AGENT_OBVIOUS_NON_LEARNING_QUERY_MARKERS = (
 )
 
 
+@dataclass(frozen=True)
+class AgentTurnRoute:
+    route: str
+    should_search: bool
+    use_context: bool
+    search_query: str = ""
+    reason: str = "local"
+
+
 class AiService:
     """StudyHub AI compatibility layer with optional external agent providers."""
 
@@ -240,18 +252,32 @@ class AiService:
                 status = "scope_greeting"
                 body = _learning_scope_greeting_body()
                 return {"output": _agent_json_output(body)}
+            context_query = getattr(payload, "contextQuery", None)
+            turn_route = self._route_agent_turn(
+                payload.query,
+                context_query=context_query,
+                has_image=bool(image_attachments),
+            )
             if not _is_learning_related_agent_query(
                 payload.query,
-                context_query=getattr(payload, "contextQuery", None),
+                context_query=context_query,
                 has_image=bool(image_attachments),
-            ):
+            ) and not _route_has_learning_context(turn_route, context_query):
                 status = "scope_blocked"
                 body = _learning_scope_block_body()
                 return {"output": _agent_json_output(body)}
-            context_query = getattr(payload, "contextQuery", None)
-            effective_context_query = _agent_context_for_query(payload.query, context_query)
+            effective_context_query = (
+                _compact_agent_context(context_query)
+                if turn_route.use_context
+                else _agent_context_for_query(payload.query, context_query)
+            )
             retrieval_query = _agent_retrieval_query(payload.query, effective_context_query)
-            materials = self._rank_materials(session, retrieval_query, payload.filters or {})
+            material_query = turn_route.search_query or retrieval_query
+            materials = (
+                self._rank_materials(session, material_query, payload.filters or {})
+                if turn_route.should_search
+                else []
+            )
             pdf_evidence = self._collect_pdf_evidence(materials, retrieval_query, current_user_id=current_user_id)
             memory_context = (
                 self._collect_memory_context(
@@ -317,6 +343,7 @@ class AiService:
                         memory_context,
                         query_plan=query_plan,
                         course_memory_card=course_memory_card,
+                        conversation_context=effective_context_query,
                         image_attachments=image_attachments,
                     )
             else:
@@ -327,6 +354,7 @@ class AiService:
                     memory_context,
                     query_plan=query_plan,
                     course_memory_card=course_memory_card,
+                    conversation_context=effective_context_query,
                     image_attachments=image_attachments,
                 )
             body = {
@@ -352,6 +380,7 @@ class AiService:
                     memory_context,
                     query_plan=query_plan,
                     course_memory_card=course_memory_card,
+                    conversation_context=effective_context_query,
                     image_attachments=image_attachments,
                 )
                 body["followup_questions"] = self._local_followup_questions(
@@ -361,10 +390,17 @@ class AiService:
                     recommendations=cps_recommendations,
                     memory_context=memory_context,
                 )
+            body["followup_questions"] = self._validate_followups_with_model(
+                query=payload.query,
+                body=body,
+                recommendations=body.get("recommendations", []),
+                route=turn_route,
+            )
             body = self.safety_service.sanitize_public_response_body(
                 body,
                 candidate_materials=materials,
                 pdf_evidence=pdf_evidence,
+                current_query=payload.query,
             )
             return {"output": _agent_json_output(body)}
         except Exception:
@@ -485,6 +521,138 @@ class AiService:
             "memorySnapshot": _agent_memory_snapshot_payload(memory_context, candidate_material_count=len(materials)),
             "candidateMaterialCount": len(materials),
         }
+
+    def _route_agent_turn(self, query: str, *, context_query: str | None, has_image: bool) -> AgentTurnRoute:
+        local_route = _local_agent_turn_route(query, context_query=context_query, has_image=has_image)
+        settings = get_settings()
+        if not self._is_agent_validator_configured(settings):
+            return local_route
+        payload = {
+            "user_query": query,
+            "context_summary": _compact_agent_context(context_query),
+            "has_image": bool(has_image),
+            "allowed_routes": [
+                "new_material_search",
+                "refine_existing_answer",
+                "revise_study_plan",
+                "rerank_existing_materials",
+                "ask_user_clarification",
+            ],
+            "output_schema": {
+                "route": "one allowed route",
+                "should_search": "boolean; true only when a fresh material search is needed",
+                "use_context": "boolean; true when the current user query depends on previous conversation",
+                "search_query": "short query for material search; empty when should_search=false",
+                "reason": "brief internal reason",
+            },
+        }
+        system_prompt = (
+            "你是 StudyHub Agent 的语义路由器。只输出严格 JSON。"
+            "判断当前用户输入是新资料检索，还是对上一轮答案的细化、改写、重排、复习计划修订或需要澄清。"
+            "只有明确需要重新找资料时 should_search 才能为 true。"
+            "对“细化到每天两小时”“改成冲刺刷题版”“只看真题和讲义”“把推荐资料排成每日顺序”等上下文追问，应 use_context=true 且 should_search=false。"
+        )
+        try:
+            parsed = self._call_agent_validator_json(settings, system_prompt, payload)
+        except Exception:
+            return local_route
+        return _coerce_agent_turn_route(parsed, fallback=local_route)
+
+    def _validate_followups_with_model(
+        self,
+        *,
+        query: str,
+        body: dict[str, Any],
+        recommendations: Any,
+        route: AgentTurnRoute,
+    ) -> list[str]:
+        raw_followups = body.get("followup_questions")
+        if not isinstance(raw_followups, list) or not raw_followups:
+            return []
+        local_cleaned = self.safety_service.sanitize_public_response_body(
+            {"answer": body.get("answer") or "", "followup_questions": raw_followups},
+            candidate_materials=[],
+            pdf_evidence=[],
+            current_query=query,
+        ).get("followup_questions", [])
+        if not local_cleaned:
+            return []
+        settings = get_settings()
+        if not self._is_agent_validator_configured(settings):
+            return local_cleaned[:3]
+        compact_recommendations = []
+        if isinstance(recommendations, list):
+            for item in recommendations[:3]:
+                if isinstance(item, dict):
+                    compact_recommendations.append(
+                        {
+                            "title": str(item.get("title") or "")[:80],
+                            "reason": str(item.get("reason") or "")[:120],
+                        }
+                    )
+        payload = {
+            "current_user_query": query,
+            "route": route.route,
+            "answer_excerpt": str(body.get("answer") or "")[:420],
+            "recommendations": compact_recommendations,
+            "candidate_followups": local_cleaned,
+            "rules": [
+                "保留用户点击后可以直接发送执行的请求。",
+                "拒绝重复当前问题的追问。",
+                "拒绝 AI 口吻、反问句、让用户补空的半截句。",
+                "拒绝“你的考试日期和每天可复习时间是多少”这类 Agent 向用户提问。",
+                "必要时把轻微 AI 口吻改写成用户口吻。",
+            ],
+            "output_schema": {
+                "valid_followups": ["最多 3 条用户可点击请求"],
+                "rewritten_followups": ["可选，改写后的用户口吻请求"],
+                "rejected_followups": ["被拒绝的原句"],
+                "reason": "简短说明",
+            },
+        }
+        system_prompt = (
+            "你是 StudyHub Agent 追问验证器。使用 v4 flash 风格的快速严格判断。"
+            "只输出严格 JSON，不要 Markdown。valid_followups 必须像用户下一句会发送的话，不能像助手在问用户。"
+        )
+        try:
+            parsed = self._call_agent_validator_json(settings, system_prompt, payload)
+        except Exception:
+            return local_cleaned[:3]
+        validated = _coerce_validated_followups(parsed, fallback=local_cleaned, current_query=query)
+        return validated[:3]
+
+    def _is_agent_validator_configured(self, settings: Any) -> bool:
+        has_explicit_validator = any(
+            getattr(settings, field, None)
+            for field in (
+                "ai_agent_validator_provider",
+                "ai_agent_validator_base_url",
+                "ai_agent_validator_api_key",
+            )
+        )
+        if not has_explicit_validator:
+            return False
+        provider = str(settings.ai_agent_validator_provider or settings.ai_agent_provider or "").strip().lower()
+        if provider not in CHAT_COMPLETIONS_AGENT_PROVIDERS | SUB2API_AGENT_PROVIDERS:
+            return False
+        base_url = settings.ai_agent_validator_base_url or settings.ai_agent_base_url
+        api_key = settings.ai_agent_validator_api_key or settings.ai_agent_api_key
+        model = settings.ai_agent_validator_model or "v4-flash"
+        return bool(base_url and api_key and model)
+
+    def _call_agent_validator_json(self, settings: Any, system_prompt: str, user_prompt: dict[str, Any]) -> dict[str, Any]:
+        provider = str(settings.ai_agent_validator_provider or settings.ai_agent_provider or "").strip().lower()
+        validator_settings = SimpleNamespace(
+            ai_agent_provider=provider,
+            ai_agent_base_url=settings.ai_agent_validator_base_url or settings.ai_agent_base_url,
+            ai_agent_api_key=settings.ai_agent_validator_api_key or settings.ai_agent_api_key,
+            ai_agent_model=settings.ai_agent_validator_model or "v4-flash",
+            ai_agent_timeout_seconds=max(2.0, float(settings.ai_agent_validator_timeout_seconds or 8.0)),
+            ai_agent_thinking_enabled=False,
+            ai_agent_reasoning_effort="none",
+        )
+        content = self._call_agent_model(validator_settings, system_prompt, self.safety_service.sanitize_prompt_payload(user_prompt))
+        return self._loads_object(content) or {}
 
     def _recommendation_payload(
         self,
@@ -674,6 +842,7 @@ class AiService:
             parsed,
             candidate_materials=context_materials,
             pdf_evidence=pdf_evidence,
+            current_query=query,
         )
 
     def _is_agent_model_configured(self, settings: Any) -> bool:
@@ -817,12 +986,16 @@ class AiService:
         memory_context: AgentMemoryContext | None = None,
         query_plan: AgentQueryPlan | None = None,
         course_memory_card: CourseMemoryCard | None = None,
+        conversation_context: str | None = None,
         image_attachments: list[dict[str, Any]] | None = None,
     ) -> str:
         image_hint = "我已收到你发的图片；当前会结合图片上下文、你的文字和平台资料一起判断。" if image_attachments else ""
         cps_plan_answer = _local_cps_two_week_plan_answer(query, query_plan, recommendations)
         if cps_plan_answer:
             return f"{image_hint}{cps_plan_answer}"
+        contextual_answer = _local_contextual_followup_answer(query, conversation_context, query_plan)
+        if contextual_answer and not recommendations:
+            return f"{image_hint}{contextual_answer}"
         if not recommendations:
             if image_attachments:
                 return f"{image_hint}我没有在平台资料库里找到足够贴近「{query}」的候选。你可以补充课程名、考试范围或题目文字，我再帮你缩小检索。"
@@ -1166,7 +1339,7 @@ class AiService:
         elif intent == "study_plan":
             constraints = getattr(query_plan, "study_constraints", {}) or {}
             days = _safe_positive_int(constraints.get("days_until_exam")) if isinstance(constraints, dict) else None
-            first_question = f"帮我按 {days} 天拆成每日复习安排" if days else "我的考试日期和每天可复习时间是"
+            first_question = f"帮我按 {days} 天拆成每日复习安排" if days else "帮我先按两周复习计划安排"
             if _is_cps_course_plan(query_plan) and (days == 14 or _query_plan_has_two_week_constraint(query_plan)):
                 first_question = "帮我整理成两周复习计划"
             questions = [
@@ -1356,6 +1529,7 @@ class AiService:
         school = str(filters.get("school")).strip() if filters.get("school") else None
         major = str(filters.get("major")).strip() if filters.get("major") else None
         query_terms = self._query_terms(normalized_query)
+        material_search_query = parse_material_search_query(_agent_material_search_text(query_terms, normalized_query))
         candidate_materials = self._candidate_materials_for_ranking(
             session,
             normalized_query=normalized_query,
@@ -1365,7 +1539,10 @@ class AiService:
         )
         scored_items = []
         for item in candidate_materials:
-            score = self._score(item, query_terms, normalized_query, school=school, major=major)
+            search_score = _agent_material_search_score(item, material_search_query, self._loads)
+            if material_search_query.has_terms and _agent_material_matches_search(item, material_search_query, self._loads):
+                search_score += 30
+            score = search_score + self._score(item, query_terms, normalized_query, school=school, major=major)
             course_score = self._course_score(item, query_terms)
             material_signals = build_material_signals(item)
             quality_score = material_signals.quality_score
@@ -1635,6 +1812,162 @@ def _split_prompt_image_payload(user_prompt: dict[str, Any]) -> tuple[dict[str, 
 def _agent_json_output(body: dict[str, Any]) -> str:
     payload = json.dumps(body, ensure_ascii=False, separators=(",", ":"))
     return f"{AGENT_OUTPUT_FENCE_OPEN}{payload}{AGENT_OUTPUT_FENCE_CLOSE}"
+
+
+def _local_agent_turn_route(query: str, *, context_query: str | None, has_image: bool) -> AgentTurnRoute:
+    context = _compact_agent_context(context_query)
+    normalized = re.sub(r"\s+", "", str(query or "")).lower()
+    has_context = bool(context)
+    if not normalized:
+        return AgentTurnRoute("ask_user_clarification", should_search=False, use_context=has_context, reason="empty_query")
+    if _has_obvious_non_learning_query_marker(normalized):
+        return AgentTurnRoute("ask_user_clarification", should_search=False, use_context=False, reason="obvious_non_learning")
+    if has_image:
+        return AgentTurnRoute("new_material_search", should_search=True, use_context=has_context, reason="image_learning_query")
+    if has_context and _looks_like_study_plan_revision(normalized):
+        return AgentTurnRoute("revise_study_plan", should_search=False, use_context=True, reason="contextual_plan_revision")
+    if has_context and _looks_like_existing_answer_refinement(normalized):
+        return AgentTurnRoute("refine_existing_answer", should_search=False, use_context=True, reason="contextual_answer_refinement")
+    use_context = bool(context and (_should_use_agent_context(query) or not _query_has_course_anchor(normalized)))
+    search_query = _agent_retrieval_query(query, context if use_context else None)
+    return AgentTurnRoute(
+        "new_material_search",
+        should_search=True,
+        use_context=use_context,
+        search_query=search_query,
+        reason="fresh_or_contextual_search",
+    )
+
+
+def _looks_like_study_plan_revision(normalized_query: str) -> bool:
+    markers = (
+        "两周复习计划",
+        "复习计划",
+        "复习安排",
+        "学习顺序",
+        "每日学习顺序",
+        "每日复习",
+        "每天两小时",
+        "每天2小时",
+        "第1-7天",
+        "第8-14天",
+        "1-7天",
+        "8-14天",
+        "冲刺刷题",
+        "只看真题",
+        "只看讲义",
+        "真题和讲义",
+        "细化到每天",
+        "改成冲刺",
+    )
+    action_markers = ("帮我", "把", "按", "只看", "改成", "细化", "整理", "安排")
+    return any(marker in normalized_query for marker in markers) and any(
+        marker in normalized_query for marker in action_markers
+    )
+
+
+def _looks_like_existing_answer_refinement(normalized_query: str) -> bool:
+    markers = (
+        "展开",
+        "细化",
+        "继续",
+        "接着",
+        "换一种",
+        "更详细",
+        "简洁一点",
+        "按表格",
+        "列成清单",
+        "排个顺序",
+        "只保留",
+    )
+    return any(marker in normalized_query for marker in markers)
+
+
+def _coerce_agent_turn_route(value: dict[str, Any], *, fallback: AgentTurnRoute) -> AgentTurnRoute:
+    if not isinstance(value, dict):
+        return fallback
+    route = str(value.get("route") or "").strip()
+    allowed = {
+        "new_material_search",
+        "refine_existing_answer",
+        "revise_study_plan",
+        "rerank_existing_materials",
+        "ask_user_clarification",
+    }
+    if route not in allowed:
+        return fallback
+    should_search = bool(value.get("should_search")) and route == "new_material_search"
+    use_context = bool(value.get("use_context")) or (route != "new_material_search" and fallback.use_context)
+    search_query = str(value.get("search_query") or "").strip()[:900] if should_search else ""
+    reason = str(value.get("reason") or "validator").strip()[:120]
+    return AgentTurnRoute(
+        route=route,
+        should_search=should_search,
+        use_context=use_context,
+        search_query=search_query,
+        reason=reason or "validator",
+    )
+
+
+def _route_has_learning_context(route: AgentTurnRoute, context_query: str | None) -> bool:
+    if not route.use_context:
+        return False
+    context = _compact_agent_context(context_query)
+    if not context:
+        return False
+    return _has_learning_marker(re.sub(r"\s+", "", context).lower())
+
+
+def _coerce_validated_followups(
+    value: dict[str, Any],
+    *,
+    fallback: list[str],
+    current_query: str,
+) -> list[str]:
+    if not isinstance(value, dict):
+        return fallback[:3]
+    raw_items = value.get("valid_followups")
+    if not isinstance(raw_items, list) or not raw_items:
+        raw_items = value.get("rewritten_followups")
+    if not isinstance(raw_items, list) or not raw_items:
+        return fallback[:3]
+    current_key = _agent_followup_key(current_query)
+    result: list[str] = []
+    seen: set[str] = set()
+    for raw_item in raw_items:
+        if not isinstance(raw_item, (str, int, float)):
+            continue
+        item = re.sub(r"\s+", " ", str(raw_item)).strip(" ?？。")[:80]
+        if not item:
+            continue
+        key = _agent_followup_key(item)
+        if not key or key == current_key or key in seen:
+            continue
+        if _agent_followup_is_fill_prompt(item):
+            continue
+        seen.add(key)
+        result.append(item)
+        if len(result) >= 3:
+            break
+    return result or fallback[:3]
+
+
+def _agent_followup_key(value: str) -> str:
+    return re.sub(r"[^\u4e00-\u9fffA-Za-z0-9]+", "", str(value or "")).lower()
+
+
+def _agent_followup_is_fill_prompt(value: str) -> bool:
+    normalized = re.sub(r"\s+", "", str(value or "")).lower()
+    return any(
+        marker in normalized
+        for marker in (
+            "你的考试日期和每天可复习时间",
+            "我的考试日期和每天可复习时间是",
+            "考试日期和每天可复习时间是",
+            "告诉我考试时间",
+            "请补充课程名",
+        )
+    )
 
 
 def _agent_output_guardrail_payload() -> dict[str, Any]:
@@ -2281,6 +2614,42 @@ def _agent_material_match_values(normalized_query: str, query_terms: list[str]) 
     return values
 
 
+def _agent_material_search_text(query_terms: list[str], normalized_query: str) -> str:
+    useful_terms: list[str] = []
+    for term in query_terms:
+        cleaned = str(term or "").strip().lower()
+        if not cleaned or cleaned in LOW_VALUE_QUERY_TERMS:
+            continue
+        if cleaned not in useful_terms:
+            useful_terms.append(cleaned)
+    if useful_terms:
+        return " ".join(useful_terms[:12])
+    return normalized_query[:120]
+
+
+def _agent_material_matches_search(material: MaterialRecord, query: Any, tags_loader: Any) -> bool:
+    try:
+        return material_matches_search(material, query, tags_loader)
+    except AttributeError:
+        return False
+
+
+def _agent_material_search_score(material: MaterialRecord, query: Any, tags_loader: Any) -> int:
+    try:
+        score = material_search_score(material, query, tags_loader)
+    except AttributeError:
+        return 0
+    try:
+        score -= min(int(getattr(material, "download_count", 0) or 0), 100) // 5
+        score -= min(int(getattr(material, "like_count", 0) or 0), 30)
+        rating_count = min(int(getattr(material, "rating_count", 0) or 0), 20)
+        rating_avg = max(0, min(int(float(getattr(material, "rating_avg", 0) or 0)), 5))
+        score -= rating_count * rating_avg
+    except (TypeError, ValueError):
+        pass
+    return max(score, 0)
+
+
 def _prioritize_exam_summary_parts(
     parts: list[tuple[str, str]],
     query_plan: AgentQueryPlan | None,
@@ -2413,6 +2782,94 @@ def _local_cps_two_week_plan_answer(
         "第 14 天：轻量回顾。上午过核心公式和错因，下午做少量典型题保持手感，晚上停止高强度刷题。\n\n"
         "每天最低完成标准：看完一个模块、做完一组题、记录 3 个错因。基础一般时不要追求资料全看完，先保证核心概念能复述、常见题型有步骤、错题原因能复盘。"
     )
+
+
+def _local_contextual_followup_answer(
+    query: str,
+    conversation_context: str | None,
+    query_plan: AgentQueryPlan | None,
+) -> str:
+    context = _compact_agent_context(conversation_context)
+    if not context:
+        return ""
+    normalized = re.sub(r"\s+", "", str(query or "")).lower()
+    is_cps_context = "通信原理" in context or "cps" in context.lower()
+    if is_cps_context and any(marker in normalized for marker in ("两周复习计划", "两周复习安排", "14天复习", "十四天复习")):
+        return (
+            "可以。下面按“基础一般、两周后考通信原理”来排 14 天复习计划。"
+            "资料使用顺序保持上一轮建议：先用手写笔记或讲义补框架，再用 CPS/通信原理真题和答案解析刷题复盘。\n\n"
+            "第 1 天：搭框架。整理调制、解调、频谱、带宽、信噪比、误码率这些核心概念。\n"
+            "第 2 天：补基础公式。把常用公式、适用条件和单位写成一页表。\n"
+            "第 3 天：看助教讲义 Part3，标出题干关键词和公式入口。\n"
+            "第 4 天：看助教讲义 Part4，把不会的推导和计算步骤列成问题清单。\n"
+            "第 5 天：刷第一套真题，不限时，先看懂题型和答案解析。\n"
+            "第 6 天：复盘第一套真题，按错因分类。\n"
+            "第 7 天：补第一轮短板，只处理最薄弱的 2-3 个模块。\n"
+            "第 8 天：刷第二套真题，开始计时。\n"
+            "第 9 天：按题型归纳高频计算题、证明/推导题和概念判断题。\n"
+            "第 10 天：刷第三套真题，重点练步骤书写和公式选择。\n"
+            "第 11 天：集中复盘错题，写清楚错因和正确入口。\n"
+            "第 12 天：做一次完整模拟，严格按考试时长。\n"
+            "第 13 天：压缩资料，只看公式表、错题清单和高频题型。\n"
+            "第 14 天：轻量回顾核心公式和错因，少量典型题保持手感。\n\n"
+            "每天最低完成标准：看完一个模块、做完一组题、记录 3 个错因。"
+        )
+    if is_cps_context and any(marker in normalized for marker in ("第1-7天", "1-7天", "每天两小时", "每天2小时")):
+        return (
+            "可以。下面把前 7 天按“每天约 2 小时”细化，目标是先把通信原理框架搭起来，再进入真题。\n\n"
+            "- 第 1 天：40 分钟过课程目录和核心概念，50 分钟整理调制、解调、频谱、带宽、信噪比，30 分钟写一页问题清单。\n"
+            "- 第 2 天：45 分钟整理常用公式和适用条件，45 分钟做 3-5 道基础计算题，30 分钟复盘单位和代入步骤。\n"
+            "- 第 3 天：60 分钟看 Part3 助教讲义，40 分钟标出题干关键词，20 分钟记录不会的推导。\n"
+            "- 第 4 天：60 分钟看 Part4 助教讲义，40 分钟补公式入口，20 分钟整理易混点。\n"
+            "- 第 5 天：90 分钟刷第一套真题，30 分钟只标错因，不急着重做。\n"
+            "- 第 6 天：60 分钟对答案解析，40 分钟按题型归类错题，20 分钟回查讲义对应模块。\n"
+            "- 第 7 天：70 分钟补最弱的 2 个模块，30 分钟做同类题，20 分钟整理下一周冲刺清单。\n\n"
+            "这 7 天不要追求刷题量，重点是形成“概念入口 -> 公式选择 -> 计算步骤 -> 错因复盘”的闭环。"
+        )
+    if is_cps_context and any(marker in normalized for marker in ("第8-14天", "8-14天", "冲刺刷题", "改成冲刺")):
+        return (
+            "可以。第 8-14 天改成冲刺刷题版，重点从“补框架”切到“限时训练 + 错题收束”。\n\n"
+            "- 第 8 天：限时刷第二套真题，先保基础题和中档题正确率。\n"
+            "- 第 9 天：按题型复盘，把计算题、证明/推导题、概念判断题各写一个答题模板。\n"
+            "- 第 10 天：限时刷第三套真题，训练步骤书写和公式选择。\n"
+            "- 第 11 天：集中复盘错题，只处理反复错的知识点和公式入口。\n"
+            "- 第 12 天：做一次完整模拟，严格计时，做完立即对答案。\n"
+            "- 第 13 天：压缩资料，只看公式表、错题清单和高频题型，不再扩展新资料。\n"
+            "- 第 14 天：轻量回顾，上午过核心公式，下午做少量典型题保持手感，晚上停止高强度刷题。\n\n"
+            "冲刺阶段的标准不是“看完所有资料”，而是把会做的题稳定拿分，把高频错因降到最低。"
+        )
+    if is_cps_context and any(marker in normalized for marker in ("只看真题", "真题和讲义", "只看讲义")):
+        return (
+            "可以。如果只看真题和讲义，建议顺序压缩成三步：\n\n"
+            "1. 先用《CPS-通信原理-Part3&4-助教讲义》补公式入口和章节框架，只标出会直接影响做题的概念。\n"
+            "2. 再用《CPS六年期末考答案自制（2019-2024）》或通信原理真题解析按年份刷题，先不限时看题型，再限时训练。\n"
+            "3. 最后把每套题的错因回写到讲义对应章节，形成“真题题型 -> 讲义知识点 -> 公式步骤”的复盘表。\n\n"
+            "如果时间很紧，讲义只看 Part3/Part4 中能直接解释真题错题的部分，不做大范围泛读。"
+        )
+    if is_cps_context and any(marker in normalized for marker in ("每日学习顺序", "排成每日", "学习顺序")):
+        return (
+            "可以。按资料使用顺序排，每天都遵循“讲义/笔记补入口 -> 真题验证 -> 错题回查”的节奏：\n\n"
+            "- 第 1-2 天：先看《通信原理手写笔记》或讲义，整理核心概念和公式表。\n"
+            "- 第 3-4 天：看《CPS-通信原理-Part3&4-助教讲义》，把题干关键词和公式入口对应起来。\n"
+            "- 第 5-6 天：刷第一套真题并对答案解析，记录错因。\n"
+            "- 第 7 天：回查讲义，补第一轮短板。\n"
+            "- 第 8-10 天：继续刷真题，按题型归纳模板。\n"
+            "- 第 11-12 天：做限时模拟并复盘。\n"
+            "- 第 13-14 天：只看错题、公式表和高频题型，收束复习范围。\n\n"
+            "这样排的好处是每份资料都有明确用途：笔记搭框架，讲义补入口，真题和解析负责验证。"
+        )
+    if query_plan and query_plan.intent == "study_plan":
+        return (
+            "可以。我会沿用上一轮课程和资料上下文继续细化，不重新把这句话当关键词检索。"
+            "建议先把复习任务拆成“补框架、刷题、复盘”三段：前段确认课程范围和核心公式，中段按题型做题，后段只处理错题和高频薄弱点。"
+            "如果需要每日版，可以继续说“按每天两小时细化”。"
+        )
+    if any(marker in normalized for marker in ("展开", "细化", "更详细", "继续", "接着", "排个顺序", "列成清单")):
+        return (
+            "可以。我会沿用上一轮 StudyHub 资料和回答继续细化，不重新把这句话当成独立关键词。"
+            "建议按“先确认目标、再拆步骤、最后列检查项”的方式推进；如果上一轮已有推荐资料，就优先围绕那些资料安排阅读和复盘顺序。"
+        )
+    return ""
 
 
 def _is_cps_two_week_plan_request(query: str, query_plan: AgentQueryPlan | None) -> bool:

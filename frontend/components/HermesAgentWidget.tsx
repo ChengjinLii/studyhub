@@ -33,6 +33,7 @@ export default function HermesAgentWidget() {
   });
   const {
     loading,
+    thinkingStages,
     user,
     messages,
     materialDetails,
@@ -153,6 +154,7 @@ export default function HermesAgentWidget() {
             listRef={listRef}
             messages={messages}
             loading={loading}
+            thinkingStages={thinkingStages}
             materialDetails={materialDetails}
             onFollowup={submitAndClear}
           />

@@ -204,7 +204,7 @@ test('mock page mode covers StudyHub Agent open, fallback, drag and collapse', a
   const thinking = page.locator('.hermes-agent__message--thinking');
   await expect(thinking).toBeVisible();
   await expect(thinking).toContainText('StudyHub 正在思考');
-  await expect(thinking.locator('.hermes-agent__thinking-steps span')).toHaveCount(3);
+  await expect(thinking.locator('.hermes-agent__thinking-steps span').first()).toBeVisible();
   await expect(page.getByText('推荐失败，请稍后重试')).toBeVisible();
 
   await page.getByLabel('收起 StudyHub 学习辅导').click({ force: true });

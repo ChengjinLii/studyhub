@@ -8,6 +8,7 @@ import { materialPath } from '../lib/slug';
 import { fetchStudyHubAgentMaterial, requestStudyHubAgentRecommendations } from '../lib/studyHubAgentApi';
 import { RoleMask, SessionUser } from '../types/user';
 import { MaterialListItem } from '../types/material';
+import SafeMarkdown from './SafeMarkdown';
 
 type EyeOffset = { x: number; y: number };
 type AiRecommendation = {
@@ -59,6 +60,8 @@ export default function FloatingSidebar() {
   const [chatQuery, setChatQuery] = useState('');
   const [chatLoading, setChatLoading] = useState(false);
   const [chatError, setChatError] = useState<string | null>(null);
+  const [aiAnswer, setAiAnswer] = useState('');
+  const [aiContextQuery, setAiContextQuery] = useState('');
   const [aiRecommendations, setAiRecommendations] = useState<AiRecommendation[]>([]);
   const [aiFollowups, setAiFollowups] = useState<string[]>([]);
   const [aiDetails, setAiDetails] = useState<Record<number, MaterialListItem>>({});
@@ -294,10 +297,11 @@ export default function FloatingSidebar() {
         setChatError('登录后可使用资料推荐');
         return;
       }
+      const currentQuery = chatQuery.trim();
       setChatLoading(true);
       setChatError(null);
       try {
-        const data = await requestStudyHubAgentRecommendations(chatQuery.trim());
+        const data = await requestStudyHubAgentRecommendations(currentQuery, aiContextQuery);
         const output = data.output;
         if (!output || typeof output !== 'string') {
           setChatError('AI 响应为空，请稍后再试');
@@ -306,13 +310,14 @@ export default function FloatingSidebar() {
         }
         const parsed = JSON.parse(extractAiJson(output));
         const recs = normalizeRecommendations(parsed?.recommendations);
-        const followups = Array.isArray(parsed?.followup_questions)
-          ? parsed.followup_questions.filter((item: unknown) => typeof item === 'string')
-          : [];
+        const answer = typeof parsed?.answer === 'string' ? parsed.answer.trim() : '';
+        const followups = normalizeAiFollowups(parsed?.followup_questions, currentQuery);
+        setAiAnswer(answer);
         setAiRecommendations(recs);
         setAiFollowups(followups);
+        setAiContextQuery(buildSidebarAiContext(currentQuery, answer, recs));
         await Promise.all(recs.map((rec) => loadMaterialDetail(rec.material_id)));
-        if (recs.length === 0) {
+        if (recs.length === 0 && !answer) {
           setChatError('没有匹配到合适的资料，可以换个关键词试试');
         }
       } catch (err) {
@@ -321,7 +326,7 @@ export default function FloatingSidebar() {
         setChatLoading(false);
       }
     },
-    [chatQuery, chatLoading, user, loadMaterialDetail]
+    [chatQuery, chatLoading, user, loadMaterialDetail, aiContextQuery]
   );
 
   const pickRecommendationReason = (rec: AiRecommendation) =>
@@ -608,6 +613,11 @@ export default function FloatingSidebar() {
                   <h4 className="sidebar-section-title">AI 资料推荐</h4>
                   <p className="sidebar-muted">输入关键词，AI 只会推荐资料库内的内容。</p>
                   {chatError && <p className="sidebar-chat__error">{chatError}</p>}
+                  {aiAnswer && (
+                    <div className="sidebar-ai-answer">
+                      <SafeMarkdown>{aiAnswer}</SafeMarkdown>
+                    </div>
+                  )}
                   {aiRecommendations.length > 0 && (
                     <ul className="sidebar-ai-list">
                       {aiRecommendations.map((rec) => {
@@ -651,7 +661,10 @@ export default function FloatingSidebar() {
                           key={`${item}-${index}`}
                           type="button"
                           className="sidebar-ai-followup"
-                          onClick={() => setChatQuery(item)}
+                          onClick={() => {
+                            setChatQuery(item);
+                            setChatError(null);
+                          }}
                         >
                           {item}
                         </button>
@@ -696,4 +709,58 @@ function maskLabel(mask: RoleMask): string | null {
     default:
       return null;
   }
+}
+
+function normalizeAiFollowups(value: unknown, currentQuery: string) {
+  if (!Array.isArray(value)) return [];
+  const currentKey = followupKey(currentQuery);
+  const seen = new Set<string>();
+  return value
+    .map((item) => (typeof item === 'string' ? item.trim().replace(/\s+/g, ' ') : ''))
+    .filter((item): item is string => {
+      if (!item) return false;
+      const key = followupKey(item);
+      if (!key || key === currentKey || seen.has(key)) return false;
+      if (isBadFollowupPrompt(item)) return false;
+      seen.add(key);
+      return true;
+    })
+    .slice(0, 3);
+}
+
+function buildSidebarAiContext(query: string, answer: string, recommendations: AiRecommendation[]) {
+  const titles = recommendations
+    .map((item) => item.title)
+    .filter((title): title is string => Boolean(title && title.trim()))
+    .slice(0, 4);
+  return [
+    `用户：${redactSidebarContext(query).slice(0, 220)}`,
+    answer ? `助手：${redactSidebarContext(answer).slice(0, 420)}` : '',
+    titles.length > 0 ? `推荐资料：${titles.map(redactSidebarContext).join('；')}` : '',
+  ]
+    .filter(Boolean)
+    .join(' ')
+    .slice(-1000);
+}
+
+function followupKey(value: string) {
+  return value.replace(/[^\u4e00-\u9fa5A-Za-z0-9]+/g, '').toLowerCase();
+}
+
+function isBadFollowupPrompt(value: string) {
+  const normalized = followupKey(value);
+  return [
+    '你的考试日期和每天可复习时间',
+    '我的考试日期和每天可复习时间是',
+    '考试日期和每天可复习时间是',
+    '告诉我考试时间',
+    '请补充课程名',
+  ].some((marker) => normalized.includes(marker));
+}
+
+function redactSidebarContext(value: string) {
+  return value
+    .replace(/https?:\/\/[^\s,;，；。]+|www\.[^\s,;，；。]+/gi, '[redacted-url]')
+    .replace(/[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}/g, '[redacted-email]')
+    .replace(/(^|[^\d])(1[3-9]\d{9})(?!\d)/g, '$1[redacted-phone]');
 }

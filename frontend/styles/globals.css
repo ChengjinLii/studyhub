@@ -1163,8 +1163,28 @@ main {
   line-height: 1.55;
 }
 
-.hermes-agent__message p {
+.hermes-agent__message p,
+.hermes-agent__markdown p {
   margin: 0;
+}
+
+.hermes-agent__markdown {
+  display: grid;
+  gap: 7px;
+}
+
+.hermes-agent__markdown :where(ul, ol) {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.hermes-agent__markdown :where(li + li) {
+  margin-top: 4px;
+}
+
+.hermes-agent__message--user .hermes-agent__markdown a {
+  color: #ffffff;
+  text-decoration: underline;
 }
 
 .hermes-agent__message-images {
@@ -1628,6 +1648,30 @@ main {
   margin: 6px 0 0;
   font-size: 0.82rem;
   color: #dc2626;
+}
+
+.sidebar-ai-answer {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(37, 99, 235, 0.14);
+  background: #f8fbff;
+  color: #334155;
+  font-size: 0.82rem;
+  line-height: 1.55;
+}
+
+.sidebar-ai-answer p {
+  margin: 0;
+}
+
+.sidebar-ai-answer :where(ul, ol) {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.sidebar-ai-answer :where(p + p, p + ul, p + ol, ul + p, ol + p) {
+  margin-top: 7px;
 }
 
 .sidebar-ai-list {
