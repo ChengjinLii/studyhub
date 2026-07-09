@@ -106,6 +106,17 @@ describe('studyHubAgentContext', () => {
     ]);
   });
 
+  it('filters generic preference and profile follow-up prompts', () => {
+    const followups = normalizeFollowups([
+      '我更想要真题、笔记还是经验分享',
+      '限定学校、学院或专业',
+      '结合我的专业和年级调整推荐顺序',
+      '按题型整理真题刷题清单',
+    ]);
+
+    expect(followups).toEqual(['按题型整理真题刷题清单']);
+  });
+
   it('uses the CPS demo overview for the first review question', () => {
     const turn = resolveStudyHubAgentDemoTurn('两周后考通信原理，基础一般，怎么复习？', []);
 
@@ -116,6 +127,18 @@ describe('studyHubAgentContext', () => {
     expect(turn?.stage).toBe('整理答案中');
     expect(turn?.followups).toContain('帮我整理成两周复习计划');
     expect(turn?.recommendations.map((item) => item.materialId)).toEqual([209, 18, 168]);
+  });
+
+  it('uses different CPS follow-ups across overview, plan, and topics turns', () => {
+    const overview = resolveStudyHubAgentDemoTurn('两周后考通信原理，基础一般，怎么复习？', []);
+    const plan = resolveStudyHubAgentDemoTurn('帮我整理成两周复习计划', [
+      message(1, 'assistant', overview?.answer || '', overview?.recommendations || []),
+    ]);
+    const topics = resolveStudyHubAgentDemoTurn('通信原理有哪些常考题型和知识点？', []);
+
+    expect(overview?.followups).not.toEqual(plan?.followups);
+    expect(plan?.followups).not.toEqual(topics?.followups);
+    expect(topics?.followups).toContain('给我一份公式速查清单');
   });
 
   it('uses prior CPS context for a generic plan follow-up', () => {

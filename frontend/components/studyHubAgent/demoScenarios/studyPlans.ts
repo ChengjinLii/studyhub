@@ -49,19 +49,37 @@ const ESD_RECOMMENDATIONS = [
   },
 ];
 
-const CPS_FOLLOWUPS = [
+const CPS_OVERVIEW_FOLLOWUPS = [
   '帮我整理成两周复习计划',
-  '按基础薄弱和冲刺刷题分阶段安排',
+  '通信原理有哪些常考题型和知识点？',
   '把推荐资料排成每日学习顺序',
 ];
 
 const CPS_PLAN_FOLLOWUPS = [
   '把第 1-7 天细化到每天两小时',
+  '把第 8-14 天改成冲刺刷题版',
   '按题型整理真题刷题清单',
+];
+
+const CPS_TOPICS_FOLLOWUPS = [
+  '把高频题型排成刷题顺序',
+  '给我一份公式速查清单',
   '给我一份考前 48 小时冲刺清单',
 ];
 
-const ESD_FOLLOWUPS = [
+const CPS_DAILY_FOLLOWUPS = [
+  '继续细化第 8-14 天冲刺安排',
+  '给我一份每天 20 分钟错题复盘模板',
+  '按题型整理真题刷题清单',
+];
+
+const CPS_SPRINT_FOLLOWUPS = [
+  '给我一份考前 48 小时冲刺清单',
+  '把高频题型排成刷题顺序',
+  '给我一份公式速查清单',
+];
+
+const ESD_OVERVIEW_FOLLOWUPS = [
   'ESD 有哪些常考题型和知识点？',
   '给我总结一下两周复习计划',
   '按每天两小时安排复习节奏',
@@ -70,7 +88,19 @@ const ESD_FOLLOWUPS = [
 const ESD_PLAN_FOLLOWUPS = [
   '把 ESD 第 1-7 天细化到每天两小时',
   '按题型整理 ESD 刷题清单',
+  '列一份 ESD 错题复盘清单',
+];
+
+const ESD_TOPICS_FOLLOWUPS = [
+  '把这些题型排成刷题顺序',
+  '给我总结一下两周复习计划',
+  '列一份 ESD 错题复盘清单',
+];
+
+const ESD_DAILY_FOLLOWUPS = [
+  '按题型整理 ESD 刷题清单',
   '给我一份 ESD 考前 48 小时冲刺清单',
+  '列一份 ESD 错题复盘清单',
 ];
 
 const CPS_DIRECT_QUERIES = [
@@ -78,15 +108,19 @@ const CPS_DIRECT_QUERIES = [
   '两周后考CPS基础一般怎么复习',
   '通信原理两周复习计划',
   'CPS两周复习计划',
+  '通信原理有哪些常考题型和知识点',
+  'CPS有哪些常考题型和知识点',
   '通信原理常考题型和知识点',
   'CPS常考题型和知识点',
 ];
 
 const CPS_CONTEXT_FOLLOWUPS = [
-  ...CPS_FOLLOWUPS,
+  ...CPS_OVERVIEW_FOLLOWUPS,
   ...CPS_PLAN_FOLLOWUPS,
-  '把第 8-14 天改成冲刺刷题版',
-  '把第 8 到 14 天改成冲刺刷题版',
+  ...CPS_TOPICS_FOLLOWUPS,
+  ...CPS_DAILY_FOLLOWUPS,
+  ...CPS_SPRINT_FOLLOWUPS,
+  '按基础薄弱和冲刺刷题分阶段安排',
 ];
 
 const ESD_DIRECT_QUERIES = [
@@ -99,9 +133,10 @@ const ESD_DIRECT_QUERIES = [
 ];
 
 const ESD_CONTEXT_FOLLOWUPS = [
-  ...ESD_FOLLOWUPS,
+  ...ESD_OVERVIEW_FOLLOWUPS,
   ...ESD_PLAN_FOLLOWUPS,
-  '列一份 ESD 错题复盘清单',
+  ...ESD_TOPICS_FOLLOWUPS,
+  ...ESD_DAILY_FOLLOWUPS,
 ];
 
 export const STUDY_PLAN_DEMO_SCENARIOS: StudyHubAgentDemoScenario[] = [
@@ -112,6 +147,22 @@ export const STUDY_PLAN_DEMO_SCENARIOS: StudyHubAgentDemoScenario[] = [
     recommendations: CPS_RECOMMENDATIONS,
     resolve: (query) => {
       const intent = inferDemoIntent(query);
+      if (intent === 'daily-hours') {
+        return {
+          answer: CPS_DAILY_HOURS_ANSWER,
+          followups: CPS_DAILY_FOLLOWUPS,
+          recommendations: CPS_RECOMMENDATIONS,
+          stage: '细化安排中',
+        };
+      }
+      if (intent === 'sprint') {
+        return {
+          answer: CPS_SPRINT_ANSWER,
+          followups: CPS_SPRINT_FOLLOWUPS,
+          recommendations: CPS_RECOMMENDATIONS,
+          stage: '整理冲刺清单中',
+        };
+      }
       if (intent === 'plan' || intent === 'order' || intent === 'phases') {
         return {
           answer: CPS_PLAN_ANSWER,
@@ -123,14 +174,14 @@ export const STUDY_PLAN_DEMO_SCENARIOS: StudyHubAgentDemoScenario[] = [
       if (intent === 'topics') {
         return {
           answer: CPS_TOPICS_ANSWER,
-          followups: CPS_PLAN_FOLLOWUPS,
+          followups: CPS_TOPICS_FOLLOWUPS,
           recommendations: CPS_RECOMMENDATIONS,
           stage: '整理题型重点中',
         };
       }
       return {
         answer: CPS_OVERVIEW_ANSWER,
-        followups: CPS_FOLLOWUPS,
+        followups: CPS_OVERVIEW_FOLLOWUPS,
         recommendations: CPS_RECOMMENDATIONS,
         stage: '整理答案中',
       };
@@ -146,12 +197,20 @@ export const STUDY_PLAN_DEMO_SCENARIOS: StudyHubAgentDemoScenario[] = [
       if (intent === 'topics') {
         return {
           answer: ESD_TOPICS_ANSWER,
-          followups: ['给我总结一下两周复习计划', '按每天两小时安排复习节奏', '列一份 ESD 错题复盘清单'],
+          followups: ESD_TOPICS_FOLLOWUPS,
           recommendations: ESD_RECOMMENDATIONS,
           stage: '整理题型重点中',
         };
       }
-      if (intent === 'plan' || intent === 'order' || intent === 'phases' || intent === 'daily-hours') {
+      if (intent === 'daily-hours') {
+        return {
+          answer: ESD_DAILY_HOURS_ANSWER,
+          followups: ESD_DAILY_FOLLOWUPS,
+          recommendations: ESD_RECOMMENDATIONS,
+          stage: '细化安排中',
+        };
+      }
+      if (intent === 'plan' || intent === 'order' || intent === 'phases' || intent === 'sprint') {
         return {
           answer: ESD_PLAN_ANSWER,
           followups: ESD_PLAN_FOLLOWUPS,
@@ -161,7 +220,7 @@ export const STUDY_PLAN_DEMO_SCENARIOS: StudyHubAgentDemoScenario[] = [
       }
       return {
         answer: ESD_OVERVIEW_ANSWER,
-        followups: ESD_FOLLOWUPS,
+        followups: ESD_OVERVIEW_FOLLOWUPS,
         recommendations: ESD_RECOMMENDATIONS,
         stage: '整理答案中',
       };
@@ -209,6 +268,9 @@ export function inferScenarioFromContext(
 
 export function inferDemoIntent(query: string) {
   const text = normalizeDemoText(query);
+  if (text.includes('第814天') || text.includes('第8到14天') || text.includes('冲刺刷题版') || text.includes('48小时')) {
+    return 'sprint';
+  }
   if (text.includes('每天两小时') || text.includes('每天2小时') || text.includes('两小时')) return 'daily-hours';
   if (text.includes('题型') || text.includes('知识点') || text.includes('考点') || text.includes('分数占比')) return 'topics';
   if (text.includes('顺序') || text.includes('每日学习')) return 'order';
@@ -314,6 +376,48 @@ const CPS_PLAN_ANSWER = `## 通信原理两周复习计划
 2. **先题型后年份。** 同一类题连续刷 2-3 道，比机械刷完一年更有效。
 3. **每天留 20 分钟复盘。** 不复盘的刷题基本等于“看过”。`;
 
+const CPS_DAILY_HOURS_ANSWER = `## 第 1-7 天每天两小时安排
+
+这 7 天的目标不是刷很多题，而是把框架搭起来，并完成第一轮真题诊断。
+
+### 每天固定节奏
+
+- **前 20 分钟：** 回顾昨天错题和公式。
+- **中间 75 分钟：** 完成当天主任务。
+- **最后 25 分钟：** 写下今天最容易丢分的 3 个点。
+
+### 具体安排
+
+- **第 1 天：** 整理课程目录、考试范围和完全不会的模块。产出一张知识框架图。
+- **第 2 天：** 复习 AM、FM、PM 的概念、频谱和框图。产出 3 个核心公式。
+- **第 3 天：** 复习 ASK、PSK、QAM 的判决和性能。产出调制方式对比表。
+- **第 4 天：** 复习信道、噪声、带宽、信噪比相关计算。产出计算题模板。
+- **第 5 天：** 刷一套真题，不限时，重点看题型和答案解析。
+- **第 6 天：** 复盘第 5 天错题，按“概念 / 公式 / 计算 / 读题”分类。
+- **第 7 天：** 只补最薄弱的 2 个模块，不新增资料。`;
+
+const CPS_SPRINT_ANSWER = `## 第 8-14 天冲刺刷题版
+
+后 7 天建议从“补知识”切换到“稳定拿分”。核心是限时、复盘和模板化。
+
+### 第 8-10 天：按题型刷
+
+- **第 8 天：** 刷第二套真题，开始计时，记录超时题。
+- **第 9 天：** 专攻计算题，把公式、单位、代入步骤固定下来。
+- **第 10 天：** 专攻框图和概念题，练习用标准语言解释模块作用。
+
+### 第 11-13 天：整套模拟
+
+- **第 11 天：** 严格限时做一套题，训练卷面节奏。
+- **第 12 天：** 复盘错题，只处理反复错的题型。
+- **第 13 天：** 压缩成一页公式表和一页错题清单。
+
+### 第 14 天：轻量保持手感
+
+- 上午过公式表。
+- 下午做 2-3 道典型题。
+- 晚上停止高强度刷题，只看错题原因。`;
+
 const CPS_TOPICS_ANSWER = `## 通信原理常见题型与复习抓手
 
 ### 高频题型
@@ -397,3 +501,26 @@ const ESD_PLAN_ANSWER = `## ESD 两周复习计划
 - **前 30 分钟：** 回顾昨天错题和公式。
 - **中间 70 分钟：** 做当天主任务。
 - **最后 20 分钟：** 写下“今天最容易丢分的 3 个点”。`;
+
+const ESD_DAILY_HOURS_ANSWER = `## ESD 每天两小时安排
+
+每天两小时足够完成一轮有效复习，但要避免“只看不写”。每一天都要有可检查产出。
+
+### 第 1-4 天：框架和公式
+
+- **第 1 天：** 通读手写笔记目录，整理课程模块清单。
+- **第 2 天：** 梳理系统设计流程，写出“需求 -> 指标 -> 模块 -> 验证”模板。
+- **第 3 天：** 整理接口、信号连接和约束条件。
+- **第 4 天：** 整理公式和单位，做 3 道基础计算题。
+
+### 第 5-7 天：样卷诊断
+
+- **第 5 天：** 看样卷答案，识别题型和标准表达。
+- **第 6 天：** 专练流程 / 设计思路题，写 2 道完整答案。
+- **第 7 天：** 专练计算 / 判断题，形成错题清单。
+
+### 每天收尾
+
+- 写下当天 3 个薄弱点。
+- 标出明天必须回查的 1 个知识点。
+- 不在最后 20 分钟打开新资料。`;
