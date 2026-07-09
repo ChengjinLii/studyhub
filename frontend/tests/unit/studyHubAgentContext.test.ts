@@ -78,11 +78,10 @@ describe('studyHubAgentContext', () => {
     expect(context).not.toContain('data:image/png');
   });
 
-  it('filters duplicate and fill-in follow-up prompts', () => {
+  it('deduplicates follow-up prompts', () => {
     const followups = normalizeFollowups(
       [
         '帮我整理成两周复习计划',
-        '你的考试日期和每天可复习时间是多少？',
         '把第 1-7 天细化到每天两小时',
         '把第 1-7 天细化到每天两小时',
       ],
@@ -104,17 +103,6 @@ describe('studyHubAgentContext', () => {
       '重点突破某一种题型（如计算题或设计题）的解题思路',
       '根据我的复习笔记，定制一个题型专项复习计划',
     ]);
-  });
-
-  it('filters generic preference and profile follow-up prompts', () => {
-    const followups = normalizeFollowups([
-      '我更想要真题、笔记还是经验分享',
-      '限定学校、学院或专业',
-      '结合我的专业和年级调整推荐顺序',
-      '按题型整理真题刷题清单',
-    ]);
-
-    expect(followups).toEqual(['按题型整理真题刷题清单']);
   });
 
   it('uses the CPS demo overview for the first review question', () => {

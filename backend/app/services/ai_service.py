@@ -628,8 +628,24 @@ class AiService:
                 "拒绝重复当前问题的追问。",
                 "拒绝 AI 口吻、反问句、让用户补空的半截句。",
                 "拒绝“你的考试日期和每天可复习时间是多少”这类 Agent 向用户提问。",
-                "必要时把轻微 AI 口吻改写成用户口吻。",
+                "拒绝“我更想要真题、笔记还是经验分享”“限定学校、学院或专业”这类选项标题或筛选提示。",
+                "拒绝“结合我的专业和年级调整推荐顺序”这类过泛的个人化口号，除非已经改写成具体任务。",
+                "必要时把轻微 AI 口吻改写成用户口吻和可执行任务。",
             ],
+            "examples": {
+                "reject": [
+                    "需要我帮你分析真题分数占比吗",
+                    "我更想要真题、笔记还是经验分享",
+                    "限定学校、学院或专业",
+                    "结合我的专业和年级调整推荐顺序",
+                ],
+                "accept": [
+                    "分析 2020-2022 年真题中各类题型的分数占比",
+                    "把第 1-7 天细化到每天两小时",
+                    "只看真题和讲义怎么安排",
+                    "按题型整理刷题清单",
+                ],
+            },
             "output_schema": {
                 "valid_followups": ["最多 3 条用户可点击请求"],
                 "rewritten_followups": ["可选，改写后的用户口吻请求"],
@@ -640,6 +656,9 @@ class AiService:
         system_prompt = (
             "你是 StudyHub Agent 追问验证器。使用 v4 flash 风格的快速严格判断。"
             "只输出严格 JSON，不要 Markdown。valid_followups 必须像用户下一句会发送的话，不能像助手在问用户。"
+            "追问必须是可执行学习任务，不要是澄清问题、选项标题、筛选提示或泛泛的个性化口号。"
+            "合格示例：把推荐资料排成每日学习顺序；按年份整理常考题型；只看真题和讲义怎么安排。"
+            "不合格示例：我更想要真题、笔记还是经验分享；限定学校、学院或专业；结合我的专业和年级调整推荐顺序。"
         )
         try:
             parsed = self._call_agent_validator_json(settings, system_prompt, payload)
@@ -853,9 +872,10 @@ class AiService:
             "如果提供了 course_memory_card，你可以用它总结课程级年份、逐年题型、章节模块、答案解析信号、知识点、经验策略和推荐顺序，"
             "并结合资料质量与风险分布做保守排序和必要提醒，"
             "并根据 evidence_coverage 和 confidence_assessment 避免过度概括。"
-            "followup_questions 必须是用户点击后会直接发送给助手的下一句请求，必须使用用户口吻。"
-            "禁止输出助手口吻、询问用户意愿或半截填空句，例如不得使用“需要我帮你”“是否想”“是否需要”“要不要我”“你想”“你的复习笔记”“你的考试日期”等表达。"
-            "应写成可执行请求，例如“分析 2020-2022 年真题中各类题型的分数占比”“重点突破计算题解题思路”“根据我的复习笔记定制题型专项复习计划”。"
+            "followup_questions 必须是用户点击后会直接发送给助手的下一句请求，必须使用用户口吻，并且是一个能直接执行的学习任务。"
+            "禁止输出助手口吻、询问用户意愿、选项标题、筛选提示或半截填空句，例如不得使用“需要我帮你”“是否想”“是否需要”“要不要我”“你想”“你的复习笔记”“你的考试日期”“我更想要真题、笔记还是经验分享”“限定学校、学院或专业”“结合我的专业和年级调整推荐顺序”等表达。"
+            "应写成可执行请求，例如“分析 2020-2022 年真题中各类题型的分数占比”“把第 1-7 天细化到每天两小时”“只看真题和讲义怎么安排”“按题型整理刷题清单”。"
+            "如果当前回答是两周复习、题型分析或资料排序，追问优先围绕细化天数、真题刷题顺序、公式清单、考前冲刺清单展开。"
             "answer 字段允许使用安全 Markdown 来提升前台阅读体验，例如短段落、编号列表、项目符号、加粗重点和站内/可信链接；"
             "但最外层响应必须仍然是严格 JSON 对象，不要在 JSON 外包裹 Markdown、代码块或任何额外说明。"
             "不要输出 memory_context、conversation_context、conversation_focus、query_plan、problem_context、candidate_materials、image_attachments、output_guardrail、resource_budget、coverage、user_fit_signals、"
@@ -1421,12 +1441,12 @@ class AiService:
             ]
         elif intent == "problem_tutoring":
             questions = [
-                "我卡住的是概念理解、公式推导还是计算步骤",
+                "按概念理解、公式推导和计算步骤分别拆解这题",
                 "按同类题型再找几页练习",
             ]
         elif intent == "material_fit_assessment":
             questions = [
-                "我现在是补基础、刷题冲刺还是查漏补缺",
+                "按补基础、刷题冲刺和查漏补缺分别安排这份资料",
                 "把这份资料拆成先看页和后看页",
             ]
         else:
@@ -1434,7 +1454,7 @@ class AiService:
         if has_pdf and intent not in {"exam_trend_analysis", "pdf_summary", "problem_tutoring", "material_fit_assessment"}:
             questions.append("基于已读取页码继续归纳重点")
         if memory_context and memory_context.user:
-            questions.append("结合我的专业和年级调整推荐顺序")
+            questions.append("按我的已读和已下载记录调整复习顺序")
         return _dedupe_questions(questions)[:3] or _default_followups()
 
     def _local_study_plan_hint(self, query_plan: AgentQueryPlan | None) -> str:
@@ -1996,14 +2016,21 @@ def _coerce_validated_followups(
     if not isinstance(value, dict):
         return fallback[:3]
     raw_items = value.get("valid_followups")
-    if not isinstance(raw_items, list) or not raw_items:
-        raw_items = value.get("rewritten_followups")
-    if not isinstance(raw_items, list) or not raw_items:
+    rewritten_items = value.get("rewritten_followups")
+    if isinstance(raw_items, list) and raw_items:
+        items_to_check = raw_items
+    elif isinstance(rewritten_items, list):
+        items_to_check = rewritten_items
+    elif isinstance(raw_items, list):
+        return []
+    else:
         return fallback[:3]
+    if not items_to_check:
+        return []
     current_key = _agent_followup_key(current_query)
     result: list[str] = []
     seen: set[str] = set()
-    for raw_item in raw_items:
+    for raw_item in items_to_check:
         if not isinstance(raw_item, (str, int, float)):
             continue
         item = re.sub(r"\s+", " ", str(raw_item)).strip(" ?？。")[:80]
@@ -2018,7 +2045,7 @@ def _coerce_validated_followups(
         result.append(item)
         if len(result) >= 3:
             break
-    return result or fallback[:3]
+    return result
 
 
 def _agent_followup_key(value: str) -> str:
@@ -3102,8 +3129,9 @@ def _is_cps_title(value: str) -> bool:
 
 def _default_followups() -> list[str]:
     return [
-        "我更想要真题、笔记还是经验分享",
-        "限定学校、学院或专业",
+        "按资料类型整理推荐顺序",
+        "把推荐资料排成先后学习顺序",
+        "只看最适合入门的资料怎么安排",
     ]
 
 

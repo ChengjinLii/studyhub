@@ -303,7 +303,7 @@ export default function FloatingSidebar() {
       }
       const currentQuery = chatQuery.trim();
       setChatLoading(true);
-      setChatStage('检索资料中');
+      setChatStage('理解问题中');
       setChatError(null);
       try {
         const demoTurn = resolveStudyHubAgentDemoTurn(
@@ -749,7 +749,6 @@ function normalizeAiFollowups(value: unknown, currentQuery: string) {
       if (!item) return false;
       const key = followupKey(item);
       if (!key || key === currentKey || seen.has(key)) return false;
-      if (isBadFollowupPrompt(item)) return false;
       seen.add(key);
       return true;
     })
@@ -810,32 +809,6 @@ function toSidebarAiRecommendations(items: StudyHubAgentRecommendation[]): AiRec
 
 function followupKey(value: string) {
   return value.replace(/[^\u4e00-\u9fa5A-Za-z0-9]+/g, '').toLowerCase();
-}
-
-function isBadFollowupPrompt(value: string) {
-  const normalized = followupKey(value);
-  return [
-    '你的考试日期和每天可复习时间',
-    '我的考试日期和每天可复习时间是',
-    '考试日期和每天可复习时间是',
-    '告诉我考试时间',
-    '请补充课程名',
-    '需要我',
-    '我可以帮你',
-    '是否想',
-    '是否希望',
-    '你是否想',
-    '你想不想',
-    '我更想要真题笔记还是经验分享',
-    '更想要真题笔记还是经验分享',
-    '想要真题笔记还是经验分享',
-    '限定学校学院或专业',
-    '学校学院或专业',
-    '限定学校',
-    '限定学院',
-    '限定专业',
-    '结合我的专业和年级调整推荐顺序',
-  ].some((marker) => normalized.includes(marker));
 }
 
 function normalizeFollowupVoice(value: string) {

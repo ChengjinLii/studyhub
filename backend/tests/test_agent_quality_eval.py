@@ -935,6 +935,71 @@ def test_agent_explicit_v4_flash_validator_routes_plan_followup_without_retrieva
     ]
 
 
+def test_agent_validator_rejects_generic_followups_without_fallback(monkeypatch) -> None:
+    settings = Settings(
+        ai_agent_provider="local",
+        ai_agent_validator_provider="openai-compatible",
+        ai_agent_validator_base_url="https://validator.example.test/v1",
+        ai_agent_validator_api_key="validator-key",
+        ai_agent_validator_model="v4-flash",
+    )
+    monkeypatch.setattr("app.services.ai_service.get_settings", lambda: settings)
+
+    service = AiService(
+        read_repo=None,
+        material_repo=None,
+        query_planner_service=AgentQueryPlannerService(),
+    )  # type: ignore[arg-type]
+    monkeypatch.setattr(
+        service,
+        "_rank_materials",
+        lambda session, query, filters: [
+            _material(101, title="通信原理四年真题解析", description="通信原理期末真题解析", downloads=80)
+        ],
+    )
+    validator_payloads: list[dict[str, Any]] = []
+
+    def fake_call_agent_model(settings: Settings, system_prompt: str, user_prompt: dict[str, Any]) -> str:
+        validator_payloads.append(user_prompt)
+        if "allowed_routes" in user_prompt:
+            return json.dumps(
+                {
+                    "route": "new_material_search",
+                    "should_search": True,
+                    "use_context": False,
+                    "search_query": "通信原理真题",
+                    "reason": "new search",
+                },
+                ensure_ascii=False,
+            )
+        assert "可执行学习任务" in system_prompt
+        return json.dumps(
+            {
+                "valid_followups": [],
+                "rejected_followups": [
+                    "我更想要真题、笔记还是经验分享",
+                    "限定学校、学院或专业",
+                    "结合我的专业和年级调整推荐顺序",
+                ],
+                "reason": "generic prompts",
+            },
+            ensure_ascii=False,
+        )
+
+    monkeypatch.setattr(service, "_call_agent_model", fake_call_agent_model)
+
+    response = service.recommend(
+        object(),  # type: ignore[arg-type]
+        SimpleNamespace(query="通信原理往年题常考什么", filters={}),
+        current_user_id=7,
+    )
+    body = json.loads(str(response["output"]).removeprefix("<json>").removesuffix("</json>"))
+
+    followup_payload = next(payload for payload in validator_payloads if "candidate_followups" in payload)
+    assert "examples" in followup_payload
+    assert "followup_questions" not in body
+
+
 def test_agent_local_study_plan_uses_query_learning_preferences(monkeypatch) -> None:
     metrics = get_runtime_metrics()
     metrics.clear()
@@ -1104,9 +1169,9 @@ def test_agent_local_material_fit_assessment_uses_evidence_and_profile(monkeypat
     assert "可先从《通信原理四年真题解析》第 3 页开始" in body["answer"]
     assert "我会优先按你的电子科技大学/信通/通信工程背景来判断匹配度" in body["answer"]
     assert body["followup_questions"] == [
-        "我现在是补基础、刷题冲刺还是查漏补缺",
+        "按补基础、刷题冲刺和查漏补缺分别安排这份资料",
         "把这份资料拆成先看页和后看页",
-        "结合我的专业和年级调整推荐顺序",
+        "按我的已读和已下载记录调整复习顺序",
     ]
     assert "query_plan" not in json.dumps(body, ensure_ascii=False)
     metrics.clear()
@@ -1403,7 +1468,7 @@ def test_agent_local_problem_tutoring_uses_intent_specific_evidence(monkeypatch)
     assert "预估难度：综合、偏难" in body["answer"]
     assert "注意公式/图表信息：公式、图示" in body["answer"]
     assert body["followup_questions"] == [
-        "我卡住的是概念理解、公式推导还是计算步骤",
+        "按概念理解、公式推导和计算步骤分别拆解这题",
         "按同类题型再找几页练习",
     ]
     metrics.clear()
