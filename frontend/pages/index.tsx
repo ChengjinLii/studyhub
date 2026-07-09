@@ -220,6 +220,12 @@ export default function Home({
     downloads: statSource?.totalDownloads ?? 0,
     users: statSource?.userCount ?? 0,
   };
+  const mobileOverviewStats = [
+    { label: '已上架', value: formatNumber(Number(statValues.total)) },
+    { label: '免费资料', value: formatNumber(Number(statValues.free)) },
+    { label: '下载次数', value: formatNumber(Number(statValues.downloads)) },
+    { label: '用户个数', value: formatNumber(Number(statValues.users)) },
+  ];
   const recommendedItems = useMemo(() => recommendations ?? [], [recommendations]);
   const mobileRecommendedItems = useMemo(() => recommendedItems.slice(0, 4), [recommendedItems]);
   const mobileLatestItems = useMemo(() => materialList.slice(0, 5), [materialList]);
@@ -736,10 +742,12 @@ export default function Home({
         </section>
         <MobileHomeSections
           mobileSearch={mobileSearch}
+          stats={mobileOverviewStats}
           recommendedItems={mobileRecommendedItems}
           latestItems={mobileLatestItems}
           onMobileSearchChange={setMobileSearch}
           onMobileSearchSubmit={handleMobileSearchSubmit}
+          onJumpToLeaderboard={handleJumpToLeaderboard}
         />
         <HomeRequestPanels
           requestItems={requestItems}

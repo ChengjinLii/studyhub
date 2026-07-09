@@ -13647,6 +13647,10 @@ g.studyhub-popup-poster__hotspot:hover > text {
     padding-top: 12px;
   }
 
+  .home-page > .hero.hero-magazine {
+    display: none;
+  }
+
   .hero.hero-magazine {
     grid-template-columns: 1fr;
     gap: 12px;
@@ -13728,6 +13732,16 @@ g.studyhub-popup-poster__hotspot:hover > text {
     background: #ffffff;
   }
 
+  .mobile-home-task-panel {
+    padding: 16px;
+    border-color: rgba(96, 165, 250, 0.28);
+    background:
+      linear-gradient(145deg, rgba(255, 255, 255, 0.92), rgba(239, 246, 255, 0.82)),
+      rgba(255, 255, 255, 0.82);
+    box-shadow: 0 18px 42px rgba(30, 64, 175, 0.14), inset 0 1px 0 rgba(255, 255, 255, 0.78);
+    backdrop-filter: blur(16px);
+  }
+
   .mobile-home-task-panel__head,
   .mobile-section-head {
     display: flex;
@@ -13751,9 +13765,14 @@ g.studyhub-popup-poster__hotspot:hover > text {
   .mobile-section-head h2,
   .mobile-library-list__header h2 {
     margin: 2px 0 0;
-    color: #0f172a;
+    color: #123b7a;
     font-size: 1.12rem;
     line-height: 1.25;
+  }
+
+  .mobile-home-task-panel__head h2 {
+    font-size: 1.28rem;
+    letter-spacing: 0;
   }
 
   .mobile-section-head a {
@@ -13776,9 +13795,10 @@ g.studyhub-popup-poster__hotspot:hover > text {
     min-height: 42px;
     height: 42px;
     border-radius: 14px;
-    background: #f8fafc;
-    border-color: #dbe3ef;
+    background: rgba(255, 255, 255, 0.88);
+    border-color: rgba(96, 165, 250, 0.34);
     font-size: 0.98rem;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.88);
   }
 
   .mobile-home-search .button,
@@ -13789,29 +13809,37 @@ g.studyhub-popup-poster__hotspot:hover > text {
     padding: 0 15px;
   }
 
+  .mobile-home-search .button.primary {
+    background: #123b7a;
+    color: #ffffff;
+    box-shadow: 0 10px 18px rgba(18, 59, 122, 0.2);
+  }
+
   .mobile-home-actions {
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 8px;
   }
 
   .mobile-home-action {
+    appearance: none;
     min-width: 0;
-    min-height: 68px;
+    min-height: 62px;
     padding: 9px 5px;
-    border: 1px solid #dbe3ef;
-    border-radius: 18px;
-    background: #fbfdff;
+    border: 1px solid rgba(96, 165, 250, 0.26);
+    border-radius: 16px;
+    background: rgba(255, 255, 255, 0.68);
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
     gap: 5px;
-    color: #0f172a;
+    color: #123b7a;
     font-size: 0.84rem;
     font-weight: 800;
     text-decoration: none;
-    box-shadow: 0 8px 18px rgba(15, 23, 42, 0.05);
+    box-shadow: 0 8px 18px rgba(30, 64, 175, 0.07);
+    cursor: pointer;
   }
 
   .mobile-home-action:active {
@@ -13823,9 +13851,9 @@ g.studyhub-popup-poster__hotspot:hover > text {
   }
 
   .mobile-home-action--upload {
-    background: #eff6ff;
-    border-color: #bfdbfe;
-    color: #174db5;
+    background: rgba(219, 234, 254, 0.76);
+    border-color: rgba(59, 130, 246, 0.32);
+    color: #123b7a;
   }
 
   .mobile-home-action--request .mobile-home-action__icon {
@@ -13833,7 +13861,11 @@ g.studyhub-popup-poster__hotspot:hover > text {
   }
 
   .mobile-home-action--more .mobile-home-action__icon {
-    color: #4f46e5;
+    color: #123b7a;
+  }
+
+  .mobile-home-action--leaderboard .mobile-home-action__icon {
+    color: #123b7a;
   }
 
   .mobile-home-action__icon {
@@ -13878,6 +13910,42 @@ g.studyhub-popup-poster__hotspot:hover > text {
     font-size: 1.25rem;
     line-height: 1.1;
     font-variant-numeric: tabular-nums;
+  }
+
+  .mobile-home-overview {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 7px;
+  }
+
+  .mobile-home-overview__item {
+    min-width: 0;
+    padding: 9px 6px;
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.7);
+    border: 1px solid rgba(96, 165, 250, 0.2);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.82);
+    text-align: center;
+  }
+
+  .mobile-home-overview__item span {
+    display: block;
+    color: #4b6b9f;
+    font-size: 0.68rem;
+    font-weight: 800;
+    white-space: nowrap;
+  }
+
+  .mobile-home-overview__item strong {
+    display: block;
+    margin-top: 3px;
+    color: #123b7a;
+    font-size: 0.98rem;
+    line-height: 1.1;
+    font-variant-numeric: tabular-nums;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .home-desktop-library {

@@ -3,31 +3,28 @@ import { FormEvent } from 'react';
 import MaterialCard from '../MaterialCard';
 import { MaterialListItem } from '../../types/material';
 
-const ACTIONS = [
-  {
-    href: '/materials',
-    label: '找资料',
-    variant: 'materials',
-    paths: ['M5 4h10a4 4 0 0 1 4 4v12H7a2 2 0 0 1-2-2V4z', 'M7 16h12M9 8h6M9 11h5'],
-  },
+const CTA_LINKS = [
   {
     href: '/upload',
-    label: '去投稿',
+    label: '我要投稿',
     variant: 'upload',
     paths: ['M12 4v10M8 8l4-4 4 4', 'M5 14v4a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-4'],
   },
   {
-    href: '/requests/new',
-    label: '发求购',
-    variant: 'request',
-    paths: ['M12 5v14M5 12h14', 'M12 4a8 8 0 1 0 0 16 8 8 0 0 0 0-16'],
-  },
-  {
-    href: '/more',
-    label: '更多',
+    href: '/join',
+    label: '关于我们',
     variant: 'more',
-    paths: ['M5 6h14M5 12h14M5 18h14'],
+    paths: ['M12 6v.01', 'M11 10h1v7h1', 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18'],
   },
+];
+
+const LEADERBOARD_ICON_PATHS = [
+  'M8 21h8',
+  'M12 17v4',
+  'M7 4h10',
+  'M17 4v5a5 5 0 0 1-10 0V4',
+  'M5 4h2v3a5 5 0 0 1-2 4',
+  'M19 4h-2v3a5 5 0 0 0 2 4',
 ];
 
 function MobileResourceSection({ title, eyebrow, hrefLabel, items }: { title: string; eyebrow: string; hrefLabel: string; items: MaterialListItem[] }) {
@@ -53,32 +50,44 @@ function MobileResourceSection({ title, eyebrow, hrefLabel, items }: { title: st
 
 interface MobileHomeSectionsProps {
   mobileSearch: string;
+  stats: Array<{ label: string; value: string }>;
   recommendedItems: MaterialListItem[];
   latestItems: MaterialListItem[];
   onMobileSearchChange: (value: string) => void;
   onMobileSearchSubmit: (event: FormEvent<HTMLFormElement>) => void;
+  onJumpToLeaderboard: () => void;
 }
 
 export default function MobileHomeSections({
   mobileSearch,
+  stats,
   recommendedItems,
   latestItems,
   onMobileSearchChange,
   onMobileSearchSubmit,
+  onJumpToLeaderboard,
 }: MobileHomeSectionsProps) {
   return (
     <>
-      <section className="card mobile-home-task-panel" aria-label="移动端快捷入口">
+      <section className="card mobile-home-task-panel" aria-label="移动端搜索与概览">
         <div className="mobile-home-task-panel__head">
           <span>StudyHub</span>
-          <h2>找资料、投稿、求购</h2>
+          <h2>校园资料集</h2>
+        </div>
+        <div className="mobile-home-overview" aria-label="平台概览">
+          {stats.map((stat) => (
+            <div key={stat.label} className="mobile-home-overview__item">
+              <span>{stat.label}</span>
+              <strong>{stat.value}</strong>
+            </div>
+          ))}
         </div>
         <form className="mobile-home-search" onSubmit={onMobileSearchSubmit}>
           <input value={mobileSearch} onChange={(event) => onMobileSearchChange(event.target.value)} placeholder="空格分隔：概率论 期末" aria-label="搜索资料" />
           <button className="button primary" type="submit">搜索</button>
         </form>
         <div className="mobile-home-actions">
-          {ACTIONS.map((item) => (
+          {CTA_LINKS.map((item) => (
             <Link key={item.href} className={`mobile-home-action mobile-home-action--${item.variant}`} href={item.href} prefetch={false}>
               <span className="mobile-home-action__icon" aria-hidden="true">
                 <svg viewBox="0 0 24 24">
@@ -88,6 +97,14 @@ export default function MobileHomeSections({
               <span>{item.label}</span>
             </Link>
           ))}
+          <button className="mobile-home-action mobile-home-action--leaderboard" type="button" onClick={onJumpToLeaderboard}>
+            <span className="mobile-home-action__icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24">
+                {LEADERBOARD_ICON_PATHS.map((path) => <path key={path} d={path} fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" />)}
+              </svg>
+            </span>
+            <span>贡献榜单</span>
+          </button>
         </div>
       </section>
       <MobileResourceSection title="为你推荐" eyebrow="Recommend" hrefLabel="更多" items={recommendedItems} />
