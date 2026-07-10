@@ -168,14 +168,24 @@ STUDYHUB_AI_AGENT_MODEL=gpt-5.4-mini
 STUDYHUB_AI_AGENT_THINKING_ENABLED=false
 STUDYHUB_AI_AGENT_REASONING_EFFORT=none
 STUDYHUB_AI_AGENT_TIMEOUT_SECONDS=60
+STUDYHUB_AI_AGENT_MAX_OUTPUT_TOKENS=1800
+STUDYHUB_AI_AGENT_ORCHESTRATOR_PROVIDER=custom
+STUDYHUB_AI_AGENT_ORCHESTRATOR_BASE_URL=https://api.deepseek.com
+STUDYHUB_AI_AGENT_ORCHESTRATOR_API_KEY=CHANGE_ME
+STUDYHUB_AI_AGENT_ORCHESTRATOR_MODEL=deepseek-v4-flash
+STUDYHUB_AI_AGENT_ORCHESTRATOR_TIMEOUT_SECONDS=12
+STUDYHUB_AI_AGENT_ORCHESTRATOR_MAX_OUTPUT_TOKENS=1600
 ```
 
-学习辅导 Agent 还支持只读记忆上下文和 PDF 页级证据读取。默认不会写入数据库，且有资源上限；生产环境可按服务器余量调整：
+学习辅导 Agent 支持双层记忆和 PDF 页级证据读取。会话记忆按 `user_id + session_id` 隔离，优先存入 Redis，Redis 不可用时使用带 TTL、轮数和会话数上限的进程内缓存；不会新增或修改业务数据库表。平台记忆只从可见资料和证据生成匿名聚合信号，不混入用户对话。生产环境可按服务器余量调整：
 
 ```env
 STUDYHUB_AI_AGENT_MEMORY_CONTEXT_ENABLED=true
 STUDYHUB_AI_AGENT_MEMORY_MAX_MATERIALS=8
 STUDYHUB_AI_AGENT_MEMORY_MAX_INTERACTION_CHECKS=6
+STUDYHUB_AI_AGENT_SESSION_MEMORY_ENABLED=true
+STUDYHUB_AI_AGENT_SESSION_MEMORY_TTL_SECONDS=604800
+STUDYHUB_AI_AGENT_SESSION_MEMORY_MAX_TURNS=12
 STUDYHUB_AI_AGENT_PDF_EVIDENCE_ENABLED=true
 STUDYHUB_AI_AGENT_PDF_EVIDENCE_MAX_MATERIALS=2
 STUDYHUB_AI_AGENT_PDF_EVIDENCE_MAX_PAGES=6
@@ -184,13 +194,13 @@ STUDYHUB_AI_AGENT_PDF_EXTRACT_CACHE_ENABLED=true
 STUDYHUB_AI_AGENT_PDF_EXTRACT_CACHE_MAX_ENTRIES=64
 ```
 
-Agent 会在后端用轻量规则生成 `query_plan`，用于识别资料推荐、往年常考分析、复习计划、资料总结或错题辅导等意图；该步骤不访问外部服务、不写入数据库。
+生产链路先由轻量编排模型生成语义计划，统一判断学习范围、上下文继承、是否重新检索、检索词、学习约束和回答/追问方向；主模型再结合资料、页级证据、用户会话记忆和平台聚合记忆生成 Markdown 回答，最后由同一轻量模型做语义审阅。本地规则只在模型不可用时负责降级，不主导正常回答。
 
-外部模型输出会经过后端 Safety Harness：只允许推荐候选资料中的 `material_id`，只允许引用已读取的 PDF 页码，并过滤内部上下文字段泄露；不合格输出会回退到本地推荐回答。
+外部模型输出仍经过结构化 Safety Harness：只允许推荐候选资料中的 `material_id`，正文资料 ID 也必须属于候选白名单，只允许引用已读取的 PDF 页码，并过滤敏感信息与内部上下文字段泄露。学习意图、追问口吻和答题方向交由模型提示词与语义审阅处理，不再使用前后端字符串改写器。
 
 PDF 页级证据会尽量抽取年份、题型、题号、知识点线索和来源类型，用于支撑往年常考分析和可核验引用。
 
-Agent 还会从当前请求的候选资料、PDF 证据、`query_plan` 和只读记忆上下文生成临时课程记忆卡片，汇总课程级年份、题型、知识点、页码引用和推荐学习顺序；当前版本不持久化该卡片。
+Agent 还会从当前请求的候选资料、PDF 证据、语义计划和双层记忆生成临时课程记忆卡片，汇总课程级年份、题型、知识点、页码引用和推荐学习顺序；课程卡片本身不持久化。站内课程缩写由 `private/material_search_synonyms.json` 提供给检索和模型，避免 ESD、CPS 等缩写被解释成其他学科含义。
 
 ## RESTful API 约定
 

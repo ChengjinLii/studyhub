@@ -226,6 +226,7 @@ class AgentQueryPlan:
     search_terms: tuple[str, ...]
     evidence_tasks: tuple[str, ...]
     response_guidance: tuple[str, ...]
+    followup_guidance: tuple[str, ...] = ()
     study_constraints: dict[str, Any] = field(default_factory=dict)
     problem_context: dict[str, Any] = field(default_factory=dict)
     material_scope: dict[str, Any] = field(default_factory=dict)
@@ -243,6 +244,8 @@ class AgentQueryPlan:
             "evidence_tasks": list(self.evidence_tasks),
             "response_guidance": list(self.response_guidance),
         }
+        if self.followup_guidance:
+            payload["followup_guidance"] = list(self.followup_guidance)
         if self.study_constraints:
             payload["study_constraints"] = self.study_constraints
         if self.problem_context:
@@ -257,11 +260,11 @@ class AgentQueryPlan:
 
 
 class AgentQueryPlannerService:
-    """Deterministic query understanding for the StudyHub Agent.
+    """Build the evidence plan from model semantics, with an offline fallback.
 
-    The planner is intentionally cheap: it uses only the user query and already
-    gathered candidates/evidence/memory. It does not add database queries or
-    network calls, so it can run on every Agent request.
+    Normal production requests pass the v4-flash orchestration result through
+    ``semantic_plan``. Deterministic extraction remains only for local mode or
+    model outages so the learning endpoint still degrades gracefully.
     """
 
     def build_plan(
@@ -271,8 +274,17 @@ class AgentQueryPlannerService:
         materials: list[MaterialRecord],
         pdf_evidence: list[MaterialPageEvidence],
         memory_context: AgentMemoryContext | None,
+        semantic_plan: dict[str, Any] | None = None,
     ) -> AgentQueryPlan:
         normalized = query.strip().lower()
+        if semantic_plan:
+            return self._build_semantic_plan(
+                normalized,
+                materials=materials,
+                pdf_evidence=pdf_evidence,
+                memory_context=memory_context,
+                semantic_plan=semantic_plan,
+            )
         intent, confidence = _detect_intent(normalized)
         course_terms = _extract_course_terms(normalized, materials)
         resource_types = _extract_resource_types(normalized, materials)
@@ -317,6 +329,95 @@ class AgentQueryPlannerService:
             learning_preferences=learning_preferences,
             exam_analysis_focus=exam_analysis_focus,
         )
+
+    def _build_semantic_plan(
+        self,
+        normalized_query: str,
+        *,
+        materials: list[MaterialRecord],
+        pdf_evidence: list[MaterialPageEvidence],
+        memory_context: AgentMemoryContext | None,
+        semantic_plan: dict[str, Any],
+    ) -> AgentQueryPlan:
+        intent = str(semantic_plan.get("intent") or "general_learning_support")
+        confidence = _safe_confidence(semantic_plan.get("confidence"))
+        course_terms = _string_list(semantic_plan.get("course_terms"), limit=4)
+        resource_types = _string_list(semantic_plan.get("resource_types"), limit=5)
+        years = _string_list(semantic_plan.get("years"), limit=6)
+        for year in _extract_years(normalized_query, pdf_evidence, memory_context):
+            if year not in years:
+                years.append(year)
+        search_terms = _string_list(semantic_plan.get("search_terms"), limit=12)
+        study_constraints = _mapping(semantic_plan.get("study_constraints"))
+        problem_context = _mapping(semantic_plan.get("problem_context"))
+        material_scope = _mapping(semantic_plan.get("material_scope")) or _extract_material_scope(
+            normalized_query, materials, pdf_evidence
+        )
+        learning_preferences = _mapping(semantic_plan.get("learning_preferences"))
+        exam_analysis_focus = _mapping(semantic_plan.get("exam_analysis_focus"))
+        evidence_tasks = _string_list(semantic_plan.get("evidence_tasks"), limit=8)
+        if not evidence_tasks:
+            evidence_tasks = _build_evidence_tasks(
+                intent,
+                pdf_evidence,
+                memory_context,
+                problem_context,
+                material_scope,
+                learning_preferences,
+                exam_analysis_focus,
+            )
+        response_guidance = _string_list(semantic_plan.get("response_guidance"), limit=8)
+        if not response_guidance:
+            response_guidance = _build_response_guidance(
+                intent,
+                bool(pdf_evidence),
+                memory_context is not None,
+                bool(study_constraints),
+                bool(problem_context),
+                material_scope,
+                bool(learning_preferences),
+                bool(exam_analysis_focus),
+            )
+        return AgentQueryPlan(
+            intent=intent,
+            confidence=confidence,
+            course_terms=tuple(course_terms),
+            resource_types=tuple(resource_types),
+            years=tuple(years[:6]),
+            search_terms=tuple(search_terms),
+            evidence_tasks=tuple(evidence_tasks),
+            response_guidance=tuple(response_guidance),
+            followup_guidance=tuple(_string_list(semantic_plan.get("followup_guidance"), limit=3)),
+            study_constraints=study_constraints,
+            problem_context=problem_context,
+            material_scope=material_scope,
+            learning_preferences=learning_preferences,
+            exam_analysis_focus=exam_analysis_focus,
+        )
+
+
+def _safe_confidence(value: Any) -> float:
+    try:
+        return max(0.0, min(1.0, float(value)))
+    except (TypeError, ValueError):
+        return 0.5
+
+
+def _string_list(value: Any, *, limit: int) -> list[str]:
+    if not isinstance(value, (list, tuple)):
+        return []
+    result: list[str] = []
+    for item in value:
+        cleaned = re.sub(r"\s+", " ", str(item or "")).strip()[:160]
+        if cleaned and cleaned not in result:
+            result.append(cleaned)
+        if len(result) >= limit:
+            break
+    return result
+
+
+def _mapping(value: Any) -> dict[str, Any]:
+    return dict(value) if isinstance(value, dict) else {}
 
 
 def _detect_intent(normalized_query: str) -> tuple[str, float]:

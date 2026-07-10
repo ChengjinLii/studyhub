@@ -98,6 +98,13 @@ class Settings(BaseSettings):
     ai_agent_thinking_enabled: bool = False
     ai_agent_reasoning_effort: str = "none"
     ai_agent_timeout_seconds: float = 20.0
+    ai_agent_max_output_tokens: int = 1800
+    ai_agent_orchestrator_provider: str | None = None
+    ai_agent_orchestrator_base_url: str | None = None
+    ai_agent_orchestrator_api_key: str | None = None
+    ai_agent_orchestrator_model: str = "deepseek-v4-flash"
+    ai_agent_orchestrator_timeout_seconds: float = 8.0
+    ai_agent_orchestrator_max_output_tokens: int = 1600
     ai_agent_validator_provider: str | None = None
     ai_agent_validator_base_url: str | None = None
     ai_agent_validator_api_key: str | None = None
@@ -114,6 +121,11 @@ class Settings(BaseSettings):
     ai_agent_memory_max_materials: int = 8
     ai_agent_memory_max_interaction_checks: int = 6
     ai_agent_memory_cookie_name: str = "studyhub_ai_memory"
+    ai_agent_session_memory_enabled: bool = True
+    ai_agent_session_memory_ttl_seconds: int = 604800
+    ai_agent_session_memory_max_turns: int = 12
+    ai_agent_session_memory_max_context_chars: int = 6000
+    ai_agent_session_memory_max_sessions: int = 1024
     public_site_base_url: str = "https://study-hub.cn"
     security_headers_enabled: bool = True
     security_hsts_enabled: bool | None = None

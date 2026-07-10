@@ -55,7 +55,7 @@ def test_ai_memory_preview_shows_current_user_derived_memory(client, auth_servic
     second_data = second_response.json()["data"]
     serialized = json.dumps(data, ensure_ascii=False)
     assert data["personalMemoryEnabled"] is True
-    assert data["mode"] == "read_only_derived"
+    assert data["mode"] == "isolated_session_and_derived_profile"
     assert data["personalMemory"]["profile"] == {
         "school": "电子科技大学",
         "college": "信通",
@@ -67,7 +67,10 @@ def test_ai_memory_preview_shows_current_user_derived_memory(client, auth_servic
         "title": "通信原理真题解析记忆预览",
         "signals": ["favorited"],
     }
-    assert data["memoryExplanation"]["personalMemory"][0] == {
+    profile_memory = next(
+        item for item in data["memoryExplanation"]["personalMemory"] if item["field"] == "profile"
+    )
+    assert profile_memory == {
         "field": "profile",
         "source": "account_profile",
         "scope": "current_authenticated_user",
@@ -75,21 +78,21 @@ def test_ai_memory_preview_shows_current_user_derived_memory(client, auth_servic
     }
     assert data["memoryExplanation"]["deleteBehavior"] == {
         "currentBrowserDisable": True,
-        "dedicatedAgentMemoryRecordsDeleted": False,
+        "dedicatedAgentMemoryRecordsDeleted": True,
         "platformCollectiveMemoryAffected": False,
     }
     assert data["memoryLifecycle"] == {
         "schema": "agent-memory-lifecycle-v1",
-        "mode": "read_only_derived",
-        "persistence": "not_persisted",
+        "mode": "isolated_session_and_derived_profile",
+        "persistence": "redis_or_bounded_local_session_memory",
         "personalMemory": {
             "scope": "current_authenticated_user",
-            "source": "account_profile_and_current_user_material_interactions",
-            "writeMode": "read_only_derived",
+            "source": "isolated_conversation_session_account_profile_and_current_user_material_interactions",
+            "writeMode": "bounded_session_conversation_plus_read_only_derived_profile",
             "currentBrowserDisable": True,
             "deleteWithCurrentBrowserPreference": True,
-            "dedicatedAgentMemoryRecordsPersisted": False,
-            "futureExplicitWritePathRequired": True,
+            "dedicatedAgentMemoryRecordsPersisted": True,
+            "futureExplicitWritePathRequired": False,
         },
         "platformMemory": {
             "scope": "anonymous_platform_aggregate",
@@ -100,22 +103,22 @@ def test_ai_memory_preview_shows_current_user_derived_memory(client, auth_servic
             "requiresAnonymousAggregationForUserFeedback": True,
         },
         "privacyBoundary": (
-            "Current Agent memory is derived at request time. Personal memory is private to the current user, "
-            "and platform memory must only contain anonymous aggregate signals."
+            "Conversation memory is isolated by authenticated user and browser session. Derived personal memory "
+            "is private to that user, and platform memory contains anonymous aggregate signals only."
         ),
     }
     assert data["memorySnapshot"]["schema"] == "agent-memory-preview-v1"
     assert data["memorySnapshot"]["lifecycleSchema"] == "agent-memory-lifecycle-v1"
-    assert data["memorySnapshot"]["version"].startswith("read-only-derived-v1-")
+    assert data["memorySnapshot"]["version"].startswith("dual-layer-memory-v2-")
     assert len(data["memorySnapshot"]["versionFingerprint"]) == 16
     assert data["memorySnapshot"]["version"].endswith(data["memorySnapshot"]["versionFingerprint"][:12])
     assert data["memorySnapshot"]["versionFingerprint"] == second_data["memorySnapshot"]["versionFingerprint"]
     assert data["memorySnapshot"]["sourceCounts"]["candidateMaterialCount"] == data["candidateMaterialCount"]
     assert data["memorySnapshot"]["sourceCounts"]["personalMemorySections"] >= 2
     assert data["memorySnapshot"]["sourceCounts"]["platformMemorySections"] >= 2
-    assert data["memorySnapshot"]["persistence"] == "not_persisted"
+    assert data["memorySnapshot"]["persistence"] == "redis_or_bounded_local_session_memory"
     assert data["controls"]["canDisableCurrentBrowser"] is True
-    assert data["controls"]["canDeletePersistedMemory"] is False
+    assert data["controls"]["canDeletePersistedMemory"] is True
     assert "admin@example.com" not in serialized
     assert "超级管理员" not in serialized
 
@@ -138,14 +141,17 @@ def test_ai_memory_preference_cookie_disables_preview(client, auth_service) -> N
     assert data["disabledReason"] == "user_preference"
     assert data["personalMemory"] is None
     assert data["memorySnapshot"] is None
-    assert preference_response.json()["data"]["affectedScopes"] == ["current_browser_personal_memory"]
+    assert preference_response.json()["data"]["affectedScopes"] == [
+        "current_browser_personal_memory",
+        "user_session_conversation_memory",
+    ]
     assert "platform_collective_memory" in preference_response.json()["data"]["retainedScopes"]
     assert preference_response.json()["data"]["memoryLifecycle"]["personalMemory"]["currentBrowserDisable"] is True
     assert preference_response.json()["data"]["memoryLifecycle"]["platformMemory"]["deleteWithPersonalMemory"] is False
     assert data["memoryExplanation"]["deleteBehavior"]["platformCollectiveMemoryAffected"] is False
 
 
-def test_ai_memory_delete_disables_current_browser_without_persisted_delete(client, auth_service) -> None:
+def test_ai_memory_delete_clears_user_sessions_and_disables_current_browser(client, auth_service) -> None:
     seed_read_users(auth_service)
     _seed_memory_material(user_id=3)
     headers = build_auth_headers(3, 8)
@@ -162,17 +168,18 @@ def test_ai_memory_delete_disables_current_browser_without_persisted_delete(clie
     assert delete_data["personalMemoryEnabled"] is False
     assert delete_data["deletedPersistedMemory"] is False
     assert delete_data["disabledCurrentBrowserMemory"] is True
-    assert delete_data["persistence"] == "not_persisted"
-    assert delete_data["affectedScopes"] == ["current_browser_personal_memory"]
+    assert delete_data["persistence"] == "redis_or_bounded_local_session_memory"
+    assert delete_data["deletedConversationSessions"] == 0
+    assert delete_data["affectedScopes"] == ["user_session_conversation_memory", "current_browser_personal_memory"]
     assert delete_data["retainedScopes"] == [
         "platform_collective_memory",
         "source_material_records",
         "account_profile",
         "material_interactions",
     ]
-    assert delete_data["memoryLifecycle"]["personalMemory"]["dedicatedAgentMemoryRecordsPersisted"] is False
+    assert delete_data["memoryLifecycle"]["personalMemory"]["dedicatedAgentMemoryRecordsPersisted"] is True
     assert delete_data["memoryLifecycle"]["platformMemory"]["rawPersonalDataAllowed"] is False
-    assert "Platform collective memory is not affected" in delete_data["privacyBoundary"]
+    assert "Platform collective memory" in delete_data["privacyBoundary"]
 
     preview_data = preview_response.json()["data"]
     assert preview_data["personalMemoryEnabled"] is False

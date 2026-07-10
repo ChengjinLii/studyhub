@@ -13,6 +13,8 @@ FORBIDDEN_INTERNAL_MARKERS = (
     "platform_collective_memory",
     "conversation_context",
     "conversation_focus",
+    "conversation_memory",
+    "platform_term_glossary",
     "privacy_boundary",
     "candidate_materials",
     "image_attachments",
@@ -70,7 +72,7 @@ PROMPT_TEXT_FIELD_LIMITS = {
     "summary": 240,
     "reason": 260,
     "title": 120,
-    "answer": 1200,
+    "answer": 6000,
     "conversation_focus": 650,
 }
 
@@ -111,13 +113,10 @@ class AgentSafetyService:
             current_query=current_query,
         )
 
-        if had_recommendation_list and not recommendations:
-            answer = ""
-        if answer and candidate_materials and _answer_denies_candidate_materials(answer):
-            return None
-        if answer and _text_is_obviously_non_learning(answer):
-            return None
+        del had_recommendation_list
         if answer and _answer_mentions_unscoped_material_title(answer, candidate_materials, pdf_evidence):
+            return None
+        if answer and _answer_mentions_unscoped_material_id(answer, allowed_material_ids):
             return None
         if answer and not pdf_evidence and _answer_overclaims_pdf_evidence(answer):
             return None
@@ -129,6 +128,9 @@ class AgentSafetyService:
             answer = self._ensure_answer_has_source_hint(answer, evidence_sources)
         elif answer:
             answer = self._ensure_low_evidence_caveat(answer)
+
+        if answer and _answer_mentions_unscoped_material_id(answer, allowed_material_ids):
+            answer = ""
         if not answer and not recommendations:
             return None
 
@@ -237,7 +239,7 @@ class AgentSafetyService:
     def _sanitize_answer(self, value: Any) -> str:
         if not isinstance(value, str):
             return ""
-        answer = _clean_public_answer(value, max_chars=1800)
+        answer = _clean_public_answer(value, max_chars=6000)
         if not answer:
             return ""
         return answer
@@ -357,7 +359,7 @@ class AgentSafetyService:
         hint = _source_hint(evidence_sources)
         if not hint:
             return answer
-        max_chars = 1800
+        max_chars = 6000
         trimmed_answer = answer[: max(0, max_chars - len(hint) - 1)].rstrip()
         return f"{trimmed_answer} {hint}".strip()
 
@@ -365,7 +367,7 @@ class AgentSafetyService:
         if not answer or _answer_mentions_low_evidence_boundary(answer):
             return answer
         caveat = "说明：当前没有可用 PDF 页级证据，这里仅基于候选资料元数据和可见记忆信号给出保守建议。"
-        max_chars = 1800
+        max_chars = 6000
         trimmed_answer = answer[: max(0, max_chars - len(caveat) - 1)].rstrip()
         return f"{trimmed_answer} {caveat}".strip()
 
@@ -380,24 +382,17 @@ class AgentSafetyService:
             return []
         questions: list[str] = []
         seen_questions: set[str] = set()
-        has_candidate_materials = bool(candidate_materials)
+        del candidate_materials
         current_key = _followup_dedupe_key(current_query or "")
         for item in value:
             question = _clean_public_text(item, max_chars=80)
-            question = _normalize_followup_voice(question)
             if not question:
                 continue
             question_key = _followup_dedupe_key(question)
             if current_key and question_key == current_key:
                 continue
-            if _followup_needs_user_fill(question):
-                continue
             lowered = question.lower()
             if any(marker in lowered for marker in FORBIDDEN_INTERNAL_MARKERS):
-                continue
-            if _text_is_obviously_non_learning(question):
-                continue
-            if has_candidate_materials and _followup_requests_external_material(question):
                 continue
             if question_key in seen_questions:
                 continue
@@ -457,79 +452,8 @@ def _clean_public_title(value: Any, *, max_chars: int) -> str:
     return text
 
 
-def _normalize_followup_voice(value: str) -> str:
-    text = re.sub(r"\s+", " ", str(value or "")).strip(" ?？。")
-    if not text:
-        return ""
-    replacements = (
-        ("你可以把具体题目截图发我吗", "我把具体题目截图发你"),
-        ("需要我帮你", ""),
-        ("需要我", ""),
-        ("我可以帮你", ""),
-        ("是否想", ""),
-        ("你是否想", ""),
-        ("想不想", ""),
-        ("你想不想", ""),
-        ("是否希望我", ""),
-        ("你希望我", ""),
-        ("要不要我按", "按"),
-        ("要不要我继续", "继续"),
-        ("要不要我基于", "基于"),
-        ("要不要我把", "把"),
-        ("要不要我帮你", ""),
-        ("要不要我", ""),
-        ("要不要按", "按"),
-        ("要不要把", "把"),
-        ("要不要", ""),
-        ("是否需要我把", "把"),
-        ("是否需要我", ""),
-        ("是否需要", ""),
-        ("你更想要", "我更想要"),
-        ("你的专业和年级", "我的专业和年级"),
-    )
-    for old, new in replacements:
-        if text.startswith(old):
-            text = f"{new}{text[len(old):]}".strip()
-            break
-    text = text.replace("你的", "我的").replace("帮你", "帮我")
-    text = text.strip(" ?？。吗")
-    return re.sub(r"\s+", " ", text).strip(" ?？。")[:80]
-
-
 def _followup_dedupe_key(value: str) -> str:
     return re.sub(r"[^\u4e00-\u9fffA-Za-z0-9]+", "", str(value or "")).lower()
-
-
-def _followup_needs_user_fill(value: str) -> bool:
-    normalized = re.sub(r"\s+", "", str(value or "")).lower()
-    if not normalized:
-        return True
-    fill_markers = (
-        "你的考试日期和每天可复习时间",
-        "我的考试日期和每天可复习时间是",
-        "考试日期和每天可复习时间是",
-        "请补充课程名",
-        "告诉我考试时间",
-        "告诉我每天可复习时间",
-    )
-    if any(marker in normalized for marker in fill_markers):
-        return True
-    assistant_voice_markers = (
-        "需要我",
-        "我可以帮你",
-        "是否想",
-        "是否希望",
-        "你是否想",
-        "你想不想",
-        "你希望我",
-    )
-    if any(marker in normalized for marker in assistant_voice_markers):
-        return True
-    if normalized.endswith(("是多少", "是什么", "有哪些", "吗")) and any(
-        marker in normalized for marker in ("你的", "你现在", "你想", "需要我", "要不要")
-    ):
-        return True
-    return False
 
 
 def _clean_prompt_text(value: str, *, field_name: str | None) -> str:
@@ -633,119 +557,6 @@ def _answer_mentions_low_evidence_boundary(answer: str) -> bool:
     return any(marker in normalized for marker in markers)
 
 
-def _answer_denies_candidate_materials(answer: str) -> bool:
-    normalized = re.sub(r"\s+", "", answer).lower()
-    markers = (
-        "没有收到任何",
-        "没有收到可用",
-        "没有可用的studyhub候选资料",
-        "没有可用studyhub候选资料",
-        "没有候选资料",
-        "没有studyhub候选资料",
-        "不能基于指定资料",
-        "无法基于指定资料",
-        "没有匹配到相关资料",
-    )
-    return any(marker in normalized for marker in markers)
-
-
-def _text_is_obviously_non_learning(value: str) -> bool:
-    normalized = re.sub(r"\s+", "", str(value or "")).lower()
-    if not normalized:
-        return False
-    if any(marker in normalized for marker in _LEARNING_SCOPE_MARKERS):
-        return False
-    return any(marker in normalized for marker in _OBVIOUS_NON_LEARNING_MARKERS)
-
-
-_LEARNING_SCOPE_MARKERS = (
-    "学习",
-    "复习",
-    "考试",
-    "期末",
-    "期中",
-    "真题",
-    "往年题",
-    "历年题",
-    "题目",
-    "题型",
-    "考题",
-    "考点",
-    "作业",
-    "课程",
-    "资料",
-    "笔记",
-    "讲义",
-    "答案",
-    "解析",
-    "错题",
-    "知识点",
-    "公式",
-    "推导",
-    "计算题",
-    "证明题",
-    "pdf",
-    "课件",
-    "专业",
-    "学院",
-    "studyhub",
-    "esd",
-    "cps",
-    "通信原理",
-    "电子系统设计",
-    "信号与系统",
-    "数据结构",
-    "高数",
-    "高等数学",
-    "微积分",
-    "概率论",
-)
-
-
-_OBVIOUS_NON_LEARNING_MARKERS = (
-    "天气",
-    "几度",
-    "股票",
-    "炒股",
-    "投资建议",
-    "彩票",
-    "博彩",
-    "赌球",
-    "电影",
-    "电视剧",
-    "综艺",
-    "音乐推荐",
-    "游戏攻略",
-    "王者荣耀",
-    "笑话",
-    "段子",
-    "闲聊",
-    "菜谱",
-    "外卖",
-    "旅游攻略",
-    "穿搭",
-    "美妆",
-    "购物",
-    "手机推荐",
-    "星座",
-    "运势",
-    "占卜",
-    "八卦",
-    "恋爱",
-    "约会",
-    "情感咨询",
-    "写情书",
-    "医疗诊断",
-    "看病",
-    "法律咨询",
-    "律师",
-    "房价",
-    "买房",
-    "健身计划",
-    "减肥计划",
-)
-
-
 def _answer_mentions_unscoped_material_title(
     answer: str,
     candidate_materials: list[MaterialRecord],
@@ -768,33 +579,20 @@ def _answer_mentions_unscoped_material_title(
     return any(not _title_matches_allowed_scope(title, allowed_titles) for title in material_like_titles)
 
 
-def _followup_requests_external_material(question: str) -> bool:
-    normalized = re.sub(r"\s+", "", question).lower()
-    request_markers = (
-        "发给我",
-        "发我",
-        "发一下",
-        "上传",
-        "传一下",
-        "提供",
-        "给我",
-        "贴一下",
+def _answer_mentions_unscoped_material_id(answer: str, allowed_material_ids: set[int]) -> bool:
+    mentioned: set[int] = set()
+    patterns = (
+        r"(?:资料\s*ID|material\s*ID|ID)\s*[:：#]?\s*(\d{1,10})",
+        r"(?:资料|material|mat)\s*#\s*(\d{1,10})",
+        r"资料\s*(\d{1,10})(?!\d)(?!\s*(?:页|份|条|个))",
     )
-    material_markers = (
-        "资料",
-        "真题",
-        "往年题",
-        "历年题",
-        "试卷",
-        "样卷",
-        "讲义",
-        "笔记",
-        "pdf",
-        "文件",
-    )
-    return any(marker in normalized for marker in request_markers) and any(
-        marker in normalized for marker in material_markers
-    )
+    for pattern in patterns:
+        for raw_value in re.findall(pattern, answer, flags=re.IGNORECASE):
+            try:
+                mentioned.add(int(raw_value))
+            except (TypeError, ValueError):
+                continue
+    return any(material_id not in allowed_material_ids for material_id in mentioned)
 
 
 def _looks_like_material_title(title: str) -> bool:

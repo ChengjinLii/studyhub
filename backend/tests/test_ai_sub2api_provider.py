@@ -80,7 +80,7 @@ def test_sub2api_provider_posts_responses_payload(monkeypatch) -> None:
     assert isinstance(body, dict)
     assert body["model"] == "gpt-5.4-mini"
     assert body["instructions"] == "system prompt"
-    assert body["max_output_tokens"] == 900
+    assert body["max_output_tokens"] == 1800
     assert body["reasoning"] == {"effort": "none"}
     assert body["store"] is False
     assert isinstance(body["input"], list)

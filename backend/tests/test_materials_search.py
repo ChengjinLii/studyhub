@@ -10,6 +10,7 @@ from app.services.materials_search import (
     material_mapping_matches_search,
     material_mapping_search_score,
     material_matches_search,
+    material_search_glossary,
     material_search_score,
     parse_material_search_query,
 )
@@ -79,6 +80,20 @@ def test_private_synonym_file_expands_short_course_names(monkeypatch, tmp_path) 
     material = _material(title="大学物理期末复习 PPT")
 
     assert material_matches_search(material, query, _load_tags) is True
+
+
+def test_private_synonyms_supply_agent_platform_glossary(monkeypatch, tmp_path) -> None:
+    synonym_file = tmp_path / "synonyms.json"
+    synonym_file.write_text('{"ESD": ["电子系统设计"], "CPS": ["通信原理"]}', encoding="utf-8")
+    monkeypatch.setenv(SYNONYM_FILE_ENV, str(synonym_file))
+    clear_material_search_cache()
+
+    glossary = material_search_glossary("两周后考 ESD，之后还要复习 CPS")
+
+    assert glossary == {
+        "esd": ["esd", "电子系统设计"],
+        "cps": ["cps", "通信原理"],
+    }
 
 
 def test_keyword_score_prefers_title_match_over_description_only() -> None:

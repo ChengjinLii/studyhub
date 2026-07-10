@@ -161,11 +161,11 @@ def update_ai_memory_preferences(
 @router.delete("/api/ai/memory")
 def delete_ai_memory(
     response: Response,
-    _: AuthContext = Depends(require_privileged_auth_context),
+    auth: AuthContext = Depends(require_privileged_auth_context),
     service: AiService = Depends(get_ai_service),
 ) -> dict[str, object]:
     service.write_personal_memory_preference_cookie(response, enabled=False)
-    return api_ok(service.delete_personal_memory_payload())
+    return api_ok(service.delete_personal_memory_payload(current_user_id=auth.user_id))
 
 
 @router.post("/api/ai/feedback")

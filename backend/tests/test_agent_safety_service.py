@@ -83,7 +83,7 @@ def test_agent_safety_filters_unknown_recommendations_and_unread_pages() -> None
                 "source_type": "past_exam",
             }
         ],
-        "followup_questions": ["按题型整理"],
+        "followup_questions": ["要不要按题型整理？"],
     }
 
 
@@ -104,7 +104,7 @@ def test_agent_safety_filters_memory_coverage_resource_budget_fields() -> None:
 
     assert sanitized == {
         "recommendations": [{"material_id": 101}],
-        "followup_questions": ["按题型整理"],
+        "followup_questions": ["要不要按题型整理？"],
     }
     assert "resource_budget" not in json.dumps(sanitized, ensure_ascii=False)
     assert "coverage" not in json.dumps(sanitized, ensure_ascii=False)
@@ -243,6 +243,19 @@ def test_agent_safety_rejects_unscoped_quoted_material_title() -> None:
     assert sanitized is None
 
 
+def test_agent_safety_rejects_unscoped_material_id_in_answer() -> None:
+    sanitized = AgentSafetyService().sanitize_recommendation_body(
+        {
+            "answer": "先看候选资料（ID:101），再做模型临时编出的资料（ID:999）。",
+            "recommendations": [{"material_id": 101, "reason": "候选资料"}],
+        },
+        candidate_materials=[_material()],
+        pdf_evidence=[],
+    )
+
+    assert sanitized is None
+
+
 def test_agent_safety_allows_quoted_course_name_without_material_marker() -> None:
     sanitized = AgentSafetyService().sanitize_recommendation_body(
         {
@@ -260,7 +273,7 @@ def test_agent_safety_allows_quoted_course_name_without_material_marker() -> Non
     )
 
 
-def test_agent_safety_filters_material_upload_followups_when_candidates_exist() -> None:
+def test_agent_safety_preserves_followup_semantics_for_model_review() -> None:
     sanitized = AgentSafetyService().sanitize_recommendation_body(
         {
             "answer": "我先基于候选资料给你分析。",
@@ -276,7 +289,11 @@ def test_agent_safety_filters_material_upload_followups_when_candidates_exist() 
     )
 
     assert sanitized is not None
-    assert sanitized["followup_questions"] == ["按年份整理题型"]
+    assert sanitized["followup_questions"] == [
+        "你可以把真题发给我吗？",
+        "要不要我按年份整理题型？",
+        "能不能上传 PDF 资料？",
+    ]
 
 
 def test_agent_safety_keeps_problem_screenshot_followup_with_candidates() -> None:
@@ -291,10 +308,10 @@ def test_agent_safety_keeps_problem_screenshot_followup_with_candidates() -> Non
     )
 
     assert sanitized is not None
-    assert sanitized["followup_questions"] == ["我把具体题目截图发你"]
+    assert sanitized["followup_questions"] == ["你可以把具体题目截图发我吗？"]
 
 
-def test_agent_safety_filters_obvious_non_learning_followups() -> None:
+def test_agent_safety_does_not_classify_followup_intent() -> None:
     sanitized = AgentSafetyService().sanitize_recommendation_body(
         {
             "answer": "我会基于当前候选资料分析通信原理真题趋势。",
@@ -310,10 +327,14 @@ def test_agent_safety_filters_obvious_non_learning_followups() -> None:
     )
 
     assert sanitized is not None
-    assert sanitized["followup_questions"] == ["按年份整理题型"]
+    assert sanitized["followup_questions"] == [
+        "要不要我查一下明天天气？",
+        "要不要按年份整理题型？",
+        "要不要我讲个笑话？",
+    ]
 
 
-def test_agent_safety_filters_duplicate_and_fill_in_followups() -> None:
+def test_agent_safety_filters_duplicate_current_followup_only() -> None:
     sanitized = AgentSafetyService().sanitize_public_response_body(
         {
             "answer": "可以按两周复习计划安排。",
@@ -328,10 +349,13 @@ def test_agent_safety_filters_duplicate_and_fill_in_followups() -> None:
         current_query="帮我整理成两周复习计划",
     )
 
-    assert sanitized["followup_questions"] == ["把第 1-7 天细化到每天两小时"]
+    assert sanitized["followup_questions"] == [
+        "你的考试日期和每天可复习时间是多少？",
+        "把第 1-7 天细化到每天两小时",
+    ]
 
 
-def test_agent_safety_rewrites_assistant_voice_followups_to_user_requests() -> None:
+def test_agent_safety_does_not_rewrite_followup_voice() -> None:
     sanitized = AgentSafetyService().sanitize_public_response_body(
         {
             "answer": "可以继续按真题题型分析。",
@@ -346,9 +370,9 @@ def test_agent_safety_rewrites_assistant_voice_followups_to_user_requests() -> N
     )
 
     assert sanitized["followup_questions"] == [
-        "分析2020-2022年真题中各类题型的分数占比",
-        "重点突破某一种题型（如计算题或设计题）的解题思路",
-        "根据我的复习笔记，定制一个题型专项复习计划",
+        "需要我帮你分析2020-2022年真题中各类题型的分数占比吗",
+        "是否想重点突破某一种题型（如计算题或设计题）的解题思路",
+        "根据你的复习笔记，定制一个题型专项复习计划",
     ]
 
 
@@ -366,7 +390,7 @@ def test_agent_safety_does_not_repeat_low_evidence_caveat() -> None:
     assert sanitized["answer"] == "我只能基于候选资料元数据给出保守建议，建议先确认课程范围。"
 
 
-def test_agent_safety_rejects_candidate_denial_when_candidates_exist() -> None:
+def test_agent_safety_leaves_candidate_denial_to_semantic_reviewer() -> None:
     sanitized = AgentSafetyService().sanitize_recommendation_body(
         {
             "answer": "目前我这边没有收到任何 ESD 的候选资料，所以不能基于指定资料直接分析考题风格。",
@@ -376,7 +400,8 @@ def test_agent_safety_rejects_candidate_denial_when_candidates_exist() -> None:
         pdf_evidence=[],
     )
 
-    assert sanitized is None
+    assert sanitized is not None
+    assert "没有收到任何" in sanitized["answer"]
 
 
 def test_agent_safety_rejects_pdf_page_overclaim_without_pdf_evidence() -> None:
@@ -538,7 +563,7 @@ def test_agent_safety_preserves_and_redacts_local_public_response_fields() -> No
     assert "summary" in sanitized["recommendations"][0]
     assert sanitized["evidence_sources"][0]["title"] == "通信原理 [redacted-email] [redacted-phone]"
     assert sanitized["evidence_sources"][0]["excerpt"] == "联系 [redacted-phone] 看解析。"
-    assert sanitized["followup_questions"] == ["继续发给 [redacted-email]"]
+    assert sanitized["followup_questions"] == ["要不要继续发给 [redacted-email]？"]
 
 
 def test_agent_safety_rejects_internal_context_leaks_and_invalid_only_recommendations() -> None:
@@ -723,7 +748,7 @@ def test_ai_recommendation_falls_back_when_model_mentions_non_candidate_material
     assert body["recommendations"][0]["material_id"] == 101
 
 
-def test_ai_recommendation_uses_local_followups_when_model_asks_for_existing_materials(monkeypatch) -> None:
+def test_ai_recommendation_does_not_programmatically_rewrite_model_followups(monkeypatch) -> None:
     settings = Settings(
         ai_agent_provider="openai-compatible",
         ai_agent_base_url="https://example.test/v1",
@@ -759,13 +784,10 @@ def test_ai_recommendation_uses_local_followups_when_model_asks_for_existing_mat
     )
     body = json.loads(str(response["output"]).removeprefix("<json>").removesuffix("</json>"))
 
-    assert body["followup_questions"] == [
-        "按年份整理常考题型",
-        "把这些资料整理成两周复习顺序",
-    ]
+    assert body["followup_questions"] == ["你可以把真题发给我吗？"]
 
 
-def test_ai_recommendation_falls_back_when_model_answer_leaves_learning_scope(monkeypatch) -> None:
+def test_ai_recommendation_without_orchestrator_does_not_use_keyword_answer_interceptor(monkeypatch) -> None:
     settings = Settings(
         ai_agent_provider="openai-compatible",
         ai_agent_base_url="https://example.test/v1",
@@ -797,10 +819,9 @@ def test_ai_recommendation_falls_back_when_model_answer_leaves_learning_scope(mo
     )
     body = json.loads(str(response["output"]).removeprefix("<json>").removesuffix("</json>"))
 
-    assert "写情书" not in body["answer"]
-    assert "电影" not in json.dumps(body, ensure_ascii=False)
-    assert "闲聊" not in json.dumps(body, ensure_ascii=False)
-    assert body["answer"].startswith("我先基于 StudyHub 资料库找到")
+    assert "写情书" in body["answer"]
+    assert "电影" in json.dumps(body, ensure_ascii=False)
+    assert "闲聊" in json.dumps(body, ensure_ascii=False)
     assert body["recommendations"][0]["material_id"] == 101
 
 
@@ -1004,6 +1025,5 @@ def test_ai_recommendation_emits_current_processing_stages(monkeypatch) -> None:
         "理解问题中",
         "检索资料中",
         "生成本地回答中",
-        "验证追问中",
         "整理答案中",
     ]

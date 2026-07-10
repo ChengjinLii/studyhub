@@ -637,7 +637,7 @@ def test_agent_exam_trend_closed_loop_prompt_and_response_contract(monkeypatch) 
     assert "visual_signals" not in body["evidence_sources"][0]
     assert "anchor_terms" not in body["evidence_sources"][0]
     assert "anchor_text" not in body["evidence_sources"][0]
-    assert body["followup_questions"] == ["按年份整理题型", "两周复习顺序"]
+    assert body["followup_questions"] == ["要不要按年份整理题型？", "是否需要两周复习顺序？"]
     assert "memory_context" not in json.dumps(body, ensure_ascii=False)
     assert "query_plan" not in json.dumps(body, ensure_ascii=False)
 
@@ -862,7 +862,7 @@ def test_agent_local_plan_summary_followup_uses_context_without_retrieval(monkey
     metrics.clear()
 
 
-def test_agent_explicit_v4_flash_validator_routes_plan_followup_without_retrieval(monkeypatch) -> None:
+def test_agent_explicit_v4_flash_orchestrator_routes_plan_followup_without_retrieval(monkeypatch) -> None:
     settings = Settings(
         ai_agent_provider="local",
         ai_agent_validator_provider="openai-compatible",
@@ -930,12 +930,12 @@ def test_agent_explicit_v4_flash_validator_routes_plan_followup_without_retrieva
     assert "第 1 天" in body["answer"]
     assert "recommendations" not in body
     assert body["followup_questions"] == [
-        "把第 8-14 天改成冲刺刷题版",
-        "只看真题和讲义怎么安排",
+        "帮我先按两周复习计划安排",
+        "按基础薄弱和冲刺刷题分阶段安排",
     ]
 
 
-def test_agent_validator_rejects_generic_followups_without_fallback(monkeypatch) -> None:
+def test_agent_orchestrator_drives_retrieval_without_followup_interceptor(monkeypatch) -> None:
     settings = Settings(
         ai_agent_provider="local",
         ai_agent_validator_provider="openai-compatible",
@@ -972,19 +972,7 @@ def test_agent_validator_rejects_generic_followups_without_fallback(monkeypatch)
                 },
                 ensure_ascii=False,
             )
-        assert "可执行学习任务" in system_prompt
-        return json.dumps(
-            {
-                "valid_followups": [],
-                "rejected_followups": [
-                    "我更想要真题、笔记还是经验分享",
-                    "限定学校、学院或专业",
-                    "结合我的专业和年级调整推荐顺序",
-                ],
-                "reason": "generic prompts",
-            },
-            ensure_ascii=False,
-        )
+        raise AssertionError(f"local answer mode should only call the orchestrator: {system_prompt}")
 
     monkeypatch.setattr(service, "_call_agent_model", fake_call_agent_model)
 
@@ -995,9 +983,88 @@ def test_agent_validator_rejects_generic_followups_without_fallback(monkeypatch)
     )
     body = json.loads(str(response["output"]).removeprefix("<json>").removesuffix("</json>"))
 
-    followup_payload = next(payload for payload in validator_payloads if "candidate_followups" in payload)
-    assert "examples" in followup_payload
-    assert "followup_questions" not in body
+    assert len(validator_payloads) == 1
+    assert validator_payloads[0]["current_user_query"] == "通信原理往年题常考什么"
+    assert body["recommendations"][0]["material_id"] == 101
+
+
+def test_agent_v4_flash_semantic_reviewer_repairs_direction_and_followups(monkeypatch) -> None:
+    settings = Settings(
+        ai_agent_provider="openai-compatible",
+        ai_agent_base_url="https://answer.example.test/v1",
+        ai_agent_api_key="answer-key",
+        ai_agent_model="answer-model",
+        ai_agent_orchestrator_provider="openai-compatible",
+        ai_agent_orchestrator_base_url="https://flash.example.test/v1",
+        ai_agent_orchestrator_api_key="flash-key",
+        ai_agent_orchestrator_model="deepseek-v4-flash",
+    )
+    monkeypatch.setattr("app.services.ai_service.get_settings", lambda: settings)
+
+    service = AiService(
+        read_repo=None,
+        material_repo=None,
+        query_planner_service=AgentQueryPlannerService(),
+    )  # type: ignore[arg-type]
+    monkeypatch.setattr(
+        service,
+        "_rank_materials",
+        lambda session, query, filters: [
+            _material(101, title="通信原理真题解析", description="通信原理期末复习资料", downloads=80)
+        ],
+    )
+    calls: list[tuple[str, str]] = []
+
+    def fake_call_agent_model(settings: Settings, system_prompt: str, user_prompt: dict[str, Any]) -> str:
+        calls.append((settings.ai_agent_model, system_prompt))
+        if "学习 Agent 的编排器" in system_prompt:
+            return json.dumps(
+                {
+                    "scope": "learning",
+                    "route": "new_material_search",
+                    "should_search": True,
+                    "use_context": False,
+                    "search_query": "通信原理 真题 复习",
+                    "intent": "study_plan",
+                    "confidence": 0.96,
+                    "study_constraints": {"days_until_exam": 14},
+                    "response_guidance": ["按 14 天分阶段输出"],
+                    "followup_guidance": ["细化前七天", "整理刷题顺序"],
+                },
+                ensure_ascii=False,
+            )
+        if "语义审阅器" in system_prompt:
+            assert user_prompt["candidate_materials"][0]["material_id"] == 101
+            return json.dumps(
+                {
+                    "approved": False,
+                    "answer": "## 两周复习计划\n\n1. 第 1-3 天补基础。\n2. 第 4-10 天结合候选真题资料训练。\n3. 第 11-14 天模拟与复盘。",
+                    "followup_questions": ["把第 1-7 天细化到每天两小时", "按题型整理刷题清单"],
+                    "reason": "修复答非所问和助手口吻追问",
+                },
+                ensure_ascii=False,
+            )
+        return json.dumps(
+            {
+                "answer": "目前没有候选资料，我给你讲个笑话。",
+                "recommendations": [{"material_id": 101, "reason": "标题匹配"}],
+                "followup_questions": ["需要我帮你分析真题吗", "你的考试日期是多少"],
+            },
+            ensure_ascii=False,
+        )
+
+    monkeypatch.setattr(service, "_call_agent_model", fake_call_agent_model)
+    response = service.recommend(
+        object(),  # type: ignore[arg-type]
+        SimpleNamespace(query="两周后考通信原理，基础一般，怎么复习？", filters={}),
+        current_user_id=7,
+    )
+    body = json.loads(str(response["output"]).removeprefix("<json>").removesuffix("</json>"))
+
+    assert body["answer"].startswith("## 两周复习计划")
+    assert "笑话" not in body["answer"]
+    assert body["followup_questions"] == ["把第 1-7 天细化到每天两小时", "按题型整理刷题清单"]
+    assert [model for model, _ in calls] == ["deepseek-v4-flash", "answer-model", "deepseek-v4-flash"]
 
 
 def test_agent_local_study_plan_uses_query_learning_preferences(monkeypatch) -> None:
@@ -1627,7 +1694,7 @@ def test_agent_local_exam_trend_prioritizes_requested_focus_dimensions(monkeypat
     metrics.clear()
 
 
-def test_agent_replaces_model_no_candidate_answer_when_local_materials_exist(monkeypatch) -> None:
+def test_agent_without_semantic_reviewer_preserves_model_candidate_claim(monkeypatch) -> None:
     metrics = get_runtime_metrics()
     metrics.clear()
     settings = Settings(
@@ -1684,9 +1751,7 @@ def test_agent_replaces_model_no_candidate_answer_when_local_materials_exist(mon
     )
     body = json.loads(str(response["output"]).removeprefix("<json>").removesuffix("</json>"))
 
-    assert "没有收到任何" not in body["answer"]
-    assert "StudyHub 资料库找到" in body["answer"]
-    assert "ESD-电子系统设计-2021年真题及答案" in body["answer"]
+    assert "没有收到任何" in body["answer"]
     assert body["recommendations"][0]["material_id"] == 501
     assert "电子系统设计" in body["recommendations"][0]["title"]
     metrics.clear()

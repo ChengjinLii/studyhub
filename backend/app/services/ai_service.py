@@ -3,7 +3,6 @@ from __future__ import annotations
 import hashlib
 import json
 import re
-from dataclasses import dataclass
 from time import perf_counter
 from types import SimpleNamespace
 from typing import Any, Callable
@@ -19,11 +18,26 @@ from app.repos.material_repo import MaterialRepository
 from app.repos.read_api_repo import ReadApiRepository
 from app.schemas.ai import AiChatRequestPayload, AiRecommendRequestPayload
 from app.services.agent_course_memory_service import AgentCourseMemoryService, CourseMemoryCard
+from app.services.agent_conversation_memory_service import (
+    AgentConversationMemoryService,
+    AgentConversationTurn,
+)
 from app.services.agent_material_signal_service import build_material_signals
 from app.services.agent_memory_service import AgentMemoryContext, AgentMemoryService
+from app.services.agent_orchestrator_service import (
+    AGENT_ORCHESTRATOR_SYSTEM_PROMPT,
+    AGENT_RESPONSE_REVIEW_SYSTEM_PROMPT,
+    AgentOrchestrationPlan,
+    AgentOrchestratorService,
+)
 from app.services.agent_query_planner_service import AgentQueryPlan, AgentQueryPlannerService
 from app.services.agent_safety_service import AgentSafetyService
-from app.services.materials_search import material_matches_search, material_search_score, parse_material_search_query
+from app.services.materials_search import (
+    material_matches_search,
+    material_search_glossary,
+    material_search_score,
+    parse_material_search_query,
+)
 from app.services.material_pdf_evidence_service import MaterialPageEvidence, MaterialPdfEvidenceService
 from app.services.read_support import parse_iso_datetime
 
@@ -202,15 +216,6 @@ AGENT_OBVIOUS_NON_LEARNING_QUERY_MARKERS = (
 )
 
 
-@dataclass(frozen=True)
-class AgentTurnRoute:
-    route: str
-    should_search: bool
-    use_context: bool
-    search_query: str = ""
-    reason: str = "local"
-
-
 class AiService:
     """StudyHub AI compatibility layer with optional external agent providers."""
 
@@ -223,6 +228,8 @@ class AiService:
         query_planner_service: AgentQueryPlannerService | None = None,
         course_memory_service: AgentCourseMemoryService | None = None,
         safety_service: AgentSafetyService | None = None,
+        orchestrator_service: AgentOrchestratorService | None = None,
+        conversation_memory_service: AgentConversationMemoryService | None = None,
     ) -> None:
         self.read_repo = read_repo
         self.material_repo = material_repo
@@ -231,6 +238,8 @@ class AiService:
         self.query_planner_service = query_planner_service
         self.course_memory_service = course_memory_service
         self.safety_service = safety_service or AgentSafetyService()
+        self.orchestrator_service = orchestrator_service or AgentOrchestratorService()
+        self.conversation_memory_service = conversation_memory_service
 
     def chat(self, payload: AiChatRequestPayload) -> dict[str, Any]:
         latest_user_message = next((item.content.strip() for item in reversed(payload.messages) if item.role.lower() == "user"), "")
@@ -264,37 +273,39 @@ class AiService:
         try:
             _emit_agent_stage(stage_callback, "理解问题中")
             image_attachments = _agent_image_attachments(getattr(payload, "imageAttachments", []))
-            if _is_agent_greeting_query(payload.query):
+            session_id = getattr(payload, "sessionId", None)
+            conversation_turns = self._load_agent_conversation(
+                current_user_id=current_user_id,
+                session_id=session_id,
+            ) if personal_memory_enabled else []
+            context_query = _merge_agent_conversation_context(
+                self.conversation_memory_service.context_text(conversation_turns)
+                if self.conversation_memory_service
+                else "",
+                getattr(payload, "contextQuery", None),
+            )
+            turn_plan = self._plan_agent_turn(
+                payload.query,
+                context_query=context_query,
+                has_image=bool(image_attachments),
+            )
+            if turn_plan.scope == "greeting":
                 status = "scope_greeting"
                 _emit_agent_stage(stage_callback, "整理答案中")
                 body = _learning_scope_greeting_body()
                 return {"output": _agent_json_output(body)}
-            context_query = getattr(payload, "contextQuery", None)
-            turn_route = self._route_agent_turn(
-                payload.query,
-                context_query=context_query,
-                has_image=bool(image_attachments),
-            )
-            if not _is_learning_related_agent_query(
-                payload.query,
-                context_query=context_query,
-                has_image=bool(image_attachments),
-            ) and not _route_has_learning_context(turn_route, context_query):
+            if turn_plan.scope == "out_of_scope":
                 status = "scope_blocked"
                 _emit_agent_stage(stage_callback, "整理答案中")
                 body = _learning_scope_block_body()
                 return {"output": _agent_json_output(body)}
-            effective_context_query = (
-                _compact_agent_context(context_query)
-                if turn_route.use_context
-                else _agent_context_for_query(payload.query, context_query)
-            )
+            effective_context_query = _compact_agent_context(context_query) if turn_plan.use_context else ""
             retrieval_query = _agent_retrieval_query(payload.query, effective_context_query)
-            material_query = turn_route.search_query or retrieval_query
-            _emit_agent_stage(stage_callback, "检索资料中" if turn_route.should_search else "读取上下文中")
+            material_query = turn_plan.search_query or retrieval_query
+            _emit_agent_stage(stage_callback, "检索资料中" if turn_plan.should_search else "读取上下文中")
             materials = (
                 self._rank_materials(session, material_query, payload.filters or {})
-                if turn_route.should_search
+                if turn_plan.should_search
                 else self._context_materials(session, effective_context_query)
             )
             pdf_evidence = self._collect_pdf_evidence(
@@ -310,6 +321,7 @@ class AiService:
                     materials=materials,
                     current_user_id=current_user_id,
                     pdf_evidence=pdf_evidence,
+                    conversation_turns=conversation_turns,
                 )
                 if personal_memory_enabled
                 else None
@@ -319,6 +331,7 @@ class AiService:
                 materials=materials,
                 pdf_evidence=pdf_evidence,
                 memory_context=memory_context,
+                semantic_plan=turn_plan,
             )
             course_memory_card = self._build_course_memory_card(
                 materials=materials,
@@ -350,27 +363,20 @@ class AiService:
                 recommendations = self._merge_llm_recommendations(llm_body, recommendations)
             elif model_configured:
                 status = "model_fallback"
-            followup_questions = self._local_followup_questions(
-                query=payload.query,
-                query_plan=query_plan,
-                pdf_evidence=pdf_evidence,
-                recommendations=recommendations,
-                memory_context=memory_context,
+            followup_questions = (
+                []
+                if llm_body
+                else self._local_followup_questions(
+                    query=payload.query,
+                    query_plan=query_plan,
+                    pdf_evidence=pdf_evidence,
+                    recommendations=recommendations,
+                    memory_context=memory_context,
+                )
             )
             answer = ""
             if llm_body:
                 answer = str(llm_body.get("answer") or "").strip()
-                if _llm_answer_denies_available_candidates(answer, materials, recommendations):
-                    answer = self._build_local_answer(
-                        payload.query,
-                        recommendations,
-                        pdf_evidence,
-                        memory_context,
-                        query_plan=query_plan,
-                        course_memory_card=course_memory_card,
-                        conversation_context=effective_context_query,
-                        image_attachments=image_attachments,
-                    )
             else:
                 answer = self._build_local_answer(
                     payload.query,
@@ -395,33 +401,34 @@ class AiService:
                     for item in llm_body["followup_questions"]
                     if isinstance(item, (str, int, float)) and str(item).strip()
                 ][:3] or body["followup_questions"]
-            if _is_cps_two_week_plan_request(payload.query, query_plan):
-                cps_recommendations = _filter_cps_plan_recommendations(body.get("recommendations", []))
-                body["recommendations"] = cps_recommendations
-                body["answer"] = self._build_local_answer(
-                    payload.query,
-                    cps_recommendations,
-                    pdf_evidence,
-                    memory_context,
-                    query_plan=query_plan,
-                    course_memory_card=course_memory_card,
-                    conversation_context=effective_context_query,
-                    image_attachments=image_attachments,
-                )
-                body["followup_questions"] = self._local_followup_questions(
+            if model_configured and self._is_agent_orchestrator_configured(settings):
+                _emit_agent_stage(stage_callback, "验证答案中")
+                body = self._review_agent_response(
                     query=payload.query,
-                    query_plan=query_plan,
+                    body=body,
+                    plan=turn_plan,
+                    materials=materials,
                     pdf_evidence=pdf_evidence,
-                    recommendations=cps_recommendations,
-                    memory_context=memory_context,
+                    local_fallback=lambda: {
+                        "answer": self._build_local_answer(
+                            payload.query,
+                            recommendations,
+                            pdf_evidence,
+                            memory_context,
+                            query_plan=query_plan,
+                            course_memory_card=course_memory_card,
+                            conversation_context=effective_context_query,
+                            image_attachments=image_attachments,
+                        ),
+                        "followup_questions": self._local_followup_questions(
+                            query=payload.query,
+                            query_plan=query_plan,
+                            pdf_evidence=pdf_evidence,
+                            recommendations=recommendations,
+                            memory_context=memory_context,
+                        ),
+                    },
                 )
-            _emit_agent_stage(stage_callback, "验证追问中")
-            body["followup_questions"] = self._validate_followups_with_model(
-                query=payload.query,
-                body=body,
-                recommendations=body.get("recommendations", []),
-                route=turn_route,
-            )
             _emit_agent_stage(stage_callback, "整理答案中")
             body = self.safety_service.sanitize_public_response_body(
                 body,
@@ -429,6 +436,13 @@ class AiService:
                 pdf_evidence=pdf_evidence,
                 current_query=payload.query,
             )
+            if personal_memory_enabled:
+                self._remember_agent_turn(
+                    current_user_id=current_user_id,
+                    session_id=session_id,
+                    query=payload.query,
+                    body=body,
+                )
             return {"output": _agent_json_output(body)}
         except Exception:
             status = "error"
@@ -468,27 +482,33 @@ class AiService:
     def memory_preference_payload(self, *, enabled: bool) -> dict[str, Any]:
         return {
             "personalMemoryEnabled": enabled,
-            "mode": "read_only_derived",
+            "mode": "isolated_session_and_derived_profile",
             "scope": "current_browser",
-            "affectedScopes": ["current_browser_personal_memory"],
+            "affectedScopes": ["current_browser_personal_memory", "user_session_conversation_memory"],
             "retainedScopes": ["platform_collective_memory", "source_material_records"],
             "memoryLifecycle": _agent_memory_lifecycle_payload(),
-            "privacyBoundary": "This preference only controls whether the StudyHub Agent uses derived personal memory for this browser session.",
+            "privacyBoundary": "This preference controls whether the Agent reads or writes this browser session's private conversation memory and derived personal context.",
         }
 
-    def delete_personal_memory_payload(self) -> dict[str, Any]:
+    def delete_personal_memory_payload(self, *, current_user_id: int | None) -> dict[str, Any]:
+        deleted_sessions = (
+            self.conversation_memory_service.clear_user(user_id=current_user_id)
+            if self.conversation_memory_service
+            else 0
+        )
         return {
             "personalMemoryEnabled": False,
-            "mode": "read_only_derived",
-            "scope": "current_browser",
-            "deletedPersistedMemory": False,
+            "mode": "isolated_session_and_derived_profile",
+            "scope": "authenticated_user",
+            "deletedPersistedMemory": deleted_sessions > 0,
+            "deletedConversationSessions": deleted_sessions,
             "disabledCurrentBrowserMemory": True,
-            "persistence": "not_persisted",
-            "affectedScopes": ["current_browser_personal_memory"],
+            "persistence": "redis_or_bounded_local_session_memory",
+            "affectedScopes": ["user_session_conversation_memory", "current_browser_personal_memory"],
             "retainedScopes": ["platform_collective_memory", "source_material_records", "account_profile", "material_interactions"],
             "memoryLifecycle": _agent_memory_lifecycle_payload(),
-            "deleteExplanation": "当前 StudyHub Agent 个人记忆为只读派生上下文，尚未持久化保存用户对话记忆；本次操作已关闭当前浏览器继续使用派生个人记忆。",
-            "privacyBoundary": "No persisted Agent personal memory was deleted because this phase stores no dedicated Agent memory records. Platform collective memory is not affected.",
+            "deleteExplanation": "已清理当前登录用户的 Agent 会话记忆，并关闭当前浏览器继续使用个人派生记忆。账号资料和正常业务记录不属于 Agent 会话记忆，不会被修改。",
+            "privacyBoundary": "Only the authenticated user's Agent session memory is cleared. Platform collective memory and source records are not affected.",
         }
 
     def preview_memory(
@@ -502,12 +522,12 @@ class AiService:
         controls = {
             "canView": True,
             "canDisableCurrentBrowser": True,
-            "canDeletePersistedMemory": False,
-            "deleteExplanation": "当前 StudyHub Agent 个人记忆为只读派生上下文，尚未持久化保存用户对话记忆；因此本阶段没有可删除的 Agent 专属持久化记忆。",
+            "canDeletePersistedMemory": True,
+            "deleteExplanation": "可删除当前登录用户的 Agent 会话记忆；平台匿名聚合记忆和正常业务数据不受影响。",
         }
         base_payload: dict[str, Any] = {
-            "mode": "read_only_derived",
-            "sourceTypes": ["account_profile", "candidate_material_interactions", "visible_material_metadata"],
+            "mode": "isolated_session_and_derived_profile",
+            "sourceTypes": ["user_session_conversation", "account_profile", "candidate_material_interactions", "visible_material_metadata"],
             "controls": controls,
             "memoryExplanation": _agent_memory_explanation(),
             "memoryLifecycle": _agent_memory_lifecycle_payload(),
@@ -549,155 +569,202 @@ class AiService:
             "candidateMaterialCount": len(materials),
         }
 
-    def _route_agent_turn(self, query: str, *, context_query: str | None, has_image: bool) -> AgentTurnRoute:
-        local_route = _local_agent_turn_route(query, context_query=context_query, has_image=has_image)
+    def _plan_agent_turn(self, query: str, *, context_query: str | None, has_image: bool) -> AgentOrchestrationPlan:
+        fallback = _local_agent_orchestration_plan(query, context_query=context_query, has_image=has_image)
         settings = get_settings()
-        if not self._is_agent_validator_configured(settings):
-            return local_route
-        payload = {
-            "user_query": query,
-            "context_summary": _compact_agent_context(context_query),
-            "has_image": bool(has_image),
-            "allowed_routes": [
-                "new_material_search",
-                "refine_existing_answer",
-                "revise_study_plan",
-                "rerank_existing_materials",
-                "ask_user_clarification",
-            ],
-            "output_schema": {
-                "route": "one allowed route",
-                "should_search": "boolean; true only when a fresh material search is needed",
-                "use_context": "boolean; true when the current user query depends on previous conversation",
-                "search_query": "short query for material search; empty when should_search=false",
-                "reason": "brief internal reason",
-            },
-        }
-        system_prompt = (
-            "你是 StudyHub Agent 的语义路由器。只输出严格 JSON。"
-            "判断当前用户输入是新资料检索，还是对上一轮答案的细化、改写、重排、复习计划修订或需要澄清。"
-            "只有明确需要重新找资料时 should_search 才能为 true。"
-            "对“细化到每天两小时”“改成冲刺刷题版”“只看真题和讲义”“把推荐资料排成每日顺序”等上下文追问，应 use_context=true 且 should_search=false。"
+        if not self._is_agent_orchestrator_configured(settings):
+            return fallback
+        payload = self.orchestrator_service.build_request(
+            query,
+            context_query=_compact_agent_context(context_query),
+            has_image=has_image,
+            platform_term_glossary=material_search_glossary(f"{query} {context_query or ''}"),
         )
         try:
-            parsed = self._call_agent_validator_json(settings, system_prompt, payload)
+            parsed = self._call_agent_orchestrator_json(settings, payload)
         except Exception:
-            return local_route
-        return _coerce_agent_turn_route(parsed, fallback=local_route)
+            return fallback
+        return self.orchestrator_service.parse(parsed, fallback=fallback)
 
-    def _validate_followups_with_model(
+    def _is_agent_orchestrator_configured(self, settings: Any) -> bool:
+        explicit_fields = (
+            "ai_agent_orchestrator_provider",
+            "ai_agent_orchestrator_base_url",
+            "ai_agent_orchestrator_api_key",
+            "ai_agent_validator_provider",
+            "ai_agent_validator_base_url",
+            "ai_agent_validator_api_key",
+        )
+        if not any(getattr(settings, field, None) for field in explicit_fields):
+            return False
+        orchestrator_settings = self._agent_orchestrator_settings(settings)
+        return bool(
+            orchestrator_settings.ai_agent_provider
+            in CHAT_COMPLETIONS_AGENT_PROVIDERS | SUB2API_AGENT_PROVIDERS
+            and orchestrator_settings.ai_agent_base_url
+            and orchestrator_settings.ai_agent_api_key
+            and orchestrator_settings.ai_agent_model
+        )
+
+    def _agent_orchestrator_settings(self, settings: Any) -> SimpleNamespace:
+        use_orchestrator_config = any(
+            getattr(settings, field, None)
+            for field in (
+                "ai_agent_orchestrator_provider",
+                "ai_agent_orchestrator_base_url",
+                "ai_agent_orchestrator_api_key",
+            )
+        )
+        provider = str(
+            (
+                getattr(settings, "ai_agent_orchestrator_provider", None)
+                if use_orchestrator_config
+                else settings.ai_agent_validator_provider
+            )
+            or settings.ai_agent_provider
+            or ""
+        ).strip().lower()
+        return SimpleNamespace(
+            ai_agent_provider=provider,
+            ai_agent_base_url=(
+                (
+                    getattr(settings, "ai_agent_orchestrator_base_url", None)
+                    if use_orchestrator_config
+                    else settings.ai_agent_validator_base_url
+                )
+                or settings.ai_agent_base_url
+            ),
+            ai_agent_api_key=(
+                (
+                    getattr(settings, "ai_agent_orchestrator_api_key", None)
+                    if use_orchestrator_config
+                    else settings.ai_agent_validator_api_key
+                )
+                or settings.ai_agent_api_key
+            ),
+            ai_agent_model=(
+                (
+                    getattr(settings, "ai_agent_orchestrator_model", None)
+                    if use_orchestrator_config
+                    else settings.ai_agent_validator_model
+                )
+                or "deepseek-v4-flash"
+            ),
+            ai_agent_timeout_seconds=max(
+                2.0,
+                float(
+                    (
+                        getattr(settings, "ai_agent_orchestrator_timeout_seconds", None)
+                        if use_orchestrator_config
+                        else settings.ai_agent_validator_timeout_seconds
+                    )
+                    or 8.0
+                ),
+            ),
+            ai_agent_max_output_tokens=max(
+                400,
+                int(getattr(settings, "ai_agent_orchestrator_max_output_tokens", 1600) or 1600),
+            ),
+            ai_agent_thinking_enabled=False,
+            ai_agent_reasoning_effort="none",
+        )
+
+    def _call_agent_orchestrator_json(self, settings: Any, user_prompt: dict[str, Any]) -> dict[str, Any]:
+        orchestrator_settings = self._agent_orchestrator_settings(settings)
+        content = self._call_agent_model(
+            orchestrator_settings,
+            AGENT_ORCHESTRATOR_SYSTEM_PROMPT,
+            self.safety_service.sanitize_prompt_payload(user_prompt),
+        )
+        return self._loads_object(content) or {}
+
+    def _review_agent_response(
         self,
         *,
         query: str,
         body: dict[str, Any],
-        recommendations: Any,
-        route: AgentTurnRoute,
-    ) -> list[str]:
-        raw_followups = body.get("followup_questions")
-        if not isinstance(raw_followups, list) or not raw_followups:
-            return []
-        local_cleaned = self.safety_service.sanitize_public_response_body(
-            {"answer": body.get("answer") or "", "followup_questions": raw_followups},
-            candidate_materials=[],
-            pdf_evidence=[],
-            current_query=query,
-        ).get("followup_questions", [])
-        if not local_cleaned:
-            return []
+        plan: AgentOrchestrationPlan,
+        materials: list[MaterialRecord],
+        pdf_evidence: list[MaterialPageEvidence],
+        local_fallback: Callable[[], dict[str, Any]],
+    ) -> dict[str, Any]:
         settings = get_settings()
-        if not self._is_agent_validator_configured(settings):
-            return local_cleaned[:3]
-        compact_recommendations = []
-        if isinstance(recommendations, list):
-            for item in recommendations[:3]:
-                if isinstance(item, dict):
-                    compact_recommendations.append(
-                        {
-                            "title": str(item.get("title") or "")[:80],
-                            "reason": str(item.get("reason") or "")[:120],
-                        }
-                    )
+        candidates = [
+            {
+                "material_id": int(material.id),
+                "title": self._safe_text(material, "title")[:120],
+                "summary": self._safe_text(material, "description")[:180],
+                "major": self._safe_text(material, "major")[:80],
+                "college": self._safe_text(material, "college")[:80],
+            }
+            for material in materials[:3]
+        ]
         payload = {
             "current_user_query": query,
-            "route": route.route,
-            "answer_excerpt": str(body.get("answer") or "")[:420],
-            "recommendations": compact_recommendations,
-            "candidate_followups": local_cleaned,
-            "rules": [
-                "保留用户点击后可以直接发送执行的请求。",
-                "拒绝重复当前问题的追问。",
-                "拒绝 AI 口吻、反问句、让用户补空的半截句。",
-                "拒绝“你的考试日期和每天可复习时间是多少”这类 Agent 向用户提问。",
-                "拒绝“我更想要真题、笔记还是经验分享”“限定学校、学院或专业”这类选项标题或筛选提示。",
-                "拒绝“结合我的专业和年级调整推荐顺序”这类过泛的个人化口号，除非已经改写成具体任务。",
-                "必要时把轻微 AI 口吻改写成用户口吻和可执行任务。",
+            "platform_term_glossary": material_search_glossary(query),
+            "conversation_plan": {
+                "route": plan.route,
+                "intent": plan.intent,
+                "use_context": plan.use_context,
+                "should_search": plan.should_search,
+                "response_guidance": list(plan.response_guidance),
+                "followup_guidance": list(plan.followup_guidance),
+            },
+            "candidate_materials": candidates,
+            "available_pdf_evidence": [
+                {"material_id": int(item.material_id), "title": item.title[:120], "page": int(item.page)}
+                for item in pdf_evidence[:6]
             ],
-            "examples": {
-                "reject": [
-                    "需要我帮你分析真题分数占比吗",
-                    "我更想要真题、笔记还是经验分享",
-                    "限定学校、学院或专业",
-                    "结合我的专业和年级调整推荐顺序",
-                ],
-                "accept": [
-                    "分析 2020-2022 年真题中各类题型的分数占比",
-                    "把第 1-7 天细化到每天两小时",
-                    "只看真题和讲义怎么安排",
-                    "按题型整理刷题清单",
-                ],
+            "draft_response": {
+                "answer": str(body.get("answer") or "")[:6000],
+                "followup_questions": body.get("followup_questions")
+                if isinstance(body.get("followup_questions"), list)
+                else [],
             },
             "output_schema": {
-                "valid_followups": ["最多 3 条用户可点击请求"],
-                "rewritten_followups": ["可选，改写后的用户口吻请求"],
-                "rejected_followups": ["被拒绝的原句"],
-                "reason": "简短说明",
+                "approved": "boolean",
+                "answer": "complete reviewed Markdown answer",
+                "followup_questions": ["0-3 concrete next requests written in user voice"],
+                "reason": "brief internal review reason",
             },
         }
-        system_prompt = (
-            "你是 StudyHub Agent 追问验证器。使用 v4 flash 风格的快速严格判断。"
-            "只输出严格 JSON，不要 Markdown。valid_followups 必须像用户下一句会发送的话，不能像助手在问用户。"
-            "追问必须是可执行学习任务，不要是澄清问题、选项标题、筛选提示或泛泛的个性化口号。"
-            "合格示例：把推荐资料排成每日学习顺序；按年份整理常考题型；只看真题和讲义怎么安排。"
-            "不合格示例：我更想要真题、笔记还是经验分享；限定学校、学院或专业；结合我的专业和年级调整推荐顺序。"
-        )
         try:
-            parsed = self._call_agent_validator_json(settings, system_prompt, payload)
-        except Exception:
-            return local_cleaned[:3]
-        validated = _coerce_validated_followups(parsed, fallback=local_cleaned, current_query=query)
-        return validated[:3]
-
-    def _is_agent_validator_configured(self, settings: Any) -> bool:
-        has_explicit_validator = any(
-            getattr(settings, field, None)
-            for field in (
-                "ai_agent_validator_provider",
-                "ai_agent_validator_base_url",
-                "ai_agent_validator_api_key",
+            parsed = self._call_agent_orchestrator_json_with_prompt(
+                settings,
+                AGENT_RESPONSE_REVIEW_SYSTEM_PROMPT,
+                payload,
             )
-        )
-        if not has_explicit_validator:
-            return False
-        provider = str(settings.ai_agent_validator_provider or settings.ai_agent_provider or "").strip().lower()
-        if provider not in CHAT_COMPLETIONS_AGENT_PROVIDERS | SUB2API_AGENT_PROVIDERS:
-            return False
-        base_url = settings.ai_agent_validator_base_url or settings.ai_agent_base_url
-        api_key = settings.ai_agent_validator_api_key or settings.ai_agent_api_key
-        model = settings.ai_agent_validator_model or "v4-flash"
-        return bool(base_url and api_key and model)
+        except Exception:
+            return body
+        answer = parsed.get("answer")
+        followups = parsed.get("followup_questions")
+        if not isinstance(answer, str) or not answer.strip():
+            if parsed.get("approved") is False:
+                replacement = local_fallback()
+                return {**body, **replacement}
+            answer = str(body.get("answer") or "")
+        reviewed = dict(body)
+        reviewed["answer"] = answer.strip()
+        if isinstance(followups, list):
+            reviewed["followup_questions"] = [
+                str(item).strip()
+                for item in followups
+                if isinstance(item, (str, int, float)) and str(item).strip()
+            ][:3]
+        return reviewed
 
-    def _call_agent_validator_json(self, settings: Any, system_prompt: str, user_prompt: dict[str, Any]) -> dict[str, Any]:
-        provider = str(settings.ai_agent_validator_provider or settings.ai_agent_provider or "").strip().lower()
-        validator_settings = SimpleNamespace(
-            ai_agent_provider=provider,
-            ai_agent_base_url=settings.ai_agent_validator_base_url or settings.ai_agent_base_url,
-            ai_agent_api_key=settings.ai_agent_validator_api_key or settings.ai_agent_api_key,
-            ai_agent_model=settings.ai_agent_validator_model or "v4-flash",
-            ai_agent_timeout_seconds=max(2.0, float(settings.ai_agent_validator_timeout_seconds or 8.0)),
-            ai_agent_thinking_enabled=False,
-            ai_agent_reasoning_effort="none",
+    def _call_agent_orchestrator_json_with_prompt(
+        self,
+        settings: Any,
+        system_prompt: str,
+        user_prompt: dict[str, Any],
+    ) -> dict[str, Any]:
+        orchestrator_settings = self._agent_orchestrator_settings(settings)
+        content = self._call_agent_model(
+            orchestrator_settings,
+            system_prompt,
+            self.safety_service.sanitize_prompt_payload(user_prompt),
         )
-        content = self._call_agent_model(validator_settings, system_prompt, self.safety_service.sanitize_prompt_payload(user_prompt))
         return self._loads_object(content) or {}
 
     def _recommendation_payload(
@@ -752,20 +819,65 @@ class AiService:
         materials: list[MaterialRecord],
         current_user_id: int | None,
         pdf_evidence: list[MaterialPageEvidence],
+        conversation_turns: list[AgentConversationTurn] | None = None,
     ) -> AgentMemoryContext | None:
-        if not self.memory_service:
-            return None
-        try:
-            context = self.memory_service.collect(
-                session,
-                query=query,
-                materials=materials,
-                current_user_id=current_user_id,
-                pdf_evidence=pdf_evidence,
-            )
-        except Exception:
-            return None
+        context = AgentMemoryContext(platform={}, user=None)
+        if self.memory_service:
+            try:
+                context = self.memory_service.collect(
+                    session,
+                    query=query,
+                    materials=materials,
+                    current_user_id=current_user_id,
+                    pdf_evidence=pdf_evidence,
+                )
+            except Exception:
+                context = AgentMemoryContext(platform={}, user=None)
+        if conversation_turns and self.conversation_memory_service:
+            user_memory = dict(context.user or {})
+            user_memory["conversation_memory"] = self.conversation_memory_service.prompt_payload(conversation_turns)
+            context = AgentMemoryContext(platform=dict(context.platform), user=user_memory)
         return None if context.is_empty() else context
+
+    def _load_agent_conversation(
+        self,
+        *,
+        current_user_id: int | None,
+        session_id: str | None,
+    ) -> list[AgentConversationTurn]:
+        if not self.conversation_memory_service:
+            return []
+        return self.conversation_memory_service.load(user_id=current_user_id, session_id=session_id)
+
+    def _remember_agent_turn(
+        self,
+        *,
+        current_user_id: int | None,
+        session_id: str | None,
+        query: str,
+        body: dict[str, Any],
+    ) -> None:
+        if not self.conversation_memory_service:
+            return
+        answer = body.get("answer")
+        if not isinstance(answer, str) or not answer.strip():
+            return
+        material_ids: list[int] = []
+        recommendations = body.get("recommendations")
+        if isinstance(recommendations, list):
+            for item in recommendations:
+                if not isinstance(item, dict):
+                    continue
+                material_id = self._safe_int(item.get("material_id"))
+                if material_id is not None and material_id > 0:
+                    material_ids.append(material_id)
+        self.conversation_memory_service.append(
+            user_id=current_user_id,
+            session_id=session_id,
+            user_query=query,
+            assistant_answer=answer,
+            material_ids=material_ids,
+        )
 
     def _context_materials(self, session: Session, context_query: str | None) -> list[MaterialRecord]:
         material_ids = _agent_context_material_ids(context_query)
@@ -792,6 +904,7 @@ class AiService:
         materials: list[MaterialRecord],
         pdf_evidence: list[MaterialPageEvidence],
         memory_context: AgentMemoryContext | None,
+        semantic_plan: AgentOrchestrationPlan | None = None,
     ) -> AgentQueryPlan | None:
         if not self.query_planner_service:
             return None
@@ -801,6 +914,7 @@ class AiService:
                 materials=materials,
                 pdf_evidence=pdf_evidence,
                 memory_context=memory_context,
+                semantic_plan=semantic_plan.to_query_plan_seed() if semantic_plan and semantic_plan.source == "model" else None,
             )
         except Exception:
             return None
@@ -847,19 +961,23 @@ class AiService:
             for material in context_materials
         ]
         system_prompt = (
-            "你是 StudyHub 学习辅导 Agent。你只能基于给定的 StudyHub 候选资料回答，"
-            "不要编造不存在的资料。用户可能需要资料推荐、真题讲解思路、复习规划或错题辅导。"
+            "你是 StudyHub 学习辅导 Agent，保留完整的多轮学习推理、题目讲解、复习规划、资料检索与证据编排能力。"
+            "资料推荐、平台事实、资料内容和页码引用必须基于给定的 StudyHub 候选资料与证据，不要编造不存在的资料；"
+            "概念解释、通用解题方法和学习规划可以使用可靠的课程常识，但必须与平台资料事实分开表述，不能伪装成已读取的资料证据。"
             "输出围栏：只回答课程学习、资料检索、题目分析、复习规划、平台学习资料使用相关内容；"
             "如果问题明显不属于学习场景，应简短说明只能处理学习相关问题，不要展开闲聊或平台外建议。"
-            "如果候选资料不足，要明确说明并追问课程范围。"
+            "如果候选资料不足，仍应尽量完成可由通用课程知识回答的学习任务，再简短说明平台资料证据不足；只有缺少完成任务所必需的信息时才追问。"
             "如果提供了图片附件，只能把图片用于识别题目、截图或学习资料内容，不要推断与学习无关的个人隐私。"
             "如果提供了 conversation_context，只能用来补全当前问题省略的课程、资料和上一轮学习目标，回答必须以 user_query 为准。"
             "如果提供了 conversation_focus，优先用它识别当前追问省略的课程、年份、资料标题和资源类型，"
             "但回答仍必须以 user_query、candidate_materials、pdf_evidence 和 course_memory_card 为准。"
+            "如果提供了 platform_term_glossary，遇到 ESD、CPS 等缩写时必须优先采用站内词典给出的课程含义，不能自行切换到其他学科释义。"
             "如果提供了 pdf_evidence，你必须优先基于这些页级证据总结，并在关键结论中引用资料名和页码。"
             "如果 pdf_evidence 提供了 anchor_text 或 anchor_terms，应优先用它们定位页内关键片段。"
             "如果候选资料提供了 quality_signals 或 risk_signals，你可以用它们辅助排序和提示，但不能把风险提示夸大成确定违规。"
-            "如果提供了 memory_context，你可以用平台集体记忆增强课程/题型判断，用用户个人记忆做个性化建议；"
+            "memory_context 严格分为两层：platform_collective_memory 只包含匿名聚合的平台信号，user_personal_memory 只属于当前登录用户；"
+            "用户会话记忆 conversation_memory 只用于延续当前 user_id + session_id 的目标、约束和已完成步骤，绝不能写入平台集体记忆或用于其他用户。"
+            "你可以用平台集体记忆增强课程/题型判断，用用户个人记忆做个性化建议；"
             "如果用户个人记忆提供了 current_query_memory，只能用它理解本次问题中的目标、薄弱点、题号、卡点和偏好；"
             "如果平台集体记忆里有经验或复习策略聚合信号，可以用来辅助学习路径和资料使用顺序；"
             "但不能把用户个人记忆写入或表述成平台集体结论。"
@@ -887,6 +1005,7 @@ class AiService:
             "user_query": query,
             "conversation_context": _compact_agent_context(conversation_context),
             "conversation_focus": _agent_context_retrieval_focus(_compact_agent_context(conversation_context)),
+            "platform_term_glossary": material_search_glossary(f"{query} {conversation_context or ''}"),
             "query_plan": query_plan.to_prompt_payload() if query_plan else {},
             "candidate_materials": candidates,
             "image_attachments": _agent_image_attachment_metadata(image_attachments or []),
@@ -951,7 +1070,8 @@ class AiService:
             user_content = user_text
         request_body: dict[str, Any] = {
             "model": settings.ai_agent_model,
-            "max_tokens": 900,
+            "max_tokens": max(400, int(getattr(settings, "ai_agent_max_output_tokens", 1800) or 1800)),
+            "response_format": {"type": "json_object"},
             "messages": [
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_content},
@@ -1005,7 +1125,10 @@ class AiService:
                             "content": response_content,
                         }
                     ],
-                    "max_output_tokens": 900,
+                    "max_output_tokens": max(
+                        400,
+                        int(getattr(settings, "ai_agent_max_output_tokens", 1800) or 1800),
+                    ),
                     "reasoning": {"effort": "none"},
                     "store": False,
                 },
@@ -1033,6 +1156,16 @@ class AiService:
             "title": self._safe_text(material, "title"),
             "reason": self._build_reason(material, query, pdf_evidence, memory_context),
             "summary": description[:180],
+            "course_metadata": {
+                key: value
+                for key, value in {
+                    "school": self._safe_text(material, "school")[:80],
+                    "college": self._safe_text(material, "college")[:80],
+                    "major": self._safe_text(material, "major")[:80],
+                    "course_category": self._safe_text(material, "course_category")[:40],
+                }.items()
+                if value
+            },
             **build_material_signals(material).to_prompt_payload(),
         }
         if user_fit_signals:
@@ -1900,28 +2033,87 @@ def _agent_json_output(body: dict[str, Any]) -> str:
     return f"{AGENT_OUTPUT_FENCE_OPEN}{payload}{AGENT_OUTPUT_FENCE_CLOSE}"
 
 
-def _local_agent_turn_route(query: str, *, context_query: str | None, has_image: bool) -> AgentTurnRoute:
+def _local_agent_orchestration_plan(
+    query: str,
+    *,
+    context_query: str | None,
+    has_image: bool,
+) -> AgentOrchestrationPlan:
     context = _compact_agent_context(context_query)
     normalized = re.sub(r"\s+", "", str(query or "")).lower()
     has_context = bool(context)
+    scope = "learning"
+    intent = "general_learning_support"
     if not normalized:
-        return AgentTurnRoute("ask_user_clarification", should_search=False, use_context=has_context, reason="empty_query")
+        return AgentOrchestrationPlan(
+            scope="learning",
+            route="ask_user_clarification",
+            should_search=False,
+            use_context=has_context,
+            search_query="",
+            intent=intent,
+            reason="empty_query",
+            source="fallback",
+        )
+    if _is_agent_greeting(normalized):
+        scope = "greeting"
     if _has_obvious_non_learning_query_marker(normalized):
-        return AgentTurnRoute("ask_user_clarification", should_search=False, use_context=False, reason="obvious_non_learning")
+        scope = "out_of_scope"
+    if scope != "learning":
+        return AgentOrchestrationPlan(
+            scope=scope,
+            route="ask_user_clarification",
+            should_search=False,
+            use_context=False,
+            search_query="",
+            intent=intent,
+            reason="local_scope_fallback",
+            source="fallback",
+        )
     if has_image:
-        return AgentTurnRoute("new_material_search", should_search=True, use_context=has_context, reason="image_learning_query")
+        return AgentOrchestrationPlan(
+            scope=scope,
+            route="new_material_search",
+            should_search=True,
+            use_context=has_context,
+            search_query=str(query or "").strip(),
+            intent="problem_tutoring",
+            reason="image_learning_query",
+            source="fallback",
+        )
     if has_context and _looks_like_study_plan_revision(normalized):
-        return AgentTurnRoute("revise_study_plan", should_search=False, use_context=True, reason="contextual_plan_revision")
+        return AgentOrchestrationPlan(
+            scope=scope,
+            route="revise_study_plan",
+            should_search=False,
+            use_context=True,
+            search_query="",
+            intent="study_plan",
+            reason="contextual_plan_revision",
+            source="fallback",
+        )
     if has_context and _looks_like_existing_answer_refinement(normalized):
-        return AgentTurnRoute("refine_existing_answer", should_search=False, use_context=True, reason="contextual_answer_refinement")
+        return AgentOrchestrationPlan(
+            scope=scope,
+            route="refine_existing_answer",
+            should_search=False,
+            use_context=True,
+            search_query="",
+            intent=intent,
+            reason="contextual_answer_refinement",
+            source="fallback",
+        )
     use_context = bool(context and (_should_use_agent_context(query) or not _query_has_course_anchor(normalized)))
     search_query = _agent_retrieval_query(query, context if use_context else None)
-    return AgentTurnRoute(
-        "new_material_search",
+    return AgentOrchestrationPlan(
+        scope=scope,
+        route="new_material_search",
         should_search=True,
         use_context=use_context,
         search_query=search_query,
+        intent=intent,
         reason="fresh_or_contextual_search",
+        source="fallback",
     )
 
 
@@ -1972,100 +2164,6 @@ def _looks_like_existing_answer_refinement(normalized_query: str) -> bool:
     return any(marker in normalized_query for marker in markers)
 
 
-def _coerce_agent_turn_route(value: dict[str, Any], *, fallback: AgentTurnRoute) -> AgentTurnRoute:
-    if not isinstance(value, dict):
-        return fallback
-    route = str(value.get("route") or "").strip()
-    allowed = {
-        "new_material_search",
-        "refine_existing_answer",
-        "revise_study_plan",
-        "rerank_existing_materials",
-        "ask_user_clarification",
-    }
-    if route not in allowed:
-        return fallback
-    should_search = bool(value.get("should_search")) and route == "new_material_search"
-    use_context = bool(value.get("use_context")) or (route != "new_material_search" and fallback.use_context)
-    search_query = str(value.get("search_query") or "").strip()[:900] if should_search else ""
-    reason = str(value.get("reason") or "validator").strip()[:120]
-    return AgentTurnRoute(
-        route=route,
-        should_search=should_search,
-        use_context=use_context,
-        search_query=search_query,
-        reason=reason or "validator",
-    )
-
-
-def _route_has_learning_context(route: AgentTurnRoute, context_query: str | None) -> bool:
-    if not route.use_context:
-        return False
-    context = _compact_agent_context(context_query)
-    if not context:
-        return False
-    return _has_learning_marker(re.sub(r"\s+", "", context).lower())
-
-
-def _coerce_validated_followups(
-    value: dict[str, Any],
-    *,
-    fallback: list[str],
-    current_query: str,
-) -> list[str]:
-    if not isinstance(value, dict):
-        return fallback[:3]
-    raw_items = value.get("valid_followups")
-    rewritten_items = value.get("rewritten_followups")
-    if isinstance(raw_items, list) and raw_items:
-        items_to_check = raw_items
-    elif isinstance(rewritten_items, list):
-        items_to_check = rewritten_items
-    elif isinstance(raw_items, list):
-        return []
-    else:
-        return fallback[:3]
-    if not items_to_check:
-        return []
-    current_key = _agent_followup_key(current_query)
-    result: list[str] = []
-    seen: set[str] = set()
-    for raw_item in items_to_check:
-        if not isinstance(raw_item, (str, int, float)):
-            continue
-        item = re.sub(r"\s+", " ", str(raw_item)).strip(" ?？。")[:80]
-        if not item:
-            continue
-        key = _agent_followup_key(item)
-        if not key or key == current_key or key in seen:
-            continue
-        if _agent_followup_is_fill_prompt(item):
-            continue
-        seen.add(key)
-        result.append(item)
-        if len(result) >= 3:
-            break
-    return result
-
-
-def _agent_followup_key(value: str) -> str:
-    return re.sub(r"[^\u4e00-\u9fffA-Za-z0-9]+", "", str(value or "")).lower()
-
-
-def _agent_followup_is_fill_prompt(value: str) -> bool:
-    normalized = re.sub(r"\s+", "", str(value or "")).lower()
-    return any(
-        marker in normalized
-        for marker in (
-            "你的考试日期和每天可复习时间",
-            "我的考试日期和每天可复习时间是",
-            "考试日期和每天可复习时间是",
-            "告诉我考试时间",
-            "请补充课程名",
-        )
-    )
-
-
 def _agent_output_guardrail_payload() -> dict[str, Any]:
     return {
         "format": {
@@ -2094,100 +2192,8 @@ def _agent_output_guardrail_payload() -> dict[str, Any]:
     }
 
 
-def _is_learning_related_agent_query(query: str, *, context_query: str | None, has_image: bool) -> bool:
-    current = re.sub(r"\s+", " ", str(query or "")).strip()
-    normalized_current = re.sub(r"\s+", "", current).lower()
-    if not normalized_current:
-        return False
-    if _is_agent_greeting(normalized_current):
-        return True
-    has_learning_marker = _has_learning_marker(normalized_current)
-    if has_learning_marker:
-        return True
-    if _has_obvious_non_learning_query_marker(normalized_current):
-        return False
-    if has_image and _image_query_has_learning_intent(normalized_current):
-        return True
-    context = _compact_agent_context(context_query)
-    if not context or not _should_use_agent_context(current):
-        return False
-    return _has_learning_marker(re.sub(r"\s+", "", context).lower())
-
-
-def _has_learning_marker(normalized_text: str) -> bool:
-    learning_markers = (
-        "学习",
-        "复习",
-        "考试",
-        "期末",
-        "期中",
-        "真题",
-        "往年题",
-        "历年题",
-        "题目",
-        "题型",
-        "考题",
-        "考点",
-        "作业",
-        "课程",
-        "资料",
-        "笔记",
-        "讲义",
-        "答案",
-        "解析",
-        "错题",
-        "知识点",
-        "公式",
-        "推导",
-        "计算题",
-        "证明题",
-        "pdf",
-        "课件",
-        "专业",
-        "学院",
-        "studyhub",
-        "esd",
-        "cps",
-        "通信原理",
-        "电子系统设计",
-        "信号与系统",
-        "数据结构",
-        "高数",
-        "高等数学",
-        "微积分",
-        "概率论",
-    )
-    return any(marker.lower() in normalized_text for marker in learning_markers)
-
-
 def _is_agent_greeting(normalized_query: str) -> bool:
     return normalized_query in {"你好", "您好", "hi", "hello", "hey", "在吗"}
-
-
-def _is_agent_greeting_query(query: str) -> bool:
-    normalized_query = re.sub(r"\s+", "", str(query or "")).lower()
-    return _is_agent_greeting(normalized_query)
-
-
-def _image_query_has_learning_intent(normalized_query: str) -> bool:
-    if _has_obvious_non_learning_query_marker(normalized_query):
-        return False
-    image_learning_markers = ("学习", "课程", "题", "作业", "公式", "答案", "解析", "考点", "知识点")
-    generic_learning_image_markers = (
-        "这张图",
-        "这张图片",
-        "截图",
-        "图片",
-        "图里",
-        "看图",
-        "分析一下",
-        "看一下",
-        "帮我看看",
-        "怎么做",
-    )
-    return any(marker in normalized_query for marker in image_learning_markers) or any(
-        marker in normalized_query for marker in generic_learning_image_markers
-    )
 
 
 def _has_obvious_non_learning_query_marker(normalized_query: str) -> bool:
@@ -2340,29 +2346,6 @@ def _trim_agent_context_material_segment(segment: str) -> str:
     return text
 
 
-def _llm_answer_denies_available_candidates(
-    answer: str,
-    materials: list[MaterialRecord],
-    recommendations: list[dict[str, Any]],
-) -> bool:
-    if not answer or not (materials or recommendations):
-        return False
-    normalized = re.sub(r"\s+", "", answer).lower()
-    denial_markers = (
-        "没有收到任何",
-        "没有收到可用",
-        "没有可用的studyhub候选资料",
-        "没有可用studyhub候选资料",
-        "没有候选资料",
-        "没有studyhub候选资料",
-        "不能基于指定资料",
-        "无法基于指定资料",
-        "没有匹配到相关资料",
-        "候选资料不足",
-    )
-    return any(marker in normalized for marker in denial_markers)
-
-
 def _agent_context_for_query(query: str, context_query: str | None) -> str:
     context = _compact_agent_context(context_query)
     if not context:
@@ -2433,6 +2416,20 @@ def _compact_agent_context(value: str | None) -> str:
     if len(text) <= 1200:
         return text
     return _preserve_agent_context_early_summary(text, max_chars=1200)
+
+
+def _merge_agent_conversation_context(server_context: str | None, client_context: str | None) -> str:
+    server = _compact_agent_context(server_context)
+    client = _compact_agent_context(client_context)
+    if not server:
+        return client
+    if not client:
+        return server
+    if client in server:
+        return server
+    if server in client:
+        return client
+    return _compact_agent_context(f"{server}\n{client}")
 
 
 def _preserve_agent_context_early_summary(text: str, *, max_chars: int) -> str:
@@ -2621,6 +2618,12 @@ def _agent_memory_explanation() -> dict[str, Any]:
     return {
         "personalMemory": [
             {
+                "field": "conversation_memory",
+                "source": "authenticated_user_and_browser_session",
+                "scope": "current_authenticated_user_session",
+                "persistence": "redis_with_bounded_local_fallback",
+            },
+            {
                 "field": "profile",
                 "source": "account_profile",
                 "scope": "current_authenticated_user",
@@ -2649,7 +2652,7 @@ def _agent_memory_explanation() -> dict[str, Any]:
         ],
         "deleteBehavior": {
             "currentBrowserDisable": True,
-            "dedicatedAgentMemoryRecordsDeleted": False,
+            "dedicatedAgentMemoryRecordsDeleted": True,
             "platformCollectiveMemoryAffected": False,
         },
         "privacyBoundary": "Personal memory fields are derived for the current user only and are not copied into platform collective memory.",
@@ -2659,16 +2662,16 @@ def _agent_memory_explanation() -> dict[str, Any]:
 def _agent_memory_lifecycle_payload() -> dict[str, Any]:
     return {
         "schema": "agent-memory-lifecycle-v1",
-        "mode": "read_only_derived",
-        "persistence": "not_persisted",
+        "mode": "isolated_session_and_derived_profile",
+        "persistence": "redis_or_bounded_local_session_memory",
         "personalMemory": {
             "scope": "current_authenticated_user",
-            "source": "account_profile_and_current_user_material_interactions",
-            "writeMode": "read_only_derived",
+            "source": "isolated_conversation_session_account_profile_and_current_user_material_interactions",
+            "writeMode": "bounded_session_conversation_plus_read_only_derived_profile",
             "currentBrowserDisable": True,
             "deleteWithCurrentBrowserPreference": True,
-            "dedicatedAgentMemoryRecordsPersisted": False,
-            "futureExplicitWritePathRequired": True,
+            "dedicatedAgentMemoryRecordsPersisted": True,
+            "futureExplicitWritePathRequired": False,
         },
         "platformMemory": {
             "scope": "anonymous_platform_aggregate",
@@ -2679,8 +2682,8 @@ def _agent_memory_lifecycle_payload() -> dict[str, Any]:
             "requiresAnonymousAggregationForUserFeedback": True,
         },
         "privacyBoundary": (
-            "Current Agent memory is derived at request time. Personal memory is private to the current user, "
-            "and platform memory must only contain anonymous aggregate signals."
+            "Conversation memory is isolated by authenticated user and browser session. Derived personal memory "
+            "is private to that user, and platform memory contains anonymous aggregate signals only."
         ),
     }
 
@@ -2704,7 +2707,7 @@ def _agent_memory_snapshot_payload(
     fingerprint = _stable_short_fingerprint(fingerprint_basis)
     return {
         "schema": "agent-memory-preview-v1",
-        "version": f"read-only-derived-v1-{fingerprint[:12]}",
+        "version": f"dual-layer-memory-v2-{fingerprint[:12]}",
         "versionFingerprint": fingerprint,
         "lifecycleSchema": "agent-memory-lifecycle-v1",
         "sourceCounts": {
@@ -2714,8 +2717,8 @@ def _agent_memory_snapshot_payload(
             "personalMemoryItemCount": _count_memory_items(personal_payload),
             "platformMemoryItemCount": _count_memory_items(platform_payload),
         },
-        "scope": "current_browser",
-        "persistence": "not_persisted",
+        "scope": "authenticated_user_and_current_browser_session",
+        "persistence": "redis_or_bounded_local_session_memory",
     }
 
 

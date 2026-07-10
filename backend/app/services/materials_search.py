@@ -121,6 +121,24 @@ def parse_material_search_query(keyword: str | None) -> MaterialSearchQuery:
     return MaterialSearchQuery(raw=raw, required_groups=tuple(required_groups), boost_terms=tuple(boost_terms))
 
 
+def material_search_glossary(text: str | None, *, limit: int = 8) -> dict[str, list[str]]:
+    normalized = _normalize_term(text or "")
+    if not normalized:
+        return {}
+    synonyms = _load_synonym_map()
+    result: dict[str, list[str]] = {}
+    seen_groups: set[tuple[str, ...]] = set()
+    for term in sorted(synonyms, key=len, reverse=True):
+        group = synonyms[term]
+        if len(term) < 2 or term not in normalized or group in seen_groups:
+            continue
+        seen_groups.add(group)
+        result[term] = list(group)
+        if len(result) >= max(1, limit):
+            break
+    return result
+
+
 def _material_fields(material: MaterialRecord, tags_loader: Callable[[str | None], list[Any]]) -> dict[str, str]:
     tags = [str(item) for item in tags_loader(material.tags_json) if item is not None]
     return {
