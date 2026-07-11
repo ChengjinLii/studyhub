@@ -688,12 +688,12 @@ def test_agent_local_study_plan_uses_structured_query_constraints(monkeypatch) -
     assert "目标约 85 分" in body["answer"]
     assert "每天可用约 2 小时" in body["answer"]
     assert "薄弱点先放在 调制、误码率" in body["answer"]
-    assert body["followup_questions"][0] == "帮我整理成两周复习计划"
+    assert body["followup_questions"][0] == "比较这些资料并安排最有效的使用顺序"
     assert "query_plan" not in json.dumps(body, ensure_ascii=False)
     metrics.clear()
 
 
-def test_agent_local_cps_context_followup_returns_two_week_plan(monkeypatch) -> None:
+def test_agent_local_context_followup_does_not_inject_course_fixture(monkeypatch) -> None:
     metrics = get_runtime_metrics()
     metrics.clear()
     settings = Settings(ai_agent_provider="local")
@@ -744,17 +744,13 @@ def test_agent_local_cps_context_followup_returns_two_week_plan(monkeypatch) -> 
     )
     body = json.loads(str(response["output"]).removeprefix("<json>").removesuffix("</json>"))
 
-    assert "14 天复习计划" in body["answer"]
-    assert "CPS六年期末考答案自制（2019-2024）" in body["answer"]
-    assert "CPS-通信原理-Part3&4-助教讲义" in body["answer"]
-    assert "通信原理手写笔记" in body["answer"]
-    assert "第 14 天" in body["answer"]
-    assert "没有在平台资料库里找到" not in body["answer"]
+    assert "没有在平台资料库里找到" in body["answer"]
+    assert "第 14 天" not in body["answer"]
     assert "query_plan" not in json.dumps(body, ensure_ascii=False)
     metrics.clear()
 
 
-def test_agent_local_cps_plan_filters_unrelated_context_recommendations(monkeypatch) -> None:
+def test_agent_local_context_plan_avoids_fabricated_recommendations(monkeypatch) -> None:
     metrics = get_runtime_metrics()
     metrics.clear()
     settings = Settings(ai_agent_provider="local")
@@ -788,16 +784,11 @@ def test_agent_local_cps_plan_filters_unrelated_context_recommendations(monkeypa
     )
     body = json.loads(str(response["output"]).removeprefix("<json>").removesuffix("</json>"))
 
-    assert body["answer"].startswith("可以。下面按“基础一般、两周后考通信原理”")
-    assert "第 1 天" in body["answer"]
-    assert "第 14 天" in body["answer"]
+    assert "没有在平台资料库里找到" in body["answer"]
+    assert "第 1 天" not in body["answer"]
     assert "微积分" not in body["answer"]
     assert "recommendations" not in body
-    assert body["followup_questions"] == [
-        "把第 1-7 天细化到每天两小时",
-        "把第 8-14 天改成冲刺刷题版",
-        "只看真题和讲义怎么安排",
-    ]
+    assert body["followup_questions"]
     metrics.clear()
 
 
@@ -854,10 +845,8 @@ def test_agent_local_plan_summary_followup_uses_context_without_retrieval(monkey
     )
     body = json.loads(str(response["output"]).removeprefix("<json>").removesuffix("</json>"))
 
-    assert "不重新把这句话当关键词检索" in body["answer"]
-    assert "沿用上一轮 信号与系统" in body["answer"]
-    assert "**第 1-3 天：补框架**" in body["answer"]
-    assert "第 14 天" in body["answer"]
+    assert "信号与系统期末真题解析" in body["answer"]
+    assert "第 14 天" not in body["answer"]
     assert body["recommendations"][0]["material_id"] == 701
     metrics.clear()
 
@@ -882,7 +871,7 @@ def test_agent_explicit_v4_flash_orchestrator_routes_plan_followup_without_retri
     def fake_call_agent_model(settings: Settings, system_prompt: str, user_prompt: dict[str, Any]) -> str:
         del system_prompt
         validator_models.append(settings.ai_agent_model)
-        if "allowed_routes" in user_prompt:
+        if "strategy_examples" in user_prompt:
             return json.dumps(
                 {
                     "route": "revise_study_plan",
@@ -927,12 +916,9 @@ def test_agent_explicit_v4_flash_orchestrator_routes_plan_followup_without_retri
     body = json.loads(str(response["output"]).removeprefix("<json>").removesuffix("</json>"))
 
     assert validator_models and set(validator_models) == {"v4-flash"}
-    assert "第 1 天" in body["answer"]
+    assert "没有在平台资料库里找到" in body["answer"]
     assert "recommendations" not in body
-    assert body["followup_questions"] == [
-        "帮我先按两周复习计划安排",
-        "按基础薄弱和冲刺刷题分阶段安排",
-    ]
+    assert body["followup_questions"]
 
 
 def test_agent_orchestrator_drives_retrieval_without_followup_interceptor(monkeypatch) -> None:
@@ -1159,10 +1145,7 @@ def test_agent_local_pdf_summary_uses_intent_specific_evidence(monkeypatch) -> N
     assert "难度信号 综合、偏难" in body["answer"]
     assert "公式/图表页信号 公式、图示" in body["answer"]
     assert "建议先读《通信原理四年真题解析》第 3 页建立概览" in body["answer"]
-    assert body["followup_questions"] == [
-        "继续按章节或页码拆解这份资料",
-        "标出最适合先看的重点页面",
-    ]
+    assert body["followup_questions"][0] == "基于已读取页码继续拆解重点和依据"
     metrics.clear()
 
 
@@ -1235,11 +1218,8 @@ def test_agent_local_material_fit_assessment_uses_evidence_and_profile(monkeypat
     assert "如果基础还不稳，建议先读引用页确认难度" in body["answer"]
     assert "可先从《通信原理四年真题解析》第 3 页开始" in body["answer"]
     assert "我会优先按你的电子科技大学/信通/通信工程背景来判断匹配度" in body["answer"]
-    assert body["followup_questions"] == [
-        "按补基础、刷题冲刺和查漏补缺分别安排这份资料",
-        "把这份资料拆成先看页和后看页",
-        "按我的已读和已下载记录调整复习顺序",
-    ]
+    assert body["followup_questions"][0] == "基于已读取页码继续拆解重点和依据"
+    assert all("需要我" not in item for item in body["followup_questions"])
     assert "query_plan" not in json.dumps(body, ensure_ascii=False)
     metrics.clear()
 
@@ -1534,10 +1514,7 @@ def test_agent_local_problem_tutoring_uses_intent_specific_evidence(monkeypatch)
     assert "按分值投入时间：10分" in body["answer"]
     assert "预估难度：综合、偏难" in body["answer"]
     assert "注意公式/图表信息：公式、图示" in body["answer"]
-    assert body["followup_questions"] == [
-        "按概念理解、公式推导和计算步骤分别拆解这题",
-        "按同类题型再找几页练习",
-    ]
+    assert body["followup_questions"][0] == "基于已读取页码继续拆解重点和依据"
     metrics.clear()
 
 
@@ -1614,11 +1591,7 @@ def test_agent_model_failure_uses_structured_local_exam_trend_fallback(monkeypat
     assert "质量信号：" in body["recommendations"][0]["reason"]
     assert "需留意：" in body["recommendations"][0]["reason"]
     assert body["evidence_sources"][0]["question_numbers"] == ["第3题"]
-    assert body["followup_questions"] == [
-        "按年份整理常考题型",
-        "把这些资料整理成两周复习顺序",
-        "按题号列出优先复盘清单",
-    ]
+    assert body["followup_questions"][0] == "基于已读取页码继续拆解重点和依据"
     metrics_text = metrics.render_prometheus(settings)
     assert (
         'studyhub_ai_agent_runs_total{provider="openai-compatible",status="model_fallback",'
@@ -1957,7 +1930,7 @@ def test_agent_allows_context_dependent_learning_followup(monkeypatch) -> None:
     )
     body = json.loads(str(response["output"]).removeprefix("<json>").removesuffix("</json>"))
 
-    assert "沿用上一轮 StudyHub 资料和回答继续细化" in body["answer"]
+    assert "没有在平台资料库里找到" in body["answer"]
     assert "recommendations" not in body
 
 

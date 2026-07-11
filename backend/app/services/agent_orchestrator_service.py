@@ -6,7 +6,7 @@ from typing import Any
 
 
 AGENT_SCOPES = {"learning", "greeting", "out_of_scope"}
-AGENT_ROUTES = {
+AGENT_ROUTE_EXAMPLES = {
     "new_material_search",
     "refine_existing_answer",
     "revise_study_plan",
@@ -14,7 +14,7 @@ AGENT_ROUTES = {
     "answer_from_context",
     "ask_user_clarification",
 }
-AGENT_INTENTS = {
+AGENT_INTENT_EXAMPLES = {
     "material_recommendation",
     "exam_trend_analysis",
     "study_plan",
@@ -30,7 +30,7 @@ AGENT_ORCHESTRATOR_SYSTEM_PROMPT = """
 
 你要综合 current_user_query、conversation_context、platform_term_glossary 和 has_image 自主判断：
 1. 当前内容是否属于课程学习、资料检索、题目分析、考试复习或 StudyHub 资料使用；普通问候单独标记 greeting。
-2. 当前问题是新任务，还是对上一轮答案的细化、改写、重排、继续解释或复习计划修订。
+2. 用简短、开放的 task_label 和 strategy 描述真正任务，不要强行归入预设意图。可以创建“公式推导”“错题诊断”“模拟考试设计”等最贴合用户的标签。
 3. 是否确实需要重新检索资料。用户只要求细化已有答案时不要重新检索；用户提出新的课程、资料范围、年份或题型时应检索。
 4. 生成适合 StudyHub 多词检索的 search_query。使用简短、空格分隔的核心词，保留课程名、资料类型、年份和关键知识点，去掉“帮我、怎么、一下”等对检索无帮助的表达。
 5. 识别用户的学习目标、时间、基础、薄弱点、题号、偏好和期望回答结构。不要靠固定关键词机械套分类，要根据整句话和对话语境判断。
@@ -126,19 +126,16 @@ class AgentOrchestratorService:
             "conversation_context": str(context_query or "").strip()[-1200:],
             "has_image": bool(has_image),
             "platform_term_glossary": platform_term_glossary or {},
-            "allowed_routes": sorted(AGENT_ROUTES),
-            "allowed_values": {
-                "scope": sorted(AGENT_SCOPES),
-                "route": sorted(AGENT_ROUTES),
-                "intent": sorted(AGENT_INTENTS),
-            },
+            "strategy_examples": sorted(AGENT_ROUTE_EXAMPLES),
+            "task_label_examples": sorted(AGENT_INTENT_EXAMPLES),
+            "allowed_scope": sorted(AGENT_SCOPES),
             "output_schema": {
                 "scope": "learning | greeting | out_of_scope",
-                "route": "one allowed route",
+                "route": "a concise free-form execution strategy label",
                 "should_search": "boolean",
                 "use_context": "boolean",
                 "search_query": "space-separated retrieval terms; empty when should_search=false",
-                "intent": "one allowed intent",
+                "intent": "a concise free-form task label",
                 "confidence": "number from 0 to 1",
                 "course_terms": ["canonical course names or aliases from the conversation"],
                 "resource_types": ["requested material types"],
@@ -159,12 +156,10 @@ class AgentOrchestratorService:
         if not isinstance(value, dict):
             return fallback
         scope = _enum(value.get("scope"), AGENT_SCOPES, fallback.scope)
-        route = _enum(value.get("route"), AGENT_ROUTES, fallback.route)
-        intent = _enum(value.get("intent"), AGENT_INTENTS, fallback.intent)
-        should_search = bool(value.get("should_search")) and scope == "learning"
+        route = _clean_text(value.get("route"), max_chars=80) or fallback.route
+        intent = _clean_text(value.get("intent"), max_chars=80) or fallback.intent
+        should_search = bool(value.get("should_search"))
         use_context = bool(value.get("use_context"))
-        if route in {"refine_existing_answer", "revise_study_plan", "rerank_existing_materials", "answer_from_context"}:
-            use_context = True
         search_query = _clean_text(value.get("search_query"), max_chars=500) if should_search else ""
         if should_search and not search_query:
             search_query = fallback.search_query

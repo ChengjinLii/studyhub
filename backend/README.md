@@ -169,6 +169,11 @@ STUDYHUB_AI_AGENT_THINKING_ENABLED=false
 STUDYHUB_AI_AGENT_REASONING_EFFORT=none
 STUDYHUB_AI_AGENT_TIMEOUT_SECONDS=60
 STUDYHUB_AI_AGENT_MAX_OUTPUT_TOKENS=1800
+STUDYHUB_AI_AGENT_DYNAMIC_TOOLS_ENABLED=true
+STUDYHUB_AI_AGENT_TOOL_MAX_ROUNDS=4
+STUDYHUB_AI_AGENT_TOOL_MAX_CALLS=8
+STUDYHUB_AI_AGENT_TOOL_MAX_CANDIDATES=18
+STUDYHUB_AI_AGENT_TOOL_MAX_EVIDENCE_PAGES=12
 STUDYHUB_AI_AGENT_ORCHESTRATOR_PROVIDER=custom
 STUDYHUB_AI_AGENT_ORCHESTRATOR_BASE_URL=https://api.deepseek.com
 STUDYHUB_AI_AGENT_ORCHESTRATOR_API_KEY=CHANGE_ME
@@ -189,12 +194,15 @@ STUDYHUB_AI_AGENT_SESSION_MEMORY_MAX_TURNS=12
 STUDYHUB_AI_AGENT_PDF_EVIDENCE_ENABLED=true
 STUDYHUB_AI_AGENT_PDF_EVIDENCE_MAX_MATERIALS=2
 STUDYHUB_AI_AGENT_PDF_EVIDENCE_MAX_PAGES=6
+STUDYHUB_AI_AGENT_PDF_EXTRACT_MAX_PAGES=80
 STUDYHUB_AI_AGENT_PDF_EVIDENCE_MAX_BYTES=4194304
 STUDYHUB_AI_AGENT_PDF_EXTRACT_CACHE_ENABLED=true
 STUDYHUB_AI_AGENT_PDF_EXTRACT_CACHE_MAX_ENTRIES=64
 ```
 
-生产链路先由轻量编排模型生成语义计划，统一判断学习范围、上下文继承、是否重新检索、检索词、学习约束和回答/追问方向；主模型再结合资料、页级证据、用户会话记忆和平台聚合记忆生成 Markdown 回答，最后由同一轻量模型做语义审阅。本地规则只在模型不可用时负责降级，不主导正常回答。
+启用动态工具后，主模型直接在受控预算内自主选择 `search_materials`、`inspect_materials`、`read_pdf_evidence`、`read_memory` 和 `synthesize_course_context`，可以根据前一轮工具结果继续换检索词、扩大召回、指定 PDF 页码或直接结束。任务标签和执行策略是开放文本，不再限制为固定意图与固定路由；轻量模型只负责最终语义审阅。原固定编排链路保留为模型或工具协议不可用时的兼容降级。
+
+`PDF_EVIDENCE_MAX_PAGES` 控制普通降级链路一次返回的证据页数，`PDF_EXTRACT_MAX_PAGES` 控制最多建立文本页块的文档范围；动态工具仍受 `TOOL_MAX_EVIDENCE_PAGES` 总预算和资料访问权限限制。二者分离后，Agent 可以请求第 20 页等后续页面，而不是只能查看文档最前面的若干页。
 
 外部模型输出仍经过结构化 Safety Harness：只允许推荐候选资料中的 `material_id`，正文资料 ID 也必须属于候选白名单，只允许引用已读取的 PDF 页码，并过滤敏感信息与内部上下文字段泄露。学习意图、追问口吻和答题方向交由模型提示词与语义审阅处理，不再使用前后端字符串改写器。
 

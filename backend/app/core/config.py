@@ -99,6 +99,11 @@ class Settings(BaseSettings):
     ai_agent_reasoning_effort: str = "none"
     ai_agent_timeout_seconds: float = 20.0
     ai_agent_max_output_tokens: int = 1800
+    ai_agent_dynamic_tools_enabled: bool = False
+    ai_agent_tool_max_rounds: int = 4
+    ai_agent_tool_max_calls: int = 8
+    ai_agent_tool_max_candidates: int = 18
+    ai_agent_tool_max_evidence_pages: int = 12
     ai_agent_orchestrator_provider: str | None = None
     ai_agent_orchestrator_base_url: str | None = None
     ai_agent_orchestrator_api_key: str | None = None
@@ -114,6 +119,7 @@ class Settings(BaseSettings):
     ai_agent_pdf_evidence_enabled: bool = True
     ai_agent_pdf_evidence_max_materials: int = 2
     ai_agent_pdf_evidence_max_pages: int = 6
+    ai_agent_pdf_extract_max_pages: int = 80
     ai_agent_pdf_evidence_max_bytes: int = 4 * 1024 * 1024
     ai_agent_pdf_extract_cache_enabled: bool = True
     ai_agent_pdf_extract_cache_max_entries: int = 64

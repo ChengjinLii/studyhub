@@ -316,6 +316,7 @@ def test_ai_prompt_receives_query_plan(monkeypatch) -> None:
         ai_agent_base_url="https://example.test/v1",
         ai_agent_api_key="test-key",
         ai_agent_model="demo-model",
+        ai_agent_dynamic_tools_enabled=False,
     )
     monkeypatch.setattr("app.services.ai_service.get_settings", lambda: settings)
 

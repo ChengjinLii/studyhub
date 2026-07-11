@@ -3,7 +3,6 @@ import {
   buildStudyHubAgentContext,
   normalizeFollowups,
 } from '../../components/studyHubAgent/useStudyHubAgentChat';
-import { resolveStudyHubAgentDemoTurn } from '../../components/studyHubAgent/demoScenarios';
 import { StudyHubAgentMessage } from '../../components/studyHubAgent/types';
 
 const message = (
@@ -105,74 +104,4 @@ describe('studyHubAgentContext', () => {
     ]);
   });
 
-  it('uses the CPS demo overview for the first review question', () => {
-    const turn = resolveStudyHubAgentDemoTurn('两周后考通信原理，基础一般，怎么复习？', []);
-
-    expect(turn?.answer).toContain('通信原理：两周复习路线');
-    expect(turn?.answer).toContain('推荐资料顺序');
-    expect(turn?.answer).not.toContain('| 天数 |');
-    expect(turn?.answer).not.toMatch(/\u6f14\u793a|\u6f14\u793a\u53e3\u5f84/);
-    expect(turn?.stage).toBe('整理答案中');
-    expect(turn?.followups).toContain('帮我整理成两周复习计划');
-    expect(turn?.recommendations.map((item) => item.materialId)).toEqual([209, 18, 168]);
-  });
-
-  it('uses different CPS follow-ups across overview, plan, and topics turns', () => {
-    const overview = resolveStudyHubAgentDemoTurn('两周后考通信原理，基础一般，怎么复习？', []);
-    const plan = resolveStudyHubAgentDemoTurn('帮我整理成两周复习计划', [
-      message(1, 'assistant', overview?.answer || '', overview?.recommendations || []),
-    ]);
-    const topics = resolveStudyHubAgentDemoTurn('通信原理有哪些常考题型和知识点？', []);
-
-    expect(overview?.followups).not.toEqual(plan?.followups);
-    expect(plan?.followups).not.toEqual(topics?.followups);
-    expect(topics?.followups).toContain('给我一份公式速查清单');
-  });
-
-  it('uses prior CPS context for a generic plan follow-up', () => {
-    const messages = [
-      message(1, 'user', '两周后考通信原理，基础一般，怎么复习？'),
-      message(2, 'assistant', '可以先按 CPS 真题和助教讲义来复习', [
-        { materialId: 209, title: 'CPS六年期末考答案自制（2019-2024）' },
-      ]),
-    ];
-
-    const turn = resolveStudyHubAgentDemoTurn('帮我整理成两周复习计划', messages);
-
-    expect(turn?.answer).toContain('通信原理两周复习计划');
-    expect(turn?.answer).toContain('第 1 天');
-    expect(turn?.answer).not.toContain('| 天数 |');
-    expect(turn?.followups).toContain('按题型整理真题刷题清单');
-  });
-
-  it('supports an ESD demo with topics and a context-aware plan follow-up', () => {
-    const firstTurn = resolveStudyHubAgentDemoTurn('两周后考 esd，基础一般，怎么复习？', []);
-    expect(firstTurn?.answer).toContain('ESD：两周复习路线');
-    expect(firstTurn?.followups).toContain('ESD 有哪些常考题型和知识点？');
-
-    const topicTurn = resolveStudyHubAgentDemoTurn('ESD 有哪些常考题型和知识点？', []);
-    expect(topicTurn?.answer).toContain('ESD 常考题型和知识点');
-    expect(topicTurn?.answer).toContain('综合设计题');
-
-    const planTurn = resolveStudyHubAgentDemoTurn('给我总结一下两周复习计划', [
-      message(1, 'user', '两周后考 esd，基础一般，怎么复习？'),
-      message(2, 'assistant', firstTurn?.answer || '', firstTurn?.recommendations || []),
-    ]);
-    expect(planTurn?.answer).toContain('ESD 两周复习计划');
-    expect(planTurn?.answer).toContain('第 14 天');
-    expect(planTurn?.answer).not.toContain('| 天数 |');
-  });
-
-  it('keeps non-demo questions on the normal backend path', () => {
-    const messages = [
-      message(1, 'user', '两周后考通信原理，基础一般，怎么复习？'),
-      message(2, 'assistant', '可以先按 CPS 真题和助教讲义来复习', [
-        { materialId: 209, title: 'CPS六年期末考答案自制（2019-2024）' },
-      ]),
-    ];
-
-    expect(resolveStudyHubAgentDemoTurn('通信原理教材有哪些版本？', [])).toBeNull();
-    expect(resolveStudyHubAgentDemoTurn('傅里叶变换怎么理解？', messages)).toBeNull();
-    expect(resolveStudyHubAgentDemoTurn('给我总结一下两周复习计划', [])).toBeNull();
-  });
 });

@@ -9,9 +9,6 @@ import { fetchStudyHubAgentMaterial, requestStudyHubAgentRecommendations } from 
 import { RoleMask, SessionUser } from '../types/user';
 import { MaterialListItem } from '../types/material';
 import SafeMarkdown from './SafeMarkdown';
-import { resolveStudyHubAgentDemoTurn } from './studyHubAgent/demoScenarios';
-import { runStudyHubAgentDemoWait } from './studyHubAgent/demoScenarios/timing';
-import type { StudyHubAgentMessage, StudyHubAgentRecommendation } from './studyHubAgent/types';
 
 type EyeOffset = { x: number; y: number };
 type AiRecommendation = {
@@ -306,22 +303,6 @@ export default function FloatingSidebar() {
       setChatStage('理解问题中');
       setChatError(null);
       try {
-        const demoTurn = resolveStudyHubAgentDemoTurn(
-          currentQuery,
-          buildSidebarDemoMessages(aiContextQuery, aiAnswer, aiRecommendations)
-        );
-        if (demoTurn) {
-          const recs = toSidebarAiRecommendations(demoTurn.recommendations);
-          await Promise.all([
-            runStudyHubAgentDemoWait(setChatStage, demoTurn.stage),
-            Promise.all(recs.map((rec) => loadMaterialDetail(rec.material_id))),
-          ]);
-          setAiAnswer(demoTurn.answer);
-          setAiRecommendations(recs);
-          setAiFollowups(normalizeAiFollowups(demoTurn.followups, currentQuery));
-          setAiContextQuery(buildSidebarAiContext(currentQuery, demoTurn.answer, recs));
-          return;
-        }
         const data = await requestStudyHubAgentRecommendations(currentQuery, aiContextQuery);
         const output = data.output;
         if (!output || typeof output !== 'string') {
@@ -348,7 +329,7 @@ export default function FloatingSidebar() {
         setChatStage('');
       }
     },
-    [chatQuery, chatLoading, user, loadMaterialDetail, aiContextQuery, aiAnswer, aiRecommendations]
+    [chatQuery, chatLoading, user, loadMaterialDetail, aiContextQuery]
   );
 
   const pickRecommendationReason = (rec: AiRecommendation) =>
@@ -768,43 +749,6 @@ function buildSidebarAiContext(query: string, answer: string, recommendations: A
     .filter(Boolean)
     .join(' ')
     .slice(-1000);
-}
-
-function buildSidebarDemoMessages(
-  contextQuery: string,
-  answer: string,
-  recommendations: AiRecommendation[]
-): StudyHubAgentMessage[] {
-  const content = [contextQuery, answer].filter((item) => item.trim()).join('\n');
-  if (!content && recommendations.length === 0) return [];
-  return [
-    {
-      id: 'floating-sidebar-context',
-      role: 'assistant',
-      content,
-      recommendations: recommendations.map(toStudyHubAgentRecommendation),
-    },
-  ];
-}
-
-function toStudyHubAgentRecommendation(item: AiRecommendation): StudyHubAgentRecommendation {
-  return {
-    materialId: item.material_id,
-    title: item.title,
-    tags: item.tags,
-    reason: item.reason || item.explain || item.match_reason || item.note,
-    summary: item.summary,
-  };
-}
-
-function toSidebarAiRecommendations(items: StudyHubAgentRecommendation[]): AiRecommendation[] {
-  return items.map((item) => ({
-    material_id: item.materialId,
-    title: item.title,
-    tags: item.tags,
-    reason: item.reason,
-    summary: item.summary,
-  }));
 }
 
 function followupKey(value: string) {

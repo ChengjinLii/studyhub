@@ -615,9 +615,8 @@ def test_ai_recommendation_falls_back_when_model_output_is_unsafe(monkeypatch) -
     assert body["answer"].startswith("我先基于 StudyHub 资料库找到")
     assert body["recommendations"][0]["material_id"] == 101
     assert body["followup_questions"] == [
-        "按资料类型整理推荐顺序",
-        "把推荐资料排成先后学习顺序",
-        "只看最适合入门的资料怎么安排",
+        "比较这些资料并安排最有效的使用顺序",
+        "把当前结论整理成下一步可执行的学习清单",
     ]
 
 

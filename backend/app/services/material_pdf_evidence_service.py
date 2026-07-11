@@ -244,16 +244,27 @@ class MaterialPdfEvidenceService:
         *,
         current_user_id: int | None,
         current_user_role_mask: int | None = None,
+        force: bool = False,
+        max_materials: int | None = None,
+        max_results: int | None = None,
+        page_numbers: set[int] | None = None,
     ) -> list[MaterialPageEvidence]:
-        if not self.settings.ai_agent_pdf_evidence_enabled or not self.should_load_evidence(query):
+        if not self.settings.ai_agent_pdf_evidence_enabled or (not force and not self.should_load_evidence(query)):
             return []
-        max_materials = max(0, int(self.settings.ai_agent_pdf_evidence_max_materials or 0))
-        if max_materials <= 0:
+        material_limit = max(
+            0,
+            int(
+                max_materials
+                if max_materials is not None
+                else self.settings.ai_agent_pdf_evidence_max_materials or 0
+            ),
+        )
+        if material_limit <= 0:
             return []
         all_evidence: list[MaterialPageEvidence] = []
         scanned = 0
         for material in materials:
-            if scanned >= max_materials:
+            if scanned >= material_limit:
                 break
             if not self._can_read_pdf_material(material, current_user_id, current_user_role_mask):
                 continue
@@ -263,10 +274,16 @@ class MaterialPdfEvidenceService:
                     material,
                     query,
                     cacheable=bool(safe_material_value(material, "is_free", True)),
+                    max_results=max_results,
+                    page_numbers=page_numbers,
                 )
             )
         all_evidence.sort(key=lambda item: (-item.score, item.material_id, item.page))
-        return all_evidence[: max(1, self.settings.ai_agent_pdf_evidence_max_pages)]
+        result_limit = max(
+            1,
+            int(max_results if max_results is not None else self.settings.ai_agent_pdf_evidence_max_pages),
+        )
+        return all_evidence[:result_limit]
 
     def collect_for_material(
         self,
@@ -274,6 +291,8 @@ class MaterialPdfEvidenceService:
         query: str,
         *,
         cacheable: bool | None = None,
+        max_results: int | None = None,
+        page_numbers: set[int] | None = None,
     ) -> list[MaterialPageEvidence]:
         key = str(safe_material_value(material, "file_storage_key") or "").strip()
         if not key:
@@ -285,6 +304,8 @@ class MaterialPdfEvidenceService:
         query_terms = _query_terms(query)
         evidence: list[MaterialPageEvidence] = []
         for chunk in chunks:
+            if page_numbers and chunk.page not in page_numbers:
+                continue
             if not chunk.text.strip():
                 continue
             anchor_terms = tuple(_anchor_terms(chunk, query_terms))
@@ -310,10 +331,25 @@ class MaterialPdfEvidenceService:
                 )
             )
         evidence.sort(key=lambda item: (-item.score, item.page))
-        return evidence[: max(1, self.settings.ai_agent_pdf_evidence_max_pages)]
+        result_limit = max(
+            1,
+            int(max_results if max_results is not None else self.settings.ai_agent_pdf_evidence_max_pages),
+        )
+        return evidence[:result_limit]
 
     def _load_page_chunks(self, key: str, *, cacheable: bool) -> tuple[MaterialPageChunk, ...]:
-        max_pages = max(1, int(self.settings.ai_agent_pdf_evidence_max_pages or 0))
+        max_pages = max(
+            1,
+            int(
+                getattr(
+                    self.settings,
+                    "ai_agent_pdf_extract_max_pages",
+                    self.settings.ai_agent_pdf_evidence_max_pages,
+                )
+                or self.settings.ai_agent_pdf_evidence_max_pages
+                or 1
+            ),
+        )
         max_bytes = max(1, int(self.settings.ai_agent_pdf_evidence_max_bytes or 0))
         cache_key = (key, max_pages, max_bytes)
         cache_enabled = bool(getattr(self.settings, "ai_agent_pdf_extract_cache_enabled", True))

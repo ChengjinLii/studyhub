@@ -17,8 +17,6 @@ import {
   StudyHubAgentMessage,
   StudyHubAgentRecommendation,
 } from './types';
-import { resolveStudyHubAgentDemoTurn } from './demoScenarios';
-import { runStudyHubAgentDemoWait } from './demoScenarios/timing';
 
 const STORED_CONTEXT_MESSAGE_LIMIT = 24;
 const RECENT_CONTEXT_MESSAGE_LIMIT = 8;
@@ -27,15 +25,6 @@ const CONTEXT_QUERY_MAX_CHARS = 1000;
 const CONTEXT_LINE_MAX_CHARS = 220;
 const EARLIER_CONTEXT_SUMMARY_MAX_CHARS = 360;
 const IMAGE_ONLY_QUERY = '请根据这张图片帮我分析学习问题';
-
-const COURSE_CONTEXT_HINTS: { label: string; aliases: string[] }[] = [
-  { label: '电子系统设计', aliases: ['电子系统设计', 'ESD'] },
-  { label: '通信原理', aliases: ['通信原理', 'CPS'] },
-  { label: '信号与系统', aliases: ['信号与系统', 'signals', 'signal'] },
-  { label: '数据结构', aliases: ['数据结构'] },
-  { label: '高等数学', aliases: ['高等数学', '高数', '微积分'] },
-  { label: '概率论', aliases: ['概率论'] },
-];
 
 export const useStudyHubAgentChat = () => {
   const [loading, setLoading] = useState(false);
@@ -138,24 +127,6 @@ export const useStudyHubAgentChat = () => {
       setThinkingStages(['理解问题中']);
       setStreamingAnswer('');
       try {
-        const demoTurn = resolveStudyHubAgentDemoTurn(query, messages);
-        if (demoTurn) {
-          await Promise.all([
-            runStudyHubAgentDemoWait((stage) => setThinkingStages([stage]), demoTurn.stage),
-            Promise.all(demoTurn.recommendations.map((item) => loadMaterialDetail(item.materialId))),
-          ]);
-          setMessages((prev) => [
-            ...prev,
-            {
-              id: makeMessageId(),
-              role: 'assistant',
-              content: demoTurn.answer,
-              recommendations: demoTurn.recommendations,
-              followups: normalizeFollowups(demoTurn.followups, query),
-            },
-          ]);
-          return;
-        }
         const contextQuery = buildStudyHubAgentContext(messages, query);
         const data = await requestStudyHubAgentRecommendationsStream(
           query,
@@ -380,7 +351,6 @@ function formatStudyHubAgentContextLine(message: StudyHubAgentMessage) {
 function buildStudyHubAgentEarlierContextSummary(messages: StudyHubAgentMessage[]) {
   if (messages.length === 0) return '';
   const scannedMessages = messages.slice(-EARLIER_CONTEXT_MESSAGE_SCAN_LIMIT);
-  const courseHints = collectCourseHints(scannedMessages);
   const titles = collectRecommendationTitles(scannedMessages, 4);
   const userGoals = scannedMessages
     .filter((message) => message.role === 'user')
@@ -389,9 +359,6 @@ function buildStudyHubAgentEarlierContextSummary(messages: StudyHubAgentMessage[
     .slice(-2);
 
   const parts: string[] = [];
-  if (courseHints.length > 0) {
-    parts.push(`课程/关键词：${courseHints.join('、')}`);
-  }
   const materialRefs = collectRecommendationReferences(scannedMessages, 4);
   if (materialRefs.length > 0) {
     parts.push(`曾推荐资料：${materialRefs.join('；')}`);
@@ -403,28 +370,6 @@ function buildStudyHubAgentEarlierContextSummary(messages: StudyHubAgentMessage[
   }
   if (parts.length === 0) return '';
   return `早期上下文摘要：${parts.join('。')}`.slice(0, EARLIER_CONTEXT_SUMMARY_MAX_CHARS);
-}
-
-function collectCourseHints(messages: StudyHubAgentMessage[]) {
-  const haystack = messages
-    .flatMap((message) => [
-      message.content,
-      ...(message.recommendations || []).flatMap((item) => [
-        item.title || '',
-        item.summary || '',
-        ...(item.tags || []),
-      ]),
-    ])
-    .map(redactStudyHubAgentContextText)
-    .join(' ');
-  const normalizedHaystack = haystack.toLowerCase();
-  const hints: string[] = [];
-  COURSE_CONTEXT_HINTS.forEach((item) => {
-    if (item.aliases.some((alias) => normalizedHaystack.includes(alias.toLowerCase()))) {
-      hints.push(item.label);
-    }
-  });
-  return hints.slice(0, 4);
 }
 
 function collectRecommendationTitles(messages: StudyHubAgentMessage[], limit: number) {

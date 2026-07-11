@@ -61,7 +61,7 @@ def test_model_orchestrator_keeps_user_text_for_semantic_judgment() -> None:
     assert "允许" not in request["current_user_query"]
 
 
-def test_model_orchestrator_rejects_unknown_structural_values_only() -> None:
+def test_model_orchestrator_restricts_scope_but_accepts_open_task_labels() -> None:
     fallback = _fallback()
     plan = AgentOrchestratorService().parse(
         {
@@ -75,6 +75,6 @@ def test_model_orchestrator_rejects_unknown_structural_values_only() -> None:
     )
 
     assert plan.scope == fallback.scope
-    assert plan.route == fallback.route
-    assert plan.intent == fallback.intent
+    assert plan.route == "delete_database"
+    assert plan.intent == "invent_material"
     assert plan.search_query == "通信原理 真题"

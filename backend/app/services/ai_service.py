@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+from dataclasses import dataclass
 from time import perf_counter
 from types import SimpleNamespace
 from typing import Any, Callable
@@ -32,6 +33,11 @@ from app.services.agent_orchestrator_service import (
 )
 from app.services.agent_query_planner_service import AgentQueryPlan, AgentQueryPlannerService
 from app.services.agent_safety_service import AgentSafetyService
+from app.services.agent_tool_loop_service import (
+    AGENT_TOOL_LOOP_SYSTEM_PROMPT,
+    AgentToolAction,
+    AgentToolLoopService,
+)
 from app.services.materials_search import (
     material_matches_search,
     material_search_glossary,
@@ -114,6 +120,16 @@ AGENT_RANKING_CANDIDATE_LIMIT = 80
 AGENT_CONTEXT_MATERIAL_LIMIT = 8
 
 AgentStageCallback = Callable[[str], None]
+
+
+@dataclass(slots=True)
+class DynamicAgentRunResult:
+    body: dict[str, Any]
+    materials: list[MaterialRecord]
+    pdf_evidence: list[MaterialPageEvidence]
+    memory_context: AgentMemoryContext | None
+    course_memory_card: CourseMemoryCard | None
+    task_plan: AgentQueryPlan | None
 
 
 def _emit_agent_stage(callback: AgentStageCallback | None, stage: str) -> None:
@@ -230,6 +246,7 @@ class AiService:
         safety_service: AgentSafetyService | None = None,
         orchestrator_service: AgentOrchestratorService | None = None,
         conversation_memory_service: AgentConversationMemoryService | None = None,
+        tool_loop_service: AgentToolLoopService | None = None,
     ) -> None:
         self.read_repo = read_repo
         self.material_repo = material_repo
@@ -240,6 +257,7 @@ class AiService:
         self.safety_service = safety_service or AgentSafetyService()
         self.orchestrator_service = orchestrator_service or AgentOrchestratorService()
         self.conversation_memory_service = conversation_memory_service
+        self.tool_loop_service = tool_loop_service or AgentToolLoopService()
 
     def chat(self, payload: AiChatRequestPayload) -> dict[str, Any]:
         latest_user_message = next((item.content.strip() for item in reversed(payload.messages) if item.role.lower() == "user"), "")
@@ -284,6 +302,50 @@ class AiService:
                 else "",
                 getattr(payload, "contextQuery", None),
             )
+            if model_configured and bool(getattr(settings, "ai_agent_dynamic_tools_enabled", False)):
+                dynamic_result = self._run_dynamic_agent(
+                    session,
+                    query=payload.query,
+                    conversation_context=_compact_agent_context(context_query),
+                    filters=payload.filters or {},
+                    image_attachments=image_attachments,
+                    conversation_turns=conversation_turns,
+                    current_user_id=current_user_id,
+                    current_user_role_mask=current_user_role_mask,
+                    personal_memory_enabled=personal_memory_enabled,
+                    stage_callback=stage_callback,
+                )
+                if dynamic_result is not None:
+                    status = "dynamic_tools_success"
+                    pdf_evidence = dynamic_result.pdf_evidence
+                    memory_context = dynamic_result.memory_context
+                    course_memory_card = dynamic_result.course_memory_card
+                    body = dynamic_result.body
+                    if self._is_agent_orchestrator_configured(settings):
+                        _emit_agent_stage(stage_callback, "验证答案中")
+                        body = self._review_agent_response(
+                            query=payload.query,
+                            body=body,
+                            plan=None,
+                            materials=dynamic_result.materials,
+                            pdf_evidence=pdf_evidence,
+                            local_fallback=lambda: body,
+                        )
+                    _emit_agent_stage(stage_callback, "整理答案中")
+                    body = self.safety_service.sanitize_public_response_body(
+                        body,
+                        candidate_materials=dynamic_result.materials,
+                        pdf_evidence=pdf_evidence,
+                        current_query=payload.query,
+                    )
+                    if personal_memory_enabled:
+                        self._remember_agent_turn(
+                            current_user_id=current_user_id,
+                            session_id=session_id,
+                            query=payload.query,
+                            body=body,
+                        )
+                    return {"output": _agent_json_output(body)}
             turn_plan = self._plan_agent_turn(
                 payload.query,
                 context_query=context_query,
@@ -569,6 +631,319 @@ class AiService:
             "candidateMaterialCount": len(materials),
         }
 
+    def _run_dynamic_agent(
+        self,
+        session: Session,
+        *,
+        query: str,
+        conversation_context: str,
+        filters: dict[str, Any],
+        image_attachments: list[dict[str, Any]],
+        conversation_turns: list[AgentConversationTurn],
+        current_user_id: int | None,
+        current_user_role_mask: int | None,
+        personal_memory_enabled: bool,
+        stage_callback: AgentStageCallback | None,
+    ) -> DynamicAgentRunResult | None:
+        settings = get_settings()
+        max_rounds = max(1, min(6, int(getattr(settings, "ai_agent_tool_max_rounds", 4) or 4)))
+        max_calls = max(1, min(16, int(getattr(settings, "ai_agent_tool_max_calls", 8) or 8)))
+        max_candidates = max(3, min(30, int(getattr(settings, "ai_agent_tool_max_candidates", 18) or 18)))
+        max_evidence = max(1, min(24, int(getattr(settings, "ai_agent_tool_max_evidence_pages", 12) or 12)))
+        observations: list[dict[str, Any]] = []
+        materials: list[MaterialRecord] = []
+        pdf_evidence: list[MaterialPageEvidence] = []
+        memory_context: AgentMemoryContext | None = None
+        course_memory_card: CourseMemoryCard | None = None
+        task_plan: AgentQueryPlan | None = None
+        calls_used = 0
+
+        for round_index in range(max_rounds + 1):
+            force_final = round_index >= max_rounds or calls_used >= max_calls
+            _emit_agent_stage(stage_callback, "总结答案中" if force_final else "规划下一步中")
+            request_payload = self.tool_loop_service.build_request(
+                query=query,
+                conversation_context=conversation_context,
+                platform_term_glossary=material_search_glossary(f"{query} {conversation_context}"),
+                has_image=bool(image_attachments),
+                observations=observations,
+                remaining_rounds=max(0, max_rounds - round_index),
+                remaining_tool_calls=max(0, max_calls - calls_used),
+                force_final=force_final,
+            )
+            safe_request_payload = self.safety_service.sanitize_prompt_payload(request_payload)
+            if image_attachments and round_index == 0:
+                safe_request_payload["_image_attachment_data_urls"] = [
+                    item["data_url"] for item in image_attachments if item.get("data_url")
+                ]
+            try:
+                content = self._call_agent_model(
+                    settings,
+                    AGENT_TOOL_LOOP_SYSTEM_PROMPT,
+                    safe_request_payload,
+                )
+            except Exception:
+                return None
+            decision = self.tool_loop_service.parse(self._loads_object(content))
+            if decision is None:
+                return None
+            if decision.mode == "final" and decision.final is not None:
+                body = self._dynamic_final_body(
+                    decision.final,
+                    materials=materials,
+                    pdf_evidence=pdf_evidence,
+                    query=query,
+                    memory_context=memory_context,
+                )
+                if not str(body.get("answer") or "").strip():
+                    return None
+                return DynamicAgentRunResult(
+                    body=body,
+                    materials=materials,
+                    pdf_evidence=pdf_evidence,
+                    memory_context=memory_context,
+                    course_memory_card=course_memory_card,
+                    task_plan=task_plan,
+                )
+            if force_final:
+                return None
+
+            for action in decision.actions:
+                if calls_used >= max_calls:
+                    break
+                _emit_agent_stage(stage_callback, _dynamic_tool_stage(action))
+                calls_used += 1
+                observation, materials, pdf_evidence, memory_context, course_memory_card, task_plan = (
+                    self._execute_dynamic_agent_tool(
+                        session,
+                        action=action,
+                        query=query,
+                        conversation_context=conversation_context,
+                        filters=filters,
+                        conversation_turns=conversation_turns,
+                        current_user_id=current_user_id,
+                        current_user_role_mask=current_user_role_mask,
+                        personal_memory_enabled=personal_memory_enabled,
+                        materials=materials,
+                        pdf_evidence=pdf_evidence,
+                        memory_context=memory_context,
+                        course_memory_card=course_memory_card,
+                        task_plan=task_plan,
+                        max_candidates=max_candidates,
+                        max_evidence=max_evidence,
+                    )
+                )
+                observations.append(
+                    self.safety_service.sanitize_prompt_payload(
+                        {
+                            "tool": action.name,
+                            "result": observation,
+                        }
+                    )
+                )
+        return None
+
+    def _execute_dynamic_agent_tool(
+        self,
+        session: Session,
+        *,
+        action: AgentToolAction,
+        query: str,
+        conversation_context: str,
+        filters: dict[str, Any],
+        conversation_turns: list[AgentConversationTurn],
+        current_user_id: int | None,
+        current_user_role_mask: int | None,
+        personal_memory_enabled: bool,
+        materials: list[MaterialRecord],
+        pdf_evidence: list[MaterialPageEvidence],
+        memory_context: AgentMemoryContext | None,
+        course_memory_card: CourseMemoryCard | None,
+        task_plan: AgentQueryPlan | None,
+        max_candidates: int,
+        max_evidence: int,
+    ) -> tuple[
+        dict[str, Any],
+        list[MaterialRecord],
+        list[MaterialPageEvidence],
+        AgentMemoryContext | None,
+        CourseMemoryCard | None,
+        AgentQueryPlan | None,
+    ]:
+        arguments = action.arguments
+        if action.name == "search_materials":
+            search_query = _dynamic_text(arguments.get("query"), max_chars=500) or query
+            requested_limit = _bounded_int(arguments.get("limit"), default=6, minimum=1, maximum=12)
+            action_filters = _dynamic_search_filters(filters, arguments.get("filters"))
+            found = self._rank_materials(session, search_query, action_filters)[:requested_limit]
+            materials = _merge_material_candidates(materials, found, limit=max_candidates)
+            return (
+                {
+                    "query": search_query,
+                    "count": len(found),
+                    "candidates": [
+                        self._compact_recommendation_payload(item, search_query, pdf_evidence, memory_context)
+                        for item in found
+                    ],
+                },
+                materials,
+                pdf_evidence,
+                memory_context,
+                course_memory_card,
+                task_plan,
+            )
+
+        selected = _select_materials(materials, arguments.get("material_ids"))
+        if action.name == "inspect_materials":
+            if not selected:
+                selected = materials[:6]
+            return (
+                {
+                    "materials": [
+                        self._compact_recommendation_payload(item, query, pdf_evidence, memory_context)
+                        for item in selected[:8]
+                    ]
+                },
+                materials,
+                pdf_evidence,
+                memory_context,
+                course_memory_card,
+                task_plan,
+            )
+
+        if action.name == "read_pdf_evidence":
+            if not self.pdf_evidence_service:
+                result = {"available": False, "reason": "pdf_evidence_service_unavailable"}
+            else:
+                if not selected:
+                    selected = materials[:3]
+                remaining = max(0, max_evidence - len(pdf_evidence))
+                requested_pages = _bounded_int(arguments.get("max_pages"), default=4, minimum=1, maximum=8)
+                page_numbers = _dynamic_page_numbers(
+                    arguments.get("page_numbers"),
+                    max_page=max(1, int(getattr(get_settings(), "ai_agent_pdf_extract_max_pages", 80) or 80)),
+                )
+                evidence_query = _dynamic_text(arguments.get("query"), max_chars=500) or _agent_retrieval_query(
+                    query, conversation_context
+                )
+                loaded: list[MaterialPageEvidence] = []
+                if selected and remaining > 0:
+                    try:
+                        loaded = self.pdf_evidence_service.collect_for_materials(
+                            selected,
+                            evidence_query,
+                            current_user_id=current_user_id,
+                            current_user_role_mask=current_user_role_mask,
+                            force=True,
+                            max_materials=len(selected),
+                            max_results=min(requested_pages, remaining),
+                            page_numbers=page_numbers or None,
+                        )
+                    except Exception:
+                        loaded = []
+                pdf_evidence = _merge_pdf_evidence(pdf_evidence, loaded, limit=max_evidence)
+                result = {
+                    "available": bool(loaded),
+                    "requested_material_ids": [int(item.id) for item in selected],
+                    "requested_page_numbers": sorted(page_numbers),
+                    "evidence": [item.to_prompt_payload() for item in loaded],
+                }
+            return (
+                result,
+                materials,
+                pdf_evidence,
+                memory_context,
+                course_memory_card,
+                task_plan,
+            )
+
+        if action.name == "read_memory":
+            focus = _dynamic_text(arguments.get("focus"), max_chars=500) or query
+            memory_context = self._collect_memory_context(
+                session,
+                query=focus,
+                materials=materials,
+                current_user_id=current_user_id if personal_memory_enabled else None,
+                pdf_evidence=pdf_evidence,
+                conversation_turns=conversation_turns if personal_memory_enabled else [],
+            )
+            return (
+                {
+                    "focus": focus,
+                    "memory": memory_context.to_prompt_payload() if memory_context else {},
+                },
+                materials,
+                pdf_evidence,
+                memory_context,
+                course_memory_card,
+                task_plan,
+            )
+
+        if action.name == "synthesize_course_context":
+            if memory_context is None:
+                memory_context = self._collect_memory_context(
+                    session,
+                    query=query,
+                    materials=materials,
+                    current_user_id=current_user_id if personal_memory_enabled else None,
+                    pdf_evidence=pdf_evidence,
+                    conversation_turns=conversation_turns if personal_memory_enabled else [],
+                )
+            task_plan = _dynamic_query_plan(arguments, query)
+            course_memory_card = self._build_course_memory_card(
+                materials=materials,
+                pdf_evidence=pdf_evidence,
+                memory_context=memory_context,
+                query_plan=task_plan,
+            )
+            return (
+                {
+                    "task": task_plan.to_prompt_payload(),
+                    "course_context": course_memory_card.to_prompt_payload() if course_memory_card else {},
+                },
+                materials,
+                pdf_evidence,
+                memory_context,
+                course_memory_card,
+                task_plan,
+            )
+
+        return (
+            {"error": "tool_not_available"},
+            materials,
+            pdf_evidence,
+            memory_context,
+            course_memory_card,
+            task_plan,
+        )
+
+    def _dynamic_final_body(
+        self,
+        value: dict[str, Any],
+        *,
+        materials: list[MaterialRecord],
+        pdf_evidence: list[MaterialPageEvidence],
+        query: str,
+        memory_context: AgentMemoryContext | None,
+    ) -> dict[str, Any]:
+        body: dict[str, Any] = {"answer": str(value.get("answer") or "").strip()}
+        raw_recommendations = value.get("recommendations")
+        if isinstance(raw_recommendations, list):
+            fallback = [
+                self._recommendation_payload(item, query, pdf_evidence, memory_context)
+                for item in materials
+            ]
+            body["recommendations"] = self._merge_llm_recommendations(
+                {"recommendations": raw_recommendations},
+                fallback,
+                fill_missing=False,
+            )
+        if isinstance(value.get("evidence_sources"), list):
+            body["evidence_sources"] = value["evidence_sources"]
+        if isinstance(value.get("followup_questions"), list):
+            body["followup_questions"] = value["followup_questions"]
+        return body
+
     def _plan_agent_turn(self, query: str, *, context_query: str | None, has_image: bool) -> AgentOrchestrationPlan:
         fallback = _local_agent_orchestration_plan(query, context_query=context_query, has_image=has_image)
         settings = get_settings()
@@ -683,7 +1058,7 @@ class AiService:
         *,
         query: str,
         body: dict[str, Any],
-        plan: AgentOrchestrationPlan,
+        plan: AgentOrchestrationPlan | None,
         materials: list[MaterialRecord],
         pdf_evidence: list[MaterialPageEvidence],
         local_fallback: Callable[[], dict[str, Any]],
@@ -703,12 +1078,12 @@ class AiService:
             "current_user_query": query,
             "platform_term_glossary": material_search_glossary(query),
             "conversation_plan": {
-                "route": plan.route,
-                "intent": plan.intent,
-                "use_context": plan.use_context,
-                "should_search": plan.should_search,
-                "response_guidance": list(plan.response_guidance),
-                "followup_guidance": list(plan.followup_guidance),
+                "route": plan.route if plan else "model_directed_tool_loop",
+                "intent": plan.intent if plan else "open_learning_task",
+                "use_context": plan.use_context if plan else True,
+                "should_search": plan.should_search if plan else bool(materials),
+                "response_guidance": list(plan.response_guidance) if plan else [],
+                "followup_guidance": list(plan.followup_guidance) if plan else [],
             },
             "candidate_materials": candidates,
             "available_pdf_evidence": [
@@ -1172,7 +1547,13 @@ class AiService:
             payload["user_fit_signals"] = user_fit_signals
         return payload
 
-    def _merge_llm_recommendations(self, body: dict[str, Any], fallback: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    def _merge_llm_recommendations(
+        self,
+        body: dict[str, Any],
+        fallback: list[dict[str, Any]],
+        *,
+        fill_missing: bool = True,
+    ) -> list[dict[str, Any]]:
         by_id = {int(item["material_id"]): dict(item) for item in fallback if item.get("material_id") is not None}
         merged: list[dict[str, Any]] = []
         raw_items = body.get("recommendations")
@@ -1187,11 +1568,12 @@ class AiService:
                 if isinstance(raw_item.get("reason"), str) and raw_item["reason"].strip():
                     item["reason"] = raw_item["reason"].strip()
                 merged.append(item)
-        for item in fallback:
-            if len(merged) >= 3:
-                break
-            if not any(existing.get("material_id") == item.get("material_id") for existing in merged):
-                merged.append(item)
+        if fill_missing:
+            for item in fallback:
+                if len(merged) >= 3:
+                    break
+                if not any(existing.get("material_id") == item.get("material_id") for existing in merged):
+                    merged.append(item)
         return merged[:3]
 
     def _build_local_answer(
@@ -1206,12 +1588,6 @@ class AiService:
         image_attachments: list[dict[str, Any]] | None = None,
     ) -> str:
         image_hint = "我已收到你发的图片；当前会结合图片上下文、你的文字和平台资料一起判断。" if image_attachments else ""
-        cps_plan_answer = _local_cps_two_week_plan_answer(query, query_plan, recommendations)
-        if cps_plan_answer:
-            return f"{image_hint}{cps_plan_answer}"
-        contextual_answer = _local_contextual_followup_answer(query, conversation_context, query_plan)
-        if contextual_answer:
-            return f"{image_hint}{contextual_answer}"
         if not recommendations:
             if image_attachments:
                 return f"{image_hint}我没有在平台资料库里找到足够贴近「{query}」的候选。你可以补充课程名、考试范围或题目文字，我再帮你缩小检索。"
@@ -1536,58 +1912,17 @@ class AiService:
         recommendations: list[dict[str, Any]],
         memory_context: AgentMemoryContext | None,
     ) -> list[str]:
-        if query_plan is None:
-            return _default_followups()
-        has_pdf = bool(pdf_evidence)
-        has_questions = any(item.question_numbers for item in pdf_evidence)
-        intent = query_plan.intent
-        questions: list[str]
-        if _is_cps_two_week_plan_request(query, query_plan):
-            return [
-                "把第 1-7 天细化到每天两小时",
-                "把第 8-14 天改成冲刺刷题版",
-                "只看真题和讲义怎么安排",
-            ]
-        if intent == "exam_trend_analysis":
-            questions = [
-                "按年份整理常考题型",
-                "把这些资料整理成两周复习顺序",
-            ]
-            if has_questions:
-                questions.append("按题号列出优先复盘清单")
-        elif intent == "study_plan":
-            constraints = getattr(query_plan, "study_constraints", {}) or {}
-            days = _safe_positive_int(constraints.get("days_until_exam")) if isinstance(constraints, dict) else None
-            first_question = f"帮我按 {days} 天拆成每日复习安排" if days else "帮我先按两周复习计划安排"
-            if _is_cps_course_plan(query_plan) and (days == 14 or _query_plan_has_two_week_constraint(query_plan)):
-                first_question = "帮我整理成两周复习计划"
-            questions = [
-                first_question,
-                "按基础薄弱和冲刺刷题分阶段安排",
-            ]
-            if recommendations:
-                questions.append("把推荐资料排成每日学习顺序")
-        elif intent == "pdf_summary":
-            questions = [
-                "继续按章节或页码拆解这份资料",
-                "标出最适合先看的重点页面",
-            ]
-        elif intent == "problem_tutoring":
-            questions = [
-                "按概念理解、公式推导和计算步骤分别拆解这题",
-                "按同类题型再找几页练习",
-            ]
-        elif intent == "material_fit_assessment":
-            questions = [
-                "按补基础、刷题冲刺和查漏补缺分别安排这份资料",
-                "把这份资料拆成先看页和后看页",
-            ]
-        else:
-            questions = _default_followups()
-        if has_pdf and intent not in {"exam_trend_analysis", "pdf_summary", "problem_tutoring", "material_fit_assessment"}:
-            questions.append("基于已读取页码继续归纳重点")
+        del query
+        questions = list(query_plan.followup_guidance) if query_plan else []
+        if pdf_evidence:
+            questions.append("基于已读取页码继续拆解重点和依据")
+            if any(item.question_numbers for item in pdf_evidence):
+                questions.append("按题号整理下一步练习和复盘顺序")
+        if recommendations:
+            questions.append("比较这些资料并安排最有效的使用顺序")
+        questions.append("把当前结论整理成下一步可执行的学习清单")
         if memory_context and memory_context.user:
-            questions.append("按我的已读和已下载记录调整复习顺序")
+            questions.append("结合我之前的学习进度调整下一步安排")
         return _dedupe_questions(questions)[:3] or _default_followups()
 
     def _local_study_plan_hint(self, query_plan: AgentQueryPlan | None) -> str:
@@ -1953,6 +2288,162 @@ class AiService:
         except json.JSONDecodeError:
             return []
         return [str(item) for item in parsed if isinstance(item, (str, int, float))]
+
+
+def _dynamic_tool_stage(action: AgentToolAction) -> str:
+    if action.name == "search_materials":
+        query = _dynamic_text(action.arguments.get("query"), max_chars=28)
+        return f"检索“{query}”中" if query else "检索资料中"
+    if action.name == "inspect_materials":
+        return "读取资料详情中"
+    if action.name == "read_pdf_evidence":
+        pages = _dynamic_page_numbers(action.arguments.get("page_numbers"), max_page=999)
+        if pages:
+            return "读取第 " + "、".join(str(item) for item in sorted(pages)[:4]) + " 页证据中"
+        return "读取页级证据中"
+    if action.name == "read_memory":
+        return "读取学习记忆中"
+    if action.name == "synthesize_course_context":
+        return "汇总课程证据中"
+    return "调用学习工具中"
+
+
+def _dynamic_text(value: Any, *, max_chars: int) -> str:
+    return re.sub(r"\s+", " ", str(value or "")).strip()[:max_chars]
+
+
+def _bounded_int(value: Any, *, default: int, minimum: int, maximum: int) -> int:
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError):
+        parsed = default
+    return max(minimum, min(maximum, parsed))
+
+
+def _dynamic_search_filters(base: dict[str, Any], value: Any) -> dict[str, Any]:
+    merged = {
+        key: _dynamic_text(item, max_chars=80)
+        for key, item in base.items()
+        if key in {"school", "college", "major", "tag"} and _dynamic_text(item, max_chars=80)
+    }
+    if isinstance(value, dict):
+        for key in ("school", "college", "major", "tag"):
+            text = _dynamic_text(value.get(key), max_chars=80)
+            if text:
+                merged[key] = text
+    return merged
+
+
+def _merge_material_candidates(
+    existing: list[MaterialRecord],
+    incoming: list[MaterialRecord],
+    *,
+    limit: int,
+) -> list[MaterialRecord]:
+    merged: list[MaterialRecord] = []
+    seen: set[int] = set()
+    for item in [*existing, *incoming]:
+        material_id = int(item.id)
+        if material_id in seen:
+            continue
+        seen.add(material_id)
+        merged.append(item)
+        if len(merged) >= limit:
+            break
+    return merged
+
+
+def _select_materials(materials: list[MaterialRecord], value: Any) -> list[MaterialRecord]:
+    if not isinstance(value, list):
+        return []
+    requested: list[int] = []
+    for item in value[:12]:
+        try:
+            material_id = int(item)
+        except (TypeError, ValueError):
+            continue
+        if material_id > 0 and material_id not in requested:
+            requested.append(material_id)
+    by_id = {int(item.id): item for item in materials}
+    return [by_id[item] for item in requested if item in by_id]
+
+
+def _dynamic_page_numbers(value: Any, *, max_page: int) -> set[int]:
+    if not isinstance(value, list):
+        return set()
+    pages: set[int] = set()
+    for item in value[:12]:
+        try:
+            page = int(item)
+        except (TypeError, ValueError):
+            continue
+        if 1 <= page <= max_page:
+            pages.add(page)
+    return pages
+
+
+def _merge_pdf_evidence(
+    existing: list[MaterialPageEvidence],
+    incoming: list[MaterialPageEvidence],
+    *,
+    limit: int,
+) -> list[MaterialPageEvidence]:
+    by_key: dict[tuple[int, int], MaterialPageEvidence] = {
+        (int(item.material_id), int(item.page)): item for item in existing
+    }
+    for item in incoming:
+        by_key[(int(item.material_id), int(item.page))] = item
+    merged = sorted(by_key.values(), key=lambda item: (-item.score, item.material_id, item.page))
+    return merged[:limit]
+
+
+def _dynamic_string_list(value: Any, *, limit: int, max_chars: int = 100) -> tuple[str, ...]:
+    if not isinstance(value, list):
+        return ()
+    items: list[str] = []
+    for raw in value:
+        text = _dynamic_text(raw, max_chars=max_chars)
+        if text and text not in items:
+            items.append(text)
+        if len(items) >= limit:
+            break
+    return tuple(items)
+
+
+def _dynamic_mapping(value: Any) -> dict[str, Any]:
+    if not isinstance(value, dict):
+        return {}
+    result: dict[str, Any] = {}
+    for raw_key, raw_value in list(value.items())[:12]:
+        key = _dynamic_text(raw_key, max_chars=50)
+        if not key:
+            continue
+        if isinstance(raw_value, (str, int, float, bool)):
+            result[key] = _dynamic_text(raw_value, max_chars=160) if isinstance(raw_value, str) else raw_value
+        elif isinstance(raw_value, list):
+            result[key] = list(_dynamic_string_list(raw_value, limit=8, max_chars=80))
+    return result
+
+
+def _dynamic_query_plan(arguments: dict[str, Any], query: str) -> AgentQueryPlan:
+    task_label = _dynamic_text(arguments.get("task_label"), max_chars=100) or "自主学习任务"
+    course_terms = _dynamic_string_list(arguments.get("course_terms"), limit=6, max_chars=60)
+    evidence_goals = _dynamic_string_list(arguments.get("evidence_goals"), limit=10, max_chars=160)
+    response_preferences = _dynamic_string_list(
+        arguments.get("response_preferences"), limit=10, max_chars=160
+    )
+    search_terms = tuple(dict.fromkeys(re.findall(r"[A-Za-z0-9_\-]+|[\u4e00-\u9fff]{2,}", query)))[:12]
+    return AgentQueryPlan(
+        intent=task_label,
+        confidence=1.0,
+        course_terms=course_terms,
+        resource_types=(),
+        years=tuple(dict.fromkeys(re.findall(r"(?:19|20)\d{2}", query)))[:8],
+        search_terms=search_terms,
+        evidence_tasks=evidence_goals,
+        response_guidance=response_preferences,
+        study_constraints=_dynamic_mapping(arguments.get("constraints")),
+    )
 
 
 def _agent_retrieval_query(query: str, context_query: str | None) -> str:
@@ -2889,245 +3380,6 @@ def _safe_text_list(value: Any) -> list[str]:
         if len(result) >= 6:
             break
     return result
-
-
-def _local_cps_two_week_plan_answer(
-    query: str,
-    query_plan: AgentQueryPlan | None,
-    recommendations: list[dict[str, Any]],
-) -> str:
-    if not _is_cps_two_week_plan_request(query, query_plan):
-        return ""
-    titles = _cps_plan_titles(recommendations)
-    exam_title = titles[0]
-    lecture_title = titles[1]
-    notes_title = titles[2]
-    return (
-        "可以。下面按“基础一般、两周后考通信原理”来排 14 天复习计划。"
-        f"资料只用通信原理相关内容：先看《{notes_title}》和《{lecture_title}》补框架，再用《{exam_title}》刷真题和核对解析；这里基于候选资料元数据给出保守建议。\n\n"
-        "第 1 天：搭框架。整理调制、解调、频谱、带宽、信噪比、误码率这些核心概念，先知道每章在考什么。\n"
-        "第 2 天：补基础公式。把常用公式、适用条件和单位写成一页表，配 3-5 道基础例题。\n"
-        "第 3 天：看助教讲义 Part3。重点标出题干常出现的关键词和公式入口。\n"
-        "第 4 天：看助教讲义 Part4。把不会的推导和计算步骤单独列成问题清单。\n"
-        "第 5 天：刷第一套真题。不限时，目标是看懂题型和答案解析，不追求速度。\n"
-        "第 6 天：复盘第一套真题。按“概念不会、公式选错、计算失误、读题偏差”分类错题。\n"
-        "第 7 天：补第一轮短板。只处理前 6 天暴露出的 2-3 个薄弱模块。\n"
-        "第 8 天：刷第二套真题。开始计时，先保证基础题和中档题稳定拿分。\n"
-        "第 9 天：按题型归纳。把高频计算题、证明/推导题、概念判断题各整理一个答题模板。\n"
-        "第 10 天：刷第三套真题。重点练答题步骤和书写格式，减少会做但丢分的问题。\n"
-        "第 11 天：集中复盘错题。每道错题写清楚错因、正确公式、下次识别信号。\n"
-        "第 12 天：做一次模拟。按考试时长完成一套题，做完立刻对答案并标出最后漏洞。\n"
-        "第 13 天：压缩资料。只看公式表、错题清单和高频题型，不再扩展新资料。\n"
-        "第 14 天：轻量回顾。上午过核心公式和错因，下午做少量典型题保持手感，晚上停止高强度刷题。\n\n"
-        "每天最低完成标准：看完一个模块、做完一组题、记录 3 个错因。基础一般时不要追求资料全看完，先保证核心概念能复述、常见题型有步骤、错题原因能复盘。"
-    )
-
-
-def _local_contextual_followup_answer(
-    query: str,
-    conversation_context: str | None,
-    query_plan: AgentQueryPlan | None,
-) -> str:
-    context = _compact_agent_context(conversation_context)
-    if not context:
-        return ""
-    normalized = re.sub(r"\s+", "", str(query or "")).lower()
-    is_cps_context = "通信原理" in context or "cps" in context.lower()
-    two_week_plan_markers = ("两周复习计划", "两周计划", "两周复习安排", "14天复习", "十四天复习", "复习计划", "备考计划")
-    if is_cps_context and any(marker in normalized for marker in ("两周复习计划", "两周复习安排", "14天复习", "十四天复习")):
-        return (
-            "可以。下面按“基础一般、两周后考通信原理”来排 14 天复习计划。"
-            "资料使用顺序保持上一轮建议：先用手写笔记或讲义补框架，再用 CPS/通信原理真题和答案解析刷题复盘。\n\n"
-            "第 1 天：搭框架。整理调制、解调、频谱、带宽、信噪比、误码率这些核心概念。\n"
-            "第 2 天：补基础公式。把常用公式、适用条件和单位写成一页表。\n"
-            "第 3 天：看助教讲义 Part3，标出题干关键词和公式入口。\n"
-            "第 4 天：看助教讲义 Part4，把不会的推导和计算步骤列成问题清单。\n"
-            "第 5 天：刷第一套真题，不限时，先看懂题型和答案解析。\n"
-            "第 6 天：复盘第一套真题，按错因分类。\n"
-            "第 7 天：补第一轮短板，只处理最薄弱的 2-3 个模块。\n"
-            "第 8 天：刷第二套真题，开始计时。\n"
-            "第 9 天：按题型归纳高频计算题、证明/推导题和概念判断题。\n"
-            "第 10 天：刷第三套真题，重点练步骤书写和公式选择。\n"
-            "第 11 天：集中复盘错题，写清楚错因和正确入口。\n"
-            "第 12 天：做一次完整模拟，严格按考试时长。\n"
-            "第 13 天：压缩资料，只看公式表、错题清单和高频题型。\n"
-            "第 14 天：轻量回顾核心公式和错因，少量典型题保持手感。\n\n"
-            "每天最低完成标准：看完一个模块、做完一组题、记录 3 个错因。"
-        )
-    if any(marker in normalized for marker in two_week_plan_markers):
-        return _local_contextual_two_week_plan_answer(context)
-    if is_cps_context and any(marker in normalized for marker in ("第1-7天", "1-7天", "每天两小时", "每天2小时")):
-        return (
-            "可以。下面把前 7 天按“每天约 2 小时”细化，目标是先把通信原理框架搭起来，再进入真题。\n\n"
-            "- 第 1 天：40 分钟过课程目录和核心概念，50 分钟整理调制、解调、频谱、带宽、信噪比，30 分钟写一页问题清单。\n"
-            "- 第 2 天：45 分钟整理常用公式和适用条件，45 分钟做 3-5 道基础计算题，30 分钟复盘单位和代入步骤。\n"
-            "- 第 3 天：60 分钟看 Part3 助教讲义，40 分钟标出题干关键词，20 分钟记录不会的推导。\n"
-            "- 第 4 天：60 分钟看 Part4 助教讲义，40 分钟补公式入口，20 分钟整理易混点。\n"
-            "- 第 5 天：90 分钟刷第一套真题，30 分钟只标错因，不急着重做。\n"
-            "- 第 6 天：60 分钟对答案解析，40 分钟按题型归类错题，20 分钟回查讲义对应模块。\n"
-            "- 第 7 天：70 分钟补最弱的 2 个模块，30 分钟做同类题，20 分钟整理下一周冲刺清单。\n\n"
-            "这 7 天不要追求刷题量，重点是形成“概念入口 -> 公式选择 -> 计算步骤 -> 错因复盘”的闭环。"
-        )
-    if is_cps_context and any(marker in normalized for marker in ("第8-14天", "8-14天", "冲刺刷题", "改成冲刺")):
-        return (
-            "可以。第 8-14 天改成冲刺刷题版，重点从“补框架”切到“限时训练 + 错题收束”。\n\n"
-            "- 第 8 天：限时刷第二套真题，先保基础题和中档题正确率。\n"
-            "- 第 9 天：按题型复盘，把计算题、证明/推导题、概念判断题各写一个答题模板。\n"
-            "- 第 10 天：限时刷第三套真题，训练步骤书写和公式选择。\n"
-            "- 第 11 天：集中复盘错题，只处理反复错的知识点和公式入口。\n"
-            "- 第 12 天：做一次完整模拟，严格计时，做完立即对答案。\n"
-            "- 第 13 天：压缩资料，只看公式表、错题清单和高频题型，不再扩展新资料。\n"
-            "- 第 14 天：轻量回顾，上午过核心公式，下午做少量典型题保持手感，晚上停止高强度刷题。\n\n"
-            "冲刺阶段的标准不是“看完所有资料”，而是把会做的题稳定拿分，把高频错因降到最低。"
-        )
-    if is_cps_context and any(marker in normalized for marker in ("只看真题", "真题和讲义", "只看讲义")):
-        return (
-            "可以。如果只看真题和讲义，建议顺序压缩成三步：\n\n"
-            "1. 先用《CPS-通信原理-Part3&4-助教讲义》补公式入口和章节框架，只标出会直接影响做题的概念。\n"
-            "2. 再用《CPS六年期末考答案自制（2019-2024）》或通信原理真题解析按年份刷题，先不限时看题型，再限时训练。\n"
-            "3. 最后把每套题的错因回写到讲义对应章节，形成“真题题型 -> 讲义知识点 -> 公式步骤”的复盘表。\n\n"
-            "如果时间很紧，讲义只看 Part3/Part4 中能直接解释真题错题的部分，不做大范围泛读。"
-        )
-    if is_cps_context and any(marker in normalized for marker in ("每日学习顺序", "排成每日", "学习顺序")):
-        return (
-            "可以。按资料使用顺序排，每天都遵循“讲义/笔记补入口 -> 真题验证 -> 错题回查”的节奏：\n\n"
-            "- 第 1-2 天：先看《通信原理手写笔记》或讲义，整理核心概念和公式表。\n"
-            "- 第 3-4 天：看《CPS-通信原理-Part3&4-助教讲义》，把题干关键词和公式入口对应起来。\n"
-            "- 第 5-6 天：刷第一套真题并对答案解析，记录错因。\n"
-            "- 第 7 天：回查讲义，补第一轮短板。\n"
-            "- 第 8-10 天：继续刷真题，按题型归纳模板。\n"
-            "- 第 11-12 天：做限时模拟并复盘。\n"
-            "- 第 13-14 天：只看错题、公式表和高频题型，收束复习范围。\n\n"
-            "这样排的好处是每份资料都有明确用途：笔记搭框架，讲义补入口，真题和解析负责验证。"
-        )
-    if query_plan and query_plan.intent == "study_plan":
-        return (
-            "可以。我会沿用上一轮课程和资料上下文继续细化，不重新把这句话当关键词检索。"
-            "建议先把复习任务拆成“补框架、刷题、复盘”三段：前段确认课程范围和核心公式，中段按题型做题，后段只处理错题和高频薄弱点。"
-            "如果需要每日版，可以继续说“按每天两小时细化”。"
-        )
-    if any(marker in normalized for marker in ("展开", "细化", "更详细", "继续", "接着", "排个顺序", "列成清单")):
-        return (
-            "可以。我会沿用上一轮 StudyHub 资料和回答继续细化，不重新把这句话当成独立关键词。"
-            "建议按“先确认目标、再拆步骤、最后列检查项”的方式推进；如果上一轮已有推荐资料，就优先围绕那些资料安排阅读和复盘顺序。"
-        )
-    return ""
-
-
-def _local_contextual_two_week_plan_answer(context: str) -> str:
-    course_label = _agent_context_course_label(context) or "这门课"
-    titles = _agent_context_material_titles(context)
-    if titles:
-        material_hint = f"资料使用顺序建议先看《{titles[0]}》"
-        if len(titles) >= 2:
-            material_hint += f"，再结合《{titles[1]}》"
-        if len(titles) >= 3:
-            material_hint += f"和《{titles[2]}》"
-        material_hint += "做题型训练和复盘。"
-    else:
-        material_hint = "资料使用顺序建议先用上一轮推荐资料补框架，再用真题、样卷或解析类资料训练。"
-    return (
-        f"可以。下面沿用上一轮 {course_label} 的资料上下文，不重新把这句话当关键词检索，"
-        "按“基础一般、两周后考试”排一个 14 天复习计划。"
-        f"{material_hint}\n\n"
-        "**第 1-3 天：补框架**\n"
-        "- 第 1 天：先过课程目录、考试范围和上一轮推荐资料的标题/简介，确认这门课主要考什么。\n"
-        "- 第 2 天：整理核心概念、常用公式或常见设计步骤，把不会的点列成问题清单。\n"
-        "- 第 3 天：用笔记、讲义或速成资料补基础，只记录能直接影响做题的知识入口。\n\n"
-        "**第 4-7 天：按题型训练**\n"
-        "- 第 4 天：从真题、样卷或解析资料里拆出常见题型，先看题型结构，不急着追求速度。\n"
-        "- 第 5 天：专项练最基础的一类题，要求能写清楚解题入口、步骤和结论。\n"
-        "- 第 6 天：专项练中档题，把卡住的知识点回查到对应讲义或笔记。\n"
-        "- 第 7 天：复盘前半周错因，整理一页“题型 -> 解题入口 -> 易错点”。\n\n"
-        "**第 8-12 天：真题/样卷冲刺**\n"
-        "- 第 8 天：限时做一套真题或样卷，先保证基础题和模板题稳定得分。\n"
-        "- 第 9 天：对照答案解析复盘，把错题按概念不会、入口选错、步骤不完整、粗心失误分类。\n"
-        "- 第 10 天：再做一套题，重点训练答题顺序和书写完整度。\n"
-        "- 第 11 天：集中处理反复出错的 2-3 个模块，不再大范围扩展新资料。\n"
-        "- 第 12 天：做一次完整模拟，严格计时，做完立刻标出最后漏洞。\n\n"
-        "**第 13-14 天：收束复盘**\n"
-        "- 第 13 天：只看错题清单、公式/模板表和高频题型，压缩复习范围。\n"
-        "- 第 14 天：轻量回顾核心概念和错因，少量典型题保持手感，晚上停止高强度刷题。\n\n"
-        "最低完成标准：每天完成一个模块复习、一组题型训练、三条错因记录。基础一般时不要追求资料全看完，先保证核心概念能复述、常见题型有步骤、错题原因能复盘。"
-    )
-
-
-def _agent_context_course_label(context: str) -> str:
-    normalized = context.lower()
-    for label in ("电子系统设计", "通信原理", "信号与系统", "数据结构", "概率论", "高数下", "高等数学", "微积分"):
-        aliases = QUERY_TERM_ALIASES.get(label, (label,))
-        if any(alias.lower() in normalized for alias in aliases):
-            return "高等数学" if label in {"高数下", "微积分"} else label
-    return ""
-
-
-def _is_cps_two_week_plan_request(query: str, query_plan: AgentQueryPlan | None) -> bool:
-    if query_plan is None:
-        return False
-    if not _is_cps_course_plan(query_plan):
-        return False
-    normalized = re.sub(r"\s+", "", str(query or "")).lower()
-    has_plan_marker = any(marker in normalized for marker in ("复习计划", "复习安排", "学习计划", "备考计划", "冲刺计划", "整理成计划"))
-    has_action_marker = any(marker in normalized for marker in ("帮我", "整理", "安排", "计划"))
-    if not has_plan_marker or not has_action_marker:
-        return False
-    constraints = getattr(query_plan, "study_constraints", {}) or {}
-    days = _safe_positive_int(constraints.get("days_until_exam")) if isinstance(constraints, dict) else None
-    return days == 14 or any(marker in normalized for marker in ("两周", "二周", "14天", "十四天"))
-
-
-def _is_cps_course_plan(query_plan: AgentQueryPlan | None) -> bool:
-    if query_plan is None:
-        return False
-    course_terms = {str(term).strip().lower() for term in getattr(query_plan, "course_terms", ()) if str(term).strip()}
-    return "通信原理" in course_terms or "cps" in course_terms
-
-
-def _query_plan_has_two_week_constraint(query_plan: AgentQueryPlan | None) -> bool:
-    constraints = getattr(query_plan, "study_constraints", {}) if query_plan else {}
-    if not isinstance(constraints, dict):
-        return False
-    return _safe_positive_int(constraints.get("days_until_exam")) == 14
-
-
-def _cps_plan_titles(recommendations: list[dict[str, Any]]) -> list[str]:
-    recommendation_titles = [" ".join(str(item.get("title") or "").split()) for item in recommendations]
-
-    def pick(markers: tuple[str, ...], fallback: str) -> str:
-        for title in recommendation_titles:
-            normalized = title.lower()
-            if _is_cps_title(title) and any(marker.lower() in normalized for marker in markers):
-                return title
-        return fallback
-
-    return [
-        pick(("真题", "答案", "解析", "期末", "考"), "CPS六年期末考答案自制（2019-2024）"),
-        pick(("讲义", "part3", "part4", "助教"), "CPS-通信原理-Part3&4-助教讲义"),
-        pick(("笔记", "手写"), "通信原理手写笔记"),
-    ]
-
-
-def _filter_cps_plan_recommendations(recommendations: Any) -> list[dict[str, Any]]:
-    if not isinstance(recommendations, list):
-        return []
-    filtered: list[dict[str, Any]] = []
-    for item in recommendations:
-        if not isinstance(item, dict):
-            continue
-        searchable = " ".join(
-            [
-                str(item.get("title") or ""),
-                str(item.get("summary") or ""),
-            ]
-        )
-        if _is_cps_title(searchable):
-            filtered.append(item)
-    return filtered[:3]
-
-
-def _is_cps_title(value: str) -> bool:
-    normalized = re.sub(r"\s+", "", str(value or "")).lower()
-    return "cps" in normalized or "通信原理" in normalized
 
 
 def _default_followups() -> list[str]:

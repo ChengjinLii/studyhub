@@ -187,6 +187,31 @@ def test_pdf_evidence_allows_paid_material_uploaded_by_current_user() -> None:
     assert store.read_keys == ["materials/demo.pdf"]
 
 
+def test_dynamic_pdf_evidence_can_read_requested_page_beyond_default_result_limit() -> None:
+    pages = "\n".join(
+        f"/Type /Page (第{i}页 通信原理 能控性 公式 推导 例题)" for i in range(1, 26)
+    )
+    store = _FakeAssetStore(f"%PDF-1.4\n{pages}".encode())
+    service = MaterialPdfEvidenceService(
+        _settings(ai_agent_pdf_evidence_max_pages=3, ai_agent_pdf_extract_max_pages=25),
+        store,
+    )  # type: ignore[arg-type]
+
+    evidence = service.collect_for_materials(
+        [_material()],
+        "能控性公式推导",
+        current_user_id=7,
+        force=True,
+        max_materials=1,
+        max_results=2,
+        page_numbers={20},
+    )
+
+    assert [(item.page, item.text) for item in evidence] == [
+        (20, "第20页 通信原理 能控性 公式 推导 例题")
+    ]
+
+
 def test_pdf_evidence_missing_file_key_does_not_consume_scan_budget() -> None:
     store = _FakeAssetStore()
     service = MaterialPdfEvidenceService(_settings(ai_agent_pdf_evidence_max_materials=1), store)  # type: ignore[arg-type]

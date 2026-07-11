@@ -126,7 +126,7 @@ class AgentSafetyService:
             if not evidence_sources:
                 evidence_sources = self._fallback_evidence_sources(pdf_evidence)
             answer = self._ensure_answer_has_source_hint(answer, evidence_sources)
-        elif answer:
+        elif answer and _answer_uses_platform_evidence(answer, candidate_materials):
             answer = self._ensure_low_evidence_caveat(answer)
 
         if answer and _answer_mentions_unscoped_material_id(answer, allowed_material_ids):
@@ -169,7 +169,7 @@ class AgentSafetyService:
             if not evidence_sources:
                 evidence_sources = self._fallback_evidence_sources(pdf_evidence)
             answer = self._ensure_answer_has_source_hint(answer, evidence_sources)
-        elif answer:
+        elif answer and _answer_uses_platform_evidence(answer, candidate_materials):
             answer = self._ensure_low_evidence_caveat(answer)
 
         sanitized: dict[str, Any] = {}
@@ -636,6 +636,23 @@ def _title_matches_allowed_scope(title: str, allowed_titles: list[str]) -> bool:
 
 def _normalize_title_for_scope(title: str) -> str:
     return re.sub(r"[^0-9a-zA-Z\u4e00-\u9fff]+", "", title).lower()
+
+
+def _answer_uses_platform_evidence(answer: str, candidate_materials: list[MaterialRecord]) -> bool:
+    if candidate_materials:
+        return True
+    normalized = re.sub(r"\s+", "", answer).lower()
+    return any(
+        marker in normalized
+        for marker in (
+            "studyhub",
+            "平台资料",
+            "候选资料",
+            "资料库",
+            "pdf",
+            "页级证据",
+        )
+    )
 
 
 def _answer_overclaims_pdf_evidence(answer: str) -> bool:
