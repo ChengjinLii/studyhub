@@ -87,9 +87,17 @@ def required_scope_for_tool(settings: Settings, tool_name: str) -> str | None:
 
 
 def _required_scopes_for_protocol_method(settings: Settings, method: str) -> set[str] | None:
-    del settings
     if method in {"initialize", "notifications/initialized", "ping", "tools/list"}:
-        return set(public_mcp_scopes())
+        # Tool discovery must remain available to integrations that still use
+        # the previous read-only scope names. Individual tool calls continue
+        # to enforce their own narrower scope set below.
+        return {
+            *public_mcp_scopes(),
+            DISCOVER_PUBLIC_MATERIALS_SCOPE,
+            RECOMMEND_PUBLIC_MATERIALS_SCOPE,
+            READ_PUBLIC_MATERIAL_SUMMARY_SCOPE,
+            settings.mcp_read_scope,
+        }
     return None
 
 

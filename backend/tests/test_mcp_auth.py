@@ -340,3 +340,23 @@ def test_mcp_legacy_discovery_scope_remains_valid_during_scope_migration(scoped_
 
     assert response.status_code == 200
     assert response.json()["result"]["structuredContent"]["items"]
+
+
+def test_mcp_legacy_discovery_scope_can_list_public_tools(scoped_mcp_client: TestClient) -> None:
+    response = scoped_mcp_client.post(
+        "/mcp",
+        headers={
+            "Accept": "application/json, text/event-stream",
+            "Content-Type": "application/json",
+            "Authorization": "Bearer legacy-token",
+        },
+        json={"jsonrpc": "2.0", "id": 1, "method": "tools/list", "params": {}},
+    )
+
+    assert response.status_code == 200
+    assert {tool["name"] for tool in response.json()["result"]["tools"]} == {
+        "materials.search",
+        "materials.get",
+        "materials.recommend",
+        "platform.policy",
+    }
