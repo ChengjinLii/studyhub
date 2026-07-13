@@ -40,8 +40,8 @@ def test_mcp_initialize_returns_server_capabilities(client: TestClient) -> None:
     assert body["id"] == 1
     assert body["result"]["serverInfo"]["name"] == "StudyHub MCP"
     assert "tools" in body["result"]["capabilities"]
-    assert "resources" in body["result"]["capabilities"]
-    assert "prompts" in body["result"]["capabilities"]
+    assert "resources" not in body["result"]["capabilities"]
+    assert "prompts" not in body["result"]["capabilities"]
 
 
 def test_mcp_oauth_protected_resource_metadata(client: TestClient) -> None:
@@ -51,36 +51,21 @@ def test_mcp_oauth_protected_resource_metadata(client: TestClient) -> None:
     body = response.json()
     assert body["resource"].endswith("/mcp")
     assert body["bearer_methods_supported"] == ["header"]
-    assert {
-        "mcp:discover_public_materials",
-        "mcp:recommend_public_materials",
-        "mcp:read_public_material_summary",
-    }.issubset(set(body["scopes_supported"]))
+    assert set(body["scopes_supported"]) == {
+        "mcp:materials.search",
+        "mcp:materials.read",
+        "mcp:materials.recommend",
+        "mcp:policy.read",
+    }
+    assert body["resource_name"] == "StudyHub MCP"
+    assert body["resource_documentation"].endswith("/MCP.md")
+    assert "authorization_servers" not in body
 
 
-def test_mcp_tools_list_exposes_v0_read_tools(client: TestClient) -> None:
+def test_mcp_tools_list_exposes_only_public_material_and_policy_tools(client: TestClient) -> None:
     response = mcp_call(client, "tools/list")
 
     assert response.status_code == 200
     tools = response.json()["result"]["tools"]
     names = {tool["name"] for tool in tools}
-    assert {
-        "search",
-        "fetch",
-        "materials.search",
-        "materials.discover",
-        "materials.get",
-        "materials.summarize",
-        "materials.recommend",
-        "materials.recommend_public",
-        "requests.search",
-        "requests.get",
-        "requests.leaderboard",
-        "market.search",
-        "market.get",
-        "leaderboard.contributors",
-    }.issubset(names)
-    assert "health.ready" not in names
-    assert "materials.preview" not in names
-    assert "comments.create" not in names
-    assert "admin.users.search" not in names
+    assert names == {"materials.search", "materials.get", "materials.recommend", "platform.policy"}

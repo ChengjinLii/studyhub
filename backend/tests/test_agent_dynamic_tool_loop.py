@@ -209,3 +209,124 @@ def test_orchestrator_accepts_open_task_and_strategy_labels() -> None:
     assert plan.route == "derive_formula_then_design_mock_exam"
     assert plan.intent == "公式推导与模拟考试设计"
     assert plan.use_context is True
+
+
+def test_dynamic_agent_preserves_model_extracted_context_across_rewritten_searches(monkeypatch) -> None:
+    settings = _settings(ai_agent_tool_max_search_calls=3)
+    monkeypatch.setattr("app.services.ai_service.get_settings", lambda: settings)
+    service = AiService(read_repo=None, material_repo=None)  # type: ignore[arg-type]
+    searched_queries: list[str] = []
+    model_payloads: list[dict[str, Any]] = []
+
+    def fake_rank(session, query, filters):
+        del session, filters
+        searched_queries.append(query)
+        return [_material(801 if len(searched_queries) == 1 else 802)]
+
+    responses = iter(
+        [
+            {
+                "mode": "tools",
+                "task_context": {
+                    "course_terms": ["ESD", "电子系统设计"],
+                    "exam_goal": "两周后完成期末复习",
+                    "time_budget": {"days_until_exam": 14, "daily_hours": 2},
+                    "resource_types": ["样卷", "解析"],
+                    "constraints": ["基础一般"],
+                },
+                "actions": [{"name": "search_materials", "arguments": {"query": "ESD 期末 样卷", "limit": 4}}],
+            },
+            {
+                "mode": "tools",
+                "actions": [
+                    {
+                        "name": "search_materials",
+                        "arguments": {"query": "电子系统设计 样卷 答案解析", "limit": 4},
+                    }
+                ],
+            },
+            {
+                "mode": "final",
+                "answer": "## ESD 复习建议\n\n先建立知识框架，再使用样卷查漏补缺。",
+                "recommendations": [{"material_id": 801, "reason": "与期末目标匹配"}],
+                "followup_questions": ["把两周任务细化到每天两小时"],
+            },
+        ]
+    )
+
+    def fake_model(settings, system_prompt, payload):
+        del settings, system_prompt
+        model_payloads.append(payload)
+        return json.dumps(next(responses), ensure_ascii=False)
+
+    monkeypatch.setattr(service, "_rank_materials", fake_rank)
+    monkeypatch.setattr(service, "_call_agent_model", fake_model)
+
+    response = service.recommend(
+        object(),  # type: ignore[arg-type]
+        SimpleNamespace(query="两周后考 ESD，基础一般，怎么复习？", filters={}, imageAttachments=[]),
+        current_user_id=7,
+    )
+    body = json.loads(str(response["output"]).removeprefix("<json>").removesuffix("</json>"))
+
+    assert searched_queries == ["ESD 期末 样卷", "电子系统设计 样卷 答案解析"]
+    assert model_payloads[1]["task_context"] == {
+        "course_terms": ["ESD", "电子系统设计"],
+        "exam_goal": "两周后完成期末复习",
+        "time_budget": {"days_until_exam": 14.0, "daily_hours": 2.0},
+        "resource_types": ["样卷", "解析"],
+        "constraints": ["基础一般"],
+    }
+    assert model_payloads[2]["search_history"][0]["query"] == "ESD 期末 样卷"
+    assert model_payloads[2]["search_history"][1]["query"] == "电子系统设计 样卷 答案解析"
+    assert model_payloads[2]["budget"]["remaining_search_calls"] == 1
+    assert body["answer"].startswith("## ESD 复习建议")
+
+
+def test_dynamic_agent_enforces_search_budget_without_reclassifying_task(monkeypatch) -> None:
+    settings = _settings(ai_agent_tool_max_search_calls=1)
+    monkeypatch.setattr("app.services.ai_service.get_settings", lambda: settings)
+    service = AiService(read_repo=None, material_repo=None)  # type: ignore[arg-type]
+    searched_queries: list[str] = []
+    model_payloads: list[dict[str, Any]] = []
+    responses = iter(
+        [
+            {
+                "mode": "tools",
+                "task_context": {"course_terms": ["通信原理"], "exam_goal": "期末复习"},
+                "actions": [{"name": "search_materials", "arguments": {"query": "通信原理 真题"}}],
+            },
+            {
+                "mode": "tools",
+                "actions": [{"name": "search_materials", "arguments": {"query": "CPS 期末解析"}}],
+            },
+            {
+                "mode": "final",
+                "answer": "## 通信原理复习\n\n使用当前候选完成第一轮复习。",
+                "recommendations": [{"material_id": 801, "reason": "课程匹配"}],
+            },
+        ]
+    )
+
+    monkeypatch.setattr(
+        service,
+        "_rank_materials",
+        lambda session, query, filters: searched_queries.append(query) or [_material()],
+    )
+
+    def fake_model(settings, system_prompt, payload):
+        del settings, system_prompt
+        model_payloads.append(payload)
+        return json.dumps(next(responses), ensure_ascii=False)
+
+    monkeypatch.setattr(service, "_call_agent_model", fake_model)
+    service.recommend(
+        object(),  # type: ignore[arg-type]
+        SimpleNamespace(query="两周后考通信原理", filters={}, imageAttachments=[]),
+        current_user_id=7,
+    )
+
+    assert searched_queries == ["通信原理 真题"]
+    exhausted = model_payloads[2]["tool_observations"][-1]
+    assert exhausted["result"]["reason"] == "search_budget_exhausted"
+    assert model_payloads[2]["task_context"]["course_terms"] == ["通信原理"]

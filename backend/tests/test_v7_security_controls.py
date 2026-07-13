@@ -156,7 +156,7 @@ def test_mcp_rate_limit_returns_429(strict_security_client: TestClient) -> None:
         "jsonrpc": "2.0",
         "id": 1,
         "method": "tools/call",
-        "params": {"name": "materials.discover", "arguments": {"query": "数据结构", "limit": 1}},
+        "params": {"name": "materials.search", "arguments": {"query": "数据结构", "limit": 1}},
     }
 
     assert strict_security_client.post("/mcp", headers=MCP_HEADERS, json=payload).status_code == 200

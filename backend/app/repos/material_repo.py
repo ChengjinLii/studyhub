@@ -293,26 +293,51 @@ class MaterialRepository:
         match_values: list[str],
         school: str | None,
         major: str | None,
+        college: str | None = None,
+        tag: str | None = None,
         limit: int | None = None,
     ) -> list[MaterialRecord]:
-        search_filters = self._material_text_match_filters(
-            session,
-            match_values=match_values,
-            school=school,
-            major=major,
-        )
-        if not search_filters:
+        search_filters = self._material_text_match_filters(session, match_values=match_values)
+        existing_columns = _table_columns(session, "materials")
+        constraint_filters = []
+        if school and "school" in existing_columns:
+            constraint_filters.append(MaterialRecord.school == school)
+        if college and "college" in existing_columns:
+            constraint_filters.append(
+                func.lower(func.coalesce(MaterialRecord.college, "")).like(
+                    f"%{_escape_like(college.lower())}%",
+                    escape="\\",
+                )
+            )
+        if major and "major" in existing_columns:
+            constraint_filters.append(
+                func.lower(func.coalesce(MaterialRecord.major, "")).like(
+                    f"%{_escape_like(major.lower())}%",
+                    escape="\\",
+                )
+            )
+        if tag and "tags_json" in existing_columns:
+            constraint_filters.append(
+                func.lower(func.coalesce(MaterialRecord.tags_json, "")).like(
+                    f"%{_escape_like(tag.lower())}%",
+                    escape="\\",
+                )
+            )
+        if not search_filters and not constraint_filters:
             if limit is not None:
                 return self.list_visible_materials_for_agent_memory(session, limit=limit)
             return self.list_visible_materials(session)
+        where_filters = [
+            MaterialRecord.deleted_at.is_(None),
+            MaterialRecord.status.not_in(("REMOVED", "HIDDEN")),
+            *constraint_filters,
+        ]
+        if search_filters:
+            where_filters.append(or_(*search_filters))
         stmt = (
             select(MaterialRecord)
             .options(*_material_record_load_options(session))
-            .where(
-                MaterialRecord.deleted_at.is_(None),
-                MaterialRecord.status.not_in(("REMOVED", "HIDDEN")),
-                or_(*search_filters),
-            )
+            .where(*where_filters)
             .order_by(
                 MaterialRecord.download_count.desc(),
                 MaterialRecord.rating_avg.desc(),
@@ -359,8 +384,6 @@ class MaterialRepository:
         session: Session,
         *,
         match_values: list[str],
-        school: str | None,
-        major: str | None,
     ):
         existing_columns = _table_columns(session, "materials")
         filters = []
@@ -387,10 +410,6 @@ class MaterialRepository:
         for value in normalized_values:
             pattern = f"%{_escape_like(value)}%"
             filters.extend(func.lower(func.coalesce(column, "")).like(pattern, escape="\\") for column in search_columns)
-        if school and "school" in existing_columns:
-            filters.append(MaterialRecord.school == school)
-        if major and "major" in existing_columns:
-            filters.append(func.lower(func.coalesce(MaterialRecord.major, "")).like(f"%{_escape_like(major.lower())}%", escape="\\"))
         return tuple(filters)
 
     def count_paid_visible_materials_for_uploader(self, session: Session, uploader_id: int) -> int:

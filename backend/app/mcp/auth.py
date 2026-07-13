@@ -1,105 +1,95 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from functools import lru_cache
+from hashlib import sha256
 import json
 from secrets import compare_digest
+from typing import Any
 
 from fastapi import Request
+import jwt
+from jwt import PyJWKClient
 
 from app.core.config import Settings
+
+
+SEARCH_MATERIALS_SCOPE = "mcp:materials.search"
+READ_MATERIAL_SCOPE = "mcp:materials.read"
+RECOMMEND_MATERIALS_SCOPE = "mcp:materials.recommend"
+READ_PLATFORM_POLICY_SCOPE = "mcp:policy.read"
+
+# Temporary aliases keep already-issued static integration tokens working while
+# clients migrate to the four public OAuth scopes above.
+DISCOVER_PUBLIC_MATERIALS_SCOPE = "mcp:discover_public_materials"
+RECOMMEND_PUBLIC_MATERIALS_SCOPE = "mcp:recommend_public_materials"
+READ_PUBLIC_MATERIAL_SUMMARY_SCOPE = "mcp:read_public_material_summary"
 
 
 @dataclass(frozen=True)
 class McpToolAccess:
     name: str
     scopes: tuple[str, ...]
-    mutating: bool
-    admin: bool = False
 
 
-DISCOVER_PUBLIC_MATERIALS_SCOPE = "mcp:discover_public_materials"
-RECOMMEND_PUBLIC_MATERIALS_SCOPE = "mcp:recommend_public_materials"
-READ_PUBLIC_MATERIAL_SUMMARY_SCOPE = "mcp:read_public_material_summary"
-READ_PUBLIC_LEADERBOARD_SCOPE = "mcp:read_public_leaderboard"
-MCP_OPS_SCOPE = "mcp:ops"
+@dataclass(frozen=True)
+class McpPrincipal:
+    client_id: str
+    subject: str | None
+    scopes: frozenset[str]
+    auth_method: str
+
+    @property
+    def quota_key(self) -> str:
+        digest = sha256(f"{self.auth_method}:{self.client_id}".encode()).hexdigest()[:24]
+        return f"{self.auth_method}:{digest}"
 
 
-def _public_discovery_scopes(settings: Settings) -> tuple[str, ...]:
-    return (settings.mcp_read_scope, DISCOVER_PUBLIC_MATERIALS_SCOPE)
-
-
-def _public_summary_scopes(settings: Settings) -> tuple[str, ...]:
-    return (settings.mcp_read_scope, READ_PUBLIC_MATERIAL_SUMMARY_SCOPE)
-
-
-def _public_recommend_scopes(settings: Settings) -> tuple[str, ...]:
-    return (settings.mcp_read_scope, RECOMMEND_PUBLIC_MATERIALS_SCOPE)
-
-
-def _public_leaderboard_scopes(settings: Settings) -> tuple[str, ...]:
-    return (settings.mcp_read_scope, READ_PUBLIC_LEADERBOARD_SCOPE)
+def public_mcp_scopes() -> tuple[str, ...]:
+    return (
+        SEARCH_MATERIALS_SCOPE,
+        READ_MATERIAL_SCOPE,
+        RECOMMEND_MATERIALS_SCOPE,
+        READ_PLATFORM_POLICY_SCOPE,
+    )
 
 
 def _tool_access_registry(settings: Settings) -> dict[str, McpToolAccess]:
-    registry = {
-        "search": McpToolAccess("search", _public_discovery_scopes(settings), mutating=False),
-        "fetch": McpToolAccess("fetch", _public_summary_scopes(settings), mutating=False),
-        "materials.search": McpToolAccess("materials.search", _public_discovery_scopes(settings), mutating=False),
-        "materials.discover": McpToolAccess("materials.discover", _public_discovery_scopes(settings), mutating=False),
-        "materials.get": McpToolAccess("materials.get", _public_summary_scopes(settings), mutating=False),
-        "materials.summarize": McpToolAccess("materials.summarize", _public_summary_scopes(settings), mutating=False),
-        "materials.recommend": McpToolAccess("materials.recommend", _public_recommend_scopes(settings), mutating=False),
-        "materials.recommend_public": McpToolAccess(
-            "materials.recommend_public",
-            _public_recommend_scopes(settings),
-            mutating=False,
+    read_alias = settings.mcp_read_scope
+    return {
+        "materials.search": McpToolAccess(
+            "materials.search",
+            (SEARCH_MATERIALS_SCOPE, DISCOVER_PUBLIC_MATERIALS_SCOPE, read_alias),
         ),
-        "requests.search": McpToolAccess("requests.search", _public_discovery_scopes(settings), mutating=False),
-        "requests.get": McpToolAccess("requests.get", _public_summary_scopes(settings), mutating=False),
-        "requests.leaderboard": McpToolAccess("requests.leaderboard", _public_leaderboard_scopes(settings), mutating=False),
-        "market.search": McpToolAccess("market.search", _public_discovery_scopes(settings), mutating=False),
-        "market.get": McpToolAccess("market.get", _public_summary_scopes(settings), mutating=False),
-        "leaderboard.contributors": McpToolAccess(
-            "leaderboard.contributors",
-            _public_leaderboard_scopes(settings),
-            mutating=False,
+        "materials.get": McpToolAccess(
+            "materials.get",
+            (READ_MATERIAL_SCOPE, READ_PUBLIC_MATERIAL_SUMMARY_SCOPE, read_alias),
         ),
-        "comments.create": McpToolAccess("comments.create", (settings.mcp_write_scope,), mutating=True),
-        "requests.create": McpToolAccess("requests.create", (settings.mcp_write_scope,), mutating=True),
-        "admin.users.search": McpToolAccess("admin.users.search", (settings.mcp_admin_scope,), mutating=False, admin=True),
-        "admin.reports.search": McpToolAccess("admin.reports.search", (settings.mcp_admin_scope,), mutating=False, admin=True),
+        "materials.recommend": McpToolAccess(
+            "materials.recommend",
+            (RECOMMEND_MATERIALS_SCOPE, RECOMMEND_PUBLIC_MATERIALS_SCOPE, read_alias),
+        ),
+        "platform.policy": McpToolAccess(
+            "platform.policy",
+            (READ_PLATFORM_POLICY_SCOPE, read_alias),
+        ),
     }
-    if settings.mcp_expose_ops_tools:
-        registry["health.ready"] = McpToolAccess("health.ready", (MCP_OPS_SCOPE,), mutating=False)
-    return registry
 
 
 def required_scopes_for_tool(settings: Settings, tool_name: str) -> set[str] | None:
     access = _tool_access_registry(settings).get(tool_name)
-    if access is None:
-        return None
-    return set(access.scopes)
+    return set(access.scopes) if access else None
 
 
 def required_scope_for_tool(settings: Settings, tool_name: str) -> str | None:
     scopes = required_scopes_for_tool(settings, tool_name)
-    if not scopes:
-        return None
-    return sorted(scopes)[0]
+    return sorted(scopes)[0] if scopes else None
 
 
 def _required_scopes_for_protocol_method(settings: Settings, method: str) -> set[str] | None:
-    public_list_scopes = {
-        settings.mcp_read_scope,
-        DISCOVER_PUBLIC_MATERIALS_SCOPE,
-        RECOMMEND_PUBLIC_MATERIALS_SCOPE,
-        READ_PUBLIC_MATERIAL_SUMMARY_SCOPE,
-        READ_PUBLIC_LEADERBOARD_SCOPE,
-    }
-    if method in {"initialize", "tools/list", "prompts/list", "prompts/get"}:
-        return public_list_scopes
-    if method in {"resources/list", "resources/templates/list", "resources/read"}:
-        return {settings.mcp_read_scope, READ_PUBLIC_MATERIAL_SUMMARY_SCOPE}
+    del settings
+    if method in {"initialize", "notifications/initialized", "ping", "tools/list"}:
+        return set(public_mcp_scopes())
     return None
 
 
@@ -138,14 +128,95 @@ def _bearer_token(request: Request) -> str | None:
     return clean_token or None
 
 
-def scopes_for_request(settings: Settings, request: Request) -> set[str] | None:
+def _static_principal(settings: Settings, token: str) -> McpPrincipal | None:
+    for configured_token, scopes in _parse_access_tokens(settings):
+        if compare_digest(token, configured_token):
+            token_id = sha256(configured_token.encode()).hexdigest()[:20]
+            return McpPrincipal(
+                client_id=f"static-{token_id}",
+                subject=None,
+                scopes=frozenset(scopes),
+                auth_method="static",
+            )
+    return None
+
+
+@lru_cache(maxsize=8)
+def _oauth_jwks_client(jwks_uri: str) -> PyJWKClient:
+    return PyJWKClient(
+        jwks_uri,
+        cache_keys=True,
+        max_cached_keys=16,
+        cache_jwk_set=True,
+        lifespan=300,
+        timeout=5,
+    )
+
+
+def _oauth_signing_key(jwks_uri: str, token: str) -> Any:
+    return _oauth_jwks_client(jwks_uri).get_signing_key_from_jwt(token).key
+
+
+def _oauth_scopes(claims: dict[str, Any]) -> frozenset[str]:
+    raw_scope = claims.get("scope")
+    values: list[str] = []
+    if isinstance(raw_scope, str):
+        values.extend(raw_scope.split())
+    raw_scp = claims.get("scp")
+    if isinstance(raw_scp, str):
+        values.extend(raw_scp.split())
+    elif isinstance(raw_scp, list):
+        values.extend(str(item) for item in raw_scp)
+    return frozenset(value.strip() for value in values if value.strip())
+
+
+def _oauth_principal(settings: Settings, token: str) -> McpPrincipal | None:
+    if not (settings.mcp_oauth_jwks_uri and settings.mcp_oauth_issuer):
+        return None
+    try:
+        signing_key = _oauth_signing_key(settings.mcp_oauth_jwks_uri, token)
+        claims = jwt.decode(
+            token,
+            signing_key,
+            algorithms=settings.resolved_mcp_oauth_algorithms,
+            audience=settings.resolved_mcp_oauth_audience,
+            issuer=settings.mcp_oauth_issuer,
+            options={"require": ["exp", "iat", "iss", "aud", "sub"]},
+        )
+    except (jwt.PyJWTError, ValueError, TypeError):
+        return None
+    scopes = _oauth_scopes(dict(claims))
+    client_id = str(claims.get("client_id") or claims.get("azp") or claims.get("sub") or "").strip()
+    subject = str(claims.get("sub") or "").strip()
+    if not client_id or not subject or not scopes:
+        return None
+    return McpPrincipal(
+        client_id=client_id[:160],
+        subject=subject[:200],
+        scopes=scopes,
+        auth_method="oauth",
+    )
+
+
+def authenticate_mcp_request(settings: Settings, request: Request) -> McpPrincipal | None:
+    cached = getattr(request.state, "mcp_principal", None)
+    if isinstance(cached, McpPrincipal):
+        return cached
     token = _bearer_token(request)
     if not token:
         return None
-    for configured_token, scopes in _parse_access_tokens(settings):
-        if compare_digest(token, configured_token):
-            return scopes
-    return None
+    mode = settings.resolved_mcp_auth_mode
+    principal = _static_principal(settings, token) if mode in {"static", "hybrid"} else None
+    if principal is None and mode in {"oauth", "hybrid"}:
+        principal = _oauth_principal(settings, token)
+    if principal is not None:
+        request.state.mcp_principal = principal
+    return principal
+
+
+def scopes_for_request(settings: Settings, request: Request) -> set[str] | None:
+    principal = authenticate_mcp_request(settings, request)
+    return set(principal.scopes) if principal else None
 
 
 async def _json_rpc_payload(request: Request) -> dict | list | None:
@@ -160,9 +231,7 @@ async def _json_rpc_payload(request: Request) -> dict | list | None:
 
 async def requested_tool_name(request: Request) -> str | None:
     payload = await _json_rpc_payload(request)
-    if not isinstance(payload, dict):
-        return None
-    if payload.get("method") != "tools/call":
+    if not isinstance(payload, dict) or payload.get("method") != "tools/call":
         return None
     params = payload.get("params")
     if not isinstance(params, dict):
@@ -182,19 +251,14 @@ async def required_scopes_for_request(settings: Settings, request: Request) -> s
             return method_scopes
     if method == "tools/call":
         params = payload.get("params")
-        if not isinstance(params, dict):
-            return None
-        tool_name = params.get("name")
-        if isinstance(tool_name, str):
-            return required_scopes_for_tool(settings, tool_name)
+        if isinstance(params, dict) and isinstance(params.get("name"), str):
+            return required_scopes_for_tool(settings, params["name"])
     return None
 
 
 async def required_scope_for_request(settings: Settings, request: Request) -> str | None:
     scopes = await required_scopes_for_request(settings, request)
-    if not scopes:
-        return None
-    return sorted(scopes)[0]
+    return sorted(scopes)[0] if scopes else None
 
 
 def _scope_allowed(granted_scopes: set[str], required_scopes: set[str]) -> bool:
@@ -207,16 +271,32 @@ async def mcp_request_allowed(settings: Settings, request: Request) -> tuple[boo
     payload = await _json_rpc_payload(request)
     if isinstance(payload, list):
         return False, "MCP batch requests are not allowed"
-    if not settings.resolved_mcp_require_auth:
-        return True, None
-    if not _parse_access_tokens(settings):
-        return False, "MCP access token is not configured"
-    scopes = scopes_for_request(settings, request)
-    if scopes is None:
-        return False, "MCP authentication required"
     required_scopes = await required_scopes_for_request(settings, request)
     if required_scopes is None:
         return False, "MCP method or tool is not allowed"
-    if not _scope_allowed(scopes, required_scopes):
+    if not settings.resolved_mcp_require_auth:
+        request.state.mcp_principal = McpPrincipal(
+            client_id="anonymous",
+            subject=None,
+            scopes=frozenset(public_mcp_scopes()),
+            auth_method="anonymous",
+        )
+        return True, None
+    principal = authenticate_mcp_request(settings, request)
+    if principal is None:
+        return False, "MCP authentication required"
+    if not _scope_allowed(set(principal.scopes), required_scopes):
         return False, "MCP scope is not allowed"
     return True, None
+
+
+def mcp_audit_identity(request: Request) -> dict[str, str | None]:
+    principal = getattr(request.state, "mcp_principal", None)
+    if not isinstance(principal, McpPrincipal):
+        return {"client_id": None, "subject_hash": None, "auth_method": None}
+    subject_hash = sha256(principal.subject.encode()).hexdigest()[:16] if principal.subject else None
+    return {
+        "client_id": principal.client_id[:80],
+        "subject_hash": subject_hash,
+        "auth_method": principal.auth_method,
+    }

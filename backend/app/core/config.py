@@ -85,12 +85,19 @@ class Settings(BaseSettings):
     mcp_enabled: bool | None = None
     mcp_allowed_origins: str | None = None
     mcp_require_auth: bool | None = None
+    mcp_auth_mode: str = "static"
     mcp_access_token: str | None = None
     mcp_access_tokens: str | None = None
     mcp_read_scope: str = "studyhub.read"
-    mcp_write_scope: str = "studyhub.write"
-    mcp_admin_scope: str = "studyhub.admin"
-    mcp_expose_ops_tools: bool = False
+    mcp_oauth_authorization_servers: str | None = None
+    mcp_oauth_issuer: str | None = None
+    mcp_oauth_jwks_uri: str | None = None
+    mcp_oauth_audience: str | None = None
+    mcp_oauth_algorithms: str = "RS256,ES256"
+    mcp_resource_documentation_url: str | None = None
+    mcp_client_rate_limit: int = 60
+    mcp_client_quota: int = 1000
+    mcp_client_quota_window_seconds: int = 86400
     ai_agent_provider: str = "local"
     ai_agent_base_url: str | None = None
     ai_agent_api_key: str | None = None
@@ -102,6 +109,7 @@ class Settings(BaseSettings):
     ai_agent_dynamic_tools_enabled: bool = False
     ai_agent_tool_max_rounds: int = 4
     ai_agent_tool_max_calls: int = 8
+    ai_agent_tool_max_search_calls: int = 3
     ai_agent_tool_max_candidates: int = 18
     ai_agent_tool_max_evidence_pages: int = 12
     ai_agent_orchestrator_provider: str | None = None
@@ -446,6 +454,30 @@ class Settings(BaseSettings):
         if self.mcp_require_auth is not None:
             return bool(self.mcp_require_auth)
         return self.is_preview or self.is_production
+
+    @property
+    def resolved_mcp_auth_mode(self) -> str:
+        return (self.mcp_auth_mode or "static").strip().lower()
+
+    @property
+    def resolved_mcp_oauth_authorization_servers(self) -> list[str]:
+        return self._split_csv(self.mcp_oauth_authorization_servers)
+
+    @property
+    def resolved_mcp_oauth_algorithms(self) -> list[str]:
+        allowed = {"RS256", "RS384", "RS512", "ES256", "ES384", "ES512", "EdDSA"}
+        return [item for item in self._split_csv(self.mcp_oauth_algorithms) if item in allowed] or ["RS256", "ES256"]
+
+    @property
+    def resolved_mcp_oauth_audience(self) -> str:
+        return (self.mcp_oauth_audience or f"{self.resolved_public_site_base_url}/mcp").strip()
+
+    @property
+    def resolved_mcp_resource_documentation_url(self) -> str:
+        return (
+            self.mcp_resource_documentation_url
+            or "https://github.com/ChengjinLii/studyhub/blob/main/MCP.md"
+        ).strip()
 
     @property
     def resolved_docs_enabled(self) -> bool:

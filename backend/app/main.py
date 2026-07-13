@@ -6,10 +6,10 @@ from contextlib import asynccontextmanager
 from time import perf_counter
 from uuid import uuid4
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from app.api.deps import get_auth_service
@@ -23,7 +23,8 @@ from app.core.origin_guard import write_origin_allowed
 from app.core.rate_limit import rate_limit_allowed
 from app.core.response import api_fail
 from app.core.security_headers import apply_security_headers
-from app.mcp.auth import mcp_request_allowed
+from app.mcp.auth import mcp_audit_identity, mcp_request_allowed, public_mcp_scopes, requested_tool_name
+from app.mcp.governance import check_mcp_client_budget
 from app.mcp.server import create_studyhub_mcp
 
 
@@ -113,6 +114,10 @@ def create_app() -> FastAPI:
         response = None
         status_code = 500
         route_path = request.url.path
+        is_mcp_protocol_request = route_path == "/mcp" or (
+            route_path.startswith("/mcp/") and route_path != "/mcp/docs"
+        )
+        mcp_tool_name = await requested_tool_name(request) if is_mcp_protocol_request else None
 
         def middleware_error_response(code: str, message: str, status: int) -> JSONResponse:
             error_response = JSONResponse(api_fail(code, message), status_code=status)
@@ -149,7 +154,7 @@ def create_app() -> FastAPI:
                 return response
             mcp_allowed, mcp_error = (
                 await mcp_request_allowed(settings, request)
-                if route_path.startswith("/mcp")
+                if is_mcp_protocol_request
                 else (True, None)
             )
             if not mcp_allowed:
@@ -164,6 +169,18 @@ def create_app() -> FastAPI:
                         status_code,
                     )
                 return response
+            if is_mcp_protocol_request:
+                budget_allowed, budget_error, retry_after = check_mcp_client_budget(settings, request)
+                if not budget_allowed:
+                    status_code = 429
+                    response = middleware_error_response(
+                        "MCP_QUOTA_EXCEEDED",
+                        budget_error or "MCP client quota exceeded",
+                        status_code,
+                    )
+                    if retry_after:
+                        response.headers["Retry-After"] = str(retry_after)
+                    return response
             response = await call_next(request)
             status_code = response.status_code
             route = request.scope.get("route")
@@ -195,26 +212,40 @@ def create_app() -> FastAPI:
                         "client_ip": request.client.host if request.client else None,
                     },
                 )
+            if is_mcp_protocol_request:
+                logger.info(
+                    "MCP access audited",
+                    extra={
+                        "event": "mcp_access_audit",
+                        "tool": mcp_tool_name,
+                        "status_code": status_code,
+                        **mcp_audit_identity(request),
+                    },
+                )
             reset_request_context(context_tokens)
 
     install_exception_handlers(app)
 
     @app.get("/.well-known/oauth-protected-resource", include_in_schema=False)
-    def oauth_protected_resource_metadata() -> dict[str, object]:
+    @app.get("/.well-known/oauth-protected-resource/mcp", include_in_schema=False)
+    def oauth_protected_resource_metadata(response: Response) -> dict[str, object]:
+        response.headers["Cache-Control"] = "public, max-age=300"
         resource = f"{settings.resolved_public_site_base_url}/mcp"
-        return {
+        metadata: dict[str, object] = {
             "resource": resource,
-            "authorization_servers": [settings.resolved_public_site_base_url],
-            "scopes_supported": [
-                "mcp:discover_public_materials",
-                "mcp:recommend_public_materials",
-                "mcp:read_public_material_summary",
-                "mcp:read_public_leaderboard",
-                "mcp:recommend_for_user",
-                "mcp:read_user_profile_signals",
-            ],
+            "resource_name": "StudyHub MCP",
+            "resource_documentation": settings.resolved_mcp_resource_documentation_url,
+            "scopes_supported": list(public_mcp_scopes()),
             "bearer_methods_supported": ["header"],
         }
+        authorization_servers = settings.resolved_mcp_oauth_authorization_servers
+        if authorization_servers:
+            metadata["authorization_servers"] = authorization_servers
+        return metadata
+
+    @app.get("/mcp/docs", include_in_schema=False)
+    def mcp_public_documentation() -> RedirectResponse:
+        return RedirectResponse(settings.resolved_mcp_resource_documentation_url, status_code=307)
 
     app.include_router(api_router)
     if settings.resolved_mcp_enabled:

@@ -2,30 +2,10 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import HTTPException
-
-from app.api.deps import (
-    get_health_service,
-    get_leaderboard_read_service,
-    get_market_service,
-    get_materials_service,
-    get_requests_service,
-)
+from app.api.deps import get_materials_service
 from app.core.db import session_scope
-from app.mcp.public_serializers import discovery_material, public_market, public_material, public_request
-from app.mcp.schemas import validate_contributor, validate_fetch_resource
-from app.mcp.serializers import (
-    json_text,
-    market_result,
-    market_text,
-    market_url,
-    material_result,
-    material_referral_url,
-    material_text,
-    request_result,
-    request_text,
-    request_url,
-)
+from app.mcp.public_serializers import discovery_material
+from app.mcp.serializers import public_base_url
 
 
 def clamp_limit(limit: int | None, *, default: int = 5, max_value: int = 20) -> int:
@@ -34,42 +14,26 @@ def clamp_limit(limit: int | None, *, default: int = 5, max_value: int = 20) -> 
     return max(1, min(int(limit), max_value))
 
 
-def search_materials(query: str | None, limit: int | None) -> dict[str, Any]:
-    safe_limit = clamp_limit(limit)
-    with session_scope() as session:
-        data = get_materials_service().list_materials(
-            session,
-            None,
-            keyword=query,
-            school=None,
-            college=None,
-            major=None,
-            tag=None,
-            grade_value=None,
-            course_category=None,
-            price=None,
-            sort="latest",
-            page=1,
-            size=safe_limit,
-        )
-    data["items"] = [public_material(item) for item in data.get("items") or []]
-    return data
-
-
-def discover_materials(
-    query: str | None = None,
-    limit: int | None = 5,
+def search_materials(
+    query: str | None,
+    limit: int | None,
+    *,
+    course: str | None = None,
+    goal: str | None = None,
+    material_type: str | None = None,
     school: str | None = None,
     college: str | None = None,
     major: str | None = None,
     tag: str | None = None,
 ) -> dict[str, Any]:
+    del goal
     safe_limit = clamp_limit(limit)
+    search_query = _join_search_context(course, query, material_type)
     with session_scope() as session:
         data = get_materials_service().list_materials(
             session,
             None,
-            keyword=query,
+            keyword=search_query,
             school=school,
             college=college,
             major=major,
@@ -81,177 +45,122 @@ def discover_materials(
             page=1,
             size=safe_limit,
         )
-    items = data.get("items") or []
     return {
-        "items": [discovery_material(item, reason=_material_reason(item, query)) for item in items],
+        "items": [
+            discovery_material(item, reason=_material_reason(item, search_query))
+            for item in data.get("items") or []
+        ],
         "meta": data.get("meta"),
-        "message": "请打开返回的 StudyHub 链接完成登录、购买或下载；MCP 不提供文件下载。",
+        "message": "请打开返回的 StudyHub 资料详情链接完成登录、购买或下载；MCP 不提供文件或下载地址。",
     }
 
 
 def material_detail(material_id: int) -> dict[str, Any]:
     with session_scope() as session:
         detail = get_materials_service().get_detail(session, None, material_id, False)
-    return public_material(detail)
+    return discovery_material(
+        detail,
+        reason="这是 StudyHub 公开资料详情。请打开返回的站内链接完成登录、购买或下载。",
+    )
 
 
-def material_summary(material_id: int) -> dict[str, Any]:
-    with session_scope() as session:
-        detail = get_materials_service().get_detail(session, None, material_id, False)
-    return discovery_material(detail, reason="这是 StudyHub 站内资料摘要，请打开链接查看详情并按平台流程下载。")
-
-
-def material_recommendations(limit: int | None) -> dict[str, Any]:
-    with session_scope() as session:
-        items = get_materials_service().get_recommendations(session, None, clamp_limit(limit))
-    return {
-        "items": [discovery_material(item, reason=_material_reason(item, None)) for item in items],
-        "message": "这些是基于公开资料目录的推荐。请打开 StudyHub 链接完成后续查看或下载。",
-    }
-
-
-def public_material_recommendations(query: str | None = None, limit: int | None = 6) -> dict[str, Any]:
+def public_material_recommendations(
+    query: str | None = None,
+    limit: int | None = 6,
+    *,
+    course: str | None = None,
+    goal: str | None = None,
+    time_budget: str | None = None,
+    material_type: str | None = None,
+    school: str | None = None,
+    college: str | None = None,
+    major: str | None = None,
+) -> dict[str, Any]:
     safe_limit = clamp_limit(limit, default=6)
-    if query and query.strip():
-        discovered = discover_materials(query=query, limit=safe_limit)
-        items = discovered.get("items") or []
-        if items:
-            return {
-                "items": items,
-                "message": "这些是基于公开资料目录的推荐。请打开 StudyHub 链接完成后续查看或下载。",
-            }
+    search_query = _join_search_context(course, query, material_type)
+    if search_query:
+        discovered = search_materials(
+            search_query,
+            safe_limit,
+            school=school,
+            college=college,
+            major=major,
+        )
+        raw_items = discovered.get("items") or []
+        if not raw_items and course:
+            broader_query = _join_search_context(course, material_type)
+            if broader_query and broader_query != search_query:
+                discovered = search_materials(
+                    broader_query,
+                    safe_limit,
+                    school=school,
+                    college=college,
+                    major=major,
+                )
+                raw_items = discovered.get("items") or []
+        items = [
+            _with_recommendation_context(item, goal=goal, time_budget=time_budget)
+            for item in raw_items
+        ]
+        return {
+            "items": items,
+            "message": (
+                "这些是基于公开资料目录的推荐。请打开 StudyHub 链接完成后续查看或下载。"
+                if items
+                else "暂未找到与当前课程和目标足够相关的公开资料；可以调整课程名称或资料类型后重试。"
+            ),
+        }
     with session_scope() as session:
         items = get_materials_service().get_recommendations(session, None, safe_limit)
     return {
-        "items": [discovery_material(item, reason=_material_reason(item, query)) for item in items],
+        "items": [
+            _with_recommendation_context(
+                discovery_material(item, reason=_material_reason(item, search_query)),
+                goal=goal,
+                time_budget=time_budget,
+            )
+            for item in items
+        ],
         "message": "这些是基于公开资料目录的推荐。请打开 StudyHub 链接完成后续查看或下载。",
     }
 
 
-def search_requests(query: str | None, limit: int | None) -> dict[str, Any]:
-    safe_limit = clamp_limit(limit)
-    source_limit = 100 if query else safe_limit
-    with session_scope() as session:
-        items = get_requests_service().list_requests(session, None, sort="hot", limit=source_limit)
-    if query:
-        filtered = [item for item in items if _matches_text(item, query)]
-        if not filtered:
-            return {"items": [], "message": "未找到相关求购"}
-        items = filtered
-    return {"items": [public_request(item) for item in items[:safe_limit]]}
-
-
-def request_detail(request_id: int) -> dict[str, Any]:
-    with session_scope() as session:
-        detail = get_requests_service().get_detail(session, 0, None, request_id)
-    return public_request(detail)
-
-
-def request_leaderboard(limit: int | None) -> dict[str, Any]:
-    safe_limit = clamp_limit(limit)
-    with session_scope() as session:
-        items = get_requests_service().list_leaderboard(session, None, limit=safe_limit)
-    return {"items": [public_request(item) for item in items]}
-
-
-def search_market(query: str | None, limit: int | None) -> dict[str, Any]:
-    safe_limit = clamp_limit(limit)
-    with session_scope() as session:
-        data = get_market_service().list_market(session, None, keyword=query, category=None, page=1, size=safe_limit)
-    if query and not data.get("items"):
-        return {"items": [], "meta": data.get("meta"), "stats": data.get("stats"), "message": "未找到相关集市商品"}
-    data["items"] = [public_market(item) for item in data.get("items") or []]
-    return data
-
-
-def market_detail(item_id: int) -> dict[str, Any]:
-    with session_scope() as session:
-        detail = get_market_service().get_detail(session, None, item_id)
-    return public_market(detail)
-
-
-def contributor_leaderboard(limit: int | None, period: str | None) -> dict[str, Any]:
-    with session_scope() as session:
-        items = get_leaderboard_read_service().get_contributors(session, clamp_limit(limit, default=20, max_value=100), period)
-    return {"items": [validate_contributor(item) for item in items]}
-
-
-def health_ready() -> dict[str, Any]:
-    with session_scope() as session:
-        return get_health_service().build_readiness_payload(session, deep=False)
-
-
-def search_all(query: str, limit: int | None) -> dict[str, Any]:
-    per_kind = max(1, clamp_limit(limit, default=9) // 3)
-    materials = search_materials(query, per_kind).get("items") or []
-    requests = search_requests(query, per_kind).get("items") or []
-    market = search_market(query, per_kind).get("items") or []
-
-    if query and not requests:
-        requests = []
-    if query and not market:
-        market = []
-
-    results = [material_result(item) for item in materials[:per_kind]]
-    results.extend(request_result(item) for item in requests[:per_kind])
-    results.extend(market_result(item) for item in market[:per_kind])
-    return {"results": results[: clamp_limit(limit, default=9)]}
-
-
-def fetch_typed(resource_id: str) -> dict[str, Any]:
-    kind, raw_id = parse_typed_id(resource_id)
-    item_id = int(raw_id)
-    if kind == "material":
-        detail = material_detail(item_id)
-        return validate_fetch_resource({
-            "id": resource_id,
-            "title": detail.get("title") or f"资料 {item_id}",
-            "text": material_text(detail),
-            "url": material_referral_url(item_id),
-            "metadata": {"type": "material", "public": detail},
-        })
-    if kind == "request":
-        detail = request_detail(item_id)
-        return validate_fetch_resource({
-            "id": resource_id,
-            "title": detail.get("course") or detail.get("keyword") or f"求购 {item_id}",
-            "text": request_text(detail),
-            "url": request_url(item_id),
-            "metadata": {"type": "request", "public": detail},
-        })
-    if kind == "market":
-        detail = market_detail(item_id)
-        return validate_fetch_resource({
-            "id": resource_id,
-            "title": detail.get("title") or f"集市商品 {item_id}",
-            "text": market_text(detail),
-            "url": market_url(item_id),
-            "metadata": {"type": "market", "public": detail},
-        })
-    raise HTTPException(status_code=400, detail=f"Unsupported fetch id: {resource_id}")
-
-
-def parse_typed_id(resource_id: str) -> tuple[str, str]:
-    if ":" not in resource_id:
-        raise HTTPException(status_code=400, detail="fetch id must use '<type>:<id>' format")
-    kind, raw_id = resource_id.split(":", 1)
-    if kind not in {"material", "request", "market", "user"}:
-        raise HTTPException(status_code=400, detail=f"Unsupported fetch type: {kind}")
-    if not raw_id.isdigit():
-        raise HTTPException(status_code=400, detail="fetch id must end with a numeric id")
-    return kind, raw_id
-
-
-def as_text_result(payload: dict[str, Any]) -> dict[str, Any]:
-    return {"content": [{"type": "text", "text": json_text(payload)}], "structuredContent": payload}
-
-
-def _matches_text(item: dict[str, Any], query: str) -> bool:
-    needle = query.strip().lower()
-    if not needle:
-        return True
-    haystack = json_text(item).lower()
-    return needle in haystack
+def platform_policy(question: str) -> dict[str, Any]:
+    normalized = str(question or "").strip().lower()
+    policies = [
+        {
+            "topic": "资料上传与审核",
+            "summary": "投稿者应拥有合法分享权，并如实填写资料信息；资料需经过平台审核后公开展示。",
+            "url": _site_url("/upload"),
+            "signals": ("上传", "投稿", "审核", "版权", "侵权"),
+        },
+        {
+            "topic": "资料获取与下载",
+            "summary": "资料获取、登录校验、积分或付费判断以及下载配额均在 StudyHub 站内完成；MCP 不返回文件和下载链接。",
+            "url": _site_url("/materials"),
+            "signals": ("下载", "获取", "积分", "配额", "免费"),
+        },
+        {
+            "topic": "付费与退款",
+            "summary": "付费资料必须通过 StudyHub 站内订单和支付流程处理，不应通过外部 Agent 绕过订单、支付或结算规则。",
+            "url": _site_url("/materials"),
+            "signals": ("支付", "付费", "价格", "退款", "订单", "结算"),
+        },
+        {
+            "topic": "账号与隐私",
+            "summary": "登录态和个人数据仅用于获得用户授权的站内功能；外部 Agent 只能在获授 OAuth scope 范围内调用 MCP。",
+            "url": _site_url("/login"),
+            "signals": ("登录", "账号", "隐私", "oauth", "授权"),
+        },
+    ]
+    matched = [item for item in policies if any(signal in normalized for signal in item["signals"])]
+    selected = matched or policies
+    return {
+        "question": str(question or "").strip()[:500],
+        "policies": [{key: value for key, value in item.items() if key != "signals"} for item in selected],
+        "url": _site_url("/more"),
+        "message": "规则可能随平台更新，请以返回的 StudyHub 页面和站内实际流程为准。",
+    }
 
 
 def _material_reason(item: dict[str, Any], query: str | None) -> str:
@@ -262,3 +171,32 @@ def _material_reason(item: dict[str, Any], query: str | None) -> str:
     if tags:
         return f"这份资料包含 {' / '.join(str(tag) for tag in tags[:3])} 等标签，适合作为公开目录推荐候选。"
     return "这是 StudyHub 公开资料目录中的推荐候选，请打开站内链接查看详情。"
+
+
+def _join_search_context(*values: str | None) -> str:
+    parts: list[str] = []
+    for value in values:
+        text = " ".join(str(value or "").split()).strip()
+        if text and text not in parts:
+            parts.append(text[:160])
+    return " ".join(parts)[:500]
+
+
+def _with_recommendation_context(
+    item: dict[str, Any],
+    *,
+    goal: str | None,
+    time_budget: str | None,
+) -> dict[str, Any]:
+    reason_parts = [str(item.get("reason") or "").rstrip("。")]
+    clean_goal = " ".join(str(goal or "").split()).strip()[:120]
+    clean_budget = " ".join(str(time_budget or "").split()).strip()[:120]
+    if clean_goal:
+        reason_parts.append(f"适合围绕“{clean_goal}”进一步判断")
+    if clean_budget:
+        reason_parts.append(f"可结合“{clean_budget}”安排使用顺序")
+    return {**item, "reason": "；".join(part for part in reason_parts if part) + "。"}
+
+
+def _site_url(path: str) -> str:
+    return f"{public_base_url()}{path}"

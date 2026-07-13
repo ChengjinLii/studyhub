@@ -187,6 +187,72 @@ def test_preview_accepts_enabled_mcp_with_scoped_token(tmp_path: Path, monkeypat
     _reset_runtime_state()
 
 
+def test_preview_rejects_oauth_mcp_without_authorization_server_config(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    private_dir = _write_private_env(
+        tmp_path,
+        "preview",
+        """
+        STUDYHUB_ENVIRONMENT=preview
+        STUDYHUB_DATABASE_URL=mysql+pymysql://preview_user:preview_pass@127.0.0.1:3306/studyhub_preview
+        STUDYHUB_JWT_SECRET=preview-secret-abcdefghijklmnopqrstuvwxyz
+        STUDYHUB_MAIL_PROVIDER=smtp
+        STUDYHUB_SMTP_HOST=smtp.preview.example.com
+        STUDYHUB_SMTP_FROM_EMAIL=preview@example.com
+        STUDYHUB_STORAGE_PROVIDER=local_fs
+        STUDYHUB_PAYMENT_PROVIDER=local_alipay
+        STUDYHUB_MCP_ENABLED=true
+        STUDYHUB_MCP_REQUIRE_AUTH=true
+        STUDYHUB_MCP_AUTH_MODE=oauth
+        """,
+    )
+    monkeypatch.setenv("STUDYHUB_ENVIRONMENT", "preview")
+    monkeypatch.setenv("STUDYHUB_PRIVATE_DIR_PATH", str(private_dir))
+
+    _reset_runtime_state()
+    with pytest.raises(RuntimeError, match="MCP OAuth 缺少必要配置"):
+        get_settings()
+    _reset_runtime_state()
+
+
+def test_preview_accepts_oauth_mcp_resource_server_config(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    private_dir = _write_private_env(
+        tmp_path,
+        "preview",
+        """
+        STUDYHUB_ENVIRONMENT=preview
+        STUDYHUB_DATABASE_URL=mysql+pymysql://preview_user:preview_pass@127.0.0.1:3306/studyhub_preview
+        STUDYHUB_JWT_SECRET=preview-secret-abcdefghijklmnopqrstuvwxyz
+        STUDYHUB_MAIL_PROVIDER=smtp
+        STUDYHUB_SMTP_HOST=smtp.preview.example.com
+        STUDYHUB_SMTP_FROM_EMAIL=preview@example.com
+        STUDYHUB_STORAGE_PROVIDER=local_fs
+        STUDYHUB_PAYMENT_PROVIDER=local_alipay
+        STUDYHUB_MCP_ENABLED=true
+        STUDYHUB_MCP_REQUIRE_AUTH=true
+        STUDYHUB_MCP_AUTH_MODE=oauth
+        STUDYHUB_MCP_OAUTH_AUTHORIZATION_SERVERS=https://auth.example.edu
+        STUDYHUB_MCP_OAUTH_ISSUER=https://auth.example.edu
+        STUDYHUB_MCP_OAUTH_JWKS_URI=https://auth.example.edu/.well-known/jwks.json
+        STUDYHUB_MCP_OAUTH_AUDIENCE=https://preview.study-hub.cn/mcp
+        """,
+    )
+    monkeypatch.setenv("STUDYHUB_ENVIRONMENT", "preview")
+    monkeypatch.setenv("STUDYHUB_PRIVATE_DIR_PATH", str(private_dir))
+
+    _reset_runtime_state()
+    settings = get_settings()
+    assert settings.resolved_mcp_auth_mode == "oauth"
+    assert settings.resolved_mcp_oauth_authorization_servers == ["https://auth.example.edu"]
+    assert settings.resolved_mcp_oauth_audience == "https://preview.study-hub.cn/mcp"
+    _reset_runtime_state()
+
+
 def test_preview_supports_real_provider_selection_without_touching_network(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

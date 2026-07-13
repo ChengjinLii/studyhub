@@ -104,14 +104,40 @@ def _validate_kyc(settings: Any) -> None:
 
 
 def _validate_mcp(settings: Any) -> None:
+    mode = settings.resolved_mcp_auth_mode
+    if mode not in {"static", "oauth", "hybrid"}:
+        raise RuntimeError("STUDYHUB_MCP_AUTH_MODE 只允许为 static、oauth 或 hybrid。")
     if not (settings.is_preview or settings.is_production):
         return
     if not settings.resolved_mcp_enabled:
         return
     if not settings.resolved_mcp_require_auth:
         raise RuntimeError("preview/production 开启 MCP 时必须启用 STUDYHUB_MCP_REQUIRE_AUTH。")
-    if not (settings.mcp_access_token or settings.mcp_access_tokens):
-        raise RuntimeError("preview/production 开启 MCP 时必须配置 STUDYHUB_MCP_ACCESS_TOKENS 或 STUDYHUB_MCP_ACCESS_TOKEN。")
+    if mode in {"static", "hybrid"} and not (settings.mcp_access_token or settings.mcp_access_tokens):
+        raise RuntimeError("MCP static/hybrid 鉴权必须配置 STUDYHUB_MCP_ACCESS_TOKENS 或 STUDYHUB_MCP_ACCESS_TOKEN。")
+    if mode in {"oauth", "hybrid"}:
+        missing = []
+        if not settings.resolved_mcp_oauth_authorization_servers:
+            missing.append("STUDYHUB_MCP_OAUTH_AUTHORIZATION_SERVERS")
+        if not settings.mcp_oauth_issuer:
+            missing.append("STUDYHUB_MCP_OAUTH_ISSUER")
+        if not settings.mcp_oauth_jwks_uri:
+            missing.append("STUDYHUB_MCP_OAUTH_JWKS_URI")
+        if not settings.resolved_mcp_oauth_audience:
+            missing.append("STUDYHUB_MCP_OAUTH_AUDIENCE")
+        if missing:
+            raise RuntimeError(f"MCP OAuth 缺少必要配置：{', '.join(missing)}")
+        authorization_servers = settings.resolved_mcp_oauth_authorization_servers
+        if settings.mcp_oauth_issuer not in authorization_servers:
+            raise RuntimeError("STUDYHUB_MCP_OAUTH_ISSUER 必须出现在 MCP OAuth authorization_servers 中。")
+        oauth_urls = [
+            *authorization_servers,
+            settings.mcp_oauth_issuer,
+            settings.mcp_oauth_jwks_uri,
+            settings.resolved_mcp_oauth_audience,
+        ]
+        if any(not str(value or "").startswith("https://") for value in oauth_urls):
+            raise RuntimeError("preview/production 的 MCP OAuth issuer、JWKS、audience 和授权服务器必须使用 HTTPS。")
 
 
 def _validate_production_providers(settings: Any) -> None:

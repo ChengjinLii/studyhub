@@ -23,19 +23,6 @@ MCP_SENSITIVE_KEYS = {
     "previewManifest",
     "previewSource",
 }
-MATERIAL_PUBLIC_KEYS = {
-    "id",
-    "title",
-    "description",
-    "school",
-    "college",
-    "major",
-    "tags",
-    "free",
-    "downloadCount",
-    "ratingAvg",
-    "ratingCount",
-}
 DISCOVERY_MATERIAL_KEYS = {
     "materialId",
     "title",
@@ -56,20 +43,6 @@ DISCOVERY_MATERIAL_KEYS = {
     "url",
     "reason",
 }
-REQUEST_PUBLIC_KEYS = {
-    "id",
-    "course",
-    "keyword",
-    "school",
-    "college",
-    "major",
-    "budget",
-    "fundedAmount",
-    "responseCount",
-    "status",
-    "createdAt",
-}
-MARKET_PUBLIC_KEYS = {"id", "title", "description", "school", "category", "price", "wantCount", "status"}
 
 
 def assert_no_sensitive_mcp_keys(value) -> None:
@@ -80,16 +53,6 @@ def assert_no_sensitive_mcp_keys(value) -> None:
     elif isinstance(value, list):
         for item in value:
             assert_no_sensitive_mcp_keys(item)
-
-
-def assert_fetch_contract(structured: dict, *, resource_id: str, public_keys: set[str]) -> None:
-    assert set(structured) == {"id", "title", "text", "url", "metadata"}
-    assert structured["id"] == resource_id
-    assert isinstance(structured["title"], str)
-    assert isinstance(structured["text"], str)
-    assert structured["url"].startswith("https://")
-    assert set(structured["metadata"]) == {"type", "public"}
-    assert set(structured["metadata"]["public"]) == public_keys
 
 
 def call_tool(client: TestClient, name: str, arguments: dict | None = None, headers: dict[str, str] | None = None):
@@ -106,148 +69,75 @@ def call_tool(client: TestClient, name: str, arguments: dict | None = None, head
     )
 
 
-def test_mcp_search_returns_mixed_studyhub_results(client: TestClient) -> None:
-    response = call_tool(client, "search", {"query": "数据结构", "limit": 10})
-
-    assert response.status_code == 200
-    result = response.json()["result"]
-    structured = result["structuredContent"]
-    assert structured["results"]
-    ids = {item["id"] for item in structured["results"]}
-    assert any(item_id.startswith("material:") for item_id in ids)
-    material_results = [item for item in structured["results"] if item["id"].startswith("material:")]
-    assert material_results and "ref=mcp" in material_results[0]["url"]
-    assert result["content"][0]["type"] == "text"
-    assert '"results"' in result["content"][0]["text"]
-
-
-def test_mcp_fetch_material_returns_full_structured_content(client: TestClient) -> None:
-    response = call_tool(client, "fetch", {"id": "material:101"})
-
-    assert response.status_code == 200
-    result = response.json()["result"]
-    structured = result["structuredContent"]
-    assert structured["id"] == "material:101"
-    assert structured["title"] == "数据结构期末真题解析"
-    assert_fetch_contract(structured, resource_id="material:101", public_keys=MATERIAL_PUBLIC_KEYS)
-    assert "ref=mcp" in structured["url"]
-    assert "text" in structured
-    assert structured["metadata"]["type"] == "material"
-    assert "raw" not in structured["metadata"]
-    assert "public" in structured["metadata"]
-    assert "netdiskUrl" not in structured["metadata"]["public"]
-    assert "netdiskPassword" not in structured["metadata"]["public"]
-    assert_no_sensitive_mcp_keys(result)
-    assert result["content"][0]["type"] == "text"
-    assert "数据结构期末真题解析" in result["content"][0]["text"]
-
-
-def test_mcp_fetch_market_does_not_expose_contact_value(client: TestClient) -> None:
-    response = call_tool(client, "fetch", {"id": "market:201"})
-
-    assert response.status_code == 200
-    public = response.json()["result"]["structuredContent"]["metadata"]["public"]
-    assert "contactValue" not in public
-    assert "contactType" not in public
-    assert_fetch_contract(response.json()["result"]["structuredContent"], resource_id="market:201", public_keys=MARKET_PUBLIC_KEYS)
-    assert_no_sensitive_mcp_keys(response.json())
-
-
-def test_mcp_fetch_request_uses_public_contract(client: TestClient) -> None:
-    response = call_tool(client, "fetch", {"id": "request:401"})
+def test_mcp_material_search_returns_ranked_referral_only_results(client: TestClient) -> None:
+    response = call_tool(
+        client,
+        "materials.search",
+        {"query": "期末 真题", "course": "数据结构", "goal": "考试复习", "limit": 3},
+    )
 
     assert response.status_code == 200
     structured = response.json()["result"]["structuredContent"]
-    assert_fetch_contract(structured, resource_id="request:401", public_keys=REQUEST_PUBLIC_KEYS)
+    assert structured["items"]
+    assert "下载" in structured["message"]
+    for item in structured["items"]:
+        assert set(item) == DISCOVERY_MATERIAL_KEYS
+        assert item["url"].startswith("https://")
+        assert "ref=mcp" in item["url"]
     assert_no_sensitive_mcp_keys(response.json())
 
 
-def test_mcp_search_no_match_returns_empty_related_results(client: TestClient) -> None:
-    response = call_tool(client, "market.search", {"query": "不存在的火星集市商品xyz", "limit": 2})
+def test_mcp_material_detail_always_returns_studyhub_page_link(client: TestClient) -> None:
+    response = call_tool(client, "materials.get", {"material_id": 101})
 
     assert response.status_code == 200
-    structured = response.json()["result"]["structuredContent"]
-    assert structured["items"] == []
-    assert "未找到" in structured["message"]
+    detail = response.json()["result"]["structuredContent"]
+    assert set(detail) == DISCOVERY_MATERIAL_KEYS
+    assert detail["materialId"] == 101
+    assert detail["title"] == "数据结构期末真题解析"
+    assert detail["url"].endswith("/materials/101?ref=mcp")
+    assert_no_sensitive_mcp_keys(response.json())
 
 
-def test_mcp_specific_read_tools_return_structured_content(client: TestClient) -> None:
-    materials = call_tool(client, "materials.search", {"query": "通信", "limit": 2})
-    requests = call_tool(client, "requests.search", {"query": "概率论", "limit": 2})
-    market = call_tool(client, "market.search", {"query": "教材", "limit": 2})
-
-    assert materials.status_code == 200
-    assert requests.status_code == 200
-    assert market.status_code == 200
-    assert materials.json()["result"]["structuredContent"]["items"]
-    assert requests.json()["result"]["structuredContent"]["items"]
-    assert market.json()["result"]["structuredContent"]["items"]
-    assert set(materials.json()["result"]["structuredContent"]["items"][0]) == MATERIAL_PUBLIC_KEYS
-    assert set(requests.json()["result"]["structuredContent"]["items"][0]) == REQUEST_PUBLIC_KEYS
-    assert set(market.json()["result"]["structuredContent"]["items"][0]) == MARKET_PUBLIC_KEYS
-    assert_no_sensitive_mcp_keys(materials.json())
-    assert_no_sensitive_mcp_keys(requests.json())
-    assert_no_sensitive_mcp_keys(market.json())
-
-
-def test_mcp_discovery_tools_return_referral_only_materials(client: TestClient) -> None:
-    discover = call_tool(client, "materials.discover", {"query": "数据结构", "limit": 2})
-    recommend = call_tool(client, "materials.recommend_public", {"query": "数据结构", "limit": 2})
-    summarize = call_tool(client, "materials.summarize", {"id": 101})
-
-    assert discover.status_code == 200
-    assert recommend.status_code == 200
-    assert summarize.status_code == 200
-    discover_item = discover.json()["result"]["structuredContent"]["items"][0]
-    recommend_item = recommend.json()["result"]["structuredContent"]["items"][0]
-    summary = summarize.json()["result"]["structuredContent"]
-    assert set(discover_item) == DISCOVERY_MATERIAL_KEYS
-    assert set(recommend_item) == DISCOVERY_MATERIAL_KEYS
-    assert set(summary) == DISCOVERY_MATERIAL_KEYS
-    assert discover_item["url"].startswith("https://")
-    assert "ref=mcp" in discover_item["url"]
-    assert recommend_item["reason"]
-    assert "下载" in discover.json()["result"]["structuredContent"]["message"]
-    assert_no_sensitive_mcp_keys(discover.json())
-    assert_no_sensitive_mcp_keys(recommend.json())
-    assert_no_sensitive_mcp_keys(summarize.json())
-
-
-def test_mcp_get_tools_use_fixed_public_schema(client: TestClient) -> None:
-    material = call_tool(client, "materials.get", {"id": 101})
-    request = call_tool(client, "requests.get", {"id": 401})
-    market = call_tool(client, "market.get", {"id": 201})
-
-    assert material.status_code == 200
-    assert request.status_code == 200
-    assert market.status_code == 200
-    assert set(material.json()["result"]["structuredContent"]) == MATERIAL_PUBLIC_KEYS
-    assert set(request.json()["result"]["structuredContent"]) == REQUEST_PUBLIC_KEYS
-    assert set(market.json()["result"]["structuredContent"]) == MARKET_PUBLIC_KEYS
-    assert_no_sensitive_mcp_keys(material.json())
-    assert_no_sensitive_mcp_keys(request.json())
-    assert_no_sensitive_mcp_keys(market.json())
-
-
-def test_mcp_contributor_leaderboard_uses_fixed_public_schema(client: TestClient) -> None:
-    response = call_tool(client, "leaderboard.contributors", {"limit": 3, "period": "all"})
+def test_mcp_material_recommendation_uses_goal_and_returns_links(client: TestClient) -> None:
+    response = call_tool(
+        client,
+        "materials.recommend",
+        {
+            "query": "基础一般",
+            "course": "数据结构",
+            "goal": "两周后期末考试",
+            "time_budget": "14 天，每天 2 小时",
+            "limit": 2,
+        },
+    )
 
     assert response.status_code == 200
     items = response.json()["result"]["structuredContent"]["items"]
     assert items
-    assert set(items[0]) == {"userId", "username", "downloads", "roleMask"}
-    assert isinstance(items[0]["userId"], int)
-    assert isinstance(items[0]["downloads"], int)
-    assert isinstance(items[0]["roleMask"], int)
+    assert all(item["url"].startswith("https://") for item in items)
+    assert all(item["reason"] for item in items)
+    assert_no_sensitive_mcp_keys(response.json())
+
+
+def test_mcp_platform_policy_returns_public_policy_links(client: TestClient) -> None:
+    response = call_tool(client, "platform.policy", {"question": "付费资料如何下载？"})
+
+    assert response.status_code == 200
+    structured = response.json()["result"]["structuredContent"]
+    assert structured["policies"]
+    assert structured["url"].startswith("https://")
+    assert all(item["url"].startswith("https://") for item in structured["policies"])
+    assert_no_sensitive_mcp_keys(response.json())
 
 
 def test_mcp_tool_call_records_safe_metrics(client: TestClient) -> None:
-    response = call_tool(client, "materials.discover", {"query": "数据结构", "limit": 1})
+    response = call_tool(client, "materials.search", {"query": "数据结构", "limit": 1})
 
     assert response.status_code == 200
     metrics = client.get("/api/metrics")
     assert metrics.status_code == 200
-    assert 'studyhub_mcp_tool_calls_total{tool="materials.discover",status="ok"}' in metrics.text
+    assert 'studyhub_mcp_tool_calls_total{tool="materials.search",status="ok"}' in metrics.text
 
 
 def test_mcp_public_urls_use_configured_site_base_url(monkeypatch) -> None:

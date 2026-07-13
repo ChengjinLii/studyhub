@@ -648,6 +648,7 @@ class AiService:
         settings = get_settings()
         max_rounds = max(1, min(6, int(getattr(settings, "ai_agent_tool_max_rounds", 4) or 4)))
         max_calls = max(1, min(16, int(getattr(settings, "ai_agent_tool_max_calls", 8) or 8)))
+        max_search_calls = max(1, min(5, int(getattr(settings, "ai_agent_tool_max_search_calls", 3) or 3)))
         max_candidates = max(3, min(30, int(getattr(settings, "ai_agent_tool_max_candidates", 18) or 18)))
         max_evidence = max(1, min(24, int(getattr(settings, "ai_agent_tool_max_evidence_pages", 12) or 12)))
         observations: list[dict[str, Any]] = []
@@ -656,7 +657,10 @@ class AiService:
         memory_context: AgentMemoryContext | None = None
         course_memory_card: CourseMemoryCard | None = None
         task_plan: AgentQueryPlan | None = None
+        task_context: dict[str, Any] = {}
+        search_history: list[dict[str, Any]] = []
         calls_used = 0
+        search_calls_used = 0
 
         for round_index in range(max_rounds + 1):
             force_final = round_index >= max_rounds or calls_used >= max_calls
@@ -667,8 +671,12 @@ class AiService:
                 platform_term_glossary=material_search_glossary(f"{query} {conversation_context}"),
                 has_image=bool(image_attachments),
                 observations=observations,
+                task_context=task_context,
+                search_history=search_history,
                 remaining_rounds=max(0, max_rounds - round_index),
                 remaining_tool_calls=max(0, max_calls - calls_used),
+                remaining_search_calls=max(0, max_search_calls - search_calls_used),
+                remaining_candidate_slots=max(0, max_candidates - len(materials)),
                 force_final=force_final,
             )
             safe_request_payload = self.safety_service.sanitize_prompt_payload(request_payload)
@@ -687,6 +695,8 @@ class AiService:
             decision = self.tool_loop_service.parse(self._loads_object(content))
             if decision is None:
                 return None
+            if decision.task_context:
+                task_context = _merge_dynamic_task_context(task_context, decision.task_context)
             if decision.mode == "final" and decision.final is not None:
                 body = self._dynamic_final_body(
                     decision.final,
@@ -711,6 +721,16 @@ class AiService:
             for action in decision.actions:
                 if calls_used >= max_calls:
                     break
+                if action.name == "search_materials" and search_calls_used >= max_search_calls:
+                    observations.append({
+                        "tool": action.name,
+                        "result": {
+                            "executed": False,
+                            "reason": "search_budget_exhausted",
+                            "search_history": search_history[-6:],
+                        },
+                    })
+                    continue
                 _emit_agent_stage(stage_callback, _dynamic_tool_stage(action))
                 calls_used += 1
                 observation, materials, pdf_evidence, memory_context, course_memory_card, task_plan = (
@@ -729,10 +749,19 @@ class AiService:
                         memory_context=memory_context,
                         course_memory_card=course_memory_card,
                         task_plan=task_plan,
+                        task_context=task_context,
+                        search_history=search_history,
                         max_candidates=max_candidates,
                         max_evidence=max_evidence,
                     )
                 )
+                if action.name == "search_materials" and observation.get("executed") is True:
+                    search_calls_used += 1
+                    search_history.append({
+                        "query": observation.get("query"),
+                        "filters": observation.get("filters") or {},
+                        "count": observation.get("count") or 0,
+                    })
                 observations.append(
                     self.safety_service.sanitize_prompt_payload(
                         {
@@ -760,6 +789,8 @@ class AiService:
         memory_context: AgentMemoryContext | None,
         course_memory_card: CourseMemoryCard | None,
         task_plan: AgentQueryPlan | None,
+        task_context: dict[str, Any],
+        search_history: list[dict[str, Any]],
         max_candidates: int,
         max_evidence: int,
     ) -> tuple[
@@ -772,15 +803,58 @@ class AiService:
     ]:
         arguments = action.arguments
         if action.name == "search_materials":
-            search_query = _dynamic_text(arguments.get("query"), max_chars=500) or query
+            search_query = (
+                _dynamic_text(arguments.get("query"), max_chars=500)
+                or _dynamic_task_context_query(task_context)
+                or query
+            )
             requested_limit = _bounded_int(arguments.get("limit"), default=6, minimum=1, maximum=12)
             action_filters = _dynamic_search_filters(filters, arguments.get("filters"))
-            found = self._rank_materials(session, search_query, action_filters)[:requested_limit]
+            signature = _dynamic_search_signature(search_query, action_filters)
+            previous_signatures = {
+                _dynamic_search_signature(str(item.get("query") or ""), item.get("filters") or {})
+                for item in search_history
+                if isinstance(item, dict)
+            }
+            if signature in previous_signatures:
+                return (
+                    {
+                        "executed": False,
+                        "reason": "duplicate_search",
+                        "query": search_query,
+                        "filters": action_filters,
+                    },
+                    materials,
+                    pdf_evidence,
+                    memory_context,
+                    course_memory_card,
+                    task_plan,
+                )
+            remaining_candidate_slots = max(0, max_candidates - len(materials))
+            if remaining_candidate_slots <= 0:
+                return (
+                    {
+                        "executed": False,
+                        "reason": "candidate_budget_exhausted",
+                        "query": search_query,
+                        "filters": action_filters,
+                    },
+                    materials,
+                    pdf_evidence,
+                    memory_context,
+                    course_memory_card,
+                    task_plan,
+                )
+            found = self._rank_materials(session, search_query, action_filters)[: min(requested_limit, remaining_candidate_slots)]
             materials = _merge_material_candidates(materials, found, limit=max_candidates)
             return (
                 {
+                    "executed": True,
                     "query": search_query,
+                    "filters": action_filters,
                     "count": len(found),
+                    "retrieval_engine": "multi_word_synonym_weighted",
+                    "task_context": task_context,
                     "candidates": [
                         self._compact_recommendation_payload(item, search_query, pdf_evidence, memory_context)
                         for item in found
@@ -889,7 +963,7 @@ class AiService:
                     pdf_evidence=pdf_evidence,
                     conversation_turns=conversation_turns if personal_memory_enabled else [],
                 )
-            task_plan = _dynamic_query_plan(arguments, query)
+            task_plan = _dynamic_query_plan(arguments, query, task_context=task_context)
             course_memory_card = self._build_course_memory_card(
                 materials=materials,
                 pdf_evidence=pdf_evidence,
@@ -2081,7 +2155,9 @@ class AiService:
         self.material_repo.ensure_seed_bootstrap(session, seed)
         normalized_query = query.strip().lower()
         school = str(filters.get("school")).strip() if filters.get("school") else None
+        college = str(filters.get("college")).strip() if filters.get("college") else None
         major = str(filters.get("major")).strip() if filters.get("major") else None
+        tag = str(filters.get("tag")).strip() if filters.get("tag") else None
         query_terms = self._query_terms(normalized_query)
         material_search_query = parse_material_search_query(_agent_material_search_text(query_terms, normalized_query))
         candidate_materials = self._candidate_materials_for_ranking(
@@ -2089,14 +2165,24 @@ class AiService:
             normalized_query=normalized_query,
             query_terms=query_terms,
             school=school,
+            college=college,
             major=major,
+            tag=tag,
         )
         scored_items = []
         for item in candidate_materials:
             search_score = _agent_material_search_score(item, material_search_query, self._loads)
             if material_search_query.has_terms and _agent_material_matches_search(item, material_search_query, self._loads):
                 search_score += 30
-            score = search_score + self._score(item, query_terms, normalized_query, school=school, major=major)
+            score = search_score + self._score(
+                item,
+                query_terms,
+                normalized_query,
+                school=school,
+                college=college,
+                major=major,
+                tag=tag,
+            )
             course_score = self._course_score(item, query_terms)
             material_signals = build_material_signals(item)
             quality_score = material_signals.quality_score
@@ -2133,7 +2219,9 @@ class AiService:
         normalized_query: str,
         query_terms: list[str],
         school: str | None,
+        college: str | None,
         major: str | None,
+        tag: str | None,
     ) -> list[MaterialRecord]:
         match_values = _agent_material_match_values(normalized_query, query_terms)
         list_matching = getattr(self.material_repo, "list_visible_materials_matching_text", None)
@@ -2142,14 +2230,26 @@ class AiService:
                 session,
                 match_values=match_values,
                 school=school,
+                college=college,
                 major=major,
+                tag=tag,
                 limit=AGENT_RANKING_CANDIDATE_LIMIT,
             )
             if matched:
                 return matched
         return self.material_repo.list_visible_materials(session)
 
-    def _score(self, material: MaterialRecord, query_terms: list[str], query: str, *, school: str | None, major: str | None) -> int:
+    def _score(
+        self,
+        material: MaterialRecord,
+        query_terms: list[str],
+        query: str,
+        *,
+        school: str | None,
+        college: str | None,
+        major: str | None,
+        tag: str | None,
+    ) -> int:
         title = self._safe_text(material, "title").lower()
         haystack = self._material_haystack(material, title)
         score = 0
@@ -2163,7 +2263,11 @@ class AiService:
             score += 16
         if school and self._safe_text(material, "school") == school:
             score += 3
+        if college and college in self._safe_text(material, "college"):
+            score += 3
         if major and major in self._safe_text(material, "major"):
+            score += 4
+        if tag and tag in " ".join(self._loads(self._safe_text(material, "tags_json"))):
             score += 4
         return score
 
@@ -2334,6 +2438,53 @@ def _dynamic_search_filters(base: dict[str, Any], value: Any) -> dict[str, Any]:
     return merged
 
 
+def _dynamic_search_signature(query: str, filters: dict[str, Any]) -> str:
+    normalized_query = re.sub(r"\s+", " ", str(query or "")).strip().lower()
+    normalized_filters = "|".join(
+        f"{key}={_normalize_dynamic_search_value(filters.get(key))}"
+        for key in ("school", "college", "major", "tag")
+        if filters.get(key)
+    )
+    return f"{normalized_query}|{normalized_filters}"
+
+
+def _normalize_dynamic_search_value(value: Any) -> str:
+    return re.sub(r"\s+", " ", str(value or "")).strip().lower()
+
+
+def _merge_dynamic_task_context(existing: dict[str, Any], incoming: dict[str, Any]) -> dict[str, Any]:
+    merged = dict(existing)
+    for key in ("course_terms", "resource_types", "constraints"):
+        values: list[str] = []
+        for source in (existing.get(key), incoming.get(key)):
+            if not isinstance(source, list):
+                continue
+            for item in source:
+                text = _dynamic_text(item, max_chars=80)
+                if text and text not in values:
+                    values.append(text)
+        if values:
+            merged[key] = values[:6]
+    exam_goal = _dynamic_text(incoming.get("exam_goal"), max_chars=160)
+    if exam_goal:
+        merged["exam_goal"] = exam_goal
+    if isinstance(incoming.get("time_budget"), dict):
+        merged["time_budget"] = dict(incoming["time_budget"])
+    return merged
+
+
+def _dynamic_task_context_query(context: dict[str, Any]) -> str:
+    parts: list[str] = []
+    for key in ("course_terms", "resource_types"):
+        values = context.get(key)
+        if isinstance(values, list):
+            parts.extend(_dynamic_text(item, max_chars=80) for item in values)
+    goal = _dynamic_text(context.get("exam_goal"), max_chars=160)
+    if goal:
+        parts.append(goal)
+    return " ".join(dict.fromkeys(part for part in parts if part))[:500]
+
+
 def _merge_material_candidates(
     existing: list[MaterialRecord],
     incoming: list[MaterialRecord],
@@ -2425,24 +2576,42 @@ def _dynamic_mapping(value: Any) -> dict[str, Any]:
     return result
 
 
-def _dynamic_query_plan(arguments: dict[str, Any], query: str) -> AgentQueryPlan:
+def _dynamic_query_plan(
+    arguments: dict[str, Any],
+    query: str,
+    *,
+    task_context: dict[str, Any] | None = None,
+) -> AgentQueryPlan:
+    task_context = task_context or {}
     task_label = _dynamic_text(arguments.get("task_label"), max_chars=100) or "自主学习任务"
     course_terms = _dynamic_string_list(arguments.get("course_terms"), limit=6, max_chars=60)
+    if not course_terms:
+        course_terms = _dynamic_string_list(task_context.get("course_terms"), limit=6, max_chars=60)
     evidence_goals = _dynamic_string_list(arguments.get("evidence_goals"), limit=10, max_chars=160)
     response_preferences = _dynamic_string_list(
         arguments.get("response_preferences"), limit=10, max_chars=160
     )
     search_terms = tuple(dict.fromkeys(re.findall(r"[A-Za-z0-9_\-]+|[\u4e00-\u9fff]{2,}", query)))[:12]
+    resource_types = _dynamic_string_list(task_context.get("resource_types"), limit=5, max_chars=60)
+    constraints = _dynamic_mapping(arguments.get("constraints"))
+    if isinstance(task_context.get("time_budget"), dict):
+        constraints["time_budget"] = dict(task_context["time_budget"])
+    context_constraints = task_context.get("constraints")
+    if isinstance(context_constraints, list):
+        constraints["user_constraints"] = list(_dynamic_string_list(context_constraints, limit=6, max_chars=80))
+    exam_goal = _dynamic_text(task_context.get("exam_goal"), max_chars=160)
+    if exam_goal:
+        constraints["exam_goal"] = exam_goal
     return AgentQueryPlan(
         intent=task_label,
         confidence=1.0,
         course_terms=course_terms,
-        resource_types=(),
+        resource_types=resource_types,
         years=tuple(dict.fromkeys(re.findall(r"(?:19|20)\d{2}", query)))[:8],
         search_terms=search_terms,
         evidence_tasks=evidence_goals,
         response_guidance=response_preferences,
-        study_constraints=_dynamic_mapping(arguments.get("constraints")),
+        study_constraints=constraints,
     )
 
 

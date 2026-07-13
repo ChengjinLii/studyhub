@@ -167,13 +167,26 @@ def rate_limit_allowed(settings: Settings, request: Request) -> tuple[bool, str 
     if rule is None:
         return True, None
     key = f"{rule.name}:{_client_key(settings, request)}"
-    if _rate_limit_backend(settings) == "redis":
-        try:
-            allowed = get_redis_rate_limiter().check(settings, key, limit=rule.limit, window_seconds=settings.rate_limit_window_seconds)
-        except Exception:
-            allowed = get_rate_limiter().check(key, limit=rule.limit, window_seconds=settings.rate_limit_window_seconds)
-    else:
-        allowed = get_rate_limiter().check(key, limit=rule.limit, window_seconds=settings.rate_limit_window_seconds)
+    allowed = rate_limit_key_allowed(
+        settings,
+        key,
+        limit=rule.limit,
+        window_seconds=settings.rate_limit_window_seconds,
+    )
     if allowed:
         return True, None
     return False, f"Too many {rule.name} requests"
+
+
+def rate_limit_key_allowed(settings: Settings, key: str, *, limit: int, window_seconds: int) -> bool:
+    if _rate_limit_backend(settings) == "redis":
+        try:
+            return get_redis_rate_limiter().check(
+                settings,
+                key,
+                limit=limit,
+                window_seconds=window_seconds,
+            )
+        except Exception:
+            return get_rate_limiter().check(key, limit=limit, window_seconds=window_seconds)
+    return get_rate_limiter().check(key, limit=limit, window_seconds=window_seconds)

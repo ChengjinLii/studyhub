@@ -50,12 +50,23 @@ http://127.0.0.1:8011/mcp
 STUDYHUB_MCP_ENABLED=true
 ```
 
-如果开启 MCP 访问鉴权，客户端请求需要附带 Bearer token。对外部 agent 建议按 client 分配 token 和 discovery scopes：
+对外 MCP 只注册四个只读工具：`materials.search`、`materials.get`、`materials.recommend`、`platform.policy`。求购、集市、榜单、用户、OpenAPI、写操作、管理工具和健康检查均不注册，也不能通过 resources/prompts 绕过工具边界。
+
+生产环境推荐把 StudyHub 作为 OAuth 2.1 Resource Server，接入现有授权服务器，通过 issuer、audience 和 JWKS 验证访问令牌：
 
 ```bash
 STUDYHUB_MCP_REQUIRE_AUTH=true
-STUDYHUB_MCP_ACCESS_TOKENS='agent-token:mcp:discover_public_materials,mcp:recommend_public_materials,mcp:read_public_material_summary'
+STUDYHUB_MCP_AUTH_MODE=oauth
+STUDYHUB_MCP_OAUTH_AUTHORIZATION_SERVERS=https://auth.example.edu
+STUDYHUB_MCP_OAUTH_ISSUER=https://auth.example.edu
+STUDYHUB_MCP_OAUTH_JWKS_URI=https://auth.example.edu/.well-known/jwks.json
+STUDYHUB_MCP_OAUTH_AUDIENCE=https://study-hub.cn/mcp
+STUDYHUB_MCP_CLIENT_RATE_LIMIT=60
+STUDYHUB_MCP_CLIENT_QUOTA=1000
+STUDYHUB_MCP_CLIENT_QUOTA_WINDOW_SECONDS=86400
 ```
+
+`hybrid` 可用于 OAuth 迁移期；`static` 只建议本地开发或短期兼容。旧的 discovery/recommend/summary scope 在迁移期仍能匹配对应新工具，但 Protected Resource Metadata 只发布新的最小 scope。
 
 MCP 返回的站内 URL 默认使用 `https://study-hub.cn`，可以通过 `STUDYHUB_PUBLIC_SITE_BASE_URL` 改成当前部署域名。
 MCP 对外定位为资料发现和导流入口，只返回公开资料摘要和 StudyHub 站内链接；不会返回下载链接、网盘链接、提取码、文件 token 或完整预览内容。用户需要打开 StudyHub 链接后，按站内正常流程登录、购买或下载。
@@ -64,7 +75,10 @@ OAuth Protected Resource Metadata：
 
 ```text
 http://127.0.0.1:8011/.well-known/oauth-protected-resource
+http://127.0.0.1:8011/.well-known/oauth-protected-resource/mcp
 ```
+
+完整外部接入说明见仓库根目录 [`MCP.md`](../MCP.md)。
 
 用 MCP Inspector 验证：
 
@@ -97,7 +111,7 @@ npx -y @modelcontextprotocol/inspector http://127.0.0.1:8011/mcp
 我想要数据结构期末复习资料，帮我在 StudyHub 里找几份，并把最相关的资料链接推荐给我。
 ```
 
-预期行为：CLI 优先调用 `materials.discover` 或 `materials.recommend_public`，返回轻量资料元数据、推荐理由和 StudyHub 站内链接。后续下载、购买、打赏等动作必须由用户打开链接后在 StudyHub 站内完成。
+预期行为：CLI 调用 `materials.search` 或 `materials.recommend`，返回轻量资料元数据、推荐理由和 StudyHub 站内链接。后续下载、购买、打赏等动作必须由用户打开链接后在 StudyHub 站内完成。
 
 也可以直接用 JSON-RPC 验证：
 
@@ -112,13 +126,13 @@ curl -s http://127.0.0.1:8011/mcp \
   -H 'Accept: application/json, text/event-stream' \
   -H 'Content-Type: application/json' \
   -H 'Authorization: Bearer <your-token>' \
-  --data '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"materials.discover","arguments":{"query":"数据结构","limit":10}}}'
+  --data '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"materials.search","arguments":{"query":"期末 真题","course":"数据结构","limit":5}}}'
 
 curl -s http://127.0.0.1:8011/mcp \
   -H 'Accept: application/json, text/event-stream' \
   -H 'Content-Type: application/json' \
   -H 'Authorization: Bearer <your-token>' \
-  --data '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"materials.recommend_public","arguments":{"query":"通信原理期末","limit":3}}}'
+  --data '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"materials.recommend","arguments":{"query":"基础一般","course":"通信原理","goal":"两周后期末考试","time_budget":"14 天，每天 2 小时","limit":3}}}'
 ```
 
 需要本地环境变量样例时：
