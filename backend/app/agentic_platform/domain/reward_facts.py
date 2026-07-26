@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from pydantic import Field
+from pydantic import Field, field_validator
 
 from ._base import DomainModel
 from .artifact import ArtifactRef
@@ -34,3 +34,11 @@ class RewardFacts(DomainModel):
     context_tokens: int = Field(default=0, ge=0)
 
     trainable: bool = True
+    quarantine_reason: str | None = Field(default=None, max_length=512)
+
+    @field_validator("quarantine_reason")
+    @classmethod
+    def reject_blank_quarantine_reason(cls, value: str | None) -> str | None:
+        if value is not None and not value.strip():
+            raise ValueError("quarantine reason must not be blank")
+        return value

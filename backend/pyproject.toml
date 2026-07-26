@@ -47,7 +47,7 @@ include = ["app*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-pythonpath = ["."]
+pythonpath = [".", ".."]
 addopts = "-q"
 
 [tool.ruff]

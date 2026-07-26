@@ -13,6 +13,7 @@ from .observation import EvidenceReference, Observation, ObservationSource
 from .plan import AgentPlan, PlanStep, PlanStepStatus, RetryPolicy
 from .reward_facts import RewardFacts
 from .state import AgentBudget, AgentTaskState, StateDelta
+from .state_abstract import state_abstract_key
 from .transition import AgentTransitionEvent, TokenRole, TokenRoleSpan
 
 __all__ = [
@@ -40,4 +41,5 @@ __all__ = [
     "TokenRole",
     "TokenRoleSpan",
     "apply_state_delta",
+    "state_abstract_key",
 ]

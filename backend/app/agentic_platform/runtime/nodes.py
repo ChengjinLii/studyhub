@@ -15,6 +15,7 @@ from app.agentic_platform.domain.hashing import canonical_hash, json_schema_hash
 from app.agentic_platform.domain.observation import Observation, ObservationSource
 from app.agentic_platform.domain.reward_facts import RewardFacts
 from app.agentic_platform.domain.state import AgentTaskState, FailureRecord, StateDelta, TerminalState, TerminalStatus
+from app.agentic_platform.domain.state_abstract import state_abstract_key
 from app.agentic_platform.domain.transition import AgentTransitionEvent, ExecutionError, VerifierResult
 from app.agentic_platform.policy.base import AgentPolicy
 from app.agentic_platform.policy.context_builder import ContextBuilder
@@ -1217,26 +1218,7 @@ class AgentGraphNodes:
 
     @staticmethod
     def _state_abstract_key(state: AgentTaskState) -> str:
-        return canonical_hash(
-            {
-                "goal_id": state.goal.goal_id,
-                "plan": [(step.step_id, step.status.value) for step in state.plan.steps],
-                "pending": "user"
-                if state.pending_user_request
-                else "approval"
-                if state.pending_approval
-                else "event"
-                if state.pending_event
-                else None,
-                "working_set": {
-                    "candidate": len(state.working_set.candidate_ids),
-                    "accepted": len(state.working_set.accepted_ids),
-                    "rejected": len(state.working_set.rejected_ids),
-                    "evidence": len(state.working_set.evidence_refs),
-                },
-                "terminal": state.terminal.status.value if state.terminal else None,
-            }
-        )
+        return state_abstract_key(state)
 
     @staticmethod
     def _failure_delta(graph_state: Mapping[str, Any], error: ExecutionError | None) -> StateDelta:
