@@ -18,6 +18,8 @@ dist/
 backend/artifacts/
 ai_platform/data/*.local.json
 ai_platform/logs/
+.local-research/vendor/
+artifacts/agentic_platform/
 frontend/node_modules/
 frontend/.next/
 frontend/tsconfig.tsbuildinfo

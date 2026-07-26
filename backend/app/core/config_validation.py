@@ -33,6 +33,7 @@ def validate_runtime_configuration(settings: Any, *, default_dev_jwt_secret: str
     _validate_payment(settings)
     _validate_kyc(settings)
     _validate_mcp(settings)
+    _validate_agentic_platform(settings)
     _validate_production_providers(settings)
 
 
@@ -138,6 +139,25 @@ def _validate_mcp(settings: Any) -> None:
         ]
         if any(not str(value or "").startswith("https://") for value in oauth_urls):
             raise RuntimeError("preview/production 的 MCP OAuth issuer、JWKS、audience 和授权服务器必须使用 HTTPS。")
+
+
+def _validate_agentic_platform(settings: Any) -> None:
+    if not settings.agentic_admin_only:
+        raise RuntimeError("Agentic Platform 必须保持 STUDYHUB_AGENTIC_ADMIN_ONLY=true。")
+    if settings.agentic_runtime not in {"legacy", "langgraph"}:
+        raise RuntimeError("STUDYHUB_AGENTIC_RUNTIME 只允许为 legacy 或 langgraph。")
+    if settings.agentic_checkpointer not in {"memory", "sqlite", "redis"}:
+        raise RuntimeError("STUDYHUB_AGENTIC_CHECKPOINTER 只允许为 memory、sqlite 或 redis。")
+    positive_limits = {
+        "STUDYHUB_AGENTIC_MAX_TURNS": settings.agentic_max_turns,
+        "STUDYHUB_AGENTIC_MAX_SKILL_CALLS": settings.agentic_max_skill_calls,
+        "STUDYHUB_DEEP_RESEARCH_MAX_SEARCH_TURNS": settings.deep_research_max_search_turns,
+        "STUDYHUB_DEEP_RESEARCH_MAX_PAGE_READS": settings.deep_research_max_page_reads,
+        "STUDYHUB_AGENTIC_MAX_CONTEXT_TOKENS": settings.agentic_max_context_tokens,
+    }
+    for variable, value in positive_limits.items():
+        if int(value) <= 0:
+            raise RuntimeError(f"{variable} 必须大于 0。")
 
 
 def _validate_production_providers(settings: Any) -> None:

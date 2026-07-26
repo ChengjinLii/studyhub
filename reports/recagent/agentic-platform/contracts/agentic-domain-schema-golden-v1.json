@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "contract_version": "1.0",
+  "schemas": {
+    "AgentDecision": "ed44d1a5392e291aa9d971b4cec95a039c45fc94701a12f4ba88f8e4bfa8a131",
+    "AgentTaskState": "45bfcab38180a1d68e33fd9c7422e3e9cef126bb6f30bd45b2ba69fb7a77cba4",
+    "AgentTransitionEvent": "51a6c1dc479426256e2160711c04fd32cc5b624e5077f9aea54fdb3976227cb1",
+    "ArtifactRef": "38dc8089b9cfc9eb9e8b7440401f5c093511d5366e1fe5235c23ac0da5385d74",
+    "StateDelta": "5bd5afa141312926a144c0716da42d704b2ed147d1a44271a36a4172dabbb735"
+  }
+}

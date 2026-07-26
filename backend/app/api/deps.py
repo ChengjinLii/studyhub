@@ -5,6 +5,7 @@ from functools import lru_cache
 from fastapi import Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
+from app.agentic_platform.skills.registry import SkillRegistry, build_default_skill_registry
 from app.core.config import get_settings
 from app.core.db import get_db_session
 from app.core.public_read_cache import PublicReadCache
@@ -97,6 +98,13 @@ def get_admin_repo() -> AdminRepository:
 @lru_cache(maxsize=1)
 def get_material_repo() -> MaterialRepository:
     return MaterialRepository()
+
+
+@lru_cache(maxsize=1)
+def get_agentic_skill_registry() -> SkillRegistry:
+    """Build the dormant registry without enabling or exposing the platform."""
+
+    return build_default_skill_registry()
 
 
 @lru_cache(maxsize=1)
@@ -443,6 +451,28 @@ def require_privileged_auth_context(auth: AuthContext = Depends(require_auth_con
     return auth
 
 
+def require_admin_agent_context(auth: AuthContext = Depends(require_auth_context)) -> AuthContext:
+    """Strict boundary for the new agentic platform; developers are not administrators here."""
+
+    if not has_role(auth.role_mask, ROLE_ADMIN):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Agentic research platform is admin-only",
+        )
+    return auth
+
+
+def require_enabled_admin_agent_context(
+    auth: AuthContext = Depends(require_admin_agent_context),
+) -> AuthContext:
+    if not get_settings().agentic_platform_enabled:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Agentic research platform is disabled",
+        )
+    return auth
+
+
 def clear_dependency_caches() -> None:
     get_public_read_cache.cache_clear()
     get_material_catalog_repo.cache_clear()
@@ -451,6 +481,7 @@ def clear_dependency_caches() -> None:
     get_auth_repo.cache_clear()
     get_admin_repo.cache_clear()
     get_material_repo.cache_clear()
+    get_agentic_skill_registry.cache_clear()
     get_comment_repo.cache_clear()
     get_market_repo.cache_clear()
     get_community_repo.cache_clear()

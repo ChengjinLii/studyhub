@@ -23,6 +23,8 @@ dependencies = [
   "pypdf>=5.1,<7.0",
   "httpx>=0.28,<0.29",
   "mcp>=1.27,<2.0",
+  "langgraph==1.2.9",
+  "langgraph-checkpoint-sqlite==3.1.0",
   "python-multipart>=0.0.20,<0.1",
   "cryptography>=44.0,<45.0",
   "redis>=5.2,<6.0",
@@ -34,6 +36,7 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
   "alembic>=1.13,<2.0",
+  "hypothesis>=6.0,<7.0",
   "pytest>=8.3,<9.0",
   "pytest-cov>=5.0,<7.0",
   "ruff>=0.8,<0.14"

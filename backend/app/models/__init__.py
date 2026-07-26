@@ -1,6 +1,14 @@
 """SQLAlchemy models live here as the migration proceeds."""
 
 from app.models.admin import UserNoteRecord
+from app.models.agentic_runtime import (
+    AgentArtifactRecord,
+    AgentJobRecord,
+    AgentRunRecord,
+    AgentStepRecord,
+    AgentThreadRecord,
+    AgentWaitRecord,
+)
 from app.models.auth import AuthUser, EmailVerification
 from app.models.base import Base
 from app.models.comments import CommentLikeRecord, CommentRecord
@@ -41,6 +49,12 @@ from app.models.social import UserFollow
 __all__ = [
     "AuthUser",
     "AdminMonthlyPayoutMarkRecord",
+    "AgentArtifactRecord",
+    "AgentJobRecord",
+    "AgentRunRecord",
+    "AgentStepRecord",
+    "AgentThreadRecord",
+    "AgentWaitRecord",
     "AlipayGatewayNotificationRecord",
     "Base",
     "CommentLikeRecord",

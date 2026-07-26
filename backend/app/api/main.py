@@ -5,6 +5,7 @@ from fastapi import APIRouter
 from app.api.routes import (
     account,
     admin,
+    admin_agentic,
     ai,
     community,
     auth,
@@ -47,5 +48,6 @@ api_router.include_router(community.router)
 api_router.include_router(notifications.router)
 api_router.include_router(reports.router)
 api_router.include_router(admin.router)
+api_router.include_router(admin_agentic.router)
 api_router.include_router(requests.router)
 api_router.include_router(security.router)
