@@ -5,6 +5,7 @@ from functools import lru_cache
 from fastapi import Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
+from app.agentic_platform.application import AdminAgentRunService
 from app.agentic_platform.skills.registry import SkillRegistry, build_default_skill_registry
 from app.core.config import get_settings
 from app.core.db import get_db_session
@@ -105,6 +106,13 @@ def get_agentic_skill_registry() -> SkillRegistry:
     """Build the dormant registry without enabling or exposing the platform."""
 
     return build_default_skill_registry()
+
+
+@lru_cache(maxsize=1)
+def get_admin_agent_run_service() -> AdminAgentRunService:
+    """The admin control plane is inert until the feature flags allow its routes."""
+
+    return AdminAgentRunService(get_settings())
 
 
 @lru_cache(maxsize=1)
@@ -473,6 +481,17 @@ def require_enabled_admin_agent_context(
     return auth
 
 
+def require_enabled_deep_research_admin_context(
+    auth: AuthContext = Depends(require_enabled_admin_agent_context),
+) -> AuthContext:
+    if not get_settings().deep_research_enabled:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Deep research is disabled",
+        )
+    return auth
+
+
 def clear_dependency_caches() -> None:
     get_public_read_cache.cache_clear()
     get_material_catalog_repo.cache_clear()
@@ -482,6 +501,7 @@ def clear_dependency_caches() -> None:
     get_admin_repo.cache_clear()
     get_material_repo.cache_clear()
     get_agentic_skill_registry.cache_clear()
+    get_admin_agent_run_service.cache_clear()
     get_comment_repo.cache_clear()
     get_market_repo.cache_clear()
     get_community_repo.cache_clear()
