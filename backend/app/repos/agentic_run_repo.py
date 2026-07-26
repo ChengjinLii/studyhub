@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 import json
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
-from sqlalchemy import select
+from sqlalchemy import and_, or_, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -33,6 +33,10 @@ class AgentRuntimeNotFoundError(LookupError):
 
 class IdempotencyConflictError(ValueError):
     """Raised when an idempotency key is reused for a different logical action."""
+
+
+class AgentJobLeaseLostError(RuntimeError):
+    """A stale worker attempted to update a job reclaimed by another worker."""
 
 
 def _new_id(prefix: str) -> str:
@@ -84,6 +88,44 @@ class AgentRunRepository:
         session.add(record)
         session.flush()
         return record
+
+    def create_or_get_thread(
+        self,
+        session: Session,
+        *,
+        admin_actor_id: int,
+        user_id: int | None = None,
+        title: str | None = None,
+        thread_id: str,
+    ) -> tuple[AgentThreadRecord, bool]:
+        """Create a stable worker-owned thread once, including after a crash.
+
+        Proactive dispatchers derive ``thread_id`` from the durable outbox ID.
+        A duplicate delivery can therefore resume the same thread instead of
+        manufacturing a second logical run.
+        """
+
+        _require_nonblank("thread_id", thread_id)
+        existing = self.get_thread(session, thread_id)
+        if existing is not None:
+            self._assert_same_thread_request(existing, admin_actor_id=admin_actor_id, user_id=user_id)
+            return existing, False
+        try:
+            with session.begin_nested():
+                record = self.create_thread(
+                    session,
+                    admin_actor_id=admin_actor_id,
+                    user_id=user_id,
+                    title=title,
+                    thread_id=thread_id,
+                )
+            return record, True
+        except IntegrityError as exc:
+            existing = self.get_thread(session, thread_id)
+            if existing is None:
+                raise exc
+            self._assert_same_thread_request(existing, admin_actor_id=admin_actor_id, user_id=user_id)
+            return existing, False
 
     def get_thread(self, session: Session, thread_id: str) -> AgentThreadRecord | None:
         return session.get(AgentThreadRecord, thread_id)
@@ -492,6 +534,169 @@ class AgentRunRepository:
         session.flush()
         return record
 
+    def claim_next_job(
+        self,
+        session: Session,
+        *,
+        job_types: set[str] | frozenset[str] | list[str] | tuple[str, ...],
+        claimed_by: str,
+        claim_ttl_seconds: int,
+        now: datetime | None = None,
+    ) -> AgentJobRecord | None:
+        """Atomically lease one due or abandoned job from the supported types.
+
+        Claims intentionally use a short-lived lease rather than an in-memory
+        worker flag.  If a worker process dies after its claim is committed, a
+        later worker can reclaim the job after ``claim_ttl_seconds``.
+        """
+
+        _require_nonblank("claimed_by", claimed_by)
+        normalized_types = sorted({value.strip() for value in job_types if value and value.strip()})
+        if not normalized_types:
+            return None
+        if claim_ttl_seconds <= 0:
+            raise ValueError("claim_ttl_seconds must be positive")
+        claimed_now = now or datetime.now(UTC)
+        stale_before = claimed_now - timedelta(seconds=claim_ttl_seconds)
+        due = and_(
+            AgentJobRecord.status == AgentJobStatus.PENDING.value,
+            or_(AgentJobRecord.scheduled_at.is_(None), AgentJobRecord.scheduled_at <= claimed_now),
+        )
+        stale = and_(
+            AgentJobRecord.status == AgentJobStatus.CLAIMED.value,
+            or_(AgentJobRecord.claimed_at.is_(None), AgentJobRecord.claimed_at <= stale_before),
+        )
+        candidates = list(
+            session.scalars(
+                select(AgentJobRecord)
+                .where(AgentJobRecord.job_type.in_(normalized_types), or_(due, stale))
+                .order_by(AgentJobRecord.scheduled_at.asc(), AgentJobRecord.created_at.asc(), AgentJobRecord.id.asc())
+                .limit(max(8, len(normalized_types) * 4))
+            )
+        )
+        for candidate in candidates:
+            claimable = or_(
+                and_(
+                    AgentJobRecord.status == AgentJobStatus.PENDING.value,
+                    or_(AgentJobRecord.scheduled_at.is_(None), AgentJobRecord.scheduled_at <= claimed_now),
+                ),
+                and_(
+                    AgentJobRecord.status == AgentJobStatus.CLAIMED.value,
+                    or_(AgentJobRecord.claimed_at.is_(None), AgentJobRecord.claimed_at <= stale_before),
+                ),
+            )
+            result = session.execute(
+                update(AgentJobRecord)
+                .where(AgentJobRecord.id == candidate.id, claimable)
+                .values(
+                    status=AgentJobStatus.CLAIMED.value,
+                    claimed_by=claimed_by,
+                    claimed_at=claimed_now,
+                    attempts=AgentJobRecord.attempts + 1,
+                    error_code=None,
+                )
+                .execution_options(synchronize_session=False)
+            )
+            if result.rowcount == 1:
+                session.expire(candidate)
+                claimed = session.get(AgentJobRecord, candidate.id)
+                if claimed is not None:
+                    return claimed
+        return None
+
+    def complete_job(self, session: Session, *, job_id: str, claimed_by: str) -> AgentJobRecord:
+        return self._finish_claimed_job(
+            session,
+            job_id=job_id,
+            claimed_by=claimed_by,
+            target_status=AgentJobStatus.COMPLETED,
+            error_code=None,
+            scheduled_at=None,
+        )
+
+    def cancel_job(self, session: Session, *, job_id: str, claimed_by: str, error_code: str | None = None) -> AgentJobRecord:
+        return self._finish_claimed_job(
+            session,
+            job_id=job_id,
+            claimed_by=claimed_by,
+            target_status=AgentJobStatus.CANCELLED,
+            error_code=error_code,
+            scheduled_at=None,
+        )
+
+    def retry_or_fail_job(
+        self,
+        session: Session,
+        *,
+        job_id: str,
+        claimed_by: str,
+        error_code: str,
+        retry_at: datetime | None,
+        retryable: bool = True,
+    ) -> AgentJobRecord:
+        _require_nonblank("claimed_by", claimed_by)
+        _require_nonblank("error_code", error_code)
+        record = self.require_job(session, job_id)
+        if AgentJobStatus(record.status) != AgentJobStatus.CLAIMED or record.claimed_by != claimed_by:
+            raise AgentJobLeaseLostError(f"agent job lease was lost: {job_id}")
+        target = AgentJobStatus.PENDING if retryable and record.attempts < record.max_attempts else AgentJobStatus.FAILED
+        return self._finish_claimed_job(
+            session,
+            job_id=job_id,
+            claimed_by=claimed_by,
+            target_status=target,
+            error_code=error_code,
+            scheduled_at=retry_at if target == AgentJobStatus.PENDING else None,
+        )
+
+    def require_job(self, session: Session, job_id: str) -> AgentJobRecord:
+        record = session.get(AgentJobRecord, job_id)
+        if record is None:
+            raise AgentRuntimeNotFoundError(f"agent job not found: {job_id}")
+        return record
+
+    def _finish_claimed_job(
+        self,
+        session: Session,
+        *,
+        job_id: str,
+        claimed_by: str,
+        target_status: AgentJobStatus,
+        error_code: str | None,
+        scheduled_at: datetime | None,
+    ) -> AgentJobRecord:
+        _require_nonblank("claimed_by", claimed_by)
+        record = self.require_job(session, job_id)
+        finished_at = datetime.now(UTC)
+        values: dict[str, object] = {
+            "status": target_status.value,
+            "error_code": error_code,
+            "scheduled_at": scheduled_at,
+            "claimed_by": None,
+            "claimed_at": None,
+        }
+        if target_status in {AgentJobStatus.COMPLETED, AgentJobStatus.FAILED, AgentJobStatus.CANCELLED}:
+            values["completed_at"] = finished_at
+        else:
+            values["completed_at"] = None
+        result = session.execute(
+            update(AgentJobRecord)
+            .where(
+                AgentJobRecord.id == job_id,
+                AgentJobRecord.status == AgentJobStatus.CLAIMED.value,
+                AgentJobRecord.claimed_by == claimed_by,
+            )
+            .values(**values)
+            .execution_options(synchronize_session=False)
+        )
+        if result.rowcount != 1:
+            raise AgentJobLeaseLostError(f"agent job lease was lost: {job_id}")
+        session.expire(record)
+        refreshed = session.get(AgentJobRecord, job_id)
+        if refreshed is None:
+            raise AgentRuntimeNotFoundError(f"agent job not found: {job_id}")
+        return refreshed
+
     @staticmethod
     def _assert_same_run_request(
         existing: AgentRunRecord,
@@ -505,6 +710,11 @@ class AgentRunRepository:
             or existing.trigger_type != trigger_type
         ):
             raise IdempotencyConflictError("agent run idempotency key belongs to another logical run")
+
+    @staticmethod
+    def _assert_same_thread_request(existing: AgentThreadRecord, *, admin_actor_id: int, user_id: int | None) -> None:
+        if existing.admin_actor_id != admin_actor_id or existing.user_id != user_id:
+            raise IdempotencyConflictError("agent thread ID belongs to another logical thread")
 
     @staticmethod
     def _assert_same_step_request(existing: AgentStepRecord, step_index: int, node_name: str) -> None:

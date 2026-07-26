@@ -4,6 +4,7 @@ from app.models.admin import UserNoteRecord
 from app.models.agentic_runtime import (
     AgentArtifactRecord,
     AgentJobRecord,
+    AgentOutboxRecord,
     AgentRunRecord,
     AgentStepRecord,
     AgentThreadRecord,
@@ -51,6 +52,7 @@ __all__ = [
     "AdminMonthlyPayoutMarkRecord",
     "AgentArtifactRecord",
     "AgentJobRecord",
+    "AgentOutboxRecord",
     "AgentRunRecord",
     "AgentStepRecord",
     "AgentThreadRecord",

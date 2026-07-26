@@ -158,6 +158,22 @@ def _validate_agentic_platform(settings: Any) -> None:
     for variable, value in positive_limits.items():
         if int(value) <= 0:
             raise RuntimeError(f"{variable} 必须大于 0。")
+    if settings.agentic_proactive_enabled:
+        if not settings.agentic_platform_enabled:
+            raise RuntimeError("STUDYHUB_AGENTIC_PROACTIVE_ENABLED 需要先启用 STUDYHUB_AGENTIC_PLATFORM_ENABLED。")
+        if settings.agentic_shadow_admin_actor_id is None or int(settings.agentic_shadow_admin_actor_id) <= 0:
+            raise RuntimeError("STUDYHUB_AGENTIC_SHADOW_ADMIN_ACTOR_ID 必须是正数管理员 ID。")
+    positive_worker_limits = {
+        "STUDYHUB_AGENTIC_WORKER_LOCK_TIMEOUT_SECONDS": settings.agentic_worker_lock_timeout_seconds,
+        "STUDYHUB_AGENTIC_WORKER_BATCH_SIZE": settings.agentic_worker_batch_size,
+        "STUDYHUB_AGENTIC_WORKER_CLAIM_TTL_SECONDS": settings.agentic_worker_claim_ttl_seconds,
+        "STUDYHUB_AGENTIC_WORKER_MAX_ATTEMPTS": settings.agentic_worker_max_attempts,
+    }
+    for variable, value in positive_worker_limits.items():
+        if int(value) <= 0:
+            raise RuntimeError(f"{variable} 必须大于 0。")
+    if int(settings.agentic_worker_retry_delay_seconds) < 0:
+        raise RuntimeError("STUDYHUB_AGENTIC_WORKER_RETRY_DELAY_SECONDS 不能小于 0。")
 
 
 def _validate_production_providers(settings: Any) -> None:

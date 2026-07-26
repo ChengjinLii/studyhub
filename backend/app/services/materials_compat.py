@@ -473,7 +473,14 @@ class MaterialsCompatMixin:
         self._compat_assert_download_access(session, row, user_id, role_mask)
         if self._compat_should_consume_download_quota(row, user_id, role_mask):
             self._compat_consume_download_quota(session, user_id, 1)
-        self._compat_register_download(session, material_id, user_id)
+        registered = self._compat_register_download(session, material_id, user_id)
+        if registered:
+            self._enqueue_proactive_material_download(
+                session,
+                material_id=material_id,
+                material_title=str(row["title"]),
+                user_id=user_id,
+            )
         session.commit()
         self.invalidate_material_summary_cache()
         return self._compat_download_payload(row)
@@ -496,7 +503,15 @@ class MaterialsCompatMixin:
         if quota_needed:
             self._compat_consume_download_quota(session, user_id, quota_needed)
         for row in rows:
-            self._compat_register_download(session, int(row["id"]), user_id)
+            material_id = int(row["id"])
+            registered = self._compat_register_download(session, material_id, user_id)
+            if registered:
+                self._enqueue_proactive_material_download(
+                    session,
+                    material_id=material_id,
+                    material_title=str(row["title"]),
+                    user_id=user_id,
+                )
         session.commit()
         self.invalidate_material_summary_cache()
         return [self._compat_batch_download_payload(row) for row in rows]
@@ -580,7 +595,7 @@ class MaterialsCompatMixin:
         if result.rowcount != 1:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="DOWNLOAD_QUOTA_EXHAUSTED")
 
-    def _compat_register_download(self, session: Session, material_id: int, user_id: int) -> None:
+    def _compat_register_download(self, session: Session, material_id: int, user_id: int) -> bool:
         existing = session.execute(
             text(
                 """
@@ -593,7 +608,7 @@ class MaterialsCompatMixin:
             {"material_id": material_id, "user_id": user_id},
         ).first()
         if existing is not None:
-            return
+            return False
         session.execute(
             text(
                 """
@@ -614,6 +629,7 @@ class MaterialsCompatMixin:
             ),
             {"material_id": material_id},
         )
+        return True
 
     def _compat_download_payload(self, row: dict[str, Any]) -> dict[str, Any]:
         material_id = int(row["id"])

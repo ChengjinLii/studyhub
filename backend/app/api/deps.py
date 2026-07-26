@@ -6,6 +6,11 @@ from fastapi import Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
 from app.agentic_platform.application import AdminAgentRunService
+from app.agentic_platform.application.runtime_events import RuntimeEventStore
+from app.agentic_platform.proactive.dispatcher import ProactiveDispatcher
+from app.agentic_platform.proactive.jobs import ProactiveAgentWorker
+from app.agentic_platform.proactive.outbox import AgentOutboxRepository
+from app.agentic_platform.proactive.triggers import ProactiveTriggerService
 from app.agentic_platform.skills.registry import SkillRegistry, build_default_skill_registry
 from app.core.config import get_settings
 from app.core.db import get_db_session
@@ -21,6 +26,8 @@ from app.providers.payment import AlipayPagePaymentProvider, LocalAlipayPaymentP
 from app.providers.storage import AliyunOssStorageProvider, LocalFileStorageProvider, StorageProvider
 from app.providers.transfer import AlipayTransferProvider, LocalTransferProvider, PayoutTransferProvider
 from app.repos.auth_repo import AuthRepository
+from app.repos.agentic_artifact_repo import AgentArtifactRepository
+from app.repos.agentic_run_repo import AgentRunRepository
 from app.repos.admin_repo import AdminRepository
 from app.repos.comment_repo import CommentRepository
 from app.repos.community_repo import CommunityRepository
@@ -113,6 +120,38 @@ def get_admin_agent_run_service() -> AdminAgentRunService:
     """The admin control plane is inert until the feature flags allow its routes."""
 
     return AdminAgentRunService(get_settings())
+
+
+@lru_cache(maxsize=1)
+def get_proactive_trigger_service() -> ProactiveTriggerService:
+    return ProactiveTriggerService(get_settings())
+
+
+@lru_cache(maxsize=1)
+def get_proactive_agent_worker() -> ProactiveAgentWorker:
+    settings = get_settings()
+    outbox = AgentOutboxRepository()
+    runs = AgentRunRepository()
+    artifacts = AgentArtifactRepository()
+    events = RuntimeEventStore(artifacts)
+    triggers = ProactiveTriggerService(settings, outbox_repository=outbox)
+    dispatcher = ProactiveDispatcher(
+        settings,
+        run_repository=runs,
+        outbox_repository=outbox,
+        events=events,
+    )
+    return ProactiveAgentWorker(
+        settings,
+        triggers=triggers,
+        dispatcher=dispatcher,
+        outbox_repository=outbox,
+        run_repository=runs,
+        artifact_repository=artifacts,
+        material_repository=get_material_repo(),
+        pdf_evidence_service=MaterialPdfEvidenceService(settings, get_material_asset_store()),
+        events=events,
+    )
 
 
 @lru_cache(maxsize=1)
@@ -279,7 +318,14 @@ def get_user_read_service() -> UserReadService:
 
 @lru_cache(maxsize=1)
 def get_materials_service() -> MaterialsService:
-    return MaterialsService(get_settings(), get_read_api_repo(), get_auth_repo(), get_material_repo(), get_material_asset_store())
+    return MaterialsService(
+        get_settings(),
+        get_read_api_repo(),
+        get_auth_repo(),
+        get_material_repo(),
+        get_material_asset_store(),
+        get_proactive_trigger_service(),
+    )
 
 
 @lru_cache(maxsize=1)
@@ -372,6 +418,7 @@ def get_worker_service() -> WorkerService:
         get_payout_service(),
         get_requests_service(),
         get_lock_provider(),
+        get_proactive_agent_worker(),
     )
 
 
@@ -502,6 +549,8 @@ def clear_dependency_caches() -> None:
     get_material_repo.cache_clear()
     get_agentic_skill_registry.cache_clear()
     get_admin_agent_run_service.cache_clear()
+    get_proactive_trigger_service.cache_clear()
+    get_proactive_agent_worker.cache_clear()
     get_comment_repo.cache_clear()
     get_market_repo.cache_clear()
     get_community_repo.cache_clear()

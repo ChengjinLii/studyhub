@@ -30,6 +30,7 @@ def main(argv: list[str] | None = None) -> int:
             "refund",
             "payout-transfer",
             "transfer",
+            "agentic",
         ],
     )
     parser.add_argument("--once", action="store_true", help="仅执行一轮任务后退出")

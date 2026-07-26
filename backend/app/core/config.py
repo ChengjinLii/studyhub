@@ -145,6 +145,16 @@ class Settings(BaseSettings):
     agentic_runtime: str = "legacy"
     agentic_checkpointer: str = "sqlite"
     agentic_transition_export_enabled: bool = True
+    # Proactive work is a separately activated Shadow Mode.  It never turns on
+    # merely because the admin control plane is available.
+    agentic_proactive_enabled: bool = False
+    agentic_shadow_admin_actor_id: int | None = None
+    agentic_worker_lock_name: str = "studyhub:agentic"
+    agentic_worker_lock_timeout_seconds: int = 10
+    agentic_worker_batch_size: int = 8
+    agentic_worker_claim_ttl_seconds: int = 300
+    agentic_worker_retry_delay_seconds: int = 60
+    agentic_worker_max_attempts: int = 3
     deep_research_enabled: bool = False
     deep_research_web_enabled: bool = False
     deep_research_scholar_enabled: bool = False

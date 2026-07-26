@@ -10,6 +10,7 @@ from app.core.config import Settings
 from app.providers.lock import LockProvider
 from app.services.payout_service import PayoutService
 from app.services.requests_service import RequestsService
+from app.agentic_platform.proactive.jobs import ProactiveAgentWorker
 
 
 class WorkerService:
@@ -21,11 +22,13 @@ class WorkerService:
         payout_service: PayoutService,
         requests_service: RequestsService,
         lock_provider: LockProvider,
+        agentic_worker: ProactiveAgentWorker | None = None,
     ) -> None:
         self.settings = settings
         self.payout_service = payout_service
         self.requests_service = requests_service
         self.lock_provider = lock_provider
+        self.agentic_worker = agentic_worker
 
     def run_settlement_job(self, session: Session, *, owner_token: str | None = None) -> dict[str, Any]:
         return self._run_locked(
@@ -63,6 +66,36 @@ class WorkerService:
             task=lambda: {"processed": self.payout_service.refresh_pending_transfers(session)},
         )
 
+    def run_agentic_job(self, session: Session, *, owner_token: str | None = None) -> dict[str, Any]:
+        """Run opted-in proactive Shadow Mode through the independent worker.
+
+        This is intentionally a named job rather than part of ``all``.  Existing
+        finance/request worker schedules therefore retain their historical
+        behavior, while operations can explicitly deploy the agentic worker.
+        """
+
+        if self.agentic_worker is None:
+            return {"enabled": False, "reason": "agentic_worker_unconfigured"}
+        token = owner_token or uuid.uuid4().hex
+        lock_name = self.settings.agentic_worker_lock_name
+        acquired = self.try_acquire_lock(
+            session,
+            lock_name=lock_name,
+            owner_token=token,
+            ttl_seconds=max(
+                self.settings.agentic_worker_lock_timeout_seconds,
+                self.settings.agentic_worker_claim_ttl_seconds,
+                self.settings.worker_lock_ttl_seconds,
+            ),
+        )
+        if not acquired:
+            return {"lockName": lock_name, "acquired": False}
+        try:
+            result = self.agentic_worker.run_once(session, worker_id=f"agentic:{token}")
+            return {"lockName": lock_name, "acquired": True, **result}
+        finally:
+            self.release_lock(session, lock_name=lock_name, owner_token=token)
+
     def run_named_job(self, session: Session, job_name: str, *, owner_token: str | None = None) -> dict[str, Any]:
         normalized = (job_name or "all").strip().lower()
         if normalized == "settlement":
@@ -73,6 +106,8 @@ class WorkerService:
             return self.run_request_refund_job(session, owner_token=owner_token)
         if normalized in {"payout-transfer", "transfer"}:
             return self.run_payout_transfer_job(session, owner_token=owner_token)
+        if normalized == "agentic":
+            return self.run_agentic_job(session, owner_token=owner_token)
         if normalized == "all":
             return {
                 "settlement": self.run_settlement_job(session, owner_token=owner_token),
