@@ -8,6 +8,7 @@ import pytest
 
 from app.agentic_platform.deepresearch.graph import DeepResearchGraph
 from app.agentic_platform.deepresearch.policy import ReplayResearchPolicy
+from app.agentic_platform.deepresearch.citation import CitationVerifier
 from app.agentic_platform.deepresearch.domain_router import (
     ResearchCapabilityFlags,
     ResearchDomainRouter,
@@ -15,13 +16,17 @@ from app.agentic_platform.deepresearch.domain_router import (
     StudyHubResearchEnvironment,
 )
 from app.agentic_platform.deepresearch.state import (
+    Citation,
+    Claim,
     ClaimSupportStatus,
     EvidenceRecord,
+    ReportSection,
     ResearchActionType,
     ResearchContextAction,
     ResearchDecision,
     ResearchSourceRef,
     ResearchSourceType,
+    ResearchReport,
     ResearchTaskPacket,
     initial_research_state,
 )
@@ -370,6 +375,35 @@ def test_unsupported_claim_is_rejected_by_citation_validation() -> None:
     assert validation is not None
     assert validation.passed is False
     assert validation.metrics.unsupported_claim_ids == [result.state.claims[0].claim_id]
+
+
+def test_invalid_citation_target_is_rejected_by_citation_validation() -> None:
+    claim = Claim(
+        claim_id="claim-supported",
+        statement="A supported claim.",
+        status=ClaimSupportStatus.SUPPORTED,
+        evidence_ids=["evidence-supported"],
+        confidence=0.9,
+    )
+    report = ResearchReport(
+        report_id="report-invalid-citation",
+        title="Invalid citation fixture",
+        research_question="Does citation validation reject an unknown evidence ID?",
+        sections=[
+            ReportSection(
+                section_id="findings",
+                heading="Findings",
+                content="A supported claim.",
+                claim_ids=[claim.claim_id],
+                citations=[Citation(claim_id=claim.claim_id, evidence_id="evidence-missing")],
+            )
+        ],
+    )
+
+    validation = CitationVerifier().validate(report, claims=[claim], evidence=[_evidence("evidence-supported")])
+
+    assert validation.passed is False
+    assert validation.metrics.invalid_citation_count == 1
 
 
 def test_disabled_web_capability_never_calls_the_external_adapter() -> None:

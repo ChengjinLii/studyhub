@@ -23,11 +23,14 @@
 - 检查 shell 脚本语法：`bash scripts/check-shell-scripts.sh`
 - 检查敏感文件误提交：`bash scripts/security/check-sensitive-files.sh`
 - 推送前快速门禁：`bash scripts/pre-push-check.sh`
+- Agentic Platform 离线 smoke：`bash scripts/research/agentic-smoke.sh`
 - 非生产 CI 检查：`bash scripts/ci-check.sh`
 - 发布前检查：`bash scripts/predeploy-check.sh`
 - 浏览器加载性能预算：`npm --prefix frontend run test:perf`
 
 `check-shell-scripts.sh` 只执行 `bash -n`，不会运行脚本主体，也不会连接数据库或修改运行态。
+
+`research/agentic-smoke.sh` 是第一阶段 Agentic Platform 的离线验收集。它只运行 fixture/SQLite 测试与 lint，不启动模型、Worker、浏览器、生产服务或外部检索器；用于复查多轮恢复、Snapshot Replay、证据/引用、Shadow Worker、Token Mask 和管理员边界。
 
 `scripts/dev/doctor.sh` 是只读诊断脚本，用来检查 Docker local-dev 和 shell quickstart 至少有一条路径是否可用；它不会启动服务、连接数据库、读取 private env 内容或修改运行态。
 

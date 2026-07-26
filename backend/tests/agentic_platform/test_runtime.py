@@ -125,6 +125,7 @@ async def _kernel(
     events: InMemoryRuntimeEventSink | None = None,
     transitions: InMemoryTransitionSink | None = None,
     persistence=None,
+    redis_checkpoint_mirror=None,
 ) -> AgentKernel:
     return AgentKernel(
         policy=policy,
@@ -137,6 +138,7 @@ async def _kernel(
         transition_sink=transitions,
         persistence=persistence,
         metadata=RuntimeMetadata(policy_version="runtime-test-policy-v1", model_id="replay-test"),
+        redis_checkpoint_mirror=redis_checkpoint_mirror,
     )
 
 
@@ -436,6 +438,16 @@ class FakeRedis:
         return self.values.get(name)
 
 
+class FailingRedis:
+    def set(self, name: str, value: str, ex: int | None = None) -> bool:
+        del name, value, ex
+        raise ConnectionError("fixture redis unavailable")
+
+    def get(self, name: str) -> str | None:
+        del name
+        raise ConnectionError("fixture redis unavailable")
+
+
 def test_redis_checkpoint_adapter_round_trips_a_safe_snapshot() -> None:
     adapter = RedisCheckpointAdapter(FakeRedis(), key_prefix="test:agentic")
     snapshot = RuntimeCheckpointSnapshot(
@@ -451,3 +463,24 @@ def test_redis_checkpoint_adapter_round_trips_a_safe_snapshot() -> None:
 
     assert reference == "redis://test:agentic/agent-run:run-1"
     assert loaded == snapshot
+
+
+def test_redis_checkpoint_mirror_failure_does_not_interrupt_a_durable_run() -> None:
+    async def scenario() -> KernelRunResult:
+        from app.agentic_platform.runtime.checkpoint import InMemoryCheckpointHandle
+
+        kernel = await _kernel(
+            policy=ReplayPolicy(plans=[agent_plan()], decisions=[_final_decision()]),
+            skill_executor=ScriptedSkillExecutor(deque()),
+            checkpoint=InMemoryCheckpointHandle(),
+            redis_checkpoint_mirror=RedisCheckpointAdapter(FailingRedis(), key_prefix="test:agentic"),
+        )
+        result = await kernel.start(_state_with_budget())
+        recovered = await kernel.get_result(result.run_id)
+        await kernel.close()
+        assert recovered.state_hash == result.state_hash
+        return result
+
+    result = asyncio.run(scenario())
+
+    assert result.status == KernelRunStatus.COMPLETED

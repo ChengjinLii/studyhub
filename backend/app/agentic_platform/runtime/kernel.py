@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from enum import StrEnum
 from typing import Any
 
@@ -37,6 +38,9 @@ from .nodes import (
     dump_task_state,
 )
 from .routing import recursion_limit_for_state
+
+
+logger = logging.getLogger(__name__)
 
 
 class KernelRunStatus(StrEnum):
@@ -202,15 +206,24 @@ class AgentKernel:
         checkpoint_ref = self.checkpoint_handle.checkpoint_ref(graph_thread_id)
         await self.persistence.save_checkpoint(state, checkpoint_ref=checkpoint_ref, state_hash=state_hash)
         if self.redis_checkpoint_mirror is not None:
-            self.redis_checkpoint_mirror.save(
-                RuntimeCheckpointSnapshot(
-                    graph_thread_id=graph_thread_id,
-                    run_id=run_id,
-                    state_hash=state_hash,
-                    graph_state=dict(snapshot.values),
-                    next_nodes=list(snapshot.next),
+            try:
+                self.redis_checkpoint_mirror.save(
+                    RuntimeCheckpointSnapshot(
+                        graph_thread_id=graph_thread_id,
+                        run_id=run_id,
+                        state_hash=state_hash,
+                        graph_state=dict(snapshot.values),
+                        next_nodes=list(snapshot.next),
+                    )
                 )
-            )
+            except Exception:  # noqa: BLE001 - Redis is an optional recovery mirror.
+                # The LangGraph checkpointer and durable run persistence above
+                # remain authoritative.  Do not expose Redis error payloads or
+                # let a transient mirror outage change the agent's result.
+                logger.warning(
+                    "agentic Redis checkpoint mirror unavailable; durable checkpoint remains authoritative",
+                    extra={"run_id": run_id, "checkpoint_mirror": "redis"},
+                )
         return KernelRunResult(
             run_id=run_id,
             graph_thread_id=graph_thread_id,
