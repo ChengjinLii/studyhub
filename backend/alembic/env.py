@@ -7,6 +7,7 @@ from sqlalchemy import engine_from_config, pool
 
 from app.core.config import get_settings
 from app.models import Base
+from app.ops.alembic_versioning import prepare_alembic_version_table
 
 
 config = context.config
@@ -43,6 +44,12 @@ def run_migrations_online() -> None:
         poolclass=pool.NullPool,
         future=True,
     )
+
+    # Commit the version-table bootstrap before Alembic opens its migration
+    # transaction.  Otherwise SQLite can roll back Alembic's version-row write
+    # when the shared implicit transaction closes.
+    with connectable.begin() as connection:
+        prepare_alembic_version_table(connection)
 
     with connectable.connect() as connection:
         context.configure(connection=connection, target_metadata=target_metadata, compare_type=True)
