@@ -14,7 +14,10 @@ fail() {
   exit 1
 }
 
-[[ -x "$PYTHON_BIN" ]] || fail "missing Python interpreter: $PYTHON_BIN"
+if [[ ! -x "$PYTHON_BIN" ]]; then
+  PYTHON_BIN="$(command -v "$PYTHON_BIN" 2>/dev/null || true)"
+fi
+[[ -n "$PYTHON_BIN" && -x "$PYTHON_BIN" ]] || fail "missing Python interpreter"
 
 cd "$BACKEND_DIR"
 

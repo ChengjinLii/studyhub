@@ -10,7 +10,7 @@ from __future__ import annotations
 from collections.abc import Iterable, Mapping, Sequence
 from typing import Any
 
-from app.agentic_platform.domain.data_policy import ExportTarget
+from app.agentic_platform.domain.data_policy import ExportTarget, TrainingCollectionAuthorization
 
 from ...data_governance import DatasetExportDenied, DatasetExportGuard
 
@@ -29,13 +29,14 @@ class SearchR1DatasetAdapter:
         ability: str = "agentic_search",
         target: ExportTarget = ExportTarget.TRAIN,
         export_guard: DatasetExportGuard | None = None,
+        collection_authorization: TrainingCollectionAuthorization | None = None,
     ) -> None:
         if not data_source.strip() or not ability.strip():
             raise ValueError("data source and ability must not be blank")
         self.data_source = data_source
         self.ability = ability
         self.target = ExportTarget(target)
-        self.export_guard = export_guard or DatasetExportGuard()
+        self.export_guard = export_guard or DatasetExportGuard(collection_authorization=collection_authorization)
 
     def export_record(self, record: Mapping[str, Any]) -> dict[str, Any]:
         try:
@@ -58,12 +59,16 @@ class SearchR1DatasetAdapter:
             "run_id",
             "transition_id",
             "environment_snapshot_id",
+            "environment_snapshot_hash",
             "state_before_hash",
             "state_after_hash",
             "state_abstract_key",
             "state_group_key_v2",
             "policy_version",
             "model_id",
+            "prompt_template_hash",
+            "skill_catalog_hash",
+            "retriever_version",
         )
         identifiers = {name: _nonblank_string(record.get(name), name) for name in required_strings}
         return {

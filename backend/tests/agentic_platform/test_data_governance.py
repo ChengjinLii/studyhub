@@ -13,6 +13,7 @@ from sqlalchemy.orm import sessionmaker
 from app.agentic_platform.domain.data_policy import (
     ExportTarget,
     LicenseClass,
+    TrainingCollectionAuthorization,
     TrainingDataPolicy,
     aggregate_data_policies,
 )
@@ -24,7 +25,12 @@ from app.agentic_platform.simulation.trajectory import ModelIORecord, Transition
 from app.models import Base
 from app.models.agentic_runtime import AgentArtifactRecord
 from ml.agentic_platform.collection.pilot import PilotScenario, PilotScenarioManifest, run_pilot
-from ml.agentic_platform.collection.validation import validate_pilot_dataset
+from ml.agentic_platform.collection.validation import (
+    PilotGateAuthorizationError,
+    PilotGateReport,
+    authorize_training_collection,
+    validate_pilot_dataset,
+)
 from ml.agentic_platform.data_governance import DatasetExportDenied, DatasetExportGuard
 from tests.agentic_platform.test_trajectory_export import _tokenized_transition
 
@@ -41,7 +47,18 @@ def _trainable_event(*, scenario_id: str = "policy-scenario"):
         update={
             "training_eligible": True,
             "data_policy": TrainingDataPolicy.synthetic_trainable(),
+            "environment_snapshot_hash": f"environment-hash-{scenario_id}",
+            "skill_catalog_hash": "fixture-skill-catalog-v1",
+            "retriever_version": "fixture-retriever-v1",
         }
+    )
+
+
+def _collection_authorization() -> TrainingCollectionAuthorization:
+    return TrainingCollectionAuthorization.issue(
+        pilot_report_hash="a" * 64,
+        pilot_gate_content_hash="b" * 64,
+        required_count=100,
     )
 
 
@@ -64,7 +81,10 @@ async def pilot_runner(*, scenario: dict[str, object], provider: str, trajectory
 
 def test_policy_export_guard_fails_closed_and_preserves_nontrainable_observations() -> None:
     record = ModelIORecord.from_transition(_trainable_event()).model_dump(mode="json")
-    guard = DatasetExportGuard()
+    with pytest.raises(DatasetExportDenied, match="collection_gate_not_authorized"):
+        DatasetExportGuard().authorize_record(record, target=ExportTarget.TRAIN)
+
+    guard = DatasetExportGuard(collection_authorization=_collection_authorization())
 
     assert guard.authorize_record(record, target=ExportTarget.TRAIN).license_class == LicenseClass.SYNTHETIC_TRAINABLE
     for policy, target, reason in (
@@ -92,6 +112,47 @@ def test_policy_export_guard_fails_closed_and_preserves_nontrainable_observation
     )
     assert mixed_retention.license_class == LicenseClass.INTERNAL_EVAL_ONLY
     assert mixed_retention.retention_policy == "mixed_trainable_sources_require_review"
+
+
+def test_collection_authorization_can_only_be_issued_from_a_passing_100_run_train_gate() -> None:
+    base = {
+        "pilot_report_hash": "c" * 64,
+        "export_target": ExportTarget.TRAIN,
+        "required_count": 100,
+        "run_completion": {"requested": 100, "reported": 100, "completed": 100, "not_terminal": 0},
+        "queued_duration": {"total_ms": 0.0, "max_ms": 0.0, "long_queued": 0},
+        "turn_count": 100,
+        "tool_count": 0,
+        "token_coverage": {"covered": 100, "total": 100},
+        "role_span_coverage": {"covered": 100, "total": 100},
+        "tool_observation_trainability": {"observation_tokens": 0, "trainable_observation_tokens": 0},
+        "child_transition_coverage": {"required_runs": 0, "covered_runs": 0, "child_transition_count": 0},
+        "version_coverage": {"covered": 100, "total": 100},
+        "citation_validity": {"checked": 100, "valid": 100, "invalid": 0},
+        "replay_result": {"checked": 100, "consistent": 100},
+        "data_classification": {"synthetic_trainable": 100},
+        "quarantine_reasons": {},
+        "api_cost": 0.0,
+        "gpu_metadata": {"cost": 0.0, "seconds": 0.0},
+        "manifest_verification": {"verified": 100, "failed": 0},
+        "acl_violations": 0,
+        "invalid_citations": 0,
+        "restricted_export_denials": 0,
+        "ci_passed": True,
+        "mysql_migration_verified": True,
+        "gate_passed": True,
+        "failed_gates": [],
+    }
+    gate = PilotGateReport.build(**base)
+
+    authorization = authorize_training_collection(gate)
+
+    assert authorization.pilot_report_hash == gate.pilot_report_hash
+    assert authorization.pilot_gate_content_hash == gate.content_hash
+
+    undersized = PilotGateReport.build(**(base | {"required_count": 99}))
+    with pytest.raises(PilotGateAuthorizationError, match="requires_100"):
+        authorize_training_collection(undersized)
 
 
 def test_artifact_policy_is_persisted_with_a_safe_default_and_explicit_override(tmp_path: Path) -> None:

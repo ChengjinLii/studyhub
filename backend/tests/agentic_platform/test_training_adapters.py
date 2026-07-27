@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import asyncio
 
-from app.agentic_platform.domain.data_policy import TrainingDataPolicy
+import pytest
+
+from app.agentic_platform.domain.data_policy import TrainingCollectionAuthorization, TrainingDataPolicy
 from app.agentic_platform.simulation.trajectory import ModelIORecord
-from ml.agentic_platform.adapters.search_r1 import SearchR1DatasetAdapter
+from ml.agentic_platform.adapters.search_r1 import SearchR1DatasetAdapter, SearchR1DatasetError
 from ml.agentic_platform.adapters.verl import VerlAgentLoopAdapter
 from tests.agentic_platform.test_trajectory_export import _tokenized_transition
 
@@ -15,12 +17,23 @@ def test_search_r1_adapter_exports_compatible_shape_without_retokenizing() -> No
             update={
                 "training_eligible": True,
                 "data_policy": TrainingDataPolicy.synthetic_trainable(),
+                "environment_snapshot_hash": "fixture-environment-hash-v1",
+                "skill_catalog_hash": "fixture-skill-catalog-v1",
+                "retriever_version": "fixture-retriever-v1",
             }
         )
     )
     assert record is not None
 
-    exported = SearchR1DatasetAdapter().export_record(record.model_dump(mode="json"))
+    with pytest.raises(SearchR1DatasetError, match="collection_gate_not_authorized"):
+        SearchR1DatasetAdapter().export_record(record.model_dump(mode="json"))
+
+    authorization = TrainingCollectionAuthorization.issue(
+        pilot_report_hash="a" * 64,
+        pilot_gate_content_hash="b" * 64,
+        required_count=100,
+    )
+    exported = SearchR1DatasetAdapter(collection_authorization=authorization).export_record(record.model_dump(mode="json"))
 
     assert set(exported) == {"data_source", "prompt", "ability", "reward_model", "extra_info"}
     assert exported["extra_info"]["raw_token_ids"] == [101, 102, 103, 104, 105]

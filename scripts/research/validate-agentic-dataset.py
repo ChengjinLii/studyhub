@@ -22,7 +22,11 @@ from ml.agentic_platform.collection.pilot import (  # noqa: E402
     load_pilot_manifest,
     load_pilot_report,
 )
-from ml.agentic_platform.collection.validation import validate_pilot_dataset  # noqa: E402
+from ml.agentic_platform.collection.validation import (  # noqa: E402
+    PilotGateAuthorizationError,
+    authorize_training_collection,
+    validate_pilot_dataset,
+)
 
 
 def parse_args() -> argparse.Namespace:
@@ -41,6 +45,11 @@ def parse_args() -> argparse.Namespace:
         help="Assert that the additive MySQL migration was verified in the target environment",
     )
     parser.add_argument("--output", required=True, help="Path for the JSON gate report")
+    parser.add_argument(
+        "--authorize-collection",
+        action="store_true",
+        help="After a passing 100-run Train Gate, write collection-authorization.json next to --output",
+    )
     return parser.parse_args()
 
 
@@ -66,6 +75,16 @@ def main() -> int:
     temporary = output.with_name(f".{output.name}.tmp")
     temporary.write_text(canonical_json(gate, exclude_fields=()) + "\n", encoding="utf-8")
     temporary.replace(output)
+    if args.authorize_collection:
+        try:
+            authorization = authorize_training_collection(gate)
+        except PilotGateAuthorizationError as exc:
+            print(f"agentic-dataset: {exc}", file=sys.stderr)
+            return 1
+        authorization_output = output.with_name("collection-authorization.json")
+        authorization_temporary = authorization_output.with_name(f".{authorization_output.name}.tmp")
+        authorization_temporary.write_text(canonical_json(authorization, exclude_fields=()) + "\n", encoding="utf-8")
+        authorization_temporary.replace(authorization_output)
     print(json.dumps(gate.model_dump(mode="json"), ensure_ascii=False, sort_keys=True))
     return 0 if gate.gate_passed else 1
 

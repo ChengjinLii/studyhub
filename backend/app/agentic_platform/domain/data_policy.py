@@ -14,6 +14,7 @@ from typing import Iterable
 from pydantic import Field, field_validator, model_validator
 
 from ._base import DomainModel
+from .hashing import canonical_hash
 
 
 class DataSensitivity(StrEnum):
@@ -160,6 +161,66 @@ class TrainingDataPolicy(DomainModel):
             LicenseClass.PUBLIC_TRAINABLE,
             LicenseClass.SYNTHETIC_TRAINABLE,
         }
+
+
+class TrainingCollectionAuthorization(DomainModel):
+    """Immutable evidence that the pre-collection Train Go Gate passed.
+
+    A data policy answers whether bytes *may* be used for training.  This
+    separate contract answers whether the platform has completed the required
+    100-run readiness gate before any Train export is materialized.  It is not
+    an Agent control policy and does not restrict the model's legal actions.
+    """
+
+    schema_version: str = "1.0"
+    pilot_report_hash: str = Field(min_length=64, max_length=64)
+    pilot_gate_content_hash: str = Field(min_length=64, max_length=64)
+    export_target: ExportTarget = ExportTarget.TRAIN
+    required_count: int = Field(ge=100)
+    content_hash: str = Field(min_length=64, max_length=64)
+
+    @field_validator("pilot_report_hash", "pilot_gate_content_hash", "content_hash")
+    @classmethod
+    def validate_hashes(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("collection authorization hashes must not be blank")
+        return value
+
+    @model_validator(mode="after")
+    def validate_authorization(self) -> "TrainingCollectionAuthorization":
+        if self.export_target != ExportTarget.TRAIN:
+            raise ValueError("collection authorization only permits train exports")
+        if self.content_hash != self._content_hash():
+            raise ValueError("collection authorization content hash does not match its fields")
+        return self
+
+    @classmethod
+    def issue(
+        cls,
+        *,
+        pilot_report_hash: str,
+        pilot_gate_content_hash: str,
+        required_count: int,
+    ) -> "TrainingCollectionAuthorization":
+        data = {
+            "pilot_report_hash": pilot_report_hash,
+            "pilot_gate_content_hash": pilot_gate_content_hash,
+            "export_target": ExportTarget.TRAIN,
+            "required_count": required_count,
+        }
+        return cls(**data, content_hash=canonical_hash({"schema_version": "1.0", **data}, exclude_fields=()))
+
+    def _content_hash(self) -> str:
+        return canonical_hash(
+            {
+                "schema_version": self.schema_version,
+                "pilot_report_hash": self.pilot_report_hash,
+                "pilot_gate_content_hash": self.pilot_gate_content_hash,
+                "export_target": self.export_target,
+                "required_count": self.required_count,
+            },
+            exclude_fields=(),
+        )
 
 
 class TrainingDataExportError(PermissionError):

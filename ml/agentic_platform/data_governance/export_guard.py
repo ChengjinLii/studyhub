@@ -7,6 +7,7 @@ from typing import Any
 
 from app.agentic_platform.domain.data_policy import (
     ExportTarget,
+    TrainingCollectionAuthorization,
     TrainingDataExportError,
     TrainingDataPolicy,
     require_export_allowed,
@@ -30,6 +31,15 @@ class DatasetExportGuard:
     make a Tool Observation or un-tokenized provider response trainable.
     """
 
+    def __init__(
+        self,
+        *,
+        collection_authorization: TrainingCollectionAuthorization | None = None,
+        enforce_collection_gate: bool = True,
+    ) -> None:
+        self.collection_authorization = collection_authorization
+        self.enforce_collection_gate = enforce_collection_gate
+
     def authorize_record(self, record: Mapping[str, Any], *, target: ExportTarget) -> TrainingDataPolicy:
         policy = self.policy_for(record)
         try:
@@ -38,6 +48,9 @@ class DatasetExportGuard:
             raise DatasetExportDenied(exc.reason_code) from exc
         if target == ExportTarget.TRAIN and record.get("training_eligible") is not True:
             raise DatasetExportDenied("training_record_not_eligible")
+        if target == ExportTarget.TRAIN:
+            self._require_training_collection_authorization()
+            self._validate_train_provenance(record)
         self._validate_role_spans(record)
         return policy
 
@@ -47,7 +60,35 @@ class DatasetExportGuard:
             require_export_allowed(policy, target)
         except TrainingDataExportError as exc:
             raise DatasetExportDenied(exc.reason_code) from exc
+        if target == ExportTarget.TRAIN:
+            self._require_training_collection_authorization()
         return policy
+
+    def _require_training_collection_authorization(self) -> None:
+        if not self.enforce_collection_gate:
+            return
+        if self.collection_authorization is None:
+            raise DatasetExportDenied("collection_gate_not_authorized")
+
+    @staticmethod
+    def _validate_train_provenance(record: Mapping[str, Any]) -> None:
+        required_fields = (
+            "model_id",
+            "policy_version",
+            "prompt_template_hash",
+            "skill_catalog_hash",
+            "retriever_version",
+            "environment_snapshot_id",
+            "environment_snapshot_hash",
+        )
+        values: list[str] = []
+        for field_name in required_fields:
+            value = record.get(field_name)
+            if not isinstance(value, str) or not value.strip():
+                raise DatasetExportDenied("missing_runtime_provenance")
+            values.append(value)
+        if any(value.startswith("legacy-unavailable-") or value == "unconfigured-retriever" for value in values):
+            raise DatasetExportDenied("unresolved_runtime_provenance")
 
     @staticmethod
     def policy_for(value: Mapping[str, Any]) -> TrainingDataPolicy:

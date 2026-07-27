@@ -8,15 +8,22 @@ from .pilot import (
     PilotScenarioOutcome,
     run_pilot,
 )
-from .validation import PilotGateReport, validate_pilot_dataset
+from .validation import (
+    PilotGateAuthorizationError,
+    PilotGateReport,
+    authorize_training_collection,
+    validate_pilot_dataset,
+)
 
 __all__ = [
     "PilotConfigurationError",
     "PilotGateReport",
+    "PilotGateAuthorizationError",
     "PilotRunReport",
     "PilotScenario",
     "PilotScenarioManifest",
     "PilotScenarioOutcome",
     "run_pilot",
+    "authorize_training_collection",
     "validate_pilot_dataset",
 ]

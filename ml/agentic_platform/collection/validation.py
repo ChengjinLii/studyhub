@@ -8,7 +8,7 @@ from pathlib import Path
 from pydantic import Field, field_validator, model_validator
 
 from app.agentic_platform.domain import DomainModel
-from app.agentic_platform.domain.data_policy import ExportTarget
+from app.agentic_platform.domain.data_policy import ExportTarget, TrainingCollectionAuthorization
 from app.agentic_platform.domain.transition import TokenRole
 from app.agentic_platform.persistence.durable_transition_sink import DurableTrajectoryError, DurableTransitionSink
 from app.agentic_platform.domain.hashing import canonical_hash
@@ -102,6 +102,31 @@ class PilotGateReport(DomainModel):
         )
 
 
+class PilotGateAuthorizationError(ValueError):
+    """The documented Go Gate is not sufficient to open Train collection."""
+
+
+def authorize_training_collection(gate: PilotGateReport) -> TrainingCollectionAuthorization:
+    """Issue a content-addressed Train export authorization after the Go Gate.
+
+    The report remains the detailed audit evidence; the compact authorization
+    is what offline exporters require.  Deliberately no authorization is
+    issued for a small smoke pilot, a failed gate, or an Eval-only report.
+    """
+
+    if gate.export_target != ExportTarget.TRAIN:
+        raise PilotGateAuthorizationError("collection_authorization_requires_train_gate")
+    if gate.required_count < 100:
+        raise PilotGateAuthorizationError("collection_authorization_requires_100_pilot_runs")
+    if not gate.gate_passed or gate.failed_gates:
+        raise PilotGateAuthorizationError("collection_authorization_requires_passing_gate")
+    return TrainingCollectionAuthorization.issue(
+        pilot_report_hash=gate.pilot_report_hash,
+        pilot_gate_content_hash=gate.content_hash,
+        required_count=gate.required_count,
+    )
+
+
 def validate_pilot_dataset(
     report: PilotRunReport,
     *,
@@ -124,7 +149,10 @@ def validate_pilot_dataset(
     if long_queue_threshold_ms < 0:
         raise ValueError("long_queue_threshold_ms must not be negative")
 
-    guard = DatasetExportGuard()
+    # This function only audits prospective records; it does not materialize
+    # an offline Train dataset.  Requiring the authorization here would make
+    # the Gate circular, so exporters retain the strict default instead.
+    guard = DatasetExportGuard(enforce_collection_gate=False)
     sink = DurableTransitionSink(Path(report.trajectory_root))
     outcomes = list(report.outcomes)
     completed = [item for item in outcomes if item.status == PilotOutcomeStatus.COMPLETED]
@@ -195,13 +223,29 @@ def validate_pilot_dataset(
             if child.error_code:
                 quarantine_reasons[child.error_code] += 1
                 acl_violations += int(_is_acl_violation(child.error_code))
+            if child.model_turn is not None:
+                model = child.model_turn
+                model_turn_count += 1
+                tokenized_turns += int(model.token_ids is not None and len(model.token_ids) > 0)
+                role_spanned_turns += int(bool(model.token_role_spans))
+                versioned_turns += int(_has_complete_runtime_provenance(model.model_dump(mode="json")))
+                for span in model.token_role_spans:
+                    if span.role in {TokenRole.TOOL_OBSERVATION, TokenRole.USER_SIMULATOR_OBSERVATION}:
+                        observation_token_count += span.end - span.start
+                        trainable_observation_token_count += (span.end - span.start) * int(span.trainable)
+                if model.quarantine_reason:
+                    quarantine_reasons[model.quarantine_reason] += 1
+                try:
+                    guard.authorize_record(model.model_dump(mode="json"), target=target)
+                except DatasetExportDenied as exc:
+                    export_denials += 1
+                    restricted_export_denials += int(exc.reason_code in {"restricted_no_export", "personal_no_training"})
+                    quarantine_reasons[f"export:{exc.reason_code}"] += 1
         for model in records.model_records:
             model_turn_count += 1
             tokenized_turns += int(model.token_ids is not None and len(model.token_ids) > 0)
             role_spanned_turns += int(bool(model.token_role_spans))
-            versioned_turns += int(
-                bool(model.model_id.strip() and model.prompt_template_hash.strip() and model.policy_version.strip())
-            )
+            versioned_turns += int(_has_complete_runtime_provenance(model.model_dump(mode="json")))
             for span in model.token_role_spans:
                 if span.role in {TokenRole.TOOL_OBSERVATION, TokenRole.USER_SIMULATOR_OBSERVATION}:
                     observation_token_count += span.end - span.start
@@ -310,3 +354,23 @@ def _is_acl_violation(code: str) -> bool:
 def _safe_error_code(error: Exception) -> str:
     code = getattr(error, "reason_code", None)
     return str(code) if isinstance(code, str) and code.strip() else "trajectory_validation_failed"
+
+
+def _has_complete_runtime_provenance(value: dict[str, object]) -> bool:
+    required_fields = (
+        "model_id",
+        "policy_version",
+        "prompt_template_hash",
+        "skill_catalog_hash",
+        "retriever_version",
+        "environment_snapshot_id",
+        "environment_snapshot_hash",
+    )
+    fields = [value.get(field_name) for field_name in required_fields]
+    return all(
+        isinstance(field, str)
+        and field.strip()
+        and not field.startswith("legacy-unavailable-")
+        and field != "unconfigured-retriever"
+        for field in fields
+    )
