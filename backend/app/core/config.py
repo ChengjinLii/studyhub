@@ -155,6 +155,13 @@ class Settings(BaseSettings):
     agentic_worker_claim_ttl_seconds: int = 300
     agentic_worker_retry_delay_seconds: int = 60
     agentic_worker_max_attempts: int = 3
+    # The generic execution plane is independently opt-in.  Keeping it
+    # separate from proactive Shadow Mode prevents an admin control-plane
+    # deploy from accidentally starting model-backed work.
+    agentic_execution_enabled: bool = False
+    agentic_execution_batch_size: int = 4
+    agentic_execution_claim_ttl_seconds: int = 900
+    agentic_execution_max_attempts: int = 3
     deep_research_enabled: bool = False
     deep_research_web_enabled: bool = False
     deep_research_scholar_enabled: bool = False

@@ -32,6 +32,7 @@ def main(argv: list[str] | None = None) -> int:
             "transfer",
             "agentic",
         ],
+        help="agentic explicitly runs the opt-in execution and proactive workers; all excludes both",
     )
     parser.add_argument("--once", action="store_true", help="仅执行一轮任务后退出")
     parser.add_argument("--interval-seconds", type=int, default=300, help="非 once 模式下的轮询间隔")

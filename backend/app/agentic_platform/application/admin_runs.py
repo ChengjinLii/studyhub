@@ -218,6 +218,7 @@ class AdminAgentRunService:
                 job_type="agent_run.resume",
                 payload={"schemaVersion": "1.0", "waitId": wait.id, "resume": safe_payload},
                 idempotency_key=_job_idempotency_key(run.id, f"resume:{wait.id}"),
+                max_attempts=self.settings.agentic_execution_max_attempts,
             )
             self.events.append(
                 session,
@@ -274,6 +275,7 @@ class AdminAgentRunService:
                 job_type="agent_run.cancel",
                 payload={"schemaVersion": "1.0", "reason": normalized_reason},
                 idempotency_key=_job_idempotency_key(run.id, "cancel"),
+                max_attempts=self.settings.agentic_execution_max_attempts,
             )
             self.events.append(
                 session,
@@ -383,6 +385,7 @@ class AdminAgentRunService:
                 job_type=f"{kind}.dispatch",
                 payload=dispatch_payload,
                 idempotency_key=_job_idempotency_key(run.id, "dispatch"),
+                max_attempts=self.settings.agentic_execution_max_attempts,
             )
             if created:
                 self.events.append(

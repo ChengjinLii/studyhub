@@ -45,20 +45,32 @@ class SqlAlchemyRuntimePersistence:
                     user_id=state.user_id,
                     title=state.goal.statement[:512],
                 )
-            run, _created = self.repository.create_or_get_run(
-                session,
-                thread_id=state.thread_id,
-                run_id=state.run_id,
-                admin_actor_id=state.admin_actor_id,
-                user_id=state.user_id,
-                trigger_type=state.trigger.trigger_type.value,
-                trigger_ref=state.trigger.request_id or state.trigger.event_id,
-                runtime_version=self.metadata.runtime_version,
-                policy_version=self.metadata.policy_version,
-                environment_snapshot_id=state.environment.snapshot_id,
-                idempotency_key=f"runtime:{state.run_id}",
-            )
-            if AgentRunStatus(run.status) == AgentRunStatus.CREATED:
+            # AdminAgentRunService creates the durable Run before a worker gets
+            # involved. Its request idempotency key intentionally differs from
+            # the runtime key, so checking by run ID first avoids an accidental
+            # second insert or false idempotency conflict.
+            run = self.repository.get_run(session, state.run_id)
+            if run is None:
+                run, _created = self.repository.create_or_get_run(
+                    session,
+                    thread_id=state.thread_id,
+                    run_id=state.run_id,
+                    admin_actor_id=state.admin_actor_id,
+                    user_id=state.user_id,
+                    trigger_type=state.trigger.trigger_type.value,
+                    trigger_ref=state.trigger.request_id or state.trigger.event_id,
+                    runtime_version=self.metadata.runtime_version,
+                    policy_version=self.metadata.policy_version,
+                    environment_snapshot_id=state.environment.snapshot_id,
+                    idempotency_key=f"runtime:{state.run_id}",
+                )
+            elif (
+                run.thread_id != state.thread_id
+                or run.admin_actor_id != state.admin_actor_id
+                or run.user_id != state.user_id
+            ):
+                raise ValueError(f"agent run ownership does not match runtime state: {state.run_id}")
+            if AgentRunStatus(run.status) in {AgentRunStatus.CREATED, AgentRunStatus.QUEUED, AgentRunStatus.WAITING}:
                 self.repository.transition_run_status(session, run_id=state.run_id, target_status=AgentRunStatus.RUNNING)
 
         self._transaction(operation)

@@ -10,6 +10,7 @@ from app.core.config import Settings
 from app.providers.lock import LockProvider
 from app.services.payout_service import PayoutService
 from app.services.requests_service import RequestsService
+from app.agentic_platform.execution.worker import AgentExecutionWorker
 from app.agentic_platform.proactive.jobs import ProactiveAgentWorker
 
 
@@ -23,12 +24,14 @@ class WorkerService:
         requests_service: RequestsService,
         lock_provider: LockProvider,
         agentic_worker: ProactiveAgentWorker | None = None,
+        agentic_execution_worker: AgentExecutionWorker | None = None,
     ) -> None:
         self.settings = settings
         self.payout_service = payout_service
         self.requests_service = requests_service
         self.lock_provider = lock_provider
         self.agentic_worker = agentic_worker
+        self.agentic_execution_worker = agentic_execution_worker
 
     def run_settlement_job(self, session: Session, *, owner_token: str | None = None) -> dict[str, Any]:
         return self._run_locked(
@@ -74,9 +77,21 @@ class WorkerService:
         behavior, while operations can explicitly deploy the agentic worker.
         """
 
-        if self.agentic_worker is None:
-            return {"enabled": False, "reason": "agentic_worker_unconfigured"}
         token = owner_token or uuid.uuid4().hex
+        execution_result: dict[str, Any]
+        if self.agentic_execution_worker is None:
+            execution_result = {"enabled": False, "reason": "agentic_execution_worker_unconfigured"}
+        else:
+            execution_result = self.agentic_execution_worker.run_once(
+                session,
+                worker_id=f"agentic-execution:{token}",
+            ).as_dict()
+
+        if self.agentic_worker is None:
+            return {
+                "execution": execution_result,
+                "proactive": {"enabled": False, "reason": "proactive_agentic_worker_unconfigured"},
+            }
         lock_name = self.settings.agentic_worker_lock_name
         acquired = self.try_acquire_lock(
             session,
@@ -89,10 +104,16 @@ class WorkerService:
             ),
         )
         if not acquired:
-            return {"lockName": lock_name, "acquired": False}
+            return {
+                "execution": execution_result,
+                "proactive": {"lockName": lock_name, "acquired": False},
+            }
         try:
             result = self.agentic_worker.run_once(session, worker_id=f"agentic:{token}")
-            return {"lockName": lock_name, "acquired": True, **result}
+            return {
+                "execution": execution_result,
+                "proactive": {"lockName": lock_name, "acquired": True, **result},
+            }
         finally:
             self.release_lock(session, lock_name=lock_name, owner_token=token)
 

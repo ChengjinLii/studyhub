@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.agentic_platform.application import AdminAgentRunService
 from app.agentic_platform.application.runtime_events import RuntimeEventStore
+from app.agentic_platform.execution import AgentExecutionWorker, AgentRuntimeFactory
 from app.agentic_platform.proactive.dispatcher import ProactiveDispatcher
 from app.agentic_platform.proactive.jobs import ProactiveAgentWorker
 from app.agentic_platform.proactive.outbox import AgentOutboxRepository
@@ -151,6 +152,27 @@ def get_proactive_agent_worker() -> ProactiveAgentWorker:
         material_repository=get_material_repo(),
         pdf_evidence_service=MaterialPdfEvidenceService(settings, get_material_asset_store()),
         events=events,
+    )
+
+
+@lru_cache(maxsize=1)
+def get_agent_runtime_factory() -> AgentRuntimeFactory:
+    """R1 keeps the plane inert until R2 binds a real model-backed runtime."""
+
+    return AgentRuntimeFactory()
+
+
+@lru_cache(maxsize=1)
+def get_agent_execution_worker() -> AgentExecutionWorker:
+    settings = get_settings()
+    artifacts = AgentArtifactRepository()
+    return AgentExecutionWorker(
+        settings,
+        runtime_factory=get_agent_runtime_factory(),
+        lock_provider=get_lock_provider(),
+        run_repository=AgentRunRepository(),
+        artifact_repository=artifacts,
+        events=RuntimeEventStore(artifacts),
     )
 
 
@@ -418,7 +440,8 @@ def get_worker_service() -> WorkerService:
         get_payout_service(),
         get_requests_service(),
         get_lock_provider(),
-        get_proactive_agent_worker(),
+        agentic_worker=get_proactive_agent_worker(),
+        agentic_execution_worker=get_agent_execution_worker(),
     )
 
 
@@ -551,6 +574,8 @@ def clear_dependency_caches() -> None:
     get_admin_agent_run_service.cache_clear()
     get_proactive_trigger_service.cache_clear()
     get_proactive_agent_worker.cache_clear()
+    get_agent_runtime_factory.cache_clear()
+    get_agent_execution_worker.cache_clear()
     get_comment_repo.cache_clear()
     get_market_repo.cache_clear()
     get_community_repo.cache_clear()
