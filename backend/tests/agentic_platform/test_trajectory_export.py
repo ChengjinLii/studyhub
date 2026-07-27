@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 
-from app.agentic_platform.domain.transition import AgentTransitionEvent, TokenRole, TokenRoleSpan
+from app.agentic_platform.domain.transition import AgentTransitionEvent, ModelTurnPurpose, TokenRole, TokenRoleSpan
 from app.agentic_platform.simulation.trajectory import ModelIORecord, TransitionJsonlSink
 from tests.agentic_platform.factories import transition
 
@@ -82,3 +82,33 @@ def test_trajectory_paths_are_isolated_by_thread_and_run(tmp_path) -> None:
     assert first_paths.transitions_path != second_paths.transitions_path
     assert first_paths.transitions_path.read_text(encoding="utf-8").count("\n") == 1
     assert second_paths.transitions_path.read_text(encoding="utf-8").count("\n") == 1
+
+
+def test_standalone_planner_model_io_is_retained_without_local_tokens(tmp_path) -> None:
+    action = _tokenized_transition()
+    planner_turn = action.model_turn_event().model_copy(
+        update={
+            "model_turn_id": "model-turn-planner-1",
+            "transition_id": None,
+            "turn_purpose": ModelTurnPurpose.PLANNER,
+            "token_ids": None,
+            "token_logprobs": None,
+            "token_role_spans": [],
+            "training_eligible": False,
+            "quarantine_reason": "missing_student_tokenization",
+        }
+    )
+    sink = TransitionJsonlSink(tmp_path / "trajectory-export")
+
+    asyncio.run(sink.emit_model_turn(planner_turn))
+    asyncio.run(sink.emit(action))
+
+    paths = sink.paths_for_event(action)
+    records = [ModelIORecord.model_validate_json(line) for line in paths.model_io_path.read_text(encoding="utf-8").splitlines()]
+    manifest = sink.manifest_for_event(action)
+    assert len(records) == 2
+    assert records[0].transition_id is None
+    assert records[0].training_eligible is False
+    assert records[0].quarantine_reason == "missing_student_tokenization"
+    assert manifest is not None
+    assert manifest.model_io_count == 2

@@ -25,6 +25,23 @@ class TokenRole(StrEnum):
 TRAINABLE_TOKEN_ROLES = frozenset({TokenRole.ASSISTANT_ACTION, TokenRole.ASSISTANT_FINAL})
 
 
+class ModelTurnPurpose(StrEnum):
+    """The bounded role of one model invocation in an agent rollout.
+
+    This is deliberately provenance rather than control flow.  A policy may
+    still choose any legal next action; the value only makes downstream data
+    handling able to distinguish planning, action selection, and final output
+    generation without reconstructing a prompt.
+    """
+
+    PLANNER = "planner"
+    POLICY = "policy"
+    FINALIZER = "finalizer"
+    RESEARCH_PLANNER = "research_planner"
+    RESEARCH_POLICY = "research_policy"
+    RESEARCH_FINALIZER = "research_finalizer"
+
+
 class TokenRoleSpan(DomainModel):
     role: TokenRole
     start: int = Field(ge=0)
@@ -92,6 +109,110 @@ class ExecutionError(DomainModel):
         return value
 
 
+class ModelTurnEvent(DomainModel):
+    """Durable, raw-content-free provenance for one model invocation.
+
+    A normal action Transition has one corresponding ``ModelTurnEvent``.  The
+    planner and finalizer can also emit one without a canonical action
+    transition, which prevents successful model calls from disappearing when a
+    run stops before the next action is executed.
+    """
+
+    schema_version: str = DOMAIN_SCHEMA_VERSION
+
+    model_turn_id: str = Field(min_length=1, max_length=128)
+    thread_id: str = Field(min_length=1, max_length=128)
+    run_id: str = Field(min_length=1, max_length=128)
+    transition_id: str | None = Field(default=None, max_length=128)
+    turn_index: int = Field(ge=0)
+    turn_purpose: ModelTurnPurpose
+
+    environment_snapshot_id: str = Field(min_length=1, max_length=128)
+    state_before_hash: str = Field(min_length=1, max_length=128)
+    state_after_hash: str = Field(min_length=1, max_length=128)
+    state_abstract_key: str = Field(min_length=1, max_length=256)
+    policy_version: str = Field(min_length=1, max_length=128)
+
+    model_id: str = Field(min_length=1, max_length=256)
+    model_revision: str | None = Field(default=None, max_length=256)
+    prompt_template_hash: str = Field(min_length=1, max_length=128)
+    context_view_ref: ArtifactRef
+    raw_model_output_ref: ArtifactRef | None = None
+
+    parsed_decision: AgentDecision | None = None
+    state_delta: StateDelta | None = None
+    reward_facts: RewardFacts | None = None
+
+    token_ids: list[int] | None = None
+    token_logprobs: list[float] | None = None
+    token_role_spans: list[TokenRoleSpan] = Field(default_factory=list)
+    usage: ModelUsage = Field(default_factory=ModelUsage)
+    latency_ms: dict[str, float] = Field(default_factory=dict)
+    finish_reason: str | None = Field(default=None, max_length=128)
+    provider_request_id: str | None = Field(default=None, max_length=256)
+
+    training_eligible: bool = False
+    quarantine_reason: str | None = Field(default=None, max_length=512)
+
+    @field_validator(
+        "model_turn_id",
+        "thread_id",
+        "run_id",
+        "transition_id",
+        "environment_snapshot_id",
+        "state_before_hash",
+        "state_after_hash",
+        "state_abstract_key",
+        "policy_version",
+        "model_id",
+        "model_revision",
+        "prompt_template_hash",
+        "finish_reason",
+        "provider_request_id",
+        "quarantine_reason",
+    )
+    @classmethod
+    def reject_blank_model_turn_strings(cls, value: str | None) -> str | None:
+        if value is not None and not value.strip():
+            raise ValueError("must not be blank")
+        return value
+
+    @field_validator("token_ids")
+    @classmethod
+    def validate_model_turn_token_ids(cls, token_ids: list[int] | None) -> list[int] | None:
+        if token_ids is not None and any(token_id < 0 for token_id in token_ids):
+            raise ValueError("token IDs must be non-negative")
+        return token_ids
+
+    @field_validator("latency_ms")
+    @classmethod
+    def validate_model_turn_latency(cls, latency_ms: dict[str, float]) -> dict[str, float]:
+        if any(not key.strip() for key in latency_ms):
+            raise ValueError("latency metric names must not be blank")
+        if any(value < 0 for value in latency_ms.values()):
+            raise ValueError("latency values must be non-negative")
+        return latency_ms
+
+    @model_validator(mode="after")
+    def validate_model_turn_token_trace(self) -> "ModelTurnEvent":
+        if self.token_logprobs is not None:
+            if self.token_ids is None:
+                raise ValueError("token logprobs require raw token IDs")
+            if len(self.token_logprobs) != len(self.token_ids):
+                raise ValueError("token logprobs must align with raw token IDs")
+        if self.token_role_spans and self.token_ids is None:
+            raise ValueError("token role spans require raw token IDs")
+        if self.token_ids is not None and any(span.end > len(self.token_ids) for span in self.token_role_spans):
+            raise ValueError("token role span exceeds raw token IDs")
+        if self.training_eligible and self.token_ids is None:
+            raise ValueError("training-eligible model turns require raw token IDs")
+        if self.training_eligible and not any(span.trainable for span in self.token_role_spans):
+            raise ValueError("training-eligible model turns require trainable token spans")
+        if self.token_ids is None and self.quarantine_reason != "missing_student_tokenization":
+            raise ValueError("model turns without raw token IDs require missing_student_tokenization")
+        return self
+
+
 class AgentTransitionEvent(DomainModel):
     schema_version: str = DOMAIN_SCHEMA_VERSION
 
@@ -112,6 +233,8 @@ class AgentTransitionEvent(DomainModel):
     policy_version: str = Field(min_length=1, max_length=128)
     model_id: str = Field(min_length=1, max_length=256)
     model_revision: str | None = Field(default=None, max_length=256)
+    model_turn_id: str | None = Field(default=None, max_length=128)
+    turn_purpose: ModelTurnPurpose = ModelTurnPurpose.POLICY
 
     prompt_template_hash: str = Field(min_length=1, max_length=128)
     skill_catalog_hash: str = Field(min_length=1, max_length=128)
@@ -133,6 +256,10 @@ class AgentTransitionEvent(DomainModel):
 
     latency_ms: dict[str, float] = Field(default_factory=dict)
     usage: ModelUsage = Field(default_factory=ModelUsage)
+    finish_reason: str | None = Field(default=None, max_length=128)
+    provider_request_id: str | None = Field(default=None, max_length=256)
+    training_eligible: bool = False
+    quarantine_reason: str | None = Field(default=None, max_length=512)
     error: ExecutionError | None = None
     terminal_reason: str | None = Field(default=None, max_length=2_000)
     exported_at: datetime | None = None
@@ -151,9 +278,13 @@ class AgentTransitionEvent(DomainModel):
         "policy_version",
         "model_id",
         "model_revision",
+        "model_turn_id",
         "prompt_template_hash",
         "skill_catalog_hash",
         "action_schema_hash",
+        "finish_reason",
+        "provider_request_id",
+        "quarantine_reason",
         "terminal_reason",
     )
     @classmethod
@@ -189,7 +320,56 @@ class AgentTransitionEvent(DomainModel):
             raise ValueError("token role spans require raw token IDs")
         if self.token_ids is not None and any(span.end > len(self.token_ids) for span in self.token_role_spans):
             raise ValueError("token role span exceeds raw token IDs")
+        if self.training_eligible and self.token_ids is None:
+            raise ValueError("training-eligible transitions require raw token IDs")
+        if self.training_eligible and not any(span.trainable for span in self.token_role_spans):
+            raise ValueError("training-eligible transitions require trainable token spans")
+        if self.token_ids is None and self.quarantine_reason not in {None, "missing_student_tokenization"}:
+            raise ValueError("transitions without raw token IDs may only use missing_student_tokenization")
         return self
+
+    def model_turn_event(self) -> ModelTurnEvent:
+        """Project an action Transition into its matching model-I/O record.
+
+        Legacy transitions did not have a stable model-turn identifier.  The
+        deterministic fallback keeps their historical exports readable while
+        new runtime writes always provide ``model_turn_id`` explicitly.
+        """
+
+        model_turn_id = self.model_turn_id or f"model_turn_{self.transition_id}"
+        quarantine_reason = self.quarantine_reason
+        if self.token_ids is None and quarantine_reason is None:
+            quarantine_reason = "missing_student_tokenization"
+        return ModelTurnEvent(
+            model_turn_id=model_turn_id,
+            thread_id=self.thread_id,
+            run_id=self.run_id,
+            transition_id=self.transition_id,
+            turn_index=self.turn_index,
+            turn_purpose=self.turn_purpose,
+            environment_snapshot_id=self.environment_snapshot_id,
+            state_before_hash=self.state_before_hash,
+            state_after_hash=self.state_after_hash,
+            state_abstract_key=self.state_abstract_key,
+            policy_version=self.policy_version,
+            model_id=self.model_id,
+            model_revision=self.model_revision,
+            prompt_template_hash=self.prompt_template_hash,
+            context_view_ref=self.context_view_ref.model_copy(deep=True),
+            raw_model_output_ref=self.raw_model_output_ref.model_copy(deep=True) if self.raw_model_output_ref else None,
+            parsed_decision=self.parsed_decision.model_copy(deep=True),
+            state_delta=self.state_delta.model_copy(deep=True),
+            reward_facts=self.reward_facts.model_copy(deep=True),
+            token_ids=list(self.token_ids) if self.token_ids is not None else None,
+            token_logprobs=list(self.token_logprobs) if self.token_logprobs is not None else None,
+            token_role_spans=[span.model_copy(deep=True) for span in self.token_role_spans],
+            usage=self.usage.model_copy(deep=True),
+            latency_ms=dict(self.latency_ms),
+            finish_reason=self.finish_reason,
+            provider_request_id=self.provider_request_id,
+            training_eligible=self.training_eligible,
+            quarantine_reason=quarantine_reason,
+        )
 
     def canonical_hash(self) -> str:
         """Hash the durable transition while ignoring its trace-export timestamp."""

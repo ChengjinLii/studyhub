@@ -14,7 +14,7 @@ from .plan import AgentPlan, PlanStep, PlanStepStatus, RetryPolicy
 from .reward_facts import RewardFacts
 from .state import AgentBudget, AgentTaskState, StateDelta
 from .state_abstract import state_abstract_key
-from .transition import AgentTransitionEvent, TokenRole, TokenRoleSpan
+from .transition import AgentTransitionEvent, ModelTurnEvent, ModelTurnPurpose, TokenRole, TokenRoleSpan
 
 __all__ = [
     "DOMAIN_SCHEMA_VERSION",
@@ -26,6 +26,8 @@ __all__ = [
     "AgentPlan",
     "AgentTaskState",
     "AgentTransitionEvent",
+    "ModelTurnEvent",
+    "ModelTurnPurpose",
     "ArtifactKind",
     "ArtifactRef",
     "EvidenceReference",

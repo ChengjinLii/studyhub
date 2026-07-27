@@ -19,6 +19,12 @@ class KernelGraphState(TypedDict, total=False):
     turn_delta: dict[str, Any]
     context_ref: dict[str, Any]
     context_catalog_hash: str
+    # Model-turn entries contain only provenance, token trace metadata, and
+    # restricted artifact references; never raw provider content or hidden
+    # reasoning.
+    planner_turn_result: dict[str, Any]
+    policy_turn_result: dict[str, Any]
+    finalizer_turn_result: dict[str, Any]
     action_fingerprints: list[str]
     observation_summaries: list[str]
     current_step_id: str | None

@@ -6,7 +6,7 @@ from enum import StrEnum
 from typing import Any, Protocol
 
 from langgraph.types import Command, interrupt
-from pydantic import Field
+from pydantic import Field, field_validator
 
 from app.agentic_platform.domain import DomainModel, apply_state_delta
 from app.agentic_platform.domain.artifact import ArtifactKind, ArtifactRef
@@ -16,10 +16,17 @@ from app.agentic_platform.domain.observation import Observation, ObservationSour
 from app.agentic_platform.domain.reward_facts import RewardFacts
 from app.agentic_platform.domain.state import AgentTaskState, FailureRecord, StateDelta, TerminalState, TerminalStatus
 from app.agentic_platform.domain.state_abstract import state_abstract_key
-from app.agentic_platform.domain.transition import AgentTransitionEvent, ExecutionError, VerifierResult
+from app.agentic_platform.domain.transition import (
+    AgentTransitionEvent,
+    ExecutionError,
+    ModelTurnEvent,
+    ModelTurnPurpose,
+    VerifierResult,
+)
 from app.agentic_platform.policy.base import AgentPolicy
 from app.agentic_platform.policy.context_builder import ContextBuilder
-from app.agentic_platform.policy.turn_result import unwrap_policy_output
+from app.agentic_platform.policy.context_view import ContextPurpose, ContextView
+from app.agentic_platform.policy.turn_result import PolicyTurnResult, unwrap_policy_output
 from app.agentic_platform.skills.context import SkillExecutionContext
 from app.agentic_platform.skills.executor import SkillExecutionError, SkillExecutor
 from app.agentic_platform.skills.registry import SkillRegistry
@@ -68,6 +75,13 @@ class TransitionSink(Protocol):
         ...
 
 
+class ModelTurnSink(Protocol):
+    """Records every successful model invocation, including non-action turns."""
+
+    async def emit_model_turn(self, event: ModelTurnEvent) -> None:
+        ...
+
+
 class InMemoryRuntimeEventSink:
     def __init__(self) -> None:
         self.events: list[RuntimeEvent] = []
@@ -92,6 +106,22 @@ class InMemoryTransitionSink:
         self.events.append(event.model_copy(deep=True))
 
 
+class InMemoryModelTurnSink:
+    def __init__(self) -> None:
+        self.events: list[ModelTurnEvent] = []
+        self._hashes_by_id: dict[str, str] = {}
+
+    async def emit_model_turn(self, event: ModelTurnEvent) -> None:
+        event_hash = canonical_hash(event)
+        existing = self._hashes_by_id.get(event.model_turn_id)
+        if existing is not None:
+            if existing != event_hash:
+                raise ValueError(f"model turn id collision: {event.model_turn_id}")
+            return
+        self._hashes_by_id[event.model_turn_id] = event_hash
+        self.events.append(event.model_copy(deep=True))
+
+
 class NullRuntimeEventSink:
     async def emit(self, event: RuntimeEvent) -> None:
         del event
@@ -99,6 +129,11 @@ class NullRuntimeEventSink:
 
 class NullTransitionSink:
     async def emit(self, event: AgentTransitionEvent) -> None:
+        del event
+
+
+class NullModelTurnSink:
+    async def emit_model_turn(self, event: ModelTurnEvent) -> None:
         del event
 
 
@@ -417,6 +452,16 @@ class RuntimeMetadata(DomainModel):
     policy_version: str = Field(default="policy-v1", min_length=1, max_length=128)
     model_id: str = Field(default="policy-adapter", min_length=1, max_length=256)
     model_revision: str | None = Field(default=None, max_length=256)
+    trainable_turn_purposes: list[ModelTurnPurpose] = Field(
+        default_factory=lambda: [ModelTurnPurpose.POLICY, ModelTurnPurpose.FINALIZER]
+    )
+
+    @field_validator("trainable_turn_purposes")
+    @classmethod
+    def _validate_trainable_turn_purposes(cls, values: list[ModelTurnPurpose]) -> list[ModelTurnPurpose]:
+        if len(values) != len(set(values)):
+            raise ValueError("trainable turn purposes must be unique")
+        return values
 
 
 def dump_task_state(state: AgentTaskState) -> dict[str, Any]:
@@ -471,6 +516,7 @@ class AgentGraphNodes:
         artifact_store: RuntimeArtifactStore,
         event_sink: RuntimeEventSink,
         transition_sink: TransitionSink,
+        model_turn_sink: ModelTurnSink,
         persistence: RuntimePersistence,
         cancellation_registry: CancellationRegistry,
         metadata: RuntimeMetadata,
@@ -485,6 +531,7 @@ class AgentGraphNodes:
         self.artifact_store = artifact_store
         self.event_sink = event_sink
         self.transition_sink = transition_sink
+        self.model_turn_sink = model_turn_sink
         self.persistence = persistence
         self.cancellation_registry = cancellation_registry
         self.metadata = metadata
@@ -508,12 +555,32 @@ class AgentGraphNodes:
         try:
             builder = self._budgeted_builder(state)
             context = builder.build_planner_context(state, self.skill_registry.list())
-            plan = unwrap_policy_output(await self.policy.create_plan(state, context))
+            context_ref = await self._store_context_view(
+                state,
+                context=context,
+                artifact_key="planner-context",
+                turn_index=int(graph_state.get("turn_index", 0)),
+            )
+            planner_turn = self._coerce_policy_turn(
+                await self.policy.create_plan(state, context),
+                context=context,
+                purpose=ContextPurpose.PLANNER,
+            )
+            plan = planner_turn.parsed_output
             delta = merge_state_deltas(
                 StateDelta(plan_update=plan),
                 BudgetGuard.model_turn_delta(context_tokens=context.estimated_tokens),
             )
             successor = apply_state_delta(state, delta)
+            await self._emit_standalone_model_turn(
+                state_before=state,
+                state_after=successor,
+                context_ref=context_ref,
+                turn=planner_turn,
+                purpose=ModelTurnPurpose.PLANNER,
+                turn_index=int(graph_state.get("turn_index", 0)),
+                state_delta=delta,
+            )
         except BudgetExhaustedError as exc:
             return self._terminate(exc.reason.value, TerminalStatus.ABORTED)
         except ValueError as exc:
@@ -530,6 +597,7 @@ class AgentGraphNodes:
         )
         update: dict[str, Any] = {
             "task_state": dump_task_state(successor),
+            "planner_turn_result": planner_turn.runtime_metadata(),
             "observation_summaries": self._append_summary(
                 graph_state,
                 f"Plan {plan.plan_id} version {plan.version} is available for policy selection.",
@@ -557,15 +625,18 @@ class AgentGraphNodes:
                 self.skill_registry.list(),
                 observation_summaries=graph_state.get("observation_summaries", []),
             )
-            context_ref = await self.artifact_store.store_json(
+            context_ref = await self._store_context_view(
                 state_before,
-                artifact_type=ArtifactKind.CONTEXT_VIEW,
+                context=context,
                 artifact_key="policy-context",
-                payload=context.model_dump(mode="json"),
-                summary="Secret-free policy context view",
-                idempotency_key=f"context:{state_before.run_id}:{int(graph_state.get('turn_index', 0))}:{canonical_hash(context)[:24]}",
+                turn_index=int(graph_state.get("turn_index", 0)),
             )
-            decision = unwrap_policy_output(await self.policy.decide(state_before, context))
+            policy_turn = self._coerce_policy_turn(
+                await self.policy.decide(state_before, context),
+                context=context,
+                purpose=ContextPurpose.POLICY,
+            )
+            decision = policy_turn.parsed_output
             assessment = self.duplicate_detector.assess(decision, list(graph_state.get("action_fingerprints", [])))
             base_delta = BudgetGuard.model_turn_delta(context_tokens=context.estimated_tokens)
             state_after_decision = apply_state_delta(state_before, base_delta)
@@ -593,6 +664,7 @@ class AgentGraphNodes:
             "current_step_id": step_id,
             "context_ref": context_ref.model_dump(mode="json"),
             "context_catalog_hash": context.capability_catalog_hash,
+            "policy_turn_result": policy_turn.runtime_metadata(),
             "action_fingerprints": [*graph_state.get("action_fingerprints", []), assessment.fingerprint],
             "duplicate_action": assessment.is_duplicate,
             "event_sequence": sequence,
@@ -917,20 +989,48 @@ class AgentGraphNodes:
         decision = AgentDecision.model_validate(decision_raw) if decision_raw else None
         status = TerminalStatus(graph_state.get("termination_status", TerminalStatus.COMPLETED.value))
         reason = str(graph_state.get("termination_reason") or "finalized")
+        finalizer_turn: PolicyTurnResult[Any] | None = None
         if status != TerminalStatus.COMPLETED:
             output = AgentOutput(summary=f"Agent run ended safely: {reason}", user_visible=True)
         else:
             try:
                 builder = self._budgeted_builder(state)
-                output = unwrap_policy_output(await self.policy.finalize(state, builder.build_final_context(state)))
+                context = builder.build_final_context(state)
+                context_ref = await self._store_context_view(
+                    state,
+                    context=context,
+                    artifact_key="finalizer-context",
+                    turn_index=int(graph_state.get("turn_index", 0)),
+                )
+                finalizer_turn = self._coerce_policy_turn(
+                    await self.policy.finalize(state, context),
+                    context=context,
+                    purpose=ContextPurpose.FINALIZER,
+                )
+                output = finalizer_turn.parsed_output
+                await self._emit_standalone_model_turn(
+                    state_before=state,
+                    state_after=state,
+                    context_ref=context_ref,
+                    turn=finalizer_turn,
+                    purpose=ModelTurnPurpose.FINALIZER,
+                    turn_index=int(graph_state.get("turn_index", 0)),
+                )
             except Exception:  # noqa: BLE001
                 output = (
                     decision.final_output
                     if decision is not None and decision.final_output is not None
                     else AgentOutput(summary="Agent run completed; final output requires review.", user_visible=True)
                 )
+        update: dict[str, Any] = {
+            "final_output": output.model_dump(mode="json"),
+            "termination_status": status.value,
+            "termination_reason": reason,
+        }
+        if finalizer_turn is not None:
+            update["finalizer_turn_result"] = finalizer_turn.runtime_metadata()
         return Command(
-            update={"final_output": output.model_dump(mode="json"), "termination_status": status.value, "termination_reason": reason},
+            update=update,
             goto="artifact_persist",
         )
 
@@ -1066,11 +1166,12 @@ class AgentGraphNodes:
         goto: str,
         wait_turn: bool = False,
     ) -> Command:
+        effective_graph_state = {**graph_state, **update}
         state_current = AgentTaskState.model_validate(update["task_state"])
         execution = ActionExecutionResult()
         verification = VerifierResult(passed=True, summary="Action is awaiting external input." if wait_turn else "Action accepted.")
         return await self._complete_turn(
-            graph_state,
+            effective_graph_state,
             state_before=state_before,
             state_current=state_current,
             decision=decision,
@@ -1116,6 +1217,23 @@ class AgentGraphNodes:
                 "user_questions": 1 if decision.action_type == AgentActionType.ASK_USER else 0,
             }
         )
+        policy_turn = self._turn_from_graph(
+            graph_state,
+            field_name="policy_turn_result",
+            parsed_output=decision,
+            context_ref=context_ref,
+            purpose=ContextPurpose.POLICY,
+        )
+        training_eligible, quarantine_reason = self._training_status(
+            policy_turn,
+            purpose=ModelTurnPurpose.POLICY,
+        )
+        reward_facts = reward_facts.model_copy(
+            update={
+                "trainable": training_eligible,
+                "quarantine_reason": quarantine_reason,
+            }
+        )
         event = AgentTransitionEvent(
             thread_id=successor.thread_id,
             run_id=successor.run_id,
@@ -1129,23 +1247,39 @@ class AgentGraphNodes:
             state_after_hash=canonical_hash(successor),
             state_abstract_key=self._state_abstract_key(successor),
             policy_version=self.metadata.policy_version,
-            model_id=self.metadata.model_id,
-            model_revision=self.metadata.model_revision,
-            prompt_template_hash=canonical_hash(
-                {"policy_version": self.metadata.policy_version, "purpose": "policy", "action_schema": json_schema_hash(AgentDecision)}
+            model_id=policy_turn.model_id,
+            model_revision=policy_turn.model_revision,
+            model_turn_id=self._model_turn_id(
+                state_before,
+                turn_index=max(0, int(graph_state.get("turn_index", 1)) - 1),
+                purpose=ModelTurnPurpose.POLICY,
+                turn=policy_turn,
             ),
+            turn_purpose=ModelTurnPurpose.POLICY,
+            prompt_template_hash=policy_turn.prompt_hash,
             skill_catalog_hash=str(graph_state.get("context_catalog_hash") or "unavailable-catalog-hash"),
             action_schema_hash=json_schema_hash(AgentDecision),
             context_view_ref=context_ref,
+            raw_model_output_ref=policy_turn.raw_model_output_ref,
             parsed_decision=decision,
             observation_ref=execution.observation.artifact_ref if execution.observation else None,
             state_delta=complete_delta,
             verifier_result=verifier_result,
             reward_facts=reward_facts,
+            token_ids=list(policy_turn.token_ids) if policy_turn.token_ids is not None else None,
+            token_logprobs=list(policy_turn.token_logprobs) if policy_turn.token_logprobs is not None else None,
+            token_role_spans=[span.model_copy(deep=True) for span in policy_turn.token_role_spans],
+            usage=policy_turn.usage.model_copy(deep=True),
+            latency_ms=dict(policy_turn.latency_ms),
+            finish_reason=policy_turn.finish_reason,
+            provider_request_id=policy_turn.provider_request_id,
+            training_eligible=training_eligible,
+            quarantine_reason=quarantine_reason,
             error=execution.error,
             terminal_reason=str((update or graph_state).get("termination_reason")) if terminal else None,
         )
         await self.transition_sink.emit(event)
+        await self.model_turn_sink.emit_model_turn(event.model_turn_event())
         await self.persistence.complete_turn(
             successor,
             step_id=(update or graph_state).get("current_step_id"),
@@ -1173,6 +1307,177 @@ class AgentGraphNodes:
             }
         )
         return Command(update=final_update, goto=goto)
+
+    def _coerce_policy_turn(
+        self,
+        value: object,
+        *,
+        context: ContextView,
+        purpose: ContextPurpose,
+    ) -> PolicyTurnResult[Any]:
+        """Accept the structured contract while keeping older adapters usable.
+
+        The fallback is intentionally non-trainable and clearly marked as
+        missing local tokenization.  It does not invent model IDs, token IDs,
+        or hidden content, and therefore keeps an open policy integration from
+        becoming silently eligible for RL data.
+        """
+
+        if isinstance(value, PolicyTurnResult):
+            return value
+        parsed_output = unwrap_policy_output(value)
+        context_hash = canonical_hash(context)
+        return PolicyTurnResult(
+            parsed_output=parsed_output,
+            model_id=self.metadata.model_id,
+            model_revision=self.metadata.model_revision,
+            prompt_hash=canonical_hash(
+                {
+                    "runtime_version": self.metadata.runtime_version,
+                    "policy_version": self.metadata.policy_version,
+                    "purpose": purpose.value,
+                    "context_hash": context_hash,
+                    "compatibility_adapter": True,
+                }
+            ),
+            context_hash=context_hash,
+            trainable=False,
+        )
+
+    def _turn_from_graph(
+        self,
+        graph_state: Mapping[str, Any],
+        *,
+        field_name: str,
+        parsed_output: object,
+        context_ref: ArtifactRef,
+        purpose: ContextPurpose,
+    ) -> PolicyTurnResult[Any]:
+        raw = graph_state.get(field_name)
+        if isinstance(raw, Mapping):
+            try:
+                return PolicyTurnResult.model_validate({**raw, "parsed_output": parsed_output})
+            except Exception:  # noqa: BLE001 - old checkpoints remain non-trainable rather than unreadable.
+                pass
+        context_hash = canonical_hash(context_ref)
+        return PolicyTurnResult(
+            parsed_output=parsed_output,
+            model_id=self.metadata.model_id,
+            model_revision=self.metadata.model_revision,
+            prompt_hash=canonical_hash(
+                {
+                    "runtime_version": self.metadata.runtime_version,
+                    "policy_version": self.metadata.policy_version,
+                    "purpose": purpose.value,
+                    "context_ref": context_hash,
+                    "compatibility_checkpoint": True,
+                }
+            ),
+            context_hash=context_hash,
+            trainable=False,
+        )
+
+    async def _store_context_view(
+        self,
+        state: AgentTaskState,
+        *,
+        context: ContextView,
+        artifact_key: str,
+        turn_index: int,
+    ) -> ArtifactRef:
+        return await self.artifact_store.store_json(
+            state,
+            artifact_type=ArtifactKind.CONTEXT_VIEW,
+            artifact_key=artifact_key,
+            payload=context.model_dump(mode="json"),
+            summary=f"Secret-free {context.purpose.value} context view",
+            idempotency_key=(
+                f"context:{context.purpose.value}:{state.run_id}:{turn_index}:{canonical_hash(context)[:24]}"
+            ),
+        )
+
+    def _training_status(
+        self,
+        turn: PolicyTurnResult[Any],
+        *,
+        purpose: ModelTurnPurpose,
+    ) -> tuple[bool, str | None]:
+        if turn.token_ids is None:
+            return False, "missing_student_tokenization"
+        if not turn.token_role_spans:
+            return False, "missing_token_role_spans"
+        if not turn.trainable:
+            return False, "non_trainable_token_trace"
+        if purpose not in self.metadata.trainable_turn_purposes:
+            return False, None
+        if not any(span.trainable for span in turn.token_role_spans):
+            return False, "missing_trainable_assistant_span"
+        return True, None
+
+    @staticmethod
+    def _model_turn_id(
+        state: AgentTaskState,
+        *,
+        turn_index: int,
+        purpose: ModelTurnPurpose,
+        turn: PolicyTurnResult[Any],
+    ) -> str:
+        return "model_turn_" + canonical_hash(
+            {
+                "run_id": state.run_id,
+                "turn_index": turn_index,
+                "purpose": purpose.value,
+                "prompt_hash": turn.prompt_hash,
+                "context_hash": turn.context_hash,
+            }
+        )[:40]
+
+    async def _emit_standalone_model_turn(
+        self,
+        *,
+        state_before: AgentTaskState,
+        state_after: AgentTaskState,
+        context_ref: ArtifactRef,
+        turn: PolicyTurnResult[Any],
+        purpose: ModelTurnPurpose,
+        turn_index: int,
+        state_delta: StateDelta | None = None,
+    ) -> None:
+        training_eligible, quarantine_reason = self._training_status(turn, purpose=purpose)
+        await self.model_turn_sink.emit_model_turn(
+            ModelTurnEvent(
+                model_turn_id=self._model_turn_id(
+                    state_before,
+                    turn_index=turn_index,
+                    purpose=purpose,
+                    turn=turn,
+                ),
+                thread_id=state_before.thread_id,
+                run_id=state_before.run_id,
+                turn_index=turn_index,
+                turn_purpose=purpose,
+                environment_snapshot_id=state_after.environment.snapshot_id,
+                state_before_hash=canonical_hash(state_before),
+                state_after_hash=canonical_hash(state_after),
+                state_abstract_key=self._state_abstract_key(state_after),
+                policy_version=self.metadata.policy_version,
+                model_id=turn.model_id,
+                model_revision=turn.model_revision,
+                prompt_template_hash=turn.prompt_hash,
+                context_view_ref=context_ref,
+                raw_model_output_ref=turn.raw_model_output_ref,
+                state_delta=state_delta,
+                token_ids=list(turn.token_ids) if turn.token_ids is not None else None,
+                token_logprobs=list(turn.token_logprobs) if turn.token_logprobs is not None else None,
+                token_role_spans=[span.model_copy(deep=True) for span in turn.token_role_spans],
+                usage=turn.usage.model_copy(deep=True),
+                latency_ms=dict(turn.latency_ms),
+                finish_reason=turn.finish_reason,
+                provider_request_id=turn.provider_request_id,
+                training_eligible=training_eligible,
+                quarantine_reason=quarantine_reason,
+            )
+        )
 
     def _budgeted_builder(self, state: AgentTaskState) -> ContextBuilder:
         return ContextBuilder(token_budget=BudgetGuard.policy_context_budget(state, self.context_builder.token_budget))

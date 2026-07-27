@@ -104,6 +104,16 @@ class PolicyTurnResult(DomainModel, Generic[OutputT]):
             token_role_spans=self.token_role_spans,
         )
 
+    def runtime_metadata(self) -> dict[str, object]:
+        """Return checkpoint-safe provenance without parsed or raw content.
+
+        Parsed output already has a typed home in graph state (plan, decision,
+        or final output).  Raw provider content is intentionally absent from
+        this model and may only be reached through ``raw_model_output_ref``.
+        """
+
+        return self.model_dump(mode="json", exclude={"parsed_output"})
+
 
 def replay_turn(*, parsed_output: OutputT, purpose: ContextPurpose, context_hash: str) -> PolicyTurnResult[OutputT]:
     """Produce a deliberately non-trainable result for deterministic fixtures."""
@@ -120,6 +130,6 @@ def replay_turn(*, parsed_output: OutputT, purpose: ContextPurpose, context_hash
 
 
 def unwrap_policy_output(value: OutputT | PolicyTurnResult[OutputT]) -> OutputT:
-    """Temporary runtime compatibility boundary while R3 persists turn metadata."""
+    """Compatibility helper for integrations that only need parsed output."""
 
     return value.parsed_output if isinstance(value, PolicyTurnResult) else value

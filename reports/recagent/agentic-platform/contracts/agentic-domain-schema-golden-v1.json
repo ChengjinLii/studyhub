@@ -4,7 +4,7 @@
   "schemas": {
     "AgentDecision": "ed44d1a5392e291aa9d971b4cec95a039c45fc94701a12f4ba88f8e4bfa8a131",
     "AgentTaskState": "45bfcab38180a1d68e33fd9c7422e3e9cef126bb6f30bd45b2ba69fb7a77cba4",
-    "AgentTransitionEvent": "3f24aa436b8a1056c4cee8dc7b4269f9835f5fe515ba005030b331128fc88982",
+    "AgentTransitionEvent": "e75afcbc5d292f90b46316049a6dc1b8c8cebcab30621b484844cf67cb31653e",
     "ArtifactRef": "38dc8089b9cfc9eb9e8b7440401f5c093511d5366e1fe5235c23ac0da5385d74",
     "StateDelta": "5bd5afa141312926a144c0716da42d704b2ed147d1a44271a36a4172dabbb735"
   }
