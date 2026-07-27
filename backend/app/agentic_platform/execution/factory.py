@@ -11,6 +11,7 @@ from app.agentic_platform.deepresearch import (
     ModelResearchPolicy,
     ResearchCapabilityFlags,
     ResearchDomainRouter,
+    ResearchRuntimeMetadata,
     StudyHubResearchEnvironment,
 )
 from app.agentic_platform.deepresearch.state import ResearchTaskPacket
@@ -23,6 +24,7 @@ from app.agentic_platform.persistence.durable_artifact_store import (
 )
 from app.agentic_platform.persistence.durable_transition_sink import DurableTransitionSink
 from app.agentic_platform.policy.context_builder import ContextBuilder
+from app.agentic_platform.domain.hashing import canonical_hash
 from app.agentic_platform.policy.model_policy import ModelPolicy
 from app.agentic_platform.policy.provider_factory import build_agent_model_provider
 from app.agentic_platform.runtime.kernel import AgentKernel
@@ -153,13 +155,14 @@ def build_durable_agent_runtime_factory(
         for skill in dependencies.skill_registry.list()
         for scope in skill.spec.permission_scopes
     )
+    catalog_hash = _skill_catalog_hash(dependencies.skill_registry)
 
     async def build_kernel(run: AgentRunRecord, dispatch_payload: dict[str, object]) -> AgentKernel:
         del dispatch_payload
         checkpoint = await _open_durable_checkpointer(settings)
         live_session = dependencies.session_factory()
         try:
-            metadata = _runtime_metadata(run, settings)
+            metadata = _runtime_metadata(run, settings, skill_catalog_hash=catalog_hash)
             skill_executor = LiveSkillExecutor(dependencies.skill_registry)
 
             def context_factory(state, decision) -> SkillExecutionContext:
@@ -198,6 +201,7 @@ def build_durable_agent_runtime_factory(
                 model_provider=model_provider,
                 session=live_session,
                 checkpointer=checkpoint.checkpointer,
+                skill_catalog_hash=catalog_hash,
             )
             return AgentKernel(
                 policy=ModelPolicy(model_provider, raw_output_store=artifact_store),
@@ -234,6 +238,7 @@ def build_durable_agent_runtime_factory(
                 model_provider=model_provider,
                 session=live_session,
                 checkpointer=checkpoint.checkpointer,
+                skill_catalog_hash=catalog_hash,
             )
             agent.add_close_callbacks([live_session.close, checkpoint.close])
             if research_task.admin_actor_id != run.admin_actor_id:
@@ -286,6 +291,7 @@ def _build_research_agent(
     model_provider,
     session: Session,
     checkpointer: Any,
+    skill_catalog_hash: str,
 ) -> DeepResearchSearchAgent:
     research_artifacts = DurableResearchArtifactStore(
         artifact_store,
@@ -318,6 +324,7 @@ def _build_research_agent(
         trace_store=DurableResearchTraceStore(research_artifacts),
         artifact_store=research_artifacts,
         transition_sink=transition_sink.research_child_sink(thread_id=run.thread_id, run_id=run.id),
+        metadata=_research_runtime_metadata(run, settings, skill_catalog_hash=skill_catalog_hash),
     )
     return DeepResearchSearchAgent(graph)
 
@@ -342,10 +349,50 @@ async def _open_durable_checkpointer(settings: Settings) -> SQLiteCheckpointHand
     return await SQLiteCheckpointHandle.open(path)
 
 
-def _runtime_metadata(run: AgentRunRecord, settings: Settings) -> RuntimeMetadata:
+def _runtime_metadata(
+    run: AgentRunRecord,
+    settings: Settings,
+    *,
+    skill_catalog_hash: str,
+) -> RuntimeMetadata:
     return RuntimeMetadata(
         runtime_version=run.runtime_version,
         policy_version=run.policy_version,
         model_id=settings.agentic_model_id or "configured-agentic-model",
         model_revision=settings.agentic_model_revision,
+        skill_catalog_hash=skill_catalog_hash,
+        retriever_version=settings.agentic_retriever_version or "unconfigured-retriever",
+    )
+
+
+def _research_runtime_metadata(
+    run: AgentRunRecord,
+    settings: Settings,
+    *,
+    skill_catalog_hash: str,
+) -> ResearchRuntimeMetadata:
+    return ResearchRuntimeMetadata(
+        policy_version=run.policy_version,
+        skill_catalog_hash=skill_catalog_hash,
+        retriever_version=settings.agentic_retriever_version or "unconfigured-retriever",
+        environment_snapshot_id=run.environment_snapshot_id,
+        environment_snapshot_hash=_environment_snapshot_hash(run),
+    )
+
+
+def _skill_catalog_hash(registry: SkillRegistry) -> str:
+    """Hash every registered typed capability and version in execution order."""
+
+    return canonical_hash([skill.spec.model_dump(mode="json") for skill in registry.list()])
+
+
+def _environment_snapshot_hash(run: AgentRunRecord) -> str:
+    """Match the immutable envelope hash constructed by the execution worker."""
+
+    return canonical_hash(
+        {
+            "snapshot_id": run.environment_snapshot_id,
+            "run_id": run.id,
+            "thread_id": run.thread_id,
+        }
     )

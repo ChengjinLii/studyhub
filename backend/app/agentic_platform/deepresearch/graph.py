@@ -40,6 +40,7 @@ from .transition import (
     ResearchArtifactStore,
     ResearchChildTransitionSink,
     ResearchModelTurn,
+    ResearchRuntimeMetadata,
     ResearchToolObservation,
 )
 
@@ -130,12 +131,14 @@ class DeepResearchGraph:
         artifact_store: ResearchArtifactStore | None = None,
         transition_sink: ResearchChildTransitionSink | None = None,
         trainable_turn_purposes: set[ModelTurnPurpose] | None = None,
+        metadata: ResearchRuntimeMetadata | None = None,
     ) -> None:
         self.policy = policy
         self.router = router
         self.trace_store = trace_store or InMemoryResearchTraceStore()
         self.artifact_store = artifact_store or InMemoryResearchArtifactStore()
         self.transition_sink = transition_sink or InMemoryResearchChildTransitionSink()
+        self.metadata = metadata or ResearchRuntimeMetadata()
         self.trainable_turn_purposes = trainable_turn_purposes or {
             ModelTurnPurpose.RESEARCH_POLICY,
             ModelTurnPurpose.RESEARCH_FINALIZER,
@@ -429,6 +432,11 @@ class DeepResearchGraph:
             task_id=state_before.task.task_id,
             graph_thread_id=str(graph_state.get("graph_thread_id") or self._graph_thread_id(state_before.task.task_id)),
             node_name=node_name,
+            policy_version=self.metadata.policy_version,
+            skill_catalog_hash=self.metadata.skill_catalog_hash,
+            retriever_version=self.metadata.retriever_version,
+            environment_snapshot_id=self.metadata.environment_snapshot_id,
+            environment_snapshot_hash=self.metadata.environment_snapshot_hash,
             state_before_hash=state_before_hash,
             state_after_hash=state_after_hash,
             parsed_decision=action,
@@ -438,6 +446,7 @@ class DeepResearchGraph:
             observation=observation,
             model_turn=model_turn,
             reward_facts=reward_facts,
+            data_policy=self.metadata.data_policy.model_copy(deep=True),
             error_code=error_code,
             summary=summary,
         )
@@ -629,6 +638,12 @@ class DeepResearchGraph:
             provider_request_id=turn.provider_request_id,
             training_eligible=training_eligible,
             quarantine_reason=quarantine_reason,
+            policy_version=self.metadata.policy_version,
+            skill_catalog_hash=self.metadata.skill_catalog_hash,
+            retriever_version=self.metadata.retriever_version,
+            environment_snapshot_id=self.metadata.environment_snapshot_id,
+            environment_snapshot_hash=self.metadata.environment_snapshot_hash,
+            data_policy=self.metadata.data_policy.model_copy(deep=True),
         )
 
     async def _store_trace(self, state: DeepResearchState, raw_entries: object) -> ArtifactRef:

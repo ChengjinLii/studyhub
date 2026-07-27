@@ -173,6 +173,9 @@ class Settings(BaseSettings):
     agentic_model_api_key: str | None = None
     agentic_model_id: str | None = None
     agentic_model_revision: str | None = None
+    # A stable index/build identifier is required for executable runs so every
+    # trajectory can be traced back to the retrieval corpus and implementation.
+    agentic_retriever_version: str | None = None
     agentic_model_timeout_seconds: float = 30.0
     agentic_model_max_retries: int = 2
     agentic_model_token_trace_source: str = "teacher_api"

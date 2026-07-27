@@ -61,6 +61,11 @@ class ResearchModelTurn(DomainModel):
     model_revision: str | None = Field(default=None, max_length=256)
     prompt_template_hash: str = Field(min_length=1, max_length=128)
     context_hash: str = Field(min_length=1, max_length=128)
+    policy_version: str = Field(default="legacy-unavailable-policy", min_length=1, max_length=128)
+    skill_catalog_hash: str = Field(default="legacy-unavailable-catalog", min_length=1, max_length=128)
+    retriever_version: str = Field(default="legacy-unavailable-retriever", min_length=1, max_length=128)
+    environment_snapshot_id: str = Field(default="legacy-unavailable-environment", min_length=1, max_length=128)
+    environment_snapshot_hash: str = Field(default="legacy-unavailable-environment", min_length=1, max_length=128)
     raw_model_output_ref: ArtifactRef | None = None
     token_ids: list[int] | None = None
     token_logprobs: list[float] | None = None
@@ -78,6 +83,11 @@ class ResearchModelTurn(DomainModel):
         "model_revision",
         "prompt_template_hash",
         "context_hash",
+        "policy_version",
+        "skill_catalog_hash",
+        "retriever_version",
+        "environment_snapshot_id",
+        "environment_snapshot_hash",
         "finish_reason",
         "provider_request_id",
         "quarantine_reason",
@@ -122,6 +132,35 @@ class ResearchModelTurn(DomainModel):
         return self
 
 
+class ResearchRuntimeMetadata(DomainModel):
+    """Run-level provenance copied onto each DeepResearch model child turn.
+
+    It captures the production wiring only; it deliberately contains no
+    prescribed search sequence or fixed decision policy.
+    """
+
+    schema_version: str = "1.0"
+    policy_version: str = Field(default="legacy-unavailable-policy", min_length=1, max_length=128)
+    skill_catalog_hash: str = Field(default="legacy-unavailable-catalog", min_length=1, max_length=128)
+    retriever_version: str = Field(default="legacy-unavailable-retriever", min_length=1, max_length=128)
+    environment_snapshot_id: str = Field(default="legacy-unavailable-environment", min_length=1, max_length=128)
+    environment_snapshot_hash: str = Field(default="legacy-unavailable-environment", min_length=1, max_length=128)
+    data_policy: TrainingDataPolicy = Field(default_factory=TrainingDataPolicy.internal_eval_only)
+
+    @field_validator(
+        "policy_version",
+        "skill_catalog_hash",
+        "retriever_version",
+        "environment_snapshot_id",
+        "environment_snapshot_hash",
+    )
+    @classmethod
+    def reject_blank_provenance(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("research runtime provenance must not be blank")
+        return value
+
+
 class DeepResearchChildTransition(DomainModel):
     """One immutable state transition in an isolated DeepResearch graph."""
 
@@ -135,6 +174,11 @@ class DeepResearchChildTransition(DomainModel):
     graph_thread_id: str = Field(min_length=1, max_length=256)
     node_name: str = Field(min_length=1, max_length=128)
 
+    policy_version: str = Field(default="legacy-unavailable-policy", min_length=1, max_length=128)
+    skill_catalog_hash: str = Field(default="legacy-unavailable-catalog", min_length=1, max_length=128)
+    retriever_version: str = Field(default="legacy-unavailable-retriever", min_length=1, max_length=128)
+    environment_snapshot_id: str = Field(default="legacy-unavailable-environment", min_length=1, max_length=128)
+    environment_snapshot_hash: str = Field(default="legacy-unavailable-environment", min_length=1, max_length=128)
     state_before_hash: str = Field(min_length=1, max_length=128)
     state_after_hash: str = Field(min_length=1, max_length=128)
     parsed_decision: ResearchDecision | None = None
@@ -156,6 +200,11 @@ class DeepResearchChildTransition(DomainModel):
         "task_id",
         "graph_thread_id",
         "node_name",
+        "policy_version",
+        "skill_catalog_hash",
+        "retriever_version",
+        "environment_snapshot_id",
+        "environment_snapshot_hash",
         "state_before_hash",
         "state_after_hash",
         "error_code",

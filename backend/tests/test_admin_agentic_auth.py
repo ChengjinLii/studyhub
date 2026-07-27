@@ -91,6 +91,7 @@ def test_agentic_platform_configuration_defaults_to_safe_values() -> None:
     assert settings.deep_research_web_enabled is False
     assert settings.deep_research_scholar_enabled is False
     assert settings.deep_research_python_enabled is False
+    assert settings.agentic_retriever_version is None
 
 
 @pytest.mark.parametrize(
@@ -103,4 +104,21 @@ def test_agentic_platform_configuration_defaults_to_safe_values() -> None:
 )
 def test_agentic_platform_configuration_rejects_unsafe_values(settings: Settings, message: str) -> None:
     with pytest.raises(RuntimeError, match=message):
+        settings.validate_runtime_configuration()
+
+
+def test_agent_execution_requires_an_explicit_retriever_build_version() -> None:
+    settings = Settings(
+        agentic_platform_enabled=True,
+        agentic_execution_enabled=True,
+        agentic_runtime="langgraph",
+        agentic_checkpointer="sqlite",
+        agentic_durable_storage_enabled=True,
+        agentic_model_provider="openai_compatible",
+        agentic_model_base_url="https://model.example.invalid/v1",
+        agentic_model_api_key="fixture-key",
+        agentic_model_id="fixture-model",
+    )
+
+    with pytest.raises(RuntimeError, match="RETRIEVER_VERSION"):
         settings.validate_runtime_configuration()

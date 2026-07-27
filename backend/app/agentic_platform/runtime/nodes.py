@@ -467,6 +467,11 @@ class RuntimeMetadata(DomainModel):
     policy_version: str = Field(default="policy-v1", min_length=1, max_length=128)
     model_id: str = Field(default="policy-adapter", min_length=1, max_length=256)
     model_revision: str | None = Field(default=None, max_length=256)
+    # These are run-level provenance values.  They describe the actually
+    # wired registry and retriever, rather than an action sequence selected by
+    # the policy, so recording them does not constrain the Agent's choices.
+    skill_catalog_hash: str = Field(default="legacy-unavailable-catalog", min_length=1, max_length=128)
+    retriever_version: str = Field(default="legacy-unavailable-retriever", min_length=1, max_length=128)
     trainable_turn_purposes: list[ModelTurnPurpose] = Field(
         default_factory=lambda: [ModelTurnPurpose.POLICY, ModelTurnPurpose.FINALIZER]
     )
@@ -1271,6 +1276,7 @@ class AgentGraphNodes:
             plan_step_id=decision.plan_step_id,
             subagent_name=decision.delegate_agent,
             environment_snapshot_id=successor.environment.snapshot_id,
+            environment_snapshot_hash=successor.environment.snapshot_hash,
             state_before_hash=canonical_hash(state_before),
             state_after_hash=canonical_hash(successor),
             state_abstract_key=state_group,
@@ -1286,7 +1292,8 @@ class AgentGraphNodes:
             ),
             turn_purpose=ModelTurnPurpose.POLICY,
             prompt_template_hash=policy_turn.prompt_hash,
-            skill_catalog_hash=str(graph_state.get("context_catalog_hash") or "unavailable-catalog-hash"),
+            skill_catalog_hash=self.metadata.skill_catalog_hash,
+            retriever_version=self.metadata.retriever_version,
             action_schema_hash=json_schema_hash(AgentDecision),
             context_view_ref=context_ref,
             raw_model_output_ref=policy_turn.raw_model_output_ref,
@@ -1488,11 +1495,14 @@ class AgentGraphNodes:
                 turn_index=turn_index,
                 turn_purpose=purpose,
                 environment_snapshot_id=state_after.environment.snapshot_id,
+                environment_snapshot_hash=state_after.environment.snapshot_hash,
                 state_before_hash=canonical_hash(state_before),
                 state_after_hash=canonical_hash(state_after),
                 state_abstract_key=state_group,
                 state_group_key_v2=state_group,
                 policy_version=self.metadata.policy_version,
+                skill_catalog_hash=self.metadata.skill_catalog_hash,
+                retriever_version=self.metadata.retriever_version,
                 model_id=turn.model_id,
                 model_revision=turn.model_revision,
                 prompt_template_hash=turn.prompt_hash,

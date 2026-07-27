@@ -259,6 +259,7 @@ def test_production_factory_builds_kernel_with_only_durable_runtime_adapters(tmp
             agentic_model_base_url="https://model.example.invalid/v1",
             agentic_model_api_key="test-key-not-a-secret",
             agentic_model_id="test-agent-model",
+            agentic_retriever_version="fixture-material-index-v1",
         )
         factory = build_durable_agent_runtime_factory(
             settings,
@@ -289,6 +290,8 @@ def test_production_factory_builds_kernel_with_only_durable_runtime_adapters(tmp
             assert isinstance(kernel.nodes.transition_sink, DurableTransitionSink)
             assert isinstance(kernel.nodes.model_turn_sink, DurableTransitionSink)
             assert isinstance(kernel.persistence, SqlAlchemyRuntimePersistence)
+            assert kernel.metadata.retriever_version == "fixture-material-index-v1"
+            assert len(kernel.metadata.skill_catalog_hash) == 64
         finally:
             asyncio.run(kernel.close())
     finally:

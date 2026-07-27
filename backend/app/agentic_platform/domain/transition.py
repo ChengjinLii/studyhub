@@ -129,11 +129,14 @@ class ModelTurnEvent(DomainModel):
     turn_purpose: ModelTurnPurpose
 
     environment_snapshot_id: str = Field(min_length=1, max_length=128)
+    environment_snapshot_hash: str = Field(default="legacy-unavailable-environment", min_length=1, max_length=128)
     state_before_hash: str = Field(min_length=1, max_length=128)
     state_after_hash: str = Field(min_length=1, max_length=128)
     state_abstract_key: str = Field(min_length=1, max_length=256)
     state_group_key_v2: str = Field(default="legacy_state_group_key_v1", min_length=1, max_length=256)
     policy_version: str = Field(min_length=1, max_length=128)
+    skill_catalog_hash: str = Field(default="legacy-unavailable-catalog", min_length=1, max_length=128)
+    retriever_version: str = Field(default="legacy-unavailable-retriever", min_length=1, max_length=128)
 
     model_id: str = Field(min_length=1, max_length=256)
     model_revision: str | None = Field(default=None, max_length=256)
@@ -163,11 +166,14 @@ class ModelTurnEvent(DomainModel):
         "run_id",
         "transition_id",
         "environment_snapshot_id",
+        "environment_snapshot_hash",
         "state_before_hash",
         "state_after_hash",
         "state_abstract_key",
         "state_group_key_v2",
         "policy_version",
+        "skill_catalog_hash",
+        "retriever_version",
         "model_id",
         "model_revision",
         "prompt_template_hash",
@@ -230,6 +236,7 @@ class AgentTransitionEvent(DomainModel):
     subagent_name: str | None = Field(default=None, max_length=128)
 
     environment_snapshot_id: str = Field(min_length=1, max_length=128)
+    environment_snapshot_hash: str = Field(default="legacy-unavailable-environment", min_length=1, max_length=128)
     state_before_hash: str = Field(min_length=1, max_length=128)
     state_after_hash: str = Field(min_length=1, max_length=128)
     state_abstract_key: str = Field(min_length=1, max_length=256)
@@ -243,6 +250,7 @@ class AgentTransitionEvent(DomainModel):
 
     prompt_template_hash: str = Field(min_length=1, max_length=128)
     skill_catalog_hash: str = Field(min_length=1, max_length=128)
+    retriever_version: str = Field(default="legacy-unavailable-retriever", min_length=1, max_length=128)
     action_schema_hash: str = Field(min_length=1, max_length=128)
 
     context_view_ref: ArtifactRef
@@ -278,6 +286,7 @@ class AgentTransitionEvent(DomainModel):
         "plan_step_id",
         "subagent_name",
         "environment_snapshot_id",
+        "environment_snapshot_hash",
         "state_before_hash",
         "state_after_hash",
         "state_abstract_key",
@@ -288,6 +297,7 @@ class AgentTransitionEvent(DomainModel):
         "model_turn_id",
         "prompt_template_hash",
         "skill_catalog_hash",
+        "retriever_version",
         "action_schema_hash",
         "finish_reason",
         "provider_request_id",
@@ -355,11 +365,14 @@ class AgentTransitionEvent(DomainModel):
             turn_index=self.turn_index,
             turn_purpose=self.turn_purpose,
             environment_snapshot_id=self.environment_snapshot_id,
+            environment_snapshot_hash=self.environment_snapshot_hash,
             state_before_hash=self.state_before_hash,
             state_after_hash=self.state_after_hash,
             state_abstract_key=self.state_abstract_key,
             state_group_key_v2=self.state_group_key_v2,
             policy_version=self.policy_version,
+            skill_catalog_hash=self.skill_catalog_hash,
+            retriever_version=self.retriever_version,
             model_id=self.model_id,
             model_revision=self.model_revision,
             prompt_template_hash=self.prompt_template_hash,

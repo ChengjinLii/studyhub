@@ -147,6 +147,8 @@ def test_local_token_model_turns_populate_transitions_and_all_model_io() -> None
             metadata=RuntimeMetadata(
                 policy_version="trace-fixture-policy-v1",
                 model_id="fallback-never-used",
+                skill_catalog_hash="trace-fixture-skill-catalog-v1",
+                retriever_version="trace-fixture-retriever-v1",
                 trainable_turn_purposes=[
                     ModelTurnPurpose.PLANNER,
                     ModelTurnPurpose.POLICY,
@@ -170,6 +172,9 @@ def test_local_token_model_turns_populate_transitions_and_all_model_io() -> None
     assert all(turn.token_role_spans for turn in model_turn_sink.events)
     assert all(turn.usage.total_tokens > 0 for turn in model_turn_sink.events)
     assert all(turn.training_eligible for turn in model_turn_sink.events)
+    assert all(turn.environment_snapshot_hash == "snapshot-hash-1" for turn in model_turn_sink.events)
+    assert all(turn.skill_catalog_hash == "trace-fixture-skill-catalog-v1" for turn in model_turn_sink.events)
+    assert all(turn.retriever_version == "trace-fixture-retriever-v1" for turn in model_turn_sink.events)
 
     policy_records = [ModelIORecord.from_model_turn(turn) for turn in model_turn_sink.events]
     assert all(len(record.trainable_token_mask) == len(record.token_ids or []) for record in policy_records)
@@ -183,6 +188,9 @@ def test_local_token_model_turns_populate_transitions_and_all_model_io() -> None
     assert all(event.token_ids is not None for event in transition_sink.events)
     assert all(event.training_eligible for event in transition_sink.events)
     assert all(event.reward_facts.trainable for event in transition_sink.events)
+    assert all(event.environment_snapshot_hash == "snapshot-hash-1" for event in transition_sink.events)
+    assert all(event.skill_catalog_hash == "trace-fixture-skill-catalog-v1" for event in transition_sink.events)
+    assert all(event.retriever_version == "trace-fixture-retriever-v1" for event in transition_sink.events)
     assert "parsed_output" not in graph_state["policy_turn_result"]
     assert "raw_content" not in graph_state["policy_turn_result"]
     assert graph_state["policy_turn_result"]["raw_model_output_ref"]["artifact_type"] == "raw_model_output"

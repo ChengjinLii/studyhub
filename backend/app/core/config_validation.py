@@ -185,6 +185,8 @@ def _validate_agentic_platform(settings: Any) -> None:
             not isinstance(value, str) or not value.strip() for value in required_model_settings.values()
         ):
             raise RuntimeError("启用 Agent Execution 前必须完整配置 OpenAI-compatible Agentic Model Provider。")
+        if not isinstance(settings.agentic_retriever_version, str) or not settings.agentic_retriever_version.strip():
+            raise RuntimeError("启用 Agent Execution 前必须配置 STUDYHUB_AGENTIC_RETRIEVER_VERSION。")
         if settings.agentic_runtime != "langgraph":
             raise RuntimeError("启用 Agent Execution 时必须使用 STUDYHUB_AGENTIC_RUNTIME=langgraph。")
         if settings.agentic_checkpointer != "sqlite":

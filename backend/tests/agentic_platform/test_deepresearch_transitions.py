@@ -19,6 +19,7 @@ from app.agentic_platform.deepresearch.state import (
 from app.agentic_platform.deepresearch.transition import (
     InMemoryResearchArtifactStore,
     InMemoryResearchChildTransitionSink,
+    ResearchRuntimeMetadata,
 )
 from app.agentic_platform.domain.decision import AgentActionType, AgentDecision, AgentOutput, ExpectedStateChange, SubAgentTaskPacket
 from app.agentic_platform.domain.state import StateDelta
@@ -138,6 +139,13 @@ def test_deep_research_emits_ordered_child_transitions_for_an_open_policy_path()
             router=ResearchDomainRouter(environment),
             transition_sink=sink,
             artifact_store=artifacts,
+            metadata=ResearchRuntimeMetadata(
+                policy_version="research-fixture-policy-v1",
+                skill_catalog_hash="research-fixture-skill-catalog-v1",
+                retriever_version="research-fixture-retriever-v1",
+                environment_snapshot_id="research-fixture-snapshot-v1",
+                environment_snapshot_hash="research-fixture-snapshot-hash-v1",
+            ),
         )
         result = await graph.run(_task())
         return result, sink.events, artifacts.payloads
@@ -148,6 +156,11 @@ def test_deep_research_emits_ordered_child_transitions_for_an_open_policy_path()
     assert result.child_transition_count == len(events)
     assert all(event.parent_transition_id == "transition_delegate_parent_1" for event in events)
     assert all(event.subagent_name == "deep_research" for event in events)
+    assert all(event.policy_version == "research-fixture-policy-v1" for event in events)
+    assert all(event.skill_catalog_hash == "research-fixture-skill-catalog-v1" for event in events)
+    assert all(event.retriever_version == "research-fixture-retriever-v1" for event in events)
+    assert all(event.environment_snapshot_id == "research-fixture-snapshot-v1" for event in events)
+    assert all(event.environment_snapshot_hash == "research-fixture-snapshot-hash-v1" for event in events)
     assert [event.sequence_in_subagent for event in events] == list(range(len(events)))
     assert events[0].previous_child_transition_id is None
     assert [event.previous_child_transition_id for event in events[1:]] == [
@@ -165,6 +178,9 @@ def test_deep_research_emits_ordered_child_transitions_for_an_open_policy_path()
     assert all(turn.token_ids is None for turn in replay_model_turns)
     assert all(turn.training_eligible is False for turn in replay_model_turns)
     assert all(turn.quarantine_reason == "missing_student_tokenization" for turn in replay_model_turns)
+    assert all(turn.policy_version == "research-fixture-policy-v1" for turn in replay_model_turns)
+    assert all(turn.skill_catalog_hash == "research-fixture-skill-catalog-v1" for turn in replay_model_turns)
+    assert all(turn.retriever_version == "research-fixture-retriever-v1" for turn in replay_model_turns)
 
     search_events = [
         event

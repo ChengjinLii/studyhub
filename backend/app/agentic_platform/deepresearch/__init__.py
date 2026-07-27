@@ -15,6 +15,7 @@ from .transition import (
     ResearchArtifactStore,
     ResearchChildTransitionSink,
     ResearchModelTurn,
+    ResearchRuntimeMetadata,
     ResearchToolObservation,
 )
 from .state import (
@@ -46,6 +47,7 @@ __all__ = [
     "ResearchArtifactStore",
     "ResearchChildTransitionSink",
     "ResearchModelTurn",
+    "ResearchRuntimeMetadata",
     "ResearchReport",
     "ResearchTaskPacket",
     "ResearchToolObservation",
