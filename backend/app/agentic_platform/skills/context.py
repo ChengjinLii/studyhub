@@ -17,6 +17,7 @@ if TYPE_CHECKING:
 class SkillExecutionMode(StrEnum):
     LIVE = "live"
     FIXTURE = "fixture"
+    SNAPSHOT = "snapshot"
 
 
 @dataclass(slots=True)
