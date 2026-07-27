@@ -138,10 +138,10 @@ export const useFloatingPanelPosition = ({
 
   const closePanel = useCallback(() => {
     const restorePosition = launcherPositionRef.current;
-    setOpen(false);
     if (restorePosition) {
-      window.requestAnimationFrame(() => setPosition(restorePosition));
+      setPosition(restorePosition);
     }
+    setOpen(false);
   }, []);
 
   return {
