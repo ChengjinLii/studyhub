@@ -8,6 +8,15 @@ from .domain_router import (
 )
 from .graph import DeepResearchGraph, DeepResearchRunResult, InMemoryResearchTraceStore
 from .policy import ModelResearchPolicy, ReplayResearchPolicy, ResearchPolicy
+from .transition import (
+    DeepResearchChildTransition,
+    InMemoryResearchArtifactStore,
+    InMemoryResearchChildTransitionSink,
+    ResearchArtifactStore,
+    ResearchChildTransitionSink,
+    ResearchModelTurn,
+    ResearchToolObservation,
+)
 from .state import (
     DeepResearchState,
     EvidenceRecord,
@@ -19,10 +28,13 @@ from .state import (
 
 __all__ = [
     "DeepResearchGraph",
+    "DeepResearchChildTransition",
     "DeepResearchRunResult",
     "DeepResearchState",
     "EvidenceRecord",
     "InMemoryResearchTraceStore",
+    "InMemoryResearchArtifactStore",
+    "InMemoryResearchChildTransitionSink",
     "ModelResearchPolicy",
     "ReplayResearchPolicy",
     "ResearchCapabilityFlags",
@@ -31,7 +43,11 @@ __all__ = [
     "ResearchEnvironment",
     "ResearchPacket",
     "ResearchPolicy",
+    "ResearchArtifactStore",
+    "ResearchChildTransitionSink",
+    "ResearchModelTurn",
     "ResearchReport",
     "ResearchTaskPacket",
+    "ResearchToolObservation",
     "StudyHubResearchEnvironment",
 ]

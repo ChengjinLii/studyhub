@@ -226,6 +226,20 @@ class SubagentActionExecutor(Protocol):
         ...
 
 
+class ParentTransitionAwareSubagentExecutor(Protocol):
+    """Optional extension for delegates that emit their own child trajectory."""
+
+    async def execute_with_parent_transition(
+        self,
+        state: AgentTaskState,
+        decision: AgentDecision,
+        *,
+        idempotency_key: str,
+        parent_transition_id: str,
+    ) -> ActionExecutionResult:
+        ...
+
+
 class RuntimeVerifier(Protocol):
     async def verify(
         self,
@@ -793,11 +807,22 @@ class AgentGraphNodes:
                 RuntimeEventName.SUBAGENT_STARTED,
                 {"subagent_name": decision.delegate_agent, "plan_step_id": decision.plan_step_id},
             )
-            execution = await self.subagent_executor.execute(
-                state,
-                decision,
-                idempotency_key=self._turn_idempotency_key(graph_state, decision),
-            )
+            state_before = load_stored_state(graph_state.get("turn_state_before"))
+            parent_transition_id = self._transition_id(graph_state, state_before, decision)
+            execute_with_parent = getattr(self.subagent_executor, "execute_with_parent_transition", None)
+            if callable(execute_with_parent):
+                execution = await execute_with_parent(
+                    state,
+                    decision,
+                    idempotency_key=self._turn_idempotency_key(graph_state, decision),
+                    parent_transition_id=parent_transition_id,
+                )
+            else:
+                execution = await self.subagent_executor.execute(
+                    state,
+                    decision,
+                    idempotency_key=self._turn_idempotency_key(graph_state, decision),
+                )
             consumed_turns = max(1, execution.subagent_turns_used)
             action_delta = merge_state_deltas(
                 execution.state_delta,

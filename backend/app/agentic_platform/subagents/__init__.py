@@ -9,7 +9,12 @@ from .curator import (
     DailyBriefResult,
     DailyBriefTaskPacket,
 )
-from .deepresearch import DeepResearchSearchAgent, DeepResearchSubAgentResult
+from .deepresearch import (
+    DeepResearchDelegateExecutor,
+    DeepResearchSearchAgent,
+    DeepResearchSubAgentResult,
+    research_task_from_parent_decision,
+)
 from .planner import LearningPlannerAgent, LearningPlannerResult, LearningPlannerTaskPacket
 
 __all__ = [
@@ -22,6 +27,7 @@ __all__ = [
     "DailyBriefResult",
     "DailyBriefTaskPacket",
     "DeepResearchSearchAgent",
+    "DeepResearchDelegateExecutor",
     "DeepResearchSubAgentResult",
     "LearningPlannerAgent",
     "LearningPlannerResult",
@@ -29,4 +35,5 @@ __all__ = [
     "SubAgent",
     "SubAgentResult",
     "SubAgentTaskPacket",
+    "research_task_from_parent_decision",
 ]
