@@ -1,6 +1,6 @@
 import { GetServerSideProps } from 'next';
 import Link from 'next/link';
-import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { FormEvent, useEffect, useState } from 'react';
 import AdminMarketPanel from '../../components/admin/AdminMarketPanel';
 import AdminMaterialsPanel from '../../components/admin/AdminMaterialsPanel';
 import AdminPayoutQrModal from '../../components/admin/AdminPayoutQrModal';
@@ -63,7 +63,6 @@ const FEEDBACK_TYPES = [
   { value: 'UX', label: '体验问题' },
   { value: 'OTHER', label: '其他' },
 ];
-
 const FEEDBACK_STATUS_OPTIONS = [
   { value: 'NEW', label: '待处理' },
   { value: 'IN_PROGRESS', label: '处理中' },
@@ -187,8 +186,7 @@ export default function AdminPage({
     loadSchedule,
     submitSchedule,
   } = useAdminPayouts();
-  const adminNavItems = useMemo(() => ADMIN_QUICK_NAV_ITEMS, []);
-  const { activeSection: activeAdminSection, jumpToSection } = useSectionNavigation(adminNavItems, {
+  const { activeSection: activeAdminSection, jumpToSection } = useSectionNavigation(ADMIN_QUICK_NAV_ITEMS, {
     rootMargin: '-20% 0px -60% 0px',
     threshold: [0.1, 0.25, 0.5],
   });
@@ -205,13 +203,9 @@ export default function AdminPage({
   const isAgenticAdmin = hasRole(user.roleMask, RoleMask.ADMIN);
   const roleLabel = isSuperAdmin ? '超级管理员' : '管理员';
   const totalEarnings = users.reduce((sum, item) => sum + Number(item.totalEarnings ?? 0), 0);
-  const scaleToActual = (amountCents: number) => {
-    const base = amountCents / 100;
-    if (actualTotalValue !== null && totalEarnings > 0) {
-      return base * (actualTotalValue / totalEarnings);
-    }
-    return base;
-  };
+  const scaleToActual = (amountCents: number) =>
+    (amountCents / 100) *
+    (actualTotalValue !== null && totalEarnings > 0 ? actualTotalValue / totalEarnings : 1);
 
   const reloadUsers = async (keywordParam?: string) => {
     const data = await fetchAdminUsers(keywordParam);
@@ -477,7 +471,7 @@ export default function AdminPage({
         <aside className="admin-sidebar">
           <div className="admin-sidebar__title">管理导航</div>
           <div className="admin-sidebar__items">
-            {adminNavItems.map((item) => (
+            {ADMIN_QUICK_NAV_ITEMS.map((item) => (
               <a
                 key={item.id}
                 className={`admin-sidebar__item ${activeAdminSection === item.id ? 'active' : ''}`}

@@ -26,6 +26,13 @@ if (!allowFrontendBuild) {
 const pageJsonBudget = 10;
 const failures = [];
 
+function countLines(contents) {
+  if (!contents) {
+    return 0;
+  }
+  return contents.endsWith('\n') ? contents.split('\n').length - 1 : contents.split('\n').length;
+}
+
 function listFiles(dir, predicate) {
   const absoluteDir = resolve(root, dir);
   if (!existsSync(absoluteDir)) {
@@ -84,7 +91,7 @@ for (const [file, maxLines] of lineBudgets) {
     failures.push(`${file}: missing`);
     continue;
   }
-  const lines = readFileSync(absolute, 'utf8').split('\n').length;
+  const lines = countLines(readFileSync(absolute, 'utf8'));
   if (lines > maxLines) {
     failures.push(`${file}: ${lines} lines exceeds ${maxLines}`);
   }
