@@ -10,21 +10,38 @@ from __future__ import annotations
 from collections.abc import Iterable, Mapping, Sequence
 from typing import Any
 
+from app.agentic_platform.domain.data_policy import ExportTarget
+
+from ...data_governance import DatasetExportDenied, DatasetExportGuard
+
 
 class SearchR1DatasetError(ValueError):
     pass
 
 
 class SearchR1DatasetAdapter:
-    """Pure mapping adapter; no Search-R1 or product-runtime import is needed."""
+    """Map only export-authorized, already-tokenized model records."""
 
-    def __init__(self, *, data_source: str = "studyhub.agentic.transition.v1", ability: str = "agentic_search") -> None:
+    def __init__(
+        self,
+        *,
+        data_source: str = "studyhub.agentic.transition.v1",
+        ability: str = "agentic_search",
+        target: ExportTarget = ExportTarget.TRAIN,
+        export_guard: DatasetExportGuard | None = None,
+    ) -> None:
         if not data_source.strip() or not ability.strip():
             raise ValueError("data source and ability must not be blank")
         self.data_source = data_source
         self.ability = ability
+        self.target = ExportTarget(target)
+        self.export_guard = export_guard or DatasetExportGuard()
 
     def export_record(self, record: Mapping[str, Any]) -> dict[str, Any]:
+        try:
+            data_policy = self.export_guard.authorize_record(record, target=self.target)
+        except DatasetExportDenied as exc:
+            raise SearchR1DatasetError(f"dataset_export_denied:{exc.reason_code}") from exc
         token_ids = _raw_token_ids(record.get("token_ids"))
         token_logprobs = _optional_logprobs(record.get("token_logprobs"), len(token_ids))
         spans = _token_role_spans(record.get("token_role_spans"), len(token_ids))
@@ -44,6 +61,7 @@ class SearchR1DatasetAdapter:
             "state_before_hash",
             "state_after_hash",
             "state_abstract_key",
+            "state_group_key_v2",
             "policy_version",
             "model_id",
         )
@@ -54,7 +72,7 @@ class SearchR1DatasetAdapter:
             "data_source": self.data_source,
             "prompt": {
                 "context_view_ref": context_view_ref,
-                "state_abstract_key": identifiers["state_abstract_key"],
+                "state_group_key_v2": identifiers["state_group_key_v2"],
             },
             "ability": self.ability,
             "reward_model": {
@@ -69,6 +87,7 @@ class SearchR1DatasetAdapter:
                 "token_role_spans": spans,
                 "loss_mask": mask,
                 "training_eligible": training_eligible,
+                "data_policy": data_policy.model_dump(mode="json"),
                 "parsed_decision": parsed_decision,
                 "observation_ref": _optional_mapping(record.get("observation_ref"), "observation_ref"),
                 "raw_model_output_ref": _optional_mapping(record.get("raw_model_output_ref"), "raw_model_output_ref"),

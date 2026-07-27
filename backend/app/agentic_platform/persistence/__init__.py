@@ -15,6 +15,7 @@ from .durable_artifact_store import (
 from .durable_transition_sink import (
     DurableResearchChildTransitionSink,
     DurableTrajectoryManifest,
+    DurableTrajectoryRecords,
     DurableTransitionSink,
 )
 from .run_lease import RunLease, RunLeaseLostError
@@ -25,6 +26,7 @@ __all__ = [
     "DurableResearchChildTransitionSink",
     "DurableResearchTraceStore",
     "DurableTrajectoryManifest",
+    "DurableTrajectoryRecords",
     "DurableTransitionSink",
     "InvalidStatusTransition",
     "LocalFilesystemArtifactBlobStore",

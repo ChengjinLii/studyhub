@@ -115,6 +115,7 @@ class AgentStepRecord(TimestampMixin, Base):
     state_before_hash: Mapped[str | None] = mapped_column(String(128), nullable=True)
     state_after_hash: Mapped[str | None] = mapped_column(String(128), nullable=True)
     state_abstract_key: Mapped[str | None] = mapped_column(String(256), nullable=True)
+    state_group_key_v2: Mapped[str | None] = mapped_column(String(256), nullable=True)
     action_type: Mapped[str | None] = mapped_column(String(64), nullable=True)
     skill_name: Mapped[str | None] = mapped_column(String(128), nullable=True)
     observation_ref: Mapped[str | None] = mapped_column(String(64), nullable=True)
@@ -202,3 +203,14 @@ class AgentArtifactRecord(TimestampMixin, Base):
     media_type: Mapped[str | None] = mapped_column(String(128), nullable=True)
     content_size_bytes: Mapped[int | None] = mapped_column(Integer, nullable=True)
     idempotency_key: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    training_allowed: Mapped[bool] = mapped_column(nullable=False, default=False, server_default="0")
+    sensitivity: Mapped[str] = mapped_column(String(32), nullable=False, default="internal", server_default="internal")
+    license_class: Mapped[str] = mapped_column(
+        String(64), nullable=False, default="internal_eval_only", server_default="internal_eval_only"
+    )
+    source_scope: Mapped[str] = mapped_column(String(32), nullable=False, default="internal", server_default="internal")
+    contains_personal_data: Mapped[bool] = mapped_column(nullable=False, default=False, server_default="0")
+    anonymization_version: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    retention_policy: Mapped[str] = mapped_column(
+        String(256), nullable=False, default="internal_evaluation_only", server_default="internal_evaluation_only"
+    )

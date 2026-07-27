@@ -14,6 +14,7 @@ from pydantic import Field, field_validator, model_validator
 
 from app.agentic_platform.domain import DomainModel
 from app.agentic_platform.domain.artifact import ArtifactKind, ArtifactRef
+from app.agentic_platform.domain.data_policy import TrainingDataPolicy
 from app.agentic_platform.domain.hashing import canonical_hash, canonical_model_hash
 from app.agentic_platform.domain.reward_facts import RewardFacts
 from app.agentic_platform.domain.transition import ModelTurnPurpose, ModelUsage, TokenRoleSpan
@@ -70,6 +71,7 @@ class ResearchModelTurn(DomainModel):
     provider_request_id: str | None = Field(default=None, max_length=256)
     training_eligible: bool = False
     quarantine_reason: str | None = Field(default=None, max_length=512)
+    data_policy: TrainingDataPolicy = Field(default_factory=TrainingDataPolicy.internal_eval_only)
 
     @field_validator(
         "model_id",
@@ -142,6 +144,7 @@ class DeepResearchChildTransition(DomainModel):
     observation: ResearchToolObservation | None = None
     model_turn: ResearchModelTurn | None = None
     reward_facts: RewardFacts = Field(default_factory=RewardFacts)
+    data_policy: TrainingDataPolicy = Field(default_factory=TrainingDataPolicy.internal_eval_only)
     error_code: str | None = Field(default=None, max_length=128)
     summary: str = Field(min_length=1, max_length=2_000)
 

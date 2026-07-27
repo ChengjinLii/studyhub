@@ -23,6 +23,13 @@ from pydantic import Field, ValidationError, field_validator, model_validator
 
 from app.agentic_platform.deepresearch.transition import DeepResearchChildTransition
 from app.agentic_platform.domain import DomainModel
+from app.agentic_platform.domain.data_policy import (
+    DataSensitivity,
+    LicenseClass,
+    TrainingDataPolicy,
+    aggregate_data_policies,
+    manifest_policy_fields,
+)
 from app.agentic_platform.domain.hashing import canonical_hash, canonical_json
 from app.agentic_platform.domain.transition import AgentTransitionEvent, ModelTurnEvent
 from app.agentic_platform.simulation.trajectory import (
@@ -98,7 +105,7 @@ class DurableTrajectorySegment(DomainModel):
 class DurableTrajectoryManifest(DomainModel):
     """Checksum manifest for all immutable records in one thread/run path."""
 
-    schema_version: str = "1.0"
+    schema_version: str = "1.1"
     trajectory_id: str = Field(min_length=1, max_length=128)
     thread_id: str = Field(min_length=1, max_length=128)
     run_id: str = Field(min_length=1, max_length=128)
@@ -109,6 +116,12 @@ class DurableTrajectoryManifest(DomainModel):
     transition_count: int = Field(default=0, ge=0)
     model_io_count: int = Field(default=0, ge=0)
     child_transition_count: int = Field(default=0, ge=0)
+    data_policy: TrainingDataPolicy = Field(default_factory=TrainingDataPolicy.internal_eval_only)
+    training_allowed: bool = False
+    sensitivity: DataSensitivity = DataSensitivity.INTERNAL
+    license_class: LicenseClass = LicenseClass.INTERNAL_EVAL_ONLY
+    anonymization_version: str | None = Field(default=None, max_length=128)
+    retention_policy: str = Field(default="internal_evaluation_only", min_length=1, max_length=256)
     content_hash: str = Field(min_length=64, max_length=64)
 
     @field_validator("trajectory_id", "thread_id", "run_id", "content_hash")
@@ -131,6 +144,14 @@ class DurableTrajectoryManifest(DomainModel):
             raise ValueError("manifest model I/O count does not match IDs")
         if self.child_transition_count != len(self.child_transition_ids):
             raise ValueError("manifest child transition count does not match IDs")
+        if manifest_policy_fields(self.data_policy) != {
+            "training_allowed": self.training_allowed,
+            "sensitivity": self.sensitivity,
+            "license_class": self.license_class,
+            "anonymization_version": self.anonymization_version,
+            "retention_policy": self.retention_policy,
+        }:
+            raise ValueError("manifest data-policy fields do not match nested policy")
         if self.content_hash != self._expected_content_hash():
             raise ValueError("manifest content hash does not match fields")
         return self
@@ -143,6 +164,7 @@ class DurableTrajectoryManifest(DomainModel):
         thread_id: str,
         run_id: str,
         segments: Iterable[DurableTrajectorySegment],
+        data_policy: TrainingDataPolicy,
     ) -> "DurableTrajectoryManifest":
         ordered = sorted(segments, key=lambda item: (item.sequence, item.kind.value))
         transition_ids = [item.transition_id for item in ordered if item.kind == DurableSegmentKind.TRANSITION]
@@ -159,8 +181,10 @@ class DurableTrajectoryManifest(DomainModel):
             "transition_count": len(transition_ids),
             "model_io_count": len(model_turn_ids),
             "child_transition_count": len(child_ids),
+            "data_policy": data_policy,
+            **manifest_policy_fields(data_policy),
         }
-        content_hash = canonical_hash({"schema_version": "1.0", **payload}, exclude_fields=())
+        content_hash = canonical_hash({"schema_version": "1.1", **payload}, exclude_fields=())
         return cls(**payload, content_hash=content_hash)
 
     def _expected_content_hash(self) -> str:
@@ -177,6 +201,12 @@ class DurableTrajectoryManifest(DomainModel):
                 "transition_count": self.transition_count,
                 "model_io_count": self.model_io_count,
                 "child_transition_count": self.child_transition_count,
+                "data_policy": self.data_policy,
+                "training_allowed": self.training_allowed,
+                "sensitivity": self.sensitivity,
+                "license_class": self.license_class,
+                "anonymization_version": self.anonymization_version,
+                "retention_policy": self.retention_policy,
             },
             exclude_fields=(),
         )
@@ -188,6 +218,16 @@ class DurableTrajectoryPaths:
     root: Path
     segments_dir: Path
     manifest_path: Path
+
+
+@dataclass(frozen=True, slots=True)
+class DurableTrajectoryRecords:
+    """Fully verified immutable records exposed to offline validation tools."""
+
+    manifest: DurableTrajectoryManifest
+    transitions: tuple[AgentTransitionEvent, ...]
+    model_records: tuple[ModelIORecord, ...]
+    child_transitions: tuple[DeepResearchChildTransition, ...]
 
 
 @dataclass(slots=True)
@@ -281,13 +321,23 @@ class DurableTransitionSink:
     def load_manifest(self, trajectory_id: str) -> DurableTrajectoryManifest:
         """Load and fully re-verify all manifest files, hashes, and alignment."""
 
+        return self.load_records(trajectory_id).manifest
+
+    def load_records(self, trajectory_id: str) -> DurableTrajectoryRecords:
+        """Load verified records without offering a mutating replay surface."""
+
         paths = self.paths_for_trajectory(trajectory_id)
         loaded = self._load(paths, expected_thread_id=None, expected_run_id=None)
         if loaded.manifest is None:
             raise DurableTrajectoryError("trajectory_manifest_missing")
         self._validate_manifest_matches_files(loaded)
         self._validate_alignment(loaded)
-        return loaded.manifest.model_copy(deep=True)
+        return DurableTrajectoryRecords(
+            manifest=loaded.manifest.model_copy(deep=True),
+            transitions=tuple(event.model_copy(deep=True) for event in loaded.transitions.values()),
+            model_records=tuple(record.model_copy(deep=True) for record in loaded.model_records.values()),
+            child_transitions=tuple(event.model_copy(deep=True) for event in loaded.child_transitions.values()),
+        )
 
     async def _lock_for(self, trajectory_id: str) -> asyncio.Lock:
         async with self._locks_guard:
@@ -481,6 +531,11 @@ class DurableTransitionSink:
             thread_id=loaded.thread_id,
             run_id=loaded.run_id,
             segments=loaded.segments,
+            data_policy=aggregate_data_policies(
+                [event.data_policy for event in loaded.transitions.values()]
+                + [record.data_policy for record in loaded.model_records.values()]
+                + [event.data_policy for event in loaded.child_transitions.values()]
+            ),
         )
         _atomic_write(loaded.paths.manifest_path, _render_json(manifest))
         loaded.manifest = manifest
@@ -504,6 +559,13 @@ class DurableTransitionSink:
             raise DurableTrajectoryError("manifest_model_turn_ids_mismatch")
         if manifest.child_transition_ids != [item.child_transition_id for item in actual if item.child_transition_id is not None]:
             raise DurableTrajectoryError("manifest_child_transition_ids_mismatch")
+        actual_policy = aggregate_data_policies(
+            [event.data_policy for event in loaded.transitions.values()]
+            + [record.data_policy for record in loaded.model_records.values()]
+            + [event.data_policy for event in loaded.child_transitions.values()]
+        )
+        if manifest.data_policy != actual_policy:
+            raise DurableTrajectoryError("manifest_data_policy_mismatch")
 
     @staticmethod
     def _validate_alignment(loaded: _LoadedTrajectory) -> None:

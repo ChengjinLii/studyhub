@@ -7,6 +7,7 @@ from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.agentic_platform.domain.data_policy import TrainingDataPolicy
 from app.models.agentic_runtime import AgentArtifactRecord
 
 
@@ -99,6 +100,7 @@ class AgentArtifactRepository:
         idempotency_key: str | None = None,
         artifact_id: str | None = None,
         external_content_size_bytes: int | None = None,
+        data_policy: TrainingDataPolicy | None = None,
     ) -> tuple[AgentArtifactRecord, bool]:
         _require_nonblank("thread_id", thread_id)
         _require_nonblank("artifact_type", artifact_type)
@@ -116,6 +118,7 @@ class AgentArtifactRepository:
             raise ValueError("an artifact requires small JSON content or an external_uri")
         if content is None and external_uri is not None and external_content_size_bytes is None:
             raise ValueError("external artifacts require external_content_size_bytes")
+        policy = (data_policy or TrainingDataPolicy.internal_eval_only()).model_copy(deep=True)
         content_json, content_size_bytes = serialize_small_json(content)
         if content is None:
             content_size_bytes = external_content_size_bytes
@@ -144,6 +147,13 @@ class AgentArtifactRepository:
                 media_type=media_type,
                 content_size_bytes=content_size_bytes,
                 idempotency_key=idempotency_key,
+                training_allowed=policy.training_allowed,
+                sensitivity=policy.sensitivity.value,
+                license_class=policy.license_class.value,
+                source_scope=policy.source_scope.value,
+                contains_personal_data=policy.contains_personal_data,
+                anonymization_version=policy.anonymization_version,
+                retention_policy=policy.retention_policy,
             )
             try:
                 with session.begin_nested():

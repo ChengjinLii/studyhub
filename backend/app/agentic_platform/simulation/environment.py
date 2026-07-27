@@ -13,7 +13,7 @@ from app.agentic_platform.domain.hashing import canonical_hash
 from app.agentic_platform.domain.observation import Observation
 from app.agentic_platform.domain.reward_facts import RewardFacts
 from app.agentic_platform.domain.state import AgentTaskState, StateDelta
-from app.agentic_platform.domain.state_abstract import state_abstract_key
+from app.agentic_platform.domain.state_abstract import state_group_key_v2
 from app.agentic_platform.domain.transition import ExecutionError, VerifierResult
 
 from .scenario import ScenarioSpec
@@ -51,6 +51,7 @@ class EnvironmentReset(DomainModel):
     state: AgentTaskState
     state_hash: str = Field(min_length=1, max_length=128)
     state_abstract_key: str = Field(min_length=1, max_length=256)
+    state_group_key_v2: str = Field(min_length=1, max_length=256)
 
 
 class EnvironmentStep(DomainModel):
@@ -63,6 +64,7 @@ class EnvironmentStep(DomainModel):
     state_before_hash: str = Field(min_length=1, max_length=128)
     state_after_hash: str = Field(min_length=1, max_length=128)
     state_abstract_key: str = Field(min_length=1, max_length=256)
+    state_group_key_v2: str = Field(min_length=1, max_length=256)
     state: AgentTaskState
     state_delta: StateDelta
     observation: Observation | None = None
@@ -121,13 +123,15 @@ class _StatefulStudyHubEnvironment:
         self._state = self._snapshot.task_state.model_copy(deep=True)
         self._seed = seed
         self._action_index = self._snapshot.turn_index
+        group_key = state_group_key_v2(self._state)
         return EnvironmentReset(
             scenario_id=self._scenario.scenario_id,
             seed=seed,
             snapshot=self._snapshot.model_copy(deep=True),
             state=self._state.model_copy(deep=True),
             state_hash=canonical_hash(self._state),
-            state_abstract_key=state_abstract_key(self._state),
+            state_abstract_key=group_key,
+            state_group_key_v2=group_key,
         )
 
     async def step(self, action: AgentDecision) -> EnvironmentStep:
@@ -145,6 +149,7 @@ class _StatefulStudyHubEnvironment:
         successor = apply_state_delta(state, result.state_delta)
         self._state = successor.model_copy(deep=True)
         self._action_index += 1
+        group_key = state_group_key_v2(successor)
         return EnvironmentStep(
             environment_kind=self.environment_kind,
             snapshot_id=self._require_snapshot().snapshot_id,
@@ -153,7 +158,8 @@ class _StatefulStudyHubEnvironment:
             action_hash=canonical_hash(action),
             state_before_hash=canonical_hash(state),
             state_after_hash=canonical_hash(successor),
-            state_abstract_key=state_abstract_key(successor),
+            state_abstract_key=group_key,
+            state_group_key_v2=group_key,
             state=successor.model_copy(deep=True),
             state_delta=result.state_delta.model_copy(deep=True),
             observation=result.observation.model_copy(deep=True) if result.observation else None,

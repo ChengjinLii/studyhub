@@ -33,6 +33,7 @@ export interface AgentStep {
   stateBeforeHash: string | null;
   stateAfterHash: string | null;
   stateAbstractKey: string | null;
+  stateGroupKeyV2: string | null;
   errorCode: string | null;
   startedAt: string | null;
   completedAt: string | null;
@@ -62,6 +63,13 @@ export interface AgentArtifact {
   externalUri: string | null;
   mediaType: string | null;
   contentSizeBytes: number | null;
+  trainingAllowed: boolean;
+  sensitivity: string;
+  licenseClass: string;
+  sourceScope: string;
+  containsPersonalData: boolean;
+  anonymizationVersion: string | null;
+  retentionPolicy: string;
   preview: unknown;
   createdAt: string | null;
 }

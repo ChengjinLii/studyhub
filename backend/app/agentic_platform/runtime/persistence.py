@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from app.agentic_platform.domain.decision import AgentDecision
 from app.agentic_platform.domain.hashing import canonical_hash
 from app.agentic_platform.domain.state import AgentTaskState, TerminalStatus
+from app.agentic_platform.domain.state_abstract import state_group_key_v2
 from app.agentic_platform.persistence.state_machine import InvalidStatusTransition
 from app.models.agentic_runtime import AgentRunStatus, AgentStepRecord, AgentStepStatus, AgentWaitRecord, AgentWaitStatus
 from app.repos.agentic_run_repo import AgentRunRepository
@@ -110,12 +111,14 @@ class SqlAlchemyRuntimePersistence:
             return
 
         def operation(session: Session) -> None:
+            group_key = state_group_key_v2(state)
             self.repository.record_step_outcome(
                 session,
                 step_id=step_id,
                 state_before_hash=state_before_hash,
                 state_after_hash=state_after_hash,
-                state_abstract_key=self._state_abstract_key(state),
+                state_abstract_key=group_key,
+                state_group_key_v2=group_key,
                 action_type=decision.action_type.value,
                 skill_name=decision.skill_name,
                 observation_ref=observation_ref.artifact_id if observation_ref is not None else None,
@@ -263,10 +266,10 @@ class SqlAlchemyRuntimePersistence:
 
     @staticmethod
     def _state_abstract_key(state: AgentTaskState) -> str:
-        return canonical_hash(
-            {
-                "plan": [(step.step_id, step.status.value) for step in state.plan.steps],
-                "pending": bool(state.pending_user_request or state.pending_approval or state.pending_event),
-                "terminal": state.terminal.status.value if state.terminal else None,
-            }
-        )
+        """Compatibility hook; persistence now shares the v2 grouping function."""
+
+        return state_group_key_v2(state)
+
+    @staticmethod
+    def _state_group_key_v2(state: AgentTaskState) -> str:
+        return state_group_key_v2(state)

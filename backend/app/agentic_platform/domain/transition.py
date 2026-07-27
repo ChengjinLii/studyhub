@@ -7,6 +7,7 @@ from pydantic import Field, field_validator, model_validator
 
 from ._base import DOMAIN_SCHEMA_VERSION, DomainModel
 from .artifact import ArtifactRef
+from .data_policy import TrainingDataPolicy
 from .decision import AgentDecision
 from .hashing import canonical_model_hash
 from .reward_facts import RewardFacts
@@ -131,6 +132,7 @@ class ModelTurnEvent(DomainModel):
     state_before_hash: str = Field(min_length=1, max_length=128)
     state_after_hash: str = Field(min_length=1, max_length=128)
     state_abstract_key: str = Field(min_length=1, max_length=256)
+    state_group_key_v2: str = Field(default="legacy_state_group_key_v1", min_length=1, max_length=256)
     policy_version: str = Field(min_length=1, max_length=128)
 
     model_id: str = Field(min_length=1, max_length=256)
@@ -153,6 +155,7 @@ class ModelTurnEvent(DomainModel):
 
     training_eligible: bool = False
     quarantine_reason: str | None = Field(default=None, max_length=512)
+    data_policy: TrainingDataPolicy = Field(default_factory=TrainingDataPolicy.internal_eval_only)
 
     @field_validator(
         "model_turn_id",
@@ -163,6 +166,7 @@ class ModelTurnEvent(DomainModel):
         "state_before_hash",
         "state_after_hash",
         "state_abstract_key",
+        "state_group_key_v2",
         "policy_version",
         "model_id",
         "model_revision",
@@ -229,6 +233,7 @@ class AgentTransitionEvent(DomainModel):
     state_before_hash: str = Field(min_length=1, max_length=128)
     state_after_hash: str = Field(min_length=1, max_length=128)
     state_abstract_key: str = Field(min_length=1, max_length=256)
+    state_group_key_v2: str = Field(default="legacy_state_group_key_v1", min_length=1, max_length=256)
 
     policy_version: str = Field(min_length=1, max_length=128)
     model_id: str = Field(min_length=1, max_length=256)
@@ -260,6 +265,7 @@ class AgentTransitionEvent(DomainModel):
     provider_request_id: str | None = Field(default=None, max_length=256)
     training_eligible: bool = False
     quarantine_reason: str | None = Field(default=None, max_length=512)
+    data_policy: TrainingDataPolicy = Field(default_factory=TrainingDataPolicy.internal_eval_only)
     error: ExecutionError | None = None
     terminal_reason: str | None = Field(default=None, max_length=2_000)
     exported_at: datetime | None = None
@@ -275,6 +281,7 @@ class AgentTransitionEvent(DomainModel):
         "state_before_hash",
         "state_after_hash",
         "state_abstract_key",
+        "state_group_key_v2",
         "policy_version",
         "model_id",
         "model_revision",
@@ -351,6 +358,7 @@ class AgentTransitionEvent(DomainModel):
             state_before_hash=self.state_before_hash,
             state_after_hash=self.state_after_hash,
             state_abstract_key=self.state_abstract_key,
+            state_group_key_v2=self.state_group_key_v2,
             policy_version=self.policy_version,
             model_id=self.model_id,
             model_revision=self.model_revision,
@@ -369,6 +377,7 @@ class AgentTransitionEvent(DomainModel):
             provider_request_id=self.provider_request_id,
             training_eligible=self.training_eligible,
             quarantine_reason=quarantine_reason,
+            data_policy=self.data_policy.model_copy(deep=True),
         )
 
     def canonical_hash(self) -> str:

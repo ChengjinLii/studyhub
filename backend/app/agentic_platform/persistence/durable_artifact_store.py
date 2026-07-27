@@ -20,6 +20,7 @@ from sqlalchemy.orm import Session
 
 from app.agentic_platform.deepresearch.state import DeepResearchState
 from app.agentic_platform.domain.artifact import ArtifactKind, ArtifactRef
+from app.agentic_platform.domain.data_policy import TrainingDataPolicy
 from app.agentic_platform.domain.hashing import canonical_hash, canonical_json
 from app.agentic_platform.domain.state import AgentTaskState
 from app.agentic_platform.policy.context_view import ContextPurpose
@@ -157,6 +158,7 @@ class DurableArtifactStore:
         payload: object,
         summary: str,
         idempotency_key: str,
+        data_policy: TrainingDataPolicy | None = None,
     ) -> ArtifactRef:
         return self.store_json_for_owner(
             thread_id=state.thread_id,
@@ -167,6 +169,7 @@ class DurableArtifactStore:
             payload=payload,
             summary=summary,
             idempotency_key=idempotency_key,
+            data_policy=data_policy,
         )
 
     async def store(
@@ -206,6 +209,7 @@ class DurableArtifactStore:
         payload: object,
         summary: str,
         idempotency_key: str,
+        data_policy: TrainingDataPolicy | None = None,
     ) -> ArtifactRef:
         """Synchronous implementation shared by main and research adapters."""
 
@@ -214,6 +218,7 @@ class DurableArtifactStore:
         content_hash = _sha256(content)
         artifact_type_value = _artifact_type_value(artifact_type)
         schema_version = _payload_schema_version(payload)
+        policy = (data_policy or TrainingDataPolicy.internal_eval_only()).model_copy(deep=True)
 
         session = self.session_factory()
         try:
@@ -228,6 +233,7 @@ class DurableArtifactStore:
                     artifact_type=artifact_type_value,
                     artifact_key=artifact_key,
                     content_hash=content_hash,
+                    data_policy=policy,
                 )
                 return self._reference_for_record(existing, artifact_type=artifact_type, summary=summary)
 
@@ -261,12 +267,14 @@ class DurableArtifactStore:
                 content_hash=content_hash,
                 media_type="application/json",
                 idempotency_key=idempotency_key,
+                data_policy=policy,
             )
             self._assert_existing_matches(
                 record,
                 artifact_type=artifact_type_value,
                 artifact_key=artifact_key,
                 content_hash=content_hash,
+                data_policy=policy,
             )
             session.commit()
             return self._reference_for_record(record, artifact_type=artifact_type, summary=summary)
@@ -283,11 +291,23 @@ class DurableArtifactStore:
         artifact_type: str,
         artifact_key: str,
         content_hash: str,
+        data_policy: TrainingDataPolicy,
     ) -> None:
         if record.artifact_type != artifact_type or record.artifact_key != artifact_key:
             raise ArtifactIdempotencyPayloadConflictError("artifact_idempotency_logical_target_conflict")
         if not record.content_hash or record.content_hash != content_hash:
             raise ArtifactIdempotencyPayloadConflictError("artifact_idempotency_payload_conflict")
+        stored_policy = TrainingDataPolicy(
+            training_allowed=record.training_allowed,
+            sensitivity=record.sensitivity,
+            license_class=record.license_class,
+            source_scope=record.source_scope,
+            contains_personal_data=record.contains_personal_data,
+            anonymization_version=record.anonymization_version,
+            retention_policy=record.retention_policy,
+        )
+        if stored_policy != data_policy:
+            raise ArtifactIdempotencyPayloadConflictError("artifact_idempotency_data_policy_conflict")
 
     @staticmethod
     def _reference_for_record(
@@ -342,6 +362,7 @@ class DurableResearchArtifactStore:
         payload: object,
         summary: str,
         idempotency_key: str,
+        data_policy: TrainingDataPolicy | None = None,
     ) -> ArtifactRef:
         if state.task.admin_actor_id != self.admin_actor_id:
             raise DurableArtifactStoreError("research_artifact_owner_mismatch")
@@ -355,6 +376,7 @@ class DurableResearchArtifactStore:
             payload=payload,
             summary=summary,
             idempotency_key=f"research:{task_hash}:{idempotency_key}"[:128],
+            data_policy=data_policy,
         )
 
 

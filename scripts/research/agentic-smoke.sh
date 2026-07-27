@@ -35,6 +35,8 @@ cd "$BACKEND_DIR"
   tests/agentic_platform/test_proactive.py::test_worker_restart_reclaims_stale_proactive_job \
   tests/agentic_platform/test_persistence.py::test_artifact_versions_increment_and_inline_content_stays_bounded \
   tests/agentic_platform/test_simulation.py::test_same_snapshot_seed_and_actions_replay_to_the_same_state_hash_for_ten_turns \
+  tests/agentic_platform/test_dynamic_snapshot_environment.py \
+  tests/agentic_platform/test_data_governance.py \
   tests/agentic_platform/test_trajectory_export.py::test_transition_sink_preserves_raw_token_ids_and_masks_observations \
   tests/agentic_platform/test_trajectory_export.py::test_corrupted_trajectory_is_quarantined_before_a_fresh_trace_is_written \
   tests/test_admin_agentic_auth.py::test_admin_agentic_health_rejects_developer \

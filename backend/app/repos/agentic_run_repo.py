@@ -368,6 +368,7 @@ class AgentRunRepository:
         state_before_hash: str,
         state_after_hash: str,
         state_abstract_key: str,
+        state_group_key_v2: str,
         action_type: str,
         skill_name: str | None = None,
         observation_ref: str | None = None,
@@ -377,6 +378,7 @@ class AgentRunRepository:
             ("state_before_hash", state_before_hash),
             ("state_after_hash", state_after_hash),
             ("state_abstract_key", state_abstract_key),
+            ("state_group_key_v2", state_group_key_v2),
             ("action_type", action_type),
         ):
             _require_nonblank(name, value)
@@ -390,6 +392,7 @@ class AgentRunRepository:
         record.state_before_hash = state_before_hash
         record.state_after_hash = state_after_hash
         record.state_abstract_key = state_abstract_key
+        record.state_group_key_v2 = state_group_key_v2
         record.action_type = action_type
         record.skill_name = skill_name
         record.observation_ref = observation_ref

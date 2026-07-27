@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 
+from app.agentic_platform.domain.data_policy import TrainingDataPolicy
 from app.agentic_platform.simulation.trajectory import ModelIORecord
 from ml.agentic_platform.adapters.search_r1 import SearchR1DatasetAdapter
 from ml.agentic_platform.adapters.verl import VerlAgentLoopAdapter
@@ -9,7 +10,14 @@ from tests.agentic_platform.test_trajectory_export import _tokenized_transition
 
 
 def test_search_r1_adapter_exports_compatible_shape_without_retokenizing() -> None:
-    record = ModelIORecord.from_transition(_tokenized_transition())
+    record = ModelIORecord.from_transition(
+        _tokenized_transition().model_copy(
+            update={
+                "training_eligible": True,
+                "data_policy": TrainingDataPolicy.synthetic_trainable(),
+            }
+        )
+    )
     assert record is not None
 
     exported = SearchR1DatasetAdapter().export_record(record.model_dump(mode="json"))

@@ -10,12 +10,13 @@ from pydantic import Field, field_validator
 
 from app.agentic_platform.domain import DomainModel, apply_state_delta
 from app.agentic_platform.domain.artifact import ArtifactKind, ArtifactRef
+from app.agentic_platform.domain.data_policy import TrainingDataPolicy
 from app.agentic_platform.domain.decision import AgentActionType, AgentDecision, AgentOutput
 from app.agentic_platform.domain.hashing import canonical_hash, json_schema_hash
 from app.agentic_platform.domain.observation import Observation, ObservationSource
 from app.agentic_platform.domain.reward_facts import RewardFacts
 from app.agentic_platform.domain.state import AgentTaskState, FailureRecord, StateDelta, TerminalState, TerminalStatus
-from app.agentic_platform.domain.state_abstract import state_abstract_key
+from app.agentic_platform.domain.state_abstract import state_group_key_v2
 from app.agentic_platform.domain.transition import (
     AgentTransitionEvent,
     ExecutionError,
@@ -469,6 +470,7 @@ class RuntimeMetadata(DomainModel):
     trainable_turn_purposes: list[ModelTurnPurpose] = Field(
         default_factory=lambda: [ModelTurnPurpose.POLICY, ModelTurnPurpose.FINALIZER]
     )
+    data_policy: TrainingDataPolicy = Field(default_factory=TrainingDataPolicy.internal_eval_only)
 
     @field_validator("trainable_turn_purposes")
     @classmethod
@@ -1259,6 +1261,7 @@ class AgentGraphNodes:
                 "quarantine_reason": quarantine_reason,
             }
         )
+        state_group = self._state_group_key_v2(successor)
         event = AgentTransitionEvent(
             thread_id=successor.thread_id,
             run_id=successor.run_id,
@@ -1270,7 +1273,8 @@ class AgentGraphNodes:
             environment_snapshot_id=successor.environment.snapshot_id,
             state_before_hash=canonical_hash(state_before),
             state_after_hash=canonical_hash(successor),
-            state_abstract_key=self._state_abstract_key(successor),
+            state_abstract_key=state_group,
+            state_group_key_v2=state_group,
             policy_version=self.metadata.policy_version,
             model_id=policy_turn.model_id,
             model_revision=policy_turn.model_revision,
@@ -1300,6 +1304,7 @@ class AgentGraphNodes:
             provider_request_id=policy_turn.provider_request_id,
             training_eligible=training_eligible,
             quarantine_reason=quarantine_reason,
+            data_policy=self.metadata.data_policy.model_copy(deep=True),
             error=execution.error,
             terminal_reason=str((update or graph_state).get("termination_reason")) if terminal else None,
         )
@@ -1469,6 +1474,7 @@ class AgentGraphNodes:
         state_delta: StateDelta | None = None,
     ) -> None:
         training_eligible, quarantine_reason = self._training_status(turn, purpose=purpose)
+        state_group = self._state_group_key_v2(state_after)
         await self.model_turn_sink.emit_model_turn(
             ModelTurnEvent(
                 model_turn_id=self._model_turn_id(
@@ -1484,7 +1490,8 @@ class AgentGraphNodes:
                 environment_snapshot_id=state_after.environment.snapshot_id,
                 state_before_hash=canonical_hash(state_before),
                 state_after_hash=canonical_hash(state_after),
-                state_abstract_key=self._state_abstract_key(state_after),
+                state_abstract_key=state_group,
+                state_group_key_v2=state_group,
                 policy_version=self.metadata.policy_version,
                 model_id=turn.model_id,
                 model_revision=turn.model_revision,
@@ -1501,6 +1508,7 @@ class AgentGraphNodes:
                 provider_request_id=turn.provider_request_id,
                 training_eligible=training_eligible,
                 quarantine_reason=quarantine_reason,
+                data_policy=self.metadata.data_policy.model_copy(deep=True),
             )
         )
 
@@ -1549,7 +1557,11 @@ class AgentGraphNodes:
 
     @staticmethod
     def _state_abstract_key(state: AgentTaskState) -> str:
-        return state_abstract_key(state)
+        return state_group_key_v2(state)
+
+    @staticmethod
+    def _state_group_key_v2(state: AgentTaskState) -> str:
+        return state_group_key_v2(state)
 
     @staticmethod
     def _failure_delta(graph_state: Mapping[str, Any], error: ExecutionError | None) -> StateDelta:

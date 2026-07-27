@@ -19,6 +19,13 @@ from pydantic import Field, ValidationError, field_validator, model_validator
 
 from app.agentic_platform.domain import DomainModel
 from app.agentic_platform.domain.artifact import ArtifactRef
+from app.agentic_platform.domain.data_policy import (
+    DataSensitivity,
+    LicenseClass,
+    TrainingDataPolicy,
+    aggregate_data_policies,
+    manifest_policy_fields,
+)
 from app.agentic_platform.domain.decision import AgentDecision
 from app.agentic_platform.domain.hashing import canonical_hash, canonical_json
 from app.agentic_platform.domain.reward_facts import RewardFacts
@@ -98,7 +105,7 @@ class ModelIORecord(ModelTurnEvent):
 class TrajectoryManifest(DomainModel):
     """Small integrity manifest for one isolated thread/run trajectory."""
 
-    schema_version: str = "1.0"
+    schema_version: str = "1.1"
     trajectory_id: str = Field(min_length=1, max_length=128)
     thread_id: str = Field(min_length=1, max_length=128)
     run_id: str = Field(min_length=1, max_length=128)
@@ -110,6 +117,12 @@ class TrajectoryManifest(DomainModel):
     final_state_hash: str = Field(min_length=1, max_length=128)
     transitions_sha256: str = Field(min_length=1, max_length=128)
     model_io_sha256: str | None = Field(default=None, min_length=1, max_length=128)
+    data_policy: TrainingDataPolicy = Field(default_factory=TrainingDataPolicy.internal_eval_only)
+    training_allowed: bool = False
+    sensitivity: DataSensitivity = DataSensitivity.INTERNAL
+    license_class: LicenseClass = LicenseClass.INTERNAL_EVAL_ONLY
+    anonymization_version: str | None = Field(default=None, max_length=128)
+    retention_policy: str = Field(default="internal_evaluation_only", min_length=1, max_length=256)
     content_hash: str = Field(min_length=1, max_length=128)
 
     @field_validator("environment_snapshot_ids", "transition_ids")
@@ -125,6 +138,14 @@ class TrajectoryManifest(DomainModel):
     def validate_manifest(self) -> "TrajectoryManifest":
         if self.transition_count != len(self.transition_ids):
             raise ValueError("manifest transition count must match transition IDs")
+        if manifest_policy_fields(self.data_policy) != {
+            "training_allowed": self.training_allowed,
+            "sensitivity": self.sensitivity,
+            "license_class": self.license_class,
+            "anonymization_version": self.anonymization_version,
+            "retention_policy": self.retention_policy,
+        }:
+            raise ValueError("manifest data-policy fields do not match nested policy")
         if self.content_hash != self._content_hash():
             raise ValueError("manifest content hash does not match manifest fields")
         return self
@@ -141,6 +162,9 @@ class TrajectoryManifest(DomainModel):
         if not events:
             raise ValueError("cannot build a trajectory manifest without transitions")
         first = events[0]
+        data_policy = aggregate_data_policies(
+            [event.data_policy for event in events] + [record.data_policy for record in model_records]
+        )
         data = {
             "trajectory_id": trajectory_id_for_event(first),
             "thread_id": first.thread_id,
@@ -153,8 +177,10 @@ class TrajectoryManifest(DomainModel):
             "final_state_hash": events[-1].state_after_hash,
             "transitions_sha256": transitions_sha256,
             "model_io_sha256": model_io_sha256,
+            "data_policy": data_policy,
+            **manifest_policy_fields(data_policy),
         }
-        content_hash = canonical_hash({"schema_version": "1.0", **data})
+        content_hash = canonical_hash({"schema_version": "1.1", **data})
         return cls(**data, content_hash=content_hash)
 
     def _content_hash(self) -> str:
@@ -172,6 +198,12 @@ class TrajectoryManifest(DomainModel):
                 "final_state_hash": self.final_state_hash,
                 "transitions_sha256": self.transitions_sha256,
                 "model_io_sha256": self.model_io_sha256,
+                "data_policy": self.data_policy,
+                "training_allowed": self.training_allowed,
+                "sensitivity": self.sensitivity,
+                "license_class": self.license_class,
+                "anonymization_version": self.anonymization_version,
+                "retention_policy": self.retention_policy,
             }
         )
 
