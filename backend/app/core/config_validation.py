@@ -38,7 +38,7 @@ def validate_runtime_configuration(settings: Any, *, default_dev_jwt_secret: str
 
 
 def _validate_storage(settings: Any) -> None:
-    if settings.storage_provider != "oss":
+    if settings.storage_provider != "oss" and settings.agentic_artifact_storage_provider != "oss":
         return
     missing_keys: list[str] = []
     if not settings.oss_endpoint:
@@ -165,6 +165,8 @@ def _validate_agentic_platform(settings: Any) -> None:
             raise RuntimeError("STUDYHUB_AGENTIC_SHADOW_ADMIN_ACTOR_ID 必须是正数管理员 ID。")
     if settings.agentic_execution_enabled and not settings.agentic_platform_enabled:
         raise RuntimeError("STUDYHUB_AGENTIC_EXECUTION_ENABLED 需要先启用 STUDYHUB_AGENTIC_PLATFORM_ENABLED。")
+    if settings.agentic_artifact_storage_provider not in {"local_fs", "oss"}:
+        raise RuntimeError("STUDYHUB_AGENTIC_ARTIFACT_STORAGE_PROVIDER 只允许为 local_fs 或 oss。")
     if settings.agentic_model_provider not in {"disabled", "openai_compatible"}:
         raise RuntimeError("STUDYHUB_AGENTIC_MODEL_PROVIDER 只允许为 disabled 或 openai_compatible。")
     if settings.agentic_model_token_trace_source not in {"local", "teacher_api", "unavailable"}:
@@ -183,6 +185,14 @@ def _validate_agentic_platform(settings: Any) -> None:
             not isinstance(value, str) or not value.strip() for value in required_model_settings.values()
         ):
             raise RuntimeError("启用 Agent Execution 前必须完整配置 OpenAI-compatible Agentic Model Provider。")
+        if settings.agentic_runtime != "langgraph":
+            raise RuntimeError("启用 Agent Execution 时必须使用 STUDYHUB_AGENTIC_RUNTIME=langgraph。")
+        if settings.agentic_checkpointer != "sqlite":
+            raise RuntimeError("启用 Agent Execution 时必须使用可恢复的 STUDYHUB_AGENTIC_CHECKPOINTER=sqlite。")
+        if not settings.agentic_durable_storage_enabled:
+            raise RuntimeError("启用 Agent Execution 前必须设置 STUDYHUB_AGENTIC_DURABLE_STORAGE_ENABLED=true。")
+        if settings.is_production and settings.agentic_artifact_storage_provider != "oss":
+            raise RuntimeError("production Agent Execution 必须使用 STUDYHUB_AGENTIC_ARTIFACT_STORAGE_PROVIDER=oss。")
     positive_worker_limits = {
         "STUDYHUB_AGENTIC_WORKER_LOCK_TIMEOUT_SECONDS": settings.agentic_worker_lock_timeout_seconds,
         "STUDYHUB_AGENTIC_WORKER_BATCH_SIZE": settings.agentic_worker_batch_size,

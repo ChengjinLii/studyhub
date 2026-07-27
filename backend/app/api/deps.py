@@ -7,14 +7,19 @@ from sqlalchemy.orm import Session
 
 from app.agentic_platform.application import AdminAgentRunService
 from app.agentic_platform.application.runtime_events import RuntimeEventStore
-from app.agentic_platform.execution import AgentExecutionWorker, AgentRuntimeFactory
+from app.agentic_platform.execution import (
+    AgentExecutionWorker,
+    AgentRuntimeFactory,
+    DurableRuntimeDependencies,
+    build_durable_agent_runtime_factory,
+)
 from app.agentic_platform.proactive.dispatcher import ProactiveDispatcher
 from app.agentic_platform.proactive.jobs import ProactiveAgentWorker
 from app.agentic_platform.proactive.outbox import AgentOutboxRepository
 from app.agentic_platform.proactive.triggers import ProactiveTriggerService
 from app.agentic_platform.skills.registry import SkillRegistry, build_default_skill_registry
 from app.core.config import get_settings
-from app.core.db import get_db_session
+from app.core.db import get_db_session, get_session_factory
 from app.core.public_read_cache import PublicReadCache
 from app.core.security import AuthContext, JwtTokenCodec, resolve_token_from_request
 from app.integrations.material_asset_store import MaterialAssetStore
@@ -157,9 +162,26 @@ def get_proactive_agent_worker() -> ProactiveAgentWorker:
 
 @lru_cache(maxsize=1)
 def get_agent_runtime_factory() -> AgentRuntimeFactory:
-    """R1 keeps the plane inert until R2 binds a real model-backed runtime."""
+    """Bind the real model/runtime only after its independent opt-in is on."""
 
-    return AgentRuntimeFactory()
+    settings = get_settings()
+    if not settings.agentic_execution_enabled:
+        return AgentRuntimeFactory()
+    return build_durable_agent_runtime_factory(
+        settings,
+        dependencies=DurableRuntimeDependencies(
+            session_factory=get_session_factory(),
+            skill_registry=get_agentic_skill_registry(),
+            material_repository=get_material_repo(),
+            materials_service=get_materials_service(),
+            pdf_evidence_service=MaterialPdfEvidenceService(settings, get_material_asset_store()),
+            storage_provider=(
+                AliyunOssStorageProvider(settings)
+                if settings.agentic_artifact_storage_provider == "oss"
+                else get_storage_provider()
+            ),
+        ),
+    )
 
 
 @lru_cache(maxsize=1)

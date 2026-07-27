@@ -162,6 +162,11 @@ class Settings(BaseSettings):
     agentic_execution_batch_size: int = 4
     agentic_execution_claim_ttl_seconds: int = 900
     agentic_execution_max_attempts: int = 3
+    # Execution data is intentionally a separate opt-in from the admin API.
+    # Once enabled, it requires the durable SQL/artifact/segment path below.
+    agentic_durable_storage_enabled: bool = False
+    agentic_artifact_storage_provider: str = "local_fs"
+    agentic_artifact_root_dir: str | None = None
     # A distinct provider namespace keeps the legacy AiService path isolated.
     agentic_model_provider: str = "disabled"
     agentic_model_base_url: str | None = None
@@ -466,6 +471,25 @@ class Settings(BaseSettings):
             return Path(self.mail_outbox_dir)
         runtime_root = self.local_dev_root if self.is_local_dev else self.private_dir
         return runtime_root / "outbox" / "mail"
+
+    @property
+    def resolved_agentic_artifact_root_dir(self) -> Path:
+        if self.agentic_artifact_root_dir:
+            return Path(self.agentic_artifact_root_dir)
+        runtime_root = self.local_dev_root if self.is_local_dev else self.private_dir
+        return runtime_root / "artifacts" / "agentic_platform"
+
+    @property
+    def resolved_agentic_transition_root_dir(self) -> Path:
+        return self.resolved_agentic_artifact_root_dir / "trajectories"
+
+    @property
+    def resolved_agentic_blob_root_dir(self) -> Path:
+        return self.resolved_agentic_artifact_root_dir / "blobs"
+
+    @property
+    def resolved_agentic_checkpoint_path(self) -> Path:
+        return self.resolved_agentic_artifact_root_dir / "checkpoints" / "agentic-langgraph.sqlite3"
 
     @property
     def resolved_cors_allowed_origins(self) -> list[str]:

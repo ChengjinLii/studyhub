@@ -8,6 +8,7 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from app.agentic_platform.application.runtime_events import RuntimeEventStore
+from app.agentic_platform.persistence.run_lease import RunLease
 from app.agentic_platform.runtime.kernel import KernelRunStatus
 from app.core.config import Settings
 from app.models.agentic_runtime import AgentJobRecord, AgentJobStatus, AgentRunRecord, AgentRunStatus
@@ -133,15 +134,14 @@ class AgentExecutionWorker:
             )
             return
 
-        lease_owner = f"agent-execution:{worker_id}:{job.id}:{job.attempts}"
-        lease_name = f"agent-execution:{job.run_id}"
-        acquired = self.lock_provider.acquire(
+        lease = RunLease(
+            self.lock_provider,
             session,
-            lock_name=lease_name,
-            owner_token=lease_owner,
+            run_id=job.run_id,
+            owner_token=f"agent-execution:{worker_id}:{job.id}:{job.attempts}",
             ttl_seconds=self.settings.agentic_execution_claim_ttl_seconds,
         )
-        if not acquired:
+        if not lease.acquire():
             metrics.lease_unavailable += 1
             self._retry_or_fail(
                 session,
@@ -191,7 +191,7 @@ class AgentExecutionWorker:
                 metrics=metrics,
             )
         finally:
-            self.lock_provider.release(session, lock_name=lease_name, owner_token=lease_owner)
+            lease.release()
 
     def _prepare_run(self, session: Session, *, job: AgentJobRecord, worker_id: str) -> AgentRunRecord | None:
         assert job.run_id is not None

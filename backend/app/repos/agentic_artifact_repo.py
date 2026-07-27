@@ -98,6 +98,7 @@ class AgentArtifactRepository:
         media_type: str | None = None,
         idempotency_key: str | None = None,
         artifact_id: str | None = None,
+        external_content_size_bytes: int | None = None,
     ) -> tuple[AgentArtifactRecord, bool]:
         _require_nonblank("thread_id", thread_id)
         _require_nonblank("artifact_type", artifact_type)
@@ -107,9 +108,17 @@ class AgentArtifactRepository:
             raise ValueError("admin_actor_id must be positive")
         if external_uri is not None:
             _require_nonblank("external_uri", external_uri)
+        if external_content_size_bytes is not None and external_content_size_bytes < 0:
+            raise ValueError("external_content_size_bytes must not be negative")
+        if content is not None and external_content_size_bytes is not None:
+            raise ValueError("external_content_size_bytes is only valid for external artifacts")
         if content is None and external_uri is None:
             raise ValueError("an artifact requires small JSON content or an external_uri")
+        if content is None and external_uri is not None and external_content_size_bytes is None:
+            raise ValueError("external artifacts require external_content_size_bytes")
         content_json, content_size_bytes = serialize_small_json(content)
+        if content is None:
+            content_size_bytes = external_content_size_bytes
 
         if idempotency_key is not None:
             _require_nonblank("idempotency_key", idempotency_key)

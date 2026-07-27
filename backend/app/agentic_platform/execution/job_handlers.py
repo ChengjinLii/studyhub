@@ -120,39 +120,52 @@ class AgentExecutionJobHandlers:
         if task.task_id != run.id or task.admin_actor_id != run.admin_actor_id:
             raise AgentExecutionPayloadError("research_task_run_mismatch")
         agent = await self.factory.build_deep_research_agent(run=run, research_task=task)
-        result = await agent.run(task)
-        packet = result.research_packet.model_dump(mode="json")
-        report = result.research_report.model_dump(mode="json")
-        self.artifacts.create_next_version(
-            session,
-            thread_id=run.thread_id,
-            run_id=run.id,
-            admin_actor_id=run.admin_actor_id,
-            artifact_type="research_packet",
-            artifact_key=f"deep-research:{run.id}:packet",
-            content=packet,
-            schema_version=result.research_packet.schema_version,
-            content_hash=canonical_hash(packet),
-            media_type="application/json",
-            idempotency_key=f"deep-research-packet:{job.id}",
+        try:
+            result = await agent.run(task)
+        finally:
+            await _close_if_supported(agent)
+        persisted_count = await self.factory.persist_deep_research_result(
+            run=run,
+            result=result,
+            idempotency_key=job.id,
         )
-        self.artifacts.create_next_version(
-            session,
-            thread_id=run.thread_id,
-            run_id=run.id,
-            admin_actor_id=run.admin_actor_id,
-            artifact_type="research_report",
-            artifact_key=f"deep-research:{run.id}:report",
-            content=report,
-            schema_version="1.0",
-            content_hash=canonical_hash(report),
-            media_type="application/json",
-            idempotency_key=f"deep-research-report:{job.id}",
-        )
+        if persisted_count is None:
+            # Bounded fixture factories used by legacy tests do not have the
+            # R5 durable artifact adapter. Production factories always take
+            # the branch above, including external storage for large packets.
+            packet = result.research_packet.model_dump(mode="json")
+            report = result.research_report.model_dump(mode="json")
+            self.artifacts.create_next_version(
+                session,
+                thread_id=run.thread_id,
+                run_id=run.id,
+                admin_actor_id=run.admin_actor_id,
+                artifact_type="research_packet",
+                artifact_key=f"deep-research:{run.id}:packet",
+                content=packet,
+                schema_version=result.research_packet.schema_version,
+                content_hash=canonical_hash(packet),
+                media_type="application/json",
+                idempotency_key=f"deep-research-packet:{job.id}",
+            )
+            self.artifacts.create_next_version(
+                session,
+                thread_id=run.thread_id,
+                run_id=run.id,
+                admin_actor_id=run.admin_actor_id,
+                artifact_type="research_report",
+                artifact_key=f"deep-research:{run.id}:report",
+                content=report,
+                schema_version="1.0",
+                content_hash=canonical_hash(report),
+                media_type="application/json",
+                idempotency_key=f"deep-research-report:{job.id}",
+            )
+            persisted_count = 2
         return JobExecutionResult(
             kind="deep_research",
             summary=result.summary,
-            artifacts_created=2,
+            artifacts_created=persisted_count,
         )
 
     def _initial_state(self, *, run: AgentRunRecord, payload: dict[str, object]) -> AgentTaskState:

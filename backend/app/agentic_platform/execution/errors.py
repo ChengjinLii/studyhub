@@ -4,6 +4,8 @@ import asyncio
 
 from pydantic import ValidationError
 
+from app.agentic_platform.persistence.durable_artifact_store import DurableArtifactStoreError
+from app.agentic_platform.persistence.durable_transition_sink import DurableTrajectoryError
 from app.repos.agentic_artifact_repo import ArtifactPayloadTooLargeError
 
 
@@ -45,6 +47,10 @@ def classify_execution_error(exc: BaseException) -> AgentExecutionError:
         return AgentExecutionTimeoutError()
     if isinstance(exc, ArtifactPayloadTooLargeError):
         return AgentExecutionError("agent_execution_artifact_too_large", retryable=False)
+    if isinstance(exc, DurableTrajectoryError):
+        return AgentExecutionError("agent_execution_trajectory_integrity", retryable=False)
+    if isinstance(exc, DurableArtifactStoreError):
+        return AgentExecutionError("agent_execution_artifact_integrity", retryable=False)
     if isinstance(exc, OSError):
         return AgentExecutionError("agent_execution_storage_unavailable", retryable=True)
     if isinstance(exc, (ValidationError, KeyError, TypeError)):

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Awaitable, Callable
 from enum import StrEnum
 from typing import Any
 
@@ -101,6 +102,7 @@ class AgentKernel:
         redis_checkpoint_mirror: RedisCheckpointAdapter | None = None,
         resume_coordinator: ResumeCoordinator | None = None,
         cancellation_registry: CancellationRegistry | None = None,
+        close_callbacks: list[Callable[[], object]] | None = None,
     ) -> None:
         self.policy = policy
         self.context_builder = context_builder
@@ -111,6 +113,7 @@ class AgentKernel:
         self.resume_coordinator = resume_coordinator or ResumeCoordinator()
         self.cancellation_registry = cancellation_registry or CancellationRegistry()
         self.metadata = metadata or RuntimeMetadata()
+        self._close_callbacks = list(close_callbacks or [])
         self.nodes = AgentGraphNodes(
             policy=policy,
             context_builder=context_builder,
@@ -189,11 +192,18 @@ class AgentKernel:
         return await self._result_from_snapshot(run_id)
 
     async def close(self) -> None:
-        close = getattr(self.checkpoint_handle, "close", None)
-        if close is not None:
-            result = close()
-            if hasattr(result, "__await__"):
-                await result
+        try:
+            close = getattr(self.checkpoint_handle, "close", None)
+            if close is not None:
+                result = close()
+                if isinstance(result, Awaitable):
+                    await result
+        finally:
+            callbacks, self._close_callbacks = self._close_callbacks, []
+            for callback in callbacks:
+                result = callback()
+                if isinstance(result, Awaitable):
+                    await result
 
     async def _require_snapshot(self, run_id: str):
         config = self._config_for_run_id(run_id, recursion_limit=64)

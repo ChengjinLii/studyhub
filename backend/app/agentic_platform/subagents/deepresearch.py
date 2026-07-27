@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Awaitable, Callable
 from typing import TYPE_CHECKING
 
 from pydantic import Field
@@ -33,8 +34,9 @@ class DeepResearchSearchAgent(SubAgent[ResearchTaskPacket, DeepResearchSubAgentR
 
     name = "deep_research"
 
-    def __init__(self, graph: DeepResearchGraph) -> None:
+    def __init__(self, graph: DeepResearchGraph, *, close_callbacks: list[Callable[[], object]] | None = None) -> None:
         self.graph = graph
+        self._close_callbacks = list(close_callbacks or [])
 
     async def run(self, task: ResearchTaskPacket) -> DeepResearchSubAgentResult:
         result = await self.graph.run(task)
@@ -50,6 +52,16 @@ class DeepResearchSearchAgent(SubAgent[ResearchTaskPacket, DeepResearchSubAgentR
             terminal_reason=result.terminal_reason,
             child_transition_count=result.child_transition_count,
         )
+
+    def add_close_callbacks(self, callbacks: list[Callable[[], object]]) -> None:
+        self._close_callbacks.extend(callbacks)
+
+    async def close(self) -> None:
+        callbacks, self._close_callbacks = self._close_callbacks, []
+        for callback in callbacks:
+            result = callback()
+            if isinstance(result, Awaitable):
+                await result
 
     @staticmethod
     def _summary(result: DeepResearchRunResult) -> str:
