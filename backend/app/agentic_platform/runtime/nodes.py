@@ -19,6 +19,7 @@ from app.agentic_platform.domain.state_abstract import state_abstract_key
 from app.agentic_platform.domain.transition import AgentTransitionEvent, ExecutionError, VerifierResult
 from app.agentic_platform.policy.base import AgentPolicy
 from app.agentic_platform.policy.context_builder import ContextBuilder
+from app.agentic_platform.policy.turn_result import unwrap_policy_output
 from app.agentic_platform.skills.context import SkillExecutionContext
 from app.agentic_platform.skills.executor import SkillExecutionError, SkillExecutor
 from app.agentic_platform.skills.registry import SkillRegistry
@@ -507,7 +508,7 @@ class AgentGraphNodes:
         try:
             builder = self._budgeted_builder(state)
             context = builder.build_planner_context(state, self.skill_registry.list())
-            plan = await self.policy.create_plan(state, context)
+            plan = unwrap_policy_output(await self.policy.create_plan(state, context))
             delta = merge_state_deltas(
                 StateDelta(plan_update=plan),
                 BudgetGuard.model_turn_delta(context_tokens=context.estimated_tokens),
@@ -564,7 +565,7 @@ class AgentGraphNodes:
                 summary="Secret-free policy context view",
                 idempotency_key=f"context:{state_before.run_id}:{int(graph_state.get('turn_index', 0))}:{canonical_hash(context)[:24]}",
             )
-            decision = await self.policy.decide(state_before, context)
+            decision = unwrap_policy_output(await self.policy.decide(state_before, context))
             assessment = self.duplicate_detector.assess(decision, list(graph_state.get("action_fingerprints", [])))
             base_delta = BudgetGuard.model_turn_delta(context_tokens=context.estimated_tokens)
             state_after_decision = apply_state_delta(state_before, base_delta)
@@ -921,7 +922,7 @@ class AgentGraphNodes:
         else:
             try:
                 builder = self._budgeted_builder(state)
-                output = await self.policy.finalize(state, builder.build_final_context(state))
+                output = unwrap_policy_output(await self.policy.finalize(state, builder.build_final_context(state)))
             except Exception:  # noqa: BLE001
                 output = (
                     decision.final_output

@@ -162,6 +162,15 @@ class Settings(BaseSettings):
     agentic_execution_batch_size: int = 4
     agentic_execution_claim_ttl_seconds: int = 900
     agentic_execution_max_attempts: int = 3
+    # A distinct provider namespace keeps the legacy AiService path isolated.
+    agentic_model_provider: str = "disabled"
+    agentic_model_base_url: str | None = None
+    agentic_model_api_key: str | None = None
+    agentic_model_id: str | None = None
+    agentic_model_revision: str | None = None
+    agentic_model_timeout_seconds: float = 30.0
+    agentic_model_max_retries: int = 2
+    agentic_model_token_trace_source: str = "teacher_api"
     deep_research_enabled: bool = False
     deep_research_web_enabled: bool = False
     deep_research_scholar_enabled: bool = False

@@ -1,13 +1,14 @@
 from __future__ import annotations
 
-from collections.abc import Mapping
 from typing import Protocol
 
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 
 from app.agentic_platform.domain import DomainModel
 from app.agentic_platform.domain.hashing import canonical_hash
-from app.agentic_platform.domain.transition import ModelUsage
+from app.agentic_platform.domain.transition import ModelUsage, TokenRoleSpan
+
+from .token_trace import TokenTraceSource
 
 from .context_view import ContextPurpose
 
@@ -41,13 +42,53 @@ class AgentModelRequest(DomainModel):
 
 
 class AgentModelResponse(DomainModel):
-    """Only structured output is retained; raw reasoning text is intentionally absent."""
+    """A provider response with raw content kept outside public runtime events."""
 
+    schema_version: str = "1.0"
     model_id: str = Field(min_length=1, max_length=256)
     model_revision: str | None = Field(default=None, max_length=256)
     structured_output: dict[str, object]
     usage: ModelUsage = Field(default_factory=ModelUsage)
     token_ids: list[int] | None = None
+    token_logprobs: list[float] | None = None
+    token_role_spans: list[TokenRoleSpan] = Field(default_factory=list)
+    token_trace_source: TokenTraceSource = TokenTraceSource.UNAVAILABLE
+    raw_content: str | None = Field(default=None, max_length=200_000)
+    reasoning_content_present: bool = False
+    finish_reason: str | None = Field(default=None, max_length=128)
+    latency_ms: dict[str, float] = Field(default_factory=dict)
+    provider_request_id: str | None = Field(default=None, max_length=256)
+
+    @field_validator("token_ids")
+    @classmethod
+    def validate_token_ids(cls, value: list[int] | None) -> list[int] | None:
+        if value is not None and any(token_id < 0 for token_id in value):
+            raise ValueError("token IDs must be non-negative")
+        return value
+
+    @field_validator("latency_ms")
+    @classmethod
+    def validate_latency(cls, value: dict[str, float]) -> dict[str, float]:
+        if any(not name.strip() for name in value):
+            raise ValueError("latency metric names must not be blank")
+        if any(number < 0 for number in value.values()):
+            raise ValueError("latency values must be non-negative")
+        return value
+
+    @model_validator(mode="after")
+    def validate_token_trace(self) -> "AgentModelResponse":
+        if self.token_logprobs is not None:
+            if self.token_ids is None or len(self.token_logprobs) != len(self.token_ids):
+                raise ValueError("token logprobs must align with token IDs")
+        if self.token_role_spans and self.token_ids is None:
+            raise ValueError("token role spans require token IDs")
+        if self.token_ids is not None and any(span.end > len(self.token_ids) for span in self.token_role_spans):
+            raise ValueError("token role span exceeds token IDs")
+        if self.token_trace_source != TokenTraceSource.LOCAL and (
+            self.token_ids is not None or self.token_logprobs is not None or self.token_role_spans
+        ):
+            raise ValueError("only explicitly local providers may supply token traces")
+        return self
 
 
 class AgentModelProvider(Protocol):

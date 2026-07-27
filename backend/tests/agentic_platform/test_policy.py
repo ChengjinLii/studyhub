@@ -120,9 +120,11 @@ def test_replay_policy_completes_without_any_model_provider() -> None:
     action = asyncio.run(replay.decide(state, builder.build_policy_context(state, registry.list())))
     output = asyncio.run(replay.finalize(state, builder.build_final_context(state)))
 
-    assert plan.plan_id == "plan-1"
-    assert action == scripted_decision
-    assert output == scripted_final
+    assert plan.parsed_output.plan_id == "plan-1"
+    assert action.parsed_output == scripted_decision
+    assert output.parsed_output == scripted_final
+    assert {plan.model_id, action.model_id, output.model_id} == {"replay"}
+    assert not plan.trainable and plan.token_ids is None
     assert not hasattr(replay, "provider")
 
 
@@ -173,9 +175,11 @@ def test_model_policy_uses_replaceable_structured_provider_and_cached_capabiliti
     again_capabilities = asyncio.run(cached.capabilities())
     probe = CapabilityProbe()
 
-    assert plan.plan_id == "plan-1"
-    assert action.action_type == AgentActionType.REVIEW
-    assert output.summary == "Model final"
+    assert plan.parsed_output.plan_id == "plan-1"
+    assert action.parsed_output.action_type == AgentActionType.REVIEW
+    assert output.parsed_output.summary == "Model final"
+    assert plan.model_id == "fake-model"
+    assert plan.context_hash and plan.prompt_hash
     assert first_cached == second_cached
     assert len(provider.calls) == 4  # Three direct model-policy calls plus one cached-provider miss.
     assert capabilities == again_capabilities

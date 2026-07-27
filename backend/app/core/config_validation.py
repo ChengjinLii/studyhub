@@ -165,6 +165,24 @@ def _validate_agentic_platform(settings: Any) -> None:
             raise RuntimeError("STUDYHUB_AGENTIC_SHADOW_ADMIN_ACTOR_ID 必须是正数管理员 ID。")
     if settings.agentic_execution_enabled and not settings.agentic_platform_enabled:
         raise RuntimeError("STUDYHUB_AGENTIC_EXECUTION_ENABLED 需要先启用 STUDYHUB_AGENTIC_PLATFORM_ENABLED。")
+    if settings.agentic_model_provider not in {"disabled", "openai_compatible"}:
+        raise RuntimeError("STUDYHUB_AGENTIC_MODEL_PROVIDER 只允许为 disabled 或 openai_compatible。")
+    if settings.agentic_model_token_trace_source not in {"local", "teacher_api", "unavailable"}:
+        raise RuntimeError("STUDYHUB_AGENTIC_MODEL_TOKEN_TRACE_SOURCE 配置非法。")
+    if settings.agentic_model_timeout_seconds <= 0:
+        raise RuntimeError("STUDYHUB_AGENTIC_MODEL_TIMEOUT_SECONDS 必须大于 0。")
+    if int(settings.agentic_model_max_retries) < 0:
+        raise RuntimeError("STUDYHUB_AGENTIC_MODEL_MAX_RETRIES 不能小于 0。")
+    if settings.agentic_execution_enabled:
+        required_model_settings = {
+            "STUDYHUB_AGENTIC_MODEL_BASE_URL": settings.agentic_model_base_url,
+            "STUDYHUB_AGENTIC_MODEL_API_KEY": settings.agentic_model_api_key,
+            "STUDYHUB_AGENTIC_MODEL_ID": settings.agentic_model_id,
+        }
+        if settings.agentic_model_provider != "openai_compatible" or any(
+            not isinstance(value, str) or not value.strip() for value in required_model_settings.values()
+        ):
+            raise RuntimeError("启用 Agent Execution 前必须完整配置 OpenAI-compatible Agentic Model Provider。")
     positive_worker_limits = {
         "STUDYHUB_AGENTIC_WORKER_LOCK_TIMEOUT_SECONDS": settings.agentic_worker_lock_timeout_seconds,
         "STUDYHUB_AGENTIC_WORKER_BATCH_SIZE": settings.agentic_worker_batch_size,
