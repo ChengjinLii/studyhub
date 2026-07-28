@@ -9,7 +9,7 @@ description = "StudyHub FastAPI migration skeleton"
 readme = "README.md"
 requires-python = ">=3.12,<3.13"
 dependencies = [
-  "bcrypt>=4.1,<5.0",
+  "bcrypt>=4.1,<6.0",
   "email-validator>=2.2,<3.0",
   "fastapi>=0.115,<1.0",
   "uvicorn[standard]>=0.34,<0.35",
