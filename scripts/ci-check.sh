@@ -45,6 +45,7 @@ run "frontend typecheck and lint" npm --prefix "$FRONTEND_DIR" run check
 run "frontend strict typecheck subset" npm --prefix "$FRONTEND_DIR" run typecheck:strict
 run "frontend unit tests" npm --prefix "$FRONTEND_DIR" run test:unit
 run "frontend critical mock tests" npm --prefix "$FRONTEND_DIR" run test:critical
+run "frontend production critical tests" npm --prefix "$FRONTEND_DIR" run test:critical:prod
 run "clean generated artifacts after tests" bash "$ROOT_DIR/scripts/clean-generated.sh" "--$GENERATED_CLEAN_MODE"
 
 if [[ "$GENERATED_CLEAN_MODE" == "source" ]]; then

@@ -52,6 +52,7 @@ StudyHub 后端以 RESTful 风格作为公开 API 的主要设计约定，便于
 
 ## 快速开始
 
+- 推荐运行时：Python 3.12、Node.js 22、npm 10（版本文件见 `.python-version` 与 `.nvmrc`）
 - Docker 开发环境：`bash scripts/dev/docker-dev-up.sh`
 - 本地轻量启动：`bash scripts/dev/local-dev-up.sh`
 
@@ -85,7 +86,7 @@ CI 或本地非生产质量门禁可以使用：
 bash scripts/ci-check.sh
 ```
 
-`predeploy-check.sh` 会额外运行可选生产 preflight、nginx 和 systemd 状态检查；更多环境变量和生产机器注意事项见 [scripts/README.md](scripts/README.md)。
+`predeploy-check.sh` 会同时运行开发模式和生产构建模式的 Playwright 关键路径，并额外运行可选生产 preflight、nginx 和 systemd 状态检查；更多环境变量和生产机器注意事项见 [scripts/README.md](scripts/README.md)。
 
 ## 生产安全配置
 

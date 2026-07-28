@@ -33,10 +33,12 @@ bash scripts/dev/docker-dev-up.sh
 如果你只想单独跑后端：
 
 ```bash
-cd backend
-../.venv/bin/pip install -e '.[dev]'
-../.venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8011
+python3.12 -m venv .venv
+.venv/bin/python -m pip install --require-hashes -r backend/requirements.lock
+PYTHONPATH=backend .venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8011
 ```
+
+修改 `backend/pyproject.toml` 后，运行 `bash scripts/deps/update-backend-lock.sh` 更新哈希锁文件。
 
 MCP Gateway 在本地和测试环境默认跟随后端一起启动，Streamable HTTP 入口是：
 
@@ -183,6 +185,9 @@ STUDYHUB_AI_AGENT_THINKING_ENABLED=false
 STUDYHUB_AI_AGENT_REASONING_EFFORT=none
 STUDYHUB_AI_AGENT_TIMEOUT_SECONDS=60
 STUDYHUB_AI_AGENT_MAX_OUTPUT_TOKENS=1800
+STUDYHUB_AI_AGENT_STREAM_MAX_CONCURRENCY=4
+STUDYHUB_AI_AGENT_STREAM_BUFFER_SIZE=16
+STUDYHUB_AI_AGENT_STREAM_HEARTBEAT_SECONDS=10
 STUDYHUB_AI_AGENT_DYNAMIC_TOOLS_ENABLED=true
 STUDYHUB_AI_AGENT_TOOL_MAX_ROUNDS=4
 STUDYHUB_AI_AGENT_TOOL_MAX_CALLS=8

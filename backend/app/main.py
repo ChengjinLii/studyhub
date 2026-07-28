@@ -110,6 +110,7 @@ def create_app() -> FastAPI:
     async def record_http_observability(request: Request, call_next):
         started_at = perf_counter()
         request_id = sanitize_request_id(request.headers.get("x-request-id") or uuid4().hex[:16])
+        request.state.request_id = request_id
         context_tokens = bind_request_context(request_id=request_id, method=request.method, path=request.url.path)
         response = None
         status_code = 500

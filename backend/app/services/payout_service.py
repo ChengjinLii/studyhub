@@ -10,6 +10,7 @@ from fastapi import HTTPException, UploadFile, status
 from sqlalchemy.orm import Session
 
 from app.core.config import Settings
+from app.core.storage_mutation import StorageMutation
 from app.core.upload_validation import validate_image_upload
 from app.models.auth import AuthUser
 from app.models.finance import (
@@ -81,12 +82,19 @@ class PayoutService:
 
         user = self._require_user(session, user_id)
         previous_key = user.payout_qr_key
+        storage_mutation = StorageMutation(self.payout_qr_store.delete_key)
         key = self.payout_qr_store.save_upload(user_id=user_id, upload=upload)
-        user.payout_qr_key = key
-        self.auth_repo.save_user(session, user)
-        session.commit()
-        if previous_key and previous_key != key:
-            self.payout_qr_store.delete_key(previous_key)
+        storage_mutation.record_new(key)
+        storage_mutation.replace_after_commit(previous_key)
+        try:
+            user.payout_qr_key = key
+            self.auth_repo.save_user(session, user)
+            session.commit()
+        except Exception:
+            session.rollback()
+            storage_mutation.rollback()
+            raise
+        storage_mutation.finalize()
         return self._account_payload(user)
 
     def clear_payout_qr(self, session: Session, *, user_id: int) -> dict[str, Any]:
@@ -94,9 +102,14 @@ class PayoutService:
         previous_key = user.payout_qr_key
         user.payout_qr_key = None
         self.auth_repo.save_user(session, user)
-        session.commit()
-        if previous_key:
-            self.payout_qr_store.delete_key(previous_key)
+        try:
+            session.commit()
+        except Exception:
+            session.rollback()
+            raise
+        storage_mutation = StorageMutation(self.payout_qr_store.delete_key)
+        storage_mutation.replace_after_commit(previous_key)
+        storage_mutation.finalize()
         return self._account_payload(user)
 
     def resolve_payout_qr_asset(

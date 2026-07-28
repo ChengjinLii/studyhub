@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from typing import Any, Callable
 
 from sqlalchemy.orm import Session
@@ -12,6 +13,9 @@ from app.providers.payment import PaymentGatewayProvider
 from app.providers.storage import StorageProvider
 from app.providers.transfer import PayoutTransferProvider
 from app.repos.system_repo import SystemRepository
+
+
+logger = logging.getLogger(__name__)
 
 
 class HealthService:
@@ -102,8 +106,9 @@ class HealthService:
             result = callback()
             result.setdefault("status", "ok")
             return result
-        except Exception as exc:  # noqa: BLE001
+        except Exception:  # noqa: BLE001
+            logger.exception("Readiness dependency probe failed", extra={"event": "readiness_probe_failed"})
             return {
                 "status": "error",
-                "message": str(exc),
+                "message": "Dependency probe failed",
             }

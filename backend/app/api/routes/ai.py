@@ -1,14 +1,16 @@
 from __future__ import annotations
 
 import json
-from queue import Queue
-from threading import Thread
+import logging
 
+import anyio
+from anyio import BrokenResourceError, ClosedResourceError, EndOfStream, WouldBlock
 from fastapi import APIRouter, Depends, Request, Response
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_agent_feedback_service, get_ai_service, require_privileged_auth_context
+from app.core.config import get_settings
 from app.core.db import get_db_session, get_session_factory
 from app.core.response import api_ok
 from app.core.security import AuthContext
@@ -18,6 +20,7 @@ from app.services.ai_service import AiService
 
 
 router = APIRouter(tags=["ai"])
+logger = logging.getLogger(__name__)
 
 
 @router.post("/api/ai-chats")
@@ -55,55 +58,125 @@ def ai_recommend(
 
 @router.post("/api/ai-recommendations/stream")
 @router.post("/api/ai/recommend/stream")
-def ai_recommend_stream(
+async def ai_recommend_stream(
     payload: AiRecommendRequestPayload,
     request: Request,
     auth: AuthContext = Depends(require_privileged_auth_context),
     service: AiService = Depends(get_ai_service),
 ) -> StreamingResponse:
+    settings = get_settings()
     personal_memory_enabled = service.resolve_personal_memory_enabled(
         request.cookies.get(service.memory_cookie_name())
     )
+    limiter = getattr(request.app.state, "ai_stream_limiter", None)
+    if limiter is None:
+        limiter = anyio.CapacityLimiter(max(1, settings.ai_agent_stream_max_concurrency))
+        request.app.state.ai_stream_limiter = limiter
+    request_id = str(getattr(request.state, "request_id", "") or "")
 
-    def events():
-        queue: Queue[tuple[str, dict[str, object]] | None] = Queue()
+    async def events():
+        send_stream, receive_stream = anyio.create_memory_object_stream[
+            tuple[str, dict[str, object]]
+        ](max_buffer_size=max(1, settings.ai_agent_stream_buffer_size))
 
-        def emit(event: str, data: dict[str, object]) -> None:
-            queue.put((event, data))
-
-        def emit_stage(stage: str) -> None:
-            emit("stage", {"stage": stage})
-
-        def worker() -> None:
-            session = get_session_factory()()
+        async def worker() -> None:
+            acquired = False
             try:
-                result = service.recommend(
-                    session,
-                    payload,
-                    current_user_id=auth.user_id,
-                    current_user_role_mask=auth.role_mask,
-                    personal_memory_enabled=personal_memory_enabled,
-                    stage_callback=emit_stage,
-                )
+                try:
+                    limiter.acquire_nowait()
+                    acquired = True
+                except WouldBlock:
+                    await send_stream.send(
+                        (
+                            "error",
+                            {
+                                "code": "AI_STREAM_BUSY",
+                                "message": "StudyHub 学习辅导当前请求较多，请稍后重试",
+                                "requestId": request_id,
+                            },
+                        )
+                    )
+                    return
+
+                def run_recommendation() -> dict[str, object]:
+                    session = get_session_factory()()
+
+                    def emit_stage(stage: str) -> None:
+                        try:
+                            anyio.from_thread.run(
+                                send_stream.send,
+                                ("stage", {"stage": stage}),
+                            )
+                        except (BrokenResourceError, ClosedResourceError):
+                            return
+
+                    try:
+                        return service.recommend(
+                            session,
+                            payload,
+                            current_user_id=auth.user_id,
+                            current_user_role_mask=auth.role_mask,
+                            personal_memory_enabled=personal_memory_enabled,
+                            stage_callback=emit_stage,
+                        )
+                    finally:
+                        session.close()
+
+                result = await anyio.to_thread.run_sync(run_recommendation)
                 answer_delta = _agent_answer_delta(result)
                 if answer_delta:
-                    emit("delta", {"delta": answer_delta})
-                emit("result", result)
-            except Exception as exc:
-                emit("error", {"message": str(exc) or "StudyHub 学习辅导暂时无法回答"})
+                    await send_stream.send(("delta", {"delta": answer_delta}))
+                await send_stream.send(("result", result))
+            except (BrokenResourceError, ClosedResourceError):
+                return
+            except Exception:  # noqa: BLE001
+                logger.exception(
+                    "AI recommendation stream failed",
+                    extra={"event": "ai_stream_failed", "request_id": request_id},
+                )
+                try:
+                    await send_stream.send(
+                        (
+                            "error",
+                            {
+                                "code": "AI_STREAM_FAILED",
+                                "message": "StudyHub 学习辅导暂时无法回答",
+                                "requestId": request_id,
+                            },
+                        )
+                    )
+                except (BrokenResourceError, ClosedResourceError):
+                    return
             finally:
-                session.close()
-                queue.put(None)
+                if acquired:
+                    limiter.release()
+                await send_stream.aclose()
 
-        Thread(target=worker, daemon=True).start()
-        while True:
-            item = queue.get()
-            if item is None:
-                break
-            event, data = item
-            yield _sse_event(event, data)
+        async with anyio.create_task_group() as task_group:
+            task_group.start_soon(worker)
+            async with receive_stream:
+                while True:
+                    if await request.is_disconnected():
+                        task_group.cancel_scope.cancel()
+                        break
+                    with anyio.move_on_after(max(1.0, settings.ai_agent_stream_heartbeat_seconds)) as scope:
+                        try:
+                            event, data = await receive_stream.receive()
+                        except EndOfStream:
+                            break
+                    if scope.cancel_called:
+                        yield ": keep-alive\n\n"
+                        continue
+                    yield _sse_event(event, data)
 
-    return StreamingResponse(events(), media_type="text/event-stream")
+    return StreamingResponse(
+        events(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache, no-transform",
+            "X-Accel-Buffering": "no",
+        },
+    )
 
 
 @router.get("/api/ai/memory")

@@ -1,7 +1,7 @@
 # Development image for docker-compose local-dev.
 # Production should use scripts/runtime/production-up.sh or a dedicated runtime image;
 # this file intentionally installs dev extras and runs uvicorn with --reload.
-FROM python:3.11-slim
+FROM python:3.12-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
@@ -9,14 +9,12 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
-RUN pip install --upgrade pip setuptools wheel
-
-COPY pyproject.toml README.md ./
+COPY pyproject.toml requirements.lock README.md ./
 COPY app ./app
 COPY fixtures ./fixtures
 COPY scripts ./scripts
 
-RUN pip install -e ".[dev]"
+RUN pip install --require-hashes -r requirements.lock
 
 EXPOSE 8011
 

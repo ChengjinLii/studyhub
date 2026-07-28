@@ -19,16 +19,18 @@
     "test:perf": "node scripts/perf-budget.mjs",
     "xmas:hat": "node scripts/vectorize-hat.mjs"
   },
+  "engines": {
+    "node": ">=22 <23",
+    "npm": ">=10 <11"
+  },
   "dependencies": {
-    "imagetracerjs": "^1.2.6",
     "jszip": "^3.10.1",
     "next": "14.2.35",
     "react": "18.2.0",
     "react-dom": "18.2.0",
     "react-markdown": "^9.1.0",
     "react-snowfall": "^2.4.0",
-    "remark-gfm": "^4.0.1",
-    "svgo": "4.0.1"
+    "remark-gfm": "^4.0.1"
   },
   "devDependencies": {
     "@playwright/test": "^1.47.2",
@@ -38,8 +40,13 @@
     "eslint": "8.57.0",
     "eslint-config-next": "14.2.35",
     "eslint-config-prettier": "9.1.0",
+    "imagetracerjs": "^1.2.6",
     "prettier": "3.3.3",
+    "svgo": "4.0.2",
     "typescript": "5.4.5",
     "vitest": "^1.6.1"
+  },
+  "overrides": {
+    "mdast-util-to-hast": "13.2.1"
   }
 }

@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 from app.core.async_db import async_session_scope
 from app.core.config import Settings
 from app.core.profile_metadata import DEFAULT_FREE_DOWNLOAD_QUOTA
-from app.core.upload_validation import validate_image_upload, validate_material_upload
+from app.core.storage_mutation import StorageMutation
 from app.integrations.material_asset_store import MaterialAssetStore
 from app.models.auth import AuthUser
 from app.models.materials import MaterialFavoriteRecord, MaterialRatingRecord, MaterialRecord
@@ -35,6 +35,7 @@ from app.services.materials_query_support import (
 from app.services.materials_search import material_matches_search, material_search_score, parse_material_search_query
 from app.services.materials_compat import MaterialsCompatMixin
 from app.services.materials_serializers import admin_material_item, load_json_list, material_has_file, material_list_item
+from app.services.materials_storage_mutation import MaterialsStorageMutationMixin
 from app.services.read_support import (
     clamp_limit,
     compat_as_float,
@@ -63,7 +64,7 @@ VISIBLE_STATUSES = {"VISIBLE", "visible", "", None}
 VISIBLE_MATERIAL_STATUS_SQL = "(m.status IS NULL OR LOWER(m.status) NOT IN ('hidden', 'removed'))"
 
 
-class MaterialsService(MaterialsCompatMixin):
+class MaterialsService(MaterialsStorageMutationMixin, MaterialsCompatMixin):
     def __init__(
         self,
         settings: Settings,
@@ -637,10 +638,25 @@ class MaterialsService(MaterialsCompatMixin):
             created_at=datetime.now(UTC),
             updated_at=datetime.now(UTC),
         )
-        self._apply_payload_to_material(session, material, payload, file_upload=file_upload, previews=previews, custom_previews=custom_previews, is_create=True)
-        self.material_repo.save_material(session, material)
-        self.material_repo.add_version(session, material_id=material.id, version_label="v1.0")
-        session.commit()
+        storage_mutation = StorageMutation(self.asset_store.delete_key)
+        try:
+            self._apply_payload_to_material(
+                material,
+                payload,
+                file_upload=file_upload,
+                previews=previews,
+                custom_previews=custom_previews,
+                is_create=True,
+                storage_mutation=storage_mutation,
+            )
+            self.material_repo.save_material(session, material)
+            self.material_repo.add_version(session, material_id=material.id, version_label="v1.0")
+            session.commit()
+        except Exception:
+            session.rollback()
+            storage_mutation.rollback()
+            raise
+        storage_mutation.finalize()
         self.invalidate_material_summary_cache()
         return self.get_detail(session, uploader_id, material.id)
 
@@ -660,11 +676,26 @@ class MaterialsService(MaterialsCompatMixin):
         self._bootstrap(session)
         material = self._load_accessible_material(session, material_id, operator_id, can_manage_all, require_owner=True)
         file_upload = zip_file or markdown_file
-        self._apply_payload_to_material(session, material, payload, file_upload=file_upload, previews=previews, custom_previews=custom_previews, is_create=False)
-        version_index = len(self.material_repo.list_versions(session, material.id)) + 1
-        self.material_repo.add_version(session, material_id=material.id, version_label=f"v{version_index}.0")
-        self.material_repo.save_material(session, material)
-        session.commit()
+        storage_mutation = StorageMutation(self.asset_store.delete_key)
+        try:
+            self._apply_payload_to_material(
+                material,
+                payload,
+                file_upload=file_upload,
+                previews=previews,
+                custom_previews=custom_previews,
+                is_create=False,
+                storage_mutation=storage_mutation,
+            )
+            version_index = len(self.material_repo.list_versions(session, material.id)) + 1
+            self.material_repo.add_version(session, material_id=material.id, version_label=f"v{version_index}.0")
+            self.material_repo.save_material(session, material)
+            session.commit()
+        except Exception:
+            session.rollback()
+            storage_mutation.rollback()
+            raise
+        storage_mutation.finalize()
         self.invalidate_material_summary_cache()
         return self.get_detail(session, operator_id, material.id, can_manage_all)
 
@@ -1096,147 +1127,6 @@ class MaterialsService(MaterialsCompatMixin):
         items = [material for material in self.material_repo.list_visible_materials(session) if int(material.uploader_id or 0) == target_user_id]
         items.sort(key=lambda item: (-(item.download_count or 0), -self._material_created_ts(item)))
         return items
-
-    def _apply_payload_to_material(
-        self,
-        session: Session,
-        material: MaterialRecord,
-        payload: MaterialCreatePayload | MaterialUpdatePayload,
-        *,
-        file_upload: UploadFile | None,
-        previews: list[UploadFile],
-        custom_previews: list[UploadFile],
-        is_create: bool,
-    ) -> None:
-        if file_upload is not None:
-            validate_material_upload(
-                file_upload,
-                max_size_bytes=self.settings.material_file_max_size_bytes,
-                missing_detail="请上传有效的资料文件",
-                invalid_type_detail="资料文件内容与文件类型不匹配",
-                too_large_detail="资料文件不能超过 50MB",
-            )
-        if len(previews) > self.settings.material_manual_preview_max_images:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="手动预览图最多上传 10 张")
-        if len(custom_previews) > self.settings.material_custom_preview_max_images:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="自定义配图最多上传 5 张")
-        for preview_file in previews:
-            validate_image_upload(
-                preview_file,
-                settings=self.settings,
-                max_size_bytes=self.settings.material_preview_image_max_size_bytes,
-                missing_detail="请上传有效的预览图片",
-                invalid_type_detail="预览图片仅支持 PNG、JPG、WEBP、GIF、BMP、AVIF、HEIC、HEIF 格式",
-                too_large_detail="预览图片不能超过 5MB",
-            )
-        for preview_file in custom_previews:
-            validate_image_upload(
-                preview_file,
-                settings=self.settings,
-                max_size_bytes=self.settings.material_preview_image_max_size_bytes,
-                missing_detail="请上传有效的自定义配图",
-                invalid_type_detail="自定义配图仅支持 PNG、JPG、WEBP、GIF、BMP、AVIF、HEIC、HEIF 格式",
-                too_large_detail="自定义配图不能超过 5MB",
-            )
-        delivery_method = (payload.deliveryMethod or material.delivery_method or "FILE").upper()
-        material.title = payload.title.strip()
-        material.description = payload.description
-        material.price = int(payload.price or 0)
-        material.is_free = material.price <= 0
-        material.school = payload.school
-        material.college = payload.college or None
-        material.major = payload.major or None
-        material.general_course = bool(payload.generalCourse)
-        material.course_category = payload.courseCategory or ("GENERAL" if payload.generalCourse else "MAJOR")
-        material.grade_type = payload.gradeType or material.grade_type or "STAGE"
-        material.grade_value = payload.gradeValue or material.grade_value or "大一"
-        material.keywords = payload.keywords
-        material.tags_json = self._json_dumps(self._split_tags(payload.tags))
-        material.delivery_method = delivery_method
-        material.netdisk_url = payload.netdiskUrl
-        material.netdisk_password = payload.netdiskPassword
-        material.netdisk_expired_at = payload.netdiskExpiredAt
-        material.netdisk_reminder_at = payload.netdiskReminderAt
-        material.preview_watermark_enabled = bool(payload.previewWatermarkEnabled if payload.previewWatermarkEnabled is not None else material.preview_watermark_enabled)
-        material.preview_source = payload.previewSource or material.preview_source or "AUTO"
-        material.custom_preview_text = payload.customPreviewText
-        material.copyright_owner = payload.copyrightOwner
-        material.status = "VISIBLE"
-        material.review_status = "APPROVED"
-        material.deleted_at = None
-        material.updated_at = datetime.now(UTC)
-
-        if file_upload is not None:
-            if material.file_storage_key:
-                self.asset_store.delete_key(material.file_storage_key)
-            key, size = self.asset_store.save_upload(material_id=material.id, slot="file", upload=file_upload)
-            material.file_storage_key = key
-            material.original_filename = file_upload.filename or material.original_filename
-            material.file_size = size
-            material.file_type = self._resolve_file_type(file_upload.filename)
-        elif is_create and delivery_method == "NETDISK":
-            material.file_storage_key = None
-            material.original_filename = None
-            material.file_size = 0
-            material.file_type = "netdisk"
-
-        if delivery_method == "NETDISK":
-            material.file_storage_key = None
-            material.original_filename = None if material.original_filename is None and not self._has_file(material) else material.original_filename
-            material.file_size = 0 if material.file_storage_key is None else material.file_size
-            material.file_type = "netdisk" if material.file_storage_key is None else material.file_type
-
-        if previews:
-            for existing_key in self._loads(material.manual_preview_keys_json):
-                if not self._is_external_url(existing_key):
-                    self.asset_store.delete_key(existing_key)
-            preview_keys = [self.asset_store.save_upload(material_id=material.id, slot="manual-preview", upload=file)[0] for file in previews]
-            material.manual_preview_keys_json = self._json_dumps(preview_keys)
-        elif is_create:
-            material.manual_preview_keys_json = material.manual_preview_keys_json or self._json_dumps([])
-
-        if custom_previews:
-            for existing_key in self._loads(material.custom_preview_images_json):
-                if not self._is_external_url(existing_key):
-                    self.asset_store.delete_key(existing_key)
-            custom_keys = [self.asset_store.save_upload(material_id=material.id, slot="custom-preview", upload=file)[0] for file in custom_previews]
-            material.custom_preview_images_json = self._json_dumps(custom_keys)
-        elif getattr(payload, "customPreviewClear", False):
-            for existing_key in self._loads(material.custom_preview_images_json):
-                if not self._is_external_url(existing_key):
-                    self.asset_store.delete_key(existing_key)
-            material.custom_preview_images_json = self._json_dumps([])
-
-        manual_keys = self._loads(material.manual_preview_keys_json)
-        if material.preview_source == "MANUAL" and manual_keys:
-            material.preview_status = "done"
-            material.preview_page_count = len(manual_keys)
-            material.preview_pages = len(manual_keys)
-        elif (material.file_type or "").lower() == "pdf" and self._has_file(material):
-            material.preview_status = "done"
-            material.preview_page_count = max(int(material.preview_page_count or 0), self.settings.material_preview_pages_large)
-            material.preview_pages = min(material.preview_page_count, self.settings.material_preview_pages_small)
-        else:
-            material.preview_status = "unsupported"
-            material.preview_page_count = None
-            material.preview_pages = None
-        material.preview_manifest = self._json_dumps(
-            {
-                "status": material.preview_status,
-                "pageCount": material.preview_page_count,
-                "previewPages": material.preview_pages,
-                "pages": [
-                    {"index": index + 1, "key": key}
-                    for index, key in enumerate(manual_keys)
-                    if isinstance(key, str) and key.strip()
-                ],
-            }
-        )
-
-        if delivery_method == "FILE" and not self._has_file(material):
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="资料缺少有效的下载方式")
-        if delivery_method == "NETDISK" and not material.netdisk_url:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="资料缺少有效的下载方式")
 
     def _bootstrap(self, session: Session) -> dict[str, Any]:
         seed = self.read_repo.load_seed()

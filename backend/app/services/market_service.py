@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 from threading import RLock
 from time import monotonic
 from typing import Any
@@ -12,6 +13,7 @@ from sqlalchemy.orm import Session
 
 from app.core.async_db import async_session_scope
 from app.core.config import Settings
+from app.core.storage_mutation import StorageMutation
 from app.core.upload_validation import validate_image_upload
 from app.integrations.market_asset_store import MarketAssetStore
 from app.models.market import MarketItemRecord
@@ -42,6 +44,7 @@ ADMIN_STATUSES = {"SALE", "RESERVED", "SOLD", "REMOVED", "HIDDEN"}
 PLACEHOLDER_IMAGE = "https://placehold.co/600x400?text=Campus+Market"
 THUMB_PROCESS = "image/resize,w_600/quality,q_75"
 DETAIL_PROCESS = "image/resize,w_1400/quality,q_80"
+logger = logging.getLogger(__name__)
 THUMB_WIDTHS = (400, 800, 1200)
 DETAIL_WIDTHS = (800, 1200, 1600)
 THUMB_QUALITY = 75
@@ -303,24 +306,37 @@ class MarketService:
                 too_large_detail="商品图片不能超过 5MB",
             )
         item_id = self.market_repo.next_item_id(session, seed)
-        keys = [self.asset_store.save_upload(item_id=item_id, upload=file) for file in images if getattr(file, "filename", None)]
-        item = MarketItemRecord(
-            id=item_id,
-            source="local",
-            seller_id=seller.id,
-            seller_name=seller.nickname or seller.username,
-            title=payload.title.strip(),
-            description=self._strip(payload.description),
-            price_cents=int(round(payload.price * 100)),
-            category=self._normalize_category(payload.category),
-            school=self._strip(payload.school),
-            status="SALE",
-            contact_type=self._normalize_contact_type(payload.contactType),
-            contact_value=payload.contactValue.strip(),
-        )
-        self._assign_images(item, keys)
-        self.market_repo.save_item(session, item)
-        session.commit()
+        storage_mutation = StorageMutation(self.asset_store.delete_key)
+        try:
+            keys = []
+            for file in images:
+                if not getattr(file, "filename", None):
+                    continue
+                key = self.asset_store.save_upload(item_id=item_id, upload=file)
+                storage_mutation.record_new(key)
+                keys.append(key)
+            item = MarketItemRecord(
+                id=item_id,
+                source="local",
+                seller_id=seller.id,
+                seller_name=seller.nickname or seller.username,
+                title=payload.title.strip(),
+                description=self._strip(payload.description),
+                price_cents=int(round(payload.price * 100)),
+                category=self._normalize_category(payload.category),
+                school=self._strip(payload.school),
+                status="SALE",
+                contact_type=self._normalize_contact_type(payload.contactType),
+                contact_value=payload.contactValue.strip(),
+            )
+            self._assign_images(item, keys)
+            self.market_repo.save_item(session, item)
+            session.commit()
+        except Exception:
+            session.rollback()
+            storage_mutation.rollback()
+            raise
+        storage_mutation.finalize()
         self.invalidate_market_summary_cache()
         return self._to_detail_item(item, wanted=False, is_owner=True)
 
@@ -364,15 +380,25 @@ class MarketService:
         item = self._require_item(session, item_id)
         if item.seller_id != seller_id:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="无权删除该商品")
-        self._delete_item(session, item)
-        session.commit()
+        keys = self._delete_item(session, item)
+        try:
+            session.commit()
+        except Exception:
+            session.rollback()
+            raise
+        self._delete_committed_images(keys)
         self.invalidate_market_summary_cache()
 
     def remove_by_admin(self, session: Session, item_id: int) -> None:
         self._bootstrap(session)
         item = self._require_item(session, item_id)
-        self._delete_item(session, item)
-        session.commit()
+        keys = self._delete_item(session, item)
+        try:
+            session.commit()
+        except Exception:
+            session.rollback()
+            raise
+        self._delete_committed_images(keys)
         self.invalidate_market_summary_cache()
 
     def list_for_admin(
@@ -473,14 +499,20 @@ class MarketService:
         self._bootstrap(session)
         deleted = 0
         failed_ids: list[int] = []
+        committed_image_keys: list[str] = []
         for item_id in payload.itemIds:
             item = self.market_repo.get_item(session, item_id)
             if item is None:
                 failed_ids.append(item_id)
                 continue
-            self._delete_item(session, item)
+            committed_image_keys.extend(self._delete_item(session, item))
             deleted += 1
-        session.commit()
+        try:
+            session.commit()
+        except Exception:
+            session.rollback()
+            raise
+        self._delete_committed_images(committed_image_keys)
         if deleted:
             self.invalidate_market_summary_cache()
         return {"deleted": deleted, "requested": len(payload.itemIds), "failedIds": failed_ids}
@@ -598,12 +630,22 @@ class MarketService:
         item.thumbnail_url = image_urls[0]
         item.thumbnail_variant_json = json.dumps(image_variants[0], ensure_ascii=False, separators=(",", ":"))
 
-    def _delete_item(self, session: Session, item: MarketItemRecord) -> None:
-        for key in self._loads(item.images_json):
-            if not self._is_external_url(str(key)):
-                self.asset_store.delete_key(str(key))
+    def _delete_item(self, session: Session, item: MarketItemRecord) -> list[str]:
+        keys = [str(key) for key in self._loads(item.images_json) if not self._is_external_url(str(key))]
         self.market_repo.delete_wants_by_item(session, item.id)
         self.market_repo.delete_item(session, item)
+        return keys
+
+    def _delete_committed_images(self, keys: list[str]) -> None:
+        for key in dict.fromkeys(keys):
+            try:
+                self.asset_store.delete_key(key)
+            except Exception:  # noqa: BLE001
+                logger.exception(
+                    "Committed market image cleanup failed",
+                    extra={"event": "market_image_cleanup_failed"},
+                )
+                continue
 
     def _sync_count_and_detail(self, session: Session, item: MarketItemRecord, *, wanted: bool, is_owner: bool) -> dict[str, Any]:
         item.want_count = self.market_repo.count_wants(session, item.id)
