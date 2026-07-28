@@ -78,6 +78,8 @@ if [[ ! -x "$PYTHON_BIN" ]]; then
   exit 1
 fi
 
+run "runtime version alignment" env STUDYHUB_PYTHON_BIN="$PYTHON_BIN" bash "$ROOT_DIR/scripts/check-runtime-versions.sh"
+
 run "backend ruff" "$PYTHON_BIN" -m ruff check "$BACKEND_DIR/app" "$BACKEND_DIR/tests"
 
 mkdir -p "$ROOT_DIR/reports/coverage"

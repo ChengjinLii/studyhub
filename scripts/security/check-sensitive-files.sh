@@ -6,9 +6,23 @@ cd "$ROOT_DIR"
 
 violations=()
 
+safe_npmrc() {
+  local path="$1"
+  local object_id="${2:-}"
+  local content
+  if [[ -n "$object_id" ]]; then
+    content="$(git cat-file blob "$object_id" 2>/dev/null)" || return 1
+  else
+    [[ -f "$path" ]] || return 1
+    content="$(<"$path")"
+  fi
+  [[ "$content" == $'engine-strict=true\nsave-exact=true' ]]
+}
+
 check_path() {
   local path="$1"
   local scope="$2"
+  local object_id="${3:-}"
 
   case "$path" in
     .env.example|*/.env.example)
@@ -26,7 +40,12 @@ check_path() {
     *.pem|*.key|*.p12|*.pfx|*.crt|*.cer)
       violations+=("$path: $scope key or certificate file")
       ;;
-    *id_rsa*|*id_ed25519*|*.npmrc)
+    *.npmrc)
+      if ! safe_npmrc "$path" "$object_id"; then
+        violations+=("$path: $scope credential-like file")
+      fi
+      ;;
+    *id_rsa*|*id_ed25519*)
       violations+=("$path: $scope credential-like file")
       ;;
   esac
@@ -41,7 +60,8 @@ while IFS= read -r object_and_path; do
   if [[ "$path" == "$object_and_path" || -z "$path" ]]; then
     continue
   fi
-  check_path "$path" "historical"
+  object_id="${object_and_path%% *}"
+  check_path "$path" "historical" "$object_id"
 done < <(git rev-list --objects --all)
 
 if [[ "${#violations[@]}" -gt 0 ]]; then

@@ -26,6 +26,7 @@ export STUDYHUB_CODE_SIZE_ALLOW_FRONTEND_BUILD="${STUDYHUB_CODE_SIZE_ALLOW_FRONT
 run "code size budget" node "$ROOT_DIR/scripts/check-code-size.mjs"
 
 if [[ -x "$PYTHON_BIN" ]]; then
+  run "runtime version alignment" env STUDYHUB_PYTHON_BIN="$PYTHON_BIN" bash "$ROOT_DIR/scripts/check-runtime-versions.sh"
   run "backend ruff" "$PYTHON_BIN" -m ruff check "$ROOT_DIR/backend/app" "$ROOT_DIR/backend/tests"
   run "backend tests" "$PYTHON_BIN" -m pytest -q "$ROOT_DIR/backend/tests"
 else
