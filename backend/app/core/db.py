@@ -17,6 +17,17 @@ LEGACY_TABLE_COMPATIBILITY: dict[str, tuple[str, ...]] = {
     "material_reviews": ("reviews",),
     "material_purchases": ("orders",),
 }
+AGENTIC_DURABLE_TABLES = frozenset(
+    {
+        "agent_artifacts",
+        "agent_jobs",
+        "agent_outbox_events",
+        "agent_runs",
+        "agent_steps",
+        "agent_threads",
+        "agent_waits",
+    }
+)
 
 
 def get_engine():
@@ -88,6 +99,13 @@ def expected_table_names() -> list[str]:
     return sorted(Base.metadata.tables.keys())
 
 
+def required_table_names() -> list[str]:
+    table_names = expected_table_names()
+    if get_settings().agentic_durable_storage_enabled:
+        return table_names
+    return [name for name in table_names if name not in AGENTIC_DURABLE_TABLES]
+
+
 def has_compatible_legacy_table(table_name: str, actual_tables: set[str]) -> bool:
     legacy_tables = LEGACY_TABLE_COMPATIBILITY.get(table_name)
     if not legacy_tables:
@@ -100,7 +118,7 @@ def list_missing_tables() -> list[str]:
     actual_tables = set(inspector.get_table_names())
     return [
         name
-        for name in expected_table_names()
+        for name in required_table_names()
         if name not in actual_tables and not has_compatible_legacy_table(name, actual_tables)
     ]
 
