@@ -13609,6 +13609,98 @@ g.studyhub-popup-poster__hotspot:hover > text {
   background: #eef2f7;
 }
 
+.material-file-dropzone {
+  min-height: 104px;
+  padding: 16px 18px;
+  border-color: #bfdbfe;
+  background: #f8fbff;
+  transition: border-color 0.18s ease, background-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.material-file-dropzone:hover {
+  border-color: #60a5fa;
+  background: #f0f7ff;
+}
+
+.material-file-dropzone.is-dragover {
+  border-color: #2563eb;
+  background: #eaf3ff;
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.12);
+}
+
+.material-file-dropzone.has-file {
+  border-style: solid;
+  border-color: #60a5fa;
+  background: #eff6ff;
+  box-shadow: inset 4px 0 0 #2563eb;
+}
+
+.material-file-dropzone__copy {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 5px;
+}
+
+.material-file-dropzone .file-trigger {
+  margin-right: 0;
+  font-size: 0.92rem;
+}
+
+.material-file-dropzone.has-file .file-trigger {
+  color: #1d4ed8;
+  font-size: 0.82rem;
+}
+
+.material-file-dropzone .file-name {
+  width: 100%;
+  color: #475569;
+}
+
+.material-file-dropzone.has-file .file-name {
+  color: #172554;
+  font-weight: 700;
+}
+
+.material-file-dropzone__meta {
+  color: #64748b;
+  font-size: 0.8rem;
+  line-height: 1.3;
+}
+
+.material-file-dropzone__status {
+  flex: 0 0 auto;
+  padding: 5px 9px;
+  border: 1px solid #93c5fd;
+  border-radius: 999px;
+  background: #dbeafe;
+  color: #1e40af;
+  font-size: 0.78rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.material-file-dropzone .file-clear {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  flex: 0 0 32px;
+  place-items: center;
+  border: 1px solid #cbd5e1;
+  border-radius: 50%;
+  background: #ffffff;
+  color: #475569;
+  font-size: 1.05rem;
+  line-height: 1;
+}
+
+.material-file-dropzone .file-clear:hover {
+  border-color: #94a3b8;
+  color: #0f172a;
+}
+
 .leaderboard-rank {
   width: 36px;
   height: 36px;
@@ -15246,6 +15338,22 @@ g.studyhub-popup-poster__hotspot:hover > text {
 
   .drop-zone {
     min-height: 56px;
+  }
+
+  .material-file-dropzone {
+    min-height: 108px;
+    padding: 14px;
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .material-file-dropzone__copy {
+    flex-basis: calc(100% - 84px);
+  }
+
+  .material-file-dropzone .file-name {
+    white-space: normal;
+    overflow-wrap: anywhere;
   }
 
   .join-page {

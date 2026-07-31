@@ -7,6 +7,7 @@ import NavBar from '../components/NavBar';
 import UploadBasicSection from '../components/upload/UploadBasicSection';
 import UploadConfirmSection from '../components/upload/UploadConfirmSection';
 import UploadHero from '../components/upload/UploadHero';
+import UploadMaterialFileField from '../components/upload/UploadMaterialFileField';
 import UploadMetaSection from '../components/upload/UploadMetaSection';
 import UploadPolicyModal from '../components/upload/UploadPolicyModal';
 import SectionLabel from '../components/upload/UploadSectionLabel';
@@ -78,6 +79,7 @@ const MAX_TITLE_LENGTH = 80;
 const MAX_DESC_LENGTH = 300;
 const MAX_EXPERIENCE_LENGTH = 3000;
 const MAX_COPYRIGHT_LENGTH = 8;
+
 const PREVIEW_SOURCE_AUTO = 'AUTO';
 const PREVIEW_SOURCE_MANUAL = 'MANUAL';
 const MAX_PREVIEW_IMAGE_BYTES = 5 * 1024 * 1024;
@@ -528,14 +530,6 @@ export default function UploadPage({ user, token, account }: UploadPageProps) {
       if (zipTaskRef.current === taskId) {
         setZipPreparing(false);
       }
-    }
-  };
-
-  const handleZipDrop = (event: React.DragEvent<HTMLDivElement>) => {
-    event.preventDefault();
-    if (event.dataTransfer.files && event.dataTransfer.files.length > 0) {
-      void handleZipSelection(event.dataTransfer.files);
-      event.dataTransfer.clearData();
     }
   };
 
@@ -1008,46 +1002,19 @@ export default function UploadPage({ user, token, account }: UploadPageProps) {
               </div>
             )}
             {deliveryMethod === 'FILE' && (
-              <div className="form-item full">
-                <SectionLabel htmlFor="zip" text="资料文件（总大小≤50MB，支持多文件）" />
-                <div className="file-field drop-zone" onDragOver={(e) => e.preventDefault()} onDrop={handleZipDrop}>
-                  <span className="file-trigger">选择 / 拖拽 文件</span>
-                  <span className="file-name">
-                    {zipPreparing
-                      ? '正在打包文件...'
-                      : zipFile
-                        ? zipSourceCount > 1
-                          ? `已选择 ${zipSourceCount} 个文件，打包为 ${buildZipName(
-                              title,
-                              zipFile.name.replace(/\.zip$/i, ''),
-                              MAX_TITLE_LENGTH
-                            )}`
-                          : zipFile.name
-                        : isEditing
-                          ? '保持现有文件（可重新上传）'
-                          : zipPlaceholder}
-                  </span>
-                  {zipFile && (
-                    <button type="button" className="file-clear" onClick={clearZipFile} aria-label="移除文件">
-                      x
-                    </button>
-                  )}
-                  <input
-                    id="zip"
-                    type="file"
-                    ref={zipInputRef}
-                    multiple
-                    onChange={(e) => void handleZipSelection(e.target.files)}
-                  />
-                </div>
-                {uploadProgress !== null && (
-                  <div className="upload-progress" aria-live="polite">
-                    <progress value={uploadProgress} max={100} />
-                    <span className="upload-percent">{uploadProgress}%</span>
-                  </div>
-                )}
-                <p className="help-text">将文件拖拽到此区域或点击选择，总大小不超过 50MB，多文件将自动打包为 zip。</p>
-              </div>
+              <UploadMaterialFileField
+                file={zipFile}
+                sourceCount={zipSourceCount}
+                preparing={zipPreparing}
+                isEditing={isEditing}
+                placeholder={zipPlaceholder}
+                title={title}
+                maxTitleLength={MAX_TITLE_LENGTH}
+                inputRef={zipInputRef}
+                uploadProgress={uploadProgress}
+                onFilesSelected={handleZipSelection}
+                onClear={clearZipFile}
+              />
             )}
             {deliveryMethod === 'NETDISK' && (
               <>
