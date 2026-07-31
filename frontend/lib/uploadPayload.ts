@@ -53,6 +53,7 @@ export interface UploadPayload {
   copyrightOwner: string | null;
   requestId?: number;
   customPreviewClear?: boolean;
+  submissionId?: string;
 }
 
 export const deriveUploadGradeType = (stage: string) => {

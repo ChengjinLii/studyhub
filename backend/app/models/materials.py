@@ -10,10 +10,14 @@ from app.models.base import Base, TimestampMixin
 
 class MaterialRecord(TimestampMixin, Base):
     __tablename__ = "materials"
+    __table_args__ = (
+        UniqueConstraint("uploader_id", "submission_key", name="uq_materials_uploader_submission_key"),
+    )
 
-    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=False)
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     source: Mapped[str] = mapped_column(String(16), nullable=False, default="local")
     uploader_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    submission_key: Mapped[str | None] = mapped_column(String(64), nullable=True)
     uploader_username: Mapped[str | None] = mapped_column(String(64), nullable=True)
     uploader_nickname: Mapped[str | None] = mapped_column(String(128), nullable=True)
     title: Mapped[str] = mapped_column(String(80), nullable=False)

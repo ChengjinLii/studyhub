@@ -8,6 +8,7 @@ import zipfile
 from fastapi import APIRouter, Depends, Query, Request, Response, UploadFile
 from fastapi.responses import FileResponse, JSONResponse
 from sqlalchemy.orm import Session
+from starlette.concurrency import run_in_threadpool
 
 from app.api.deps import (
     get_leaderboard_read_service,
@@ -213,17 +214,26 @@ async def create_material(
     markdown_file = form.get("markdown")
     previews = _coerce_upload_list(form.getlist("previews"))
     custom_previews = _coerce_upload_list(form.getlist("customPreviews"))
-    detail = service.create_material(
-        session,
-        payload=payload,
-        uploader_id=auth.user_id or 0,
-        zip_file=zip_file if hasattr(zip_file, "filename") else None,
-        markdown_file=markdown_file if hasattr(markdown_file, "filename") else None,
-        previews=previews,
-        custom_previews=custom_previews,
-    )
-    if payload.requestId is not None:
-        requests_service.attach_material_to_request(session, payload.requestId, auth.user_id or 0, int(detail["id"]))
+    def create_and_attach() -> dict[str, object]:
+        detail = service.create_material(
+            session,
+            payload=payload,
+            uploader_id=auth.user_id or 0,
+            zip_file=zip_file if hasattr(zip_file, "filename") else None,
+            markdown_file=markdown_file if hasattr(markdown_file, "filename") else None,
+            previews=previews,
+            custom_previews=custom_previews,
+        )
+        if payload.requestId is not None:
+            requests_service.attach_material_to_request(
+                session,
+                payload.requestId,
+                auth.user_id or 0,
+                int(detail["id"]),
+            )
+        return detail
+
+    detail = await run_in_threadpool(create_and_attach)
     _invalidate_material_read_caches()
     return api_ok(detail)
 
@@ -242,7 +252,8 @@ async def update_material(
     markdown_file = form.get("markdown")
     previews = _coerce_upload_list(form.getlist("previews"))
     custom_previews = _coerce_upload_list(form.getlist("customPreviews"))
-    detail = service.update_material(
+    detail = await run_in_threadpool(
+        service.update_material,
         session,
         material_id=id,
         payload=payload,

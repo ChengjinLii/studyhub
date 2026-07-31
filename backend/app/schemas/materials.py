@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import date
 import json
+import re
 from typing import Any
 
 from fastapi import HTTPException, status
@@ -69,6 +70,17 @@ class MaterialCreatePayload(MaterialMutationBase):
     price: int
     school: str
     requestId: int | None = None
+    submissionId: str | None = None
+
+    @field_validator("submissionId")
+    @classmethod
+    def validate_submission_id(cls, value: str | None) -> str | None:
+        normalized = str(value or "").strip()
+        if not normalized:
+            return None
+        if not re.fullmatch(r"[A-Za-z0-9_-]{16,64}", normalized):
+            raise ValueError("投稿标识格式非法")
+        return normalized
 
 
 class MaterialUpdatePayload(MaterialMutationBase):

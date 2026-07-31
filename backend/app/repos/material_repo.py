@@ -472,6 +472,24 @@ class MaterialRepository:
         )
         return session.scalar(stmt)
 
+    def find_by_submission_key(
+        self,
+        session: Session,
+        *,
+        uploader_id: int,
+        submission_key: str,
+    ) -> MaterialRecord | None:
+        stmt = (
+            select(MaterialRecord)
+            .options(*_material_record_load_options(session))
+            .where(
+                MaterialRecord.uploader_id == uploader_id,
+                MaterialRecord.submission_key == submission_key,
+            )
+            .limit(1)
+        )
+        return session.scalar(stmt)
+
     def list_materials_by_ids(self, session: Session, material_ids: list[int]) -> list[MaterialRecord]:
         if not material_ids:
             return []
@@ -497,6 +515,11 @@ class MaterialRepository:
         refreshable_columns = [column.name for column in _MATERIAL_MAPPED_COLUMNS if column.name in existing_columns]
         if refreshable_columns:
             session.refresh(material, attribute_names=refreshable_columns)
+        return material
+
+    def reserve_material(self, session: Session, material: MaterialRecord) -> MaterialRecord:
+        session.add(material)
+        session.flush()
         return material
 
     def list_versions(self, session: Session, material_id: int) -> list[MaterialVersionRecord]:

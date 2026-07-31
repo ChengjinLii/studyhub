@@ -12523,6 +12523,53 @@ g.studyhub-popup-poster__hotspot:hover > text {
   gap: 28px;
 }
 
+.upload-stacked-form.is-submitting > .upload-section-shell:not(#upload-confirm) {
+  pointer-events: none;
+  opacity: 0.72;
+  transition: opacity 0.18s ease;
+}
+
+.upload-submission-state {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid #bfdbfe;
+  border-radius: 8px;
+  background: #eff6ff;
+  color: #1e3a8a;
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.upload-submission-state__indicator {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 16px;
+  border: 2px solid #93c5fd;
+  border-top-color: #2563eb;
+  border-radius: 50%;
+  animation: upload-submission-spin 0.8s linear infinite;
+}
+
+.upload-success-fallback {
+  margin: 0;
+  color: #475569;
+  font-size: 0.9rem;
+}
+
+.upload-success-fallback a {
+  color: #1d4ed8;
+  font-weight: 700;
+}
+
+@keyframes upload-submission-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .upload-section-shell {
   display: flex;
   flex-direction: column;

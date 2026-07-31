@@ -36,6 +36,12 @@ import { buildZipName, resolveZipFileName, zipFiles, zipMarkdownContent } from '
 import { buildUploadPayload } from '../lib/uploadPayload';
 import { sendUploadFormData } from '../lib/uploadSubmit';
 import {
+  buildUploadSubmissionFingerprint,
+  clearUploadSubmission,
+  resolveUploadSubmissionId,
+  UploadSubmissionStage,
+} from '../lib/uploadSubmission';
+import {
   formatPriceSummary,
   normalizePriceInput,
   sanitizePriceInput,
@@ -177,13 +183,17 @@ export default function UploadPage({ user, token, account }: UploadPageProps) {
   const [netdiskReminderAt, setNetdiskReminderAt] = useState('');
   const [copyrightOwner, setCopyrightOwner] = useState('');
   const [status, setStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
-  const [submitting, setSubmitting] = useState(false);
+  const [submissionStage, setSubmissionStage] = useState<UploadSubmissionStage>('idle');
+  const [successPath, setSuccessPath] = useState<string | null>(null);
   const [zipPlaceholder, setZipPlaceholder] = useState('未选择任何文件');
   const [quickPanelOpen, setQuickPanelOpen] = useState(false);
   const [quickSelectedOption, setQuickSelectedOption] = useState<string | null>(null);
   const [requestId, setRequestId] = useState<number | null>(null);
   const [requestPrefilled, setRequestPrefilled] = useState(false);
   const uploadRequestRef = useRef<XMLHttpRequest | null>(null);
+  const submissionInFlightRef = useRef(false);
+  const allowSubmissionNavigationRef = useRef(false);
+  const submitting = submissionStage !== 'idle';
   const apiBase = useMemo(
     () => resolveApiBase(typeof window !== 'undefined' ? window.location.origin : undefined),
     []
@@ -307,6 +317,16 @@ export default function UploadPage({ user, token, account }: UploadPageProps) {
     setCustomPreviewClear,
     setStatus,
   });
+
+  useEffect(() => {
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      if (!submissionInFlightRef.current || allowSubmissionNavigationRef.current) return;
+      event.preventDefault();
+      event.returnValue = '';
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, []);
 
   useEffect(() => {
     if (courseCategory === 'MAJOR') {
@@ -439,6 +459,7 @@ export default function UploadPage({ user, token, account }: UploadPageProps) {
   };
 
   const clearZipFile = () => {
+    if (submissionInFlightRef.current) return;
     if (uploadRequestRef.current) {
       uploadRequestRef.current.abort();
       uploadRequestRef.current = null;
@@ -469,6 +490,7 @@ export default function UploadPage({ user, token, account }: UploadPageProps) {
   };
 
   const handleZipSelection = async (fileList: FileList | null) => {
+    if (submissionInFlightRef.current) return;
     const files = fileList ? Array.from(fileList) : [];
     const taskId = ++zipTaskRef.current;
     if (files.length === 0) {
@@ -524,6 +546,7 @@ export default function UploadPage({ user, token, account }: UploadPageProps) {
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
+    if (submissionInFlightRef.current) return;
     setStatus(null);
     const fallbackGradeValue = gradeStageOptions[0];
     const effectiveTitle = (title.trim() || (isQuickMode && zipFile ? deriveAutoTitle(zipFile.name) : '')).slice(
@@ -586,8 +609,14 @@ export default function UploadPage({ user, token, account }: UploadPageProps) {
       return;
     }
     const resolvedPriceValue = validation.priceValue;
+    let completed = false;
+    let uploadTransferred = false;
+    let submissionId: string | null = null;
     try {
-      setSubmitting(true);
+      submissionInFlightRef.current = true;
+      allowSubmissionNavigationRef.current = false;
+      setSuccessPath(null);
+      setSubmissionStage('preparing');
       setUploadProgress(isExperience || zipFile ? 0 : null);
       const trimmedTitle = effectiveTitle;
       const trimmedDescription = description.trim();
@@ -638,24 +667,66 @@ export default function UploadPage({ user, token, account }: UploadPageProps) {
       if (allowCustomPreview && customPreviewFiles.length > 0) {
         customPreviewFiles.forEach((file) => formData.append('customPreviews', file));
       }
+      if (!isEditing) {
+        const fingerprint = await buildUploadSubmissionFingerprint({
+          payload,
+          file: uploadFile
+            ? {
+                name: uploadFile.name,
+                size: uploadFile.size,
+                type: uploadFile.type,
+                lastModified: isExperience || zipSourceCount > 1 ? null : uploadFile.lastModified,
+              }
+            : null,
+          previews: manualPreviewFiles.map((file) => [file.name, file.size, file.lastModified]),
+          customPreviews: customPreviewFiles.map((file) => [file.name, file.size, file.lastModified]),
+        });
+        submissionId = resolveUploadSubmissionId(fingerprint, window.sessionStorage);
+        payload.submissionId = submissionId;
+        formData.set('payload', new Blob([JSON.stringify(payload)], { type: 'application/json' }));
+      }
       const endpoint = isEditing ? `${apiBase}/materials/${editingId}` : `${apiBase}/materials`;
       const method = isEditing ? 'PUT' : 'POST';
+      setSubmissionStage('uploading');
       const json = await sendUploadFormData(endpoint, method, formData, {
         token,
-        onProgress: setUploadProgress,
+        onProgress: (value) => {
+          setUploadProgress(value);
+          if (value >= 100) {
+            uploadTransferred = true;
+            setSubmissionStage('processing');
+          }
+        },
         requestRef: uploadRequestRef,
       });
       if (isQuickMode && !title.trim()) {
         setTitle(trimmedTitle);
       }
-      setStatus({ type: 'success', message: isEditing ? '更新成功，正在跳转...' : '投稿成功，正在跳转到资料详情...' });
-      await router.push(materialPath(json.data.id, json.data.title || trimmedTitle));
+      const destination = materialPath(json.data.id, json.data.title || trimmedTitle);
+      if (submissionId) {
+        clearUploadSubmission(window.sessionStorage, submissionId);
+      }
+      completed = true;
+      submissionInFlightRef.current = false;
+      allowSubmissionNavigationRef.current = true;
+      setUploadProgress(100);
+      setSuccessPath(destination);
+      setSubmissionStage('redirecting');
+      setStatus({ type: 'success', message: isEditing ? '更新成功。' : '投稿成功。' });
+      window.setTimeout(() => window.location.replace(destination), 80);
     } catch (error: unknown) {
-      setStatus({ type: 'error', message: toErrorMessage(error, '投稿失败') });
+      const errorMessage = toErrorMessage(error, '投稿失败');
+      const fallback = uploadTransferred
+        ? `连接已中断，但服务器可能仍在保存资料。请不要新建投稿，稍后直接重新提交，系统会识别同一次投稿。（${errorMessage}）`
+        : errorMessage;
+      setStatus({ type: 'error', message: fallback });
     } finally {
-      setSubmitting(false);
-      setUploadProgress(null);
       uploadRequestRef.current = null;
+      if (!completed) {
+        submissionInFlightRef.current = false;
+        setSubmissionStage('idle');
+        setUploadProgress(null);
+      }
     }
   };
 
@@ -711,7 +782,12 @@ export default function UploadPage({ user, token, account }: UploadPageProps) {
       : '资料投稿';
 
   const formContent = (
-    <form id="upload-form" className="upload-stacked-form" onSubmit={handleSubmit}>
+    <form
+      id="upload-form"
+      className={`upload-stacked-form${submitting ? ' is-submitting' : ''}`}
+      onSubmit={handleSubmit}
+      aria-busy={submitting}
+    >
       <UploadBasicSection
         isExperience={isExperience}
         isQuickMode={isQuickMode}
@@ -1010,7 +1086,9 @@ export default function UploadPage({ user, token, account }: UploadPageProps) {
         copyrightOwner={copyrightOwner}
         maxCopyrightLength={MAX_COPYRIGHT_LENGTH}
         submitting={submitting}
+        submissionStage={submissionStage}
         uploadProgress={uploadProgress}
+        successPath={successPath}
         status={status}
         onCopyrightOwnerChange={setCopyrightOwner}
         onPolicyOpen={() => setPolicyModalOpen(true)}

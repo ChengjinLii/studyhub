@@ -5,6 +5,7 @@ from pathlib import Path
 import sqlalchemy as sa
 from alembic import command
 from alembic.config import Config
+from alembic.script import ScriptDirectory
 from sqlalchemy import create_engine, inspect
 from sqlalchemy.dialects import mysql, postgresql
 
@@ -60,6 +61,7 @@ def test_fresh_alembic_upgrade_persists_long_revision_id(tmp_path, monkeypatch) 
     get_settings.cache_clear()
     try:
         config = Config(str(BACKEND_ROOT / "alembic.ini"))
+        expected_head = ScriptDirectory.from_config(config).get_current_head()
         command.upgrade(config, "head")
 
         engine = create_engine(f"sqlite+pysqlite:///{database_path}", future=True)
@@ -69,7 +71,8 @@ def test_fresh_alembic_upgrade_persists_long_revision_id(tmp_path, monkeypatch) 
                 version_column = next(
                     column for column in inspect(connection).get_columns(ALEMBIC_VERSION_TABLE) if column["name"] == ALEMBIC_VERSION_COLUMN
                 )
-            assert revision == "0007_add_agentic_data_governance"
+            assert revision == expected_head
+            assert len(revision) > 32
             assert version_column["type"].length == ALEMBIC_VERSION_LENGTH
         finally:
             engine.dispose()
