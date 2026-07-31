@@ -162,7 +162,11 @@ def test_duplicate_material_event_dispatches_once_and_artifact_is_admin_visible(
     assert jobs[0].status == AgentJobStatus.COMPLETED.value
     assert jobs[0].attempts == 1
 
-    artifacts = AdminAgentRunService(settings).list_artifacts(session, artifact_type="material_analysis")
+    artifacts = AdminAgentRunService(settings).list_artifacts(
+        session,
+        admin_actor_id=3,
+        artifact_type="material_analysis",
+    )
     assert len(artifacts["items"]) == 1
     assert artifacts["items"][0]["preview"]["material_id"] == 41
     assert artifacts["items"][0]["preview"]["artifact_type"] == "material_analysis"

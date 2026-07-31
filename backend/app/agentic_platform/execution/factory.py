@@ -144,6 +144,8 @@ def build_durable_agent_runtime_factory(
 
     if not settings.agentic_durable_storage_enabled or settings.agentic_checkpointer != "sqlite":
         raise AgentExecutionConfigurationError("agent_execution_durable_storage_not_configured")
+    if settings.deep_research_web_enabled or settings.deep_research_scholar_enabled:
+        raise AgentExecutionConfigurationError("agent_execution_external_research_adapter_not_configured")
     model_provider = build_agent_model_provider(settings)
     artifact_store = DurableArtifactStore(
         dependencies.session_factory,

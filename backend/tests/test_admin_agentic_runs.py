@@ -102,6 +102,41 @@ def test_admin_can_create_refresh_and_stream_a_durable_agent_run(client, auth_se
     assert "id: 1" in stream.text
 
 
+def test_admin_agent_runs_are_isolated_by_owner(client, auth_service, agentic_platform_enabled) -> None:
+    seed_read_users(auth_service)
+    _set_role(2, 8)
+    owner_headers = build_auth_headers(3, 8)
+    other_admin_headers = build_auth_headers(2, 8)
+    created = client.post(RUNS_PATH, headers=owner_headers, json={"goal": "Owner-only research task"})
+    assert created.status_code == 200
+    run_id = created.json()["data"]["id"]
+
+    listing = client.get(RUNS_PATH, headers=other_admin_headers)
+    detail = client.get(f"{RUNS_PATH}/{run_id}", headers=other_admin_headers)
+    events = client.get(f"{RUNS_PATH}/{run_id}/events", headers=other_admin_headers)
+    cancellation = client.post(
+        f"{RUNS_PATH}/{run_id}/cancel",
+        headers=other_admin_headers,
+        json={"reason": "Must not cancel another administrator's run"},
+    )
+    artifacts = client.get(
+        "/api/admin/agent-artifacts",
+        headers=other_admin_headers,
+        params={"runId": run_id},
+    )
+
+    assert listing.status_code == 200
+    assert listing.json()["data"]["items"] == []
+    assert detail.status_code == 404
+    assert events.status_code == 404
+    assert cancellation.status_code == 404
+    assert artifacts.status_code == 404
+
+    owner_detail = client.get(f"{RUNS_PATH}/{run_id}", headers=owner_headers)
+    assert owner_detail.status_code == 200
+    assert owner_detail.json()["data"]["id"] == run_id
+
+
 def test_sse_reconnect_uses_last_event_id_and_redacts_private_reasoning(client, auth_service, agentic_platform_enabled) -> None:
     seed_read_users(auth_service)
     headers = build_auth_headers(3, 8)

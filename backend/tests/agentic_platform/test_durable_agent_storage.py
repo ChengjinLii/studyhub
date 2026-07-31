@@ -44,6 +44,10 @@ class _MemoryLock:
         self.owners[lock_name] = owner_token
         return True
 
+    def renew(self, session: Session, *, lock_name: str, owner_token: str, ttl_seconds: int) -> bool:
+        del session, ttl_seconds
+        return self.owners.get(lock_name) == owner_token
+
     def release(self, session: Session, *, lock_name: str, owner_token: str) -> None:
         del session
         if self.owners.get(lock_name) == owner_token:

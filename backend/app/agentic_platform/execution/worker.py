@@ -8,7 +8,7 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from app.agentic_platform.application.runtime_events import RuntimeEventStore
-from app.agentic_platform.persistence.run_lease import RunLease
+from app.agentic_platform.persistence.run_lease import RunLease, RunLeaseLostError
 from app.agentic_platform.runtime.kernel import KernelRunStatus
 from app.core.config import Settings
 from app.models.agentic_runtime import AgentJobRecord, AgentJobStatus, AgentRunRecord, AgentRunStatus
@@ -159,7 +159,17 @@ class AgentExecutionWorker:
                 metrics.jobs_cancelled += 1
                 return
             session.commit()
-            result = _run_async(self.handlers.execute(session, job=job, run=run))
+            heartbeat_bind = session.get_bind()
+            result = _run_async(
+                lease.run_with_heartbeat(
+                    self.handlers.execute(session, job=job, run=run),
+                    ownership_check=lambda: self._renew_job_claim(
+                        heartbeat_bind,
+                        job_id=job.id,
+                        worker_id=worker_id,
+                    ),
+                )
+            )
             session.expire_all()
             refreshed_run = self.runs.require_run(session, run.id)
             self._persist_result_status(session, run=refreshed_run, result=result)
@@ -181,6 +191,16 @@ class AgentExecutionWorker:
             metrics.jobs_completed += 1
         except AgentJobLeaseLostError:
             session.rollback()
+        except RunLeaseLostError:
+            metrics.lease_unavailable += 1
+            self._retry_or_fail(
+                session,
+                job=job,
+                worker_id=worker_id,
+                now=now,
+                error=AgentExecutionLeaseError("agent_execution_lease_lost"),
+                metrics=metrics,
+            )
         except Exception as exc:  # noqa: BLE001 - error details stay out of durable admin artifacts.
             self._retry_or_fail(
                 session,
@@ -192,6 +212,20 @@ class AgentExecutionWorker:
             )
         finally:
             lease.release()
+
+    def _renew_job_claim(self, bind: Any, *, job_id: str, worker_id: str) -> bool:
+        with Session(bind=bind, expire_on_commit=False) as heartbeat_session:
+            try:
+                renewed = self.runs.renew_job_claim(
+                    heartbeat_session,
+                    job_id=job_id,
+                    claimed_by=worker_id,
+                )
+                heartbeat_session.commit()
+                return renewed
+            except Exception:
+                heartbeat_session.rollback()
+                raise
 
     def _prepare_run(self, session: Session, *, job: AgentJobRecord, worker_id: str) -> AgentRunRecord | None:
         assert job.run_id is not None

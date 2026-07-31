@@ -100,6 +100,9 @@ def test_agentic_platform_configuration_defaults_to_safe_values() -> None:
         (Settings(agentic_admin_only=False), "AGENTIC_ADMIN_ONLY"),
         (Settings(agentic_runtime="unsupported"), "AGENTIC_RUNTIME"),
         (Settings(agentic_max_turns=0), "AGENTIC_MAX_TURNS"),
+        (Settings(deep_research_enabled=True), "DEEP_RESEARCH_ENABLED"),
+        (Settings(deep_research_web_enabled=True), "Web/Scholar Research"),
+        (Settings(deep_research_scholar_enabled=True), "Web/Scholar Research"),
     ],
 )
 def test_agentic_platform_configuration_rejects_unsafe_values(settings: Settings, message: str) -> None:
@@ -121,4 +124,23 @@ def test_agent_execution_requires_an_explicit_retriever_build_version() -> None:
     )
 
     with pytest.raises(RuntimeError, match="RETRIEVER_VERSION"):
+        settings.validate_runtime_configuration()
+
+
+def test_agent_execution_requires_redis_run_leases() -> None:
+    settings = Settings(
+        agentic_platform_enabled=True,
+        agentic_execution_enabled=True,
+        agentic_runtime="langgraph",
+        agentic_checkpointer="sqlite",
+        agentic_durable_storage_enabled=True,
+        agentic_model_provider="openai_compatible",
+        agentic_model_base_url="https://model.example.invalid/v1",
+        agentic_model_api_key="fixture-key",
+        agentic_model_id="fixture-model",
+        agentic_retriever_version="fixture-index-v1",
+        lock_provider="db_row",
+    )
+
+    with pytest.raises(RuntimeError, match="LOCK_PROVIDER=redis"):
         settings.validate_runtime_configuration()

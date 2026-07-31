@@ -16,7 +16,7 @@ from app.models.agentic_runtime import AgentJobRecord, AgentRunRecord, AgentWait
 from app.repos.agentic_artifact_repo import AgentArtifactRepository
 from app.repos.agentic_run_repo import AgentRunRepository
 
-from .errors import AgentExecutionPayloadError
+from .errors import AgentExecutionError, AgentExecutionPayloadError
 from .factory import AgentRuntimeFactory
 
 
@@ -62,7 +62,11 @@ class AgentExecutionJobHandlers:
         state = self._initial_state(run=run, payload=payload)
         kernel = await self.factory.build_agent_kernel(run=run, dispatch_payload=payload)
         try:
-            result = await self._start_or_recover(kernel, state)
+            result = await self._start_or_recover(
+                kernel,
+                state,
+                checkpoint_expected=bool(run.checkpoint_ref),
+            )
             return JobExecutionResult(kind="agent_run", kernel_result=result)
         finally:
             await _close_if_supported(kernel)
@@ -215,13 +219,19 @@ class AgentExecutionJobHandlers:
         )
 
     @staticmethod
-    async def _start_or_recover(kernel: AgentKernel, state: AgentTaskState) -> KernelRunResult:
+    async def _start_or_recover(
+        kernel: AgentKernel,
+        state: AgentTaskState,
+        *,
+        checkpoint_expected: bool,
+    ) -> KernelRunResult:
         get_result = getattr(kernel, "get_result", None)
         if get_result is not None:
             try:
                 return await get_result(state.run_id)
             except KernelRunNotFoundError:
-                pass
+                if checkpoint_expected:
+                    raise AgentExecutionError("agent_execution_checkpoint_unavailable", retryable=True) from None
         return await kernel.start(state)
 
 

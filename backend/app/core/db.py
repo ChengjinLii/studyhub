@@ -28,6 +28,13 @@ AGENTIC_DURABLE_TABLES = frozenset(
         "agent_waits",
     }
 )
+AGENTIC_TABLE_FEATURE_FLAGS = (
+    "agentic_platform_enabled",
+    "agentic_proactive_enabled",
+    "agentic_execution_enabled",
+    "agentic_durable_storage_enabled",
+    "deep_research_enabled",
+)
 
 
 def get_engine():
@@ -101,7 +108,8 @@ def expected_table_names() -> list[str]:
 
 def required_table_names() -> list[str]:
     table_names = expected_table_names()
-    if get_settings().agentic_durable_storage_enabled:
+    settings = get_settings()
+    if any(bool(getattr(settings, flag, False)) for flag in AGENTIC_TABLE_FEATURE_FLAGS):
         return table_names
     return [name for name in table_names if name not in AGENTIC_DURABLE_TABLES]
 
