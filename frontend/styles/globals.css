@@ -9854,6 +9854,50 @@ g.studyhub-popup-poster__hotspot:hover > text {
   background: #94a3b8;
 }
 
+.me-content-section__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.me-grid .me-content-section__header .card-title {
+  margin-bottom: 0;
+}
+
+.me-upload-sort {
+  display: inline-flex;
+  flex: 0 0 auto;
+  gap: 3px;
+  padding: 3px;
+  border: 1px solid #dbe3ee;
+  border-radius: 8px;
+  background: #f1f5f9;
+}
+
+.me-upload-sort button {
+  min-height: 30px;
+  padding: 5px 10px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #64748b;
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.me-upload-sort button:hover {
+  color: #1e40af;
+}
+
+.me-upload-sort button.active {
+  background: #ffffff;
+  color: #1d4ed8;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.12);
+}
+
 .column-page {
   margin: 36px auto 64px;
 }
@@ -15551,6 +15595,19 @@ g.studyhub-popup-poster__hotspot:hover > text {
 
   .me-profile__title {
     font-size: 1rem;
+  }
+
+  .me-content-section__header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .me-upload-sort {
+    width: 100%;
+  }
+
+  .me-upload-sort button {
+    flex: 1;
   }
 
   .purchase-row {

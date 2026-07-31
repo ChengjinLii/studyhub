@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { ReactNode } from 'react';
+import { UploadTimeOrder } from '../../lib/profileUploads';
 import { MarketListingItem, MarketWantItem, PurchaseItem, UploadItem } from '../../types/profile';
 
 interface MeContentSectionsProps {
@@ -7,6 +8,7 @@ interface MeContentSectionsProps {
   visibleUploads: UploadItem[];
   uploadsExpanded: boolean;
   canExpandUploads: boolean;
+  uploadTimeOrder: UploadTimeOrder;
   purchases: PurchaseItem[];
   visiblePurchases: PurchaseItem[];
   purchasesExpanded: boolean;
@@ -24,6 +26,7 @@ interface MeContentSectionsProps {
   renderMarketWant: (item: MarketWantItem) => ReactNode;
   renderMarketListing: (item: MarketListingItem) => ReactNode;
   onUploadsExpandedChange: (value: boolean) => void;
+  onUploadTimeOrderChange: (value: UploadTimeOrder) => void;
   onPurchasesExpandedChange: (value: boolean) => void;
   onWantsExpandedChange: (value: boolean) => void;
   onListingsExpandedChange: (value: boolean) => void;
@@ -34,6 +37,7 @@ export default function MeContentSections({
   visibleUploads,
   uploadsExpanded,
   canExpandUploads,
+  uploadTimeOrder,
   purchases,
   visiblePurchases,
   purchasesExpanded,
@@ -51,6 +55,7 @@ export default function MeContentSections({
   renderMarketWant,
   renderMarketListing,
   onUploadsExpandedChange,
+  onUploadTimeOrderChange,
   onPurchasesExpandedChange,
   onWantsExpandedChange,
   onListingsExpandedChange,
@@ -58,7 +63,29 @@ export default function MeContentSections({
   return (
     <>
       <section className="card" id="uploads">
-        <div className="card-title">我的投稿</div>
+        <div className="me-content-section__header">
+          <div className="card-title">我的投稿</div>
+          {uploads.length > 1 && (
+            <div className="me-upload-sort" role="group" aria-label="按投稿时间排序">
+              <button
+                type="button"
+                className={uploadTimeOrder === 'newest' ? 'active' : ''}
+                aria-pressed={uploadTimeOrder === 'newest'}
+                onClick={() => onUploadTimeOrderChange('newest')}
+              >
+                最新优先
+              </button>
+              <button
+                type="button"
+                className={uploadTimeOrder === 'oldest' ? 'active' : ''}
+                aria-pressed={uploadTimeOrder === 'oldest'}
+                onClick={() => onUploadTimeOrderChange('oldest')}
+              >
+                最早优先
+              </button>
+            </div>
+          )}
+        </div>
         {uploads.length === 0 ? (
           <p className="help-text">
             还没有投稿，<Link href="/upload">前往投稿</Link> 提供优质资料吧。

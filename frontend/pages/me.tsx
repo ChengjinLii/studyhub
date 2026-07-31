@@ -1,7 +1,7 @@
 import { GetServerSideProps } from 'next';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import { FormEvent, useEffect, useState } from 'react';
+import { FormEvent, useEffect, useMemo, useState } from 'react';
 import MeAccountSections from '../components/me/MeAccountSections';
 import MeContentSections from '../components/me/MeContentSections';
 import MePayoutSection from '../components/me/MePayoutSection';
@@ -15,6 +15,7 @@ import { fetchBackend, getRequestOrigin } from '../lib/apiBase';
 import { ensureApiSuccess, readApiEnvelope, unwrapApiResponse } from '../lib/apiEnvelope';
 import { toErrorMessage } from '../lib/errors';
 import { formatDateTime } from '../lib/format';
+import { sortUploadsByTime, UploadTimeOrder } from '../lib/profileUploads';
 import { marketPath, materialPath } from '../lib/slug';
 import { SessionUser } from '../types/user';
 import { UserAccountProfile, UserFollowItem } from '../types/userProfile';
@@ -22,6 +23,7 @@ import { PayoutApplication } from '../types/payout';
 import { ProfileSummary, PurchaseItem, UploadItem, MarketWantItem, MarketListingItem } from '../types/profile';
 
 const ADMIN_QQ = '245934740';
+const EMPTY_UPLOADS: UploadItem[] = [];
 
 interface MePageProps {
   user: SessionUser | null;
@@ -108,14 +110,16 @@ export default function MePage({ user, summary, account }: MePageProps) {
   const [purchasesExpanded, setPurchasesExpanded] = useState(false);
   const [wantsExpanded, setWantsExpanded] = useState(false);
   const [uploadsExpanded, setUploadsExpanded] = useState(false);
+  const [uploadTimeOrder, setUploadTimeOrder] = useState<UploadTimeOrder>('newest');
   const [listingsExpanded, setListingsExpanded] = useState(false);
   const purchases = summary?.purchases ?? [];
   const marketWants = summary?.marketWants ?? [];
-  const uploads = summary?.uploads ?? [];
+  const uploads = summary?.uploads ?? EMPTY_UPLOADS;
   const marketListings = summary?.marketListings ?? [];
+  const sortedUploads = useMemo(() => sortUploadsByTime(uploads, uploadTimeOrder), [uploads, uploadTimeOrder]);
   const visiblePurchases = purchasesExpanded ? purchases : purchases.slice(0, 5);
   const visibleMarketWants = wantsExpanded ? marketWants : marketWants.slice(0, 5);
-  const visibleUploads = uploadsExpanded ? uploads : uploads.slice(0, 5);
+  const visibleUploads = uploadsExpanded ? sortedUploads : sortedUploads.slice(0, 5);
   const visibleMarketListings = listingsExpanded ? marketListings : marketListings.slice(0, 5);
   const canExpandPurchases = purchases.length > 5;
   const canExpandMarketWants = marketWants.length > 5;
@@ -793,10 +797,8 @@ export default function MePage({ user, summary, account }: MePageProps) {
                 onConfirmBindEmail={confirmBindEmail}
               />
               <MeContentSections
-                uploads={uploads}
-                visibleUploads={visibleUploads}
-                uploadsExpanded={uploadsExpanded}
-                canExpandUploads={canExpandUploads}
+                uploads={sortedUploads} visibleUploads={visibleUploads} uploadsExpanded={uploadsExpanded}
+                canExpandUploads={canExpandUploads} uploadTimeOrder={uploadTimeOrder}
                 purchases={purchases}
                 visiblePurchases={visiblePurchases}
                 purchasesExpanded={purchasesExpanded}
@@ -813,7 +815,7 @@ export default function MePage({ user, summary, account }: MePageProps) {
                 renderPurchase={renderPurchase}
                 renderMarketWant={renderMarketWant}
                 renderMarketListing={renderMarketListing}
-                onUploadsExpandedChange={setUploadsExpanded}
+                onUploadsExpandedChange={setUploadsExpanded} onUploadTimeOrderChange={setUploadTimeOrder}
                 onPurchasesExpandedChange={setPurchasesExpanded}
                 onWantsExpandedChange={setWantsExpanded}
                 onListingsExpandedChange={setListingsExpanded}
