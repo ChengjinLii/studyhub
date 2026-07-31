@@ -34,7 +34,7 @@ import { parseMajorList } from '../lib/major';
 import { materialPath } from '../lib/slug';
 import { buildZipName, resolveZipFileName, zipFiles, zipMarkdownContent } from '../lib/uploadAssets';
 import { buildUploadPayload } from '../lib/uploadPayload';
-import { sendUploadFormData } from '../lib/uploadSubmit';
+import { isUploadResultUncertain, sendUploadFormData } from '../lib/uploadSubmit';
 import {
   buildUploadSubmissionFingerprint,
   clearUploadSubmission,
@@ -716,9 +716,9 @@ export default function UploadPage({ user, token, account }: UploadPageProps) {
       window.setTimeout(() => window.location.replace(destination), 80);
     } catch (error: unknown) {
       const errorMessage = toErrorMessage(error, '投稿失败');
-      const fallback = uploadTransferred
+      const fallback = uploadTransferred && isUploadResultUncertain(error)
         ? `连接已中断，但服务器可能仍在保存资料。请不要新建投稿，稍后直接重新提交，系统会识别同一次投稿。（${errorMessage}）`
-        : errorMessage;
+        : `${isEditing ? '更新' : '投稿'}未成功：${errorMessage}`;
       setStatus({ type: 'error', message: fallback });
     } finally {
       uploadRequestRef.current = null;

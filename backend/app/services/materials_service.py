@@ -638,6 +638,12 @@ class MaterialsService(MaterialsStorageMutationMixin, MaterialsCompatMixin):
         if (payload.deliveryMethod or "FILE").upper() == "FILE" and file_upload is None:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="资料缺少有效的下载方式")
 
+        delivery_method = (payload.deliveryMethod or "FILE").upper()
+        initial_file_type = (
+            "netdisk"
+            if delivery_method == "NETDISK"
+            else self._resolve_file_type(file_upload.filename if file_upload is not None else None)
+        )
         material = MaterialRecord(
             source="local",
             uploader_id=uploader.id,
@@ -645,6 +651,26 @@ class MaterialsService(MaterialsStorageMutationMixin, MaterialsCompatMixin):
             uploader_username=uploader.username,
             uploader_nickname=uploader.nickname or uploader.username,
             title=payload.title,
+            description=payload.description,
+            original_filename=file_upload.filename if file_upload is not None else None,
+            file_type=initial_file_type,
+            file_size=0,
+            price=int(payload.price or 0),
+            is_free=int(payload.price or 0) <= 0,
+            school=payload.school,
+            college=payload.college or None,
+            major=payload.major or None,
+            general_course=bool(payload.generalCourse),
+            course_category=payload.courseCategory or ("GENERAL" if payload.generalCourse else "MAJOR"),
+            grade_type=payload.gradeType or "STAGE",
+            grade_value=payload.gradeValue or "大一",
+            delivery_method=delivery_method,
+            preview_watermark_enabled=bool(
+                payload.previewWatermarkEnabled if payload.previewWatermarkEnabled is not None else True
+            ),
+            preview_source=payload.previewSource or "AUTO",
+            status="VISIBLE",
+            review_status="APPROVED",
             created_at=datetime.now(UTC),
             updated_at=datetime.now(UTC),
         )

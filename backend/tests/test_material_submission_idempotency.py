@@ -3,7 +3,8 @@ from __future__ import annotations
 import json
 
 from fastapi.testclient import TestClient
-from sqlalchemy import func, select
+from sqlalchemy import event, func, select
+from sqlalchemy.orm import Session
 
 from app.core.db import session_scope
 from app.models.materials import MaterialRecord, MaterialVersionRecord
@@ -74,6 +75,39 @@ def test_retried_material_submission_returns_the_original_material(
 
     assert material_count == 1
     assert version_count == 1
+
+
+def test_submission_reservation_satisfies_production_required_fields(
+    client: TestClient,
+    auth_service: AuthService,
+) -> None:
+    seed_read_users(auth_service)
+    observed: list[MaterialRecord] = []
+
+    def inspect_pending_materials(session: Session, _flush_context, _instances) -> None:
+        for entity in session.new:
+            if not isinstance(entity, MaterialRecord) or not entity.submission_key:
+                continue
+            assert entity.school == "电子科技大学"
+            assert entity.file_type == "pdf"
+            assert entity.course_category == "MAJOR"
+            assert entity.grade_type == "STAGE"
+            assert entity.review_status == "APPROVED"
+            observed.append(entity)
+
+    event.listen(Session, "before_flush", inspect_pending_materials)
+    try:
+        response = _create(
+            client,
+            build_auth_headers(1, 1),
+            title="生产字段约束回归",
+            submission_id="upload_required_01HZZZZZZZZZ",
+        )
+    finally:
+        event.remove(Session, "before_flush", inspect_pending_materials)
+
+    assert response.status_code == 200
+    assert len(observed) == 1
 
 
 def test_submission_id_is_scoped_to_the_uploader(client: TestClient, auth_service: AuthService) -> None:
