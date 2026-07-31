@@ -63,8 +63,6 @@ run_stage "database connectivity" "$PYTHON_BIN" - <<'PY'
 import os
 
 import sqlalchemy as sa
-from alembic.config import Config
-from alembic.script import ScriptDirectory
 
 url = os.environ["STUDYHUB_DATABASE_URL"]
 engine = sa.create_engine(url, future=True)
@@ -80,6 +78,8 @@ run_stage "schema inspection" "$PYTHON_BIN" - <<'PY'
 import os
 
 import sqlalchemy as sa
+from alembic.config import Config
+from alembic.script import ScriptDirectory
 
 url = os.environ["STUDYHUB_DATABASE_URL"]
 engine = sa.create_engine(url, future=True)
