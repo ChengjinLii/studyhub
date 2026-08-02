@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { Dispatch, SetStateAction } from 'react';
 import { COURSE_CATEGORY_OPTIONS, CourseCategoryValue, SUPPORTED_COLLEGES, SUPPORTED_MAJORS, SUPPORTED_SCHOOL } from '../../constants/metadata';
 import { ColumnTopicKey } from '../../lib/column';
@@ -80,7 +81,19 @@ export default function UploadMetaSection({
     <div className="upload-section-shell" id="upload-meta">
       <div className="upload-section-heading">
         <div className="upload-section-heading__copy">
-          <h2 className="upload-section-heading__title">课程与标签</h2>
+          <div className="upload-section-heading__title-row">
+            <h2 className="upload-section-heading__title">课程与标签</h2>
+            <details className="upload-profile-help">
+              <summary aria-label="查看课程信息默认值说明" title="课程信息默认值说明">?</summary>
+              <div className="upload-profile-help__popover">
+                <strong>默认信息从哪里来？</strong>
+                <p>学校、学院、专业和年级会优先读取“我的”个人主页概览；本次投稿仍可单独调整。</p>
+                <Link className="button ghost small" href="/me#profile" prefetch={false}>
+                  前往个人主页修改
+                </Link>
+              </div>
+            </details>
+          </div>
         </div>
       </div>
       <section className="card upload-main-card upload-section-card">

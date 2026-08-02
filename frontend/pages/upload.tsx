@@ -10,6 +10,7 @@ import UploadHero from '../components/upload/UploadHero';
 import UploadMaterialFileField from '../components/upload/UploadMaterialFileField';
 import UploadMetaSection from '../components/upload/UploadMetaSection';
 import UploadPolicyModal from '../components/upload/UploadPolicyModal';
+import UploadProgressSidebar from '../components/upload/UploadProgressSidebar';
 import SectionLabel from '../components/upload/UploadSectionLabel';
 import { readSession } from '../lib/auth';
 import { SessionUser } from '../types/user';
@@ -51,6 +52,7 @@ import {
 import { useSectionNavigation } from '../lib/useSectionNavigation';
 import { useUploadExistingMaterial } from '../lib/useUploadExistingMaterial';
 import { useUploadImageSelection } from '../lib/useUploadImageSelection';
+import { resolveUploadSectionCompletion } from '../lib/uploadSectionCompletion';
 
 const presetTags = [
   '日常学习笔记',
@@ -187,6 +189,7 @@ export default function UploadPage({ user, token, account }: UploadPageProps) {
   const [status, setStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [submissionStage, setSubmissionStage] = useState<UploadSubmissionStage>('idle');
   const [successPath, setSuccessPath] = useState<string | null>(null);
+  const [agreementAccepted, setAgreementAccepted] = useState(false);
   const [zipPlaceholder, setZipPlaceholder] = useState('未选择任何文件');
   const [quickPanelOpen, setQuickPanelOpen] = useState(false);
   const [quickSelectedOption, setQuickSelectedOption] = useState<string | null>(null);
@@ -284,6 +287,18 @@ export default function UploadPage({ user, token, account }: UploadPageProps) {
       courseCategoryLabel: resolvedCourseCategory === 'MAJOR' ? '专业课' : '通识课',
     };
   }, [account, gradeStageOptions]);
+  const sectionCompletion = resolveUploadSectionCompletion({
+    isExperience, isQuickMode, isExperienceCustomTopic, title, description, experienceCustomTag, price,
+    school: isQuickMode ? quickProfile.school : school,
+    college: isQuickMode ? quickProfile.college : college,
+    gradeValue: isQuickMode ? quickProfile.gradeValue : gradeValue,
+    courseCategory: isQuickMode ? quickProfile.courseCategory : courseCategory,
+    deliveryMethod, hasSelectedFile: Boolean(zipFile), hasExistingFile, zipPreparing, netdiskUrl,
+    previewSource: isRequestResponse ? PREVIEW_SOURCE_MANUAL : previewSource,
+    isRequestResponse, isEditing, manualPreviewCount: manualPreviewFiles.length,
+    minManualPreviewImages: MIN_MANUAL_PREVIEW_IMAGES, minRequestPreviewImages: MIN_REQUEST_PREVIEW_IMAGES,
+    agreementAccepted,
+  });
   const { loadingExisting } = useUploadExistingMaterial({
     isEditing,
     editingId,
@@ -1056,9 +1071,11 @@ export default function UploadPage({ user, token, account }: UploadPageProps) {
         submissionStage={submissionStage}
         uploadProgress={uploadProgress}
         successPath={successPath}
+        agreementAccepted={agreementAccepted}
         status={status}
         onCopyrightOwnerChange={setCopyrightOwner}
         onPolicyOpen={() => setPolicyModalOpen(true)}
+        onAgreementAcceptedChange={setAgreementAccepted}
       />
     </form>
   );
@@ -1082,29 +1099,12 @@ export default function UploadPage({ user, token, account }: UploadPageProps) {
           </section>
         ) : (
           <div className="upload-layout">
-            <aside className="me-sidebar upload-sidebar">
-              <div className="me-sidebar__brand">投稿中心</div>
-              <div className="me-sidebar__group">
-                <div className="me-sidebar__label">页面导航</div>
-                <nav className="me-sidebar__items" aria-label="投稿页面导航">
-                  {uploadNavItems.map((item, index) => (
-                    <a
-                      key={item.id}
-                      href={`#${item.id}`}
-                      className={`me-sidebar__item${activeSection === item.id ? ' active' : ''}`}
-                      onClick={(event) => {
-                        event.preventDefault();
-                        jumpToSection(item.id);
-                      }}
-                    >
-                      <span className="me-sidebar__indicator" />
-                      <span className="me-sidebar__index">{String(index + 1).padStart(2, '0')}</span>
-                      <span className="me-sidebar__text">{item.label}</span>
-                    </a>
-                  ))}
-                </nav>
-              </div>
-            </aside>
+            <UploadProgressSidebar
+              items={uploadNavItems}
+              activeSection={activeSection}
+              completion={sectionCompletion}
+              onJump={jumpToSection}
+            />
             <div className="upload-main">
               <UploadHero
                 isEditing={isEditing}

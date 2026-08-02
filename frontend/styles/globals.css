@@ -12633,6 +12633,12 @@ g.studyhub-popup-poster__hotspot:hover > text {
   min-width: 0;
 }
 
+.upload-section-heading__title-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
 .upload-section-heading__title {
   margin: 0;
   font-size: 1.05rem;
@@ -12646,6 +12652,96 @@ g.studyhub-popup-poster__hotspot:hover > text {
   color: #64748b;
   font-size: 0.9rem;
   line-height: 1.55;
+}
+
+.upload-profile-help {
+  position: relative;
+  z-index: 8;
+}
+
+.upload-profile-help summary {
+  display: grid;
+  width: 20px;
+  height: 20px;
+  place-items: center;
+  border: 1px solid #93c5fd;
+  border-radius: 50%;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-size: 0.78rem;
+  font-weight: 800;
+  line-height: 1;
+  cursor: pointer;
+  list-style: none;
+}
+
+.upload-profile-help summary::-webkit-details-marker {
+  display: none;
+}
+
+.upload-profile-help summary:hover,
+.upload-profile-help[open] summary {
+  border-color: #2563eb;
+  background: #dbeafe;
+}
+
+.upload-profile-help__popover {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: -8px;
+  display: none;
+  width: min(320px, calc(100vw - 44px));
+  padding: 14px;
+  border: 1px solid #bfdbfe;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #334155;
+  box-shadow: 0 14px 32px rgba(15, 23, 42, 0.16);
+}
+
+.upload-profile-help:hover .upload-profile-help__popover,
+.upload-profile-help:focus-within .upload-profile-help__popover,
+.upload-profile-help[open] .upload-profile-help__popover {
+  display: block;
+}
+
+.upload-profile-help__popover strong {
+  display: block;
+  color: #0f172a;
+  font-size: 0.9rem;
+}
+
+.upload-profile-help__popover p {
+  margin: 7px 0 12px;
+  font-size: 0.84rem;
+  line-height: 1.6;
+}
+
+.upload-profile-help__popover .button {
+  width: 100%;
+  justify-content: center;
+}
+
+.upload-sidebar__completion {
+  display: grid;
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+  margin-left: auto;
+  place-items: center;
+  border: 1px solid #cbd5e1;
+  border-radius: 50%;
+  background: #ffffff;
+  color: transparent;
+  font-size: 0.72rem;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.upload-sidebar .me-sidebar__item.is-complete .upload-sidebar__completion {
+  border-color: #60a5fa;
+  background: #2563eb;
+  color: #ffffff;
 }
 
 .upload-section-card {
@@ -15300,6 +15396,13 @@ g.studyhub-popup-poster__hotspot:hover > text {
     flex-direction: column;
     align-items: flex-start;
     gap: 5px;
+  }
+
+  .upload-sidebar__completion {
+    position: absolute;
+    top: 9px;
+    right: 9px;
+    margin-left: 0;
   }
 
   .upload-sidebar .me-sidebar__indicator,

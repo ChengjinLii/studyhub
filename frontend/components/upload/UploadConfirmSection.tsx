@@ -11,9 +11,11 @@ interface UploadConfirmSectionProps {
   submissionStage: UploadSubmissionStage;
   uploadProgress: number | null;
   successPath: string | null;
+  agreementAccepted: boolean;
   status: { type: 'success' | 'error'; message: string } | null;
   onCopyrightOwnerChange: (value: string) => void;
   onPolicyOpen: () => void;
+  onAgreementAcceptedChange: (value: boolean) => void;
 }
 
 export default function UploadConfirmSection({
@@ -26,9 +28,11 @@ export default function UploadConfirmSection({
   submissionStage,
   uploadProgress,
   successPath,
+  agreementAccepted,
   status,
   onCopyrightOwnerChange,
   onPolicyOpen,
+  onAgreementAcceptedChange,
 }: UploadConfirmSectionProps) {
   const submitLabel = submitting
     ? submissionStage === 'preparing'
@@ -87,7 +91,12 @@ export default function UploadConfirmSection({
           )}
           <div className="form-item full">
             <label className="choice agreement">
-              <input type="checkbox" required />
+              <input
+                type="checkbox"
+                checked={agreementAccepted}
+                onChange={(event) => onAgreementAcceptedChange(event.target.checked)}
+                required
+              />
               <span>
                 我已阅读并同意
                 <button
