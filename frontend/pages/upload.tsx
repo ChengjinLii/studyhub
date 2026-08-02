@@ -5,6 +5,7 @@ import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import AppImage from '../components/AppImage';
 import NavBar from '../components/NavBar';
 import UploadBasicSection from '../components/upload/UploadBasicSection';
+import UploadChoiceCard from '../components/upload/UploadChoiceCard';
 import UploadConfirmSection from '../components/upload/UploadConfirmSection';
 import UploadHero from '../components/upload/UploadHero';
 import UploadMaterialFileField from '../components/upload/UploadMaterialFileField';
@@ -868,30 +869,24 @@ export default function UploadPage({ user, token, account }: UploadPageProps) {
           <section className="card upload-main-card upload-section-card">
             <div className="form-grid upload-section-grid">
             <div className="form-item full">
-              <SectionLabel text="资料交付方式" />
+              <SectionLabel text="资料交付方式" selectionHint="请选择 1 项" />
               <div className="delivery-method-options" role="radiogroup" aria-label="资料交付方式">
-                <label className={`delivery-method-card ${deliveryMethod === 'FILE' ? 'active' : ''}`}>
-                  <input
-                    type="radio"
-                    name="deliveryMethod"
-                    value="FILE"
-                    checked={deliveryMethod === 'FILE'}
-                    onChange={() => setDeliveryMethod('FILE')}
-                  />
-                  <span className="delivery-method-card__title">站内文件交付</span>
-                  <span className="delivery-method-card__desc">后续在下方选择文件，单次总大小不超过 50MB。</span>
-                </label>
-                <label className={`delivery-method-card ${deliveryMethod === 'NETDISK' ? 'active' : ''}`}>
-                  <input
-                    type="radio"
-                    name="deliveryMethod"
-                    value="NETDISK"
-                    checked={deliveryMethod === 'NETDISK'}
-                    onChange={() => setDeliveryMethod('NETDISK')}
-                  />
-                  <span className="delivery-method-card__title">网盘链接交付</span>
-                  <span className="delivery-method-card__desc">适合超过 50MB 或需要外部维护的资料。</span>
-                </label>
+                <UploadChoiceCard
+                  name="deliveryMethod"
+                  value="FILE"
+                  title="站内文件交付"
+                  description="后续在下方选择文件，单次总大小不超过 50MB。"
+                  selected={deliveryMethod === 'FILE'}
+                  onSelect={() => setDeliveryMethod('FILE')}
+                />
+                <UploadChoiceCard
+                  name="deliveryMethod"
+                  value="NETDISK"
+                  title="网盘链接交付"
+                  description="适合超过 50MB 或需要外部维护的资料。"
+                  selected={deliveryMethod === 'NETDISK'}
+                  onSelect={() => setDeliveryMethod('NETDISK')}
+                />
               </div>
               <p className="help-text">
                 {isQuickMode
@@ -901,7 +896,7 @@ export default function UploadPage({ user, token, account }: UploadPageProps) {
             </div>
             {!isQuickMode && (
               <div className="form-item full">
-              <SectionLabel text="预览图设置" />
+              <SectionLabel text="预览图设置" selectionHint="请选择 1 项" />
               {isRequestResponse ? (
                 <p className="help-text">
                   请上传符合求购者要求的预览图
@@ -909,27 +904,23 @@ export default function UploadPage({ user, token, account }: UploadPageProps) {
                 </p>
               ) : (
                 <>
-                  <div className="inline-group wrap">
-                    <label className={`choice-pill ${previewSource === PREVIEW_SOURCE_AUTO ? 'active' : ''}`}>
-                      <input
-                        type="radio"
-                        name="previewSource"
-                        value={PREVIEW_SOURCE_AUTO}
-                        checked={previewSource === PREVIEW_SOURCE_AUTO}
-                        onChange={() => setPreviewSource(PREVIEW_SOURCE_AUTO)}
-                      />
-                      <span>自动生成（推荐）</span>
-                    </label>
-                    <label className={`choice-pill ${previewSource === PREVIEW_SOURCE_MANUAL ? 'active' : ''}`}>
-                      <input
-                        type="radio"
-                        name="previewSource"
-                        value={PREVIEW_SOURCE_MANUAL}
-                        checked={previewSource === PREVIEW_SOURCE_MANUAL}
-                        onChange={() => setPreviewSource(PREVIEW_SOURCE_MANUAL)}
-                      />
-                      <span>手动上传</span>
-                    </label>
+                  <div className="upload-preview-source-options" role="radiogroup" aria-label="预览图设置">
+                    <UploadChoiceCard
+                      name="previewSource"
+                      value={PREVIEW_SOURCE_AUTO}
+                      title="自动生成（推荐）"
+                      description="系统从资料文件生成预览，PDF 文件效果最佳。"
+                      selected={previewSource === PREVIEW_SOURCE_AUTO}
+                      onSelect={() => setPreviewSource(PREVIEW_SOURCE_AUTO)}
+                    />
+                    <UploadChoiceCard
+                      name="previewSource"
+                      value={PREVIEW_SOURCE_MANUAL}
+                      title="手动上传"
+                      description="自行选择展示内容，至少上传 1 张预览图。"
+                      selected={previewSource === PREVIEW_SOURCE_MANUAL}
+                      onSelect={() => setPreviewSource(PREVIEW_SOURCE_MANUAL)}
+                    />
                   </div>
                   {previewSource === PREVIEW_SOURCE_AUTO && (
                     <p className="help-text">系统将自动生成预览图（PDF 最佳）。如需自定义可切换手动上传。</p>

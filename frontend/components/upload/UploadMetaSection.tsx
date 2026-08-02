@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { Dispatch, SetStateAction } from 'react';
 import { COURSE_CATEGORY_OPTIONS, CourseCategoryValue, SUPPORTED_COLLEGES, SUPPORTED_MAJORS, SUPPORTED_SCHOOL } from '../../constants/metadata';
 import { ColumnTopicKey } from '../../lib/column';
+import UploadChoiceCard from './UploadChoiceCard';
 import UploadSectionLabel from './UploadSectionLabel';
 
 interface QuickProfile {
@@ -233,24 +234,18 @@ export default function UploadMetaSection({
                 </div>
               </div>
               <div className="form-item full">
-                <UploadSectionLabel text="课程类型" />
+                <UploadSectionLabel text="课程类型" selectionHint="请选择 1 项" />
                 <div className="course-type-options upload-course-type-options">
                   {COURSE_CATEGORY_OPTIONS.map((option) => (
-                    <label
+                    <UploadChoiceCard
                       key={option.value}
-                      className={`choice-pill course upload-course-type-chip ${courseCategory === option.value ? 'active' : ''}`}
-                    >
-                      <input
-                        type="radio"
-                        name="courseCategory"
-                        value={option.value}
-                        checked={courseCategory === option.value}
-                        onChange={(e) => onCourseCategoryChange(e.target.value as CourseCategoryValue)}
-                      />
-                      <div>
-                        <strong>{option.label}</strong>
-                      </div>
-                    </label>
+                      name="courseCategory"
+                      value={option.value}
+                      title={option.label}
+                      description={option.helper}
+                      selected={courseCategory === option.value}
+                      onSelect={() => onCourseCategoryChange(option.value as CourseCategoryValue)}
+                    />
                   ))}
                 </div>
               </div>
