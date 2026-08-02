@@ -12810,7 +12810,7 @@ g.studyhub-popup-poster__hotspot:hover > text {
 
 .upload-profile-help {
   position: relative;
-  z-index: 8;
+  z-index: 60;
 }
 
 .upload-profile-help summary {
@@ -12854,7 +12854,6 @@ g.studyhub-popup-poster__hotspot:hover > text {
 }
 
 .upload-profile-help:hover .upload-profile-help__popover,
-.upload-profile-help:focus-within .upload-profile-help__popover,
 .upload-profile-help[open] .upload-profile-help__popover {
   display: block;
 }
@@ -12902,9 +12901,9 @@ g.studyhub-popup-poster__hotspot:hover > text {
 
 .upload-sidebar__completion-tooltip {
   position: absolute;
-  top: calc(100% + 9px);
-  right: -6px;
-  z-index: 30;
+  top: 50%;
+  left: calc(100% + 10px);
+  z-index: 80;
   width: max-content;
   max-width: 280px;
   padding: 9px 11px;
@@ -12920,14 +12919,28 @@ g.studyhub-popup-poster__hotspot:hover > text {
   opacity: 0;
   visibility: hidden;
   pointer-events: none;
-  transform: translateY(-3px);
+  transform: translate(3px, -50%);
   transition: opacity 0.16s ease, transform 0.16s ease, visibility 0.16s ease;
+}
+
+.upload-sidebar {
+  z-index: 40;
+  overflow: visible;
+}
+
+.upload-sidebar .me-sidebar__items,
+.upload-sidebar .me-sidebar__item {
+  overflow: visible;
+}
+
+.upload-sidebar .me-sidebar__item:hover {
+  z-index: 70;
 }
 
 .upload-sidebar__completion:hover .upload-sidebar__completion-tooltip {
   opacity: 1;
   visibility: visible;
-  transform: translateY(0);
+  transform: translate(0, -50%);
 }
 
 .upload-section-card {
