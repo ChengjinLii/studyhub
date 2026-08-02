@@ -7015,6 +7015,160 @@ g.studyhub-popup-poster__hotspot:hover > text {
   border-left: 4px solid #2563eb;
 }
 
+.netdisk-info--ready {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.netdisk-info--ready p {
+  margin: 0;
+  color: #475569;
+}
+
+.netdisk-access-mask {
+  background: rgba(15, 23, 42, 0.48);
+  backdrop-filter: blur(6px);
+}
+
+.netdisk-access-modal {
+  width: min(600px, calc(100vw - 32px));
+  padding: 26px;
+  border: 1px solid #dbe7f5;
+  border-radius: 12px;
+  overflow-y: auto;
+}
+
+.netdisk-access-modal__heading {
+  padding-right: 36px;
+}
+
+.netdisk-access-modal__heading > span {
+  display: inline-flex;
+  margin-bottom: 9px;
+  color: #2563eb;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.netdisk-access-modal__heading h2 {
+  margin: 0;
+  color: #0f172a;
+  font-size: 1.25rem;
+  line-height: 1.45;
+}
+
+.netdisk-access-modal__heading p {
+  margin: 8px 0 0;
+  color: #64748b;
+  font-size: 0.88rem;
+  line-height: 1.55;
+}
+
+.netdisk-access-modal__details {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 20px;
+}
+
+.netdisk-access-modal__field {
+  padding: 13px 14px;
+  border: 1px solid #dbe7f5;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.netdisk-access-modal__field > span {
+  display: block;
+  margin-bottom: 7px;
+  color: #64748b;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.netdisk-access-modal__field > div {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.netdisk-access-modal__field p {
+  min-width: 0;
+  margin: 0;
+  color: #0f172a;
+  font-size: 0.94rem;
+  font-weight: 650;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+
+.netdisk-access-modal__field button {
+  flex: 0 0 auto;
+  padding: 2px 0;
+  border: 0;
+  background: transparent;
+  color: #2563eb;
+  font-size: 0.82rem;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.netdisk-access-modal__field button:hover {
+  color: #1d4ed8;
+  text-decoration: underline;
+}
+
+.netdisk-access-modal__meta {
+  margin: 0;
+  color: #64748b;
+  font-size: 0.84rem;
+  line-height: 1.55;
+}
+
+.netdisk-access-modal__actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.netdisk-access-modal > .success-text,
+.netdisk-access-modal > .error-text {
+  margin: 12px 0 0;
+}
+
+@media (max-width: 600px) {
+  .netdisk-access-mask {
+    align-items: flex-end;
+    padding: 12px;
+  }
+
+  .netdisk-access-modal {
+    width: 100%;
+    max-height: min(86vh, 680px);
+    padding: 22px 18px calc(18px + env(safe-area-inset-bottom));
+    border-radius: 12px 12px 8px 8px;
+  }
+
+  .netdisk-access-modal__field > div,
+  .netdisk-info--ready {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .netdisk-access-modal__field button {
+    align-self: flex-start;
+    min-height: 30px;
+  }
+
+  .netdisk-access-modal__actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
 .delivery-toggle .choice-pill {
   cursor: pointer;
 }
@@ -12723,25 +12877,57 @@ g.studyhub-popup-poster__hotspot:hover > text {
 }
 
 .upload-sidebar__completion {
+  position: relative;
   display: grid;
-  width: 18px;
-  height: 18px;
-  flex: 0 0 18px;
+  width: 22px;
+  height: 22px;
+  flex: 0 0 22px;
   margin-left: auto;
   place-items: center;
   border: 1px solid #cbd5e1;
   border-radius: 50%;
   background: #ffffff;
   color: transparent;
-  font-size: 0.72rem;
+  font-size: 0.82rem;
   font-weight: 900;
   line-height: 1;
+  cursor: help;
 }
 
 .upload-sidebar .me-sidebar__item.is-complete .upload-sidebar__completion {
   border-color: #60a5fa;
   background: #2563eb;
   color: #ffffff;
+}
+
+.upload-sidebar__completion-tooltip {
+  position: absolute;
+  top: calc(100% + 9px);
+  right: -6px;
+  z-index: 30;
+  width: max-content;
+  max-width: 280px;
+  padding: 9px 11px;
+  border: 1px solid #bfdbfe;
+  border-radius: 7px;
+  background: #ffffff;
+  color: #1e3a5f;
+  box-shadow: 0 12px 26px rgba(15, 23, 42, 0.16);
+  font-size: 0.86rem;
+  font-weight: 650;
+  line-height: 1.5;
+  white-space: normal;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform: translateY(-3px);
+  transition: opacity 0.16s ease, transform 0.16s ease, visibility 0.16s ease;
+}
+
+.upload-sidebar__completion:hover .upload-sidebar__completion-tooltip {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
 }
 
 .upload-section-card {

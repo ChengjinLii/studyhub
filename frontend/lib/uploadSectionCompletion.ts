@@ -27,36 +27,61 @@ export interface UploadSectionCompletionInput {
   agreementAccepted: boolean;
 }
 
-export const resolveUploadSectionCompletion = (input: UploadSectionCompletionInput): Record<string, boolean> => {
+export interface UploadSectionStatus {
+  complete: boolean;
+  missing: string[];
+}
+
+const statusFromMissing = (missing: string[]): UploadSectionStatus => ({
+  complete: missing.length === 0,
+  missing,
+});
+
+export const resolveUploadSectionCompletion = (
+  input: UploadSectionCompletionInput
+): Record<string, UploadSectionStatus> => {
   const hasEffectiveTitle = Boolean(input.title.trim()) || (input.isQuickMode && input.hasSelectedFile);
-  const basicComplete =
-    hasEffectiveTitle &&
-    (!input.isExperience || Boolean(input.description.trim())) &&
-    (input.isExperience || parsePriceValue(input.price) !== null);
-  const metaComplete = input.isExperience
-    ? !input.isExperienceCustomTopic || Boolean(input.experienceCustomTag.trim())
-    : Boolean(input.school.trim()) &&
-      Boolean(input.gradeValue.trim()) &&
-      input.courseCategory !== undefined &&
-      (input.courseCategory !== 'MAJOR' || Boolean(input.college.trim()));
+  const basicMissing: string[] = [];
+  if (!hasEffectiveTitle) basicMissing.push('资料标题');
+  if (input.isExperience && !input.description.trim()) basicMissing.push('经验分享内容');
+  if (!input.isExperience && parsePriceValue(input.price) === null) basicMissing.push('有效价格');
+
+  const metaMissing: string[] = [];
+  if (input.isExperience) {
+    if (input.isExperienceCustomTopic && !input.experienceCustomTag.trim()) {
+      metaMissing.push('自定义标签名称');
+    }
+  } else {
+    if (!input.school.trim()) metaMissing.push('学校');
+    if (input.courseCategory === 'MAJOR' && !input.college.trim()) metaMissing.push('学院');
+    if (!input.gradeValue.trim()) metaMissing.push('年级/阶段');
+  }
+
   const requiredPreviewCount = input.isRequestResponse
     ? input.minRequestPreviewImages
     : input.minManualPreviewImages;
-  const previewComplete =
-    input.previewSource === 'AUTO' || input.isEditing || input.manualPreviewCount >= requiredPreviewCount;
-  const deliveryComplete =
-    input.isExperience ||
-    (!input.zipPreparing &&
-      previewComplete &&
-      (input.deliveryMethod === 'NETDISK'
-        ? Boolean(input.netdiskUrl.trim())
-        : input.hasSelectedFile || input.hasExistingFile));
+  const deliveryMissing: string[] = [];
+  if (!input.isExperience) {
+    if (input.zipPreparing) deliveryMissing.push('等待文件打包完成');
+    if (input.deliveryMethod === 'NETDISK' && !input.netdiskUrl.trim()) {
+      deliveryMissing.push('网盘链接');
+    }
+    if (input.deliveryMethod === 'FILE' && !input.hasSelectedFile && !input.hasExistingFile) {
+      deliveryMissing.push('资料文件');
+    }
+    if (
+      input.previewSource === 'MANUAL' &&
+      !input.isEditing &&
+      input.manualPreviewCount < requiredPreviewCount
+    ) {
+      deliveryMissing.push(`至少 ${requiredPreviewCount} 张预览图`);
+    }
+  }
 
   return {
-    'upload-overview': true,
-    'upload-basic': basicComplete,
-    'upload-meta': metaComplete,
-    'upload-delivery': deliveryComplete,
-    'upload-confirm': input.agreementAccepted,
+    'upload-basic': statusFromMissing(basicMissing),
+    'upload-meta': statusFromMissing(metaMissing),
+    'upload-delivery': statusFromMissing(deliveryMissing),
+    'upload-confirm': statusFromMissing(input.agreementAccepted ? [] : ['同意平台协议']),
   };
 };

@@ -92,7 +92,6 @@ const MIN_MANUAL_PREVIEW_IMAGES = 1;
 const MIN_REQUEST_PREVIEW_IMAGES = 2;
 const QUICK_UPLOAD_OPTIONS: string[] = [];
 const UPLOAD_NAV_ITEMS = [
-  { id: 'upload-overview', label: '页面总览' },
   { id: 'upload-basic', label: '基础信息' },
   { id: 'upload-meta', label: '课程与标签' },
   { id: 'upload-delivery', label: '交付与预览' },

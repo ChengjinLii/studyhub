@@ -33,11 +33,10 @@ const completeInput: UploadSectionCompletionInput = {
 describe('resolveUploadSectionCompletion', () => {
   it('marks all required material sections complete', () => {
     expect(resolveUploadSectionCompletion(completeInput)).toEqual({
-      'upload-overview': true,
-      'upload-basic': true,
-      'upload-meta': true,
-      'upload-delivery': true,
-      'upload-confirm': true,
+      'upload-basic': { complete: true, missing: [] },
+      'upload-meta': { complete: true, missing: [] },
+      'upload-delivery': { complete: true, missing: [] },
+      'upload-confirm': { complete: true, missing: [] },
     });
   });
 
@@ -50,10 +49,10 @@ describe('resolveUploadSectionCompletion', () => {
       agreementAccepted: false,
     });
 
-    expect(result['upload-basic']).toBe(false);
-    expect(result['upload-meta']).toBe(false);
-    expect(result['upload-delivery']).toBe(false);
-    expect(result['upload-confirm']).toBe(false);
+    expect(result['upload-basic']).toEqual({ complete: false, missing: ['资料标题'] });
+    expect(result['upload-meta']).toEqual({ complete: false, missing: ['学院'] });
+    expect(result['upload-delivery']).toEqual({ complete: false, missing: ['资料文件'] });
+    expect(result['upload-confirm']).toEqual({ complete: false, missing: ['同意平台协议'] });
   });
 
   it('requires experience content and a selected custom topic name', () => {
@@ -66,9 +65,9 @@ describe('resolveUploadSectionCompletion', () => {
       hasSelectedFile: false,
     });
 
-    expect(result['upload-basic']).toBe(false);
-    expect(result['upload-meta']).toBe(false);
-    expect(result['upload-delivery']).toBe(true);
+    expect(result['upload-basic']).toEqual({ complete: false, missing: ['经验分享内容'] });
+    expect(result['upload-meta']).toEqual({ complete: false, missing: ['自定义标签名称'] });
+    expect(result['upload-delivery']).toEqual({ complete: true, missing: [] });
   });
 
   it('requires the configured number of manual preview images for a new submission', () => {
@@ -83,7 +82,7 @@ describe('resolveUploadSectionCompletion', () => {
       manualPreviewCount: 1,
     });
 
-    expect(incomplete['upload-delivery']).toBe(false);
-    expect(complete['upload-delivery']).toBe(true);
+    expect(incomplete['upload-delivery']).toEqual({ complete: false, missing: ['至少 1 张预览图'] });
+    expect(complete['upload-delivery']).toEqual({ complete: true, missing: [] });
   });
 });

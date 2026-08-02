@@ -43,6 +43,7 @@ export const useMaterialActions = ({
   const [downloading, setDownloading] = useState(false);
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
   const [showNetdiskLink, setShowNetdiskLink] = useState(false);
+  const [netdiskModalOpen, setNetdiskModalOpen] = useState(false);
   const [myRating, setMyRating] = useState<number | null>(material?.myRating ?? null);
   const [ratingAvg, setRatingAvg] = useState(material?.ratingAvg ?? 0);
   const [ratingCount, setRatingCount] = useState(material?.ratingCount ?? 0);
@@ -56,6 +57,9 @@ export const useMaterialActions = ({
     setMyRating(material?.myRating ?? null);
     setRatingAvg(material?.ratingAvg ?? 0);
     setRatingCount(material?.ratingCount ?? 0);
+    setDownloadUrl(null);
+    setShowNetdiskLink(false);
+    setNetdiskModalOpen(false);
   }, [material, canManage]);
 
   useEffect(() => {
@@ -99,6 +103,10 @@ export const useMaterialActions = ({
       setError('请先完成支付后再下载。');
       return;
     }
+    if (material.hasNetdisk && showNetdiskLink && downloadUrl) {
+      setNetdiskModalOpen(true);
+      return;
+    }
     setDownloading(true);
     setError('');
     setInfo('');
@@ -119,6 +127,7 @@ export const useMaterialActions = ({
         setInfo('下载链接已生成，请记得尊重知识创作者的辛勤付出，不要外传或用于商业用途哦~');
       } else if (material.hasNetdisk) {
         setShowNetdiskLink(true);
+        setNetdiskModalOpen(true);
         setInfo('下载链接已生成，请记得尊重知识创作者的辛勤付出，不要外传或用于商业用途哦~');
       }
     } catch (err: unknown) {
@@ -132,7 +141,7 @@ export const useMaterialActions = ({
     } finally {
       setDownloading(false);
     }
-  }, [dialog, ensureLoggedIn, material, purchased]);
+  }, [dialog, downloadUrl, ensureLoggedIn, material, purchased, showNetdiskLink]);
 
   const handlePurchase = useCallback(async () => {
     if (!material) return;
@@ -265,6 +274,8 @@ export const useMaterialActions = ({
     downloading,
     downloadUrl,
     showNetdiskLink,
+    netdiskModalOpen,
+    setNetdiskModalOpen,
     myRating,
     ratingAvg,
     ratingCount,

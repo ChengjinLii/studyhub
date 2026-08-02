@@ -1,3 +1,5 @@
+import { UploadSectionStatus } from '../../lib/uploadSectionCompletion';
+
 interface UploadNavigationItem {
   id: string;
   label: string;
@@ -6,7 +8,7 @@ interface UploadNavigationItem {
 interface UploadProgressSidebarProps {
   items: UploadNavigationItem[];
   activeSection: string;
-  completion: Record<string, boolean>;
+  completion: Record<string, UploadSectionStatus>;
   onJump: (sectionId: string) => void;
 }
 
@@ -23,13 +25,18 @@ export default function UploadProgressSidebar({
         <div className="me-sidebar__label">页面导航</div>
         <nav className="me-sidebar__items" aria-label="投稿页面导航">
           {items.map((item, index) => {
-            const complete = Boolean(completion[item.id]);
+            const status = completion[item.id] || { complete: false, missing: [] };
+            const statusText = status.complete
+              ? `${item.label}已完成`
+              : status.missing.length > 0
+                ? `还需填写：${status.missing.join('、')}`
+                : `${item.label}待完善`;
             return (
               <a
                 key={item.id}
                 href={`#${item.id}`}
                 className={`me-sidebar__item${activeSection === item.id ? ' active' : ''}${
-                  complete ? ' is-complete' : ''
+                  status.complete ? ' is-complete' : ''
                 }`}
                 aria-current={activeSection === item.id ? 'location' : undefined}
                 onClick={(event) => {
@@ -43,10 +50,12 @@ export default function UploadProgressSidebar({
                 <span
                   className="upload-sidebar__completion"
                   role="img"
-                  aria-label={complete ? `${item.label}已完成` : `${item.label}待完善`}
-                  title={complete ? '该部分已完成' : '该部分还有必填项'}
+                  aria-label={statusText}
                 >
-                  {complete ? '✓' : ''}
+                  {status.complete ? '✓' : ''}
+                  <span className="upload-sidebar__completion-tooltip" role="tooltip">
+                    {statusText}
+                  </span>
                 </span>
               </a>
             );
