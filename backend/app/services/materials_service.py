@@ -125,7 +125,18 @@ class MaterialsService(MaterialsStorageMutationMixin, MaterialsCompatMixin):
             if self._matches_material(material, search_query, school, college, major, tag, grade_value, course_category, price)
         ]
 
-        if (sort or "").lower() == "price":
+        normalized_sort = (sort or "latest").strip().lower()
+        if normalized_sort == "newest":
+            items.sort(key=lambda material: (-self._material_created_ts(material), -int(material.id or 0)))
+        elif normalized_sort == "downloads":
+            items.sort(
+                key=lambda material: (
+                    -int(material.download_count or 0),
+                    -self._material_created_ts(material),
+                    -int(material.id or 0),
+                )
+            )
+        elif normalized_sort == "price":
             items.sort(key=lambda material: (material.price, -self._material_created_ts(material)))
         elif search_query.has_terms:
             items.sort(

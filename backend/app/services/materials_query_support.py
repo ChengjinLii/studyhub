@@ -65,6 +65,22 @@ def compat_sort_material_rows(
 ) -> list[dict[str, Any]]:
     ordered = list(rows)
     normalized_sort = (sort or "latest").strip().lower()
+    if normalized_sort == "newest":
+        ordered.sort(
+            key=lambda row: (compat_timestamp(row["created_at"]), compat_as_int(row["id"])),
+            reverse=True,
+        )
+        return ordered
+    if normalized_sort == "downloads":
+        ordered.sort(
+            key=lambda row: (
+                compat_as_int(row["download_count"]),
+                compat_timestamp(row["created_at"]),
+                compat_as_int(row["id"]),
+            ),
+            reverse=True,
+        )
+        return ordered
     if normalized_sort == "price":
         ordered.sort(
             key=lambda row: (compat_as_int(row["price"]), compat_timestamp(row["created_at"])),
@@ -163,6 +179,10 @@ def compat_material_order_clause(
     keyword: str | None = None,
 ) -> tuple[str, dict[str, Any], str]:
     normalized_sort = (sort or "latest").strip().lower()
+    if normalized_sort == "newest":
+        return "m.created_at DESC, m.id DESC", {}, "0"
+    if normalized_sort == "downloads":
+        return "COALESCE(m.download_count, 0) DESC, m.created_at DESC, m.id DESC", {}, "0"
     if normalized_sort == "price":
         return "COALESCE(m.price, 0) DESC, m.created_at DESC, m.id DESC", {}, "0"
     if normalized_sort == "sales":

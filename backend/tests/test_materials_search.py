@@ -3,7 +3,11 @@ from __future__ import annotations
 import json
 
 from app.models.materials import MaterialRecord
-from app.services.materials_query_support import compat_material_filter_parts, compat_material_order_clause
+from app.services.materials_query_support import (
+    compat_material_filter_parts,
+    compat_material_order_clause,
+    compat_sort_material_rows,
+)
 from app.services.materials_search import (
     SYNONYM_FILE_ENV,
     clear_material_search_cache,
@@ -144,3 +148,27 @@ def test_compat_order_clause_adds_keyword_score_for_default_sort(monkeypatch, tm
     assert "keyword_score_0_1" in score_sql
     assert "keyword_score_1_0" in score_sql
     assert params["keyword_score_0_0"] == "%概率论%"
+
+
+def test_explicit_material_sort_orders_are_stable_across_database_paths() -> None:
+    newest_sql, newest_params, newest_score = compat_material_order_clause(
+        sort="newest", profile={"school": "电子科技大学"}, keyword="概率论"
+    )
+    downloads_sql, downloads_params, downloads_score = compat_material_order_clause(
+        sort="downloads", profile={"school": "电子科技大学"}, keyword="概率论"
+    )
+
+    assert newest_sql == "m.created_at DESC, m.id DESC"
+    assert newest_params == {}
+    assert newest_score == "0"
+    assert downloads_sql.startswith("COALESCE(m.download_count, 0) DESC")
+    assert downloads_params == {}
+    assert downloads_score == "0"
+
+    rows = [
+        {"id": 1, "download_count": 5, "created_at": "2026-01-03T00:00:00Z"},
+        {"id": 2, "download_count": 20, "created_at": "2026-01-01T00:00:00Z"},
+        {"id": 3, "download_count": 5, "created_at": "2026-01-04T00:00:00Z"},
+    ]
+    assert [row["id"] for row in compat_sort_material_rows(rows, sort="newest", profile=None)] == [3, 1, 2]
+    assert [row["id"] for row in compat_sort_material_rows(rows, sort="downloads", profile=None)] == [2, 3, 1]

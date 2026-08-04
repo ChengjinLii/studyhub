@@ -6543,6 +6543,32 @@ g.studyhub-popup-poster__hotspot:hover > text {
   margin-right: auto;
 }
 
+.material-sort-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: #475569;
+  font-size: 0.8rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.material-sort-control select {
+  min-width: 210px;
+  min-height: 40px;
+  border-color: #cbd5e1;
+  border-radius: 8px;
+  background-color: #ffffff;
+  color: #0f172a;
+  font-size: 0.86rem;
+  font-weight: 650;
+}
+
+.material-sort-control select:focus {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+}
+
 .materials-pagination {
   display: flex;
   flex-direction: column;
@@ -15316,7 +15342,7 @@ g.studyhub-popup-poster__hotspot:hover > text {
 
   .mobile-library-list__header {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) 118px;
+    grid-template-columns: minmax(0, 1fr) minmax(142px, 52%);
     gap: 12px;
     align-items: center;
   }
@@ -15328,10 +15354,26 @@ g.studyhub-popup-poster__hotspot:hover > text {
   }
 
   .mobile-library-list__header select {
+    width: 100%;
+    min-width: 0;
     min-height: 40px;
     height: 40px;
     border-radius: 12px;
     font-size: 0.88rem;
+  }
+
+  .mobile-library-list__header .material-sort-control {
+    display: block;
+    min-width: 0;
+  }
+
+  .mobile-library-list__header .material-sort-control > span {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
   }
 
   .mobile-load-more {

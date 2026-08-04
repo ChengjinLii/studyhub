@@ -7,6 +7,7 @@ import Link from 'next/link';
 import NavBar from '../components/NavBar';
 import AppImage from '../components/AppImage';
 import MaterialIconSprite from '../components/MaterialIconSprite';
+import MaterialSortSelect from '../components/materials/MaterialSortSelect';
 import PaginationBar from '../components/PaginationBar';
 import { MaterialListItem, PaginationMeta } from '../types/material';
 import { SessionUser, RoleMask } from '../types/user';
@@ -38,6 +39,7 @@ import {
   GRADE_STAGE_OPTIONS,
 } from '../constants/metadata';
 import { getTierLabel } from '../constants/request';
+import { normalizeMaterialSort } from '../constants/materialSort';
 import { ContributorRank, LeaderboardPeriod } from '../types/contributor';
 import { MaterialRequestItem } from '../types/request';
 
@@ -253,14 +255,12 @@ export default function Home({
   const gradeStageOptions = GRADE_STAGE_OPTIONS;
   const hasAdvancedFilters = useMemo(() => {
     const priceActive = filtersState.price && filtersState.price !== 'all';
-    const sortActive = filtersState.sort && filtersState.sort !== 'latest';
     return Boolean(
       filtersState.school ||
         filtersState.college ||
         filtersState.tag ||
         filtersState.courseCategory ||
-        priceActive ||
-        sortActive
+        priceActive
     );
   }, [
     filtersState.school,
@@ -268,7 +268,6 @@ export default function Home({
     filtersState.tag,
     filtersState.courseCategory,
     filtersState.price,
-    filtersState.sort,
   ]);
   const [isMobile, setIsMobile] = useState(false);
   const [reduceMotion, setReduceMotion] = useState(false);
@@ -658,6 +657,15 @@ export default function Home({
     await applyFilters(nextFilters, { scrollTarget: 'materials' });
   };
 
+  const handleMaterialSortChange = async (sort: string) => {
+    const nextFilters = {
+      ...filtersState,
+      sort: normalizeMaterialSort(sort),
+      page: '1',
+    };
+    await applyFilters(nextFilters, { scrollTarget: 'materials' });
+  };
+
   const handleMobileSearchSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const keyword = mobileSearch.trim();
@@ -790,6 +798,11 @@ export default function Home({
                 <p className="help-text">
                   当前第 {pageMeta.page} / {totalPages} 页 · 每页 {pageSize} 条 · 共 {pageMeta.total} 条结果
                 </p>
+                <MaterialSortSelect
+                  value={filtersState.sort}
+                  disabled={loadingPage}
+                  onChange={(value) => void handleMaterialSortChange(value)}
+                />
                 <div className="view-toggle" role="group" aria-label="列表视图切换">
                   <button
                     type="button"
@@ -952,7 +965,7 @@ export const getServerSideProps: GetServerSideProps<HomeProps> = async (ctx) => 
     gradeValue: sanitizeMetadataChoice(sanitizeFilter(ctx.query.gradeValue), GRADE_STAGE_OPTIONS),
     courseCategory: sanitizeCourseCategory(sanitizeFilter(ctx.query.courseCategory)),
     price: sanitizeFilter(ctx.query.price),
-    sort: sanitizeFilter(ctx.query.sort) || 'latest',
+    sort: normalizeMaterialSort(sanitizeFilter(ctx.query.sort)),
     page: sanitizeFilter(ctx.query.page) || '1',
     size: String(MATERIALS_PAGE_SIZE),
   };

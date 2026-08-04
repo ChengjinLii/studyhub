@@ -77,7 +77,7 @@ export default function HomeFilterCard({
               {showAdvanced ? '收起高级筛选' : '更多筛选'}
             </button>
             <button className="button primary" type="submit">
-              应用筛选
+              搜索
             </button>
           </div>
         </div>
@@ -185,20 +185,6 @@ export default function HomeFilterCard({
                       付费
                     </label>
                   </div>
-                </div>
-                <div className="form-item sort-group" style={{ margin: 0 }}>
-                  <label htmlFor="sort">排序</label>
-                  <select
-                    id="sort"
-                    name="sort"
-                    value={filtersState.sort || 'latest'}
-                    onChange={(event) => onFilterChange('sort', event.target.value)}
-                    style={{ minWidth: 160 }}
-                  >
-                    <option value="latest">默认（综合）</option>
-                    <option value="price">价格</option>
-                    <option value="sales">销量</option>
-                  </select>
                 </div>
               </div>
               <div style={{ display: 'flex', justifyContent: 'flex-end' }}>

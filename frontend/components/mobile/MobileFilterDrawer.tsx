@@ -5,6 +5,7 @@ import {
   SUPPORTED_MAJORS,
   SUPPORTED_SCHOOL,
 } from '../../constants/metadata';
+import { MATERIAL_SORT_OPTIONS } from '../../constants/materialSort';
 
 export interface MobileMaterialFilterState {
   keyword: string;
@@ -139,9 +140,9 @@ export default function MobileFilterDrawer({
           <label className="form-item">
             <span>排序</span>
             <select value={filters.sort || 'latest'} onChange={(event) => onChange('sort', event.target.value)}>
-              <option value="latest">默认（综合）</option>
-              <option value="price">价格</option>
-              <option value="sales">销量</option>
+              {MATERIAL_SORT_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
             </select>
           </label>
         </div>
@@ -150,7 +151,7 @@ export default function MobileFilterDrawer({
             重置
           </button>
           <button type="button" className="button primary" onClick={onApply}>
-            应用筛选
+            搜索
           </button>
         </div>
       </section>
