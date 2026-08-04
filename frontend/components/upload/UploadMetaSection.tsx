@@ -156,6 +156,10 @@ export default function UploadMetaSection({
             <div className="form-item full">
               <div className="upload-quick-summary">
                 <div className="upload-quick-summary__item">
+                  <span className="upload-quick-summary__label">课程类型</span>
+                  <strong className="upload-quick-summary__value">{quickProfile.courseCategoryLabel}</strong>
+                </div>
+                <div className="upload-quick-summary__item">
                   <span className="upload-quick-summary__label">学校</span>
                   <strong className="upload-quick-summary__value">{quickProfile.school}</strong>
                 </div>
@@ -171,15 +175,27 @@ export default function UploadMetaSection({
                   <span className="upload-quick-summary__label">专业</span>
                   <strong className="upload-quick-summary__value">{quickProfile.majorDisplay}</strong>
                 </div>
-                <div className="upload-quick-summary__item">
-                  <span className="upload-quick-summary__label">课程类型</span>
-                  <strong className="upload-quick-summary__value">{quickProfile.courseCategoryLabel}</strong>
-                </div>
               </div>
               <p className="help-text">一键投稿会优先使用“我的”里个人主页概览所填的学校、学院、专业与年级信息；未填写的字段将按默认值补齐。</p>
             </div>
           ) : (
             <>
+              <div className="form-item full">
+                <UploadSectionLabel text="课程类型" selectionHint="请选择 1 项" />
+                <div className="course-type-options upload-course-type-options">
+                  {COURSE_CATEGORY_OPTIONS.map((option) => (
+                    <UploadChoiceCard
+                      key={option.value}
+                      name="courseCategory"
+                      value={option.value}
+                      title={option.label}
+                      description={option.helper}
+                      selected={courseCategory === option.value}
+                      onSelect={() => onCourseCategoryChange(option.value as CourseCategoryValue)}
+                    />
+                  ))}
+                </div>
+              </div>
               <div className="form-item">
                 <UploadSectionLabel htmlFor="school" text="学校" />
                 <select id="school" value={school} onChange={(e) => onSchoolChange(e.target.value)} required>
@@ -231,22 +247,6 @@ export default function UploadMetaSection({
                       </label>
                     );
                   })}
-                </div>
-              </div>
-              <div className="form-item full">
-                <UploadSectionLabel text="课程类型" selectionHint="请选择 1 项" />
-                <div className="course-type-options upload-course-type-options">
-                  {COURSE_CATEGORY_OPTIONS.map((option) => (
-                    <UploadChoiceCard
-                      key={option.value}
-                      name="courseCategory"
-                      value={option.value}
-                      title={option.label}
-                      description={option.helper}
-                      selected={courseCategory === option.value}
-                      onSelect={() => onCourseCategoryChange(option.value as CourseCategoryValue)}
-                    />
-                  ))}
                 </div>
               </div>
               <div className="form-item full">
