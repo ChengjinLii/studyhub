@@ -25,6 +25,9 @@ type AiRecommendation = {
 
 const POS_STORAGE_KEY = 'floating-sidebar-pos';
 const HAT_STORAGE_KEY = 'studyhub-bot-hat';
+const MOBILE_BREAKPOINT = 720;
+const MOBILE_EDGE_GAP = 16;
+const MOBILE_BUBBLE_SIZE = 50;
 const BOT_HAT_IDS = ['santa', 'graduation', 'party', 'wizard', 'none'] as const;
 type BotHat = (typeof BOT_HAT_IDS)[number];
 const BOT_HATS: { id: BotHat; label: string; previewClass: string }[] = [
@@ -69,10 +72,13 @@ export default function FloatingSidebar() {
 
   const getMobileRestingPosition = useCallback(() => {
     if (typeof window === 'undefined') return null;
-    if (window.innerWidth > 720) return null;
+    if (window.innerWidth > MOBILE_BREAKPOINT) return null;
+    const mobileNav = document.querySelector<HTMLElement>('.mobile-bottom-nav');
+    const mobileNavTop = mobileNav?.getBoundingClientRect().top;
+    const availableBottom = mobileNavTop && mobileNavTop > 0 ? mobileNavTop : window.innerHeight - 76;
     return {
-      x: Math.max(16, window.innerWidth - 72),
-      y: Math.max(110, window.innerHeight - 92),
+      x: Math.max(MOBILE_EDGE_GAP, window.innerWidth - MOBILE_BUBBLE_SIZE - MOBILE_EDGE_GAP),
+      y: Math.max(96, availableBottom - MOBILE_BUBBLE_SIZE - MOBILE_EDGE_GAP),
     };
   }, []);
 
@@ -83,7 +89,12 @@ export default function FloatingSidebar() {
     const minX = 16;
     const minY = 96;
     const maxX = Math.max(minX, window.innerWidth - width - 16);
-    const maxY = Math.max(minY, window.innerHeight - height - 16);
+    const mobileNav = window.innerWidth <= MOBILE_BREAKPOINT
+      ? document.querySelector<HTMLElement>('.mobile-bottom-nav')
+      : null;
+    const mobileNavTop = mobileNav?.getBoundingClientRect().top;
+    const availableBottom = mobileNavTop && mobileNavTop > 0 ? mobileNavTop : window.innerHeight;
+    const maxY = Math.max(minY, availableBottom - height - MOBILE_EDGE_GAP);
     return {
       x: Math.min(Math.max(minX, x), maxX),
       y: Math.min(Math.max(minY, y), maxY),
@@ -157,7 +168,13 @@ export default function FloatingSidebar() {
     };
     if (typeof window === 'undefined') return undefined;
     window.addEventListener('resize', handler);
-    return () => window.removeEventListener('resize', handler);
+    window.visualViewport?.addEventListener('resize', handler);
+    window.visualViewport?.addEventListener('scroll', handler);
+    return () => {
+      window.removeEventListener('resize', handler);
+      window.visualViewport?.removeEventListener('resize', handler);
+      window.visualViewport?.removeEventListener('scroll', handler);
+    };
   }, [clampSidebarPosition, getSidebarClampSize]);
 
 

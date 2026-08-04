@@ -249,6 +249,26 @@ test('mock page mode hides StudyHub Agent from non-admin users', async ({ page }
   await expect(page.locator('.hermes-agent__launcher')).toHaveCount(0, { timeout: 3000 });
 });
 
+test('mobile StudyHub Bot stays fully above the bottom navigation', async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 780 });
+  await page.addInitScript(() => window.localStorage.removeItem('floating-sidebar-pos'));
+  await page.goto('/more');
+  await closeEntryModalIfPresent(page);
+
+  const bot = page.locator('.floating-sidebar__bubble');
+  const navigation = page.locator('.mobile-bottom-nav');
+  await expect(bot).toBeVisible();
+  await expect(navigation).toBeVisible();
+
+  const botBox = await bot.boundingBox();
+  const navigationBox = await navigation.boundingBox();
+  expect(botBox).not.toBeNull();
+  expect(navigationBox).not.toBeNull();
+  expect((botBox?.y ?? 0) + (botBox?.height ?? 0)).toBeLessThanOrEqual((navigationBox?.y ?? 0) - 8);
+  expect(botBox?.x ?? -1).toBeGreaterThanOrEqual(0);
+  expect((botBox?.x ?? 0) + (botBox?.width ?? 0)).toBeLessThanOrEqual(320);
+});
+
 test('mock page mode covers more page secondary navigation', async ({ page }) => {
   await page.route('**/api/session', async (route) => {
     await route.fulfill({

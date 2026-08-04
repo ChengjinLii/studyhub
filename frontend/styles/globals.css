@@ -3079,7 +3079,8 @@ main {
     position: fixed;
     left: 14px;
     top: auto;
-    bottom: calc(92px + env(safe-area-inset-bottom));
+    bottom: auto;
+    margin-bottom: 0;
     --hat-scale: 1.5;
     --hat-x: -58%;
     --hat-y: -74%;
@@ -15296,6 +15297,10 @@ g.studyhub-popup-poster__hotspot:hover > text {
     line-height: 1.5;
   }
 
+  .leaderboard-card .help-text + .help-text {
+    display: none;
+  }
+
   .leaderboard-tabs {
     width: 100%;
     justify-content: space-between;
@@ -15323,11 +15328,11 @@ g.studyhub-popup-poster__hotspot:hover > text {
 
   .leaderboard-list li {
     display: grid;
-    grid-template-columns: 34px minmax(0, 1fr);
-    gap: 9px 10px;
+    grid-template-columns: 34px minmax(0, 1fr) auto;
+    gap: 8px 10px;
     align-items: center;
-    padding: 11px;
-    border-radius: 14px;
+    padding: 10px 11px;
+    border-radius: 12px;
     background: #ffffff;
     box-shadow: 0 8px 18px rgba(15, 23, 42, 0.05);
   }
@@ -15349,26 +15354,39 @@ g.studyhub-popup-poster__hotspot:hover > text {
     white-space: nowrap;
   }
 
+  .leaderboard-meta strong .text-button::after {
+    content: '›';
+    margin-left: 4px;
+    color: #2563eb;
+    font-weight: 800;
+  }
+
   .leaderboard-meta span {
     font-size: 0.78rem;
     line-height: 1.35;
   }
 
   .leaderboard-actions {
-    grid-column: 1 / -1;
-    width: 100%;
+    grid-column: 3;
+    width: auto;
     margin-left: 0;
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 8px;
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 5px;
+  }
+
+  .leaderboard-actions .leaderboard-view-action {
+    display: none;
   }
 
   .leaderboard-actions .button {
-    width: 100%;
-    min-height: 34px;
-    border-radius: 12px;
+    width: auto;
+    height: 30px;
+    min-height: 30px;
+    padding: 0 9px;
+    border-radius: 9px;
     justify-content: center;
-    font-size: 0.8rem;
+    font-size: 0.75rem;
   }
 
   .support-card {
@@ -15403,35 +15421,47 @@ g.studyhub-popup-poster__hotspot:hover > text {
     box-sizing: border-box;
     width: 100%;
     min-width: 0;
-    min-height: 176px;
-    padding: 13px;
-    gap: 7px;
-    box-shadow: 0 8px 18px rgba(15, 23, 42, 0.05);
+    min-height: 166px;
+    padding: 12px;
+    gap: 8px;
+    border-color: #dfe7f1;
+    border-radius: 12px;
+    box-shadow: 0 6px 16px rgba(15, 23, 42, 0.055);
     overflow: hidden;
   }
 
-  .mobile-home-resource-grid .material-card__header {
-    display: flex;
-    flex-direction: column;
-    gap: 7px;
+  .materials-list.mobile-home-resource-grid .material-card__header {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: flex-start;
+    gap: 6px;
     min-width: 0;
     max-width: 100%;
   }
 
-  .mobile-home-resource-grid .material-card__header .price-tag {
-    align-self: flex-start;
+  .materials-list.mobile-home-resource-grid .material-card__header > div {
+    min-width: 0;
+  }
+
+  .materials-list.mobile-home-resource-grid .material-card__header .price-tag {
+    align-self: start;
+    justify-self: end;
     max-width: 100%;
-    font-size: 0.78rem;
+    font-size: 0.74rem;
     white-space: normal;
     overflow-wrap: anywhere;
   }
 
-  .mobile-home-resource-grid .material-card__header h3 {
-    font-size: 0.9rem;
-    line-height: 1.28;
+  .materials-list.mobile-home-resource-grid .material-card__header h3 {
+    display: -webkit-box;
+    margin-bottom: 6px;
+    font-size: 0.88rem;
+    line-height: 1.3;
     max-width: 100%;
+    overflow: hidden;
     overflow-wrap: anywhere;
     word-break: break-word;
+    -webkit-box-orient: vertical;
     -webkit-line-clamp: 2;
   }
 
@@ -15457,14 +15487,36 @@ g.studyhub-popup-poster__hotspot:hover > text {
     display: none;
   }
 
-  .mobile-home-resource-grid .material-stats__actions {
+  .materials-list.mobile-home-resource-grid .material-stats__actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: nowrap;
+    width: 100%;
     margin-top: auto;
-    gap: 7px;
+    padding-top: 8px;
+    gap: 2px;
+    border-top: 1px solid #e8edf4;
     font-size: 0.72rem;
   }
 
-  .mobile-home-resource-grid .material-emoji {
-    min-width: 0;
+  .materials-list.mobile-home-resource-grid .material-emoji {
+    min-width: max-content;
+    flex: 0 0 auto;
+    padding: 0;
+    justify-content: center;
+    gap: 2px;
+    border-radius: 0;
+    background: transparent;
+    color: #64748b;
+    font-size: 0.66rem;
+    line-height: 1;
+    white-space: nowrap;
+  }
+
+  .materials-list.mobile-home-resource-grid .material-emoji .material-icon {
+    width: 12px;
+    height: 12px;
   }
 
   .mobile-resource-list .material-card__header {
