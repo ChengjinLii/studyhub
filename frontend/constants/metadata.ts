@@ -13,6 +13,7 @@ export const COURSE_CATEGORY_OPTIONS = [
 ] as const;
 
 export type CourseCategoryValue = (typeof COURSE_CATEGORY_OPTIONS)[number]['value'];
+export type CourseCategorySelection = CourseCategoryValue | '';
 
 export const COURSE_CATEGORY_LABELS: Record<CourseCategoryValue, string> = COURSE_CATEGORY_OPTIONS.reduce(
   (acc, option) => {

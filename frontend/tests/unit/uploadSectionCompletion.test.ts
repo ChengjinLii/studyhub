@@ -70,6 +70,14 @@ describe('resolveUploadSectionCompletion', () => {
     expect(result['upload-delivery']).toEqual({ complete: true, missing: [] });
   });
 
+  it('keeps standard and quick upload metadata incomplete until a course category is selected', () => {
+    const standard = resolveUploadSectionCompletion({ ...completeInput, courseCategory: '' });
+    const quick = resolveUploadSectionCompletion({ ...completeInput, isQuickMode: true, courseCategory: '' });
+
+    expect(standard['upload-meta']).toEqual({ complete: false, missing: ['课程类型'] });
+    expect(quick['upload-meta']).toEqual({ complete: false, missing: ['课程类型'] });
+  });
+
   it('requires the configured number of manual preview images for a new submission', () => {
     const incomplete = resolveUploadSectionCompletion({
       ...completeInput,

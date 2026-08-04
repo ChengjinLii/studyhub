@@ -1,6 +1,13 @@
 import Link from 'next/link';
 import { Dispatch, SetStateAction } from 'react';
-import { COURSE_CATEGORY_OPTIONS, CourseCategoryValue, SUPPORTED_COLLEGES, SUPPORTED_MAJORS, SUPPORTED_SCHOOL } from '../../constants/metadata';
+import {
+  COURSE_CATEGORY_OPTIONS,
+  CourseCategorySelection,
+  CourseCategoryValue,
+  SUPPORTED_COLLEGES,
+  SUPPORTED_MAJORS,
+  SUPPORTED_SCHOOL,
+} from '../../constants/metadata';
 import { ColumnTopicKey } from '../../lib/column';
 import UploadChoiceCard from './UploadChoiceCard';
 import UploadSectionLabel from './UploadSectionLabel';
@@ -10,7 +17,6 @@ interface QuickProfile {
   college: string;
   majorDisplay: string;
   gradeValue: string;
-  courseCategoryLabel: string;
 }
 
 interface UploadMetaSectionProps {
@@ -25,7 +31,7 @@ interface UploadMetaSectionProps {
   gradeValue: string;
   gradeStageOptions: readonly string[];
   selectedMajors: string[];
-  courseCategory: CourseCategoryValue;
+  courseCategory: CourseCategorySelection;
   selectedTags: string[];
   customTags: string;
   yearTag: string;
@@ -99,6 +105,24 @@ export default function UploadMetaSection({
       </div>
       <section className="card upload-main-card upload-section-card">
         <div className="form-grid upload-section-grid">
+          {!isExperience && (
+            <div className="form-item full">
+              <UploadSectionLabel text="课程类型" selectionHint="必选 · 请选择 1 项" />
+              <div className="course-type-options upload-course-type-options">
+                {COURSE_CATEGORY_OPTIONS.map((option) => (
+                  <UploadChoiceCard
+                    key={option.value}
+                    name="courseCategory"
+                    value={option.value}
+                    title={option.label}
+                    description={option.helper}
+                    selected={courseCategory === option.value}
+                    onSelect={() => onCourseCategoryChange(option.value)}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
           {isExperience ? (
             <div className="form-item full">
               <div className="upload-meta-empty">
@@ -156,10 +180,6 @@ export default function UploadMetaSection({
             <div className="form-item full">
               <div className="upload-quick-summary">
                 <div className="upload-quick-summary__item">
-                  <span className="upload-quick-summary__label">课程类型</span>
-                  <strong className="upload-quick-summary__value">{quickProfile.courseCategoryLabel}</strong>
-                </div>
-                <div className="upload-quick-summary__item">
                   <span className="upload-quick-summary__label">学校</span>
                   <strong className="upload-quick-summary__value">{quickProfile.school}</strong>
                 </div>
@@ -180,22 +200,6 @@ export default function UploadMetaSection({
             </div>
           ) : (
             <>
-              <div className="form-item full">
-                <UploadSectionLabel text="课程类型" selectionHint="请选择 1 项" />
-                <div className="course-type-options upload-course-type-options">
-                  {COURSE_CATEGORY_OPTIONS.map((option) => (
-                    <UploadChoiceCard
-                      key={option.value}
-                      name="courseCategory"
-                      value={option.value}
-                      title={option.label}
-                      description={option.helper}
-                      selected={courseCategory === option.value}
-                      onSelect={() => onCourseCategoryChange(option.value as CourseCategoryValue)}
-                    />
-                  ))}
-                </div>
-              </div>
               <div className="form-item">
                 <UploadSectionLabel htmlFor="school" text="学校" />
                 <select id="school" value={school} onChange={(e) => onSchoolChange(e.target.value)} required>

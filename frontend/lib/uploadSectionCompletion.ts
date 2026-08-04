@@ -1,4 +1,4 @@
-import { CourseCategoryValue } from '../constants/metadata';
+import { CourseCategorySelection } from '../constants/metadata';
 import { parsePriceValue } from './uploadValidation';
 
 export interface UploadSectionCompletionInput {
@@ -12,7 +12,7 @@ export interface UploadSectionCompletionInput {
   school: string;
   college: string;
   gradeValue: string;
-  courseCategory: CourseCategoryValue;
+  courseCategory: CourseCategorySelection;
   deliveryMethod: 'FILE' | 'NETDISK';
   hasSelectedFile: boolean;
   hasExistingFile: boolean;
@@ -52,6 +52,7 @@ export const resolveUploadSectionCompletion = (
       metaMissing.push('自定义标签名称');
     }
   } else {
+    if (!input.courseCategory) metaMissing.push('课程类型');
     if (!input.school.trim()) metaMissing.push('学校');
     if (input.courseCategory === 'MAJOR' && !input.college.trim()) metaMissing.push('学院');
     if (!input.gradeValue.trim()) metaMissing.push('年级/阶段');

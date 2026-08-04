@@ -19,6 +19,7 @@ import { UserAccountProfile } from '../types/userProfile';
 import {
   SUPPORTED_SCHOOL,
   defaultCollege,
+  CourseCategorySelection,
   CourseCategoryValue,
   GRADE_STAGE_OPTIONS,
 } from '../constants/metadata';
@@ -106,31 +107,17 @@ interface UploadPageProps {
 }
 
 const resolveMaterialProfilePrefill = (account: UserAccountProfile | null) => {
-  const accountSchool = account?.school?.trim();
   const accountCollege = account?.college?.trim();
   const accountMajor = account?.major?.trim();
   const accountGrades = Array.isArray(account?.gradeStages) ? account.gradeStages.filter(Boolean) : [];
   const matchedGrade =
     accountGrades.find((stage) => GRADE_STAGE_OPTIONS.includes(stage as (typeof GRADE_STAGE_OPTIONS)[number])) || '';
   const resolvedMajors = accountMajor ? parseMajorList(accountMajor) : [];
-  const hasProfileContext = Boolean(accountSchool || accountCollege || accountMajor || matchedGrade);
-  if (!hasProfileContext) {
-    return {
-      school: SUPPORTED_SCHOOL,
-      college: defaultCollege,
-      majors: [] as string[],
-      gradeValue: GRADE_STAGE_OPTIONS[0],
-      courseCategory: 'MAJOR' as CourseCategoryValue,
-    };
-  }
-  const resolvedCourseCategory: CourseCategoryValue =
-    accountCollege || resolvedMajors.length > 0 ? 'MAJOR' : 'GENERAL';
   return {
     school: SUPPORTED_SCHOOL,
-    college: resolvedCourseCategory === 'MAJOR' ? accountCollege || defaultCollege : '',
-    majors: resolvedCourseCategory === 'MAJOR' ? resolvedMajors : [],
+    college: accountCollege || defaultCollege,
+    majors: resolvedMajors,
     gradeValue: matchedGrade || GRADE_STAGE_OPTIONS[0],
-    courseCategory: resolvedCourseCategory,
   };
 };
 
@@ -151,7 +138,7 @@ export default function UploadPage({ user, token, account }: UploadPageProps) {
   const [policyModalOpen, setPolicyModalOpen] = useState(false);
   const gradeStageOptions = GRADE_STAGE_OPTIONS;
   const [gradeValue, setGradeValue] = useState<string>(materialProfilePrefill.gradeValue);
-  const [courseCategory, setCourseCategory] = useState<CourseCategoryValue>(materialProfilePrefill.courseCategory);
+  const [courseCategory, setCourseCategory] = useState<CourseCategorySelection>('');
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [customTags, setCustomTags] = useState('');
   const [yearTag, setYearTag] = useState('');
@@ -275,16 +262,12 @@ export default function UploadPage({ user, token, account }: UploadPageProps) {
     const resolvedCollege = accountCollege || defaultCollege;
     const resolvedMajors = accountMajor ? parseMajorList(accountMajor) : [];
     const resolvedGradeValue = matchedGrade || gradeStageOptions[0];
-    const resolvedCourseCategory: CourseCategoryValue =
-      accountCollege || resolvedMajors.length > 0 ? 'MAJOR' : 'GENERAL';
     return {
       school: resolvedSchool,
       college: resolvedCollege,
       majors: resolvedMajors,
       majorDisplay: accountMajor || '未填写',
       gradeValue: resolvedGradeValue,
-      courseCategory: resolvedCourseCategory,
-      courseCategoryLabel: resolvedCourseCategory === 'MAJOR' ? '专业课' : '通识课',
     };
   }, [account, gradeStageOptions]);
   const sectionCompletion = resolveUploadSectionCompletion({
@@ -292,7 +275,7 @@ export default function UploadPage({ user, token, account }: UploadPageProps) {
     school: isQuickMode ? quickProfile.school : school,
     college: isQuickMode ? quickProfile.college : college,
     gradeValue: isQuickMode ? quickProfile.gradeValue : gradeValue,
-    courseCategory: isQuickMode ? quickProfile.courseCategory : courseCategory,
+    courseCategory,
     deliveryMethod, hasSelectedFile: Boolean(zipFile), hasExistingFile, zipPreparing, netdiskUrl,
     previewSource: isRequestResponse ? PREVIEW_SOURCE_MANUAL : previewSource,
     isRequestResponse, isEditing, manualPreviewCount: manualPreviewFiles.length,
@@ -346,6 +329,7 @@ export default function UploadPage({ user, token, account }: UploadPageProps) {
   }, []);
 
   useEffect(() => {
+    if (!courseCategory) return;
     if (courseCategory === 'MAJOR') {
       setCollege((prev) => (prev ? prev : defaultCollege));
       setSelectedMajors((prev) => (prev.length > 0 ? prev : []));
@@ -413,7 +397,6 @@ export default function UploadPage({ user, token, account }: UploadPageProps) {
 
   useEffect(() => {
     if (isEditing || !isExperience) return;
-    setCourseCategory('GENERAL');
     setCollege('');
     setSelectedMajors([]);
     setSelectedTags([]);
@@ -563,7 +546,7 @@ export default function UploadPage({ user, token, account }: UploadPageProps) {
       MAX_TITLE_LENGTH
     );
     const effectiveGradeValue = isQuickMode ? quickProfile.gradeValue || fallbackGradeValue : gradeValue;
-    const effectiveCourseCategory = isQuickMode ? quickProfile.courseCategory : courseCategory;
+    const effectiveCourseCategory: CourseCategorySelection = isExperience ? 'GENERAL' : courseCategory;
     const effectiveCollege = effectiveCourseCategory === 'MAJOR' ? (isQuickMode ? quickProfile.college : college) : '';
     const effectiveMajors = effectiveCourseCategory === 'MAJOR' ? (isQuickMode ? quickProfile.majors : selectedMajors) : [];
     const effectiveTagList = isQuickMode ? [] : tagList;
@@ -601,6 +584,7 @@ export default function UploadPage({ user, token, account }: UploadPageProps) {
       descriptionLimit,
       copyrightOwner,
       price,
+      courseCategory: effectiveCourseCategory,
       limits: {
         maxTitleLength: MAX_TITLE_LENGTH,
         maxDescLength: MAX_DESC_LENGTH,
@@ -617,6 +601,11 @@ export default function UploadPage({ user, token, account }: UploadPageProps) {
       setStatus({ type: 'error', message: validation.error });
       return;
     }
+    if (!effectiveCourseCategory) {
+      setStatus({ type: 'error', message: '请选择课程类型。' });
+      return;
+    }
+    const selectedCourseCategory: CourseCategoryValue = effectiveCourseCategory;
     const resolvedPriceValue = validation.priceValue;
     let completed = false;
     let uploadTransferred = false;
@@ -638,7 +627,7 @@ export default function UploadPage({ user, token, account }: UploadPageProps) {
         college: effectiveCollege,
         majors: effectiveMajors,
         gradeValue: effectiveGradeValue,
-        courseCategory: effectiveCourseCategory,
+        courseCategory: selectedCourseCategory,
         tags: effectiveTagList,
         deliveryMethod: resolvedDelivery,
         netdiskUrl: trimmedNetdiskUrl,

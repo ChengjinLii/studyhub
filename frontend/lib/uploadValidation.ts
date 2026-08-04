@@ -1,3 +1,5 @@
+import { CourseCategorySelection } from '../constants/metadata';
+
 export const sanitizePriceInput = (value: string) => value.replace(/[^\d]/g, '');
 
 export const normalizePriceInput = (value: string) => {
@@ -56,6 +58,7 @@ interface UploadSubmitValidationInput {
   descriptionLimit: number;
   copyrightOwner: string;
   price: string;
+  courseCategory: CourseCategorySelection;
   limits: UploadValidationLimits;
 }
 
@@ -83,6 +86,7 @@ export const validateUploadSubmitInput = ({
   descriptionLimit,
   copyrightOwner,
   price,
+  courseCategory,
   limits,
 }: UploadSubmitValidationInput): { error: string | null; priceValue: number } => {
   if (!token) {
@@ -96,6 +100,9 @@ export const validateUploadSubmitInput = ({
   }
   if (!isExperience && customTags.split(/[,，\s]+/).some((tag) => tag.trim() === '经验分享')) {
     return { error: '“经验分享”标签仅用于经验分享投稿。', priceValue: 0 };
+  }
+  if (!isExperience && !courseCategory) {
+    return { error: '请选择课程类型。', priceValue: 0 };
   }
   if (zipPreparing) {
     return { error: '正在打包文件，请稍后再提交。', priceValue: 0 };

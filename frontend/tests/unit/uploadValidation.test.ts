@@ -42,6 +42,7 @@ const validInput = {
   descriptionLimit: 300,
   copyrightOwner: '',
   price: '0',
+  courseCategory: 'MAJOR' as const,
   limits,
 };
 
@@ -59,6 +60,13 @@ describe('uploadValidation', () => {
   it('requires login before upload submission', () => {
     const result = validateUploadSubmitInput({ ...validInput, token: null });
     expect(result.error).toBe('请先登录后再投稿。');
+  });
+
+  it('requires an explicit course category in standard and quick upload modes', () => {
+    expect(validateUploadSubmitInput({ ...validInput, courseCategory: '' }).error).toBe('请选择课程类型。');
+    expect(validateUploadSubmitInput({ ...validInput, courseCategory: '', isQuickMode: true }).error).toBe(
+      '请选择课程类型。'
+    );
   });
 
   it('rejects manual previews when required images are missing', () => {
