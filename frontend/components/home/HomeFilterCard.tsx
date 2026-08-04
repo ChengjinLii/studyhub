@@ -82,6 +82,15 @@ export default function HomeFilterCard({
           </div>
         </div>
         <div className={`filter-advanced ${showAdvanced ? 'open' : ''}`}>
+          <div className="filter-advanced__header">
+            <div>
+              <strong>高级筛选</strong>
+              <span>按学校、专业和资料属性缩小结果范围</span>
+            </div>
+            <button type="button" className="button ghost small filter-advanced__reset" onClick={onResetFilters}>
+              重置条件
+            </button>
+          </div>
           <div className="advanced-grid">
             <div className="form-item">
               <label htmlFor="school">学校</label>
@@ -146,80 +155,70 @@ export default function HomeFilterCard({
               </select>
               {!availableTagOptions.length && <p className="help-text">暂无热门标签，等待更多投稿。</p>}
             </div>
-            <div
-              className="form-item full price-sort-row"
-              style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', alignItems: 'center', gap: 12 }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
-                <div className="form-item price-group" style={{ margin: 0 }}>
-                  <label>价格</label>
-                  <div className="choice-group">
-                    <label className="choice">
-                      <input
-                        type="radio"
-                        name="price"
-                        value=""
-                        checked={!filtersState.price || filtersState.price === 'all'}
-                        onChange={(event) => onFilterChange('price', event.target.value)}
-                      />
-                      全部
-                    </label>
-                    <label className="choice">
-                      <input
-                        type="radio"
-                        name="price"
-                        value="free"
-                        checked={filtersState.price === 'free'}
-                        onChange={(event) => onFilterChange('price', event.target.value)}
-                      />
-                      免费
-                    </label>
-                    <label className="choice">
-                      <input
-                        type="radio"
-                        name="price"
-                        value="paid"
-                        checked={filtersState.price === 'paid'}
-                        onChange={(event) => onFilterChange('price', event.target.value)}
-                      />
-                      付费
-                    </label>
-                  </div>
-                </div>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                <button type="button" className="button primary" onClick={onResetFilters} style={{ minWidth: 100 }}>
-                  重置筛选
-                </button>
-              </div>
-            </div>
           </div>
-          <div className="form-item full course-type-advanced">
-            <label>课程类型</label>
-            <div className="course-type-options compact">
-              <label className={`choice-pill ${!filtersState.courseCategory ? 'active' : ''}`}>
-                <input
-                  type="radio"
-                  name="courseCategory"
-                  value=""
-                  checked={!filtersState.courseCategory}
-                  onChange={() => onCourseCategoryChange(null)}
-                />
-                全部
-              </label>
-              {COURSE_CATEGORY_OPTIONS.map((option) => (
-                <label key={option.value} className={`choice-pill ${filtersState.courseCategory === option.value ? 'active' : ''}`}>
+          <div className="filter-advanced__choices">
+            <fieldset className="form-item course-type-advanced">
+              <legend>课程类型</legend>
+              <div className="course-type-options compact">
+                <label className={`choice-pill ${!filtersState.courseCategory ? 'active' : ''}`}>
                   <input
                     type="radio"
                     name="courseCategory"
-                    value={option.value}
-                    checked={filtersState.courseCategory === option.value}
-                    onChange={() => onCourseCategoryChange(option.value)}
+                    value=""
+                    checked={!filtersState.courseCategory}
+                    onChange={() => onCourseCategoryChange(null)}
                   />
-                  {option.label}
+                  全部
                 </label>
-              ))}
-            </div>
+                {COURSE_CATEGORY_OPTIONS.map((option) => (
+                  <label key={option.value} className={`choice-pill ${filtersState.courseCategory === option.value ? 'active' : ''}`}>
+                    <input
+                      type="radio"
+                      name="courseCategory"
+                      value={option.value}
+                      checked={filtersState.courseCategory === option.value}
+                      onChange={() => onCourseCategoryChange(option.value)}
+                    />
+                    {option.label}
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+            <fieldset className="form-item price-group">
+              <legend>价格</legend>
+              <div className="choice-group">
+                <label className={`choice-pill price-choice ${!filtersState.price || filtersState.price === 'all' ? 'active' : ''}`}>
+                  <input
+                    type="radio"
+                    name="price"
+                    value=""
+                    checked={!filtersState.price || filtersState.price === 'all'}
+                    onChange={(event) => onFilterChange('price', event.target.value)}
+                  />
+                  全部
+                </label>
+                <label className={`choice-pill price-choice ${filtersState.price === 'free' ? 'active' : ''}`}>
+                  <input
+                    type="radio"
+                    name="price"
+                    value="free"
+                    checked={filtersState.price === 'free'}
+                    onChange={(event) => onFilterChange('price', event.target.value)}
+                  />
+                  免费
+                </label>
+                <label className={`choice-pill price-choice ${filtersState.price === 'paid' ? 'active' : ''}`}>
+                  <input
+                    type="radio"
+                    name="price"
+                    value="paid"
+                    checked={filtersState.price === 'paid'}
+                    onChange={(event) => onFilterChange('price', event.target.value)}
+                  />
+                  付费
+                </label>
+              </div>
+            </fieldset>
           </div>
         </div>
       </form>

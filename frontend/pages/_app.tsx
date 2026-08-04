@@ -56,7 +56,14 @@ type EntryModalVariant = 'stable' | 'welcome' | null;
 function StudyHubEntryPoster() {
   return (
     <div className="studyhub-popup-poster" role="img" aria-label="StudyHub 学汇入口海报">
-      <svg className="studyhub-popup-poster__svg" viewBox="0 0 2048 1152" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg">
+      <svg
+        className="studyhub-popup-poster__svg"
+        viewBox="0 0 2048 1152"
+        preserveAspectRatio="xMidYMid meet"
+        aria-hidden="true"
+        focusable="false"
+        xmlns="http://www.w3.org/2000/svg"
+      >
         <defs>
           <clipPath id="studyhub-popup-poster-band">
             <polygon points="0,535 2048,137 2048,660 0,1056" />
@@ -76,12 +83,24 @@ function StudyHubEntryPoster() {
         <circle cx="498" cy="208" r="21" fill="#62cd68" />
         <g className="studyhub-popup-poster__hotspot">
           <rect className="studyhub-popup-poster__hotspot-bg" x="590" y="150" width="865" height="104" rx="28" />
-          <text className="studyhub-popup-poster__url" x="1023" y="232" textAnchor="middle">https://study-hub.cn</text>
+          <text
+            className="studyhub-popup-poster__url"
+            x="1023"
+            y="202"
+            textAnchor="middle"
+            dominantBaseline="middle"
+            textLength="760"
+            lengthAdjust="spacingAndGlyphs"
+          >
+            https://study-hub.cn
+          </text>
         </g>
         <g className="studyhub-popup-poster__hotspot">
           <rect className="studyhub-popup-poster__hotspot-bg" x="1228" y="72" width="404" height="68" rx="20" />
-          <text className="studyhub-popup-poster__brand" x="1250" y="122">STUDYHUB ·</text>
-          <text className="studyhub-popup-poster__brand-cn" x="1576" y="122">学汇</text>
+          <text className="studyhub-popup-poster__brand" x="1430" y="106" textAnchor="middle" dominantBaseline="middle">
+            <tspan>STUDYHUB · </tspan>
+            <tspan className="studyhub-popup-poster__brand-cn">学汇</tspan>
+          </text>
         </g>
         <g fill="none" stroke="#ffffff" strokeLinecap="round" strokeLinejoin="round">
           <circle cx="1530" cy="264" r="63" strokeWidth="10" />
@@ -94,8 +113,18 @@ function StudyHubEntryPoster() {
         <rect x="272" y="613" width="26" height="76" rx="13" fill="#f7f7f8" />
         <rect x="336" y="613" width="26" height="76" rx="13" fill="#f7f7f8" />
         <g className="studyhub-popup-poster__hotspot">
-          <rect className="studyhub-popup-poster__hotspot-bg" x="486" y="520" width="892" height="230" rx="34" />
-          <text className="studyhub-popup-poster__title" x="503" y="734">StudyHub</text>
+          <rect className="studyhub-popup-poster__hotspot-bg" x="486" y="470" width="892" height="286" rx="34" />
+          <text
+            className="studyhub-popup-poster__title"
+            x="932"
+            y="635"
+            textAnchor="middle"
+            dominantBaseline="middle"
+            textLength="850"
+            lengthAdjust="spacingAndGlyphs"
+          >
+            StudyHub
+          </text>
         </g>
         {[
           { x: 582, label: '贡献资料', textX: 694 },
@@ -105,25 +134,37 @@ function StudyHubEntryPoster() {
         ].map((item) => (
           <g key={item.label} className="studyhub-popup-poster__hotspot studyhub-popup-poster__chip-hotspot">
             <rect className="studyhub-popup-poster__chip-box" x={item.x} y="970" width="224" height="68" rx="3" />
-            <text className="studyhub-popup-poster__chip" x={item.textX} y="1016" textAnchor="middle">{item.label}</text>
+            <text className="studyhub-popup-poster__chip" x={item.textX} y="1004" textAnchor="middle" dominantBaseline="middle">
+              {item.label}
+            </text>
           </g>
         ))}
         <g className="studyhub-popup-poster__hotspot">
           <rect className="studyhub-popup-poster__hotspot-bg" x="290" y="1065" width="190" height="62" rx="16" />
-          <text className="studyhub-popup-poster__contact" x="310" y="1112">联系邮箱</text>
+          <text className="studyhub-popup-poster__contact" x="385" y="1096" textAnchor="middle" dominantBaseline="middle">联系邮箱</text>
         </g>
         <g className="studyhub-popup-poster__hotspot">
           <rect className="studyhub-popup-poster__hotspot-bg" x="500" y="1065" width="560" height="62" rx="16" />
-          <text className="studyhub-popup-poster__contact" x="515" y="1112">chengjinli@std.uestc.edu.cn</text>
+          <text
+            className="studyhub-popup-poster__contact"
+            x="780"
+            y="1096"
+            textAnchor="middle"
+            dominantBaseline="middle"
+            textLength="510"
+            lengthAdjust="spacingAndGlyphs"
+          >
+            chengjinli@std.uestc.edu.cn
+          </text>
         </g>
-        <text className="studyhub-popup-poster__contact" x="1098" y="1112">|</text>
+        <text className="studyhub-popup-poster__contact" x="1098" y="1096" textAnchor="middle" dominantBaseline="middle">|</text>
         <g className="studyhub-popup-poster__hotspot">
           <rect className="studyhub-popup-poster__hotspot-bg" x="1130" y="1065" width="230" height="62" rx="16" />
-          <text className="studyhub-popup-poster__contact" x="1148" y="1112">核心贡献者</text>
+          <text className="studyhub-popup-poster__contact" x="1245" y="1096" textAnchor="middle" dominantBaseline="middle">核心贡献者</text>
         </g>
         <g className="studyhub-popup-poster__hotspot">
           <rect className="studyhub-popup-poster__hotspot-bg" x="1372" y="1065" width="340" height="62" rx="16" />
-          <text className="studyhub-popup-poster__contact" x="1390" y="1112">李承锦、曾逸帆</text>
+          <text className="studyhub-popup-poster__contact" x="1542" y="1096" textAnchor="middle" dominantBaseline="middle">李承锦、曾逸帆</text>
         </g>
         <g className="studyhub-popup-poster__svg-meteors" clipPath="url(#studyhub-popup-poster-band)">
           {[

@@ -783,9 +783,9 @@ export default function Home({
             onSubmit={handleFilterSubmit}
           />
 
-          <section className="card" id="materials-list" ref={materialsRef} style={{ gridColumn: '1 / -1' }}>
-            <div className="materials-header">
-              <div>
+          <section className="card materials-library-card" id="materials-list" ref={materialsRef}>
+            <div className="materials-header materials-library-header">
+              <div className="materials-library-header__summary">
                 <h2 className="card-title">
                   资料列表
                   <svg className="title-icon" viewBox="0 0 24 24" aria-hidden="true">
@@ -793,11 +793,11 @@ export default function Home({
                     <path d="M8 9h8M8 12h8M8 15h5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
                   </svg>
                 </h2>
-              </div>
-              <div className="materials-header__actions">
                 <p className="help-text">
                   当前第 {pageMeta.page} / {totalPages} 页 · 每页 {pageSize} 条 · 共 {pageMeta.total} 条结果
                 </p>
+              </div>
+              <div className="materials-library-header__actions">
                 <MaterialSortSelect
                   value={filtersState.sort}
                   disabled={loadingPage}

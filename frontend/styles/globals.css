@@ -2899,13 +2899,13 @@ main {
 .filter-quick-row {
   display: grid;
   grid-template-columns: minmax(240px, 1fr) auto;
-  gap: 14px;
-  align-items: end;
-  padding: 14px 16px;
-  border-radius: 16px;
-  background: rgba(248, 250, 252, 0.95);
-  border: 1px solid rgba(148, 163, 184, 0.25);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.6);
+  gap: 12px;
+  align-items: start;
+  padding: 15px 16px;
+  border-radius: 12px;
+  background: #f8fbff;
+  border: 1px solid rgba(37, 99, 235, 0.3);
+  box-shadow: 0 8px 24px rgba(37, 99, 235, 0.08), inset 3px 0 0 #2563eb;
 }
 
 .filter-quick-row .form-item {
@@ -2930,6 +2930,12 @@ main {
   justify-content: flex-end;
   flex-wrap: wrap;
   align-items: center;
+  padding-top: 27px;
+}
+
+.filter-actions.quick .button {
+  min-height: 42px;
+  margin: 0;
 }
 
 .filter-keyword {
@@ -2937,7 +2943,13 @@ main {
 }
 
 .filter-keyword__input input {
-  border-color: rgba(148, 163, 184, 0.4);
+  border-color: rgba(37, 99, 235, 0.48);
+  background: #ffffff;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.06);
+}
+
+.filter-keyword__input input:hover {
+  border-color: rgba(37, 99, 235, 0.72);
 }
 
 @media (max-width: 720px) {
@@ -2953,6 +2965,7 @@ main {
     gap: 10px;
     justify-items: stretch;
     align-items: stretch;
+    padding-top: 0;
   }
 
   .filter-quick-row .form-item {
@@ -3941,7 +3954,7 @@ main {
 }
 
 .stable-version-modal {
-  width: min(960px, calc(100vw - 40px), calc((100dvh - 190px) * 1.777));
+  width: min(960px, calc(100vw - 40px), calc((100dvh - 286px) * 1.777));
   max-height: calc(100vh - 52px);
   max-height: calc(100dvh - 52px);
   padding: 0;
@@ -4063,39 +4076,39 @@ main {
 }
 
 .studyhub-popup-poster__brand {
-  font-family: Inter, Arial, 'Helvetica Neue', sans-serif;
+  font-family: Arial, 'Microsoft YaHei', 'PingFang SC', sans-serif;
   font-size: 47px;
   font-weight: 900;
-  letter-spacing: 1px;
+  letter-spacing: 0;
   fill: #343434;
 }
 
 .studyhub-popup-poster__brand-cn {
-  font-family: 'Noto Serif CJK SC', 'Songti SC', SimSun, serif;
+  font-family: 'Microsoft YaHei', 'PingFang SC', Arial, sans-serif;
   font-size: 47px;
   font-weight: 800;
-  letter-spacing: 1px;
+  letter-spacing: 0;
   fill: #343434;
 }
 
 .studyhub-popup-poster__url {
-  font-family: Georgia, 'Times New Roman', 'Noto Serif SC', 'Songti SC', SimSun, serif;
+  font-family: Georgia, 'Times New Roman', serif;
   font-size: 70px;
   font-weight: 900;
-  letter-spacing: -2px;
+  letter-spacing: 0;
   fill: #ffffff;
 }
 
 .studyhub-popup-poster__title {
-  font-family: Inter, Arial, 'Helvetica Neue', 'Noto Sans SC', sans-serif;
+  font-family: Arial, 'Helvetica Neue', sans-serif;
   font-size: 245px;
   font-weight: 900;
-  letter-spacing: -13px;
+  letter-spacing: 0;
   fill: #f5f6fa;
 }
 
 .studyhub-popup-poster__chip {
-  font-family: 'Noto Serif CJK SC', 'Songti SC', SimSun, serif;
+  font-family: 'Microsoft YaHei', 'PingFang SC', Arial, sans-serif;
   font-size: 42px;
   font-weight: 700;
   fill: #060606;
@@ -4111,10 +4124,10 @@ main {
 }
 
 .studyhub-popup-poster__contact {
-  font-family: 'Noto Serif CJK SC', 'Songti SC', SimSun, serif;
+  font-family: 'Microsoft YaHei', 'PingFang SC', Arial, sans-serif;
   font-size: 39px;
   font-weight: 700;
-  letter-spacing: 2px;
+  letter-spacing: 0;
   fill: #080808;
 }
 
@@ -6543,30 +6556,71 @@ g.studyhub-popup-poster__hotspot:hover > text {
   margin-right: auto;
 }
 
+.materials-library-card {
+  grid-column: 1 / -1;
+}
+
+.materials-library-header {
+  flex-wrap: nowrap;
+  align-items: center;
+  margin-bottom: 2px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid #e5ebf3;
+}
+
+.materials-library-header__summary {
+  min-width: 0;
+}
+
+.materials-library-header__summary .card-title {
+  margin-bottom: 5px;
+}
+
+.materials-library-header__summary .help-text {
+  margin: 0;
+  color: #718096;
+  font-size: 0.82rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.materials-library-header__actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
 .material-sort-control {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  color: #475569;
-  font-size: 0.8rem;
-  font-weight: 700;
+  gap: 10px;
+  min-height: 42px;
+  padding: 4px 4px 4px 12px;
+  border: 1px solid #d9e2ee;
+  border-radius: 8px;
+  background: #f8fafc;
+  color: #526176;
+  box-shadow: 0 5px 16px rgba(15, 23, 42, 0.06);
+  font-size: 0.78rem;
+  font-weight: 750;
   white-space: nowrap;
 }
 
 .material-sort-control select {
-  min-width: 210px;
-  min-height: 40px;
-  border-color: #cbd5e1;
-  border-radius: 8px;
+  min-width: 190px;
+  min-height: 32px;
+  border-color: transparent;
+  border-radius: 6px;
   background-color: #ffffff;
-  color: #0f172a;
+  color: #102a56;
   font-size: 0.86rem;
-  font-weight: 650;
+  font-weight: 700;
 }
 
 .material-sort-control select:focus {
   border-color: #2563eb;
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.12);
 }
 
 .materials-pagination {
@@ -8210,21 +8264,148 @@ g.studyhub-popup-poster__hotspot:hover > text {
 
 .filter-advanced {
   display: none;
-  border: 1px solid rgba(15, 23, 42, 0.08);
-  border-radius: 16px;
-  padding: 16px;
-  margin-top: 16px;
-  background: #fff;
+  padding: 20px 2px 2px;
+  margin-top: 18px;
+  border-top: 1px solid #dbe4f0;
 }
 
 .filter-advanced.open {
   display: block;
 }
 
+.filter-advanced__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 18px;
+}
+
+.filter-advanced__header > div {
+  display: flex;
+  min-width: 0;
+  align-items: baseline;
+  gap: 12px;
+}
+
+.filter-advanced__header strong {
+  color: #102a56;
+  font-size: 0.95rem;
+  font-weight: 800;
+}
+
+.filter-advanced__header span {
+  color: #718096;
+  font-size: 0.8rem;
+}
+
+.filter-advanced__reset {
+  flex: 0 0 auto;
+  color: #315b93;
+  border-color: #cfdaea;
+  background: #ffffff;
+}
+
 .advanced-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 16px;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.advanced-grid .form-item {
+  min-width: 0;
+}
+
+.advanced-grid select {
+  min-width: 0;
+  border-color: #d6dfeb;
+  background-color: #fbfdff;
+}
+
+.advanced-grid select:hover {
+  border-color: #93b4e5;
+}
+
+.filter-advanced__choices {
+  display: grid;
+  grid-template-columns: minmax(0, 1.45fr) minmax(280px, 0.55fr);
+  gap: 20px;
+  align-items: start;
+  margin-top: 18px;
+  padding-top: 18px;
+  border-top: 1px dashed #dbe4f0;
+}
+
+.filter-advanced__choices fieldset {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.filter-advanced__choices legend {
+  margin-bottom: 10px;
+  color: #35445a;
+  font-size: 0.82rem;
+  font-weight: 750;
+}
+
+.filter-advanced__choices .choice-pill {
+  min-height: 36px;
+  justify-content: center;
+  padding: 6px 15px;
+  border-color: #d5dfec;
+  border-radius: 8px;
+  background: #f8fafc;
+  color: #315b93;
+  box-shadow: none;
+}
+
+.filter-advanced__choices .choice-pill:hover {
+  border-color: #8eafe0;
+  background: #f2f7ff;
+}
+
+.filter-advanced__choices .choice-pill.active {
+  border-color: #2563eb;
+  background: #eaf2ff;
+  color: #174ea6;
+  box-shadow: inset 0 0 0 1px rgba(37, 99, 235, 0.08);
+}
+
+.filter-advanced__choices .price-group {
+  align-items: flex-end;
+}
+
+.filter-advanced__choices .price-group legend {
+  width: 100%;
+  text-align: right;
+}
+
+.filter-advanced__choices .choice-group {
+  justify-content: flex-end;
+}
+
+@media (max-width: 1080px) {
+  .advanced-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .filter-advanced__choices {
+    grid-template-columns: 1fr;
+  }
+
+  .filter-advanced__choices .price-group {
+    align-items: flex-start;
+  }
+
+  .filter-advanced__choices .price-group legend {
+    text-align: left;
+  }
+
+  .filter-advanced__choices .choice-group {
+    justify-content: flex-start;
+  }
 }
 
 .form-grid {
@@ -15365,6 +15546,11 @@ g.studyhub-popup-poster__hotspot:hover > text {
   .mobile-library-list__header .material-sort-control {
     display: block;
     min-width: 0;
+    min-height: 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    box-shadow: none;
   }
 
   .mobile-library-list__header .material-sort-control > span {
