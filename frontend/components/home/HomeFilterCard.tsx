@@ -49,7 +49,7 @@ export default function HomeFilterCard({
       <div className="filter-header">
         <div>
           <h2 className="card-title">
-            筛选资料
+            资料搜索
             <svg className="title-icon" viewBox="0 0 24 24" aria-hidden="true">
               <circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" strokeWidth="1.6" />
               <path d="M20 20l-3.5-3.5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />

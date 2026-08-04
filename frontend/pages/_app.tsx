@@ -113,15 +113,13 @@ function StudyHubEntryPoster() {
         <rect x="272" y="613" width="26" height="76" rx="13" fill="#f7f7f8" />
         <rect x="336" y="613" width="26" height="76" rx="13" fill="#f7f7f8" />
         <g className="studyhub-popup-poster__hotspot">
-          <rect className="studyhub-popup-poster__hotspot-bg" x="486" y="470" width="892" height="286" rx="34" />
+          <rect className="studyhub-popup-poster__hotspot-bg" x="390" y="470" width="1160" height="300" rx="34" />
           <text
             className="studyhub-popup-poster__title"
-            x="932"
-            y="635"
+            x="970"
+            y="625"
             textAnchor="middle"
             dominantBaseline="middle"
-            textLength="850"
-            lengthAdjust="spacingAndGlyphs"
           >
             StudyHub
           </text>
