@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+from datetime import UTC, datetime, timedelta
+
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import Session
 
+from app.models.materials import MaterialDownloadRecord
 from app.repos import material_repo as material_repo_module
 from app.repos.material_repo import MaterialRepository
 from app.services.materials_service import MaterialsService
@@ -141,6 +144,30 @@ def test_material_download_methods_tolerate_legacy_table_without_updated_at() ->
         repo.add_download(session, material_id=41, user_id=7)
         session.commit()
         assert repo.has_download(session, 41, 7) is True
+
+
+def test_count_downloads_by_material_since_uses_only_recent_records() -> None:
+    engine = create_engine("sqlite+pysqlite:///:memory:", future=True)
+    MaterialDownloadRecord.__table__.create(engine)
+    now = datetime(2026, 8, 7, 6, 0, tzinfo=UTC)
+    with Session(engine) as session:
+        session.add_all(
+            [
+                MaterialDownloadRecord(material_id=41, user_id=1, created_at=now - timedelta(days=2)),
+                MaterialDownloadRecord(material_id=41, user_id=2, created_at=now - timedelta(days=20)),
+                MaterialDownloadRecord(material_id=41, user_id=3, created_at=now - timedelta(days=31)),
+                MaterialDownloadRecord(material_id=42, user_id=4, created_at=now - timedelta(days=5)),
+            ]
+        )
+        session.commit()
+
+        counts = MaterialRepository().count_downloads_by_material_since(
+            session,
+            since=now - timedelta(days=30),
+            material_ids=[41, 42, 43],
+        )
+
+    assert counts == {41: 2, 42: 1}
 
 
 def test_material_like_service_does_not_reload_missing_material_columns_after_commit() -> None:

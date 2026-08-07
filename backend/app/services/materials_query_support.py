@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from app.services.materials_search import MaterialSearchQuery, parse_material_search_query
@@ -8,6 +9,12 @@ from app.services.read_support import compat_as_int, compat_normalize_text, comp
 
 
 MAJOR_SPLIT_PATTERN = re.compile(r"[，,、/]+")
+RECENT_DOWNLOAD_WINDOW_DAYS = 30
+
+
+def recent_downloads_since(now: datetime | None = None) -> datetime:
+    reference = now or datetime.now(UTC)
+    return reference - timedelta(days=RECENT_DOWNLOAD_WINDOW_DAYS)
 
 
 def compat_normalize_major_selections(raw: Any) -> list[str]:
@@ -74,6 +81,17 @@ def compat_sort_material_rows(
     if normalized_sort == "downloads":
         ordered.sort(
             key=lambda row: (
+                compat_as_int(row["download_count"]),
+                compat_timestamp(row["created_at"]),
+                compat_as_int(row["id"]),
+            ),
+            reverse=True,
+        )
+        return ordered
+    if normalized_sort == "recent_downloads":
+        ordered.sort(
+            key=lambda row: (
+                compat_as_int(row.get("recent_download_count")),
                 compat_as_int(row["download_count"]),
                 compat_timestamp(row["created_at"]),
                 compat_as_int(row["id"]),
@@ -177,12 +195,27 @@ def compat_material_order_clause(
     sort: str | None,
     profile: dict[str, Any] | None,
     keyword: str | None = None,
+    recent_downloads_cutoff: datetime | None = None,
 ) -> tuple[str, dict[str, Any], str]:
     normalized_sort = (sort or "latest").strip().lower()
     if normalized_sort == "newest":
         return "m.created_at DESC, m.id DESC", {}, "0"
     if normalized_sort == "downloads":
         return "COALESCE(m.download_count, 0) DESC, m.created_at DESC, m.id DESC", {}, "0"
+    if normalized_sort == "recent_downloads":
+        recent_download_count_sql = """
+            (
+                SELECT COUNT(*)
+                FROM material_downloads md_recent
+                WHERE md_recent.material_id = m.id
+                  AND md_recent.created_at >= :recent_downloads_cutoff
+            )
+        """
+        return (
+            f"{recent_download_count_sql} DESC, COALESCE(m.download_count, 0) DESC, m.created_at DESC, m.id DESC",
+            {"recent_downloads_cutoff": recent_downloads_cutoff or recent_downloads_since()},
+            "0",
+        )
     if normalized_sort == "price":
         return "COALESCE(m.price, 0) DESC, m.created_at DESC, m.id DESC", {}, "0"
     if normalized_sort == "sales":

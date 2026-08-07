@@ -1017,7 +1017,7 @@ export const getServerSideProps: GetServerSideProps<HomeProps> = async (ctx) => 
     return [] as MaterialRequestItem[];
   });
   const popularMaterialsPromise: Promise<MaterialListItem[]> = fetchMaterials(
-    { sort: 'downloads', page: 1, size: HOME_POPULAR_PREVIEW_LIMIT },
+    { sort: 'recent_downloads', page: 1, size: HOME_POPULAR_PREVIEW_LIMIT },
     session.token || undefined,
     origin
   )

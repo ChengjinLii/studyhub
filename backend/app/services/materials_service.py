@@ -32,6 +32,7 @@ from app.services.materials_query_support import (
     compat_normalize_major_selections,
     compat_recommendation_score,
     compat_sort_material_rows,
+    recent_downloads_since,
 )
 from app.services.materials_search import material_matches_search, material_search_score, parse_material_search_query
 from app.services.materials_compat import MaterialsCompatMixin
@@ -131,6 +132,20 @@ class MaterialsService(MaterialsStorageMutationMixin, MaterialsCompatMixin):
         elif normalized_sort == "downloads":
             items.sort(
                 key=lambda material: (
+                    -int(material.download_count or 0),
+                    -self._material_created_ts(material),
+                    -int(material.id or 0),
+                )
+            )
+        elif normalized_sort == "recent_downloads":
+            recent_download_counts = self.material_repo.count_downloads_by_material_since(
+                session,
+                since=recent_downloads_since(),
+                material_ids=[int(material.id) for material in items],
+            )
+            items.sort(
+                key=lambda material: (
+                    -recent_download_counts.get(int(material.id), 0),
                     -int(material.download_count or 0),
                     -self._material_created_ts(material),
                     -int(material.id or 0),

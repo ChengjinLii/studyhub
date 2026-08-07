@@ -11,10 +11,10 @@ describe('home SSR data limits', () => {
     expect(source).not.toContain("fetchMaterialRequests(\n    { sort: 'hot', limit: 0 }");
   });
 
-  it('loads a bounded download-sorted list for the switchable discovery card', () => {
+  it('loads a bounded recent-download-sorted list for the switchable discovery card', () => {
     const source = readFileSync(join(process.cwd(), 'pages/index.tsx'), 'utf8');
 
     expect(source).toContain('const HOME_POPULAR_PREVIEW_LIMIT = 8;');
-    expect(source).toContain("{ sort: 'downloads', page: 1, size: HOME_POPULAR_PREVIEW_LIMIT }");
+    expect(source).toContain("{ sort: 'recent_downloads', page: 1, size: HOME_POPULAR_PREVIEW_LIMIT }");
   });
 });

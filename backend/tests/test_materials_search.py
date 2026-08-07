@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from datetime import UTC, datetime
 
 from app.models.materials import MaterialRecord
 from app.services.materials_query_support import (
@@ -157,6 +158,13 @@ def test_explicit_material_sort_orders_are_stable_across_database_paths() -> Non
     downloads_sql, downloads_params, downloads_score = compat_material_order_clause(
         sort="downloads", profile={"school": "电子科技大学"}, keyword="概率论"
     )
+    cutoff = datetime(2026, 7, 8, tzinfo=UTC)
+    recent_sql, recent_params, recent_score = compat_material_order_clause(
+        sort="recent_downloads",
+        profile={"school": "电子科技大学"},
+        keyword="概率论",
+        recent_downloads_cutoff=cutoff,
+    )
 
     assert newest_sql == "m.created_at DESC, m.id DESC"
     assert newest_params == {}
@@ -164,6 +172,11 @@ def test_explicit_material_sort_orders_are_stable_across_database_paths() -> Non
     assert downloads_sql.startswith("COALESCE(m.download_count, 0) DESC")
     assert downloads_params == {}
     assert downloads_score == "0"
+    assert "FROM material_downloads md_recent" in recent_sql
+    assert "md_recent.created_at >= :recent_downloads_cutoff" in recent_sql
+    assert "COALESCE(m.download_count, 0) DESC" in recent_sql
+    assert recent_params == {"recent_downloads_cutoff": cutoff}
+    assert recent_score == "0"
 
     rows = [
         {"id": 1, "download_count": 5, "created_at": "2026-01-03T00:00:00Z"},
@@ -172,3 +185,10 @@ def test_explicit_material_sort_orders_are_stable_across_database_paths() -> Non
     ]
     assert [row["id"] for row in compat_sort_material_rows(rows, sort="newest", profile=None)] == [3, 1, 2]
     assert [row["id"] for row in compat_sort_material_rows(rows, sort="downloads", profile=None)] == [2, 3, 1]
+
+    recent_rows = [
+        {**rows[0], "recent_download_count": 3},
+        {**rows[1], "recent_download_count": 1},
+        {**rows[2], "recent_download_count": 3},
+    ]
+    assert [row["id"] for row in compat_sort_material_rows(recent_rows, sort="recent_downloads", profile=None)] == [3, 1, 2]

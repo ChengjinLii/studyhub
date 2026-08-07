@@ -63,6 +63,15 @@ class MaterialsReadService:
                     -int(material.get("id") or 0),
                 )
             )
+        elif normalized_sort == "recent_downloads":
+            items.sort(
+                key=lambda material: (
+                    -(material.get("recentDownloadCount") or 0),
+                    -(material.get("downloadCount") or 0),
+                    -parse_iso_datetime(material.get("createdAt")).timestamp(),
+                    -int(material.get("id") or 0),
+                )
+            )
         elif normalized_sort == "price":
             items.sort(key=lambda material: (float(material.get("price", 0)), -parse_iso_datetime(material.get("createdAt")).timestamp()))
         elif search_query.has_terms:
