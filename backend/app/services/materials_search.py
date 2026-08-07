@@ -13,6 +13,8 @@ from app.models.materials import MaterialRecord
 TOKEN_SPLIT_PATTERN = re.compile(r"[\s,，、;；|/\\]+")
 DEFAULT_SYNONYM_FILE = Path(__file__).resolve().parents[3] / "private" / "material_search_synonyms.json"
 SYNONYM_FILE_ENV = "STUDYHUB_MATERIAL_SEARCH_SYNONYMS_PATH"
+MATCHED_GROUP_SCORE = 10_000
+FULL_QUERY_MATCH_SCORE = 100_000
 
 AUXILIARY_TERMS = {
     "答案",
@@ -158,6 +160,21 @@ def _contains_any(fields: dict[str, str], terms: tuple[str, ...]) -> bool:
     return any(term in value for term in terms for value in normalized_values)
 
 
+def _query_term_groups(query: MaterialSearchQuery) -> tuple[tuple[str, ...], ...]:
+    return query.required_groups + tuple((term,) for term in query.boost_terms)
+
+
+def _matched_group_count(fields: dict[str, str], query: MaterialSearchQuery) -> int:
+    return sum(1 for group in _query_term_groups(query) if _contains_any(fields, group))
+
+
+def _match_priority_score(fields: dict[str, str], query: MaterialSearchQuery) -> int:
+    term_groups = _query_term_groups(query)
+    matched_group_count = _matched_group_count(fields, query)
+    full_match_bonus = FULL_QUERY_MATCH_SCORE if matched_group_count == len(term_groups) else 0
+    return full_match_bonus + matched_group_count * MATCHED_GROUP_SCORE
+
+
 def material_matches_search(
     material: MaterialRecord,
     query: MaterialSearchQuery,
@@ -166,9 +183,7 @@ def material_matches_search(
     if not query.has_terms:
         return True
     fields = _material_fields(material, tags_loader)
-    if query.required_groups:
-        return all(_contains_any(fields, group) for group in query.required_groups)
-    return all(_contains_any(fields, (term,)) for term in query.boost_terms)
+    return _matched_group_count(fields, query) > 0
 
 
 def material_search_score(
@@ -189,8 +204,8 @@ def material_search_score(
         ("college", 6),
         ("school", 4),
     )
-    score = 0
-    term_groups = list(query.required_groups) + [(term,) for term in query.boost_terms]
+    score = _match_priority_score(fields, query)
+    term_groups = _query_term_groups(query)
     for group in term_groups:
         for field_name, weight in weighted_fields:
             value = fields[field_name]
@@ -217,9 +232,7 @@ def material_mapping_matches_search(material: dict[str, Any], query: MaterialSea
         "college": str(material.get("college") or ""),
         "major": str(material.get("major") or ""),
     }
-    if query.required_groups:
-        return all(_contains_any(fields, group) for group in query.required_groups)
-    return all(_contains_any(fields, (term,)) for term in query.boost_terms)
+    return _matched_group_count(fields, query) > 0
 
 
 def material_mapping_search_score(material: dict[str, Any], query: MaterialSearchQuery) -> int:
@@ -246,8 +259,8 @@ def material_mapping_search_score(material: dict[str, Any], query: MaterialSearc
         ("college", 6),
         ("school", 4),
     )
-    score = 0
-    term_groups = list(query.required_groups) + [(term,) for term in query.boost_terms]
+    score = _match_priority_score(fields, query)
+    term_groups = _query_term_groups(query)
     for group in term_groups:
         for field_name, weight in weighted_fields:
             value = fields[field_name]

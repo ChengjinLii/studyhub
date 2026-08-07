@@ -283,13 +283,28 @@ test('home entry modal and discovery views remain keyboard accessible', async ({
   await expect(modal).toBeHidden();
 
   const requestTab = page.getByRole('tab', { name: '求购列表' });
-  const popularTab = page.getByRole('tab', { name: '下载热门' });
+  const popularTab = page.getByRole('tab', { name: '近期热门' });
   await popularTab.click();
   await expect(popularTab).toHaveAttribute('aria-selected', 'true');
-  await expect(page.locator('.request-card .card-title')).toHaveText('下载热门');
+  await expect(page.locator('.request-card .card-title')).toHaveText('近期热门');
+  await expect(page.locator('.home-popular-item')).toHaveCount(20);
+  await expect(page.locator('.recommend-item')).toHaveCount(30);
+  const pageUrl = page.url();
+  await page.getByRole('button', { name: '全部资料' }).click();
+  await expect(page).toHaveURL(pageUrl);
+  await expect(page.locator('#materials-list')).toBeInViewport();
   await requestTab.click();
   await expect(requestTab).toHaveAttribute('aria-selected', 'true');
   await expect(page.locator('.request-card .card-title')).toHaveText('求购列表');
+});
+
+test('material list shows active search keywords and the 21-item page size', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.goto('/?keyword=概率论%20期末');
+  await closeEntryModalIfPresent(page);
+
+  await expect(page.locator('.materials-search-context')).toContainText('当前搜索：概率论 期末');
+  await expect(page.locator('.materials-library-header__summary .help-text')).toContainText('每页 21 条');
 });
 
 test('mock page mode covers more page secondary navigation', async ({ page }) => {

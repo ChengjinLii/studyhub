@@ -20,7 +20,7 @@ import { normalizeMaterialSort } from '../../constants/materialSort';
 import { MaterialListItem, PaginationMeta } from '../../types/material';
 import { SessionUser } from '../../types/user';
 
-const MATERIALS_PAGE_SIZE = 18;
+const MATERIALS_PAGE_SIZE = 21;
 const DEFAULT_TAG_OPTIONS = ['期末真题', '期末速成', '日常学习笔记', '教材答案', '一页纸', '开卷资料'];
 
 interface MaterialsPageProps {
@@ -237,6 +237,11 @@ export default function MaterialsPage({ user, materials, meta, filters, stats, t
             <div>
               <h2>全部资料</h2>
               <p>共 {pageMeta.total} 条结果，当前显示 {materialList.length} 条。</p>
+              {filtersState.keyword.trim() ? (
+                <p className="materials-search-context">
+                  当前搜索：<strong>{filtersState.keyword.trim()}</strong>
+                </p>
+              ) : null}
             </div>
             <MaterialSortSelect
               value={filtersState.sort || 'latest'}

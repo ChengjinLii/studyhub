@@ -43,6 +43,9 @@ export default function HomeRequestPanels({
     const atEnd = target.scrollTop + target.clientHeight >= target.scrollHeight - 8;
     setRecommendListAtEnd(atEnd);
   }, []);
+  const handleViewAllMaterials = useCallback(() => {
+    document.getElementById('materials-list')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, []);
 
   return (
     <div className="home-dual-panel" id="home-requests">
@@ -50,7 +53,7 @@ export default function HomeRequestPanels({
         <div className="materials-header home-discovery-header">
           <div className="home-discovery-heading">
             <h2 className="card-title">
-              {activeDiscoveryView === 'requests' ? '求购列表' : '下载热门'}
+              {activeDiscoveryView === 'requests' ? '求购列表' : '近期热门'}
             </h2>
             <div className="home-discovery-tabs" role="tablist" aria-label="首页发现内容">
               <button
@@ -71,17 +74,20 @@ export default function HomeRequestPanels({
                 className={activeDiscoveryView === 'popular' ? 'active' : ''}
                 onClick={() => setActiveDiscoveryView('popular')}
               >
-                下载热门
+                近期热门
               </button>
             </div>
           </div>
           <div className="request-header-actions">
-            <Link
-              className="button primary small"
-              href={activeDiscoveryView === 'requests' ? '/requests/new' : '/materials?sort=downloads'}
-            >
-              {activeDiscoveryView === 'requests' ? '我要购买' : '全部资料'}
-            </Link>
+            {activeDiscoveryView === 'requests' ? (
+              <Link className="button primary small" href="/requests/new">
+                我要购买
+              </Link>
+            ) : (
+              <button className="button primary small" type="button" onClick={handleViewAllMaterials}>
+                全部资料
+              </button>
+            )}
           </div>
         </div>
         <div className="request-list-wrapper" id="home-discovery-panel" role="tabpanel">
@@ -95,7 +101,7 @@ export default function HomeRequestPanels({
                 </p>
               )}
               {!requestLoading && requestItems.length === 0 ? (
-                <div className="empty-state">暂无求购需求，可以切换查看下载热门资料。</div>
+                <div className="empty-state">暂无求购需求，可以切换查看近期热门资料。</div>
               ) : (
                 <ul className="request-list">
                   {requestItems.map((item) => {

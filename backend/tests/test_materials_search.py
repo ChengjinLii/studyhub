@@ -54,7 +54,7 @@ def _load_tags(raw: str | None) -> list[str]:
     return json.loads(raw or "[]")
 
 
-def test_multi_keyword_requires_course_core_term(monkeypatch, tmp_path) -> None:
+def test_multi_keyword_keeps_partial_matches_but_prioritizes_full_matches(monkeypatch, tmp_path) -> None:
     synonym_file = tmp_path / "synonyms.json"
     synonym_file.write_text('{"概率论": ["概率论与数理统计", "概率统计"]}', encoding="utf-8")
     monkeypatch.setenv(SYNONYM_FILE_ENV, str(synonym_file))
@@ -63,16 +63,23 @@ def test_multi_keyword_requires_course_core_term(monkeypatch, tmp_path) -> None:
     query = parse_material_search_query("概率论 期末 真题")
     probability = _material(title="概率论与数理统计期末真题解析", tags=["真题"])
     calculus = _material(title="微积分期末真题解析", tags=["真题"])
+    unrelated = _material(title="大学英语听力资料")
 
     assert material_matches_search(probability, query, _load_tags) is True
-    assert material_matches_search(calculus, query, _load_tags) is False
+    assert material_matches_search(calculus, query, _load_tags) is True
+    assert material_matches_search(unrelated, query, _load_tags) is False
+    assert material_search_score(probability, query, _load_tags) > material_search_score(calculus, query, _load_tags)
 
 
-def test_auxiliary_only_query_matches_all_requested_aux_terms() -> None:
+def test_auxiliary_only_query_prioritizes_all_requested_terms() -> None:
     query = parse_material_search_query("期末 真题")
+    full_match = {"title": "微积分期末真题", "tags": []}
+    partial_match = {"title": "微积分期末复习", "tags": []}
 
-    assert material_mapping_matches_search({"title": "微积分期末真题", "tags": []}, query) is True
-    assert material_mapping_matches_search({"title": "微积分期末复习", "tags": []}, query) is False
+    assert material_mapping_matches_search(full_match, query) is True
+    assert material_mapping_matches_search(partial_match, query) is True
+    assert material_mapping_matches_search({"title": "微积分复习资料", "tags": []}, query) is False
+    assert material_mapping_search_score(full_match, query) > material_mapping_search_score(partial_match, query)
 
 
 def test_private_synonym_file_expands_short_course_names(monkeypatch, tmp_path) -> None:
@@ -110,7 +117,7 @@ def test_keyword_score_prefers_title_match_over_description_only() -> None:
     assert material_mapping_search_score({"title": "线性代数期末真题"}, query) > material_mapping_search_score({"description": "包含期末真题"}, query)
 
 
-def test_compat_keyword_filter_uses_core_groups_and_synonyms(monkeypatch, tmp_path) -> None:
+def test_compat_keyword_filter_accepts_any_group_and_keeps_synonyms(monkeypatch, tmp_path) -> None:
     synonym_file = tmp_path / "synonyms.json"
     synonym_file.write_text('{"概率论": ["概率论与数理统计"]}', encoding="utf-8")
     monkeypatch.setenv(SYNONYM_FILE_ENV, str(synonym_file))
@@ -129,11 +136,15 @@ def test_compat_keyword_filter_uses_core_groups_and_synonyms(monkeypatch, tmp_pa
     )
 
     joined = " AND ".join(clauses)
-    assert "keyword_core_0_0" in joined
-    assert "keyword_core_0_1" in joined
-    assert "keyword_aux" not in joined
-    assert params["keyword_core_0_0"] == "%概率论%"
-    assert params["keyword_core_0_1"] == "%概率论与数理统计%"
+    assert "keyword_match_0_0" in joined
+    assert "keyword_match_0_1" in joined
+    assert "keyword_match_1_0" in joined
+    assert "keyword_match_2_0" in joined
+    assert " OR " in joined
+    assert params["keyword_match_0_0"] == "%概率论%"
+    assert params["keyword_match_0_1"] == "%概率论与数理统计%"
+    assert params["keyword_match_1_0"] == "%期末%"
+    assert params["keyword_match_2_0"] == "%真题%"
 
 
 def test_compat_order_clause_adds_keyword_score_for_default_sort(monkeypatch, tmp_path) -> None:
@@ -145,10 +156,14 @@ def test_compat_order_clause_adds_keyword_score_for_default_sort(monkeypatch, tm
     order_sql, params, score_sql = compat_material_order_clause(sort="latest", profile=None, keyword="概率论 真题")
 
     assert order_sql.startswith("recommendation_score DESC")
-    assert "keyword_score_0_0" in score_sql
-    assert "keyword_score_0_1" in score_sql
-    assert "keyword_score_1_0" in score_sql
-    assert params["keyword_score_0_0"] == "%概率论%"
+    assert "CASE WHEN" in score_sql
+    assert "100000" in score_sql
+    assert "10000" in score_sql
+    assert "keyword_score_match_0_0" in score_sql
+    assert "keyword_score_match_0_1" in score_sql
+    assert "keyword_score_match_1_0" in score_sql
+    assert "keyword_score_field_0_0" in score_sql
+    assert params["keyword_score_match_0_0"] == "%概率论%"
 
 
 def test_explicit_material_sort_orders_are_stable_across_database_paths() -> None:

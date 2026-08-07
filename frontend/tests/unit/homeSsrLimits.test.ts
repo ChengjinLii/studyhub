@@ -14,7 +14,19 @@ describe('home SSR data limits', () => {
   it('loads a bounded recent-download-sorted list for the switchable discovery card', () => {
     const source = readFileSync(join(process.cwd(), 'pages/index.tsx'), 'utf8');
 
-    expect(source).toContain('const HOME_POPULAR_PREVIEW_LIMIT = 8;');
+    expect(source).toContain('const HOME_POPULAR_PREVIEW_LIMIT = 20;');
+    expect(source).toContain('const HOME_RECOMMENDATION_LIMIT = 30;');
     expect(source).toContain("{ sort: 'recent_downloads', page: 1, size: HOME_POPULAR_PREVIEW_LIMIT }");
+    expect(source).toContain('HOME_RECOMMENDATION_LIMIT');
+  });
+
+  it('uses 21 results per page on both material list screens', () => {
+    const homeSource = readFileSync(join(process.cwd(), 'pages/index.tsx'), 'utf8');
+    const materialsSource = readFileSync(join(process.cwd(), 'pages/materials/index.tsx'), 'utf8');
+
+    expect(homeSource).toContain('const MATERIALS_PAGE_SIZE = 21;');
+    expect(materialsSource).toContain('const MATERIALS_PAGE_SIZE = 21;');
+    expect(homeSource).toContain('当前搜索：');
+    expect(materialsSource).toContain('当前搜索：');
   });
 });

@@ -4,7 +4,12 @@ import re
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
-from app.services.materials_search import MaterialSearchQuery, parse_material_search_query
+from app.services.materials_search import (
+    FULL_QUERY_MATCH_SCORE,
+    MATCHED_GROUP_SCORE,
+    MaterialSearchQuery,
+    parse_material_search_query,
+)
 from app.services.read_support import compat_as_int, compat_normalize_text, compat_timestamp
 
 
@@ -156,14 +161,12 @@ def _compat_keyword_filter_clauses(
 ) -> list[str]:
     if not query.has_terms:
         return []
-    clauses: list[str] = []
-    if query.required_groups:
-        for group_index, group in enumerate(query.required_groups):
-            clauses.append(_compat_like_group_sql(terms=group, param_prefix=f"keyword_core_{group_index}", params=params))
-        return clauses
-    for term_index, term in enumerate(query.boost_terms):
-        clauses.append(_compat_like_group_sql(terms=(term,), param_prefix=f"keyword_aux_{term_index}", params=params))
-    return clauses
+    term_groups = query.required_groups + tuple((term,) for term in query.boost_terms)
+    group_clauses = [
+        _compat_like_group_sql(terms=group, param_prefix=f"keyword_match_{group_index}", params=params)
+        for group_index, group in enumerate(term_groups)
+    ]
+    return [f"({' OR '.join(group_clauses)})"]
 
 
 def _compat_keyword_score_sql(
@@ -172,22 +175,34 @@ def _compat_keyword_score_sql(
 ) -> str:
     if not query.has_terms:
         return "0"
-    parts: list[str] = []
-    all_groups = list(query.required_groups) + [(term,) for term in query.boost_terms]
+    field_score_parts: list[str] = []
+    term_groups = query.required_groups + tuple((term,) for term in query.boost_terms)
+    group_match_sql: list[str] = []
     weighted_fields = (
         ("LOWER(COALESCE(m.title, ''))", 50),
         ("LOWER(COALESCE(m.keywords, ''))", 35),
         ("LOWER(COALESCE(m.description, ''))", 12),
     )
-    for group_index, group in enumerate(all_groups):
+    for group_index, group in enumerate(term_groups):
+        group_match_sql.append(
+            _compat_like_group_sql(
+                terms=group,
+                param_prefix=f"keyword_score_match_{group_index}",
+                params=params,
+            )
+        )
         for term_index, term in enumerate(group):
-            param_name = f"keyword_score_{group_index}_{term_index}"
+            param_name = f"keyword_score_field_{group_index}_{term_index}"
             params[param_name] = f"%{term}%"
             for field_sql, weight in weighted_fields:
-                parts.append(f"(CASE WHEN {field_sql} LIKE :{param_name} THEN {weight} ELSE 0 END)")
-    if not parts:
+                field_score_parts.append(f"(CASE WHEN {field_sql} LIKE :{param_name} THEN {weight} ELSE 0 END)")
+    if not group_match_sql:
         return "0"
-    return " + ".join(parts)
+    full_match_sql = f"(CASE WHEN {' AND '.join(group_match_sql)} THEN {FULL_QUERY_MATCH_SCORE} ELSE 0 END)"
+    matched_group_sql = [
+        f"(CASE WHEN {match_sql} THEN {MATCHED_GROUP_SCORE} ELSE 0 END)" for match_sql in group_match_sql
+    ]
+    return " + ".join([full_match_sql, *matched_group_sql, *field_score_parts])
 
 
 def compat_material_order_clause(

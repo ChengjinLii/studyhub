@@ -43,9 +43,10 @@ import { normalizeMaterialSort } from '../constants/materialSort';
 import { ContributorRank, LeaderboardPeriod } from '../types/contributor';
 import { MaterialRequestItem } from '../types/request';
 
-const MATERIALS_PAGE_SIZE = 18;
+const MATERIALS_PAGE_SIZE = 21;
 const HOME_REQUEST_PREVIEW_LIMIT = 8;
-const HOME_POPULAR_PREVIEW_LIMIT = 8;
+const HOME_POPULAR_PREVIEW_LIMIT = 20;
+const HOME_RECOMMENDATION_LIMIT = 30;
 const Snowfall = dynamic(() => import('react-snowfall'), { ssr: false });
 const MaterialCard = dynamic(() => import('../components/MaterialCard'));
 const HomeFilterCard = dynamic(() => import('../components/home/HomeFilterCard'));
@@ -232,7 +233,7 @@ export default function Home({
     { label: '用户个数', value: formatNumber(Number(statValues.users)) },
   ];
   const recommendedItems = useMemo(() => recommendations ?? [], [recommendations]);
-  const mobileRecommendedItems = useMemo(() => recommendedItems.slice(0, 4), [recommendedItems]);
+  const mobileRecommendedItems = useMemo(() => recommendedItems.slice(0, 6), [recommendedItems]);
   const mobileLatestItems = useMemo(() => materialList.slice(0, 5), [materialList]);
   const recommendationHint = '';
   const recommendationEmpty = user
@@ -800,6 +801,11 @@ export default function Home({
                 <p className="help-text">
                   当前第 {pageMeta.page} / {totalPages} 页 · 每页 {pageSize} 条 · 共 {pageMeta.total} 条结果
                 </p>
+                {filtersState.keyword.trim() ? (
+                  <p className="materials-search-context">
+                    当前搜索：<strong>{filtersState.keyword.trim()}</strong>
+                  </p>
+                ) : null}
               </div>
               <div className="materials-library-header__actions">
                 <MaterialSortSelect
@@ -1001,7 +1007,7 @@ export const getServerSideProps: GetServerSideProps<HomeProps> = async (ctx) => 
   const recommendationsPromise: Promise<MaterialListItem[]> = fetchRecommendations(
     session.token || undefined,
     origin,
-    18
+    HOME_RECOMMENDATION_LIMIT
   ).catch((error) => {
     // eslint-disable-next-line no-console
     console.warn('Failed to fetch recommendations', error);
