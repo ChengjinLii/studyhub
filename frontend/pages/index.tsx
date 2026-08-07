@@ -45,6 +45,7 @@ import { MaterialRequestItem } from '../types/request';
 
 const MATERIALS_PAGE_SIZE = 18;
 const HOME_REQUEST_PREVIEW_LIMIT = 8;
+const HOME_POPULAR_PREVIEW_LIMIT = 8;
 const Snowfall = dynamic(() => import('react-snowfall'), { ssr: false });
 const MaterialCard = dynamic(() => import('../components/MaterialCard'));
 const HomeFilterCard = dynamic(() => import('../components/home/HomeFilterCard'));
@@ -99,6 +100,7 @@ interface HomeProps {
   tagOptions: string[];
   profileSummary: ProfileSummary | null;
   recommendations: MaterialListItem[];
+  popularMaterials: MaterialListItem[];
   requests: MaterialRequestItem[];
   requestLeaderboard: MaterialRequestItem[];
   contributors: ContributorRank[];
@@ -114,6 +116,7 @@ export default function Home({
   tagOptions,
   profileSummary,
   recommendations,
+  popularMaterials,
   requests,
   requestLeaderboard,
   contributors: initialContributors,
@@ -763,6 +766,7 @@ export default function Home({
           requestError={requestError}
           requestNotice={requestNotice}
           leaderboardItems={leaderboardItems}
+          popularItems={popularMaterials}
           recommendedItems={recommendedItems}
           recommendationHint={recommendationHint}
           recommendationEmpty={recommendationEmpty}
@@ -1012,6 +1016,17 @@ export const getServerSideProps: GetServerSideProps<HomeProps> = async (ctx) => 
     console.warn('Failed to fetch requests', error);
     return [] as MaterialRequestItem[];
   });
+  const popularMaterialsPromise: Promise<MaterialListItem[]> = fetchMaterials(
+    { sort: 'downloads', page: 1, size: HOME_POPULAR_PREVIEW_LIMIT },
+    session.token || undefined,
+    origin
+  )
+    .then((data) => data.items.slice(0, HOME_POPULAR_PREVIEW_LIMIT))
+    .catch((error) => {
+      // eslint-disable-next-line no-console
+      console.warn('Failed to fetch popular materials', error);
+      return [] as MaterialListItem[];
+    });
   const requestLeaderboardPromise: Promise<MaterialRequestItem[]> = fetchRequestLeaderboard(
     5,
     session.token || undefined,
@@ -1030,11 +1045,20 @@ export const getServerSideProps: GetServerSideProps<HomeProps> = async (ctx) => 
     console.warn('Failed to fetch contributors', error);
     return [] as ContributorRank[];
   });
-  const [{ materials, meta, stats, tagOptions }, profileSummary, recommendations, requests, requestLeaderboard, contributors] =
+  const [
+    { materials, meta, stats, tagOptions },
+    profileSummary,
+    recommendations,
+    popularMaterials,
+    requests,
+    requestLeaderboard,
+    contributors,
+  ] =
     await Promise.all([
       materialsPromise,
       profilePromise,
       recommendationsPromise,
+      popularMaterialsPromise,
       requestsPromise,
       requestLeaderboardPromise,
       contributorsPromise,
@@ -1052,6 +1076,7 @@ export const getServerSideProps: GetServerSideProps<HomeProps> = async (ctx) => 
       tagOptions,
       profileSummary,
       recommendations,
+      popularMaterials,
       requests,
       requestLeaderboard,
       contributors,

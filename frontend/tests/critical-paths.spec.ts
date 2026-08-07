@@ -269,6 +269,29 @@ test('mobile StudyHub Bot stays fully above the bottom navigation', async ({ pag
   expect((botBox?.x ?? 0) + (botBox?.width ?? 0)).toBeLessThanOrEqual(320);
 });
 
+test('home entry modal and discovery views remain keyboard accessible', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.goto('/');
+
+  const modal = page.locator('.stable-version-modal');
+  await expect(modal).toBeVisible();
+  await expect(page.getByText('也可以点击弹窗外区域，或按 ESC 键关闭。')).toBeVisible();
+  const firstHotspotBackground = page.locator('.studyhub-popup-poster__hotspot-bg').first();
+  await page.locator('.studyhub-popup-poster__hotspot').first().hover();
+  await expect(firstHotspotBackground).toHaveCSS('opacity', '0');
+  await page.keyboard.press('Escape');
+  await expect(modal).toBeHidden();
+
+  const requestTab = page.getByRole('tab', { name: '求购列表' });
+  const popularTab = page.getByRole('tab', { name: '下载热门' });
+  await popularTab.click();
+  await expect(popularTab).toHaveAttribute('aria-selected', 'true');
+  await expect(page.locator('.request-card .card-title')).toHaveText('下载热门');
+  await requestTab.click();
+  await expect(requestTab).toHaveAttribute('aria-selected', 'true');
+  await expect(page.locator('.request-card .card-title')).toHaveText('求购列表');
+});
+
 test('mock page mode covers more page secondary navigation', async ({ page }) => {
   await page.route('**/api/session', async (route) => {
     await route.fulfill({

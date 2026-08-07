@@ -423,6 +423,7 @@ export default function MyApp({ Component, pageProps }: AppProps) {
                     {isStableEntryModal ? '留在当前版本' : '关闭窗口'}
                   </button>
                 </div>
+                <p className="stable-version-modal__dismiss-hint">也可以点击弹窗外区域，或按 ESC 键关闭。</p>
               </div>
             </div>
           </div>

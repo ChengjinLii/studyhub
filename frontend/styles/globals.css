@@ -4151,14 +4151,14 @@ main {
 }
 
 g.studyhub-popup-poster__hotspot:hover > .studyhub-popup-poster__hotspot-bg {
-  opacity: 0.16 !important;
-  filter: drop-shadow(0 0 8px rgba(99, 213, 207, 0.35)) !important;
+  opacity: 0 !important;
+  filter: none !important;
 }
 
 g.studyhub-popup-poster__chip-hotspot:hover > .studyhub-popup-poster__chip-box {
-  fill: rgba(232, 255, 253, 0.96) !important;
-  stroke: #63d5cf !important;
-  filter: drop-shadow(0 0 5px rgba(99, 213, 207, 0.48)) !important;
+  fill: #ffffff !important;
+  stroke: #111111 !important;
+  filter: none !important;
 }
 
 g.studyhub-popup-poster__hotspot:hover > text {
@@ -4301,6 +4301,14 @@ g.studyhub-popup-poster__hotspot:hover > text {
   gap: 12px;
   align-items: center;
   margin-top: 4px;
+}
+
+.stable-version-modal__dismiss-hint {
+  margin: 1px 0 0;
+  color: #7b8494;
+  font-size: 12px;
+  line-height: 1.35;
+  text-align: right;
 }
 
 .stable-version-modal__cta,
@@ -4541,6 +4549,12 @@ g.studyhub-popup-poster__hotspot:hover > text {
     min-height: 40px;
     padding: 0 12px;
     font-size: 13px;
+  }
+
+  .stable-version-modal__dismiss-hint {
+    margin-top: 0;
+    font-size: 11px;
+    text-align: center;
   }
 }
 
@@ -7835,6 +7849,55 @@ g.studyhub-popup-poster__hotspot:hover > text {
   justify-content: flex-end;
 }
 
+.home-discovery-header {
+  flex-wrap: nowrap;
+}
+
+.home-discovery-heading {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 9px;
+}
+
+.home-discovery-tabs {
+  display: inline-flex;
+  padding: 3px;
+  border: 1px solid #dbe4ee;
+  border-radius: 10px;
+  background: #eef2f6;
+}
+
+.home-discovery-tabs button {
+  min-height: 30px;
+  padding: 0 11px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: #64748b;
+  font-size: 0.78rem;
+  font-weight: 750;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 0.16s ease, color 0.16s ease, box-shadow 0.16s ease;
+}
+
+.home-discovery-tabs button:hover {
+  color: #176f66;
+}
+
+.home-discovery-tabs button.active {
+  background: #ffffff;
+  color: #176f66;
+  box-shadow: 0 4px 10px rgba(15, 23, 42, 0.1);
+}
+
+.home-discovery-tabs button:focus-visible {
+  outline: 2px solid rgba(42, 157, 143, 0.35);
+  outline-offset: 2px;
+}
+
 .request-card .request-header-actions .button.primary,
 .recommend-card .request-header-actions .button.primary {
   background: #2a9d8f;
@@ -7923,6 +7986,90 @@ g.studyhub-popup-poster__hotspot:hover > text {
   overflow: auto;
   flex: 1;
   min-height: 0;
+}
+
+.home-popular-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  flex-direction: column;
+  overflow-y: auto;
+}
+
+.home-popular-item {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 11px;
+  min-height: 54px;
+  padding: 9px 5px;
+  border-bottom: 1px solid #e7edf3;
+}
+
+.home-popular-item:last-child {
+  border-bottom: 0;
+}
+
+.home-popular-rank {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border-radius: 8px;
+  background: #e8edf3;
+  color: #475569;
+  font-size: 0.78rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.home-popular-rank.is-top {
+  background: #dff3ef;
+  color: #176f66;
+}
+
+.home-popular-copy {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.home-popular-copy a {
+  overflow: hidden;
+  color: #172033;
+  font-size: 0.92rem;
+  font-weight: 700;
+  line-height: 1.35;
+  text-decoration: none;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.home-popular-copy a:hover {
+  color: #1d4ed8;
+}
+
+.home-popular-copy span {
+  overflow: hidden;
+  color: #7b8494;
+  font-size: 0.74rem;
+  line-height: 1.3;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.home-popular-downloads {
+  min-width: 64px;
+  color: #176f66;
+  font-size: 0.78rem;
+  font-weight: 750;
+  text-align: right;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
 
 .request-leaderboard {
