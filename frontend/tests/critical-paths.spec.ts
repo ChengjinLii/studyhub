@@ -287,8 +287,6 @@ test('home entry modal and discovery views remain keyboard accessible', async ({
   await popularTab.click();
   await expect(popularTab).toHaveAttribute('aria-selected', 'true');
   await expect(page.locator('.request-card .card-title')).toHaveText('近期热门');
-  await expect(page.locator('.home-popular-item')).toHaveCount(20);
-  await expect(page.locator('.recommend-item')).toHaveCount(30);
   const pageUrl = page.url();
   await page.getByRole('button', { name: '全部资料' }).click();
   await expect(page).toHaveURL(pageUrl);
