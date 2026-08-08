@@ -121,6 +121,7 @@ class AgentToolLoopService:
             return None
         if body.startswith("```"):
             body = re.sub(r"^```(?:json)?\s*|\s*```$", "", body, flags=re.IGNORECASE | re.DOTALL).strip()
+        recovery_body = body
         start = body.find("{")
         end = body.rfind("}")
         if start >= 0 and end > start:
@@ -128,7 +129,7 @@ class AgentToolLoopService:
         try:
             parsed = json.loads(body)
         except json.JSONDecodeError:
-            parsed = recover_agent_tool_payload(body) if repair else None
+            parsed = recover_agent_tool_payload(recovery_body) if repair else None
         return self.parse(parsed)
 
     def parse(self, value: Any) -> AgentToolDecision | None:
@@ -207,12 +208,19 @@ def build_agent_routing_state(request: dict[str, Any]) -> dict[str, Any]:
 _RECOVERABLE_TOOL_NAME_PATTERN = re.compile(
     r'"name"\s*:\s*"(search_materials|inspect_materials|read_pdf_evidence|read_memory|synthesize_course_context)"'
 )
+_TOOLS_MODE_PATTERN = re.compile(r'"mode"\s*:\s*"tools"')
+_ACTIONS_ARRAY_PATTERN = re.compile(r'"actions"\s*:\s*\[')
 
 
 def recover_agent_tool_payload(text: str) -> dict[str, Any] | None:
     """Recover one explicitly named allowlisted action from malformed JSON."""
 
-    tool_match = _RECOVERABLE_TOOL_NAME_PATTERN.search(text)
+    actions_match = _ACTIONS_ARRAY_PATTERN.search(text)
+    tool_match = (
+        _RECOVERABLE_TOOL_NAME_PATTERN.search(text, pos=actions_match.end())
+        if _TOOLS_MODE_PATTERN.search(text) is not None and actions_match is not None
+        else None
+    )
     if tool_match is not None:
         name = tool_match.group(1)
         arguments: dict[str, Any] = {}

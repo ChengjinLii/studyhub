@@ -402,6 +402,21 @@ def test_tool_loop_rejects_malformed_unsupported_action() -> None:
     assert service.parse_model_output(malformed, repair=True) is None
 
 
+def test_tool_loop_never_recovers_tool_from_malformed_final_payload() -> None:
+    service = AgentToolLoopService()
+    malformed = (
+        '{"mode":"final","metadata":{"name":"search_materials"},'
+        '"actions":[{"name":"search_materials","arguments":{"query":"不应执行"}}],'
+        '"answer":"安全回答"'
+    )
+
+    repaired = service.parse_model_output(malformed, repair=True)
+
+    assert repaired is not None
+    assert repaired.mode == "final"
+    assert repaired.actions == ()
+
+
 def test_dynamic_agent_uses_guarded_parser_only_when_flag_enabled(monkeypatch) -> None:
     settings = _settings(ai_agent_runtime_constraints_enabled=True)
     monkeypatch.setattr("app.services.ai_service.get_settings", lambda: settings)
