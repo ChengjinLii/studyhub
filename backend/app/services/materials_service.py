@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, Any
 
 from fastapi import HTTPException, UploadFile, status
 from sqlalchemy import bindparam, func, text, update
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.async_db import async_session_scope
@@ -31,6 +32,7 @@ from app.services.materials_query_support import (
     compat_normalize_major_selections,
     compat_recommendation_score,
     compat_sort_material_rows,
+    recent_downloads_since,
 )
 from app.services.materials_search import material_matches_search, material_search_score, parse_material_search_query
 from app.services.materials_compat import MaterialsCompatMixin
@@ -124,7 +126,32 @@ class MaterialsService(MaterialsStorageMutationMixin, MaterialsCompatMixin):
             if self._matches_material(material, search_query, school, college, major, tag, grade_value, course_category, price)
         ]
 
-        if (sort or "").lower() == "price":
+        normalized_sort = (sort or "latest").strip().lower()
+        if normalized_sort == "newest":
+            items.sort(key=lambda material: (-self._material_created_ts(material), -int(material.id or 0)))
+        elif normalized_sort == "downloads":
+            items.sort(
+                key=lambda material: (
+                    -int(material.download_count or 0),
+                    -self._material_created_ts(material),
+                    -int(material.id or 0),
+                )
+            )
+        elif normalized_sort == "recent_downloads":
+            recent_download_counts = self.material_repo.count_downloads_by_material_since(
+                session,
+                since=recent_downloads_since(),
+                material_ids=[int(material.id) for material in items],
+            )
+            items.sort(
+                key=lambda material: (
+                    -recent_download_counts.get(int(material.id), 0),
+                    -int(material.download_count or 0),
+                    -self._material_created_ts(material),
+                    -int(material.id or 0),
+                )
+            )
+        elif normalized_sort == "price":
             items.sort(key=lambda material: (material.price, -self._material_created_ts(material)))
         elif search_query.has_terms:
             items.sort(
@@ -622,24 +649,62 @@ class MaterialsService(MaterialsStorageMutationMixin, MaterialsCompatMixin):
         previews: list[UploadFile],
         custom_previews: list[UploadFile],
     ) -> dict[str, Any]:
-        seed = self._bootstrap(session)
+        self._bootstrap(session)
         uploader = self._require_user(session, uploader_id)
-        material_id = self.material_repo.next_material_id(session, seed)
+        submission_key = payload.submissionId
+        if submission_key:
+            existing = self.material_repo.find_by_submission_key(
+                session,
+                uploader_id=uploader.id,
+                submission_key=submission_key,
+            )
+            if existing is not None:
+                return self.get_detail(session, uploader_id, existing.id)
         file_upload = zip_file or markdown_file
         if (payload.deliveryMethod or "FILE").upper() == "FILE" and file_upload is None:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="资料缺少有效的下载方式")
 
+        delivery_method = (payload.deliveryMethod or "FILE").upper()
+        initial_file_type = (
+            "netdisk"
+            if delivery_method == "NETDISK"
+            else self._resolve_file_type(file_upload.filename if file_upload is not None else None)
+        )
         material = MaterialRecord(
-            id=material_id,
             source="local",
             uploader_id=uploader.id,
+            submission_key=submission_key,
             uploader_username=uploader.username,
             uploader_nickname=uploader.nickname or uploader.username,
+            title=payload.title,
+            description=payload.description,
+            original_filename=file_upload.filename if file_upload is not None else None,
+            file_type=initial_file_type,
+            file_size=0,
+            price=int(payload.price or 0),
+            is_free=int(payload.price or 0) <= 0,
+            school=payload.school,
+            college=payload.college or None,
+            major=payload.major or None,
+            general_course=bool(payload.generalCourse),
+            course_category=payload.courseCategory or ("GENERAL" if payload.generalCourse else "MAJOR"),
+            grade_type=payload.gradeType or "STAGE",
+            grade_value=payload.gradeValue or "大一",
+            delivery_method=delivery_method,
+            preview_watermark_enabled=bool(
+                payload.previewWatermarkEnabled if payload.previewWatermarkEnabled is not None else True
+            ),
+            preview_source=payload.previewSource or "AUTO",
+            status="VISIBLE",
+            review_status="APPROVED",
             created_at=datetime.now(UTC),
             updated_at=datetime.now(UTC),
         )
         storage_mutation = StorageMutation(self.asset_store.delete_key)
         try:
+            # Reserve the database-generated material ID and submission key before
+            # writing objects, so concurrent retries cannot create separate rows.
+            self.material_repo.reserve_material(session, material)
             self._apply_payload_to_material(
                 material,
                 payload,
@@ -652,6 +717,18 @@ class MaterialsService(MaterialsStorageMutationMixin, MaterialsCompatMixin):
             self.material_repo.save_material(session, material)
             self.material_repo.add_version(session, material_id=material.id, version_label="v1.0")
             session.commit()
+        except IntegrityError:
+            session.rollback()
+            storage_mutation.rollback()
+            if submission_key:
+                existing = self.material_repo.find_by_submission_key(
+                    session,
+                    uploader_id=uploader.id,
+                    submission_key=submission_key,
+                )
+                if existing is not None:
+                    return self.get_detail(session, uploader_id, existing.id)
+            raise
         except Exception:
             session.rollback()
             storage_mutation.rollback()

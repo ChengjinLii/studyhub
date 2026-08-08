@@ -7,6 +7,7 @@ import Link from 'next/link';
 import NavBar from '../components/NavBar';
 import AppImage from '../components/AppImage';
 import MaterialIconSprite from '../components/MaterialIconSprite';
+import MaterialSortSelect from '../components/materials/MaterialSortSelect';
 import PaginationBar from '../components/PaginationBar';
 import { MaterialListItem, PaginationMeta } from '../types/material';
 import { SessionUser, RoleMask } from '../types/user';
@@ -38,11 +39,14 @@ import {
   GRADE_STAGE_OPTIONS,
 } from '../constants/metadata';
 import { getTierLabel } from '../constants/request';
+import { normalizeMaterialSort } from '../constants/materialSort';
 import { ContributorRank, LeaderboardPeriod } from '../types/contributor';
 import { MaterialRequestItem } from '../types/request';
 
-const MATERIALS_PAGE_SIZE = 18;
+const MATERIALS_PAGE_SIZE = 21;
 const HOME_REQUEST_PREVIEW_LIMIT = 8;
+const HOME_POPULAR_PREVIEW_LIMIT = 20;
+const HOME_RECOMMENDATION_LIMIT = 30;
 const Snowfall = dynamic(() => import('react-snowfall'), { ssr: false });
 const MaterialCard = dynamic(() => import('../components/MaterialCard'));
 const HomeFilterCard = dynamic(() => import('../components/home/HomeFilterCard'));
@@ -97,6 +101,7 @@ interface HomeProps {
   tagOptions: string[];
   profileSummary: ProfileSummary | null;
   recommendations: MaterialListItem[];
+  popularMaterials: MaterialListItem[];
   requests: MaterialRequestItem[];
   requestLeaderboard: MaterialRequestItem[];
   contributors: ContributorRank[];
@@ -112,6 +117,7 @@ export default function Home({
   tagOptions,
   profileSummary,
   recommendations,
+  popularMaterials,
   requests,
   requestLeaderboard,
   contributors: initialContributors,
@@ -227,7 +233,7 @@ export default function Home({
     { label: '用户个数', value: formatNumber(Number(statValues.users)) },
   ];
   const recommendedItems = useMemo(() => recommendations ?? [], [recommendations]);
-  const mobileRecommendedItems = useMemo(() => recommendedItems.slice(0, 4), [recommendedItems]);
+  const mobileRecommendedItems = useMemo(() => recommendedItems.slice(0, 6), [recommendedItems]);
   const mobileLatestItems = useMemo(() => materialList.slice(0, 5), [materialList]);
   const recommendationHint = '';
   const recommendationEmpty = user
@@ -253,14 +259,12 @@ export default function Home({
   const gradeStageOptions = GRADE_STAGE_OPTIONS;
   const hasAdvancedFilters = useMemo(() => {
     const priceActive = filtersState.price && filtersState.price !== 'all';
-    const sortActive = filtersState.sort && filtersState.sort !== 'latest';
     return Boolean(
       filtersState.school ||
         filtersState.college ||
         filtersState.tag ||
         filtersState.courseCategory ||
-        priceActive ||
-        sortActive
+        priceActive
     );
   }, [
     filtersState.school,
@@ -268,7 +272,6 @@ export default function Home({
     filtersState.tag,
     filtersState.courseCategory,
     filtersState.price,
-    filtersState.sort,
   ]);
   const [isMobile, setIsMobile] = useState(false);
   const [reduceMotion, setReduceMotion] = useState(false);
@@ -658,6 +661,15 @@ export default function Home({
     await applyFilters(nextFilters, { scrollTarget: 'materials' });
   };
 
+  const handleMaterialSortChange = async (sort: string) => {
+    const nextFilters = {
+      ...filtersState,
+      sort: normalizeMaterialSort(sort),
+      page: '1',
+    };
+    await applyFilters(nextFilters, { scrollTarget: 'materials' });
+  };
+
   const handleMobileSearchSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const keyword = mobileSearch.trim();
@@ -755,6 +767,7 @@ export default function Home({
           requestError={requestError}
           requestNotice={requestNotice}
           leaderboardItems={leaderboardItems}
+          popularItems={popularMaterials}
           recommendedItems={recommendedItems}
           recommendationHint={recommendationHint}
           recommendationEmpty={recommendationEmpty}
@@ -775,9 +788,9 @@ export default function Home({
             onSubmit={handleFilterSubmit}
           />
 
-          <section className="card" id="materials-list" ref={materialsRef} style={{ gridColumn: '1 / -1' }}>
-            <div className="materials-header">
-              <div>
+          <section className="card materials-library-card" id="materials-list" ref={materialsRef}>
+            <div className="materials-header materials-library-header">
+              <div className="materials-library-header__summary">
                 <h2 className="card-title">
                   资料列表
                   <svg className="title-icon" viewBox="0 0 24 24" aria-hidden="true">
@@ -785,11 +798,21 @@ export default function Home({
                     <path d="M8 9h8M8 12h8M8 15h5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
                   </svg>
                 </h2>
-              </div>
-              <div className="materials-header__actions">
                 <p className="help-text">
                   当前第 {pageMeta.page} / {totalPages} 页 · 每页 {pageSize} 条 · 共 {pageMeta.total} 条结果
                 </p>
+                {filtersState.keyword.trim() ? (
+                  <p className="materials-search-context">
+                    当前搜索：<strong>{filtersState.keyword.trim()}</strong>
+                  </p>
+                ) : null}
+              </div>
+              <div className="materials-library-header__actions">
+                <MaterialSortSelect
+                  value={filtersState.sort}
+                  disabled={loadingPage}
+                  onChange={(value) => void handleMaterialSortChange(value)}
+                />
                 <div className="view-toggle" role="group" aria-label="列表视图切换">
                   <button
                     type="button"
@@ -952,7 +975,7 @@ export const getServerSideProps: GetServerSideProps<HomeProps> = async (ctx) => 
     gradeValue: sanitizeMetadataChoice(sanitizeFilter(ctx.query.gradeValue), GRADE_STAGE_OPTIONS),
     courseCategory: sanitizeCourseCategory(sanitizeFilter(ctx.query.courseCategory)),
     price: sanitizeFilter(ctx.query.price),
-    sort: sanitizeFilter(ctx.query.sort) || 'latest',
+    sort: normalizeMaterialSort(sanitizeFilter(ctx.query.sort)),
     page: sanitizeFilter(ctx.query.page) || '1',
     size: String(MATERIALS_PAGE_SIZE),
   };
@@ -984,7 +1007,7 @@ export const getServerSideProps: GetServerSideProps<HomeProps> = async (ctx) => 
   const recommendationsPromise: Promise<MaterialListItem[]> = fetchRecommendations(
     session.token || undefined,
     origin,
-    18
+    HOME_RECOMMENDATION_LIMIT
   ).catch((error) => {
     // eslint-disable-next-line no-console
     console.warn('Failed to fetch recommendations', error);
@@ -999,6 +1022,17 @@ export const getServerSideProps: GetServerSideProps<HomeProps> = async (ctx) => 
     console.warn('Failed to fetch requests', error);
     return [] as MaterialRequestItem[];
   });
+  const popularMaterialsPromise: Promise<MaterialListItem[]> = fetchMaterials(
+    { sort: 'recent_downloads', page: 1, size: HOME_POPULAR_PREVIEW_LIMIT },
+    session.token || undefined,
+    origin
+  )
+    .then((data) => data.items.slice(0, HOME_POPULAR_PREVIEW_LIMIT))
+    .catch((error) => {
+      // eslint-disable-next-line no-console
+      console.warn('Failed to fetch popular materials', error);
+      return [] as MaterialListItem[];
+    });
   const requestLeaderboardPromise: Promise<MaterialRequestItem[]> = fetchRequestLeaderboard(
     5,
     session.token || undefined,
@@ -1017,11 +1051,20 @@ export const getServerSideProps: GetServerSideProps<HomeProps> = async (ctx) => 
     console.warn('Failed to fetch contributors', error);
     return [] as ContributorRank[];
   });
-  const [{ materials, meta, stats, tagOptions }, profileSummary, recommendations, requests, requestLeaderboard, contributors] =
+  const [
+    { materials, meta, stats, tagOptions },
+    profileSummary,
+    recommendations,
+    popularMaterials,
+    requests,
+    requestLeaderboard,
+    contributors,
+  ] =
     await Promise.all([
       materialsPromise,
       profilePromise,
       recommendationsPromise,
+      popularMaterialsPromise,
       requestsPromise,
       requestLeaderboardPromise,
       contributorsPromise,
@@ -1039,6 +1082,7 @@ export const getServerSideProps: GetServerSideProps<HomeProps> = async (ctx) => 
       tagOptions,
       profileSummary,
       recommendations,
+      popularMaterials,
       requests,
       requestLeaderboard,
       contributors,

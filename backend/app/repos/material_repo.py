@@ -472,6 +472,24 @@ class MaterialRepository:
         )
         return session.scalar(stmt)
 
+    def find_by_submission_key(
+        self,
+        session: Session,
+        *,
+        uploader_id: int,
+        submission_key: str,
+    ) -> MaterialRecord | None:
+        stmt = (
+            select(MaterialRecord)
+            .options(*_material_record_load_options(session))
+            .where(
+                MaterialRecord.uploader_id == uploader_id,
+                MaterialRecord.submission_key == submission_key,
+            )
+            .limit(1)
+        )
+        return session.scalar(stmt)
+
     def list_materials_by_ids(self, session: Session, material_ids: list[int]) -> list[MaterialRecord]:
         if not material_ids:
             return []
@@ -497,6 +515,11 @@ class MaterialRepository:
         refreshable_columns = [column.name for column in _MATERIAL_MAPPED_COLUMNS if column.name in existing_columns]
         if refreshable_columns:
             session.refresh(material, attribute_names=refreshable_columns)
+        return material
+
+    def reserve_material(self, session: Session, material: MaterialRecord) -> MaterialRecord:
+        session.add(material)
+        session.flush()
         return material
 
     def list_versions(self, session: Session, material_id: int) -> list[MaterialVersionRecord]:
@@ -882,6 +905,25 @@ class MaterialRepository:
     def has_download(self, session: Session, material_id: int, user_id: int) -> bool:
         stmt = select(MaterialDownloadRecord.id).where(MaterialDownloadRecord.material_id == material_id, MaterialDownloadRecord.user_id == user_id)
         return session.scalar(stmt) is not None
+
+    def count_downloads_by_material_since(
+        self,
+        session: Session,
+        *,
+        since: datetime,
+        material_ids: list[int],
+    ) -> dict[int, int]:
+        if not material_ids:
+            return {}
+        stmt = (
+            select(MaterialDownloadRecord.material_id, func.count(MaterialDownloadRecord.id))
+            .where(
+                MaterialDownloadRecord.material_id.in_(material_ids),
+                MaterialDownloadRecord.created_at >= since,
+            )
+            .group_by(MaterialDownloadRecord.material_id)
+        )
+        return {int(material_id): int(count) for material_id, count in session.execute(stmt).all()}
 
     def add_download(self, session: Session, *, material_id: int, user_id: int) -> MaterialDownloadRecord:
         if self._uses_legacy_material_downloads(session):

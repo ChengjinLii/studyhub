@@ -2,6 +2,7 @@ import { GetServerSideProps } from 'next';
 import Link from 'next/link';
 import { FormEvent, useMemo, useState } from 'react';
 import MaterialCard from '../../components/MaterialCard';
+import MaterialSortSelect from '../../components/materials/MaterialSortSelect';
 import NavBar from '../../components/NavBar';
 import MobileFilterDrawer, { MobileMaterialFilterState } from '../../components/mobile/MobileFilterDrawer';
 import {
@@ -15,10 +16,11 @@ import { fetchMaterials, MaterialListStats } from '../../lib/api';
 import { getRequestOrigin } from '../../lib/apiBase';
 import { readSession } from '../../lib/auth';
 import { formatNumber } from '../../lib/format';
+import { normalizeMaterialSort } from '../../constants/materialSort';
 import { MaterialListItem, PaginationMeta } from '../../types/material';
 import { SessionUser } from '../../types/user';
 
-const MATERIALS_PAGE_SIZE = 18;
+const MATERIALS_PAGE_SIZE = 21;
 const DEFAULT_TAG_OPTIONS = ['期末真题', '期末速成', '日常学习笔记', '教材答案', '一页纸', '开卷资料'];
 
 interface MaterialsPageProps {
@@ -235,20 +237,21 @@ export default function MaterialsPage({ user, materials, meta, filters, stats, t
             <div>
               <h2>全部资料</h2>
               <p>共 {pageMeta.total} 条结果，当前显示 {materialList.length} 条。</p>
+              {filtersState.keyword.trim() ? (
+                <p className="materials-search-context">
+                  当前搜索：<strong>{filtersState.keyword.trim()}</strong>
+                </p>
+              ) : null}
             </div>
-            <select
+            <MaterialSortSelect
               value={filtersState.sort || 'latest'}
-              onChange={async (event) => {
-                const nextFilters = { ...filtersState, sort: event.target.value, page: '1' };
+              disabled={loading}
+              onChange={async (value) => {
+                const nextFilters = { ...filtersState, sort: normalizeMaterialSort(value), page: '1' };
                 setFiltersState(nextFilters);
                 await loadPage(nextFilters, 1);
               }}
-              aria-label="排序"
-            >
-              <option value="latest">综合</option>
-              <option value="price">价格</option>
-              <option value="sales">销量</option>
-            </select>
+            />
           </div>
           {error && <p className="error-text">{error}</p>}
           {materialList.length === 0 ? (
@@ -300,7 +303,7 @@ export const getServerSideProps: GetServerSideProps<MaterialsPageProps> = async 
     gradeValue: sanitizeMetadataChoice(sanitizeFilter(ctx.query.gradeValue), GRADE_STAGE_OPTIONS),
     courseCategory: sanitizeCourseCategory(sanitizeFilter(ctx.query.courseCategory)),
     price: sanitizeFilter(ctx.query.price),
-    sort: sanitizeFilter(ctx.query.sort) || 'latest',
+    sort: normalizeMaterialSort(sanitizeFilter(ctx.query.sort)),
     page: sanitizeFilter(ctx.query.page) || '1',
     size: String(MATERIALS_PAGE_SIZE),
   };

@@ -108,7 +108,10 @@ export default function HomeLeaderboard({
                       <span>{c.downloads} 位同学下载过 Ta 的资料</span>
                     </div>
                     <div className="leaderboard-actions">
-                      <Link className="button ghost small" href={userPath(c.userId, c.username || '匿名贡献者')}>
+                      <Link
+                        className="button ghost small leaderboard-view-action"
+                        href={userPath(c.userId, c.username || '匿名贡献者')}
+                      >
                         查看
                       </Link>
                       <button

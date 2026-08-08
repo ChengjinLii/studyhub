@@ -1,5 +1,11 @@
 import { Dispatch, SetStateAction, useEffect, useState } from 'react';
-import { CourseCategoryValue, defaultCollege, GRADE_STAGE_OPTIONS, SUPPORTED_SCHOOL, normalizeCourseCategory } from '../constants/metadata';
+import {
+  CourseCategorySelection,
+  defaultCollege,
+  GRADE_STAGE_OPTIONS,
+  SUPPORTED_SCHOOL,
+  normalizeCourseCategory,
+} from '../constants/metadata';
 import { MaterialDetail } from '../types/material';
 import { ColumnTopicKey, resolveExperienceTopicFromTags } from './column';
 import { toErrorMessage } from './errors';
@@ -21,7 +27,7 @@ interface UseUploadExistingMaterialOptions {
   setSchool: StringSetter;
   setCollege: StringSetter;
   setSelectedMajors: Dispatch<SetStateAction<string[]>>;
-  setCourseCategory: Dispatch<SetStateAction<CourseCategoryValue>>;
+  setCourseCategory: Dispatch<SetStateAction<CourseCategorySelection>>;
   setGradeValue: StringSetter;
   setSelectedTags: Dispatch<SetStateAction<string[]>>;
   setUploadMode: Dispatch<SetStateAction<'material' | 'experience'>>;

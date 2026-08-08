@@ -5,10 +5,13 @@ import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import AppImage from '../components/AppImage';
 import NavBar from '../components/NavBar';
 import UploadBasicSection from '../components/upload/UploadBasicSection';
+import UploadChoiceCard from '../components/upload/UploadChoiceCard';
 import UploadConfirmSection from '../components/upload/UploadConfirmSection';
 import UploadHero from '../components/upload/UploadHero';
+import UploadMaterialFileField from '../components/upload/UploadMaterialFileField';
 import UploadMetaSection from '../components/upload/UploadMetaSection';
 import UploadPolicyModal from '../components/upload/UploadPolicyModal';
+import UploadProgressSidebar from '../components/upload/UploadProgressSidebar';
 import SectionLabel from '../components/upload/UploadSectionLabel';
 import { readSession } from '../lib/auth';
 import { SessionUser } from '../types/user';
@@ -16,6 +19,7 @@ import { UserAccountProfile } from '../types/userProfile';
 import {
   SUPPORTED_SCHOOL,
   defaultCollege,
+  CourseCategorySelection,
   CourseCategoryValue,
   GRADE_STAGE_OPTIONS,
 } from '../constants/metadata';
@@ -34,7 +38,13 @@ import { parseMajorList } from '../lib/major';
 import { materialPath } from '../lib/slug';
 import { buildZipName, resolveZipFileName, zipFiles, zipMarkdownContent } from '../lib/uploadAssets';
 import { buildUploadPayload } from '../lib/uploadPayload';
-import { sendUploadFormData } from '../lib/uploadSubmit';
+import { isUploadResultUncertain, sendUploadFormData } from '../lib/uploadSubmit';
+import {
+  buildUploadSubmissionFingerprint,
+  clearUploadSubmission,
+  resolveUploadSubmissionId,
+  UploadSubmissionStage,
+} from '../lib/uploadSubmission';
 import {
   formatPriceSummary,
   normalizePriceInput,
@@ -44,6 +54,7 @@ import {
 import { useSectionNavigation } from '../lib/useSectionNavigation';
 import { useUploadExistingMaterial } from '../lib/useUploadExistingMaterial';
 import { useUploadImageSelection } from '../lib/useUploadImageSelection';
+import { resolveUploadSectionCompletion } from '../lib/uploadSectionCompletion';
 
 const presetTags = [
   '日常学习笔记',
@@ -72,6 +83,7 @@ const MAX_TITLE_LENGTH = 80;
 const MAX_DESC_LENGTH = 300;
 const MAX_EXPERIENCE_LENGTH = 3000;
 const MAX_COPYRIGHT_LENGTH = 8;
+
 const PREVIEW_SOURCE_AUTO = 'AUTO';
 const PREVIEW_SOURCE_MANUAL = 'MANUAL';
 const MAX_PREVIEW_IMAGE_BYTES = 5 * 1024 * 1024;
@@ -82,7 +94,6 @@ const MIN_MANUAL_PREVIEW_IMAGES = 1;
 const MIN_REQUEST_PREVIEW_IMAGES = 2;
 const QUICK_UPLOAD_OPTIONS: string[] = [];
 const UPLOAD_NAV_ITEMS = [
-  { id: 'upload-overview', label: '页面总览' },
   { id: 'upload-basic', label: '基础信息' },
   { id: 'upload-meta', label: '课程与标签' },
   { id: 'upload-delivery', label: '交付与预览' },
@@ -96,31 +107,17 @@ interface UploadPageProps {
 }
 
 const resolveMaterialProfilePrefill = (account: UserAccountProfile | null) => {
-  const accountSchool = account?.school?.trim();
   const accountCollege = account?.college?.trim();
   const accountMajor = account?.major?.trim();
   const accountGrades = Array.isArray(account?.gradeStages) ? account.gradeStages.filter(Boolean) : [];
   const matchedGrade =
     accountGrades.find((stage) => GRADE_STAGE_OPTIONS.includes(stage as (typeof GRADE_STAGE_OPTIONS)[number])) || '';
   const resolvedMajors = accountMajor ? parseMajorList(accountMajor) : [];
-  const hasProfileContext = Boolean(accountSchool || accountCollege || accountMajor || matchedGrade);
-  if (!hasProfileContext) {
-    return {
-      school: SUPPORTED_SCHOOL,
-      college: defaultCollege,
-      majors: [] as string[],
-      gradeValue: GRADE_STAGE_OPTIONS[0],
-      courseCategory: 'MAJOR' as CourseCategoryValue,
-    };
-  }
-  const resolvedCourseCategory: CourseCategoryValue =
-    accountCollege || resolvedMajors.length > 0 ? 'MAJOR' : 'GENERAL';
   return {
     school: SUPPORTED_SCHOOL,
-    college: resolvedCourseCategory === 'MAJOR' ? accountCollege || defaultCollege : '',
-    majors: resolvedCourseCategory === 'MAJOR' ? resolvedMajors : [],
+    college: accountCollege || defaultCollege,
+    majors: resolvedMajors,
     gradeValue: matchedGrade || GRADE_STAGE_OPTIONS[0],
-    courseCategory: resolvedCourseCategory,
   };
 };
 
@@ -141,7 +138,7 @@ export default function UploadPage({ user, token, account }: UploadPageProps) {
   const [policyModalOpen, setPolicyModalOpen] = useState(false);
   const gradeStageOptions = GRADE_STAGE_OPTIONS;
   const [gradeValue, setGradeValue] = useState<string>(materialProfilePrefill.gradeValue);
-  const [courseCategory, setCourseCategory] = useState<CourseCategoryValue>(materialProfilePrefill.courseCategory);
+  const [courseCategory, setCourseCategory] = useState<CourseCategorySelection>('');
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [customTags, setCustomTags] = useState('');
   const [yearTag, setYearTag] = useState('');
@@ -177,13 +174,18 @@ export default function UploadPage({ user, token, account }: UploadPageProps) {
   const [netdiskReminderAt, setNetdiskReminderAt] = useState('');
   const [copyrightOwner, setCopyrightOwner] = useState('');
   const [status, setStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
-  const [submitting, setSubmitting] = useState(false);
+  const [submissionStage, setSubmissionStage] = useState<UploadSubmissionStage>('idle');
+  const [successPath, setSuccessPath] = useState<string | null>(null);
+  const [agreementAccepted, setAgreementAccepted] = useState(false);
   const [zipPlaceholder, setZipPlaceholder] = useState('未选择任何文件');
   const [quickPanelOpen, setQuickPanelOpen] = useState(false);
   const [quickSelectedOption, setQuickSelectedOption] = useState<string | null>(null);
   const [requestId, setRequestId] = useState<number | null>(null);
   const [requestPrefilled, setRequestPrefilled] = useState(false);
   const uploadRequestRef = useRef<XMLHttpRequest | null>(null);
+  const submissionInFlightRef = useRef(false);
+  const allowSubmissionNavigationRef = useRef(false);
+  const submitting = submissionStage !== 'idle';
   const apiBase = useMemo(
     () => resolveApiBase(typeof window !== 'undefined' ? window.location.origin : undefined),
     []
@@ -260,18 +262,26 @@ export default function UploadPage({ user, token, account }: UploadPageProps) {
     const resolvedCollege = accountCollege || defaultCollege;
     const resolvedMajors = accountMajor ? parseMajorList(accountMajor) : [];
     const resolvedGradeValue = matchedGrade || gradeStageOptions[0];
-    const resolvedCourseCategory: CourseCategoryValue =
-      accountCollege || resolvedMajors.length > 0 ? 'MAJOR' : 'GENERAL';
     return {
       school: resolvedSchool,
       college: resolvedCollege,
       majors: resolvedMajors,
       majorDisplay: accountMajor || '未填写',
       gradeValue: resolvedGradeValue,
-      courseCategory: resolvedCourseCategory,
-      courseCategoryLabel: resolvedCourseCategory === 'MAJOR' ? '专业课' : '通识课',
     };
   }, [account, gradeStageOptions]);
+  const sectionCompletion = resolveUploadSectionCompletion({
+    isExperience, isQuickMode, isExperienceCustomTopic, title, description, experienceCustomTag, price,
+    school: isQuickMode ? quickProfile.school : school,
+    college: isQuickMode ? quickProfile.college : college,
+    gradeValue: isQuickMode ? quickProfile.gradeValue : gradeValue,
+    courseCategory,
+    deliveryMethod, hasSelectedFile: Boolean(zipFile), hasExistingFile, zipPreparing, netdiskUrl,
+    previewSource: isRequestResponse ? PREVIEW_SOURCE_MANUAL : previewSource,
+    isRequestResponse, isEditing, manualPreviewCount: manualPreviewFiles.length,
+    minManualPreviewImages: MIN_MANUAL_PREVIEW_IMAGES, minRequestPreviewImages: MIN_REQUEST_PREVIEW_IMAGES,
+    agreementAccepted,
+  });
   const { loadingExisting } = useUploadExistingMaterial({
     isEditing,
     editingId,
@@ -309,6 +319,17 @@ export default function UploadPage({ user, token, account }: UploadPageProps) {
   });
 
   useEffect(() => {
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      if (!submissionInFlightRef.current || allowSubmissionNavigationRef.current) return;
+      event.preventDefault();
+      event.returnValue = '';
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, []);
+
+  useEffect(() => {
+    if (!courseCategory) return;
     if (courseCategory === 'MAJOR') {
       setCollege((prev) => (prev ? prev : defaultCollege));
       setSelectedMajors((prev) => (prev.length > 0 ? prev : []));
@@ -376,7 +397,6 @@ export default function UploadPage({ user, token, account }: UploadPageProps) {
 
   useEffect(() => {
     if (isEditing || !isExperience) return;
-    setCourseCategory('GENERAL');
     setCollege('');
     setSelectedMajors([]);
     setSelectedTags([]);
@@ -439,6 +459,7 @@ export default function UploadPage({ user, token, account }: UploadPageProps) {
   };
 
   const clearZipFile = () => {
+    if (submissionInFlightRef.current) return;
     if (uploadRequestRef.current) {
       uploadRequestRef.current.abort();
       uploadRequestRef.current = null;
@@ -469,6 +490,7 @@ export default function UploadPage({ user, token, account }: UploadPageProps) {
   };
 
   const handleZipSelection = async (fileList: FileList | null) => {
+    if (submissionInFlightRef.current) return;
     const files = fileList ? Array.from(fileList) : [];
     const taskId = ++zipTaskRef.current;
     if (files.length === 0) {
@@ -509,14 +531,6 @@ export default function UploadPage({ user, token, account }: UploadPageProps) {
     }
   };
 
-  const handleZipDrop = (event: React.DragEvent<HTMLDivElement>) => {
-    event.preventDefault();
-    if (event.dataTransfer.files && event.dataTransfer.files.length > 0) {
-      void handleZipSelection(event.dataTransfer.files);
-      event.dataTransfer.clearData();
-    }
-  };
-
   const deriveAutoTitle = (name: string) => {
     const withoutExt = name.replace(/\.[^/.]+$/, '');
     return withoutExt.slice(0, MAX_TITLE_LENGTH);
@@ -524,6 +538,7 @@ export default function UploadPage({ user, token, account }: UploadPageProps) {
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
+    if (submissionInFlightRef.current) return;
     setStatus(null);
     const fallbackGradeValue = gradeStageOptions[0];
     const effectiveTitle = (title.trim() || (isQuickMode && zipFile ? deriveAutoTitle(zipFile.name) : '')).slice(
@@ -531,7 +546,7 @@ export default function UploadPage({ user, token, account }: UploadPageProps) {
       MAX_TITLE_LENGTH
     );
     const effectiveGradeValue = isQuickMode ? quickProfile.gradeValue || fallbackGradeValue : gradeValue;
-    const effectiveCourseCategory = isQuickMode ? quickProfile.courseCategory : courseCategory;
+    const effectiveCourseCategory: CourseCategorySelection = isExperience ? 'GENERAL' : courseCategory;
     const effectiveCollege = effectiveCourseCategory === 'MAJOR' ? (isQuickMode ? quickProfile.college : college) : '';
     const effectiveMajors = effectiveCourseCategory === 'MAJOR' ? (isQuickMode ? quickProfile.majors : selectedMajors) : [];
     const effectiveTagList = isQuickMode ? [] : tagList;
@@ -569,6 +584,7 @@ export default function UploadPage({ user, token, account }: UploadPageProps) {
       descriptionLimit,
       copyrightOwner,
       price,
+      courseCategory: effectiveCourseCategory,
       limits: {
         maxTitleLength: MAX_TITLE_LENGTH,
         maxDescLength: MAX_DESC_LENGTH,
@@ -585,9 +601,20 @@ export default function UploadPage({ user, token, account }: UploadPageProps) {
       setStatus({ type: 'error', message: validation.error });
       return;
     }
+    if (!effectiveCourseCategory) {
+      setStatus({ type: 'error', message: '请选择课程类型。' });
+      return;
+    }
+    const selectedCourseCategory: CourseCategoryValue = effectiveCourseCategory;
     const resolvedPriceValue = validation.priceValue;
+    let completed = false;
+    let uploadTransferred = false;
+    let submissionId: string | null = null;
     try {
-      setSubmitting(true);
+      submissionInFlightRef.current = true;
+      allowSubmissionNavigationRef.current = false;
+      setSuccessPath(null);
+      setSubmissionStage('preparing');
       setUploadProgress(isExperience || zipFile ? 0 : null);
       const trimmedTitle = effectiveTitle;
       const trimmedDescription = description.trim();
@@ -600,7 +627,7 @@ export default function UploadPage({ user, token, account }: UploadPageProps) {
         college: effectiveCollege,
         majors: effectiveMajors,
         gradeValue: effectiveGradeValue,
-        courseCategory: effectiveCourseCategory,
+        courseCategory: selectedCourseCategory,
         tags: effectiveTagList,
         deliveryMethod: resolvedDelivery,
         netdiskUrl: trimmedNetdiskUrl,
@@ -638,24 +665,66 @@ export default function UploadPage({ user, token, account }: UploadPageProps) {
       if (allowCustomPreview && customPreviewFiles.length > 0) {
         customPreviewFiles.forEach((file) => formData.append('customPreviews', file));
       }
+      if (!isEditing) {
+        const fingerprint = await buildUploadSubmissionFingerprint({
+          payload,
+          file: uploadFile
+            ? {
+                name: uploadFile.name,
+                size: uploadFile.size,
+                type: uploadFile.type,
+                lastModified: isExperience || zipSourceCount > 1 ? null : uploadFile.lastModified,
+              }
+            : null,
+          previews: manualPreviewFiles.map((file) => [file.name, file.size, file.lastModified]),
+          customPreviews: customPreviewFiles.map((file) => [file.name, file.size, file.lastModified]),
+        });
+        submissionId = resolveUploadSubmissionId(fingerprint, window.sessionStorage);
+        payload.submissionId = submissionId;
+        formData.set('payload', new Blob([JSON.stringify(payload)], { type: 'application/json' }));
+      }
       const endpoint = isEditing ? `${apiBase}/materials/${editingId}` : `${apiBase}/materials`;
       const method = isEditing ? 'PUT' : 'POST';
+      setSubmissionStage('uploading');
       const json = await sendUploadFormData(endpoint, method, formData, {
         token,
-        onProgress: setUploadProgress,
+        onProgress: (value) => {
+          setUploadProgress(value);
+          if (value >= 100) {
+            uploadTransferred = true;
+            setSubmissionStage('processing');
+          }
+        },
         requestRef: uploadRequestRef,
       });
       if (isQuickMode && !title.trim()) {
         setTitle(trimmedTitle);
       }
-      setStatus({ type: 'success', message: isEditing ? '更新成功，正在跳转...' : '投稿成功，正在跳转到资料详情...' });
-      await router.push(materialPath(json.data.id, json.data.title || trimmedTitle));
+      const destination = materialPath(json.data.id, json.data.title || trimmedTitle);
+      if (submissionId) {
+        clearUploadSubmission(window.sessionStorage, submissionId);
+      }
+      completed = true;
+      submissionInFlightRef.current = false;
+      allowSubmissionNavigationRef.current = true;
+      setUploadProgress(100);
+      setSuccessPath(destination);
+      setSubmissionStage('redirecting');
+      setStatus({ type: 'success', message: isEditing ? '更新成功。' : '投稿成功。' });
+      window.setTimeout(() => window.location.replace(destination), 80);
     } catch (error: unknown) {
-      setStatus({ type: 'error', message: toErrorMessage(error, '投稿失败') });
+      const errorMessage = toErrorMessage(error, '投稿失败');
+      const fallback = uploadTransferred && isUploadResultUncertain(error)
+        ? `连接已中断，但服务器可能仍在保存资料。请不要新建投稿，稍后直接重新提交，系统会识别同一次投稿。（${errorMessage}）`
+        : `${isEditing ? '更新' : '投稿'}未成功：${errorMessage}`;
+      setStatus({ type: 'error', message: fallback });
     } finally {
-      setSubmitting(false);
-      setUploadProgress(null);
       uploadRequestRef.current = null;
+      if (!completed) {
+        submissionInFlightRef.current = false;
+        setSubmissionStage('idle');
+        setUploadProgress(null);
+      }
     }
   };
 
@@ -711,7 +780,12 @@ export default function UploadPage({ user, token, account }: UploadPageProps) {
       : '资料投稿';
 
   const formContent = (
-    <form id="upload-form" className="upload-stacked-form" onSubmit={handleSubmit}>
+    <form
+      id="upload-form"
+      className={`upload-stacked-form${submitting ? ' is-submitting' : ''}`}
+      onSubmit={handleSubmit}
+      aria-busy={submitting}
+    >
       <UploadBasicSection
         isExperience={isExperience}
         isQuickMode={isQuickMode}
@@ -784,30 +858,24 @@ export default function UploadPage({ user, token, account }: UploadPageProps) {
           <section className="card upload-main-card upload-section-card">
             <div className="form-grid upload-section-grid">
             <div className="form-item full">
-              <SectionLabel text="资料交付方式" />
+              <SectionLabel text="资料交付方式" selectionHint="请选择 1 项" />
               <div className="delivery-method-options" role="radiogroup" aria-label="资料交付方式">
-                <label className={`delivery-method-card ${deliveryMethod === 'FILE' ? 'active' : ''}`}>
-                  <input
-                    type="radio"
-                    name="deliveryMethod"
-                    value="FILE"
-                    checked={deliveryMethod === 'FILE'}
-                    onChange={() => setDeliveryMethod('FILE')}
-                  />
-                  <span className="delivery-method-card__title">站内文件交付</span>
-                  <span className="delivery-method-card__desc">后续在下方选择文件，单次总大小不超过 50MB。</span>
-                </label>
-                <label className={`delivery-method-card ${deliveryMethod === 'NETDISK' ? 'active' : ''}`}>
-                  <input
-                    type="radio"
-                    name="deliveryMethod"
-                    value="NETDISK"
-                    checked={deliveryMethod === 'NETDISK'}
-                    onChange={() => setDeliveryMethod('NETDISK')}
-                  />
-                  <span className="delivery-method-card__title">网盘链接交付</span>
-                  <span className="delivery-method-card__desc">适合超过 50MB 或需要外部维护的资料。</span>
-                </label>
+                <UploadChoiceCard
+                  name="deliveryMethod"
+                  value="FILE"
+                  title="站内文件交付"
+                  description="后续在下方选择文件，单次总大小不超过 50MB。"
+                  selected={deliveryMethod === 'FILE'}
+                  onSelect={() => setDeliveryMethod('FILE')}
+                />
+                <UploadChoiceCard
+                  name="deliveryMethod"
+                  value="NETDISK"
+                  title="网盘链接交付"
+                  description="适合超过 50MB 或需要外部维护的资料。"
+                  selected={deliveryMethod === 'NETDISK'}
+                  onSelect={() => setDeliveryMethod('NETDISK')}
+                />
               </div>
               <p className="help-text">
                 {isQuickMode
@@ -817,7 +885,7 @@ export default function UploadPage({ user, token, account }: UploadPageProps) {
             </div>
             {!isQuickMode && (
               <div className="form-item full">
-              <SectionLabel text="预览图设置" />
+              <SectionLabel text="预览图设置" selectionHint="请选择 1 项" />
               {isRequestResponse ? (
                 <p className="help-text">
                   请上传符合求购者要求的预览图
@@ -825,27 +893,23 @@ export default function UploadPage({ user, token, account }: UploadPageProps) {
                 </p>
               ) : (
                 <>
-                  <div className="inline-group wrap">
-                    <label className={`choice-pill ${previewSource === PREVIEW_SOURCE_AUTO ? 'active' : ''}`}>
-                      <input
-                        type="radio"
-                        name="previewSource"
-                        value={PREVIEW_SOURCE_AUTO}
-                        checked={previewSource === PREVIEW_SOURCE_AUTO}
-                        onChange={() => setPreviewSource(PREVIEW_SOURCE_AUTO)}
-                      />
-                      <span>自动生成（推荐）</span>
-                    </label>
-                    <label className={`choice-pill ${previewSource === PREVIEW_SOURCE_MANUAL ? 'active' : ''}`}>
-                      <input
-                        type="radio"
-                        name="previewSource"
-                        value={PREVIEW_SOURCE_MANUAL}
-                        checked={previewSource === PREVIEW_SOURCE_MANUAL}
-                        onChange={() => setPreviewSource(PREVIEW_SOURCE_MANUAL)}
-                      />
-                      <span>手动上传</span>
-                    </label>
+                  <div className="upload-preview-source-options" role="radiogroup" aria-label="预览图设置">
+                    <UploadChoiceCard
+                      name="previewSource"
+                      value={PREVIEW_SOURCE_AUTO}
+                      title="自动生成（推荐）"
+                      description="系统从资料文件生成预览，PDF 文件效果最佳。"
+                      selected={previewSource === PREVIEW_SOURCE_AUTO}
+                      onSelect={() => setPreviewSource(PREVIEW_SOURCE_AUTO)}
+                    />
+                    <UploadChoiceCard
+                      name="previewSource"
+                      value={PREVIEW_SOURCE_MANUAL}
+                      title="手动上传"
+                      description="自行选择展示内容，至少上传 1 张预览图。"
+                      selected={previewSource === PREVIEW_SOURCE_MANUAL}
+                      onSelect={() => setPreviewSource(PREVIEW_SOURCE_MANUAL)}
+                    />
                   </div>
                   {previewSource === PREVIEW_SOURCE_AUTO && (
                     <p className="help-text">系统将自动生成预览图（PDF 最佳）。如需自定义可切换手动上传。</p>
@@ -932,46 +996,19 @@ export default function UploadPage({ user, token, account }: UploadPageProps) {
               </div>
             )}
             {deliveryMethod === 'FILE' && (
-              <div className="form-item full">
-                <SectionLabel htmlFor="zip" text="资料文件（总大小≤50MB，支持多文件）" />
-                <div className="file-field drop-zone" onDragOver={(e) => e.preventDefault()} onDrop={handleZipDrop}>
-                  <span className="file-trigger">选择 / 拖拽 文件</span>
-                  <span className="file-name">
-                    {zipPreparing
-                      ? '正在打包文件...'
-                      : zipFile
-                        ? zipSourceCount > 1
-                          ? `已选择 ${zipSourceCount} 个文件，打包为 ${buildZipName(
-                              title,
-                              zipFile.name.replace(/\.zip$/i, ''),
-                              MAX_TITLE_LENGTH
-                            )}`
-                          : zipFile.name
-                        : isEditing
-                          ? '保持现有文件（可重新上传）'
-                          : zipPlaceholder}
-                  </span>
-                  {zipFile && (
-                    <button type="button" className="file-clear" onClick={clearZipFile} aria-label="移除文件">
-                      x
-                    </button>
-                  )}
-                  <input
-                    id="zip"
-                    type="file"
-                    ref={zipInputRef}
-                    multiple
-                    onChange={(e) => void handleZipSelection(e.target.files)}
-                  />
-                </div>
-                {uploadProgress !== null && (
-                  <div className="upload-progress" aria-live="polite">
-                    <progress value={uploadProgress} max={100} />
-                    <span className="upload-percent">{uploadProgress}%</span>
-                  </div>
-                )}
-                <p className="help-text">将文件拖拽到此区域或点击选择，总大小不超过 50MB，多文件将自动打包为 zip。</p>
-              </div>
+              <UploadMaterialFileField
+                file={zipFile}
+                sourceCount={zipSourceCount}
+                preparing={zipPreparing}
+                isEditing={isEditing}
+                placeholder={zipPlaceholder}
+                title={title}
+                maxTitleLength={MAX_TITLE_LENGTH}
+                inputRef={zipInputRef}
+                uploadProgress={uploadProgress}
+                onFilesSelected={handleZipSelection}
+                onClear={clearZipFile}
+              />
             )}
             {deliveryMethod === 'NETDISK' && (
               <>
@@ -1010,10 +1047,14 @@ export default function UploadPage({ user, token, account }: UploadPageProps) {
         copyrightOwner={copyrightOwner}
         maxCopyrightLength={MAX_COPYRIGHT_LENGTH}
         submitting={submitting}
+        submissionStage={submissionStage}
         uploadProgress={uploadProgress}
+        successPath={successPath}
+        agreementAccepted={agreementAccepted}
         status={status}
         onCopyrightOwnerChange={setCopyrightOwner}
         onPolicyOpen={() => setPolicyModalOpen(true)}
+        onAgreementAcceptedChange={setAgreementAccepted}
       />
     </form>
   );
@@ -1037,29 +1078,12 @@ export default function UploadPage({ user, token, account }: UploadPageProps) {
           </section>
         ) : (
           <div className="upload-layout">
-            <aside className="me-sidebar upload-sidebar">
-              <div className="me-sidebar__brand">投稿中心</div>
-              <div className="me-sidebar__group">
-                <div className="me-sidebar__label">页面导航</div>
-                <nav className="me-sidebar__items" aria-label="投稿页面导航">
-                  {uploadNavItems.map((item, index) => (
-                    <a
-                      key={item.id}
-                      href={`#${item.id}`}
-                      className={`me-sidebar__item${activeSection === item.id ? ' active' : ''}`}
-                      onClick={(event) => {
-                        event.preventDefault();
-                        jumpToSection(item.id);
-                      }}
-                    >
-                      <span className="me-sidebar__indicator" />
-                      <span className="me-sidebar__index">{String(index + 1).padStart(2, '0')}</span>
-                      <span className="me-sidebar__text">{item.label}</span>
-                    </a>
-                  ))}
-                </nav>
-              </div>
-            </aside>
+            <UploadProgressSidebar
+              items={uploadNavItems}
+              activeSection={activeSection}
+              completion={sectionCompletion}
+              onJump={jumpToSection}
+            />
             <div className="upload-main">
               <UploadHero
                 isEditing={isEditing}

@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from 'react';
 import AppImage from '../../components/AppImage';
 import ExperienceImageModal from '../../components/materials/ExperienceImageModal';
 import MaterialPreviewPanel from '../../components/materials/MaterialPreviewPanel';
+import NetdiskAccessModal from '../../components/materials/NetdiskAccessModal';
 import NavBar from '../../components/NavBar';
 import SafeMarkdown from '../../components/SafeMarkdown';
 import ShareSheet from '../../components/ShareSheet';
@@ -61,6 +62,8 @@ export default function MaterialDetailPage({ material, user }: MaterialDetailPag
     downloading,
     downloadUrl,
     showNetdiskLink,
+    netdiskModalOpen,
+    setNetdiskModalOpen,
     myRating,
     ratingAvg,
     ratingCount,
@@ -575,7 +578,7 @@ export default function MaterialDetailPage({ material, user }: MaterialDetailPag
                     </p>
                   )}
                   {info && <p className="success-text">{info}</p>}
-                  {downloadUrl && (
+                  {material.hasFile && downloadUrl && (
                     <p className="help-text detail-price-card__note">
                       如果浏览器未自动开始下载，可
                       <a href={downloadUrl} target="_blank" rel="noopener noreferrer">
@@ -667,34 +670,11 @@ export default function MaterialDetailPage({ material, user }: MaterialDetailPag
                 {canViewNetdisk ? (
                   <>
                     {showNetdiskLink ? (
-                      <div className="netdisk-info">
-                        <p className="netdisk-link">
-                          链接：{downloadUrl || material.netdiskUrl || '暂无链接'}
-                          {downloadUrl || material.netdiskUrl ? (
-                            <button
-                              type="button"
-                              className="text-button"
-                              onClick={() => navigator.clipboard.writeText(downloadUrl || material.netdiskUrl || '')}
-                            >
-                              复制
-                            </button>
-                          ) : null}
-                          {downloadUrl || material.netdiskUrl ? (
-                            <button
-                              type="button"
-                              className="button ghost small"
-                              style={{ marginLeft: 8 }}
-                              onClick={() => navigator.clipboard.writeText(downloadUrl || material.netdiskUrl || '')}
-                            >
-                              复制链接
-                            </button>
-                          ) : null}
-                        </p>
-                        {material.netdiskPassword && <p>提取码：{material.netdiskPassword}</p>}
-                        {material.netdiskExpiredAt && <p>建议 {material.netdiskExpiredAt} 前检查链接有效性。</p>}
-                        {material.netdiskReminderAt && (
-                          <p className="help-text">投稿者备注提醒：{material.netdiskReminderAt}</p>
-                        )}
+                      <div className="netdisk-info netdisk-info--ready">
+                        <p>链接与提取码已获取，可在弹窗中复制或打开网盘。</p>
+                        <button className="button ghost small" type="button" onClick={() => setNetdiskModalOpen(true)}>
+                          再次查看
+                        </button>
                       </div>
                     ) : (
                       <p className="help-text">点击右侧操作区的“获取网盘链接”后查看链接与提取码。</p>
@@ -778,6 +758,17 @@ export default function MaterialDetailPage({ material, user }: MaterialDetailPag
         linkUrl={shareSheetUrl}
         onClose={() => setShareSheetOpen(false)}
       />
+      {material?.hasNetdisk && (
+        <NetdiskAccessModal
+          open={netdiskModalOpen}
+          title={material.title}
+          url={downloadUrl || material.netdiskUrl || ''}
+          password={material.netdiskPassword}
+          expiredAt={material.netdiskExpiredAt}
+          reminder={material.netdiskReminderAt}
+          onClose={() => setNetdiskModalOpen(false)}
+        />
+      )}
       {isExperienceMaterial && (
         <ExperienceImageModal
           images={experienceImages}

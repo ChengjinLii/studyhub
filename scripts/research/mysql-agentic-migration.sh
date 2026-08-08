@@ -2,8 +2,8 @@
 set -euo pipefail
 
 # Runs the complete Alembic chain against the MySQL URL supplied by CI, then
-# inspects the additive Agentic governance columns.  This avoids treating a
-# SQLite fixture migration as proof of production dialect compatibility.
+# inspects the additive schema guarantees covered by this gate. This avoids
+# treating a SQLite fixture migration as proof of production compatibility.
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 BACKEND_DIR="$ROOT_DIR/backend"
@@ -78,6 +78,8 @@ run_stage "schema inspection" "$PYTHON_BIN" - <<'PY'
 import os
 
 import sqlalchemy as sa
+from alembic.config import Config
+from alembic.script import ScriptDirectory
 
 url = os.environ["STUDYHUB_DATABASE_URL"]
 engine = sa.create_engine(url, future=True)
@@ -92,6 +94,7 @@ required = {
         "retention_policy",
     },
     "agent_steps": {"state_group_key_v2"},
+    "materials": {"submission_key"},
 }
 try:
     inspector = sa.inspect(engine)
@@ -101,10 +104,20 @@ try:
     }
     missing = {table: columns for table, columns in missing.items() if columns}
     if missing:
-        raise SystemExit(f"missing Agentic migration columns: {missing}")
+        raise SystemExit(f"missing migration columns: {missing}")
+    material_indexes = {
+        index["name"]: index
+        for index in inspector.get_indexes("materials")
+    }
+    submission_index = material_indexes.get("uq_materials_uploader_submission_key")
+    if not submission_index or not submission_index.get("unique"):
+        raise SystemExit("missing unique material submission idempotency index")
+    if submission_index.get("column_names") != ["uploader_id", "submission_key"]:
+        raise SystemExit(f"unexpected material submission index: {submission_index}")
     with engine.connect() as connection:
         revision = connection.execute(sa.text("SELECT version_num FROM alembic_version")).scalar_one()
-    if revision != "0007_add_agentic_data_governance":
+    expected_revision = ScriptDirectory.from_config(Config("alembic.ini")).get_current_head()
+    if revision != expected_revision:
         raise SystemExit(f"unexpected Alembic revision: {revision}")
     print("MySQL Agentic migration verified at revision", revision)
 finally:

@@ -249,6 +249,62 @@ test('mock page mode hides StudyHub Agent from non-admin users', async ({ page }
   await expect(page.locator('.hermes-agent__launcher')).toHaveCount(0, { timeout: 3000 });
 });
 
+test('mobile StudyHub Bot stays fully above the bottom navigation', async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 780 });
+  await page.addInitScript(() => window.localStorage.removeItem('floating-sidebar-pos'));
+  await page.goto('/more');
+  await closeEntryModalIfPresent(page);
+
+  const bot = page.locator('.floating-sidebar__bubble');
+  const navigation = page.locator('.mobile-bottom-nav');
+  await expect(bot).toBeVisible();
+  await expect(navigation).toBeVisible();
+
+  const botBox = await bot.boundingBox();
+  const navigationBox = await navigation.boundingBox();
+  expect(botBox).not.toBeNull();
+  expect(navigationBox).not.toBeNull();
+  expect((botBox?.y ?? 0) + (botBox?.height ?? 0)).toBeLessThanOrEqual((navigationBox?.y ?? 0) - 8);
+  expect(botBox?.x ?? -1).toBeGreaterThanOrEqual(0);
+  expect((botBox?.x ?? 0) + (botBox?.width ?? 0)).toBeLessThanOrEqual(320);
+});
+
+test('home entry modal and discovery views remain keyboard accessible', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.goto('/');
+
+  const modal = page.locator('.stable-version-modal');
+  await expect(modal).toBeVisible();
+  await expect(page.getByText('也可以点击弹窗外区域，或按 ESC 键关闭。')).toBeVisible();
+  const firstHotspotBackground = page.locator('.studyhub-popup-poster__hotspot-bg').first();
+  await page.locator('.studyhub-popup-poster__hotspot').first().hover();
+  await expect(firstHotspotBackground).toHaveCSS('opacity', '0');
+  await page.keyboard.press('Escape');
+  await expect(modal).toBeHidden();
+
+  const requestTab = page.getByRole('tab', { name: '求购列表' });
+  const popularTab = page.getByRole('tab', { name: '近期热门' });
+  await popularTab.click();
+  await expect(popularTab).toHaveAttribute('aria-selected', 'true');
+  await expect(page.locator('.request-card .card-title')).toHaveText('近期热门');
+  const pageUrl = page.url();
+  await page.getByRole('button', { name: '全部资料' }).click();
+  await expect(page).toHaveURL(pageUrl);
+  await expect(page.locator('#materials-list')).toBeInViewport();
+  await requestTab.click();
+  await expect(requestTab).toHaveAttribute('aria-selected', 'true');
+  await expect(page.locator('.request-card .card-title')).toHaveText('求购列表');
+});
+
+test('material list shows active search keywords and the 21-item page size', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.goto('/?keyword=概率论%20期末');
+  await closeEntryModalIfPresent(page);
+
+  await expect(page.locator('.materials-search-context')).toContainText('当前搜索：概率论 期末');
+  await expect(page.locator('.materials-library-header__summary .help-text')).toContainText('每页 21 条');
+});
+
 test('mock page mode covers more page secondary navigation', async ({ page }) => {
   await page.route('**/api/session', async (route) => {
     await route.fulfill({

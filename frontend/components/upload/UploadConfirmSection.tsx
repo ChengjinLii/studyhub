@@ -1,4 +1,5 @@
 import UploadSectionLabel from './UploadSectionLabel';
+import type { UploadSubmissionStage } from '../../lib/uploadSubmission';
 
 interface UploadConfirmSectionProps {
   isEditing: boolean;
@@ -7,10 +8,14 @@ interface UploadConfirmSectionProps {
   copyrightOwner: string;
   maxCopyrightLength: number;
   submitting: boolean;
+  submissionStage: UploadSubmissionStage;
   uploadProgress: number | null;
+  successPath: string | null;
+  agreementAccepted: boolean;
   status: { type: 'success' | 'error'; message: string } | null;
   onCopyrightOwnerChange: (value: string) => void;
   onPolicyOpen: () => void;
+  onAgreementAcceptedChange: (value: boolean) => void;
 }
 
 export default function UploadConfirmSection({
@@ -20,11 +25,46 @@ export default function UploadConfirmSection({
   copyrightOwner,
   maxCopyrightLength,
   submitting,
+  submissionStage,
   uploadProgress,
+  successPath,
+  agreementAccepted,
   status,
   onCopyrightOwnerChange,
   onPolicyOpen,
+  onAgreementAcceptedChange,
 }: UploadConfirmSectionProps) {
+  const submitLabel = submitting
+    ? submissionStage === 'preparing'
+      ? '正在准备文件...'
+      : submissionStage === 'uploading'
+        ? uploadProgress !== null
+          ? `正在上传 ${uploadProgress}%`
+          : '正在上传...'
+        : submissionStage === 'processing'
+          ? '正在创建资料...'
+          : '投稿成功，正在打开...'
+    : isEditing
+      ? isExperience
+        ? '更新经验分享'
+        : '更新资料'
+      : isExperience
+        ? '提交经验分享'
+        : isQuickMode
+          ? '一键投稿'
+          : '提交资料';
+
+  const stageMessage =
+    submissionStage === 'preparing'
+      ? '正在整理待提交内容。'
+      : submissionStage === 'uploading'
+        ? '文件正在上传，请保持当前页面打开。'
+        : submissionStage === 'processing'
+          ? '文件已上传，服务器正在安全保存并创建资料，请勿刷新或重复提交。'
+          : submissionStage === 'redirecting'
+            ? '资料已经创建成功，正在打开详情页。'
+            : null;
+
   return (
     <div className="upload-section-shell" id="upload-confirm">
       <div className="upload-section-heading">
@@ -51,7 +91,12 @@ export default function UploadConfirmSection({
           )}
           <div className="form-item full">
             <label className="choice agreement">
-              <input type="checkbox" required />
+              <input
+                type="checkbox"
+                checked={agreementAccepted}
+                onChange={(event) => onAgreementAcceptedChange(event.target.checked)}
+                required
+              />
               <span>
                 我已阅读并同意
                 <button
@@ -71,21 +116,15 @@ export default function UploadConfirmSection({
           </div>
           <div className="form-item">
             <button className="button primary" type="submit" disabled={submitting}>
-              {submitting
-                ? isEditing
-                  ? '更新中...'
-                  : '提交中...'
-                : isEditing
-                  ? isExperience
-                    ? '更新经验分享'
-                    : '更新资料'
-                  : isExperience
-                    ? '提交经验分享'
-                    : isQuickMode
-                      ? '一键投稿'
-                      : '提交资料'}
+              {submitLabel}
             </button>
           </div>
+          {stageMessage && (
+            <div className="form-item full upload-submission-state" role="status" aria-live="polite">
+              <span className="upload-submission-state__indicator" aria-hidden="true" />
+              <span>{stageMessage}</span>
+            </div>
+          )}
           {isExperience && uploadProgress !== null && (
             <div className="form-item full">
               <div className="upload-progress" aria-live="polite">
@@ -95,6 +134,11 @@ export default function UploadConfirmSection({
             </div>
           )}
           {status && <p className={status.type === 'error' ? 'error-text' : 'success-text'}>{status.message}</p>}
+          {successPath && (
+            <p className="form-item full upload-success-fallback">
+              如未自动跳转，<a href={successPath}>立即查看已发布资料</a>。
+            </p>
+          )}
         </div>
       </section>
     </div>

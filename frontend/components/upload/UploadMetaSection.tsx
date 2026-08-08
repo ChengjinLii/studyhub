@@ -1,6 +1,15 @@
+import Link from 'next/link';
 import { Dispatch, SetStateAction } from 'react';
-import { COURSE_CATEGORY_OPTIONS, CourseCategoryValue, SUPPORTED_COLLEGES, SUPPORTED_MAJORS, SUPPORTED_SCHOOL } from '../../constants/metadata';
+import {
+  COURSE_CATEGORY_OPTIONS,
+  CourseCategorySelection,
+  CourseCategoryValue,
+  SUPPORTED_COLLEGES,
+  SUPPORTED_MAJORS,
+  SUPPORTED_SCHOOL,
+} from '../../constants/metadata';
 import { ColumnTopicKey } from '../../lib/column';
+import UploadChoiceCard from './UploadChoiceCard';
 import UploadSectionLabel from './UploadSectionLabel';
 
 interface QuickProfile {
@@ -8,7 +17,6 @@ interface QuickProfile {
   college: string;
   majorDisplay: string;
   gradeValue: string;
-  courseCategoryLabel: string;
 }
 
 interface UploadMetaSectionProps {
@@ -23,7 +31,7 @@ interface UploadMetaSectionProps {
   gradeValue: string;
   gradeStageOptions: readonly string[];
   selectedMajors: string[];
-  courseCategory: CourseCategoryValue;
+  courseCategory: CourseCategorySelection;
   selectedTags: string[];
   customTags: string;
   yearTag: string;
@@ -80,11 +88,41 @@ export default function UploadMetaSection({
     <div className="upload-section-shell" id="upload-meta">
       <div className="upload-section-heading">
         <div className="upload-section-heading__copy">
-          <h2 className="upload-section-heading__title">课程与标签</h2>
+          <div className="upload-section-heading__title-row">
+            <h2 className="upload-section-heading__title">课程与标签</h2>
+            <details className="upload-profile-help">
+              <summary aria-label="查看课程信息默认值说明">?</summary>
+              <div className="upload-profile-help__popover">
+                <strong>默认信息从哪里来？</strong>
+                <p>学校、学院、专业和年级会优先读取“我的”个人主页概览；本次投稿仍可单独调整。</p>
+                <Link className="button ghost small" href="/me#profile" prefetch={false}>
+                  前往个人主页修改
+                </Link>
+              </div>
+            </details>
+          </div>
         </div>
       </div>
       <section className="card upload-main-card upload-section-card">
         <div className="form-grid upload-section-grid">
+          {!isExperience && (
+            <div className="form-item full">
+              <UploadSectionLabel text="课程类型" selectionHint="必选 · 请选择 1 项" />
+              <div className="course-type-options upload-course-type-options">
+                {COURSE_CATEGORY_OPTIONS.map((option) => (
+                  <UploadChoiceCard
+                    key={option.value}
+                    name="courseCategory"
+                    value={option.value}
+                    title={option.label}
+                    description={option.helper}
+                    selected={courseCategory === option.value}
+                    onSelect={() => onCourseCategoryChange(option.value)}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
           {isExperience ? (
             <div className="form-item full">
               <div className="upload-meta-empty">
@@ -157,10 +195,6 @@ export default function UploadMetaSection({
                   <span className="upload-quick-summary__label">专业</span>
                   <strong className="upload-quick-summary__value">{quickProfile.majorDisplay}</strong>
                 </div>
-                <div className="upload-quick-summary__item">
-                  <span className="upload-quick-summary__label">课程类型</span>
-                  <strong className="upload-quick-summary__value">{quickProfile.courseCategoryLabel}</strong>
-                </div>
               </div>
               <p className="help-text">一键投稿会优先使用“我的”里个人主页概览所填的学校、学院、专业与年级信息；未填写的字段将按默认值补齐。</p>
             </div>
@@ -217,28 +251,6 @@ export default function UploadMetaSection({
                       </label>
                     );
                   })}
-                </div>
-              </div>
-              <div className="form-item full">
-                <UploadSectionLabel text="课程类型" />
-                <div className="course-type-options upload-course-type-options">
-                  {COURSE_CATEGORY_OPTIONS.map((option) => (
-                    <label
-                      key={option.value}
-                      className={`choice-pill course upload-course-type-chip ${courseCategory === option.value ? 'active' : ''}`}
-                    >
-                      <input
-                        type="radio"
-                        name="courseCategory"
-                        value={option.value}
-                        checked={courseCategory === option.value}
-                        onChange={(e) => onCourseCategoryChange(e.target.value as CourseCategoryValue)}
-                      />
-                      <div>
-                        <strong>{option.label}</strong>
-                      </div>
-                    </label>
-                  ))}
                 </div>
               </div>
               <div className="form-item full">

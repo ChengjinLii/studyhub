@@ -47,7 +47,32 @@ class MaterialsReadService:
         search_query = parse_material_search_query(keyword)
         items = [material for material in items if self._matches_material(material, search_query, school, college, major, tag, grade_value, course_category, price)]
 
-        if (sort or "").lower() == "price":
+        normalized_sort = (sort or "latest").strip().lower()
+        if normalized_sort == "newest":
+            items.sort(
+                key=lambda material: (
+                    -parse_iso_datetime(material.get("createdAt")).timestamp(),
+                    -int(material.get("id") or 0),
+                )
+            )
+        elif normalized_sort == "downloads":
+            items.sort(
+                key=lambda material: (
+                    -(material.get("downloadCount") or 0),
+                    -parse_iso_datetime(material.get("createdAt")).timestamp(),
+                    -int(material.get("id") or 0),
+                )
+            )
+        elif normalized_sort == "recent_downloads":
+            items.sort(
+                key=lambda material: (
+                    -(material.get("recentDownloadCount") or 0),
+                    -(material.get("downloadCount") or 0),
+                    -parse_iso_datetime(material.get("createdAt")).timestamp(),
+                    -int(material.get("id") or 0),
+                )
+            )
+        elif normalized_sort == "price":
             items.sort(key=lambda material: (float(material.get("price", 0)), -parse_iso_datetime(material.get("createdAt")).timestamp()))
         elif search_query.has_terms:
             items.sort(
