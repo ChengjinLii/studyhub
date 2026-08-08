@@ -161,7 +161,10 @@ async def run_snapshot_pilot_scenario(
         artifact_root=os.getenv("STUDYHUB_OFFLINE_PILOT_ROOT") or None,
     )
 
-    source_commit = os.getenv("STUDYHUB_OFFLINE_PILOT_SOURCE_COMMIT", "offline-pilot-uncommitted")
+    source_commit = str(
+        payload.get("source_commit_sha")
+        or os.getenv("STUDYHUB_OFFLINE_PILOT_SOURCE_COMMIT", "offline-pilot-uncommitted")
+    )
     snapshot, world_artifact_store = build_synthetic_world_snapshot(seed=seed, source_commit_sha=source_commit)
     registry = build_default_skill_registry()
     runtime_artifact_store = InMemoryRuntimeArtifactStore()
@@ -254,6 +257,7 @@ async def run_snapshot_pilot_scenario(
     diagnostic = {
         "schema_version": "1.0",
         "scenario_id": scenario_id,
+        "source_commit_sha": source_commit,
         "family": payload.get("family"),
         "provider": provider,
         "kernel_status": result.status.value,

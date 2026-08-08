@@ -10,6 +10,11 @@ RUN_NAME="${2:-snapshot-pilot}"
 ARTIFACT_ROOT="${STUDYHUB_OFFLINE_PILOT_ROOT:-$ROOT_DIR/artifacts/agentic_platform/offline-pilot}"
 RUN_ROOT="$ARTIFACT_ROOT/$RUN_NAME"
 
+if [[ -n "$(git -C "$ROOT_DIR" status --porcelain --untracked-files=normal)" ]]; then
+  echo "offline pilot requires a clean Git worktree for reproducible provenance" >&2
+  exit 2
+fi
+
 if [[ "$PROVIDER" == local-qwen* ]]; then
   PYTHON_BIN="${STUDYHUB_OFFLINE_PILOT_PYTHON:-/data/chengjin/LLaMA-Factory/.venv/bin/python}"
   BACKEND_DEPS_PYTHON="${STUDYHUB_BACKEND_DEPS_PYTHON:-/data/chengjin/studyhub/backend/.venv/bin/python}"

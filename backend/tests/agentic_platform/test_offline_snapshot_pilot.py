@@ -28,7 +28,11 @@ _ISOLATION_VARIABLES = (
 )
 
 
-def test_offline_manifest_contains_the_versioned_100_scenario_matrix(tmp_path: Path) -> None:
+def test_offline_manifest_contains_the_versioned_100_scenario_matrix(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("STUDYHUB_OFFLINE_PILOT_SOURCE_COMMIT", "a" * 40)
     manifest = build_pilot_manifest(trajectory_root=tmp_path / "trajectories")
 
     assert len(manifest.scenarios) == 100
@@ -44,6 +48,7 @@ def test_offline_manifest_contains_the_versioned_100_scenario_matrix(tmp_path: P
     }
     assert all(item.data_policy.license_class == LicenseClass.INTERNAL_EVAL_ONLY for item in manifest.scenarios)
     assert all(item.payload["forbidden_material_ids"] == [9901] for item in manifest.scenarios)
+    assert all(item.payload["source_commit_sha"] == "a" * 40 for item in manifest.scenarios)
 
 
 def test_offline_guard_rejects_database_remote_provider_and_escaped_output(

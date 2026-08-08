@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -212,6 +213,9 @@ def build_pilot_manifest(*, trajectory_root: str | Path) -> PilotScenarioManifes
     ]
     if len(scenarios) != 100:
         raise AssertionError("offline pilot manifest must contain exactly 100 scenarios")
+    source_commit_sha = os.getenv("STUDYHUB_OFFLINE_PILOT_SOURCE_COMMIT", "offline-pilot-uncommitted")
+    for scenario in scenarios:
+        scenario.payload["source_commit_sha"] = source_commit_sha
     return PilotScenarioManifest(
         trajectory_root=str(Path(trajectory_root).resolve()),
         runner="ml.agentic_platform.collection.studyhub_snapshot_runner:run_snapshot_pilot_scenario",
