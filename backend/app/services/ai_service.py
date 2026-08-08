@@ -651,6 +651,9 @@ class AiService:
         max_search_calls = max(1, min(5, int(getattr(settings, "ai_agent_tool_max_search_calls", 3) or 3)))
         max_candidates = max(3, min(30, int(getattr(settings, "ai_agent_tool_max_candidates", 18) or 18)))
         max_evidence = max(1, min(24, int(getattr(settings, "ai_agent_tool_max_evidence_pages", 12) or 12)))
+        runtime_constraints_enabled = bool(
+            getattr(settings, "ai_agent_runtime_constraints_enabled", False)
+        )
         observations: list[dict[str, Any]] = []
         materials: list[MaterialRecord] = []
         pdf_evidence: list[MaterialPageEvidence] = []
@@ -678,6 +681,7 @@ class AiService:
                 remaining_search_calls=max(0, max_search_calls - search_calls_used),
                 remaining_candidate_slots=max(0, max_candidates - len(materials)),
                 force_final=force_final,
+                runtime_constraints_enabled=runtime_constraints_enabled,
             )
             safe_request_payload = self.safety_service.sanitize_prompt_payload(request_payload)
             if image_attachments and round_index == 0:
@@ -692,7 +696,11 @@ class AiService:
                 )
             except Exception:
                 return None
-            decision = self.tool_loop_service.parse(self._loads_object(content))
+            decision = (
+                self.tool_loop_service.parse_model_output(content, repair=True)
+                if runtime_constraints_enabled
+                else self.tool_loop_service.parse(self._loads_object(content))
+            )
             if decision is None:
                 return None
             if decision.task_context:

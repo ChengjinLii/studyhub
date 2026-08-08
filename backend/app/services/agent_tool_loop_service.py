@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+import re
 from dataclasses import dataclass
 from typing import Any
 
@@ -86,8 +88,9 @@ class AgentToolLoopService:
         remaining_search_calls: int,
         remaining_candidate_slots: int,
         force_final: bool = False,
+        runtime_constraints_enabled: bool = False,
     ) -> dict[str, Any]:
-        return {
+        payload = {
             "current_user_query": str(query or "").strip()[:1200],
             "conversation_context": str(conversation_context or "").strip()[-1800:],
             "platform_term_glossary": platform_term_glossary,
@@ -108,6 +111,25 @@ class AgentToolLoopService:
                 else "自主决定下一步；可以调用工具，也可以直接完成回答。"
             ),
         }
+        if runtime_constraints_enabled:
+            payload["routing_state"] = build_agent_routing_state(payload)
+        return payload
+
+    def parse_model_output(self, value: str, *, repair: bool = False) -> AgentToolDecision | None:
+        body = value.strip()
+        if "<think>" in body or "</think>" in body:
+            return None
+        if body.startswith("```"):
+            body = re.sub(r"^```(?:json)?\s*|\s*```$", "", body, flags=re.IGNORECASE | re.DOTALL).strip()
+        start = body.find("{")
+        end = body.rfind("}")
+        if start >= 0 and end > start:
+            body = body[start : end + 1]
+        try:
+            parsed = json.loads(body)
+        except json.JSONDecodeError:
+            parsed = recover_agent_tool_payload(body) if repair else None
+        return self.parse(parsed)
 
     def parse(self, value: Any) -> AgentToolDecision | None:
         if not isinstance(value, dict):
@@ -143,6 +165,137 @@ class AgentToolLoopService:
 def _clean_progress(value: Any) -> str:
     text = " ".join(str(value or "").split()).strip()
     return text[:60]
+
+
+def build_agent_routing_state(request: dict[str, Any]) -> dict[str, Any]:
+    budget = request.get("budget") if isinstance(request.get("budget"), dict) else {}
+    observations = request.get("tool_observations") if isinstance(request.get("tool_observations"), list) else []
+    must_finish = bool(request.get("force_final")) or int(budget.get("remaining_tool_calls") or 0) <= 0
+    has_candidates = False
+    has_evidence = False
+    has_details = False
+    has_memory = False
+    for observation in observations:
+        if not isinstance(observation, dict):
+            continue
+        tool_name = str(observation.get("tool") or "")
+        result = observation.get("result")
+        if not isinstance(result, dict):
+            continue
+        if tool_name == "search_materials":
+            candidates = result.get("candidates")
+            has_candidates = has_candidates or (isinstance(candidates, list) and bool(candidates))
+        elif tool_name == "inspect_materials":
+            materials = result.get("materials")
+            has_details = has_details or (isinstance(materials, list) and bool(materials))
+            has_candidates = has_candidates or has_details
+        elif tool_name == "read_pdf_evidence":
+            evidence = result.get("evidence")
+            has_evidence = has_evidence or (isinstance(evidence, list) and bool(evidence))
+        elif tool_name == "read_memory" and result.get("executed") is True:
+            has_memory = True
+    return {
+        "version": "studyhub.router.state.v1",
+        "must_finish_without_tools": must_finish,
+        "budget_phase": "must_finish" if must_finish else "tools_available",
+        "evidence_phase": "available" if has_evidence else ("pending" if has_candidates else "not_observed"),
+        "candidate_phase": "details_observed" if has_details else ("search_results_only" if has_candidates else "not_observed"),
+        "memory_phase": "loaded" if has_memory else "not_loaded",
+    }
+
+
+_RECOVERABLE_TOOL_NAME_PATTERN = re.compile(
+    r'"name"\s*:\s*"(search_materials|inspect_materials|read_pdf_evidence|read_memory|synthesize_course_context)"'
+)
+
+
+def recover_agent_tool_payload(text: str) -> dict[str, Any] | None:
+    """Recover one explicitly named allowlisted action from malformed JSON."""
+
+    tool_match = _RECOVERABLE_TOOL_NAME_PATTERN.search(text)
+    if tool_match is not None:
+        name = tool_match.group(1)
+        arguments: dict[str, Any] = {}
+        if name == "search_materials":
+            query = _extract_json_string_field(text, "query")
+            if query:
+                arguments["query"] = query
+            limit = _extract_positive_int_field(text, "limit")
+            if limit is not None:
+                arguments["limit"] = limit
+        elif name in {"inspect_materials", "read_pdf_evidence"}:
+            material_ids = _extract_positive_int_list_field(text, "material_ids")
+            if material_ids:
+                arguments["material_ids"] = material_ids
+            if name == "read_pdf_evidence":
+                query = _extract_json_string_field(text, "query")
+                if query:
+                    arguments["query"] = query
+                max_pages = _extract_positive_int_field(text, "max_pages")
+                if max_pages is not None:
+                    arguments["max_pages"] = max_pages
+                page_numbers = _extract_positive_int_list_field(text, "page_numbers")
+                if page_numbers:
+                    arguments["page_numbers"] = page_numbers
+        elif name == "read_memory":
+            focus = _extract_json_string_field(text, "focus")
+            if focus:
+                arguments["focus"] = focus
+        return {
+            "mode": "tools",
+            "progress": _extract_json_string_field(text, "progress") or "恢复只读动作中",
+            "task_context": {},
+            "actions": [{"name": name, "arguments": arguments}],
+        }
+    answer = _extract_json_string_field(text, "answer")
+    if answer is not None and re.search(r'"mode"\s*:\s*"final"', text):
+        return {
+            "mode": "final",
+            "task_context": {},
+            "answer": answer,
+            "recommendations": [],
+            "evidence_sources": [],
+            "followup_questions": [],
+        }
+    return None
+
+
+def _extract_json_string_field(text: str, field_name: str) -> str | None:
+    match = re.search(rf'"{re.escape(field_name)}"\s*:\s*"((?:\\.|[^"\\])*)"', text)
+    if match is None:
+        return None
+    try:
+        value = json.loads(f'"{match.group(1)}"')
+    except json.JSONDecodeError:
+        return None
+    return value if isinstance(value, str) else None
+
+
+def _extract_positive_int_field(text: str, field_name: str) -> int | None:
+    match = re.search(rf'"{re.escape(field_name)}"\s*:\s*(\d+)', text)
+    return _positive_int(match.group(1)) if match is not None else None
+
+
+def _extract_positive_int_list_field(text: str, field_name: str) -> list[int]:
+    match = re.search(rf'"{re.escape(field_name)}"\s*:\s*\[([^\]]*)\]', text)
+    if match is None:
+        return []
+    values: list[int] = []
+    for raw in re.findall(r"\d+", match.group(1)):
+        value = _positive_int(raw)
+        if value is not None and value not in values:
+            values.append(value)
+    return values
+
+
+def _positive_int(value: Any) -> int | None:
+    if isinstance(value, bool):
+        return None
+    try:
+        number = int(value)
+    except (TypeError, ValueError):
+        return None
+    return number if number > 0 else None
 
 
 def _clean_task_context(value: Any) -> dict[str, Any]:
