@@ -9,9 +9,7 @@ from app.main import create_app
 def test_healthz_returns_ok(client: TestClient) -> None:
     response = client.get("/api/healthz")
     assert response.status_code == 200
-    assert response.json()["ok"] is True
-    assert response.json()["data"]["database"] == "ok"
-    assert response.json()["data"]["build"]["gitSha"]
+    assert response.json() == {"ok": True, "data": {"status": "ok"}}
 
 
 def test_session_cookie_round_trip_and_invalid_cookie(client: TestClient) -> None:

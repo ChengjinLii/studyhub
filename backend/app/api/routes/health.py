@@ -17,10 +17,9 @@ router = APIRouter(tags=["health"])
 @router.get("/healthz")
 @router.get("/api/healthz")
 def healthz(
-    session: Session = Depends(get_db_session),
     service: HealthService = Depends(get_health_service),
 ) -> dict[str, object]:
-    return api_ok(service.build_payload(session))
+    return api_ok(service.build_public_payload())
 
 
 @router.get("/readyz")

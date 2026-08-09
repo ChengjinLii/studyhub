@@ -1,13 +1,6 @@
 {
   "ok": true,
   "data": {
-    "status": "ok",
-    "service": "StudyHub FastAPI",
-    "environment": "local",
-    "database": "ok",
-    "build": {
-      "gitSha": "local-dev",
-      "source": "fastapi"
-    }
+    "status": "ok"
   }
 }

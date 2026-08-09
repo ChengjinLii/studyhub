@@ -27,21 +27,7 @@ def test_local_dev_bootstraps_developer_and_supports_quick_login(tmp_path: Path,
     with _build_local_dev_client(tmp_path, monkeypatch) as client:
         health_response = client.get("/api/healthz")
         assert health_response.status_code == 200
-        health_data = health_response.json()["data"]
-        assert health_data["environment"] == "local-dev"
-        assert health_data["providers"] == {
-            "mail": "local_outbox",
-            "storage": "local_fs",
-            "payment": "local_alipay",
-            "transfer": "local_transfer",
-            "kyc": "mock_local",
-            "lock": "db_row",
-        }
-        assert health_data["localDev"] == {
-            "enabled": True,
-            "quickLoginEnabled": True,
-            "developerUsername": "developer",
-        }
+        assert health_response.json()["data"] == {"status": "ok"}
 
         with session_scope() as session:
             developer = AuthRepository().find_user_by_username(session, "developer")

@@ -85,11 +85,22 @@ check_health_git_sha() {
   fi
 }
 
+check_public_health() {
+  local label="$1"
+  local health_url="$2"
+  local response
+  response="$(curl "${CURL_ARGS[@]}" "$health_url")"
+  if ! printf '%s' "$response" | "$PYTHON_BIN" -c 'import json, sys; payload=json.load(sys.stdin); raise SystemExit(0 if (payload.get("data") or {}).get("status") == "ok" else 1)'; then
+    echo "$label did not return status=ok"
+    exit 1
+  fi
+}
+
 echo "[1/5] backend healthz"
-check_health_git_sha "backend healthz" "${BACKEND_BASE%/}/api/healthz"
+check_public_health "backend healthz" "${BACKEND_BASE%/}/api/healthz"
 
 echo "[2/5] backend readyz"
-curl "${CURL_ARGS[@]}" "${BACKEND_BASE%/}/api/readyz" >/dev/null
+check_health_git_sha "backend readyz" "${BACKEND_BASE%/}/api/readyz"
 
 echo "[3/5] backend metrics"
 curl "${CURL_ARGS[@]}" "${BACKEND_BASE%/}/api/metrics" | grep -q "studyhub_app_info"
@@ -116,7 +127,7 @@ if [[ -n "$PUBLIC_SMOKE_BASES" ]]; then
       continue
     fi
     echo "[public] $public_base healthz"
-    check_health_git_sha "$public_base healthz" "$public_base/api/healthz"
+    check_public_health "$public_base healthz" "$public_base/api/healthz"
     echo "[public] $public_base frontend root"
     curl "${CURL_ARGS[@]}" "$public_base/" >/dev/null
   done

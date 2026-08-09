@@ -39,34 +39,8 @@ class HealthService:
         self.kyc_provider = kyc_provider
         self.lock_provider = lock_provider
 
-    def build_payload(self, session: Session) -> dict[str, object]:
-        self.system_repo.ping(session)
-        payload = {
-            "status": "ok",
-            "service": self.settings.app_name,
-            "environment": self.settings.environment,
-            "database": "ok",
-            "build": {
-                "gitSha": self.settings.resolved_build_git_sha,
-                "source": "fastapi",
-            },
-        }
-        if self.settings.is_local_dev or self.settings.requires_private_env_file:
-            payload["providers"] = {
-                "mail": self.settings.mail_provider,
-                "storage": self.settings.storage_provider,
-                "payment": self.settings.payment_provider,
-                "transfer": self.settings.payout_transfer_provider,
-                "kyc": self.settings.kyc_provider,
-                "lock": self.settings.lock_provider,
-            }
-        if self.settings.is_local_dev:
-            payload["localDev"] = {
-                "enabled": True,
-                "quickLoginEnabled": self.settings.local_dev_quick_login_enabled,
-                "developerUsername": self.settings.local_dev_username,
-            }
-        return payload
+    def build_public_payload(self) -> dict[str, object]:
+        return {"status": "ok"}
 
     def build_readiness_payload(self, session: Session, *, deep: bool = False) -> dict[str, object]:
         checks = {
