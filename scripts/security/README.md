@@ -57,6 +57,17 @@ bash scripts/security/check-security-headers.sh https://study-hub.cn
 
 在决定启用强制 CSP 前，应至少观察 7～14 天报告，并实际验证 Next.js 水合、支付宝跳转、OSS 图片/预览和 AI 流式响应。切勿直接增加 `preload` 或删除当前兼容源。
 
+## Redis Expiring State
+
+Redis 只承载限流、验证码、注册/上传临时凭证和短期缓存，不保存文件、订单、结算或其他永久业务数据。生产安装入口：
+
+```bash
+sudo bash scripts/security/install-redis.sh --apply
+bash scripts/security/check-redis.sh
+```
+
+安装器会备份原配置和私有生产环境文件，生成仅存于 `private/` 的随机 ACL 密码，并启用以下边界：仅监听 loopback、仅允许访问 `studyhub-fastapi:*`、数据内存上限 64MB、systemd 进程上限 128MB、关闭 RDB/AOF。Redis 故障时缓存和普通限流可以降级；注册与上传授权不得静默绕过。
+
 若服务器为 APT 配置了本机代理，而腾讯云 Ubuntu 镜像应走内网或直连，可安装仓库中的单域名例外，避免代理故障阻断安全更新：
 
 ```bash
