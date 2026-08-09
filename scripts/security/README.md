@@ -29,7 +29,7 @@ sudo STUDYHUB_ENABLE_UFW=1 bash scripts/security/install-runtime-guards.sh --app
 
 应用限流默认保留校园 NAT 突发空间，同时收紧登录、邮件验证码、投稿、AI 和 MCP。Nginx 对投稿保留当前 128MB body 上限，不改变站内 50MB 文件加预览图的业务能力。详细 readiness 和 metrics 只允许源站本机访问，公网 health 只返回最小存活状态。
 
-监控复用 `private/.env.production` 中的 SMTP 配置，向 unit 中声明的管理员地址发送新告警、每小时持续告警提醒和恢复通知；失败通知每五分钟重试，避免每分钟重复投递。查看本机监控结果：
+监控复用 `private/.env.production` 中的 SMTP 配置，向 unit 中声明的管理员地址发送已确认告警、每小时持续告警提醒和恢复通知；异常默认连续出现 3 次才发首封，之后连续健康 2 次才发一次恢复，失败通知每五分钟重试。单次 CPU 抖动或一分钟内完成的正常部署不会发信。查看本机监控结果：
 
 ```bash
 sudo systemctl status studyhub-abuse-monitor.timer

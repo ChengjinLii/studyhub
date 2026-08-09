@@ -18,12 +18,14 @@ def _notification_args(tmp_path: Path) -> Namespace:
         alert_state_file=str(tmp_path / "alert-state.json"),
         alert_cooldown_seconds=3600,
         alert_retry_seconds=300,
+        alert_confirm_runs=3,
+        recovery_confirm_runs=2,
         env_file=str(tmp_path / ".env"),
         alert_email=["admin-one@example.com", "admin-two@example.com"],
     )
 
 
-def test_notification_deduplicates_changed_alerts_and_recovery(tmp_path: Path, monkeypatch) -> None:
+def test_notification_confirms_alerts_and_recovery_before_sending(tmp_path: Path, monkeypatch) -> None:
     deliveries: list[str] = []
 
     def capture_email(**kwargs) -> None:
@@ -33,36 +35,50 @@ def test_notification_deduplicates_changed_alerts_and_recovery(tmp_path: Path, m
     args = _notification_args(tmp_path)
     started_at = datetime(2026, 8, 9, 8, 0, tzinfo=timezone.utc)
 
-    first = runtime_monitor.notify(
+    first_observation = runtime_monitor.notify(
         args=args,
         now=started_at,
         alerts={"server_errors": "21"},
         payload={"serverErrors": 21},
     )
-    duplicate = runtime_monitor.notify(
+    second_observation = runtime_monitor.notify(
         args=args,
         now=started_at + timedelta(minutes=1),
+        alerts={"server_errors": "21"},
+        payload={"serverErrors": 21},
+    )
+    confirmed = runtime_monitor.notify(
+        args=args,
+        now=started_at + timedelta(minutes=2),
+        alerts={"server_errors": "21"},
+        payload={"serverErrors": 21},
+    )
+    duplicate = runtime_monitor.notify(
+        args=args,
+        now=started_at + timedelta(minutes=3),
         alerts={"server_errors": "25"},
         payload={"serverErrors": 25},
     )
-    changed = runtime_monitor.notify(
+    recovery_pending = runtime_monitor.notify(
         args=args,
-        now=started_at + timedelta(minutes=2),
-        alerts={"server_errors": "25", "service_inactive:nginx": "inactive"},
-        payload={"serverErrors": 25},
+        now=started_at + timedelta(minutes=4),
+        alerts={},
+        payload={},
     )
     recovered = runtime_monitor.notify(
         args=args,
-        now=started_at + timedelta(minutes=3),
+        now=started_at + timedelta(minutes=5),
         alerts={},
         payload={},
     )
 
-    assert first == {"status": "sent", "type": "alert", "recipients": 2}
+    assert first_observation == {"status": "pending_confirmation", "observedRuns": 1, "requiredRuns": 3}
+    assert second_observation == {"status": "pending_confirmation", "observedRuns": 2, "requiredRuns": 3}
+    assert confirmed == {"status": "sent", "type": "alert", "recipients": 2}
     assert duplicate == {"status": "deduplicated"}
-    assert changed == {"status": "sent", "type": "alert", "recipients": 2}
+    assert recovery_pending == {"status": "pending_recovery", "healthyRuns": 1, "requiredRuns": 2}
     assert recovered == {"status": "sent", "type": "recovery", "recipients": 2}
-    assert len(deliveries) == 3
+    assert len(deliveries) == 2
     assert "Runtime recovered" in deliveries[-1]
 
 
@@ -78,21 +94,33 @@ def test_notification_failure_is_retried_after_retry_window(tmp_path: Path, monk
     args = _notification_args(tmp_path)
     started_at = datetime(2026, 8, 9, 8, 0, tzinfo=timezone.utc)
 
-    first = runtime_monitor.notify(
+    runtime_monitor.notify(
         args=args,
         now=started_at,
         alerts={"cpu_percent": "99"},
         payload={},
     )
-    suppressed = runtime_monitor.notify(
+    runtime_monitor.notify(
         args=args,
         now=started_at + timedelta(minutes=1),
         alerts={"cpu_percent": "99"},
         payload={},
     )
+    first = runtime_monitor.notify(
+        args=args,
+        now=started_at + timedelta(minutes=2),
+        alerts={"cpu_percent": "99"},
+        payload={},
+    )
+    suppressed = runtime_monitor.notify(
+        args=args,
+        now=started_at + timedelta(minutes=3),
+        alerts={"cpu_percent": "99"},
+        payload={},
+    )
     retried = runtime_monitor.notify(
         args=args,
-        now=started_at + timedelta(minutes=5),
+        now=started_at + timedelta(minutes=7),
         alerts={"cpu_percent": "99"},
         payload={},
     )
@@ -101,6 +129,30 @@ def test_notification_failure_is_retried_after_retry_window(tmp_path: Path, monk
     assert suppressed == {"status": "deduplicated"}
     assert retried["status"] == "failed"
     assert attempts == 2
+
+
+def test_transient_alert_never_sends_alert_or_recovery(tmp_path: Path, monkeypatch) -> None:
+    deliveries: list[str] = []
+    monkeypatch.setattr(runtime_monitor, "send_email", lambda **kwargs: deliveries.append(kwargs["subject"]))
+    args = _notification_args(tmp_path)
+    started_at = datetime(2026, 8, 9, 8, 0, tzinfo=timezone.utc)
+
+    pending = runtime_monitor.notify(
+        args=args,
+        now=started_at,
+        alerts={"service_inactive:frontend": "inactive"},
+        payload={},
+    )
+    healthy = runtime_monitor.notify(
+        args=args,
+        now=started_at + timedelta(minutes=1),
+        alerts={},
+        payload={},
+    )
+
+    assert pending == {"status": "pending_confirmation", "observedRuns": 1, "requiredRuns": 3}
+    assert healthy == {"status": "idle"}
+    assert deliveries == []
 
 
 def test_load_env_file_accepts_exported_and_quoted_values(tmp_path: Path) -> None:

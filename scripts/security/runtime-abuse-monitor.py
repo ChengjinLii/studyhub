@@ -48,6 +48,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--alert-email", action="append", default=[])
     parser.add_argument("--alert-cooldown-seconds", type=positive_int, default=3600)
     parser.add_argument("--alert-retry-seconds", type=positive_int, default=300)
+    parser.add_argument("--alert-confirm-runs", type=positive_int, default=3)
+    parser.add_argument("--recovery-confirm-runs", type=positive_int, default=2)
     parser.add_argument("--service", action="append", default=[])
     parser.add_argument("--probe-url", action="append", default=[])
     parser.add_argument("--filesystem", action="append", default=[])
@@ -291,20 +293,56 @@ def notify(
     state = read_json(args.alert_state_file)
     previous_codes = {str(code) for code in state.get("activeAlertCodes", [])}
     current_codes = set(alerts)
+    observed_codes = {str(code) for code in state.get("observedAlertCodes", [])}
+    observed_runs = int(state.get("observedAlertRuns", 0) or 0)
+    healthy_runs = int(state.get("healthyRuns", 0) or 0)
     last_attempt = _parse_time(state.get("lastAttemptAt"))
     last_sent = _parse_time(state.get("lastSentAt"))
     notification_type: str | None = None
+    last_attempt_failed = state.get("lastAttemptFailed") is True
+    retry_elapsed = (
+        not last_attempt_failed
+        or last_attempt is None
+        or (now - last_attempt).total_seconds() >= args.alert_retry_seconds
+    )
 
     if current_codes:
-        changed = current_codes != previous_codes
-        cooldown_elapsed = last_sent is None or (now - last_sent).total_seconds() >= args.alert_cooldown_seconds
-        retry_elapsed = last_attempt is None or (now - last_attempt).total_seconds() >= args.alert_retry_seconds
-        if changed or (cooldown_elapsed and retry_elapsed):
-            notification_type = "alert"
+        healthy_runs = 0
+        if current_codes == observed_codes:
+            observed_runs += 1
+        else:
+            observed_codes = current_codes
+            observed_runs = 1
+        if observed_runs >= args.alert_confirm_runs:
+            changed = current_codes != previous_codes
+            cooldown_elapsed = last_sent is None or (now - last_sent).total_seconds() >= args.alert_cooldown_seconds
+            if retry_elapsed and (changed or cooldown_elapsed):
+                notification_type = "alert"
     elif previous_codes:
-        notification_type = "recovery"
+        observed_codes = set()
+        observed_runs = 0
+        healthy_runs += 1
+        if healthy_runs >= args.recovery_confirm_runs and retry_elapsed:
+            notification_type = "recovery"
+    else:
+        observed_codes = set()
+        observed_runs = 0
+        healthy_runs = 0
 
-    notification: dict[str, object] = {"status": "deduplicated" if current_codes else "idle"}
+    if current_codes and observed_runs < args.alert_confirm_runs:
+        notification: dict[str, object] = {
+            "status": "pending_confirmation",
+            "observedRuns": observed_runs,
+            "requiredRuns": args.alert_confirm_runs,
+        }
+    elif not current_codes and previous_codes and healthy_runs < args.recovery_confirm_runs:
+        notification = {
+            "status": "pending_recovery",
+            "healthyRuns": healthy_runs,
+            "requiredRuns": args.recovery_confirm_runs,
+        }
+    else:
+        notification = {"status": "deduplicated" if current_codes else "idle"}
     if notification_type is not None:
         state["lastAttemptAt"] = now.isoformat()
         hostname = socket.gethostname()
@@ -314,6 +352,7 @@ def notify(
             body = (
                 "StudyHub runtime monitoring detected an abnormal condition.\n\n"
                 f"Checked at: {now.isoformat()}\nHost: {hostname}\n\nAlerts:\n{summary}\n\n"
+                f"Confirmed checks: {observed_runs}\n\n"
                 f"Status snapshot:\n{json.dumps(payload, ensure_ascii=False, indent=2)}\n"
             )
         else:
@@ -326,12 +365,21 @@ def notify(
         try:
             send_email(env_file=args.env_file, recipients=args.alert_email, subject=subject, body=body)
         except Exception as exc:
+            state["lastAttemptFailed"] = True
             notification = {"status": "failed", "type": notification_type, "error": type(exc).__name__}
         else:
+            state["lastAttemptFailed"] = False
             state["lastSentAt"] = now.isoformat()
+            if notification_type == "alert":
+                state["activeAlertCodes"] = sorted(current_codes)
+            else:
+                state["activeAlertCodes"] = []
+                healthy_runs = 0
             notification = {"status": "sent", "type": notification_type, "recipients": len(args.alert_email)}
 
-    state["activeAlertCodes"] = sorted(current_codes)
+    state["observedAlertCodes"] = sorted(observed_codes)
+    state["observedAlertRuns"] = observed_runs
+    state["healthyRuns"] = healthy_runs
     write_json(args.alert_state_file, state)
     return notification
 
