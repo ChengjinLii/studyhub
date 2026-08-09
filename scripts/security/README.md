@@ -15,7 +15,7 @@ bash scripts/security/check-sensitive-files.sh
 仓库提供一组不修改数据库的运行时防护：
 
 - `deploy/nginx/studyhub-abuse-zones.conf`：按全局、写请求、认证、AI、MCP 和 `/v1` 分桶限速
-- `deploy/nginx/studyhub-abuse-server.conf`：连接限制、慢请求保护、仅本机 metrics 与 Nginx status
+- `deploy/nginx/studyhub-abuse-server.conf`：连接限制、慢请求保护、仅本机 metrics 与 Nginx status，以及前端和 API 统一安全响应头
 - `deploy/systemd/studyhub-backend-hardening.conf`：Uvicorn 并发和 backlog 上限
 - `runtime-abuse-monitor.py`：每分钟检查请求峰值、429、5xx、连接数、CPU、内存、磁盘、inode、证书、服务和本机探针
 
@@ -48,6 +48,14 @@ sudo /usr/bin/python3 scripts/security/runtime-abuse-monitor.py \
 ```
 
 该层可以缓解 HTTP/CC、暴力请求和资源耗尽，不能替代云端 L3/L4 流量清洗。`/api/metrics` 安装后仅允许从源站本机访问，生产 smoke 仍通过后端 loopback 地址检查指标。
+
+Nginx 会为页面、静态资源、API 和错误响应统一设置 HSTS、`nosniff`、frame、referrer 与 permissions 策略。HSTS 仅在 HTTPS 响应中发送；CSP 当前仅使用 `Content-Security-Policy-Report-Only`，违规报告匿名提交到 `/api/security/csp-reports`，不会阻断支付、OSS 预览或前端资源。上线后可运行：
+
+```bash
+bash scripts/security/check-security-headers.sh https://study-hub.cn
+```
+
+在决定启用强制 CSP 前，应至少观察 7～14 天报告，并实际验证 Next.js 水合、支付宝跳转、OSS 图片/预览和 AI 流式响应。切勿直接增加 `preload` 或删除当前兼容源。
 
 若服务器为 APT 配置了本机代理，而腾讯云 Ubuntu 镜像应走内网或直连，可安装仓库中的单域名例外，避免代理故障阻断安全更新：
 

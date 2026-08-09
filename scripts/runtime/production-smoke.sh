@@ -130,6 +130,8 @@ if [[ -n "$PUBLIC_SMOKE_BASES" ]]; then
     check_public_health "$public_base healthz" "$public_base/api/healthz"
     echo "[public] $public_base frontend root"
     curl "${CURL_ARGS[@]}" "$public_base/" >/dev/null
+    echo "[public] $public_base security headers"
+    bash "$ROOT_DIR/scripts/security/check-security-headers.sh" "$public_base"
   done
 fi
 
