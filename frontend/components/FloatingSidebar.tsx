@@ -201,7 +201,7 @@ export default function FloatingSidebar() {
       const dx = lastPointer.x - centerX;
       const dy = lastPointer.y - centerY;
       const dist = Math.max(Math.hypot(dx, dy), 1);
-      const maxOffset = 6; // px
+      const maxOffset = 5; // Keep both eyes clear of the circular edge while tracking.
       target.x = (dx / dist) * maxOffset;
       target.y = (dy / dist) * maxOffset;
     };

@@ -314,6 +314,59 @@ test('StudyHub Bot wardrobe hats sit diagonally over the upper-left corner', asy
   }
 });
 
+test('StudyHub Bot eyes remain centered and symmetric while looking sideways', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/more');
+  await closeEntryModalIfPresent(page);
+  await page.addStyleTag({
+    content: '.floating-sidebar__bubble .floating-face::before { animation: none !important; transition: none !important; }',
+  });
+
+  const measurements = await page.locator('.floating-sidebar__bubble').evaluate((source) =>
+    [-5, 0, 5].map((eyeX) => {
+      const clone = source.cloneNode(true) as HTMLElement;
+      clone.style.position = 'fixed';
+      clone.style.left = '120px';
+      clone.style.top = '120px';
+      clone.style.setProperty('--eye-x', `${eyeX}px`, 'important');
+      clone.style.setProperty('--eye-y', '0px', 'important');
+      document.body.appendChild(clone);
+
+      const face = clone.querySelector<HTMLElement>('.floating-face');
+      if (!face) throw new Error('StudyHub Bot face is missing');
+      const faceStyle = window.getComputedStyle(face);
+      const eyeStyle = window.getComputedStyle(face, '::before');
+      const transform = new DOMMatrixReadOnly(eyeStyle.transform);
+      const eyeWidth = Number.parseFloat(eyeStyle.width);
+      const shadowOffset = Number.parseFloat(eyeStyle.boxShadow.match(/-?\d+(?:\.\d+)?px/)?.[0] || '0');
+      const faceWidth = Number.parseFloat(faceStyle.width);
+      const eyeLeft = (faceWidth - eyeWidth) / 2 + transform.e;
+      const pairLeft = Math.min(eyeLeft, eyeLeft + shadowOffset);
+      const pairRight = Math.max(eyeLeft + eyeWidth, eyeLeft + shadowOffset + eyeWidth);
+      const result = {
+        eyeX,
+        leftMargin: pairLeft,
+        rightMargin: faceWidth - pairRight,
+        pairCenter: (pairLeft + pairRight) / 2,
+        faceCenter: faceWidth / 2,
+      };
+      clone.remove();
+      return result;
+    })
+  );
+
+  const [lookingLeft, centered, lookingRight] = measurements;
+  for (const measurement of measurements) {
+    expect(measurement.leftMargin).toBeGreaterThanOrEqual(8);
+    expect(measurement.rightMargin).toBeGreaterThanOrEqual(8);
+  }
+  expect(centered.leftMargin).toBeCloseTo(centered.rightMargin, 4);
+  expect(lookingLeft.leftMargin).toBeCloseTo(lookingRight.rightMargin, 4);
+  expect(lookingLeft.rightMargin).toBeCloseTo(lookingRight.leftMargin, 4);
+  expect(lookingLeft.pairCenter).toBeLessThan(lookingLeft.faceCenter);
+  expect(lookingRight.pairCenter).toBeGreaterThan(lookingRight.faceCenter);
+});
+
 test('home entry modal and discovery views remain keyboard accessible', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.goto('/');

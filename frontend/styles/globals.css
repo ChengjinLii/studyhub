@@ -1375,6 +1375,7 @@ main {
 
 .floating-sidebar__bubble .floating-face::before {
   content: '';
+  --eye-pair-center-x: -7px;
   width: 6px;
   height: 16px;
   background: #f7f8fb;
@@ -1383,7 +1384,7 @@ main {
   position: relative;
   display: block;
   animation: eye-blink 5s ease-in-out infinite;
-  transform: translate(var(--eye-x, 0px), var(--eye-y, 0px));
+  transform: translate(calc(var(--eye-x, 0px) + var(--eye-pair-center-x)), var(--eye-y, 0px));
   transition: transform 0.08s ease-out;
 }
 
@@ -2094,9 +2095,9 @@ main {
 }
 
 @keyframes eye-blink {
-  0%, 90%, 100% { transform: translate(var(--eye-x, 0px), var(--eye-y, 0px)) scaleY(1); }
-  94% { transform: translate(var(--eye-x, 0px), var(--eye-y, 0px)) scaleY(0.2); }
-  96% { transform: translate(var(--eye-x, 0px), var(--eye-y, 0px)) scaleY(0.05); }
+  0%, 90%, 100% { transform: translate(calc(var(--eye-x, 0px) + var(--eye-pair-center-x)), var(--eye-y, 0px)) scaleY(1); }
+  94% { transform: translate(calc(var(--eye-x, 0px) + var(--eye-pair-center-x)), var(--eye-y, 0px)) scaleY(0.2); }
+  96% { transform: translate(calc(var(--eye-x, 0px) + var(--eye-pair-center-x)), var(--eye-y, 0px)) scaleY(0.05); }
 }
 
 .sidebar-body {
