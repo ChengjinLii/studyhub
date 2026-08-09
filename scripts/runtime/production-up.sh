@@ -13,6 +13,9 @@ BACKEND_PID_FILE="$RUN_DIR/backend.pid"
 FRONTEND_PID_FILE="$RUN_DIR/frontend.pid"
 RUN_PREFLIGHT="${STUDYHUB_PRODUCTION_UP_PREFLIGHT:-1}"
 REBUILD_FRONTEND="${STUDYHUB_PRODUCTION_REBUILD_FRONTEND:-auto}"
+UVICORN_LIMIT_CONCURRENCY="${STUDYHUB_UVICORN_LIMIT_CONCURRENCY:-128}"
+UVICORN_BACKLOG="${STUDYHUB_UVICORN_BACKLOG:-512}"
+UVICORN_KEEPALIVE_SECONDS="${STUDYHUB_UVICORN_KEEPALIVE_SECONDS:-5}"
 
 require_tcp_port() {
   local name="$1"
@@ -25,6 +28,19 @@ require_tcp_port() {
 
 require_tcp_port "PRODUCTION_BACKEND_PORT" "$BACKEND_PORT"
 require_tcp_port "PRODUCTION_FRONTEND_PORT" "$FRONTEND_PORT"
+
+require_positive_int() {
+  local name="$1"
+  local value="$2"
+  if ! [[ "$value" =~ ^[1-9][0-9]*$ ]]; then
+    echo "$name must be a positive integer; got $value"
+    exit 2
+  fi
+}
+
+require_positive_int "STUDYHUB_UVICORN_LIMIT_CONCURRENCY" "$UVICORN_LIMIT_CONCURRENCY"
+require_positive_int "STUDYHUB_UVICORN_BACKLOG" "$UVICORN_BACKLOG"
+require_positive_int "STUDYHUB_UVICORN_KEEPALIVE_SECONDS" "$UVICORN_KEEPALIVE_SECONDS"
 
 case "$RUN_PREFLIGHT" in
   0|1|false|true)
@@ -109,7 +125,12 @@ if ! is_running "$BACKEND_PID_FILE"; then
     cd "$ROOT_DIR/backend"
     export STUDYHUB_ENVIRONMENT=production
     export STUDYHUB_PRIVATE_DIR_PATH="$PRIVATE_DIR"
-    launch_background "$LOG_DIR/backend.log" "$ROOT_DIR/.venv/bin/uvicorn" app.main:app --host 127.0.0.1 --port "$BACKEND_PORT" >"$BACKEND_PID_FILE"
+    launch_background "$LOG_DIR/backend.log" "$ROOT_DIR/.venv/bin/uvicorn" app.main:app \
+      --host 127.0.0.1 \
+      --port "$BACKEND_PORT" \
+      --limit-concurrency "$UVICORN_LIMIT_CONCURRENCY" \
+      --backlog "$UVICORN_BACKLOG" \
+      --timeout-keep-alive "$UVICORN_KEEPALIVE_SECONDS" >"$BACKEND_PID_FILE"
   )
 fi
 

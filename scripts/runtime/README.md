@@ -49,3 +49,4 @@ bash scripts/runtime/production-down.sh
 - `preview-down.sh` / `production-down.sh` 只会对正整数 pid 文件执行 `kill`，无效 pid 文件会被当作损坏状态处理
 - preview / production 不应隐式回退到 SQLite 或本地 fake provider
 - 生产环境相关操作应保持显式、保守、可回滚
+- systemd 部署应安装 `deploy/systemd/studyhub-backend-hardening.conf`，将 Uvicorn 并发限制为 128、连接 backlog 限制为 512；shell runtime 使用相同默认值，可分别通过 `STUDYHUB_UVICORN_LIMIT_CONCURRENCY`、`STUDYHUB_UVICORN_BACKLOG`、`STUDYHUB_UVICORN_KEEPALIVE_SECONDS` 覆盖

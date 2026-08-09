@@ -151,12 +151,31 @@ def _rule_for_request(settings: Settings, request: Request) -> RateLimitRule | N
         return RateLimitRule("login", settings.rate_limit_login)
     if method == "GET" and path in {"/api/captchas", "/api/captcha", "/api/auth/captcha"}:
         return RateLimitRule("captcha", settings.rate_limit_captcha)
-    if method == "POST" and path in {"/api/registration-verifications", "/api/auth/register", "/api/password-resets", "/api/auth/reset-password"}:
+    if method == "POST" and path in {
+        "/api/registration-verifications",
+        "/api/registrations",
+        "/api/auth/register",
+        "/api/auth/verify",
+        "/api/password-resets",
+        "/api/auth/reset-password",
+        "/api/auth/bind-email",
+    }:
+        return RateLimitRule("email-verification", settings.rate_limit_email_verification)
+    if method == "PUT" and path == "/api/me/email":
         return RateLimitRule("email-verification", settings.rate_limit_email_verification)
     if method == "POST" and path in {"/api/materials", "/api/market"}:
         return RateLimitRule("upload", settings.rate_limit_upload)
     if method == "POST" and path.startswith("/api/materials/") and path.endswith(("/view", "/views")):
         return RateLimitRule("view", settings.rate_limit_view)
+    if method == "POST" and path in {
+        "/api/ai-chats",
+        "/api/ai/chat",
+        "/api/ai-recommendations",
+        "/api/ai/recommend",
+        "/api/ai-recommendations/stream",
+        "/api/ai/recommend/stream",
+    }:
+        return RateLimitRule("ai", settings.rate_limit_ai)
     return None
 
 

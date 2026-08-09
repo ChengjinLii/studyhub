@@ -48,6 +48,7 @@ def strict_security_client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> T
     monkeypatch.setenv("STUDYHUB_RATE_LIMIT_EMAIL_VERIFICATION", "2")
     monkeypatch.setenv("STUDYHUB_RATE_LIMIT_UPLOAD", "2")
     monkeypatch.setenv("STUDYHUB_RATE_LIMIT_VIEW", "2")
+    monkeypatch.setenv("STUDYHUB_RATE_LIMIT_AI", "2")
     monkeypatch.setenv("STUDYHUB_RATE_LIMIT_MCP", "2")
 
     get_settings.cache_clear()
@@ -221,6 +222,49 @@ def test_password_reset_rate_limit_returns_429(strict_security_client: TestClien
 
     assert response.status_code == 429
     assert_error_envelope(response, "RATE_LIMITED", "Too many email-verification requests")
+
+
+@pytest.mark.parametrize("path", ["/api/registrations", "/api/auth/verify"])
+def test_registration_completion_uses_email_rate_limit(
+    strict_security_client: TestClient,
+    path: str,
+) -> None:
+    for _ in range(2):
+        assert strict_security_client.post(path, json={}).status_code in {400, 422}
+
+    response = strict_security_client.post(path, json={})
+
+    assert response.status_code == 429
+    assert_error_envelope(response, "RATE_LIMITED", "Too many email-verification requests")
+
+
+def test_email_binding_uses_email_rate_limit(strict_security_client: TestClient) -> None:
+    for _ in range(2):
+        assert strict_security_client.put("/api/me/email", json={}).status_code in {401, 422}
+
+    response = strict_security_client.put("/api/me/email", json={})
+
+    assert response.status_code == 429
+    assert_error_envelope(response, "RATE_LIMITED", "Too many email-verification requests")
+
+
+def test_ai_routes_use_dedicated_rate_limit(strict_security_client: TestClient) -> None:
+    for _ in range(2):
+        assert strict_security_client.post("/api/ai-recommendations", json={}).status_code in {401, 422}
+
+    response = strict_security_client.post("/api/ai-recommendations", json={})
+
+    assert response.status_code == 429
+    assert_error_envelope(response, "RATE_LIMITED", "Too many ai requests")
+
+
+def test_default_rate_limits_are_bounded_for_production_abuse_control() -> None:
+    settings = Settings()
+
+    assert settings.rate_limit_login == 30
+    assert settings.rate_limit_email_verification == 10
+    assert settings.rate_limit_upload == 20
+    assert settings.rate_limit_ai == 12
 
 
 def _request_with_client(host: str, forwarded_for: str | None = None) -> Request:

@@ -1,0 +1,11 @@
+[Unit]
+Description=StudyHub zero-cost abuse monitor
+After=nginx.service
+
+[Service]
+Type=oneshot
+User=root
+WorkingDirectory=/data/studyhub
+ExecStart=/usr/bin/python3 /data/studyhub/scripts/security/runtime-abuse-monitor.py --access-log /var/log/nginx/access.log --status-file /var/lib/studyhub-security/runtime-abuse-status.json
+SyslogIdentifier=studyhub-abuse-monitor
+Nice=10

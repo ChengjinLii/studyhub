@@ -138,6 +138,10 @@ def create_app() -> FastAPI:
             rate_allowed, rate_error = rate_limit_allowed(settings, request)
             if not rate_allowed:
                 status_code = 429
+                get_runtime_metrics().record_security_event(
+                    event="rate_limit",
+                    reason=rate_error or "unknown",
+                )
                 response = middleware_error_response(
                     "RATE_LIMITED",
                     rate_error or "Too many requests",

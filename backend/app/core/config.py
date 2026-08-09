@@ -206,12 +206,13 @@ class Settings(BaseSettings):
     rate_limit_enabled: bool = True
     rate_limit_backend: str = "auto"
     rate_limit_window_seconds: int = 60
-    rate_limit_login: int = 1000
-    rate_limit_captcha: int = 1000
-    rate_limit_email_verification: int = 1000
-    rate_limit_upload: int = 1000
-    rate_limit_view: int = 1000
-    rate_limit_mcp: int = 1000
+    rate_limit_login: int = 30
+    rate_limit_captcha: int = 60
+    rate_limit_email_verification: int = 10
+    rate_limit_upload: int = 20
+    rate_limit_view: int = 300
+    rate_limit_ai: int = 12
+    rate_limit_mcp: int = 120
 
     lock_provider: str = "db_row"
     redis_url: str | None = None
