@@ -7,19 +7,46 @@ from app.services.captcha_service import CaptchaService
 
 class FakeRedis:
     def __init__(self) -> None:
-        self.store: dict[str, str] = {}
+        self.store: dict[str, dict[str, str]] = {}
+        self.ttls: dict[str, int] = {}
 
-    def set(self, key: str, value: str, ex: int | None = None) -> bool:
-        del ex
-        self.store[key] = value
+    def pipeline(self, transaction: bool = True):
+        del transaction
+        return self
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, traceback) -> None:
+        del exc_type, exc, traceback
+
+    def hset(self, key: str, mapping: dict[str, object]) -> int:
+        self.store[key] = {name: str(value) for name, value in mapping.items()}
+        return len(mapping)
+
+    def expire(self, key: str, ttl: int) -> bool:
+        self.ttls[key] = ttl
         return True
 
-    def get(self, key: str) -> str | None:
-        return self.store.get(key)
+    def execute(self) -> list[object]:
+        return [True, True]
 
-    def eval(self, script: str, numkeys: int, key: str) -> str | None:
+    def eval(self, script: str, numkeys: int, key: str, submitted_digest: str) -> int:
         del script, numkeys
-        return self.store.pop(key, None)
+        entry = self.store.get(key)
+        if entry is None:
+            return -1
+        attempts = int(entry["attempts"])
+        max_attempts = int(entry["max_attempts"])
+        if entry["code_digest"] != submitted_digest:
+            attempts += 1
+            entry["attempts"] = str(attempts)
+            if attempts >= max_attempts:
+                self.store.pop(key, None)
+                return -2
+            return 0
+        self.store.pop(key, None)
+        return 1
 
     def scan_iter(self, match: str, count: int = 0):
         del count
@@ -34,6 +61,7 @@ class FakeRedis:
             if key in self.store:
                 deleted += 1
                 self.store.pop(key, None)
+                self.ttls.pop(key, None)
         return deleted
 
 
@@ -46,7 +74,10 @@ def test_captcha_service_uses_redis_backend_once(monkeypatch) -> None:
     code = service.peek_code_for_testing(payload.captchaId)
 
     assert code is not None
-    assert any(key.startswith("studyhub-fastapi:captcha:") for key in fake_redis.store)
+    key = next(key for key in fake_redis.store if key.startswith("studyhub-fastapi:captcha:"))
+    assert fake_redis.ttls[key] == 60
+    assert "code" not in fake_redis.store[key]
+    assert code not in fake_redis.store[key].values()
     service.validate(payload.captchaId, code)
 
     try:

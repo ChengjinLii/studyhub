@@ -69,6 +69,7 @@ from app.services.notification_service import NotificationService
 from app.services.payout_service import PayoutService
 from app.services.requests_service import RequestsService
 from app.services.report_service import ReportService
+from app.services.registration_state_service import RegistrationStateService
 from app.services.kyc_crypto_service import KycCryptoService
 from app.services.read_support import ROLE_ADMIN, ROLE_DEVELOPER, has_role
 from app.services.session_service import SessionService
@@ -237,6 +238,11 @@ def get_token_codec() -> JwtTokenCodec:
 @lru_cache(maxsize=1)
 def get_captcha_service() -> CaptchaService:
     return CaptchaService(get_settings())
+
+
+@lru_cache(maxsize=1)
+def get_registration_state_service() -> RegistrationStateService:
+    return RegistrationStateService(get_settings())
 
 
 @lru_cache(maxsize=1)
@@ -498,6 +504,7 @@ def get_auth_service() -> AuthService:
         get_captcha_service(),
         get_auth_cookie_service(),
         get_mail_provider(),
+        get_registration_state_service(),
     )
 
 
@@ -606,6 +613,7 @@ def clear_dependency_caches() -> None:
     get_finance_repo.cache_clear()
     get_token_codec.cache_clear()
     get_captcha_service.cache_clear()
+    get_registration_state_service.cache_clear()
     get_auth_cookie_service.cache_clear()
     get_mail_provider.cache_clear()
     get_storage_provider.cache_clear()

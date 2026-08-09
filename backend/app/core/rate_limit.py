@@ -153,6 +153,7 @@ def _rule_for_request(settings: Settings, request: Request) -> RateLimitRule | N
         return RateLimitRule("captcha", settings.rate_limit_captcha)
     if method == "POST" and path in {
         "/api/registration-verifications",
+        "/api/registration-tickets",
         "/api/registrations",
         "/api/auth/register",
         "/api/auth/verify",

@@ -29,6 +29,11 @@ export interface RegisterVerificationPayload {
 }
 
 export interface RegistrationPayload {
+  registrationTicket: string;
+  purpose: 'REGISTER';
+}
+
+export interface RegistrationTicketPayload {
   email: string;
   code: string;
   purpose: 'REGISTER';
@@ -51,6 +56,11 @@ export interface VerificationSendResult {
   email: string;
   expiresInSeconds: number;
   resendAfterSeconds: number;
+}
+
+export interface RegistrationTicketResult {
+  registrationTicket: string;
+  expiresInSeconds: number;
 }
 
 export const fetchCaptchaPayload = async () => {
@@ -96,6 +106,16 @@ export const completeRegistration = async (payload: RegistrationPayload) => {
     body: JSON.stringify(payload),
   });
   return ensureApiSuccess(response, '注册失败');
+};
+
+export const issueRegistrationTicket = async (payload: RegistrationTicketPayload) => {
+  const response = await fetchBackend('/registration-tickets', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  const envelope = await ensureApiSuccess<RegistrationTicketResult>(response, '验证码验证失败');
+  return envelope.data;
 };
 
 export const sendRegistrationVerification = async (payload: RegisterVerificationPayload) => {

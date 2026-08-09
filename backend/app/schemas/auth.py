@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from enum import Enum
 
-from pydantic import AliasChoices, BaseModel, ConfigDict, EmailStr, Field, field_validator
+from pydantic import AliasChoices, BaseModel, ConfigDict, EmailStr, Field, field_validator, model_validator
 
 
 class VerificationPurpose(str, Enum):
@@ -62,6 +62,33 @@ class VerifyEmailRequestPayload(BaseModel):
     @classmethod
     def strip_code(cls, value: object) -> object:
         return value.strip() if isinstance(value, str) else value
+
+
+class RegistrationTicketResponsePayload(BaseModel):
+    registrationTicket: str
+    expiresInSeconds: int
+
+
+class CompleteRegistrationRequestPayload(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    registrationTicket: str | None = Field(default=None, min_length=16, max_length=256)
+    email: EmailStr | None = None
+    code: str | None = Field(default=None, min_length=4, max_length=10)
+    purpose: VerificationPurpose = VerificationPurpose.REGISTER
+
+    @field_validator("registrationTicket", "code", mode="before")
+    @classmethod
+    def strip_registration_strings(cls, value: object) -> object:
+        return value.strip() if isinstance(value, str) else value
+
+    @model_validator(mode="after")
+    def require_ticket_or_legacy_code(self) -> "CompleteRegistrationRequestPayload":
+        if self.registrationTicket:
+            return self
+        if self.email and self.code:
+            return self
+        raise ValueError("请先完成邮箱验证")
 
 
 class PasswordChangeRequestPayload(BaseModel):

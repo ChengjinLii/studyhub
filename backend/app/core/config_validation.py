@@ -29,12 +29,30 @@ def validate_runtime_configuration(settings: Any, *, default_dev_jwt_secret: str
 
     _validate_storage(settings)
     _validate_mail(settings)
+    _validate_redis(settings)
     _validate_lock(settings)
     _validate_payment(settings)
     _validate_kyc(settings)
     _validate_mcp(settings)
     _validate_agentic_platform(settings)
     _validate_production_providers(settings)
+
+
+def _validate_redis(settings: Any) -> None:
+    backend_fields = {
+        "STUDYHUB_RATE_LIMIT_BACKEND": settings.rate_limit_backend,
+        "STUDYHUB_CAPTCHA_BACKEND": settings.captcha_backend,
+        "STUDYHUB_SECURITY_STATE_BACKEND": settings.security_state_backend,
+        "STUDYHUB_PUBLIC_READ_CACHE_BACKEND": settings.public_read_cache_backend,
+    }
+    for variable, raw_value in backend_fields.items():
+        if str(raw_value or "auto").strip().lower() not in {"auto", "local", "redis"}:
+            raise RuntimeError(f"{variable} 只允许为 auto、local 或 redis。")
+    if float(settings.redis_socket_timeout_seconds) <= 0 or float(settings.redis_connect_timeout_seconds) <= 0:
+        raise RuntimeError("Redis 连接与读取超时必须大于 0 秒。")
+    explicitly_redis = any(str(value or "").strip().lower() == "redis" for value in backend_fields.values())
+    if explicitly_redis and not settings.redis_url:
+        raise RuntimeError("Redis 状态服务缺少 STUDYHUB_REDIS_URL 配置。")
 
 
 def _validate_storage(settings: Any) -> None:

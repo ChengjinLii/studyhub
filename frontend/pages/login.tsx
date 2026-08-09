@@ -9,6 +9,7 @@ import {
   confirmPasswordReset,
   fetchCaptchaPayload,
   fetchLocalDevInfo,
+  issueRegistrationTicket,
   loginWithLocalDev,
   loginWithPassword,
   sendPasswordResetCode,
@@ -212,9 +213,13 @@ export default function Login({ user }: LoginPageProps) {
       return;
     }
     try {
-      await completeRegistration({
+      const registration = await issueRegistrationTicket({
         email: registerForm.email,
         code: registerForm.code,
+        purpose: 'REGISTER',
+      });
+      await completeRegistration({
+        registrationTicket: registration.registrationTicket,
         purpose: 'REGISTER',
       });
       setSuccess('注册并登录成功，正在跳转...');

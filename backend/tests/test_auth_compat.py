@@ -7,7 +7,7 @@ from fastapi.testclient import TestClient
 from app.core.config import Settings
 from app.core.db import session_scope
 from app.core.security import JwtTokenCodec
-from app.models.auth import AuthUser
+from app.models.auth import AuthUser, EmailVerification
 from app.schemas.auth import VerificationPurpose
 from app.services.auth_cookie_service import AuthCookieService
 from app.services.auth_service import AuthService
@@ -61,6 +61,52 @@ def _register_and_verify(
         },
     )
     assert verify_response.status_code == 200
+
+
+def test_registration_ticket_is_one_time_and_register_state_is_not_persisted(
+    client: TestClient,
+    captcha_service: CaptchaService,
+    auth_service: AuthService,
+) -> None:
+    email = "ticket-once@example.com"
+    captcha_id, captcha_code = _issue_captcha(client, captcha_service)
+    send_response = client.post(
+        "/api/registration-verifications",
+        json={
+            "username": "ticket_once",
+            "email": email,
+            "password": "secret123",
+            "captchaId": captcha_id,
+            "captchaCode": captcha_code,
+        },
+    )
+    assert send_response.status_code == 200
+    with session_scope() as session:
+        code = auth_service.peek_latest_verification_code_for_testing(
+            session,
+            email=email,
+            purpose=VerificationPurpose.REGISTER,
+        )
+        assert session.query(EmailVerification).filter(EmailVerification.email == email).count() == 0
+    assert code is not None
+
+    ticket_response = client.post(
+        "/api/registration-tickets",
+        json={"email": email, "code": code, "purpose": "REGISTER"},
+    )
+    assert ticket_response.status_code == 200
+    ticket = ticket_response.json()["data"]["registrationTicket"]
+
+    registration = client.post(
+        "/api/registrations",
+        json={"registrationTicket": ticket, "purpose": "REGISTER"},
+    )
+    assert registration.status_code == 200
+    replay = client.post(
+        "/api/registrations",
+        json={"registrationTicket": ticket, "purpose": "REGISTER"},
+    )
+    assert replay.status_code == 409
 
 
 def test_register_validation_uses_user_facing_username_message(client: TestClient) -> None:

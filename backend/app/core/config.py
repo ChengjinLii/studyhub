@@ -218,8 +218,11 @@ class Settings(BaseSettings):
     redis_url: str | None = None
     redis_namespace: str = "studyhub-fastapi"
     redis_lock_key_prefix: str = "locks"
-    redis_socket_timeout_seconds: int = 5
-    redis_connect_timeout_seconds: int = 5
+    redis_socket_timeout_seconds: float = 5.0
+    redis_connect_timeout_seconds: float = 5.0
+    security_state_backend: str = "auto"
+    registration_ticket_ttl_seconds: int = 300
+    registration_consumed_marker_ttl_seconds: int = 60
 
     oss_endpoint: str | None = None
     oss_bucket: str | None = None
@@ -280,6 +283,7 @@ class Settings(BaseSettings):
     captcha_backend: str = "auto"
     captcha_ttl_seconds: int = 60
     captcha_code_length: int = 4
+    captcha_max_attempts: int = 5
     verification_ttl_seconds: int = 300
     verification_resend_after_seconds: int = 120
     verification_max_attempts: int = 5

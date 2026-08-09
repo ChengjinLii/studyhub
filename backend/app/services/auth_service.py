@@ -18,15 +18,18 @@ from app.repos.auth_repo import AuthRepository
 from app.schemas.auth import (
     BindEmailRequestPayload,
     BindEmailResponsePayload,
+    CompleteRegistrationRequestPayload,
     LoginRequestPayload,
     RegisterRequestPayload,
     ResetPasswordRequestPayload,
     VerificationPurpose,
     VerificationSendResponsePayload,
     VerifyEmailRequestPayload,
+    RegistrationTicketResponsePayload,
 )
 from app.services.auth_cookie_service import AuthCookieService
 from app.services.captcha_service import CaptchaService
+from app.services.registration_state_service import RegistrationStateService
 
 
 logger = logging.getLogger(__name__)
@@ -40,12 +43,14 @@ class AuthService:
         captcha_service: CaptchaService,
         auth_cookie_service: AuthCookieService,
         mail_provider: MailProvider,
+        registration_state_service: RegistrationStateService,
     ) -> None:
         self.settings = settings
         self.repo = repo
         self.captcha_service = captcha_service
         self.auth_cookie_service = auth_cookie_service
         self.mail_provider = mail_provider
+        self.registration_state_service = registration_state_service
 
     def login(self, session: Session, payload: LoginRequestPayload, response: Response) -> dict[str, object]:
         self.captcha_service.validate(payload.captchaId, payload.captchaCode)
@@ -60,47 +65,76 @@ class AuthService:
         dispatcher: BackgroundDispatcher | None = None,
     ) -> VerificationSendResponsePayload:
         self.captcha_service.validate(payload.captchaId, payload.captchaCode)
-        verification = self._create_verification(
-            session,
-            email=self._normalize_email(payload.email),
-            purpose=VerificationPurpose.REGISTER,
-            username=self._normalize_username(payload.username),
+        email = self._normalize_email(payload.email)
+        username = self._normalize_username(payload.username)
+        if self.repo.username_exists(session, username):
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="USERNAME_EXISTS")
+        if self.repo.email_exists(session, email):
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="EMAIL_EXISTS")
+        issue = self.registration_state_service.create_verification(
+            email=email,
+            username=username,
             password_hash=self._hash_password(payload.password),
         )
-        session.commit()
+        verification = EmailVerification(
+            email=issue.email,
+            purpose=VerificationPurpose.REGISTER.value,
+            username=issue.username,
+            password_hash=issue.password_hash,
+            code=issue.code,
+            expires_at=self._utcnow() + timedelta(seconds=issue.expires_in_seconds),
+            last_sent_at=self._utcnow(),
+            attempts=0,
+            max_attempts=self.settings.verification_max_attempts,
+            used=False,
+        )
         self._dispatch_verification_email(verification, dispatcher)
-        return self._to_send_response(verification)
+        return VerificationSendResponsePayload(
+            email=issue.email,
+            expiresInSeconds=issue.expires_in_seconds,
+            resendAfterSeconds=issue.resend_after_seconds,
+        )
+
+    def issue_registration_ticket(self, payload: VerifyEmailRequestPayload) -> RegistrationTicketResponsePayload:
+        if payload.purpose is not VerificationPurpose.REGISTER:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="暂不支持该验证类型")
+        ticket, expires_in = self.registration_state_service.issue_ticket(
+            email=self._normalize_email(payload.email),
+            code=payload.code,
+        )
+        return RegistrationTicketResponsePayload(registrationTicket=ticket, expiresInSeconds=expires_in)
 
     def complete_registration(
         self,
         session: Session,
-        payload: VerifyEmailRequestPayload,
+        payload: CompleteRegistrationRequestPayload,
         response: Response,
     ) -> dict[str, object]:
         if payload.purpose is not VerificationPurpose.REGISTER:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="暂不支持该验证类型")
+        registration_ticket = payload.registrationTicket
+        if not registration_ticket:
+            if payload.email is None or payload.code is None:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="请先完成邮箱验证")
+            ticket_payload = VerifyEmailRequestPayload(
+                email=payload.email,
+                code=payload.code,
+                purpose=payload.purpose,
+            )
+            registration_ticket = self.issue_registration_ticket(ticket_payload).registrationTicket
+        credentials = self.registration_state_service.consume_ticket(registration_ticket)
 
-        verification = self._consume_verification(
-            session,
-            email=self._normalize_email(payload.email),
-            code=payload.code,
-            purpose=VerificationPurpose.REGISTER,
-            user_id=None,
-        )
-        if not verification.username or not verification.password_hash:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="注册信息不完整，请重新获取验证码")
-
-        if self.repo.username_exists(session, verification.username):
+        if self.repo.username_exists(session, credentials.username):
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="USERNAME_EXISTS")
-        if self.repo.email_exists(session, verification.email):
+        if self.repo.email_exists(session, credentials.email):
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="EMAIL_EXISTS")
 
         user = self.repo.build_user(
             session,
-            username=verification.username,
-            email=verification.email,
-            password_hash=verification.password_hash,
-            nickname=verification.username,
+            username=credentials.username,
+            email=credentials.email,
+            password_hash=credentials.password_hash,
+            nickname=credentials.username,
             role_mask=self.settings.default_role_mask,
             verified=True,
             free_download_quota=self.settings.initial_download_quota,
@@ -315,6 +349,8 @@ class AuthService:
         purpose: VerificationPurpose,
         user_id: int | None = None,
     ) -> str | None:
+        if purpose is VerificationPurpose.REGISTER:
+            return self.registration_state_service.peek_code_for_testing(self._normalize_email(email))
         verification = self.repo.latest_verification(
             session,
             email=self._normalize_email(email),

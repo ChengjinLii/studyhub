@@ -1,78 +1,99 @@
 from __future__ import annotations
 
 import base64
+import hashlib
+import hmac
 import io
-import json
 import secrets
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
+from threading import RLock
 from typing import Any
 
 from PIL import Image, ImageDraw, ImageFont
 
 from app.core.config import Settings
 from app.core.exceptions import BizException
+from app.core.redis_client import create_redis_client, redis_namespace
 from app.schemas.auth import CaptchaResponsePayload
 
 
 @dataclass(slots=True)
 class CaptchaEntry:
-    code: str
+    code_digest: str
     expires_at: datetime
+    attempts: int = 0
 
 
 class CaptchaService:
-    _GET_DELETE_SCRIPT = """
-local value = redis.call('GET', KEYS[1])
-if value then
-  redis.call('DEL', KEYS[1])
+    _VALIDATE_SCRIPT = """
+if redis.call('EXISTS', KEYS[1]) == 0 then
+  return -1
 end
-return value
+local attempts = tonumber(redis.call('HGET', KEYS[1], 'attempts') or '0')
+local max_attempts = tonumber(redis.call('HGET', KEYS[1], 'max_attempts') or '1')
+if attempts >= max_attempts then
+  redis.call('DEL', KEYS[1])
+  return -2
+end
+if redis.call('HGET', KEYS[1], 'code_digest') ~= ARGV[1] then
+  attempts = redis.call('HINCRBY', KEYS[1], 'attempts', 1)
+  if attempts >= max_attempts then
+    redis.call('DEL', KEYS[1])
+    return -2
+  end
+  return 0
+end
+redis.call('DEL', KEYS[1])
+return 1
 """
 
     def __init__(self, settings: Settings) -> None:
         self.settings = settings
         self._store: dict[str, CaptchaEntry] = {}
+        self._test_codes: dict[str, str] = {}
         self._redis_client: Any | None = None
+        self._lock = RLock()
 
     def generate(self) -> CaptchaResponsePayload:
         code = self._generate_code()
         captcha_id = secrets.token_urlsafe(18)
         ttl_seconds = max(60, int(self.settings.captcha_ttl_seconds))
         expires_at = datetime.now(UTC) + timedelta(seconds=ttl_seconds)
-        self._store_local(captcha_id, code, expires_at)
+        digest = self._code_digest(captcha_id, code)
+        self._store_local(captcha_id, digest, expires_at)
+        if self.settings.environment.strip().lower() in {"test", "local-dev"}:
+            self._test_codes[captcha_id] = code
         if self._backend() == "redis":
             try:
-                self._redis_set(captcha_id, code, ttl_seconds)
+                self._redis_set(captcha_id, digest, ttl_seconds)
             except Exception:
+                # Login and registration retain the existing single-process
+                # image-CAPTCHA fallback when Redis is temporarily unavailable.
                 pass
-        return CaptchaResponsePayload(
-            captchaId=captcha_id,
-            imageBase64=self._render_png(code),
-        )
+        return CaptchaResponsePayload(captchaId=captcha_id, imageBase64=self._render_png(code))
 
     def validate(self, captcha_id: str | None, captcha_code: str | None) -> None:
-        captcha_key = captcha_id or ""
-        entry = self._pop(captcha_key)
-        now = datetime.now(UTC)
-        if entry is None or entry.expires_at < now:
-            raise BizException("CAPTCHA_EXPIRED", "验证码已失效，请重新获取")
-        if not captcha_code or entry.code.lower() != captcha_code.strip().lower():
-            raise BizException("CAPTCHA_MISMATCH", "验证码错误")
+        captcha_key = (captcha_id or "").strip()
+        submitted_digest = self._code_digest(captcha_key, captcha_code or "")
+        if self._backend() == "redis":
+            try:
+                outcome = int(self._client().eval(self._VALIDATE_SCRIPT, 1, self._redis_key(captcha_key), submitted_digest))
+            except Exception:
+                outcome = self._validate_local(captcha_key, submitted_digest)
+            else:
+                self._mirror_redis_outcome(captcha_key, outcome)
+        else:
+            outcome = self._validate_local(captcha_key, submitted_digest)
+        self._raise_for_outcome(outcome)
 
     def peek_code_for_testing(self, captcha_id: str) -> str | None:
-        entry = self._store.get(captcha_id)
-        if entry is not None:
-            return entry.code
-        if self._backend() != "redis":
-            return None
-        try:
-            return self._redis_get(captcha_id)
-        except Exception:
-            return None
+        return self._test_codes.get(captcha_id)
 
     def reset(self) -> None:
-        self._store.clear()
+        with self._lock:
+            self._store.clear()
+            self._test_codes.clear()
         if self._backend() == "redis":
             try:
                 self._redis_clear()
@@ -84,26 +105,66 @@ return value
         alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
         return "".join(secrets.choice(alphabet) for _ in range(max(4, self.settings.captcha_code_length)))
 
-    def _cleanup(self) -> None:
-        now = datetime.now(UTC)
+    def _code_digest(self, captcha_id: str, code: str) -> str:
+        normalized = (code or "").strip().upper()
+        message = f"captcha:{captcha_id}:{normalized}".encode()
+        return hmac.new(self.settings.jwt_secret.encode(), message, hashlib.sha256).hexdigest()
+
+    def _cleanup_locked(self, now: datetime) -> None:
         expired_ids = [key for key, entry in self._store.items() if entry.expires_at < now]
         for key in expired_ids:
             self._store.pop(key, None)
+            self._test_codes.pop(key, None)
 
-    def _store_local(self, captcha_id: str, code: str, expires_at: datetime) -> None:
-        self._cleanup()
-        self._store[captcha_id] = CaptchaEntry(code=code, expires_at=expires_at)
+    def _store_local(self, captcha_id: str, digest: str, expires_at: datetime) -> None:
+        with self._lock:
+            self._cleanup_locked(datetime.now(UTC))
+            self._store[captcha_id] = CaptchaEntry(code_digest=digest, expires_at=expires_at)
 
-    def _pop(self, captcha_id: str) -> CaptchaEntry | None:
-        if self._backend() == "redis":
-            try:
-                entry = self._redis_pop(captcha_id)
-                if entry is not None:
+    def _validate_local(self, captcha_id: str, submitted_digest: str) -> int:
+        now = datetime.now(UTC)
+        with self._lock:
+            self._cleanup_locked(now)
+            entry = self._store.get(captcha_id)
+            if entry is None or entry.expires_at < now:
+                self._store.pop(captcha_id, None)
+                self._test_codes.pop(captcha_id, None)
+                return -1
+            if entry.attempts >= max(1, int(self.settings.captcha_max_attempts)):
+                self._store.pop(captcha_id, None)
+                self._test_codes.pop(captcha_id, None)
+                return -2
+            if not hmac.compare_digest(entry.code_digest, submitted_digest):
+                entry.attempts += 1
+                if entry.attempts >= max(1, int(self.settings.captcha_max_attempts)):
                     self._store.pop(captcha_id, None)
-                    return entry
-            except Exception:
-                pass
-        return self._store.pop(captcha_id, None)
+                    self._test_codes.pop(captcha_id, None)
+                    return -2
+                return 0
+            self._store.pop(captcha_id, None)
+            self._test_codes.pop(captcha_id, None)
+            return 1
+
+    def _mirror_redis_outcome(self, captcha_id: str, outcome: int) -> None:
+        if outcome in {1, -1, -2}:
+            with self._lock:
+                self._store.pop(captcha_id, None)
+                self._test_codes.pop(captcha_id, None)
+            return
+        if outcome == 0:
+            with self._lock:
+                entry = self._store.get(captcha_id)
+                if entry is not None:
+                    entry.attempts += 1
+
+    def _raise_for_outcome(self, outcome: int) -> None:
+        if outcome == 1:
+            return
+        if outcome == 0:
+            raise BizException("CAPTCHA_MISMATCH", "验证码错误")
+        if outcome == -2:
+            raise BizException("CAPTCHA_ATTEMPTS_EXCEEDED", "验证码错误次数过多，请重新获取")
+        raise BizException("CAPTCHA_EXPIRED", "验证码已失效，请重新获取")
 
     def _backend(self) -> str:
         backend = (self.settings.captcha_backend or "auto").strip().lower()
@@ -114,57 +175,32 @@ return value
         return backend if backend in {"local", "redis"} else "local"
 
     def _redis_key(self, captcha_id: str) -> str:
-        namespace = self.settings.redis_namespace.strip(":") or "studyhub-fastapi"
-        return f"{namespace}:captcha:{captcha_id}"
+        return f"{redis_namespace(self.settings)}:captcha:{captcha_id}"
 
-    def _redis_set(self, captcha_id: str, code: str, ttl_seconds: int) -> None:
-        payload = json.dumps({"code": code}, separators=(",", ":"))
-        self._client().set(self._redis_key(captcha_id), payload, ex=ttl_seconds)
-
-    def _redis_get(self, captcha_id: str) -> str | None:
-        raw_value = self._client().get(self._redis_key(captcha_id))
-        return self._decode_redis_code(raw_value)
-
-    def _redis_pop(self, captcha_id: str) -> CaptchaEntry | None:
-        raw_value = self._client().eval(self._GET_DELETE_SCRIPT, 1, self._redis_key(captcha_id))
-        code = self._decode_redis_code(raw_value)
-        if code is None:
-            return None
-        return CaptchaEntry(code=code, expires_at=datetime.now(UTC) + timedelta(seconds=max(1, int(self.settings.captcha_ttl_seconds))))
+    def _redis_set(self, captcha_id: str, digest: str, ttl_seconds: int) -> None:
+        key = self._redis_key(captcha_id)
+        with self._client().pipeline(transaction=True) as pipe:
+            pipe.hset(
+                key,
+                mapping={
+                    "code_digest": digest,
+                    "attempts": 0,
+                    "max_attempts": max(1, int(self.settings.captcha_max_attempts)),
+                    "kind": "image",
+                },
+            )
+            pipe.expire(key, ttl_seconds)
+            pipe.execute()
 
     def _redis_clear(self) -> None:
         client = self._client()
-        namespace = self.settings.redis_namespace.strip(":") or "studyhub-fastapi"
-        keys = list(client.scan_iter(match=f"{namespace}:captcha:*", count=100))
+        keys = list(client.scan_iter(match=f"{redis_namespace(self.settings)}:captcha:*", count=100))
         if keys:
             client.delete(*keys)
 
-    def _decode_redis_code(self, raw_value: object) -> str | None:
-        if raw_value is None:
-            return None
-        if isinstance(raw_value, bytes):
-            raw_text = raw_value.decode("utf-8")
-        else:
-            raw_text = str(raw_value)
-        try:
-            payload = json.loads(raw_text)
-        except json.JSONDecodeError:
-            return None
-        code = payload.get("code") if isinstance(payload, dict) else None
-        return str(code) if code else None
-
-    def _client(self):
-        if self._redis_client is not None:
-            return self._redis_client
-        if not self.settings.redis_url:
-            raise RuntimeError("Redis captcha backend requires redis_url")
-        import redis  # type: ignore[import-not-found]
-
-        self._redis_client = redis.Redis.from_url(
-            self.settings.redis_url,
-            socket_timeout=self.settings.redis_socket_timeout_seconds,
-            socket_connect_timeout=self.settings.redis_connect_timeout_seconds,
-        )
+    def _client(self) -> Any:
+        if self._redis_client is None:
+            self._redis_client = create_redis_client(self.settings)
         return self._redis_client
 
     def _render_png(self, code: str) -> str:

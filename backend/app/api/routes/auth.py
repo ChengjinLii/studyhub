@@ -10,6 +10,7 @@ from app.core.security import AuthContext
 from app.core.tasks import BackgroundDispatcher
 from app.schemas.auth import (
     BindEmailRequestPayload,
+    CompleteRegistrationRequestPayload,
     LoginRequestPayload,
     PasswordChangeRequestPayload,
     RegisterRequestPayload,
@@ -45,12 +46,20 @@ def register(
 @router.post("/api/registrations")
 @router.post("/api/auth/verify")
 def verify_email(
-    payload: VerifyEmailRequestPayload,
+    payload: CompleteRegistrationRequestPayload,
     response: Response,
     session: Session = Depends(get_db_session),
     service: AuthService = Depends(get_auth_service),
 ) -> dict[str, object]:
     return api_ok(service.complete_registration(session, payload, response))
+
+
+@router.post("/api/registration-tickets")
+def issue_registration_ticket(
+    payload: VerifyEmailRequestPayload,
+    service: AuthService = Depends(get_auth_service),
+) -> dict[str, object]:
+    return api_ok(service.issue_registration_ticket(payload))
 
 
 @router.post("/api/session")
