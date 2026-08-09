@@ -29,13 +29,13 @@ def validate_runtime_configuration(settings: Any, *, default_dev_jwt_secret: str
 
     _validate_storage(settings)
     _validate_mail(settings)
-    _validate_redis(settings)
     _validate_lock(settings)
     _validate_payment(settings)
     _validate_kyc(settings)
     _validate_mcp(settings)
     _validate_agentic_platform(settings)
     _validate_production_providers(settings)
+    _validate_redis(settings)
 
 
 def _validate_redis(settings: Any) -> None:
@@ -57,7 +57,7 @@ def _validate_redis(settings: Any) -> None:
         settings.is_preview or settings.is_production
     ):
         raise RuntimeError("启用上传授权时必须配置 STUDYHUB_REDIS_URL。")
-    if settings.is_preview or settings.is_production:
+    if settings.is_production:
         required_redis_backends = {
             "STUDYHUB_RATE_LIMIT_BACKEND": settings.rate_limit_backend,
             "STUDYHUB_CAPTCHA_BACKEND": settings.captcha_backend,

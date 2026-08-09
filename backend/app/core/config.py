@@ -606,7 +606,7 @@ class Settings(BaseSettings):
     def resolved_upload_authorization_required(self) -> bool:
         if self.upload_authorization_required is not None:
             return bool(self.upload_authorization_required)
-        return self.is_preview or self.is_production
+        return self.is_production
 
     @property
     def resolved_upload_allowed_material_extensions(self) -> set[str]:

@@ -109,9 +109,13 @@ def test_production_disables_seed_loading(
         STUDYHUB_ALIPAY_PUBLIC_KEY_PATH={mock_public_key}
         STUDYHUB_PAYOUT_TRANSFER_PROVIDER=alipay_transfer
         STUDYHUB_KYC_PROVIDER=aliyun_cloud_auth
-        STUDYHUB_ALIBABA_CLOUD_ACCESS_KEY_ID=aliyun-ak
-        STUDYHUB_ALIBABA_CLOUD_ACCESS_KEY_SECRET=aliyun-sk
-        """,
+            STUDYHUB_ALIBABA_CLOUD_ACCESS_KEY_ID=aliyun-ak
+            STUDYHUB_ALIBABA_CLOUD_ACCESS_KEY_SECRET=aliyun-sk
+            STUDYHUB_REDIS_URL=redis://studyhub:test-password@127.0.0.1:6379/0
+            STUDYHUB_RATE_LIMIT_BACKEND=redis
+            STUDYHUB_CAPTCHA_BACKEND=redis
+            STUDYHUB_SECURITY_STATE_BACKEND=redis
+            """,
     )
     monkeypatch.setenv("STUDYHUB_ENVIRONMENT", "production")
     monkeypatch.setenv("STUDYHUB_PRIVATE_DIR_PATH", str(private_dir))
