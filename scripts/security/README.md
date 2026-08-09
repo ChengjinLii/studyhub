@@ -48,3 +48,13 @@ sudo /usr/bin/python3 scripts/security/runtime-abuse-monitor.py \
 ```
 
 该层可以缓解 HTTP/CC、暴力请求和资源耗尽，不能替代云端 L3/L4 流量清洗。`/api/metrics` 安装后仅允许从源站本机访问，生产 smoke 仍通过后端 loopback 地址检查指标。
+
+若服务器为 APT 配置了本机代理，而腾讯云 Ubuntu 镜像应走内网或直连，可安装仓库中的单域名例外，避免代理故障阻断安全更新：
+
+```bash
+sudo install -m 0644 deploy/apt/studyhub-mirror-direct.conf /etc/apt/apt.conf.d/96studyhub-mirror-direct
+sudo install -m 0644 deploy/apt/studyhub-unattended-security.conf /etc/apt/apt.conf.d/60studyhub-unattended-security
+sudo apt-get update
+```
+
+第二个 drop-in 显式恢复 Ubuntu security pocket，并保持自动重启关闭。安装后应执行一次 `sudo unattended-upgrade --dry-run --debug`，确认输出中确实包含待升级包，而不只是 timer 成功退出。
