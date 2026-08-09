@@ -11,109 +11,79 @@ interface MorePageProps {
 interface MoreEntry {
   href: string;
   label: string;
-  eyebrow: string;
-  title: string;
-  body: string;
-  cta: string;
-  marker: string;
-  tone: 'blue' | 'green' | 'navy' | 'violet' | 'amber';
+  description: string;
   external?: boolean;
 }
 
-const FEATURED_ENTRIES: MoreEntry[] = [
+interface MoreGroup {
+  title: string;
+  entries: MoreEntry[];
+}
+
+const MORE_GROUPS: MoreGroup[] = [
   {
-    href: '/column',
-    label: '学汇专栏',
-    eyebrow: 'Content',
-    title: '经验分享与内容专栏',
-    body: '浏览课程复盘、学习路径、经验分享与平台专题。',
-    cta: '进入专栏',
-    marker: '专',
-    tone: 'blue',
+    title: '内容与校园',
+    entries: [
+      {
+        href: '/column',
+        label: '学汇专栏',
+        description: '课程复盘、学习路径、经验分享与平台专题。',
+      },
+      {
+        href: '/market',
+        label: '校园集市',
+        description: '同校闲置、教材、电子设备与求购信息。',
+      },
+    ],
   },
   {
-    href: '/market',
-    label: '校园集市',
-    eyebrow: 'Market',
-    title: '校园二手与求购',
-    body: '查看同校同学发布的闲置、教材、电子设备与交易信息。',
-    cta: '进入集市',
-    marker: '市',
-    tone: 'green',
+    title: '平台信息',
+    entries: [
+      {
+        href: '/join',
+        label: '关于我们',
+        description: '平台定位、官方渠道与核心贡献者。',
+      },
+      {
+        href: '/join#engineering',
+        label: '工程日志',
+        description: '技术栈、开源进展与工程建设记录。',
+      },
+      {
+        href: '/identity-info',
+        label: '协议与隐私',
+        description: '投稿、收益、实名与隐私相关说明。',
+      },
+    ],
+  },
+  {
+    title: '联系与协作',
+    entries: [
+      {
+        href: 'mailto:chengjinli@std.uestc.edu.cn',
+        label: '联系邮箱',
+        description: '反馈资料、账号、支付或内容审核问题。',
+        external: true,
+      },
+      {
+        href: 'https://github.com/ChengjinLii/studyhub',
+        label: 'GitHub',
+        description: '查看源码、提交 issue 或参与项目协作。',
+        external: true,
+      },
+    ],
   },
 ];
 
-const DIRECTORY_ENTRIES: MoreEntry[] = [
-  {
-    href: '/join',
-    label: '关于我们',
-    eyebrow: 'About',
-    title: '平台定位与联系方式',
-    body: '了解 StudyHub、官方渠道与核心贡献者。',
-    cta: '查看说明',
-    marker: '介',
-    tone: 'navy',
-  },
-  {
-    href: '/join#engineering',
-    label: '工程日志',
-    eyebrow: 'Engineering',
-    title: '技术栈与开源进展',
-    body: '查看项目结构、核心技术与工程建设记录。',
-    cta: '查看日志',
-    marker: '工',
-    tone: 'violet',
-  },
-  {
-    href: '/identity-info',
-    label: '协议与隐私',
-    eyebrow: 'Policy',
-    title: '用户协议与身份信息说明',
-    body: '查看投稿、收益、实名与隐私相关说明。',
-    cta: '查看政策',
-    marker: '规',
-    tone: 'amber',
-  },
-  {
-    href: 'mailto:chengjinli@std.uestc.edu.cn',
-    label: '联系邮箱',
-    eyebrow: 'Support',
-    title: '问题反馈与内容协作',
-    body: '反馈资料、账号、支付或内容审核问题。',
-    cta: '发送邮件',
-    marker: '@',
-    tone: 'blue',
-    external: true,
-  },
-  {
-    href: 'https://github.com/ChengjinLii/studyhub',
-    label: 'GitHub',
-    eyebrow: 'Open Source',
-    title: 'StudyHub 开源仓库',
-    body: '关注代码更新、提交 issue 或参与项目协作。',
-    cta: '打开仓库',
-    marker: 'GH',
-    tone: 'navy',
-    external: true,
-  },
-];
-
-function MoreEntryLink({ entry, featured = false }: { entry: MoreEntry; featured?: boolean }) {
-  const className = featured ? 'more-feature-card' : 'more-directory-row';
+function MoreLink({ entry }: { entry: MoreEntry }) {
   const content = (
     <>
-      <span className="more-entry-marker" aria-hidden="true">
-        {entry.marker}
+      <span className="more-link__copy">
+        <strong>{entry.label}</strong>
+        <span>{entry.description}</span>
       </span>
-      <span className="more-entry-copy">
-        <span className="more-entry-kicker">{entry.eyebrow}</span>
-        {featured ? <h2>{entry.label}</h2> : <h3>{entry.label}</h3>}
-        <strong>{entry.title}</strong>
-        <span className="more-entry-description">{entry.body}</span>
-      </span>
-      <span className="more-entry-action">
-        {entry.cta}
-        <span aria-hidden="true">{entry.external ? '↗' : '→'}</span>
+      <span className="more-link__arrow" aria-hidden="true">
+        {entry.external ? '↗' : '→'}
       </span>
     </>
   );
@@ -121,8 +91,7 @@ function MoreEntryLink({ entry, featured = false }: { entry: MoreEntry; featured
   if (entry.external) {
     return (
       <a
-        className={className}
-        data-tone={entry.tone}
+        className="more-link"
         href={entry.href}
         target={entry.href.startsWith('http') ? '_blank' : undefined}
         rel={entry.href.startsWith('http') ? 'noopener noreferrer' : undefined}
@@ -133,7 +102,7 @@ function MoreEntryLink({ entry, featured = false }: { entry: MoreEntry; featured
   }
 
   return (
-    <Link className={className} data-tone={entry.tone} href={entry.href}>
+    <Link className="more-link" href={entry.href}>
       {content}
     </Link>
   );
@@ -144,45 +113,23 @@ export default function MorePage({ user }: MorePageProps) {
     <>
       <NavBar user={user} />
       <main className="container more-page">
-        <header className="more-hero">
-          <div className="more-hero__accent" aria-hidden="true">
-            <span />
-            <span />
-          </div>
-          <span className="more-hero__eyebrow">StudyHub Directory</span>
+        <header className="more-header">
           <h1>其他功能</h1>
-          <p>内容、校园服务、平台说明与帮助入口集中在这里。</p>
+          <p>内容专栏、校园服务、平台信息与支持入口。</p>
         </header>
 
-        <section className="more-section" aria-labelledby="more-explore-title">
-          <div className="more-section-heading">
-            <div>
-              <span className="more-section-heading__eyebrow">Explore</span>
-              <h2 id="more-explore-title">浏览与交流</h2>
-            </div>
-            <p>发现校园内容与同校交易信息</p>
-          </div>
-          <div className="more-feature-grid">
-            {FEATURED_ENTRIES.map((entry) => (
-              <MoreEntryLink key={entry.href} entry={entry} featured />
-            ))}
-          </div>
-        </section>
-
-        <section className="more-section" aria-labelledby="more-platform-title">
-          <div className="more-section-heading">
-            <div>
-              <span className="more-section-heading__eyebrow">Platform</span>
-              <h2 id="more-platform-title">平台与支持</h2>
-            </div>
-            <p>了解项目，获取帮助或参与协作</p>
-          </div>
-          <div className="more-directory">
-            {DIRECTORY_ENTRIES.map((entry) => (
-              <MoreEntryLink key={entry.href} entry={entry} />
-            ))}
-          </div>
-        </section>
+        <div className="more-directory" aria-label="其他功能入口">
+          {MORE_GROUPS.map((group) => (
+            <section className="more-group" key={group.title} aria-labelledby={`more-${group.title}`}>
+              <h2 id={`more-${group.title}`}>{group.title}</h2>
+              <div className="more-link-list">
+                {group.entries.map((entry) => (
+                  <MoreLink key={entry.href} entry={entry} />
+                ))}
+              </div>
+            </section>
+          ))}
+        </div>
       </main>
     </>
   );
