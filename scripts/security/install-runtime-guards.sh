@@ -67,8 +67,7 @@ trap rollback_nginx ERR
 install -m 0644 "$ROOT_DIR/deploy/nginx/studyhub-abuse-zones.conf" /etc/nginx/conf.d/studyhub-abuse-zones.conf
 install -m 0644 "$ROOT_DIR/deploy/nginx/studyhub-abuse-server.conf" /etc/nginx/snippets/studyhub-abuse-server.conf
 
-if ! grep -Fq 'include /etc/nginx/snippets/studyhub-abuse-server.conf;' "$SITE_CONFIG"; then
-  python3 - "$SITE_CONFIG" <<'PY'
+python3 - "$SITE_CONFIG" <<'PY'
 from pathlib import Path
 import sys
 
@@ -76,17 +75,33 @@ path = Path(sys.argv[1])
 lines = path.read_text(encoding="utf-8").splitlines()
 updated: list[str] = []
 server_names = 0
-for line in lines:
+include_line = "include /etc/nginx/snippets/studyhub-abuse-server.conf;"
+timeout_replacements = {
+    "proxy_connect_timeout 30s;": "proxy_connect_timeout 5s;",
+    "proxy_read_timeout 300s;": "proxy_read_timeout 120s;",
+    "proxy_send_timeout 300s;": "proxy_send_timeout 120s;",
+    "proxy_read_timeout 600s;": "proxy_read_timeout 300s;",
+    "proxy_send_timeout 600s;": "proxy_send_timeout 300s;",
+}
+for index, line in enumerate(lines):
+    stripped = line.strip()
+    replacement = timeout_replacements.get(stripped)
+    if replacement is not None:
+        indent = line[: len(line) - len(line.lstrip())]
+        line = f"{indent}{replacement}"
     updated.append(line)
     if line.lstrip().startswith("server_name ") and line.rstrip().endswith(";"):
+        next_line = lines[index + 1] if index + 1 < len(lines) else ""
+        if next_line.strip() == include_line:
+            continue
         indent = line[: len(line) - len(line.lstrip())]
-        updated.append(f"{indent}include /etc/nginx/snippets/studyhub-abuse-server.conf;")
+        updated.append(f"{indent}{include_line}")
         server_names += 1
 if server_names == 0:
-    raise SystemExit("nginx site contains no server_name directive")
+    if not any(line.strip() == include_line for line in lines):
+        raise SystemExit("nginx site contains no server_name directive")
 path.write_text("\n".join(updated) + "\n", encoding="utf-8")
 PY
-fi
 
 nginx -t
 systemctl reload nginx
