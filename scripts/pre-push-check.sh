@@ -33,6 +33,7 @@ else
   echo "warning: skipping backend checks; missing Python interpreter: $PYTHON_BIN" >&2
 fi
 
+run "frontend production dependency audit" npm --prefix "$FRONTEND_DIR" audit --omit=dev --audit-level=high
 run "frontend check" npm --prefix "$FRONTEND_DIR" run check
 run "frontend strict typecheck subset" npm --prefix "$FRONTEND_DIR" run typecheck:strict
 run "frontend unit tests" npm --prefix "$FRONTEND_DIR" run test:unit

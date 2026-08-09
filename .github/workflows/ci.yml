@@ -74,12 +74,9 @@ jobs:
         env:
           npm_config_engine_strict: "true"
         run: npm ci
-      - name: Report production dependency advisories
+      - name: Reject high-risk production dependency advisories
         working-directory: frontend
-        run: |
-          if ! npm audit --omit=dev --audit-level=high; then
-            echo "::warning::Production dependency advisories were reported. Review npm audit output above; this report-only step does not block CI."
-          fi
+        run: npm audit --omit=dev --audit-level=high
       - name: Run frontend checks
         working-directory: frontend
         run: npm run check

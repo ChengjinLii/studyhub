@@ -22,6 +22,7 @@ ai_platform/logs/
 artifacts/agentic_platform/
 frontend/node_modules/
 frontend/.next/
+frontend/.next-*/
 frontend/tsconfig.tsbuildinfo
 frontend/test-results/
 frontend/playwright-report/

@@ -43,6 +43,7 @@ run "runtime version alignment" env STUDYHUB_PYTHON_BIN="$PYTHON_BIN" bash "$ROO
 run "backend ruff" "$PYTHON_BIN" -m ruff check "$BACKEND_DIR/app" "$BACKEND_DIR/tests"
 mkdir -p "$ROOT_DIR/reports/coverage"
 run "backend pytest with coverage report" "$PYTHON_BIN" -m pytest "$BACKEND_DIR/tests" --cov="$BACKEND_DIR/app" --cov-report=term-missing --cov-report=xml:"$ROOT_DIR/reports/coverage/backend-coverage.xml"
+run "frontend production dependency audit" npm --prefix "$FRONTEND_DIR" audit --omit=dev --audit-level=high
 run "frontend typecheck and lint" npm --prefix "$FRONTEND_DIR" run check
 run "frontend strict typecheck subset" npm --prefix "$FRONTEND_DIR" run typecheck:strict
 run "frontend unit tests" npm --prefix "$FRONTEND_DIR" run test:unit
