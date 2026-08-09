@@ -16,12 +16,14 @@ interface MoreEntry {
 }
 
 interface MoreGroup {
+  id: string;
   title: string;
   entries: MoreEntry[];
 }
 
 const MORE_GROUPS: MoreGroup[] = [
   {
+    id: 'campus',
     title: '内容与校园',
     entries: [
       {
@@ -37,6 +39,7 @@ const MORE_GROUPS: MoreGroup[] = [
     ],
   },
   {
+    id: 'platform',
     title: '平台信息',
     entries: [
       {
@@ -52,11 +55,12 @@ const MORE_GROUPS: MoreGroup[] = [
       {
         href: '/identity-info',
         label: '协议与隐私',
-        description: '投稿、收益、实名与隐私相关说明。',
+        description: '投稿、收款码、收益结算与隐私相关说明。',
       },
     ],
   },
   {
+    id: 'contact',
     title: '联系与协作',
     entries: [
       {
@@ -114,14 +118,26 @@ export default function MorePage({ user }: MorePageProps) {
       <NavBar user={user} />
       <main className="container more-page">
         <header className="more-header">
-          <h1>其他功能</h1>
-          <p>内容专栏、校园服务、平台信息与支持入口。</p>
+          <div className="more-header__copy">
+            <h1>其他功能</h1>
+            <p>内容专栏、校园服务、平台信息与支持入口。</p>
+          </div>
+          <nav className="more-header__nav" aria-label="功能分类">
+            {MORE_GROUPS.map((group) => (
+              <a key={group.id} href={`#${group.id}`}>
+                {group.title}
+              </a>
+            ))}
+          </nav>
         </header>
 
         <div className="more-directory" aria-label="其他功能入口">
-          {MORE_GROUPS.map((group) => (
-            <section className="more-group" key={group.title} aria-labelledby={`more-${group.title}`}>
-              <h2 id={`more-${group.title}`}>{group.title}</h2>
+          {MORE_GROUPS.map((group, index) => (
+            <section className="more-group" id={group.id} key={group.id} aria-labelledby={`more-${group.id}`}>
+              <div className="more-group__heading">
+                <span aria-hidden="true">{String(index + 1).padStart(2, '0')}</span>
+                <h2 id={`more-${group.id}`}>{group.title}</h2>
+              </div>
               <div className="more-link-list">
                 {group.entries.map((entry) => (
                   <MoreLink key={entry.href} entry={entry} />

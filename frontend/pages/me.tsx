@@ -19,7 +19,6 @@ import { sortUploadsByTime, UploadTimeOrder } from '../lib/profileUploads';
 import { marketPath, materialPath } from '../lib/slug';
 import { SessionUser } from '../types/user';
 import { UserAccountProfile, UserFollowItem } from '../types/userProfile';
-import { PayoutApplication } from '../types/payout';
 import { ProfileSummary, PurchaseItem, UploadItem, MarketWantItem, MarketListingItem } from '../types/profile';
 
 const ADMIN_QQ = '245934740';
@@ -89,18 +88,6 @@ export default function MePage({ user, summary, account }: MePageProps) {
   const totalDownloads = summary?.totalDownloads ?? 0;
   const uniqueDownloaders = summary?.uniqueDownloaders ?? 0;
   const totalEarnings = summary?.totalEarnings ?? 0;
-  const [payoutApp, setPayoutApp] = useState<PayoutApplication | null>(null);
-  const [payoutLoading, setPayoutLoading] = useState(false);
-  const [payoutMessage, setPayoutMessage] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
-  const [payoutForm, setPayoutForm] = useState({
-    alipayAccount: '',
-    alipayName: '',
-    realName: '',
-    idCardNo: '',
-    contactType: 'WECHAT',
-    contactValue: '',
-    notes: '',
-  });
   const [followTab, setFollowTab] = useState<'following' | 'followers'>('following');
   const [followingUsers, setFollowingUsers] = useState<UserFollowItem[]>([]);
   const [followersUsers, setFollowersUsers] = useState<UserFollowItem[]>([]);
@@ -145,29 +132,6 @@ export default function MePage({ user, summary, account }: MePageProps) {
   useEffect(() => {
     setEmailResetForm((prev) => ({ ...prev, identifier: defaultIdentifier }));
   }, [defaultIdentifier]);
-
-  useEffect(() => {
-    const loadPayout = async () => {
-      setPayoutLoading(true);
-      try {
-        const resp = await fetchBackend('/me/creator-payout-application');
-        const json = await readApiEnvelope<PayoutApplication | null>(resp);
-        if (resp.ok && json.ok) {
-          setPayoutApp(json.data);
-          if (json.data?.contactType) {
-            setPayoutForm((prev) => ({ ...prev, contactType: json.data.contactType, contactValue: json.data.contactValue || '' }));
-          }
-        }
-      } catch (e: unknown) {
-        setPayoutMessage({ type: 'error', message: toErrorMessage(e, '加载收益申请失败') });
-      } finally {
-        setPayoutLoading(false);
-      }
-    };
-    if (user) {
-      loadPayout();
-    }
-  }, [user]);
 
   useEffect(() => {
     const loadFollowLists = async () => {
@@ -246,36 +210,6 @@ export default function MePage({ user, summary, account }: MePageProps) {
       setToast({ type: 'error', message: toErrorMessage(error, '下载失败') });
     }
   };
-  const submitPayout = async (e: FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    setPayoutMessage(null);
-    setPayoutLoading(true);
-    try {
-      const payload = {
-        ...payoutForm,
-        alipayName: payoutForm.realName || payoutForm.alipayName,
-      };
-      const resp = await fetchBackend('/creator-payout-applications', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-      const data = await unwrapApiResponse<PayoutApplication>(resp, '提交失败');
-      setPayoutApp(data);
-      if (data?.status === 'KYC_FAILED') {
-        setPayoutMessage({ type: 'error', message: '实名核验失败，请核对姓名与身份证号后重试。' });
-      } else if (data?.status === 'KYC_PENDING') {
-        setPayoutMessage({ type: 'error', message: '核验中断，请稍后再试（1 分钟后可重试）。' });
-      } else {
-        setPayoutMessage({ type: 'success', message: '提交成功' });
-      }
-    } catch (err: unknown) {
-      setPayoutMessage({ type: 'error', message: toErrorMessage(err, '提交失败') });
-    } finally {
-      setPayoutLoading(false);
-    }
-  };
-
   const fetchResetCaptcha = async () => {
     try {
       const resp = await fetchBackend('/captchas');
@@ -374,23 +308,6 @@ export default function MePage({ user, summary, account }: MePageProps) {
     }
   };
 
-  const renderPayoutStatus = () => {
-    if (!payoutApp) return null;
-    const status = payoutApp.status;
-    const next = payoutApp.cycleEndDate || payoutApp.cycleKey;
-    const earnings = payoutApp.earnings?.payoutAmount ?? 0;
-    const unclaimed = payoutApp.earnings?.unclaimedPayoutTotal ?? 0;
-    const parts: string[] = [];
-    if (status === 'KYC_FAILED') parts.push('实名核验未通过，请核对信息后重新提交');
-    if (status === 'KYC_PENDING') parts.push('实名核验中断，请稍后再试');
-    if (status === 'PENDING') parts.push(`已提交，等待审核。下次可在 ${next || '-'} 后申请`);
-    if (status === 'APPROVED') parts.push(`已通过审核，待结算。预计实得 ¥${(earnings / 100).toFixed(2)}，下次结算日 ${next || '-'}`);
-    if (status === 'REJECTED') parts.push(`已拒绝：${payoutApp.reviewNotes || ''}。下次可在 ${next || '-'} 后再试`);
-    if (status === 'SETTLED') parts.push(`本周期已结算（至 ${payoutApp.cycleKey || '-'}），下个结算日 ${next || '-'}`);
-    if (unclaimed > 0) parts.push(`历史未结算累计：¥${(unclaimed / 100).toFixed(2)}`);
-    return parts.join('；');
-  };
-
   const formatPrice = (value: number) => `¥${value.toFixed(2)}`;
   const accountAssetCards = [
     { label: '剩余下载', value: `${freeDownloadsLeft}` },
@@ -401,7 +318,7 @@ export default function MePage({ user, summary, account }: MePageProps) {
   const accountQuickLinks = [
     { href: '#uploads', label: '我的投稿', desc: '更新资料' },
     { href: '#purchases', label: '最近购买', desc: '查看下载' },
-    { href: '#payout', label: '创作者收益', desc: '提现信息' },
+    { href: '#payout', label: '创作者收益', desc: '收款设置' },
     { href: '#security', label: '安全设置', desc: '账号安全' },
   ];
 
@@ -820,15 +737,7 @@ export default function MePage({ user, summary, account }: MePageProps) {
                 onWantsExpandedChange={setWantsExpanded}
                 onListingsExpandedChange={setListingsExpanded}
               />
-              <MePayoutSection
-                payoutForm={payoutForm}
-                payoutLoading={payoutLoading}
-                payoutMessage={payoutMessage}
-                payoutApp={payoutApp}
-                payoutStatusText={renderPayoutStatus()}
-                onPayoutFormChange={(patch) => setPayoutForm((prev) => ({ ...prev, ...patch }))}
-                onSubmit={submitPayout}
-              />
+              <MePayoutSection totalEarnings={totalEarnings} />
             {adminNotes.length > 0 && (
               <section className="card" id="admin-notes">
                 <div className="card-title">管理员留言</div>

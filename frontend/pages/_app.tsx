@@ -493,8 +493,6 @@ export default function MyApp({ Component, pageProps }: AppProps) {
               <span className="footer-divider">|</span>
               <Link href="/join" prefetch={false}>关于我们</Link>
               <span className="footer-divider">|</span>
-              <Link href="/identity-info" prefetch={false}>身份信息说明</Link>
-              <span className="footer-divider">|</span>
               <Link href="/identity-info" prefetch={false}>用户协议 / 隐私政策</Link>
               <span className="footer-divider">|</span>
               <span>内容版权归作者</span>

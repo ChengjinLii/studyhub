@@ -756,9 +756,9 @@ export default function ProfileCard({
           </label>
         )}
         {(editable || payoutQrUrl) && (
-          <div className="profile-card__payout-block">
+          <div className="profile-card__payout-block" id="payout-qr">
             <div className="profile-card__payout-label">个人收款码</div>
-            <div className="profile-card__payout-hint">用于未来收益打款，仅本人和超级管理员可见。</div>
+            <div className="profile-card__payout-hint">用于创作者收益结算，仅本人和负责结算的授权管理员可见。</div>
             {editable && (
               <>
                 <input

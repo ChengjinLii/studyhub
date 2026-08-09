@@ -335,6 +335,7 @@ test('mock page mode covers more page secondary navigation', async ({ page }) =>
   await expect(page.getByRole('heading', { name: '联系与协作' })).toBeVisible();
   await expect(page.getByRole('link', { name: /学汇专栏/ })).toHaveAttribute('href', '/column');
   await expect(page.getByRole('link', { name: /校园集市/ })).toHaveAttribute('href', '/market');
+  await expect(page.getByText('投稿、收款码、收益结算与隐私相关说明。')).toBeVisible();
 });
 
 test('login success should make session readable', async ({ request }) => {

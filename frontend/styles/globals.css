@@ -4598,11 +4598,23 @@ g.studyhub-popup-poster__hotspot:hover > text {
   margin: 44px auto 72px;
   display: flex;
   flex-direction: column;
-  gap: 26px;
+  gap: 20px;
 }
 
 .more-header {
-  padding: 4px 2px 0;
+  padding: 26px 30px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 36px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 20px;
+  box-shadow: 0 18px 44px rgba(15, 23, 42, 0.08);
+}
+
+.more-header__copy {
+  min-width: 0;
 }
 
 .more-header h1 {
@@ -4619,6 +4631,33 @@ g.studyhub-popup-poster__hotspot:hover > text {
   line-height: 1.6;
 }
 
+.more-header__nav {
+  display: flex;
+  align-items: stretch;
+}
+
+.more-header__nav a {
+  min-height: 42px;
+  padding: 0 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #475569;
+  font-size: 0.88rem;
+  font-weight: 700;
+  text-decoration: none;
+  border-left: 1px solid #e2e8f0;
+  transition: color 0.18s ease;
+}
+
+.more-header__nav a:first-child {
+  border-left: 0;
+}
+
+.more-header__nav a:hover {
+  color: #1d4ed8;
+}
+
 .more-directory {
   padding: 28px 30px;
   display: grid;
@@ -4630,6 +4669,7 @@ g.studyhub-popup-poster__hotspot:hover > text {
 }
 
 .more-group {
+  scroll-margin-top: 90px;
   min-width: 0;
   padding: 0 28px;
   border-left: 1px solid #e2e8f0;
@@ -4644,8 +4684,22 @@ g.studyhub-popup-poster__hotspot:hover > text {
   padding-right: 0;
 }
 
+.more-group__heading {
+  min-height: 28px;
+  margin-bottom: 9px;
+  display: flex;
+  align-items: baseline;
+  gap: 9px;
+}
+
+.more-group__heading > span {
+  color: #94a3b8;
+  font-size: 0.7rem;
+  font-weight: 800;
+}
+
 .more-group h2 {
-  margin: 0 0 12px;
+  margin: 0;
   color: #0f172a;
   font-size: 1.05rem;
   line-height: 1.35;
@@ -4659,7 +4713,8 @@ g.studyhub-popup-poster__hotspot:hover > text {
 
 .more-link {
   min-height: 92px;
-  padding: 16px 0;
+  margin: 0 -10px;
+  padding: 16px 10px;
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
@@ -4667,6 +4722,8 @@ g.studyhub-popup-poster__hotspot:hover > text {
   color: #0f172a;
   text-decoration: none;
   border-top: 1px solid #e8edf4;
+  border-radius: 8px;
+  transition: background-color 0.18s ease;
 }
 
 .more-link__copy {
@@ -4690,9 +4747,20 @@ g.studyhub-popup-poster__hotspot:hover > text {
 }
 
 .more-link__arrow {
+  width: 30px;
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   color: #64748b;
-  font-size: 1rem;
-  transition: color 0.18s ease, transform 0.18s ease;
+  font-size: 0.9rem;
+  border: 1px solid #dbe4f0;
+  border-radius: 50%;
+  transition: color 0.18s ease, background-color 0.18s ease, border-color 0.18s ease, transform 0.18s ease;
+}
+
+.more-link:hover {
+  background: #f8fafc;
 }
 
 .more-link:hover .more-link__copy strong,
@@ -4701,7 +4769,16 @@ g.studyhub-popup-poster__hotspot:hover > text {
 }
 
 .more-link:hover .more-link__arrow {
+  color: #ffffff;
+  background: #1d4ed8;
+  border-color: #1d4ed8;
   transform: translateX(2px);
+}
+
+.more-link:focus-visible,
+.more-header__nav a:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 3px;
 }
 
 .join-page {
@@ -8774,6 +8851,7 @@ g.studyhub-popup-poster__hotspot:hover > text {
 .policy-modal {
   width: min(780px, 94vw);
   padding: 24px;
+  overflow-y: auto;
 }
 
 .policy-modal h2 {
@@ -8797,6 +8875,23 @@ g.studyhub-popup-poster__hotspot:hover > text {
 .policy-modal li {
   margin-bottom: 8px;
   line-height: 1.6;
+}
+
+.policy-modal__actions {
+  margin-top: 22px;
+  padding-top: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  border-top: 1px solid #e2e8f0;
+}
+
+.policy-modal__actions > a {
+  color: #1d4ed8;
+  font-size: 0.9rem;
+  font-weight: 650;
+  text-underline-offset: 3px;
 }
 
 .button-icon {
@@ -12194,6 +12289,37 @@ g.studyhub-popup-poster__hotspot:hover > text {
   color: #94a3b8;
 }
 
+.payout-qr-summary {
+  padding: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+}
+
+.payout-qr-summary__copy {
+  min-width: 0;
+}
+
+.payout-qr-summary__copy > strong {
+  display: block;
+  color: #0f172a;
+  font-size: 1.05rem;
+}
+
+.payout-qr-summary__copy .help-text {
+  max-width: 720px;
+  margin: 7px 0 0;
+  line-height: 1.7;
+}
+
+.payout-qr-summary > .button {
+  flex: 0 0 auto;
+}
+
 .profile-card__actions {
   padding: 12px 20px 16px;
   display: flex;
@@ -14924,6 +15050,19 @@ g.studyhub-popup-poster__hotspot:hover > text {
   gap: 18px;
 }
 
+.legal-page__intro {
+  padding-top: 26px;
+  border-top: 3px solid #1d4ed8;
+}
+
+.legal-page__eyebrow {
+  margin: 0 0 8px;
+  color: #64748b;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0;
+}
+
 .legal-page .card h1,
 .legal-page .card h2,
 .legal-page .card h3 {
@@ -14940,6 +15079,29 @@ g.studyhub-popup-poster__hotspot:hover > text {
 .legal-page .card li {
   margin-bottom: 8px;
   line-height: 1.6;
+}
+
+.legal-page__actions {
+  margin-top: 18px;
+}
+
+@media (max-width: 640px) {
+  .policy-modal__actions,
+  .payout-qr-summary {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .policy-modal__actions > .button,
+  .payout-qr-summary > .button {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .legal-page {
+    margin: 22px auto 36px;
+    gap: 12px;
+  }
 }
 
 .home-desktop-library {
@@ -16117,7 +16279,10 @@ g.studyhub-popup-poster__hotspot:hover > text {
   }
 
   .more-header {
-    padding: 0 1px;
+    padding: 20px;
+    grid-template-columns: 1fr;
+    gap: 17px;
+    border-radius: 18px;
   }
 
   .more-header h1 {
@@ -16127,6 +16292,27 @@ g.studyhub-popup-poster__hotspot:hover > text {
   .more-header p {
     margin-top: 7px;
     font-size: 0.9rem;
+  }
+
+  .more-header__nav {
+    padding-top: 14px;
+    justify-content: space-between;
+    border-top: 1px solid #e2e8f0;
+  }
+
+  .more-header__nav a {
+    min-width: 0;
+    min-height: 32px;
+    padding: 0 10px;
+    font-size: 0.8rem;
+  }
+
+  .more-header__nav a:first-child {
+    padding-left: 0;
+  }
+
+  .more-header__nav a:last-child {
+    padding-right: 0;
   }
 
   .more-directory {
@@ -16151,14 +16337,18 @@ g.studyhub-popup-poster__hotspot:hover > text {
     padding-bottom: 20px;
   }
 
+  .more-group__heading {
+    margin-bottom: 6px;
+  }
+
   .more-group h2 {
-    margin-bottom: 8px;
     font-size: 1rem;
   }
 
   .more-link {
     min-height: 82px;
-    padding: 14px 0;
+    margin: 0 -8px;
+    padding: 14px 8px;
   }
 
   .more-link__copy > span {
