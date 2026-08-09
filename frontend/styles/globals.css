@@ -3269,35 +3269,35 @@ main {
 
 .floating-sidebar.hat-graduation {
   --hat-image: url('/bot-hats/graduation-cap.svg');
-  --hat-scale: 1;
-  --hat-x: -54%;
-  --hat-y: -112%;
-  --hat-rot: -3deg;
+  --hat-scale: 1.05;
+  --hat-x: -66%;
+  --hat-y: -105%;
+  --hat-rot: -10deg;
   --hat-width: 128%;
   --hat-height: 66%;
-  --hat-origin: 52% 92%;
+  --hat-origin: 78% 90%;
 }
 
 .floating-sidebar.hat-party {
   --hat-image: url('/bot-hats/party-hat.svg');
   --hat-scale: 0.82;
-  --hat-x: -58%;
-  --hat-y: -101%;
-  --hat-rot: -10deg;
+  --hat-x: -92%;
+  --hat-y: -96%;
+  --hat-rot: -18deg;
   --hat-width: 104%;
   --hat-height: 126%;
-  --hat-origin: 52% 92%;
+  --hat-origin: 78% 90%;
 }
 
 .floating-sidebar.hat-wizard {
   --hat-image: url('/bot-hats/wizard-hat.svg');
-  --hat-scale: 0.9;
-  --hat-x: -58%;
-  --hat-y: -108%;
-  --hat-rot: -7deg;
+  --hat-scale: 0.86;
+  --hat-x: -87%;
+  --hat-y: -101%;
+  --hat-rot: -16deg;
   --hat-width: 118%;
   --hat-height: 124%;
-  --hat-origin: 55% 94%;
+  --hat-origin: 78% 90%;
 }
 
 .floating-sidebar.hat-santa .floating-sidebar__hat,

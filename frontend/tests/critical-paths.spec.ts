@@ -269,6 +269,51 @@ test('mobile StudyHub Bot stays fully above the bottom navigation', async ({ pag
   expect((botBox?.x ?? 0) + (botBox?.width ?? 0)).toBeLessThanOrEqual(320);
 });
 
+test('StudyHub Bot wardrobe hats sit diagonally over the upper-left corner', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.addInitScript(() => {
+    window.localStorage.removeItem('floating-sidebar-pos');
+    window.localStorage.setItem('studyhub-bot-hat', 'santa');
+  });
+  await page.goto('/more');
+  await closeEntryModalIfPresent(page);
+
+  const sidebar = page.locator('.floating-sidebar');
+  const bubble = page.locator('.floating-sidebar__bubble');
+  const hat = page.locator('.floating-sidebar__hat');
+  await expect(bubble).toBeVisible();
+
+  for (const hatId of ['graduation', 'party', 'wizard']) {
+    await sidebar.evaluate((element, id) => {
+      element.classList.remove('hat-santa', 'hat-graduation', 'hat-party', 'hat-wizard', 'hat-none');
+      element.classList.add(`hat-${id}`);
+    }, hatId);
+
+    const [bubbleBox, hatBox, styles] = await Promise.all([
+      bubble.boundingBox(),
+      hat.boundingBox(),
+      sidebar.evaluate((element) => {
+        const computed = window.getComputedStyle(element);
+        return {
+          x: Number.parseFloat(computed.getPropertyValue('--hat-x')),
+          rotation: Number.parseFloat(computed.getPropertyValue('--hat-rot')),
+        };
+      }),
+    ]);
+
+    expect(bubbleBox).not.toBeNull();
+    expect(hatBox).not.toBeNull();
+    expect((hatBox?.x ?? 0) + (hatBox?.width ?? 0) / 2).toBeLessThan(
+      (bubbleBox?.x ?? 0) + (bubbleBox?.width ?? 0) / 2
+    );
+    expect((hatBox?.y ?? 0) + (hatBox?.height ?? 0) / 2).toBeLessThan(
+      (bubbleBox?.y ?? 0) + (bubbleBox?.height ?? 0) / 2
+    );
+    expect(styles.x).toBeLessThanOrEqual(-66);
+    expect(styles.rotation).toBeLessThanOrEqual(-10);
+  }
+});
+
 test('home entry modal and discovery views remain keyboard accessible', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.goto('/');
