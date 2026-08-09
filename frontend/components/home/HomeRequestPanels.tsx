@@ -5,7 +5,10 @@ import { MaterialListItem } from '../../types/material';
 import { MaterialRequestItem } from '../../types/request';
 import { HomeDiscoveryView, resolveInitialHomeDiscoveryView } from '../../lib/homeDiscovery';
 import { formatMajorDisplay } from '../../lib/major';
+import { copyToClipboard } from '../../lib/share';
 import { materialPath } from '../../lib/slug';
+
+const COOPERATION_EMAIL = 'chengjinli@std.uestc.edu.cn';
 
 interface HomeRequestPanelsProps {
   requestItems: MaterialRequestItem[];
@@ -37,6 +40,7 @@ export default function HomeRequestPanels({
   const [activeDiscoveryView, setActiveDiscoveryView] = useState<HomeDiscoveryView>(() =>
     resolveInitialHomeDiscoveryView(requestItems.length)
   );
+  const [emailCopyState, setEmailCopyState] = useState<'idle' | 'copied' | 'failed'>('idle');
   const [recommendListAtEnd, setRecommendListAtEnd] = useState(false);
   const handleRecommendationScroll = useCallback((event: UIEvent<HTMLUListElement>) => {
     const target = event.currentTarget;
@@ -46,6 +50,11 @@ export default function HomeRequestPanels({
   const handleViewAllMaterials = useCallback(() => {
     document.getElementById('materials-list')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }, []);
+  const handleCopyEmail = useCallback(async () => {
+    const copied = await copyToClipboard(COOPERATION_EMAIL);
+    setEmailCopyState(copied ? 'copied' : 'failed');
+    window.setTimeout(() => setEmailCopyState('idle'), 2000);
+  }, []);
 
   return (
     <div className="home-dual-panel" id="home-requests">
@@ -53,7 +62,11 @@ export default function HomeRequestPanels({
         <div className="materials-header home-discovery-header">
           <div className="home-discovery-heading">
             <h2 className="card-title">
-              {activeDiscoveryView === 'requests' ? '求购列表' : '近期热门'}
+              {activeDiscoveryView === 'requests'
+                ? '求购列表'
+                : activeDiscoveryView === 'popular'
+                  ? '近期热门'
+                  : '合作招募'}
             </h2>
             <div className="home-discovery-tabs" role="tablist" aria-label="首页发现内容">
               <button
@@ -76,6 +89,16 @@ export default function HomeRequestPanels({
               >
                 近期热门
               </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={activeDiscoveryView === 'cooperation'}
+                aria-controls="home-discovery-panel"
+                className={activeDiscoveryView === 'cooperation' ? 'active' : ''}
+                onClick={() => setActiveDiscoveryView('cooperation')}
+              >
+                合作招募
+              </button>
             </div>
           </div>
           <div className="request-header-actions">
@@ -83,11 +106,11 @@ export default function HomeRequestPanels({
               <Link className="button primary small" href="/requests/new">
                 我要购买
               </Link>
-            ) : (
+            ) : activeDiscoveryView === 'popular' ? (
               <button className="button primary small" type="button" onClick={handleViewAllMaterials}>
                 全部资料
               </button>
-            )}
+            ) : null}
           </div>
         </div>
         <div className="request-list-wrapper" id="home-discovery-panel" role="tabpanel">
@@ -174,7 +197,7 @@ export default function HomeRequestPanels({
                 </div>
               )}
             </>
-          ) : (
+          ) : activeDiscoveryView === 'popular' ? (
             popularItems.length === 0 ? (
               <div className="empty-state">暂无热门资料。</div>
             ) : (
@@ -195,6 +218,22 @@ export default function HomeRequestPanels({
                 })}
               </ol>
             )
+          ) : (
+            <div className="home-cooperation">
+              <p>资料共建、校园合作或技术协作，欢迎邮件联系。</p>
+              <div className="home-cooperation__contact">
+                <div>
+                  <span>联系邮箱</span>
+                  <a href={`mailto:${COOPERATION_EMAIL}`}>{COOPERATION_EMAIL}</a>
+                </div>
+                <button className="button ghost small" type="button" onClick={handleCopyEmail}>
+                  {emailCopyState === 'copied' ? '已复制' : '复制邮箱'}
+                </button>
+              </div>
+              <span className="home-cooperation__status" role="status" aria-live="polite">
+                {emailCopyState === 'failed' ? '复制失败，请手动复制邮箱。' : ''}
+              </span>
+            </div>
           )}
         </div>
       </section>

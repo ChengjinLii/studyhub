@@ -368,6 +368,7 @@ test('StudyHub Bot eyes remain centered and symmetric while looking sideways', a
 });
 
 test('home entry modal and discovery views remain keyboard accessible', async ({ page }) => {
+  await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.goto('/');
 
@@ -382,6 +383,7 @@ test('home entry modal and discovery views remain keyboard accessible', async ({
 
   const requestTab = page.getByRole('tab', { name: '求购列表' });
   const popularTab = page.getByRole('tab', { name: '近期热门' });
+  const cooperationTab = page.getByRole('tab', { name: '合作招募' });
   await popularTab.click();
   await expect(popularTab).toHaveAttribute('aria-selected', 'true');
   await expect(page.locator('.request-card .card-title')).toHaveText('近期热门');
@@ -389,6 +391,15 @@ test('home entry modal and discovery views remain keyboard accessible', async ({
   await page.getByRole('button', { name: '全部资料' }).click();
   await expect(page).toHaveURL(pageUrl);
   await expect(page.locator('#materials-list')).toBeInViewport();
+  await cooperationTab.click();
+  await expect(cooperationTab).toHaveAttribute('aria-selected', 'true');
+  await expect(page.locator('.request-card .card-title')).toHaveText('合作招募');
+  await expect(page.getByRole('link', { name: 'chengjinli@std.uestc.edu.cn' })).toHaveAttribute(
+    'href',
+    'mailto:chengjinli@std.uestc.edu.cn'
+  );
+  await page.getByRole('button', { name: '复制邮箱' }).click();
+  await expect(page.getByRole('button', { name: '已复制' })).toBeVisible();
   await requestTab.click();
   await expect(requestTab).toHaveAttribute('aria-selected', 'true');
   await expect(page.locator('.request-card .card-title')).toHaveText('求购列表');
