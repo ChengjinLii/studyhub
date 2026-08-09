@@ -53,6 +53,33 @@ def _validate_redis(settings: Any) -> None:
     explicitly_redis = any(str(value or "").strip().lower() == "redis" for value in backend_fields.values())
     if explicitly_redis and not settings.redis_url:
         raise RuntimeError("Redis 状态服务缺少 STUDYHUB_REDIS_URL 配置。")
+    if settings.resolved_upload_authorization_required and not settings.redis_url and (
+        settings.is_preview or settings.is_production
+    ):
+        raise RuntimeError("启用上传授权时必须配置 STUDYHUB_REDIS_URL。")
+    if settings.is_preview or settings.is_production:
+        required_redis_backends = {
+            "STUDYHUB_RATE_LIMIT_BACKEND": settings.rate_limit_backend,
+            "STUDYHUB_CAPTCHA_BACKEND": settings.captcha_backend,
+            "STUDYHUB_SECURITY_STATE_BACKEND": settings.security_state_backend,
+        }
+        for variable, raw_value in required_redis_backends.items():
+            resolved = "redis" if str(raw_value or "auto").strip().lower() == "auto" and settings.redis_url else str(raw_value).strip().lower()
+            if resolved != "redis":
+                raise RuntimeError(f"preview/production 的 {variable} 必须使用 redis。")
+    positive_upload_limits = {
+        "STUDYHUB_UPLOAD_AUTHORIZATION_TTL_SECONDS": settings.upload_authorization_ttl_seconds,
+        "STUDYHUB_UPLOAD_DAILY_SUBMISSION_LIMIT": settings.upload_daily_submission_limit,
+        "STUDYHUB_UPLOAD_DAILY_BYTES_LIMIT": settings.upload_daily_bytes_limit,
+        "STUDYHUB_UPLOAD_MAX_CONCURRENT_AUTHORIZATIONS": settings.upload_max_concurrent_authorizations,
+        "STUDYHUB_UPLOAD_MAX_FILE_COUNT": settings.upload_max_file_count,
+        "STUDYHUB_CAPTCHA_LOCAL_MAX_ENTRIES": settings.captcha_local_max_entries,
+    }
+    for variable, value in positive_upload_limits.items():
+        if int(value) <= 0:
+            raise RuntimeError(f"{variable} 必须大于 0。")
+    if not settings.resolved_upload_allowed_material_extensions:
+        raise RuntimeError("STUDYHUB_UPLOAD_ALLOWED_MATERIAL_EXTENSIONS 不能为空。")
 
 
 def _validate_storage(settings: Any) -> None:

@@ -113,3 +113,12 @@ def test_captcha_service_reset_clears_redis_keys(monkeypatch) -> None:
 
     assert service.peek_code_for_testing(payload.captchaId) is None
     assert fake_redis.store == {}
+
+
+def test_captcha_local_fallback_is_bounded() -> None:
+    service = CaptchaService(Settings(environment="test", captcha_backend="local", captcha_local_max_entries=1))
+    first = service.generate()
+    second = service.generate()
+
+    assert service.peek_code_for_testing(first.captchaId) is None
+    assert service.peek_code_for_testing(second.captchaId) is not None

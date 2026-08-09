@@ -38,6 +38,7 @@ import { parseMajorList } from '../lib/major';
 import { materialPath } from '../lib/slug';
 import { buildZipName, resolveZipFileName, zipFiles, zipMarkdownContent } from '../lib/uploadAssets';
 import { buildUploadPayload } from '../lib/uploadPayload';
+import { describeUploadFile, requestMaterialUploadAuthorization } from '../lib/uploadAuthorization';
 import { isUploadResultUncertain, sendUploadFormData } from '../lib/uploadSubmit';
 import {
   buildUploadSubmissionFingerprint,
@@ -659,12 +660,11 @@ export default function UploadPage({ user, token, account }: UploadPageProps) {
       if (uploadFile) {
         formData.append('zip', uploadFile);
       }
-      if (!isExperience && !isQuickMode && effectivePreviewSource === PREVIEW_SOURCE_MANUAL) {
-        manualPreviewFiles.forEach((file) => formData.append('previews', file));
-      }
-      if (allowCustomPreview && customPreviewFiles.length > 0) {
-        customPreviewFiles.forEach((file) => formData.append('customPreviews', file));
-      }
+      const submittedPreviews =
+        !isExperience && !isQuickMode && effectivePreviewSource === PREVIEW_SOURCE_MANUAL ? manualPreviewFiles : [];
+      const submittedCustomPreviews = allowCustomPreview ? customPreviewFiles : [];
+      submittedPreviews.forEach((file) => formData.append('previews', file));
+      submittedCustomPreviews.forEach((file) => formData.append('customPreviews', file));
       if (!isEditing) {
         const fingerprint = await buildUploadSubmissionFingerprint({
           payload,
@@ -683,11 +683,25 @@ export default function UploadPage({ user, token, account }: UploadPageProps) {
         payload.submissionId = submissionId;
         formData.set('payload', new Blob([JSON.stringify(payload)], { type: 'application/json' }));
       }
+      let uploadAuthorizationToken: string | null = null;
+      if (!isEditing && submissionId) {
+        const authorization = await requestMaterialUploadAuthorization(
+          submissionId,
+          [
+            ...(uploadFile ? [describeUploadFile('MATERIAL', uploadFile)] : []),
+            ...submittedPreviews.map((file) => describeUploadFile('PREVIEW', file)),
+            ...submittedCustomPreviews.map((file) => describeUploadFile('CUSTOM_PREVIEW', file)),
+          ],
+          token
+        );
+        uploadAuthorizationToken = authorization.uploadToken;
+      }
       const endpoint = isEditing ? `${apiBase}/materials/${editingId}` : `${apiBase}/materials`;
       const method = isEditing ? 'PUT' : 'POST';
       setSubmissionStage('uploading');
       const json = await sendUploadFormData(endpoint, method, formData, {
         token,
+        uploadToken: uploadAuthorizationToken,
         onProgress: (value) => {
           setUploadProgress(value);
           if (value >= 100) {

@@ -223,6 +223,14 @@ class Settings(BaseSettings):
     security_state_backend: str = "auto"
     registration_ticket_ttl_seconds: int = 300
     registration_consumed_marker_ttl_seconds: int = 60
+    upload_authorization_required: bool | None = None
+    upload_authorization_ttl_seconds: int = 600
+    upload_authorization_consumed_marker_ttl_seconds: int = 60
+    upload_daily_submission_limit: int = 50
+    upload_daily_bytes_limit: int = 1024 * 1024 * 1024
+    upload_max_concurrent_authorizations: int = 3
+    upload_max_file_count: int = 16
+    upload_allowed_material_extensions: str = ".pdf,.zip,.rar,.7z,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.md,.csv"
 
     oss_endpoint: str | None = None
     oss_bucket: str | None = None
@@ -284,6 +292,7 @@ class Settings(BaseSettings):
     captcha_ttl_seconds: int = 60
     captcha_code_length: int = 4
     captcha_max_attempts: int = 5
+    captcha_local_max_entries: int = 5000
     verification_ttl_seconds: int = 300
     verification_resend_after_seconds: int = 120
     verification_max_attempts: int = 5
@@ -592,6 +601,20 @@ class Settings(BaseSettings):
         if self.security_hsts_enabled is not None:
             return bool(self.security_hsts_enabled)
         return self.is_preview or self.is_production
+
+    @property
+    def resolved_upload_authorization_required(self) -> bool:
+        if self.upload_authorization_required is not None:
+            return bool(self.upload_authorization_required)
+        return self.is_preview or self.is_production
+
+    @property
+    def resolved_upload_allowed_material_extensions(self) -> set[str]:
+        return {
+            value if value.startswith(".") else f".{value}"
+            for item in self._split_csv(self.upload_allowed_material_extensions)
+            if (value := item.strip().lower())
+        }
 
     @property
     def resolved_write_origin_protection_enabled(self) -> bool:

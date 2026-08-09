@@ -5,7 +5,7 @@ from pathlib import Path
 from urllib.parse import quote
 import zipfile
 
-from fastapi import APIRouter, Depends, Query, Request, Response, UploadFile
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, UploadFile, status
 from fastapi.responses import FileResponse, JSONResponse
 from sqlalchemy.orm import Session
 from starlette.concurrency import run_in_threadpool
@@ -17,6 +17,7 @@ from app.api.deps import (
     get_materials_service,
     get_optional_auth_context,
     get_requests_service,
+    get_upload_authorization_service,
     require_auth_context,
 )
 from app.core.db import get_db_session
@@ -24,6 +25,7 @@ from app.core.public_read_cache import PublicReadCache, cache_if_anonymous_async
 from app.core.rate_limit import client_key_for_request
 from app.core.response import api_ok
 from app.core.security import AuthContext
+from app.core.upload_validation import detect_upload_size
 from app.schemas.materials import (
     BatchDownloadPayload,
     MaterialCreatePayload,
@@ -33,9 +35,14 @@ from app.schemas.materials import (
     ReviewPayload,
     parse_payload_json,
 )
+from app.schemas.upload_authorization import (
+    MaterialUploadAuthorizationRequestPayload,
+    UploadFileDescriptorPayload,
+)
 from app.services.materials_column_service import MaterialsColumnService
 from app.services.materials_service import MaterialsService
 from app.services.requests_service import RequestsService
+from app.services.upload_authorization_service import UploadAuthorizationService
 
 
 router = APIRouter(tags=["materials"])
@@ -207,6 +214,7 @@ async def create_material(
     session: Session = Depends(get_db_session),
     service: MaterialsService = Depends(get_materials_service),
     requests_service: RequestsService = Depends(get_requests_service),
+    upload_authorization: UploadAuthorizationService = Depends(get_upload_authorization_service),
 ) -> dict[str, object]:
     form = await request.form()
     payload = parse_payload_json(form.get("payload"), MaterialCreatePayload)
@@ -214,6 +222,17 @@ async def create_material(
     markdown_file = form.get("markdown")
     previews = _coerce_upload_list(form.getlist("previews"))
     custom_previews = _coerce_upload_list(form.getlist("customPreviews"))
+    material_uploads = _coerce_upload_list([zip_file, markdown_file])
+    upload_token = request.headers.get("x-studyhub-upload-token", "").strip()
+    if upload_authorization.settings.resolved_upload_authorization_required or upload_token:
+        if not payload.submissionId:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="受保护的投稿必须包含投稿标识")
+        upload_authorization.consume(
+            token=upload_token,
+            user_id=auth.user_id or 0,
+            submission_id=payload.submissionId,
+            files=_upload_descriptors(material_uploads, previews, custom_previews),
+        )
     def create_and_attach() -> dict[str, object]:
         detail = service.create_material(
             session,
@@ -236,6 +255,21 @@ async def create_material(
     detail = await run_in_threadpool(create_and_attach)
     _invalidate_material_read_caches()
     return api_ok(detail)
+
+
+@router.post("/api/material-upload-authorizations")
+def authorize_material_upload(
+    payload: MaterialUploadAuthorizationRequestPayload,
+    auth: AuthContext = Depends(require_auth_context),
+    service: UploadAuthorizationService = Depends(get_upload_authorization_service),
+) -> dict[str, object]:
+    return api_ok(
+        service.authorize(
+            user_id=auth.user_id or 0,
+            submission_id=payload.submissionId,
+            files=payload.files,
+        )
+    )
 
 
 @router.put("/api/materials/{id}")
@@ -436,6 +470,32 @@ def material_custom_preview_asset(
 
 def _coerce_upload_list(values: list[object]) -> list[UploadFile]:
     return [value for value in values if hasattr(value, "filename")]
+
+
+def _upload_descriptors(
+    materials: list[UploadFile],
+    previews: list[UploadFile],
+    custom_previews: list[UploadFile],
+) -> list[UploadFileDescriptorPayload]:
+    descriptors: list[UploadFileDescriptorPayload] = []
+
+    def append(role: str, upload: UploadFile) -> None:
+        descriptors.append(
+            UploadFileDescriptorPayload(
+                role=role,
+                name=upload.filename or "",
+                sizeBytes=detect_upload_size(upload),
+                contentType=upload.content_type or "",
+            )
+        )
+
+    for upload in materials:
+        append("MATERIAL", upload)
+    for upload in previews:
+        append("PREVIEW", upload)
+    for upload in custom_previews:
+        append("CUSTOM_PREVIEW", upload)
+    return descriptors
 
 
 def _invalidate_material_read_caches() -> None:

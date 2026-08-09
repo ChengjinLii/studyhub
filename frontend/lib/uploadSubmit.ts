@@ -26,6 +26,7 @@ export const sendUploadFormData = (
   formData: FormData,
   options: {
     token?: string | null;
+    uploadToken?: string | null;
     onProgress: (value: number) => void;
     requestRef: { current: XMLHttpRequest | null };
   }
@@ -38,6 +39,9 @@ export const sendUploadFormData = (
     xhr.timeout = 10 * 60 * 1000;
     if (options.token) {
       xhr.setRequestHeader('Authorization', `Bearer ${options.token}`);
+    }
+    if (options.uploadToken) {
+      xhr.setRequestHeader('X-StudyHub-Upload-Token', options.uploadToken);
     }
     xhr.upload.onprogress = (event) => {
       if (!event.lengthComputable) return;

@@ -76,6 +76,7 @@ from app.services.session_service import SessionService
 from app.services.user_follow_service import UserFollowService
 from app.services.user_read_service import UserReadService
 from app.services.worker_service import WorkerService
+from app.services.upload_authorization_service import UploadAuthorizationService
 
 
 @lru_cache(maxsize=1)
@@ -243,6 +244,11 @@ def get_captcha_service() -> CaptchaService:
 @lru_cache(maxsize=1)
 def get_registration_state_service() -> RegistrationStateService:
     return RegistrationStateService(get_settings())
+
+
+@lru_cache(maxsize=1)
+def get_upload_authorization_service() -> UploadAuthorizationService:
+    return UploadAuthorizationService(get_settings())
 
 
 @lru_cache(maxsize=1)
@@ -614,6 +620,7 @@ def clear_dependency_caches() -> None:
     get_token_codec.cache_clear()
     get_captcha_service.cache_clear()
     get_registration_state_service.cache_clear()
+    get_upload_authorization_service.cache_clear()
     get_auth_cookie_service.cache_clear()
     get_mail_provider.cache_clear()
     get_storage_provider.cache_clear()

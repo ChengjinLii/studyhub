@@ -120,6 +120,11 @@ return 1
         with self._lock:
             self._cleanup_locked(datetime.now(UTC))
             self._store[captcha_id] = CaptchaEntry(code_digest=digest, expires_at=expires_at)
+            limit = max(1, int(self.settings.captcha_local_max_entries))
+            while len(self._store) > limit:
+                oldest_id = next(iter(self._store))
+                self._store.pop(oldest_id, None)
+                self._test_codes.pop(oldest_id, None)
 
     def _validate_local(self, captcha_id: str, submitted_digest: str) -> int:
         now = datetime.now(UTC)

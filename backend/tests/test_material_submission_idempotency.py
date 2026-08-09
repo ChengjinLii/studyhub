@@ -143,3 +143,51 @@ def test_material_submission_rejects_invalid_submission_id(client: TestClient, a
     )
 
     assert response.status_code == 400
+
+
+def test_material_submission_accepts_only_matching_one_time_upload_ticket(
+    client: TestClient,
+    auth_service: AuthService,
+) -> None:
+    seed_read_users(auth_service)
+    submission_id = "upload_authorized_01HZZZZZZZZ"
+    content = b"%PDF-1.4\nauthorized\n%%EOF\n"
+    headers = build_auth_headers(1, 1)
+    authorization = client.post(
+        "/api/material-upload-authorizations",
+        headers=headers,
+        json={
+            "submissionId": submission_id,
+            "files": [
+                {
+                    "role": "MATERIAL",
+                    "name": "notes.pdf",
+                    "sizeBytes": len(content),
+                    "contentType": "application/pdf",
+                }
+            ],
+        },
+    )
+    assert authorization.status_code == 200, authorization.text
+    upload_token = authorization.json()["data"]["uploadToken"]
+    authorized_headers = {**headers, "X-StudyHub-Upload-Token": upload_token}
+
+    first = client.post(
+        "/api/materials",
+        headers=authorized_headers,
+        files=[
+            ("payload", _payload(title="授权投稿", submission_id=submission_id)),
+            ("zip", ("notes.pdf", content, "application/pdf")),
+        ],
+    )
+    assert first.status_code == 200, first.text
+
+    replay = client.post(
+        "/api/materials",
+        headers=authorized_headers,
+        files=[
+            ("payload", _payload(title="授权投稿", submission_id=submission_id)),
+            ("zip", ("notes.pdf", content, "application/pdf")),
+        ],
+    )
+    assert replay.status_code == 409

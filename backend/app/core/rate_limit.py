@@ -10,6 +10,7 @@ from typing import Any
 from fastapi import Request
 
 from app.core.config import Settings
+from app.core.redis_client import create_redis_client, redis_namespace
 
 
 @dataclass(frozen=True)
@@ -68,7 +69,7 @@ return 1
             return True
         client = self._client(settings)
         window = max(1, int(window_seconds))
-        redis_key = f"{settings.redis_namespace.strip(':') or 'studyhub-fastapi'}:rate-limit:{key}"
+        redis_key = f"{redis_namespace(settings)}:rate-limit:{key}"
         member = f"{time():.9f}:{secrets.token_hex(4)}"
         result = client.eval(self._CHECK_SCRIPT, 1, redis_key, time(), window, int(limit), member)
         return int(result) == 1
@@ -76,15 +77,7 @@ return 1
     def _client(self, settings: Settings):
         if self._redis_client is not None:
             return self._redis_client
-        if not settings.redis_url:
-            raise RuntimeError("Redis rate limit backend requires redis_url")
-        import redis  # type: ignore[import-not-found]
-
-        self._redis_client = redis.Redis.from_url(
-            settings.redis_url,
-            socket_timeout=settings.redis_socket_timeout_seconds,
-            socket_connect_timeout=settings.redis_connect_timeout_seconds,
-        )
+        self._redis_client = create_redis_client(settings)
         return self._redis_client
 
 
@@ -164,7 +157,7 @@ def _rule_for_request(settings: Settings, request: Request) -> RateLimitRule | N
         return RateLimitRule("email-verification", settings.rate_limit_email_verification)
     if method == "PUT" and path == "/api/me/email":
         return RateLimitRule("email-verification", settings.rate_limit_email_verification)
-    if method == "POST" and path in {"/api/materials", "/api/market"}:
+    if method == "POST" and path in {"/api/material-upload-authorizations", "/api/materials", "/api/market"}:
         return RateLimitRule("upload", settings.rate_limit_upload)
     if method == "POST" and path.startswith("/api/materials/") and path.endswith(("/view", "/views")):
         return RateLimitRule("view", settings.rate_limit_view)
