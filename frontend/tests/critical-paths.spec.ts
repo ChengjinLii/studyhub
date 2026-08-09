@@ -328,6 +328,10 @@ test('mock page mode covers more page secondary navigation', async ({ page }) =>
   await page.goto('/more');
   await closeEntryModalIfPresent(page);
   await expect(page.getByRole('heading', { name: '其他功能' })).toBeVisible();
+  await expect(page.getByText('内容、校园服务、平台说明与帮助入口集中在这里。')).toBeVisible();
+  await expect(page.getByText(/主导航保持轻量/)).toHaveCount(0);
+  await expect(page.getByRole('heading', { name: '浏览与交流' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '平台与支持' })).toBeVisible();
   await expect(page.getByRole('link', { name: /学汇专栏/ })).toHaveAttribute('href', '/column');
   await expect(page.getByRole('link', { name: /校园集市/ })).toHaveAttribute('href', '/market');
 });
