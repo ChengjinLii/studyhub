@@ -3,6 +3,7 @@ import { GetServerSideProps } from 'next';
 import { useAppDialog } from '../components/AppDialogProvider';
 import AppImage from '../components/AppImage';
 import NavBar from '../components/NavBar';
+import UserGrowthChart from '../components/join/UserGrowthChart';
 import { readSession } from '../lib/auth';
 import { SessionUser } from '../types/user';
 
@@ -126,7 +127,7 @@ export default function JoinPage({ user }: JoinPageProps) {
   };
 
   useEffect(() => {
-    const sections = ['overview', 'contact', 'channels', 'engineering', 'summary']
+    const sections = ['overview', 'growth', 'contact', 'channels', 'engineering', 'summary']
       .map((id) => document.getElementById(id))
       .filter((node): node is HTMLElement => Boolean(node));
     if (!sections.length) return;
@@ -147,6 +148,7 @@ export default function JoinPage({ user }: JoinPageProps) {
 
   const navItems = [
     { id: 'overview', label: '关于 StudyHub' },
+    { id: 'growth', label: '用户增长' },
     { id: 'contact', label: '联系方式' },
     { id: 'channels', label: '官方公众号' },
     { id: 'engineering', label: '工程日志' },
@@ -199,6 +201,16 @@ export default function JoinPage({ user }: JoinPageProps) {
                   ))}
                 </div>
               </section>
+            </section>
+
+            <section className="join-section-block" id="growth">
+              <div className="card join-panel-card join-growth-card">
+                <div className="join-section-head join-panel-head">
+                  <span className="join-section-head__eyebrow">Community Growth</span>
+                  <h2>用户增长</h2>
+                </div>
+                <UserGrowthChart />
+              </div>
             </section>
 
             <section className="join-section-block join-section-block--contact" id="contact">

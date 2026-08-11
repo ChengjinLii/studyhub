@@ -447,6 +447,22 @@ test('mock page mode covers more page secondary navigation', async ({ page }) =>
   await expect(page.getByText('投稿、收款码、收益结算与隐私相关说明。')).toBeVisible();
 });
 
+test('about page shows the static user growth trend without horizontal overflow', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/join');
+
+  const growthSection = page.locator('#growth');
+  await expect(growthSection.getByRole('heading', { name: '用户增长' })).toBeVisible();
+  await expect(growthSection.getByLabel('用户增长摘要').getByText('345', { exact: true })).toBeVisible();
+  await expect(growthSection.getByText(/数据截至 2026\.07\.08/)).toBeVisible();
+  await expect(growthSection.locator('.join-growth-chart__svg--mobile')).toBeVisible();
+
+  const hasHorizontalOverflow = await page.evaluate(
+    () => document.documentElement.scrollWidth > window.innerWidth + 1
+  );
+  expect(hasHorizontalOverflow).toBe(false);
+});
+
 test('login success should make session readable', async ({ request }) => {
   const available = await isSmokeTargetAvailable(request);
   test.skip(!available, 'smoke target is unavailable (SMOKE_BASE_URL is not reachable)');
