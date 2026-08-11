@@ -169,6 +169,15 @@ export default function ProfileCard({
     setMessage(null);
   };
 
+  const toggleSchoolEdit = () => {
+    if (editingSchool) {
+      resetSchoolEdit();
+      return;
+    }
+    setMessage(null);
+    setEditingSchool(true);
+  };
+
   const legendaryActive = useMemo(() => {
     if (!profile.legendaryContributorUntil) return false;
     const ts = Date.parse(profile.legendaryContributorUntil);
@@ -557,11 +566,12 @@ export default function ProfileCard({
           {editable && (
             <button
               type="button"
-              className="profile-card__edit profile-card__edit--text"
-              onClick={() => setEditingSchool(true)}
-              disabled={editingSchool}
-              aria-label="编辑学校信息"
-              title="编辑学校信息"
+              className={`profile-card__edit profile-card__edit--text${editingSchool ? ' is-active' : ''}`}
+              onClick={toggleSchoolEdit}
+              disabled={saving}
+              aria-label={editingSchool ? '取消修改学校信息' : '修改学校信息'}
+              aria-pressed={editingSchool}
+              title={editingSchool ? '取消修改学校信息' : '修改学校信息'}
             >
               <svg viewBox="0 0 24 24" aria-hidden="true">
                 <path
@@ -573,7 +583,7 @@ export default function ProfileCard({
                 />
                 <path d="M13 6.5l4.5 4.5" fill="none" stroke="currentColor" strokeWidth="1.6" />
               </svg>
-              <span>修改</span>
+              <span>{editingSchool ? '取消修改' : '修改'}</span>
             </button>
           )}
         </div>
