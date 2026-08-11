@@ -14,7 +14,7 @@ from app.agentic_platform.persistence.durable_transition_sink import DurableTraj
 from app.agentic_platform.domain.hashing import canonical_hash
 
 from ..data_governance import DatasetExportDenied, DatasetExportGuard
-from .pilot import PilotRunReport, PilotScenarioManifest, PilotScenarioOutcome, PilotOutcomeStatus
+from .pilot import PilotRunReport, PilotScenarioManifest, PilotOutcomeStatus
 
 
 class PilotGateReport(DomainModel):

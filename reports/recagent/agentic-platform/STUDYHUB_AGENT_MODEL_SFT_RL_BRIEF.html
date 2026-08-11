@@ -1,0 +1,1549 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>StudyHub Agent 模型与训练路线简报</title>
+  <style>
+    :root {
+      --paper: #f4f1e9;
+      --paper-deep: #e9e4d8;
+      --ink: #17231d;
+      --muted: #657068;
+      --green: #2e6a57;
+      --green-soft: #dce8df;
+      --green-dark: #153e33;
+      --gold: #c99a2e;
+      --gold-soft: #f0e2b9;
+      --red: #a44f3c;
+      --line: rgba(23, 35, 29, 0.15);
+      --white: #fffdf7;
+      --shadow: 0 24px 70px rgba(28, 43, 35, 0.1);
+      --serif: "Noto Serif SC", "Source Han Serif SC", "Songti SC", serif;
+      --sans: "IBM Plex Sans", "Noto Sans SC", "Source Han Sans SC", "Microsoft YaHei", sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      margin: 0;
+      overflow-x: hidden;
+      color: var(--ink);
+      background:
+        linear-gradient(rgba(46, 106, 87, 0.035) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(46, 106, 87, 0.035) 1px, transparent 1px),
+        var(--paper);
+      background-size: 32px 32px;
+      font-family: var(--sans);
+      line-height: 1.72;
+    }
+
+    a {
+      color: var(--green);
+      text-decoration-thickness: 1px;
+      text-underline-offset: 3px;
+    }
+
+    code {
+      padding: 0.13em 0.38em;
+      border: 1px solid var(--line);
+      border-radius: 5px;
+      background: rgba(255, 253, 247, 0.7);
+      font-size: 0.88em;
+    }
+
+    .page {
+      display: grid;
+      grid-template-columns: 250px minmax(0, 1fr);
+      max-width: 1480px;
+      min-height: 100vh;
+      margin: 0 auto;
+    }
+
+    .rail {
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      padding: 42px 30px;
+      border-right: 1px solid var(--line);
+      background: rgba(244, 241, 233, 0.86);
+      backdrop-filter: blur(14px);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 11px;
+      margin-bottom: 64px;
+      font-family: var(--serif);
+      font-size: 19px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+
+    .brand-mark {
+      position: relative;
+      width: 31px;
+      height: 31px;
+      border: 2px solid var(--green);
+      border-radius: 50% 50% 42% 42%;
+    }
+
+    .brand-mark::before,
+    .brand-mark::after {
+      position: absolute;
+      top: 8px;
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: var(--gold);
+      content: "";
+    }
+
+    .brand-mark::before {
+      left: 6px;
+    }
+
+    .brand-mark::after {
+      right: 6px;
+    }
+
+    .rail-label {
+      margin-bottom: 11px;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+    }
+
+    .rail nav {
+      display: grid;
+      gap: 7px;
+    }
+
+    .rail nav a {
+      padding: 7px 0;
+      color: var(--muted);
+      font-size: 14px;
+      text-decoration: none;
+      transition: color 160ms ease, transform 160ms ease;
+    }
+
+    .rail nav a:hover,
+    .rail nav a.active {
+      color: var(--green-dark);
+      transform: translateX(4px);
+    }
+
+    .rail-meta {
+      position: absolute;
+      right: 30px;
+      bottom: 36px;
+      left: 30px;
+      padding-top: 18px;
+      border-top: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.65;
+    }
+
+    main {
+      min-width: 0;
+    }
+
+    .hero {
+      position: relative;
+      display: grid;
+      grid-template-columns: minmax(0, 1.35fr) minmax(260px, 0.65fr);
+      min-height: 610px;
+      overflow: hidden;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .hero-copy {
+      position: relative;
+      z-index: 2;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      padding: 84px clamp(36px, 7vw, 112px);
+    }
+
+    .eyebrow {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 22px;
+      color: var(--green);
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+    }
+
+    .eyebrow::before {
+      width: 38px;
+      height: 2px;
+      background: var(--gold);
+      content: "";
+    }
+
+    h1,
+    h2,
+    h3 {
+      font-family: var(--serif);
+      font-weight: 700;
+    }
+
+    h1 {
+      max-width: 780px;
+      margin: 0;
+      font-size: clamp(48px, 6.2vw, 91px);
+      line-height: 1.04;
+      letter-spacing: -0.055em;
+    }
+
+    h1 span {
+      color: var(--green);
+    }
+
+    .hero-lead {
+      max-width: 700px;
+      margin: 28px 0 0;
+      color: #445049;
+      font-family: var(--serif);
+      font-size: clamp(18px, 1.8vw, 25px);
+      line-height: 1.65;
+    }
+
+    .hero-panel {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      padding: 64px 40px;
+      color: var(--white);
+      background: var(--green-dark);
+    }
+
+    .hero-panel::before {
+      position: absolute;
+      top: 9%;
+      right: -75px;
+      width: 260px;
+      height: 260px;
+      border: 1px solid rgba(240, 226, 185, 0.4);
+      border-radius: 50%;
+      box-shadow:
+        0 0 0 33px rgba(240, 226, 185, 0.05),
+        0 0 0 67px rgba(240, 226, 185, 0.04);
+      content: "";
+    }
+
+    .verdict-label {
+      margin-bottom: 18px;
+      color: var(--gold-soft);
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+    }
+
+    .verdict {
+      display: grid;
+      gap: 18px;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .verdict li {
+      display: grid;
+      grid-template-columns: 32px 1fr;
+      gap: 12px;
+      align-items: start;
+      font-size: 15px;
+      line-height: 1.5;
+    }
+
+    .verdict b {
+      color: var(--gold-soft);
+    }
+
+    .signal {
+      display: inline-grid;
+      width: 28px;
+      height: 28px;
+      place-items: center;
+      border: 1px solid rgba(255, 253, 247, 0.35);
+      border-radius: 50%;
+      font-size: 11px;
+      font-weight: 800;
+    }
+
+    .hero-foot {
+      margin-top: 36px;
+      color: rgba(255, 253, 247, 0.58);
+      font-size: 12px;
+    }
+
+    section {
+      padding: 92px clamp(36px, 7vw, 112px);
+      border-bottom: 1px solid var(--line);
+    }
+
+    .section-head {
+      display: grid;
+      grid-template-columns: minmax(0, 0.72fr) minmax(280px, 1.28fr);
+      gap: 56px;
+      align-items: end;
+      margin-bottom: 48px;
+    }
+
+    .section-index {
+      color: var(--gold);
+      font-size: 13px;
+      font-weight: 800;
+      letter-spacing: 0.16em;
+    }
+
+    h2 {
+      margin: 8px 0 0;
+      font-size: clamp(32px, 4vw, 56px);
+      line-height: 1.12;
+      letter-spacing: -0.045em;
+    }
+
+    .section-summary {
+      max-width: 720px;
+      margin: 0;
+      color: var(--muted);
+      font-size: 16px;
+    }
+
+    .status-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 16px;
+    }
+
+    .status-card {
+      min-height: 210px;
+      padding: 26px;
+      border: 1px solid var(--line);
+      background: rgba(255, 253, 247, 0.68);
+      box-shadow: 0 10px 34px rgba(28, 43, 35, 0.04);
+    }
+
+    .status-card.accent {
+      color: var(--white);
+      background: var(--green);
+    }
+
+    .status-card .tag {
+      display: inline-block;
+      margin-bottom: 22px;
+      padding: 4px 9px;
+      border: 1px solid currentColor;
+      border-radius: 99px;
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+
+    .status-card h3 {
+      margin: 0 0 11px;
+      font-size: 22px;
+      line-height: 1.25;
+    }
+
+    .status-card p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .status-card.accent p {
+      color: rgba(255, 253, 247, 0.74);
+    }
+
+    .architecture {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 44px minmax(0, 1fr);
+      gap: 16px;
+      align-items: stretch;
+      margin-top: 16px;
+    }
+
+    .arch-box {
+      padding: 28px;
+      border: 1px solid var(--line);
+      background: var(--white);
+    }
+
+    .arch-box h3 {
+      margin: 0 0 8px;
+      font-size: 21px;
+    }
+
+    .arch-box p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .arch-arrow {
+      display: grid;
+      place-items: center;
+      color: var(--gold);
+      font-size: 24px;
+    }
+
+    .model-stack {
+      display: grid;
+      gap: 10px;
+    }
+
+    .model-row {
+      display: grid;
+      grid-template-columns: 168px minmax(220px, 0.75fr) minmax(280px, 1.25fr) 102px;
+      gap: 18px;
+      align-items: center;
+      padding: 20px 22px;
+      border: 1px solid var(--line);
+      background: rgba(255, 253, 247, 0.74);
+    }
+
+    .model-row.header {
+      padding-top: 8px;
+      padding-bottom: 8px;
+      color: var(--muted);
+      background: transparent;
+      border-color: transparent;
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.11em;
+      text-transform: uppercase;
+    }
+
+    .role {
+      color: var(--green);
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: 0.07em;
+    }
+
+    .model-name {
+      font-family: var(--serif);
+      font-size: 18px;
+      font-weight: 700;
+    }
+
+    .model-note {
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .state {
+      justify-self: start;
+      padding: 4px 8px;
+      border-radius: 99px;
+      color: var(--green-dark);
+      background: var(--green-soft);
+      font-size: 10px;
+      font-weight: 800;
+      white-space: nowrap;
+    }
+
+    .state.download {
+      color: #714f00;
+      background: var(--gold-soft);
+    }
+
+    .decision-note {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 18px;
+      align-items: start;
+      margin-top: 24px;
+      padding: 22px 26px;
+      border-left: 3px solid var(--gold);
+      background: rgba(240, 226, 185, 0.35);
+    }
+
+    .decision-note strong {
+      color: var(--green);
+      font-family: var(--serif);
+      font-size: 18px;
+    }
+
+    .decision-note p {
+      margin: 0;
+      color: #4e574f;
+      font-size: 14px;
+    }
+
+    .training-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 18px;
+    }
+
+    .training-card {
+      position: relative;
+      overflow: hidden;
+      padding: 30px;
+      border: 1px solid var(--line);
+      background: var(--white);
+    }
+
+    .training-card::after {
+      position: absolute;
+      right: -26px;
+      bottom: -34px;
+      color: rgba(46, 106, 87, 0.065);
+      font-family: var(--serif);
+      font-size: 118px;
+      font-weight: 700;
+      line-height: 1;
+      content: attr(data-step);
+    }
+
+    .training-card .phase {
+      color: var(--gold);
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.13em;
+      text-transform: uppercase;
+    }
+
+    .training-card h3 {
+      margin: 7px 0 13px;
+      font-size: 23px;
+    }
+
+    .training-card p {
+      position: relative;
+      z-index: 1;
+      margin: 0 0 13px;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .training-card dl {
+      position: relative;
+      z-index: 1;
+      display: grid;
+      grid-template-columns: 72px 1fr;
+      gap: 6px 12px;
+      margin: 0;
+      font-size: 13px;
+    }
+
+    .training-card dt {
+      color: var(--green);
+      font-weight: 800;
+    }
+
+    .training-card dd {
+      margin: 0;
+    }
+
+    .sequence {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      margin: 44px 0 32px;
+      border: 1px solid var(--line);
+      background: var(--white);
+    }
+
+    .sequence-step {
+      position: relative;
+      min-height: 136px;
+      padding: 23px 20px;
+      border-right: 1px solid var(--line);
+    }
+
+    .sequence-step:last-child {
+      border-right: 0;
+    }
+
+    .sequence-step:not(:last-child)::after {
+      position: absolute;
+      z-index: 2;
+      top: 50%;
+      right: -10px;
+      display: grid;
+      width: 19px;
+      height: 19px;
+      place-items: center;
+      border: 1px solid var(--line);
+      border-radius: 50%;
+      color: var(--gold);
+      background: var(--paper);
+      font-size: 11px;
+      content: "›";
+      transform: translateY(-50%);
+    }
+
+    .sequence-step small {
+      color: var(--gold);
+      font-weight: 800;
+    }
+
+    .sequence-step b {
+      display: block;
+      margin: 8px 0 5px;
+      font-family: var(--serif);
+      font-size: 17px;
+    }
+
+    .sequence-step span {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.5;
+    }
+
+    .rl-panel {
+      display: grid;
+      grid-template-columns: minmax(0, 1.1fr) minmax(300px, 0.9fr);
+      gap: 18px;
+    }
+
+    .reward {
+      padding: 30px;
+      color: var(--white);
+      background: var(--green-dark);
+    }
+
+    .reward h3,
+    .gate h3 {
+      margin: 0 0 16px;
+      font-size: 23px;
+    }
+
+    .formula {
+      margin: 18px 0;
+      padding: 19px;
+      border: 1px solid rgba(255, 253, 247, 0.2);
+      color: var(--gold-soft);
+      background: rgba(0, 0, 0, 0.13);
+      font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
+      font-size: 13px;
+      line-height: 1.7;
+    }
+
+    .reward p,
+    .gate p {
+      margin: 0;
+      color: rgba(255, 253, 247, 0.68);
+      font-size: 13px;
+    }
+
+    .gate {
+      padding: 30px;
+      border: 1px solid var(--line);
+      background: var(--white);
+    }
+
+    .gate p {
+      color: var(--muted);
+    }
+
+    .gate-list {
+      display: grid;
+      gap: 10px;
+      margin-top: 20px;
+    }
+
+    .gate-item {
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      padding-bottom: 9px;
+      border-bottom: 1px solid var(--line);
+      font-size: 13px;
+    }
+
+    .gate-item b {
+      color: var(--green);
+    }
+
+    .truth-table {
+      width: 100%;
+      border-collapse: collapse;
+      background: rgba(255, 253, 247, 0.7);
+      font-size: 14px;
+    }
+
+    .truth-table th,
+    .truth-table td {
+      padding: 17px 18px;
+      border-bottom: 1px solid var(--line);
+      text-align: left;
+      vertical-align: top;
+    }
+
+    .truth-table th {
+      color: var(--muted);
+      font-size: 11px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+    }
+
+    .truth-table td:first-child {
+      color: var(--green);
+      font-weight: 800;
+      white-space: nowrap;
+    }
+
+    .yes,
+    .no,
+    .later {
+      display: inline-block;
+      min-width: 58px;
+      padding: 3px 8px;
+      border-radius: 99px;
+      text-align: center;
+      font-size: 10px;
+      font-weight: 800;
+    }
+
+    .yes {
+      color: #174c39;
+      background: var(--green-soft);
+    }
+
+    .no {
+      color: #7f3425;
+      background: #f0d8d2;
+    }
+
+    .later {
+      color: #714f00;
+      background: var(--gold-soft);
+    }
+
+    .roadmap {
+      position: relative;
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 0;
+      margin-top: 12px;
+    }
+
+    .roadmap::before {
+      position: absolute;
+      top: 18px;
+      right: 12.5%;
+      left: 12.5%;
+      height: 1px;
+      background: var(--line);
+      content: "";
+    }
+
+    .road-step {
+      position: relative;
+      padding: 0 20px;
+      text-align: center;
+    }
+
+    .road-dot {
+      position: relative;
+      z-index: 1;
+      width: 37px;
+      height: 37px;
+      margin: 0 auto 18px;
+      border: 8px solid var(--paper);
+      border-radius: 50%;
+      background: var(--green);
+      box-shadow: 0 0 0 1px var(--green);
+    }
+
+    .road-step:nth-child(3) .road-dot,
+    .road-step:nth-child(4) .road-dot {
+      background: var(--gold);
+      box-shadow: 0 0 0 1px var(--gold);
+    }
+
+    .road-step small {
+      color: var(--gold);
+      font-weight: 800;
+    }
+
+    .road-step h3 {
+      margin: 5px 0 8px;
+      font-size: 18px;
+    }
+
+    .road-step p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .principles {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 18px;
+      margin-top: 46px;
+    }
+
+    .principle {
+      padding: 27px;
+      border-top: 3px solid var(--green);
+      background: var(--white);
+    }
+
+    .principle.stop {
+      border-top-color: var(--red);
+    }
+
+    .principle h3 {
+      margin: 0 0 14px;
+      font-size: 21px;
+    }
+
+    .principle ul {
+      display: grid;
+      gap: 9px;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .principle li {
+      position: relative;
+      padding-left: 17px;
+    }
+
+    .principle li::before {
+      position: absolute;
+      top: 0.73em;
+      left: 0;
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--gold);
+      content: "";
+      transform: translateY(-50%);
+    }
+
+    .sources {
+      background: var(--paper-deep);
+    }
+
+    .source-columns {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 42px;
+    }
+
+    .source-group h3 {
+      margin: 0 0 14px;
+      font-size: 18px;
+    }
+
+    .source-group ol,
+    .source-group ul {
+      display: grid;
+      gap: 9px;
+      margin: 0;
+      padding-left: 19px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .source-group li::marker {
+      color: var(--gold);
+      font-weight: 800;
+    }
+
+    .final-call {
+      padding: 68px clamp(36px, 7vw, 112px);
+      color: var(--white);
+      background: var(--green);
+    }
+
+    .final-call p {
+      max-width: 980px;
+      margin: 0;
+      font-family: var(--serif);
+      font-size: clamp(25px, 3vw, 42px);
+      font-weight: 700;
+      line-height: 1.45;
+      letter-spacing: -0.03em;
+    }
+
+    .final-call b {
+      color: var(--gold-soft);
+    }
+
+    .fade-in {
+      animation: rise 700ms both;
+    }
+
+    .mobile-break {
+      display: none;
+    }
+
+    @keyframes rise {
+      from {
+        opacity: 0;
+        transform: translateY(18px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    @media (max-width: 1080px) {
+      .page {
+        display: block;
+      }
+
+      .rail {
+        position: relative;
+        z-index: 10;
+        display: flex;
+        height: auto;
+        align-items: center;
+        justify-content: space-between;
+        padding: 18px 28px;
+        border-right: 0;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .brand {
+        margin: 0;
+      }
+
+      .rail-label,
+      .rail-meta {
+        display: none;
+      }
+
+      .rail nav {
+        display: flex;
+        gap: 18px;
+      }
+
+      .rail nav a {
+        font-size: 12px;
+      }
+
+      .model-row {
+        grid-template-columns: 130px minmax(190px, 0.8fr) minmax(220px, 1.2fr) 86px;
+      }
+    }
+
+    @media (max-width: 780px) {
+      .rail {
+        display: grid;
+        grid-template-columns: 1fr;
+        align-items: start;
+        gap: 0;
+        padding: 14px 18px;
+      }
+
+      .brand {
+        display: none;
+      }
+
+      .rail nav {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        width: 100%;
+        gap: 2px 10px;
+      }
+
+      .rail nav a {
+        font-size: 11px;
+      }
+
+      .hero {
+        grid-template-columns: 1fr;
+      }
+
+      .hero-copy {
+        min-height: 520px;
+        padding: 64px 26px;
+      }
+
+      h1 {
+        font-size: 43px;
+        line-height: 1.06;
+      }
+
+      h1 > span {
+        display: block;
+        margin-top: 5px;
+      }
+
+      .mobile-break {
+        display: block;
+      }
+
+      .hero-lead {
+        font-size: 17px;
+      }
+
+      .hero-panel {
+        min-height: 420px;
+        padding: 54px 26px;
+      }
+
+      section {
+        padding: 68px 26px;
+      }
+
+      .section-head,
+      .status-grid,
+      .architecture,
+      .training-grid,
+      .rl-panel,
+      .principles,
+      .source-columns {
+        grid-template-columns: 1fr;
+      }
+
+      .section-head {
+        gap: 22px;
+      }
+
+      .arch-arrow {
+        transform: rotate(90deg);
+      }
+
+      .model-row,
+      .model-row.header {
+        grid-template-columns: 1fr;
+        gap: 6px;
+      }
+
+      .model-row.header {
+        display: none;
+      }
+
+      .state {
+        margin-top: 5px;
+      }
+
+      .sequence {
+        grid-template-columns: 1fr;
+      }
+
+      .sequence-step {
+        min-height: 0;
+        border-right: 0;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .sequence-step:last-child {
+        border-bottom: 0;
+      }
+
+      .sequence-step:not(:last-child)::after {
+        top: auto;
+        right: 50%;
+        bottom: -10px;
+        transform: translateX(50%) rotate(90deg);
+      }
+
+      .truth-table {
+        font-size: 12px;
+      }
+
+      .truth-table th,
+      .truth-table td {
+        padding: 12px 10px;
+      }
+
+      .roadmap {
+        grid-template-columns: 1fr;
+        gap: 26px;
+      }
+
+      .roadmap::before {
+        display: none;
+      }
+
+      .road-step {
+        text-align: left;
+      }
+
+      .road-dot {
+        margin: 0 0 12px;
+      }
+
+      .final-call {
+        padding: 54px 26px;
+      }
+    }
+
+    @media print {
+      body {
+        background: #fff;
+      }
+
+      .page {
+        display: block;
+      }
+
+      .rail {
+        display: none;
+      }
+
+      .hero {
+        min-height: 0;
+      }
+
+      .hero-copy,
+      section {
+        padding: 42px;
+      }
+
+      .fade-in {
+        animation: none;
+      }
+
+      a {
+        color: inherit;
+      }
+
+      .status-card,
+      .training-card,
+      .model-row,
+      .arch-box,
+      .reward,
+      .gate {
+        break-inside: avoid;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <aside class="rail">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true"></span>
+        <span>StudyHub Agent</span>
+      </div>
+      <div>
+        <div class="rail-label">Decision brief</div>
+        <nav aria-label="报告目录">
+          <a href="#status">01 现状判断</a>
+          <a href="#models">02 模型组合</a>
+          <a href="#training">03 训练任务</a>
+          <a href="#rl">04 RL 边界</a>
+          <a href="#roadmap">05 实施顺序</a>
+          <a href="#sources">06 依据</a>
+        </nav>
+      </div>
+      <div class="rail-meta">
+        研究日期 · 2026.07.31<br>
+        代码基线 · <code>8f204326</code><br>
+        算力 · 2 × H100 80GB
+      </div>
+    </aside>
+
+    <main>
+      <header class="hero">
+        <div class="hero-copy fade-in">
+          <div class="eyebrow">Model &amp; training brief</div>
+          <h1>StudyHub<br class="mobile-break"> Agent<br><span>模型与训练路线</span></h1>
+          <p class="hero-lead">
+            不做“一个模型包办所有任务”。用教师模型生产高质量轨迹，用 2B/4B 学会路由与工具策略，
+            用 9B 承担中文讲解，再用可验证离线环境决定 RL 是否真正带来增益。
+          </p>
+        </div>
+        <div class="hero-panel fade-in">
+          <div class="verdict-label">Executive verdict</div>
+          <ul class="verdict">
+            <li><span class="signal">01</span><span><b>现在可以开始 SFT</b><br>数据契约、工具轨迹和本地算力已经具备。</span></li>
+            <li><span class="signal">02</span><span><b>可以做 4B 离线 RL 小试验</b><br>先用稳定基线跑通，再迁移到新模型。</span></li>
+            <li><span class="signal">03</span><span><b>暂不做生产在线 RL</b><br>行为数据、奖励校准和安全门禁仍不充分。</span></li>
+          </ul>
+          <div class="hero-foot">本报告是技术决策建议，不表示所列模型已经部署。</div>
+        </div>
+      </header>
+
+      <section id="status">
+        <div class="section-head">
+          <div>
+            <div class="section-index">01 / READINESS</div>
+            <h2>Agent 已有骨架，缺的是受控学习闭环</h2>
+          </div>
+          <p class="section-summary">
+            当前代码不是从零开始：用户学习助手已有检索、工具循环、记忆和证据约束；
+            管理端 Agentic Platform 已有 LangGraph 状态机、训练数据策略与奖励事实。
+            现阶段应在这些边界内训练，而不是重写 Hermes 或另造一套运行时。
+          </p>
+        </div>
+
+        <div class="status-grid">
+          <article class="status-card accent">
+            <span class="tag">Ready</span>
+            <h3>结构化工具轨迹</h3>
+            <p>工具名、参数、观察、最终回答已可记录；训练导出已支持 loss mask，只训练 assistant action 与 final。</p>
+          </article>
+          <article class="status-card">
+            <span class="tag">Ready</span>
+            <h3>奖励事实与数据分级</h3>
+            <p>成功、格式、证据、重复调用、成本等事实已有表达；公开/合成可训练，个人与受限数据禁止导出。</p>
+          </article>
+          <article class="status-card">
+            <span class="tag">Gap</span>
+            <h3>固定评测与真实反馈</h3>
+            <p>仍需扩大检索金标、构建 500–1,000 个 Agent 场景，并验证奖励分数与人工判断的一致性。</p>
+          </article>
+        </div>
+
+        <div class="architecture">
+          <article class="arch-box">
+            <h3>用户层学习 Agent</h3>
+            <p>负责资料搜索、证据读取、题目讲解、学习计划与个体记忆。个体进化应更新 profile / memory，不应给每个用户单独改权重。</p>
+          </article>
+          <div class="arch-arrow" aria-hidden="true">→</div>
+          <article class="arch-box">
+            <h3>管理端 Agentic Platform</h3>
+            <p>负责规划、策略、验证、研究任务和训练轨迹治理。群体进化应汇总匿名反馈，周期性训练新 adapter，经离线门禁后灰度替换。</p>
+          </article>
+        </div>
+      </section>
+
+      <section id="models">
+        <div class="section-head">
+          <div>
+            <div class="section-index">02 / MODEL STACK</div>
+            <h2>推荐模型组合</h2>
+          </div>
+          <p class="section-summary">
+            主线优先选 Apache 2.0、中文能力强、工具调用生态明确的 Qwen 系列；
+            MiMo API 与本地 27B 只作为教师和评审，避免把昂贵模型绑进每一次用户请求。
+          </p>
+        </div>
+
+        <div class="model-stack" role="table" aria-label="推荐模型组合">
+          <div class="model-row header" role="row">
+            <div>职责</div><div>模型</div><div>用法</div><div>状态</div>
+          </div>
+          <div class="model-row" role="row">
+            <div class="role">教师 / Judge</div>
+            <div class="model-name">MiMo-V2.5-Pro API<br>Qwen3.6-27B</div>
+            <div class="model-note">生成候选轨迹、成对偏好、难例与离线评审；不保存或蒸馏隐藏思维链，只保留可审计的动作、简短理由和答案。</div>
+            <div class="state">已可用</div>
+          </div>
+          <div class="model-row" role="row">
+            <div class="role">主讲解模型</div>
+            <div class="model-name">Qwen3.5-9B</div>
+            <div class="model-note">中文学习讲解、材料证据归纳、学习计划与图片题目理解。作为单模型产品主力，优先做 LoRA/QLoRA。</div>
+            <div class="state download">待下载</div>
+          </div>
+          <div class="model-row" role="row">
+            <div class="role">工具策略 / RL</div>
+            <div class="model-name">Qwen3.5-4B</div>
+            <div class="model-note">低延迟工具调用与多步搜索策略。先用现有 Qwen3-4B 跑通训练控制组，再迁移并固定依赖版本。</div>
+            <div class="state download">待下载</div>
+          </div>
+          <div class="model-row" role="row">
+            <div class="role">路由 / 验证 / 审核</div>
+            <div class="model-name">Qwen3.5-2B</div>
+            <div class="model-note">意图分类、scope、工具参数 JSON、证据检查和多标签审核。0.8B 只适合粗路由，不作为最终安全裁决者。</div>
+            <div class="state download">待下载</div>
+          </div>
+          <div class="model-row" role="row">
+            <div class="role">STEM 专项基线</div>
+            <div class="model-name">MiMo-7B-RL</div>
+            <div class="model-note">数学与理工推理的对照项或教师；不建议用通用工具 SFT 覆盖其原有推理能力，也不作为全域 Agent 基座。</div>
+            <div class="state download">可选</div>
+          </div>
+          <div class="model-row" role="row">
+            <div class="role">检索 / 精排</div>
+            <div class="model-name">Qwen3-Embedding-0.6B<br>BGE-M3</div>
+            <div class="model-note">继续保留双路基线；当前 60-query 实验中 0.6B 向量模型已足够强，先扩大金标与难负例，再决定是否微调。</div>
+            <div class="state">已下载</div>
+          </div>
+        </div>
+
+        <div class="decision-note">
+          <strong>算力判断</strong>
+          <p>
+            2 × H100 80GB 足以稳定完成 2B/4B/9B 的 LoRA/QLoRA；9B 全参 SFT 技术上可做，但首轮没有必要。
+            27B 更适合常驻为教师与上界。第一轮多轮工具 RL 只做 4B，确认收益后再考虑 9B。
+          </p>
+        </div>
+      </section>
+
+      <section id="training">
+        <div class="section-head">
+          <div>
+            <div class="section-index">03 / TRAINING JOBS</div>
+            <h2>应该训练什么</h2>
+          </div>
+          <p class="section-summary">
+            每个任务都对应当前代码中的真实职责和可验收指标。先让模型“格式正确、证据正确、调用正确”，
+            再追求回答风格与长链路收益。
+          </p>
+        </div>
+
+        <div class="training-grid">
+          <article class="training-card" data-step="1">
+            <div class="phase">P0 · SFT</div>
+            <h3>路由与工具策略</h3>
+            <p>训练严格 JSON、是否检索、工具选择、参数构造、澄清问题和越权拒绝。</p>
+            <dl>
+              <dt>模型</dt><dd>Qwen3.5-2B；Qwen3-4B 作稳定控制组</dd>
+              <dt>数据</dt><dd>10k–30k 条，来自合成轨迹 + 失败轨迹修复 + 人工抽检</dd>
+              <dt>门槛</dt><dd>Schema ≥ 99.5%，工具名 ≥ 98%，越权召回率优先</dd>
+            </dl>
+          </article>
+
+          <article class="training-card" data-step="2">
+            <div class="phase">P0/P1 · SFT</div>
+            <h3>证据化学习讲解</h3>
+            <p>训练中文分步讲解、页码引用、证据不足时的克制回答和可执行学习计划。</p>
+            <dl>
+              <dt>模型</dt><dd>Qwen3.5-9B LoRA/QLoRA</dd>
+              <dt>数据</dt><dd>20k–50k 条，资料 chunk + 教师候选 + 人工 rubric</dd>
+              <dt>门槛</dt><dd>正确性、教学性、引用精度、无依据断言率</dd>
+            </dl>
+          </article>
+
+          <article class="training-card" data-step="3">
+            <div class="phase">P1 · SFT</div>
+            <h3>验证器与 AI 审核</h3>
+            <p>识别无效 material_id、伪页码、错误标签、低质描述、广告与链接风险，并输出可校准置信度。</p>
+            <dl>
+              <dt>模型</dt><dd>Qwen3.5-2B</dd>
+              <dt>数据</dt><dd>10k–20k 条多标签样本，规则/LLM 预标注后人工复核</dd>
+              <dt>门槛</dt><dd>Macro-F1、风险召回率、ECE 校准、拒判覆盖率</dd>
+            </dl>
+          </article>
+
+          <article class="training-card" data-step="4">
+            <div class="phase">P1 · DPO</div>
+            <h3>教学偏好优化</h3>
+            <p>用 chosen / rejected 对齐讲解层次、简洁度、追问质量和证据忠实度，不把主观风格塞进奖励函数。</p>
+            <dl>
+              <dt>模型</dt><dd>Qwen3.5-4B 或 9B</dd>
+              <dt>数据</dt><dd>5k–15k 对，至少双人抽检高风险子集</dd>
+              <dt>门槛</dt><dd>盲测胜率提升，同时事实与工具指标不得回退</dd>
+            </dl>
+          </article>
+        </div>
+
+        <div class="decision-note">
+          <strong>不是 SFT / RL</strong>
+          <p>
+            检索模型应在 ≥1,000 组 query–positive–hard-negative 后做对比学习与 pairwise reranker 微调；
+            推荐系统先做监督排序，收齐曝光 propensity、点击、收藏、下载、接受/跳过后再考虑 contextual bandit。
+          </p>
+        </div>
+      </section>
+
+      <section id="rl">
+        <div class="section-head">
+          <div>
+            <div class="section-index">04 / OFFLINE RL</div>
+            <h2>RL 只优化可验证的多步行为</h2>
+          </div>
+          <p class="section-summary">
+            RL 的目标不是让答案“更像人”，而是在固定资料快照和无副作用工具中，减少无效搜索、提高证据命中和任务完成率。
+            生产数据库与真实用户会话不进入 rollout 环境。
+          </p>
+        </div>
+
+        <div class="sequence" aria-label="训练顺序">
+          <div class="sequence-step"><small>STEP 01</small><b>冻结评测集</b><span>场景、资料快照、预期证据与失败条件</span></div>
+          <div class="sequence-step"><small>STEP 02</small><b>SFT 热启动</b><span>先保证格式、工具和权限边界稳定</span></div>
+          <div class="sequence-step"><small>STEP 03</small><b>DPO 对齐</b><span>优化教学偏好，不改变环境策略</span></div>
+          <div class="sequence-step"><small>STEP 04</small><b>4B RL Pilot</b><span>GRPO 控制组，GSPO 稳定性对照</span></div>
+          <div class="sequence-step"><small>STEP 05</small><b>Shadow</b><span>只旁路评测，不自动切换用户流量</span></div>
+        </div>
+
+        <div class="rl-panel">
+          <article class="reward">
+            <h3>奖励使用现有事实，不使用“感觉分”</h3>
+            <div class="formula">
+              R = success + format + action_valid<br>
+              &nbsp;&nbsp;+ evidence_supported + rank_delta<br>
+              &nbsp;&nbsp;− invalid_citation − duplicate_tool<br>
+              &nbsp;&nbsp;− void_observation − tool_cost<br>
+              &nbsp;&nbsp;− permission_violation
+            </div>
+            <p>
+              观察、系统提示和用户 token 全部 mask；只训练 assistant 的 action 与 final。
+              RL batch 混入 SFT replay，防止多轮训练后工具格式崩塌。
+            </p>
+          </article>
+          <article class="gate">
+            <h3>进入 RL 前的硬门禁</h3>
+            <p>任一项不满足，就继续补 SFT、环境或评测，不通过“多跑几轮 RL”掩盖问题。</p>
+            <div class="gate-list">
+              <div class="gate-item"><span>固定 Agent 场景</span><b>500–1,000+</b></div>
+              <div class="gate-item"><span>可验证训练任务</span><b>2,000+</b></div>
+              <div class="gate-item"><span>Schema 有效率</span><b>≥ 99%</b></div>
+              <div class="gate-item"><span>Action 有效率</span><b>≥ 98%</b></div>
+              <div class="gate-item"><span>奖励/人工相关性</span><b>先校验</b></div>
+              <div class="gate-item"><span>数据级别</span><b>公开 / 合成</b></div>
+            </div>
+          </article>
+        </div>
+
+        <table class="truth-table" aria-label="训练方式适用性">
+          <thead>
+            <tr><th>工作</th><th>现在做？</th><th>理由</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>2B / 9B SFT</td><td><span class="yes">现在</span></td><td>任务边界、数据格式和验收指标清晰，收益最确定。</td></tr>
+            <tr><td>4B DPO</td><td><span class="later">随后</span></td><td>先积累可靠偏好对，避免把教师偏见直接固化。</td></tr>
+            <tr><td>4B 离线 GRPO / GSPO</td><td><span class="later">小试验</span></td><td>在 Search-R1 / veRL 风格的无副作用环境中验证增益。</td></tr>
+            <tr><td>9B 长链路 RL</td><td><span class="no">暂缓</span></td><td>先证明 4B 策略确有稳定收益，再扩大算力与模型。</td></tr>
+            <tr><td>生产在线 RL</td><td><span class="no">不做</span></td><td>真实行为稀疏，奖励尚未校准，并存在内容与权限风险。</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section id="roadmap">
+        <div class="section-head">
+          <div>
+            <div class="section-index">05 / 8-WEEK PATH</div>
+            <h2>建议实施顺序</h2>
+          </div>
+          <p class="section-summary">
+            先把可复现性和评测做实，再训练。Qwen3.5 生态更新较快，应锁定 Transformers、vLLM、TRL / veRL 版本，
+            并用现有 Qwen3-4B 完成一遍端到端控制实验。
+          </p>
+        </div>
+
+        <div class="roadmap">
+          <article class="road-step">
+            <div class="road-dot"></div>
+            <small>WEEK 1</small>
+            <h3>冻结基线</h3>
+            <p>固定数据快照、500+ 场景、版本与当前模型零样本成绩。</p>
+          </article>
+          <article class="road-step">
+            <div class="road-dot"></div>
+            <small>WEEK 2–4</small>
+            <h3>SFT 主线</h3>
+            <p>2B 路由/审核与 9B 讲解并行；抽检教师数据和难例。</p>
+          </article>
+          <article class="road-step">
+            <div class="road-dot"></div>
+            <small>WEEK 5–6</small>
+            <h3>DPO + 控制 RL</h3>
+            <p>偏好盲测；现有 Qwen3-4B 跑通离线 GRPO 控制组。</p>
+          </article>
+          <article class="road-step">
+            <div class="road-dot"></div>
+            <small>WEEK 7–8</small>
+            <h3>迁移与旁路</h3>
+            <p>Qwen3.5-4B 对比 GRPO / GSPO；仅 shadow，不接管线上。</p>
+          </article>
+        </div>
+
+        <div class="principles">
+          <article class="principle">
+            <h3>应该坚持</h3>
+            <ul>
+              <li>每次训练都与未微调基座、教师模型和确定性规则做消融对照。</li>
+              <li>个体学习状态写入可删除的 memory/profile，不写入模型权重。</li>
+              <li>群体反馈只做匿名聚合和周期性 adapter，经过离线门禁再灰度。</li>
+              <li>保留原始 token IDs、tool observations 与 loss mask，保证可复现。</li>
+            </ul>
+          </article>
+          <article class="principle stop">
+            <h3>明确不要做</h3>
+            <ul>
+              <li>不要训练内部 CoT，也不要让教师生成内容未经抽检直接成为金标。</li>
+              <li>不要在真实网站、数据库或付费资料上执行 RL rollout。</li>
+              <li>不要先上 PPO、GiGPO、TIPS 或多 Agent RL；先证明简单方案有效。</li>
+              <li>不要把推荐、审核、检索和讲解硬塞进同一个 9B adapter。</li>
+            </ul>
+          </article>
+        </div>
+      </section>
+
+      <section id="sources" class="sources">
+        <div class="section-head">
+          <div>
+            <div class="section-index">06 / EVIDENCE</div>
+            <h2>依据与边界</h2>
+          </div>
+          <p class="section-summary">
+            模型能力与训练方法取自官方模型卡、官方框架文档和论文；项目判断来自当前本地代码与实验报告。
+            链接用于复核，不构成部署承诺。
+          </p>
+        </div>
+
+        <div class="source-columns">
+          <div class="source-group">
+            <h3>模型与检索</h3>
+            <ol>
+              <li><a href="https://huggingface.co/Qwen/Qwen3.5-9B">Qwen3.5-9B 官方模型卡</a>：Apache 2.0、多模态、长上下文与工具调用。</li>
+              <li><a href="https://huggingface.co/Qwen/Qwen3.5-4B">Qwen3.5-4B</a>、<a href="https://huggingface.co/Qwen/Qwen3.5-2B">2B</a>、<a href="https://huggingface.co/Qwen/Qwen3.5-0.8B">0.8B</a> 官方模型卡。</li>
+              <li><a href="https://huggingface.co/Qwen/Qwen3.6-27B">Qwen3.6-27B 官方模型卡</a>。</li>
+              <li><a href="https://huggingface.co/XiaomiMiMo/MiMo-7B-RL">MiMo-7B-RL 官方模型卡</a>。</li>
+              <li><a href="https://huggingface.co/Qwen/Qwen3-Embedding-0.6B">Qwen3-Embedding-0.6B</a> 与 <a href="https://huggingface.co/BAAI/bge-m3">BGE-M3</a> 官方模型卡。</li>
+              <li><a href="https://ai.google.dev/gemma/docs/core">Gemma 官方文档</a>：作为跨模型族对照，不作为中文主线。</li>
+            </ol>
+          </div>
+          <div class="source-group">
+            <h3>训练方法与本地证据</h3>
+            <ol>
+              <li><a href="https://arxiv.org/abs/2305.18290">DPO 论文</a>、<a href="https://arxiv.org/abs/2402.03300">GRPO / DeepSeekMath 论文</a>。</li>
+              <li><a href="https://qwenlm.github.io/blog/gspo/">Qwen GSPO 官方说明</a>：序列级重要性比率与训练稳定性。</li>
+              <li><a href="https://github.com/PeterGriffinJin/Search-R1">Search-R1</a>：交错推理与检索的 RL 环境设计。</li>
+              <li><a href="https://github.com/verl-project/verl/blob/main/docs/start/agentic_rl.rst">veRL Agentic RL 文档</a>：多轮工具 rollout 与 LangGraph 支持。</li>
+              <li><a href="https://arxiv.org/abs/2606.26027">多步工具 RL 稳定性研究</a>：提示应混入 SFT replay，防止格式退化。</li>
+              <li><code>backend/app/agentic_platform/</code>：状态机、RewardFacts、数据策略与训练导出。</li>
+              <li><code>ai_platform/rag_experiments/reports/RAG_EXPERIMENT_REPORT.md</code>：当前检索对照结果。</li>
+            </ol>
+          </div>
+        </div>
+      </section>
+
+      <footer class="final-call">
+        <p>
+          最优路线不是“立刻训练一个更大的 Agent”，而是：
+          <b>先用 2B/9B 做高质量 SFT，再用 4B 在离线环境证明 RL 有效，最后才进入旁路验证。</b>
+        </p>
+      </footer>
+    </main>
+  </div>
+
+  <script>
+    const links = [...document.querySelectorAll(".rail nav a")];
+    const sections = links
+      .map((link) => document.querySelector(link.getAttribute("href")))
+      .filter(Boolean);
+
+    const observer = new IntersectionObserver((entries) => {
+      const visible = entries
+        .filter((entry) => entry.isIntersecting)
+        .sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
+
+      if (!visible) return;
+      links.forEach((link) => {
+        link.classList.toggle("active", link.getAttribute("href") === `#${visible.target.id}`);
+      });
+    }, { rootMargin: "-25% 0px -60% 0px", threshold: [0.05, 0.25, 0.5] });
+
+    sections.forEach((section) => observer.observe(section));
+  </script>
+</body>
+</html>

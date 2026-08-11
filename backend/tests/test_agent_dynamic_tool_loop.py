@@ -8,6 +8,11 @@ from app.core.config import Settings
 from app.models.materials import MaterialRecord
 from app.services.agent_orchestrator_service import AgentOrchestrationPlan, AgentOrchestratorService
 from app.services.ai_service import AiService
+from app.services.agent_tool_loop_service import (
+    AGENT_TOOL_LOOP_CONTINUE_INSTRUCTION,
+    AGENT_TOOL_LOOP_FORCE_FINAL_INSTRUCTION,
+    AgentToolLoopService,
+)
 from app.services.material_pdf_evidence_service import MaterialPageEvidence
 
 
@@ -330,3 +335,182 @@ def test_dynamic_agent_enforces_search_budget_without_reclassifying_task(monkeyp
     exhausted = model_payloads[2]["tool_observations"][-1]
     assert exhausted["result"]["reason"] == "search_budget_exhausted"
     assert model_payloads[2]["task_context"]["course_terms"] == ["通信原理"]
+
+
+def test_runtime_constraints_are_disabled_by_default() -> None:
+    assert Settings(_env_file=None).ai_agent_runtime_constraints_enabled is False
+
+
+def test_tool_loop_adds_structured_routing_state_only_when_enabled() -> None:
+    service = AgentToolLoopService()
+    arguments = {
+        "query": "通信原理真题怎么复习",
+        "conversation_context": "",
+        "platform_term_glossary": {},
+        "has_image": False,
+        "observations": [
+            {
+                "tool": "search_materials",
+                "result": {"candidates": [{"material_id": 801}]},
+            },
+            {
+                "tool": "read_pdf_evidence",
+                "result": {"evidence": [{"material_id": 801, "page": 20}]},
+            },
+        ],
+        "task_context": {},
+        "search_history": [],
+        "remaining_rounds": 2,
+        "remaining_tool_calls": 3,
+        "remaining_search_calls": 1,
+        "remaining_candidate_slots": 5,
+    }
+
+    legacy = service.build_request(**arguments)
+    constrained = service.build_request(**arguments, runtime_constraints_enabled=True)
+    forced = service.build_request(**arguments, force_final=True)
+
+    assert "routing_state" not in legacy
+    assert legacy["instruction"] == AGENT_TOOL_LOOP_CONTINUE_INSTRUCTION
+    assert forced["instruction"] == AGENT_TOOL_LOOP_FORCE_FINAL_INSTRUCTION
+    assert constrained["routing_state"] == {
+        "version": "studyhub.router.state.v1",
+        "must_finish_without_tools": False,
+        "budget_phase": "tools_available",
+        "evidence_phase": "available",
+        "candidate_phase": "search_results_only",
+        "memory_phase": "not_loaded",
+    }
+
+
+def test_tool_loop_routing_state_matches_production_tool_result_shapes() -> None:
+    service = AgentToolLoopService()
+    payload = service.build_request(
+        query="通信原理错题怎么复习",
+        conversation_context="",
+        platform_term_glossary={},
+        has_image=False,
+        observations=[
+            {
+                "tool": "search_materials",
+                "result": {"candidates": [{"id": 801}]},
+            },
+            {
+                "tool": "inspect_materials",
+                "result": {"materials": [{"id": 801}]},
+            },
+            {
+                "tool": "read_pdf_evidence",
+                "result": {"evidence": [{"material_id": 801, "page": 20}]},
+            },
+            {
+                "tool": "read_memory",
+                "result": {"focus": "薄弱点", "memory": {}},
+            },
+        ],
+        task_context={},
+        search_history=[],
+        remaining_rounds=2,
+        remaining_tool_calls=3,
+        remaining_search_calls=1,
+        remaining_candidate_slots=5,
+        runtime_constraints_enabled=True,
+    )
+
+    assert payload["routing_state"] == {
+        "version": "studyhub.router.state.v1",
+        "must_finish_without_tools": False,
+        "budget_phase": "tools_available",
+        "evidence_phase": "available",
+        "candidate_phase": "details_observed",
+        "memory_phase": "loaded",
+    }
+
+
+def test_tool_loop_repairs_only_explicit_allowlisted_read_action() -> None:
+    service = AgentToolLoopService()
+    malformed = (
+        '{"mode":"tools","progress":"检索中","actions":['
+        '{"name":"search_materials","arguments":{"query":"通信原理 真题","limit":5}}'
+    )
+
+    assert service.parse_model_output(malformed, repair=False) is None
+    repaired = service.parse_model_output(malformed, repair=True)
+
+    assert repaired is not None
+    assert repaired.mode == "tools"
+    assert repaired.actions[0].name == "search_materials"
+    assert repaired.actions[0].arguments == {"query": "通信原理 真题", "limit": 5}
+
+
+def test_tool_loop_rejects_malformed_unsupported_action() -> None:
+    service = AgentToolLoopService()
+    malformed = (
+        '{"mode":"tools","actions":['
+        '{"name":"delete_database","arguments":{"material_ids":[801]}}'
+    )
+
+    assert service.parse_model_output(malformed, repair=True) is None
+
+
+def test_tool_loop_never_recovers_tool_from_malformed_final_payload() -> None:
+    service = AgentToolLoopService()
+    malformed = (
+        '{"mode":"final","metadata":{"name":"search_materials"},'
+        '"actions":[{"name":"search_materials","arguments":{"query":"不应执行"}}],'
+        '"answer":"安全回答"'
+    )
+
+    repaired = service.parse_model_output(malformed, repair=True)
+
+    assert repaired is not None
+    assert repaired.mode == "final"
+    assert repaired.actions == ()
+
+
+def test_dynamic_agent_uses_guarded_parser_only_when_flag_enabled(monkeypatch) -> None:
+    settings = _settings(ai_agent_runtime_constraints_enabled=True)
+    monkeypatch.setattr("app.services.ai_service.get_settings", lambda: settings)
+    service = AiService(read_repo=None, material_repo=None)  # type: ignore[arg-type]
+    searched_queries: list[str] = []
+    model_payloads: list[dict[str, Any]] = []
+    responses = iter(
+        [
+            (
+                '{"mode":"tools","actions":['
+                '{"name":"search_materials","arguments":{"query":"通信原理 真题","limit":4}}'
+            ),
+            json.dumps(
+                {
+                    "mode": "final",
+                    "answer": "## 通信原理复习\n\n优先用真题建立题型地图。",
+                    "recommendations": [{"material_id": 801, "reason": "课程匹配"}],
+                },
+                ensure_ascii=False,
+            ),
+        ]
+    )
+    monkeypatch.setattr(
+        service,
+        "_rank_materials",
+        lambda session, query, filters: searched_queries.append(query) or [_material()],
+    )
+
+    def fake_model(settings, system_prompt, payload):
+        del settings, system_prompt
+        model_payloads.append(payload)
+        return next(responses)
+
+    monkeypatch.setattr(service, "_call_agent_model", fake_model)
+
+    response = service.recommend(
+        object(),  # type: ignore[arg-type]
+        SimpleNamespace(query="通信原理怎么复习", filters={}, imageAttachments=[]),
+        current_user_id=7,
+    )
+    body = json.loads(str(response["output"]).removeprefix("<json>").removesuffix("</json>"))
+
+    assert searched_queries == ["通信原理 真题"]
+    assert model_payloads[0]["routing_state"]["candidate_phase"] == "not_observed"
+    assert model_payloads[1]["routing_state"]["candidate_phase"] == "search_results_only"
+    assert body["answer"].startswith("## 通信原理复习")

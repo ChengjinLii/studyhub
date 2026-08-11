@@ -145,29 +145,54 @@ class AdminAgentRunService:
             idempotency_key=payload.idempotencyKey,
         )
 
-    def list_runs(self, session: Session, *, limit: int = 30, status: str | None = None) -> dict[str, Any]:
+    def list_runs(
+        self,
+        session: Session,
+        *,
+        admin_actor_id: int,
+        limit: int = 30,
+        status: str | None = None,
+    ) -> dict[str, Any]:
         safe_limit = max(1, min(limit, 100))
-        stmt = select(AgentRunRecord).order_by(AgentRunRecord.created_at.desc(), AgentRunRecord.id.desc()).limit(safe_limit)
+        stmt = (
+            select(AgentRunRecord)
+            .where(AgentRunRecord.admin_actor_id == admin_actor_id)
+            .order_by(AgentRunRecord.created_at.desc(), AgentRunRecord.id.desc())
+            .limit(safe_limit)
+        )
         if status:
             try:
                 normalized_status = AgentRunStatus(status).value
             except ValueError as exc:
                 raise AdminRunConflictError("Unknown agent run status.", code="INVALID_RUN_STATUS") from exc
-            stmt = select(AgentRunRecord).where(AgentRunRecord.status == normalized_status).order_by(
-                AgentRunRecord.created_at.desc(), AgentRunRecord.id.desc()
-            ).limit(safe_limit)
+            stmt = (
+                select(AgentRunRecord)
+                .where(
+                    AgentRunRecord.admin_actor_id == admin_actor_id,
+                    AgentRunRecord.status == normalized_status,
+                )
+                .order_by(AgentRunRecord.created_at.desc(), AgentRunRecord.id.desc())
+                .limit(safe_limit)
+            )
         runs = list(session.scalars(stmt))
         return {
             "items": [self._serialize_run(session, run, include_details=False) for run in runs],
             "meta": {"limit": safe_limit, "total": len(runs)},
         }
 
-    def get_run(self, session: Session, *, run_id: str) -> dict[str, Any]:
-        run = self._require_run(session, run_id)
+    def get_run(self, session: Session, *, run_id: str, admin_actor_id: int) -> dict[str, Any]:
+        run = self._require_run(session, run_id, admin_actor_id=admin_actor_id)
         return self._serialize_run(session, run, include_details=True)
 
-    def list_events(self, session: Session, *, run_id: str, after_sequence: int = 0) -> dict[str, Any]:
-        run = self._require_run(session, run_id)
+    def list_events(
+        self,
+        session: Session,
+        *,
+        run_id: str,
+        admin_actor_id: int,
+        after_sequence: int = 0,
+    ) -> dict[str, Any]:
+        run = self._require_run(session, run_id, admin_actor_id=admin_actor_id)
         safe_after = max(0, after_sequence)
         return {
             "runId": run.id,
@@ -180,12 +205,13 @@ class AdminAgentRunService:
         session: Session,
         *,
         run_id: str,
+        admin_actor_id: int,
         wait_id: str,
         resume_token: str,
         payload: object,
     ) -> dict[str, Any]:
         try:
-            run = self._require_run(session, run_id)
+            run = self._require_run(session, run_id, admin_actor_id=admin_actor_id)
             wait = session.get(AgentWaitRecord, wait_id)
             if wait is None or wait.run_id != run.id:
                 raise ResumeTokenRejectedError("The requested wait does not belong to this run.", code="WAIT_NOT_FOUND")
@@ -228,14 +254,18 @@ class AdminAgentRunService:
                 idempotency_key=f"resume:{wait.id}",
             )
             session.commit()
-            return self._serialize_run(session, self._require_run(session, run.id), include_details=True)
+            return self._serialize_run(
+                session,
+                self._require_run(session, run.id, admin_actor_id=admin_actor_id),
+                include_details=True,
+            )
         except Exception:
             session.rollback()
             raise
 
-    def cancel(self, session: Session, *, run_id: str, reason: str) -> dict[str, Any]:
+    def cancel(self, session: Session, *, run_id: str, admin_actor_id: int, reason: str) -> dict[str, Any]:
         try:
-            run = self._require_run(session, run_id)
+            run = self._require_run(session, run_id, admin_actor_id=admin_actor_id)
             normalized_reason = _normalize_required(reason, max_length=1_000)
             current = AgentRunStatus(run.status)
             if current in {AgentRunStatus.COMPLETED, AgentRunStatus.FAILED, AgentRunStatus.CANCELLED}:
@@ -281,11 +311,18 @@ class AdminAgentRunService:
                 session,
                 run=run,
                 name="run.cancel_requested",
-                payload={"reason": normalized_reason, "status": self._require_run(session, run.id).status},
+                payload={
+                    "reason": normalized_reason,
+                    "status": self._require_run(session, run.id, admin_actor_id=admin_actor_id).status,
+                },
                 idempotency_key="cancel-requested",
             )
             session.commit()
-            return self._serialize_run(session, self._require_run(session, run.id), include_details=True)
+            return self._serialize_run(
+                session,
+                self._require_run(session, run.id, admin_actor_id=admin_actor_id),
+                include_details=True,
+            )
         except Exception:
             session.rollback()
             raise
@@ -294,14 +331,18 @@ class AdminAgentRunService:
         self,
         session: Session,
         *,
+        admin_actor_id: int,
         run_id: str | None = None,
         artifact_type: str | None = None,
         limit: int = 50,
     ) -> dict[str, Any]:
         safe_limit = max(1, min(limit, 100))
-        stmt = select(AgentArtifactRecord).where(AgentArtifactRecord.artifact_type != RUNTIME_EVENT_ARTIFACT_TYPE)
+        stmt = select(AgentArtifactRecord).where(
+            AgentArtifactRecord.admin_actor_id == admin_actor_id,
+            AgentArtifactRecord.artifact_type != RUNTIME_EVENT_ARTIFACT_TYPE,
+        )
         if run_id:
-            self._require_run(session, run_id)
+            self._require_run(session, run_id, admin_actor_id=admin_actor_id)
             stmt = stmt.where(AgentArtifactRecord.run_id == run_id)
         if artifact_type:
             stmt = stmt.where(AgentArtifactRecord.artifact_type == artifact_type)
@@ -396,7 +437,11 @@ class AdminAgentRunService:
                     idempotency_key="queued",
                 )
             session.commit()
-            return self._serialize_run(session, self._require_run(session, run.id), include_details=True)
+            return self._serialize_run(
+                session,
+                self._require_run(session, run.id, admin_actor_id=admin_actor_id),
+                include_details=True,
+            )
         except IdempotencyConflictError as exc:
             session.rollback()
             raise AdminRunConflictError("Agent run idempotency conflict.", code="IDEMPOTENCY_CONFLICT") from exc
@@ -691,8 +736,13 @@ class AdminAgentRunService:
         }
 
     @staticmethod
-    def _require_run(session: Session, run_id: str) -> AgentRunRecord:
-        run = session.get(AgentRunRecord, run_id)
+    def _require_run(session: Session, run_id: str, *, admin_actor_id: int) -> AgentRunRecord:
+        run = session.scalar(
+            select(AgentRunRecord).where(
+                AgentRunRecord.id == run_id,
+                AgentRunRecord.admin_actor_id == admin_actor_id,
+            )
+        )
         if run is None:
             raise AdminRunNotFoundError(f"agent run not found: {run_id}")
         return run

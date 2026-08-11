@@ -51,12 +51,19 @@ def agentic_platform_health(
 def list_agent_runs(
     limit: int = Query(default=30, ge=1, le=100),
     run_status: str | None = Query(default=None, alias="status", max_length=32),
-    _: AuthContext = Depends(require_enabled_admin_agent_context),
+    auth: AuthContext = Depends(require_enabled_admin_agent_context),
     session: Session = Depends(get_db_session),
     service: AdminAgentRunService = Depends(get_admin_agent_run_service),
 ) -> dict[str, object]:
     try:
-        return api_ok(service.list_runs(session, limit=limit, status=run_status))
+        return api_ok(
+            service.list_runs(
+                session,
+                admin_actor_id=_require_actor_id(auth),
+                limit=limit,
+                status=run_status,
+            )
+        )
     except Exception as exc:  # noqa: BLE001 - mapped to the established API envelope below.
         raise _agentic_http_error(exc) from exc
 
@@ -79,14 +86,20 @@ def stream_agent_run_events(
     run_id: str,
     after: int = Query(default=0, ge=0),
     last_event_id: str | None = Header(default=None, alias="Last-Event-ID"),
-    _: AuthContext = Depends(require_enabled_admin_agent_context),
+    auth: AuthContext = Depends(require_enabled_admin_agent_context),
     session: Session = Depends(get_db_session),
     service: AdminAgentRunService = Depends(get_admin_agent_run_service),
 ) -> StreamingResponse:
     resume_after = max(after, _parse_event_sequence(last_event_id))
     try:
-        snapshot = service.get_run(session, run_id=run_id)
-        events = service.list_events(session, run_id=run_id, after_sequence=resume_after)["events"]
+        admin_actor_id = _require_actor_id(auth)
+        snapshot = service.get_run(session, run_id=run_id, admin_actor_id=admin_actor_id)
+        events = service.list_events(
+            session,
+            run_id=run_id,
+            admin_actor_id=admin_actor_id,
+            after_sequence=resume_after,
+        )["events"]
     except Exception as exc:  # noqa: BLE001 - mapped to the established API envelope below.
         raise _agentic_http_error(exc) from exc
 
@@ -112,12 +125,12 @@ def stream_agent_run_events(
 @router.get("/api/admin/agent-runs/{run_id}", include_in_schema=False)
 def get_agent_run(
     run_id: str,
-    _: AuthContext = Depends(require_enabled_admin_agent_context),
+    auth: AuthContext = Depends(require_enabled_admin_agent_context),
     session: Session = Depends(get_db_session),
     service: AdminAgentRunService = Depends(get_admin_agent_run_service),
 ) -> dict[str, object]:
     try:
-        return api_ok(service.get_run(session, run_id=run_id))
+        return api_ok(service.get_run(session, run_id=run_id, admin_actor_id=_require_actor_id(auth)))
     except Exception as exc:  # noqa: BLE001 - mapped to the established API envelope below.
         raise _agentic_http_error(exc) from exc
 
@@ -126,7 +139,7 @@ def get_agent_run(
 def resume_agent_run(
     run_id: str,
     payload: AgentRunResumePayload,
-    _: AuthContext = Depends(require_enabled_admin_agent_context),
+    auth: AuthContext = Depends(require_enabled_admin_agent_context),
     session: Session = Depends(get_db_session),
     service: AdminAgentRunService = Depends(get_admin_agent_run_service),
 ) -> dict[str, object]:
@@ -135,6 +148,7 @@ def resume_agent_run(
             service.resume(
                 session,
                 run_id=run_id,
+                admin_actor_id=_require_actor_id(auth),
                 wait_id=payload.waitId,
                 resume_token=payload.resumeToken,
                 payload=payload.payload,
@@ -148,12 +162,19 @@ def resume_agent_run(
 def cancel_agent_run(
     run_id: str,
     payload: AgentRunCancelPayload,
-    _: AuthContext = Depends(require_enabled_admin_agent_context),
+    auth: AuthContext = Depends(require_enabled_admin_agent_context),
     session: Session = Depends(get_db_session),
     service: AdminAgentRunService = Depends(get_admin_agent_run_service),
 ) -> dict[str, object]:
     try:
-        return api_ok(service.cancel(session, run_id=run_id, reason=payload.reason))
+        return api_ok(
+            service.cancel(
+                session,
+                run_id=run_id,
+                admin_actor_id=_require_actor_id(auth),
+                reason=payload.reason,
+            )
+        )
     except Exception as exc:  # noqa: BLE001 - mapped to the established API envelope below.
         raise _agentic_http_error(exc) from exc
 
@@ -176,12 +197,20 @@ def list_agent_artifacts(
     run_id: str | None = Query(default=None, alias="runId", max_length=64),
     artifact_type: str | None = Query(default=None, alias="artifactType", max_length=128),
     limit: int = Query(default=50, ge=1, le=100),
-    _: AuthContext = Depends(require_enabled_admin_agent_context),
+    auth: AuthContext = Depends(require_enabled_admin_agent_context),
     session: Session = Depends(get_db_session),
     service: AdminAgentRunService = Depends(get_admin_agent_run_service),
 ) -> dict[str, object]:
     try:
-        return api_ok(service.list_artifacts(session, run_id=run_id, artifact_type=artifact_type, limit=limit))
+        return api_ok(
+            service.list_artifacts(
+                session,
+                admin_actor_id=_require_actor_id(auth),
+                run_id=run_id,
+                artifact_type=artifact_type,
+                limit=limit,
+            )
+        )
     except Exception as exc:  # noqa: BLE001 - mapped to the established API envelope below.
         raise _agentic_http_error(exc) from exc
 

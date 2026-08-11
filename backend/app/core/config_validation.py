@@ -208,6 +208,10 @@ def _validate_agentic_platform(settings: Any) -> None:
             raise RuntimeError("STUDYHUB_AGENTIC_PROACTIVE_ENABLED 需要先启用 STUDYHUB_AGENTIC_PLATFORM_ENABLED。")
         if settings.agentic_shadow_admin_actor_id is None or int(settings.agentic_shadow_admin_actor_id) <= 0:
             raise RuntimeError("STUDYHUB_AGENTIC_SHADOW_ADMIN_ACTOR_ID 必须是正数管理员 ID。")
+    if settings.deep_research_enabled and not settings.agentic_platform_enabled:
+        raise RuntimeError("STUDYHUB_DEEP_RESEARCH_ENABLED 需要先启用 STUDYHUB_AGENTIC_PLATFORM_ENABLED。")
+    if settings.deep_research_web_enabled or settings.deep_research_scholar_enabled:
+        raise RuntimeError("Web/Scholar Research 适配器尚未接入，不能启用对应的 DEEP_RESEARCH 开关。")
     if settings.agentic_execution_enabled and not settings.agentic_platform_enabled:
         raise RuntimeError("STUDYHUB_AGENTIC_EXECUTION_ENABLED 需要先启用 STUDYHUB_AGENTIC_PLATFORM_ENABLED。")
     if settings.agentic_artifact_storage_provider not in {"local_fs", "oss"}:
@@ -238,6 +242,8 @@ def _validate_agentic_platform(settings: Any) -> None:
             raise RuntimeError("启用 Agent Execution 时必须使用可恢复的 STUDYHUB_AGENTIC_CHECKPOINTER=sqlite。")
         if not settings.agentic_durable_storage_enabled:
             raise RuntimeError("启用 Agent Execution 前必须设置 STUDYHUB_AGENTIC_DURABLE_STORAGE_ENABLED=true。")
+        if settings.lock_provider != "redis":
+            raise RuntimeError("启用 Agent Execution 时必须使用 STUDYHUB_LOCK_PROVIDER=redis 以保证跨进程租约安全。")
         if settings.is_production and settings.agentic_artifact_storage_provider != "oss":
             raise RuntimeError("production Agent Execution 必须使用 STUDYHUB_AGENTIC_ARTIFACT_STORAGE_PROVIDER=oss。")
     positive_worker_limits = {

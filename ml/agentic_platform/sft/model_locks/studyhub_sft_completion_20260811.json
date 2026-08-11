@@ -1,0 +1,263 @@
+{
+  "schema_version": "studyhub.agent.sft.completion.v1",
+  "run_date": "2026-08-11",
+  "branch": "research/agent-sft-completion",
+  "implementation_commit": "6ab4fe704cb75481fbbff0abd9cbfd3a7abe62d6",
+  "release_status": "rejected_for_production_both_tracks_gate_failed",
+  "decision": {
+    "training_complete": true,
+    "production_release_allowed": false,
+    "router_final_holdout_allowed": false,
+    "router_model_pilot_allowed": false,
+    "reason": "Router 2B failed both production-shaped development paths and Grounded Tutor 9B failed its one-time sealed holdout gate."
+  },
+  "isolation": {
+    "environment": "offline_sft_research",
+    "production_api_called": false,
+    "production_database_accessed": false,
+    "production_oss_write_called": false,
+    "paid_material_used": false,
+    "real_user_memory_used": false,
+    "artifacts_git_ignored": true,
+    "router_final_holdout_read": false,
+    "router_model_pilot_run": false
+  },
+  "teacher_labels": {
+    "quality_tier": "teacher_reviewed_silver",
+    "human_gold": false,
+    "runtime": "current_codex_session"
+  },
+  "framework": {
+    "llamafactory_version": "0.9.5",
+    "llamafactory_commit": "7af909522a951e3ad9f022ea6f88b6755257eaa5",
+    "python": "3.12.13",
+    "torch": "2.4.1+cu121",
+    "cuda": "12.1",
+    "transformers": "5.6.0",
+    "peft": "0.18.1",
+    "datasets": "4.0.0",
+    "accelerate": "1.11.0",
+    "hardware": "NVIDIA H100 PCIe 80 GB",
+    "network_mode": "offline"
+  },
+  "base_models": {
+    "router_2b": {
+      "repo_id": "Qwen/Qwen3.5-2B",
+      "revision": "15852e8c16360a2fea060d615a32b45270f8a8fc",
+      "license": "Apache-2.0",
+      "config_sha256": "ed1c1723241f23f7f4e23430759cbd7dcfb4103cbdfe052bfe7626b57c2615b4",
+      "weight_index_sha256": "aca8afed9da75b0f050b408d270766fd77627f1af401e240f61c3b47d0db02f9",
+      "tokenizer_config_sha256": "49e2b6e395f959f077f1e992b338919c0d4a9732fc6e613995e06557f843500c"
+    },
+    "grounded_tutor_9b": {
+      "repo_id": "Qwen/Qwen3.5-9B",
+      "revision": "c202236235762e1c871ad0ccb60c8ee5ba337b9a",
+      "license": "Apache-2.0",
+      "config_sha256": "d0883072e01861ed0b2d47be3c16c36a8e81c224c7ffaa310c6558fb3f932b05",
+      "weight_index_sha256": "26d3539b516be613f39563617cb9d33b3f83d401298125be392c80cefb8f7fe5",
+      "tokenizer_config_sha256": "316230d6a809701f4db5ea8f8fc862bc3a6f3229c937c174e674ff3ca0a64ac8"
+    }
+  },
+  "router_2b": {
+    "dataset": {
+      "version": "router_2b_v1_7_state_transitions",
+      "records": 1640,
+      "train_records": 1476,
+      "validation_records": 164,
+      "raw_records": 820,
+      "runtime_state_records": 820,
+      "dataset_sha256": "89ac4ffda706693cd5ec59b1f9b46938324ec511970d2fb19956189160e3eb14",
+      "audit_sha256": "5133cf4bf5672c372137566ddb601f0a7632f3c5063de080a8a8d2c9f3b1e9e6",
+      "manifest_sha256": "0749fc2e1941977f1c9e2a5c0f9b7a902aecd8c60f0ae31e29623b9254dca2b9",
+      "tokenization_report_sha256": "8599f5479ce6d84549db8c4f8539bab4cba28b1bde2f431952f94cc7ab28c272",
+      "maximum_tokens": 1731,
+      "over_cutoff_records": 0,
+      "duplicate_pairs": 0,
+      "diagnostic_query_payload_target_exact_overlap": 0,
+      "final_holdout_read": false
+    },
+    "training": {
+      "method": "bf16_lora_continuation_from_v1_6",
+      "config": "ml/agentic_platform/sft/configs/qwen35_2b_lora_v1_7_state_transitions_from_v1_6_seed_7703.yaml",
+      "config_sha256": "cc0d66239e15fe52beee8f7600cca742278cde24f2dda891e74a0ca33096b096",
+      "seed": 7703,
+      "epochs": 1,
+      "optimizer": "adamw_torch",
+      "learning_rate": 0.000005,
+      "scheduler": "cosine",
+      "warmup_steps": 10,
+      "effective_batch_size": 8,
+      "lora_rank": 16,
+      "lora_alpha": 32,
+      "lora_dropout": 0.05,
+      "trainable_parameters": 16819200,
+      "trainable_parameter_rate": 0.007542,
+      "train_loss": 0.0704537,
+      "eval_loss": 0.0437211,
+      "eval_token_accuracy": 0.9895159,
+      "best_eval_loss_step": 184,
+      "best_eval_loss": 0.043601,
+      "runtime_seconds": 1417,
+      "peak_cuda_memory_mib": 76588,
+      "adapter_sha256": "6d2428abf3686be600509c5dff8fae34bb43076f391d86c90eab9b1971797eb1",
+      "merged_model_aggregate_sha256": "070320668fc72f8979a0797135435fc7448c9cd673d4b42169f835f09c035e97"
+    },
+    "formal_development_gate": {
+      "dataset_role": "teacher_hidden_development_diagnostic_not_final_holdout",
+      "records": 300,
+      "max_new_tokens": 1800,
+      "required_paths": [
+        "raw",
+        "normalized_runtime_state"
+      ],
+      "passed": false,
+      "raw": {
+        "json_valid": 0.953333,
+        "contract_valid": 0.9,
+        "tool_required_mode": 0.886957,
+        "tool_required_name": 0.873913,
+        "force_final_compliant": 0.5,
+        "explicit_page_number_preserved": 0.457143,
+        "material_ids_exact": 0.736364,
+        "policy_refusal_compliant": 1.0,
+        "injection_safe_readonly": 0.0,
+        "safety_passed": true,
+        "predictions_sha256": "a4a9d3ffab72084cd12a256e56016d1c9c7ee9cccfd6af75141d390520846285",
+        "analysis_sha256": "0e95f70de5603b09953bc0e26b0c0930903e9c68c3104499a83cfa76a5a61e23"
+      },
+      "normalized_runtime_state": {
+        "json_valid": 0.963333,
+        "contract_valid": 0.91,
+        "tool_required_mode": 0.882609,
+        "tool_required_name": 0.86087,
+        "force_final_compliant": 0.65,
+        "explicit_page_number_preserved": 0.228571,
+        "material_ids_exact": 0.754545,
+        "policy_refusal_compliant": 1.0,
+        "injection_safe_readonly": 0.0,
+        "safety_passed": true,
+        "predictions_sha256": "9c58d21782925d6b0bb904973c62fa2867ecd90e30d2b44e8a8880ac74fcac57",
+        "analysis_sha256": "4989181767de721a0b142ed7f6312a5b533bc2d868db4f61f03c2c912bf6aaf8"
+      },
+      "gate_sha256": "92fbbbb9140a1732244eca4d78e309361b5399d4de11a1cb4730fcf92d8af78c",
+      "manifest_sha256": "44373af51e9e3a30fd70a794c1880e81bee864b67f5a01a7469d414c40d34729"
+    },
+    "best_validation_checkpoint_review": {
+      "checkpoint": 184,
+      "adapter_sha256": "975edb81d5d1d9c6f15926a58333e40392116cc2a202621c2d48ed222d6f09b8",
+      "evaluated_paths": [
+        "raw"
+      ],
+      "normalized_path_skipped": true,
+      "passed": false,
+      "json_valid": 0.953333,
+      "contract_valid": 0.903333,
+      "force_final_compliant": 0.4,
+      "injection_safe_readonly": 0.0,
+      "predictions_sha256": "025bc9c00fcabcdc30e1e2ff049bc9d5f508b5c3d2388d4d021584e6672003a5",
+      "analysis_sha256": "84e24bef899772cbf6e11010ca9875dff8c22a4641d94f48c42a5e314591aa51",
+      "gate_sha256": "5580db07b745ba50acdae33674c9785453a5920373a67181a119d86d30aeb9f8"
+    },
+    "final_holdout": {
+      "sealed": true,
+      "evaluated": false,
+      "reason_not_evaluated": "Both final-step production-shaped development paths failed."
+    },
+    "model_pilot": {
+      "evaluated": false,
+      "reason_not_evaluated": "Development gate failed."
+    }
+  },
+  "grounded_tutor_9b": {
+    "dataset": {
+      "version": "grounded_tutor_9b_v1_0",
+      "train_records": 960,
+      "validation_records": 120,
+      "sealed_holdout_records": 120,
+      "train_validation_holdout_materials": [
+        55,
+        7,
+        7
+      ],
+      "dataset_sha256": "85f5f211b913991beffbfea88daf45c4cf3291c5cf802d5b2d49ddb6befca0e4",
+      "clean_chunks_sha256": "26a0cf8878b69b912988700a8ec02c6e2151bab55783bc830cf4fe766f549227",
+      "system_prompt_sha256": "5831319b198c6d2e2e22c6f4da58793e47850a8966d4ef7f05252f71f7198e27",
+      "manifest_sha256": "4caffcb16773701b5d2ae4f90dd8405e9e141de6d392ceef10b0d02487f120d8",
+      "tokenization_report_sha256": "bedba3ed459b779ffe610c265346a6138cd10dfc43b05642f215ffcc75e9880e",
+      "maximum_tokens": 2233,
+      "over_cutoff_records": 0,
+      "duplicate_pairs": 0,
+      "material_split_leaks": 0
+    },
+    "training": {
+      "method": "bf16_lora",
+      "config": "ml/agentic_platform/sft/configs/qwen35_9b_lora_grounded_tutor_v1_seed_6209.yaml",
+      "config_sha256": "9377c784ac53befe50b2bf0e79f437ed7114bbef272e5d85e4aaf25a8f0d529d",
+      "seed": 6209,
+      "epochs": 1,
+      "optimizer": "adamw_torch",
+      "learning_rate": 0.00008,
+      "scheduler": "cosine",
+      "warmup_steps": 6,
+      "effective_batch_size": 8,
+      "lora_rank": 16,
+      "lora_alpha": 32,
+      "lora_dropout": 0.05,
+      "trainable_parameters": 43278336,
+      "trainable_parameter_rate": 0.004578,
+      "train_loss": 0.2219344,
+      "eval_loss": 0.1863942,
+      "eval_token_accuracy": 0.9451959,
+      "runtime_seconds": 2469,
+      "peak_cuda_memory_mib": 50544,
+      "adapter_sha256": "d5f1b1cca2386cfa62b8f010c9b9c9cdc0055eb7c9c08e8672ec818eaef46c1a",
+      "merged_model_aggregate_sha256": "da7b7887487d8799c019a65f59db20f7d41c64336b5ba0f90660cfaba1d5d7a5"
+    },
+    "evaluation": {
+      "adapter_validation": {
+        "passed": true,
+        "strict_grounded_pass": "120/120",
+        "peak_cuda_memory_mib": 21399.2,
+        "generated_tokens_per_second": 86.491,
+        "predictions_sha256": "2c6c46fec347fa8e6619c47ec8eb2e682f1b10273dfb7bebc728277bb21e4e45",
+        "gate_sha256": "f8b841c9fab68969951ecca1766158d1b6498fc3b84e2c8ae0f65cd64e8e2006"
+      },
+      "merged_bf16_validation": {
+        "passed": true,
+        "strict_grounded_pass": "120/120",
+        "peak_cuda_memory_mib": 21232.6,
+        "generated_tokens_per_second": 139.982,
+        "predictions_sha256": "ebb56332966dcdb68188b4fbefe0856fe672de55f409406de5bd8cb44707ad48",
+        "gate_sha256": "1b21c1192b33680cae82a2ee1b382fdb9fd4f32aeee2259a0f42cbbd31bf8df6"
+      },
+      "merged_nf4_validation": {
+        "passed": false,
+        "strict_grounded_pass": "116/120",
+        "peak_cuda_memory_mib": 10800.9,
+        "generated_tokens_per_second": 80.861,
+        "predictions_sha256": "ae87058808d2db2ee25718410874963735e2a6a3a02f0eed95b98c4f539a26eb",
+        "gate_sha256": "29082d6c7e1527315202d7b6b820385d23bd53da89518d16f1827ecb68ebe21f"
+      },
+      "one_time_sealed_holdout": {
+        "access_count": 1,
+        "passed": false,
+        "strict_grounded_pass": "119/120",
+        "failure_reason": "One response reached the 768-token decode limit and left invalid JSON; the no-tool-actions gate is zero tolerance.",
+        "predictions_sha256": "3866859761162462e32cfa1f9bb8864286d91b8c428629139958718480dcdc89",
+        "gate_sha256": "757c501d1c2b2caae1bfdef18e893684ca7333b60a4e96da030d3776f26786f2"
+      }
+    }
+  },
+  "production_controls": {
+    "ai_agent_runtime_constraints_enabled_default": false,
+    "agentic_model_provider_default": "disabled",
+    "shadow_release_allowed": false,
+    "rollback_plan_required_before_future_release": true
+  },
+  "verification": {
+    "ruff": "passed",
+    "pytest_test_files": 17,
+    "pytest_tests": 76,
+    "pytest_status": "passed"
+  }
+}

@@ -15,7 +15,7 @@ import inspect
 from datetime import UTC, datetime
 from enum import StrEnum
 from pathlib import Path
-from typing import Any, Callable
+from typing import Callable
 
 from pydantic import Field, field_validator, model_validator
 

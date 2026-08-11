@@ -607,6 +607,29 @@ class AgentRunRepository:
                     return claimed
         return None
 
+    def renew_job_claim(
+        self,
+        session: Session,
+        *,
+        job_id: str,
+        claimed_by: str,
+        now: datetime | None = None,
+    ) -> bool:
+        """Atomically keep a live claim from being reclaimed as abandoned."""
+
+        _require_nonblank("claimed_by", claimed_by)
+        result = session.execute(
+            update(AgentJobRecord)
+            .where(
+                AgentJobRecord.id == job_id,
+                AgentJobRecord.status == AgentJobStatus.CLAIMED.value,
+                AgentJobRecord.claimed_by == claimed_by,
+            )
+            .values(claimed_at=now or datetime.now(UTC))
+            .execution_options(synchronize_session=False)
+        )
+        return result.rowcount == 1
+
     def complete_job(self, session: Session, *, job_id: str, claimed_by: str) -> AgentJobRecord:
         return self._finish_claimed_job(
             session,

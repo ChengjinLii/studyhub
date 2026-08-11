@@ -110,6 +110,7 @@ class Settings(BaseSettings):
     ai_agent_stream_buffer_size: int = 16
     ai_agent_stream_heartbeat_seconds: float = 10.0
     ai_agent_dynamic_tools_enabled: bool = False
+    ai_agent_runtime_constraints_enabled: bool = False
     ai_agent_tool_max_rounds: int = 4
     ai_agent_tool_max_calls: int = 8
     ai_agent_tool_max_search_calls: int = 3

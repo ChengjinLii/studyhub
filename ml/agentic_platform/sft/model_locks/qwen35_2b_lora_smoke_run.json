@@ -1,0 +1,60 @@
+{
+  "schema_version": "studyhub.agent.sft.run.v0",
+  "run_date": "2026-07-31",
+  "purpose": "2B router/tool-policy LoRA pipeline smoke test",
+  "base_model": {
+    "repo_id": "Qwen/Qwen3.5-2B",
+    "revision": "15852e8c16360a2fea060d615a32b45270f8a8fc",
+    "license": "Apache-2.0",
+    "local_path": "/data/chengjin/studyhub/models/P0/Qwen3.5-2B",
+    "weight_file": "model.safetensors-00001-of-00001.safetensors",
+    "weight_bytes": 4548221488,
+    "weight_sha256": "aa33250c4fc64891ddfaba3a314fd9542ea371843c387178b425fbcc5ed680b1"
+  },
+  "framework": {
+    "llamafactory_repo": "/data/chengjin/LLaMA-Factory",
+    "llamafactory_version": "0.9.5",
+    "llamafactory_commit": "7af909522a951e3ad9f022ea6f88b6755257eaa5",
+    "python": "3.12.13",
+    "torch": "2.4.1+cu121",
+    "transformers": "5.6.0",
+    "datasets": "4.0.0",
+    "accelerate": "1.11.0",
+    "peft": "0.18.1",
+    "trl": "0.24.0"
+  },
+  "hardware": {
+    "gpu": "NVIDIA H100 PCIe",
+    "gpu_count_used": 1,
+    "driver": "535.288.01",
+    "cuda_runtime": "12.1",
+    "precision": "bfloat16"
+  },
+  "dataset": {
+    "schema_version": "studyhub.agent.sft.spec.v0",
+    "router_source_sha256": "39cea2d16d375959c2b1ac9516f8df31bdb92c24508107a6916bfebf9ece2128",
+    "train_records": 400,
+    "validation_records": 50,
+    "test_records": 50,
+    "test_used_during_training": false
+  },
+  "training": {
+    "config": "ml/agentic_platform/sft/configs/qwen35_2b_lora_smoke.yaml",
+    "epochs": 1,
+    "optimizer_steps": 50,
+    "lora_rank": 16,
+    "lora_alpha": 32,
+    "trainable_parameters": 16819200,
+    "train_loss": 0.23196842830628156,
+    "eval_loss": 0.026755092665553093,
+    "eval_token_accuracy": 0.9925068100300933,
+    "runtime_seconds": 234.4889
+  },
+  "adapter": {
+    "local_path": "/data/chengjin/studyhub/training_artifacts/studyhub_agent_sft/qwen35_2b_lora_smoke",
+    "weight_file": "adapter_model.safetensors",
+    "weight_bytes": 67332688,
+    "weight_sha256": "1fdd5ba95048cf152d958949e8743a2df9722737358a69217db941988ec68347"
+  },
+  "release_status": "smoke_test_only_not_production"
+}

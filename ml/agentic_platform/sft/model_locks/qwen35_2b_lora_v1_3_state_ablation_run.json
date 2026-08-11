@@ -1,0 +1,176 @@
+{
+  "schema_version": "studyhub.agent.sft.run.v1",
+  "run_date": "2026-07-31",
+  "purpose": "2B router deterministic-state normalization ablation",
+  "release_status": "rejected_ablation_three_seed_and_final_holdout_blocked",
+  "base_model": {
+    "repo_id": "Qwen/Qwen3.5-2B",
+    "revision": "15852e8c16360a2fea060d615a32b45270f8a8fc",
+    "local_path": "/data/chengjin/studyhub/models/P0/Qwen3.5-2B",
+    "weight_sha256": "aa33250c4fc64891ddfaba3a314fd9542ea371843c387178b425fbcc5ed680b1"
+  },
+  "continuation_source": {
+    "seed": 7703,
+    "adapter_path": "/data/chengjin/studyhub/training_artifacts/studyhub_agent_sft/qwen35_2b_lora_v1_1_seed_7703",
+    "adapter_sha256": "31815c3e0ba9d030aac527638e6bd1e37d5874e6266a1f5c6d9a88b62dc9d791",
+    "failed_v1_2_adapter_used_as_source": false
+  },
+  "framework": {
+    "llamafactory_version": "0.9.5",
+    "llamafactory_commit": "7af909522a951e3ad9f022ea6f88b6755257eaa5",
+    "precision": "bfloat16",
+    "gpu": "NVIDIA H100 PCIe",
+    "network_mode": "offline"
+  },
+  "isolation": {
+    "production_api_called": false,
+    "production_database_accessed": false,
+    "paid_material_used": false,
+    "real_user_memory_used": false,
+    "artifacts_git_ignored": true
+  },
+  "teacher": {
+    "runtime": "current_codex_session",
+    "model_requested": "gpt-5.6-thinking",
+    "runtime_model_verified": false,
+    "human_gold": false
+  },
+  "routing_normalizer": {
+    "version": "studyhub.router.state.v1",
+    "source": "ml/agentic_platform/sft/router_state.py",
+    "uses_labels_or_predictions": false,
+    "uses_production_services": false,
+    "evaluation_flag": "--normalize-routing-state"
+  },
+  "dataset": {
+    "version": "router_2b_v1_3_normalized_state",
+    "records": 1800,
+    "train_records": 1620,
+    "validation_records": 180,
+    "test_records": 0,
+    "components": {
+      "normalized_v1_2_replay": 1500,
+      "v1_3_structural": 300
+    },
+    "dataset_sha256": "0eff7528690d5f87c32706a66b1a7640aabe0187537ce1ef50942dd237a16937",
+    "audit_sha256": "3ff8cf0c602592f46063c8a7354fc53e59bdcf91cf77750e6df2250eb670d00f",
+    "manifest_sha256": "771b7ee29ca1bab4b1bb670a7955c362ec227e1c13606acb7258dd381b3dbc54",
+    "tokenization_report_sha256": "c29d43f4938438772ee44efcb5ee97141c0027a047028bbc0161fe471d317d73",
+    "maximum_tokens": 984,
+    "over_cutoff_records": 0,
+    "duplicate_pairs": 0,
+    "material_split_leaks": 0,
+    "diagnostic_exact_overlap": 0,
+    "sealed_final_holdout_read": false
+  },
+  "normalization_only_baseline": {
+    "raw_predictions_sha256": "28a620072661de1af64f0339ab4577b0cb626e15eeb7b7526192a7796d7c3260",
+    "normalized_predictions_sha256": "b384bad6a937ccac772ebded3ac4bd1c7e81bc168a6d51bc058c87f3883a14c6",
+    "comparison_sha256": "9540c6ea13138409e452c5516466eaf59d39bfbb63f6320dbe4b3f50a317b579",
+    "raw": {
+      "force_final_compliant": 0.55,
+      "synthesis_contract": 0.32,
+      "injection_safe_readonly": 0.8,
+      "direct_no_tool_compliant": 0.95
+    },
+    "normalized": {
+      "force_final_compliant": 0.65,
+      "synthesis_contract": 0.12,
+      "injection_safe_readonly": 0.65,
+      "direct_no_tool_compliant": 1.0
+    }
+  },
+  "training": {
+    "config": "ml/agentic_platform/sft/configs/qwen35_2b_lora_v1_3_state_ablation_from_7703.yaml",
+    "config_sha256": "de007dc230e72379d96ca5df427d48a4f78456c1606d077000f886120ae4a902",
+    "learning_rate": 0.000008,
+    "epochs": 1,
+    "optimizer_steps": 203,
+    "lora_rank": 16,
+    "lora_alpha": 32,
+    "lora_dropout": 0.05,
+    "train_loss": 0.17621279885909827,
+    "eval_loss": 0.04537907615303993,
+    "eval_token_accuracy": 0.9888200680944519,
+    "runtime_seconds": 1029.3701,
+    "adapter_path": "/data/chengjin/studyhub/training_artifacts/studyhub_agent_sft/qwen35_2b_lora_v1_3_state_ablation_from_7703",
+    "adapter_sha256": "458256e929f2ee3560712912bffc4eb97d69df6fbd6ec4d3272e673616ec8ee6"
+  },
+  "v1_3_validation": {
+    "records": 180,
+    "baseline_predictions_sha256": "446535a25ad5721ecbcbb2809ac02da712076821f040cfa6d40fba8d08b8adba",
+    "candidate_predictions_sha256": "d3ad9bf76e47c1a931bae77a73bc239cdda275d4eebd38e823d6cb4fa384f223",
+    "baseline": {
+      "json_valid": 0.994444,
+      "contract_valid": 0.938889,
+      "mode_correct": 0.966667,
+      "tool_name_correct": 0.827778,
+      "arguments_exact": 0.361111
+    },
+    "candidate": {
+      "json_valid": 0.994444,
+      "contract_valid": 0.977778,
+      "mode_correct": 0.966667,
+      "tool_name_correct": 0.961111,
+      "arguments_exact": 0.6
+    }
+  },
+  "raw_diagnostic": {
+    "records": 300,
+    "predictions_sha256": "1cbe6127874b5e5ebdcde2c2309b7a47dc5b739eff6abfda9a07057b7df0e15e",
+    "comparison_sha256": "5f937bf02cb9f22bb009651b97c485f7ae61a6d743d765d7d1e0cfb8d2e12b7c",
+    "metrics": {
+      "json_valid": 0.993333,
+      "contract_valid": 0.986667,
+      "mode_correct": 0.97,
+      "tool_name_correct": 0.94,
+      "tool_required_mode": 0.965217,
+      "force_final_compliant": 1.0,
+      "page_numbers_preserved": 1.0,
+      "synthesis_contract": 0.92,
+      "policy_refusal_compliant": 1.0,
+      "injection_safe_readonly": 0.65,
+      "material_ids_exact": 0.863636,
+      "direct_no_tool_compliant": 0.9
+    },
+    "safety_passed": true,
+    "eligible_for_three_seed_expansion": false
+  },
+  "normalized_diagnostic": {
+    "records": 300,
+    "predictions_sha256": "19708e8f992a7b274d3342904c999b04e781e9461cd0f5089149527a42c5b855",
+    "comparison_sha256": "80b63df007c0e63009821a2ddebe857ccfb429c76f8a00b0702463c1c6539da7",
+    "metrics": {
+      "json_valid": 0.99,
+      "contract_valid": 0.973333,
+      "mode_correct": 0.963333,
+      "tool_name_correct": 0.923333,
+      "tool_required_mode": 0.96087,
+      "force_final_compliant": 1.0,
+      "page_numbers_preserved": 1.0,
+      "synthesis_contract": 0.68,
+      "policy_refusal_compliant": 1.0,
+      "injection_safe_readonly": 0.6,
+      "material_ids_exact": 0.854545,
+      "direct_no_tool_compliant": 0.85
+    },
+    "safety_passed": true,
+    "eligible_for_three_seed_expansion": false
+  },
+  "decision": {
+    "ablation_passed": false,
+    "three_seed_expansion_started": false,
+    "final_holdout_evaluation_allowed": false,
+    "rl_allowed": false,
+    "reason": "Both raw and normalized diagnostics failed routing, injection-continuation, material-ID retention, or direct-final gates."
+  },
+  "final_holdout": {
+    "dataset_sha256": "3255cab382da942b9a89103a737b86a7f98b97759857b22b4c03cb324fbad86d",
+    "audit_sha256": "ef1a2614f5e2af1362a72c1e288ffff7b5e98adf25fdf29e36070ed89583ac90",
+    "seal_sha256": "38f15fed430173a19bec6f6625cab35834b690e77f9e869115966396cb784ad0",
+    "sealed": true,
+    "evaluated": false,
+    "evaluation_receipt_created": false,
+    "reason_not_evaluated": "The seed 7703 v1.3 ablation failed both diagnostic paths."
+  }
+}

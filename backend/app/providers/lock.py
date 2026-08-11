@@ -3,6 +3,8 @@ from __future__ import annotations
 from datetime import UTC, datetime, timedelta
 from typing import Any, Protocol
 
+from redis.exceptions import WatchError
+from sqlalchemy import update
 from sqlalchemy.orm import Session
 
 from app.core.config import Settings
@@ -14,6 +16,8 @@ class LockProvider(Protocol):
     provider_name: str
 
     def acquire(self, session: Session, *, lock_name: str, owner_token: str, ttl_seconds: int) -> bool: ...
+
+    def renew(self, session: Session, *, lock_name: str, owner_token: str, ttl_seconds: int) -> bool: ...
 
     def release(self, session: Session, *, lock_name: str, owner_token: str) -> None: ...
 
@@ -59,6 +63,22 @@ class DbRowLockProvider:
         self.finance_repo.save_worker_lock(session, lock)
         session.commit()
 
+    def renew(self, session: Session, *, lock_name: str, owner_token: str, ttl_seconds: int) -> bool:
+        now = datetime.now(UTC)
+        result = session.execute(
+            update(WorkerLockRecord)
+            .where(
+                WorkerLockRecord.name == lock_name,
+                WorkerLockRecord.owner_token == owner_token,
+                WorkerLockRecord.expires_at.is_not(None),
+                WorkerLockRecord.expires_at > now,
+            )
+            .values(expires_at=now + timedelta(seconds=max(1, ttl_seconds)))
+            .execution_options(synchronize_session=False)
+        )
+        session.commit()
+        return result.rowcount == 1
+
     def probe(self, *, deep: bool = False) -> dict[str, Any]:
         del deep
         return {
@@ -78,17 +98,36 @@ class RedisLockProvider:
         self.settings = settings
 
     def acquire(self, session: Session, *, lock_name: str, owner_token: str, ttl_seconds: int) -> bool:
-        del session
         client = self._client()
         key = self._key(lock_name)
         acquired = bool(client.set(key, owner_token, nx=True, ex=max(1, ttl_seconds)))
         if acquired:
             return True
-        current = client.get(key)
-        if current and current.decode("utf-8") == owner_token:
-            client.expire(key, max(1, ttl_seconds))
-            return True
-        return False
+        return self.renew(
+            session,
+            lock_name=lock_name,
+            owner_token=owner_token,
+            ttl_seconds=ttl_seconds,
+        )
+
+    def renew(self, session: Session, *, lock_name: str, owner_token: str, ttl_seconds: int) -> bool:
+        del session
+        client = self._client()
+        key = self._key(lock_name)
+        with client.pipeline() as pipe:
+            while True:
+                try:
+                    pipe.watch(key)
+                    current = pipe.get(key)
+                    if current is None or current.decode("utf-8") != owner_token:
+                        pipe.unwatch()
+                        return False
+                    pipe.multi()
+                    pipe.expire(key, max(1, ttl_seconds))
+                    renewed = pipe.execute()
+                    return bool(renewed and renewed[0])
+                except WatchError:
+                    pipe.reset()
 
     def release(self, session: Session, *, lock_name: str, owner_token: str) -> None:
         del session
@@ -106,9 +145,8 @@ class RedisLockProvider:
                     pipe.delete(key)
                     pipe.execute()
                     return
-                except Exception:
+                except WatchError:
                     pipe.reset()
-                    return
 
     def probe(self, *, deep: bool = False) -> dict[str, Any]:
         payload: dict[str, Any] = {

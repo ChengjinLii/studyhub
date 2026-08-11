@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
@@ -84,6 +85,8 @@ class _MemoryLock:
     def __init__(self) -> None:
         self.owners: dict[str, str] = {}
         self.deny = False
+        self.fail_renewal = False
+        self.renew_calls = 0
 
     def acquire(self, session: Session, *, lock_name: str, owner_token: str, ttl_seconds: int) -> bool:
         del session, ttl_seconds
@@ -94,6 +97,13 @@ class _MemoryLock:
             return False
         self.owners[lock_name] = owner_token
         return True
+
+    def renew(self, session: Session, *, lock_name: str, owner_token: str, ttl_seconds: int) -> bool:
+        del session, ttl_seconds
+        self.renew_calls += 1
+        if self.fail_renewal:
+            return False
+        return self.owners.get(lock_name) == owner_token
 
     def release(self, session: Session, *, lock_name: str, owner_token: str) -> None:
         del session
@@ -134,10 +144,18 @@ def _synthetic_state(run_id: str) -> AgentTaskState:
 
 
 class _Kernel:
-    def __init__(self, run_id: str, *, status: KernelRunStatus = KernelRunStatus.COMPLETED, error: Exception | None = None) -> None:
+    def __init__(
+        self,
+        run_id: str,
+        *,
+        status: KernelRunStatus = KernelRunStatus.COMPLETED,
+        error: Exception | None = None,
+        delay_seconds: float = 0.0,
+    ) -> None:
         self.run_id = run_id
         self.status = status
         self.error = error
+        self.delay_seconds = delay_seconds
         self.start_calls = 0
         self.resume_calls: list[tuple[str, object, str | None]] = []
         self.cancel_calls: list[tuple[str, str]] = []
@@ -149,6 +167,8 @@ class _Kernel:
 
     async def start(self, state: AgentTaskState) -> KernelRunResult:
         self.start_calls += 1
+        if self.delay_seconds > 0:
+            await asyncio.sleep(self.delay_seconds)
         if self.error is not None:
             raise self.error
         return self._result(state)
@@ -298,6 +318,25 @@ def test_dispatch_completes_and_persists_checkpoint(session: Session) -> None:
     assert len(kernels) == 1 and kernels[0].closed is True
 
 
+def test_dispatch_does_not_restart_when_durable_checkpoint_is_missing(session: Session) -> None:
+    run, job = _create_run(session, max_attempts=2)
+    run.checkpoint_ref = f"langgraph-sqlite://agent-run:{run.id}"
+    session.commit()
+    kernel = _Kernel(run.id)
+    worker = _worker(
+        _settings(),
+        AgentRuntimeFactory(agent_kernel_builder=lambda record, payload: kernel),
+    )
+
+    result = worker.run_once(session, worker_id="worker-missing-checkpoint", now=BASE_TIME)
+
+    refreshed_job = session.get(AgentJobRecord, job.id)
+    assert result.jobs_retried == 1
+    assert kernel.start_calls == 0
+    assert refreshed_job is not None and refreshed_job.status == AgentJobStatus.PENDING.value
+    assert refreshed_job.error_code == "agent_execution_checkpoint_unavailable"
+
+
 def test_deep_research_dispatch_persists_packet_and_report(session: Session) -> None:
     research_agent = _ResearchAgent()
     payload = {
@@ -441,6 +480,46 @@ def test_worker_restart_reclaims_stale_claim(session: Session) -> None:
     assert session.get(AgentRunRecord, run.id).status == AgentRunStatus.COMPLETED.value
 
 
+def test_job_claim_heartbeat_prevents_premature_reclaim(session: Session) -> None:
+    _run, job = _create_run(session)
+    runs = AgentRunRepository()
+    claimed = runs.claim_next_job(
+        session,
+        job_types=("agent_run.dispatch",),
+        claimed_by="worker-one",
+        claim_ttl_seconds=60,
+        now=BASE_TIME,
+    )
+    assert claimed is not None and claimed.id == job.id
+    session.commit()
+    assert runs.renew_job_claim(
+        session,
+        job_id=job.id,
+        claimed_by="worker-one",
+        now=BASE_TIME + timedelta(seconds=59),
+    )
+    session.commit()
+
+    premature = runs.claim_next_job(
+        session,
+        job_types=("agent_run.dispatch",),
+        claimed_by="worker-two",
+        claim_ttl_seconds=60,
+        now=BASE_TIME + timedelta(seconds=61),
+    )
+    assert premature is None
+
+    reclaimed = runs.claim_next_job(
+        session,
+        job_types=("agent_run.dispatch",),
+        claimed_by="worker-two",
+        claim_ttl_seconds=60,
+        now=BASE_TIME + timedelta(seconds=120),
+    )
+    assert reclaimed is not None and reclaimed.id == job.id
+    assert reclaimed.claimed_by == "worker-two"
+
+
 def test_second_run_lease_retries_without_writing_trajectory(session: Session) -> None:
     run, job = _create_run(session, max_attempts=2)
     lock = _MemoryLock()
@@ -454,6 +533,43 @@ def test_second_run_lease_retries_without_writing_trajectory(session: Session) -
     assert result.jobs_retried == 1
     assert refreshed is not None and refreshed.status == AgentJobStatus.PENDING.value
     assert session.get(AgentRunRecord, run.id).status == AgentRunStatus.QUEUED.value
+
+
+def test_long_execution_renews_run_lease(session: Session) -> None:
+    run, job = _create_run(session)
+    lock = _MemoryLock()
+    worker = _worker(
+        _settings(agentic_execution_claim_ttl_seconds=1),
+        AgentRuntimeFactory(agent_kernel_builder=lambda record, payload: _Kernel(record.id, delay_seconds=0.45)),
+        lock,
+    )
+
+    result = worker.run_once(session, worker_id="worker-heartbeat", now=BASE_TIME)
+
+    assert result.jobs_completed == 1
+    assert lock.renew_calls >= 1
+    assert session.get(AgentJobRecord, job.id).status == AgentJobStatus.COMPLETED.value
+    assert session.get(AgentRunRecord, run.id).status == AgentRunStatus.COMPLETED.value
+
+
+def test_lost_run_lease_cancels_execution_and_retries(session: Session) -> None:
+    run, job = _create_run(session, max_attempts=2)
+    lock = _MemoryLock()
+    lock.fail_renewal = True
+    worker = _worker(
+        _settings(agentic_execution_claim_ttl_seconds=1),
+        AgentRuntimeFactory(agent_kernel_builder=lambda record, payload: _Kernel(record.id, delay_seconds=0.45)),
+        lock,
+    )
+
+    result = worker.run_once(session, worker_id="worker-lost-lease", now=BASE_TIME)
+
+    refreshed_job = session.get(AgentJobRecord, job.id)
+    assert result.lease_unavailable == 1
+    assert result.jobs_retried == 1
+    assert refreshed_job is not None and refreshed_job.status == AgentJobStatus.PENDING.value
+    assert refreshed_job.error_code == "agent_execution_lease_lost"
+    assert session.get(AgentRunRecord, run.id).status == AgentRunStatus.RUNNING.value
 
 
 def test_timeout_retries_then_fails_at_max_attempts(session: Session) -> None:
