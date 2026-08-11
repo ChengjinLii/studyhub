@@ -405,13 +405,13 @@ test('home entry modal and discovery views remain keyboard accessible', async ({
   await expect(page.locator('.request-card .card-title')).toHaveText('求购列表');
 });
 
-test('material list shows active search keywords and the 21-item page size', async ({ page }) => {
+test('material list shows active search keywords and the 24-item page size', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.goto('/?keyword=概率论%20期末');
   await closeEntryModalIfPresent(page);
 
   await expect(page.locator('.materials-search-context')).toContainText('当前搜索：概率论 期末');
-  await expect(page.locator('.materials-library-header__summary .help-text')).toContainText('每页 21 条');
+  await expect(page.locator('.materials-library-header__summary .help-text')).toContainText('每页 24 条');
 });
 
 test('mock page mode covers more page secondary navigation', async ({ page }) => {
