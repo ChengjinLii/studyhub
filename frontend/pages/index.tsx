@@ -17,8 +17,6 @@ import {
   fetchMaterials,
   MaterialListStats,
   MaterialListResponse,
-  fetchAccountProfile,
-  fetchProfile,
   fetchContributorRanks,
   fetchRecommendations,
   fetchMaterialRequests,
@@ -29,7 +27,7 @@ import { getRequestOrigin } from '../lib/apiBase';
 import { ensureApiSuccess, unwrapApiResponse } from '../lib/apiEnvelope';
 import { toErrorMessage } from '../lib/errors';
 import { formatDate, formatNumber } from '../lib/format';
-import { getMissingProfileFields } from '../lib/profileCompletion';
+import { fetchHomeProfileContext } from '../lib/homeProfileContext';
 import { materialPath } from '../lib/slug';
 import { copyToClipboard, isLikelyMobile, tryNativeShare } from '../lib/share';
 import {
@@ -1002,20 +1000,9 @@ export const getServerSideProps: GetServerSideProps<HomeProps> = async (ctx) => 
         tagOptions: [] as string[],
       };
     });
-  const profilePromise: Promise<ProfileSummary | null> = session.user && session.token
-    ? fetchProfile(session.token, origin).catch((error) => {
-        // eslint-disable-next-line no-console
-        console.warn('Failed to fetch profile summary', error);
-        return null;
-      })
-    : Promise.resolve(null);
-  const accountProfilePromise = session.user && session.token
-    ? fetchAccountProfile(session.token, origin).catch((error) => {
-        // eslint-disable-next-line no-console
-        console.warn('Failed to fetch account profile completion', error);
-        return null;
-      })
-    : Promise.resolve(null);
+  const profileContextPromise = session.user && session.token
+    ? fetchHomeProfileContext(session.token, origin)
+    : Promise.resolve({ summary: null, missingFields: [] });
   const recommendationsPromise: Promise<MaterialListItem[]> = fetchRecommendations(
     session.token || undefined,
     origin,
@@ -1065,8 +1052,7 @@ export const getServerSideProps: GetServerSideProps<HomeProps> = async (ctx) => 
   });
   const [
     { materials, meta, stats, tagOptions },
-    profileSummary,
-    accountProfile,
+    profileContext,
     recommendations,
     popularMaterials,
     requests,
@@ -1075,8 +1061,7 @@ export const getServerSideProps: GetServerSideProps<HomeProps> = async (ctx) => 
   ] =
     await Promise.all([
       materialsPromise,
-      profilePromise,
-      accountProfilePromise,
+      profileContextPromise,
       recommendationsPromise,
       popularMaterialsPromise,
       requestsPromise,
@@ -1094,8 +1079,8 @@ export const getServerSideProps: GetServerSideProps<HomeProps> = async (ctx) => 
       officialQQ,
       stats,
       tagOptions,
-      profileSummary,
-      profileMissingFields: getMissingProfileFields(accountProfile),
+      profileSummary: profileContext.summary,
+      profileMissingFields: profileContext.missingFields,
       recommendations,
       popularMaterials,
       requests,

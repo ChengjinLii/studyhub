@@ -8139,27 +8139,28 @@ g.studyhub-popup-poster__hotspot:hover > text {
   position: relative;
   display: inline-flex;
   align-items: center;
-  gap: 7px;
   white-space: nowrap;
 }
 
-.recommend-card .request-header-actions .profile-completion-link.is-incomplete {
-  box-shadow: 0 10px 18px rgba(42, 157, 143, 0.24), 0 0 0 3px rgba(245, 158, 11, 0.2);
-}
-
 .profile-completion-link__badge {
+  position: absolute;
+  top: -10px;
+  right: -14px;
+  z-index: 1;
   display: inline-flex;
   min-height: 19px;
   align-items: center;
   justify-content: center;
   padding: 1px 6px;
-  border: 1px solid rgba(255, 255, 255, 0.78);
+  border: 1px solid #fcd34d;
   border-radius: 999px;
-  background: #ffffff;
-  color: #b45309;
+  background: #fffbeb;
+  box-shadow: 0 3px 8px rgba(146, 64, 14, 0.18);
+  color: #92400e;
   font-size: 0.65rem;
   font-weight: 800;
   line-height: 1;
+  pointer-events: none;
 }
 
 
