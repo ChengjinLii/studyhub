@@ -142,6 +142,24 @@ export default function ProfileCard({
     setMessage(null);
   };
 
+  const toggleSignatureEdit = () => {
+    if (editingSignature) {
+      resetSignatureEdit();
+      return;
+    }
+    setMessage(null);
+    setEditingSignature(true);
+  };
+
+  const toggleNicknameEdit = () => {
+    if (editingNickname) {
+      resetNicknameEdit();
+      return;
+    }
+    setMessage(null);
+    setEditingNickname(true);
+  };
+
   const resetSchoolEdit = () => {
     setSchool(profile.school ?? '');
     setCollege(profile.college ?? '');
@@ -410,11 +428,12 @@ export default function ProfileCard({
         {editable && (
           <button
             type="button"
-            className="profile-card__edit profile-card__edit--text"
-            onClick={() => setEditingSignature(true)}
-            disabled={editingSignature}
-            aria-label="编辑签名"
-            title="编辑签名"
+            className={`profile-card__edit profile-card__edit--text${editingSignature ? ' is-active' : ''}`}
+            onClick={toggleSignatureEdit}
+            disabled={saving}
+            aria-label={editingSignature ? '取消编辑签名' : '编辑签名'}
+            aria-pressed={editingSignature}
+            title={editingSignature ? '取消编辑签名' : '编辑签名'}
           >
             <svg viewBox="0 0 24 24" aria-hidden="true">
               <path
@@ -426,7 +445,7 @@ export default function ProfileCard({
               />
               <path d="M13 6.5l4.5 4.5" fill="none" stroke="currentColor" strokeWidth="1.6" />
             </svg>
-            <span>编辑签名</span>
+            <span>{editingSignature ? '取消编辑' : '编辑签名'}</span>
           </button>
         )}
       </div>
@@ -471,7 +490,35 @@ export default function ProfileCard({
       </div>
 
       <div className="profile-card__section">
-        <div className="profile-card__label">昵称</div>
+        <div className="profile-card__label-row">
+          <div className="profile-card__label">昵称</div>
+          {editable && (
+            <button
+              type="button"
+              className={`profile-card__edit profile-card__edit--text${editingNickname ? ' is-active' : ''}`}
+              onClick={toggleNicknameEdit}
+              disabled={saving}
+              aria-label={editingNickname ? '取消修改昵称' : '修改昵称'}
+              aria-pressed={editingNickname}
+              title={editingNickname ? '取消修改昵称' : '修改昵称'}
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path
+                  d="M4 15.5V20h4.5L19 9.5 14.5 5 4 15.5z"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.6"
+                  strokeLinejoin="round"
+                />
+                <path d="M13 6.5l4.5 4.5" fill="none" stroke="currentColor" strokeWidth="1.6" />
+              </svg>
+              <span>{editingNickname ? '取消修改' : '修改'}</span>
+            </button>
+          )}
+        </div>
+        {editable && (
+          <div className="profile-card__identity-hint">昵称用于公开展示，用户名用于登录且保持唯一，二者可以不同。</div>
+        )}
         {editable ? (
           editingNickname ? (
             <>
@@ -497,28 +544,7 @@ export default function ProfileCard({
               </div>
             </>
           ) : (
-            <div className="profile-card__name-row">
-              <div className="profile-card__value">{displayName}</div>
-              <button
-                type="button"
-                className="profile-card__edit profile-card__edit--text"
-                onClick={() => setEditingNickname(true)}
-                aria-label="修改昵称"
-                title="修改昵称"
-              >
-                <svg viewBox="0 0 24 24" aria-hidden="true">
-                  <path
-                    d="M4 15.5V20h4.5L19 9.5 14.5 5 4 15.5z"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.6"
-                    strokeLinejoin="round"
-                  />
-                  <path d="M13 6.5l4.5 4.5" fill="none" stroke="currentColor" strokeWidth="1.6" />
-                </svg>
-                <span>修改</span>
-              </button>
-            </div>
+            <div className="profile-card__value">{displayName}</div>
           )
         ) : (
           <div className="profile-card__value">{displayName}</div>
