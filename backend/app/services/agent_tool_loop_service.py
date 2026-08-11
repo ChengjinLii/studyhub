@@ -48,6 +48,13 @@ AGENT_TOOL_LOOP_SYSTEM_PROMPT = """
 - 不要展示隐含推理过程。progress 只描述正在执行的真实动作，例如“检索通信原理真题中”“读取第 12 页证据中”。
 """.strip()
 
+AGENT_TOOL_LOOP_CONTINUE_INSTRUCTION = (
+    "自主决定下一步；可以调用工具，也可以直接完成回答。"
+)
+AGENT_TOOL_LOOP_FORCE_FINAL_INSTRUCTION = (
+    "预算已经用完，请基于现有观察直接输出 mode=final，不再请求工具。"
+)
+
 
 @dataclass(frozen=True, slots=True)
 class AgentToolAction:
@@ -106,9 +113,9 @@ class AgentToolLoopService:
             },
             "force_final": bool(force_final),
             "instruction": (
-                "预算已经用完，请基于现有观察直接输出 mode=final，不再请求工具。"
+                AGENT_TOOL_LOOP_FORCE_FINAL_INSTRUCTION
                 if force_final
-                else "自主决定下一步；可以调用工具，也可以直接完成回答。"
+                else AGENT_TOOL_LOOP_CONTINUE_INSTRUCTION
             ),
         }
         if runtime_constraints_enabled:
@@ -193,7 +200,9 @@ def build_agent_routing_state(request: dict[str, Any]) -> dict[str, Any]:
         elif tool_name == "read_pdf_evidence":
             evidence = result.get("evidence")
             has_evidence = has_evidence or (isinstance(evidence, list) and bool(evidence))
-        elif tool_name == "read_memory" and result.get("executed") is True:
+        elif tool_name == "read_memory":
+            # A read_memory observation is only appended after the tool ran;
+            # the production result carries focus/memory, not an executed flag.
             has_memory = True
     return {
         "version": "studyhub.router.state.v1",

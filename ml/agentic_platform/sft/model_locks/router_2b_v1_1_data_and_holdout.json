@@ -1,0 +1,77 @@
+{
+  "schema_version": "studyhub.agent.router.data_release.v1",
+  "release_date": "2026-07-31",
+  "release_status": "training_candidate_with_sealed_final_holdout",
+  "teacher": {
+    "runtime": "current_codex_session",
+    "model_requested": "gpt-5.6-thinking",
+    "runtime_model_verified": false,
+    "human_gold": false
+  },
+  "isolation": {
+    "production_api_called": false,
+    "production_database_accessed": false,
+    "paid_material_used": false,
+    "artifacts_git_ignored": true
+  },
+  "targeted_sft": {
+    "version": "router_2b_targeted_v1_1",
+    "records": 1000,
+    "split_counts": {
+      "train": 900,
+      "validation": 100
+    },
+    "family_counts": {
+      "force_final_budget": 300,
+      "explicit_page_numbers": 250,
+      "synthesize_context_contract": 250,
+      "material_ids_preservation": 120,
+      "direct_no_tool_hard": 40,
+      "refuse_boundary_hard": 40
+    },
+    "dataset_sha256": "1190c8dc4b4aa5412bfef3b41c63ed87a45d82877a41be311792c0b7a150471f",
+    "audit_sha256": "da00b51efbd55cb9d61a748d0c7baca94a279c9630b8416561bb15d2457ca634",
+    "unique_user_payloads": 1000,
+    "unique_query_target_pairs": 1000,
+    "exact_query_overlap_reference_or_diagnostic": 0,
+    "exact_payload_overlap_reference_or_diagnostic": 0,
+    "exact_target_overlap_reference_or_diagnostic": 0,
+    "reserved_test_material_overlap": 0
+  },
+  "combined_training": {
+    "records": 1500,
+    "split_counts": {
+      "train": 1300,
+      "validation": 150,
+      "test": 50
+    },
+    "dataset_sha256": "8073758e7cfb7fc19045289ce3ae9a1928ecf82a1140173d9e93e4ff19ed69b8",
+    "dataset_info_sha256": "b207782b9e2f9742c941527b39debcdc96ed046aafdd811335349362a1eaf259",
+    "material_split_leaks": 0,
+    "tokenization": {
+      "cutoff_len": 4096,
+      "max_total_tokens": 990,
+      "p95_total_tokens": 783,
+      "over_cutoff": 0,
+      "nonpositive_targets": 0
+    }
+  },
+  "final_holdout": {
+    "schema_version": "studyhub.agent.router.final_holdout.v2",
+    "records": 300,
+    "unique_material_ids": 13,
+    "dataset_sha256": "3255cab382da942b9a89103a737b86a7f98b97759857b22b4c03cb324fbad86d",
+    "audit_sha256": "ef1a2614f5e2af1362a72c1e288ffff7b5e98adf25fdf29e36070ed89583ac90",
+    "seal_sha256": "38f15fed430173a19bec6f6625cab35834b690e77f9e869115966396cb784ad0",
+    "file_mode": "0600",
+    "training_eligible_records": 0,
+    "trainable_messages": 0,
+    "exact_query_overlap": 0,
+    "exact_payload_overlap": 0,
+    "exact_target_overlap": 0,
+    "train_material_overlap": 0,
+    "sealed": true,
+    "evaluated": false,
+    "evaluation_policy": "one evaluation after diagnostic-only three-seed selection"
+  }
+}

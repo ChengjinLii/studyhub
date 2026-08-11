@@ -8,7 +8,11 @@ from app.core.config import Settings
 from app.models.materials import MaterialRecord
 from app.services.agent_orchestrator_service import AgentOrchestrationPlan, AgentOrchestratorService
 from app.services.ai_service import AiService
-from app.services.agent_tool_loop_service import AgentToolLoopService
+from app.services.agent_tool_loop_service import (
+    AGENT_TOOL_LOOP_CONTINUE_INSTRUCTION,
+    AGENT_TOOL_LOOP_FORCE_FINAL_INSTRUCTION,
+    AgentToolLoopService,
+)
 from app.services.material_pdf_evidence_service import MaterialPageEvidence
 
 
@@ -364,8 +368,11 @@ def test_tool_loop_adds_structured_routing_state_only_when_enabled() -> None:
 
     legacy = service.build_request(**arguments)
     constrained = service.build_request(**arguments, runtime_constraints_enabled=True)
+    forced = service.build_request(**arguments, force_final=True)
 
     assert "routing_state" not in legacy
+    assert legacy["instruction"] == AGENT_TOOL_LOOP_CONTINUE_INSTRUCTION
+    assert forced["instruction"] == AGENT_TOOL_LOOP_FORCE_FINAL_INSTRUCTION
     assert constrained["routing_state"] == {
         "version": "studyhub.router.state.v1",
         "must_finish_without_tools": False,
@@ -373,6 +380,50 @@ def test_tool_loop_adds_structured_routing_state_only_when_enabled() -> None:
         "evidence_phase": "available",
         "candidate_phase": "search_results_only",
         "memory_phase": "not_loaded",
+    }
+
+
+def test_tool_loop_routing_state_matches_production_tool_result_shapes() -> None:
+    service = AgentToolLoopService()
+    payload = service.build_request(
+        query="通信原理错题怎么复习",
+        conversation_context="",
+        platform_term_glossary={},
+        has_image=False,
+        observations=[
+            {
+                "tool": "search_materials",
+                "result": {"candidates": [{"id": 801}]},
+            },
+            {
+                "tool": "inspect_materials",
+                "result": {"materials": [{"id": 801}]},
+            },
+            {
+                "tool": "read_pdf_evidence",
+                "result": {"evidence": [{"material_id": 801, "page": 20}]},
+            },
+            {
+                "tool": "read_memory",
+                "result": {"focus": "薄弱点", "memory": {}},
+            },
+        ],
+        task_context={},
+        search_history=[],
+        remaining_rounds=2,
+        remaining_tool_calls=3,
+        remaining_search_calls=1,
+        remaining_candidate_slots=5,
+        runtime_constraints_enabled=True,
+    )
+
+    assert payload["routing_state"] == {
+        "version": "studyhub.router.state.v1",
+        "must_finish_without_tools": False,
+        "budget_phase": "tools_available",
+        "evidence_phase": "available",
+        "candidate_phase": "details_observed",
+        "memory_phase": "loaded",
     }
 
 

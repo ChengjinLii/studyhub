@@ -20,6 +20,8 @@ ai_platform/data/*.local.json
 ai_platform/logs/
 .local-research/vendor/
 artifacts/agentic_platform/
+ai_platform/rag_experiments/artifacts/
+ai_platform/rag_experiments/.venv/
 frontend/node_modules/
 frontend/.next/
 frontend/tsconfig.tsbuildinfo
@@ -27,3 +29,5 @@ frontend/test-results/
 frontend/playwright-report/
 backup/
 prototypes/
+training_artifacts/
+evaluation_artifacts/

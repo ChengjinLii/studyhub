@@ -1,0 +1,1224 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>StudyHub Agent · 当前进展与下一步</title>
+  <style>
+    :root {
+      --paper: #f2eee3;
+      --paper-deep: #e8e0cf;
+      --ink: #17231e;
+      --muted: #5f6b64;
+      --green: #2e6a57;
+      --green-dark: #173f34;
+      --green-soft: #d5e2d9;
+      --gold: #d3a73c;
+      --gold-soft: #f2e4b8;
+      --red: #a74f40;
+      --red-soft: #ecd7d0;
+      --line: rgba(23, 63, 52, 0.22);
+      --shadow: 0 24px 70px rgba(23, 35, 30, 0.12);
+      --display: "Noto Serif CJK SC", "Source Han Serif SC", "Songti SC", STSong, serif;
+      --body: "LXGW WenKai", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif;
+      --mono: "JetBrains Mono", "Sarasa Mono SC", "Cascadia Code", monospace;
+    }
+
+    * { box-sizing: border-box; }
+
+    html {
+      scroll-behavior: smooth;
+      background: var(--paper);
+      overflow-x: hidden;
+    }
+
+    body {
+      margin: 0;
+      overflow-x: hidden;
+      color: var(--ink);
+      font-family: var(--body);
+      line-height: 1.72;
+      background:
+        radial-gradient(circle at 84% 4%, rgba(211, 167, 60, 0.16), transparent 24rem),
+        radial-gradient(circle at 5% 30%, rgba(46, 106, 87, 0.13), transparent 30rem),
+        linear-gradient(135deg, rgba(255, 255, 255, 0.36), transparent 48%),
+        var(--paper);
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      opacity: 0.18;
+      background-image:
+        repeating-linear-gradient(0deg, transparent 0 5px, rgba(23, 35, 30, 0.025) 5px 6px),
+        repeating-linear-gradient(90deg, transparent 0 11px, rgba(23, 35, 30, 0.018) 11px 12px);
+      mix-blend-mode: multiply;
+      z-index: 20;
+    }
+
+    a { color: inherit; }
+
+    .shell {
+      width: min(1260px, calc(100% - 40px));
+      margin: 0 auto;
+      position: relative;
+      z-index: 1;
+    }
+
+    .topbar {
+      min-height: 68px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 24px;
+      border-bottom: 1px solid var(--line);
+      font-family: var(--mono);
+      font-size: 12px;
+      letter-spacing: 0.06em;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 11px;
+      font-weight: 800;
+      color: var(--green-dark);
+    }
+
+    .brand-mark {
+      width: 31px;
+      height: 31px;
+      position: relative;
+      border: 1px solid var(--green);
+      border-radius: 50%;
+    }
+
+    .brand-mark::before,
+    .brand-mark::after {
+      content: "";
+      position: absolute;
+      border-radius: 50%;
+      inset: 5px;
+      border: 1px solid var(--gold);
+    }
+
+    .brand-mark::after {
+      inset: 11px;
+      border: 0;
+      background: var(--green);
+    }
+
+    .top-nav {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      color: var(--muted);
+    }
+
+    .top-nav a {
+      text-decoration: none;
+      transition: color 160ms ease;
+    }
+
+    .top-nav a:hover { color: var(--green); }
+
+    .hero {
+      min-height: 620px;
+      display: grid;
+      grid-template-columns: 1.15fr 0.85fr;
+      gap: 6vw;
+      align-items: center;
+      padding: 84px 0 72px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .eyebrow {
+      margin: 0 0 20px;
+      color: var(--green);
+      font-family: var(--mono);
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+    }
+
+    h1, h2, h3 {
+      font-family: var(--display);
+      font-weight: 760;
+      line-height: 1.1;
+      letter-spacing: -0.035em;
+    }
+
+    h1 {
+      margin: 0;
+      max-width: 760px;
+      font-size: clamp(52px, 7.2vw, 105px);
+    }
+
+    h1 span {
+      display: block;
+      color: var(--green);
+      font-style: italic;
+      font-weight: 520;
+    }
+
+    .hero-lead {
+      max-width: 720px;
+      margin: 34px 0 0;
+      font-size: clamp(17px, 1.7vw, 22px);
+      color: #34443b;
+    }
+
+    .hero-lead strong { color: var(--red); }
+
+    .hero-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 32px;
+    }
+
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      min-height: 32px;
+      padding: 5px 11px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.22);
+      color: var(--muted);
+      font-family: var(--mono);
+      font-size: 11px;
+    }
+
+    .orbit {
+      aspect-ratio: 1;
+      position: relative;
+      display: grid;
+      place-items: center;
+      isolation: isolate;
+    }
+
+    .orbit::before,
+    .orbit::after,
+    .orbit-ring {
+      content: "";
+      position: absolute;
+      border: 1px solid rgba(46, 106, 87, 0.35);
+      border-radius: 50%;
+    }
+
+    .orbit::before { inset: 2%; }
+    .orbit::after { inset: 15%; border-style: dashed; animation: spin 28s linear infinite; }
+    .orbit-ring { inset: 28%; border-color: rgba(211, 167, 60, 0.7); }
+
+    .orbit-core {
+      width: 44%;
+      aspect-ratio: 1;
+      display: grid;
+      place-items: center;
+      text-align: center;
+      border-radius: 50%;
+      color: var(--paper);
+      background: var(--green-dark);
+      box-shadow: 0 0 0 10px rgba(46, 106, 87, 0.08), var(--shadow);
+    }
+
+    .orbit-core strong {
+      display: block;
+      font-family: var(--display);
+      font-size: clamp(42px, 5vw, 72px);
+      line-height: 0.9;
+    }
+
+    .orbit-core small {
+      font-family: var(--mono);
+      font-size: 10px;
+      letter-spacing: 0.1em;
+      color: var(--gold-soft);
+    }
+
+    .orbit-note {
+      position: absolute;
+      max-width: 150px;
+      padding: 8px 11px;
+      border-left: 2px solid var(--gold);
+      background: rgba(242, 238, 227, 0.8);
+      font-family: var(--mono);
+      font-size: 10px;
+      line-height: 1.45;
+      color: var(--green-dark);
+      backdrop-filter: blur(6px);
+    }
+
+    .orbit-note.one { top: 17%; left: 0; }
+    .orbit-note.two { right: -2%; bottom: 18%; }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .verdict {
+      display: grid;
+      grid-template-columns: minmax(230px, 0.64fr) 1.36fr;
+      margin: 0 0 100px;
+      border: 1px solid var(--green-dark);
+      background: var(--green-dark);
+      color: var(--paper);
+      box-shadow: var(--shadow);
+    }
+
+    .verdict-code {
+      display: flex;
+      min-height: 240px;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 32px;
+      border-right: 1px solid rgba(255, 255, 255, 0.22);
+      background:
+        linear-gradient(145deg, rgba(211, 167, 60, 0.2), transparent 45%),
+        var(--green-dark);
+    }
+
+    .verdict-code span {
+      font-family: var(--mono);
+      font-size: 11px;
+      letter-spacing: 0.12em;
+      color: var(--gold-soft);
+    }
+
+    .verdict-code strong {
+      font-family: var(--display);
+      font-size: clamp(42px, 5vw, 72px);
+      line-height: 0.9;
+      color: #fffaf0;
+    }
+
+    .verdict-copy {
+      padding: 34px 42px;
+      display: grid;
+      align-content: center;
+    }
+
+    .verdict-copy h2 {
+      margin: 0 0 16px;
+      font-size: clamp(29px, 3vw, 44px);
+      color: var(--gold-soft);
+    }
+
+    .verdict-copy p { margin: 0; color: rgba(255, 255, 255, 0.8); }
+
+    .section {
+      padding: 0 0 112px;
+      scroll-margin-top: 28px;
+    }
+
+    .section-head {
+      display: grid;
+      grid-template-columns: 0.35fr 1fr;
+      gap: 32px;
+      align-items: end;
+      margin-bottom: 42px;
+      border-bottom: 1px solid var(--line);
+      padding-bottom: 24px;
+    }
+
+    .section-index {
+      font-family: var(--mono);
+      font-size: 12px;
+      color: var(--green);
+      letter-spacing: 0.12em;
+    }
+
+    .section-head h2 {
+      margin: 0;
+      font-size: clamp(38px, 4.8vw, 70px);
+    }
+
+    .section-head p {
+      grid-column: 2;
+      max-width: 780px;
+      margin: 0;
+      color: var(--muted);
+      font-size: 16px;
+    }
+
+    .metrics {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      border-top: 1px solid var(--line);
+      border-left: 1px solid var(--line);
+      margin-bottom: 54px;
+    }
+
+    .metric {
+      min-height: 190px;
+      padding: 25px;
+      border-right: 1px solid var(--line);
+      border-bottom: 1px solid var(--line);
+      background: rgba(255, 255, 255, 0.17);
+    }
+
+    .metric .label {
+      font-family: var(--mono);
+      font-size: 10px;
+      letter-spacing: 0.11em;
+      color: var(--muted);
+      text-transform: uppercase;
+    }
+
+    .metric strong {
+      display: block;
+      margin: 16px 0 8px;
+      font-family: var(--display);
+      font-size: clamp(44px, 5vw, 70px);
+      font-weight: 700;
+      line-height: 0.95;
+      color: var(--green-dark);
+    }
+
+    .metric strong.warn { color: var(--red); }
+    .metric p { margin: 0; color: var(--muted); font-size: 13px; }
+
+    .layer-map {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 1px;
+      background: var(--line);
+      border: 1px solid var(--line);
+    }
+
+    .layer {
+      min-height: 310px;
+      padding: 26px;
+      background: var(--paper);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .layer::after {
+      content: attr(data-step);
+      position: absolute;
+      right: -8px;
+      bottom: -30px;
+      font-family: var(--display);
+      font-size: 140px;
+      line-height: 1;
+      color: rgba(46, 106, 87, 0.06);
+      pointer-events: none;
+    }
+
+    .status {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      min-height: 27px;
+      padding: 4px 9px;
+      border-radius: 999px;
+      font-family: var(--mono);
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: 0.06em;
+    }
+
+    .status::before {
+      content: "";
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: currentColor;
+    }
+
+    .status.done { color: var(--green-dark); background: var(--green-soft); }
+    .status.partial { color: #7b5d12; background: var(--gold-soft); }
+    .status.blocked { color: #7f342a; background: var(--red-soft); }
+    .status.hold { color: #59615c; background: rgba(95, 107, 100, 0.13); }
+
+    .layer h3 {
+      margin: 22px 0 13px;
+      font-size: 27px;
+    }
+
+    .layer p { margin: 0; color: var(--muted); font-size: 14px; }
+    .layer code { display: block; margin-top: 22px; }
+
+    code, .mono {
+      font-family: var(--mono);
+      font-size: 11px;
+      overflow-wrap: anywhere;
+    }
+
+    .filterbar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 9px;
+      margin-bottom: 26px;
+    }
+
+    .filterbar span {
+      margin-right: 8px;
+      color: var(--muted);
+      font-family: var(--mono);
+      font-size: 11px;
+    }
+
+    .filter-btn {
+      appearance: none;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 8px 13px;
+      color: var(--green-dark);
+      background: transparent;
+      font: 700 11px var(--mono);
+      cursor: pointer;
+      transition: 160ms ease;
+    }
+
+    .filter-btn:hover,
+    .filter-btn.active {
+      color: var(--paper);
+      border-color: var(--green-dark);
+      background: var(--green-dark);
+    }
+
+    .work-grid {
+      display: grid;
+      grid-template-columns: repeat(12, 1fr);
+      gap: 18px;
+    }
+
+    .work-card {
+      grid-column: span 6;
+      min-height: 310px;
+      padding: 29px;
+      border: 1px solid var(--line);
+      background: rgba(255, 255, 255, 0.2);
+      position: relative;
+      transition: transform 180ms ease, box-shadow 180ms ease, opacity 180ms ease;
+    }
+
+    .work-card:nth-child(3n + 1) { grid-column: span 7; }
+    .work-card:nth-child(3n + 2) { grid-column: span 5; }
+    .work-card:hover { transform: translateY(-3px); box-shadow: 0 16px 36px rgba(23, 35, 30, 0.08); }
+    .work-card.is-hidden { display: none; }
+
+    .work-card h3 { margin: 18px 0 14px; font-size: 29px; }
+    .work-card > p { margin: 0 0 20px; color: var(--muted); }
+
+    .checklist {
+      display: grid;
+      gap: 9px;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .checklist li {
+      position: relative;
+      padding-left: 19px;
+      font-size: 13px;
+      color: #38483f;
+    }
+
+    .checklist li::before {
+      content: "";
+      position: absolute;
+      left: 1px;
+      top: 0.72em;
+      width: 7px;
+      height: 1px;
+      background: var(--gold);
+    }
+
+    .experiment {
+      display: grid;
+      grid-template-columns: 190px minmax(0, 1fr);
+      gap: 24px;
+      padding: 30px 0;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .experiment:first-of-type { border-top: 1px solid var(--line); }
+
+    .experiment-tag {
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--green);
+    }
+
+    .experiment-body {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 25px;
+      align-items: start;
+    }
+
+    .experiment h3 { margin: 0 0 9px; font-size: 26px; }
+    .experiment p { margin: 0; color: var(--muted); font-size: 14px; }
+
+    .score {
+      min-width: 150px;
+      text-align: right;
+      font-family: var(--mono);
+      color: var(--green-dark);
+    }
+
+    .score strong {
+      display: block;
+      font-family: var(--display);
+      font-size: 33px;
+      line-height: 1;
+    }
+
+    .score.fail strong { color: var(--red); }
+
+    .gate-table-wrap {
+      overflow-x: auto;
+      margin-top: 42px;
+      border: 1px solid var(--line);
+      background: rgba(255, 255, 255, 0.17);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 760px;
+      font-size: 13px;
+    }
+
+    th, td {
+      padding: 16px 18px;
+      border-bottom: 1px solid var(--line);
+      text-align: left;
+      vertical-align: top;
+    }
+
+    th {
+      color: var(--green-dark);
+      background: rgba(46, 106, 87, 0.08);
+      font-family: var(--mono);
+      font-size: 10px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    tbody tr:last-child td { border-bottom: 0; }
+    td strong { color: var(--green-dark); }
+    td .bad { color: var(--red); font-weight: 800; }
+
+    .todo-layout {
+      display: grid;
+      grid-template-columns: 0.8fr 1.2fr;
+      gap: 18px;
+    }
+
+    .todo-summary {
+      padding: 34px;
+      color: var(--paper);
+      background: var(--red);
+      min-height: 100%;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .todo-summary::after {
+      content: "NO-GO";
+      position: absolute;
+      right: -18px;
+      bottom: -22px;
+      color: rgba(255, 255, 255, 0.1);
+      font: 800 82px/1 var(--mono);
+    }
+
+    .todo-summary h3 { margin: 20px 0; font-size: 38px; color: #fff9eb; }
+    .todo-summary p { margin: 0; color: rgba(255, 255, 255, 0.8); }
+
+    .todo-list {
+      display: grid;
+      gap: 1px;
+      border: 1px solid var(--line);
+      background: var(--line);
+    }
+
+    .todo-item {
+      display: grid;
+      grid-template-columns: 60px minmax(0, 1fr);
+      gap: 18px;
+      padding: 23px;
+      background: var(--paper);
+    }
+
+    .todo-item .num {
+      color: var(--gold);
+      font: 800 25px var(--display);
+    }
+
+    .todo-item h3 { margin: 0 0 6px; font-size: 21px; }
+    .todo-item p { margin: 0; color: var(--muted); font-size: 13px; }
+
+    .route {
+      counter-reset: route;
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 14px;
+      margin-top: 40px;
+    }
+
+    .route-step {
+      counter-increment: route;
+      min-height: 270px;
+      padding: 26px;
+      border-top: 4px solid var(--green);
+      background: rgba(255, 255, 255, 0.24);
+      position: relative;
+    }
+
+    .route-step::before {
+      content: "0" counter(route);
+      display: block;
+      margin-bottom: 34px;
+      color: var(--gold);
+      font: 800 12px var(--mono);
+    }
+
+    .route-step:not(:last-child)::after {
+      content: "→";
+      position: absolute;
+      top: 50%;
+      right: -14px;
+      z-index: 2;
+      width: 28px;
+      height: 28px;
+      display: grid;
+      place-items: center;
+      border-radius: 50%;
+      color: var(--paper);
+      background: var(--green-dark);
+      font-family: var(--mono);
+    }
+
+    .route-step h3 { margin: 0 0 12px; font-size: 24px; }
+    .route-step p { margin: 0; color: var(--muted); font-size: 13px; }
+    .route-step:last-child { border-color: var(--gold); }
+
+    details {
+      border-top: 1px solid var(--line);
+    }
+
+    details:last-child { border-bottom: 1px solid var(--line); }
+
+    summary {
+      display: grid;
+      grid-template-columns: 180px minmax(0, 1fr) auto;
+      gap: 20px;
+      align-items: center;
+      padding: 22px 4px;
+      cursor: pointer;
+      list-style: none;
+    }
+
+    summary::-webkit-details-marker { display: none; }
+    summary code { color: var(--green); }
+    summary span { color: var(--muted); font-size: 13px; }
+    summary::after { content: "+"; color: var(--gold); font: 700 22px var(--mono); }
+    details[open] summary::after { content: "−"; }
+
+    .detail-body {
+      margin: 0 0 22px 200px;
+      padding: 18px 22px;
+      border-left: 2px solid var(--gold);
+      color: var(--muted);
+      background: rgba(255, 255, 255, 0.18);
+      font-size: 13px;
+    }
+
+    .footer {
+      margin-top: 20px;
+      padding: 42px 0 56px;
+      border-top: 1px solid var(--line);
+      display: flex;
+      justify-content: space-between;
+      gap: 30px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .footer strong { color: var(--green-dark); }
+    .footer code { display: block; max-width: 600px; margin-top: 7px; }
+
+    .reveal {
+      opacity: 0;
+      transform: translateY(14px);
+      transition: opacity 650ms ease, transform 650ms ease;
+    }
+
+    .reveal.visible { opacity: 1; transform: none; }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation: none !important; scroll-behavior: auto !important; transition: none !important; }
+      .reveal { opacity: 1; transform: none; }
+    }
+
+    @media (max-width: 980px) {
+      .hero { grid-template-columns: 1fr; min-height: auto; }
+      .orbit { width: min(520px, 90vw); justify-self: center; }
+      .metrics, .layer-map, .route { grid-template-columns: repeat(2, 1fr); }
+      .work-card, .work-card:nth-child(3n + 1), .work-card:nth-child(3n + 2) { grid-column: span 12; }
+      .todo-layout { grid-template-columns: 1fr; }
+      .route-step:nth-child(2)::after { display: none; }
+    }
+
+    @media (max-width: 680px) {
+      .shell { width: min(100% - 24px, 1260px); }
+      .topbar { min-height: 58px; }
+      .top-nav { display: none; }
+      .hero { padding: 58px 0; }
+      h1 { font-size: clamp(46px, 16vw, 74px); }
+      .verdict { grid-template-columns: 1fr; }
+      .verdict-code { min-height: 180px; border-right: 0; border-bottom: 1px solid rgba(255,255,255,.2); }
+      .verdict-copy { padding: 28px; }
+      .section { padding-bottom: 82px; }
+      .section-head { grid-template-columns: 1fr; }
+      .section-head p { grid-column: 1; }
+      .metrics, .layer-map, .route { grid-template-columns: 1fr; }
+      .metric { min-height: 155px; }
+      .experiment { grid-template-columns: 1fr; gap: 9px; }
+      .experiment-body { grid-template-columns: 1fr; }
+      .score { text-align: left; }
+      .route-step::after { display: none; }
+      summary { grid-template-columns: 1fr auto; }
+      summary span { grid-column: 1 / -1; }
+      .detail-body { margin-left: 0; }
+      .footer { flex-direction: column; }
+    }
+
+    @media print {
+      body { background: #fff; }
+      body::before, .filterbar, .orbit::after { display: none; }
+      .shell { width: 100%; }
+      .hero { min-height: auto; padding: 30px 0; }
+      .section { break-inside: avoid; padding-bottom: 44px; }
+      .work-card, .layer, .metric { break-inside: avoid; }
+      .reveal { opacity: 1; transform: none; }
+    }
+  </style>
+</head>
+<body>
+  <header class="shell topbar">
+    <div class="brand"><span class="brand-mark" aria-hidden="true"></span> STUDYHUB / AGENT STATUS</div>
+    <nav class="top-nav" aria-label="报告导航">
+      <a href="#overview">总览</a>
+      <a href="#completed">已完成</a>
+      <a href="#experiments">实验</a>
+      <a href="#remaining">未完成</a>
+      <a href="#next">下一步</a>
+    </nav>
+  </header>
+
+  <main class="shell">
+    <section class="hero reveal">
+      <div>
+        <p class="eyebrow">Current state review · 2026.08.09</p>
+        <h1>StudyHub Agent<span>做到哪一步了？</span></h1>
+        <p class="hero-lead">
+          已经完成从 Agent 工程底座、安全修复、SFT 数据规范、2B LoRA 多轮消融，到 100 场景离线 Pilot 的完整研究闭环。
+          <strong>结论仍然是：工程链路可用，安全边界成立，模型质量尚未达到上线门槛。</strong>
+        </p>
+        <div class="hero-meta">
+          <span class="chip">origin/main · d5d85e5</span>
+          <span class="chip">security · d0d5ced</span>
+          <span class="chip">offline pilot · aea9fa5</span>
+          <span class="chip">production unchanged</span>
+        </div>
+      </div>
+      <div class="orbit" aria-label="当前处于第四阶段：离线 Pilot 后的定向 SFT 决策">
+        <span class="orbit-ring"></span>
+        <div class="orbit-core"><div><strong>04</strong><small>OFFLINE GATE</small></div></div>
+        <div class="orbit-note one">ENGINEERING<br>REPLAY 100/100</div>
+        <div class="orbit-note two">MODEL QUALITY<br>52/100</div>
+      </div>
+    </section>
+
+    <section class="verdict reveal" aria-label="当前总判定">
+      <div class="verdict-code">
+        <span>RELEASE VERDICT / V1.3</span>
+        <strong>NO-GO</strong>
+      </div>
+      <div class="verdict-copy">
+        <h2>可以继续训练，不能接入生产流量。</h2>
+        <p>
+          v1.4 仅批准进入全新定向数据构建和单 seed SFT 消融。RL、三 seed 扩展、最终封存集评测、线上切换全部暂缓。
+          本轮所有修改均未部署，运行时约束开关默认关闭，也没有访问生产数据库、OSS、付费资料或真实用户记忆。
+        </p>
+      </div>
+    </section>
+
+    <section class="section reveal" id="overview">
+      <div class="section-head">
+        <div class="section-index">01 / STATE SNAPSHOT</div>
+        <h2>一眼看懂当前状态</h2>
+        <p>四个数字分别代表数据准备、工程验证、真实模型质量与安全底线。前三者不能相互替代。</p>
+      </div>
+
+      <div class="metrics">
+        <article class="metric">
+          <div class="label">Spec validation</div>
+          <strong>800</strong>
+          <p>500 条 2B 路由样本 + 300 条 9B 讲解样本，结构与安全校验通过。</p>
+        </article>
+        <article class="metric">
+          <div class="label">Offline scenarios</div>
+          <strong>100</strong>
+          <p>覆盖检索、证据、比较、注入、受限资料、强制收束等 8 类场景。</p>
+        </article>
+        <article class="metric">
+          <div class="label">Strict model completion</div>
+          <strong class="warn">52%</strong>
+          <p>Qwen3.5-2B v1.3 + 运行时约束的权威 Gate，仍未通过质量门槛。</p>
+        </article>
+        <article class="metric">
+          <div class="label">ACL violations</div>
+          <strong>0</strong>
+          <p>100 场景中无付费资料越权；Replay 与内核安全终止均为 100/100。</p>
+        </article>
+      </div>
+
+      <div class="layer-map" aria-label="代码和产物所在层级">
+        <article class="layer" data-step="1">
+          <span class="status done">主干已有</span>
+          <h3>Agent 工程底座</h3>
+          <p>持久化运行、暂停恢复、Worker、证据与引用、Artifact、Snapshot、Transition 契约和管理员专属接口已在主干基础中。</p>
+          <code>origin/main · d5d85e5</code>
+        </article>
+        <article class="layer" data-step="2">
+          <span class="status done">远端分支</span>
+          <h3>安全边界修复</h3>
+          <p>修复跨管理员读取、租约续期、并发锁原子性和功能启用时的 Schema fail-closed。未做数据库迁移。</p>
+          <code>agent/fix-agent-security-boundaries · d0d5ced</code>
+        </article>
+        <article class="layer" data-step="3">
+          <span class="status done">远端分支</span>
+          <h3>离线 Pilot</h3>
+          <p>增加隔离守卫、冻结 Snapshot、100 场景 Runner、轨迹重放和默认关闭的运行时约束。</p>
+          <code>agent/offline-pilot-runtime-guards · aea9fa5</code>
+        </article>
+        <article class="layer" data-step="4">
+          <span class="status partial">本地研究资产</span>
+          <h3>SFT 与 RAG 实验</h3>
+          <p>训练代码、报告和 2.1 GB adapter 仍在本地；源代码尚未纳入 Git，权重与数据按设计保持忽略。</p>
+          <code>ml/agentic_platform/sft · ai_platform/rag_experiments</code>
+        </article>
+      </div>
+    </section>
+
+    <section class="section reveal" id="completed">
+      <div class="section-head">
+        <div class="section-index">02 / COMPLETED WORK</div>
+        <h2>已经做了什么</h2>
+        <p>可按状态筛选。这里的“完成”表示对应工程或实验已闭环，不表示已经上线。</p>
+      </div>
+
+      <div class="filterbar" role="group" aria-label="工作项筛选">
+        <span>FILTER</span>
+        <button class="filter-btn active" type="button" data-filter="all">全部</button>
+        <button class="filter-btn" type="button" data-filter="done">已完成</button>
+        <button class="filter-btn" type="button" data-filter="partial">研究完成</button>
+        <button class="filter-btn" type="button" data-filter="blocked">未过门禁</button>
+      </div>
+
+      <div class="work-grid">
+        <article class="work-card" data-status="done">
+          <span class="status done">已完成</span>
+          <h3>Agentic Platform 第一阶段底座</h3>
+          <p>不是简单 Chatbot，而是一套可审计、可恢复的 Agent 运行基础设施。</p>
+          <ul class="checklist">
+            <li>AgentKernel 支持多轮、暂停、进程重启与 Resume</li>
+            <li>持久化 Run、Step、Job、Wait、Artifact 与 Event</li>
+            <li>Evidence Ledger、Claim-Citation 校验与无效引用拒绝</li>
+            <li>Snapshot Replay、Transition、Token role mask 和损坏轨迹隔离</li>
+            <li>管理员专属 API，Developer、普通用户与匿名访问被拒绝</li>
+          </ul>
+        </article>
+
+        <article class="work-card" data-status="done">
+          <span class="status done">已完成</span>
+          <h3>Agent 安全漏洞修复</h3>
+          <p>修复结果已推送独立分支，与网站当前运行隔离。</p>
+          <ul class="checklist">
+            <li>所有 Run、Event、Artifact、Resume、Cancel 均绑定 admin_actor_id</li>
+            <li>Worker Claim 和 Run Lease 增加续期，避免长任务被重复接管</li>
+            <li>Redis / DB 锁续期与释放改为所有者校验的原子操作</li>
+            <li>任一 Agentic 功能启用时，缺失持久化表会启动失败而非带病运行</li>
+            <li>新增并发、鉴权、租约与数据库准备测试</li>
+          </ul>
+        </article>
+
+        <article class="work-card" data-status="done">
+          <span class="status done">已完成</span>
+          <h3>公开只读 MCP 边界</h3>
+          <p>外部 Agent 只能发现公开资料并回到 StudyHub 页面完成后续操作。</p>
+          <ul class="checklist">
+            <li>公开面仅保留 materials.search / get / recommend 与 platform.policy</li>
+            <li>不返回受保护文件、直链、网盘链接、提取码、存储键或全文</li>
+            <li>OAuth / static token、scope、客户端限流、配额和审计接口已具备</li>
+            <li>资料权限继续由 StudyHub 后端判断，模型不能绕过</li>
+          </ul>
+        </article>
+
+        <article class="work-card" data-status="partial">
+          <span class="status partial">研究完成</span>
+          <h3>800 条 SFT 数据规范验证</h3>
+          <p>数据形态可用于管线和协议验证，但仍是 teacher-reviewed silver。</p>
+          <ul class="checklist">
+            <li>2B：500 条，覆盖 8 类路由、只读工具和拒绝任务</li>
+            <li>9B：300 条，覆盖页级解释、摘要、推荐、比较和学习计划</li>
+            <li>0 重复、0 跨 split 材料泄漏、0 网盘信息、0 付费资料</li>
+            <li>覆盖 133/133 条有效公开免费资料和 293 个唯一 chunk</li>
+          </ul>
+        </article>
+
+        <article class="work-card" data-status="blocked">
+          <span class="status blocked">未过门禁</span>
+          <h3>Qwen3.5-2B LoRA 多轮实验</h3>
+          <p>完成 smoke、隐藏集、三 seed、v1.2 replay 和 v1.3 状态归一化消融。</p>
+          <ul class="checklist">
+            <li>LoRA 工程链路、chat template、assistant-only loss 与离线评测已跑通</li>
+            <li>页码保真曾由 14.3% 提升到 100%</li>
+            <li>v1.3 修复零预算收束和部分合成路由，但引入提前 final 与 ID 丢失</li>
+            <li>所有 adapter 均保留为研究产物，没有一个被标记为生产候选</li>
+          </ul>
+        </article>
+
+        <article class="work-card" data-status="done">
+          <span class="status done">已完成</span>
+          <h3>100 场景离线 Pilot</h3>
+          <p>用真实 AgentKernel 和只读 Snapshot Skill，而不是返回预设分数的假 Runner。</p>
+          <ul class="checklist">
+            <li>Fixture 权威基线：100/100 完成、引用和 Replay 全部通过</li>
+            <li>v1.3 raw 质量完成 15/100，guarded 提升到 52/100</li>
+            <li>无效引用由 82 降到 28，ACL 违规始终为 0</li>
+            <li>49/100 仍依赖 JSON 运行时恢复，证明模型协议尚不稳定</li>
+          </ul>
+        </article>
+
+        <article class="work-card" data-status="partial">
+          <span class="status partial">研究完成</span>
+          <h3>RAG 方法对照实现</h3>
+          <p>把面试材料中提到的方法真正写成了离线可运行代码，但没有接生产搜索。</p>
+          <ul class="checklist">
+            <li>实现 TF-IDF、BM25、BGE-M3、Qwen3-Embedding-0.6B</li>
+            <li>实现加权双路融合、RRF、HNSW、IVF 与 BGE Reranker</li>
+            <li>60 Query 小型 benchmark 上最佳 nDCG@10 为 0.9731</li>
+            <li>使用 135 条免费资料、517 个 chunk，生产搜索仍保持原实现</li>
+          </ul>
+        </article>
+
+        <article class="work-card" data-status="done">
+          <span class="status done">已完成</span>
+          <h3>生产隔离与可追溯性</h3>
+          <p>研究环境从数据、模型、运行路径和 Git 四个层面隔离。</p>
+          <ul class="checklist">
+            <li>离线启动器拒绝 production、数据库 URL、远程模型和生产 .env</li>
+            <li>Hugging Face 强制 local_files_only 与离线模式</li>
+            <li>每个场景记录干净 worktree 的 Commit SHA、模型与数据哈希</li>
+            <li>权重、训练数据、预测、轨迹和 Gate JSON 均被 Git 忽略</li>
+          </ul>
+        </article>
+      </div>
+    </section>
+
+    <section class="section reveal" id="experiments">
+      <div class="section-head">
+        <div class="section-index">03 / EXPERIMENT TRAIL</div>
+        <h2>模型实验走到了哪里</h2>
+        <p>这一条轨迹解释了为什么“训练跑完”不等于“模型可以上线”。</p>
+      </div>
+
+      <article class="experiment">
+        <div class="experiment-tag">STEP 01 · SPEC</div>
+        <div class="experiment-body">
+          <div><h3>数据规范验证</h3><p>500 条 2B + 300 条 9B，结构、安全、split 和引用约束全部通过。用途是验证规范，不是宣称金标质量。</p></div>
+          <div class="score"><strong>PASS</strong>800 samples</div>
+        </div>
+      </article>
+      <article class="experiment">
+        <div class="experiment-tag">STEP 02 · SMOKE</div>
+        <div class="experiment-body">
+          <div><h3>2B LoRA 冒烟</h3><p>同模板 Test 上裸 JSON、契约、Mode 和工具名达到 100%，证明训练链路有效；参数完全一致仅 50%，且模板泛化未验证。</p></div>
+          <div class="score"><strong>100%</strong>contract / same template</div>
+        </div>
+      </article>
+      <article class="experiment">
+        <div class="experiment-tag">STEP 03 · HIDDEN</div>
+        <div class="experiment-body">
+          <div><h3>300 条教师隐藏集</h3><p>更独立的模板暴露泛化缺口：契约有效 80%、Mode 88%、工具名 81%；页码参数保真只有 14.3%，零预算收束为 0%。</p></div>
+          <div class="score fail"><strong>80%</strong>contract</div>
+        </div>
+      </article>
+      <article class="experiment">
+        <div class="experiment-tag">STEP 04 · V1.1</div>
+        <div class="experiment-body">
+          <div><h3>1,500 条定向 SFT，三随机种子</h3><p>页码保真三 seed 均达到 100%，但综合上下文、注入后继续只读、强制收束和契约稳定性没有任何一个 seed 全部过线。</p></div>
+          <div class="score fail"><strong>0 / 3</strong>eligible seeds</div>
+        </div>
+      </article>
+      <article class="experiment">
+        <div class="experiment-tag">STEP 05 · V1.2</div>
+        <div class="experiment-body">
+          <div><h3>Hard negative 与 Replay 消融</h3><p>局部工具边界改善，但出现灾难性遗忘和 read_pdf_evidence 偏置。两种续训方案均被拒绝，没有扩展三 seed。</p></div>
+          <div class="score fail"><strong>FAIL</strong>ablation gate</div>
+        </div>
+      </article>
+      <article class="experiment">
+        <div class="experiment-tag">STEP 06 · V1.3</div>
+        <div class="experiment-body">
+          <div><h3>Routing state 归一化</h3><p>零预算收束达到 100%，原始路径合成契约达到 92%；同时注入后继续任务降到 65%，Material ID 保真降到 86.36%，形成提前结束偏置。</p></div>
+          <div class="score fail"><strong>FAIL</strong>dual-path gate</div>
+        </div>
+      </article>
+      <article class="experiment">
+        <div class="experiment-tag">STEP 07 · PILOT</div>
+        <div class="experiment-body">
+          <div><h3>真实内核 100 场景 Gate</h3><p>运行时约束让严格完成由 15 提升到 52，但不能替模型创造缺失的搜索步骤、资料 ID 和 PDF 证据。最终判定为 v1.4 单 seed GO，生产 NO-GO。</p></div>
+          <div class="score fail"><strong>52 / 100</strong>strict quality</div>
+        </div>
+      </article>
+
+      <div class="gate-table-wrap">
+        <table>
+          <thead>
+            <tr><th>100 场景家族</th><th>通过</th><th>失败</th><th>当前判断</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><strong>Discovery</strong></td><td>20</td><td>0</td><td>已具备基础发现能力</td></tr>
+            <tr><td><strong>Evidence</strong></td><td>0</td><td class="bad">20</td><td>搜索、详情与 PDF 证据前置关系仍不稳定</td></tr>
+            <tr><td><strong>Compare</strong></td><td>0</td><td class="bad">10</td><td>容易提前 final，未完成多资料证据闭环</td></tr>
+            <tr><td><strong>Question pages</strong></td><td>3</td><td class="bad">7</td><td>页码协议会做，但流程中仍可能丢失证据</td></tr>
+            <tr><td><strong>Answer pages</strong></td><td>9</td><td>1</td><td>接近可用，仍需消除单点失误</td></tr>
+            <tr><td><strong>Force final</strong></td><td>10</td><td>0</td><td>运行时收束约束有效</td></tr>
+            <tr><td><strong>Injection</strong></td><td>0</td><td class="bad">10</td><td>安全上会 fail closed，但任务连续性不合格</td></tr>
+            <tr><td><strong>Restricted</strong></td><td>10</td><td>0</td><td>付费资料 ACL 边界成立</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="section reveal" id="remaining">
+      <div class="section-head">
+        <div class="section-index">04 / OPEN WORK</div>
+        <h2>还有哪些没有做</h2>
+        <p>未完成项分为模型门禁、代码治理、生产接入和长期产品能力四类。</p>
+      </div>
+
+      <div class="todo-layout">
+        <aside class="todo-summary">
+          <span class="status blocked">当前上线判定</span>
+          <h3>不是 Agent 不能跑，而是不能可靠地跑。</h3>
+          <p>现在适合做离线演示、复现实验和继续训练，不适合把 2B adapter 设为网站默认模型，也不适合用 RL 掩盖 JSON、ID 和工具前置条件问题。</p>
+        </aside>
+        <div class="todo-list">
+          <article class="todo-item"><div class="num">01</div><div><h3>v1.4 新数据与单 seed SFT 尚未开始</h3><p>需要约 1,800 条全新、与当前 100 Gate 场景不重叠的数据，从 v1.1 seed 7703 路径重建，不从失败的 v1.3 继续训。</p></div></article>
+          <article class="todo-item"><div class="num">02</div><div><h3>模型 Gate 仍未通过</h3><p>当前严格质量 52/100、引用有效 72/100、JSON 恢复 49/100；目标是质量、引用、Replay 全部 100/100，ACL 违规为 0。</p></div></article>
+          <article class="todo-item"><div class="num">03</div><div><h3>最终封存集没有启封</h3><p>final_holdout_v2 仍保持 sealed=true、evaluated=false。只有单 seed 与三 seed 门禁全部通过后，才允许唯一一次最终评测。</p></div></article>
+          <article class="todo-item"><div class="num">04</div><div><h3>RL 没有开始，也不应该现在开始</h3><p>RL 无法可靠修复损坏 JSON、丢失 Material ID 或错误工具前置条件，当前还可能放大提前 final 偏置。</p></div></article>
+          <article class="todo-item"><div class="num">05</div><div><h3>9B 讲解模型没有训练</h3><p>现有 300 条仅用于规范验证。正式 9B SFT 前，需要清晰原文和至少 300–500 条人工确认的讲解与引用评测集。</p></div></article>
+          <article class="todo-item"><div class="num">06</div><div><h3>SFT 与 RAG 源代码尚未版本化</h3><p>本地脚本、配置、锁文件和报告还未提交 Git；2.1 GB 权重、数据与 67 MB Pilot 轨迹应继续忽略，只提交可复现代码与摘要。</p></div></article>
+          <article class="todo-item"><div class="num">07</div><div><h3>安全分支和 Pilot 分支尚未进入 main</h3><p>两个分支已上传，但 origin/main 尚不包含本轮 6 个提交。安全修复适合独立审阅；运行时约束应保持默认关闭。</p></div></article>
+          <article class="todo-item"><div class="num">08</div><div><h3>生产灰度、监控和性能优化尚未做</h3><p>尚无真实流量 A/B、Shadow 指标、质量告警或 queue 调度优化；9 个场景排队超过 60 秒，最大 126.49 秒。</p></div></article>
+          <article class="todo-item"><div class="num">09</div><div><h3>个体层 / 群体层双层进化尚未形成闭环</h3><p>已有轨迹、事件和学习对象契约，但真实用户行为采集、个体策略更新、群体聚合、版本回滚与效果归因尚未上线。</p></div></article>
+          <article class="todo-item"><div class="num">10</div><div><h3>经营分析 Agent 尚未实现</h3><p>销售周报、月报、异常趋势和运营建议仍属于后续产品线，不在本轮 2B Router 与离线 Pilot 范围内。</p></div></article>
+        </div>
+      </div>
+    </section>
+
+    <section class="section reveal" id="next">
+      <div class="section-head">
+        <div class="section-index">05 / RECOMMENDED ROUTE</div>
+        <h2>接下来只走这一条路线</h2>
+        <p>先把研究资产和模型协议做稳，再考虑扩大训练与接入网站。顺序不建议调换。</p>
+      </div>
+
+      <div class="route">
+        <article class="route-step">
+          <h3>版本化研究代码</h3>
+          <p>从当前分支切出独立 research 分支，只提交 SFT / RAG 源代码、测试、配置、模型锁与报告。继续忽略数据、权重、预测和轨迹。</p>
+        </article>
+        <article class="route-step">
+          <h3>构建 v1.4 数据</h3>
+          <p>新增严格 JSON、搜索前置、ID / 页码保真、注入后继续与拒绝对照、evidence / compare 条件和旧能力 replay，共约 1,800 条。</p>
+        </article>
+        <article class="route-step">
+          <h3>单 seed 训练与 Gate</h3>
+          <p>只训练一个 seed。先达到 JSON ≥99%、恢复 ≤5%、ID ≥98%、注入与权限 100%，再跑同一套 100 场景。</p>
+        </article>
+        <article class="route-step">
+          <h3>过线后才扩展</h3>
+          <p>通过后训练三 seed，再唯一一次启封最终集，之后才讨论 Shadow、灰度和 RL。任何一步失败都回到数据与运行时契约。</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="section reveal" id="evidence">
+      <div class="section-head">
+        <div class="section-index">06 / EVIDENCE LEDGER</div>
+        <h2>依据与产物位置</h2>
+        <p>展开可查看每类结论对应的权威文件和本地资产边界。</p>
+      </div>
+
+      <details>
+        <summary><code>OFFLINE PILOT</code><span>100 场景 Gate、运行时约束和 v1.4 决策</span></summary>
+        <div class="detail-body mono">/data/chengjin/studyhub-offline-pilot/reports/recagent/agentic-platform/OFFLINE_PILOT_RUNTIME_GUARD_V1_REPORT.md<br>Branch: agent/offline-pilot-runtime-guards · aea9fa5f5e738588591f9a42c55619fc2f1c33be</div>
+      </details>
+      <details>
+        <summary><code>SECURITY</code><span>管理员隔离、租约续期、锁原子性和 Schema fail-closed</span></summary>
+        <div class="detail-body mono">Branch: agent/fix-agent-security-boundaries · d0d5cedd47233af49c8bc756f129886bbcc338f1<br>Core fix: 8f204326a984e7279191fe2f2f6148f5b7b0ac1c</div>
+      </details>
+      <details>
+        <summary><code>SFT REPORTS</code><span>数据规范、Smoke、隐藏集、v1.1、v1.2 与 v1.3</span></summary>
+        <div class="detail-body mono">/data/chengjin/studyhub/reports/recagent/agentic-platform/SFT_DATA_SPEC_VALIDATION_REPORT.md<br>/data/chengjin/studyhub/reports/recagent/agentic-platform/QWEN35_2B_LORA_SMOKE_REPORT.md<br>/data/chengjin/studyhub/reports/recagent/agentic-platform/TEACHER_HIDDEN_ROUTER_EVAL_REPORT.md<br>/data/chengjin/studyhub/reports/recagent/agentic-platform/QWEN35_2B_LORA_V1_1_THREE_SEED_REPORT.md<br>/data/chengjin/studyhub/reports/recagent/agentic-platform/QWEN35_2B_LORA_V1_2_ABLATION_REPORT.md<br>/data/chengjin/studyhub/reports/recagent/agentic-platform/QWEN35_2B_LORA_V1_3_STATE_ABLATION_REPORT.md</div>
+      </details>
+      <details>
+        <summary><code>LOCAL MODELS</code><span>2.1 GB 训练数据与 LoRA adapter，按设计不进 Git</span></summary>
+        <div class="detail-body mono">/data/chengjin/studyhub/training_artifacts/studyhub_agent_sft/<br>/data/chengjin/studyhub/evaluation_artifacts/studyhub_agent/</div>
+      </details>
+      <details>
+        <summary><code>RAG LAB</code><span>BM25、BGE-M3、Qwen Embedding、融合、ANN 与 Reranker 对照</span></summary>
+        <div class="detail-body mono">/data/chengjin/studyhub/ai_platform/rag_experiments/<br>Status: local untracked research code · not production</div>
+      </details>
+    </section>
+  </main>
+
+  <footer class="shell footer">
+    <div><strong>StudyHub Agent · 状态报告</strong><br>生成日期：2026-08-09 · 时区：Asia/Shanghai</div>
+    <div>本报告不把 Fixture 结果等同于模型能力，也不把离线训练等同于生产发布。<code>/data/chengjin/studyhub/reports/recagent/agentic-platform/STUDYHUB_AGENT_PROGRESS_2026-08-09.html</code></div>
+  </footer>
+
+  <script>
+    const filterButtons = document.querySelectorAll('.filter-btn');
+    const workCards = document.querySelectorAll('.work-card');
+
+    filterButtons.forEach((button) => {
+      button.addEventListener('click', () => {
+        const filter = button.dataset.filter;
+        filterButtons.forEach((item) => item.classList.toggle('active', item === button));
+        workCards.forEach((card) => {
+          card.classList.toggle('is-hidden', filter !== 'all' && card.dataset.status !== filter);
+        });
+      });
+    });
+
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('visible');
+          observer.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.08 });
+
+    document.querySelectorAll('.reveal').forEach((element) => observer.observe(element));
+  </script>
+</body>
+</html>
