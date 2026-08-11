@@ -222,7 +222,7 @@ def _knowledge_cards(
         (
             "LoRA / QLoRA",
             "rank、target modules 与合并/量化行为都要实测。",
-            "两条训练均为 BF16 LoRA，而非 QLoRA：r=16、alpha=32、dropout=0.05、target=all。9B 可训练 43.28M 参数，占 0.4578%；NF4 仅用于合并模型推理对照，并从 120/120 降至 116/120。",
+            "两条训练均为 BF16 LoRA，而非 QLoRA：r=16、alpha=32、dropout=0.05、target=all。2B 可训练 16.82M（0.7542%），9B 可训练 43.28M（0.4578%）；NF4 仅用于推理，并从 120/120 降至 116/120。",
             "LoRA 完成，NF4 未过 Gate",
         ),
         (
@@ -240,7 +240,7 @@ def _knowledge_cards(
         (
             "Loss 曲线诊断",
             "同时看训练与验证趋势，并用验证点选择 checkpoint。",
-            "2B eval loss 从 0.07315 降到 step 184 的 0.04360，最终 step 185 为 0.04372；9B 从 0.22853 降至约 0.186，后半程趋稳。两者无明显验证发散，但低 loss 并未保证 Router Gate 通过。",
+            "2B eval loss 从 0.07315 降到 step 184 的 0.04360，最终 step 185 为 0.04372；9B 从 0.22853 降至约 0.186，后半程趋稳。step 184 另做 raw Gate 仍失败，证明最低 validation loss 只能筛选候选，不能批准发布。",
             "已覆盖",
         ),
         (
@@ -271,7 +271,7 @@ def _knowledge_cards(
         (
             "可复现与治理",
             "代码、数据、模型、环境和决策过程都要可追溯。",
-            "保存 Git commit、LLaMA-Factory commit、配置快照、GPU 秒级遥测、数据/审计/adapter/merged SHA-256、一次性封存锁和运行清单。环境锁定 Python 3.12.13、Torch 2.4.1+cu121、Transformers 5.6.0；生产 DB/API 未访问。",
+            "保存 Git commit、配置快照、GPU 秒级遥测、各级 SHA-256、封存锁和运行清单。环境锁定 Python 3.12.13、Torch 2.4.1+cu121、Transformers 5.6.0；SFT 范围 ruff 与 76 个 pytest 通过，生产 DB/API 未访问。",
             "已覆盖",
         ),
     ]
@@ -373,6 +373,7 @@ HTML_TEMPLATE = r"""<!doctype html>
     .metric strong { display: block; font: 650 clamp(28px, 3.5vw, 48px)/1 var(--serif); }
     .metric span { display: block; margin-top: 9px; color: var(--ink-soft); font-size: 13px; }
     .report-layout { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 54px; align-items: start; padding-bottom: 100px; }
+    main, .section-head > *, .track-card, .panel, .gate-column, .knowledge-copy { min-width: 0; }
     .rail { position: sticky; top: 28px; padding: 26px 0; }
     .rail-title { font: 700 11px/1 var(--mono); color: var(--green); letter-spacing: .14em; text-transform: uppercase; }
     .rail a { display: block; padding: 9px 0; text-decoration: none; color: var(--ink-soft); font-size: 13px; border-bottom: 1px solid transparent; }
@@ -444,6 +445,7 @@ HTML_TEMPLATE = r"""<!doctype html>
     .knowledge-head h3 { margin: 0; font: 650 26px/1.1 var(--serif); }
     .status-pill { flex: 0 0 auto; border: 1px solid var(--line); padding: 5px 9px; color: var(--green); font: 700 10px/1 var(--mono); }
     .knowledge-copy p { margin: 10px 0 0; color: var(--ink-soft); }
+    .knowledge-copy p, .knowledge-head h3, .chart-note { overflow-wrap: anywhere; }
     .knowledge-copy .knowledge-lead { color: var(--ink); font-weight: 700; }
     .decision-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; }
     .decision-panel { padding: 28px; border: 1px solid var(--line); background: var(--paper-light); }
@@ -620,7 +622,7 @@ HTML_TEMPLATE = r"""<!doctype html>
           <div class="panel">
             <h3>Router 2B · train / validation loss</h3>
             @@ROUTER_LOSS_CHART@@
-            <p class="chart-note">最低验证 loss 出现在 step 184：0.04360；最终 step 185：0.04372。</p>
+            <p class="chart-note">最低验证 loss 出现在 step 184：0.04360；最终 step 185：0.04372。@@CHECKPOINT_VERDICT@@</p>
           </div>
           <div class="panel">
             <h3>Grounded Tutor 9B · train / validation loss</h3>
@@ -778,6 +780,24 @@ def build_report(output: Path) -> Path:
         manifest_path = router_root / "run_manifest.recovered.json"
     router_manifest = _load_json(manifest_path)
     router_token_limit = int(router_manifest["decoding"]["max_new_tokens"])
+    checkpoint_root = (
+        ROOT
+        / "evaluation_artifacts"
+        / "studyhub_agent"
+        / "router_v1_7_checkpoint184_contract_exact_1800_diagnostic"
+        / "seed_7703"
+    )
+    checkpoint_gate = _load_json(checkpoint_root / "gate.json")
+    checkpoint_raw_metrics = checkpoint_gate["variants"]["raw"]["metrics"]
+    checkpoint_verdict = (
+        "step 184 raw Gate 通过。"
+        if checkpoint_gate["passed"]
+        else (
+            "step 184 raw Gate 仍失败："
+            f"force-final {_pct(float(checkpoint_raw_metrics['force_final_compliant']))}，"
+            f"注入只读 {_pct(float(checkpoint_raw_metrics['injection_safe_readonly']))}。"
+        )
+    )
 
     tutor_root = (
         ROOT
@@ -835,6 +855,7 @@ def build_report(output: Path) -> Path:
             / "audit.json",
         ),
         ("Router 正式 Gate", router_root / "gate.json"),
+        ("Router step 184 raw Gate", checkpoint_root / "gate.json"),
         (
             "Tutor 9B 验证 Gate",
             tutor_root / "adapter_validation_seed_6209_768" / "gate.json",
@@ -846,6 +867,15 @@ def build_report(output: Path) -> Path:
         (
             "Tutor 9B NF4 Gate",
             tutor_root / "merged_nf4_validation_768_compat" / "gate.json",
+        ),
+        (
+            "最终 SFT 模型锁",
+            ROOT
+            / "ml"
+            / "agentic_platform"
+            / "sft"
+            / "model_locks"
+            / "studyhub_sft_completion_20260811.json",
         ),
     ]
     evidence_rows = "".join(
@@ -859,6 +889,7 @@ def build_report(output: Path) -> Path:
         "ROUTER_TOKEN_LIMIT": str(router_token_limit),
         "ROUTER_VERDICT": router_verdict,
         "ROUTER_BLOCKED_ACTION": router_blocked_action,
+        "CHECKPOINT_VERDICT": checkpoint_verdict,
         "ROUTER_LOSS_CHART": _line_chart(
             chart_id="router-loss",
             train_points=router_train,

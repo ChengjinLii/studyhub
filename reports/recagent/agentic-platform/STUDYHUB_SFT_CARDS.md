@@ -9,7 +9,7 @@
 
 | 任务线 | 基础模型 | 目标 | 生产状态 |
 |---|---|---|---|
-| Router 2B | Qwen3.5-2B | 在 `tools` / `final` 间路由，选择只读工具并保持参数、ID、页码和安全边界 | Gate 未完成前保持关闭 |
+| Router 2B | Qwen3.5-2B | 在 `tools` / `final` 间路由，选择只读工具并保持参数、ID、页码和安全边界 | 正式开发 Gate 未通过，保持关闭 |
 | Grounded Tutor 9B | Qwen3.5-9B | 基于免费资料的元数据和页级证据，生成带引用的讲解、总结、比较和学习计划 | 封存集 Gate 未通过，保持关闭 |
 
 共同边界：不访问生产数据库、生产 API、OSS 写接口或付费资料；不训练购买、下载、改价、审核或其他写操作。
@@ -55,6 +55,7 @@
 - 基础模型：本地 Qwen3.5-2B，Apache-2.0；revision `15852e8c16360a2fea060d615a32b45270f8a8fc`；合并后参数量 2,213,241,664
 - 本轮是 BF16 LoRA，不是 QLoRA；NF4 只用于合并模型的推理对照
 - 训练策略：在 v1.6 adapter 上继续训练；LoRA rank 16、alpha 32、dropout 0.05、target `all`
+- 可训练参数：16,819,200，占含 LoRA 参数模型的 0.7542%
 - 监督方式：自回归 token cross-entropy，`train_on_prompt=false`，只监督 assistant target
 - 模板：`qwen3_5_nothink`，`enable_thinking=false`；cutoff 4,096；不 packing
 - 训练：1 epoch，LR `5e-6`，cosine，warmup 10，micro batch 2，gradient accumulation 4，有效 batch 8，BF16，gradient checkpointing，seed 7703
@@ -65,6 +66,15 @@
 - Adapter SHA-256：`6d2428abf3686be600509c5dff8fae34bb43076f391d86c90eab9b1971797eb1`
 - 合并模型 SHA-256（文件清单聚合）：`070320668fc72f8979a0797135435fc7448c9cd673d4b42169f835f09c035e97`
 - 结论：训练 loss 不是上线标准；必须以 raw 与 runtime_state 两条生成式 Gate 共同判定
+
+正式 1,800-token 生产约束开发诊断（300 条教师隐藏场景）：
+
+| 路径 | JSON | Contract | Tool mode | Tool name | Force final | 页码 | 资料 ID | 注入只读 |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| Raw | 95.33% | 90.00% | 88.70% | 87.39% | 50.00% | 45.71% | 73.64% | 0.00% |
+| Runtime state | 96.33% | 91.00% | 88.26% | 86.09% | 65.00% | 22.86% | 75.45% | 0.00% |
+
+两条路径均未通过 Gate；安全扫描中的未知工具和敏感输出计数均为 0，但不能用安全项覆盖功能失败。验证 loss 最低的 step 184 checkpoint 也单独跑了 raw 诊断：JSON 95.33%、contract 90.33%、force-final 40%、注入只读 0%，同样失败。因此未继续运行其 normalized 路径，也未读取 Router 封存集或运行模型 Pilot。
 
 ### Grounded Tutor 9B v1.0 LoRA
 
@@ -94,7 +104,7 @@
 
 ## 4. 发布边界
 
-- Router 2B 只有开发诊断 raw 与 runtime_state 均通过后，才允许访问一次性封存集和运行 100 场景离线 Pilot。
+- Router 2B 的 raw 与 runtime_state 正式开发诊断均未通过，因此未访问一次性封存集，也未运行 100 场景模型 Pilot。
 - Grounded Tutor 9B 已通过独立验证集，但未通过一次性封存 Gate，因此不进入生产。
 - NF4 显存约减半，但出现 4 条严格失败，不能以成本收益覆盖质量退化。
 - 生产开关 `ai_agent_runtime_constraints_enabled` 及 provider 默认保持关闭。
@@ -112,6 +122,7 @@
 - 9B 模型锁：config `d0883072e018...`、weight index `26d3539b516b...`、tokenizer config `316230d6a809...`
 - 离线约束：`HF_HUB_OFFLINE=1`、`TRANSFORMERS_OFFLINE=1`，并清除数据库和模型服务 endpoint 环境变量
 - 数据、审计、adapter、合并模型和运行配置均有 SHA-256；训练配置、GPU 秒级采样、Git 状态和日志保存在忽略目录 `training_artifacts/`
+- 验证：SFT 范围 `ruff` 通过；17 个测试文件共 76 个 pytest 用例通过
 
 ## 6. 已知限制
 
@@ -119,4 +130,4 @@
 - Router v1.7 只完成单 seed 定向训练；此前 v1.1 做过三 seed，但不能替代 v1.7 的多 seed 稳定性验证。
 - 训练遥测记录了 samples/s、显存、GPU 利用率、温度和功耗，但没有直接记录训练 token/s。
 - 生成式评测依赖确定性贪心解码；尚未覆盖真实并发、服务排队、故障注入和长会话漂移。
-- 2B 的最终开发 Gate、封存 Gate与 Pilot 状态以完成报告中的最终结果为准。
+- Router 正式开发 Gate 已完成；最终 checkpoint 和最低 validation-loss checkpoint 均失败。封存 Gate 与模型 Pilot 未运行。
