@@ -88,7 +88,7 @@ npm --prefix frontend run test:perf
 
 ```bash
 PERF_BASE_URL=https://study-hub.cn npm --prefix frontend run test:perf
-PERF_BASE_URL=https://110.42.223.173 PERF_ROUTES=/,/more,/market npm --prefix frontend run test:perf
+PERF_BASE_URL=https://203.0.113.10 PERF_ROUTES=/,/more,/market npm --prefix frontend run test:perf
 PERF_DYNAMIC_ROUTES=/materials/1,/market/1 PERF_SAMPLE_RUNS=5 npm --prefix frontend run test:perf
 ```
 

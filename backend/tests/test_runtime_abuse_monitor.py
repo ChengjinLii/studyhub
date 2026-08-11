@@ -166,3 +166,27 @@ def test_load_env_file_accepts_exported_and_quoted_values(tmp_path: Path) -> Non
         "STUDYHUB_SMTP_HOST": "smtp.example.com",
         "STUDYHUB_SMTP_FROM_EMAIL": "noreply@example.com",
     }
+
+
+def test_resolve_alert_recipients_uses_private_env_and_deduplicates(tmp_path: Path) -> None:
+    env_file = tmp_path / ".env"
+    env_file.write_text(
+        "STUDYHUB_ABUSE_MONITOR_ALERT_EMAILS='ops@example.com, admin@example.com;OPS@example.com'\n",
+        encoding="utf-8",
+    )
+
+    assert runtime_monitor.resolve_alert_recipients(
+        env_file=str(env_file),
+        explicit=["temporary@example.com", "admin@example.com"],
+    ) == [
+        "temporary@example.com",
+        "admin@example.com",
+        "ops@example.com",
+    ]
+
+
+def test_resolve_alert_recipients_allows_no_configured_recipients(tmp_path: Path) -> None:
+    assert runtime_monitor.resolve_alert_recipients(
+        env_file=str(tmp_path / "missing.env"),
+        explicit=[],
+    ) == []

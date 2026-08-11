@@ -64,6 +64,11 @@ while IFS= read -r object_and_path; do
   check_path "$path" "historical" "$object_id"
 done < <(git rev-list --objects --all)
 
+while IFS= read -r match; do
+  [[ -z "$match" ]] && continue
+  violations+=("$match: tracked operational recipient must come from private environment configuration")
+done < <(git grep -nI -E -- '--alert-email([=[:space:]]+)[^[:space:]]+@[^[:space:]]+' -- deploy scripts 2>/dev/null || true)
+
 if [[ "${#violations[@]}" -gt 0 ]]; then
   echo "Sensitive file check failed:"
   printf -- '- %s\n' "${violations[@]}"

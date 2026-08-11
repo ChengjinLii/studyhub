@@ -198,7 +198,11 @@ def load_env_file(path: str | None) -> dict[str, str]:
     values: dict[str, str] = {}
     if not path:
         return values
-    for raw_line in Path(path).read_text(encoding="utf-8").splitlines():
+    try:
+        raw_lines = Path(path).read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return values
+    for raw_line in raw_lines:
         line = raw_line.strip()
         if not line or line.startswith("#"):
             continue
@@ -212,6 +216,21 @@ def load_env_file(path: str | None) -> dict[str, str]:
             value = value[1:-1]
         values[key.strip()] = value
     return values
+
+
+def resolve_alert_recipients(*, env_file: str | None, explicit: list[str]) -> list[str]:
+    settings = load_env_file(env_file)
+    configured = re.split(r"[,;\n]", settings.get("STUDYHUB_ABUSE_MONITOR_ALERT_EMAILS", ""))
+    recipients: list[str] = []
+    seen: set[str] = set()
+    for raw_value in [*explicit, *configured]:
+        value = raw_value.strip()
+        normalized = value.casefold()
+        if not value or normalized in seen:
+            continue
+        recipients.append(value)
+        seen.add(normalized)
+    return recipients
 
 
 def _env_bool(values: dict[str, str], key: str, default: bool) -> bool:
@@ -421,6 +440,7 @@ def collect_traffic(args: argparse.Namespace, now: datetime) -> dict[str, int]:
 
 def main() -> int:
     args = parse_args()
+    args.alert_email = resolve_alert_recipients(env_file=args.env_file, explicit=args.alert_email)
     now = datetime.now().astimezone()
     if args.test_notification:
         send_email(
