@@ -1,14 +1,12 @@
 interface FilterToggleButtonProps {
   expanded: boolean;
   activeFilterCount?: number;
-  className?: string;
   onClick: () => void;
 }
 
 export default function FilterToggleButton({
   expanded,
   activeFilterCount = 0,
-  className = '',
   onClick,
 }: FilterToggleButtonProps) {
   const actionLabel = expanded ? '收起高级筛选' : '更多筛选';
@@ -18,7 +16,7 @@ export default function FilterToggleButton({
   return (
     <button
       type="button"
-      className={`button ghost filter-toggle-button${expanded ? ' is-active' : ''}${className ? ` ${className}` : ''}`}
+      className={`button ghost filter-toggle-button${expanded ? ' is-active' : ''}`}
       onClick={onClick}
       aria-label={accessibleLabel}
       aria-expanded={expanded}

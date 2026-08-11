@@ -7,6 +7,7 @@ import {
   GRADE_STAGE_OPTIONS,
 } from '../../constants/metadata';
 import FilterToggleButton from '../FilterToggleButton';
+import SearchIconButton from '../SearchIconButton';
 
 export interface HomeFilterState {
   keyword: string;
@@ -87,12 +88,9 @@ export default function HomeFilterCard({
             <FilterToggleButton
               expanded={showAdvanced}
               activeFilterCount={activeFilterCount}
-              className="small"
               onClick={onToggleAdvancedFilters}
             />
-            <button className="button primary" type="submit">
-              搜索
-            </button>
+            <SearchIconButton />
           </div>
         </div>
         <div className={`filter-advanced ${showAdvanced ? 'open' : ''}`}>

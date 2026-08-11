@@ -6,6 +6,7 @@ import MaterialSortSelect from '../../components/materials/MaterialSortSelect';
 import NavBar from '../../components/NavBar';
 import MobileFilterDrawer, { MobileMaterialFilterState } from '../../components/mobile/MobileFilterDrawer';
 import FilterToggleButton from '../../components/FilterToggleButton';
+import SearchIconButton from '../../components/SearchIconButton';
 import {
   COURSE_CATEGORY_VALUES,
   GRADE_STAGE_OPTIONS,
@@ -164,9 +165,7 @@ export default function MaterialsPage({ user, materials, meta, filters, stats, t
               placeholder="搜课程 / 资料名 / 标签"
               aria-label="搜索资料"
             />
-            <button className="button primary" type="submit" disabled={loading}>
-              搜索
-            </button>
+            <SearchIconButton disabled={loading} />
           </form>
           <div className="mobile-library-actions">
             <FilterToggleButton

@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { FormEvent } from 'react';
 import MaterialCard from '../MaterialCard';
+import SearchIconButton from '../SearchIconButton';
 import { MaterialListItem } from '../../types/material';
 
 const CTA_LINKS = [
@@ -84,7 +85,7 @@ export default function MobileHomeSections({
         </div>
         <form className="mobile-home-search" onSubmit={onMobileSearchSubmit}>
           <input value={mobileSearch} onChange={(event) => onMobileSearchChange(event.target.value)} placeholder="空格分隔：概率论 期末" aria-label="搜索资料" />
-          <button className="button primary" type="submit">搜索</button>
+          <SearchIconButton />
         </form>
         <div className="mobile-home-actions">
           {CTA_LINKS.map((item) => (
