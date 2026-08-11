@@ -20,6 +20,7 @@ interface HomeRequestPanelsProps {
   recommendedItems: MaterialListItem[];
   recommendationHint: string;
   recommendationEmpty: ReactNode;
+  profileMissingFields: string[];
   buildUploadLink: (item: MaterialRequestItem) => string;
   onFollowRequest: (item: MaterialRequestItem) => void;
 }
@@ -34,9 +35,14 @@ export default function HomeRequestPanels({
   recommendedItems,
   recommendationHint,
   recommendationEmpty,
+  profileMissingFields,
   buildUploadLink,
   onFollowRequest,
 }: HomeRequestPanelsProps) {
+  const profileIncomplete = profileMissingFields.length > 0;
+  const profileCompletionHint = profileIncomplete
+    ? `个人信息待完善：${profileMissingFields.join('、')}`
+    : '完善个人主页';
   const [activeDiscoveryView, setActiveDiscoveryView] = useState<HomeDiscoveryView>(() =>
     resolveInitialHomeDiscoveryView(requestItems.length)
   );
@@ -245,8 +251,18 @@ export default function HomeRequestPanels({
             {recommendationHint ? <p className="help-text">{recommendationHint}</p> : null}
           </div>
           <div className="request-header-actions">
-            <Link className="button primary small" href="/me#profile">
-              完善主页
+            <Link
+              className={`button primary small profile-completion-link${profileIncomplete ? ' is-incomplete' : ''}`}
+              href="/me#profile"
+              aria-label={profileCompletionHint}
+              title={profileCompletionHint}
+            >
+              <span>完善主页</span>
+              {profileIncomplete ? (
+                <span className="profile-completion-link__badge" aria-hidden="true">
+                  待完善
+                </span>
+              ) : null}
             </Link>
           </div>
         </div>

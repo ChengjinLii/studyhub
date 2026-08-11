@@ -17,6 +17,7 @@ import {
   fetchMaterials,
   MaterialListStats,
   MaterialListResponse,
+  fetchAccountProfile,
   fetchProfile,
   fetchContributorRanks,
   fetchRecommendations,
@@ -28,6 +29,7 @@ import { getRequestOrigin } from '../lib/apiBase';
 import { ensureApiSuccess, unwrapApiResponse } from '../lib/apiEnvelope';
 import { toErrorMessage } from '../lib/errors';
 import { formatDate, formatNumber } from '../lib/format';
+import { getMissingProfileFields } from '../lib/profileCompletion';
 import { materialPath } from '../lib/slug';
 import { copyToClipboard, isLikelyMobile, tryNativeShare } from '../lib/share';
 import {
@@ -100,6 +102,7 @@ interface HomeProps {
   stats: MaterialListStats | null;
   tagOptions: string[];
   profileSummary: ProfileSummary | null;
+  profileMissingFields: string[];
   recommendations: MaterialListItem[];
   popularMaterials: MaterialListItem[];
   requests: MaterialRequestItem[];
@@ -116,6 +119,7 @@ export default function Home({
   stats,
   tagOptions,
   profileSummary,
+  profileMissingFields,
   recommendations,
   popularMaterials,
   requests,
@@ -771,6 +775,7 @@ export default function Home({
           recommendedItems={recommendedItems}
           recommendationHint={recommendationHint}
           recommendationEmpty={recommendationEmpty}
+          profileMissingFields={profileMissingFields}
           buildUploadLink={buildUploadLink}
           onFollowRequest={handleFollowRequest}
         />
@@ -1004,6 +1009,13 @@ export const getServerSideProps: GetServerSideProps<HomeProps> = async (ctx) => 
         return null;
       })
     : Promise.resolve(null);
+  const accountProfilePromise = session.user && session.token
+    ? fetchAccountProfile(session.token, origin).catch((error) => {
+        // eslint-disable-next-line no-console
+        console.warn('Failed to fetch account profile completion', error);
+        return null;
+      })
+    : Promise.resolve(null);
   const recommendationsPromise: Promise<MaterialListItem[]> = fetchRecommendations(
     session.token || undefined,
     origin,
@@ -1054,6 +1066,7 @@ export const getServerSideProps: GetServerSideProps<HomeProps> = async (ctx) => 
   const [
     { materials, meta, stats, tagOptions },
     profileSummary,
+    accountProfile,
     recommendations,
     popularMaterials,
     requests,
@@ -1063,6 +1076,7 @@ export const getServerSideProps: GetServerSideProps<HomeProps> = async (ctx) => 
     await Promise.all([
       materialsPromise,
       profilePromise,
+      accountProfilePromise,
       recommendationsPromise,
       popularMaterialsPromise,
       requestsPromise,
@@ -1081,6 +1095,7 @@ export const getServerSideProps: GetServerSideProps<HomeProps> = async (ctx) => 
       stats,
       tagOptions,
       profileSummary,
+      profileMissingFields: getMissingProfileFields(accountProfile),
       recommendations,
       popularMaterials,
       requests,

@@ -8135,6 +8135,33 @@ g.studyhub-popup-poster__hotspot:hover > text {
   box-shadow: 0 14px 24px rgba(42, 157, 143, 0.32);
 }
 
+.profile-completion-link {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  white-space: nowrap;
+}
+
+.recommend-card .request-header-actions .profile-completion-link.is-incomplete {
+  box-shadow: 0 10px 18px rgba(42, 157, 143, 0.24), 0 0 0 3px rgba(245, 158, 11, 0.2);
+}
+
+.profile-completion-link__badge {
+  display: inline-flex;
+  min-height: 19px;
+  align-items: center;
+  justify-content: center;
+  padding: 1px 6px;
+  border: 1px solid rgba(255, 255, 255, 0.78);
+  border-radius: 999px;
+  background: #ffffff;
+  color: #b45309;
+  font-size: 0.65rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
 
 .request-sort {
   display: inline-flex;
