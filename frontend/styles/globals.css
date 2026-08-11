@@ -2939,6 +2939,55 @@ main {
   margin: 0;
 }
 
+.filter-toggle-button {
+  position: relative;
+  display: inline-flex;
+  width: 42px;
+  min-width: 42px;
+  height: 42px;
+  min-height: 42px;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  color: #315b93;
+}
+
+.filter-toggle-button svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.filter-toggle-button:hover,
+.filter-toggle-button.is-active {
+  border-color: #8eafe0;
+  background: #eef5ff;
+  color: #174ea6;
+}
+
+.filter-toggle-button__badge {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  display: inline-flex;
+  min-width: 18px;
+  height: 18px;
+  align-items: center;
+  justify-content: center;
+  padding: 0 4px;
+  border: 2px solid #ffffff;
+  border-radius: 999px;
+  background: #2563eb;
+  color: #ffffff;
+  font-size: 0.65rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
 .filter-keyword {
   min-width: 0;
 }
@@ -2958,7 +3007,7 @@ main {
   .filter-actions.quick {
     width: 100%;
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: 42px minmax(0, 1fr);
     gap: 10px;
     justify-items: stretch;
     align-items: stretch;
@@ -2979,6 +3028,12 @@ main {
     white-space: nowrap;
     padding: 10px 6px;
     font-size: 0.9rem;
+  }
+
+  .filter-actions.quick .filter-toggle-button {
+    width: 42px;
+    min-width: 42px;
+    padding: 0;
   }
   .site-header {
     padding: 10px 0;
@@ -16294,7 +16349,7 @@ g.studyhub-popup-poster__hotspot:hover > text {
 
   .mobile-library-actions {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: 42px minmax(0, 1fr);
     gap: 8px;
   }
 
@@ -16302,6 +16357,12 @@ g.studyhub-popup-poster__hotspot:hover > text {
     min-width: 0;
     border-radius: 14px;
     font-size: 0.9rem;
+  }
+
+  .mobile-library-actions .filter-toggle-button {
+    width: 42px;
+    min-width: 42px;
+    padding: 0;
   }
 
   .mobile-filter-strip {

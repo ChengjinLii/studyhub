@@ -6,6 +6,7 @@ import {
   COURSE_CATEGORY_OPTIONS,
   GRADE_STAGE_OPTIONS,
 } from '../../constants/metadata';
+import FilterToggleButton from '../FilterToggleButton';
 
 export interface HomeFilterState {
   keyword: string;
@@ -44,6 +45,16 @@ export default function HomeFilterCard({
   onResetFilters,
   onSubmit,
 }: HomeFilterCardProps) {
+  const activeFilterCount = [
+    filtersState.school,
+    filtersState.college,
+    filtersState.major,
+    filtersState.tag,
+    filtersState.gradeValue,
+    filtersState.courseCategory,
+    filtersState.price && filtersState.price !== 'all' ? filtersState.price : '',
+  ].filter(Boolean).length;
+
   return (
     <section className="card filter-card" ref={filterRef}>
       <div className="filter-header">
@@ -73,9 +84,12 @@ export default function HomeFilterCard({
             <p className="help-text">多个关键词可以用空格分开。</p>
           </div>
           <div className="filter-actions quick">
-            <button type="button" className="button ghost small" onClick={onToggleAdvancedFilters} aria-expanded={showAdvanced}>
-              {showAdvanced ? '收起高级筛选' : '更多筛选'}
-            </button>
+            <FilterToggleButton
+              expanded={showAdvanced}
+              activeFilterCount={activeFilterCount}
+              className="small"
+              onClick={onToggleAdvancedFilters}
+            />
             <button className="button primary" type="submit">
               搜索
             </button>

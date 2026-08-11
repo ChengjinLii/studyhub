@@ -20,12 +20,12 @@ describe('home SSR data limits', () => {
     expect(source).toContain('HOME_RECOMMENDATION_LIMIT');
   });
 
-  it('uses 21 results per page on both material list screens', () => {
+  it('uses 24 results per page on both material list screens', () => {
     const homeSource = readFileSync(join(process.cwd(), 'pages/index.tsx'), 'utf8');
     const materialsSource = readFileSync(join(process.cwd(), 'pages/materials/index.tsx'), 'utf8');
 
-    expect(homeSource).toContain('const MATERIALS_PAGE_SIZE = 21;');
-    expect(materialsSource).toContain('const MATERIALS_PAGE_SIZE = 21;');
+    expect(homeSource).toContain('const MATERIALS_PAGE_SIZE = 24;');
+    expect(materialsSource).toContain('const MATERIALS_PAGE_SIZE = 24;');
     expect(homeSource).toContain('当前搜索：');
     expect(materialsSource).toContain('当前搜索：');
   });

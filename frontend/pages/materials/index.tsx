@@ -5,6 +5,7 @@ import MaterialCard from '../../components/MaterialCard';
 import MaterialSortSelect from '../../components/materials/MaterialSortSelect';
 import NavBar from '../../components/NavBar';
 import MobileFilterDrawer, { MobileMaterialFilterState } from '../../components/mobile/MobileFilterDrawer';
+import FilterToggleButton from '../../components/FilterToggleButton';
 import {
   COURSE_CATEGORY_VALUES,
   GRADE_STAGE_OPTIONS,
@@ -20,7 +21,7 @@ import { normalizeMaterialSort } from '../../constants/materialSort';
 import { MaterialListItem, PaginationMeta } from '../../types/material';
 import { SessionUser } from '../../types/user';
 
-const MATERIALS_PAGE_SIZE = 21;
+const MATERIALS_PAGE_SIZE = 24;
 const DEFAULT_TAG_OPTIONS = ['期末真题', '期末速成', '日常学习笔记', '教材答案', '一页纸', '开卷资料'];
 
 interface MaterialsPageProps {
@@ -168,9 +169,11 @@ export default function MaterialsPage({ user, materials, meta, filters, stats, t
             </button>
           </form>
           <div className="mobile-library-actions">
-            <button type="button" className="button ghost" onClick={() => setDrawerOpen(true)}>
-              更多筛选{activeFilterCount > 0 ? ` · ${activeFilterCount}` : ''}
-            </button>
+            <FilterToggleButton
+              expanded={drawerOpen}
+              activeFilterCount={activeFilterCount}
+              onClick={() => setDrawerOpen(true)}
+            />
             <Link className="button ghost" href="/requests/new" prefetch={false}>
               找不到？发求购
             </Link>

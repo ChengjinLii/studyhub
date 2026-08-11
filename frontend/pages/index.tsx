@@ -43,7 +43,7 @@ import { normalizeMaterialSort } from '../constants/materialSort';
 import { ContributorRank, LeaderboardPeriod } from '../types/contributor';
 import { MaterialRequestItem } from '../types/request';
 
-const MATERIALS_PAGE_SIZE = 21;
+const MATERIALS_PAGE_SIZE = 24;
 const HOME_REQUEST_PREVIEW_LIMIT = 8;
 const HOME_POPULAR_PREVIEW_LIMIT = 20;
 const HOME_RECOMMENDATION_LIMIT = 30;
