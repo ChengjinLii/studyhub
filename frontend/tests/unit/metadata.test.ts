@@ -10,6 +10,7 @@ import {
 describe('UESTC profile metadata', () => {
   it('provides the current college catalog and newly added majors', () => {
     expect(UESTC_COLLEGES).toHaveLength(20);
+    expect(UESTC_COLLEGES.slice(0, 2)).toEqual(['格院', '信通']);
     expect(UESTC_COLLEGES).toContain('计算机科学与工程学院（网络空间安全学院）');
     expect(UESTC_COLLEGES).toEqual(expect.arrayContaining(['信通', '格院']));
     expect(UESTC_COLLEGES).not.toEqual(expect.arrayContaining(['信息与通信工程学院', '格拉斯哥学院', '格拉斯哥海南学院']));

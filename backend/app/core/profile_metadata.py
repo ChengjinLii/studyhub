@@ -8,8 +8,9 @@ DEFAULT_FREE_DOWNLOAD_QUOTA = 200
 SUPPORTED_SCHOOL = "电子科技大学"
 # Mirror the selectable catalog in frontend/constants/metadata.ts.
 SUPPORTED_COLLEGES = (
-    "英才实验学院（未来技术学院）",
+    "格院",
     "信通",
+    "英才实验学院（未来技术学院）",
     "电子科学与工程学院",
     "集成电路科学与工程学院（示范性微电子学院）",
     "材料与能源学院",
@@ -27,7 +28,6 @@ SUPPORTED_COLLEGES = (
     "经济与管理学院",
     "外国语学院",
     "公共管理学院",
-    "格院",
 )
 SUPPORTED_MAJORS = (
     "通信",

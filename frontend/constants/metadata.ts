@@ -2,6 +2,8 @@ export const SUPPORTED_SCHOOL = '电子科技大学';
 
 // Keep this catalog aligned with the university's current undergraduate admissions directory.
 export const UESTC_COLLEGE_MAJOR_OPTIONS = [
+  { college: '格院', majors: ['通信', '微电子', '电工'] },
+  { college: '信通', majors: ['通信', '电工', '信息对抗技术', '网络工程', '物联网工程'] },
   {
     college: '英才实验学院（未来技术学院）',
     majors: [
@@ -25,7 +27,6 @@ export const UESTC_COLLEGE_MAJOR_OPTIONS = [
       '生物医学工程',
     ],
   },
-  { college: '信通', majors: ['通信', '电工', '信息对抗技术', '网络工程', '物联网工程'] },
   {
     college: '电子科学与工程学院',
     majors: ['电子科学与技术', '电磁场与无线技术'],
@@ -94,7 +95,6 @@ export const UESTC_COLLEGE_MAJOR_OPTIONS = [
     college: '公共管理学院',
     majors: ['法学', '信息管理与信息系统', '行政管理', '城市管理'],
   },
-  { college: '格院', majors: ['通信', '微电子', '电工'] },
 ] as const;
 
 const LEGACY_COLLEGE_ALIASES = {

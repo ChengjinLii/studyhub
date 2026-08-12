@@ -3,7 +3,11 @@ from __future__ import annotations
 import pytest
 from fastapi import HTTPException
 
-from app.core.profile_metadata import normalize_college_selection, normalize_major_selection
+from app.core.profile_metadata import SUPPORTED_COLLEGES, normalize_college_selection, normalize_major_selection
+
+
+def test_profile_metadata_prioritizes_common_colleges() -> None:
+    assert SUPPORTED_COLLEGES[:2] == ("格院", "信通")
 
 
 @pytest.mark.parametrize(
