@@ -7,7 +7,7 @@ import { createMaterialRequest } from '../../lib/requestsApi';
 import { toErrorMessage } from '../../lib/errors';
 import { submitTrustedPaymentForm } from '../../lib/safePaymentForm';
 import { SessionUser } from '../../types/user';
-import { SUPPORTED_SCHOOL, SUPPORTED_COLLEGES, SUPPORTED_MAJORS } from '../../constants/metadata';
+import { SUPPORTED_SCHOOL, getCollegeOptions, getMajorOptionsForCollege } from '../../constants/metadata';
 import { REQUEST_TIERS, RequestTierValue } from '../../constants/request';
 
 const MAX_TITLE_LENGTH = 30;
@@ -39,6 +39,8 @@ export default function RequestNewPage({ user }: RequestNewProps) {
   const [submitting, setSubmitting] = useState(false);
   const [payFormHtml, setPayFormHtml] = useState('');
   const [activeSection, setActiveSection] = useState('request-overview');
+  const collegeOptions = getCollegeOptions(college);
+  const majorOptions = getMajorOptionsForCollege(college, major);
   const formContainerRef = useRef<HTMLDivElement | null>(null);
   const activeTier = REQUEST_TIERS.find((item) => item.value === urgencyTier) || REQUEST_TIERS[REQUEST_TIERS.length - 1];
 
@@ -53,9 +55,7 @@ export default function RequestNewPage({ user }: RequestNewProps) {
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    const sections = REQUEST_NAV_ITEMS
-      .map((item) => document.getElementById(item.id))
-      .filter((item): item is HTMLElement => Boolean(item));
+    const sections = REQUEST_NAV_ITEMS.map((item) => document.getElementById(item.id)).filter((item): item is HTMLElement => Boolean(item));
     if (!sections.length) return;
     const observer = new IntersectionObserver(
       (entries) => {
@@ -204,169 +204,160 @@ export default function RequestNewPage({ user }: RequestNewProps) {
                 <div className="request-form-section__title">基础信息</div>
                 <p className="request-form-section__hint">清晰描述你需要的资料范围和用途。</p>
               </div>
-            <div className="form-item full">
-              <label htmlFor="request-title">标题</label>
-              <input
-                id="request-title"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                maxLength={MAX_TITLE_LENGTH}
-                placeholder="例如：通信原理期末速成"
-                required
-              />
-              <p className="help-text">
-                已输入 {title.length}/{MAX_TITLE_LENGTH}
-              </p>
-            </div>
-            <div className="form-item full">
-              <label htmlFor="request-intro">简介</label>
-              <textarea
-                id="request-intro"
-                value={intro}
-                onChange={(e) => setIntro(e.target.value)}
-                maxLength={MAX_DESC_LENGTH}
-                rows={4}
-                placeholder="描述你想要的资料类型、用途或具体章节"
-                required
-              />
-              <p className="help-text">
-                已输入 {intro.length}/{MAX_DESC_LENGTH}
-              </p>
-            </div>
-            <div className="form-item full">
-              <label htmlFor="request-preview-rule">预览要求（可选）</label>
-              <textarea
-                id="request-preview-rule"
-                value={previewRequirement}
-                onChange={(e) => setPreviewRequirement(e.target.value)}
-                maxLength={MAX_PREVIEW_REQUIREMENT_LENGTH}
-                rows={3}
-                placeholder="例如：需包含目录页/关键公式页/清晰页码等"
-              />
-              <p className="help-text">
-                已输入 {previewRequirement.length}/{MAX_PREVIEW_REQUIREMENT_LENGTH}
-              </p>
-            </div>
+              <div className="form-item full">
+                <label htmlFor="request-title">标题</label>
+                <input
+                  id="request-title"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  maxLength={MAX_TITLE_LENGTH}
+                  placeholder="例如：通信原理期末速成"
+                  required
+                />
+                <p className="help-text">
+                  已输入 {title.length}/{MAX_TITLE_LENGTH}
+                </p>
+              </div>
+              <div className="form-item full">
+                <label htmlFor="request-intro">简介</label>
+                <textarea
+                  id="request-intro"
+                  value={intro}
+                  onChange={(e) => setIntro(e.target.value)}
+                  maxLength={MAX_DESC_LENGTH}
+                  rows={4}
+                  placeholder="描述你想要的资料类型、用途或具体章节"
+                  required
+                />
+                <p className="help-text">
+                  已输入 {intro.length}/{MAX_DESC_LENGTH}
+                </p>
+              </div>
+              <div className="form-item full">
+                <label htmlFor="request-preview-rule">预览要求（可选）</label>
+                <textarea
+                  id="request-preview-rule"
+                  value={previewRequirement}
+                  onChange={(e) => setPreviewRequirement(e.target.value)}
+                  maxLength={MAX_PREVIEW_REQUIREMENT_LENGTH}
+                  rows={3}
+                  placeholder="例如：需包含目录页/关键公式页/清晰页码等"
+                />
+                <p className="help-text">
+                  已输入 {previewRequirement.length}/{MAX_PREVIEW_REQUIREMENT_LENGTH}
+                </p>
+              </div>
 
               <div className="request-form-section full" id="request-budget">
                 <div className="request-form-section__title">预算与期限</div>
-                <p className="request-form-section__hint">预算越合理，求购曝光与应答效率通常越高。求购被采纳后，平台收取 5% 服务费，剩余金额支付给应答者。</p>
+                <p className="request-form-section__hint">
+                  预算越合理，求购曝光与应答效率通常越高。求购被采纳后，平台收取 5% 服务费，剩余金额支付给应答者。
+                </p>
               </div>
-            <div className="form-item">
-              <label htmlFor="request-budget-input">预算（元，可选，当前档位最低 {activeTier.ownerMin} 元）</label>
-              <input
-                id="request-budget-input"
-                type="number"
-                min={activeTier.ownerMin}
-                step="1"
-                value={budget}
-                onChange={(e) => setBudget(e.target.value)}
-                placeholder="例如 10"
-              />
-            </div>
-            <div className="form-item">
-              <label htmlFor="request-tier">交付期限</label>
-              <select
-                id="request-tier"
-                value={urgencyTier}
-                onChange={(e) => setUrgencyTier(e.target.value as RequestTierValue)}
-              >
-                {REQUEST_TIERS.map((item) => (
-                  <option key={item.value} value={item.value}>
-                    {item.label}（最低 {item.ownerMin} 元）
-                  </option>
-                ))}
-              </select>
-              <p className="help-text">发起价最低要求已按期限自动调整。</p>
-            </div>
-            <div className="form-item">
-              <label htmlFor="request-floor">跟购底价下限（元，可选）</label>
-              <input
-                id="request-floor"
-                type="number"
-                min="5"
-                step="1"
-                value={creatorFloor}
-                onChange={(e) => setCreatorFloor(e.target.value)}
-                placeholder="例如 6"
-                disabled={!budget}
-              />
-              <p className="help-text">不高于预算的 60%，且最低 5 元。</p>
-            </div>
+              <div className="form-item">
+                <label htmlFor="request-budget-input">预算（元，可选，当前档位最低 {activeTier.ownerMin} 元）</label>
+                <input
+                  id="request-budget-input"
+                  type="number"
+                  min={activeTier.ownerMin}
+                  step="1"
+                  value={budget}
+                  onChange={(e) => setBudget(e.target.value)}
+                  placeholder="例如 10"
+                />
+              </div>
+              <div className="form-item">
+                <label htmlFor="request-tier">交付期限</label>
+                <select id="request-tier" value={urgencyTier} onChange={(e) => setUrgencyTier(e.target.value as RequestTierValue)}>
+                  {REQUEST_TIERS.map((item) => (
+                    <option key={item.value} value={item.value}>
+                      {item.label}（最低 {item.ownerMin} 元）
+                    </option>
+                  ))}
+                </select>
+                <p className="help-text">发起价最低要求已按期限自动调整。</p>
+              </div>
+              <div className="form-item">
+                <label htmlFor="request-floor">跟购底价下限（元，可选）</label>
+                <input
+                  id="request-floor"
+                  type="number"
+                  min="5"
+                  step="1"
+                  value={creatorFloor}
+                  onChange={(e) => setCreatorFloor(e.target.value)}
+                  placeholder="例如 6"
+                  disabled={!budget}
+                />
+                <p className="help-text">不高于预算的 60%，且最低 5 元。</p>
+              </div>
 
               <div className="request-form-section full" id="request-scope">
                 <div className="request-form-section__title">匹配范围</div>
                 <p className="request-form-section__hint">选填学校/学院/专业，用于优先推荐给对口用户。</p>
               </div>
-            <div className="form-item">
-              <label htmlFor="request-school">学校（可选）</label>
-              <select
-                id="request-school"
-                value={school}
-                onChange={(e) => {
-                  const value = e.target.value;
-                  setSchool(value);
-                  if (!value) {
-                    setCollege('');
-                    setMajor('');
-                  }
-                }}
-              >
-                <option value="">不指定</option>
-                <option value={SUPPORTED_SCHOOL}>{SUPPORTED_SCHOOL}</option>
-              </select>
-            </div>
-            <div className="form-item">
-              <label htmlFor="request-college">学院（可选）</label>
-              <select
-                id="request-college"
-                value={college}
-                onChange={(e) => {
-                  const value = e.target.value;
-                  setCollege(value);
-                  if (!value) {
-                    setMajor('');
-                  }
-                }}
-                disabled={!school}
-              >
-                <option value="">{school ? '不指定' : '请先选择学校'}</option>
-                {SUPPORTED_COLLEGES.map((name) => (
-                  <option key={name} value={name}>
-                    {name}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="form-item">
-              <label htmlFor="request-major">专业（可选）</label>
-              <select
-                id="request-major"
-                value={major}
-                onChange={(e) => setMajor(e.target.value)}
-                disabled={!college}
-              >
-                <option value="">{college ? '不指定' : '请先选择学院'}</option>
-                {SUPPORTED_MAJORS.map((name) => (
-                  <option key={name} value={name}>
-                    {name}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="form-item full">
-              <div className="inline-group wrap">
-                <button className="button primary" type="submit" disabled={submitting}>
-                  {submitting ? '发布中...' : '发布求购'}
-                </button>
-                <Link className="button ghost" href="/">
-                  返回首页
-                </Link>
+              <div className="form-item">
+                <label htmlFor="request-school">学校（可选）</label>
+                <select
+                  id="request-school"
+                  value={school}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setSchool(value);
+                    if (!value) {
+                      setCollege('');
+                      setMajor('');
+                    }
+                  }}
+                >
+                  <option value="">不指定</option>
+                  <option value={SUPPORTED_SCHOOL}>{SUPPORTED_SCHOOL}</option>
+                </select>
               </div>
-              {status && (
-                <p className={status.type === 'error' ? 'error-text' : 'success-text'}>{status.text}</p>
-              )}
-            </div>
+              <div className="form-item">
+                <label htmlFor="request-college">学院（可选）</label>
+                <select
+                  id="request-college"
+                  value={college}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setCollege(value);
+                    if (!value || (major && !getMajorOptionsForCollege(value).includes(major))) {
+                      setMajor('');
+                    }
+                  }}
+                  disabled={!school}
+                >
+                  <option value="">{school ? '不指定' : '请先选择学校'}</option>
+                  {collegeOptions.map((name) => (
+                    <option key={name} value={name}>
+                      {name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="form-item">
+                <label htmlFor="request-major">专业（可选）</label>
+                <select id="request-major" value={major} onChange={(e) => setMajor(e.target.value)} disabled={!college}>
+                  <option value="">{college ? '不指定' : '请先选择学院'}</option>
+                  {majorOptions.map((name) => (
+                    <option key={name} value={name}>
+                      {name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="form-item full">
+                <div className="inline-group wrap">
+                  <button className="button primary" type="submit" disabled={submitting}>
+                    {submitting ? '发布中...' : '发布求购'}
+                  </button>
+                  <Link className="button ghost" href="/">
+                    返回首页
+                  </Link>
+                </div>
+                {status && <p className={status.type === 'error' ? 'error-text' : 'success-text'}>{status.text}</p>}
+              </div>
             </form>
 
             <div ref={formContainerRef} style={{ display: 'none' }} />

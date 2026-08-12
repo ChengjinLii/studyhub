@@ -1,6 +1,12 @@
 import { FormEvent } from 'react';
 import PaginationBar from '../PaginationBar';
-import { COURSE_CATEGORY_LABELS, COURSE_CATEGORY_OPTIONS, GRADE_STAGE_OPTIONS, SUPPORTED_COLLEGES, SUPPORTED_MAJORS } from '../../constants/metadata';
+import {
+  COURSE_CATEGORY_LABELS,
+  COURSE_CATEGORY_OPTIONS,
+  GRADE_STAGE_OPTIONS,
+  getCollegeOptions,
+  getMajorOptionsForCollege,
+} from '../../constants/metadata';
 import { MaterialBatchFormState } from '../../lib/adminBatchPayloads';
 import { formatDateTime } from '../../lib/format';
 import { formatMajorDisplay } from '../../lib/major';
@@ -64,6 +70,8 @@ export default function AdminMaterialsPanel({
   onBatchMajorToggle,
 }: AdminMaterialsPanelProps) {
   const isRemovedMaterialView = materialView === 'removed';
+  const collegeOptions = getCollegeOptions(batchForm.college);
+  const majorOptions = Array.from(new Set([...batchMajorSelections, ...getMajorOptionsForCollege(batchForm.college)]));
   const resolveCourseCategoryLabel = (value?: string | null) => {
     if (!value) return '未分类';
     return COURSE_CATEGORY_LABELS[value as keyof typeof COURSE_CATEGORY_LABELS] || value;
@@ -116,9 +124,7 @@ export default function AdminMaterialsPanel({
         )}
         <span className="help-text">已选 {selectedMaterialIds.length} 条</span>
       </div>
-      {batchMessage && (
-        <p className={batchMessage.type === 'error' ? 'error-text' : 'success-text'}>{batchMessage.text}</p>
-      )}
+      {batchMessage && <p className={batchMessage.type === 'error' ? 'error-text' : 'success-text'}>{batchMessage.text}</p>}
       {materials.length === 0 ? (
         <p className="help-text">暂无资料</p>
       ) : (
@@ -140,12 +146,9 @@ export default function AdminMaterialsPanel({
                     {resolveCourseCategoryLabel(material.courseCategory)} · {material.gradeValue || '未设置'} ·{' '}
                     {material.college || '未设置'} {majorLabel || ''}
                   </p>
-                  {material.tags && material.tags.length > 0 && (
-                    <p className="material-meta">标签：{material.tags.join(' / ')}</p>
-                  )}
+                  {material.tags && material.tags.length > 0 && <p className="material-meta">标签：{material.tags.join(' / ')}</p>}
                   <p className="material-meta">
-                    上传者：{material.uploaderNickname || material.uploaderUsername || '匿名'} ·{' '}
-                    {formatDateTime(material.createdAt) || '-'}
+                    上传者：{material.uploaderNickname || material.uploaderUsername || '匿名'} · {formatDateTime(material.createdAt) || '-'}
                   </p>
                   {isRemovedMaterialView && (
                     <p className="material-meta">
@@ -181,13 +184,9 @@ export default function AdminMaterialsPanel({
       <form className="form-grid" onSubmit={onBatchSubmit}>
         <div className="form-item">
           <label htmlFor="batch-college">学院</label>
-          <select
-            id="batch-college"
-            value={batchForm.college}
-            onChange={(e) => onBatchInputChange('college', e.target.value)}
-          >
+          <select id="batch-college" value={batchForm.college} onChange={(e) => onBatchInputChange('college', e.target.value)}>
             <option value="">保持不变</option>
-            {SUPPORTED_COLLEGES.map((college) => (
+            {collegeOptions.map((college) => (
               <option key={college} value={college}>
                 {college}
               </option>
@@ -197,7 +196,7 @@ export default function AdminMaterialsPanel({
         <div className="form-item">
           <label>专业（多选）</label>
           <div className="inline-group wrap">
-            {SUPPORTED_MAJORS.map((major) => (
+            {majorOptions.map((major) => (
               <label key={major} className={`choice badge-outline ${batchMajorSelections.includes(major) ? 'active' : ''}`}>
                 <input
                   type="checkbox"
@@ -221,11 +220,7 @@ export default function AdminMaterialsPanel({
         </div>
         <div className="form-item">
           <label htmlFor="batch-grade">年级/阶段</label>
-          <select
-            id="batch-grade"
-            value={batchForm.gradeValue}
-            onChange={(e) => onBatchInputChange('gradeValue', e.target.value)}
-          >
+          <select id="batch-grade" value={batchForm.gradeValue} onChange={(e) => onBatchInputChange('gradeValue', e.target.value)}>
             <option value="">保持不变</option>
             {GRADE_STAGE_OPTIONS.map((grade) => (
               <option key={grade} value={grade}>

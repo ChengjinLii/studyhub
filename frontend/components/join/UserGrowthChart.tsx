@@ -191,9 +191,6 @@ export default function UserGrowthChart() {
     <div className="join-growth-chart">
       <div className="join-growth-chart__intro">
         <div>
-          <p className="join-growth-chart__lead">
-            从首批用户到稳定增长，每一次注册都代表一份真实的校园连接。
-          </p>
           <p className="join-growth-chart__period">统计区间：2025.11.16 - 2026.07.08</p>
         </div>
         <div className="join-growth-chart__legend" aria-label="图例">

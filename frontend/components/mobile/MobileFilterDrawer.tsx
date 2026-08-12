@@ -1,9 +1,9 @@
 import {
   COURSE_CATEGORY_OPTIONS,
   GRADE_STAGE_OPTIONS,
-  SUPPORTED_COLLEGES,
-  SUPPORTED_MAJORS,
   SUPPORTED_SCHOOL,
+  getCollegeOptions,
+  getMajorOptionsForCollege,
 } from '../../constants/metadata';
 import { MATERIAL_SORT_OPTIONS } from '../../constants/materialSort';
 
@@ -46,6 +46,8 @@ export default function MobileFilterDrawer({
   onReset,
   onApply,
 }: MobileFilterDrawerProps) {
+  const collegeOptions = getCollegeOptions(filters.college);
+  const majorOptions = getMajorOptionsForCollege(filters.college, filters.major);
   return (
     <div className={`mobile-filter-drawer${open ? ' is-open' : ''}`} aria-hidden={!open}>
       <button className="mobile-filter-drawer__mask" type="button" aria-label="关闭筛选" onClick={onClose} />
@@ -69,9 +71,18 @@ export default function MobileFilterDrawer({
           </label>
           <label className="form-item">
             <span>学院</span>
-            <select value={filters.college} onChange={(event) => onChange('college', event.target.value)}>
+            <select
+              value={filters.college}
+              onChange={(event) => {
+                const nextCollege = event.target.value;
+                onChange('college', nextCollege);
+                if (filters.major && !getMajorOptionsForCollege(nextCollege).includes(filters.major)) {
+                  onChange('major', '');
+                }
+              }}
+            >
               <option value="">全部</option>
-              {SUPPORTED_COLLEGES.map((name) => (
+              {collegeOptions.map((name) => (
                 <option key={name} value={name}>
                   {name}
                 </option>
@@ -82,7 +93,7 @@ export default function MobileFilterDrawer({
             <span>专业</span>
             <select value={filters.major} onChange={(event) => onChange('major', event.target.value)}>
               <option value="">全部</option>
-              {SUPPORTED_MAJORS.map((name) => (
+              {majorOptions.map((name) => (
                 <option key={name} value={name}>
                   {name}
                 </option>
@@ -141,7 +152,9 @@ export default function MobileFilterDrawer({
             <span>排序</span>
             <select value={filters.sort || 'latest'} onChange={(event) => onChange('sort', event.target.value)}>
               {MATERIAL_SORT_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>{option.label}</option>
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
               ))}
             </select>
           </label>

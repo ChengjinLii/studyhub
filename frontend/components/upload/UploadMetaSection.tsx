@@ -4,9 +4,9 @@ import {
   COURSE_CATEGORY_OPTIONS,
   CourseCategorySelection,
   CourseCategoryValue,
-  SUPPORTED_COLLEGES,
-  SUPPORTED_MAJORS,
   SUPPORTED_SCHOOL,
+  getCollegeOptions,
+  getMajorOptionsForCollege,
 } from '../../constants/metadata';
 import { ColumnTopicKey } from '../../lib/column';
 import UploadChoiceCard from './UploadChoiceCard';
@@ -84,6 +84,8 @@ export default function UploadMetaSection({
   onCustomTagsChange,
   onYearTagChange,
 }: UploadMetaSectionProps) {
+  const collegeOptions = getCollegeOptions(college);
+  const majorOptions = Array.from(new Set([...selectedMajors, ...getMajorOptionsForCollege(college)]));
   return (
     <div className="upload-section-shell" id="upload-meta">
       <div className="upload-section-heading">
@@ -196,7 +198,9 @@ export default function UploadMetaSection({
                   <strong className="upload-quick-summary__value">{quickProfile.majorDisplay}</strong>
                 </div>
               </div>
-              <p className="help-text">一键投稿会优先使用“我的”里个人主页概览所填的学校、学院、专业与年级信息；未填写的字段将按默认值补齐。</p>
+              <p className="help-text">
+                一键投稿会优先使用“我的”里个人主页概览所填的学校、学院、专业与年级信息；未填写的字段将按默认值补齐。
+              </p>
             </div>
           ) : (
             <>
@@ -216,7 +220,7 @@ export default function UploadMetaSection({
                   required={courseCategory === 'MAJOR'}
                 >
                   <option value="">{courseCategory === 'MAJOR' ? '请选择学院' : '无需选择'}</option>
-                  {SUPPORTED_COLLEGES.map((name) => (
+                  {collegeOptions.map((name) => (
                     <option key={name} value={name}>
                       {name}
                     </option>
@@ -236,7 +240,7 @@ export default function UploadMetaSection({
               <div className="form-item">
                 <UploadSectionLabel text="专业" optional />
                 <div className="inline-group wrap">
-                  {SUPPORTED_MAJORS.map((name) => {
+                  {majorOptions.map((name) => {
                     const checked = selectedMajors.includes(name);
                     return (
                       <label key={name} className={`choice badge-outline ${checked ? 'active' : ''}`}>
