@@ -3,7 +3,6 @@ import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import AppImage from '../components/AppImage';
-import { queueNextAppToast, useAppToast } from '../components/AppToastProvider';
 import NavBar from '../components/NavBar';
 import UploadBasicSection from '../components/upload/UploadBasicSection';
 import UploadChoiceCard from '../components/upload/UploadChoiceCard';
@@ -25,6 +24,7 @@ import {
   GRADE_STAGE_OPTIONS,
   getMajorOptionsForCollege,
 } from '../constants/metadata';
+import { UPLOAD_PRESET_TAGS, UPLOAD_YEAR_SUGGESTIONS } from '../constants/uploadOptions';
 import { fetchAccountProfile } from '../lib/api';
 import { getRequestOrigin } from '../lib/apiBase';
 import { ColumnTopicKey, getColumnTopicExtraTag, getColumnTopicTitle, isCommunityColumnTopic, normalizeColumnTopic } from '../lib/column';
@@ -49,27 +49,7 @@ import { useUploadImageSelection } from '../lib/useUploadImageSelection';
 import { resolveUploadSectionCompletion } from '../lib/uploadSectionCompletion';
 import { buildUploadDraftKey, UploadTextDraftValue } from '../lib/uploadDraft';
 import { useUploadTextDraftPersistence } from '../lib/useUploadTextDraft';
-
-const presetTags = [
-  '日常学习笔记',
-  '期末速成',
-  '期末真题',
-  '期末真题标答',
-  '期末答案（自制解析）',
-  '期中速成',
-  '期中真题',
-  '期中真题标答',
-  '期中答案（自制解析）',
-  '一页纸',
-  '开卷资料',
-  '教材',
-  '教材答案',
-];
-
-const currentYear = new Date().getFullYear();
-const yearSuggestions = Array.from({ length: 6 }, (_, index) => currentYear - index)
-  .flatMap((year) => [year.toString(), `${year}-${year + 1}`])
-  .filter((value, index, array) => array.indexOf(value) === index);
+import { useUploadSubmissionToast } from '../lib/useUploadSubmissionToast';
 
 const MAX_FILE_BYTES = 50 * 1024 * 1024;
 const MAX_TAGS = 3;
@@ -116,7 +96,7 @@ const resolveMaterialProfilePrefill = (account: UserAccountProfile | null) => {
 
 export default function UploadPage({ user, token, account }: UploadPageProps) {
   const router = useRouter();
-  const toast = useAppToast();
+  const submissionToast = useUploadSubmissionToast();
   const editingId = typeof router.query.materialId === 'string' ? router.query.materialId : null;
   const isEditing = Boolean(editingId);
   const materialProfilePrefill = resolveMaterialProfilePrefill(account);
@@ -644,12 +624,12 @@ export default function UploadPage({ user, token, account }: UploadPageProps) {
     });
     if (validation.error) {
       setStatus({ type: 'error', message: validation.error });
-      toast.show(validation.error, { tone: 'error' });
+      submissionToast.invalid(validation.error);
       return;
     }
     if (!effectiveCourseCategory) {
       setStatus({ type: 'error', message: '请选择课程类型。' });
-      toast.show('请选择课程类型。', { tone: 'error' });
+      submissionToast.invalid('请选择课程类型。');
       return;
     }
     const selectedCourseCategory: CourseCategoryValue = effectiveCourseCategory;
@@ -662,7 +642,7 @@ export default function UploadPage({ user, token, account }: UploadPageProps) {
       allowSubmissionNavigationRef.current = false;
       setSuccessPath(null);
       setSubmissionStage('preparing');
-      toast.show('正在准备投稿内容…', { id: 'upload-submission', tone: 'loading' });
+      submissionToast.preparing();
       setUploadProgress(isExperience || zipFile ? 0 : null);
       const trimmedTitle = effectiveTitle;
       const trimmedDescription = description.trim();
@@ -744,10 +724,7 @@ export default function UploadPage({ user, token, account }: UploadPageProps) {
       const endpoint = isEditing ? `${apiBase}/materials/${editingId}` : `${apiBase}/materials`;
       const method = isEditing ? 'PUT' : 'POST';
       setSubmissionStage('uploading');
-      toast.show(isEditing ? '正在上传更新内容…' : '正在上传资料…', {
-        id: 'upload-submission',
-        tone: 'loading',
-      });
+      submissionToast.uploading(isEditing);
       const json = await sendUploadFormData(endpoint, method, formData, {
         token,
         uploadToken: uploadAuthorizationToken,
@@ -756,7 +733,7 @@ export default function UploadPage({ user, token, account }: UploadPageProps) {
           if (value >= 100) {
             uploadTransferred = true;
             setSubmissionStage('processing');
-            toast.show('文件上传完成，正在保存资料…', { id: 'upload-submission', tone: 'loading' });
+            submissionToast.processing();
           }
         },
         requestRef: uploadRequestRef,
@@ -776,11 +753,7 @@ export default function UploadPage({ user, token, account }: UploadPageProps) {
       setSuccessPath(destination);
       setSubmissionStage('redirecting');
       setStatus({ type: 'success', message: isEditing ? '更新成功。' : '投稿成功。' });
-      toast.show(isEditing ? '更新成功，正在打开资料页' : '投稿成功，正在打开资料页', {
-        id: 'upload-submission',
-        tone: 'success',
-      });
-      queueNextAppToast(isEditing ? '资料更新成功' : '资料投稿成功');
+      submissionToast.success(isEditing);
       window.setTimeout(() => window.location.replace(destination), 80);
     } catch (error: unknown) {
       const errorMessage = toErrorMessage(error, '投稿失败');
@@ -789,10 +762,7 @@ export default function UploadPage({ user, token, account }: UploadPageProps) {
           ? `连接已中断，但服务器可能仍在保存资料。请不要新建投稿，稍后直接重新提交，系统会识别同一次投稿。（${errorMessage}）`
           : `${isEditing ? '更新' : '投稿'}未成功：${errorMessage}`;
       setStatus({ type: 'error', message: fallback });
-      toast.show(fallback, {
-        id: 'upload-submission',
-        tone: uploadTransferred && isUploadResultUncertain(error) ? 'warning' : 'error',
-      });
+      submissionToast.failed(fallback, uploadTransferred && isUploadResultUncertain(error));
     } finally {
       uploadRequestRef.current = null;
       if (!completed) {
@@ -906,8 +876,8 @@ export default function UploadPage({ user, token, account }: UploadPageProps) {
         selectedTags={selectedTags}
         customTags={customTags}
         yearTag={yearTag}
-        yearSuggestions={yearSuggestions}
-        presetTags={presetTags}
+        yearSuggestions={UPLOAD_YEAR_SUGGESTIONS}
+        presetTags={UPLOAD_PRESET_TAGS}
         tagList={tagList}
         maxTags={MAX_TAGS}
         trimmedCustom={trimmedCustom}
