@@ -40,11 +40,11 @@ describe('api base resolution', () => {
     vi.stubEnv('NEXT_PUBLIC_API_BASE', 'https://study-hub.store/api');
     vi.stubGlobal('window', {
       location: {
-        origin: 'https://110.42.223.173',
+        origin: 'https://203.0.113.10',
       },
     });
 
-    expect(resolveApiBase('https://110.42.223.173')).toBe('https://110.42.223.173/api');
+    expect(resolveApiBase('https://203.0.113.10')).toBe('https://203.0.113.10/api');
     vi.stubGlobal('window', {
       location: {
         origin: 'https://study-hub.cn',

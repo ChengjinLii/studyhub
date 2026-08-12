@@ -1,10 +1,10 @@
 import { FormEvent, RefObject } from 'react';
 import {
   SUPPORTED_SCHOOL,
-  SUPPORTED_COLLEGES,
-  SUPPORTED_MAJORS,
   COURSE_CATEGORY_OPTIONS,
   GRADE_STAGE_OPTIONS,
+  getCollegeOptions,
+  getMajorOptionsForCollege,
 } from '../../constants/metadata';
 import FilterToggleButton from '../FilterToggleButton';
 import SearchIconButton from '../SearchIconButton';
@@ -46,6 +46,8 @@ export default function HomeFilterCard({
   onResetFilters,
   onSubmit,
 }: HomeFilterCardProps) {
+  const collegeOptions = getCollegeOptions(filtersState.college);
+  const majorOptions = getMajorOptionsForCollege(filtersState.college, filtersState.major);
   const activeFilterCount = [
     filtersState.school,
     filtersState.college,
@@ -85,11 +87,7 @@ export default function HomeFilterCard({
             <p className="help-text">多个关键词可以用空格分开。</p>
           </div>
           <div className="filter-actions quick">
-            <FilterToggleButton
-              expanded={showAdvanced}
-              activeFilterCount={activeFilterCount}
-              onClick={onToggleAdvancedFilters}
-            />
+            <FilterToggleButton expanded={showAdvanced} activeFilterCount={activeFilterCount} onClick={onToggleAdvancedFilters} />
             <SearchIconButton />
           </div>
         </div>
@@ -106,16 +104,32 @@ export default function HomeFilterCard({
           <div className="advanced-grid">
             <div className="form-item">
               <label htmlFor="school">学校</label>
-              <select id="school" name="school" value={filtersState.school} onChange={(event) => onFilterChange('school', event.target.value)}>
+              <select
+                id="school"
+                name="school"
+                value={filtersState.school}
+                onChange={(event) => onFilterChange('school', event.target.value)}
+              >
                 <option value="">全部</option>
                 <option value={SUPPORTED_SCHOOL}>{SUPPORTED_SCHOOL}</option>
               </select>
             </div>
             <div className="form-item">
               <label htmlFor="college">学院</label>
-              <select id="college" name="college" value={filtersState.college} onChange={(event) => onFilterChange('college', event.target.value)}>
+              <select
+                id="college"
+                name="college"
+                value={filtersState.college}
+                onChange={(event) => {
+                  const nextCollege = event.target.value;
+                  onFilterChange('college', nextCollege);
+                  if (filtersState.major && !getMajorOptionsForCollege(nextCollege).includes(filtersState.major)) {
+                    onFilterChange('major', '');
+                  }
+                }}
+              >
                 <option value="">全部</option>
-                {SUPPORTED_COLLEGES.map((name) => (
+                {collegeOptions.map((name) => (
                   <option key={name} value={name}>
                     {name}
                   </option>
@@ -126,7 +140,7 @@ export default function HomeFilterCard({
               <label htmlFor="major">专业</label>
               <select id="major" name="major" value={filtersState.major} onChange={(event) => onFilterChange('major', event.target.value)}>
                 <option value="">全部</option>
-                {SUPPORTED_MAJORS.map((name) => (
+                {majorOptions.map((name) => (
                   <option key={name} value={name}>
                     {name}
                   </option>

@@ -4,17 +4,11 @@ import AppImage from './AppImage';
 import SafeMarkdown from './SafeMarkdown';
 import { toErrorMessage } from '../lib/errors';
 import { formatDate } from '../lib/format';
-import {
-  clearPayoutQr,
-  fetchUserMarketListings,
-  fetchUserUploads,
-  updateAccountProfile,
-  uploadPayoutQr,
-} from '../lib/profileApi';
+import { clearPayoutQr, fetchUserMarketListings, fetchUserUploads, updateAccountProfile, uploadPayoutQr } from '../lib/profileApi';
 import { marketPath, materialPath, userPath } from '../lib/slug';
 import { UploadItem, MarketListingItem } from '../types/profile';
 import { PublicUserProfile, UserAccountProfile, UserFollowItem } from '../types/userProfile';
-import { SUPPORTED_SCHOOL, SUPPORTED_COLLEGES, SUPPORTED_MAJORS, GRADE_STAGE_OPTIONS } from '../constants/metadata';
+import { GRADE_STAGE_OPTIONS, SUPPORTED_SCHOOL, getCollegeOptions, getMajorOptionsForCollege } from '../constants/metadata';
 
 type ProfileBase = Pick<
   UserAccountProfile,
@@ -75,9 +69,7 @@ export default function ProfileCard({
   const [school, setSchool] = useState(profile.school ?? '');
   const [college, setCollege] = useState(profile.college ?? '');
   const [major, setMajor] = useState(profile.major ?? '');
-  const [gradeStages, setGradeStages] = useState<string[]>(
-    Array.isArray(profile.gradeStages) ? profile.gradeStages : []
-  );
+  const [gradeStages, setGradeStages] = useState<string[]>(Array.isArray(profile.gradeStages) ? profile.gradeStages : []);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [payoutQrUrl, setPayoutQrUrl] = useState(profile.payoutQrUrl ?? null);
@@ -210,29 +202,25 @@ export default function ProfileCard({
   const canExpandUploads = totalUploads > 5;
   const canExpandListings = totalListings > 5;
 
-  const showEmail = editable
-    ? profile.email
-    : profile.emailVisible === false
-      ? null
-      : profile.email;
+  const showEmail = editable ? profile.email : profile.emailVisible === false ? null : profile.email;
   const signatureDisplay = editable ? signature : (profile.signature ?? '').trim();
   const signatureMarkdown = signatureDisplay ? formatMarkdown(signatureDisplay) : '';
   const signatureCount = signature.length;
-  const schoolDisplay = (editable ? school : profile.school ?? '').trim();
-  const collegeDisplay = (editable ? college : profile.college ?? '').trim();
-  const majorDisplay = (editable ? major : profile.major ?? '').trim();
+  const schoolDisplay = (editable ? school : (profile.school ?? '')).trim();
+  const collegeDisplay = (editable ? college : (profile.college ?? '')).trim();
+  const majorDisplay = (editable ? major : (profile.major ?? '')).trim();
   const hasSchool = Boolean(schoolDisplay);
-  const gradeStagesDisplay = (editable ? gradeStages : profile.gradeStages ?? []).filter(Boolean);
+  const collegeOptions = useMemo(() => getCollegeOptions(college), [college]);
+  const majorOptions = useMemo(() => getMajorOptionsForCollege(college, major), [college, major]);
+  const gradeStagesDisplay = (editable ? gradeStages : (profile.gradeStages ?? [])).filter(Boolean);
   const hasFollowSection = Boolean(followingUsers || followersUsers);
   const showFollowStats = editable || hasFollowSection;
   const activeFollowTab = followTab ?? localFollowTab;
   const setActiveFollowTab = onFollowTabChange ?? setLocalFollowTab;
-  const followItems =
-    activeFollowTab === 'followers' ? followersUsers ?? [] : followingUsers ?? [];
+  const followItems = activeFollowTab === 'followers' ? (followersUsers ?? []) : (followingUsers ?? []);
   const visibleFollowItems = followExpanded ? followItems : followItems.slice(0, 5);
   const canExpandFollows = followItems.length > 5;
-  const followEmptyText =
-    activeFollowTab === 'followers' ? '暂时还没有粉丝，先发布点资料吧。' : '还没有关注的人，去首页看看吧。';
+  const followEmptyText = activeFollowTab === 'followers' ? '暂时还没有粉丝，先发布点资料吧。' : '还没有关注的人，去首页看看吧。';
 
   useEffect(() => {
     setFollowExpanded(false);
@@ -268,6 +256,13 @@ export default function ProfileCard({
     setSchool(value);
     if (!value) {
       setCollege('');
+      setMajor('');
+    }
+  };
+
+  const handleCollegeChange = (value: string) => {
+    setCollege(value);
+    if (major && !getMajorOptionsForCollege(value).includes(major)) {
       setMajor('');
     }
   };
@@ -399,103 +394,95 @@ export default function ProfileCard({
             <div className="profile-card__meta">@{profile.username}</div>
           </div>
         </div>
-      <div className="profile-card__stats">
-        <div className="profile-card__stat">
-          <span className="profile-card__stat-value">{totalUploads}</span>
-          <span className="profile-card__stat-label">资料</span>
+        <div className="profile-card__stats">
+          <div className="profile-card__stat">
+            <span className="profile-card__stat-value">{totalUploads}</span>
+            <span className="profile-card__stat-label">资料</span>
+          </div>
+          <div className="profile-card__stat">
+            <span className="profile-card__stat-value">{totalListings}</span>
+            <span className="profile-card__stat-label">好物</span>
+          </div>
+          <div className="profile-card__stat">
+            <span className="profile-card__stat-value">{purchaseCount}</span>
+            <span className="profile-card__stat-label">购买</span>
+          </div>
+          <div className="profile-card__stat">
+            <span className="profile-card__stat-value">{saleCount}</span>
+            <span className="profile-card__stat-label">售出</span>
+          </div>
+          {showFollowStats && (
+            <>
+              <div className="profile-card__stat">
+                <span className="profile-card__stat-value">{followersCount}</span>
+                <span className="profile-card__stat-label">粉丝</span>
+              </div>
+              <div className="profile-card__stat">
+                <span className="profile-card__stat-value">{followingCount}</span>
+                <span className="profile-card__stat-label">关注</span>
+              </div>
+            </>
+          )}
         </div>
-        <div className="profile-card__stat">
-          <span className="profile-card__stat-value">{totalListings}</span>
-          <span className="profile-card__stat-label">好物</span>
-        </div>
-        <div className="profile-card__stat">
-          <span className="profile-card__stat-value">{purchaseCount}</span>
-          <span className="profile-card__stat-label">购买</span>
-        </div>
-        <div className="profile-card__stat">
-          <span className="profile-card__stat-value">{saleCount}</span>
-          <span className="profile-card__stat-label">售出</span>
-        </div>
-        {showFollowStats && (
-          <>
-            <div className="profile-card__stat">
-              <span className="profile-card__stat-value">{followersCount}</span>
-              <span className="profile-card__stat-label">粉丝</span>
-            </div>
-            <div className="profile-card__stat">
-              <span className="profile-card__stat-value">{followingCount}</span>
-              <span className="profile-card__stat-label">关注</span>
-            </div>
-          </>
-        )}
       </div>
-    </div>
 
-    <div className="profile-card__section profile-card__section--signature">
-      <div className="profile-card__label-row">
-        <div className="profile-card__label">个性签名</div>
-        {editable && (
-          <button
-            type="button"
-            className={`profile-card__edit profile-card__edit--text${editingSignature ? ' is-active' : ''}`}
-            onClick={toggleSignatureEdit}
-            disabled={saving}
-            aria-label={editingSignature ? '取消编辑签名' : '编辑签名'}
-            aria-pressed={editingSignature}
-            title={editingSignature ? '取消编辑签名' : '编辑签名'}
-          >
-            <svg viewBox="0 0 24 24" aria-hidden="true">
-              <path
-                d="M4 15.5V20h4.5L19 9.5 14.5 5 4 15.5z"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.6"
-                strokeLinejoin="round"
-              />
-              <path d="M13 6.5l4.5 4.5" fill="none" stroke="currentColor" strokeWidth="1.6" />
-            </svg>
-            <span>{editingSignature ? '取消编辑' : '编辑签名'}</span>
-          </button>
-        )}
-      </div>
-      <div className="profile-card__signature-hint">展示在个人主页，支持 Markdown，最多 300 字。</div>
-      {editable && editingSignature ? (
-        <div className="profile-card__signature-editor">
-          <textarea
-            className="profile-card__textarea profile-card__textarea--signature"
-            value={signature}
-            onChange={(e) => setSignature(e.target.value)}
+      <div className="profile-card__section profile-card__section--signature">
+        <div className="profile-card__label-row">
+          <div className="profile-card__label">个性签名</div>
+          {editable && (
+            <button
+              type="button"
+              className={`profile-card__edit profile-card__edit--text${editingSignature ? ' is-active' : ''}`}
+              onClick={toggleSignatureEdit}
+              disabled={saving}
+              aria-label={editingSignature ? '取消编辑签名' : '编辑签名'}
+              aria-pressed={editingSignature}
+              title={editingSignature ? '取消编辑签名' : '编辑签名'}
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M4 15.5V20h4.5L19 9.5 14.5 5 4 15.5z" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
+                <path d="M13 6.5l4.5 4.5" fill="none" stroke="currentColor" strokeWidth="1.6" />
+              </svg>
+              <span>{editingSignature ? '取消编辑' : '编辑签名'}</span>
+            </button>
+          )}
+        </div>
+        <div className="profile-card__signature-hint">展示在个人主页，支持 Markdown，最多 300 字。</div>
+        {editable && editingSignature ? (
+          <div className="profile-card__signature-editor">
+            <textarea
+              className="profile-card__textarea profile-card__textarea--signature"
+              value={signature}
+              onChange={(e) => setSignature(e.target.value)}
               maxLength={300}
               rows={4}
               placeholder="写点让别人记住你的话（支持 Markdown，300 字以内）"
             />
-          <div className="profile-card__signature-footer">
+            <div className="profile-card__signature-footer">
               <div className="profile-card__signature-tags">
                 <span className="profile-card__signature-tag">Markdown</span>
                 <span className="profile-card__signature-tag profile-card__signature-tag--muted">300 字以内</span>
               </div>
               <span>{signatureCount}/300</span>
+            </div>
+            <div className="profile-card__section-actions">
+              <span className="profile-card__edit-status">编辑中</span>
+              <button className="button primary profile-card__save-inline" type="button" onClick={handleSave} disabled={saving}>
+                {saving ? '保存中...' : '保存'}
+              </button>
+              <button className="button ghost profile-card__cancel-inline" type="button" onClick={resetSignatureEdit} disabled={saving}>
+                取消修改
+              </button>
+              {message && <span className={message.type === 'error' ? 'error-text' : 'success-text'}>{message.text}</span>}
+            </div>
           </div>
-          <div className="profile-card__section-actions">
-            <span className="profile-card__edit-status">编辑中</span>
-            <button className="button primary profile-card__save-inline" type="button" onClick={handleSave} disabled={saving}>
-              {saving ? '保存中...' : '保存'}
-            </button>
-            <button className="button ghost profile-card__cancel-inline" type="button" onClick={resetSignatureEdit} disabled={saving}>
-              取消修改
-            </button>
-            {message && (
-              <span className={message.type === 'error' ? 'error-text' : 'success-text'}>{message.text}</span>
-            )}
+        ) : signatureDisplay ? (
+          <div className="profile-card__signature-preview profile-markdown">
+            <SafeMarkdown>{signatureMarkdown}</SafeMarkdown>
           </div>
-        </div>
-      ) : signatureDisplay ? (
-        <div className="profile-card__signature-preview profile-markdown">
-          <SafeMarkdown>{signatureMarkdown}</SafeMarkdown>
-        </div>
-      ) : (
-        <div className="profile-card__signature-empty">这个人还没有写签名。</div>
-      )}
+        ) : (
+          <div className="profile-card__signature-empty">这个人还没有写签名。</div>
+        )}
       </div>
 
       <div className="profile-card__section">
@@ -512,22 +499,14 @@ export default function ProfileCard({
               title={editingNickname ? '取消修改昵称' : '修改昵称'}
             >
               <svg viewBox="0 0 24 24" aria-hidden="true">
-                <path
-                  d="M4 15.5V20h4.5L19 9.5 14.5 5 4 15.5z"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.6"
-                  strokeLinejoin="round"
-                />
+                <path d="M4 15.5V20h4.5L19 9.5 14.5 5 4 15.5z" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
                 <path d="M13 6.5l4.5 4.5" fill="none" stroke="currentColor" strokeWidth="1.6" />
               </svg>
               <span>{editingNickname ? '取消修改' : '修改'}</span>
             </button>
           )}
         </div>
-        {editable && (
-          <div className="profile-card__identity-hint">昵称用于公开展示，用户名用于登录且保持唯一，二者可以不同。</div>
-        )}
+        {editable && <div className="profile-card__identity-hint">昵称用于公开展示，用户名用于登录且保持唯一，二者可以不同。</div>}
         {editable ? (
           editingNickname ? (
             <>
@@ -547,9 +526,7 @@ export default function ProfileCard({
                 <button className="button ghost profile-card__cancel-inline" type="button" onClick={resetNicknameEdit} disabled={saving}>
                   取消修改
                 </button>
-                {message && (
-                  <span className={message.type === 'error' ? 'error-text' : 'success-text'}>{message.text}</span>
-                )}
+                {message && <span className={message.type === 'error' ? 'error-text' : 'success-text'}>{message.text}</span>}
               </div>
             </>
           ) : (
@@ -574,13 +551,7 @@ export default function ProfileCard({
               title={editingSchool ? '取消修改学校信息' : '修改学校信息'}
             >
               <svg viewBox="0 0 24 24" aria-hidden="true">
-                <path
-                  d="M4 15.5V20h4.5L19 9.5 14.5 5 4 15.5z"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.6"
-                  strokeLinejoin="round"
-                />
+                <path d="M4 15.5V20h4.5L19 9.5 14.5 5 4 15.5z" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
                 <path d="M13 6.5l4.5 4.5" fill="none" stroke="currentColor" strokeWidth="1.6" />
               </svg>
               <span>{editingSchool ? '取消修改' : '修改'}</span>
@@ -632,11 +603,11 @@ export default function ProfileCard({
                   id="profile-college"
                   className="profile-card__input profile-card__input--select"
                   value={college}
-                  onChange={(e) => setCollege(e.target.value)}
+                  onChange={(e) => handleCollegeChange(e.target.value)}
                   disabled={!hasSchool}
                 >
                   <option value="">未填写</option>
-                  {SUPPORTED_COLLEGES.map((name) => (
+                  {collegeOptions.map((name) => (
                     <option key={name} value={name}>
                       {name}
                     </option>
@@ -672,10 +643,10 @@ export default function ProfileCard({
                   className="profile-card__input profile-card__input--select"
                   value={major}
                   onChange={(e) => setMajor(e.target.value)}
-                  disabled={!hasSchool}
+                  disabled={!hasSchool || !college}
                 >
-                  <option value="">未填写</option>
-                  {SUPPORTED_MAJORS.map((name) => (
+                  <option value="">{college ? '未填写' : '请先选择学院'}</option>
+                  {majorOptions.map((name) => (
                     <option key={name} value={name}>
                       {name}
                     </option>
@@ -708,19 +679,14 @@ export default function ProfileCard({
                   {GRADE_STAGE_OPTIONS.map((stage) => {
                     const checked = gradeStages.includes(stage);
                     return (
-                      <label
-                        key={stage}
-                        className={`choice-pill profile-card__grade-choice ${checked ? 'active' : ''}`}
-                      >
+                      <label key={stage} className={`choice-pill profile-card__grade-choice ${checked ? 'active' : ''}`}>
                         <input
                           type="checkbox"
                           value={stage}
                           checked={checked}
                           onChange={() => {
                             setGradeStages((prev) => {
-                              const next = prev.includes(stage)
-                                ? prev.filter((value) => value !== stage)
-                                : [...prev, stage];
+                              const next = prev.includes(stage) ? prev.filter((value) => value !== stage) : [...prev, stage];
                               return GRADE_STAGE_OPTIONS.filter((option) => next.includes(option));
                             });
                           }}
@@ -767,27 +733,17 @@ export default function ProfileCard({
             <button className="button ghost profile-card__cancel-inline" type="button" onClick={resetSchoolEdit} disabled={saving}>
               取消修改
             </button>
-            {message && (
-              <span className={message.type === 'error' ? 'error-text' : 'success-text'}>{message.text}</span>
-            )}
+            {message && <span className={message.type === 'error' ? 'error-text' : 'success-text'}>{message.text}</span>}
           </div>
         )}
       </div>
 
       <div className="profile-card__section">
         <div className="profile-card__label">绑定邮箱</div>
-        {showEmail ? (
-          <div className="profile-card__value">{showEmail}</div>
-        ) : (
-          <div className="profile-card__value muted">已隐藏</div>
-        )}
+        {showEmail ? <div className="profile-card__value">{showEmail}</div> : <div className="profile-card__value muted">已隐藏</div>}
         {editable && (
           <label className="profile-card__toggle">
-            <input
-              type="checkbox"
-              checked={emailPrivacy}
-              onChange={(e) => setEmailPrivacy(e.target.checked)}
-            />
+            <input type="checkbox" checked={emailPrivacy} onChange={(e) => setEmailPrivacy(e.target.checked)} />
             <span>对外隐藏邮箱</span>
           </label>
         )}
@@ -843,17 +799,17 @@ export default function ProfileCard({
                         <AppImage className="profile-card__payout-preview" src={payoutQrUrl} alt="个人收款码" loading="lazy" />
                       </a>
                       <div className="profile-card__payout-actions">
-                      <button
-                        className="button ghost small"
-                        type="button"
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          handleClearPayoutQr();
-                        }}
-                        disabled={uploadingPayoutQr}
-                      >
-                        删除
-                      </button>
+                        <button
+                          className="button ghost small"
+                          type="button"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            handleClearPayoutQr();
+                          }}
+                          disabled={uploadingPayoutQr}
+                        >
+                          删除
+                        </button>
                       </div>
                     </>
                   ) : (
@@ -868,13 +824,7 @@ export default function ProfileCard({
               </>
             )}
             {!editable && payoutQrUrl ? (
-              <a
-                href={payoutQrUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="profile-card__payout-preview-link"
-                title="点击查看大图"
-              >
+              <a href={payoutQrUrl} target="_blank" rel="noreferrer" className="profile-card__payout-preview-link" title="点击查看大图">
                 <AppImage className="profile-card__payout-preview" src={payoutQrUrl} alt="个人收款码" loading="lazy" />
               </a>
             ) : !payoutQrUrl ? (
@@ -903,11 +853,7 @@ export default function ProfileCard({
               粉丝 {followersUsers?.length ?? 0}
             </button>
           </div>
-          {followMessage && (
-            <p className={followMessage.type === 'error' ? 'error-text' : 'success-text'}>
-              {followMessage.message}
-            </p>
-          )}
+          {followMessage && <p className={followMessage.type === 'error' ? 'error-text' : 'success-text'}>{followMessage.message}</p>}
           {renderFollowList()}
           {canExpandFollows && (
             <button
@@ -937,9 +883,7 @@ export default function ProfileCard({
                     下载 {item.downloadCount ?? 0} · {formatDate(item.createdAt)}
                   </span>
                 </div>
-                <span className="profile-card__badge">
-                  {item.free ? '免费' : `¥${item.price.toFixed(2)}`}
-                </span>
+                <span className="profile-card__badge">{item.free ? '免费' : `¥${item.price.toFixed(2)}`}</span>
               </li>
             ))}
           </ul>

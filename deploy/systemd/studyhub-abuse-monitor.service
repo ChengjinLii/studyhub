@@ -6,7 +6,7 @@ After=nginx.service
 Type=oneshot
 User=root
 WorkingDirectory=/data/studyhub
-ExecStart=/usr/bin/python3 /data/studyhub/scripts/security/runtime-abuse-monitor.py --access-log /var/log/nginx/access.log --status-file /var/lib/studyhub-security/runtime-abuse-status.json --alert-state-file /var/lib/studyhub-security/runtime-abuse-alert-state.json --env-file /data/studyhub/private/.env.production --alert-email 2731938007@qq.com --alert-email 1643468233@qq.com --alert-confirm-runs 3 --recovery-confirm-runs 2 --service nginx.service --service studyhub-backend.service --service studyhub-frontend.service --probe-url http://127.0.0.1:8311/api/readyz --probe-url http://127.0.0.1:3300/ --filesystem / --certificate-file /etc/letsencrypt/live/study-hub.cn/fullchain.pem
+ExecStart=/usr/bin/python3 /data/studyhub/scripts/security/runtime-abuse-monitor.py --access-log /var/log/nginx/access.log --status-file /var/lib/studyhub-security/runtime-abuse-status.json --alert-state-file /var/lib/studyhub-security/runtime-abuse-alert-state.json --env-file /data/studyhub/private/.env.production --alert-confirm-runs 3 --recovery-confirm-runs 2 --service nginx.service --service studyhub-backend.service --service studyhub-frontend.service --probe-url http://127.0.0.1:8311/api/readyz --probe-url http://127.0.0.1:3300/ --filesystem / --certificate-file /etc/letsencrypt/live/study-hub.cn/fullchain.pem
 SyslogIdentifier=studyhub-abuse-monitor
 Nice=10
 
