@@ -39,20 +39,28 @@ const ABOUT_POINTS = [
 
 const ENGINEERING_STATUS_CARDS = [
   {
-    title: '产品主线',
-    body: 'StudyHub 面向高校学习资料共享和校园互助场景，主线能力包括资料发布与检索、经验内容、求购协作、创作者结算、校园集市和个人主页。',
+    title: '产品与服务边界',
+    body: 'StudyHub 围绕高校学习资料和校园互助组织产品能力，覆盖资料投稿、检索与预览、下载与支付、经验内容、求购协作、校园集市、个人主页和创作者结算。各条业务链路共享统一的账户、权限、内容状态和错误响应约定，减少页面之间的行为差异。',
   },
   {
-    title: '前端技术栈',
-    body: '前端使用 Next.js 14、React、TypeScript 与 Playwright/Vitest 组织页面渲染、组件交互、关键路径测试和单元测试。',
+    title: '前端应用',
+    body: '前端基于 Next.js 15、React 18 与 TypeScript 构建，结合服务端渲染和客户端交互承载首页、资料详情、投稿、个人主页和管理端等页面。Vitest 负责组件与工具函数回归，Playwright 同时验证开发模式和生产构建下的登录、检索、投稿等关键路径。',
   },
   {
-    title: '后端技术栈',
-    body: '后端使用 FastAPI、SQLAlchemy、Pydantic Settings、Uvicorn、pytest 与 Alembic，围绕认证、资料、支付、结算、MCP 和 AI Agent 提供 API 能力。',
+    title: '后端与 API',
+    body: '后端以 FastAPI、SQLAlchemy、Pydantic Settings 和 Uvicorn 为基础，按 routes、services、repos、models 分层组织认证、资料、评论、求购、支付、结算与通知逻辑。公开接口采用统一响应结构和 RESTful 资源语义，历史接口保留必要兼容，避免前后端升级造成使用中断。',
   },
   {
-    title: '运行与存储',
-    body: '生产侧以 MySQL、OSS、systemd、Nginx、worker 与脚本化预检为核心，日志、健康检查和 Prometheus 指标用于支撑排障与稳定性观察。',
+    title: '数据与文件',
+    body: '业务数据在生产环境使用 MySQL，本地开发可使用 SQLite；资料文件由阿里云 OSS 承载，应用只向通过登录、订单和权限校验的用户签发短时访问地址。Redis 用于需要跨进程一致性的锁与运行态能力，数据库迁移、备份和恢复验证由独立脚本管理。',
+  },
+  {
+    title: '支付与创作者结算',
+    body: '付费资料通过支付宝网页支付完成订单确认，回调验签、幂等处理和订单状态更新均在后端执行。创作者结算记录与实际转账绑定，失败转账会释放仍待结算的记录，避免出现资金已记账但未实际支付，或同一笔结算被重复处理。',
+  },
+  {
+    title: 'AI Agent 与 MCP',
+    body: '站内 Agent 复用资料检索、用户会话记忆和平台知识，按真实执行阶段反馈检索、工具调用与答案整理状态。远程 MCP 仅开放受治理的只读资料搜索、详情、推荐和平台规则工具，返回公开元数据与站内链接，不直接暴露受保护文件或绕过登录、付费和下载规则。',
   },
 ];
 
@@ -69,21 +77,74 @@ const ENGINEERING_STRUCTURE_CARDS = [
   },
   {
     id: '03',
-    title: 'reports/',
-    body: '公开的技术报告、项目复盘材料与对外说明，适合协作者快速理解项目背景与设计取舍。',
+    title: 'ml/',
+    body: '模型训练、评测与检索实验相关代码，和在线业务服务保持边界，便于独立验证数据与模型改动。',
   },
   {
     id: '04',
     title: 'scripts/',
-    body: '开发、部署、worker 与数据库操作脚本集中在这里，方便本地开发和服务维护。',
+    body: '开发启动、生产预检、部署冒烟、worker、依赖更新、安全检查和数据库管理脚本集中在这里。',
+  },
+  {
+    id: '05',
+    title: 'reports/',
+    body: '公开技术报告、覆盖率结果与项目复盘材料，记录架构边界、验证结果和重要设计取舍。',
+  },
+  {
+    id: '06',
+    title: '.github/',
+    body: '持续集成和依赖更新配置，负责前后端检查、迁移验证、敏感文件防护与 Agent 工程门禁。',
+  },
+];
+
+const ENGINEERING_FLOW_ITEMS = [
+  {
+    title: '资料投稿与交付',
+    body: '前端先完成必填项、交付方式和文件状态校验，再向后端提交幂等投稿请求；后端负责资料元数据、站内文件或网盘信息的持久化。资料详情页根据交付方式、价格和当前用户权限展示预览、领取、购买或下载入口。',
+  },
+  {
+    title: '检索与推荐',
+    body: '搜索会统一处理多关键词、课程、标签、学校、学院和专业等条件，再结合时间、下载量和相关性返回结果。推荐能力复用公开可见资料元数据，避免将不可见、已下架或无法交付的内容推给用户。',
+  },
+  {
+    title: '订单与结算',
+    body: '创建订单、拉起支付宝、异步回调、支付结果确认和下载授权形成完整闭环；涉及创作者收入时，结算单会绑定到具体转账，并通过幂等状态机处理成功、失败与重复回调。',
+  },
+  {
+    title: 'Agent 与外部接入',
+    body: '站内 Agent 通过受控工具读取资料候选和页级证据，并在会话范围内组织后续追问。外部客户端通过 MCP 的 initialize、tools/list 和 tools/call 发现能力，只能获得结构化推荐结果和 StudyHub 页面链接。',
+  },
+];
+
+const ENGINEERING_GUARDRAIL_ITEMS = [
+  {
+    title: '代码质量',
+    body: '前端执行 TypeScript、ESLint、Vitest 与 Playwright，后端执行 Ruff、pytest 和覆盖率统计；代码体积、Shell 语法与敏感文件另有独立检查。',
+  },
+  {
+    title: '数据库安全',
+    body: '生产发布先执行只读结构预检，迁移默认不会被部署脚本静默执行；需要变更时先生成计划并备份，再经过 MySQL 升降级和恢复验证。',
+  },
+  {
+    title: '发布验证',
+    body: '前端以生产模式完成构建后再启动服务，发布脚本检查构建完整性、后端健康与就绪状态、公开资料接口、主要页面和安全响应头。',
+  },
+  {
+    title: '安全边界',
+    body: '认证、支付签名、下载授权、可信主机与代理、请求限流、Markdown 和支付表单处理均有服务端约束；公开日志和页面不展示密钥、内部路径或受保护资源地址。',
+  },
+  {
+    title: '运行观测',
+    body: '结构化日志携带请求标识，健康检查区分进程存活与依赖就绪，Prometheus 指标覆盖 HTTP、MCP、Agent 和 worker 的调用量、错误与耗时。',
   },
 ];
 
 const ENGINEERING_FUTURE_ITEMS = [
-  '内容系统：继续完善资料发布、预览、下载、举报和审核流程，保证用户能稳定提交和获取资料。',
-  '推荐检索：围绕标签、学校学院专业、下载互动和 Agent 语义理解改进推荐与搜索体验。',
-  '开放能力：通过 MCP 和公开只读能力，让外部 Agent 可以推荐平台资料链接，但不绕过站内下载和权限规则。',
-  '工程质量：持续收紧类型检查、关键路径测试、日志观测、部署预检和安全基线，降低线上回归风险。',
+  '内容治理：继续完善文件安全检查、版权举报、资料状态追踪和异常交付处理，使投稿、审核、预览与下载形成可追溯闭环。',
+  '检索推荐：在现有多关键词和字段过滤基础上，逐步评估关键词召回、语义召回、重排和离线评测，优先提升课程名、年份与资料类型的准确命中。',
+  'Agent 能力：增强多轮记忆、页级证据引用、工具执行可观测性和失败降级，让回答能够说明依据，同时保持用户记忆与平台知识隔离。',
+  '开放接入：完善 MCP 对外说明、OAuth 用户授权、调用配额和审计能力，确保外部 Agent 能推荐资料，但不能代替用户绕过站内权益流程。',
+  '工程保障：逐步扩大严格类型检查、契约测试和生产模式端到端覆盖，并持续完善依赖升级、备份恢复、运行告警与安全基线。',
 ];
 
 interface JoinPageProps {
@@ -134,9 +195,7 @@ export default function JoinPage({ user }: JoinPageProps) {
 
     const observer = new IntersectionObserver(
       (entries) => {
-        const visible = entries
-          .filter((entry) => entry.isIntersecting)
-          .sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
+        const visible = entries.filter((entry) => entry.isIntersecting).sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
         if (visible?.target?.id) setActiveSection(visible.target.id);
       },
       { rootMargin: '-20% 0px -60% 0px', threshold: [0.2, 0.45, 0.7] }
@@ -279,10 +338,15 @@ export default function JoinPage({ user }: JoinPageProps) {
                   <h2>工程日志</h2>
                 </div>
                 <div className="join-engineering-block">
+                  <p className="join-engineering-intro">
+                    工程日志记录 StudyHub
+                    当前公开主线的系统组成、关键业务链路和质量保障方式。这里侧重说明代码如何组织、功能如何协作以及发布如何验证，不公开生产密钥、内部地址和安全策略细节。
+                  </p>
                   <div className="join-engineering-meta">
-                    <span>当前仓库：studyhub</span>
-                    <span>公开主线：FastAPI + Next.js</span>
-                    <span>官网：https://study-hub.cn</span>
+                    <span>应用架构：Next.js + FastAPI</span>
+                    <span>数据与文件：MySQL + Redis + OSS</span>
+                    <span>运行环境：Node.js 22 + Python 3.12</span>
+                    <span>公开协议：RESTful API + MCP</span>
                   </div>
                   <div className="join-engineering-links" aria-label="GitHub 索引">
                     <a
@@ -313,6 +377,21 @@ export default function JoinPage({ user }: JoinPageProps) {
                   </div>
 
                   <section className="join-engineering-subsection">
+                    <h3 className="join-engineering-subtitle">关键业务链路</h3>
+                    <div className="join-engineering-stack-list">
+                      {ENGINEERING_FLOW_ITEMS.map((item, index) => (
+                        <article key={item.title} className="join-engineering-stack-item">
+                          <span className="join-engineering-stack-item__id">{String(index + 1).padStart(2, '0')}</span>
+                          <div className="join-engineering-stack-item__body">
+                            <h4>{item.title}</h4>
+                            <p className="help-text">{item.body}</p>
+                          </div>
+                        </article>
+                      ))}
+                    </div>
+                  </section>
+
+                  <section className="join-engineering-subsection">
                     <h3 className="join-engineering-subtitle">仓库结构</h3>
                     <div className="join-engineering-module-grid">
                       {ENGINEERING_STRUCTURE_CARDS.map((item) => (
@@ -326,7 +405,22 @@ export default function JoinPage({ user }: JoinPageProps) {
                   </section>
 
                   <section className="join-engineering-subsection">
-                    <h3 className="join-engineering-subtitle">未来规划</h3>
+                    <h3 className="join-engineering-subtitle">质量与运行保障</h3>
+                    <div className="join-engineering-stack-list">
+                      {ENGINEERING_GUARDRAIL_ITEMS.map((item, index) => (
+                        <article key={item.title} className="join-engineering-stack-item">
+                          <span className="join-engineering-stack-item__id">{String(index + 1).padStart(2, '0')}</span>
+                          <div className="join-engineering-stack-item__body">
+                            <h4>{item.title}</h4>
+                            <p className="help-text">{item.body}</p>
+                          </div>
+                        </article>
+                      ))}
+                    </div>
+                  </section>
+
+                  <section className="join-engineering-subsection">
+                    <h3 className="join-engineering-subtitle">持续建设方向</h3>
                     <div className="join-engineering-stack-list">
                       {ENGINEERING_FUTURE_ITEMS.map((item, index) => (
                         <article key={item} className="join-engineering-stack-item">
