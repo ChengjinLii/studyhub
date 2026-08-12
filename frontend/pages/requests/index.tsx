@@ -1,6 +1,7 @@
 import { GetServerSideProps } from 'next';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
+import { useState } from 'react';
 import NavBar from '../../components/NavBar';
 import { fetchMaterialRequests, fetchRequestLeaderboard } from '../../lib/api';
 import { getRequestOrigin } from '../../lib/apiBase';
@@ -30,12 +31,40 @@ const getRequestTitle = (item: MaterialRequestItem) => item.course || item.keywo
 
 export default function RequestsPage({ user, requests, leaderboard }: RequestsPageProps) {
   const router = useRouter();
+  const [visibleRequests, setVisibleRequests] = useState(requests);
+  const [requestOffset, setRequestOffset] = useState(requests.length);
+  const [hasMoreRequests, setHasMoreRequests] = useState(requests.length === REQUEST_LIST_LIMIT);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [loadMoreError, setLoadMoreError] = useState('');
   const handleFollowRequest = (item: MaterialRequestItem) => {
     if (!user) {
       void router.push(`/login?next=${encodeURIComponent(`/requests/${item.id}/follow`)}`);
       return;
     }
     void router.push(`/requests/${item.id}/follow`);
+  };
+
+  const handleLoadMore = async () => {
+    if (loadingMore || !hasMoreRequests) return;
+    setLoadingMore(true);
+    setLoadMoreError('');
+    try {
+      const nextItems = await fetchMaterialRequests({
+        sort: 'hot',
+        limit: REQUEST_LIST_LIMIT,
+        offset: requestOffset,
+      });
+      setVisibleRequests((current) => {
+        const ids = new Set(current.map((item) => item.id));
+        return [...current, ...nextItems.filter((item) => !ids.has(item.id))];
+      });
+      setRequestOffset((current) => current + nextItems.length);
+      setHasMoreRequests(nextItems.length === REQUEST_LIST_LIMIT);
+    } catch (error) {
+      setLoadMoreError(error instanceof Error ? error.message : '求购加载失败，请稍后重试。');
+    } finally {
+      setLoadingMore(false);
+    }
   };
 
   return (
@@ -84,9 +113,9 @@ export default function RequestsPage({ user, requests, leaderboard }: RequestsPa
           <div className="materials-header">
             <div>
               <h2 className="card-title">求购列表</h2>
-              <p className="help-text">当前展示 {requests.length} 条求购需求。</p>
+              <p className="help-text">当前展示 {visibleRequests.length} 条求购需求。</p>
             </div>
-            {requests.length > 0 && (
+            {visibleRequests.length > 0 && (
               <div className="request-header-actions">
                 <Link className="button primary small" href="/requests/new" prefetch={false}>
                   发布求购
@@ -94,7 +123,7 @@ export default function RequestsPage({ user, requests, leaderboard }: RequestsPa
               </div>
             )}
           </div>
-          {requests.length === 0 ? (
+          {visibleRequests.length === 0 ? (
             <div className="empty-state requests-empty-state">
               <strong>暂时没有公开的求购需求</strong>
               <span>可以先搜索已有资料；仍未找到时，再发布新的求购。</span>
@@ -109,7 +138,7 @@ export default function RequestsPage({ user, requests, leaderboard }: RequestsPa
             </div>
           ) : (
             <ul className="request-list">
-              {requests.map((item) => {
+              {visibleRequests.map((item) => {
                 const title = getRequestTitle(item);
                 const detailLink = `/requests/${item.id}`;
                 const budgetLabel = item.budget != null ? `预算 ¥${item.budget}` : '预算 待议';
@@ -159,6 +188,18 @@ export default function RequestsPage({ user, requests, leaderboard }: RequestsPa
               })}
             </ul>
           )}
+          {loadMoreError ? <p className="error-text requests-load-more__notice">{loadMoreError}</p> : null}
+          {visibleRequests.length > 0 ? (
+            <div className="requests-load-more">
+              {hasMoreRequests ? (
+                <button className="button ghost" type="button" onClick={handleLoadMore} disabled={loadingMore}>
+                  {loadingMore ? '加载中...' : '加载更多求购'}
+                </button>
+              ) : (
+                <span className="help-text">已显示全部公开求购</span>
+              )}
+            </div>
+          ) : null}
         </section>
       </main>
     </>

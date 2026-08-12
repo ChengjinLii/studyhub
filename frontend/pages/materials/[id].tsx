@@ -11,6 +11,7 @@ import SafeMarkdown from '../../components/SafeMarkdown';
 import ShareSheet from '../../components/ShareSheet';
 import CommentSection from '../../components/comments/CommentSection';
 import StarRating from '../../components/StarRating';
+import { useMobileBottomBar } from '../../components/mobile/MobileBottomBarProvider';
 import { readSession, hasRole } from '../../lib/auth';
 import { fetchMaterialDetail } from '../../lib/api';
 import { getRequestOrigin } from '../../lib/apiBase';
@@ -42,6 +43,7 @@ const extractExperienceLead = (value?: string | null) => {
 
 export default function MaterialDetailPage({ material, user }: MaterialDetailPageProps) {
   const router = useRouter();
+  const { setDetailActions } = useMobileBottomBar();
   const isOwner = Boolean(material && user && material.uploaderId === user.id);
   const isAdmin = Boolean(user && hasRole(user.roleMask, RoleMask.ADMIN));
   const isSuperAdmin = Boolean(user && hasRole(user.roleMask, RoleMask.DEVELOPER));
@@ -83,6 +85,50 @@ export default function MaterialDetailPage({ material, user }: MaterialDetailPag
   const isManualPreview = Boolean(material?.previewSource === 'MANUAL');
   const isPdfMaterial = Boolean(material?.hasFile && material?.fileType?.toLowerCase() === 'pdf');
   const isExperienceMaterial = Boolean(material?.tags?.includes('经验分享'));
+
+  useEffect(() => {
+    if (!material || isExperienceMaterial) {
+      setDetailActions(null);
+      return;
+    }
+    const shouldPurchase = !material.free && !canManage && !purchased;
+    const canDownload = material.hasFile || material.hasNetdisk;
+    const primaryLabel = shouldPurchase
+      ? ordering
+        ? '下单中...'
+        : '立即下单'
+      : !canDownload
+        ? '暂不可获取'
+        : downloading
+          ? material.hasNetdisk
+            ? '处理中...'
+            : '生成链接中...'
+          : material.hasNetdisk
+            ? '获取网盘链接'
+            : material.free
+              ? '获取免费链接'
+              : '获取下载链接';
+    setDetailActions({
+      liked,
+      primaryLabel,
+      primaryDisabled: shouldPurchase ? ordering : downloading || !canDownload,
+      onLike: handleToggleLike,
+      onPrimary: shouldPurchase ? handlePurchase : handleDownload,
+    });
+    return () => setDetailActions(null);
+  }, [
+    canManage,
+    downloading,
+    handleDownload,
+    handlePurchase,
+    handleToggleLike,
+    isExperienceMaterial,
+    liked,
+    material,
+    ordering,
+    purchased,
+    setDetailActions,
+  ]);
   const experienceImages = useMemo(() => material?.customPreviewImages ?? [], [material?.customPreviewImages]);
   const hasExperienceImages = experienceImages.length > 0;
   const experiencePlaceholder = user ? '暂无配图' : '登录后可查看配图（如作者已上传）';
@@ -713,44 +759,6 @@ export default function MaterialDetailPage({ material, user }: MaterialDetailPag
           </>
         )}
       </main>
-      {material && !isExperienceMaterial && (
-        <div className="mobile-detail-action-bar" aria-label="资料快捷操作">
-          <button
-            className={`button ghost mobile-detail-action-bar__secondary${liked ? ' is-active' : ''}`}
-            type="button"
-            onClick={handleToggleLike}
-          >
-            {liked ? '已点赞' : '点赞'}
-          </button>
-          {!material.free && !canManage && !purchased ? (
-            <button
-              className="button primary mobile-detail-action-bar__primary"
-              type="button"
-              onClick={handlePurchase}
-              disabled={ordering}
-            >
-              {ordering ? '下单中...' : '立即下单'}
-            </button>
-          ) : (material.hasFile || material.hasNetdisk) ? (
-            <button
-              className="button primary mobile-detail-action-bar__primary"
-              type="button"
-              onClick={handleDownload}
-              disabled={downloading}
-            >
-              {downloading
-                ? material.hasNetdisk
-                  ? '处理中...'
-                  : '生成链接中...'
-                : material.hasNetdisk
-                  ? '获取网盘链接'
-                  : material.free
-                    ? '获取免费链接'
-                    : '获取下载链接'}
-            </button>
-          ) : null}
-        </div>
-      )}
       <ShareSheet
         open={shareSheetOpen}
         title={shareSheetTitle}

@@ -46,6 +46,8 @@ import { useSectionNavigation } from '../lib/useSectionNavigation';
 import { useUploadExistingMaterial } from '../lib/useUploadExistingMaterial';
 import { useUploadImageSelection } from '../lib/useUploadImageSelection';
 import { resolveUploadSectionCompletion } from '../lib/uploadSectionCompletion';
+import { buildUploadDraftKey, UploadTextDraftValue } from '../lib/uploadDraft';
+import { useUploadTextDraftPersistence } from '../lib/useUploadTextDraft';
 
 const presetTags = [
   '日常学习笔记',
@@ -176,6 +178,13 @@ export default function UploadPage({ user, token, account }: UploadPageProps) {
   const submissionInFlightRef = useRef(false);
   const allowSubmissionNavigationRef = useRef(false);
   const submitting = submissionStage !== 'idle';
+  const draftScope = useMemo(() => {
+    if (!router.isReady || !user) return null;
+    const queryRequestId = typeof router.query.requestId === 'string' ? router.query.requestId : '';
+    const queryTopic = typeof router.query.topic === 'string' ? router.query.topic : '';
+    const scope = queryRequestId ? `request-${queryRequestId}` : queryTopic ? `topic-${queryTopic}` : 'material';
+    return buildUploadDraftKey(user.id, scope);
+  }, [router.isReady, router.query.requestId, router.query.topic, user]);
   const apiBase = useMemo(() => resolveApiBase(typeof window !== 'undefined' ? window.location.origin : undefined), []);
   const isExperienceCustomTopic = experienceTopic === 'leetcode';
   const experienceTopicTitle = getColumnTopicTitle(experienceTopic);
@@ -394,6 +403,52 @@ export default function UploadPage({ user, token, account }: UploadPageProps) {
     setCustomTags('');
     setYearTag('');
   }, [isEditing, isExperience]);
+
+  const uploadTextDraft: UploadTextDraftValue = {
+    title,
+    description,
+    uploadMode,
+    experienceTopic,
+    experienceCustomTag,
+    price,
+    school,
+    college,
+    selectedMajors,
+    gradeValue,
+    courseCategory,
+    selectedTags,
+    customTags,
+    yearTag,
+    deliveryMethod,
+    previewSource,
+    previewWatermarkEnabled,
+    customPreviewText,
+  };
+  const { draftRestored, dismissDraftRestored, clearDraft } = useUploadTextDraftPersistence({
+    draftKey: draftScope,
+    isEditing,
+    value: uploadTextDraft,
+    onRestore: (draft) => {
+      setTitle(draft.title);
+      setDescription(draft.description);
+      setUploadMode(draft.uploadMode);
+      setExperienceTopic(normalizeColumnTopic(draft.experienceTopic));
+      setExperienceCustomTag(draft.experienceCustomTag);
+      setPrice(draft.price);
+      setSchool(draft.school || materialProfilePrefill.school);
+      setCollege(draft.college);
+      setSelectedMajors(draft.selectedMajors);
+      setGradeValue(draft.gradeValue || materialProfilePrefill.gradeValue);
+      setCourseCategory(draft.courseCategory as CourseCategorySelection);
+      setSelectedTags(draft.selectedTags);
+      setCustomTags(draft.customTags);
+      setYearTag(draft.yearTag);
+      setDeliveryMethod(draft.deliveryMethod);
+      setPreviewSource(draft.previewSource);
+      setPreviewWatermarkEnabled(draft.previewWatermarkEnabled);
+      setCustomPreviewText(draft.customPreviewText);
+    },
+  });
 
   const tagComputation = useMemo(() => {
     if (isExperience) {
@@ -703,6 +758,7 @@ export default function UploadPage({ user, token, account }: UploadPageProps) {
       if (submissionId) {
         clearUploadSubmission(window.sessionStorage, submissionId);
       }
+      if (!isEditing) clearDraft();
       completed = true;
       submissionInFlightRef.current = false;
       allowSubmissionNavigationRef.current = true;
@@ -1101,6 +1157,15 @@ export default function UploadPage({ user, token, account }: UploadPageProps) {
                 onToggleQuickPanel={toggleQuickPanel}
                 onQuickOptionSelect={handleQuickOptionSelect}
               />
+              {draftRestored ? (
+                <div className="upload-draft-notice" role="status">
+                  <strong>已恢复本机草稿</strong>
+                  <span>文字与选项已恢复；资料文件、预览图片和收款信息不会保存在浏览器中，请重新选择。</span>
+                  <button className="text-button" type="button" onClick={dismissDraftRestored}>
+                    知道了
+                  </button>
+                </div>
+              ) : null}
               {formContent}
             </div>
           </div>

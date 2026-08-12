@@ -72,13 +72,24 @@ class RequestsCompatMixin:
     def _request_read_cache_clone(self, rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
         return [dict(row) for row in rows]
 
-    def _compat_list_requests(self, session: Session, viewer_id: int | None, *, sort: str | None, limit: int | None) -> list[dict[str, Any]]:
+    def _compat_list_requests(
+        self,
+        session: Session,
+        viewer_id: int | None,
+        *,
+        sort: str | None,
+        limit: int | None,
+        offset: int | None = None,
+    ) -> list[dict[str, Any]]:
         rows = self._compat_load_open_requests(session)
         visible_rows = self._compat_exclude_hidden_early_exit_requests(session, rows)
         profile = self._compat_load_viewer_profile(session, viewer_id)
         responded_ids = self._compat_load_responded_request_ids(session, viewer_id, [int(row["id"]) for row in visible_rows])
         ordered = self._compat_sort_requests(visible_rows, sort=sort, profile=profile)
         normalized_limit = self._compat_normalize_list_limit(limit)
+        normalized_offset = max(0, min(offset or 0, 10_000))
+        if normalized_offset:
+            ordered = ordered[normalized_offset:]
         if normalized_limit is not None:
             ordered = ordered[:normalized_limit]
         return [self._compat_to_request_item(row, viewer_id, int(row["id"]) in responded_ids) for row in ordered]

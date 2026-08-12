@@ -15056,6 +15056,63 @@ g.studyhub-popup-poster__hotspot:hover > text {
   margin-top: 4px;
 }
 
+.requests-load-more,
+.material-search-empty__actions {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.requests-load-more__notice {
+  margin: 14px 0 0;
+  text-align: center;
+}
+
+.material-search-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 7px;
+}
+
+.material-search-empty > strong {
+  color: #0f172a;
+}
+
+.material-search-empty > span {
+  max-width: 560px;
+  color: #64748b;
+  line-height: 1.6;
+}
+
+.leaderboard-mobile-expand {
+  display: none;
+}
+
+.upload-draft-notice {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 10px 14px;
+  align-items: center;
+  padding: 13px 15px;
+  border: 1px solid #bfdbfe;
+  border-radius: 10px;
+  background: #eff6ff;
+  color: #334155;
+  font-size: 0.9rem;
+}
+
+.upload-draft-notice strong {
+  color: #1d4ed8;
+}
+
+.upload-draft-notice .text-button {
+  min-height: 44px;
+  padding: 0 8px;
+}
+
 .drop-zone {
   border: 2px dashed #cbd5e1;
   border-radius: 12px;
@@ -15873,8 +15930,7 @@ g.studyhub-popup-poster__hotspot:hover > text {
 .mobile-bottom-nav,
 .mobile-home-task-panel,
 .mobile-home-preview,
-.mobile-filter-drawer,
-.mobile-detail-action-bar {
+.mobile-filter-drawer {
   display: none;
 }
 
@@ -16032,6 +16088,39 @@ g.studyhub-popup-poster__hotspot:hover > text {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+  }
+
+  .mobile-bottom-nav--detail {
+    grid-template-columns: minmax(0, 0.72fr) minmax(0, 0.82fr) minmax(112px, 1.9fr) minmax(0, 0.72fr);
+    gap: 6px;
+  }
+
+  .mobile-bottom-nav--detail button {
+    border: 0;
+    font-family: inherit;
+    cursor: pointer;
+  }
+
+  .mobile-bottom-nav--detail button:disabled {
+    cursor: not-allowed;
+    opacity: 0.58;
+  }
+
+  .mobile-bottom-nav__detail-like {
+    background: transparent;
+  }
+
+  .mobile-bottom-nav__detail-primary {
+    align-self: center;
+    min-width: 0;
+    min-height: 50px;
+    border-radius: 14px;
+    padding: 0 12px;
+    background: #1f5fd6;
+    color: #ffffff;
+    font-size: 0.92rem;
+    font-weight: 800;
+    line-height: 1.2;
   }
 
   .home-page {
@@ -16416,7 +16505,7 @@ g.studyhub-popup-poster__hotspot:hover > text {
 
   .leaderboard-tab {
     flex: 1 1 0;
-    min-height: 34px;
+    min-height: 44px;
     padding: 0 8px;
     font-size: 0.82rem;
     white-space: nowrap;
@@ -16426,6 +16515,23 @@ g.studyhub-popup-poster__hotspot:hover > text {
     max-height: none;
     padding-right: 0;
     overflow: visible;
+  }
+
+  .leaderboard-mobile-extra {
+    display: none !important;
+  }
+
+  .leaderboard-card.is-mobile-expanded .leaderboard-mobile-extra {
+    display: grid !important;
+  }
+
+  .leaderboard-mobile-expand {
+    display: flex;
+    width: 100%;
+    min-height: 44px;
+    margin-top: 12px;
+    align-items: center;
+    justify-content: center;
   }
 
   .leaderboard-list {
@@ -16755,6 +16861,28 @@ g.studyhub-popup-poster__hotspot:hover > text {
     padding: 0;
   }
 
+  .mobile-filter-strip-shell {
+    position: relative;
+    min-width: 0;
+  }
+
+  .mobile-filter-strip-shell::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 6px;
+    width: 50px;
+    pointer-events: none;
+    opacity: 0;
+    background: linear-gradient(90deg, rgba(248, 250, 252, 0), #f8fafc 76%);
+    transition: opacity 0.18s ease;
+  }
+
+  .mobile-filter-strip-shell.has-more::after {
+    opacity: 1;
+  }
+
   .mobile-filter-strip {
     display: flex;
     gap: 8px;
@@ -16766,6 +16894,44 @@ g.studyhub-popup-poster__hotspot:hover > text {
 
   .mobile-filter-strip::-webkit-scrollbar {
     display: none;
+  }
+
+  .mobile-filter-strip__cue {
+    position: absolute;
+    z-index: 1;
+    top: 50%;
+    right: 4px;
+    display: flex;
+    width: 24px;
+    height: 32px;
+    align-items: center;
+    justify-content: center;
+    color: #1d4ed8;
+    font-size: 1.55rem;
+    font-weight: 700;
+    line-height: 1;
+    pointer-events: none;
+    opacity: 0;
+    transform: translateY(-58%);
+    transition: opacity 0.18s ease;
+  }
+
+  .mobile-filter-strip-shell.has-more .mobile-filter-strip__cue {
+    opacity: 1;
+  }
+
+  .upload-draft-notice {
+    grid-template-columns: 1fr auto;
+  }
+
+  .upload-draft-notice span {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+
+  .material-search-empty__actions .button,
+  .requests-empty-state__actions .button {
+    min-height: 44px;
   }
 
   .mobile-filter-chip {
@@ -16809,8 +16975,8 @@ g.studyhub-popup-poster__hotspot:hover > text {
   .mobile-library-list__header .material-sort-trigger {
     width: 100%;
     min-width: 0;
-    min-height: 40px;
-    height: 40px;
+    min-height: 44px;
+    height: 44px;
     border-radius: 12px;
     font-size: 0.88rem;
   }
@@ -16944,36 +17110,8 @@ g.studyhub-popup-poster__hotspot:hover > text {
     border-radius: 14px;
   }
 
-  .mobile-detail-action-bar {
-    position: fixed;
-    left: 0;
-    right: 0;
-    bottom: calc(66px + env(safe-area-inset-bottom));
-    z-index: 78;
-    display: grid;
-    grid-template-columns: minmax(86px, 0.42fr) minmax(0, 1fr);
-    gap: 10px;
-    padding: 10px 14px;
-    background: rgba(255, 255, 255, 0.94);
-    border-top: 1px solid rgba(148, 163, 184, 0.26);
-    box-shadow: 0 -12px 28px rgba(15, 23, 42, 0.12);
-    backdrop-filter: blur(16px);
-  }
-
-  .mobile-detail-action-bar .button {
-    min-width: 0;
-    border-radius: 14px;
-    height: 44px;
-    min-height: 44px;
-    font-size: 0.94rem;
-  }
-
-  .mobile-detail-action-bar__secondary.is-active {
-    background: #eff6ff;
-  }
-
   .detail-container {
-    padding-bottom: calc(128px + env(safe-area-inset-bottom));
+    padding-bottom: calc(76px + env(safe-area-inset-bottom));
   }
 
   .detail-hero:not(.detail-hero--experience) {

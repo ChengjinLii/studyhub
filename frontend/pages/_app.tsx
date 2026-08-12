@@ -10,6 +10,7 @@ import AppImage from '../components/AppImage';
 import { AppDialogProvider } from '../components/AppDialogProvider';
 import { SessionProvider, useSession } from '../components/SessionProvider';
 import BottomTabBar from '../components/mobile/BottomTabBar';
+import { MobileBottomBarProvider } from '../components/mobile/MobileBottomBarProvider';
 import { RoleMask, SessionUser } from '../types/user';
 
 const FloatingSidebar = dynamic(() => import('../components/FloatingSidebar'), { ssr: false });
@@ -77,7 +78,9 @@ function AppProviders({
 }) {
   return (
     <SessionProvider initialUser={initialUser}>
-      <AppDialogProvider>{children}</AppDialogProvider>
+      <AppDialogProvider>
+        <MobileBottomBarProvider>{children}</MobileBottomBarProvider>
+      </AppDialogProvider>
     </SessionProvider>
   );
 }

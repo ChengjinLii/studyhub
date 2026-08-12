@@ -97,13 +97,14 @@ class RequestsService(RequestsCompatMixin):
         self.finance_repo = finance_repo
         self.payment_provider = payment_provider
 
-    def list_requests(self, session: Session, viewer_id: int | None, *, sort: str | None, limit: int | None) -> list[dict[str, Any]]:
+    def list_requests(self, session: Session, viewer_id: int | None, *, sort: str | None, limit: int | None, offset: int | None = None) -> list[dict[str, Any]]:
         if self.settings.requires_private_env_file:
-            return self._compat_list_requests(session, viewer_id, sort=sort, limit=limit)
+            return self._compat_list_requests(session, viewer_id, sort=sort, limit=limit, offset=offset)
         self._bootstrap(session)
         normalized = (sort or "latest").lower()
         safe_limit = clamp_limit(limit, max_value=100)
-        sliced = self.request_repo.list_visible_public_requests(session, sort=normalized, limit=safe_limit)
+        safe_offset = max(0, min(offset or 0, 10_000))
+        sliced = self.request_repo.list_visible_public_requests(session, sort=normalized, limit=safe_limit, offset=safe_offset)
         responded_ids = self.request_repo.find_responded_request_ids(
             session,
             responder_id=viewer_id,
@@ -114,9 +115,9 @@ class RequestsService(RequestsCompatMixin):
             for item in sliced
         ]
 
-    async def list_requests_async(self, session: Session, viewer_id: int | None, *, sort: str | None, limit: int | None) -> list[dict[str, Any]]:
+    async def list_requests_async(self, session: Session, viewer_id: int | None, *, sort: str | None, limit: int | None, offset: int | None = None) -> list[dict[str, Any]]:
         if not (self.settings.requires_private_env_file and self.settings.async_read_db_enabled):
-            return await asyncio.to_thread(self.list_requests, session, viewer_id, sort=sort, limit=limit)
+            return await asyncio.to_thread(self.list_requests, session, viewer_id, sort=sort, limit=limit, offset=offset)
 
         if viewer_id is None:
             rows = await self._call_with_new_async_session(self._compat_load_open_requests_async)
@@ -139,6 +140,9 @@ class RequestsService(RequestsCompatMixin):
         )
         ordered = self._compat_sort_requests(visible_rows, sort=sort, profile=profile)
         normalized_limit = self._compat_normalize_list_limit(limit)
+        normalized_offset = max(0, min(offset or 0, 10_000))
+        if normalized_offset:
+            ordered = ordered[normalized_offset:]
         if normalized_limit is not None:
             ordered = ordered[:normalized_limit]
         return [self._compat_to_request_item(row, viewer_id, int(row["id"]) in responded_ids) for row in ordered]
@@ -146,7 +150,7 @@ class RequestsService(RequestsCompatMixin):
     def list_leaderboard(self, session: Session, viewer_id: int | None, *, limit: int | None) -> list[dict[str, Any]]:
         if self.settings.requires_private_env_file:
             return self._compat_list_leaderboard(session, viewer_id, limit=limit)
-        return self.list_requests(session, viewer_id, sort="hot", limit=limit or 10)
+        return self.list_requests(session, viewer_id, sort="hot", limit=limit or 10, offset=0)
 
     async def list_leaderboard_async(self, session: Session, viewer_id: int | None, *, limit: int | None) -> list[dict[str, Any]]:
         if not (self.settings.requires_private_env_file and self.settings.async_read_db_enabled):

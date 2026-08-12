@@ -127,6 +127,30 @@ def test_async_legacy_request_list_skips_user_state_loads_for_anonymous_reads(mo
     assert data[0]["owner"] is False
 
 
+def test_async_legacy_request_list_applies_offset_after_sorting(monkeypatch) -> None:
+    service = _build_service()
+    rows = [
+        _request_row(401, response_count=9),
+        _request_row(402, response_count=6),
+        _request_row(403, response_count=3),
+    ]
+
+    async def fake_call(loader, *args, **kwargs):
+        del args, kwargs
+        name = loader.__name__
+        if name == "_compat_load_open_requests_async":
+            return rows
+        if name == "_compat_load_hidden_early_exit_request_ids_async":
+            return set()
+        raise AssertionError(f"unexpected loader: {name}")
+
+    monkeypatch.setattr(service, "_call_with_new_async_session", fake_call)
+
+    data = asyncio.run(service.list_requests_async(session=None, viewer_id=None, sort="hot", limit=1, offset=1))
+
+    assert [item["id"] for item in data] == [402]
+
+
 def test_async_legacy_request_leaderboard_keeps_limit_and_responded_state(monkeypatch) -> None:
     service = _build_service()
     row = _request_row(501, requester_id=12, response_count=4, anonymous=True)

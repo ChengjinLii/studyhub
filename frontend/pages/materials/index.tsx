@@ -1,12 +1,13 @@
 import { GetServerSideProps } from 'next';
 import Link from 'next/link';
-import { FormEvent, useMemo, useState } from 'react';
+import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import MaterialCard from '../../components/MaterialCard';
 import MaterialSortSelect from '../../components/materials/MaterialSortSelect';
 import NavBar from '../../components/NavBar';
 import MobileFilterDrawer, { MobileMaterialFilterState } from '../../components/mobile/MobileFilterDrawer';
 import FilterToggleButton from '../../components/FilterToggleButton';
 import SearchIconButton from '../../components/SearchIconButton';
+import MaterialSearchEmpty from '../../components/materials/MaterialSearchEmpty';
 import {
   COURSE_CATEGORY_VALUES,
   GRADE_STAGE_OPTIONS,
@@ -72,6 +73,9 @@ export default function MaterialsPage({ user, materials, meta, filters, stats, t
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
+  const filterStripRef = useRef<HTMLElement | null>(null);
+  const [filterStripHasMore, setFilterStripHasMore] = useState(false);
   const quickTags = useMemo(() => {
     const source = availableTags.length > 0 ? availableTags : DEFAULT_TAG_OPTIONS;
     return source.slice(0, 8);
@@ -87,6 +91,17 @@ export default function MaterialsPage({ user, materials, meta, filters, stats, t
     filtersState.price,
   ].filter(Boolean).length;
   const hasMore = pageMeta.page * pageMeta.size < pageMeta.total;
+
+  useEffect(() => {
+    const strip = filterStripRef.current;
+    if (!strip) return;
+    const updateCue = () => {
+      setFilterStripHasMore(strip.scrollLeft + strip.clientWidth < strip.scrollWidth - 3);
+    };
+    updateCue();
+    window.addEventListener('resize', updateCue);
+    return () => window.removeEventListener('resize', updateCue);
+  }, [quickTags]);
 
   const updateFilter = (key: keyof MobileMaterialFilterState, value: string) => {
     setFiltersState((prev) => ({ ...prev, [key]: value, page: '1', size: String(MATERIALS_PAGE_SIZE) }));
@@ -160,6 +175,7 @@ export default function MaterialsPage({ user, materials, meta, filters, stats, t
           <p>搜索课程、老师、知识点或资料类型，快速找到适合你的学习资料。</p>
           <form className="mobile-library-search" onSubmit={applyFilters}>
             <input
+              ref={searchInputRef}
               value={filtersState.keyword}
               onChange={(event) => updateFilter('keyword', event.target.value)}
               placeholder="搜课程 / 资料名 / 标签"
@@ -200,39 +216,50 @@ export default function MaterialsPage({ user, materials, meta, filters, stats, t
           </section>
         )}
 
-        <section className="mobile-filter-strip" aria-label="快捷筛选">
-          <button
-            type="button"
-            className={`mobile-filter-chip${!filtersState.price ? ' is-active' : ''}`}
-            onClick={() => handlePrice('')}
+        <div className={`mobile-filter-strip-shell${filterStripHasMore ? ' has-more' : ''}`}>
+          <section
+            ref={filterStripRef}
+            className="mobile-filter-strip"
+            aria-label="快捷筛选"
+            onScroll={() => {
+              const strip = filterStripRef.current;
+              if (strip) setFilterStripHasMore(strip.scrollLeft + strip.clientWidth < strip.scrollWidth - 3);
+            }}
           >
-            全部
-          </button>
-          <button
-            type="button"
-            className={`mobile-filter-chip${filtersState.price === 'free' ? ' is-active' : ''}`}
-            onClick={() => handlePrice('free')}
-          >
-            免费
-          </button>
-          <button
-            type="button"
-            className={`mobile-filter-chip${filtersState.price === 'paid' ? ' is-active' : ''}`}
-            onClick={() => handlePrice('paid')}
-          >
-            付费
-          </button>
-          {quickTags.map((tag) => (
             <button
-              key={tag}
               type="button"
-              className={`mobile-filter-chip${filtersState.tag === tag ? ' is-active' : ''}`}
-              onClick={() => handleQuickTag(tag)}
+              className={`mobile-filter-chip${!filtersState.price ? ' is-active' : ''}`}
+              onClick={() => handlePrice('')}
             >
-              #{tag}
+              全部
             </button>
-          ))}
-        </section>
+            <button
+              type="button"
+              className={`mobile-filter-chip${filtersState.price === 'free' ? ' is-active' : ''}`}
+              onClick={() => handlePrice('free')}
+            >
+              免费
+            </button>
+            <button
+              type="button"
+              className={`mobile-filter-chip${filtersState.price === 'paid' ? ' is-active' : ''}`}
+              onClick={() => handlePrice('paid')}
+            >
+              付费
+            </button>
+            {quickTags.map((tag) => (
+              <button
+                key={tag}
+                type="button"
+                className={`mobile-filter-chip${filtersState.tag === tag ? ' is-active' : ''}`}
+                onClick={() => handleQuickTag(tag)}
+              >
+                #{tag}
+              </button>
+            ))}
+          </section>
+          <span className="mobile-filter-strip__cue" aria-hidden="true">›</span>
+        </div>
 
         <section className="card mobile-library-list">
           <div className="mobile-library-list__header">
@@ -257,7 +284,14 @@ export default function MaterialsPage({ user, materials, meta, filters, stats, t
           </div>
           {error && <p className="error-text">{error}</p>}
           {materialList.length === 0 ? (
-            <div className="empty-state">暂无符合筛选条件的资料。</div>
+            <MaterialSearchEmpty
+              loading={loading}
+              onReset={() => void resetFilters()}
+              onEditKeyword={() => {
+                searchInputRef.current?.focus();
+                searchInputRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              }}
+            />
           ) : (
             <ul className="materials-list mobile-resource-list">
               {materialList.map((item) => (
@@ -265,15 +299,17 @@ export default function MaterialsPage({ user, materials, meta, filters, stats, t
               ))}
             </ul>
           )}
-          <div className="mobile-load-more">
-            {hasMore ? (
-              <button className="button primary" type="button" onClick={handleLoadMore} disabled={loading}>
-                {loading ? '加载中...' : '加载更多'}
-              </button>
-            ) : (
-              <span>已显示全部资料</span>
-            )}
-          </div>
+          {materialList.length > 0 ? (
+            <div className="mobile-load-more">
+              {hasMore ? (
+                <button className="button primary" type="button" onClick={handleLoadMore} disabled={loading}>
+                  {loading ? '加载中...' : '加载更多'}
+                </button>
+              ) : (
+                <span>已显示全部资料</span>
+              )}
+            </div>
+          ) : null}
         </section>
       </main>
       <MobileFilterDrawer

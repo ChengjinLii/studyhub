@@ -295,32 +295,35 @@ test('mobile StudyHub Bot stays fully above the bottom navigation', async ({ pag
   expect((botBox?.x ?? 0) + (botBox?.width ?? 0)).toBeLessThanOrEqual(320);
 });
 
-test('mobile StudyHub Bot also avoids a fixed material action bar', async ({ page }) => {
-  await page.setViewportSize({ width: 390, height: 844 });
+test('mobile detail actions reuse the global bottom navigation layer', async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 780 });
   await page.addInitScript(() => window.localStorage.removeItem('floating-sidebar-pos'));
   await page.goto('/more');
   await closeEntryModalIfPresent(page);
 
   await page.evaluate(() => {
-    const actionBar = document.createElement('div');
-    actionBar.className = 'mobile-detail-action-bar';
-    actionBar.setAttribute('aria-label', '资料快捷操作');
-    actionBar.innerHTML = '<button class="button ghost">点赞</button><button class="button primary">获取链接</button>';
-    document.body.appendChild(actionBar);
+    const navigation = document.querySelector('.mobile-bottom-nav');
+    if (!(navigation instanceof HTMLElement)) return;
+    navigation.classList.add('mobile-bottom-nav--detail');
+    navigation.setAttribute('aria-label', '资料快捷操作');
+    navigation.innerHTML = '<a class="mobile-bottom-nav__item">资料</a><button class="mobile-bottom-nav__item">点赞</button><button class="mobile-bottom-nav__detail-primary">获取链接</button><a class="mobile-bottom-nav__item">我的</a>';
     window.dispatchEvent(new Event('resize'));
   });
 
   const bot = page.locator('.floating-sidebar__bubble');
-  const actionBar = page.locator('.mobile-detail-action-bar');
+  const navigation = page.locator('.mobile-bottom-nav--detail');
   await expect(bot).toBeVisible();
-  await expect(actionBar).toBeVisible();
+  await expect(navigation).toBeVisible();
+  await expect(page.locator('.mobile-detail-action-bar')).toHaveCount(0);
   await page.waitForTimeout(100);
 
   const botBox = await bot.boundingBox();
-  const actionBarBox = await actionBar.boundingBox();
+  const navigationBox = await navigation.boundingBox();
   expect(botBox).not.toBeNull();
-  expect(actionBarBox).not.toBeNull();
-  expect((botBox?.y ?? 0) + (botBox?.height ?? 0)).toBeLessThanOrEqual((actionBarBox?.y ?? 0) - 8);
+  expect(navigationBox).not.toBeNull();
+  expect((botBox?.y ?? 0) + (botBox?.height ?? 0)).toBeLessThanOrEqual((navigationBox?.y ?? 0) - 8);
+  expect(navigationBox?.x ?? -1).toBeGreaterThanOrEqual(0);
+  expect((navigationBox?.x ?? 0) + (navigationBox?.width ?? 0)).toBeLessThanOrEqual(320);
 });
 
 test('mobile login presents the form before the supporting introduction', async ({ page }) => {

@@ -398,17 +398,33 @@ class RequestRepository:
             stmt = stmt.options(*options)
         return _apply_legacy_request_defaults(session, list(session.scalars(stmt)))
 
-    def list_public_requests(self, session: Session, *, sort: str | None, limit: int | None = None) -> list[RequestRecord]:
+    def list_public_requests(
+        self,
+        session: Session,
+        *,
+        sort: str | None,
+        limit: int | None = None,
+        offset: int = 0,
+    ) -> list[RequestRecord]:
         stmt = select(RequestRecord).where(RequestRecord.status == "OPEN")
         options = _request_load_options(session)
         if options:
             stmt = stmt.options(*options)
         stmt = self._order_public_requests(session, stmt, sort)
+        if offset > 0:
+            stmt = stmt.offset(offset)
         if limit is not None:
             stmt = stmt.limit(limit)
         return _apply_legacy_request_defaults(session, list(session.scalars(stmt)))
 
-    def list_visible_public_requests(self, session: Session, *, sort: str | None, limit: int | None = None) -> list[RequestRecord]:
+    def list_visible_public_requests(
+        self,
+        session: Session,
+        *,
+        sort: str | None,
+        limit: int | None = None,
+        offset: int = 0,
+    ) -> list[RequestRecord]:
         hidden_ids = (
             select(RequestContributionRecord.request_id)
             .where(RequestContributionRecord.status.in_(("PAID", "REFUNDING", "REFUNDED")))
@@ -422,6 +438,8 @@ class RequestRepository:
         if options:
             stmt = stmt.options(*options)
         stmt = self._order_public_requests(session, stmt, sort)
+        if offset > 0:
+            stmt = stmt.offset(offset)
         if limit is not None:
             stmt = stmt.limit(limit)
         return _apply_legacy_request_defaults(session, list(session.scalars(stmt)))

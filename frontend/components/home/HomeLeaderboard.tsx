@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { useEffect, useState } from 'react';
 import { ContributorRank, LeaderboardPeriod } from '../../types/contributor';
 import { RoleMask, SessionUser } from '../../types/user';
 import { userPath } from '../../lib/slug';
@@ -36,8 +37,18 @@ export default function HomeLeaderboard({
   onPeriodChange,
   onFollowContributor,
 }: HomeLeaderboardProps) {
+  const [mobileExpanded, setMobileExpanded] = useState(false);
+
+  useEffect(() => {
+    setMobileExpanded(false);
+  }, [leaderboardPeriod]);
+
   return (
-    <section id="leaderboard" className="card leaderboard-card" style={{ gridColumn: '1 / -1' }}>
+    <section
+      id="leaderboard"
+      className={`card leaderboard-card${mobileExpanded ? ' is-mobile-expanded' : ''}`}
+      style={{ gridColumn: '1 / -1' }}
+    >
       <div className="materials-header">
         <div>
           <h2 className="card-title">
@@ -97,7 +108,7 @@ export default function HomeLeaderboard({
                   (roleMask & RoleMask.DEVELOPER) === RoleMask.DEVELOPER;
                 const rankLabel = isAdmin ? '管' : String(++rankCounter);
                 return (
-                  <li key={`${c.userId}-${idx}`}>
+                  <li key={`${c.userId}-${idx}`} className={idx >= 10 ? 'leaderboard-mobile-extra' : undefined}>
                     <div className={`leaderboard-rank ${isAdmin ? 'rank-admin' : `rank-${rankCounter}`}`}>{rankLabel}</div>
                     <div className="leaderboard-meta">
                       <strong>
@@ -130,6 +141,16 @@ export default function HomeLeaderboard({
           </ol>
         </div>
       )}
+      {topContributors.length > 10 ? (
+        <button
+          className="button ghost leaderboard-mobile-expand"
+          type="button"
+          onClick={() => setMobileExpanded((current) => !current)}
+          aria-expanded={mobileExpanded}
+        >
+          {mobileExpanded ? '收起榜单' : `展开全部（${topContributors.length}）`}
+        </button>
+      ) : null}
     </section>
   );
 }

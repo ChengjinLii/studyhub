@@ -8,6 +8,7 @@ import NavBar from '../components/NavBar';
 import AppImage from '../components/AppImage';
 import MaterialIconSprite from '../components/MaterialIconSprite';
 import MaterialSortSelect from '../components/materials/MaterialSortSelect';
+import MaterialSearchEmpty from '../components/materials/MaterialSearchEmpty';
 import PaginationBar from '../components/PaginationBar';
 import { MaterialListItem, PaginationMeta } from '../types/material';
 import { SessionUser, RoleMask } from '../types/user';
@@ -844,7 +845,10 @@ export default function Home({
             {paginationError && <p className="error-text">{paginationError}</p>}
             {paginationNotice && !paginationError && <p className="help-text">{paginationNotice}</p>}
             {materialList.length === 0 ? (
-              <div className="empty-state">暂无符合筛选条件的资料。</div>
+              <MaterialSearchEmpty
+                onReset={handleResetFilters}
+                onEditKeyword={() => filterRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })}
+              />
             ) : (
               <>
                 <ul className={`materials-list ${viewMode === 'grid' ? 'materials-grid' : 'list-view'}`}>

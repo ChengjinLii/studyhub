@@ -41,6 +41,7 @@ def _call_service_method(service, async_name: str, sync_name: str, *args, **kwar
 async def list_requests(
     sort: str | None = None,
     limit: int | None = None,
+    offset: int | None = None,
     auth: AuthContext | None = Depends(get_optional_auth_context),
     session: Session = Depends(get_db_session),
     cache: PublicReadCache = Depends(get_public_read_cache),
@@ -51,8 +52,17 @@ async def list_requests(
         cache,
         current_user_id=current_user_id,
         namespace="requests:list",
-        key=(sort, limit),
-        factory=lambda: _call_service_method(service, "list_requests_async", "list_requests", session, current_user_id, sort=sort, limit=limit),
+        key=(sort, limit, offset),
+        factory=lambda: _call_service_method(
+            service,
+            "list_requests_async",
+            "list_requests",
+            session,
+            current_user_id,
+            sort=sort,
+            limit=limit,
+            offset=offset,
+        ),
     )
     return api_ok(data)
 

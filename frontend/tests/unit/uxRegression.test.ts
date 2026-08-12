@@ -12,7 +12,9 @@ describe('public UX regressions', () => {
     expect(detail).not.toContain(
       'disabled={downloading || (material.hasNetdisk && !canViewNetdisk)}'
     );
-    expect(detail.match(/disabled=\{downloading\}/g)).toHaveLength(2);
+    expect(detail.match(/disabled=\{downloading\}/g)).toHaveLength(1);
+    expect(detail).toContain('onPrimary: shouldPurchase ? handlePurchase : handleDownload');
+    expect(detail).toContain('primaryDisabled: shouldPurchase ? ordering : downloading || !canDownload');
   });
 
   it('uses one shared session source for global interactive components', () => {

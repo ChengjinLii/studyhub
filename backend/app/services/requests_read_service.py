@@ -12,7 +12,14 @@ class RequestsReadService:
     def __init__(self, repo: ReadApiRepository) -> None:
         self.repo = repo
 
-    def list_requests(self, viewer_id: int | None, *, sort: str | None, limit: int | None) -> list[dict[str, Any]]:
+    def list_requests(
+        self,
+        viewer_id: int | None,
+        *,
+        sort: str | None,
+        limit: int | None,
+        offset: int | None = None,
+    ) -> list[dict[str, Any]]:
         seed = self.repo.load_seed()
         items = [self._to_request_item(item, viewer_id, None) for item in seed.get("requests", []) if item.get("status") != "REMOVED"]
         normalized = (sort or "latest").lower()
@@ -21,10 +28,12 @@ class RequestsReadService:
         else:
             items.sort(key=lambda item: -parse_iso_datetime(item.get("createdAt")).timestamp())
         safe_limit = clamp_limit(limit, max_value=100)
-        return items[:safe_limit] if safe_limit else items
+        safe_offset = max(0, min(offset or 0, 10_000))
+        sliced = items[safe_offset:]
+        return sliced[:safe_limit] if safe_limit else sliced
 
     def list_leaderboard(self, viewer_id: int | None, *, limit: int | None) -> list[dict[str, Any]]:
-        items = self.list_requests(viewer_id, sort="hot", limit=limit)
+        items = self.list_requests(viewer_id, sort="hot", limit=limit, offset=0)
         return items
 
     def get_detail(self, viewer_id: int, viewer_role_mask: int | None, request_id: int) -> dict[str, Any]:
