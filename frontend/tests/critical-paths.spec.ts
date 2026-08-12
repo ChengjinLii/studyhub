@@ -334,6 +334,8 @@ test('mobile login presents the form before the supporting introduction', async 
   const loginAside = page.locator('.login-aside');
   await expect(loginCard).toBeVisible();
   await expect(loginAside).toBeVisible();
+  await expect(page.locator('.mobile-bottom-nav')).toHaveCount(0);
+  await expect(page.locator('.floating-sidebar')).toHaveCount(0);
 
   const loginBox = await loginCard.boundingBox();
   const asideBox = await loginAside.boundingBox();
@@ -350,6 +352,12 @@ test('mobile discovery controls provide comfortable touch targets', async ({ pag
   await expect(filterChip).toBeVisible();
   const chipBox = await filterChip.boundingBox();
   expect(chipBox?.height ?? 0).toBeGreaterThanOrEqual(44);
+
+  const compactView = page.getByRole('button', { name: '紧凑双列显示' });
+  const detailView = page.getByRole('button', { name: '详细单列显示' });
+  await expect(compactView).toHaveAttribute('aria-pressed', 'true');
+  await detailView.click();
+  await expect(detailView).toHaveAttribute('aria-pressed', 'true');
 
   await page.goto('/');
   await closeEntryModalIfPresent(page);

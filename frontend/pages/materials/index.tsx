@@ -73,6 +73,7 @@ export default function MaterialsPage({ user, materials, meta, filters, stats, t
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [mobileView, setMobileView] = useState<'compact' | 'detail'>('compact');
   const searchInputRef = useRef<HTMLInputElement | null>(null);
   const filterStripRef = useRef<HTMLElement | null>(null);
   const [filterStripHasMore, setFilterStripHasMore] = useState(false);
@@ -263,24 +264,57 @@ export default function MaterialsPage({ user, materials, meta, filters, stats, t
 
         <section className="card mobile-library-list">
           <div className="mobile-library-list__header">
-            <div>
-              <h2>全部资料</h2>
-              <p>共 {pageMeta.total} 条结果，当前显示 {materialList.length} 条。</p>
-              {filtersState.keyword.trim() ? (
-                <p className="materials-search-context">
-                  当前搜索：<strong>{filtersState.keyword.trim()}</strong>
-                </p>
-              ) : null}
+            <div className="mobile-library-list__heading">
+              <div>
+                <h2>全部资料</h2>
+                {filtersState.keyword.trim() ? (
+                  <p className="materials-search-context">
+                    当前搜索：<strong>{filtersState.keyword.trim()}</strong>
+                  </p>
+                ) : null}
+              </div>
+              <div className="mobile-library-view-toggle" role="group" aria-label="资料卡片显示方式">
+                <button
+                  type="button"
+                  className={mobileView === 'compact' ? 'is-active' : ''}
+                  aria-pressed={mobileView === 'compact'}
+                  aria-label="紧凑双列显示"
+                  title="紧凑双列"
+                  onClick={() => setMobileView('compact')}
+                >
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <rect x="4" y="4" width="6" height="6" rx="1" />
+                    <rect x="14" y="4" width="6" height="6" rx="1" />
+                    <rect x="4" y="14" width="6" height="6" rx="1" />
+                    <rect x="14" y="14" width="6" height="6" rx="1" />
+                  </svg>
+                </button>
+                <button
+                  type="button"
+                  className={mobileView === 'detail' ? 'is-active' : ''}
+                  aria-pressed={mobileView === 'detail'}
+                  aria-label="详细单列显示"
+                  title="详细单列"
+                  onClick={() => setMobileView('detail')}
+                >
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M5 6h14M5 12h14M5 18h14" />
+                  </svg>
+                </button>
+              </div>
             </div>
-            <MaterialSortSelect
-              value={filtersState.sort || 'latest'}
-              disabled={loading}
-              onChange={async (value) => {
-                const nextFilters = { ...filtersState, sort: normalizeMaterialSort(value), page: '1' };
-                setFiltersState(nextFilters);
-                await loadPage(nextFilters, 1);
-              }}
-            />
+            <div className="mobile-library-list__toolbar">
+              <p>共 {pageMeta.total} 条结果，当前显示 {materialList.length} 条。</p>
+              <MaterialSortSelect
+                value={filtersState.sort || 'latest'}
+                disabled={loading}
+                onChange={async (value) => {
+                  const nextFilters = { ...filtersState, sort: normalizeMaterialSort(value), page: '1' };
+                  setFiltersState(nextFilters);
+                  await loadPage(nextFilters, 1);
+                }}
+              />
+            </div>
           </div>
           {error && <p className="error-text">{error}</p>}
           {materialList.length === 0 ? (
@@ -293,7 +327,11 @@ export default function MaterialsPage({ user, materials, meta, filters, stats, t
               }}
             />
           ) : (
-            <ul className="materials-list mobile-resource-list">
+            <ul
+              className={`materials-list mobile-resource-list${
+                mobileView === 'compact' ? ' mobile-home-resource-grid mobile-library-resource-grid' : ''
+              }`}
+            >
               {materialList.map((item) => (
                 <MaterialCard key={item.id} material={item} />
               ))}

@@ -56,7 +56,7 @@ export default function NavBar({ user }: NavBarProps) {
               </div>
             ) : (
               <>
-                <span className="user-pill">游客模式</span>
+                <span className="user-pill user-pill--guest">游客模式</span>
                 <Link className="button ghost" href={loginTarget} prefetch={false}>
                   登录 / 注册
                 </Link>

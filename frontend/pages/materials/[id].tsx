@@ -799,6 +799,19 @@ export default function MaterialDetailPage({ material, user }: MaterialDetailPag
           margin: 0;
           color: var(--text-muted);
         }
+        @media (max-width: 720px) {
+          .rating-widget {
+            width: 100%;
+            margin-top: 0;
+            align-items: flex-start;
+            flex-direction: column;
+            gap: 4px;
+          }
+          .rating-widget p {
+            font-size: 0.82rem;
+            line-height: 1.45;
+          }
+        }
       `}</style>
     </>
   );

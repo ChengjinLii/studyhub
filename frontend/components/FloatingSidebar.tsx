@@ -28,6 +28,7 @@ const POS_STORAGE_KEY = 'floating-sidebar-pos';
 const HAT_STORAGE_KEY = 'studyhub-bot-hat';
 const MOBILE_BREAKPOINT = 720;
 const MOBILE_EDGE_GAP = 16;
+const MOBILE_DOCK_GAP = 8;
 const MOBILE_BUBBLE_SIZE = 50;
 const BOT_HAT_IDS = ['santa', 'graduation', 'party', 'wizard', 'none'] as const;
 type BotHat = (typeof BOT_HAT_IDS)[number];
@@ -79,19 +80,38 @@ export default function FloatingSidebar() {
       .map((element) => element.getBoundingClientRect().top)
       .filter((top) => top > 0 && top < window.innerHeight);
     const availableBottom = blockers.length > 0 ? Math.min(...blockers) : window.innerHeight - 76;
-    return {
-      x: Math.max(MOBILE_EDGE_GAP, window.innerWidth - MOBILE_BUBBLE_SIZE - MOBILE_EDGE_GAP),
-      y: Math.max(96, availableBottom - MOBILE_BUBBLE_SIZE - MOBILE_EDGE_GAP),
-    };
+    const x = Math.max(MOBILE_DOCK_GAP, window.innerWidth - MOBILE_BUBBLE_SIZE - MOBILE_DOCK_GAP);
+    let y = Math.max(96, availableBottom - MOBILE_BUBBLE_SIZE - MOBILE_EDGE_GAP);
+    const obstacles = Array.from(
+      document.querySelectorAll<HTMLElement>('main button, main a.button, main input, main textarea, main select')
+    )
+      .filter((element) => !element.closest('.floating-sidebar'))
+      .map((element) => element.getBoundingClientRect())
+      .filter((rect) => rect.width > 0 && rect.height > 0 && rect.bottom > 0 && rect.top < availableBottom);
+
+    for (let attempt = 0; attempt < 8; attempt += 1) {
+      const collision = obstacles.find(
+        (rect) =>
+          x - 8 < rect.right &&
+          x + MOBILE_BUBBLE_SIZE + 8 > rect.left &&
+          y - 8 < rect.bottom &&
+          y + MOBILE_BUBBLE_SIZE + 8 > rect.top
+      );
+      if (!collision) break;
+      y = Math.max(96, collision.top - MOBILE_BUBBLE_SIZE - 12);
+    }
+
+    return { x, y };
   }, []);
 
   const clampSidebarPosition = useCallback((x: number, y: number, panelWidth?: number, panelHeight?: number) => {
     if (typeof window === 'undefined') return { x, y };
     const width = panelWidth ?? sidebarRef.current?.offsetWidth ?? 320;
     const height = panelHeight ?? sidebarRef.current?.offsetHeight ?? 360;
-    const minX = 16;
+    const horizontalGap = window.innerWidth <= MOBILE_BREAKPOINT ? MOBILE_DOCK_GAP : 16;
+    const minX = horizontalGap;
     const minY = 96;
-    const maxX = Math.max(minX, window.innerWidth - width - 16);
+    const maxX = Math.max(minX, window.innerWidth - width - horizontalGap);
     const blockers = window.innerWidth <= MOBILE_BREAKPOINT
       ? Array.from(document.querySelectorAll<HTMLElement>('.mobile-bottom-nav, .mobile-detail-action-bar'))
           .map((element) => element.getBoundingClientRect().top)
@@ -180,22 +200,37 @@ export default function FloatingSidebar() {
   }, [sidebarOpen, clampSidebarPosition, getSidebarClampSize]);
 
   useEffect(() => {
-    const handler = () => {
+    let frame: number | null = null;
+    const updatePosition = () => {
+      frame = null;
       const size = getSidebarClampSize();
-      setSidebarPosition((pos) =>
-        clampSidebarPosition(pos.x, pos.y, size.width, size.height)
-      );
+      const restingPosition = getMobileRestingPosition();
+      setSidebarPosition((pos) => {
+        const followsRightDock =
+          restingPosition !== null &&
+          pos.x >= window.innerWidth - MOBILE_BUBBLE_SIZE - MOBILE_EDGE_GAP - 24;
+        const target = followsRightDock ? restingPosition : pos;
+        return clampSidebarPosition(target.x, target.y, size.width, size.height);
+      });
+    };
+    const handler = () => {
+      if (window.innerWidth > MOBILE_BREAKPOINT) return;
+      if (frame !== null) return;
+      frame = window.requestAnimationFrame(updatePosition);
     };
     if (typeof window === 'undefined') return undefined;
     window.addEventListener('resize', handler);
+    window.addEventListener('scroll', handler, { passive: true });
     window.visualViewport?.addEventListener('resize', handler);
     window.visualViewport?.addEventListener('scroll', handler);
     return () => {
       window.removeEventListener('resize', handler);
+      window.removeEventListener('scroll', handler);
       window.visualViewport?.removeEventListener('resize', handler);
       window.visualViewport?.removeEventListener('scroll', handler);
+      if (frame !== null) window.cancelAnimationFrame(frame);
     };
-  }, [clampSidebarPosition, getSidebarClampSize]);
+  }, [clampSidebarPosition, getMobileRestingPosition, getSidebarClampSize]);
 
 
   useEffect(() => {
@@ -503,6 +538,8 @@ export default function FloatingSidebar() {
       </div>
     </div>
   ) : null;
+
+  if (router.pathname === '/login') return null;
 
   return (
     <>

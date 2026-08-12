@@ -17761,3 +17761,197 @@ g.studyhub-popup-poster__hotspot:hover > text {
     border-radius: 12px;
   }
 }
+
+.mobile-library-view-toggle {
+  display: none;
+}
+
+/* Mobile density and fixed-layer refinements. Keep desktop composition unchanged. */
+@media (max-width: 768px) {
+  .header-top {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 8px;
+    align-items: center;
+  }
+
+  .header-content h1 {
+    font-size: clamp(1.02rem, 5vw, 1.18rem);
+  }
+
+  .site-title a {
+    gap: 4px;
+    white-space: nowrap;
+  }
+
+  .auth-actions {
+    justify-self: end;
+  }
+
+  .auth-actions .user-pill--guest {
+    display: none;
+  }
+
+  .auth-actions .button,
+  .auth-actions .user-pill {
+    min-height: 40px;
+    height: 40px;
+  }
+
+  .mobile-bottom-nav__item--upload {
+    border: 1px solid rgba(37, 99, 235, 0.3);
+    background: #f6f9ff;
+    color: #1d4ed8;
+    box-shadow: 0 8px 18px rgba(37, 99, 235, 0.12);
+  }
+
+  .mobile-bottom-nav__item--upload.is-active {
+    border-color: #174db5;
+    background: #174db5;
+    color: #ffffff;
+    box-shadow: 0 14px 26px rgba(37, 99, 235, 0.3);
+  }
+
+  .mobile-library-list__header {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+
+  .mobile-library-list__heading,
+  .mobile-library-list__toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+  }
+
+  .mobile-library-list__heading > div:first-child {
+    min-width: 0;
+  }
+
+  .mobile-library-list__heading p {
+    overflow-wrap: anywhere;
+  }
+
+  .mobile-library-list__toolbar > p {
+    min-width: 0;
+    margin: 0;
+  }
+
+  .mobile-library-list__toolbar .material-sort-control {
+    width: 138px;
+    flex: 0 0 138px;
+  }
+
+  .mobile-library-view-toggle {
+    display: grid;
+    grid-template-columns: repeat(2, 42px);
+    flex: 0 0 auto;
+    padding: 3px;
+    border: 1px solid #dbe4f0;
+    border-radius: 12px;
+    background: #f8fafc;
+  }
+
+  .mobile-library-view-toggle button {
+    display: inline-flex;
+    width: 42px;
+    height: 40px;
+    align-items: center;
+    justify-content: center;
+    border: 0;
+    border-radius: 9px;
+    background: transparent;
+    color: #64748b;
+    cursor: pointer;
+  }
+
+  .mobile-library-view-toggle button.is-active {
+    background: #ffffff;
+    color: #1d4ed8;
+    box-shadow: 0 2px 8px rgba(15, 23, 42, 0.1);
+  }
+
+  .mobile-library-view-toggle svg {
+    width: 20px;
+    height: 20px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.8;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  .mobile-library-resource-grid .material-card__header h3 {
+    font-size: 0.9rem;
+  }
+
+  .mobile-library-resource-grid .material-card__header .price-tag {
+    color: #1d4ed8;
+    font-weight: 800;
+  }
+
+  .mobile-library-resource-grid .material-card__header .price-tag.free {
+    color: #047857;
+  }
+
+  .mobile-resource-list:not(.mobile-home-resource-grid) .material-tags .badge {
+    min-height: 40px;
+    display: inline-flex;
+    align-items: center;
+  }
+
+  .detail-hero:not(.detail-hero--experience) {
+    padding: 12px;
+    gap: 10px;
+  }
+
+  .detail-main__surface {
+    min-height: 0;
+    gap: 14px;
+    padding: 17px;
+  }
+
+  .detail-main__footer {
+    margin-top: 0;
+    padding-top: 12px;
+  }
+
+  .detail-share .button {
+    min-height: 44px;
+  }
+
+  .detail-price-card {
+    min-width: 0;
+    padding: 16px;
+    gap: 11px;
+  }
+
+  .detail-price-card__actions,
+  .detail-price-card__secondary-actions .detail-action-like {
+    display: none;
+  }
+
+  .detail-price-card__secondary-actions {
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  }
+
+  .detail-main__surface > .material-tags {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding-bottom: 3px;
+    scrollbar-width: none;
+  }
+
+  .detail-main__surface > .material-tags::-webkit-scrollbar {
+    display: none;
+  }
+
+  .detail-main__surface > .material-tags .badge {
+    min-height: 36px;
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+  }
+}

@@ -55,6 +55,8 @@ export default function BottomTabBar() {
   const pathname = router.pathname || '/';
   const { detailActions } = useMobileBottomBar();
 
+  if (pathname === '/login') return null;
+
   if (detailActions) {
     return (
       <nav className="mobile-bottom-nav mobile-bottom-nav--detail" aria-label="资料快捷操作">
