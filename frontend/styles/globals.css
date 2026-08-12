@@ -14732,6 +14732,10 @@ g.studyhub-popup-poster__hotspot:hover > text {
     grid-template-columns: 1fr;
   }
 
+  .login-card {
+    order: -1;
+  }
+
   .login-aside {
     padding: 28px;
   }
@@ -15028,6 +15032,28 @@ g.studyhub-popup-poster__hotspot:hover > text {
 
 .leaderboard-actions .button {
   white-space: nowrap;
+}
+
+.requests-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.requests-empty-state > strong {
+  color: #0f172a;
+}
+
+.requests-empty-state > span {
+  color: #64748b;
+}
+
+.requests-empty-state__actions {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 4px;
 }
 
 .drop-zone {
@@ -16142,6 +16168,11 @@ g.studyhub-popup-poster__hotspot:hover > text {
   }
 
   .mobile-section-head a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    margin: -8px -6px -8px 0;
+    padding: 0 6px;
     color: #2563eb;
     font-size: 0.9rem;
     font-weight: 800;
@@ -16455,6 +16486,7 @@ g.studyhub-popup-poster__hotspot:hover > text {
   }
 
   .leaderboard-actions .button {
+    position: relative;
     width: auto;
     height: 30px;
     min-height: 30px;
@@ -16462,6 +16494,12 @@ g.studyhub-popup-poster__hotspot:hover > text {
     border-radius: 9px;
     justify-content: center;
     font-size: 0.75rem;
+  }
+
+  .leaderboard-actions .button::after {
+    content: '';
+    position: absolute;
+    inset: -7px -4px;
   }
 
   .support-card {
@@ -16736,7 +16774,7 @@ g.studyhub-popup-poster__hotspot:hover > text {
     background: #ffffff;
     color: #334155;
     border-radius: 999px;
-    min-height: 34px;
+    min-height: 44px;
     padding: 0 12px;
     font-size: 0.86rem;
     font-weight: 800;

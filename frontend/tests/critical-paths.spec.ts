@@ -1,6 +1,20 @@
 import { expect, test, type APIRequestContext, type Locator, type Page } from '@playwright/test';
 
 const apiPath = (path: string) => (path.startsWith('/') ? path : `/${path}`);
+const browserBaseUrl = process.env.SMOKE_BASE_URL || 'http://127.0.0.1:3100';
+
+const setMockSessionCookie = async (
+  page: Page,
+  user: { id: number; username: string; nickname: string; roleMask: number }
+) => {
+  await page.context().addCookies([
+    {
+      name: 'studyhub_user',
+      value: encodeURIComponent(JSON.stringify(user)),
+      url: browserBaseUrl,
+    },
+  ]);
+};
 
 const isSmokeTargetAvailable = async (request: APIRequestContext) => {
   try {
@@ -154,6 +168,12 @@ test('mock API mode covers payment status fallback envelope', async ({ page }) =
 });
 
 test('mock page mode covers StudyHub Agent open, fallback, drag and collapse', async ({ page }) => {
+  await setMockSessionCookie(page, {
+    id: 3,
+    username: 'mock-admin',
+    nickname: 'Mock Admin',
+    roleMask: 8,
+  });
   await page.route('**/api/session', async (route) => {
     await route.fulfill({
       status: 200,
@@ -221,6 +241,12 @@ test('mock page mode covers StudyHub Agent open, fallback, drag and collapse', a
 });
 
 test('mock page mode hides StudyHub Agent from non-admin users', async ({ page }) => {
+  await setMockSessionCookie(page, {
+    id: 1,
+    username: 'mock-user',
+    nickname: 'Mock User',
+    roleMask: 1,
+  });
   await page.route('**/api/session', async (route) => {
     await route.fulfill({
       status: 200,
@@ -267,6 +293,67 @@ test('mobile StudyHub Bot stays fully above the bottom navigation', async ({ pag
   expect((botBox?.y ?? 0) + (botBox?.height ?? 0)).toBeLessThanOrEqual((navigationBox?.y ?? 0) - 8);
   expect(botBox?.x ?? -1).toBeGreaterThanOrEqual(0);
   expect((botBox?.x ?? 0) + (botBox?.width ?? 0)).toBeLessThanOrEqual(320);
+});
+
+test('mobile StudyHub Bot also avoids a fixed material action bar', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.addInitScript(() => window.localStorage.removeItem('floating-sidebar-pos'));
+  await page.goto('/more');
+  await closeEntryModalIfPresent(page);
+
+  await page.evaluate(() => {
+    const actionBar = document.createElement('div');
+    actionBar.className = 'mobile-detail-action-bar';
+    actionBar.setAttribute('aria-label', '资料快捷操作');
+    actionBar.innerHTML = '<button class="button ghost">点赞</button><button class="button primary">获取链接</button>';
+    document.body.appendChild(actionBar);
+    window.dispatchEvent(new Event('resize'));
+  });
+
+  const bot = page.locator('.floating-sidebar__bubble');
+  const actionBar = page.locator('.mobile-detail-action-bar');
+  await expect(bot).toBeVisible();
+  await expect(actionBar).toBeVisible();
+  await page.waitForTimeout(100);
+
+  const botBox = await bot.boundingBox();
+  const actionBarBox = await actionBar.boundingBox();
+  expect(botBox).not.toBeNull();
+  expect(actionBarBox).not.toBeNull();
+  expect((botBox?.y ?? 0) + (botBox?.height ?? 0)).toBeLessThanOrEqual((actionBarBox?.y ?? 0) - 8);
+});
+
+test('mobile login presents the form before the supporting introduction', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/login');
+
+  const loginCard = page.locator('.login-card');
+  const loginAside = page.locator('.login-aside');
+  await expect(loginCard).toBeVisible();
+  await expect(loginAside).toBeVisible();
+
+  const loginBox = await loginCard.boundingBox();
+  const asideBox = await loginAside.boundingBox();
+  expect(loginBox).not.toBeNull();
+  expect(asideBox).not.toBeNull();
+  expect(loginBox?.y ?? Number.POSITIVE_INFINITY).toBeLessThan(asideBox?.y ?? 0);
+});
+
+test('mobile discovery controls provide comfortable touch targets', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/materials');
+
+  const filterChip = page.locator('.mobile-filter-chip').first();
+  await expect(filterChip).toBeVisible();
+  const chipBox = await filterChip.boundingBox();
+  expect(chipBox?.height ?? 0).toBeGreaterThanOrEqual(44);
+
+  await page.goto('/');
+  await closeEntryModalIfPresent(page);
+  const moreLink = page.locator('.mobile-section-head a').first();
+  await expect(moreLink).toBeVisible();
+  const moreBox = await moreLink.boundingBox();
+  expect(moreBox?.height ?? 0).toBeGreaterThanOrEqual(44);
 });
 
 test('StudyHub Bot wardrobe hats sit diagonally over the upper-left corner', async ({ page }) => {

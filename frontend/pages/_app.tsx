@@ -2,13 +2,13 @@ import type { AppProps } from 'next/app';
 import dynamic from 'next/dynamic';
 import Head from 'next/head';
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { ReactNode, useEffect, useState } from 'react';
 import { fetchBackend } from '../lib/apiBase';
 import { hasRole } from '../lib/auth';
-import { fetchOptionalSessionUser } from '../lib/sessionApi';
 import '../styles/globals.css';
 import AppImage from '../components/AppImage';
 import { AppDialogProvider } from '../components/AppDialogProvider';
+import { SessionProvider, useSession } from '../components/SessionProvider';
 import BottomTabBar from '../components/mobile/BottomTabBar';
 import { RoleMask, SessionUser } from '../types/user';
 
@@ -52,6 +52,35 @@ interface RuntimeInfo {
 }
 
 type EntryModalVariant = 'stable' | 'welcome' | null;
+
+function GlobalInteractiveChrome({ ready }: { ready: boolean }) {
+  const { user } = useSession();
+  if (!ready) return null;
+  const canShowAiAgent =
+    user !== null &&
+    (hasRole(user.roleMask, RoleMask.ADMIN) || hasRole(user.roleMask, RoleMask.DEVELOPER));
+
+  return (
+    <>
+      <FloatingSidebar />
+      {canShowAiAgent && <HermesAgentWidget />}
+    </>
+  );
+}
+
+function AppProviders({
+  children,
+  initialUser,
+}: {
+  children: ReactNode;
+  initialUser?: SessionUser | null;
+}) {
+  return (
+    <SessionProvider initialUser={initialUser}>
+      <AppDialogProvider>{children}</AppDialogProvider>
+    </SessionProvider>
+  );
+}
 
 function StudyHubEntryPoster() {
   return (
@@ -198,7 +227,6 @@ export default function MyApp({ Component, pageProps }: AppProps) {
   const [entryModalVariant, setEntryModalVariant] = useState<EntryModalVariant>(null);
   const [runtimeInfo, setRuntimeInfo] = useState<RuntimeInfo | null>(null);
   const [globalChromeReady, setGlobalChromeReady] = useState(false);
-  const [agentUser, setAgentUser] = useState<SessionUser | null>(null);
 
   useEffect(() => {
     if (!('serviceWorker' in navigator)) {
@@ -283,33 +311,14 @@ export default function MyApp({ Component, pageProps }: AppProps) {
     };
   }, []);
 
-  useEffect(() => {
-    if (!globalChromeReady || typeof window === 'undefined') {
-      return undefined;
-    }
-    let active = true;
-    const loadAgentSession = async () => {
-      const nextUser = await fetchOptionalSessionUser();
-      if (active) {
-        setAgentUser(nextUser);
-      }
-    };
-    void loadAgentSession();
-    window.addEventListener('focus', loadAgentSession);
-    return () => {
-      active = false;
-      window.removeEventListener('focus', loadAgentSession);
-    };
-  }, [globalChromeReady]);
-
   const showLocalDevBadge = runtimeInfo?.environment === 'local-dev' && runtimeInfo.localDev?.enabled;
   const localDevLabel = runtimeInfo?.localDev?.developerUsername
     ? `Local Dev · ${runtimeInfo.localDev.developerUsername}`
     : 'Local Dev';
   const isStableEntryModal = entryModalVariant === 'stable';
-  const canShowAiAgent =
-    agentUser !== null &&
-    (hasRole(agentUser.roleMask, RoleMask.ADMIN) || hasRole(agentUser.roleMask, RoleMask.DEVELOPER));
+  const initialSessionUser = Object.prototype.hasOwnProperty.call(pageProps, 'user')
+    ? ((pageProps as { user?: SessionUser | null }).user ?? null)
+    : undefined;
 
   return (
     <>
@@ -330,14 +339,9 @@ export default function MyApp({ Component, pageProps }: AppProps) {
         <meta name="apple-mobile-web-app-title" content="StudyHub·学汇" />
         <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
       </Head>
-      <AppDialogProvider>
+      <AppProviders initialUser={initialSessionUser}>
       <div className="page-with-footer">
-        {globalChromeReady && (
-          <>
-            <FloatingSidebar />
-            {canShowAiAgent && <HermesAgentWidget />}
-          </>
-        )}
+        <GlobalInteractiveChrome ready={globalChromeReady} />
         {showLocalDevBadge && <div className="runtime-environment-badge">{localDevLabel}</div>}
         {entryModalVariant && (
           <div className="modal-mask stable-version-mask" onClick={() => setEntryModalVariant(null)}>
@@ -533,7 +537,7 @@ export default function MyApp({ Component, pageProps }: AppProps) {
         )}
         <BottomTabBar />
       </div>
-      </AppDialogProvider>
+      </AppProviders>
     </>
   );
 }

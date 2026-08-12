@@ -1,14 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import Link from 'next/link';
-import { hasRole, readSession } from '../lib/auth';
+import { useRouter } from 'next/router';
+import { hasRole } from '../lib/auth';
 import { formatDateTime } from '../lib/format';
-import { fetchOptionalSessionUser } from '../lib/sessionApi';
 import { materialPath } from '../lib/slug';
 import { fetchStudyHubAgentMaterial, requestStudyHubAgentRecommendations } from '../lib/studyHubAgentApi';
-import { RoleMask, SessionUser } from '../types/user';
+import { RoleMask } from '../types/user';
 import { MaterialListItem } from '../types/material';
 import SafeMarkdown from './SafeMarkdown';
+import { useSession } from './SessionProvider';
 
 type EyeOffset = { x: number; y: number };
 type AiRecommendation = {
@@ -43,8 +44,8 @@ function isBotHat(value: string | null): value is BotHat {
 }
 
 export default function FloatingSidebar() {
-  const { user: sessionUser } = readSession();
-  const [user, setUser] = useState<SessionUser | null>(sessionUser);
+  const router = useRouter();
+  const { user, refreshSession } = useSession();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [wardrobeOpen, setWardrobeOpen] = useState(false);
   const [sidebarPosition, setSidebarPosition] = useState({ x: 60, y: 220 });
@@ -59,7 +60,6 @@ export default function FloatingSidebar() {
   const [bubbleMood, setBubbleMood] = useState<'neutral' | 'happy' | 'wink'>('neutral');
   const [eyeOffset, setEyeOffset] = useState<EyeOffset>({ x: 0, y: 0 });
   const eyeTrackingEnabled = true; // 眼睛跟随默认开启（无开关）
-  const lastFetchRef = useRef<number>(0);
   const [chatQuery, setChatQuery] = useState('');
   const [chatLoading, setChatLoading] = useState(false);
   const [chatStage, setChatStage] = useState('');
@@ -73,9 +73,12 @@ export default function FloatingSidebar() {
   const getMobileRestingPosition = useCallback(() => {
     if (typeof window === 'undefined') return null;
     if (window.innerWidth > MOBILE_BREAKPOINT) return null;
-    const mobileNav = document.querySelector<HTMLElement>('.mobile-bottom-nav');
-    const mobileNavTop = mobileNav?.getBoundingClientRect().top;
-    const availableBottom = mobileNavTop && mobileNavTop > 0 ? mobileNavTop : window.innerHeight - 76;
+    const blockers = Array.from(
+      document.querySelectorAll<HTMLElement>('.mobile-bottom-nav, .mobile-detail-action-bar')
+    )
+      .map((element) => element.getBoundingClientRect().top)
+      .filter((top) => top > 0 && top < window.innerHeight);
+    const availableBottom = blockers.length > 0 ? Math.min(...blockers) : window.innerHeight - 76;
     return {
       x: Math.max(MOBILE_EDGE_GAP, window.innerWidth - MOBILE_BUBBLE_SIZE - MOBILE_EDGE_GAP),
       y: Math.max(96, availableBottom - MOBILE_BUBBLE_SIZE - MOBILE_EDGE_GAP),
@@ -89,11 +92,12 @@ export default function FloatingSidebar() {
     const minX = 16;
     const minY = 96;
     const maxX = Math.max(minX, window.innerWidth - width - 16);
-    const mobileNav = window.innerWidth <= MOBILE_BREAKPOINT
-      ? document.querySelector<HTMLElement>('.mobile-bottom-nav')
-      : null;
-    const mobileNavTop = mobileNav?.getBoundingClientRect().top;
-    const availableBottom = mobileNavTop && mobileNavTop > 0 ? mobileNavTop : window.innerHeight;
+    const blockers = window.innerWidth <= MOBILE_BREAKPOINT
+      ? Array.from(document.querySelectorAll<HTMLElement>('.mobile-bottom-nav, .mobile-detail-action-bar'))
+          .map((element) => element.getBoundingClientRect().top)
+          .filter((top) => top > 0 && top < window.innerHeight)
+      : [];
+    const availableBottom = blockers.length > 0 ? Math.min(...blockers) : window.innerHeight;
     const maxY = Math.max(minY, availableBottom - height - MOBILE_EDGE_GAP);
     return {
       x: Math.min(Math.max(minX, x), maxX),
@@ -140,6 +144,22 @@ export default function FloatingSidebar() {
       return clampSidebarPosition(next.x, next.y, size.width, size.height);
     });
   }, [clampSidebarPosition, getMobileRestingPosition, getSidebarClampSize]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+    const frame = window.requestAnimationFrame(() => {
+      const size = getSidebarClampSize();
+      const restingPosition = getMobileRestingPosition();
+      setSidebarPosition((position) => {
+        const followsRightDock =
+          restingPosition !== null &&
+          position.x >= window.innerWidth - MOBILE_BUBBLE_SIZE - MOBILE_EDGE_GAP - 24;
+        const target = followsRightDock ? restingPosition : position;
+        return clampSidebarPosition(target.x, target.y, size.width, size.height);
+      });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [clampSidebarPosition, getMobileRestingPosition, getSidebarClampSize, router.asPath]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -244,24 +264,15 @@ export default function FloatingSidebar() {
     );
   }, [user]);
 
-  const loadData = useCallback(async () => {
-    try {
-      setUser(await fetchOptionalSessionUser());
-      lastFetchRef.current = Date.now();
-    } catch {
-      // ignore fetch errors
-    }
-  }, []);
-
   useEffect(() => {
     const handleOpen = (event: Event) => {
       const custom = event as CustomEvent<string>;
       setSidebarOpen(custom.detail === 'toggle' ? (prev) => !prev : true);
-      loadData();
+      refreshSession();
     };
     window.addEventListener('floating-sidebar:toggle', handleOpen as EventListener);
     return () => window.removeEventListener('floating-sidebar:toggle', handleOpen as EventListener);
-  }, [loadData]);
+  }, [refreshSession]);
 
   const extractAiJson = (raw: string) => {
     if (!raw) return '';
@@ -351,33 +362,6 @@ export default function FloatingSidebar() {
 
   const pickRecommendationReason = (rec: AiRecommendation) =>
     rec.reason || rec.explain || rec.match_reason || rec.note || rec.summary || '';
-
-  useEffect(() => {
-    let cancelled = false;
-    loadData();
-    return () => {
-      cancelled = true;
-    };
-  }, [loadData]);
-
-  useEffect(() => {
-    const handleVisibility = () => {
-      if (document.visibilityState === 'visible') {
-        const now = Date.now();
-        if (now - lastFetchRef.current > 15000) {
-          loadData();
-        }
-      }
-    };
-    if (typeof document === 'undefined') return;
-    document.addEventListener('visibilitychange', handleVisibility);
-    window.addEventListener('focus', handleVisibility);
-    return () => {
-      document.removeEventListener('visibilitychange', handleVisibility);
-      window.removeEventListener('focus', handleVisibility);
-    };
-  }, [loadData]);
-
 
   const handlePointerMoveDrag = useCallback(
     (event: PointerEvent) => {

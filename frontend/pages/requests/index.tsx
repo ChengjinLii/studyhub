@@ -86,14 +86,27 @@ export default function RequestsPage({ user, requests, leaderboard }: RequestsPa
               <h2 className="card-title">求购列表</h2>
               <p className="help-text">当前展示 {requests.length} 条求购需求。</p>
             </div>
-            <div className="request-header-actions">
-              <Link className="button primary small" href="/requests/new" prefetch={false}>
-                我要购买
-              </Link>
-            </div>
+            {requests.length > 0 && (
+              <div className="request-header-actions">
+                <Link className="button primary small" href="/requests/new" prefetch={false}>
+                  发布求购
+                </Link>
+              </div>
+            )}
           </div>
           {requests.length === 0 ? (
-            <div className="empty-state">暂无求购需求。</div>
+            <div className="empty-state requests-empty-state">
+              <strong>暂时没有公开的求购需求</strong>
+              <span>可以先搜索已有资料；仍未找到时，再发布新的求购。</span>
+              <div className="requests-empty-state__actions">
+                <Link className="button ghost small" href="/materials" prefetch={false}>
+                  搜索资料
+                </Link>
+                <Link className="button primary small" href="/requests/new" prefetch={false}>
+                  发布求购
+                </Link>
+              </div>
+            </div>
           ) : (
             <ul className="request-list">
               {requests.map((item) => {

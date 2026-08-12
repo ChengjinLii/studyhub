@@ -21,9 +21,13 @@ export function readSession(req?: IncomingMessage): SessionState {
   const rawUser = cookies['studyhub_user'];
   if (rawUser) {
     try {
-      user = JSON.parse(decodeURIComponent(rawUser));
+      user = JSON.parse(rawUser);
     } catch {
-      user = null;
+      try {
+        user = JSON.parse(decodeURIComponent(rawUser));
+      } catch {
+        user = null;
+      }
     }
   }
   return { user, token };

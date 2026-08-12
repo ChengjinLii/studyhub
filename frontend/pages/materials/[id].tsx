@@ -484,7 +484,7 @@ export default function MaterialDetailPage({ material, user }: MaterialDetailPag
 	                          className={`button detail-action-download ${material.free || canManage || purchased ? 'primary' : 'ghost'}`}
 	                          type="button"
 	                          onClick={handleDownload}
-	                          disabled={downloading || (material.hasNetdisk && !canViewNetdisk)}
+	                          disabled={downloading}
                         >
                           {downloading
                             ? material.hasNetdisk
@@ -736,7 +736,7 @@ export default function MaterialDetailPage({ material, user }: MaterialDetailPag
               className="button primary mobile-detail-action-bar__primary"
               type="button"
               onClick={handleDownload}
-              disabled={downloading || (material.hasNetdisk && !canViewNetdisk)}
+              disabled={downloading}
             >
               {downloading
                 ? material.hasNetdisk

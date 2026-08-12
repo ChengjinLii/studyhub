@@ -1,11 +1,10 @@
 import { useCallback, useEffect, useState } from 'react';
-import { fetchOptionalSessionUser } from '../../lib/sessionApi';
 import {
   fetchStudyHubAgentMaterial,
   requestStudyHubAgentRecommendations,
   requestStudyHubAgentRecommendationsStream,
 } from '../../lib/studyHubAgentApi';
-import { SessionUser } from '../../types/user';
+import { useSession } from '../SessionProvider';
 import {
   STUDYHUB_AGENT_INITIAL_MESSAGES,
   STUDYHUB_AGENT_MESSAGES_STORAGE_KEY,
@@ -27,28 +26,14 @@ const EARLIER_CONTEXT_SUMMARY_MAX_CHARS = 360;
 const IMAGE_ONLY_QUERY = '请根据这张图片帮我分析学习问题';
 
 export const useStudyHubAgentChat = () => {
+  const { user } = useSession();
   const [loading, setLoading] = useState(false);
   const [thinkingStages, setThinkingStages] = useState<string[]>([]);
   const [streamingAnswer, setStreamingAnswer] = useState('');
-  const [user, setUser] = useState<SessionUser | null>(null);
   const [messages, setMessages] = useState<StudyHubAgentMessage[]>(STUDYHUB_AGENT_INITIAL_MESSAGES);
   const [materialDetails, setMaterialDetails] = useState<StudyHubAgentMaterialDetails>({});
   const [agentSessionId, setAgentSessionId] = useState('');
   const [hydratedUserId, setHydratedUserId] = useState<number | null>(null);
-
-  useEffect(() => {
-    let active = true;
-    const loadSession = async () => {
-      const nextUser = await fetchOptionalSessionUser();
-      if (active) setUser(nextUser);
-    };
-    void loadSession();
-    window.addEventListener('focus', loadSession);
-    return () => {
-      active = false;
-      window.removeEventListener('focus', loadSession);
-    };
-  }, []);
 
   useEffect(() => {
     if (!user?.id) {

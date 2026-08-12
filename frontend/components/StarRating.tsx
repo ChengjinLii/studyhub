@@ -17,7 +17,7 @@ export default function StarRating({ value, onChange, readOnly, size = 28 }: Sta
   };
 
   return (
-    <div className="star-rating" role="radiogroup" aria-label="评分">
+    <div className={`star-rating${readOnly ? ' is-read-only' : ''}`} role="radiogroup" aria-label="评分">
       {[1, 2, 3, 4, 5].map((score) => {
         const active = displayValue >= score;
         return (
@@ -57,6 +57,17 @@ export default function StarRating({ value, onChange, readOnly, size = 28 }: Sta
         .star:focus-visible {
           outline: 2px solid var(--brand-primary);
           border-radius: 4px;
+        }
+        @media (max-width: 720px) {
+          .star-rating:not(.is-read-only) .star {
+            width: 44px;
+            min-width: 44px;
+            height: 44px;
+            min-height: 44px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+          }
         }
         @media (hover: none) {
           .star {
