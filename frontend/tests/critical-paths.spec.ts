@@ -367,6 +367,88 @@ test('mobile discovery controls provide comfortable touch targets', async ({ pag
   expect(moreBox?.height ?? 0).toBeGreaterThanOrEqual(44);
 });
 
+test('material list restores its session view and scroll position after detail navigation', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.addInitScript(() => {
+    const materials = Array.from({ length: 24 }, (_, index) => ({
+      id: 7000 + index,
+      title: `恢复测试资料 ${index + 1}`,
+      free: true,
+      price: 0,
+      school: '电子科技大学',
+      college: '信通',
+      major: '通信',
+      gradeValue: '大二',
+      courseCategory: 'MAJOR',
+      tags: ['期末真题'],
+      likeCount: 0,
+      commentCount: 0,
+      downloadCount: index,
+      ratingAvg: 0,
+    }));
+    window.sessionStorage.setItem('studyhub:materials-list:v1', JSON.stringify({
+      version: 1,
+      savedAt: Date.now(),
+      pendingRestore: true,
+      filters: {
+        keyword: '通信原理', school: '', college: '', major: '', tag: '期末真题',
+        gradeValue: '', courseCategory: '', price: '', sort: 'downloads', page: '1', size: '24',
+      },
+      materials,
+      meta: { page: 1, size: 24, total: 80 },
+      availableTags: ['期末真题'],
+      mobileView: 'detail',
+      scrollY: 520,
+    }));
+  });
+  await page.goto('/materials');
+  await expect(page.getByRole('textbox', { name: '搜索资料' })).toHaveValue('通信原理');
+  await expect(page.getByRole('button', { name: '详细单列显示' })).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('.material-card')).toHaveCount(24);
+  await expect(page.locator('.app-toast')).toContainText('已恢复上次的筛选条件和浏览位置');
+  await page.waitForTimeout(180);
+  expect(await page.evaluate(() => window.scrollY)).toBeGreaterThanOrEqual(450);
+});
+
+test('mobile Bot moves away while a text field is focused and returns after blur', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.addInitScript(() => window.localStorage.removeItem('floating-sidebar-pos'));
+  await page.goto('/materials');
+  const bot = page.locator('.floating-sidebar__bubble');
+  const search = page.getByRole('textbox', { name: '搜索资料' });
+  await expect(bot).toBeVisible();
+  const restingBox = await bot.boundingBox();
+  await search.focus();
+  await page.waitForTimeout(180);
+  const focusedBox = await bot.boundingBox();
+  expect(focusedBox?.y ?? Number.POSITIVE_INFINITY).toBeLessThan(restingBox?.y ?? 0);
+  expect(focusedBox?.y ?? Number.POSITIVE_INFINITY).toBeLessThanOrEqual(110);
+  await search.evaluate((element) => (element as HTMLInputElement).blur());
+  await page.waitForTimeout(260);
+  const restoredBox = await bot.boundingBox();
+  expect(restoredBox?.y ?? 0).toBeGreaterThan(focusedBox?.y ?? Number.POSITIVE_INFINITY);
+});
+
+test('material filtering updates one toast from loading to completion', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/materials');
+  await page.route('**/api/materials?**', async (route) => {
+    await new Promise((resolve) => setTimeout(resolve, 250));
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        ok: true,
+        data: { items: [], meta: { page: 1, size: 24, total: 0 }, availableTags: [] },
+      }),
+    });
+  });
+  await page.getByRole('button', { name: '付费', exact: true }).click();
+  await expect(page.locator('.app-toast')).toHaveCount(1);
+  await expect(page.locator('.app-toast')).toContainText('正在筛选资料');
+  await expect(page.locator('.app-toast')).toContainText('筛选完成，共 0 条结果');
+});
+
 test('StudyHub Bot wardrobe hats sit diagonally over the upper-left corner', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.addInitScript(() => {

@@ -70,6 +70,7 @@ export default function MaterialDetailPage({ material, user }: MaterialDetailPag
     ratingAvg,
     ratingCount,
     ratingSubmitting,
+    likeSubmitting,
     handlePurchase,
     handleDownload,
     handleRatingChange,
@@ -110,6 +111,7 @@ export default function MaterialDetailPage({ material, user }: MaterialDetailPag
               : '获取下载链接';
     setDetailActions({
       liked,
+      likeDisabled: likeSubmitting,
       primaryLabel,
       primaryDisabled: shouldPurchase ? ordering : downloading || !canDownload,
       onLike: handleToggleLike,
@@ -123,6 +125,7 @@ export default function MaterialDetailPage({ material, user }: MaterialDetailPag
     handlePurchase,
     handleToggleLike,
     isExperienceMaterial,
+    likeSubmitting,
     liked,
     material,
     ordering,
@@ -254,7 +257,7 @@ export default function MaterialDetailPage({ material, user }: MaterialDetailPag
                         </span>
                         分享文章
                       </button>
-                      <button className="button ghost small" type="button" onClick={handleToggleLike}>
+                      <button className="button ghost small" type="button" onClick={handleToggleLike} disabled={likeSubmitting}>
                         <span className="button-icon" aria-hidden="true">
                           <svg viewBox="0 0 24 24" aria-hidden="true">
                             <path
@@ -546,7 +549,7 @@ export default function MaterialDetailPage({ material, user }: MaterialDetailPag
                     </div>
                   )}
                   <div className="detail-price-card__secondary-actions">
-	                    <button className={`button ghost detail-action-like${liked ? ' is-active' : ''}`} type="button" onClick={handleToggleLike}>
+	                    <button className={`button ghost detail-action-like${liked ? ' is-active' : ''}`} type="button" onClick={handleToggleLike} disabled={likeSubmitting}>
                       <span className="button-icon" aria-hidden="true">
                         <svg viewBox="0 0 24 24" aria-hidden="true">
                           <path

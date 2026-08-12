@@ -7,6 +7,7 @@ import MeContentSections from '../components/me/MeContentSections';
 import MePayoutSection from '../components/me/MePayoutSection';
 import MeSecuritySection from '../components/me/MeSecuritySection';
 import { useAppDialog } from '../components/AppDialogProvider';
+import { useAppToast } from '../components/AppToastProvider';
 import NavBar from '../components/NavBar';
 import ProfileCard from '../components/ProfileCard';
 import { readSession } from '../lib/auth';
@@ -63,6 +64,7 @@ const ME_NAV_GROUPS = [
 
 export default function MePage({ user, summary, account }: MePageProps) {
   const dialog = useAppDialog();
+  const appToast = useAppToast();
   const router = useRouter();
   const defaultIdentifier = user?.email || user?.username || '';
   const [accountProfile, setAccountProfile] = useState<UserAccountProfile | null>(account);
@@ -189,7 +191,10 @@ export default function MePage({ user, summary, account }: MePageProps) {
   };
 
   const handleDownload = async (materialId: number) => {
-    setToast(null);
+    const toastId = appToast.show('正在生成下载链接…', {
+      id: `profile-download-${materialId}`,
+      tone: 'loading',
+    });
     try {
       const resp = await fetchBackend(`/materials/${materialId}/downloads`, { method: 'POST' });
       const json = await readApiEnvelope<{ url?: string }>(resp);
@@ -199,7 +204,7 @@ export default function MePage({ user, summary, account }: MePageProps) {
       if (!resp.ok || !json.ok || !json.data?.url) {
         throw new Error(json.msg || '获取下载链接失败');
       }
-      setToast({ type: 'success', message: '下载链接已生成，请记得尊重知识创作者的辛勤付出，不要外传或用于商业用途哦~' });
+      appToast.show('下载已开始', { id: toastId, tone: 'success' });
       const link = document.createElement('a');
       link.href = json.data.url;
       link.style.display = 'none';
@@ -207,7 +212,7 @@ export default function MePage({ user, summary, account }: MePageProps) {
       link.click();
       document.body.removeChild(link);
     } catch (error: unknown) {
-      setToast({ type: 'error', message: toErrorMessage(error, '下载失败') });
+      appToast.show(toErrorMessage(error, '下载失败'), { id: toastId, tone: 'error' });
     }
   };
   const fetchResetCaptcha = async () => {

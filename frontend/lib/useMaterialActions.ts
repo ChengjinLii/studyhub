@@ -8,6 +8,7 @@ import { materialPath } from './slug';
 import { copyToClipboard, isLikelyMobile, tryNativeShare } from './share';
 import { getOrCreateViewerId, hasRecordedMaterialView, markMaterialViewRecorded } from './viewer';
 import { useAppDialog } from '../components/AppDialogProvider';
+import { useAppToast } from '../components/AppToastProvider';
 import { MaterialDetail } from '../types/material';
 import { SessionUser } from '../types/user';
 
@@ -27,6 +28,7 @@ export const useMaterialActions = ({
   router,
 }: UseMaterialActionsOptions) => {
   const dialog = useAppDialog();
+  const toast = useAppToast();
   const [purchased, setPurchased] = useState(
     material ? material.free || material.purchased || canManage : false
   );
@@ -48,6 +50,7 @@ export const useMaterialActions = ({
   const [ratingAvg, setRatingAvg] = useState(material?.ratingAvg ?? 0);
   const [ratingCount, setRatingCount] = useState(material?.ratingCount ?? 0);
   const [ratingSubmitting, setRatingSubmitting] = useState(false);
+  const [likeSubmitting, setLikeSubmitting] = useState(false);
 
   useEffect(() => {
     setPurchased(material ? material.free || material.purchased || canManage : false);
@@ -100,13 +103,20 @@ export const useMaterialActions = ({
     if (!material) return;
     if (!ensureLoggedIn()) return;
     if (!material.free && !purchased) {
-      setError('请先完成支付后再下载。');
+      const message = '请先完成支付后再下载。';
+      setError(message);
+      toast.show(message, { tone: 'warning' });
       return;
     }
     if (material.hasNetdisk && showNetdiskLink && downloadUrl) {
       setNetdiskModalOpen(true);
+      toast.show('网盘链接已准备好', { tone: 'info' });
       return;
     }
+    const toastId = toast.show(
+      material.hasNetdisk ? '正在获取网盘链接…' : '正在生成下载链接…',
+      { id: `material-download-${material.id}`, tone: 'loading' }
+    );
     setDownloading(true);
     setError('');
     setInfo('');
@@ -125,10 +135,12 @@ export const useMaterialActions = ({
         anchor.click();
         document.body.removeChild(anchor);
         setInfo('下载链接已生成，请记得尊重知识创作者的辛勤付出，不要外传或用于商业用途哦~');
+        toast.show('下载已开始', { id: toastId, tone: 'success' });
       } else if (material.hasNetdisk) {
         setShowNetdiskLink(true);
         setNetdiskModalOpen(true);
         setInfo('下载链接已生成，请记得尊重知识创作者的辛勤付出，不要外传或用于商业用途哦~');
+        toast.show('网盘链接已获取', { id: toastId, tone: 'success' });
       }
     } catch (err: unknown) {
       if (err instanceof ApiError && err.code === 'DOWNLOAD_QUOTA_EXHAUSTED') {
@@ -137,11 +149,13 @@ export const useMaterialActions = ({
           message: err.message || '下载次数已用完，如需继续下载请联系管理员重置额度。',
         });
       }
-      setError(toErrorMessage(err, '下载失败'));
+      const message = toErrorMessage(err, '下载失败');
+      setError(message);
+      toast.show(message, { id: toastId, tone: 'error' });
     } finally {
       setDownloading(false);
     }
-  }, [dialog, downloadUrl, ensureLoggedIn, material, purchased, showNetdiskLink]);
+  }, [dialog, downloadUrl, ensureLoggedIn, material, purchased, showNetdiskLink, toast]);
 
   const handlePurchase = useCallback(async () => {
     if (!material) return;
@@ -189,20 +203,32 @@ export const useMaterialActions = ({
   const handleToggleLike = useCallback(async () => {
     if (!material) return;
     if (!ensureLoggedIn()) return;
+    if (likeSubmitting) return;
+    const nextLiked = !liked;
+    const toastId = toast.show(nextLiked ? '正在点赞…' : '正在取消点赞…', {
+      id: `material-like-${material.id}`,
+      tone: 'loading',
+    });
     const optimistic = liked ? Math.max(0, likeCount - 1) : likeCount + 1;
-    setLiked(!liked);
+    setLikeSubmitting(true);
+    setLiked(nextLiked);
     setLikeCount(optimistic);
     try {
       const nextLikeCount = await toggleMaterialLike(material.id, liked);
       if (typeof nextLikeCount === 'number') {
         setLikeCount(nextLikeCount);
       }
+      toast.show(nextLiked ? '已点赞' : '已取消点赞', { id: toastId, tone: 'success' });
     } catch (err: unknown) {
       setLiked(liked);
       setLikeCount(likeCount);
-      setError(toErrorMessage(err, '操作失败'));
+      const message = toErrorMessage(err, '操作失败');
+      setError(message);
+      toast.show(message, { id: toastId, tone: 'error' });
+    } finally {
+      setLikeSubmitting(false);
     }
-  }, [ensureLoggedIn, liked, likeCount, material]);
+  }, [ensureLoggedIn, likeSubmitting, liked, likeCount, material, toast]);
 
   const handleReport = useCallback(async () => {
     if (!material) return;
@@ -239,6 +265,7 @@ export const useMaterialActions = ({
         const shared = await tryNativeShare({ title: shareTitle, text: shareText, url: shareUrl });
         if (shared) {
           setInfo('已唤起系统分享。');
+          toast.show('已唤起系统分享', { tone: 'success' });
           return;
         }
         setShareSheetTitle('分享资料');
@@ -250,13 +277,17 @@ export const useMaterialActions = ({
       const copied = await copyToClipboard(shareUrl);
       if (copied) {
         setInfo('资料链接已复制，可以直接分享给同学。');
+        toast.show('资料链接已复制', { tone: 'success' });
         return;
       }
       setError('复制失败，请手动复制链接。');
+      toast.show('复制失败，请手动复制链接。', { tone: 'error' });
     } catch (err: unknown) {
-      setError(toErrorMessage(err, '复制失败，请手动复制链接。'));
+      const message = toErrorMessage(err, '复制失败，请手动复制链接。');
+      setError(message);
+      toast.show(message, { tone: 'error' });
     }
-  }, [material]);
+  }, [material, toast]);
 
   return {
     purchased,
@@ -280,6 +311,7 @@ export const useMaterialActions = ({
     ratingAvg,
     ratingCount,
     ratingSubmitting,
+    likeSubmitting,
     handlePurchase,
     handleDownload,
     handleRatingChange,

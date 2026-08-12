@@ -17766,8 +17766,152 @@ g.studyhub-popup-poster__hotspot:hover > text {
   display: none;
 }
 
+.app-toast-region {
+  position: fixed;
+  z-index: 160;
+  top: 78px;
+  right: 22px;
+  display: flex;
+  width: min(380px, calc(100vw - 32px));
+  flex-direction: column;
+  gap: 9px;
+  pointer-events: none;
+}
+
+.app-toast {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  min-height: 48px;
+  padding: 10px 10px 10px 13px;
+  border: 1px solid #dbe4f0;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.97);
+  color: #1e293b;
+  box-shadow: 0 16px 36px rgba(15, 23, 42, 0.18);
+  backdrop-filter: blur(14px);
+  pointer-events: auto;
+  animation: app-toast-enter 180ms ease-out both;
+}
+
+.app-toast--success {
+  border-color: #a7f3d0;
+}
+
+.app-toast--warning {
+  border-color: #fde68a;
+}
+
+.app-toast--error {
+  border-color: #fecaca;
+}
+
+.app-toast--loading,
+.app-toast--info {
+  border-color: #bfdbfe;
+}
+
+.app-toast__icon {
+  display: inline-flex;
+  width: 24px;
+  height: 24px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: #eff6ff;
+  color: #2563eb;
+}
+
+.app-toast--success .app-toast__icon {
+  background: #ecfdf5;
+  color: #047857;
+}
+
+.app-toast--warning .app-toast__icon {
+  background: #fffbeb;
+  color: #b45309;
+}
+
+.app-toast--error .app-toast__icon {
+  background: #fef2f2;
+  color: #dc2626;
+}
+
+.app-toast__icon svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.app-toast__spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(37, 99, 235, 0.22);
+  border-top-color: #2563eb;
+  border-radius: 50%;
+  animation: app-toast-spin 720ms linear infinite;
+}
+
+.app-toast__message {
+  min-width: 0;
+  font-size: 0.9rem;
+  font-weight: 650;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.app-toast__close {
+  display: inline-flex;
+  width: 32px;
+  height: 32px;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #64748b;
+  font-size: 1.15rem;
+  cursor: pointer;
+}
+
+.app-toast__close:hover {
+  background: #f1f5f9;
+  color: #0f172a;
+}
+
+@keyframes app-toast-enter {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes app-toast-spin {
+  to { transform: rotate(360deg); }
+}
+
 /* Mobile density and fixed-layer refinements. Keep desktop composition unchanged. */
 @media (max-width: 768px) {
+  .app-toast-region {
+    top: calc(70px + env(safe-area-inset-top));
+    right: 12px;
+    left: 12px;
+    width: auto;
+  }
+
+  .app-toast {
+    min-height: 50px;
+    border-radius: 13px;
+  }
+
+  .app-toast__close {
+    width: 44px;
+    height: 44px;
+    margin: -6px;
+  }
   .header-top {
     grid-template-columns: minmax(0, 1fr) auto;
     gap: 8px;

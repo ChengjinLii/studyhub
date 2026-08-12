@@ -70,6 +70,7 @@ export default function BottomTabBar() {
           className={`mobile-bottom-nav__item mobile-bottom-nav__detail-like${detailActions.liked ? ' is-active' : ''}`}
           type="button"
           onClick={detailActions.onLike}
+          disabled={detailActions.likeDisabled}
         >
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <path d="M7 10v11H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3Zm0 11h10.8a2 2 0 0 0 2-1.7l1.2-7A2 2 0 0 0 19 10h-5V6a3 3 0 0 0-3-3L7 10v11Z" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />

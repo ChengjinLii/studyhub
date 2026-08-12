@@ -44,6 +44,13 @@ function isBotHat(value: string | null): value is BotHat {
   return BOT_HAT_IDS.includes(value as BotHat);
 }
 
+const isTextEntryElement = (element: Element | null) => {
+  if (element instanceof HTMLTextAreaElement) return !element.readOnly && !element.disabled;
+  if (element instanceof HTMLElement && element.isContentEditable) return true;
+  if (!(element instanceof HTMLInputElement) || element.readOnly || element.disabled) return false;
+  return !['button', 'checkbox', 'color', 'file', 'hidden', 'radio', 'range', 'reset', 'submit'].includes(element.type);
+};
+
 export default function FloatingSidebar() {
   const router = useRouter();
   const { user, refreshSession } = useSession();
@@ -58,6 +65,7 @@ export default function FloatingSidebar() {
   const dragMovedRef = useRef(false);
   const suppressClickRef = useRef(false);
   const dragStartRef = useRef<{ x: number; y: number } | null>(null);
+  const keyboardOriginRef = useRef<{ x: number; y: number } | null>(null);
   const [bubbleMood, setBubbleMood] = useState<'neutral' | 'happy' | 'wink'>('neutral');
   const [eyeOffset, setEyeOffset] = useState<EyeOffset>({ x: 0, y: 0 });
   const eyeTrackingEnabled = true; // 眼睛跟随默认开启（无开关）
@@ -205,7 +213,19 @@ export default function FloatingSidebar() {
       frame = null;
       const size = getSidebarClampSize();
       const restingPosition = getMobileRestingPosition();
+      const textEntryFocused = isTextEntryElement(document.activeElement);
+      if (textEntryFocused) setSidebarOpen(false);
       setSidebarPosition((pos) => {
+        if (textEntryFocused) {
+          if (!keyboardOriginRef.current) keyboardOriginRef.current = pos;
+          const visualTop = window.visualViewport?.offsetTop || 0;
+          return clampSidebarPosition(pos.x, Math.max(96, visualTop + 76), size.width, size.height);
+        }
+        if (keyboardOriginRef.current) {
+          const origin = keyboardOriginRef.current;
+          keyboardOriginRef.current = null;
+          return clampSidebarPosition(origin.x, origin.y, size.width, size.height);
+        }
         const followsRightDock =
           restingPosition !== null &&
           pos.x >= window.innerWidth - MOBILE_BUBBLE_SIZE - MOBILE_EDGE_GAP - 24;
@@ -218,14 +238,19 @@ export default function FloatingSidebar() {
       if (frame !== null) return;
       frame = window.requestAnimationFrame(updatePosition);
     };
+    const handleFocusOut = () => window.setTimeout(handler, 120);
     if (typeof window === 'undefined') return undefined;
     window.addEventListener('resize', handler);
     window.addEventListener('scroll', handler, { passive: true });
+    window.addEventListener('focusin', handler);
+    window.addEventListener('focusout', handleFocusOut);
     window.visualViewport?.addEventListener('resize', handler);
     window.visualViewport?.addEventListener('scroll', handler);
     return () => {
       window.removeEventListener('resize', handler);
       window.removeEventListener('scroll', handler);
+      window.removeEventListener('focusin', handler);
+      window.removeEventListener('focusout', handleFocusOut);
       window.visualViewport?.removeEventListener('resize', handler);
       window.visualViewport?.removeEventListener('scroll', handler);
       if (frame !== null) window.cancelAnimationFrame(frame);

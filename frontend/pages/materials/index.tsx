@@ -1,6 +1,8 @@
 import { GetServerSideProps } from 'next';
 import Link from 'next/link';
+import { useRouter } from 'next/router';
 import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
+import { useAppToast } from '../../components/AppToastProvider';
 import MaterialCard from '../../components/MaterialCard';
 import MaterialSortSelect from '../../components/materials/MaterialSortSelect';
 import NavBar from '../../components/NavBar';
@@ -22,6 +24,12 @@ import { formatNumber } from '../../lib/format';
 import { normalizeMaterialSort } from '../../constants/materialSort';
 import { MaterialListItem, PaginationMeta } from '../../types/material';
 import { SessionUser } from '../../types/user';
+import {
+  MaterialsListSessionSnapshot,
+  MaterialsMobileView,
+  readMaterialsListSession,
+  writeMaterialsListSession,
+} from '../../lib/materialsListSession';
 
 const MATERIALS_PAGE_SIZE = 24;
 const DEFAULT_TAG_OPTIONS = ['期末真题', '期末速成', '日常学习笔记', '教材答案', '一页纸', '开卷资料'];
@@ -66,6 +74,8 @@ const normalizeLoadedMeta = (meta: PaginationMeta | undefined): PaginationMeta =
 });
 
 export default function MaterialsPage({ user, materials, meta, filters, stats, tagOptions }: MaterialsPageProps) {
+  const router = useRouter();
+  const toast = useAppToast();
   const [filtersState, setFiltersState] = useState(filters);
   const [materialList, setMaterialList] = useState(materials);
   const [pageMeta, setPageMeta] = useState(meta);
@@ -73,9 +83,19 @@ export default function MaterialsPage({ user, materials, meta, filters, stats, t
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [mobileView, setMobileView] = useState<'compact' | 'detail'>('compact');
+  const [mobileView, setMobileView] = useState<MaterialsMobileView>('compact');
   const searchInputRef = useRef<HTMLInputElement | null>(null);
   const filterStripRef = useRef<HTMLElement | null>(null);
+  const restoredRef = useRef(false);
+  const sessionSnapshotRef = useRef<Omit<MaterialsListSessionSnapshot, 'version' | 'savedAt'>>({
+    pendingRestore: false,
+    filters,
+    materials,
+    meta,
+    availableTags: tagOptions,
+    mobileView: 'compact',
+    scrollY: 0,
+  });
   const [filterStripHasMore, setFilterStripHasMore] = useState(false);
   const quickTags = useMemo(() => {
     const source = availableTags.length > 0 ? availableTags : DEFAULT_TAG_OPTIONS;
@@ -94,6 +114,48 @@ export default function MaterialsPage({ user, materials, meta, filters, stats, t
   const hasMore = pageMeta.page * pageMeta.size < pageMeta.total;
 
   useEffect(() => {
+    sessionSnapshotRef.current = {
+      pendingRestore: false,
+      filters: filtersState,
+      materials: materialList,
+      meta: pageMeta,
+      availableTags,
+      mobileView,
+      scrollY: window.scrollY,
+    };
+  }, [availableTags, filtersState, materialList, mobileView, pageMeta]);
+
+  useEffect(() => {
+    if (restoredRef.current) return;
+    restoredRef.current = true;
+    const snapshot = readMaterialsListSession(window.sessionStorage);
+    if (!snapshot) return;
+    setFiltersState(snapshot.filters);
+    setMaterialList(snapshot.materials);
+    setPageMeta(snapshot.meta);
+    setAvailableTags(snapshot.availableTags);
+    setMobileView(snapshot.mobileView);
+    writeMaterialsListSession(window.sessionStorage, { ...snapshot, pendingRestore: false });
+    const restoreScroll = () => window.scrollTo({ top: snapshot.scrollY, left: 0, behavior: 'auto' });
+    window.requestAnimationFrame(() => window.requestAnimationFrame(restoreScroll));
+    window.setTimeout(restoreScroll, 120);
+    toast.show('已恢复上次的筛选条件和浏览位置', { tone: 'info', duration: 2400 });
+  }, [toast]);
+
+  useEffect(() => {
+    const saveBeforeDetail = (url: string) => {
+      if (!url.startsWith('/materials/')) return;
+      writeMaterialsListSession(window.sessionStorage, {
+        ...sessionSnapshotRef.current,
+        pendingRestore: true,
+        scrollY: window.scrollY,
+      });
+    };
+    router.events.on('routeChangeStart', saveBeforeDetail);
+    return () => router.events.off('routeChangeStart', saveBeforeDetail);
+  }, [router.events]);
+
+  useEffect(() => {
     const strip = filterStripRef.current;
     if (!strip) return;
     const updateCue = () => {
@@ -109,6 +171,10 @@ export default function MaterialsPage({ user, materials, meta, filters, stats, t
   };
 
   const loadPage = async (nextFilters: MobileMaterialFilterState, page: number, append = false) => {
+    const toastId = toast.show(append ? '正在加载更多资料…' : '正在筛选资料…', {
+      id: 'materials-list-loading',
+      tone: 'loading',
+    });
     setLoading(true);
     setError('');
     try {
@@ -116,8 +182,14 @@ export default function MaterialsPage({ user, materials, meta, filters, stats, t
       setMaterialList((prev) => (append ? [...prev, ...data.items] : data.items));
       setPageMeta(normalizeLoadedMeta(data.meta));
       setAvailableTags(data.availableTags || availableTags);
+      toast.show(
+        append ? `已加载 ${data.items.length} 条资料` : `筛选完成，共 ${Number(data.meta?.total) || 0} 条结果`,
+        { id: toastId, tone: 'success' }
+      );
     } catch (err) {
-      setError(err instanceof Error ? err.message : '资料加载失败，请稍后重试。');
+      const message = err instanceof Error ? err.message : '资料加载失败，请稍后重试。';
+      setError(message);
+      toast.show(message, { id: toastId, tone: 'error' });
     } finally {
       setLoading(false);
     }

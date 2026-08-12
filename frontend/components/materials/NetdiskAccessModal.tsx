@@ -1,5 +1,6 @@
-import { useEffect, useId, useState } from 'react';
+import { useEffect, useId } from 'react';
 import { copyToClipboard } from '../../lib/share';
+import { useAppToast } from '../AppToastProvider';
 
 interface NetdiskAccessModalProps {
   open: boolean;
@@ -33,12 +34,11 @@ export default function NetdiskAccessModal({
   onClose,
 }: NetdiskAccessModalProps) {
   const titleId = useId();
-  const [notice, setNotice] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const toast = useAppToast();
   const openUrl = resolveNetdiskOpenUrl(url);
 
   useEffect(() => {
     if (!open) return;
-    setNotice(null);
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') onClose();
     };
@@ -50,9 +50,8 @@ export default function NetdiskAccessModal({
 
   const handleCopy = async (value: string, successText: string) => {
     const copied = await copyToClipboard(value);
-    setNotice({
-      type: copied ? 'success' : 'error',
-      text: copied ? successText : '复制失败，请长按内容手动复制。',
+    toast.show(copied ? successText : '复制失败，请长按内容手动复制。', {
+      tone: copied ? 'success' : 'error',
     });
   };
 
@@ -107,7 +106,6 @@ export default function NetdiskAccessModal({
             </a>
           )}
         </div>
-        {notice && <p className={notice.type === 'success' ? 'success-text' : 'error-text'}>{notice.text}</p>}
       </section>
     </div>
   );

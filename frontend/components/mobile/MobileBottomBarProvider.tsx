@@ -2,6 +2,7 @@ import { createContext, ReactNode, useContext, useMemo, useState } from 'react';
 
 export interface MobileDetailActions {
   liked: boolean;
+  likeDisabled?: boolean;
   primaryLabel: string;
   primaryDisabled?: boolean;
   onLike: () => void;

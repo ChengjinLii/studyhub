@@ -8,6 +8,7 @@ import { hasRole } from '../lib/auth';
 import '../styles/globals.css';
 import AppImage from '../components/AppImage';
 import { AppDialogProvider } from '../components/AppDialogProvider';
+import { AppToastProvider } from '../components/AppToastProvider';
 import { SessionProvider, useSession } from '../components/SessionProvider';
 import BottomTabBar from '../components/mobile/BottomTabBar';
 import { MobileBottomBarProvider } from '../components/mobile/MobileBottomBarProvider';
@@ -78,9 +79,11 @@ function AppProviders({
 }) {
   return (
     <SessionProvider initialUser={initialUser}>
-      <AppDialogProvider>
-        <MobileBottomBarProvider>{children}</MobileBottomBarProvider>
-      </AppDialogProvider>
+      <AppToastProvider>
+        <AppDialogProvider>
+          <MobileBottomBarProvider>{children}</MobileBottomBarProvider>
+        </AppDialogProvider>
+      </AppToastProvider>
     </SessionProvider>
   );
 }

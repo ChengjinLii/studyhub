@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { copyToClipboard, tryNativeShare } from '../lib/share';
+import { useAppToast } from './AppToastProvider';
 
 interface ShareSheetProps {
   open: boolean;
@@ -10,14 +11,9 @@ interface ShareSheetProps {
 }
 
 export default function ShareSheet({ open, title, text, linkUrl, onClose }: ShareSheetProps) {
-  const [notice, setNotice] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const toast = useAppToast();
   const [canShare, setCanShare] = useState(false);
   const isMulti = useMemo(() => text.includes('\n'), [text]);
-
-  useEffect(() => {
-    if (!open) return;
-    setNotice(null);
-  }, [open]);
 
   useEffect(() => {
     if (typeof navigator === 'undefined') return;
@@ -29,19 +25,19 @@ export default function ShareSheet({ open, title, text, linkUrl, onClose }: Shar
   const handleCopy = async () => {
     const ok = await copyToClipboard(text);
     if (ok) {
-      setNotice({ type: 'success', text: '已复制链接，可以直接分享。' });
+      toast.show('已复制链接，可以直接分享', { tone: 'success' });
       return;
     }
-    setNotice({ type: 'error', text: '复制失败，请长按链接手动复制。' });
+    toast.show('复制失败，请长按链接手动复制', { tone: 'error' });
   };
 
   const handleNativeShare = async () => {
     const ok = await tryNativeShare({ title, text, url: linkUrl });
     if (ok) {
-      setNotice({ type: 'success', text: '已唤起系统分享。' });
+      toast.show('已唤起系统分享', { tone: 'success' });
       return;
     }
-    setNotice({ type: 'error', text: '无法唤起系统分享，请尝试复制链接。' });
+    toast.show('无法唤起系统分享，请尝试复制链接', { tone: 'error' });
   };
 
   const handleSelect = (event: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -88,9 +84,6 @@ export default function ShareSheet({ open, title, text, linkUrl, onClose }: Shar
             </a>
           )}
         </div>
-        {notice && (
-          <p className={notice.type === 'error' ? 'error-text' : 'success-text'}>{notice.text}</p>
-        )}
       </div>
     </div>
   );
