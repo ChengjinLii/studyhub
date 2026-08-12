@@ -1,0 +1,142 @@
+{
+  "production_access": false,
+  "required_hyperparameter_axes": [
+    "learning_rate",
+    "reference_kl_beta",
+    "group_size",
+    "trajectory_discount"
+  ],
+  "required_lora_ranks": [
+    8,
+    16,
+    32
+  ],
+  "schema_version": "studyhub.agent.router_rl.grpo_sweep.v2",
+  "sealed_read": false,
+  "selection_split": "validation",
+  "status": "prepared",
+  "test_read": false,
+  "trials": [
+    {
+      "config_path": "/data/chengjin/studyhub/training_artifacts/studyhub_agent_rl/router_rl_maturity_v2/experiments/grpo_sweep/configs/00_rank16_base.json",
+      "config_sha256": "5cd3481bf63ad39be07e116679444858a3c13658bb50503bd204895d0d6ea825",
+      "index": 0,
+      "name": "rank16_base",
+      "overrides": {},
+      "seed": 26081211,
+      "shard": 0
+    },
+    {
+      "config_path": "/data/chengjin/studyhub/training_artifacts/studyhub_agent_rl/router_rl_maturity_v2/experiments/grpo_sweep/configs/01_rank8.json",
+      "config_sha256": "d00ad650f5498dec26af0b471f8ab05885bdc8706578ac813faf69e9b27c0bd2",
+      "index": 1,
+      "name": "rank8",
+      "overrides": {
+        "lora_alpha": 16,
+        "lora_rank": 8
+      },
+      "seed": 26081211,
+      "shard": 1
+    },
+    {
+      "config_path": "/data/chengjin/studyhub/training_artifacts/studyhub_agent_rl/router_rl_maturity_v2/experiments/grpo_sweep/configs/02_rank32.json",
+      "config_sha256": "373a5c630fe6b81e5820c0ba4387ff52d6837ce685d25127592e3a86d1c2c1c6",
+      "index": 2,
+      "name": "rank32",
+      "overrides": {
+        "lora_alpha": 64,
+        "lora_rank": 32
+      },
+      "seed": 26081211,
+      "shard": 0
+    },
+    {
+      "config_path": "/data/chengjin/studyhub/training_artifacts/studyhub_agent_rl/router_rl_maturity_v2/experiments/grpo_sweep/configs/03_lr_5e-6.json",
+      "config_sha256": "073e8eec50941f6833632cadb53efbd8d3149475f6a796073d0bd7e8c4de4c21",
+      "index": 3,
+      "name": "lr_5e-6",
+      "overrides": {
+        "learning_rate": 5e-06
+      },
+      "seed": 26081211,
+      "shard": 1
+    },
+    {
+      "config_path": "/data/chengjin/studyhub/training_artifacts/studyhub_agent_rl/router_rl_maturity_v2/experiments/grpo_sweep/configs/04_lr_2e-5.json",
+      "config_sha256": "da4455ba87912758882d4e1319b0d78a3390def439b0b79e735f10fbeca51163",
+      "index": 4,
+      "name": "lr_2e-5",
+      "overrides": {
+        "learning_rate": 2e-05
+      },
+      "seed": 26081211,
+      "shard": 0
+    },
+    {
+      "config_path": "/data/chengjin/studyhub/training_artifacts/studyhub_agent_rl/router_rl_maturity_v2/experiments/grpo_sweep/configs/05_kl_0.01.json",
+      "config_sha256": "dad1b48eef85aa066994e9c83277214bb79599e4f259dbcfdf1eed31d96ad391",
+      "index": 5,
+      "name": "kl_0.01",
+      "overrides": {
+        "reference_kl_beta": 0.01
+      },
+      "seed": 26081211,
+      "shard": 1
+    },
+    {
+      "config_path": "/data/chengjin/studyhub/training_artifacts/studyhub_agent_rl/router_rl_maturity_v2/experiments/grpo_sweep/configs/06_kl_0.05.json",
+      "config_sha256": "c6b3cf05d0e0133076cc069ac03bd41d1172f404ccae81f8c692bb81453a61aa",
+      "index": 6,
+      "name": "kl_0.05",
+      "overrides": {
+        "reference_kl_beta": 0.05
+      },
+      "seed": 26081211,
+      "shard": 0
+    },
+    {
+      "config_path": "/data/chengjin/studyhub/training_artifacts/studyhub_agent_rl/router_rl_maturity_v2/experiments/grpo_sweep/configs/07_group_3.json",
+      "config_sha256": "dc87828b89630f2e2de21602d62c3cb0fdc1abf78fe643cf8ede2880ea739290",
+      "index": 7,
+      "name": "group_3",
+      "overrides": {
+        "group_size": 3
+      },
+      "seed": 26081211,
+      "shard": 1
+    },
+    {
+      "config_path": "/data/chengjin/studyhub/training_artifacts/studyhub_agent_rl/router_rl_maturity_v2/experiments/grpo_sweep/configs/08_group_5.json",
+      "config_sha256": "e7e2a490a67aca2dbbffd6db3de3adc42d6c219885d60b6fcd6726c50314b64a",
+      "index": 8,
+      "name": "group_5",
+      "overrides": {
+        "group_size": 5
+      },
+      "seed": 26081211,
+      "shard": 0
+    },
+    {
+      "config_path": "/data/chengjin/studyhub/training_artifacts/studyhub_agent_rl/router_rl_maturity_v2/experiments/grpo_sweep/configs/09_discount_0.90.json",
+      "config_sha256": "03a81389e86fc9fd258b3f31756f89edb2101fd86d63d18b5779a0c89fcb92fc",
+      "index": 9,
+      "name": "discount_0.90",
+      "overrides": {
+        "trajectory_discount": 0.9
+      },
+      "seed": 26081211,
+      "shard": 1
+    },
+    {
+      "config_path": "/data/chengjin/studyhub/training_artifacts/studyhub_agent_rl/router_rl_maturity_v2/experiments/grpo_sweep/configs/10_discount_0.99.json",
+      "config_sha256": "ac6321db31138970114e481970e71a22fd60a88a255dd2c1c9b384517d6410f7",
+      "index": 10,
+      "name": "discount_0.99",
+      "overrides": {
+        "trajectory_discount": 0.99
+      },
+      "seed": 26081211,
+      "shard": 0
+    }
+  ]
+}

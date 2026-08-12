@@ -1,0 +1,12 @@
+{
+  "config_sha256": "add304a4f9e39e5de314dc26001386177159e9d69b649119636170fb5fc07b5d",
+  "git_commit": "aa04b87cf987a5d7eb47c5e23df2b83592957a46",
+  "implementation_sha256": "ac5e9f87c81bb9ebcacd5ded0d253894b972b7a088902f8346bf1cfa905ff304",
+  "production_access": false,
+  "reference_cache_sha256": "1c0ea7ca46e849fb132093eeac73e5fe28772b195265cf779c20a398d286d7a1",
+  "schema_version": "studyhub.agent.router_rl.training_manifest.v2",
+  "sealed_read": false,
+  "summary_sha256": "f7ca448816e506cd5dcbed03fbb560df8c04a714db69dbc5b9d83d922608944d",
+  "test_read": false,
+  "train_sha256": "f98224288030647d1b129bda7dd6e77e6cfdbdae591a494325b0b55ddd38b752"
+}

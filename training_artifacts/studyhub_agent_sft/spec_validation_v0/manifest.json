@@ -1,0 +1,78 @@
+{
+  "counts": {
+    "grounded_tutor_9b": 300,
+    "router_tool_2b": 500
+  },
+  "dataset_version": "spec_validation_v0",
+  "excluded_placeholder_material_ids": [
+    191,
+    211
+  ],
+  "family_counts": {
+    "grounded_tutor_9b": {
+      "insufficient_evidence": 30,
+      "material_comparison": 30,
+      "material_recommendation": 50,
+      "page_explanation": 100,
+      "page_summary": 50,
+      "study_plan": 30,
+      "unsupported_claim_correction": 10
+    },
+    "router_tool_2b": {
+      "direct_general_answer": 20,
+      "inspect_candidates": 70,
+      "read_page_evidence": 90,
+      "read_synthetic_memory": 40,
+      "reformulate_search": 40,
+      "refuse_permission_bypass": 20,
+      "search_initial": 160,
+      "synthesize_context": 60
+    }
+  },
+  "files": {
+    "grounded_tutor_9b.jsonl": {
+      "records": 300,
+      "sha256": "0bbfdc64e048848a15bedff6fc1956e2a7bbd69a675b5c1e00b08ef62a320836"
+    },
+    "router_tool_2b.jsonl": {
+      "records": 500,
+      "sha256": "39cea2d16d375959c2b1ac9516f8df31bdb92c24508107a6916bfebf9ece2128"
+    },
+    "validation_report.json": {
+      "sha256": "30754573efd6d9c81db4645bdb3561ce3d003da36ccf5b5e8caac25c43096fcc"
+    }
+  },
+  "generated_at": "2026-07-31T05:40:59+00:00",
+  "not_claimed_as": [
+    "human_gold",
+    "production_training_ready"
+  ],
+  "purpose": "Validate SFT record shape, safety boundaries, split policy, and validators.",
+  "schema_version": "studyhub.agent.sft.spec.v0",
+  "seed": 20260731,
+  "source_snapshot": {
+    "access_scope": "free_public_only",
+    "chunks_sha256": "123ac5016be06616057409f29652408b9ed97fd072748cacfca69efb212d0f6d",
+    "materials_sha256": "5675b7d441b09daa59e14cceaf73a3a4864bf9a482239b1c455c84a1fb996e72",
+    "snapshot_id": "free-public-5675b7d441b0-123ac5016be0"
+  },
+  "split_counts": {
+    "grounded_tutor_9b": {
+      "test": 30,
+      "train": 240,
+      "validation": 30
+    },
+    "router_tool_2b": {
+      "test": 50,
+      "train": 400,
+      "validation": 50
+    }
+  },
+  "teacher": {
+    "model_requested": "gpt-5.6-thinking",
+    "role": "policy, task-mix, and deterministic response-template author",
+    "runtime": "current_codex_session",
+    "runtime_model_verified": false
+  },
+  "validation_passed": true
+}

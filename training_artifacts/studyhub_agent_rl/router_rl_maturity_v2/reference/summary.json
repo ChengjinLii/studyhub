@@ -1,0 +1,36 @@
+{
+  "batch_size": 1,
+  "cache_path": "/data/chengjin/studyhub/training_artifacts/studyhub_agent_rl/router_rl_maturity_v2/reference/train_reference.jsonl",
+  "cache_sha256": "1c0ea7ca46e849fb132093eeac73e5fe28772b195265cf779c20a398d286d7a1",
+  "family_counts": {
+    "candidate_before_read": 30,
+    "direct_general_answer": 30,
+    "duplicate_search_avoidance": 30,
+    "empty_search_rewrite": 30,
+    "explicit_page_read": 30,
+    "force_final_budget": 30,
+    "grounded_final": 432,
+    "initial_search": 432,
+    "inspect_candidates": 432,
+    "memory_read": 30,
+    "permission_boundary": 30,
+    "read_evidence": 432,
+    "synthesize_context": 30,
+    "untrusted_observation": 30
+  },
+  "max_prompt_tokens": 4096,
+  "model_path": "/data/chengjin/studyhub/training_artifacts/studyhub_agent_sft/qwen35_2b_router_v1_7_merged",
+  "production_access": false,
+  "prompt_tokens": {
+    "maximum": 1928,
+    "mean": 1440.817,
+    "minimum": 1174
+  },
+  "schema_version": "studyhub.agent.router_rl.reference_cache.v2",
+  "sealed_read": false,
+  "states": 2028,
+  "temperature": 1.0,
+  "test_read": false,
+  "train_path": "/data/chengjin/studyhub/training_artifacts/studyhub_agent_rl/router_rl_maturity_v2/train.jsonl",
+  "train_sha256": "f98224288030647d1b129bda7dd6e77e6cfdbdae591a494325b0b55ddd38b752"
+}

@@ -1,0 +1,26 @@
+{
+  "schema_version": "studyhub.agent.router_rl.dpo_config.v2",
+  "algorithm": "constrained_token_dpo_baseline_v2",
+  "model_path": "/data/chengjin/studyhub/training_artifacts/studyhub_agent_sft/qwen35_2b_router_v1_7_merged",
+  "train_path": "/data/chengjin/studyhub/training_artifacts/studyhub_agent_rl/router_rl_maturity_v2/train.jsonl",
+  "reference_cache_path": "/data/chengjin/studyhub/training_artifacts/studyhub_agent_rl/router_rl_maturity_v2/reference/train_reference.jsonl",
+  "output_dir": "/data/chengjin/studyhub/training_artifacts/studyhub_agent_rl/router_rl_maturity_v2/experiments/dpo_rank16",
+  "lora_rank": 16,
+  "lora_alpha": 32,
+  "lora_dropout": 0.0,
+  "updates": 250,
+  "states_per_update": 4,
+  "learning_rate": 0.00001,
+  "beta": 0.1,
+  "max_grad_norm": 1.0,
+  "max_prompt_tokens": 4096,
+  "gradient_checkpointing": true,
+  "device": "cuda:0",
+  "isolation": {
+    "production_access_allowed": false,
+    "paid_material_allowed": false,
+    "test_read_allowed": false,
+    "sealed_read_allowed": false,
+    "production_final_holdout_allowed": false
+  }
+}

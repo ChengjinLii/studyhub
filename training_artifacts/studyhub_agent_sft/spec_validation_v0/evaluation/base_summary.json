@@ -1,0 +1,185 @@
+{
+  "adapter_path": null,
+  "batch_size": 8,
+  "dataset_path": "/data/chengjin/studyhub/training_artifacts/studyhub_agent_sft/spec_validation_v0/router_tool_2b.jsonl",
+  "elapsed_seconds": 69.831,
+  "family_metrics": {
+    "direct_general_answer": {
+      "arguments_exact": {
+        "passed": 2,
+        "total": 2
+      },
+      "json_valid": {
+        "passed": 2,
+        "total": 2
+      },
+      "mode_correct": {
+        "passed": 2,
+        "total": 2
+      },
+      "tool_name_correct": {
+        "passed": 2,
+        "total": 2
+      }
+    },
+    "inspect_candidates": {
+      "arguments_exact": {
+        "passed": 0,
+        "total": 7
+      },
+      "json_valid": {
+        "passed": 7,
+        "total": 7
+      },
+      "mode_correct": {
+        "passed": 0,
+        "total": 7
+      },
+      "tool_name_correct": {
+        "passed": 0,
+        "total": 7
+      }
+    },
+    "read_page_evidence": {
+      "arguments_exact": {
+        "passed": 0,
+        "total": 9
+      },
+      "json_valid": {
+        "passed": 5,
+        "total": 9
+      },
+      "mode_correct": {
+        "passed": 0,
+        "total": 9
+      },
+      "tool_name_correct": {
+        "passed": 0,
+        "total": 9
+      }
+    },
+    "read_synthetic_memory": {
+      "arguments_exact": {
+        "passed": 0,
+        "total": 4
+      },
+      "json_valid": {
+        "passed": 3,
+        "total": 4
+      },
+      "mode_correct": {
+        "passed": 0,
+        "total": 4
+      },
+      "tool_name_correct": {
+        "passed": 0,
+        "total": 4
+      }
+    },
+    "reformulate_search": {
+      "arguments_exact": {
+        "passed": 0,
+        "total": 4
+      },
+      "json_valid": {
+        "passed": 3,
+        "total": 4
+      },
+      "mode_correct": {
+        "passed": 0,
+        "total": 4
+      },
+      "tool_name_correct": {
+        "passed": 0,
+        "total": 4
+      }
+    },
+    "refuse_permission_bypass": {
+      "arguments_exact": {
+        "passed": 2,
+        "total": 2
+      },
+      "json_valid": {
+        "passed": 2,
+        "total": 2
+      },
+      "mode_correct": {
+        "passed": 2,
+        "total": 2
+      },
+      "tool_name_correct": {
+        "passed": 2,
+        "total": 2
+      }
+    },
+    "search_initial": {
+      "arguments_exact": {
+        "passed": 0,
+        "total": 16
+      },
+      "json_valid": {
+        "passed": 10,
+        "total": 16
+      },
+      "mode_correct": {
+        "passed": 0,
+        "total": 16
+      },
+      "tool_name_correct": {
+        "passed": 0,
+        "total": 16
+      }
+    },
+    "synthesize_context": {
+      "arguments_exact": {
+        "passed": 0,
+        "total": 6
+      },
+      "json_valid": {
+        "passed": 1,
+        "total": 6
+      },
+      "mode_correct": {
+        "passed": 0,
+        "total": 6
+      },
+      "tool_name_correct": {
+        "passed": 0,
+        "total": 6
+      }
+    }
+  },
+  "max_new_tokens": 384,
+  "metrics": {
+    "arguments_exact": {
+      "passed": 4,
+      "rate": 0.08,
+      "total": 50
+    },
+    "json_valid": {
+      "passed": 33,
+      "rate": 0.66,
+      "total": 50
+    },
+    "mode_correct": {
+      "passed": 4,
+      "rate": 0.08,
+      "total": 50
+    },
+    "tool_name_correct": {
+      "passed": 4,
+      "rate": 0.08,
+      "total": 50
+    }
+  },
+  "model_path": "/data/chengjin/studyhub/models/P0/Qwen3.5-2B",
+  "policy_refusal": {
+    "passed": 2,
+    "total": 2
+  },
+  "records": 50,
+  "seconds_per_record": 1.3966,
+  "splits": [
+    "validation"
+  ]
+}

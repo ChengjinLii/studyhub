@@ -1,0 +1,58 @@
+{
+  "audit": {
+    "path": "/data/chengjin/studyhub/training_artifacts/studyhub_agent_sft/router_2b_v1_5_contract_aligned/audit.json",
+    "sha256": "c997bbcb3ad96be944b95525a57b6802313f9615cdcbc0ea91c1eae6c8584155"
+  },
+  "dataset": {
+    "path": "/data/chengjin/studyhub/training_artifacts/studyhub_agent_sft/router_2b_v1_5_contract_aligned/router_tool_2b_v1_5.jsonl",
+    "sha256": "5401753b2188c4348cc1b3ae06f7d6b1ab6e5b331d8094869c8098ceebe3d8cb"
+  },
+  "dataset_version": "router_2b_v1_5_contract_aligned",
+  "family_counts": {
+    "compare_complete_final_v1_5": 20,
+    "direct_answer_retention_v1_5": 50,
+    "evidence_pending_read_v1_5": 40,
+    "evidence_ready_synthesize_v1_5": 40,
+    "force_final_retention_v1_5": 50,
+    "injection_after_inspect_read_v1_5": 30,
+    "injection_after_search_inspect_v1_5": 30,
+    "inspect_after_search_v1_5": 120,
+    "material_id_fidelity_v1_5": 100,
+    "must_finish_without_tools_v1_5": 50,
+    "page_number_fidelity_v1_5": 100,
+    "permission_refusal_v1_5": 40,
+    "replay_direct_v1_5": 60,
+    "replay_identifier_v1_5": 60,
+    "replay_inspect_v1_5": 80,
+    "replay_memory_v1_5": 70,
+    "replay_read_evidence_v1_5": 100,
+    "replay_refusal_v1_5": 60,
+    "replay_rewrite_v1_5": 70,
+    "replay_search_v1_5": 100,
+    "replay_synthesis_v1_5": 100,
+    "search_before_candidate_use_v1_5": 130,
+    "strict_json_final_v1_5": 120,
+    "strict_json_tool_v1_5": 180
+  },
+  "generated_at": "2026-08-11T04:40:14+00:00",
+  "human_gold": false,
+  "purpose": "Repair v1.4 observation/state contradictions using exact production tool-result fields and stage-contrast injection continuation.",
+  "records": 1800,
+  "release_status": "single_seed_sft_candidate_not_production",
+  "runtime_path_counts": {
+    "raw": 900,
+    "runtime_state": 900
+  },
+  "schema_version": "studyhub.agent.sft.spec.v0",
+  "sealed_final_holdout_read": false,
+  "source": {
+    "path": "/data/chengjin/studyhub/training_artifacts/studyhub_agent_sft/router_2b_v1_4_runtime_aligned/router_tool_2b_v1_4.jsonl",
+    "sha256": "371037241cf808639e6c15ca204244f78e6bcf0b897d9fd35e403c9cc8a61ebd"
+  },
+  "split_counts": {
+    "train": 1620,
+    "validation": 180
+  },
+  "teacher_reviewed_silver": true,
+  "validation_passed": true
+}

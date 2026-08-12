@@ -1,0 +1,49 @@
+{
+  "audit_path": "/data/chengjin/studyhub/training_artifacts/studyhub_agent_rl/router_grpo_pilot_v1/audit.json",
+  "audit_sha256": "58f96dceff6c9cca1db71ecbce5283f6159b8937ca6c1cb55fd3bd68591471d5",
+  "build_seed": 24081203,
+  "data_policy": {
+    "development_diagnostic_export_allowed": false,
+    "human_gold": false,
+    "real_user_data_used": false,
+    "teacher_label_tier": "teacher_reviewed_silver_rubric",
+    "train_export_requires": "split=train AND training_eligible=true AND training_export_allowed=true",
+    "validation_test_export_allowed": false
+  },
+  "dataset_version": "router_grpo_pilot_v1",
+  "files": {
+    "states.jsonl": {
+      "records": 269,
+      "sha256": "b3e800dcb32ed8caf316587c04cbd8077b762c9788f2e5816f194d419d16e001"
+    },
+    "test.jsonl": {
+      "records": 59,
+      "sha256": "5694523372127cdb365f873a6c4cbf152d3c8812d7f7b1f24f1bf74d9d3a1aca"
+    },
+    "train.jsonl": {
+      "records": 155,
+      "sha256": "c843df5cbb0b853d373004a9dc8a14d182eca1a7aa02fa6af9749007f5c39894"
+    },
+    "validation.jsonl": {
+      "records": 55,
+      "sha256": "d1f0a6fee3a46ea3a1b2ba483b1f94758ccef84dda891fd5aaa8a07d463254ca"
+    }
+  },
+  "generated_at": "2026-08-11T18:13:30.107694+00:00",
+  "isolation": {
+    "development_diagnostic_read": false,
+    "final_holdout_read": false,
+    "paid_material_used": false,
+    "production_api_called": false,
+    "production_database_accessed": false,
+    "production_oss_write_called": false
+  },
+  "schema_version": "studyhub.agent.router_rl.dataset_manifest.v1",
+  "source": {
+    "access_scope": "frozen_free_public_only",
+    "chunks_path": "/data/chengjin/studyhub/training_artifacts/studyhub_agent_sft/grounded_tutor_9b_v1_0/clean_preview_chunks.jsonl",
+    "chunks_sha256": "26a0cf8878b69b912988700a8ec02c6e2151bab55783bc830cf4fe766f549227",
+    "materials_path": "/data/chengjin/studyhub/backup/oss_materials/metadata/materials.jsonl",
+    "materials_sha256": "5675b7d441b09daa59e14cceaf73a3a4864bf9a482239b1c455c84a1fb996e72"
+  }
+}

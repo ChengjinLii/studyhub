@@ -1,0 +1,63 @@
+{
+  "assistant_only_loss": true,
+  "counts": {
+    "test": 0,
+    "train": 1476,
+    "validation": 164
+  },
+  "dataset_info_sha256": "b207782b9e2f9742c941527b39debcdc96ed046aafdd811335349362a1eaf259",
+  "dataset_names": {
+    "test": "studyhub_router_2b_test",
+    "train": "studyhub_router_2b_train",
+    "validation": "studyhub_router_2b_validation"
+  },
+  "family_counts": {
+    "test": {},
+    "train": {
+      "concept_after_inspect_v1_7": 324,
+      "direct_final_replay_v1_7": 72,
+      "empty_search_replay_v1_7": 36,
+      "explicit_page_replay_v1_7": 72,
+      "force_final_replay_v1_7": 144,
+      "injection_after_inspect_v1_7": 180,
+      "injection_after_search_v1_7": 180,
+      "material_id_replay_v1_7": 36,
+      "permission_refusal_replay_v1_7": 36,
+      "personal_memory_minimal_v1_7": 288,
+      "search_replay_v1_7": 72,
+      "synthesis_replay_v1_7": 36
+    },
+    "validation": {
+      "concept_after_inspect_v1_7": 36,
+      "direct_final_replay_v1_7": 8,
+      "empty_search_replay_v1_7": 4,
+      "explicit_page_replay_v1_7": 8,
+      "force_final_replay_v1_7": 16,
+      "injection_after_inspect_v1_7": 20,
+      "injection_after_search_v1_7": 20,
+      "material_id_replay_v1_7": 4,
+      "permission_refusal_replay_v1_7": 4,
+      "personal_memory_minimal_v1_7": 32,
+      "search_replay_v1_7": 8,
+      "synthesis_replay_v1_7": 4
+    }
+  },
+  "files": {
+    "router_tool_2b_test.jsonl": {
+      "records": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "router_tool_2b_train.jsonl": {
+      "records": 1476,
+      "sha256": "7c1dc91365a1e4dcac4c1ee8209335548f56bac4d1af4b5c562cc96c4340b298"
+    },
+    "router_tool_2b_validation.jsonl": {
+      "records": 164,
+      "sha256": "734482e777e447e72d5a35e71794a65275c184f18e408e37a484d90f70218e92"
+    }
+  },
+  "source": "/data/chengjin/studyhub/training_artifacts/studyhub_agent_sft/router_2b_v1_7_state_transitions/router_tool_2b_v1_7.jsonl",
+  "source_sha256": "89ac4ffda706693cd5ec59b1f9b46938324ec511970d2fb19956189160e3eb14",
+  "target_profile": "router_tool_2b",
+  "template": "qwen3_5_nothink"
+}

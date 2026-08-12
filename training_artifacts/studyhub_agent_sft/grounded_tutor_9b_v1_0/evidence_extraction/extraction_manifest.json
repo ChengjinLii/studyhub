@@ -1,0 +1,17 @@
+{
+  "contains_paid_material": false,
+  "discovered_free_preview_pages": 286,
+  "elapsed_seconds": 555.122,
+  "failed_records": 24,
+  "human_gold": false,
+  "materials_sha256": "5675b7d441b09daa59e14cceaf73a3a4864bf9a482239b1c455c84a1fb996e72",
+  "model_path": "/data/chengjin/studyhub/models/P0/Qwen3.5-2B",
+  "output_path": "/data/chengjin/studyhub/training_artifacts/studyhub_agent_sft/grounded_tutor_9b_v1_0/evidence_extraction/qwen35_2b_preview_transcriptions.jsonl",
+  "output_sha256": "efd771e53085fcefb99050ce6c33554fa8401e6ff20b283ef0c20c4e2c42859d",
+  "parsed_records": 262,
+  "processed_this_run": 116,
+  "production_api_called": false,
+  "production_database_accessed": false,
+  "records": 286,
+  "schema_version": "studyhub.agent.preview_evidence_manifest.v1"
+}

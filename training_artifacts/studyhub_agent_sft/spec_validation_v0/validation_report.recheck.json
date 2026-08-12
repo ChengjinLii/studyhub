@@ -1,0 +1,58 @@
+{
+  "data_class_counts": {
+    "public_synthetic": 760,
+    "synthetic": 40
+  },
+  "dataset_sha256": {
+    "grounded_tutor_9b.jsonl": "0bbfdc64e048848a15bedff6fc1956e2a7bbd69a675b5c1e00b08ef62a320836",
+    "router_tool_2b.jsonl": "39cea2d16d375959c2b1ac9516f8df31bdb92c24508107a6916bfebf9ece2128"
+  },
+  "duplicate_pairs": [],
+  "errors": [],
+  "evidence_kind_counts": {
+    "metadata": 720,
+    "preview_ocr": 270
+  },
+  "family_counts": {
+    "grounded_tutor_9b": {
+      "insufficient_evidence": 30,
+      "material_comparison": 30,
+      "material_recommendation": 50,
+      "page_explanation": 100,
+      "page_summary": 50,
+      "study_plan": 30,
+      "unsupported_claim_correction": 10
+    },
+    "router_tool_2b": {
+      "direct_general_answer": 20,
+      "inspect_candidates": 70,
+      "read_page_evidence": 90,
+      "read_synthetic_memory": 40,
+      "reformulate_search": 40,
+      "refuse_permission_bypass": 20,
+      "search_initial": 160,
+      "synthesize_context": 60
+    }
+  },
+  "material_split_leaks": {},
+  "passed": true,
+  "profile_counts": {
+    "grounded_tutor_9b": 300,
+    "router_tool_2b": 500
+  },
+  "split_counts": {
+    "grounded_tutor_9b": {
+      "test": 30,
+      "train": 240,
+      "validation": 30
+    },
+    "router_tool_2b": {
+      "test": 50,
+      "train": 400,
+      "validation": 50
+    }
+  },
+  "total_records": 800,
+  "unique_chunk_ids": 293,
+  "unique_material_ids": 133
+}

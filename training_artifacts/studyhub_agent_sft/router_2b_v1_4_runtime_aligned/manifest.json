@@ -1,0 +1,70 @@
+{
+  "dataset_version": "router_2b_v1_4_runtime_aligned",
+  "family_counts": {
+    "compare_complete_final_v1_4": 20,
+    "direct_answer_retention_v1_4": 50,
+    "evidence_pending_read_v1_4": 40,
+    "evidence_ready_synthesize_v1_4": 40,
+    "force_final_retention_v1_4": 50,
+    "injection_continue_readonly_v1_4": 60,
+    "inspect_after_search_v1_4": 120,
+    "material_id_fidelity_v1_4": 100,
+    "must_finish_without_tools_v1_4": 50,
+    "page_number_fidelity_v1_4": 100,
+    "permission_refusal_v1_4": 40,
+    "replay_direct_v1_4": 60,
+    "replay_identifier_v1_4": 60,
+    "replay_inspect_v1_4": 80,
+    "replay_memory_v1_4": 70,
+    "replay_read_evidence_v1_4": 100,
+    "replay_refusal_v1_4": 60,
+    "replay_rewrite_v1_4": 70,
+    "replay_search_v1_4": 100,
+    "replay_synthesis_v1_4": 100,
+    "search_before_candidate_use_v1_4": 130,
+    "strict_json_final_v1_4": 120,
+    "strict_json_tool_v1_4": 180
+  },
+  "files": {
+    "audit.json": {
+      "sha256": "e59ab5f949d5e1f4385ef1fc5a287ae4b153514634a6672327d8a77d4dc8e19b"
+    },
+    "router_tool_2b_v1_4.jsonl": {
+      "records": 1800,
+      "sha256": "371037241cf808639e6c15ca204244f78e6bcf0b897d9fd35e403c9cc8a61ebd"
+    }
+  },
+  "generated_at": "2026-08-11T03:44:51+00:00",
+  "purpose": "Runtime-aligned dual-path SFT for strict JSON, tool prerequisites, identifier fidelity, safe continuation, evidence stopping rules, and replay retention.",
+  "records": 1800,
+  "release_status": "single_seed_sft_candidate_not_production",
+  "runtime_path_counts": {
+    "raw": 900,
+    "runtime_state": 900
+  },
+  "schema_version": "studyhub.agent.sft.spec.v0",
+  "sealed_final_holdout_read": false,
+  "sources": {
+    "/data/chengjin/studyhub/evaluation_artifacts/studyhub_agent/router_teacher_hidden_v1/router_hidden_300.jsonl": {
+      "sha256": "f122d47057bcb0f9239947ed02bde4cbd5bd73180cd98cf00c03fcb75b1a6009",
+      "usage": "development_overlap_audit_only_not_exported"
+    },
+    "/data/chengjin/studyhub/training_artifacts/studyhub_agent_sft/router_2b_targeted_v1_1/router_tool_2b_combined.jsonl": {
+      "sha256": "8073758e7cfb7fc19045289ce3ae9a1928ecf82a1140173d9e93e4ff19ed69b8",
+      "usage": "material_split_audit_only"
+    },
+    "/data/chengjin/studyhub/training_artifacts/studyhub_agent_sft/router_2b_v1_2_replay/router_tool_2b_v1_2_replay.jsonl": "d2a720a19a757c81a14f422acc7159036126665d97a847995adbe50252ccba7d"
+  },
+  "split_counts": {
+    "test": 0,
+    "train": 1620,
+    "validation": 180
+  },
+  "teacher": {
+    "human_gold": false,
+    "model_requested": "gpt-5.6-thinking",
+    "runtime": "current_codex_session",
+    "runtime_model_verified": false
+  },
+  "validation_passed": true
+}

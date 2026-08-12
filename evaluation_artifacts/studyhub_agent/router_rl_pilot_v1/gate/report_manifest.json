@@ -1,0 +1,21 @@
+{
+  "coverage_path": "/data/chengjin/studyhub/evaluation_artifacts/studyhub_agent/router_rl_pilot_v1/gate/knowledge_coverage.json",
+  "coverage_sha256": "d57efb6e95b90a3c4233686dbed1b7a260e4c7043ea3c92066db9ee10494a552",
+  "gate_sha256": "839d1bd995550322454095b9f7302820492dda93ed0a59e4722d55e49eae1375",
+  "report_path": "/data/chengjin/studyhub/reports/recagent/agentic-platform/STUDYHUB_ROUTER_RL_PILOT_REPORT.html",
+  "report_sha256": "789868e690f30df67d47d2136ca0338aa9790a6826393cb20c16f8cd5d02cc1b",
+  "schema_version": "studyhub.agent.router_rl.report_manifest.v1",
+  "validation": {
+    "checks": {
+      "all_26_knowledge_ids_present": true,
+      "all_local_links_resolve": true,
+      "all_sections_present": true,
+      "doctype_present": true,
+      "no_external_resources": true,
+      "no_go_conclusion_visible": true
+    },
+    "knowledge_items": 26,
+    "local_links": 56,
+    "passed": true
+  }
+}

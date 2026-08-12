@@ -1,0 +1,154 @@
+{
+  "adapter_path": "/data/chengjin/studyhub/training_artifacts/studyhub_agent_rl/router_grpo_pilot_v1/runs/seed_3407/adapter",
+  "adapter_sha256": "1d6e2de07259d7eff5bb4f1f5f814bfb1482b5c55701c5e56de4e5d07b00a1d6",
+  "completion_tokens_mean": 132.491525,
+  "constraint": {
+    "corrections": {
+      "canonicalize_contract": 36,
+      "enforce_permission_boundary": 1,
+      "force_final_budget": 1,
+      "honor_explicit_evidence_read": 13,
+      "honor_explicit_search": 14,
+      "honor_explicit_synthesis": 1,
+      "protect_explicit_page_route": 13,
+      "protect_material_ids": 1,
+      "protect_page_numbers": 13,
+      "recover_empty_search": 1,
+      "safe_untrusted_continuation": 1
+    },
+    "source_status": {
+      "strict": 59
+    }
+  },
+  "constraint_dependency_delta_mean": -0.075482,
+  "dataset_path": "/data/chengjin/studyhub/training_artifacts/studyhub_agent_rl/router_grpo_pilot_v1/states.jsonl",
+  "dataset_sha256": "b3e800dcb32ed8caf316587c04cbd8077b762c9788f2e5816f194d419d16e001",
+  "decode_limit_hits": 0,
+  "decoding": {
+    "do_sample": false,
+    "max_new_tokens": 320,
+    "samples_per_state": 1,
+    "seed": 20260812,
+    "temperature": null,
+    "top_p": null
+  },
+  "executable": {
+    "choice_success_rate": 0.728814,
+    "hard_gates": {
+      "budget_respected": 1.0,
+      "contract_valid": 1.0,
+      "explicit_pages_preserved": 1.0,
+      "permission_safe": 1.0,
+      "readonly_tool": 1.0,
+      "sensitive_output_absent": 1.0,
+      "strict_json": 1.0,
+      "trusted_references": 1.0
+    },
+    "policy_reward_mean": 0.767167
+  },
+  "isolation": {
+    "development_diagnostic_read": false,
+    "final_holdout_read": false,
+    "paid_material_used": false,
+    "production_api_called": false,
+    "production_database_accessed": false,
+    "production_oss_write_called": false
+  },
+  "model_path": "/data/chengjin/studyhub/models/P0/Qwen3.5-2B",
+  "predictions": 59,
+  "predictions_path": "/data/chengjin/studyhub/evaluation_artifacts/studyhub_agent/router_rl_pilot_v1/test/seed_3407/predictions.jsonl",
+  "predictions_sha256": "fc775aecd5f91e4a54320dd371d81c3d83a9ac20a82c529cfc3b8cc73a8af876",
+  "raw": {
+    "choice_success_rate": 0.881356,
+    "components": {
+      "evidence_order": 0.931034,
+      "groundedness": 0.875,
+      "query_quality": 0.803571,
+      "stop_decision": 0.881356,
+      "tool_choice": 0.881356,
+      "utility": 0.828869
+    },
+    "episode_success_rate": 0.7,
+    "families": {
+      "direct_general_answer": {
+        "choice_success_rate": 1.0,
+        "reward_mean": 1.0,
+        "samples": 1
+      },
+      "empty_search_rewrite": {
+        "choice_success_rate": 1.0,
+        "reward_mean": 1.0,
+        "samples": 1
+      },
+      "force_final_budget": {
+        "choice_success_rate": 1.0,
+        "reward_mean": 1.0,
+        "samples": 1
+      },
+      "grounded_final": {
+        "choice_success_rate": 0.692308,
+        "reward_mean": 0.650888,
+        "samples": 13
+      },
+      "initial_search": {
+        "choice_success_rate": 1.0,
+        "reward_mean": 0.938462,
+        "samples": 13
+      },
+      "inspect_candidates": {
+        "choice_success_rate": 0.923077,
+        "reward_mean": 0.906777,
+        "samples": 13
+      },
+      "memory_read": {
+        "choice_success_rate": 1.0,
+        "reward_mean": 1.0,
+        "samples": 1
+      },
+      "permission_boundary": {
+        "choice_success_rate": 1.0,
+        "reward_mean": 1.0,
+        "samples": 1
+      },
+      "read_evidence": {
+        "choice_success_rate": 1.0,
+        "reward_mean": 0.974359,
+        "samples": 13
+      },
+      "synthesize_context": {
+        "choice_success_rate": 0.0,
+        "reward_mean": -0.2,
+        "samples": 1
+      },
+      "untrusted_observation": {
+        "choice_success_rate": 0.0,
+        "reward_mean": -0.2,
+        "samples": 1
+      }
+    },
+    "hard_gates": {
+      "budget_respected": 1.0,
+      "contract_valid": 0.949153,
+      "explicit_pages_preserved": 0.779661,
+      "permission_safe": 1.0,
+      "readonly_tool": 1.0,
+      "sensitive_output_absent": 1.0,
+      "strict_json": 1.0,
+      "trusted_references": 1.0
+    },
+    "policy_reward_mean": 0.842649,
+    "policy_reward_std": 0.32705,
+    "reward_hacking_flags": {
+      "premature_final": 3
+    }
+  },
+  "runtime": {
+    "elapsed_seconds": 114.019,
+    "generated_tokens": 7817,
+    "generated_tokens_per_second": 68.559,
+    "peak_cuda_memory_mib": 5617.269
+  },
+  "schema_version": "studyhub.agent.router_rl.evaluation.v1",
+  "split": "test",
+  "states": 59
+}

@@ -12,6 +12,8 @@ BACKEND_PYTHON="${STUDYHUB_BACKEND_PYTHON:-$ROOT_DIR/backend/.venv/bin/python}"
 DATASET="${STUDYHUB_ROUTER_DIAGNOSTIC_DATASET:-$ROOT_DIR/evaluation_artifacts/studyhub_agent/router_teacher_hidden_v1/router_hidden_300.jsonl}"
 MODEL_PATH="${STUDYHUB_ROUTER_MODEL:-$ROOT_DIR/models/P0/Qwen3.5-2B}"
 MAX_NEW_TOKENS="${STUDYHUB_ROUTER_EVAL_MAX_NEW_TOKENS:-1800}"
+CONSTRAINED_DECODING="${STUDYHUB_ROUTER_CONSTRAINED_DECODING:-0}"
+DETERMINISTIC_ARGUMENTS="${STUDYHUB_ROUTER_DETERMINISTIC_ARGUMENTS:-0}"
 
 MODEL_PATH="$(realpath "$MODEL_PATH")"
 if [[ "$ADAPTER_INPUT" == "-" ]]; then
@@ -32,6 +34,18 @@ if [[ "$PRECISION" != "bf16" && "$PRECISION" != "nf4" ]]; then
 fi
 if [[ ! "$MAX_NEW_TOKENS" =~ ^[1-9][0-9]*$ ]]; then
   echo "STUDYHUB_ROUTER_EVAL_MAX_NEW_TOKENS must be a positive integer" >&2
+  exit 2
+fi
+if [[ "$CONSTRAINED_DECODING" != "0" && "$CONSTRAINED_DECODING" != "1" ]]; then
+  echo "STUDYHUB_ROUTER_CONSTRAINED_DECODING must be 0 or 1" >&2
+  exit 2
+fi
+if [[ "$DETERMINISTIC_ARGUMENTS" != "0" && "$DETERMINISTIC_ARGUMENTS" != "1" ]]; then
+  echo "STUDYHUB_ROUTER_DETERMINISTIC_ARGUMENTS must be 0 or 1" >&2
+  exit 2
+fi
+if [[ "$DETERMINISTIC_ARGUMENTS" == "1" && "$CONSTRAINED_DECODING" != "1" ]]; then
+  echo "deterministic argument protection requires constrained decoding" >&2
   exit 2
 fi
 if [[ ! -d "$MODEL_PATH" || ! -f "$DATASET" ]]; then
@@ -80,6 +94,12 @@ run_evaluation() {
   if [[ "$variant" == "normalized" ]]; then
     extra_args+=(--normalize-routing-state)
   fi
+  if [[ "$CONSTRAINED_DECODING" == "1" ]]; then
+    extra_args+=(--constrained-decoding)
+  fi
+  if [[ "$DETERMINISTIC_ARGUMENTS" == "1" ]]; then
+    extra_args+=(--deterministic-argument-protection)
+  fi
   mkdir -p "$output_dir"
   (
     cd "$ROOT_DIR"
@@ -125,7 +145,8 @@ case "$MODE" in
 esac
 
 "$BACKEND_PYTHON" - "$ROOT_DIR" "$MODEL_PATH" "$ADAPTER_PATH" "$DATASET" \
-  "$OUTPUT_ROOT" "$MODE" "$PRECISION" "$MAX_NEW_TOKENS" <<'PY'
+  "$OUTPUT_ROOT" "$MODE" "$PRECISION" "$MAX_NEW_TOKENS" \
+  "$CONSTRAINED_DECODING" "$DETERMINISTIC_ARGUMENTS" <<'PY'
 import hashlib
 import json
 import subprocess
@@ -138,6 +159,7 @@ adapter = Path(sys.argv[3]) if sys.argv[3] else None
 dataset = Path(sys.argv[4])
 output_root = Path(sys.argv[5])
 mode, precision, max_new_tokens = sys.argv[6:9]
+constrained_decoding, deterministic_arguments = sys.argv[9:11]
 
 def sha256(path: Path) -> str:
     digest = hashlib.sha256()
@@ -167,6 +189,17 @@ manifest = {
         "do_sample": False,
         "max_new_tokens": int(max_new_tokens),
         "batch_size": 8,
+        "typed_constrained_projection": constrained_decoding == "1",
+        "deterministic_argument_protection": deterministic_arguments == "1",
+    },
+    "implementation_sha256": {
+        relative: sha256(root / relative)
+        for relative in (
+            "backend/app/services/agent_router_constraint_service.py",
+            "ml/agentic_platform/sft/evaluate_router.py",
+            "ml/agentic_platform/sft/analyze_teacher_hidden_eval.py",
+            "ml/agentic_platform/sft/gate_router_production_diagnostic.py",
+        )
     },
 }
 destination = output_root / "run_manifest.json"
@@ -176,3 +209,9 @@ destination.write_text(
     encoding="utf-8",
 )
 PY
+
+if [[ "$MODE" == "both" ]]; then
+  "$BACKEND_PYTHON" -m ml.agentic_platform.sft.gate_router_production_diagnostic \
+    --root "$OUTPUT_ROOT" \
+    --fail-on-gate
+fi

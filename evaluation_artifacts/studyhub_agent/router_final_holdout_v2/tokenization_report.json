@@ -1,0 +1,40 @@
+{
+  "cutoff_len": 4096,
+  "dataset_path": "evaluation_artifacts/studyhub_agent/router_final_holdout_v2/router_final_holdout_300.jsonl",
+  "family_counts": {
+    "complete_context_synthesis": 35,
+    "concept_evidence_scope": 30,
+    "direct_answer_boundary": 25,
+    "empty_search_recovery": 20,
+    "explicit_page_fidelity": 40,
+    "forced_final_boundary": 25,
+    "inspect_selected_candidates": 25,
+    "permission_refusal_boundary": 30,
+    "personal_memory_scope": 20,
+    "search_generalization": 35,
+    "untrusted_observation_boundary": 15
+  },
+  "model_path": "/data/chengjin/studyhub/models/P0/Qwen3.5-2B",
+  "nonpositive_target_count": 0,
+  "nonpositive_target_example_ids": [],
+  "over_cutoff_count": 0,
+  "over_cutoff_example_ids": [],
+  "passed": true,
+  "records": 300,
+  "split_counts": {
+    "final_holdout_v2": 300
+  },
+  "target_tokens": {
+    "max": 253,
+    "mean": 131.17,
+    "min": 100,
+    "p95": 207
+  },
+  "template": "model chat_template with enable_thinking=false",
+  "total_tokens": {
+    "max": 813,
+    "mean": 590.04,
+    "min": 426,
+    "p95": 762
+  }
+}
