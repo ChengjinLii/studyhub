@@ -121,7 +121,7 @@ function StudyHubEntryPoster() {
           <text
             className="studyhub-popup-poster__url"
             x="1023"
-            y="202"
+            y="210"
             textAnchor="middle"
             dominantBaseline="middle"
             textLength="760"
