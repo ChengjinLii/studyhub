@@ -1,7 +1,7 @@
 [Unit]
 Description=StudyHub isolated database restore drill
-After=network-online.target
-Wants=network-online.target
+After=network-online.target mysql.service
+Wants=network-online.target mysql.service
 
 [Service]
 Type=oneshot

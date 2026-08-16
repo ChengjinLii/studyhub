@@ -1,0 +1,9 @@
+[mysqld]
+bind-address = 127.0.0.1
+port = 3307
+mysqlx = 0
+skip-log-bin
+max_connections = 12
+innodb_buffer_pool_size = 128M
+innodb_buffer_pool_instances = 1
+performance_schema = OFF

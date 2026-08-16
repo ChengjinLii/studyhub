@@ -137,6 +137,16 @@ STUDYHUB_RESTORE_DRILL_DATABASE_URL='mysql+pymysql://.../studyhub_restore_drill'
 
 当前 `private/.env.preview` 若与生产数据库相同，绝不能作为恢复目标。只有独立演练库首次手工恢复验收通过后，才允许启用 `studyhub-db-restore-drill.timer`。
 
+当前主机可安装 `deploy/mysql/studyhub-restore-drill.cnf`，使用仅监听回环地址的 `3307` 端口和 128MB InnoDB buffer pool。演练账号只授予 `studyhub_restore_drill` 单库权限，不能访问生产 RDS。
+
+安装本机演练库后执行：
+
+```bash
+bash scripts/backup/install-restore-drill.sh
+```
+
+安装器会生成独立账号、执行首次真实恢复和表数量验收；只有首次成功才启用月度 timer。
+
 恢复 preview：
 
 ```bash
