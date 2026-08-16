@@ -833,6 +833,11 @@ class RequestsService(RequestsCompatMixin):
                 session.commit()
                 processed += 1
                 continue
+            if int(instruction.attempt_count or 0) > 0 and self._refund_succeeded_at_provider(contribution, instruction):
+                self._complete_refund_instruction(session, contribution, instruction, refund_trade_no=instruction.provider_reference)
+                session.commit()
+                processed += 1
+                continue
             instruction.status = "PROCESSING"
             instruction.claimed_at = now
             instruction.attempt_count = int(instruction.attempt_count or 0) + 1
@@ -848,30 +853,12 @@ class RequestsService(RequestsCompatMixin):
                     out_request_no=str(contribution.out_trade_no or instruction.operation_key),
                 )
                 if result.success:
-                    contribution.refund_status = SUCCESS_REFUND_STATUS
-                    contribution.refund_trade_no = result.refund_trade_no
-                    contribution.refunded_at = datetime.now(UTC)
-                    contribution.status = CONTRIBUTION_STATUS_REFUNDED
-                    self.request_repo.save_contribution(session, contribution)
-                    request = self._require_request(session, contribution.request_id)
-                    self._apply_refund_to_request(request, contribution.amount_cents)
-                    remaining = self.request_repo.list_contributions(session, request.id)
-                    unsettled_paid = [
-                        item
-                        for item in remaining
-                        if item.id != contribution.id
-                        and item.status in {CONTRIBUTION_STATUS_PAID, CONTRIBUTION_STATUS_REFUNDING}
-                    ]
-                    if not unsettled_paid:
-                        request.status = REQUEST_STATUS_REFUNDED
-                        request.settled_at = datetime.now(UTC)
-                    else:
-                        request.status = REQUEST_STATUS_REFUNDING
-                    self.request_repo.save_request(session, request)
-                    instruction.status = "SUCCEEDED"
-                    instruction.provider_reference = result.refund_trade_no
-                    instruction.result_json = json.dumps({"success": True}, separators=(",", ":"))
-                    instruction.last_error = None
+                    self._complete_refund_instruction(
+                        session,
+                        contribution,
+                        instruction,
+                        refund_trade_no=result.refund_trade_no,
+                    )
                     processed += 1
                 else:
                     instruction.status = "PENDING"
@@ -884,6 +871,58 @@ class RequestsService(RequestsCompatMixin):
             self.finance_repo.save_finance_instruction(session, instruction)
             session.commit()
         return processed
+
+    def _refund_succeeded_at_provider(
+        self,
+        contribution: RequestContributionRecord,
+        instruction: FinanceInstructionRecord,
+    ) -> bool:
+        query_refund = getattr(self.payment_provider, "query_refund", None)
+        if not callable(query_refund) or not contribution.out_trade_no:
+            return False
+        result = query_refund(
+            out_trade_no=str(contribution.out_trade_no),
+            trade_no=contribution.trade_no,
+            out_request_no=str(contribution.out_trade_no or instruction.operation_key),
+        )
+        if str(result.status or "").upper() != "SUCCESS":
+            return False
+        instruction.provider_reference = result.refund_trade_no
+        return True
+
+    def _complete_refund_instruction(
+        self,
+        session: Session,
+        contribution: RequestContributionRecord,
+        instruction: FinanceInstructionRecord,
+        *,
+        refund_trade_no: str | None,
+    ) -> None:
+        already_refunded = contribution.status == CONTRIBUTION_STATUS_REFUNDED
+        contribution.refund_status = SUCCESS_REFUND_STATUS
+        contribution.refund_trade_no = refund_trade_no or contribution.refund_trade_no
+        contribution.refunded_at = contribution.refunded_at or datetime.now(UTC)
+        contribution.status = CONTRIBUTION_STATUS_REFUNDED
+        self.request_repo.save_contribution(session, contribution)
+        request = self._require_request(session, contribution.request_id)
+        if not already_refunded:
+            self._apply_refund_to_request(request, contribution.amount_cents)
+        remaining = self.request_repo.list_contributions(session, request.id)
+        unsettled_paid = [
+            item
+            for item in remaining
+            if item.id != contribution.id and item.status in {CONTRIBUTION_STATUS_PAID, CONTRIBUTION_STATUS_REFUNDING}
+        ]
+        if not unsettled_paid:
+            request.status = REQUEST_STATUS_REFUNDED
+            request.settled_at = request.settled_at or datetime.now(UTC)
+        else:
+            request.status = REQUEST_STATUS_REFUNDING
+        self.request_repo.save_request(session, request)
+        instruction.status = "SUCCEEDED"
+        instruction.provider_reference = refund_trade_no or instruction.provider_reference
+        instruction.result_json = json.dumps({"success": True, "verified": True}, separators=(",", ":"))
+        instruction.last_error = None
 
     @staticmethod
     def _refund_operation_key(contribution_id: int | None) -> str:

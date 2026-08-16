@@ -28,6 +28,14 @@ class RefundResult:
     error_message: str | None = None
 
 
+@dataclass(slots=True)
+class RefundQueryResult:
+    status: str
+    refund_trade_no: str | None = None
+    error_code: str | None = None
+    error_message: str | None = None
+
+
 class PaymentGatewayProvider(Protocol):
     provider_name: str
     channel_name: str
@@ -45,6 +53,8 @@ class PaymentGatewayProvider(Protocol):
     def probe(self, *, deep: bool = False) -> dict[str, Any]: ...
 
     def refund(self, *, out_trade_no: str, trade_no: str | None, refund_amount_cents: int, out_request_no: str) -> RefundResult: ...
+
+    def query_refund(self, *, out_trade_no: str, trade_no: str | None, out_request_no: str) -> RefundQueryResult: ...
 
 
 class LocalAlipayPaymentProvider:
@@ -105,6 +115,10 @@ class LocalAlipayPaymentProvider:
 
     def refund(self, *, out_trade_no: str, trade_no: str | None, refund_amount_cents: int, out_request_no: str) -> RefundResult:
         return RefundResult(success=True, refund_trade_no=f"REFUND-LOCAL-{out_request_no[-8:]}")
+
+    def query_refund(self, *, out_trade_no: str, trade_no: str | None, out_request_no: str) -> RefundQueryResult:
+        del out_trade_no, trade_no
+        return RefundQueryResult(status="SUCCESS", refund_trade_no=f"REFUND-LOCAL-{out_request_no[-8:]}")
 
     def _build_pay_form(self, out_trade_no: str) -> str:
         escaped = html.escape(out_trade_no, quote=True)
@@ -244,6 +258,32 @@ class AlipayPagePaymentProvider:
             success=False,
             error_code=code,
             error_message=str(result.get("sub_msg") or result.get("msg") or "")[:200],
+        )
+
+    def query_refund(self, *, out_trade_no: str, trade_no: str | None, out_request_no: str) -> RefundQueryResult:
+        try:
+            result = self._client().api_alipay_trade_fastpay_refund_query(
+                out_request_no=out_request_no,
+                out_trade_no=out_trade_no,
+                trade_no=trade_no,
+            )
+        except Exception as exc:  # noqa: BLE001
+            return RefundQueryResult(status="UNKNOWN", error_code="SDK_ERROR", error_message=str(exc)[:200])
+        if not isinstance(result, dict):
+            return RefundQueryResult(status="UNKNOWN", error_code="INVALID_RESPONSE", error_message="non-dict response")
+        code = str(result.get("code") or "")
+        refund_status = str(result.get("refund_status") or "").strip().upper()
+        if code == "10000" and refund_status == "REFUND_SUCCESS":
+            return RefundQueryResult(
+                status="SUCCESS",
+                refund_trade_no=str(result.get("trade_no") or result.get("refund_detail_item_list") or "") or None,
+            )
+        if code == "20000":
+            return RefundQueryResult(status="PENDING", error_code=code)
+        return RefundQueryResult(
+            status="NOT_FOUND" if code == "40004" else "UNKNOWN",
+            error_code=code or None,
+            error_message=str(result.get("sub_msg") or result.get("msg") or "")[:200] or None,
         )
 
     def _client(self):

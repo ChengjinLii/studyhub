@@ -177,6 +177,10 @@ bash scripts/db/db-hardening-migrate.sh plan finance-outbox
 YES_PRODUCTION_HARDENING_MIGRATION=I_UNDERSTAND_ADDITIVE_SCHEMA \
 STUDYHUB_HARDENING_PLAN_TOKEN=<PLAN_TOKEN> \
   bash scripts/db/db-hardening-migrate.sh apply finance-outbox
+
+资金 Outbox 启用后，用 `bash scripts/finance/install-reconciliation.sh` 安装每日只读对账任务。报告写入
+`private/reports/finance/`，不包含收款账户、姓名或渠道密钥，历史报告保留 90 天；支付宝转账由 worker
+主动查询，退款重试前也会先按同一 `out_request_no` 查询渠道状态，避免未知超时后盲目重复提交。
 ```
 
 该入口只允许创建代码中明确登记的新表，不执行删除、重命名或数据回填。

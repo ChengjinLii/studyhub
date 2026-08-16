@@ -1,0 +1,22 @@
+[Unit]
+Description=StudyHub daily finance reconciliation report
+After=network-online.target studyhub-worker.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/data/studyhub-runtime/current/backend
+Environment=STUDYHUB_ENVIRONMENT=production
+Environment=STUDYHUB_PRIVATE_DIR_PATH=/data/studyhub/private
+ExecStart=/data/studyhub-runtime/current/.venv/bin/python -m app.ops.finance_reconcile
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ReadOnlyPaths=/data/studyhub-runtime /data/studyhub/private
+ReadWritePaths=/data/studyhub/private/reports/finance
