@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import UTC, date, datetime, timedelta
+import json
 from pathlib import Path
 import re
 from typing import Any
@@ -17,6 +18,7 @@ from app.models.finance import (
     AdminMonthlyPayoutMarkRecord,
     AlipayGatewayNotificationRecord,
     CreatorPayoutApplicationRecord,
+    FinanceInstructionRecord,
     OrderRecord,
     PayoutScheduleRecord,
     PayoutTransferRecord,
@@ -45,6 +47,7 @@ TRANSFER_STATUS_SUBMITTED = "SUBMITTED"
 TRANSFER_STATUS_PENDING = "PENDING"
 TRANSFER_STATUS_SUCCESS = "SUCCESS"
 TRANSFER_STATUS_FAILED = "FAILED"
+INSTRUCTION_PAYOUT_TRANSFER = "PAYOUT_TRANSFER"
 
 
 class PayoutService:
@@ -462,8 +465,12 @@ class PayoutService:
         return self.transfer_provider.success_response_text()
 
     def refresh_pending_transfers(self, session: Session) -> int:
-        processed = 0
+        processed = self._process_payout_instructions(session) if self.settings.resolved_finance_outbox_enabled else 0
         for transfer in self.finance_repo.list_pending_transfers(session):
+            if self.settings.resolved_finance_outbox_enabled:
+                instruction = self.finance_repo.find_finance_instruction(session, self._payout_operation_key(transfer.id))
+                if instruction is not None and instruction.status != "SUCCEEDED":
+                    continue
             self._apply_transfer_provider_result(session, transfer, self.transfer_provider.query_transfer(transfer))
             processed += 1
         session.commit()
@@ -531,8 +538,85 @@ class PayoutService:
             return None
         transfer.amount = sum(int(item.payout_amount or 0) for item in claimed)
         transfer = self.finance_repo.save_payout_transfer(session, transfer)
-        self._apply_transfer_provider_result(session, transfer, self.transfer_provider.submit_transfer(transfer))
+        if self.settings.resolved_finance_outbox_enabled:
+            self._enqueue_payout_instruction(session, transfer)
+        else:
+            self._apply_transfer_provider_result(session, transfer, self.transfer_provider.submit_transfer(transfer))
         return transfer
+
+    def _enqueue_payout_instruction(self, session: Session, transfer: PayoutTransferRecord) -> FinanceInstructionRecord:
+        operation_key = self._payout_operation_key(transfer.id)
+        existing = self.finance_repo.find_finance_instruction(session, operation_key)
+        if existing is not None:
+            return existing
+        instruction = FinanceInstructionRecord(
+            operation_key=operation_key,
+            instruction_type=INSTRUCTION_PAYOUT_TRANSFER,
+            aggregate_type="PAYOUT_TRANSFER",
+            aggregate_id=int(transfer.id),
+            payload_json=json.dumps(
+                {"transferId": int(transfer.id), "outBizNo": transfer.out_biz_no, "amount": int(transfer.amount or 0)},
+                ensure_ascii=False,
+                separators=(",", ":"),
+            ),
+            status="PENDING",
+        )
+        return self.finance_repo.save_finance_instruction(session, instruction)
+
+    def _process_payout_instructions(self, session: Session) -> int:
+        now = datetime.now(UTC)
+        stale_before = now - timedelta(minutes=5)
+        instructions = self.finance_repo.list_ready_finance_instructions(
+            session,
+            INSTRUCTION_PAYOUT_TRANSFER,
+            now,
+            stale_before=stale_before,
+        )
+        processed = 0
+        for instruction in instructions:
+            transfer = self.finance_repo.get_payout_transfer(session, int(instruction.aggregate_id))
+            if transfer is None:
+                instruction.status = "FAILED"
+                instruction.last_error = "payout transfer not found"
+                self.finance_repo.save_finance_instruction(session, instruction)
+                session.commit()
+                continue
+            if transfer.status in {TRANSFER_STATUS_SUCCESS, TRANSFER_STATUS_FAILED}:
+                instruction.status = "SUCCEEDED"
+                instruction.last_error = None
+                self.finance_repo.save_finance_instruction(session, instruction)
+                session.commit()
+                processed += 1
+                continue
+            instruction.status = "PROCESSING"
+            instruction.claimed_at = now
+            instruction.attempt_count = int(instruction.attempt_count or 0) + 1
+            instruction.last_error = None
+            self.finance_repo.save_finance_instruction(session, instruction)
+            session.commit()
+            try:
+                result = self.transfer_provider.submit_transfer(transfer)
+                self._apply_transfer_provider_result(session, transfer, result)
+                instruction.status = "SUCCEEDED"
+                instruction.provider_reference = result.alipay_order_id or result.pay_fund_order_id
+                instruction.result_json = json.dumps(
+                    {"status": result.status, "failureReason": result.failure_reason},
+                    ensure_ascii=False,
+                    separators=(",", ":"),
+                )
+                instruction.last_error = None
+                processed += 1
+            except Exception as exc:  # noqa: BLE001
+                instruction.status = "PENDING"
+                instruction.next_attempt_at = datetime.now(UTC) + timedelta(minutes=min(30, max(1, instruction.attempt_count)))
+                instruction.last_error = str(exc)[:512]
+            self.finance_repo.save_finance_instruction(session, instruction)
+            session.commit()
+        return processed
+
+    @staticmethod
+    def _payout_operation_key(transfer_id: int | None) -> str:
+        return f"payout-transfer:{int(transfer_id or 0)}"
 
     def _apply_transfer_provider_result(self, session: Session, transfer: PayoutTransferRecord, result: TransferResult) -> None:
         normalized = (result.status or TRANSFER_STATUS_PENDING).strip().upper()

@@ -174,3 +174,21 @@ class WorkerLockRecord(Base):
     owner_token: Mapped[str | None] = mapped_column(String(128), nullable=True)
     acquired_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
+
+
+class FinanceInstructionRecord(TimestampMixin, Base):
+    __tablename__ = "finance_instructions"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    operation_key: Mapped[str] = mapped_column(String(128), nullable=False, unique=True, index=True)
+    instruction_type: Mapped[str] = mapped_column(String(32), nullable=False, index=True)
+    aggregate_type: Mapped[str] = mapped_column(String(32), nullable=False)
+    aggregate_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
+    payload_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    status: Mapped[str] = mapped_column(String(24), nullable=False, default="PENDING", index=True)
+    attempt_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    next_attempt_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
+    claimed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    provider_reference: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    result_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    last_error: Mapped[str | None] = mapped_column(String(512), nullable=True)

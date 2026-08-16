@@ -170,6 +170,17 @@ STUDYHUB_INDEX_PLAN_TOKEN=<PLAN_TOKEN> \
 
 模块包括 `engagement`、`auth-community` 和 `finance`。每次只执行一个模块，随后运行生产 smoke；脚本不支持删除或修改索引。
 
+资金 Outbox 等新增运行表使用独立的 additive hardening migration：
+
+```bash
+bash scripts/db/db-hardening-migrate.sh plan finance-outbox
+YES_PRODUCTION_HARDENING_MIGRATION=I_UNDERSTAND_ADDITIVE_SCHEMA \
+STUDYHUB_HARDENING_PLAN_TOKEN=<PLAN_TOKEN> \
+  bash scripts/db/db-hardening-migrate.sh apply finance-outbox
+```
+
+该入口只允许创建代码中明确登记的新表，不执行删除、重命名或数据回填。
+
 - 默认以只读检查和备份为主
 - production 不允许通过该目录下脚本直接恢复数据库
 - production 直接 Alembic migration 默认禁用，P0 字段修复走受保护的 additive 脚本

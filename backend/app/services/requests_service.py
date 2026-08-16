@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal, ROUND_HALF_UP
@@ -12,7 +13,7 @@ from sqlalchemy.orm import Session
 
 from app.core.async_db import async_session_scope
 from app.core.config import Settings
-from app.models.finance import SettlementRecord
+from app.models.finance import FinanceInstructionRecord, SettlementRecord
 from app.models.materials import MaterialRecord
 from app.providers.payment import PaymentGatewayProvider, RefundResult
 from app.repos.finance_repo import FinanceRepository
@@ -74,6 +75,7 @@ LEADERBOARD_MAX_CONTRIBUTION_AMOUNT = 50000
 COMPAT_PAID_CONTRIBUTION_STATUSES = ("PAID", "REFUNDING", "REFUNDED")
 EARLY_EXIT_REFUND_TYPE = "EARLY_EXIT"
 SUCCESS_REFUND_STATUS = "SUCCESS"
+INSTRUCTION_REQUEST_REFUND = "REQUEST_REFUND"
 
 
 class RequestsService(RequestsCompatMixin):
@@ -498,7 +500,7 @@ class RequestsService(RequestsCompatMixin):
             contribution.status = CONTRIBUTION_STATUS_REFUNDED
             self.request_repo.save_contribution(session, contribution)
             self._apply_refund_to_request(request, contribution.amount_cents)
-        else:
+        elif not self.settings.resolved_finance_outbox_enabled:
             raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="退款请求失败，请稍后重试")
         session.commit()
         return request_contribution_item(contribution)
@@ -536,7 +538,9 @@ class RequestsService(RequestsCompatMixin):
         return seed
 
     def run_scheduled_refunds(self, session: Session) -> dict[str, int]:
-        return self.run_request_maintenance(session)
+        queued = self.process_refund_instructions(session) if self.settings.resolved_finance_outbox_enabled else 0
+        result = self.run_request_maintenance(session)
+        return {**result, "outboxProcessed": queued}
 
     def run_request_maintenance(self, session: Session) -> dict[str, int]:
         self._bootstrap(session)
@@ -756,6 +760,9 @@ class RequestsService(RequestsCompatMixin):
             return True
         contribution.refund_status = "PENDING"
         self.request_repo.save_contribution(session, contribution)
+        if self.settings.resolved_finance_outbox_enabled and self.finance_repo is not None:
+            self._enqueue_refund_instruction(session, contribution, reason=reason)
+            return False
         result = self.payment_provider.refund(
             out_trade_no=out_trade_no,
             trade_no=contribution.trade_no,
@@ -772,6 +779,109 @@ class RequestsService(RequestsCompatMixin):
         self.request_repo.save_contribution(session, contribution)
         logger.warning("Refund failed for contribution %s: %s %s", contribution.id, result.error_code, result.error_message)
         return False
+
+    def _enqueue_refund_instruction(
+        self,
+        session: Session,
+        contribution: RequestContributionRecord,
+        *,
+        reason: str,
+    ) -> FinanceInstructionRecord:
+        if self.finance_repo is None:
+            raise RuntimeError("finance repository is required for refund outbox")
+        operation_key = self._refund_operation_key(contribution.id)
+        existing = self.finance_repo.find_finance_instruction(session, operation_key)
+        if existing is not None:
+            return existing
+        instruction = FinanceInstructionRecord(
+            operation_key=operation_key,
+            instruction_type=INSTRUCTION_REQUEST_REFUND,
+            aggregate_type="REQUEST_CONTRIBUTION",
+            aggregate_id=int(contribution.id),
+            payload_json=json.dumps(
+                {"contributionId": int(contribution.id), "reason": reason[:120]},
+                ensure_ascii=False,
+                separators=(",", ":"),
+            ),
+            status="PENDING",
+        )
+        return self.finance_repo.save_finance_instruction(session, instruction)
+
+    def process_refund_instructions(self, session: Session) -> int:
+        if self.finance_repo is None or self.payment_provider is None:
+            return 0
+        now = datetime.now(UTC)
+        instructions = self.finance_repo.list_ready_finance_instructions(
+            session,
+            INSTRUCTION_REQUEST_REFUND,
+            now,
+            stale_before=now - timedelta(minutes=5),
+        )
+        processed = 0
+        for instruction in instructions:
+            contribution = self.request_repo.get_contribution(session, int(instruction.aggregate_id))
+            if contribution is None:
+                instruction.status = "FAILED"
+                instruction.last_error = "request contribution not found"
+                self.finance_repo.save_finance_instruction(session, instruction)
+                session.commit()
+                continue
+            if contribution.refund_status == SUCCESS_REFUND_STATUS:
+                instruction.status = "SUCCEEDED"
+                instruction.last_error = None
+                self.finance_repo.save_finance_instruction(session, instruction)
+                session.commit()
+                processed += 1
+                continue
+            instruction.status = "PROCESSING"
+            instruction.claimed_at = now
+            instruction.attempt_count = int(instruction.attempt_count or 0) + 1
+            instruction.last_error = None
+            self.finance_repo.save_finance_instruction(session, instruction)
+            session.commit()
+            try:
+                amount_cents = int(contribution.amount_cents or 0)
+                result = self.payment_provider.refund(
+                    out_trade_no=str(contribution.out_trade_no or ""),
+                    trade_no=contribution.trade_no,
+                    refund_amount_cents=amount_cents,
+                    out_request_no=str(contribution.out_trade_no or instruction.operation_key),
+                )
+                if result.success:
+                    contribution.refund_status = SUCCESS_REFUND_STATUS
+                    contribution.refund_trade_no = result.refund_trade_no
+                    contribution.refunded_at = datetime.now(UTC)
+                    contribution.status = CONTRIBUTION_STATUS_REFUNDED
+                    self.request_repo.save_contribution(session, contribution)
+                    request = self._require_request(session, contribution.request_id)
+                    self._apply_refund_to_request(request, contribution.amount_cents)
+                    remaining = self.request_repo.list_contributions(session, request.id)
+                    if all(item.id == contribution.id or item.status == CONTRIBUTION_STATUS_REFUNDED for item in remaining):
+                        request.status = REQUEST_STATUS_REFUNDED
+                        request.settled_at = datetime.now(UTC)
+                    else:
+                        request.status = REQUEST_STATUS_REFUNDING
+                    self.request_repo.save_request(session, request)
+                    instruction.status = "SUCCEEDED"
+                    instruction.provider_reference = result.refund_trade_no
+                    instruction.result_json = json.dumps({"success": True}, separators=(",", ":"))
+                    instruction.last_error = None
+                    processed += 1
+                else:
+                    instruction.status = "PENDING"
+                    instruction.next_attempt_at = datetime.now(UTC) + timedelta(minutes=min(30, max(1, instruction.attempt_count)))
+                    instruction.last_error = f"{result.error_code or 'REFUND_FAILED'}: {result.error_message or ''}"[:512]
+            except Exception as exc:  # noqa: BLE001
+                instruction.status = "PENDING"
+                instruction.next_attempt_at = datetime.now(UTC) + timedelta(minutes=min(30, max(1, instruction.attempt_count)))
+                instruction.last_error = str(exc)[:512]
+            self.finance_repo.save_finance_instruction(session, instruction)
+            session.commit()
+        return processed
+
+    @staticmethod
+    def _refund_operation_key(contribution_id: int | None) -> str:
+        return f"request-refund:{int(contribution_id or 0)}"
 
     def _create_contribution(
         self,

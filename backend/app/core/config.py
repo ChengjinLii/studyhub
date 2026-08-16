@@ -224,6 +224,7 @@ class Settings(BaseSettings):
     comments_write_enabled: bool = True
 
     lock_provider: str = "db_row"
+    finance_outbox_enabled: bool | None = None
     redis_url: str | None = None
     redis_namespace: str = "studyhub-fastapi"
     redis_lock_key_prefix: str = "locks"
@@ -455,6 +456,12 @@ class Settings(BaseSettings):
         if self.database_auto_create is not None:
             return bool(self.database_auto_create)
         return not self.requires_private_env_file
+
+    @property
+    def resolved_finance_outbox_enabled(self) -> bool:
+        if self.finance_outbox_enabled is not None:
+            return bool(self.finance_outbox_enabled)
+        return self.is_production
 
     @property
     def resolved_contract_sample_dir(self) -> Path:

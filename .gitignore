@@ -1,5 +1,5 @@
 docs/
-models/
+/models/
 private/
 .local-dev/
 .local-dev-docker/

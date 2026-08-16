@@ -4,13 +4,14 @@ from datetime import UTC, datetime
 from typing import Any
 import uuid
 
-from sqlalchemy import Select, bindparam, case, func, inspect, select, text, update
+from sqlalchemy import Select, and_, bindparam, case, func, inspect, or_, select, text, update
 from sqlalchemy.orm import Session
 
 from app.models.finance import (
     AdminMonthlyPayoutMarkRecord,
     AlipayGatewayNotificationRecord,
     CreatorPayoutApplicationRecord,
+    FinanceInstructionRecord,
     OrderRecord,
     PaymentNotificationRecord,
     PaymentRecord,
@@ -55,6 +56,42 @@ def _has_table_column(session: Session, table_name: str, column_name: str) -> bo
 
 
 class FinanceRepository:
+    def find_finance_instruction(self, session: Session, operation_key: str) -> FinanceInstructionRecord | None:
+        stmt = select(FinanceInstructionRecord).where(FinanceInstructionRecord.operation_key == operation_key).limit(1)
+        return session.scalar(stmt)
+
+    def save_finance_instruction(self, session: Session, entity: FinanceInstructionRecord) -> FinanceInstructionRecord:
+        session.add(entity)
+        session.flush()
+        session.refresh(entity)
+        return entity
+
+    def list_ready_finance_instructions(
+        self,
+        session: Session,
+        instruction_type: str,
+        now: datetime,
+        *,
+        stale_before: datetime,
+        limit: int = 20,
+    ) -> list[FinanceInstructionRecord]:
+        stmt = (
+            select(FinanceInstructionRecord)
+            .where(
+                FinanceInstructionRecord.instruction_type == instruction_type,
+                or_(
+                    and_(
+                        FinanceInstructionRecord.status == "PENDING",
+                        or_(FinanceInstructionRecord.next_attempt_at.is_(None), FinanceInstructionRecord.next_attempt_at <= now),
+                    ),
+                    and_(FinanceInstructionRecord.status == "PROCESSING", FinanceInstructionRecord.claimed_at <= stale_before),
+                ),
+            )
+            .order_by(FinanceInstructionRecord.created_at.asc(), FinanceInstructionRecord.id.asc())
+            .limit(max(1, min(limit, 100)))
+        )
+        return list(session.scalars(stmt))
+
     def _uses_legacy_orders(self, session: Session) -> bool:
         existing_columns = _table_columns(session, "orders")
         return any(column.name not in existing_columns for column in _ORDER_MAPPED_COLUMNS)
@@ -850,3 +887,4 @@ class FinanceRepository:
 
     def build_out_biz_no(self) -> str:
         return "PT" + uuid.uuid4().hex[:24].upper()
+    FinanceInstructionRecord,
