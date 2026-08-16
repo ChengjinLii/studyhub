@@ -1,0 +1,21 @@
+[Unit]
+Description=StudyHub isolated database restore drill
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/data/studyhub
+EnvironmentFile=-/data/studyhub/private/.env.backup
+ExecStart=/data/studyhub/scripts/backup/restore-drill.sh
+Nice=15
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ReadOnlyPaths=/data/studyhub
+ReadWritePaths=/data/studyhub/private/backups

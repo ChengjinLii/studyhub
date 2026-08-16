@@ -1,0 +1,10 @@
+[Unit]
+Description=Run StudyHub encrypted database backup daily
+
+[Timer]
+OnCalendar=*-*-* 03:17:00 Asia/Shanghai
+RandomizedDelaySec=20min
+Persistent=true
+
+[Install]
+WantedBy=timers.target

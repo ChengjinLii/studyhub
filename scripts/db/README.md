@@ -115,6 +115,28 @@ STUDYHUB_ENVIRONMENT=production bash scripts/db/db-backup.sh private/backups/man
 `db-backup.sh` 的输出路径如果是相对路径，会按仓库根目录解析；上面的示例会写入 `/data/studyhub/private/backups/manual-prod.sql.gz`。输出路径不能是全空白。
 备份命令输出会包含 `backupSizeBytes` 和 `backupSha256`，用于人工确认备份文件大小和内容指纹。
 
+生产自动备份使用 `age` 加密后再写入本机和私有 OSS，不保留临时明文：
+
+```bash
+install -d -m 0700 private/backups/keys
+age-keygen -o private/backups/keys/production.agekey
+age-keygen -y private/backups/keys/production.agekey \
+  > private/backups/keys/production.age-recipient
+chmod 0600 private/backups/keys/production.agekey private/backups/keys/production.age-recipient
+STUDYHUB_ENVIRONMENT=production bash scripts/backup/production-backup.sh
+```
+
+私钥必须另存一份到离线密码库；Git 忽略它并不等于已有灾难恢复副本。默认保留策略为本机最近 7 个每日、4 个每周、6 个月度备份，OSS 最近 10 个每日、12 个月度备份。可分别用 `STUDYHUB_BACKUP_LOCAL_*` 和 `STUDYHUB_BACKUP_OSS_*` 环境变量调整。
+
+月度恢复演练必须配置独立 MySQL 数据库，库名必须包含 `drill`，且主机、端口和库名的组合不得与生产库相同：
+
+```bash
+STUDYHUB_RESTORE_DRILL_DATABASE_URL='mysql+pymysql://.../studyhub_restore_drill' \
+  bash scripts/backup/restore-drill.sh
+```
+
+当前 `private/.env.preview` 若与生产数据库相同，绝不能作为恢复目标。只有独立演练库首次手工恢复验收通过后，才允许启用 `studyhub-db-restore-drill.timer`。
+
 恢复 preview：
 
 ```bash

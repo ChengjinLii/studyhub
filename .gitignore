@@ -28,7 +28,7 @@ frontend/.next-*/
 frontend/tsconfig.tsbuildinfo
 frontend/test-results/
 frontend/playwright-report/
-backup/
+/backup/
 prototypes/
 training_artifacts/
 evaluation_artifacts/
