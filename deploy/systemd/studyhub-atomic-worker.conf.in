@@ -1,0 +1,4 @@
+[Service]
+WorkingDirectory=__CURRENT_ROOT__/backend
+ExecStart=
+ExecStart=__CURRENT_ROOT__/.venv/bin/python -m app.workers.runner --job all --interval-seconds 60

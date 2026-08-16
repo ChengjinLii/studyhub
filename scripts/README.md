@@ -28,6 +28,7 @@
 - Agentic 数据集 Gate：`python scripts/research/validate-agentic-dataset.py --help`
 - 非生产 CI 检查：`bash scripts/ci-check.sh`
 - 发布前检查：`bash scripts/predeploy-check.sh`
+- 原子生产发布：先运行 `bash scripts/deploy/install-atomic-services.sh` 安装稳定的 `current` 服务路径，后续使用 `bash scripts/deploy/atomic-release.sh <commit>`。脚本在独立 release 安装锁定依赖、构建并以备用端口 smoke，通过后才切换软链接；启动或生产 smoke 失败会自动回滚。
 - 浏览器加载性能预算：`npm --prefix frontend run test:perf`
 
 `check-shell-scripts.sh` 只执行 `bash -n`，不会运行脚本主体，也不会连接数据库或修改运行态。

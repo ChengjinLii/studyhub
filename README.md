@@ -80,6 +80,8 @@ npm --prefix frontend run test:unit
 bash scripts/predeploy-check.sh
 ```
 
+生产环境不要在在线目录直接执行 `npm run build`。首次安装原子发布服务路径后，使用 `bash scripts/deploy/atomic-release.sh <commit>` 在独立 release 构建、验证和切换；失败版本不会覆盖当前构建。
+
 CI 或本地非生产质量门禁可以使用：
 
 ```bash

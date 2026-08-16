@@ -1,0 +1,7 @@
+[Service]
+WorkingDirectory=__CURRENT_ROOT__/frontend
+ExecStartPre=
+ExecStart=
+ExecStart=__NPM_BIN__ run start -- --hostname 127.0.0.1 --port 3300
+ExecStartPost=
+ExecStartPost=__NPM_BIN__ run prewarm

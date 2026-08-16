@@ -1,0 +1,6 @@
+[Service]
+WorkingDirectory=__CURRENT_ROOT__/backend
+ExecStartPre=
+ExecStartPre=__CURRENT_ROOT__/.venv/bin/python -m app.ops.db_admin check
+ExecStart=
+ExecStart=__CURRENT_ROOT__/.venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8311 --limit-concurrency 128 --backlog 512 --timeout-keep-alive 5
