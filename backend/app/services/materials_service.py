@@ -18,7 +18,7 @@ from app.core.profile_metadata import DEFAULT_FREE_DOWNLOAD_QUOTA
 from app.core.storage_mutation import StorageMutation
 from app.integrations.material_asset_store import MaterialAssetStore
 from app.models.auth import AuthUser
-from app.models.materials import MaterialFavoriteRecord, MaterialRatingRecord, MaterialRecord, MaterialSecurityScanRecord
+from app.models.materials import MaterialFavoriteRecord, MaterialRatingRecord, MaterialRecord
 from app.repos.auth_repo import AuthRepository
 from app.repos.material_repo import MaterialRepository
 from app.repos.read_api_repo import ReadApiRepository
@@ -38,6 +38,7 @@ from app.services.materials_search import material_matches_search, material_sear
 from app.services.materials_compat import MaterialsCompatMixin
 from app.services.materials_serializers import admin_material_item, load_json_list, material_has_file, material_list_item
 from app.services.materials_storage_mutation import MaterialsStorageMutationMixin
+from app.services.material_security_policy import MaterialSecurityPolicyMixin
 from app.services.read_support import (
     clamp_limit,
     compat_as_float,
@@ -66,7 +67,7 @@ VISIBLE_STATUSES = {"VISIBLE", "visible", "", None}
 VISIBLE_MATERIAL_STATUS_SQL = "(m.status IS NULL OR LOWER(m.status) NOT IN ('hidden', 'removed'))"
 
 
-class MaterialsService(MaterialsStorageMutationMixin, MaterialsCompatMixin):
+class MaterialsService(MaterialSecurityPolicyMixin, MaterialsStorageMutationMixin, MaterialsCompatMixin):
     def __init__(
         self,
         settings: Settings,
@@ -407,7 +408,7 @@ class MaterialsService(MaterialsStorageMutationMixin, MaterialsCompatMixin):
                     {
                         "id": version.id,
                         "versionLabel": version.version_label,
-                        "createdAt": self._serialize_datetime(version.created_at),
+                        "createdAt": serialize_datetime(version.created_at),
                     }
                     for version in self.material_repo.list_versions(session, material_id)
                 ],
@@ -417,7 +418,7 @@ class MaterialsService(MaterialsStorageMutationMixin, MaterialsCompatMixin):
                         "reviewer": review.reviewer,
                         "rating": review.rating,
                         "comment": review.comment,
-                        "createdAt": self._serialize_datetime(review.created_at),
+                        "createdAt": serialize_datetime(review.created_at),
                     }
                     for review in self.material_repo.list_reviews(session, material_id)
                 ],
@@ -1246,55 +1247,6 @@ class MaterialsService(MaterialsStorageMutationMixin, MaterialsCompatMixin):
         self.material_repo.ensure_seed_bootstrap(session, seed)
         return seed
 
-    def _queue_material_security_scan(
-        self,
-        session: Session,
-        material: MaterialRecord,
-        *,
-        release_status: str,
-        release_review_status: str | None,
-    ) -> None:
-        if not self._material_security_scan_enabled() or not material.file_storage_key:
-            return
-        scan = self.material_repo.get_security_scan(session, int(material.id))
-        if scan is None:
-            scan = MaterialSecurityScanRecord(material_id=int(material.id), object_key=material.file_storage_key)
-        scan.object_key = material.file_storage_key
-        scan.status = "PENDING"
-        scan.release_status = release_status
-        scan.release_review_status = release_review_status
-        scan.attempt_count = 0
-        scan.next_attempt_at = None
-        scan.claimed_at = None
-        scan.scanned_at = None
-        scan.scanner_version = None
-        scan.finding = None
-        scan.last_error = None
-        material.status = "HIDDEN"
-        material.review_status = "SECURITY_PENDING"
-        self.material_repo.save_security_scan(session, scan)
-
-    def _material_security_status(self, session: Session, material_id: int) -> str | None:
-        if not self._material_security_scan_enabled() or session is None:
-            return None
-        scan = self.material_repo.get_security_scan(session, material_id)
-        return scan.status if scan is not None else None
-
-    def _assert_material_security_scan_complete(self, session: Session, material_id: int) -> None:
-        if not self._material_security_scan_enabled():
-            return
-        scan = self.material_repo.get_security_scan(session, material_id)
-        if scan is None or scan.status == "CLEAN":
-            return
-        if scan.status == "INFECTED":
-            raise HTTPException(status_code=status.HTTP_423_LOCKED, detail="文件未通过安全检查，暂不可下载")
-        if scan.status == "ERROR":
-            raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="文件安全检查暂未完成，请稍后再试")
-        raise HTTPException(status_code=status.HTTP_423_LOCKED, detail="文件正在进行安全检查，请稍后再试")
-
-    def _material_security_scan_enabled(self) -> bool:
-        return bool(getattr(self.settings, "resolved_material_security_scan_enabled", False))
-
     def _resolve_current_user(self, session: Session, current_user_id: int | None) -> dict[str, Any] | None:
         if current_user_id is None:
             return None
@@ -1498,9 +1450,7 @@ class MaterialsService(MaterialsStorageMutationMixin, MaterialsCompatMixin):
         return filename.rsplit(".", 1)[1].lower()
 
     def _material_created_ts(self, material: MaterialRecord) -> float:
-        if material.created_at is None:
-            return 0.0
-        return material.created_at.astimezone(UTC).timestamp() if material.created_at.tzinfo else material.created_at.timestamp()
+        return compat_timestamp(material.created_at)
 
     def _split_tags(self, value: str | None) -> list[str]:
         if not value:
@@ -1514,9 +1464,6 @@ class MaterialsService(MaterialsStorageMutationMixin, MaterialsCompatMixin):
             seen.add(part)
             tags.append(part)
         return tags
-
-    def _serialize_datetime(self, value: datetime | None) -> str | None:
-        return serialize_datetime(value)
 
     def _loads(self, raw: str | None) -> list[Any]:
         return load_json_list(raw)
