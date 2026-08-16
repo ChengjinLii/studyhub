@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import gzip
 import re
+import shutil
+import subprocess
 from collections.abc import Mapping
 from datetime import UTC, datetime
 from pathlib import Path
@@ -269,16 +271,18 @@ def assert_additive_sql(sql: str) -> None:
 
 
 def find_latest_nonempty_backup(private_dir: Path, environment: str) -> Path | None:
-    backup_root = private_dir / "backups" / environment
-    if not backup_root.exists():
-        return None
+    backup_roots = [private_dir / "backups" / environment]
+    if environment == "production":
+        backup_roots.append(private_dir / "backups" / "production-encrypted")
     candidates = [
         path
+        for backup_root in backup_roots
+        if backup_root.exists()
         for path in backup_root.iterdir()
         if path.is_file()
         and not path.name.startswith(".")
         and path.stat().st_size > 0
-        and (path.name.endswith(".sql") or path.name.endswith(".sql.gz"))
+        and (path.name.endswith(".sql") or path.name.endswith(".sql.gz") or path.name.endswith(".sql.gz.age"))
     ]
     if not candidates:
         return None
@@ -309,6 +313,9 @@ def require_recent_nonempty_backup(
 
 
 def ensure_readable_backup_file(path: Path) -> None:
+    if path.name.endswith(".sql.gz.age"):
+        _ensure_readable_age_backup(path)
+        return
     if path.suffix != ".gz":
         return
     try:
@@ -317,6 +324,30 @@ def ensure_readable_backup_file(path: Path) -> None:
                 pass
     except (OSError, EOFError) as exc:
         raise RuntimeError(f"production migrate-additive --yes 需要可读取的数据库备份；gzip 校验失败：{path}") from exc
+
+
+def _ensure_readable_age_backup(path: Path) -> None:
+    age = shutil.which("age")
+    identity = path.parent.parent / "keys" / "production.agekey"
+    if not age or not identity.is_file():
+        raise RuntimeError("production migration 需要可解密的 age 备份；缺少 age 或备份私钥。")
+    with subprocess.Popen(
+        [age, "--decrypt", "--identity", str(identity), str(path)],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    ) as process:
+        assert process.stdout is not None
+        assert process.stderr is not None
+        try:
+            with gzip.GzipFile(fileobj=process.stdout, mode="rb") as source:
+                while source.read(1024 * 1024):
+                    pass
+        except (OSError, EOFError) as exc:
+            process.kill()
+            raise RuntimeError(f"production migration 需要可解密的数据库备份；校验失败：{path}") from exc
+        stderr = process.stderr.read().decode("utf-8", errors="replace")
+        if process.wait() != 0:
+            raise RuntimeError(f"production migration 需要可解密的数据库备份：{stderr.strip()}")
 
 
 def _index_column_sets(indexes: list[dict[str, Any]]) -> set[tuple[str, ...]]:

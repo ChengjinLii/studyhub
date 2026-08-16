@@ -149,6 +149,17 @@ bash scripts/db/db-restore-preview.sh /path/to/preview-backup.sql.gz
 
 ## 使用约束
 
+缺失索引按业务模块计划和执行，production 必须显式确认范围、近期可解密备份和计划 token：
+
+```bash
+bash scripts/db/db-index-module.sh engagement plan
+YES_PRODUCTION_CREATE_INDEXES=I_UNDERSTAND_CREATE_INDEXES \
+STUDYHUB_INDEX_PLAN_TOKEN=<PLAN_TOKEN> \
+  bash scripts/db/db-index-module.sh engagement apply
+```
+
+模块包括 `engagement`、`auth-community` 和 `finance`。每次只执行一个模块，随后运行生产 smoke；脚本不支持删除或修改索引。
+
 - 默认以只读检查和备份为主
 - production 不允许通过该目录下脚本直接恢复数据库
 - production 直接 Alembic migration 默认禁用，P0 字段修复走受保护的 additive 脚本
