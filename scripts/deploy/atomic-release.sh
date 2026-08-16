@@ -69,6 +69,7 @@ if [[ -e "$RELEASE" ]]; then
 fi
 mkdir "$RELEASE"
 git -C "$CONTROL_ROOT" archive "$FULL_SHA" | tar -x -C "$RELEASE"
+printf '%s\n' "$SHORT_SHA" > "$RELEASE/.build-git-sha"
 ln -s "$PRIVATE_DIR" "$RELEASE/private"
 
 echo "[1/5] install locked dependencies"

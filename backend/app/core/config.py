@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
+import re
 import subprocess
 from functools import lru_cache
 
@@ -363,6 +364,13 @@ class Settings(BaseSettings):
     def resolved_build_git_sha(self) -> str:
         if self.build_git_sha:
             return self.build_git_sha
+        marker = self.stack_root / ".build-git-sha"
+        try:
+            marker_sha = marker.read_text(encoding="ascii").strip()
+            if re.fullmatch(r"[0-9a-f]{7,40}", marker_sha):
+                return marker_sha
+        except (OSError, UnicodeError):
+            pass
         try:
             completed = subprocess.run(
                 ["git", "-C", str(self.stack_root), "rev-parse", "--short", "HEAD"],
