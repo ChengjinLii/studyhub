@@ -374,7 +374,9 @@ class MaterialsService(MaterialsStorageMutationMixin, MaterialsCompatMixin):
     def get_detail(self, session: Session, current_user_id: int | None, material_id: int, can_manage_all: bool = False) -> dict[str, Any]:
         if self.settings.requires_private_env_file:
             detail = self._compat_get_detail(session, current_user_id, material_id, can_manage_all)
-            detail["securityScanStatus"] = self._material_security_status(session, material_id)
+            security_status = self._material_security_status(session, material_id)
+            if security_status is not None:
+                detail["securityScanStatus"] = security_status
             return detail
         self._bootstrap(session)
         material = self._load_accessible_material(session, material_id, current_user_id, can_manage_all)
@@ -419,9 +421,11 @@ class MaterialsService(MaterialsStorageMutationMixin, MaterialsCompatMixin):
                     }
                     for review in self.material_repo.list_reviews(session, material_id)
                 ],
-                "securityScanStatus": self._material_security_status(session, material_id),
             }
         )
+        security_status = self._material_security_status(session, material_id)
+        if security_status is not None:
+            detail["securityScanStatus"] = security_status
         return detail
 
     async def get_detail_async(
@@ -540,9 +544,11 @@ class MaterialsService(MaterialsStorageMutationMixin, MaterialsCompatMixin):
                 "myRating": my_rating,
                 "versions": versions,
                 "reviews": reviews,
-                "securityScanStatus": self._material_security_status(session, material_id),
             }
         )
+        security_status = self._material_security_status(session, material_id)
+        if security_status is not None:
+            detail_base["securityScanStatus"] = security_status
         return detail_base
 
     def record_view(
@@ -765,7 +771,11 @@ class MaterialsService(MaterialsStorageMutationMixin, MaterialsCompatMixin):
         file_upload = zip_file or markdown_file
         release_status = material.status or "VISIBLE"
         release_review_status = material.review_status
-        existing_scan = self.material_repo.get_security_scan(session, material_id)
+        existing_scan = (
+            self.material_repo.get_security_scan(session, material_id)
+            if self._material_security_scan_enabled()
+            else None
+        )
         if existing_scan is not None and existing_scan.status in {"PENDING", "SCANNING"}:
             release_status = existing_scan.release_status or "VISIBLE"
             release_review_status = existing_scan.release_review_status
@@ -1244,7 +1254,7 @@ class MaterialsService(MaterialsStorageMutationMixin, MaterialsCompatMixin):
         release_status: str,
         release_review_status: str | None,
     ) -> None:
-        if not self.settings.resolved_material_security_scan_enabled or not material.file_storage_key:
+        if not self._material_security_scan_enabled() or not material.file_storage_key:
             return
         scan = self.material_repo.get_security_scan(session, int(material.id))
         if scan is None:
@@ -1265,10 +1275,14 @@ class MaterialsService(MaterialsStorageMutationMixin, MaterialsCompatMixin):
         self.material_repo.save_security_scan(session, scan)
 
     def _material_security_status(self, session: Session, material_id: int) -> str | None:
+        if not self._material_security_scan_enabled() or session is None:
+            return None
         scan = self.material_repo.get_security_scan(session, material_id)
         return scan.status if scan is not None else None
 
     def _assert_material_security_scan_complete(self, session: Session, material_id: int) -> None:
+        if not self._material_security_scan_enabled():
+            return
         scan = self.material_repo.get_security_scan(session, material_id)
         if scan is None or scan.status == "CLEAN":
             return
@@ -1277,6 +1291,9 @@ class MaterialsService(MaterialsStorageMutationMixin, MaterialsCompatMixin):
         if scan.status == "ERROR":
             raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="文件安全检查暂未完成，请稍后再试")
         raise HTTPException(status_code=status.HTTP_423_LOCKED, detail="文件正在进行安全检查，请稍后再试")
+
+    def _material_security_scan_enabled(self) -> bool:
+        return bool(getattr(self.settings, "resolved_material_security_scan_enabled", False))
 
     def _resolve_current_user(self, session: Session, current_user_id: int | None) -> dict[str, Any] | None:
         if current_user_id is None:

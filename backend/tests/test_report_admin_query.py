@@ -24,6 +24,7 @@ class _DummySeedRepo:
 class _DummyAuthRepo:
     def __init__(self) -> None:
         self.saved_users = []
+        self.revoked_user_ids: list[int] = []
 
     def find_user_by_id(self, session: Session, user_id: int):
         del session
@@ -32,6 +33,11 @@ class _DummyAuthRepo:
     def save_user(self, session: Session, user) -> None:
         del session
         self.saved_users.append(user)
+
+    def bump_session_version(self, session: Session, user_id: int, *, reason: str) -> int:
+        del session, reason
+        self.revoked_user_ids.append(user_id)
+        return 1
 
 
 class _BulkAuthRepo(_DummyAuthRepo):
@@ -212,6 +218,7 @@ def test_submit_report_counts_active_reports_without_loading_all_reports() -> No
 
     assert created_report == ("USER", 99, 6)
     assert [(user.id, user.status) for user in auth_repo.saved_users] == [(99, "hidden")]
+    assert auth_repo.revoked_user_ids == [99]
 
 
 def test_admin_report_list_batches_reporters_and_target_info() -> None:
