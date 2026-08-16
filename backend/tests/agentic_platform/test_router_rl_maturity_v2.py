@@ -23,6 +23,9 @@ from ml.agentic_platform.rl.maturity_v2.gate import (
     paired_bootstrap,
 )
 from ml.agentic_platform.rl.maturity_v2.formal_config import build_formal_config
+from ml.agentic_platform.rl.maturity_v2.double_ledger_audit import (
+    build_double_ledger_fix_audit,
+)
 from ml.agentic_platform.rl.maturity_v2.formal_gate import (
     _assess_run_lock,
     freeze_selected_candidate,
@@ -47,7 +50,7 @@ from ml.agentic_platform.rl.maturity_v2.trajectory import (
     TrajectoryStep,
     credit_trajectories,
 )
-from ml.agentic_platform.rl.reward import RouterRewardPolicy
+from ml.agentic_platform.rl.reward import RouterRewardPolicy, score_double_ledger
 from ml.agentic_platform.rl.spec import canonical_json, sha256_file
 
 
@@ -970,6 +973,12 @@ def test_robustness_perturbations_preserve_state_labels_and_gate_metrics() -> No
         )
         assert perturbed.rubric == state.rubric
         assert build_action_space(perturbed).oracle_route == build_action_space(state).oracle_route
+        ledger = score_double_ledger(state.oracle_output, perturbed)
+        assert ledger.raw.components["tool_choice"] == 1.0
+        assert ledger.executable.components["tool_choice"] == 1.0
+        assert ledger.raw.components["stop_decision"] == 1.0
+        assert ledger.executable.components["stop_decision"] == 1.0
+        assert all(ledger.raw.hard_gates.values())
 
     rows = []
     for perturbation in _transforms():
@@ -994,6 +1003,85 @@ def test_robustness_perturbations_preserve_state_labels_and_gate_metrics() -> No
     summary = _summarize(rows)
     assert summary["passed"] is True
     assert summary["route_invariance_rate"] == 1.0
+
+
+def test_double_ledger_fix_audit_requires_reproduced_failure_and_zero_post_gap(
+    tmp_path,
+) -> None:
+    hard_gates = {name: 1.0 for name in ("strict_json", "contract_valid")}
+    isolation = {"production_access": False, "test_read": False, "sealed_read": False}
+    common = {
+        "adapter_sha256": "adapter",
+        "dataset_sha256": "dataset",
+        "base_states": 1,
+        "perturbed_cases": 1,
+        "route_success_rate": 1.0,
+        "route_invariance_rate": 1.0,
+        "reward_hacking_rate": 0.0,
+        "raw_hard_gates": hard_gates,
+        "isolation": isolation,
+    }
+    before_summary = tmp_path / "before-summary.json"
+    after_summary = tmp_path / "after-summary.json"
+    before_predictions = tmp_path / "before.jsonl"
+    after_predictions = tmp_path / "after.jsonl"
+    implementation = tmp_path / "implementation.py"
+    before_summary.write_text(
+        json.dumps(
+            {
+                **common,
+                "passed": False,
+                "blockers": ["raw_executable_choice_gap"],
+                "raw_executable_choice_gap": 1.0,
+            }
+        )
+    )
+    after_summary.write_text(
+        json.dumps(
+            {
+                **common,
+                "passed": True,
+                "blockers": [],
+                "raw_executable_choice_gap": 0.0,
+            }
+        )
+    )
+    before_predictions.write_text(
+        json.dumps(
+            {
+                "raw_choice_success": True,
+                "executable_choice_success": False,
+                "perturbation": "untrusted_instruction_injection",
+                "constraint_corrections": ["safe_untrusted_continuation"],
+            }
+        )
+        + "\n"
+    )
+    after_predictions.write_text(
+        json.dumps(
+            {
+                "raw_choice_success": True,
+                "executable_choice_success": True,
+                "perturbation": "untrusted_instruction_injection",
+                "constraint_corrections": ["ignore_untrusted_observation"],
+            }
+        )
+        + "\n"
+    )
+    implementation.write_text("# locked implementation\n")
+
+    result = build_double_ledger_fix_audit(
+        before_summary_path=before_summary,
+        before_predictions_path=before_predictions,
+        after_summary_path=after_summary,
+        after_predictions_path=after_predictions,
+        implementation_paths=(implementation,),
+        output_path=tmp_path / "audit.json",
+    )
+
+    assert result["passed"] is True
+    assert result["before"]["choice_divergence_cases"] == 1
+    assert result["after"]["choice_divergence_cases"] == 0
 
 
 def test_offline_package_checks_disabled_defaults_and_base_hashes(tmp_path) -> None:

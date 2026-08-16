@@ -1,0 +1,49 @@
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[project]
+name = "studyhub-rag-experiments"
+version = "0.1.0"
+description = "Read-only, reproducible RAG experiments for StudyHub"
+readme = "README.md"
+requires-python = ">=3.11,<3.13"
+dependencies = [
+  "jieba>=0.42.1",
+  "matplotlib>=3.9",
+  "numpy>=1.26",
+  "pillow>=10.4",
+  "pypdf>=5.1",
+  "python-docx>=1.1",
+  "python-pptx>=1.0",
+  "pyyaml>=6.0",
+  "scikit-learn>=1.5",
+]
+
+[project.optional-dependencies]
+dense = [
+  "faiss-cpu>=1.9",
+  "sentence-transformers==4.1.0",
+  # PyTorch 2.3.1 ships CUDA 12.1 wheels compatible with this server's 535 driver.
+  "torch==2.3.1",
+  "transformers==4.51.3",
+]
+ocr = ["rapidocr-onnxruntime>=1.4"]
+dev = ["pytest>=8.3", "ruff>=0.9"]
+
+[project.scripts]
+studyhub-rag = "studyhub_rag.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/studyhub_rag"]
+
+[tool.pytest.ini_options]
+addopts = "-q"
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]

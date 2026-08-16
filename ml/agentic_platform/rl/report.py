@@ -206,7 +206,7 @@ def _render_html(
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="light">
-  <title>StudyHub Agent · Router RL Pilot 飞行复盘</title>
+  <title>StudyHub Agent · Router RL Pilot</title>
   <style>
     :root {{
       --forest:#14392d; --forest-deep:#0b211a; --moss:#2d7258; --mint:#91c7a8;
@@ -355,15 +355,15 @@ def _render_html(
   <header class="hero shell">
     <div class="hero-grid">
       <div>
-        <div class="eyebrow">StudyHub Agent / Offline Research Dossier</div>
-        <h1>RL<span>Router Pilot 飞行复盘</span></h1>
-        <p class="hero-lead">三随机种子、双账本、冻结候选与一次性独立测试。总体能力出现正向信号，但执行投影差值越过预设红线，因此结论保持 NO-GO。</p>
+        <div class="eyebrow">StudyHub Agent / Offline RL Experiment</div>
+        <h1>Router RL<span>Pilot 训练与独立测试</span></h1>
+        <p class="hero-lead">本报告记录三随机种子训练、Raw / Executable 双账本、候选冻结和一次性独立测试。执行投影差值超过预设阈值，最终 Gate 为 NO-GO。</p>
         <div class="hero-meta"><span>{report_date}</span><span>Qwen3.5-2B + LoRA</span><span>custom group-relative policy gradient</span><span>production isolated</span></div>
       </div>
       <div class="status-card">
         <div class="label">FINAL PILOT GATE</div>
         <strong>NO-GO</strong>
-        <p>不推广当前 RL adapter。保留 seed 3407 作为研究候选，先修复 Reward 与 runtime projection 的对齐问题。</p>
+        <p>当前 RL adapter 不进入后续发布流程。seed 3407 保留用于分析 Reward 与 runtime projection 的对齐问题。</p>
         <div class="status-rule">BLOCKER / |Δ executable−raw| 增幅 {test_delta['constraint_dependency_absolute']:.4f} &gt; 0.0200</div>
       </div>
     </div>
@@ -378,7 +378,7 @@ def _render_html(
 
   <div class="shell report-grid">
     <aside>
-      <div class="rail-title">FLIGHT INDEX</div>
+      <div class="rail-title">REPORT INDEX</div>
       <a href="#decision">01 / 结论</a><a href="#architecture">02 / 任务与算法</a><a href="#data">03 / 数据隔离</a>
       <a href="#reward">04 / Reward 边界</a><a href="#training">05 / 训练稳定性</a><a href="#evaluation">06 / 独立评测</a>
       <a href="#robustness">07 / 鲁棒性</a><a href="#knowledge">08 / 26 项覆盖</a><a href="#governance">09 / 治理与回滚</a>
@@ -386,24 +386,24 @@ def _render_html(
     </aside>
     <main>
       <section id="decision">
-        <div class="kicker">01 / Decision first</div>
-        <div class="section-head"><h2>好信号，不等于放行</h2><p>seed 3407 在独立测试上改善主要指标并保持原始安全门不退化，但预先写入 selection manifest 的约束依赖阈值被触发。为了避免测试后改规则，最终 Gate 必须按原协议判 NO-GO。</p></div>
+        <div class="kicker">01 / TEST RESULT</div>
+        <div class="section-head"><h2>独立测试结果与最终 Gate</h2><p>seed 3407 在独立测试中提高了主要指标，原始安全 Gate 未退化。由于约束依赖指标超过 selection manifest 预设阈值，最终 Gate 按预注册规则判定为 NO-GO。</p></div>
         <div class="decision-grid">
-          <article class="panel signal reveal"><h3>可确认的正向证据</h3><ul class="signal-list">
+          <article class="panel signal reveal"><h3>主要测试结果</h3><ul class="signal-list">
             <li><span>Raw policy reward</span><strong>{test_baseline_raw['policy_reward_mean']:.4f} → {test_candidate_raw['policy_reward_mean']:.4f}</strong></li>
             <li><span>动作选择成功率</span><strong>{_pct(test_baseline_raw['choice_success_rate'])} → {_pct(test_candidate_raw['choice_success_rate'])}</strong></li>
             <li><span>Episode 成功率</span><strong>{_pct(test_baseline_raw['episode_success_rate'])} → {_pct(test_candidate_raw['episode_success_rate'])}</strong></li>
             <li><span>Premature final</span><strong>5 → 3</strong></li>
             <li><span>Raw hard gates</span><strong>全部持平或改善</strong></li>
           </ul></article>
-          <article class="panel blocker reveal"><h3>唯一阻断项</h3><span class="blocker-number">+{test_delta['constraint_dependency_absolute']:.4f}</span><div class="blocker-limit">允许的绝对差增幅上限 / +0.0200</div><p>候选的 Raw→Executable Reward 差从 {baseline_test['constraint_dependency_delta_mean']:.4f} 扩大到 {candidate_test['constraint_dependency_delta_mean']:.4f}。Executable 指标仍改善、修正次数也下降，但这暴露了奖励语义与确定性投影之间的尺度不一致。</p></article>
+          <article class="panel blocker reveal"><h3>未通过的 Gate 指标</h3><span class="blocker-number">+{test_delta['constraint_dependency_absolute']:.4f}</span><div class="blocker-limit">允许的绝对差增幅上限 / +0.0200</div><p>候选的 Raw→Executable Reward 差从 {baseline_test['constraint_dependency_delta_mean']:.4f} 扩大到 {candidate_test['constraint_dependency_delta_mean']:.4f}，超过预注册上限。</p></article>
         </div>
-        <div class="protocol-note reveal"><strong>协议纪律：</strong>不根据测试结果把阈值从 0.02 放宽到 0.04。当前 test 已消费，只用于本次冻结候选的最终判断；下一版本必须建立新数据版本和新锁。</div>
+        <div class="protocol-note reveal"><strong>预注册规则：</strong>测试完成后不将阈值从 0.02 调整为 0.04。当前 test 已消费，只用于本次冻结候选的最终判断；下一版本需要建立新数据版本和输入锁。</div>
       </section>
 
       <section id="architecture">
         <div class="kicker">02 / Task · MDP · Algorithm</div>
-        <div class="section-head"><h2>短路由，双层验证</h2><p>训练把单个 Router state 视作 contextual bandit；同一状态采样 3 个动作并做组内相对优势。独立的多步环境负责验证 transition、episode 和终止条件，未伪装成完整轨迹级 GRPO。</p></div>
+        <div class="section-head"><h2>训练目标与两级评测</h2><p>训练将单个 Router state 建模为 contextual bandit，同一状态采样 3 个动作并计算组内相对优势。独立多步环境用于验证 transition、episode 和终止条件；该 Pilot 不按完整轨迹级 GRPO 解释。</p></div>
         <div class="flow reveal">
           <div class="flow-node"><b>STATE</b><strong>请求 + 上下文</strong><span>预算、历史、工具观察、可信资料与显式页码</span></div>
           <div class="flow-node"><b>ROLLOUT × 3</b><strong>策略动作组</strong><span>temperature {config['temperature']} · top-p {config['top_p']} · max {config['max_new_tokens']}</span></div>
@@ -412,14 +412,14 @@ def _render_html(
           <div class="flow-node"><b>ADAPTER</b><strong>LoRA policy</strong><span>Reference 冻结；只更新 {training['seed_3407']['trainable_parameters']:,} 参数</span></div>
         </div>
         <div class="ledger-split reveal">
-          <div class="ledger"><small>LEDGER A / GRADIENT</small><strong>Raw policy proposal</strong><p>只用模型原始提议产生梯度，运行时修复不计入奖励，防止安全层替模型“做对”。</p></div>
+          <div class="ledger"><small>LEDGER A / GRADIENT</small><strong>Raw policy proposal</strong><p>训练梯度仅来自模型原始提议，运行时修正不计入 Reward。</p></div>
           <div class="ledger"><small>LEDGER B / EXECUTION</small><strong>Constrained executable</strong><p>确定性参数保护、只读权限、预算与显式页码只作为硬门和执行投影。</p></div>
         </div>
       </section>
 
       <section id="data">
         <div class="kicker">03 / Dataset governance</div>
-        <div class="section-head"><h2>冻结、免费、无泄漏</h2><p>数据只来自本地冻结的免费资料 metadata 与 preview evidence；未访问生产数据库、API、OSS 写接口、付费资料、Router 300 条开发诊断或最终生产 holdout。</p></div>
+        <div class="section-head"><h2>数据范围与泄漏审计</h2><p>数据仅来自本地冻结的免费资料 metadata 与 preview evidence；未访问生产数据库、API、OSS 写接口、付费资料、Router 300 条开发诊断或最终生产 holdout。</p></div>
         <div class="split-board">
           <article class="panel reveal"><h3>269 states · 83 episodes</h3><div class="split-bar"><span></span><span></span><span></span></div><div class="split-legend">
             <div><strong>155</strong><span>Train · 37 materials</span></div><div><strong>55</strong><span>Validation · 12 materials</span></div><div><strong>59</strong><span>Test · 13 materials</span></div>
@@ -430,24 +430,24 @@ def _render_html(
             <div><strong>135</strong><span>frozen free materials</span></div><div><strong>62</strong><span>有 preview evidence</span></div>
           </article>
         </div>
-        <div class="warning"><strong>语义限定：</strong>这里的“offline”指与生产环境完全隔离，并非学术上仅从固定 logged transitions 学习的 strict offline RL。训练仍由当前策略在本地冻结 state 上生成 on-policy rollout。</div>
+        <div class="warning"><strong>术语说明：</strong>这里的“offline”指与生产环境完全隔离，并非学术上仅从固定 logged transitions 学习的 strict offline RL。训练仍由当前策略在本地冻结 state 上生成 on-policy rollout。</div>
       </section>
 
       <section id="reward">
         <div class="kicker">04 / Reward · Constraints · Judge</div>
-        <div class="section-head"><h2>Reward 只奖励策略拥有的能力</h2><p>可由 runtime 确定性保证的内容不进入策略奖励。Reward 限幅到 [-1, 1]，激活分项按权重重新归一化；组内 reward 再标准化为 advantage。</p></div>
+        <div class="section-head"><h2>策略 Reward 与运行时硬约束</h2><p>可由 runtime 确定性保证的内容不进入策略奖励。Reward 限幅到 [-1, 1]，激活分项按权重重新归一化；组内 reward 再标准化为 advantage。</p></div>
         <div class="reward-grid">
           <article class="panel reveal"><h3>Policy-owned components</h3><div class="weights">
             {_weight_row('Tool choice',30)}{_weight_row('Query quality',20)}{_weight_row('Evidence order',15)}{_weight_row('Stop decision',15)}{_weight_row('Groundedness',10)}{_weight_row('Utility',10)}
           </div><p>附加惩罚：duplicate search −0.12、premature final −0.20、verbosity gaming −0.08、unsafe tool reliance −0.10。</p></article>
-          <article class="panel boundary-card reveal"><h3>Runtime-owned hard gates</h3><ul><li>严格 JSON 与 Router contract</li><li>只读工具 allowlist 与 permission boundary</li><li>工具预算与 force-final</li><li>可信 material_id</li><li>显式 page_numbers</li><li>参数范围与敏感信息阻断</li></ul><p>这些门可以否决策略，但不产生训练梯度。</p></article>
+          <article class="panel boundary-card reveal"><h3>Runtime-owned hard gates</h3><ul><li>严格 JSON 与 Router contract</li><li>只读工具 allowlist 与 permission boundary</li><li>工具预算与 force-final</li><li>可信 material_id</li><li>显式 page_numbers</li><li>参数范围与敏感信息阻断</li></ul><p>这些约束不参与训练梯度，违规动作在执行前被拒绝。</p></article>
         </div>
         <div class="judge-stamp reveal"><strong>{_pct(calibration['pairwise_accuracy'])}</strong><p><b>48 个 validation preference pairs</b><br>确定性 rubric Judge 的 pairwise accuracy 与 JSON serialization invariance 均为 100%。但标签仅为 teacher-reviewed Silver，不是 human gold，也不覆盖开放式题解质量。</p></div>
       </section>
 
       <section id="training">
         <div class="kicker">05 / Multi-seed training</div>
-        <div class="section-head"><h2>稳定完成，不代表稳定获益</h2><p>三个 seed 均完成 16 updates / 48 rollouts。KL 极小、显存受控、无 NaN/Inf；但验证表现存在明显方差，只有 seed 3407 同时通过收益与安全非退化 Gate。</p></div>
+        <div class="section-head"><h2>三随机种子训练与验证结果</h2><p>三个 seed 均完成 16 次更新和 48 条 rollout，训练过程未出现 NaN/Inf，KL 与显存处于设定范围。验证集结果存在较大种子差异，仅 seed 3407 同时满足收益和安全非退化阈值。</p></div>
         <div class="panel reveal"><table><thead><tr><th>Run</th><th>Train reward</th><th>Mean / max KL</th><th>Entropy proxy</th><th>Peak VRAM</th><th>Validation reward</th><th>Gate</th></tr></thead><tbody>{training_rows}</tbody></table></div>
         <div class="curve-grid">{curve_cards}</div>
         <div class="diagnostic reveal">
@@ -461,10 +461,10 @@ def _render_html(
 
       <section id="evaluation">
         <div class="kicker">06 / Validation · Frozen selection · Test</div>
-        <div class="section-head"><h2>一次选择，一次测试</h2><p>Validation 先淘汰 seed 7703（JSON/contract 退化）和 seed 9109（Reward、动作、episode 与 grounded final 退化），只冻结 seed 3407。Test 未用于候选选择或阈值修改。</p></div>
+        <div class="section-head"><h2>候选选择与独立测试</h2><p>Validation 淘汰 seed 7703（JSON/contract 退化）和 seed 9109（Reward、动作、episode 与 grounded final 退化），并冻结 seed 3407。Test 未参与候选选择或阈值修改。</p></div>
         <div class="compare-grid">
           <article class="panel reveal"><h3>Validation</h3>{_metric_comparison(validation_baseline_raw, validation_candidate_raw)}<p>seed 3407：Reward {_signed(validation_candidate_raw['policy_reward_mean']-validation_baseline_raw['policy_reward_mean'])}，动作 {_pp(validation_candidate_raw['choice_success_rate']-validation_baseline_raw['choice_success_rate'])}，episode {_pp(validation_candidate_raw['episode_success_rate']-validation_baseline_raw['episode_success_rate'])}。</p></article>
-          <article class="panel reveal"><h3>Independent test</h3>{_metric_comparison(test_baseline_raw, test_candidate_raw)}<p>方向性改善明显，但 Reward 与动作的 bootstrap 95% CI 仍跨 0；episode 差值 CI 下界为 0。小 Pilot 只支持“继续研究”的信号，不支持上线声明。</p></article>
+          <article class="panel reveal"><h3>Independent test</h3>{_metric_comparison(test_baseline_raw, test_candidate_raw)}<p>Reward 与动作的 bootstrap 95% CI 仍跨 0，episode 差值 CI 下界为 0。当前样本量不足以确认 Reward 与动作指标存在稳定增益。</p></article>
         </div>
         <div class="ci-grid reveal">
           <div class="ci-cell"><strong>+{test_delta['raw_policy_reward']:.4f}</strong><span>Reward Δ · 95% CI [{raw_reward_ci[0]:.4f}, {raw_reward_ci[1]:.4f}]</span></div>
@@ -482,20 +482,20 @@ def _render_html(
 
       <section id="robustness">
         <div class="kicker">07 / Robustness by family</div>
-        <div class="section-head"><h2>进步集中，盲区仍在</h2><p>Test 中 empty search、memory read 和 grounded final 改善；synthesize_context 与 untrusted_observation 仍为 0%。边界 family 多数只有 1 条，因此只能作为探针，不能作为可靠通过率。</p></div>
+        <div class="section-head"><h2>分任务类型测试结果</h2><p>独立测试中，empty search、memory read 和 grounded final 指标提高；synthesize_context 与 untrusted_observation 仍为 0%。多数边界任务类型仅含 1 条样本，当前结果只用于定位问题，不能估计稳定通过率。</p></div>
         <div class="panel reveal"><table><thead><tr><th>Family</th><th>N</th><th>Baseline choice</th><th>Candidate choice</th><th>Choice Δ</th><th>Reward Δ</th><th>Interpretation</th></tr></thead><tbody>{robustness_rows}</tbody></table></div>
         <div class="panel reveal" style="margin-top:22px"><h3>Raw safety hard gates</h3><table><thead><tr><th>Gate</th><th>Baseline</th><th>Candidate</th><th>Δ</th></tr></thead><tbody>{hard_gate_rows}</tbody></table></div>
       </section>
 
       <section id="knowledge">
         <div class="kicker">08 / Complete knowledge coverage</div>
-        <div class="section-head"><h2>26 项，逐项留证</h2><p>“覆盖”不等于“全部成熟”。每项都给出实现、实测或明确限制；其中 Judge 金标、轨迹级 credit assignment、边界样本规模、生产发布演练仍是后续工作。</p></div>
+        <div class="section-head"><h2>RL 实验技术项与证据索引</h2><p>26 个技术项分别记录实现状态、实测结果和已知限制。Judge 人工金标、轨迹级 credit assignment、边界样本规模和生产发布演练仍未完成。</p></div>
         <div class="knowledge-list">{knowledge_cards}</div>
       </section>
 
       <section id="governance">
         <div class="kicker">09 / Reproducibility · Deployment · Rollback</div>
-        <div class="section-head"><h2>研究候选，不碰生产</h2><p>所有训练、验证与测试都在本地模型、本地冻结数据和显式离线环境中完成。生产默认开关未改变，当前 adapter 不允许部署；回滚目标始终是冻结的 SFT v1.7。</p></div>
+        <div class="section-head"><h2>离线研究范围与生产隔离</h2><p>训练、验证与测试均使用本地模型、本地冻结数据和显式离线环境。生产默认开关未改变，当前 adapter 未进入部署流程；回滚目标为冻结的 SFT v1.7。</p></div>
         <div class="governance-grid">
           <article class="panel reveal"><h3>Production invariants</h3><ul class="switch-list">
             <li><span>dynamic tools</span><strong>{str(production_defaults['ai_agent_dynamic_tools_enabled']).lower()}</strong></li>
@@ -505,12 +505,12 @@ def _render_html(
             <li><span>final production holdout</span><strong>unread</strong></li>
             <li><span>rollback adapter</span><strong>SFT v1.7</strong></li>
           </ul></article>
-          <article class="panel reveal"><h3>下一轮正确顺序</h3><ol class="next-list">
-            <li><strong>冻结本轮 test，不再调参</strong>把 test 视为已消费；当前 seed 3407 仅保留为诊断对象。</li>
-            <li><strong>修 Reward / projection 对齐</strong>逐状态分析投影为何降低 rubric reward，但不把安全修复本身加入梯度。</li>
-            <li><strong>扩充薄弱边界数据</strong>重点增加 synthesize_context、untrusted observation、grounded final 与多步 credit assignment。</li>
-            <li><strong>创建 v2 数据和输入锁</strong>重新做 material/query 隔离、Judge 校准、3-seed 训练与全新 Validation/Test。</li>
-            <li><strong>仍不进入生产</strong>只有 human-gold、最终 holdout、只读 shadow、canary 和自动回滚演练完成后再讨论。</li>
+          <article class="panel reveal"><h3>后续实验顺序</h3><ol class="next-list">
+            <li><strong>保留当前 Test</strong>不再用该集合调参；seed 3407 仅用于失败分析。</li>
+            <li><strong>分析 Reward / projection 差值</strong>逐状态检查投影降低 rubric reward 的原因，安全修正不加入训练梯度。</li>
+            <li><strong>补充边界数据</strong>增加 synthesize_context、untrusted observation、grounded final 与多步 credit assignment。</li>
+            <li><strong>创建 v2 数据和输入锁</strong>重新执行 material/query 隔离、Judge 校准、3-seed 训练和新的 Validation/Test。</li>
+            <li><strong>补齐后续评测</strong>完成人工金标、最终 holdout、只读 shadow、canary 和自动回滚演练。</li>
           </ol></article>
         </div>
         <div class="panel reveal" style="margin-top:22px"><h3>Evidence ledger</h3><table class="evidence-table"><thead><tr><th>Artifact</th><th>Local path</th><th>SHA-256 prefix</th></tr></thead><tbody>{evidence_table}</tbody></table></div>
@@ -538,7 +538,7 @@ def _knowledge_coverage(*, repo_root: Path, artifact_root: Path, evaluation_root
     constraints = repo_root / "backend/app/services/agent_router_constraint_service.py"
     gate = evaluation_root / "gate/gate.json"
     items = [
-        (1, "RL 目标", "VERIFIED", "优化 Router 的语义动作、停止决策和任务完成率；硬安全不作为可交易 Reward。", [code / "reward.py", code / "configs/router_grpo_pilot_v1.json"]),
+        (1, "RL 目标", "VERIFIED", "优化 Router 的语义动作、停止决策和任务完成率；硬安全指标不纳入可加权的 Reward 分项。", [code / "reward.py", code / "configs/router_grpo_pilot_v1.json"]),
         (2, "状态 State", "VERIFIED", "状态包含请求、预算、任务上下文、搜索历史、可信工具观察和 evidence rubric。", [code / "spec.py"]),
         (3, "动作 Action", "VERIFIED", "动作空间为只读 Router contract：工具调用或 final；工具名与参数被结构化评分。", [code / "reward.py", constraints]),
         (4, "状态转移 Transition", "VERIFIED", "独立环境按成功语义动作推进 next_state_id，错误动作终止轨迹。", [code / "environment.py", tests]),
@@ -550,7 +550,7 @@ def _knowledge_coverage(*, repo_root: Path, artifact_root: Path, evaluation_root
         (10, "硬约束边界", "VERIFIED", "权限、只读工具、预算、可信 ID、页码与 contract 只做硬门和执行投影。", [constraints, code / "reward.py"]),
         (11, "Reward 来源", "SILVER", "采用确定性规则、环境结果与教师 Silver rubric；未声称 human-gold 或外部 LLM Judge。", [artifact_root / "judge_calibration.json", code / "reward.py"]),
         (12, "Judge 校准", "CALIBRATED", "48 对偏好 pairwise accuracy 100%、序列化不变性 100%；开放式教学质量未覆盖。", [artifact_root / "judge_calibration.json"]),
-        (13, "算法选择", "IMPLEMENTED", "实现可审计的 GRPO-style contextual-bandit clipped policy gradient，不冒充 TRL/veRL GRPO。", [code / "trainer.py", code / "configs/router_grpo_pilot_v1.json"]),
+        (13, "算法选择", "IMPLEMENTED", "实现方式为 GRPO-style contextual-bandit clipped policy gradient，与 TRL/veRL 的完整 GRPO 实现区分记录。", [code / "trainer.py", code / "configs/router_grpo_pilot_v1.json"]),
         (14, "Credit assignment", "PARTIAL", "训练使用 state-level group advantage；多步 transition 由环境评测，尚非轨迹级 policy gradient。", [code / "trainer.py", code / "environment.py"]),
         (15, "KL、Entropy 与探索", "VERIFIED", "reference KL β=0.02；监控 KL、entropy proxy、clip fraction；采样温度提供探索。", [code / "trainer.py", artifact_root / "runs/seed_3407/trainer_metrics.jsonl"]),
         (16, "Reward scaling", "VERIFIED", "分项重归一、总 Reward 限幅、组内均值/标准差标准化；同分组 advantage 归零。", [code / "reward.py", tests]),
@@ -558,7 +558,7 @@ def _knowledge_coverage(*, repo_root: Path, artifact_root: Path, evaluation_root
         (18, "训练稳定性", "VERIFIED", "三 seed 无 NaN/Inf；KL、梯度、长度、显存与失败 peak-guard 现场均有记录。", [gate, artifact_root / "runs/failed_seed_3407_peak_guard_20260812/gpu_samples.csv"]),
         (19, "Reward hacking 与坍缩", "OBSERVED", "监控 premature final、重复搜索、冗长和不安全工具；seed 方差与 synthesis 弱点被保留。", [code / "reward.py", gate]),
         (20, "双账本", "BLOCKER", "Raw ledger 产生梯度，Executable ledger 只审计；测试 gap 增幅 0.0316 超过 0.02。", [code / "reward.py", gate]),
-        (21, "业务 Gate", "NO-GO", "Validation 冻结候选，Test 按预注册非退化阈值判定；未因总体涨分忽略 blocker。", [code / "gate.py", gate]),
+        (21, "业务 Gate", "NO-GO", "Validation 用于冻结候选；Test 按预注册非退化阈值评测，constraint dependency 超阈值后结论为 NO-GO。", [code / "gate.py", gate]),
         (22, "鲁棒性", "PARTIAL", "覆盖 11 families 和权限/注入/空查询/预算边界，但多数边界 family 仅 1 条。", [artifact_root / "audit.json", evaluation_root / "test/seed_3407/summary.json"]),
         (23, "多 Seed 与统计", "PILOT", "3 seed 报告均值、样本标准差、Student-t 95% CI；测试使用 5000 次 paired bootstrap。", [gate]),
         (24, "LoRA 与显存", "VERIFIED", "LoRA r16/alpha32，16.82M 可训练参数；成功峰值约 58.6 GiB，失败试跑约 74.7 GiB。", [Path(str(_read_json(artifact_root / "input_lock.json")["policy"]["sft_adapter_path"])) / "adapter_config.json", gate]),

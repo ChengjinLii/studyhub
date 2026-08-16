@@ -821,10 +821,10 @@
     <section class="hero reveal">
       <div>
         <p class="eyebrow">Current state review · 2026.08.09</p>
-        <h1>StudyHub Agent<span>做到哪一步了？</span></h1>
+        <h1>StudyHub Agent<span>工程与训练进度</span></h1>
         <p class="hero-lead">
-          已经完成从 Agent 工程底座、安全修复、SFT 数据规范、2B LoRA 多轮消融，到 100 场景离线 Pilot 的完整研究闭环。
-          <strong>结论仍然是：工程链路可用，安全边界成立，模型质量尚未达到上线门槛。</strong>
+          已完成 Agent 工程基础、安全修复、SFT 数据规范、2B LoRA 多轮消融和 100 场景离线 Pilot。
+          <strong>工程链路可用，安全边界成立；模型质量尚未达到上线门槛。</strong>
         </p>
         <div class="hero-meta">
           <span class="chip">origin/main · d5d85e5</span>
@@ -847,7 +847,7 @@
         <strong>NO-GO</strong>
       </div>
       <div class="verdict-copy">
-        <h2>可以继续训练，不能接入生产流量。</h2>
+        <h2>当前结论：继续离线训练，暂不接入生产流量</h2>
         <p>
           v1.4 仅批准进入全新定向数据构建和单 seed SFT 消融。RL、三 seed 扩展、最终封存集评测、线上切换全部暂缓。
           本轮所有修改均未部署，运行时约束开关默认关闭，也没有访问生产数据库、OSS、付费资料或真实用户记忆。
@@ -858,7 +858,7 @@
     <section class="section reveal" id="overview">
       <div class="section-head">
         <div class="section-index">01 / STATE SNAPSHOT</div>
-        <h2>一眼看懂当前状态</h2>
+        <h2>当前状态概览</h2>
         <p>四个数字分别代表数据准备、工程验证、真实模型质量与安全底线。前三者不能相互替代。</p>
       </div>
 
@@ -888,7 +888,7 @@
       <div class="layer-map" aria-label="代码和产物所在层级">
         <article class="layer" data-step="1">
           <span class="status done">主干已有</span>
-          <h3>Agent 工程底座</h3>
+          <h3>Agent 运行基础设施</h3>
           <p>持久化运行、暂停恢复、Worker、证据与引用、Artifact、Snapshot、Transition 契约和管理员专属接口已在主干基础中。</p>
           <code>origin/main · d5d85e5</code>
         </article>
@@ -916,8 +916,8 @@
     <section class="section reveal" id="completed">
       <div class="section-head">
         <div class="section-index">02 / COMPLETED WORK</div>
-        <h2>已经做了什么</h2>
-        <p>可按状态筛选。这里的“完成”表示对应工程或实验已闭环，不表示已经上线。</p>
+        <h2>已完成工作</h2>
+        <p>可按状态筛选。“完成”表示对应工程或实验已有结果和产物，不表示已经上线。</p>
       </div>
 
       <div class="filterbar" role="group" aria-label="工作项筛选">
@@ -931,8 +931,8 @@
       <div class="work-grid">
         <article class="work-card" data-status="done">
           <span class="status done">已完成</span>
-          <h3>Agentic Platform 第一阶段底座</h3>
-          <p>不是简单 Chatbot，而是一套可审计、可恢复的 Agent 运行基础设施。</p>
+          <h3>Agentic Platform 运行基础设施</h3>
+          <p>Agentic Platform 提供可审计、可恢复的 Agent 运行基础设施。</p>
           <ul class="checklist">
             <li>AgentKernel 支持多轮、暂停、进程重启与 Resume</li>
             <li>持久化 Run、Step、Job、Wait、Artifact 与 Event</li>
@@ -1006,7 +1006,7 @@
         <article class="work-card" data-status="partial">
           <span class="status partial">研究完成</span>
           <h3>RAG 方法对照实现</h3>
-          <p>把面试材料中提到的方法真正写成了离线可运行代码，但没有接生产搜索。</p>
+          <p>面试材料中提到的方法已实现为离线可运行代码，尚未接入生产搜索。</p>
           <ul class="checklist">
             <li>实现 TF-IDF、BM25、BGE-M3、Qwen3-Embedding-0.6B</li>
             <li>实现加权双路融合、RRF、HNSW、IVF 与 BGE Reranker</li>
@@ -1032,8 +1032,8 @@
     <section class="section reveal" id="experiments">
       <div class="section-head">
         <div class="section-index">03 / EXPERIMENT TRAIL</div>
-        <h2>模型实验走到了哪里</h2>
-        <p>这一条轨迹解释了为什么“训练跑完”不等于“模型可以上线”。</p>
+        <h2>SFT 实验记录</h2>
+        <p>下列实验按时间列出训练结果，以及各版本未通过 Gate 的原因。</p>
       </div>
 
       <article class="experiment">
@@ -1094,7 +1094,7 @@
           <tbody>
             <tr><td><strong>Discovery</strong></td><td>20</td><td>0</td><td>已具备基础发现能力</td></tr>
             <tr><td><strong>Evidence</strong></td><td>0</td><td class="bad">20</td><td>搜索、详情与 PDF 证据前置关系仍不稳定</td></tr>
-            <tr><td><strong>Compare</strong></td><td>0</td><td class="bad">10</td><td>容易提前 final，未完成多资料证据闭环</td></tr>
+            <tr><td><strong>Compare</strong></td><td>0</td><td class="bad">10</td><td>容易提前 final，未完成多资料证据流程</td></tr>
             <tr><td><strong>Question pages</strong></td><td>3</td><td class="bad">7</td><td>页码协议会做，但流程中仍可能丢失证据</td></tr>
             <tr><td><strong>Answer pages</strong></td><td>9</td><td>1</td><td>接近可用，仍需消除单点失误</td></tr>
             <tr><td><strong>Force final</strong></td><td>10</td><td>0</td><td>运行时收束约束有效</td></tr>
@@ -1108,26 +1108,26 @@
     <section class="section reveal" id="remaining">
       <div class="section-head">
         <div class="section-index">04 / OPEN WORK</div>
-        <h2>还有哪些没有做</h2>
+        <h2>未完成工作</h2>
         <p>未完成项分为模型门禁、代码治理、生产接入和长期产品能力四类。</p>
       </div>
 
       <div class="todo-layout">
         <aside class="todo-summary">
           <span class="status blocked">当前上线判定</span>
-          <h3>不是 Agent 不能跑，而是不能可靠地跑。</h3>
+          <h3>当前模型尚未达到稳定运行要求</h3>
           <p>现在适合做离线演示、复现实验和继续训练，不适合把 2B adapter 设为网站默认模型，也不适合用 RL 掩盖 JSON、ID 和工具前置条件问题。</p>
         </aside>
         <div class="todo-list">
           <article class="todo-item"><div class="num">01</div><div><h3>v1.4 新数据与单 seed SFT 尚未开始</h3><p>需要约 1,800 条全新、与当前 100 Gate 场景不重叠的数据，从 v1.1 seed 7703 路径重建，不从失败的 v1.3 继续训。</p></div></article>
           <article class="todo-item"><div class="num">02</div><div><h3>模型 Gate 仍未通过</h3><p>当前严格质量 52/100、引用有效 72/100、JSON 恢复 49/100；目标是质量、引用、Replay 全部 100/100，ACL 违规为 0。</p></div></article>
           <article class="todo-item"><div class="num">03</div><div><h3>最终封存集没有启封</h3><p>final_holdout_v2 仍保持 sealed=true、evaluated=false。只有单 seed 与三 seed 门禁全部通过后，才允许唯一一次最终评测。</p></div></article>
-          <article class="todo-item"><div class="num">04</div><div><h3>RL 没有开始，也不应该现在开始</h3><p>RL 无法可靠修复损坏 JSON、丢失 Material ID 或错误工具前置条件，当前还可能放大提前 final 偏置。</p></div></article>
+          <article class="todo-item"><div class="num">04</div><div><h3>RL 暂缓</h3><p>RL 无法可靠修复损坏 JSON、丢失 Material ID 或错误工具前置条件，当前还可能放大提前 final 偏置。</p></div></article>
           <article class="todo-item"><div class="num">05</div><div><h3>9B 讲解模型没有训练</h3><p>现有 300 条仅用于规范验证。正式 9B SFT 前，需要清晰原文和至少 300–500 条人工确认的讲解与引用评测集。</p></div></article>
           <article class="todo-item"><div class="num">06</div><div><h3>SFT 与 RAG 源代码尚未版本化</h3><p>本地脚本、配置、锁文件和报告还未提交 Git；2.1 GB 权重、数据与 67 MB Pilot 轨迹应继续忽略，只提交可复现代码与摘要。</p></div></article>
           <article class="todo-item"><div class="num">07</div><div><h3>安全分支和 Pilot 分支尚未进入 main</h3><p>两个分支已上传，但 origin/main 尚不包含本轮 6 个提交。安全修复适合独立审阅；运行时约束应保持默认关闭。</p></div></article>
           <article class="todo-item"><div class="num">08</div><div><h3>生产灰度、监控和性能优化尚未做</h3><p>尚无真实流量 A/B、Shadow 指标、质量告警或 queue 调度优化；9 个场景排队超过 60 秒，最大 126.49 秒。</p></div></article>
-          <article class="todo-item"><div class="num">09</div><div><h3>个体层 / 群体层双层进化尚未形成闭环</h3><p>已有轨迹、事件和学习对象契约，但真实用户行为采集、个体策略更新、群体聚合、版本回滚与效果归因尚未上线。</p></div></article>
+          <article class="todo-item"><div class="num">09</div><div><h3>个体层 / 群体层演化功能尚未实现</h3><p>已有轨迹、事件和学习对象契约，但真实用户行为采集、个体策略更新、群体聚合、版本回滚与效果归因尚未上线。</p></div></article>
           <article class="todo-item"><div class="num">10</div><div><h3>经营分析 Agent 尚未实现</h3><p>销售周报、月报、异常趋势和运营建议仍属于后续产品线，不在本轮 2B Router 与离线 Pilot 范围内。</p></div></article>
         </div>
       </div>
@@ -1136,8 +1136,8 @@
     <section class="section reveal" id="next">
       <div class="section-head">
         <div class="section-index">05 / RECOMMENDED ROUTE</div>
-        <h2>接下来只走这一条路线</h2>
-        <p>先把研究资产和模型协议做稳，再考虑扩大训练与接入网站。顺序不建议调换。</p>
+        <h2>后续执行顺序</h2>
+        <p>按研究代码版本化、数据构建、单 seed 训练、多 seed 复验和生产评估的顺序执行。</p>
       </div>
 
       <div class="route">
@@ -1154,7 +1154,7 @@
           <p>只训练一个 seed。先达到 JSON ≥99%、恢复 ≤5%、ID ≥98%、注入与权限 100%，再跑同一套 100 场景。</p>
         </article>
         <article class="route-step">
-          <h3>过线后才扩展</h3>
+          <h3>多 Seed、封存集与后续评测</h3>
           <p>通过后训练三 seed，再唯一一次启封最终集，之后才讨论 Shadow、灰度和 RL。任何一步失败都回到数据与运行时契约。</p>
         </article>
       </div>
@@ -1192,7 +1192,7 @@
 
   <footer class="shell footer">
     <div><strong>StudyHub Agent · 状态报告</strong><br>生成日期：2026-08-09 · 时区：Asia/Shanghai</div>
-    <div>本报告不把 Fixture 结果等同于模型能力，也不把离线训练等同于生产发布。<code>/data/chengjin/studyhub/reports/recagent/agentic-platform/STUDYHUB_AGENT_PROGRESS_2026-08-09.html</code></div>
+    <div>Fixture 结果仅表示工程链路通过；模型能力和生产发布分别使用独立 Gate。<code>/data/chengjin/studyhub/reports/recagent/agentic-platform/STUDYHUB_AGENT_PROGRESS_2026-08-09.html</code></div>
   </footer>
 
   <script>

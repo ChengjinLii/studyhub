@@ -73,6 +73,7 @@ def build_knowledge_coverage(
     scale = values["scale"]
     stability = values["stability"]
     robustness = values["robustness"]
+    double_ledger = values["double_ledger"]
     package = values["package"]
     reference = values["reference"]
     dpo = values["dpo"]
@@ -87,7 +88,7 @@ def build_knowledge_coverage(
         KnowledgeItem(
             1,
             "RL 目标与边界",
-            "目标锁定为提升 Router 语义动作与终止决策；硬安全不可交易，范围仅限离线研究。",
+            "目标为提升 Router 语义动作与终止决策；硬安全采用独立 Gate，不参与 Reward 权重折中。",
             {
                 "formal_algorithm": all_formal(
                     lambda run: run.get("algorithm") == "trajectory_constrained_token_grpo_v2"
@@ -354,19 +355,38 @@ def build_knowledge_coverage(
         KnowledgeItem(
             20,
             "Raw / Executable 双账本",
-            "Raw ledger 独占梯度，Executable 仅审计；oracle、Validation、Test 和 Sealed gap 均在阈值内。",
+            "首次扰动 Gate 记录 70 条约束改路由分歧；修复后训练梯度仅使用 Raw ledger，560 条扰动及 Validation、Test、Sealed gap 均为零。",
             {
                 "raw_only": all_formal(lambda run: run.get("objective", {}).get("raw_policy_reward_only") is True),
+                "fix_audit": double_ledger.get("passed") is True,
+                "failure_reproduced": double_ledger.get("before", {}).get(
+                    "choice_divergence_cases"
+                )
+                == 70,
+                "gap_closed": double_ledger.get("before", {}).get(
+                    "raw_executable_choice_gap"
+                )
+                == 0.125
+                and double_ledger.get("after", {}).get(
+                    "raw_executable_choice_gap"
+                )
+                == 0.0,
                 "oracle_gap_zero": action_audit.get("checks", {}).get("oracle_raw_executable_gap_zero") is True,
                 "test_gap": test_gate.get("checks", {}).get("raw_executable_choice_gap") is True,
                 "sealed_gap": sealed_gate.get("checks", {}).get("raw_executable_choice_gap") is True,
             },
-            (paths["action_audit"], paths["validation_gate"], paths["test_gate"], paths["sealed_gate"]),
+            (
+                paths["double_ledger"],
+                paths["action_audit"],
+                paths["validation_gate"],
+                paths["test_gate"],
+                paths["sealed_gate"],
+            ),
         ),
         KnowledgeItem(
             21,
             "业务 Gate 与候选冻结",
-            "先由 Validation 与五种子方差冻结候选，再按一次性顺序通过 Test 和 Sealed。",
+            "Validation 和五种子方差用于锁定候选，随后依次执行一次 Test 和一次 Sealed 评测。",
             {
                 "validation": validation_gate.get("passed") is True,
                 "frozen": frozen.get("status") == "frozen_before_test",
@@ -389,7 +409,7 @@ def build_knowledge_coverage(
         KnowledgeItem(
             23,
             "多 Seed 与统计置信度",
-            "五个独立 adapter 全部过门，方差受控，并对 Validation/Test/Sealed 使用 5,000 次 paired bootstrap。",
+            "五个独立 adapter 均通过 Validation Gate；Validation、Test 和 Sealed 使用 5,000 次 paired bootstrap。",
             {
                 "five_seed": validation_gate.get("multi_seed", {}).get("passed") is True,
                 "validation_bootstrap": all(
@@ -489,6 +509,7 @@ def _paths(repo_root: Path, artifact_root: Path, evaluation_root: Path) -> dict[
         "validation_gate": gate / "formal_validation_gate.json",
         "frozen": gate / "frozen_candidate.json",
         "robustness": evaluation_root / "validation/robustness/frozen_candidate/summary.json",
+        "double_ledger": gate / "double_ledger_fix_audit.json",
         "test_gate": gate / "test_gate.json",
         "sealed_gate": gate / "sealed_gate.json",
         "test_access": gate / "test_access.json",

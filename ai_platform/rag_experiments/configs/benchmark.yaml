@@ -1,0 +1,39 @@
+schema_version: 1
+seed: 20260716
+
+data:
+  snapshot_root: backup/oss_materials
+  materials_file: metadata/materials.json
+  preview_root: objects/materials
+  free_only: true
+  include_metadata: true
+  include_ocr: true
+  chunk_size_chars: 700
+  chunk_overlap_chars: 100
+
+benchmark:
+  dataset_path: datasets/benchmark_v1.jsonl
+  top_k: 10
+  candidate_k: 40
+
+models:
+  bge_m3: models/P0/bge-m3
+  qwen3_embedding_06b: models/P0/Qwen3-Embedding-0.6B
+  bge_reranker_v2_m3: models/P0/bge-reranker-v2-m3
+  device: cuda:0
+  embedding_batch_size: 32
+  reranker_batch_size: 24
+  max_length: 512
+
+retrieval:
+  rrf_k: 60
+  lexical_weight: 0.6
+  dense_weight: 0.4
+  hnsw_m: 32
+  hnsw_ef_search: 64
+  ivf_nlist: 8
+  ivf_nprobe: 4
+
+outputs:
+  artifact_root: artifacts
+  report_root: reports

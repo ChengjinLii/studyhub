@@ -84,6 +84,11 @@ def constrain_router_output(
     parsed, source_status = _parse_model_output(raw_output)
     state = _trusted_state(request_payload)
     corrections: list[str] = []
+    if state.has_untrusted_observation:
+        # Tool text is data, never a control-flow instruction. The typed fields
+        # and user request still determine the route; sanitizers below keep the
+        # resulting action read-only and remove sensitive text.
+        corrections.append("ignore_untrusted_observation")
     if source_status == "recovered":
         corrections.append("recover_invalid_json")
     elif source_status == "fallback":
@@ -259,9 +264,6 @@ def _trusted_state(payload: Mapping[str, Any]) -> _TrustedRouterState:
 def _deterministic_route(state: _TrustedRouterState) -> tuple[str | None, str | None]:
     if state.must_finish:
         return "final", "force_final_budget"
-    if state.has_untrusted_observation:
-        route = _safe_fallback_route(state)
-        return (route or "final"), "safe_untrusted_continuation"
     if _is_permission_bypass_request(state.query):
         return "final", "enforce_permission_boundary"
     if _is_explicit_final_request(state.query):

@@ -36,6 +36,9 @@ FORBIDDEN_ENDPOINT_VARS = (
     "STUDYHUB_AGENTIC_MODEL_BASE_URL",
 )
 CORRECTION_SEVERITY = {
+    # An untrusted field was observed and excluded from control flow. This is
+    # an audit event, not a repair of the model-selected semantic action.
+    "ignore_untrusted_observation": 0,
     "recover_invalid_json": 3,
     "replace_unparseable_output": 3,
     "replace_unexecutable_action": 3,

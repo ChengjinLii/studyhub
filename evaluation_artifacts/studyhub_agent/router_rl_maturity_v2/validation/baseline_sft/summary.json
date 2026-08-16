@@ -12,10 +12,10 @@
       "honor_explicit_memory_read": 30,
       "honor_explicit_search": 18,
       "honor_explicit_synthesis": 30,
+      "ignore_untrusted_observation": 30,
       "protect_explicit_page_route": 120,
       "protect_material_ids": 93,
-      "recover_empty_search": 60,
-      "safe_untrusted_continuation": 30
+      "recover_empty_search": 90
     },
     "severity_max": 4,
     "severity_mean": 2.19697
@@ -137,7 +137,7 @@
   },
   "model_path": "/data/chengjin/studyhub/training_artifacts/studyhub_agent_sft/qwen35_2b_router_v1_7_merged",
   "predictions_path": "/data/chengjin/studyhub/evaluation_artifacts/studyhub_agent/router_rl_maturity_v2/validation/baseline_sft/predictions.jsonl",
-  "predictions_sha256": "fa24e518071f031f1d0328ebbc0681262272f4e956ebbbcb6d757b4722fcb49f",
+  "predictions_sha256": "2433ea083007dbd3031d0a1fb1a98c4f36c5db44a2897d425b3578b0caa704b1",
   "prompt_tokens": {
     "maximum": 1713,
     "mean": 1340.632,
@@ -239,7 +239,7 @@
     "reward_delta_mean": 0.144384
   },
   "schema_version": "studyhub.agent.router_rl.evaluation.v2",
-  "seed": 20260812,
+  "seed": 26081201,
   "split": "validation",
   "states": 660
 }

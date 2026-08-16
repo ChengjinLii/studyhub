@@ -6,7 +6,7 @@
         "/data/chengjin/studyhub/ml/agentic_platform/rl/reward.py",
         "/data/chengjin/studyhub/ml/agentic_platform/rl/configs/router_grpo_pilot_v1.json"
       ],
-      "finding": "优化 Router 的语义动作、停止决策和任务完成率；硬安全不作为可交易 Reward。",
+      "finding": "优化 Router 的语义动作、停止决策和任务完成率；硬安全指标不纳入可加权的 Reward 分项。",
       "number": 1,
       "status": "VERIFIED",
       "title": "RL 目标",
@@ -135,7 +135,7 @@
         "/data/chengjin/studyhub/ml/agentic_platform/rl/trainer.py",
         "/data/chengjin/studyhub/ml/agentic_platform/rl/configs/router_grpo_pilot_v1.json"
       ],
-      "finding": "实现可审计的 GRPO-style contextual-bandit clipped policy gradient，不冒充 TRL/veRL GRPO。",
+      "finding": "实现方式为 GRPO-style contextual-bandit clipped policy gradient，与 TRL/veRL 的完整 GRPO 实现区分记录。",
       "number": 13,
       "status": "IMPLEMENTED",
       "title": "算法选择",
@@ -223,7 +223,7 @@
         "/data/chengjin/studyhub/ml/agentic_platform/rl/gate.py",
         "/data/chengjin/studyhub/evaluation_artifacts/studyhub_agent/router_rl_pilot_v1/gate/gate.json"
       ],
-      "finding": "Validation 冻结候选，Test 按预注册非退化阈值判定；未因总体涨分忽略 blocker。",
+      "finding": "Validation 用于冻结候选；Test 按预注册非退化阈值评测，constraint dependency 超阈值后结论为 NO-GO。",
       "number": 21,
       "status": "NO-GO",
       "title": "业务 Gate",

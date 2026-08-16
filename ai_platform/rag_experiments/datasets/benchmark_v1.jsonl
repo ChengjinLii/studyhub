@@ -1,0 +1,60 @@
+{"query_id":"q001","query":"随机信号一页纸","query_type":"exact","relevance":{"192":2,"163":2,"15":1}}
+{"query_id":"q002","query":"考试前快速复习随机过程和随机信号的资料","query_type":"semantic","relevance":{"192":2,"163":2,"164":1,"15":1}}
+{"query_id":"q003","query":"随机信号历年期末题答案","query_type":"semantic","relevance":{"208":2,"50":1}}
+{"query_id":"q004","query":"通信原理教材和课程讲义","query_type":"semantic","relevance":{"48":2,"18":2,"168":1}}
+{"query_id":"q005","query":"CPS 通信原理往年期末解析","query_type":"acronym","relevance":{"209":2,"48":1,"18":1}}
+{"query_id":"q006","query":"DCD 数字电路设计复习资料","query_type":"acronym","relevance":{"176":2,"206":2,"47":2,"46":1}}
+{"query_id":"q007","query":"数字通信样卷和标准答案","query_type":"semantic","relevance":{"113":2}}
+{"query_id":"q008","query":"ADC 高阶数字通信期中样题答案","query_type":"acronym","relevance":{"54":2,"55":1,"172":1}}
+{"query_id":"q009","query":"信息论近六年期末考试答案","query_type":"semantic","relevance":{"210":2}}
+{"query_id":"q010","query":"信息论课后作业参考答案","query_type":"semantic","relevance":{"167":2,"53":2}}
+{"query_id":"q011","query":"大物二老师期末复习 PPT","query_type":"exact","relevance":{"213":2,"41":2}}
+{"query_id":"q012","query":"大学物理下册历年期末卷答案解析","query_type":"semantic","relevance":{"144":2,"143":2,"142":2,"162":1}}
+{"query_id":"q013","query":"大学物理 II 例题讲解和重做","query_type":"semantic","relevance":{"188":2,"187":2,"186":2,"185":1}}
+{"query_id":"q014","query":"大物一历年期中考试答案","query_type":"semantic","relevance":{"30":2,"29":2,"28":2,"31":1}}
+{"query_id":"q015","query":"大学物理教材作业答案","query_type":"semantic","relevance":{"212":2,"38":2}}
+{"query_id":"q016","query":"概率论 2021 期末真题","query_type":"exact","relevance":{"37":2,"36":2}}
+{"query_id":"q017","query":"概率论教材课后习题答案","query_type":"semantic","relevance":{"161":2}}
+{"query_id":"q018","query":"概率论考前复习笔记","query_type":"semantic","relevance":{"141":2}}
+{"query_id":"q019","query":"线性代数期末复习讲座和往年卷","query_type":"semantic","relevance":{"87":2,"88":2}}
+{"query_id":"q020","query":"线代课本与习题答案","query_type":"semantic","relevance":{"27":2}}
+{"query_id":"q021","query":"Calculus I 微积分一期末试卷和答案","query_type":"bilingual","relevance":{"79":2,"80":2}}
+{"query_id":"q022","query":"微积分二期中真题自制解析","query_type":"semantic","relevance":{"214":2}}
+{"query_id":"q023","query":"Thomas Calculus 托马斯微积分教材答案","query_type":"bilingual","relevance":{"85":2,"20":2}}
+{"query_id":"q024","query":"信号与系统期中考试解析","query_type":"semantic","relevance":{"129":2,"130":2}}
+{"query_id":"q025","query":"信号与系统五年期末考讲解","query_type":"semantic","relevance":{"127":2,"128":2}}
+{"query_id":"q026","query":"信号与系统开卷一页纸","query_type":"exact","relevance":{"45":2}}
+{"query_id":"q027","query":"CAD 电路分析与设计历年期末真题","query_type":"acronym","relevance":{"26":2,"25":2,"24":2,"23":2,"22":2}}
+{"query_id":"q028","query":"电路分析知识点复习和自查","query_type":"semantic","relevance":{"21":2,"145":1,"131":1}}
+{"query_id":"q029","query":"功率半导体开卷考试一页纸","query_type":"semantic","relevance":{"92":2,"160":1}}
+{"query_id":"q030","query":"Power Electronics 功率器件历年真题","query_type":"bilingual","relevance":{"74":2,"73":2,"72":2,"71":2}}
+{"query_id":"q031","query":"ED 电子器件历年期末试卷","query_type":"acronym","relevance":{"78":2,"77":2,"76":2,"75":2}}
+{"query_id":"q032","query":"Electronic Devices 电子器件知识点笔记","query_type":"bilingual","relevance":{"91":2,"158":2}}
+{"query_id":"q033","query":"MNNT 微纳工艺课程 PPT","query_type":"acronym","relevance":{"101":2}}
+{"query_id":"q034","query":"微纳工艺 2021 2022 期末试卷","query_type":"semantic","relevance":{"98":2,"97":2}}
+{"query_id":"q035","query":"微纳工艺复习题和问答资料","query_type":"semantic","relevance":{"99":2,"100":2}}
+{"query_id":"q036","query":"ESD 电子系统设计历年期末卷","query_type":"acronym","relevance":{"70":2,"69":2,"68":2,"67":2}}
+{"query_id":"q037","query":"Electronic System Design 样卷答案","query_type":"bilingual","relevance":{"103":2}}
+{"query_id":"q038","query":"AI ML 人工智能与机器学习期末复习","query_type":"bilingual","relevance":{"207":2,"159":2}}
+{"query_id":"q039","query":"嵌入式处理器 PPT 和复习笔记","query_type":"semantic","relevance":{"179":2,"175":2}}
+{"query_id":"q040","query":"数字信号处理课程笔记","query_type":"exact","relevance":{"170":2}}
+{"query_id":"q041","query":"电磁场与电磁波复习资料和网课教材","query_type":"semantic","relevance":{"169":2,"56":2}}
+{"query_id":"q042","query":"移动通信自学笔记","query_type":"semantic","relevance":{"174":2}}
+{"query_id":"q043","query":"数字图像处理学习笔记","query_type":"exact","relevance":{"173":2}}
+{"query_id":"q044","query":"大学英语四六级历年听力真题解析","query_type":"semantic","relevance":{"106":2}}
+{"query_id":"q045","query":"EAGP 英文学术写作衔接技巧","query_type":"bilingual","relevance":{"154":2}}
+{"query_id":"q046","query":"EAGP 听力与课堂记笔记技巧","query_type":"bilingual","relevance":{"150":2,"153":1}}
+{"query_id":"q047","query":"英文 Academic Poster 学术海报模板","query_type":"bilingual","relevance":{"197":2,"117":1}}
+{"query_id":"q048","query":"电子科大答辩 PPT 模板","query_type":"semantic","relevance":{"117":2}}
+{"query_id":"q049","query":"中国近现代史纲要思维导图重点","query_type":"semantic","relevance":{"198":2}}
+{"query_id":"q050","query":"毛概期末考前背诵重点","query_type":"semantic","relevance":{"193":2,"90":2}}
+{"query_id":"q051","query":"马克思主义基本原理思维导图","query_type":"semantic","relevance":{"52":2}}
+{"query_id":"q052","query":"军事理论期末速成笔记","query_type":"semantic","relevance":{"183":2,"182":2}}
+{"query_id":"q053","query":"研究生矩阵理论简明笔记","query_type":"semantic","relevance":{"177":2}}
+{"query_id":"q054","query":"研究生最优化理论复习笔记","query_type":"semantic","relevance":{"178":2}}
+{"query_id":"q055","query":"EfES 英语写作 Problem-Solution Essay 往年题","query_type":"bilingual","relevance":{"196":2,"154":1}}
+{"query_id":"q056","query":"操作系统期末试卷与答案","query_type":"no_answer","relevance":{}}
+{"query_id":"q057","query":"医学影像分割深度学习教程","query_type":"no_answer","relevance":{}}
+{"query_id":"q058","query":"Python 数据结构课程作业","query_type":"no_answer","relevance":{}}
+{"query_id":"q059","query":"考研英语阅读真题精讲","query_type":"no_answer","relevance":{}}
+{"query_id":"q060","query":"有机化学实验报告模板","query_type":"no_answer","relevance":{}}
