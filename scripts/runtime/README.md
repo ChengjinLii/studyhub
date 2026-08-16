@@ -50,3 +50,4 @@ bash scripts/runtime/production-down.sh
 - preview / production 不应隐式回退到 SQLite 或本地 fake provider
 - 生产环境相关操作应保持显式、保守、可回滚
 - systemd 部署应安装 `deploy/systemd/studyhub-backend-hardening.conf`，将 Uvicorn 并发限制为 128、连接 backlog 限制为 512；shell runtime 使用相同默认值，可分别通过 `STUDYHUB_UVICORN_LIMIT_CONCURRENCY`、`STUDYHUB_UVICORN_BACKLOG`、`STUDYHUB_UVICORN_KEEPALIVE_SECONDS` 覆盖
+- production preflight 会执行完整 schema 审计，并与 `deploy/schema/production-legacy-baseline.json` 的已审指纹比较。它不再只检查两个字段；任何新增、删除或属性变化都会阻断部署。基线只能在备份、只读审计和人工评审后更新。

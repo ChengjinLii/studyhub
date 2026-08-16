@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "reviewedAt": "2026-08-16",
+  "fingerprint": "b5e4c042c967d5aaea1468bd999c9c2c30907aa74c4136e4a84dfa8f2a62ddd9",
+  "counts": {
+    "missingTables": 7,
+    "missingColumns": 40,
+    "columnWarnings": 292,
+    "missingIndexes": 0
+  },
+  "note": "The seven missing tables belong to disabled Agentic features. The remaining reviewed differences are legacy aliases/defaults handled by compatibility repositories. Any drift from this exact fingerprint blocks production preflight."
+}
