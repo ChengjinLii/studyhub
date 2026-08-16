@@ -856,7 +856,13 @@ class RequestsService(RequestsCompatMixin):
                     request = self._require_request(session, contribution.request_id)
                     self._apply_refund_to_request(request, contribution.amount_cents)
                     remaining = self.request_repo.list_contributions(session, request.id)
-                    if all(item.id == contribution.id or item.status == CONTRIBUTION_STATUS_REFUNDED for item in remaining):
+                    unsettled_paid = [
+                        item
+                        for item in remaining
+                        if item.id != contribution.id
+                        and item.status in {CONTRIBUTION_STATUS_PAID, CONTRIBUTION_STATUS_REFUNDING}
+                    ]
+                    if not unsettled_paid:
                         request.status = REQUEST_STATUS_REFUNDED
                         request.settled_at = datetime.now(UTC)
                     else:

@@ -84,7 +84,13 @@ class FinanceRepository:
                         FinanceInstructionRecord.status == "PENDING",
                         or_(FinanceInstructionRecord.next_attempt_at.is_(None), FinanceInstructionRecord.next_attempt_at <= now),
                     ),
-                    and_(FinanceInstructionRecord.status == "PROCESSING", FinanceInstructionRecord.claimed_at <= stale_before),
+                    and_(
+                        FinanceInstructionRecord.status == "PROCESSING",
+                        or_(
+                            FinanceInstructionRecord.claimed_at.is_(None),
+                            FinanceInstructionRecord.claimed_at <= stale_before,
+                        ),
+                    ),
                 ),
             )
             .order_by(FinanceInstructionRecord.created_at.asc(), FinanceInstructionRecord.id.asc())

@@ -5,7 +5,7 @@ import hashlib
 import json
 import os
 
-from sqlalchemy import inspect
+from sqlalchemy import inspect, text
 
 from app.core.config import get_settings
 from app.core.db import get_engine
@@ -14,6 +14,12 @@ from app.ops.schema_audit import require_recent_nonempty_backup
 
 
 MODULE_TABLES = {"finance-outbox": (FinanceInstructionRecord.__table__,)}
+MODULE_DEFAULTS = {
+    "finance-outbox": (
+        ("finance_instructions", "status", "'PENDING'"),
+        ("finance_instructions", "attempt_count", "0"),
+    )
+}
 
 
 def build_plan(module: str) -> dict[str, object]:
@@ -23,10 +29,24 @@ def build_plan(module: str) -> dict[str, object]:
     engine = get_engine()
     existing = set(inspect(engine).get_table_names())
     create_tables = [table.name for table in tables if table.name not in existing]
-    canonical = json.dumps({"module": module, "createTables": create_tables}, sort_keys=True, separators=(",", ":"))
+    alter_defaults: list[dict[str, str]] = []
+    inspector = inspect(engine)
+    for table_name, column_name, default_sql in MODULE_DEFAULTS.get(module, ()):
+        if table_name not in existing:
+            continue
+        columns = {str(item["name"]): item for item in inspector.get_columns(table_name)}
+        actual_default = columns.get(column_name, {}).get("default")
+        if actual_default is None:
+            alter_defaults.append({"table": table_name, "column": column_name, "defaultSql": default_sql})
+    canonical = json.dumps(
+        {"module": module, "createTables": create_tables, "alterDefaults": alter_defaults},
+        sort_keys=True,
+        separators=(",", ":"),
+    )
     return {
         "module": module,
         "createTables": create_tables,
+        "alterDefaults": alter_defaults,
         "planToken": hashlib.sha256(canonical.encode("utf-8")).hexdigest()[:16],
     }
 
@@ -46,10 +66,24 @@ def apply_plan(module: str, plan_token: str) -> dict[str, object]:
     for table in tables:
         if table.name in plan["createTables"]:
             table.create(bind=engine, checkfirst=True)
+    with engine.begin() as connection:
+        for item in plan["alterDefaults"]:
+            connection.execute(
+                text(
+                    f"ALTER TABLE `{item['table']}` ALTER COLUMN `{item['column']}` "
+                    f"SET DEFAULT {item['defaultSql']}"
+                )
+            )
     after = build_plan(module)
-    if after["createTables"]:
-        raise RuntimeError(f"hardening migration 验收失败：{after['createTables']}")
-    return {"module": module, "createdTables": plan["createTables"], "backupFile": str(backup), "verified": True}
+    if after["createTables"] or after["alterDefaults"]:
+        raise RuntimeError(f"hardening migration 验收失败：{after}")
+    return {
+        "module": module,
+        "createdTables": plan["createTables"],
+        "alteredDefaults": plan["alterDefaults"],
+        "backupFile": str(backup),
+        "verified": True,
+    }
 
 
 def main() -> int:

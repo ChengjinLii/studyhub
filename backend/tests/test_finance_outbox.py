@@ -41,3 +41,30 @@ def test_finance_instruction_repository_recovers_stale_processing_rows() -> None
             stale_before=now - timedelta(minutes=5),
         )
     assert [item.operation_key for item in ready] == ["payout-transfer:1"]
+
+
+def test_finance_instruction_repository_recovers_processing_rows_without_claim_time() -> None:
+    engine = create_engine("sqlite+pysqlite:///:memory:", future=True)
+    FinanceInstructionRecord.__table__.create(bind=engine)
+    repo = FinanceRepository()
+    now = datetime.now(UTC)
+    with Session(engine) as session:
+        repo.save_finance_instruction(
+            session,
+            FinanceInstructionRecord(
+                operation_key="request-refund:1",
+                instruction_type="REQUEST_REFUND",
+                aggregate_type="REQUEST_CONTRIBUTION",
+                aggregate_id=1,
+                status="PROCESSING",
+                claimed_at=None,
+            ),
+        )
+        session.commit()
+        ready = repo.list_ready_finance_instructions(
+            session,
+            "REQUEST_REFUND",
+            now,
+            stale_before=now - timedelta(minutes=5),
+        )
+    assert [item.operation_key for item in ready] == ["request-refund:1"]
