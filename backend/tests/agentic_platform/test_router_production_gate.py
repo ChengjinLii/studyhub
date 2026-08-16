@@ -10,6 +10,7 @@ from app.services.agent_tool_loop_service import (
 from ml.agentic_platform.sft.evaluate_router import (
     DEFAULT_MAX_NEW_TOKENS,
     PRODUCTION_MAX_NEW_TOKENS,
+    _decode_generated_output,
     _evaluation_messages,
     _install_set_submodule_compat,
     _resolve_max_new_tokens,
@@ -51,9 +52,7 @@ def test_router_gate_requires_every_metric_and_safety() -> None:
     assert gate_analysis(passing)["passed"] is True
 
     failing_metric = _analysis()
-    failing_metric["subset_metrics"]["tool_required_name"]["rate"] = (
-        THRESHOLDS["tool_required_name"] - 0.01
-    )
+    failing_metric["subset_metrics"]["tool_required_name"]["rate"] = THRESHOLDS["tool_required_name"] - 0.01
     result = gate_analysis(failing_metric)
     assert result["passed"] is False
     assert result["failures"] == {
@@ -148,10 +147,45 @@ def test_nf4_module_replacement_compatibility_is_idempotent() -> None:
 
 
 def test_production_evaluation_defaults_to_runtime_output_budget() -> None:
-    assert _resolve_max_new_tokens(None, production_contract=False) == (
-        DEFAULT_MAX_NEW_TOKENS
-    )
-    assert _resolve_max_new_tokens(None, production_contract=True) == (
-        PRODUCTION_MAX_NEW_TOKENS
-    )
+    assert _resolve_max_new_tokens(None, production_contract=False) == (DEFAULT_MAX_NEW_TOKENS)
+    assert _resolve_max_new_tokens(None, production_contract=True) == (PRODUCTION_MAX_NEW_TOKENS)
     assert _resolve_max_new_tokens(512, production_contract=True) == 512
+
+
+def test_constrained_evaluation_preserves_raw_output_and_protects_page() -> None:
+    messages = [
+        {"role": "system", "content": "system"},
+        {
+            "role": "user",
+            "content": json.dumps(
+                {
+                    "current_user_query": "读取第4页证据",
+                    "task_context": {},
+                    "tool_observations": [
+                        {
+                            "tool": "search_materials",
+                            "result": {"candidates": [{"id": 21}]},
+                        }
+                    ],
+                    "budget": {
+                        "remaining_rounds": 2,
+                        "remaining_tool_calls": 3,
+                        "remaining_search_calls": 0,
+                        "remaining_candidate_slots": 5,
+                    },
+                    "force_final": False,
+                }
+            ),
+        },
+    ]
+    generated, parsed, diagnostics = _decode_generated_output(
+        "not-json",
+        messages,
+        constrained_decoding=True,
+        deterministic_argument_protection=True,
+    )
+
+    assert json.loads(generated) == parsed
+    assert parsed["actions"][0]["arguments"]["material_ids"] == [21]
+    assert parsed["actions"][0]["arguments"]["page_numbers"] == [4]
+    assert diagnostics["source_status"] == "fallback"

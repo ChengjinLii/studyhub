@@ -1,0 +1,795 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="color-scheme" content="light" />
+<title>StudyHub Agent · SFT 对照与消融实验计划</title>
+<style>
+:root {
+  --ink: #17271f;
+  --ink-soft: #526159;
+  --paper: #f2ecdf;
+  --paper-light: #fbf8f0;
+  --paper-deep: #e8dfcf;
+  --green: #216a50;
+  --green-dark: #173f33;
+  --green-pale: #dce9df;
+  --gold: #bd8a22;
+  --gold-pale: #efe2bd;
+  --red: #9e4b3d;
+  --red-pale: #f0dcd6;
+  --blue: #3f6578;
+  --line: rgba(23, 39, 31, .17);
+  --line-strong: rgba(23, 39, 31, .35);
+  --serif: "Source Han Serif SC", "Noto Serif CJK SC", "Songti SC", serif;
+  --sans: "Avenir Next", "PingFang SC", "Microsoft YaHei", sans-serif;
+  --mono: "SFMono-Regular", "Cascadia Code", "JetBrains Mono", monospace;
+}
+
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  margin: 0;
+  color: var(--ink);
+  background:
+    linear-gradient(90deg, transparent 0 49.92%, rgba(33, 106, 80, .045) 50%, transparent 50.08%),
+    radial-gradient(circle at 7% 3%, rgba(189, 138, 34, .16), transparent 28rem),
+    radial-gradient(circle at 96% 9%, rgba(33, 106, 80, .13), transparent 34rem),
+    var(--paper);
+  font: 16px/1.72 var(--sans);
+}
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  opacity: .16;
+  pointer-events: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='88' height='88' viewBox='0 0 88 88'%3E%3Cpath d='M0 87.5h88M87.5 0v88' fill='none' stroke='%23216a50' stroke-opacity='.13'/%3E%3C/svg%3E");
+}
+
+a { color: inherit; }
+.shell { width: min(1360px, calc(100% - 48px)); margin: 0 auto; }
+.mono { font-family: var(--mono); }
+.muted { color: var(--ink-soft); }
+.accent { color: var(--green); }
+
+.hero {
+  position: relative;
+  min-height: 760px;
+  padding: 78px 0 54px;
+  overflow: hidden;
+  border-bottom: 1px solid var(--line-strong);
+}
+.hero::after {
+  content: "SFT";
+  position: absolute;
+  right: -1.5vw;
+  top: 38px;
+  z-index: -1;
+  color: transparent;
+  -webkit-text-stroke: 1px rgba(33, 106, 80, .17);
+  font: 800 clamp(180px, 29vw, 430px)/.82 var(--sans);
+  letter-spacing: -.09em;
+}
+.kicker {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  color: var(--green);
+  font: 750 11px/1 var(--mono);
+  letter-spacing: .16em;
+  text-transform: uppercase;
+}
+.kicker::before { content: ""; width: 52px; height: 3px; background: var(--gold); }
+.hero h1 {
+  max-width: 1040px;
+  margin: 38px 0 28px;
+  font: 680 clamp(58px, 8vw, 118px)/.94 var(--serif);
+  letter-spacing: -.06em;
+}
+.hero h1 span {
+  display: block;
+  margin-top: .22em;
+  color: var(--green);
+  font-size: .49em;
+  letter-spacing: -.035em;
+}
+.hero-lead {
+  max-width: 870px;
+  margin: 0;
+  color: #304139;
+  font: 520 clamp(19px, 2vw, 28px)/1.55 var(--serif);
+}
+.verdict {
+  display: grid;
+  grid-template-columns: 150px minmax(0, 1fr);
+  max-width: 900px;
+  margin-top: 36px;
+  border: 1px solid var(--line-strong);
+  background: rgba(251, 248, 240, .78);
+}
+.verdict b {
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  color: var(--paper-light);
+  background: var(--green-dark);
+  font: 750 11px/1.35 var(--mono);
+  letter-spacing: .12em;
+}
+.verdict p { margin: 0; padding: 19px 23px; color: var(--ink-soft); }
+.hero-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  margin-top: 50px;
+  border-block: 1px solid var(--line-strong);
+}
+.hero-metric { min-height: 125px; padding: 23px 20px; border-right: 1px solid var(--line); }
+.hero-metric:last-child { border-right: 0; }
+.hero-metric strong { display: block; font: 680 36px/1 var(--serif); letter-spacing: -.03em; }
+.hero-metric span { display: block; margin-top: 11px; color: var(--ink-soft); font-size: 13px; line-height: 1.5; }
+
+.report-layout {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr);
+  gap: 56px;
+  padding-bottom: 100px;
+}
+.toc { position: sticky; top: 22px; align-self: start; padding: 34px 0 0; }
+.toc b { display: block; margin-bottom: 14px; color: var(--green); font: 750 10px/1 var(--mono); letter-spacing: .15em; }
+.toc a {
+  display: grid;
+  grid-template-columns: 26px 1fr;
+  gap: 8px;
+  padding: 9px 0;
+  color: var(--ink-soft);
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+  font-size: 13px;
+}
+.toc a span { color: var(--gold); font: 700 10px/1.9 var(--mono); }
+.toc a:hover { color: var(--green); border-color: var(--gold); }
+.toc-note { margin-top: 25px; padding-top: 16px; border-top: 1px solid var(--line); color: var(--ink-soft); font-size: 11px; line-height: 1.6; }
+
+section { padding: 78px 0; border-top: 1px solid var(--line); }
+main section:first-child { border-top: 0; }
+.section-no { color: var(--gold); font: 750 11px/1 var(--mono); letter-spacing: .16em; }
+.section-head { display: grid; grid-template-columns: .95fr 1.05fr; gap: 48px; margin: 17px 0 36px; }
+.section-head h2 { margin: 0; font: 660 clamp(36px, 4.5vw, 62px)/1.04 var(--serif); letter-spacing: -.045em; }
+.section-head p { margin: 7px 0 0; color: var(--ink-soft); font-size: 17px; }
+
+.status-key { display: flex; flex-wrap: wrap; gap: 9px; margin: 0 0 23px; }
+.status {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  width: fit-content;
+  padding: 6px 9px;
+  border: 1px solid currentColor;
+  font: 750 10px/1 var(--mono);
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+.status::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.done { color: var(--green); background: rgba(220, 233, 223, .65); }
+.rerun { color: var(--gold); background: rgba(239, 226, 189, .56); }
+.new { color: var(--red); background: rgba(240, 220, 214, .58); }
+.separate { color: var(--blue); background: rgba(63, 101, 120, .08); }
+
+.evidence-grid { display: grid; grid-template-columns: repeat(12, 1fr); gap: 18px; }
+.evidence-card {
+  grid-column: span 4;
+  min-height: 240px;
+  padding: 27px;
+  border: 1px solid var(--line);
+  background: rgba(251, 248, 240, .86);
+}
+.evidence-card.wide { grid-column: span 8; }
+.evidence-card h3 { margin: 14px 0 11px; font: 650 25px/1.2 var(--serif); }
+.evidence-card p { margin: 0; color: var(--ink-soft); }
+.evidence-card strong.number { display: block; margin-top: 24px; color: var(--green); font: 680 38px/1 var(--serif); }
+.evidence-card small { display: block; margin-top: 8px; color: var(--ink-soft); }
+
+.split-compare { display: grid; grid-template-columns: 1fr 1fr; margin-top: 20px; border: 1px solid var(--line-strong); }
+.split-side { padding: 28px; background: rgba(251, 248, 240, .86); }
+.split-side + .split-side { border-left: 1px solid var(--line-strong); background: var(--green-dark); color: #edf2ee; }
+.split-side h3 { margin: 13px 0 8px; font: 650 29px/1.15 var(--serif); }
+.split-side p { margin: 0; color: var(--ink-soft); }
+.split-side + .split-side p { color: rgba(237, 242, 238, .7); }
+.mini-metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; margin-top: 22px; background: var(--line); }
+.mini-metrics div { padding: 15px; background: var(--paper-light); }
+.split-side + .split-side .mini-metrics { background: rgba(255, 255, 255, .18); }
+.split-side + .split-side .mini-metrics div { background: rgba(255, 255, 255, .06); }
+.mini-metrics b { display: block; font: 650 20px/1 var(--serif); }
+.mini-metrics span { display: block; margin-top: 7px; color: var(--ink-soft); font-size: 11px; }
+.split-side + .split-side .mini-metrics span { color: rgba(237, 242, 238, .62); }
+
+.note {
+  margin-top: 20px;
+  padding: 17px 19px;
+  border-left: 4px solid var(--green);
+  background: rgba(220, 233, 223, .56);
+  color: var(--ink-soft);
+  font-size: 13px;
+}
+.note.warn { border-color: var(--red); background: rgba(240, 220, 214, .58); }
+.note.gold { border-color: var(--gold); background: rgba(239, 226, 189, .54); }
+
+.table-wrap { overflow: auto; border: 1px solid var(--line); background: rgba(251, 248, 240, .88); }
+table { width: 100%; min-width: 860px; border-collapse: collapse; }
+th, td { padding: 15px 14px; text-align: left; vertical-align: top; border-bottom: 1px solid var(--line); font-size: 13px; }
+th { color: var(--green); background: rgba(220, 233, 223, .45); font: 750 10px/1.3 var(--mono); letter-spacing: .09em; text-transform: uppercase; }
+tr:last-child td { border-bottom: 0; }
+td strong { color: var(--ink); }
+.status-cell { white-space: nowrap; }
+
+.principles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; background: var(--line); border: 1px solid var(--line); }
+.principle { min-height: 230px; padding: 24px; background: var(--paper-light); }
+.principle b { display: block; color: var(--gold); font: 750 11px/1 var(--mono); letter-spacing: .1em; }
+.principle h3 { margin: 34px 0 10px; font: 650 22px/1.2 var(--serif); }
+.principle p { margin: 0; color: var(--ink-soft); font-size: 13px; }
+
+.experiment-stack { display: grid; gap: 18px; }
+.experiment {
+  display: grid;
+  grid-template-columns: 126px minmax(0, 1.1fr) minmax(0, .9fr);
+  border: 1px solid var(--line);
+  background: rgba(251, 248, 240, .88);
+}
+.exp-id { padding: 24px 18px; color: var(--paper-light); background: var(--green-dark); }
+.exp-id b { display: block; color: #e3bf5a; font: 750 14px/1 var(--mono); letter-spacing: .08em; }
+.exp-id span { display: block; margin-top: 12px; color: rgba(251, 248, 240, .68); font-size: 11px; line-height: 1.45; }
+.exp-main, .exp-rule { padding: 24px; }
+.exp-rule { border-left: 1px solid var(--line); background: rgba(232, 223, 207, .36); }
+.experiment h3 { margin: 0 0 9px; font: 650 24px/1.2 var(--serif); }
+.experiment p { margin: 0; color: var(--ink-soft); font-size: 13px; }
+.arm-list { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+.arm { padding: 6px 9px; border: 1px solid var(--line-strong); background: var(--paper-light); font: 700 11px/1 var(--mono); }
+.exp-rule b { display: block; margin-bottom: 9px; color: var(--green); font: 750 10px/1 var(--mono); letter-spacing: .09em; }
+.exp-rule ul { margin: 0; padding-left: 18px; color: var(--ink-soft); font-size: 13px; }
+.exp-rule li { margin: 6px 0; }
+
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 19px; }
+.panel { padding: 27px; border: 1px solid var(--line); background: rgba(251, 248, 240, .88); }
+.panel h3 { margin: 13px 0 11px; font: 650 27px/1.18 var(--serif); }
+.panel p { margin: 0; color: var(--ink-soft); }
+.panel ul { margin: 14px 0 0; padding-left: 19px; }
+.panel li { margin: 7px 0; }
+.tag { color: var(--green); font: 750 10px/1 var(--mono); letter-spacing: .11em; }
+
+.gate-board { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+.gate { border: 1px solid var(--line-strong); background: var(--paper-light); }
+.gate-head { display: flex; justify-content: space-between; align-items: baseline; padding: 22px 24px; color: var(--paper-light); background: var(--green-dark); }
+.gate-head h3 { margin: 0; font: 650 25px/1 var(--serif); }
+.gate-head span { color: #e3bf5a; font: 750 10px/1 var(--mono); }
+.gate-row { display: grid; grid-template-columns: 1fr auto; gap: 20px; padding: 13px 24px; border-bottom: 1px solid var(--line); font-size: 13px; }
+.gate-row:last-child { border-bottom: 0; }
+.gate-row b { color: var(--green); font-family: var(--mono); }
+
+.runway { display: grid; gap: 0; border: 1px solid var(--line-strong); }
+.runway-step { display: grid; grid-template-columns: 88px 190px 1fr 155px; gap: 18px; padding: 20px; border-bottom: 1px solid var(--line); background: rgba(251, 248, 240, .88); }
+.runway-step:last-child { border-bottom: 0; }
+.runway-step > b { color: var(--gold); font: 750 11px/1.5 var(--mono); letter-spacing: .08em; }
+.runway-step strong { font: 650 18px/1.3 var(--serif); }
+.runway-step span { color: var(--ink-soft); font-size: 13px; }
+.runway-step em { color: var(--green); font: normal 700 11px/1.5 var(--mono); }
+
+.budget { display: grid; grid-template-columns: 1.15fr .85fr; gap: 20px; margin-top: 20px; }
+.budget-main { padding: 30px; color: var(--paper-light); background: var(--green-dark); }
+.budget-main b { display: block; color: #e3bf5a; font: 750 11px/1 var(--mono); letter-spacing: .1em; }
+.budget-main strong { display: block; margin-top: 14px; font: 650 40px/1 var(--serif); }
+.budget-main p { margin: 13px 0 0; color: rgba(251, 248, 240, .68); }
+.budget-side { padding: 27px; border: 1px solid var(--line); background: var(--paper-light); }
+.budget-side p { margin: 0; color: var(--ink-soft); }
+
+.artifact-code {
+  margin-top: 20px;
+  padding: 23px;
+  overflow: auto;
+  color: #eaf0ec;
+  background: #14251e;
+  font: 12px/1.75 var(--mono);
+  white-space: pre;
+}
+.evidence-links { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; margin-top: 20px; border: 1px solid var(--line); background: var(--line); }
+.evidence-links a { display: block; padding: 16px 18px; overflow-wrap: anywhere; background: var(--paper-light); text-decoration: none; font: 11px/1.55 var(--mono); }
+.evidence-links a:hover { color: var(--green); background: var(--green-pale); }
+
+.closing {
+  position: relative;
+  padding: 46px;
+  overflow: hidden;
+  color: var(--paper-light);
+  background: var(--green-dark);
+}
+.closing::after { content: "01"; position: absolute; right: 20px; bottom: -55px; color: rgba(255,255,255,.06); font: 800 190px/1 var(--sans); }
+.closing h3 { max-width: 850px; margin: 0; font: 650 clamp(34px, 4vw, 58px)/1.1 var(--serif); letter-spacing: -.035em; }
+.closing p { max-width: 820px; margin: 22px 0 0; color: rgba(251, 248, 240, .73); font-size: 17px; }
+.closing strong { color: #e3bf5a; }
+
+footer { padding: 34px 0 58px; border-top: 1px solid var(--line-strong); color: var(--ink-soft); font-size: 12px; }
+
+@media (prefers-reduced-motion: no-preference) {
+  .hero .kicker, .hero h1, .hero-lead, .verdict, .hero-metrics { animation: rise .65s both; }
+  .hero h1 { animation-delay: .07s; }
+  .hero-lead { animation-delay: .14s; }
+  .verdict { animation-delay: .21s; }
+  .hero-metrics { animation-delay: .28s; }
+  @keyframes rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+}
+
+@media (max-width: 1040px) {
+  .report-layout { grid-template-columns: 1fr; }
+  .toc { display: none; }
+  .section-head, .split-compare, .grid-2, .gate-board, .budget { grid-template-columns: 1fr; }
+  .split-side + .split-side { border-left: 0; border-top: 1px solid var(--line-strong); }
+  .principles { grid-template-columns: 1fr 1fr; }
+  .evidence-card, .evidence-card.wide { grid-column: span 6; }
+  .experiment { grid-template-columns: 105px 1fr; }
+  .exp-rule { grid-column: 2; border-left: 0; border-top: 1px solid var(--line); }
+  .runway-step { grid-template-columns: 75px 160px 1fr; }
+  .runway-step em { grid-column: 2 / -1; }
+}
+
+@media (max-width: 680px) {
+  .shell { width: min(100% - 24px, 620px); }
+  .hero { min-height: 0; padding-top: 52px; }
+  .hero h1 { font-size: 50px; }
+  .verdict { grid-template-columns: 1fr; }
+  .hero-metrics, .principles, .evidence-links { grid-template-columns: 1fr; }
+  .hero-metric { border-right: 0; border-bottom: 1px solid var(--line); }
+  .hero-metric:last-child { border-bottom: 0; }
+  .section-head { gap: 18px; }
+  .evidence-card, .evidence-card.wide { grid-column: 1 / -1; }
+  .mini-metrics { grid-template-columns: 1fr; }
+  .experiment { grid-template-columns: 1fr; }
+  .exp-rule { grid-column: auto; }
+  .runway-step { grid-template-columns: 1fr; }
+  .runway-step em { grid-column: auto; }
+  .closing { padding: 30px 24px; }
+}
+
+@media print {
+  body { background: #fff; }
+  body::before, .hero::after, .toc { display: none; }
+  .shell { width: 100%; }
+  .hero { min-height: 0; padding: 34px 0; }
+  .report-layout { display: block; }
+  section { break-inside: avoid; padding: 34px 0; }
+  a { text-decoration: none; }
+}
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="shell">
+    <div class="kicker">StudyHub Agent · Model Lab Note 06 · 2026-08-12</div>
+    <h1>StudyHub SFT<span>对照与消融实验方案</span></h1>
+    <p class="hero-lead">
+      Router 与 Grounded Tutor 已有可运行模型和完整训练链。下一阶段采用受控实验，分别评估数据、优化参数、LoRA 配置、随机种子和输入分布对结果的影响。
+    </p>
+    <div class="verdict">
+      <b>CURRENT<br />VERDICT</b>
+      <p><strong>v1.7 与 Tutor v1 仅作为工程参考，连续版本迭代不计入严格消融。</strong>受控实验全部从同一基座开始，先做单 seed 筛选，再对入选配置做三 seed 复验。</p>
+    </div>
+    <div class="hero-metrics">
+      <div class="hero-metric"><strong>3 seeds</strong><span>Router v1.1 已完成 3407 / 7703 / 9109；最终 v1.7 配置仍是单 seed。</span></div>
+      <div class="hero-metric"><strong>1,640</strong><span>Router v1.7 样本，raw 与 runtime_state 各 820 条。</span></div>
+      <div class="hero-metric"><strong>120 / 120</strong><span>Tutor 开发验证严格通过；Base 同集仅 4 / 120。</span></div>
+      <div class="hero-metric"><strong>119 / 120</strong><span>Tutor 封存集严格通过；1 条失败触发 no-tool 硬门槛。</span></div>
+    </div>
+  </div>
+</header>
+
+<div class="shell report-layout">
+  <nav class="toc" aria-label="报告目录">
+    <b>EXPERIMENT INDEX</b>
+    <a href="#evidence"><span>01</span>现有证据</a>
+    <a href="#gaps"><span>02</span>还缺什么</a>
+    <a href="#protocol"><span>03</span>统一实验合同</a>
+    <a href="#router"><span>04</span>Router 实验</a>
+    <a href="#tutor"><span>05</span>Tutor 实验</a>
+    <a href="#gate"><span>06</span>指标与 Gate</a>
+    <a href="#run"><span>07</span>执行批次</a>
+    <a href="#artifacts"><span>08</span>产物与复现</a>
+    <a href="#decision"><span>09</span>最终决策</a>
+    <div class="toc-note">本页定义 SFT 对照实验和完成条件。DPO 与 GRPO 使用独立数据、Reward 和 Gate，不参与 SFT 配置选择。</div>
+  </nav>
+
+  <main>
+    <section id="evidence">
+      <div class="section-no">01 / EVIDENCE ALREADY ON DISK</div>
+      <div class="section-head">
+        <h2>现有 SFT 结果与<br />可复用产物</h2>
+        <p>仓库已包含多随机种子、Base 对照、replay、状态表示、失败分类和运行时 Gate。部分结果来自连续版本迭代，部分来自严格对照，报告对两类证据分别标记。</p>
+      </div>
+
+      <div class="status-key">
+        <span class="status done">已完成</span>
+        <span class="status rerun">需要严格重跑</span>
+        <span class="status new">需要新增</span>
+        <span class="status separate">另行研究</span>
+      </div>
+
+      <div class="evidence-grid">
+        <article class="evidence-card">
+          <span class="status done">已完成</span>
+          <h3>Router v1.1 三 seed</h3>
+          <p>3407、7703、9109 在同一开发诊断集上完成比较，7703 排名第一。三者差异也说明 Router 对初始化并不稳定。</p>
+          <strong class="number">0.790</strong>
+          <small>seed 7703 selection score</small>
+        </article>
+
+        <article class="evidence-card wide">
+          <span class="status rerun">已有方向证据</span>
+          <h3>v1.2 到 v1.7 已覆盖 replay、状态与合同修复</h3>
+          <p>现有链路依次加入 targeted data、旧能力 replay、runtime state、生产 prompt 对齐、合同修复、失败定向补样和状态迁移。各版本同时改变数据、学习率和起始 adapter，因此仅用于记录工程迭代，不用于单变量归因。</p>
+          <div class="arm-list">
+            <span class="arm">v1.2 targeted</span><span class="arm">v1.2 replay</span><span class="arm">v1.3 state</span><span class="arm">v1.4 runtime</span><span class="arm">v1.5 contract</span><span class="arm">v1.6 remediation</span><span class="arm">v1.7 transition</span>
+          </div>
+        </article>
+
+        <article class="evidence-card wide">
+          <span class="status done">已完成</span>
+          <h3>Tutor Base 与 SFT 对照结果</h3>
+          <p>同一 120 条验证集上，Qwen3.5-9B Base 的 strict grounded pass 为 3.33%，LoRA SFT 为 100%。按资料隔离的 120 条封存集通过 119 条；失败样本在 768-token 上限附近产生了额外工具动作。</p>
+          <div class="mini-metrics">
+            <div><b>3.33%</b><span>Base strict pass</span></div>
+            <div><b>100%</b><span>SFT validation</span></div>
+            <div><b>99.17%</b><span>SFT sealed holdout</span></div>
+          </div>
+        </article>
+
+        <article class="evidence-card">
+          <span class="status done">已完成</span>
+          <h3>审计与遥测可复用</h3>
+          <p>数据哈希、split、family、material overlap、训练时长、显存、loss、checkpoint 和生成式 Gate 均已有落盘结构。</p>
+          <strong class="number">0 leak</strong>
+          <small>Tutor material split overlap</small>
+        </article>
+      </div>
+
+      <div class="split-compare">
+        <div class="split-side">
+          <span class="status new">原始 SFT 提案</span>
+          <h3>v1.7 raw Gate 未通过</h3>
+          <p>开发诊断中的 raw payload 路径仍暴露参数复制、停止边界和注入恢复问题。</p>
+          <div class="mini-metrics">
+            <div><b>90.0%</b><span>contract valid</span></div>
+            <div><b>45.7%</b><span>explicit page</span></div>
+            <div><b>0%</b><span>injection recovery</span></div>
+          </div>
+        </div>
+        <div class="split-side">
+          <span class="status done">确定性投影后</span>
+          <h3>系统 Gate 已通过</h3>
+          <p>相同开发诊断经过运行时参数保护后，关键合同指标为 100%，tool-required name 为 95.65%。该结果反映运行时控制层的纠错能力，不能替代 SFT 原始策略评测。</p>
+          <div class="mini-metrics">
+            <div><b>100%</b><span>contract valid</span></div>
+            <div><b>100%</b><span>page / ID exact</span></div>
+            <div><b>95.65%</b><span>tool name</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="note gold"><strong>实验目标：</strong>保留确定性控制层，同时降低原始 Router 的纠错依赖。报告分别提供 raw policy 与 projected system 指标。</div>
+    </section>
+
+    <section id="gaps">
+      <div class="section-no">02 / WHAT IS STILL MISSING</div>
+      <div class="section-head">
+        <h2>尚未完成的<br />SFT 对照实验</h2>
+        <p>当前版本链没有固定单一变量，尚不能估计学习率、LoRA 容量、数据量、replay 比例和状态表示各自带来的指标变化。</p>
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>实验项目</th><th>仓库现状</th><th>缺少的对照</th><th>处理</th></tr></thead>
+          <tbody>
+            <tr><td><strong>最终配置稳定性</strong></td><td>v1.1 有三 seed；v1.2–v1.7 主要沿 seed 7703 继续训练。</td><td>没有 v1.7 最终配置的 mean、std 与 worst seed。</td><td class="status-cell"><span class="status new">新增</span></td></tr>
+            <tr><td><strong>优化参数</strong></td><td>不同版本 LR 从 8e-5 降到 2e-6，epoch 基本固定为 1。</td><td>LR 与数据版本、起始 adapter 同时变化，无法判断最优区间。</td><td class="status-cell"><span class="status new">新增</span></td></tr>
+            <tr><td><strong>LoRA 容量</strong></td><td>Router 与 Tutor 都使用 r16 / alpha32 / all modules。</td><td>没有 rank 与 target modules 对照。</td><td class="status-cell"><span class="status new">新增</span></td></tr>
+            <tr><td><strong>Replay 与状态表示</strong></td><td>已有 targeted、replay、raw / normalized 与 mixed-state 结果。</td><td>现有比较不是等样本、等更新、同初始化的完整 factorial。</td><td class="status-cell"><span class="status rerun">严格重跑</span></td></tr>
+            <tr><td><strong>Prompt 替代方案</strong></td><td>Tutor 有 Base；Router 评测器支持 Base / Adapter。</td><td>缺少同 prompt 下的 Base、强 Prompt、Few-shot、SFT 配对比较。</td><td class="status-cell"><span class="status new">新增</span></td></tr>
+            <tr><td><strong>跨分布泛化</strong></td><td>已有 300 条开发诊断和任务族分项。</td><td>该集合被多轮使用；缺少新模板、噪声状态、冲突证据和反事实引用。</td><td class="status-cell"><span class="status new">新增</span></td></tr>
+            <tr><td><strong>DPO / GRPO</strong></td><td>已有独立 Pilot 与 maturity 证据。</td><td>其目标、数据和 reward 不属于 SFT 参数归因。</td><td class="status-cell"><span class="status separate">分开报告</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="note warn">现有 300 条 Router 开发诊断已参与多轮观察，后续仅用于兼容性回归。模型选择使用新增的 challenge-dev v2；Router 保留未评测的 final_holdout_v2，Tutor 新建 sealed-test v2。</div>
+    </section>
+
+    <section id="protocol">
+      <div class="section-no">03 / SHARED EXPERIMENT CONTRACT</div>
+      <div class="section-head">
+        <h2>统一实验条件与<br />评测合同</h2>
+        <p>各实验臂仅改变预先指定的变量，并固定基座、数据快照、chat template、解码参数和评测脚本。</p>
+      </div>
+
+      <div class="principles">
+        <article class="principle"><b>01 / INITIALIZATION</b><h3>固定基座</h3><p>Router 主矩阵全部从 Qwen3.5-2B 新建 adapter；累计训练的 v1.7 只做工程参考。Tutor 从 Qwen3.5-9B 新建 adapter。</p></article>
+        <article class="principle"><b>02 / OBJECTIVE</b><h3>固定训练目标</h3><p>保持 assistant-only causal cross entropy，<span class="mono">train_on_prompt=false</span>。参数实验期间不同时引入加权 loss。</p></article>
+        <article class="principle"><b>03 / RUNTIME</b><h3>固定推理合同</h3><p>统一 <span class="mono">qwen3_5_nothink</span>、cutoff 4096、BF16、greedy decoding；Router 与 Tutor 各自固定输出预算。</p></article>
+        <article class="principle"><b>04 / SELECTION</b><h3>筛选与多种子复验</h3><p>seed 7703 用于开发筛选；仅将一个入选配置扩展到 3407 / 7703 / 9109。封存集不用于选择 seed。</p></article>
+      </div>
+
+      <div class="grid-2" style="margin-top:20px">
+        <article class="panel">
+          <div class="tag">FROZEN FOR ROUTER</div>
+          <h3>主矩阵固定项</h3>
+          <ul>
+            <li>v1.7 完整 family 定义与 raw / runtime_state 1:1 结构</li>
+            <li>同一 stratified train / validation manifest</li>
+            <li>effective batch size 8，BF16，assistant target only</li>
+            <li>同一生产 prompt 哈希与只读工具 schema</li>
+            <li>raw 与 normalized 两条评测路径同时保存</li>
+          </ul>
+        </article>
+        <article class="panel">
+          <div class="tag">FROZEN FOR TUTOR</div>
+          <h3>主矩阵固定项</h3>
+          <ul>
+            <li>按 material 隔离的 960 / 120 数据切分</li>
+            <li>同一 evidence rendering 与 citation schema</li>
+            <li>effective batch size 8，BF16，assistant target only</li>
+            <li>768-token 生成预算作为主结果，额外报告截断敏感性</li>
+            <li>所有回答仅使用免费资料证据</li>
+          </ul>
+        </article>
+      </div>
+    </section>
+
+    <section id="router">
+      <div class="section-no">04 / ROUTER CONTROLLED STUDY</div>
+      <div class="section-head">
+        <h2>Router 对照与<br />消融实验</h2>
+        <p>冻结 v1.7 数据定义并从同一 Base 重新训练，依次评估优化参数、LoRA 容量、replay 比例和状态表示。</p>
+      </div>
+
+      <div class="experiment-stack">
+        <article class="experiment">
+          <div class="exp-id"><b>R-BASE</b><span>4 组推理<br />不训练</span></div>
+          <div class="exp-main"><h3>Base / Prompt / Few-shot / SFT</h3><p>在完全相同的 challenge-dev v2 上比较基础模型、强合同 prompt、8-shot 示例和当前 SFT。SFT 结果同时分 raw policy 与 projection 后系统。</p><div class="arm-list"><span class="arm">Base</span><span class="arm">Prompt</span><span class="arm">8-shot</span><span class="arm">SFT raw</span><span class="arm">SFT projected</span></div></div>
+          <div class="exp-rule"><b>评估内容</b><ul><li>SFT 相对 Prompt 和 Few-shot 的严格通过率差值</li><li>投影层修正样本的数量和类型</li><li>各 task family 的指标差值</li></ul></div>
+        </article>
+
+        <article class="experiment">
+          <div class="exp-id"><b>R-OPT</b><span>8 次<br />单 seed 筛选</span></div>
+          <div class="exp-main"><h3>学习率、训练长度与 scheduler</h3><p>全部使用 r16 / all modules、同一 v1.7 数据和 seed 7703。先测 3 个学习率的一轮训练，再只让前两名进入 0.5 / 2 epoch，最后对胜者补一次 linear scheduler。</p><div class="arm-list"><span class="arm">LR 2e-5</span><span class="arm">LR 5e-5</span><span class="arm">LR 8e-5</span><span class="arm">0.5 epoch</span><span class="arm">1 epoch</span><span class="arm">2 epoch</span><span class="arm">cosine / linear</span></div></div>
+          <div class="exp-rule"><b>筛选规则</b><ul><li>安全硬门槛全部通过后，按 raw 综合分排序。</li><li>validation loss 只做诊断，不参与最终排名。</li><li>旧能力下降超过 1 个百分点时停止该臂。</li></ul></div>
+        </article>
+
+        <article class="experiment">
+          <div class="exp-id"><b>R-LORA</b><span>3 次新增<br />容量消融</span></div>
+          <div class="exp-main"><h3>Rank 与 target modules</h3><p>沿用 R-OPT 入选的 LR / epoch。r16-all 已在主矩阵中存在，只新增 r8-all、r32-all，以及入选 rank 的 attention-only 对照。</p><div class="arm-list"><span class="arm">r8 · all</span><span class="arm">r16 · all</span><span class="arm">r32 · all</span><span class="arm">selected · attention</span></div></div>
+          <div class="exp-rule"><b>同时记录</b><ul><li>可训练参数量与 adapter 大小</li><li>峰值显存、tokens/s、训练时长</li><li>指标差值与额外资源消耗</li></ul></div>
+        </article>
+
+        <article class="experiment">
+          <div class="exp-id"><b>R-DATA</b><span>扩展实验<br />等预算对照</span></div>
+          <div class="exp-main"><h3>数据量、replay 与状态表示</h3><p>这一组重做现有方向证据，但固定总样本数或 optimizer updates。数据量实验用分层子集；replay 用替换而非追加；状态实验固定 raw / runtime family 配比。</p><div class="arm-list"><span class="arm">25 / 50 / 75 / 100%</span><span class="arm">replay 0 / 10 / 25 / 40%</span><span class="arm">raw only</span><span class="arm">state only</span><span class="arm">mixed 1:1</span></div></div>
+          <div class="exp-rule"><b>控制变量</b><ul><li>数据规模曲线固定 optimizer updates。</li><li>replay 各臂总记录数相同。</li><li>每个 task family 保持最低样本数。</li><li>同时报告新能力与旧能力保留。</li></ul></div>
+        </article>
+
+        <article class="experiment">
+          <div class="exp-id"><b>R-SEED</b><span>2 次新增<br />最终复验</span></div>
+          <div class="exp-main"><h3>入选配置的三 seed 复验</h3><p>单 seed 阶段结束后锁定 config、dataset hash、prompt hash 和评测脚本。已有 7703 结果保留，再补 3407 与 9109，报告 mean ± std、最差 seed 和 family floor。</p><div class="arm-list"><span class="arm">3407</span><span class="arm">7703</span><span class="arm">9109</span></div></div>
+          <div class="exp-rule"><b>固定规则</b><ul><li>封存集不参与 seed 选择。</li><li>三个 seed 使用相同 checkpoint 规则。</li><li>同时报告三个 seed，不只报告最佳结果。</li></ul></div>
+        </article>
+      </div>
+
+      <div class="note">Router 的基础实验范围包括 R-OPT、R-LORA 和 R-SEED；R-DATA 用于估计数据规模、replay 和状态表示的单变量影响。完成基础实验后，再依据稳定复现的 failure taxonomy 设计 v1.8 数据。</div>
+    </section>
+
+    <section id="tutor">
+      <div class="section-no">05 / GROUNDED TUTOR CONTROLLED STUDY</div>
+      <div class="section-head">
+        <h2>Grounded Tutor<br />边界证据实验</h2>
+        <p>当前普通验证集已达到 120 / 120。新的评测重点覆盖证据删减、无关干扰、内容冲突和引用置换，并检查模型在证据不足时的回答边界。</p>
+      </div>
+
+      <div class="grid-2">
+        <article class="panel">
+          <div class="tag">T-CHALLENGE · 240 ITEMS</div>
+          <h3>边界证据评测集</h3>
+          <ul>
+            <li>40 条正常可回答，作为正常样本基线</li>
+            <li>40 条 no-answer，答案不在证据中</li>
+            <li>40 条 distractor，相关片段被无关内容包围</li>
+            <li>40 条 conflict，不同资料给出冲突陈述</li>
+            <li>40 条 partial，证据只支持问题的一部分</li>
+            <li>40 条 citation counterfactual，置换 page / chunk / material_id</li>
+          </ul>
+          <div class="note warn">压力集按 material 与训练集隔离；模板生成器与训练样本分开。至少分层人工复核 20%，高风险边界样本全部复核。</div>
+        </article>
+
+        <article class="panel">
+          <div class="tag">T-BASE · SAME INPUTS</div>
+          <h3>四组配对比较</h3>
+          <ul>
+            <li>Base：原始 Qwen3.5-9B</li>
+            <li>Prompt：完整 grounded contract，无示例</li>
+            <li>Few-shot：每类提供 1 个短示例</li>
+            <li>SFT：当前与候选 LoRA，使用完全相同输入</li>
+          </ul>
+          <div class="note">按样本执行 paired bootstrap，并记录每类样本由失败转为通过、或由通过转为失败的数量。</div>
+        </article>
+      </div>
+
+      <div class="experiment-stack" style="margin-top:20px">
+        <article class="experiment">
+          <div class="exp-id"><b>T-OPT</b><span>3 次新增<br />分阶段筛选</span></div>
+          <div class="exp-main"><h3>小范围 LR / rank 搜索</h3><p>保留当前 r16 / 8e-5 作为已完成参考；新增 r16 / 3e-5，再在入选 LR 上训练 r8 与 r32。所有实验仍使用原生 assistant-only CE，不同时改数据。</p><div class="arm-list"><span class="arm">LR 3e-5 / 8e-5</span><span class="arm">rank 8 / 16 / 32</span><span class="arm">1 epoch</span></div></div>
+          <div class="exp-rule"><b>选择依据</b><ul><li>challenge strict pass 与 citation entailment</li><li>no-answer / conflict 两类硬门槛</li><li>吞吐、显存和 adapter 大小作为次级指标</li></ul></div>
+        </article>
+
+        <article class="experiment">
+          <div class="exp-id"><b>T-MIX</b><span>扩展实验<br />负证据占比</span></div>
+          <div class="exp-main"><h3>负证据配比</h3><p>保持 1,080 条总量和各 material split 不变，比较 15%、30%、45% 的 no-answer / conflict / untrusted evidence。正例从同一 family 分层下采样，避免训练步数变化。</p><div class="arm-list"><span class="arm">negative 15%</span><span class="arm">negative 30%</span><span class="arm">negative 45%</span></div></div>
+          <div class="exp-rule"><b>同时观察</b><ul><li>负例增加是否导致过度拒答</li><li>正常回答质量是否下降</li><li>citation precision 与 recall 的变化</li></ul></div>
+        </article>
+
+        <article class="experiment">
+          <div class="exp-id"><b>T-CONTEXT</b><span>只推理<br />不训练</span></div>
+          <div class="exp-main"><h3>上下文长度与证据密度</h3><p>对同一问题逐步加入 1 / 3 / 5 / 8 个 chunks，并按 2k / 4k / 8k 输入 token 分桶。分别报告遗漏、错误引用、截断和推理延迟。</p><div class="arm-list"><span class="arm">1 / 3 / 5 / 8 chunks</span><span class="arm">2k / 4k / 8k tokens</span><span class="arm">768 / 1024 output</span></div></div>
+          <div class="exp-rule"><b>评估内容</b><ul><li>chunk 数增加后的严格通过率变化</li><li>输出预算对截断失败的影响</li><li>不同上下文长度下的干扰和引用错误</li></ul></div>
+        </article>
+
+        <article class="experiment">
+          <div class="exp-id"><b>T-SEED</b><span>2 次新增<br />最终复验</span></div>
+          <div class="exp-main"><h3>入选配置的三 seed 复验</h3><p>配置按 challenge-dev 的三 seed 平均表现选择；交付 checkpoint 预注册为开发主指标居中的 seed，不按最高分 seed 交付。新的 sealed-test v2 只打开一次。</p><div class="arm-list"><span class="arm">6209</span><span class="arm">3407</span><span class="arm">9109</span></div></div>
+          <div class="exp-rule"><b>人工复核</b><ul><li>最终候选抽 120 条盲评。</li><li>分别标注正确性、忠实性、可读性。</li><li>分歧由第三位评审裁决。</li></ul></div>
+        </article>
+      </div>
+    </section>
+
+    <section id="gate">
+      <div class="section-no">06 / METRICS & DECISION GATES</div>
+      <div class="section-head">
+        <h2>训练指标与<br />模型选择 Gate</h2>
+        <p>保存 train / validation loss、token accuracy 和曲线，并以真实解码结果完成模型选择。判断顺序为安全硬约束、任务指标和资源成本。</p>
+      </div>
+
+      <div class="gate-board">
+        <div class="gate">
+          <div class="gate-head"><h3>Router raw policy</h3><span>ALL 3 SEEDS</span></div>
+          <div class="gate-row"><span>JSON / contract valid</span><b>≥ .99 / .98</b></div>
+          <div class="gate-row"><span>Tool-required name / mode</span><b>≥ .95 / .97</b></div>
+          <div class="gate-row"><span>Material ID / page exact</span><b>≥ .98 / .95</b></div>
+          <div class="gate-row"><span>Force-final compliant</span><b>≥ .95</b></div>
+          <div class="gate-row"><span>Injection / permission safety</span><b>1.00</b></div>
+          <div class="gate-row"><span>Task-family floor</span><b>≥ .90</b></div>
+          <div class="gate-row"><span>Projection correction rate</span><b>≤ 2%</b></div>
+          <div class="gate-row"><span>跨 seed 主指标 std</span><b>≤ .02</b></div>
+        </div>
+
+        <div class="gate">
+          <div class="gate-head"><h3>Grounded Tutor</h3><span>CHALLENGE DEV</span></div>
+          <div class="gate-row"><span>Strict grounded pass</span><b>≥ .95</b></div>
+          <div class="gate-row"><span>Citation exact / entailment</span><b>≥ .98 / .95</b></div>
+          <div class="gate-row"><span>No-answer abstention</span><b>≥ .92</b></div>
+          <div class="gate-row"><span>Conflict disclosure</span><b>≥ .90</b></div>
+          <div class="gate-row"><span>Unsupported claim rate</span><b>≤ .02</b></div>
+          <div class="gate-row"><span>No tool / sensitive output</span><b>1.00</b></div>
+          <div class="gate-row"><span>Normal answer regression</span><b>≤ 1 pp</b></div>
+          <div class="gate-row"><span>跨 seed 主指标 std</span><b>≤ .015</b></div>
+        </div>
+      </div>
+
+      <div class="grid-2" style="margin-top:20px">
+        <article class="panel">
+          <div class="tag">STATISTICS</div>
+          <h3>统计比较方法</h3>
+          <ul>
+            <li>三 seed 报告 mean、std、min、max，不只报最好值</li>
+            <li>同一评测集采用 10,000 次 paired bootstrap，给出 95% CI</li>
+            <li>通过 / 失败变化使用 McNemar exact test 辅助判断</li>
+            <li>主指标与 Gate 预先登记，次指标只用于解释</li>
+          </ul>
+        </article>
+        <article class="panel">
+          <div class="tag">REGRESSION</div>
+          <h3>旧能力回归检查</h3>
+          <ul>
+            <li>Router 保留 direct、search、permission、ID、page、budget replay</li>
+            <li>Tutor 保留正常解释、总结、比较和学习计划锚点</li>
+            <li>任一安全硬门槛失败，综合分再高也不晋级</li>
+            <li>quantization 与 runtime projection 在模型选择后另测</li>
+          </ul>
+        </article>
+      </div>
+    </section>
+
+    <section id="run">
+      <div class="section-no">07 / EXECUTION ORDER</div>
+      <div class="section-head">
+        <h2>分阶段<br />实验顺序</h2>
+        <p>每批仅将通过 Gate 的候选送入下一批，以保留单变量解释并控制实验数量。</p>
+      </div>
+
+      <div class="runway">
+        <div class="runway-step"><b>BATCH 00</b><strong>冻结评测合同</strong><span>建立两条任务的 challenge-dev v2；复核 Router final_holdout_v2 的 seal，为 Tutor 新建 sealed-test v2，并记录哈希与人工复核结果。</span><em>0 training runs</em></div>
+        <div class="runway-step"><b>BATCH 01</b><strong>补齐 Baseline</strong><span>Base、Prompt、Few-shot 与现有 SFT 在完全相同输入上推理，确认训练增益的真实起点。</span><em>inference only</em></div>
+        <div class="runway-step"><b>BATCH 02</b><strong>Router 参数筛选</strong><span>执行 R-OPT 与 R-LORA；每阶段只保留通过硬门槛的前一或两个候选。</span><em>11 single-seed runs</em></div>
+        <div class="runway-step"><b>BATCH 03</b><strong>Router 稳定性</strong><span>入选配置补齐另外两个 seed；未通过 Gate 时停止该阶段，不读取封存集。</span><em>2 new runs</em></div>
+        <div class="runway-step"><b>BATCH 04</b><strong>Tutor 压力实验</strong><span>先跑 T-CHALLENGE 与 T-BASE，再做小范围 T-OPT，最后补齐三 seed 和人工盲评。</span><em>5 new runs</em></div>
+        <div class="runway-step"><b>BATCH 05</b><strong>扩展归因</strong><span>执行 R-DATA、T-MIX 与 T-CONTEXT，形成数据效率、replay、状态和证据密度曲线。</span><em>after core gate</em></div>
+        <div class="runway-step"><b>BATCH 06</b><strong>一次封存评测</strong><span>配置、checkpoint 选择规则、代码 commit 和报告模板全部冻结后，Router 才打开现有 final_holdout_v2，Tutor 才打开新建的 sealed-test v2。</span><em>single-use</em></div>
+      </div>
+
+      <div class="budget">
+        <div class="budget-main"><b>BASE EXPERIMENT SET</b><strong>18 次新增训练</strong><p>Router 13 次，Tutor 5 次。逐阶段筛选可能减少实际运行数；R-DATA 与 T-MIX 不计入这 18 次。</p></div>
+        <div class="budget-side"><p><strong>按现有遥测估算：</strong>Router v1.7 单次训练 1,417 秒，峰值 76,588 MiB；Tutor v1 单次训练 2,469 秒，峰值 50,544 MiB。18 次基础训练约需 8.5 GPU 小时，未计入生成式评测、失败分析和人工复核。</p></div>
+      </div>
+    </section>
+
+    <section id="artifacts">
+      <div class="section-no">08 / ARTIFACTS & REPRODUCIBILITY</div>
+      <div class="section-head">
+        <h2>实验产物与<br />可复现性</h2>
+        <p>模型权重留在本地；配置、数据规范、非敏感数据、哈希、训练日志、评测预测、Gate 和报告进入 Git。实验 ID 必须在所有产物中一致。</p>
+      </div>
+
+      <div class="artifact-code">training_artifacts/studyhub_agent_sft/controlled_v2/
+└── {router|tutor}/{experiment_id}/{seed}/
+    ├── config.yaml
+    ├── dataset_manifest.json
+    ├── trainer_log.jsonl
+    ├── run_summary.json
+    └── model_pointer.json          # hash / path only, no weights
+
+evaluation_artifacts/studyhub_agent/sft_controlled_v2/
+└── {experiment_id}/{seed}/{raw|normalized}/
+    ├── predictions.jsonl
+    ├── analysis.json
+    ├── gate.json
+    ├── bootstrap.json
+    └── run_manifest.json</div>
+
+      <div class="table-wrap" style="margin-top:20px">
+        <table>
+          <thead><tr><th>必须记录</th><th>用途</th><th>失败时如何定位</th></tr></thead>
+          <tbody>
+            <tr><td><strong>Git commit + environment lock</strong></td><td>锁定代码、依赖、CUDA 与训练框架。</td><td>区分模型退化与运行环境变化。</td></tr>
+            <tr><td><strong>Dataset / prompt / model hash</strong></td><td>确认各臂只改变预定变量。</td><td>发现数据或 prompt 漂移后整臂作废。</td></tr>
+            <tr><td><strong>完整 loss 与 LR 曲线</strong></td><td>观察过拟合、欠拟合、warmup 和 checkpoint。</td><td>回到具体 step，而不是只看最终 loss。</td></tr>
+            <tr><td><strong>逐样本 predictions</strong></td><td>支持 paired bootstrap、McNemar 和 failure taxonomy。</td><td>按 family、状态路径、证据类型追踪。</td></tr>
+            <tr><td><strong>Raw / projected 双报告</strong></td><td>区分模型能力与运行时纠错。</td><td>计算 projection correction rate 与错误来源。</td></tr>
+            <tr><td><strong>Telemetry</strong></td><td>记录显存、吞吐、耗时、温度和异常退出。</td><td>比较指标变化与训练、推理成本。</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="evidence-links">
+        <a href="../../../evaluation_artifacts/studyhub_agent/router_v1_1_diagnostic/seed_comparison.json">Router v1.1 · seed_comparison.json</a>
+        <a href="../../../training_artifacts/studyhub_agent_sft/router_2b_v1_7_state_transitions/audit.json">Router v1.7 · dataset audit.json</a>
+        <a href="../../../evaluation_artifacts/studyhub_agent/router_v1_7_contract_exact_1800_diagnostic/seed_7703/gate.json">Router v1.7 · raw production gate.json</a>
+        <a href="../../../evaluation_artifacts/studyhub_agent/router_v1_7_rl_readiness_v1_1800/seed_7703/gate.json">Router v1.7 · projected gate.json</a>
+        <a href="../../../evaluation_artifacts/studyhub_agent/grounded_tutor_9b_v1_0/adapter_validation_seed_6209_768/gate.json">Tutor v1 · validation gate.json</a>
+        <a href="../../../evaluation_artifacts/studyhub_agent/grounded_tutor_9b_v1_0/adapter_holdout_seed_6209_768/gate.json">Tutor v1 · sealed holdout gate.json</a>
+      </div>
+    </section>
+
+    <section id="decision">
+      <div class="section-no">09 / DECISION</div>
+      <div class="section-head">
+        <h2>下一阶段<br />执行方案</h2>
+        <p>以冻结的 v1.7 数据定义完成参数稳定性、Prompt / Few-shot 对照和 raw policy 纠错依赖评估。仅对三个 seed 中稳定复现的失败类型生成下一版定向数据。</p>
+      </div>
+
+      <div class="closing">
+        <h3>当前 SFT 作为<strong>对照基线</strong></h3>
+        <p>Router 实验报告参数归因、跨 seed 方差和 raw policy 指标；Tutor 实验报告冲突、缺失、干扰和反事实引用结果。两组结果共同构成后续 DPO / RL 的 SFT 对照基线。</p>
+      </div>
+    </section>
+  </main>
+</div>
+
+<footer>
+  <div class="shell">StudyHub Agent · SFT Controlled Experiment Roadmap · updated 2026-08-12</div>
+</footer>
+
+</body>
+</html>

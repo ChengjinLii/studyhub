@@ -1,0 +1,156 @@
+{
+  "dataset_sha256": "89ac4ffda706693cd5ec59b1f9b46938324ec511970d2fb19956189160e3eb14",
+  "development_overlap_audit": {
+    "exact_payload_overlap_diagnostic": 0,
+    "exact_payload_overlap_reference": 0,
+    "exact_query_overlap_diagnostic": 0,
+    "exact_query_overlap_reference": 0,
+    "exact_target_overlap_diagnostic": 0,
+    "exact_target_overlap_reference": 439,
+    "material_split_mismatches": [],
+    "query_similarity_to_original_train": {
+      "max": 0.967742,
+      "mean": 0.743537,
+      "p95": 0.948718
+    },
+    "reserved_test_material_overlap": [],
+    "targeted_train_material_overlap_diagnostic": []
+  },
+  "errors": [],
+  "family_counts": {
+    "concept_after_inspect_v1_7": 360,
+    "direct_final_replay_v1_7": 80,
+    "empty_search_replay_v1_7": 40,
+    "explicit_page_replay_v1_7": 80,
+    "force_final_replay_v1_7": 160,
+    "injection_after_inspect_v1_7": 200,
+    "injection_after_search_v1_7": 200,
+    "material_id_replay_v1_7": 40,
+    "permission_refusal_replay_v1_7": 40,
+    "personal_memory_minimal_v1_7": 320,
+    "search_replay_v1_7": 80,
+    "synthesis_replay_v1_7": 40
+  },
+  "family_runtime_cross_tab": {
+    "concept_after_inspect_v1_7": {
+      "raw": 180,
+      "runtime_state": 180
+    },
+    "direct_final_replay_v1_7": {
+      "raw": 40,
+      "runtime_state": 40
+    },
+    "empty_search_replay_v1_7": {
+      "raw": 20,
+      "runtime_state": 20
+    },
+    "explicit_page_replay_v1_7": {
+      "raw": 40,
+      "runtime_state": 40
+    },
+    "force_final_replay_v1_7": {
+      "raw": 80,
+      "runtime_state": 80
+    },
+    "injection_after_inspect_v1_7": {
+      "raw": 100,
+      "runtime_state": 100
+    },
+    "injection_after_search_v1_7": {
+      "raw": 100,
+      "runtime_state": 100
+    },
+    "material_id_replay_v1_7": {
+      "raw": 20,
+      "runtime_state": 20
+    },
+    "permission_refusal_replay_v1_7": {
+      "raw": 20,
+      "runtime_state": 20
+    },
+    "personal_memory_minimal_v1_7": {
+      "raw": 160,
+      "runtime_state": 160
+    },
+    "search_replay_v1_7": {
+      "raw": 40,
+      "runtime_state": 40
+    },
+    "synthesis_replay_v1_7": {
+      "raw": 20,
+      "runtime_state": 20
+    }
+  },
+  "isolation": {
+    "contains_paid_material": false,
+    "production_api_called": false,
+    "production_database_accessed": false
+  },
+  "offline_pilot_overlap_audit": {
+    "exact_query_overlap": 0,
+    "pilot_outputs_or_labels_read": false,
+    "pilot_scenarios_read_for_queries_only": 100,
+    "query_similarity": {
+      "max": 0.252632,
+      "mean": 0.086205,
+      "p95": 0.209302
+    }
+  },
+  "passed": true,
+  "production_prompt_sha256": "181dcc551c24484ed9ca1c9e20882589ba9497c9a5c584786ae123e01a4f8a93",
+  "records": 1640,
+  "runtime_path_counts": {
+    "raw": 820,
+    "runtime_state": 820
+  },
+  "sealed_final_holdout_read": false,
+  "spec_audit": {
+    "data_class_counts": {
+      "public_synthetic": 1520,
+      "synthetic": 120
+    },
+    "dataset_sha256": {
+      "router_tool_2b_v1_7.jsonl": "89ac4ffda706693cd5ec59b1f9b46938324ec511970d2fb19956189160e3eb14"
+    },
+    "duplicate_pairs": [],
+    "errors": [],
+    "evidence_kind_counts": {
+      "metadata": 1022,
+      "preview_ocr": 848
+    },
+    "family_counts": {
+      "router_tool_2b": {
+        "concept_after_inspect_v1_7": 360,
+        "direct_final_replay_v1_7": 80,
+        "empty_search_replay_v1_7": 40,
+        "explicit_page_replay_v1_7": 80,
+        "force_final_replay_v1_7": 160,
+        "injection_after_inspect_v1_7": 200,
+        "injection_after_search_v1_7": 200,
+        "material_id_replay_v1_7": 40,
+        "permission_refusal_replay_v1_7": 40,
+        "personal_memory_minimal_v1_7": 320,
+        "search_replay_v1_7": 80,
+        "synthesis_replay_v1_7": 40
+      }
+    },
+    "material_split_leaks": {},
+    "passed": true,
+    "profile_counts": {
+      "router_tool_2b": 1640
+    },
+    "split_counts": {
+      "router_tool_2b": {
+        "train": 1476,
+        "validation": 164
+      }
+    },
+    "total_records": 1640,
+    "unique_chunk_ids": 302,
+    "unique_material_ids": 119
+  },
+  "split_counts": {
+    "train": 1476,
+    "validation": 164
+  }
+}

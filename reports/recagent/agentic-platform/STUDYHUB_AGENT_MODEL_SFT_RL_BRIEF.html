@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="light">
-  <title>StudyHub Agent 模型与训练路线简报</title>
+  <title>StudyHub Agent 模型选择与训练计划</title>
   <style>
     :root {
       --paper: #f4f1e9;
@@ -1163,18 +1163,18 @@
       <header class="hero">
         <div class="hero-copy fade-in">
           <div class="eyebrow">Model &amp; training brief</div>
-          <h1>StudyHub<br class="mobile-break"> Agent<br><span>模型与训练路线</span></h1>
+          <h1>StudyHub<br class="mobile-break"> Agent<br><span>模型选择与训练计划</span></h1>
           <p class="hero-lead">
-            不做“一个模型包办所有任务”。用教师模型生产高质量轨迹，用 2B/4B 学会路由与工具策略，
-            用 9B 承担中文讲解，再用可验证离线环境决定 RL 是否真正带来增益。
+            教师模型用于生成和审查训练轨迹，2B/4B 负责路由与工具策略，9B 负责中文讲解。
+            RL 收益通过固定的离线环境和评测集验证。
           </p>
         </div>
         <div class="hero-panel fade-in">
-          <div class="verdict-label">Executive verdict</div>
+          <div class="verdict-label">当前决策</div>
           <ul class="verdict">
-            <li><span class="signal">01</span><span><b>现在可以开始 SFT</b><br>数据契约、工具轨迹和本地算力已经具备。</span></li>
-            <li><span class="signal">02</span><span><b>可以做 4B 离线 RL 小试验</b><br>先用稳定基线跑通，再迁移到新模型。</span></li>
-            <li><span class="signal">03</span><span><b>暂不做生产在线 RL</b><br>行为数据、奖励校准和安全门禁仍不充分。</span></li>
+            <li><span class="signal">01</span><span><b>2B / 9B SFT：可执行</b><br>已有数据合同、工具轨迹和本地算力。</span></li>
+            <li><span class="signal">02</span><span><b>4B 离线 RL：Pilot</b><br>使用固定基线完成对照后再评估模型迁移。</span></li>
+            <li><span class="signal">03</span><span><b>生产在线 RL：暂缓</b><br>行为数据、Reward 校准和安全 Gate 尚未完成。</span></li>
           </ul>
           <div class="hero-foot">本报告是技术决策建议，不表示所列模型已经部署。</div>
         </div>
@@ -1184,12 +1184,12 @@
         <div class="section-head">
           <div>
             <div class="section-index">01 / READINESS</div>
-            <h2>Agent 已有骨架，缺的是受控学习闭环</h2>
+            <h2>Agent 现状与训练条件</h2>
           </div>
           <p class="section-summary">
-            当前代码不是从零开始：用户学习助手已有检索、工具循环、记忆和证据约束；
+            用户学习助手已有检索、工具循环、记忆和证据约束；
             管理端 Agentic Platform 已有 LangGraph 状态机、训练数据策略与奖励事实。
-            现阶段应在这些边界内训练，而不是重写 Hermes 或另造一套运行时。
+            训练沿用现有运行时边界，不重写 Hermes 核心。
           </p>
         </div>
 
@@ -1219,7 +1219,7 @@
           <div class="arch-arrow" aria-hidden="true">→</div>
           <article class="arch-box">
             <h3>管理端 Agentic Platform</h3>
-            <p>负责规划、策略、验证、研究任务和训练轨迹治理。群体进化应汇总匿名反馈，周期性训练新 adapter，经离线门禁后灰度替换。</p>
+            <p>负责规划、策略、验证、研究任务和训练轨迹治理。群体进化汇总匿名反馈，周期性训练新 adapter，并在离线 Gate 通过后进入灰度评测。</p>
           </article>
         </div>
       </section>
@@ -1231,8 +1231,8 @@
             <h2>推荐模型组合</h2>
           </div>
           <p class="section-summary">
-            主线优先选 Apache 2.0、中文能力强、工具调用生态明确的 Qwen 系列；
-            MiMo API 与本地 27B 只作为教师和评审，避免把昂贵模型绑进每一次用户请求。
+            主要模型采用 Apache 2.0、中文能力和工具调用支持较完整的 Qwen 系列；
+            MiMo API 与本地 27B 用于教师生成和离线评审，不参与每次用户请求。
           </p>
         </div>
 
@@ -1281,8 +1281,8 @@
         <div class="decision-note">
           <strong>算力判断</strong>
           <p>
-            2 × H100 80GB 足以稳定完成 2B/4B/9B 的 LoRA/QLoRA；9B 全参 SFT 技术上可做，但首轮没有必要。
-            27B 更适合常驻为教师与上界。第一轮多轮工具 RL 只做 4B，确认收益后再考虑 9B。
+            2 × H100 80GB 可完成 2B/4B/9B 的 LoRA/QLoRA。首轮不安排 9B 全参 SFT；27B 用作教师模型和能力上界。
+            多轮工具 RL 首轮使用 4B，达到预注册指标后再评估 9B。
           </p>
         </div>
       </section>
@@ -1291,11 +1291,10 @@
         <div class="section-head">
           <div>
             <div class="section-index">03 / TRAINING JOBS</div>
-            <h2>应该训练什么</h2>
+            <h2>SFT 与偏好训练任务</h2>
           </div>
           <p class="section-summary">
-            每个任务都对应当前代码中的真实职责和可验收指标。先让模型“格式正确、证据正确、调用正确”，
-            再追求回答风格与长链路收益。
+            每个任务对应当前代码中的具体职责和验收指标。第一阶段评估格式、证据和工具调用，后续阶段评估回答风格与长链路收益。
           </p>
         </div>
 
@@ -1346,7 +1345,7 @@
         </div>
 
         <div class="decision-note">
-          <strong>不是 SFT / RL</strong>
+          <strong>检索与推荐任务</strong>
           <p>
             检索模型应在 ≥1,000 组 query–positive–hard-negative 后做对比学习与 pairwise reranker 微调；
             推荐系统先做监督排序，收齐曝光 propensity、点击、收藏、下载、接受/跳过后再考虑 contextual bandit。
@@ -1358,10 +1357,10 @@
         <div class="section-head">
           <div>
             <div class="section-index">04 / OFFLINE RL</div>
-            <h2>RL 只优化可验证的多步行为</h2>
+            <h2>离线 RL 目标与范围</h2>
           </div>
           <p class="section-summary">
-            RL 的目标不是让答案“更像人”，而是在固定资料快照和无副作用工具中，减少无效搜索、提高证据命中和任务完成率。
+            RL 在固定资料快照和无副作用工具中优化搜索效率、证据命中率和任务完成率。
             生产数据库与真实用户会话不进入 rollout 环境。
           </p>
         </div>
@@ -1376,7 +1375,7 @@
 
         <div class="rl-panel">
           <article class="reward">
-            <h3>奖励使用现有事实，不使用“感觉分”</h3>
+            <h3>Reward 组成与数据来源</h3>
             <div class="formula">
               R = success + format + action_valid<br>
               &nbsp;&nbsp;+ evidence_supported + rank_delta<br>
@@ -1390,8 +1389,8 @@
             </p>
           </article>
           <article class="gate">
-            <h3>进入 RL 前的硬门禁</h3>
-            <p>任一项不满足，就继续补 SFT、环境或评测，不通过“多跑几轮 RL”掩盖问题。</p>
+            <h3>RL 启动条件</h3>
+            <p>以下条件用于判断 SFT、环境和评测是否达到 RL 实验要求。</p>
             <div class="gate-list">
               <div class="gate-item"><span>固定 Agent 场景</span><b>500–1,000+</b></div>
               <div class="gate-item"><span>可验证训练任务</span><b>2,000+</b></div>
@@ -1408,10 +1407,10 @@
             <tr><th>工作</th><th>现在做？</th><th>理由</th></tr>
           </thead>
           <tbody>
-            <tr><td>2B / 9B SFT</td><td><span class="yes">现在</span></td><td>任务边界、数据格式和验收指标清晰，收益最确定。</td></tr>
-            <tr><td>4B DPO</td><td><span class="later">随后</span></td><td>先积累可靠偏好对，避免把教师偏见直接固化。</td></tr>
+            <tr><td>2B / 9B SFT</td><td><span class="yes">现在</span></td><td>任务边界、数据格式和验收指标已经定义。</td></tr>
+            <tr><td>4B DPO</td><td><span class="later">随后</span></td><td>在积累并复核偏好对之后执行。</td></tr>
             <tr><td>4B 离线 GRPO / GSPO</td><td><span class="later">小试验</span></td><td>在 Search-R1 / veRL 风格的无副作用环境中验证增益。</td></tr>
-            <tr><td>9B 长链路 RL</td><td><span class="no">暂缓</span></td><td>先证明 4B 策略确有稳定收益，再扩大算力与模型。</td></tr>
+            <tr><td>9B 长链路 RL</td><td><span class="no">暂缓</span></td><td>4B 对照达到预注册指标后再评估 9B。</td></tr>
             <tr><td>生产在线 RL</td><td><span class="no">不做</span></td><td>真实行为稀疏，奖励尚未校准，并存在内容与权限风险。</td></tr>
           </tbody>
         </table>
@@ -1421,11 +1420,11 @@
         <div class="section-head">
           <div>
             <div class="section-index">05 / 8-WEEK PATH</div>
-            <h2>建议实施顺序</h2>
+            <h2>实施顺序</h2>
           </div>
           <p class="section-summary">
-            先把可复现性和评测做实，再训练。Qwen3.5 生态更新较快，应锁定 Transformers、vLLM、TRL / veRL 版本，
-            并用现有 Qwen3-4B 完成一遍端到端控制实验。
+            执行顺序为冻结数据与评测、锁定依赖、运行训练、比较结果。Qwen3.5 相关实验固定 Transformers、vLLM、TRL / veRL 版本，
+            并使用现有 Qwen3-4B 完成端到端控制实验。
           </p>
         </div>
 
@@ -1439,7 +1438,7 @@
           <article class="road-step">
             <div class="road-dot"></div>
             <small>WEEK 2–4</small>
-            <h3>SFT 主线</h3>
+            <h3>SFT 实验</h3>
             <p>2B 路由/审核与 9B 讲解并行；抽检教师数据和难例。</p>
           </article>
           <article class="road-step">
@@ -1458,21 +1457,21 @@
 
         <div class="principles">
           <article class="principle">
-            <h3>应该坚持</h3>
+            <h3>实验原则</h3>
             <ul>
               <li>每次训练都与未微调基座、教师模型和确定性规则做消融对照。</li>
               <li>个体学习状态写入可删除的 memory/profile，不写入模型权重。</li>
-              <li>群体反馈只做匿名聚合和周期性 adapter，经过离线门禁再灰度。</li>
+              <li>群体反馈只做匿名聚合和周期性 adapter，经过离线 Gate 后再做灰度评测。</li>
               <li>保留原始 token IDs、tool observations 与 loss mask，保证可复现。</li>
             </ul>
           </article>
           <article class="principle stop">
-            <h3>明确不要做</h3>
+            <h3>排除项</h3>
             <ul>
-              <li>不要训练内部 CoT，也不要让教师生成内容未经抽检直接成为金标。</li>
-              <li>不要在真实网站、数据库或付费资料上执行 RL rollout。</li>
-              <li>不要先上 PPO、GiGPO、TIPS 或多 Agent RL；先证明简单方案有效。</li>
-              <li>不要把推荐、审核、检索和讲解硬塞进同一个 9B adapter。</li>
+              <li>不训练内部 CoT；教师生成内容经抽检后才能进入训练集，且不标记为人工金标。</li>
+              <li>RL rollout 不访问真实网站、生产数据库或付费资料。</li>
+              <li>首轮不采用 PPO、GiGPO、TIPS 或多 Agent RL，先完成 GRPO / GSPO 对照。</li>
+              <li>推荐、审核、检索和讲解使用独立任务定义与 adapter。</li>
             </ul>
           </article>
         </div>
@@ -1499,7 +1498,7 @@
               <li><a href="https://huggingface.co/Qwen/Qwen3.6-27B">Qwen3.6-27B 官方模型卡</a>。</li>
               <li><a href="https://huggingface.co/XiaomiMiMo/MiMo-7B-RL">MiMo-7B-RL 官方模型卡</a>。</li>
               <li><a href="https://huggingface.co/Qwen/Qwen3-Embedding-0.6B">Qwen3-Embedding-0.6B</a> 与 <a href="https://huggingface.co/BAAI/bge-m3">BGE-M3</a> 官方模型卡。</li>
-              <li><a href="https://ai.google.dev/gemma/docs/core">Gemma 官方文档</a>：作为跨模型族对照，不作为中文主线。</li>
+              <li><a href="https://ai.google.dev/gemma/docs/core">Gemma 官方文档</a>：用于跨模型族对照，不作为主要中文模型。</li>
             </ol>
           </div>
           <div class="source-group">
@@ -1519,8 +1518,7 @@
 
       <footer class="final-call">
         <p>
-          最优路线不是“立刻训练一个更大的 Agent”，而是：
-          <b>先用 2B/9B 做高质量 SFT，再用 4B 在离线环境证明 RL 有效，最后才进入旁路验证。</b>
+          执行顺序：<b>完成 2B/9B SFT 对照实验，使用 4B 验证离线 RL 指标变化，再进行旁路评测。</b>
         </p>
       </footer>
     </main>

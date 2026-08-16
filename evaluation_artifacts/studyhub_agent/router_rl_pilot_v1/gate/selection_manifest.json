@@ -1,0 +1,45 @@
+{
+  "algorithm": "group_relative_policy_optimization_contextual_bandit_v1",
+  "baseline": {
+    "adapter_path": "/data/chengjin/studyhub/training_artifacts/studyhub_agent_sft/qwen35_2b_lora_v1_7_state_transitions_from_v1_6_seed_7703",
+    "adapter_sha256": "6d2428abf3686be600509c5dff8fae34bb43076f391d86c90eab9b1971797eb1"
+  },
+  "candidate_blockers": {
+    "seed_3407": [],
+    "seed_7703": [
+      "decode_limit_non_regression",
+      "raw_hard_gates_non_regression"
+    ],
+    "seed_9109": [
+      "constraint_dependency_bounded",
+      "family_choice_drop_bounded",
+      "raw_choice_success_non_regression",
+      "raw_episode_success_non_regression",
+      "raw_reward_non_regression"
+    ]
+  },
+  "eligible_labels": [
+    "seed_3407"
+  ],
+  "final_holdout_read": false,
+  "reference_adapter_sha256": "6d2428abf3686be600509c5dff8fae34bb43076f391d86c90eab9b1971797eb1",
+  "schema_version": "studyhub.agent.router_rl.selection.v1",
+  "selected_adapter_path": "/data/chengjin/studyhub/training_artifacts/studyhub_agent_rl/router_grpo_pilot_v1/runs/seed_3407/adapter",
+  "selected_adapter_sha256": "1d6e2de07259d7eff5bb4f1f5f814bfb1482b5c55701c5e56de4e5d07b00a1d6",
+  "selected_label": "seed_3407",
+  "selection_basis": "validation_only_raw_policy_double_ledger",
+  "test_authorized": true,
+  "test_metrics_used_for_selection": false,
+  "thresholds": {
+    "maximum_constraint_dependency_abs_increase": 0.02,
+    "maximum_decode_limit_increase": 0.0,
+    "maximum_family_choice_drop": 0.1,
+    "maximum_reward_hacking_increase": 0.0,
+    "maximum_training_kl": 0.02,
+    "maximum_training_peak_memory_mib": 75000.0,
+    "minimum_choice_success_delta": 0.0,
+    "minimum_episode_success_delta": 0.0,
+    "minimum_hard_gate_delta": 0.0,
+    "minimum_reward_delta": 0.0
+  }
+}

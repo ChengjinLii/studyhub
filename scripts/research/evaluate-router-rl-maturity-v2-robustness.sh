@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+TRAIN_PYTHON="${STUDYHUB_TRAIN_PYTHON:-/data/chengjin/LLaMA-Factory/.venv/bin/python}"
+ADAPTER_PATH="${1:?usage: $0 <adapter-path> [output-name] [gpu-id]}"
+OUTPUT_NAME="${2:-frozen_candidate}"
+GPU_ID="${3:-0}"
+ARTIFACT_ROOT="$ROOT_DIR/training_artifacts/studyhub_agent_rl/router_rl_maturity_v2"
+OUTPUT_DIR="$ROOT_DIR/evaluation_artifacts/studyhub_agent/router_rl_maturity_v2/validation/robustness/$OUTPUT_NAME"
+
+unset DATABASE_URL MYSQL_URL STUDYHUB_DATABASE_URL
+unset OPENAI_BASE_URL ANTHROPIC_BASE_URL STUDYHUB_AGENTIC_MODEL_BASE_URL
+export STUDYHUB_ENVIRONMENT="offline-router-rl-maturity-v2-robustness"
+export HF_HUB_OFFLINE=1
+export TRANSFORMERS_OFFLINE=1
+
+cd "$ROOT_DIR"
+CUDA_VISIBLE_DEVICES="$GPU_ID" PYTHONPATH="$ROOT_DIR/backend:$ROOT_DIR" "$TRAIN_PYTHON" \
+  -m ml.agentic_platform.rl.maturity_v2.robustness \
+  --model "$ROOT_DIR/training_artifacts/studyhub_agent_sft/qwen35_2b_router_v1_7_merged" \
+  --adapter "$ADAPTER_PATH" \
+  --dataset "$ARTIFACT_ROOT/validation.jsonl" \
+  --output-dir "$OUTPUT_DIR" \
+  --device cuda:0

@@ -8,7 +8,6 @@ import json
 from pathlib import Path
 from typing import Any
 
-
 ROOT = Path(__file__).resolve().parents[3]
 DEFAULT_OUTPUT = (
     ROOT
@@ -171,106 +170,116 @@ def _knowledge_cards(
     cards = [
         (
             "任务定义",
-            "先定义模型做什么，也定义它绝不能做什么。",
+            "分别规定模型职责、输出格式和禁止操作。",
             "StudyHub 拆成 Router 2B 与 Grounded Tutor 9B：前者只输出 tools/final 严格 JSON，后者只基于免费证据生成带引用的 final JSON。生产写操作、付费链接和越权访问均不在训练边界内。",
             "已覆盖",
         ),
         (
             "数据来源与质量",
-            "标签等级、证据合法性和噪声控制决定上限。",
-            "两条数据线均为教师审校 Silver，不宣称人工金标。Router 使用公开元数据、预览 OCR 和合成状态；Tutor 使用 69 个免费资料的 223 个清洗页。重复、空 target、付费资料和生产访问均为 0。",
+            "记录标签等级、证据来源和清洗规则。",
+            "两条数据线的标注等级均为教师审校 Silver，不计作人工金标。Router 使用公开元数据、预览 OCR 和合成状态；Tutor 使用 69 个免费资料的 223 个清洗页。重复、空 target、付费资料和生产访问均为 0。",
             "已覆盖，缺人工金标",
         ),
         (
             "训练 / 验证 / 测试",
-            "三类集合承担不同职责，测试集不能参与选型。",
-            "Router 为 1,476/164，并另有 300 条开发诊断集与未读取的一次性封存集。Tutor 为 960/120，另有 120 条按资料隔离的封存集；封存集只访问一次，结果为 "
-            f"{_pct(tutor_holdout_rate)}。",
-            "制度已落地",
+            "训练集用于参数更新，验证集用于选型，封存集用于最终评测。",
+            (
+                "Router 为 1,476/164，并另有 300 条开发诊断集与未读取的一次性封存集。"
+                "Tutor 为 960/120，另有 120 条按资料隔离的封存集；封存集只访问一次，"
+                f"结果为 {_pct(tutor_holdout_rate)}。"
+            ),
+            "已执行",
         ),
         (
             "数据泄漏控制",
-            "不能只随机拆行，还要按资料、模板和 payload 检查。",
+            "同时检查资料、模板和 payload 级重叠。",
             "Tutor 按 material_id 划分 55/7/7 个资料。Router 与开发诊断集的 query、payload、target 精确重叠均为 0，并检查近似 query、资料交叉和 Pilot query 重叠；封存 Router 集尚未读取。",
             "已覆盖",
         ),
         (
             "数据构造与配比",
-            "主任务、难例、负例和 Replay 需要可解释配比。",
+            "记录主任务、难例、负例和 Replay 的样本比例。",
             "Router v1.7 含 12 个任务族、raw/runtime_state 各 820 条，重点补注入恢复、状态迁移和个人记忆，并保留直接回答、拒绝越权、页码和搜索 Replay。Tutor 含 10 个讲解与证据任务族。",
             "已覆盖，仍需真实轨迹",
         ),
         (
             "Chat Template 与 Tokenizer",
-            "训练模板与部署模板不一致会制造虚假成功。",
-            "统一使用 qwen3_5_nothink 与 enable_thinking=false，cutoff 4,096，不 packing。Router 最大总 token 1,731，Tutor 最大 2,233，均无训练截断；正式 Router 诊断按生产默认 "
-            f"{router_token_limit} 个输出 token 运行。",
+            "训练与推理采用同一模板和 tokenizer 配置。",
+            (
+                "统一使用 qwen3_5_nothink 与 enable_thinking=false，cutoff 4,096，不 packing。"
+                "Router 最大总 token 1,731，Tutor 最大 2,233，均无训练截断；"
+                f"正式 Router 诊断按生产默认 {router_token_limit} 个输出 token 运行。"
+            ),
             "已对齐",
         ),
         (
             "Loss 与 Label Mask",
-            "SFT 的核心通常不是换一种 loss，而是正确监督哪些 token。",
+            "使用标准自回归交叉熵，并明确 label mask 范围。",
             "使用自回归 token cross-entropy；train_on_prompt=false，仅 assistant target 参与 loss，system、user 和工具观察被 mask。验证同时记录 token accuracy，但上线决策不以 teacher-forcing 指标代替生成式 Gate。",
             "已覆盖",
         ),
         (
             "基础模型选择",
-            "参数规模必须与任务复杂度、时延和许可证匹配。",
+            "按任务复杂度、时延和许可证选择模型规模。",
             "Qwen3.5-2B（revision 15852e8c）用于结构化路由，合并后 2.213B 参数；Qwen3.5-9B（revision c2022362）用于长文本讲解与证据综合，9.453B 参数。两者均为本地模型、Apache-2.0，并验证 Transformers/PEFT/LLaMA-Factory 兼容性。",
             "已覆盖",
         ),
         (
             "LoRA / QLoRA",
-            "rank、target modules 与合并/量化行为都要实测。",
+            "分别记录 rank、target modules 和合并、量化结果。",
             "两条训练均为 BF16 LoRA，而非 QLoRA：r=16、alpha=32、dropout=0.05、target=all。2B 可训练 16.82M（0.7542%），9B 可训练 43.28M（0.4578%）；NF4 仅用于推理，并从 120/120 降至 116/120。",
             "LoRA 完成，NF4 未过 Gate",
         ),
         (
             "训练超参数",
-            "学习率、有效 batch、scheduler、seed 和 checkpoint 策略共同决定可复现性。",
+            "固定并记录学习率、有效 batch、scheduler、seed 和 checkpoint 策略。",
             "2B：1 epoch、5e-6、warmup 10、2×4=8、seed 7703；9B：1 epoch、8e-5、warmup 6、1×8=8、seed 6209。均为 AdamW Torch、cosine、weight decay 0、max grad norm 1.0、BF16、梯度检查点和周期验证。",
             "已覆盖",
         ),
         (
             "显存与训练效率",
-            "记录峰值显存、时长、吞吐和利用率，而不是只写硬件型号。",
-            "2B 训练 1,417 秒、峰值 76,588 MiB、1.095 sample/s；9B 训练 2,469 秒、峰值 50,544 MiB、0.408 sample/s。2B 使用 micro batch 2 且缺少快速内核，因此参数更少不等于峰值更低。训练 token/s 尚未直接记录。",
+            "记录峰值显存、时长、吞吐和利用率。",
+            "2B 训练 1,417 秒、峰值 76,588 MiB、1.095 sample/s；9B 训练 2,469 秒、峰值 50,544 MiB、0.408 sample/s。2B 使用 micro batch 2 且缺少快速内核，峰值显存因此高于 9B 运行。训练 token/s 尚未直接记录。",
             "大部分覆盖",
         ),
         (
             "Loss 曲线诊断",
-            "同时看训练与验证趋势，并用验证点选择 checkpoint。",
-            "2B eval loss 从 0.07315 降到 step 184 的 0.04360，最终 step 185 为 0.04372；9B 从 0.22853 降至约 0.186，后半程趋稳。step 184 另做 raw Gate 仍失败，证明最低 validation loss 只能筛选候选，不能批准发布。",
+            "同时记录训练与验证趋势，并依据验证点选择 checkpoint。",
+            "2B eval loss 从 0.07315 降到 step 184 的 0.04360，最终 step 185 为 0.04372；9B 从 0.22853 降至约 0.186，后半程趋稳。step 184 的 raw Gate 未通过，因此 checkpoint 选择还需要生成式评测。",
             "已覆盖",
         ),
         (
             "生成式评测",
-            "真正解码并按业务契约评分，是 SFT 验收核心。",
+            "使用实际解码输出按业务合同评分。",
             "Router 检查 JSON、contract、mode、工具名、参数、ID、页码、拒绝和注入恢复，raw 与 runtime_state 必须同时通过。Tutor 检查引用精确、证据边界、无工具动作、无敏感输出和任务族最低通过率。",
             "已覆盖",
         ),
         (
             "泛化与稳定性",
-            "要覆盖未见措辞、状态路径、长上下文与多个随机种子。",
+            "评测覆盖未见措辞、状态路径、长上下文和多个随机种子。",
             "Router 开发诊断与训练 query 精确隔离，并同时跑两条生产形态路径；但 v1.7 只有 seed 7703，尚不能宣称多 seed 稳定。Tutor 使用按资料隔离的验证和封存集，但也只有单 seed。",
             "部分覆盖",
         ),
         (
             "灾难性遗忘",
-            "定向修复新能力时必须守住旧路由和安全拒绝。",
-            "Router 数据保留直接回答、搜索、页码、ID、强制收尾和权限拒绝 Replay。当前开发诊断中直接回答与权限拒绝保持较高，但注入恢复仍失败，说明 Replay 只能监控遗忘，不能替代最终 Gate。",
+            "使用回归集检查定向数据对旧路由和权限拒绝的影响。",
+            "Router 数据保留直接回答、搜索、页码、ID、强制收尾和权限拒绝 Replay。当前开发诊断中直接回答与权限拒绝指标较高，注入恢复仍为失败项；Replay 结果与最终 Gate 分别记录。",
             "有回归集，仍未达标",
         ),
         (
             "推理与上线",
-            "Adapter、合并、量化、输出预算、约束解码和回滚都属于模型工程。",
-            "9B 完成 base/adapter/merged/NF4 对照；BF16 merged 是离线优选，NF4 因质量下降被拒绝。Router 正式评测使用生产输出预算；开发 Gate "
-            f"{'通过' if router_passed else '未通过'}，因此生产开关保持关闭，封存集和 Pilot {'可进入' if router_passed else '不进入'}。",
-            "上线受 Gate 阻断" if not router_passed else "仅获准下一道离线 Gate",
+            "分别评测 Adapter、合并、量化、输出预算、约束解码和回滚。",
+            (
+                "9B 完成 base/adapter/merged/NF4 对照；BF16 merged 通过离线 Gate，"
+                "NF4 因 4 条合同失败未通过。Router 正式评测使用生产输出预算；"
+                f"开发 Gate {'通过' if router_passed else '未通过'}，生产开关保持关闭，"
+                f"封存集和 Pilot {'可执行' if router_passed else '未执行'}。"
+            ),
+            "生产条件未满足" if not router_passed else "开发 Gate 通过",
         ),
         (
             "可复现与治理",
-            "代码、数据、模型、环境和决策过程都要可追溯。",
+            "保存代码、数据、模型、环境和评测决策记录。",
             "保存 Git commit、配置快照、GPU 秒级遥测、各级 SHA-256、封存锁和运行清单。环境锁定 Python 3.12.13、Torch 2.4.1+cu121、Transformers 5.6.0；SFT 范围 ruff 与 76 个 pytest 通过，生产 DB/API 未访问。",
             "已覆盖",
         ),
@@ -301,7 +310,7 @@ HTML_TEMPLATE = r"""<!doctype html>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="light">
-  <title>StudyHub Agent · SFT 完成报告</title>
+  <title>StudyHub Agent · SFT 实验报告</title>
   <style>
     :root {
       --ink: #14241d;
@@ -508,21 +517,21 @@ HTML_TEMPLATE = r"""<!doctype html>
   <header class="hero shell">
     <div class="hero-grid">
       <div>
-        <div class="eyebrow">StudyHub Agent · Offline Research</div>
-        <h1>SFT<span>17 项知识框架与真实结果</span></h1>
-        <p class="hero-lead">训练已经跑完；更重要的是，我们知道哪些能力真正通过了生成式验证，哪些仍然不允许上线。</p>
-        <p class="hero-note">两条任务线、2,720 条训练/验证样本、两种模型规模、LoRA 与合并/量化对照。全部在生产环境之外完成，未访问生产数据库、API、OSS 写接口或付费资料。</p>
+        <div class="eyebrow">StudyHub Agent · SFT Experiment Report</div>
+        <h1>SFT<span>任务、数据、训练与评测</span></h1>
+        <p class="hero-lead">本报告分别记录 2B Router 和 9B Grounded Tutor 的数据、训练配置、生成式评测与 Gate 结果。</p>
+        <p class="hero-note">共包含 2,720 条训练和验证样本，并比较 LoRA、合并 BF16 与 NF4 推理形态。实验未访问生产数据库、API、OSS 写接口或付费资料。</p>
       </div>
       <aside class="decision-card">
         <div class="decision-label">Release decision / 2026-08-11</div>
-        <h2>训练完成<br>生产发布未获准</h2>
-        <p>9B 在独立验证集达到 120/120，但封存集因 1 条截断失败；2B 正式开发 Gate @@ROUTER_GATE_STATE@@。任何单一 loss、accuracy 或验证集高分都不能覆盖发布门槛。</p>
+        <h2>当前 SFT<br>实验结论</h2>
+        <p>9B 独立验证为 120/120，封存集因 1 条输出截断得到 119/120；2B 正式开发 Gate @@ROUTER_GATE_STATE@@。发布判断同时使用生成式任务指标和预设 Gate。</p>
         <div class="decision-state">PRODUCTION FLAGS · OFF</div>
       </aside>
     </div>
     <div class="metric-strip">
       <div class="metric"><strong>2,720</strong><span>训练 + 验证样本</span></div>
-      <div class="metric"><strong>17</strong><span>SFT 知识与治理维度</span></div>
+      <div class="metric"><strong>17</strong><span>实验记录项目</span></div>
       <div class="metric"><strong>120/120</strong><span>9B BF16 独立验证</span></div>
       <div class="metric"><strong>0</strong><span>生产与付费资料访问</span></div>
     </div>
@@ -536,7 +545,7 @@ HTML_TEMPLATE = r"""<!doctype html>
       <a href="#curves">训练曲线</a>
       <a href="#gates">生成式 Gate</a>
       <a href="#deployment">部署对照</a>
-      <a href="#knowledge">17 项知识点</a>
+      <a href="#knowledge">实验记录</a>
       <a href="#decision">决策与下一步</a>
       <a href="#evidence">证据与复现</a>
       <div class="rail-meta">Branch<br>research/agent-sft-completion<br><br>Scope<br>Offline only</div>
@@ -546,8 +555,8 @@ HTML_TEMPLATE = r"""<!doctype html>
       <section id="overview" class="reveal">
         <div class="section-kicker">01 / Executive readout</div>
         <div class="section-head">
-          <h2>两条任务线，<br>两种不同结论</h2>
-          <p>Router 负责做离散、可审计的工具决策；Tutor 负责做带证据的学习内容生成。模型规模、数据构造、评测合同和发布风险都不同，不能用一套指标混在一起。</p>
+          <h2>任务拆分与<br>模型职责</h2>
+          <p>Router 负责离散工具决策，Tutor 负责基于证据生成学习内容。两项任务分别使用对应的模型规模、数据构造方式、输出合同和评测指标。</p>
         </div>
         <div class="track-grid">
           <article class="track-card router">
@@ -559,7 +568,7 @@ HTML_TEMPLATE = r"""<!doctype html>
               <li><span>数据</span><strong>1,476 train / 164 val</strong></li>
               <li><span>训练结果</span><strong>loss 0.0705 · val 0.0437</strong></li>
               <li><span>正式诊断</span><strong>@@ROUTER_TOKEN_LIMIT@@ output tokens</strong></li>
-              <li><span>生产结论</span><strong>@@ROUTER_GATE_LABEL@@</strong></li>
+              <li><span>Gate 状态</span><strong>@@ROUTER_GATE_LABEL@@</strong></li>
             </ul>
             <div class="verdict">@@ROUTER_VERDICT@@</div>
           </article>
@@ -572,9 +581,9 @@ HTML_TEMPLATE = r"""<!doctype html>
               <li><span>数据</span><strong>960 train / 120 val / 120 sealed</strong></li>
               <li><span>独立验证</span><strong>120/120 · 100%</strong></li>
               <li><span>一次性封存</span><strong>119/120 · 99.17%</strong></li>
-              <li><span>生产结论</span><strong>Gate 未通过</strong></li>
+              <li><span>Gate 状态</span><strong>未通过</strong></li>
             </ul>
-            <div class="verdict">1 条输出在 768-token 上限截断；零容忍 no-tool Gate 失败，不发布。</div>
+            <div class="verdict">1 条输出在 768-token 上限截断，no-tool Gate 未通过。</div>
           </article>
         </div>
       </section>
@@ -582,8 +591,8 @@ HTML_TEMPLATE = r"""<!doctype html>
       <section id="data" class="reveal">
         <div class="section-kicker">02 / Dataset anatomy</div>
         <div class="section-head">
-          <h2>数据不是数量，<br>而是边界</h2>
-          <p>教师审校 Silver、免费公开证据、按资料拆分、开发集与封存集分离。这里没有把模型生成标签冒充人工金标，也没有用测试结果回流训练。</p>
+          <h2>数据构造、拆分<br>与边界</h2>
+          <p>标签等级为教师审校 Silver，资料范围为公开免费资料，Tutor 按资料拆分数据，开发集与封存集分离。Silver 标签不记作人工金标，封存结果不回流训练。</p>
         </div>
         <div class="data-board">
           <div class="panel">
@@ -615,8 +624,8 @@ HTML_TEMPLATE = r"""<!doctype html>
       <section id="curves" class="reveal">
         <div class="section-kicker">03 / Optimization signals</div>
         <div class="section-head">
-          <h2>Loss 会说话，<br>但不会批准上线</h2>
-          <p>两条曲线都表现为正常收敛；2B 甚至有 98.95% token accuracy。生成式 Router Gate 仍失败，直接说明 teacher-forcing 指标与真实任务完成率之间存在缺口。</p>
+          <h2>训练曲线与<br>任务评测</h2>
+          <p>两条训练曲线均正常收敛，2B token accuracy 为 98.95%。Router 生成式 Gate 未通过，因此 teacher-forcing 指标不能单独用于判断任务完成率。</p>
         </div>
         <div class="chart-grid-layout">
           <div class="panel">
@@ -635,8 +644,8 @@ HTML_TEMPLATE = r"""<!doctype html>
       <section id="gates" class="reveal">
         <div class="section-kicker">04 / Generated-output gate</div>
         <div class="section-head">
-          <h2>真正的考试，<br>发生在解码之后</h2>
-          <p>Gate 对确定性生成结果逐条验收。细竖线表示阈值；红色表示未达到。raw 与 runtime_state 两条路径不能互相平均，也不能用安全项为零来覆盖功能失败。</p>
+          <h2>生成式评测与<br>合同检查</h2>
+          <p>Gate 对确定性生成结果逐条评分。细竖线表示阈值，红色表示未达到；raw 与 runtime_state 两条路径分别统计，安全指标与功能指标分别判断。</p>
         </div>
         <div class="gate-shell">
           <h3>Router 2B · 正式开发诊断</h3>
@@ -651,8 +660,8 @@ HTML_TEMPLATE = r"""<!doctype html>
       <section id="deployment" class="reveal">
         <div class="section-kicker">05 / Deployment forms</div>
         <div class="section-head">
-          <h2>显存减半，<br>不等于成本减半</h2>
-          <p>9B 的 adapter、合并 BF16 和 NF4 都做了真实生成评测。合并 BF16 保持 100% 严格通过并提高本批次吞吐；NF4 显存显著下降，但出现 4 条契约失败，因此被 Gate 拒绝。</p>
+          <h2>推理形态与<br>资源对照</h2>
+          <p>9B adapter、合并 BF16 和 NF4 均完成生成式评测。合并 BF16 的严格通过率为 100%，本批次吞吐高于 adapter；NF4 降低显存，但出现 4 条合同失败，未通过 Gate。</p>
         </div>
         <div class="compare-wrap">
           <table class="compare-table">
@@ -668,10 +677,10 @@ HTML_TEMPLATE = r"""<!doctype html>
       </section>
 
       <section id="knowledge" class="reveal">
-        <div class="section-kicker">06 / The complete SFT field guide</div>
+        <div class="section-kicker">06 / Experiment records</div>
         <div class="section-head">
-          <h2>17 个知识点，<br>缺一不可</h2>
-          <p>你列出的任务、数据拆分、loss、曲线、模型、LoRA 和显存是核心，但完整闭环还包括泄漏控制、模板对齐、生成式评测、稳定性、遗忘、部署形态和治理。</p>
+          <h2>实验设计与<br>结果覆盖</h2>
+          <p>报告覆盖任务定义、数据拆分、loss、训练曲线、模型、LoRA、显存、泄漏检查、模板一致性、生成式评测、稳定性、能力回归、推理形态和复现记录。</p>
         </div>
         <div class="knowledge-list">@@KNOWLEDGE_CARDS@@</div>
       </section>
@@ -679,12 +688,12 @@ HTML_TEMPLATE = r"""<!doctype html>
       <section id="decision" class="reveal">
         <div class="section-kicker">07 / Decision log</div>
         <div class="section-head">
-          <h2>停止错误发布，<br>也是有效结果</h2>
-          <p>当前工作已经回答“模型是否学会”和“是否值得进入下一道 Gate”两个问题。没有为了得到绿色结果而降低阈值、重复访问封存集或把截断样本删掉。</p>
+          <h2>模型结论与<br>后续实验</h2>
+          <p>本节汇总任务指标和 Gate 状态。评测沿用预设阈值，封存集按既定次数访问，截断样本保留在统计中。</p>
         </div>
         <div class="decision-grid">
           <article class="decision-panel blocked">
-            <h3>明确不做</h3>
+            <h3>当前不执行</h3>
             <ol>
               <li>不启用生产 Agent 模型开关。</li>
               <li>不把 9B 封存集失败回流为新训练样本。</li>
@@ -693,12 +702,12 @@ HTML_TEMPLATE = r"""<!doctype html>
             </ol>
           </article>
           <article class="decision-panel next">
-            <h3>下一轮应做</h3>
+            <h3>后续实验</h3>
             <ol>
               <li>建立小规模人工金标集，重点复核路由状态、页码和注入恢复。</li>
-              <li>把结构化 JSON 约束解码作为推理层实验，而非继续堆合成 SFT。</li>
+              <li>单独评测结构化 JSON 约束解码，并与新增合成 SFT 做对照。</li>
               <li>为当前版本补多 seed 稳定性和真实长会话故障注入。</li>
-              <li>只有重新通过开发 Gate，才创建新的、从未读取的封存集与 Pilot。</li>
+              <li>开发 Gate 通过后，再创建新的封存集并执行 Pilot。</li>
             </ol>
           </article>
         </div>
@@ -707,7 +716,7 @@ HTML_TEMPLATE = r"""<!doctype html>
       <section id="evidence" class="reveal">
         <div class="section-kicker">08 / Provenance</div>
         <div class="section-head">
-          <h2>结果可复查，<br>决策可追溯</h2>
+          <h2>实验产物与<br>复现索引</h2>
           <p>以下文件是本报告的直接证据。训练与评测大文件位于 Git ignore 目录；代码、配置、报告和哈希清单进入研究分支。</p>
         </div>
         <div class="evidence-list">

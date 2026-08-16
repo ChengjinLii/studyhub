@@ -1,0 +1,148 @@
+{
+  "combined_dataset_sha256": "0f889945cc3c2d90e74afa30507ae1f8257d1799ee52dd39621a13b0c534a7e9",
+  "combined_spec_audit": {
+    "data_class_counts": {
+      "public_synthetic": 2220,
+      "synthetic": 180
+    },
+    "dataset_sha256": {
+      "router_tool_2b_combined_v1_2.jsonl": "0f889945cc3c2d90e74afa30507ae1f8257d1799ee52dd39621a13b0c534a7e9"
+    },
+    "duplicate_pairs": [],
+    "errors": [],
+    "evidence_kind_counts": {
+      "metadata": 2630,
+      "preview_ocr": 1000
+    },
+    "family_counts": {
+      "router_tool_2b": {
+        "budget_one_continue_contrast": 150,
+        "budget_zero_final_contrast": 150,
+        "direct_general_answer": 20,
+        "direct_no_tool_hard": 40,
+        "direct_no_tool_retention": 30,
+        "empty_search_recovery_retention": 30,
+        "evidence_pending_contrast": 180,
+        "explicit_page_numbers": 250,
+        "force_final_budget": 300,
+        "inspect_candidates": 70,
+        "material_ids_preservation": 120,
+        "observation_injection_continue": 150,
+        "permission_refusal_retention": 30,
+        "read_page_evidence": 90,
+        "read_synthetic_memory": 40,
+        "reformulate_search": 40,
+        "refuse_boundary_hard": 40,
+        "refuse_permission_bypass": 20,
+        "search_initial": 160,
+        "synthesis_ready_contrast": 180,
+        "synthesize_context": 60,
+        "synthesize_context_contract": 250
+      }
+    },
+    "material_split_leaks": {},
+    "passed": true,
+    "profile_counts": {
+      "router_tool_2b": 2400
+    },
+    "split_counts": {
+      "router_tool_2b": {
+        "test": 50,
+        "train": 2110,
+        "validation": 240
+      }
+    },
+    "total_records": 2400,
+    "unique_chunk_ids": 460,
+    "unique_material_ids": 133
+  },
+  "contrast_pairs": {
+    "budget": 150,
+    "synthesis": 180
+  },
+  "diversity": {
+    "unique_query_target_pairs": 900,
+    "unique_user_payloads": 900
+  },
+  "errors": [],
+  "family_counts": {
+    "budget_one_continue_contrast": 150,
+    "budget_zero_final_contrast": 150,
+    "direct_no_tool_retention": 30,
+    "empty_search_recovery_retention": 30,
+    "evidence_pending_contrast": 180,
+    "observation_injection_continue": 150,
+    "permission_refusal_retention": 30,
+    "synthesis_ready_contrast": 180
+  },
+  "isolation": {
+    "contains_paid_material": false,
+    "production_api_called": false,
+    "production_database_accessed": false
+  },
+  "overlap_audit": {
+    "exact_payload_overlap_diagnostic": 0,
+    "exact_payload_overlap_reference": 0,
+    "exact_query_overlap_diagnostic": 0,
+    "exact_query_overlap_reference": 0,
+    "exact_target_overlap_diagnostic": 0,
+    "exact_target_overlap_reference": 0,
+    "material_split_mismatches": [],
+    "query_similarity_to_original_train": {
+      "max": 0.748201,
+      "mean": 0.433799,
+      "p95": 0.683761
+    },
+    "reserved_test_material_overlap": [],
+    "targeted_train_material_overlap_diagnostic": []
+  },
+  "passed": true,
+  "records": 900,
+  "sealed_final_holdout_read": false,
+  "split_counts": {
+    "train": 810,
+    "validation": 90
+  },
+  "targeted_dataset_sha256": "9f10678c840358c9235a9df2cdf919c1b43f9ae88bcdb055ff17cf3cf680d7fb",
+  "targeted_spec_audit": {
+    "data_class_counts": {
+      "public_synthetic": 840,
+      "synthetic": 60
+    },
+    "dataset_sha256": {
+      "router_tool_2b_v1_2.jsonl": "9f10678c840358c9235a9df2cdf919c1b43f9ae88bcdb055ff17cf3cf680d7fb"
+    },
+    "duplicate_pairs": [],
+    "errors": [],
+    "evidence_kind_counts": {
+      "metadata": 900,
+      "preview_ocr": 660
+    },
+    "family_counts": {
+      "router_tool_2b": {
+        "budget_one_continue_contrast": 150,
+        "budget_zero_final_contrast": 150,
+        "direct_no_tool_retention": 30,
+        "empty_search_recovery_retention": 30,
+        "evidence_pending_contrast": 180,
+        "observation_injection_continue": 150,
+        "permission_refusal_retention": 30,
+        "synthesis_ready_contrast": 180
+      }
+    },
+    "material_split_leaks": {},
+    "passed": true,
+    "profile_counts": {
+      "router_tool_2b": 900
+    },
+    "split_counts": {
+      "router_tool_2b": {
+        "train": 810,
+        "validation": 90
+      }
+    },
+    "total_records": 900,
+    "unique_chunk_ids": 374,
+    "unique_material_ids": 112
+  }
+}

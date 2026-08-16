@@ -1,0 +1,464 @@
+{
+  "manifest": {
+    "schema": "studyhub-rag-experiment-v1",
+    "mode": "all",
+    "git_commit": "cc23c1595978e07d7616926cde67bc10afab3731",
+    "python": "3.11.15",
+    "packages": {
+      "numpy": "2.4.6",
+      "scikit-learn": "1.9.0",
+      "torch": "2.3.1",
+      "transformers": "4.51.3",
+      "sentence-transformers": "4.1.0",
+      "faiss-cpu": "1.14.3"
+    },
+    "corpus": {
+      "materials": 135,
+      "chunks": 517,
+      "metadata_chunks": 135,
+      "ocr_chunks": 382,
+      "fingerprint": "0b8c7f318a78fc8e"
+    },
+    "benchmark": {
+      "queries": 60,
+      "answerable_queries": 55,
+      "no_answer_queries": 5
+    },
+    "methods": [
+      "tfidf_char_2_4",
+      "bm25_mixed_tokens",
+      "bge_m3_exact",
+      "bge_m3_hnsw",
+      "bge_m3_ivf",
+      "qwen3_embedding_06b_exact",
+      "bm25_bge_weighted_06_04",
+      "tfidf_bge_weighted_06_04",
+      "bm25_bge_rrf",
+      "tfidf_bge_rrf",
+      "bm25_bge_rrf_bge_reranker"
+    ],
+    "database_access": "forbidden",
+    "source_mode": "static_backup_read_only",
+    "report": "reports/RAG_EXPERIMENT_REPORT.md"
+  },
+  "metrics": {
+    "tfidf_char_2_4": {
+      "queries": 60,
+      "answerable_queries": 55,
+      "no_answer_queries": 5,
+      "latency_ms": 1.914046099409461,
+      "no_answer_threshold_p05": 0.13718648417593948,
+      "no_answer_fpr": 0.2,
+      "permission_leak_count": 0,
+      "permission_leaked_ids": [],
+      "hit_at_k": 0.9636363636363636,
+      "recall_at_k": 0.953030303030303,
+      "mrr": 0.902121212121212,
+      "ndcg_at_k": 0.8796796325649344,
+      "map_at_k": 0.8432792207792208,
+      "by_query_type": {
+        "acronym": {
+          "recall_at_k": 0.8571428571428571,
+          "mrr": 0.8571428571428571,
+          "ndcg_at_k": 0.7793205914720349
+        },
+        "bilingual": {
+          "recall_at_k": 0.9,
+          "mrr": 0.6783333333333333,
+          "ndcg_at_k": 0.7218417295267605
+        },
+        "exact": {
+          "recall_at_k": 1.0,
+          "mrr": 1.0,
+          "ndcg_at_k": 1.0
+        },
+        "semantic": {
+          "recall_at_k": 0.9817708333333333,
+          "mrr": 0.9635416666666667,
+          "ndcg_at_k": 0.9283974486093608
+        }
+      }
+    },
+    "bm25_mixed_tokens": {
+      "queries": 60,
+      "answerable_queries": 55,
+      "no_answer_queries": 5,
+      "latency_ms": 1.0241091717034578,
+      "no_answer_threshold_p05": 26.464957427978515,
+      "no_answer_fpr": 0.4,
+      "permission_leak_count": 0,
+      "permission_leaked_ids": [],
+      "hit_at_k": 1.0,
+      "recall_at_k": 0.9757575757575757,
+      "mrr": 0.9172727272727274,
+      "ndcg_at_k": 0.9084008631141682,
+      "map_at_k": 0.8684343434343433,
+      "by_query_type": {
+        "acronym": {
+          "recall_at_k": 0.9642857142857143,
+          "mrr": 0.9047619047619048,
+          "ndcg_at_k": 0.9111366743152834
+        },
+        "bilingual": {
+          "recall_at_k": 0.95,
+          "mrr": 0.7616666666666667,
+          "ndcg_at_k": 0.7570684756481559
+        },
+        "exact": {
+          "recall_at_k": 1.0,
+          "mrr": 1.0,
+          "ndcg_at_k": 1.0
+        },
+        "semantic": {
+          "recall_at_k": 0.9817708333333333,
+          "mrr": 0.953125,
+          "ndcg_at_k": 0.9379189373309598
+        }
+      }
+    },
+    "bge_m3_exact": {
+      "queries": 60,
+      "answerable_queries": 55,
+      "no_answer_queries": 5,
+      "latency_ms": 8.64973586673538,
+      "no_answer_threshold_p05": 0.6382120549678802,
+      "no_answer_fpr": 0.0,
+      "permission_leak_count": 0,
+      "permission_leaked_ids": [],
+      "hit_at_k": 1.0,
+      "recall_at_k": 0.9681818181818181,
+      "mrr": 1.0,
+      "ndcg_at_k": 0.9620289992626693,
+      "map_at_k": 0.928961038961039,
+      "by_query_type": {
+        "acronym": {
+          "recall_at_k": 0.9523809523809523,
+          "mrr": 1.0,
+          "ndcg_at_k": 0.9214523214530365
+        },
+        "bilingual": {
+          "recall_at_k": 0.95,
+          "mrr": 1.0,
+          "ndcg_at_k": 0.9771082613688147
+        },
+        "exact": {
+          "recall_at_k": 1.0,
+          "mrr": 1.0,
+          "ndcg_at_k": 1.0
+        },
+        "semantic": {
+          "recall_at_k": 0.9713541666666667,
+          "mrr": 1.0,
+          "ndcg_at_k": 0.9590733154871065
+        }
+      },
+      "index_build_ms": 0.04077702760696411,
+      "index_size_bytes": 2117632,
+      "ann_recall_at_candidate_k": 1.0
+    },
+    "bge_m3_hnsw": {
+      "queries": 60,
+      "answerable_queries": 55,
+      "no_answer_queries": 5,
+      "latency_ms": 8.77452241256833,
+      "no_answer_threshold_p05": 0.638212013244629,
+      "no_answer_fpr": 0.0,
+      "permission_leak_count": 0,
+      "permission_leaked_ids": [],
+      "hit_at_k": 1.0,
+      "recall_at_k": 0.9681818181818181,
+      "mrr": 1.0,
+      "ndcg_at_k": 0.9620289992626693,
+      "map_at_k": 0.928961038961039,
+      "by_query_type": {
+        "acronym": {
+          "recall_at_k": 0.9523809523809523,
+          "mrr": 1.0,
+          "ndcg_at_k": 0.9214523214530365
+        },
+        "bilingual": {
+          "recall_at_k": 0.95,
+          "mrr": 1.0,
+          "ndcg_at_k": 0.9771082613688147
+        },
+        "exact": {
+          "recall_at_k": 1.0,
+          "mrr": 1.0,
+          "ndcg_at_k": 1.0
+        },
+        "semantic": {
+          "recall_at_k": 0.9713541666666667,
+          "mrr": 1.0,
+          "ndcg_at_k": 0.9590733154871065
+        }
+      },
+      "index_build_ms": 78.89141235500574,
+      "index_size_bytes": 2257822,
+      "ann_recall_at_candidate_k": 0.995
+    },
+    "bge_m3_ivf": {
+      "queries": 60,
+      "answerable_queries": 55,
+      "no_answer_queries": 5,
+      "latency_ms": 8.613777238254746,
+      "no_answer_threshold_p05": 0.618492865562439,
+      "no_answer_fpr": 0.0,
+      "permission_leak_count": 0,
+      "permission_leaked_ids": [],
+      "hit_at_k": 0.9636363636363636,
+      "recall_at_k": 0.9181818181818182,
+      "mrr": 0.9545454545454546,
+      "ndcg_at_k": 0.9143167045934304,
+      "map_at_k": 0.8780303030303032,
+      "by_query_type": {
+        "acronym": {
+          "recall_at_k": 0.9523809523809523,
+          "mrr": 1.0,
+          "ndcg_at_k": 0.9214523214530365
+        },
+        "bilingual": {
+          "recall_at_k": 0.85,
+          "mrr": 0.9,
+          "ndcg_at_k": 0.8771082613688147
+        },
+        "exact": {
+          "recall_at_k": 1.0,
+          "mrr": 1.0,
+          "ndcg_at_k": 1.0
+        },
+        "semantic": {
+          "recall_at_k": 0.9166666666666666,
+          "mrr": 0.953125,
+          "ndcg_at_k": 0.9083178090243522
+        }
+      },
+      "index_build_ms": 365.01627042889595,
+      "index_size_bytes": 2154739,
+      "ann_recall_at_candidate_k": 0.8920833333333335
+    },
+    "qwen3_embedding_06b_exact": {
+      "queries": 60,
+      "answerable_queries": 55,
+      "no_answer_queries": 5,
+      "latency_ms": 19.659695929537218,
+      "no_answer_threshold_p05": 0.6438479781150818,
+      "no_answer_fpr": 0.0,
+      "permission_leak_count": 0,
+      "permission_leaked_ids": [],
+      "hit_at_k": 1.0,
+      "recall_at_k": 0.9893939393939394,
+      "mrr": 0.9863636363636363,
+      "ndcg_at_k": 0.9730670401316711,
+      "map_at_k": 0.9556818181818182,
+      "by_query_type": {
+        "acronym": {
+          "recall_at_k": 1.0,
+          "mrr": 1.0,
+          "ndcg_at_k": 0.9709284388482439
+        },
+        "bilingual": {
+          "recall_at_k": 1.0,
+          "mrr": 0.925,
+          "ndcg_at_k": 0.9339464947949633
+        },
+        "exact": {
+          "recall_at_k": 1.0,
+          "mrr": 1.0,
+          "ndcg_at_k": 1.0
+        },
+        "semantic": {
+          "recall_at_k": 0.9817708333333333,
+          "mrr": 1.0,
+          "ndcg_at_k": 0.9807100996048306
+        }
+      },
+      "index_build_ms": 0.29004085808992386,
+      "index_size_bytes": 2117632
+    },
+    "bm25_bge_weighted_06_04": {
+      "queries": 60,
+      "answerable_queries": 55,
+      "no_answer_queries": 5,
+      "latency_ms": 9.835696468750637,
+      "no_answer_threshold_p05": 0.7622826422561355,
+      "no_answer_fpr": 0.0,
+      "permission_leak_count": 0,
+      "permission_leaked_ids": [],
+      "hit_at_k": 1.0,
+      "recall_at_k": 0.9893939393939394,
+      "mrr": 0.990909090909091,
+      "ndcg_at_k": 0.9726867418099795,
+      "map_at_k": 0.947994227994228,
+      "by_query_type": {
+        "acronym": {
+          "recall_at_k": 1.0,
+          "mrr": 0.9285714285714286,
+          "ndcg_at_k": 0.9443049972322248
+        },
+        "bilingual": {
+          "recall_at_k": 1.0,
+          "mrr": 1.0,
+          "ndcg_at_k": 0.9852499178458298
+        },
+        "exact": {
+          "recall_at_k": 1.0,
+          "mrr": 1.0,
+          "ndcg_at_k": 1.0
+        },
+        "semantic": {
+          "recall_at_k": 0.9817708333333333,
+          "mrr": 1.0,
+          "ndcg_at_k": 0.9698480200145312
+        }
+      }
+    },
+    "tfidf_bge_weighted_06_04": {
+      "queries": 60,
+      "answerable_queries": 55,
+      "no_answer_queries": 5,
+      "latency_ms": 10.713738342747094,
+      "no_answer_threshold_p05": 0.7862288310628917,
+      "no_answer_fpr": 0.0,
+      "permission_leak_count": 0,
+      "permission_leaked_ids": [],
+      "hit_at_k": 1.0,
+      "recall_at_k": 0.9803030303030302,
+      "mrr": 0.9733333333333333,
+      "ndcg_at_k": 0.9509017679404164,
+      "map_at_k": 0.9251731601731602,
+      "by_query_type": {
+        "acronym": {
+          "recall_at_k": 1.0,
+          "mrr": 0.9047619047619048,
+          "ndcg_at_k": 0.8884707639941392
+        },
+        "bilingual": {
+          "recall_at_k": 0.95,
+          "mrr": 0.9199999999999999,
+          "ndcg_at_k": 0.8977420483256836
+        },
+        "exact": {
+          "recall_at_k": 1.0,
+          "mrr": 1.0,
+          "ndcg_at_k": 1.0
+        },
+        "semantic": {
+          "recall_at_k": 0.9817708333333333,
+          "mrr": 1.0,
+          "ndcg_at_k": 0.9719650439220966
+        }
+      }
+    },
+    "bm25_bge_rrf": {
+      "queries": 60,
+      "answerable_queries": 55,
+      "no_answer_queries": 5,
+      "latency_ms": 9.82664564313988,
+      "no_answer_threshold_p05": 0.031927643369175626,
+      "no_answer_fpr": 0.4,
+      "permission_leak_count": 0,
+      "permission_leaked_ids": [],
+      "hit_at_k": 1.0,
+      "recall_at_k": 0.9893939393939394,
+      "mrr": 0.9681818181818181,
+      "ndcg_at_k": 0.9506720411485826,
+      "map_at_k": 0.9227380952380952,
+      "by_query_type": {
+        "acronym": {
+          "recall_at_k": 1.0,
+          "mrr": 1.0,
+          "ndcg_at_k": 0.9473989791584206
+        },
+        "bilingual": {
+          "recall_at_k": 1.0,
+          "mrr": 0.825,
+          "ndcg_at_k": 0.8360200978698844
+        },
+        "exact": {
+          "recall_at_k": 1.0,
+          "mrr": 1.0,
+          "ndcg_at_k": 1.0
+        },
+        "semantic": {
+          "recall_at_k": 0.9817708333333333,
+          "mrr": 1.0,
+          "ndcg_at_k": 0.977967763448883
+        }
+      }
+    },
+    "tfidf_bge_rrf": {
+      "queries": 60,
+      "answerable_queries": 55,
+      "no_answer_queries": 5,
+      "latency_ms": 10.706885081405442,
+      "no_answer_threshold_p05": 0.03169404536720111,
+      "no_answer_fpr": 0.4,
+      "permission_leak_count": 0,
+      "permission_leaked_ids": [],
+      "hit_at_k": 1.0,
+      "recall_at_k": 0.9803030303030302,
+      "mrr": 0.9612121212121212,
+      "ndcg_at_k": 0.9409420980611516,
+      "map_at_k": 0.911590909090909,
+      "by_query_type": {
+        "acronym": {
+          "recall_at_k": 1.0,
+          "mrr": 0.880952380952381,
+          "ndcg_at_k": 0.879392548496493
+        },
+        "bilingual": {
+          "recall_at_k": 0.95,
+          "mrr": 0.8699999999999999,
+          "ndcg_at_k": 0.8573731711730908
+        },
+        "exact": {
+          "recall_at_k": 1.0,
+          "mrr": 1.0,
+          "ndcg_at_k": 1.0
+        },
+        "semantic": {
+          "recall_at_k": 0.9817708333333333,
+          "mrr": 1.0,
+          "ndcg_at_k": 0.9694479950674055
+        }
+      }
+    },
+    "bm25_bge_rrf_bge_reranker": {
+      "queries": 60,
+      "answerable_queries": 55,
+      "no_answer_queries": 5,
+      "latency_ms": 73.45307318804164,
+      "no_answer_threshold_p05": 1.7224609375,
+      "no_answer_fpr": 0.0,
+      "permission_leak_count": 0,
+      "permission_leaked_ids": [],
+      "hit_at_k": 1.0,
+      "recall_at_k": 0.9803030303030302,
+      "mrr": 0.9551515151515151,
+      "ndcg_at_k": 0.9471742332641526,
+      "map_at_k": 0.9122943722943722,
+      "by_query_type": {
+        "acronym": {
+          "recall_at_k": 1.0,
+          "mrr": 1.0,
+          "ndcg_at_k": 0.9455579747665501
+        },
+        "bilingual": {
+          "recall_at_k": 0.95,
+          "mrr": 0.9199999999999999,
+          "ndcg_at_k": 0.9145865853673211
+        },
+        "exact": {
+          "recall_at_k": 1.0,
+          "mrr": 1.0,
+          "ndcg_at_k": 1.0
+        },
+        "semantic": {
+          "recall_at_k": 0.9817708333333333,
+          "mrr": 0.9479166666666666,
+          "ndcg_at_k": 0.9478065985152917
+        }
+      }
+    }
+  }
+}

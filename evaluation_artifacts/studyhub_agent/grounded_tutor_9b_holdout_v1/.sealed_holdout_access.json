@@ -1,0 +1,6 @@
+{
+  "accessed_at": "2026-08-11T06:22:17.607376+00:00",
+  "dataset": "/data/chengjin/studyhub/evaluation_artifacts/studyhub_agent/grounded_tutor_9b_holdout_v1/grounded_tutor_9b_holdout_120.jsonl",
+  "output": "evaluation_artifacts/studyhub_agent/grounded_tutor_9b_v1_0/adapter_holdout_seed_6209_768",
+  "single_use": true
+}

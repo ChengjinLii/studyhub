@@ -1,0 +1,663 @@
+{
+  "adapter_path": "training_artifacts/studyhub_agent_sft/qwen35_2b_lora_v1_1_seed_7703",
+  "batch_size": 8,
+  "dataset_path": "training_artifacts/studyhub_agent_sft/router_2b_v1_3_state/router_tool_2b_v1_3_state.jsonl",
+  "elapsed_seconds": 191.177,
+  "family_metrics": {
+    "budget_one_continue_contrast": {
+      "arguments_exact": {
+        "passed": 0,
+        "total": 15
+      },
+      "contract_valid": {
+        "passed": 15,
+        "total": 15
+      },
+      "json_valid": {
+        "passed": 15,
+        "total": 15
+      },
+      "mode_correct": {
+        "passed": 15,
+        "total": 15
+      },
+      "tool_name_correct": {
+        "passed": 15,
+        "total": 15
+      }
+    },
+    "budget_zero_final_contrast": {
+      "arguments_exact": {
+        "passed": 15,
+        "total": 15
+      },
+      "contract_valid": {
+        "passed": 15,
+        "total": 15
+      },
+      "json_valid": {
+        "passed": 15,
+        "total": 15
+      },
+      "mode_correct": {
+        "passed": 15,
+        "total": 15
+      },
+      "tool_name_correct": {
+        "passed": 15,
+        "total": 15
+      }
+    },
+    "direct_final_schema_retention_v1_3": {
+      "arguments_exact": {
+        "passed": 3,
+        "total": 3
+      },
+      "contract_valid": {
+        "passed": 3,
+        "total": 3
+      },
+      "json_valid": {
+        "passed": 3,
+        "total": 3
+      },
+      "mode_correct": {
+        "passed": 3,
+        "total": 3
+      },
+      "tool_name_correct": {
+        "passed": 3,
+        "total": 3
+      }
+    },
+    "direct_general_answer": {
+      "arguments_exact": {
+        "passed": 1,
+        "total": 1
+      },
+      "contract_valid": {
+        "passed": 1,
+        "total": 1
+      },
+      "json_valid": {
+        "passed": 1,
+        "total": 1
+      },
+      "mode_correct": {
+        "passed": 1,
+        "total": 1
+      },
+      "tool_name_correct": {
+        "passed": 1,
+        "total": 1
+      }
+    },
+    "direct_no_tool_retention": {
+      "arguments_exact": {
+        "passed": 3,
+        "total": 3
+      },
+      "contract_valid": {
+        "passed": 3,
+        "total": 3
+      },
+      "json_valid": {
+        "passed": 3,
+        "total": 3
+      },
+      "mode_correct": {
+        "passed": 3,
+        "total": 3
+      },
+      "tool_name_correct": {
+        "passed": 3,
+        "total": 3
+      }
+    },
+    "empty_search_recovery_retention": {
+      "arguments_exact": {
+        "passed": 0,
+        "total": 3
+      },
+      "contract_valid": {
+        "passed": 3,
+        "total": 3
+      },
+      "json_valid": {
+        "passed": 3,
+        "total": 3
+      },
+      "mode_correct": {
+        "passed": 3,
+        "total": 3
+      },
+      "tool_name_correct": {
+        "passed": 3,
+        "total": 3
+      }
+    },
+    "evidence_pending_contrast": {
+      "arguments_exact": {
+        "passed": 0,
+        "total": 18
+      },
+      "contract_valid": {
+        "passed": 18,
+        "total": 18
+      },
+      "json_valid": {
+        "passed": 18,
+        "total": 18
+      },
+      "mode_correct": {
+        "passed": 18,
+        "total": 18
+      },
+      "tool_name_correct": {
+        "passed": 17,
+        "total": 18
+      }
+    },
+    "force_final_inspected_candidates": {
+      "arguments_exact": {
+        "passed": 4,
+        "total": 8
+      },
+      "contract_valid": {
+        "passed": 6,
+        "total": 8
+      },
+      "json_valid": {
+        "passed": 7,
+        "total": 8
+      },
+      "mode_correct": {
+        "passed": 4,
+        "total": 8
+      },
+      "tool_name_correct": {
+        "passed": 4,
+        "total": 8
+      }
+    },
+    "force_final_wording_alias": {
+      "arguments_exact": {
+        "passed": 4,
+        "total": 4
+      },
+      "contract_valid": {
+        "passed": 4,
+        "total": 4
+      },
+      "json_valid": {
+        "passed": 4,
+        "total": 4
+      },
+      "mode_correct": {
+        "passed": 4,
+        "total": 4
+      },
+      "tool_name_correct": {
+        "passed": 4,
+        "total": 4
+      }
+    },
+    "inspect_boundary_alias": {
+      "arguments_exact": {
+        "passed": 3,
+        "total": 8
+      },
+      "contract_valid": {
+        "passed": 8,
+        "total": 8
+      },
+      "json_valid": {
+        "passed": 8,
+        "total": 8
+      },
+      "mode_correct": {
+        "passed": 8,
+        "total": 8
+      },
+      "tool_name_correct": {
+        "passed": 3,
+        "total": 8
+      }
+    },
+    "inspect_candidates": {
+      "arguments_exact": {
+        "passed": 6,
+        "total": 6
+      },
+      "contract_valid": {
+        "passed": 6,
+        "total": 6
+      },
+      "json_valid": {
+        "passed": 6,
+        "total": 6
+      },
+      "mode_correct": {
+        "passed": 6,
+        "total": 6
+      },
+      "tool_name_correct": {
+        "passed": 6,
+        "total": 6
+      }
+    },
+    "material_ids_preservation": {
+      "arguments_exact": {
+        "passed": 3,
+        "total": 3
+      },
+      "contract_valid": {
+        "passed": 3,
+        "total": 3
+      },
+      "json_valid": {
+        "passed": 3,
+        "total": 3
+      },
+      "mode_correct": {
+        "passed": 3,
+        "total": 3
+      },
+      "tool_name_correct": {
+        "passed": 3,
+        "total": 3
+      }
+    },
+    "multi_source_final_schema_retention": {
+      "arguments_exact": {
+        "passed": 1,
+        "total": 3
+      },
+      "contract_valid": {
+        "passed": 2,
+        "total": 3
+      },
+      "json_valid": {
+        "passed": 3,
+        "total": 3
+      },
+      "mode_correct": {
+        "passed": 1,
+        "total": 3
+      },
+      "tool_name_correct": {
+        "passed": 1,
+        "total": 3
+      }
+    },
+    "observation_injection_continue": {
+      "arguments_exact": {
+        "passed": 0,
+        "total": 15
+      },
+      "contract_valid": {
+        "passed": 15,
+        "total": 15
+      },
+      "json_valid": {
+        "passed": 15,
+        "total": 15
+      },
+      "mode_correct": {
+        "passed": 15,
+        "total": 15
+      },
+      "tool_name_correct": {
+        "passed": 15,
+        "total": 15
+      }
+    },
+    "permission_refusal_retention": {
+      "arguments_exact": {
+        "passed": 3,
+        "total": 3
+      },
+      "contract_valid": {
+        "passed": 3,
+        "total": 3
+      },
+      "json_valid": {
+        "passed": 3,
+        "total": 3
+      },
+      "mode_correct": {
+        "passed": 3,
+        "total": 3
+      },
+      "tool_name_correct": {
+        "passed": 3,
+        "total": 3
+      }
+    },
+    "permission_refusal_schema_retention_v1_3": {
+      "arguments_exact": {
+        "passed": 2,
+        "total": 2
+      },
+      "contract_valid": {
+        "passed": 2,
+        "total": 2
+      },
+      "json_valid": {
+        "passed": 2,
+        "total": 2
+      },
+      "mode_correct": {
+        "passed": 2,
+        "total": 2
+      },
+      "tool_name_correct": {
+        "passed": 2,
+        "total": 2
+      }
+    },
+    "permission_refusal_wording_alias": {
+      "arguments_exact": {
+        "passed": 3,
+        "total": 3
+      },
+      "contract_valid": {
+        "passed": 3,
+        "total": 3
+      },
+      "json_valid": {
+        "passed": 3,
+        "total": 3
+      },
+      "mode_correct": {
+        "passed": 3,
+        "total": 3
+      },
+      "tool_name_correct": {
+        "passed": 3,
+        "total": 3
+      }
+    },
+    "read_memory_boundary_alias": {
+      "arguments_exact": {
+        "passed": 0,
+        "total": 5
+      },
+      "contract_valid": {
+        "passed": 5,
+        "total": 5
+      },
+      "json_valid": {
+        "passed": 5,
+        "total": 5
+      },
+      "mode_correct": {
+        "passed": 5,
+        "total": 5
+      },
+      "tool_name_correct": {
+        "passed": 1,
+        "total": 5
+      }
+    },
+    "read_synthetic_memory": {
+      "arguments_exact": {
+        "passed": 3,
+        "total": 3
+      },
+      "contract_valid": {
+        "passed": 3,
+        "total": 3
+      },
+      "json_valid": {
+        "passed": 3,
+        "total": 3
+      },
+      "mode_correct": {
+        "passed": 3,
+        "total": 3
+      },
+      "tool_name_correct": {
+        "passed": 3,
+        "total": 3
+      }
+    },
+    "reformulate_search": {
+      "arguments_exact": {
+        "passed": 1,
+        "total": 3
+      },
+      "contract_valid": {
+        "passed": 3,
+        "total": 3
+      },
+      "json_valid": {
+        "passed": 3,
+        "total": 3
+      },
+      "mode_correct": {
+        "passed": 3,
+        "total": 3
+      },
+      "tool_name_correct": {
+        "passed": 3,
+        "total": 3
+      }
+    },
+    "refuse_permission_bypass": {
+      "arguments_exact": {
+        "passed": 1,
+        "total": 1
+      },
+      "contract_valid": {
+        "passed": 1,
+        "total": 1
+      },
+      "json_valid": {
+        "passed": 1,
+        "total": 1
+      },
+      "mode_correct": {
+        "passed": 1,
+        "total": 1
+      },
+      "tool_name_correct": {
+        "passed": 1,
+        "total": 1
+      }
+    },
+    "search_initial": {
+      "arguments_exact": {
+        "passed": 3,
+        "total": 4
+      },
+      "contract_valid": {
+        "passed": 4,
+        "total": 4
+      },
+      "json_valid": {
+        "passed": 4,
+        "total": 4
+      },
+      "mode_correct": {
+        "passed": 4,
+        "total": 4
+      },
+      "tool_name_correct": {
+        "passed": 4,
+        "total": 4
+      }
+    },
+    "synthesis_minimal_pending_state": {
+      "arguments_exact": {
+        "passed": 0,
+        "total": 4
+      },
+      "contract_valid": {
+        "passed": 2,
+        "total": 4
+      },
+      "json_valid": {
+        "passed": 4,
+        "total": 4
+      },
+      "mode_correct": {
+        "passed": 4,
+        "total": 4
+      },
+      "tool_name_correct": {
+        "passed": 3,
+        "total": 4
+      }
+    },
+    "synthesis_minimal_ready_state": {
+      "arguments_exact": {
+        "passed": 0,
+        "total": 10
+      },
+      "contract_valid": {
+        "passed": 6,
+        "total": 10
+      },
+      "json_valid": {
+        "passed": 10,
+        "total": 10
+      },
+      "mode_correct": {
+        "passed": 10,
+        "total": 10
+      },
+      "tool_name_correct": {
+        "passed": 7,
+        "total": 10
+      }
+    },
+    "synthesis_ready_contrast": {
+      "arguments_exact": {
+        "passed": 0,
+        "total": 18
+      },
+      "contract_valid": {
+        "passed": 16,
+        "total": 18
+      },
+      "json_valid": {
+        "passed": 18,
+        "total": 18
+      },
+      "mode_correct": {
+        "passed": 18,
+        "total": 18
+      },
+      "tool_name_correct": {
+        "passed": 7,
+        "total": 18
+      }
+    },
+    "synthesis_state_alias": {
+      "arguments_exact": {
+        "passed": 0,
+        "total": 10
+      },
+      "contract_valid": {
+        "passed": 10,
+        "total": 10
+      },
+      "json_valid": {
+        "passed": 10,
+        "total": 10
+      },
+      "mode_correct": {
+        "passed": 10,
+        "total": 10
+      },
+      "tool_name_correct": {
+        "passed": 10,
+        "total": 10
+      }
+    },
+    "synthesize_context": {
+      "arguments_exact": {
+        "passed": 3,
+        "total": 3
+      },
+      "contract_valid": {
+        "passed": 3,
+        "total": 3
+      },
+      "json_valid": {
+        "passed": 3,
+        "total": 3
+      },
+      "mode_correct": {
+        "passed": 3,
+        "total": 3
+      },
+      "tool_name_correct": {
+        "passed": 3,
+        "total": 3
+      }
+    },
+    "synthesize_context_contract": {
+      "arguments_exact": {
+        "passed": 3,
+        "total": 6
+      },
+      "contract_valid": {
+        "passed": 6,
+        "total": 6
+      },
+      "json_valid": {
+        "passed": 6,
+        "total": 6
+      },
+      "mode_correct": {
+        "passed": 6,
+        "total": 6
+      },
+      "tool_name_correct": {
+        "passed": 6,
+        "total": 6
+      }
+    }
+  },
+  "max_new_tokens": 384,
+  "metrics": {
+    "arguments_exact": {
+      "passed": 65,
+      "rate": 0.361111,
+      "total": 180
+    },
+    "contract_valid": {
+      "passed": 169,
+      "rate": 0.938889,
+      "total": 180
+    },
+    "json_valid": {
+      "passed": 179,
+      "rate": 0.994444,
+      "total": 180
+    },
+    "mode_correct": {
+      "passed": 174,
+      "rate": 0.966667,
+      "total": 180
+    },
+    "tool_name_correct": {
+      "passed": 149,
+      "rate": 0.827778,
+      "total": 180
+    }
+  },
+  "model_path": "/data/chengjin/studyhub/models/P0/Qwen3.5-2B",
+  "normalize_routing_state": false,
+  "policy_refusal": {
+    "passed": 1,
+    "total": 1
+  },
+  "records": 180,
+  "seconds_per_record": 1.0621,
+  "splits": [
+    "validation"
+  ]
+}

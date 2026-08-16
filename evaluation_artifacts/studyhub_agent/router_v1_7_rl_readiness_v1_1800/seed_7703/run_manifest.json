@@ -1,0 +1,27 @@
+{
+  "adapter_path": "/data/chengjin/studyhub/training_artifacts/studyhub_agent_sft/qwen35_2b_lora_v1_7_state_transitions_from_v1_6_seed_7703",
+  "adapter_sha256": "6d2428abf3686be600509c5dff8fae34bb43076f391d86c90eab9b1971797eb1",
+  "dataset_path": "/data/chengjin/studyhub/evaluation_artifacts/studyhub_agent/router_teacher_hidden_v1/router_hidden_300.jsonl",
+  "dataset_sha256": "f122d47057bcb0f9239947ed02bde4cbd5bd73180cd98cf00c03fcb75b1a6009",
+  "decoding": {
+    "batch_size": 8,
+    "deterministic_argument_protection": true,
+    "do_sample": false,
+    "max_new_tokens": 1800,
+    "typed_constrained_projection": true
+  },
+  "final_holdout_read": false,
+  "git_commit": "aa04b87cf987a5d7eb47c5e23df2b83592957a46",
+  "implementation_sha256": {
+    "backend/app/services/agent_router_constraint_service.py": "79b272f3e11d9d2b96c73e93b6053dee4bf0a7daadbbfbb6542dfe9b7c8005c5",
+    "ml/agentic_platform/sft/analyze_teacher_hidden_eval.py": "a1ccf881fe5a56d242170658431e2a42e3917c7177acaac5b552d7d5cd84672c",
+    "ml/agentic_platform/sft/evaluate_router.py": "488b38dbe3bb675327aafac3d6c32b1051f2f07763d68ff5e0409a8473ec9756",
+    "ml/agentic_platform/sft/gate_router_production_diagnostic.py": "8ae89e9d82b6ce918ef48bb9d85eedba4d0519e4be35d4d2fbef8f7d94b10cd4"
+  },
+  "mode": "both",
+  "model_path": "/data/chengjin/studyhub/models/P0/Qwen3.5-2B",
+  "precision": "bf16",
+  "production_api_called": false,
+  "production_database_accessed": false,
+  "schema_version": "studyhub.agent.router.production_diagnostic.v1"
+}

@@ -1,0 +1,55 @@
+{
+  "combined_records": 2400,
+  "combined_split_counts": {
+    "test": 50,
+    "train": 2110,
+    "validation": 240
+  },
+  "dataset_version": "router_2b_targeted_v1_2",
+  "family_counts": {
+    "budget_one_continue_contrast": 150,
+    "budget_zero_final_contrast": 150,
+    "direct_no_tool_retention": 30,
+    "empty_search_recovery_retention": 30,
+    "evidence_pending_contrast": 180,
+    "observation_injection_continue": 150,
+    "permission_refusal_retention": 30,
+    "synthesis_ready_contrast": 180
+  },
+  "files": {
+    "audit.json": {
+      "sha256": "edd58d5031761fc5be8903724866be893200939a1282b9981c3b1ed4221d4f63"
+    },
+    "router_tool_2b_combined_v1_2.jsonl": {
+      "records": 2400,
+      "sha256": "0f889945cc3c2d90e74afa30507ae1f8257d1799ee52dd39621a13b0c534a7e9"
+    },
+    "router_tool_2b_v1_2.jsonl": {
+      "records": 900,
+      "sha256": "9f10678c840358c9235a9df2cdf919c1b43f9ae88bcdb055ff17cf3cf680d7fb"
+    }
+  },
+  "generated_at": "2026-07-31T08:17:33+00:00",
+  "purpose": "Paired hard-negative remediation for budget, synthesis, and untrusted-observation routing boundaries.",
+  "records": 900,
+  "release_status": "continuation_training_candidate_not_production",
+  "schema_version": "studyhub.agent.sft.spec.v0",
+  "source_snapshot": {
+    "access_scope": "free_public_only",
+    "chunks_sha256": "123ac5016be06616057409f29652408b9ed97fd072748cacfca69efb212d0f6d",
+    "materials_sha256": "5675b7d441b09daa59e14cceaf73a3a4864bf9a482239b1c455c84a1fb996e72",
+    "snapshot_id": "targeted-v1-2-5675b7d441b0-123ac5016be0"
+  },
+  "split_counts": {
+    "test": 0,
+    "train": 810,
+    "validation": 90
+  },
+  "teacher": {
+    "human_gold": false,
+    "model_requested": "gpt-5.6-thinking",
+    "runtime": "current_codex_session",
+    "runtime_model_verified": false
+  },
+  "validation_passed": true
+}

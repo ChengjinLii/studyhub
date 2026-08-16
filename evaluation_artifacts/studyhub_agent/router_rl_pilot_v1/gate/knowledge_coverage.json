@@ -1,0 +1,289 @@
+{
+  "covered": 26,
+  "items": [
+    {
+      "evidence": [
+        "/data/chengjin/studyhub/ml/agentic_platform/rl/reward.py",
+        "/data/chengjin/studyhub/ml/agentic_platform/rl/configs/router_grpo_pilot_v1.json"
+      ],
+      "finding": "优化 Router 的语义动作、停止决策和任务完成率；硬安全指标不纳入可加权的 Reward 分项。",
+      "number": 1,
+      "status": "VERIFIED",
+      "title": "RL 目标",
+      "tone": "ok"
+    },
+    {
+      "evidence": [
+        "/data/chengjin/studyhub/ml/agentic_platform/rl/spec.py"
+      ],
+      "finding": "状态包含请求、预算、任务上下文、搜索历史、可信工具观察和 evidence rubric。",
+      "number": 2,
+      "status": "VERIFIED",
+      "title": "状态 State",
+      "tone": "ok"
+    },
+    {
+      "evidence": [
+        "/data/chengjin/studyhub/ml/agentic_platform/rl/reward.py",
+        "/data/chengjin/studyhub/backend/app/services/agent_router_constraint_service.py"
+      ],
+      "finding": "动作空间为只读 Router contract：工具调用或 final；工具名与参数被结构化评分。",
+      "number": 3,
+      "status": "VERIFIED",
+      "title": "动作 Action",
+      "tone": "ok"
+    },
+    {
+      "evidence": [
+        "/data/chengjin/studyhub/ml/agentic_platform/rl/environment.py",
+        "/data/chengjin/studyhub/backend/tests/agentic_platform/test_router_rl_pilot.py"
+      ],
+      "finding": "独立环境按成功语义动作推进 next_state_id，错误动作终止轨迹。",
+      "number": 4,
+      "status": "VERIFIED",
+      "title": "状态转移 Transition",
+      "tone": "ok"
+    },
+    {
+      "evidence": [
+        "/data/chengjin/studyhub/ml/agentic_platform/rl/environment.py",
+        "/data/chengjin/studyhub/training_artifacts/studyhub_agent_rl/router_grpo_pilot_v1/audit.json"
+      ],
+      "finding": "83 个 episode；支持 terminal、错误动作提前终止和 terminal bonus。",
+      "number": 5,
+      "status": "VERIFIED",
+      "title": "Episode 与终止",
+      "tone": "ok"
+    },
+    {
+      "evidence": [
+        "/data/chengjin/studyhub/training_artifacts/studyhub_agent_rl/router_grpo_pilot_v1/input_lock.json",
+        "/data/chengjin/studyhub/ml/agentic_platform/rl/trainer.py"
+      ],
+      "finding": "Qwen3.5-2B + SFT v1.7 为初始策略，同一 SFT adapter 冻结为 reference。",
+      "number": 6,
+      "status": "LOCKED",
+      "title": "初始与参考策略",
+      "tone": "ok"
+    },
+    {
+      "evidence": [
+        "/data/chengjin/studyhub/ml/agentic_platform/rl/trainer.py",
+        "/data/chengjin/studyhub/ml/agentic_platform/rl/configs/router_grpo_pilot_v1.json"
+      ],
+      "finding": "每 state 采样 3 个候选、组内标准化 advantage；每 seed 48 rollouts。",
+      "number": 7,
+      "status": "VERIFIED",
+      "title": "Rollout 构造",
+      "tone": "ok"
+    },
+    {
+      "evidence": [
+        "/data/chengjin/studyhub/training_artifacts/studyhub_agent_rl/router_grpo_pilot_v1/audit.json",
+        "/data/chengjin/studyhub/training_artifacts/studyhub_agent_rl/router_grpo_pilot_v1/manifest.json"
+      ],
+      "finding": "Train/Validation/Test 按 material 与 query 隔离；开发诊断和最终 holdout 未读。",
+      "number": 8,
+      "status": "VERIFIED",
+      "title": "数据划分",
+      "tone": "ok"
+    },
+    {
+      "evidence": [
+        "/data/chengjin/studyhub/ml/agentic_platform/rl/reward.py"
+      ],
+      "finding": "六项策略 Reward、四类 hacking penalty、[-1,1] clipping 和激活权重归一化。",
+      "number": 9,
+      "status": "VERIFIED",
+      "title": "Reward 设计",
+      "tone": "ok"
+    },
+    {
+      "evidence": [
+        "/data/chengjin/studyhub/backend/app/services/agent_router_constraint_service.py",
+        "/data/chengjin/studyhub/ml/agentic_platform/rl/reward.py"
+      ],
+      "finding": "权限、只读工具、预算、可信 ID、页码与 contract 只做硬门和执行投影。",
+      "number": 10,
+      "status": "VERIFIED",
+      "title": "硬约束边界",
+      "tone": "ok"
+    },
+    {
+      "evidence": [
+        "/data/chengjin/studyhub/training_artifacts/studyhub_agent_rl/router_grpo_pilot_v1/judge_calibration.json",
+        "/data/chengjin/studyhub/ml/agentic_platform/rl/reward.py"
+      ],
+      "finding": "采用确定性规则、环境结果与教师 Silver rubric；未声称 human-gold 或外部 LLM Judge。",
+      "number": 11,
+      "status": "SILVER",
+      "title": "Reward 来源",
+      "tone": "partial"
+    },
+    {
+      "evidence": [
+        "/data/chengjin/studyhub/training_artifacts/studyhub_agent_rl/router_grpo_pilot_v1/judge_calibration.json"
+      ],
+      "finding": "48 对偏好 pairwise accuracy 100%、序列化不变性 100%；开放式教学质量未覆盖。",
+      "number": 12,
+      "status": "CALIBRATED",
+      "title": "Judge 校准",
+      "tone": "ok"
+    },
+    {
+      "evidence": [
+        "/data/chengjin/studyhub/ml/agentic_platform/rl/trainer.py",
+        "/data/chengjin/studyhub/ml/agentic_platform/rl/configs/router_grpo_pilot_v1.json"
+      ],
+      "finding": "实现方式为 GRPO-style contextual-bandit clipped policy gradient，与 TRL/veRL 的完整 GRPO 实现区分记录。",
+      "number": 13,
+      "status": "IMPLEMENTED",
+      "title": "算法选择",
+      "tone": "ok"
+    },
+    {
+      "evidence": [
+        "/data/chengjin/studyhub/ml/agentic_platform/rl/trainer.py",
+        "/data/chengjin/studyhub/ml/agentic_platform/rl/environment.py"
+      ],
+      "finding": "训练使用 state-level group advantage；多步 transition 由环境评测，尚非轨迹级 policy gradient。",
+      "number": 14,
+      "status": "PARTIAL",
+      "title": "Credit assignment",
+      "tone": "partial"
+    },
+    {
+      "evidence": [
+        "/data/chengjin/studyhub/ml/agentic_platform/rl/trainer.py",
+        "/data/chengjin/studyhub/training_artifacts/studyhub_agent_rl/router_grpo_pilot_v1/runs/seed_3407/trainer_metrics.jsonl"
+      ],
+      "finding": "reference KL β=0.02；监控 KL、entropy proxy、clip fraction；采样温度提供探索。",
+      "number": 15,
+      "status": "VERIFIED",
+      "title": "KL、Entropy 与探索",
+      "tone": "ok"
+    },
+    {
+      "evidence": [
+        "/data/chengjin/studyhub/ml/agentic_platform/rl/reward.py",
+        "/data/chengjin/studyhub/backend/tests/agentic_platform/test_router_rl_pilot.py"
+      ],
+      "finding": "分项重归一、总 Reward 限幅、组内均值/标准差标准化；同分组 advantage 归零。",
+      "number": 16,
+      "status": "VERIFIED",
+      "title": "Reward scaling",
+      "tone": "ok"
+    },
+    {
+      "evidence": [
+        "/data/chengjin/studyhub/ml/agentic_platform/rl/configs/router_grpo_pilot_v1.json",
+        "/data/chengjin/studyhub/training_artifacts/studyhub_agent_rl/router_grpo_pilot_v1/input_lock.json"
+      ],
+      "finding": "temperature、top-p、group size、输出长度和分层 state 选择均写入哈希锁定配置。",
+      "number": 17,
+      "status": "LOCKED",
+      "title": "采样策略",
+      "tone": "ok"
+    },
+    {
+      "evidence": [
+        "/data/chengjin/studyhub/evaluation_artifacts/studyhub_agent/router_rl_pilot_v1/gate/gate.json",
+        "/data/chengjin/studyhub/training_artifacts/studyhub_agent_rl/router_grpo_pilot_v1/runs/failed_seed_3407_peak_guard_20260812/gpu_samples.csv"
+      ],
+      "finding": "三 seed 无 NaN/Inf；KL、梯度、长度、显存与失败 peak-guard 现场均有记录。",
+      "number": 18,
+      "status": "VERIFIED",
+      "title": "训练稳定性",
+      "tone": "ok"
+    },
+    {
+      "evidence": [
+        "/data/chengjin/studyhub/ml/agentic_platform/rl/reward.py",
+        "/data/chengjin/studyhub/evaluation_artifacts/studyhub_agent/router_rl_pilot_v1/gate/gate.json"
+      ],
+      "finding": "监控 premature final、重复搜索、冗长和不安全工具；seed 方差与 synthesis 弱点被保留。",
+      "number": 19,
+      "status": "OBSERVED",
+      "title": "Reward hacking 与坍缩",
+      "tone": "partial"
+    },
+    {
+      "evidence": [
+        "/data/chengjin/studyhub/ml/agentic_platform/rl/reward.py",
+        "/data/chengjin/studyhub/evaluation_artifacts/studyhub_agent/router_rl_pilot_v1/gate/gate.json"
+      ],
+      "finding": "Raw ledger 产生梯度，Executable ledger 只审计；测试 gap 增幅 0.0316 超过 0.02。",
+      "number": 20,
+      "status": "BLOCKER",
+      "title": "双账本",
+      "tone": "stop"
+    },
+    {
+      "evidence": [
+        "/data/chengjin/studyhub/ml/agentic_platform/rl/gate.py",
+        "/data/chengjin/studyhub/evaluation_artifacts/studyhub_agent/router_rl_pilot_v1/gate/gate.json"
+      ],
+      "finding": "Validation 用于冻结候选；Test 按预注册非退化阈值评测，constraint dependency 超阈值后结论为 NO-GO。",
+      "number": 21,
+      "status": "NO-GO",
+      "title": "业务 Gate",
+      "tone": "stop"
+    },
+    {
+      "evidence": [
+        "/data/chengjin/studyhub/training_artifacts/studyhub_agent_rl/router_grpo_pilot_v1/audit.json",
+        "/data/chengjin/studyhub/evaluation_artifacts/studyhub_agent/router_rl_pilot_v1/test/seed_3407/summary.json"
+      ],
+      "finding": "覆盖 11 families 和权限/注入/空查询/预算边界，但多数边界 family 仅 1 条。",
+      "number": 22,
+      "status": "PARTIAL",
+      "title": "鲁棒性",
+      "tone": "partial"
+    },
+    {
+      "evidence": [
+        "/data/chengjin/studyhub/evaluation_artifacts/studyhub_agent/router_rl_pilot_v1/gate/gate.json"
+      ],
+      "finding": "3 seed 报告均值、样本标准差、Student-t 95% CI；测试使用 5000 次 paired bootstrap。",
+      "number": 23,
+      "status": "PILOT",
+      "title": "多 Seed 与统计",
+      "tone": "partial"
+    },
+    {
+      "evidence": [
+        "/data/chengjin/studyhub/training_artifacts/studyhub_agent_sft/qwen35_2b_lora_v1_7_state_transitions_from_v1_6_seed_7703/adapter_config.json",
+        "/data/chengjin/studyhub/evaluation_artifacts/studyhub_agent/router_rl_pilot_v1/gate/gate.json"
+      ],
+      "finding": "LoRA r16/alpha32，16.82M 可训练参数；成功峰值约 58.6 GiB，失败试跑约 74.7 GiB。",
+      "number": 24,
+      "status": "VERIFIED",
+      "title": "LoRA 与显存",
+      "tone": "ok"
+    },
+    {
+      "evidence": [
+        "/data/chengjin/studyhub/training_artifacts/studyhub_agent_rl/router_grpo_pilot_v1/input_lock.json",
+        "/data/chengjin/studyhub/training_artifacts/studyhub_agent_rl/router_grpo_pilot_v1/runs/seed_3407/run_manifest.json"
+      ],
+      "finding": "配置、数据、基座索引、tokenizer、SFT adapter 和关键实现均以 SHA-256 锁定。",
+      "number": 25,
+      "status": "VERIFIED",
+      "title": "复现与治理",
+      "tone": "ok"
+    },
+    {
+      "evidence": [
+        "/data/chengjin/studyhub/evaluation_artifacts/studyhub_agent/router_rl_pilot_v1/gate/release_rollback_manifest.json",
+        "/data/chengjin/studyhub/backend/app/core/config.py"
+      ],
+      "finding": "当前仅 research-only；生产默认关闭，回滚为 SFT v1.7，shadow/canary/final holdout 尚未执行。",
+      "number": 26,
+      "status": "GUARDED",
+      "title": "部署与回滚",
+      "tone": "partial"
+    }
+  ],
+  "production_ready": false,
+  "schema_version": "studyhub.agent.router_rl.knowledge_coverage.v1"
+}

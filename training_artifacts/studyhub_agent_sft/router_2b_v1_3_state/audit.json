@@ -1,0 +1,111 @@
+{
+  "component_counts": {
+    "normalized_v1_2_replay": 1500,
+    "v1_3_structural": 300
+  },
+  "dataset_sha256": "0eff7528690d5f87c32706a66b1a7640aabe0187537ce1ef50942dd237a16937",
+  "errors": [],
+  "isolation": {
+    "contains_paid_material": false,
+    "production_api_called": false,
+    "production_database_accessed": false
+  },
+  "passed": true,
+  "records": 1800,
+  "routing_evidence_phase_counts": {
+    "needs_page_evidence": 220,
+    "not_observed": 1200,
+    "ready_for_synthesis": 380
+  },
+  "routing_state_version": "studyhub.router.state.v1",
+  "sealed_final_holdout_read": false,
+  "spec_audit": {
+    "data_class_counts": {
+      "public_synthetic": 1640,
+      "synthetic": 160
+    },
+    "dataset_sha256": {
+      "router_tool_2b_v1_3_state.jsonl": "0eff7528690d5f87c32706a66b1a7640aabe0187537ce1ef50942dd237a16937"
+    },
+    "duplicate_pairs": [],
+    "errors": [],
+    "evidence_kind_counts": {
+      "metadata": 2461,
+      "preview_ocr": 1140
+    },
+    "family_counts": {
+      "router_tool_2b": {
+        "budget_one_continue_contrast": 150,
+        "budget_zero_final_contrast": 150,
+        "direct_final_schema_retention_v1_3": 30,
+        "direct_general_answer": 10,
+        "direct_no_tool_retention": 30,
+        "empty_search_recovery_retention": 30,
+        "evidence_pending_contrast": 180,
+        "force_final_inspected_candidates": 80,
+        "force_final_wording_alias": 40,
+        "inspect_boundary_alias": 80,
+        "inspect_candidates": 60,
+        "material_ids_preservation": 30,
+        "multi_source_final_schema_retention": 30,
+        "observation_injection_continue": 150,
+        "permission_refusal_retention": 30,
+        "permission_refusal_schema_retention_v1_3": 20,
+        "permission_refusal_wording_alias": 30,
+        "read_memory_boundary_alias": 50,
+        "read_synthetic_memory": 30,
+        "reformulate_search": 30,
+        "refuse_permission_bypass": 10,
+        "search_initial": 40,
+        "synthesis_minimal_pending_state": 40,
+        "synthesis_minimal_ready_state": 100,
+        "synthesis_ready_contrast": 180,
+        "synthesis_state_alias": 100,
+        "synthesize_context": 30,
+        "synthesize_context_contract": 60
+      }
+    },
+    "material_split_leaks": {},
+    "passed": true,
+    "profile_counts": {
+      "router_tool_2b": 1800
+    },
+    "split_counts": {
+      "router_tool_2b": {
+        "train": 1620,
+        "validation": 180
+      }
+    },
+    "total_records": 1800,
+    "unique_chunk_ids": 382,
+    "unique_material_ids": 120
+  },
+  "split_counts": {
+    "train": 1620,
+    "validation": 180
+  },
+  "structural_family_counts": {
+    "direct_final_schema_retention_v1_3": 30,
+    "force_final_inspected_candidates": 80,
+    "multi_source_final_schema_retention": 30,
+    "permission_refusal_schema_retention_v1_3": 20,
+    "synthesis_minimal_pending_state": 40,
+    "synthesis_minimal_ready_state": 100
+  },
+  "structural_overlap_audit": {
+    "exact_payload_overlap_diagnostic": 0,
+    "exact_payload_overlap_reference": 0,
+    "exact_query_overlap_diagnostic": 0,
+    "exact_query_overlap_reference": 0,
+    "exact_target_overlap_diagnostic": 0,
+    "exact_target_overlap_reference": 0,
+    "material_split_mismatches": [],
+    "query_similarity_to_original_train": {
+      "max": 0.910714,
+      "mean": 0.462214,
+      "p95": 0.8
+    },
+    "reserved_test_material_overlap": [],
+    "targeted_train_material_overlap_diagnostic": []
+  }
+}

@@ -9,6 +9,7 @@ from collections import Counter, defaultdict
 from pathlib import Path
 from typing import Any
 
+from app.services.agent_router_constraint_service import constrain_router_output
 from app.services.agent_tool_loop_service import (
     AGENT_TOOL_LOOP_CONTINUE_INSTRUCTION,
     AGENT_TOOL_LOOP_FORCE_FINAL_INSTRUCTION,
@@ -40,9 +41,7 @@ def _resolve_max_new_tokens(
     value = requested
     if value is None:
         value = (
-            PRODUCTION_MAX_NEW_TOKENS
-            if production_contract
-            else DEFAULT_MAX_NEW_TOKENS
+            PRODUCTION_MAX_NEW_TOKENS if production_contract else DEFAULT_MAX_NEW_TOKENS
         )
     if isinstance(value, bool) or value <= 0:
         raise ValueError("max_new_tokens must be a positive integer")
@@ -77,7 +76,11 @@ def _install_set_submodule_compat(module_type: type[Any]) -> bool:
 
 def _strict_json(text: str) -> dict[str, Any] | None:
     stripped = text.strip()
-    if stripped.startswith("```") or not stripped.startswith("{") or not stripped.endswith("}"):
+    if (
+        stripped.startswith("```")
+        or not stripped.startswith("{")
+        or not stripped.endswith("}")
+    ):
         return None
     try:
         value = json.loads(stripped)
@@ -88,7 +91,9 @@ def _strict_json(text: str) -> dict[str, Any] | None:
     return value
 
 
-def _score(expected: dict[str, Any], predicted: dict[str, Any] | None) -> dict[str, bool]:
+def _score(
+    expected: dict[str, Any], predicted: dict[str, Any] | None
+) -> dict[str, bool]:
     result = {
         "json_valid": predicted is not None,
         "contract_valid": False,
@@ -117,17 +122,18 @@ def _score(expected: dict[str, Any], predicted: dict[str, Any] | None) -> dict[s
             return result
         expected_action = expected_actions[0]
         predicted_action = predicted_actions[0]
-        if not isinstance(expected_action, dict) or not isinstance(predicted_action, dict):
+        if not isinstance(expected_action, dict) or not isinstance(
+            predicted_action, dict
+        ):
             return result
         predicted_name = predicted_action.get("name")
         result["tool_name_correct"] = (
-            predicted_name == expected_action.get("name") and predicted_name in ALLOWED_TOOLS
+            predicted_name == expected_action.get("name")
+            and predicted_name in ALLOWED_TOOLS
         )
-        result["arguments_exact"] = (
-            result["tool_name_correct"]
-            and canonical_json(predicted_action.get("arguments"))
-            == canonical_json(expected_action.get("arguments"))
-        )
+        result["arguments_exact"] = result["tool_name_correct"] and canonical_json(
+            predicted_action.get("arguments")
+        ) == canonical_json(expected_action.get("arguments"))
     elif expected_mode == "final":
         result["tool_name_correct"] = predicted_mode == "final"
         result["arguments_exact"] = predicted_mode == "final"
@@ -263,6 +269,44 @@ def _evaluation_messages(
     return messages
 
 
+def _request_payload(messages: list[dict[str, str]]) -> dict[str, Any]:
+    for message in messages:
+        if message.get("role") != "user":
+            continue
+        try:
+            value = json.loads(str(message.get("content") or ""))
+        except json.JSONDecodeError:
+            return {}
+        return value if isinstance(value, dict) else {}
+    return {}
+
+
+def _decode_generated_output(
+    generated: str,
+    messages: list[dict[str, str]],
+    *,
+    constrained_decoding: bool,
+    deterministic_argument_protection: bool,
+) -> tuple[str, dict[str, Any] | None, dict[str, Any] | None]:
+    if not constrained_decoding:
+        return generated, _strict_json(generated), None
+    constrained = constrain_router_output(
+        generated,
+        _request_payload(messages),
+        protect_deterministic_arguments=deterministic_argument_protection,
+    )
+    emitted = canonical_json(constrained.value)
+    return (
+        emitted,
+        constrained.value,
+        {
+            "source_status": constrained.source_status,
+            "corrections": list(constrained.corrections),
+            "deterministic_route": constrained.deterministic_route,
+        },
+    )
+
+
 def evaluate(
     *,
     model_path: Path,
@@ -276,8 +320,15 @@ def evaluate(
     normalize_routing_state: bool = False,
     production_contract: bool = False,
     precision: str = "bf16",
+    constrained_decoding: bool = False,
+    deterministic_argument_protection: bool = False,
 ) -> dict[str, Any]:
     import torch
+
+    if deterministic_argument_protection and not constrained_decoding:
+        raise ValueError(
+            "deterministic_argument_protection requires constrained_decoding"
+        )
 
     max_new_tokens = _resolve_max_new_tokens(
         max_new_tokens,
@@ -306,6 +357,8 @@ def evaluate(
     started = time.perf_counter()
     completed = 0
     generated_tokens = 0
+    constraint_corrections: Counter[str] = Counter()
+    constraint_source_status: Counter[str] = Counter()
     for batch_start in range(0, len(records), batch_size):
         batch = records[batch_start : batch_start + batch_size]
         input_messages = [
@@ -322,28 +375,48 @@ def evaluate(
             input_messages,
             max_new_tokens=max_new_tokens,
         )
-        for record, generated in zip(batch, generated_rows, strict=True):
+        for record, input_message, raw_generated in zip(
+            batch,
+            input_messages,
+            generated_rows,
+            strict=True,
+        ):
             generated_tokens += len(
-                processor.tokenizer.encode(generated, add_special_tokens=False)
+                processor.tokenizer.encode(raw_generated, add_special_tokens=False)
             )
-            parsed = _strict_json(generated)
+            generated, parsed, constraint = _decode_generated_output(
+                raw_generated,
+                input_message,
+                constrained_decoding=constrained_decoding,
+                deterministic_argument_protection=deterministic_argument_protection,
+            )
+            if constraint is not None:
+                constraint_source_status[str(constraint["source_status"])] += 1
+                constraint_corrections.update(constraint["corrections"])
             expected = dict(record["assistant_target"])
             scores = _score(expected, parsed)
             family = str(record["task_family"])
             for metric, passed in scores.items():
                 totals[metric] += int(passed)
                 family_totals[family][metric] += int(passed)
-            output_rows.append(
-                {
-                    "example_id": record["example_id"],
-                    "split": record["split"],
-                    "task_family": family,
-                    "expected": expected,
-                    "generated": generated,
-                    "parsed": parsed,
-                    "scores": scores,
-                }
-            )
+            output_row = {
+                "example_id": record["example_id"],
+                "split": record["split"],
+                "task_family": family,
+                "expected": expected,
+                "generated": generated,
+                "parsed": parsed,
+                "scores": scores,
+            }
+            if constraint is not None:
+                output_row.update(
+                    {
+                        "raw_generated": raw_generated,
+                        "raw_parsed": _strict_json(raw_generated),
+                        "constraint": constraint,
+                    }
+                )
+            output_rows.append(output_row)
             completed += 1
             print(
                 json.dumps(
@@ -370,6 +443,12 @@ def evaluate(
         "batch_size": batch_size,
         "normalize_routing_state": normalize_routing_state,
         "production_contract": production_contract,
+        "constrained_decoding": constrained_decoding,
+        "deterministic_argument_protection": deterministic_argument_protection,
+        "constraint_diagnostics": {
+            "source_status": dict(sorted(constraint_source_status.items())),
+            "corrections": dict(sorted(constraint_corrections.items())),
+        },
         "elapsed_seconds": round(elapsed, 3),
         "seconds_per_record": round(elapsed / count, 4),
         "runtime": {
@@ -407,14 +486,18 @@ def evaluate(
                 if row["task_family"] == "refuse_permission_bypass"
             ),
             "total": sum(
-                1 for row in output_rows if row["task_family"] == "refuse_permission_bypass"
+                1
+                for row in output_rows
+                if row["task_family"] == "refuse_permission_bypass"
             ),
         },
         "family_metrics": {
             family: {
                 metric: {
                     "passed": counts[metric],
-                    "total": sum(1 for row in output_rows if row["task_family"] == family),
+                    "total": sum(
+                        1 for row in output_rows if row["task_family"] == family
+                    ),
                 }
                 for metric in (
                     "json_valid",
@@ -456,6 +539,11 @@ def main() -> None:
     parser.add_argument("--batch-size", type=int, default=8)
     parser.add_argument("--normalize-routing-state", action="store_true")
     parser.add_argument("--production-contract", action="store_true")
+    parser.add_argument("--constrained-decoding", action="store_true")
+    parser.add_argument(
+        "--deterministic-argument-protection",
+        action="store_true",
+    )
     parser.add_argument("--precision", choices=("bf16", "nf4"), default="bf16")
     args = parser.parse_args()
     summary = evaluate(
@@ -470,6 +558,8 @@ def main() -> None:
         normalize_routing_state=args.normalize_routing_state,
         production_contract=args.production_contract,
         precision=args.precision,
+        constrained_decoding=args.constrained_decoding,
+        deterministic_argument_protection=args.deterministic_argument_protection,
     )
     print(json.dumps(summary, ensure_ascii=False, indent=2, sort_keys=True))
 

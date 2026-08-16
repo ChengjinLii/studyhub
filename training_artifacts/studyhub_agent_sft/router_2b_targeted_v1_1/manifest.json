@@ -1,0 +1,53 @@
+{
+  "combined_records": 1500,
+  "combined_split_counts": {
+    "test": 50,
+    "train": 1300,
+    "validation": 150
+  },
+  "dataset_version": "router_2b_targeted_v1_1",
+  "family_counts": {
+    "direct_no_tool_hard": 40,
+    "explicit_page_numbers": 250,
+    "force_final_budget": 300,
+    "material_ids_preservation": 120,
+    "refuse_boundary_hard": 40,
+    "synthesize_context_contract": 250
+  },
+  "files": {
+    "audit.json": {
+      "sha256": "da00b51efbd55cb9d61a748d0c7baca94a279c9630b8416561bb15d2457ca634"
+    },
+    "router_tool_2b_combined.jsonl": {
+      "records": 1500,
+      "sha256": "8073758e7cfb7fc19045289ce3ae9a1928ecf82a1140173d9e93e4ff19ed69b8"
+    },
+    "router_tool_2b_targeted.jsonl": {
+      "records": 1000,
+      "sha256": "1190c8dc4b4aa5412bfef3b41c63ed87a45d82877a41be311792c0b7a150471f"
+    }
+  },
+  "generated_at": "2026-07-31T07:21:28+00:00",
+  "purpose": "Repair diagnostic router failures before any RL work.",
+  "records": 1000,
+  "release_status": "training_candidate_not_production",
+  "schema_version": "studyhub.agent.sft.spec.v0",
+  "source_snapshot": {
+    "access_scope": "free_public_only",
+    "chunks_sha256": "123ac5016be06616057409f29652408b9ed97fd072748cacfca69efb212d0f6d",
+    "materials_sha256": "5675b7d441b09daa59e14cceaf73a3a4864bf9a482239b1c455c84a1fb996e72",
+    "snapshot_id": "targeted-v1-1-5675b7d441b0-123ac5016be0"
+  },
+  "split_counts": {
+    "test": 0,
+    "train": 900,
+    "validation": 100
+  },
+  "teacher": {
+    "human_gold": false,
+    "model_requested": "gpt-5.6-thinking",
+    "runtime": "current_codex_session",
+    "runtime_model_verified": false
+  },
+  "validation_passed": true
+}

@@ -1,0 +1,39 @@
+{"method": "tfidf_char_2_4", "query_id": "q012", "query": "大学物理下册历年期末卷答案解析", "expected": {"144": 2, "143": 2, "142": 2, "162": 1}, "retrieved": [144, 143, 142, 39, 38, 40, 41, 30, 28, 32]}
+{"method": "tfidf_char_2_4", "query_id": "q028", "query": "电路分析知识点复习和自查", "expected": {"21": 2, "145": 1, "131": 1}, "retrieved": [21, 31, 26, 145, 23, 22, 25, 24, 185, 91]}
+{"method": "tfidf_char_2_4", "query_id": "q031", "query": "ED 电子器件历年期末试卷", "expected": {"78": 2, "77": 2, "76": 2, "75": 2}, "retrieved": [162, 91, 209, 206, 128, 208, 207, 132, 210, 127]}
+{"method": "tfidf_char_2_4", "query_id": "q037", "query": "Electronic System Design 样卷答案", "expected": {"103": 2}, "retrieved": [70, 68, 67, 69, 48, 158, 77, 78, 75, 76]}
+{"method": "bm25_mixed_tokens", "query_id": "q006", "query": "DCD 数字电路设计复习资料", "expected": {"176": 2, "206": 2, "47": 2, "46": 1}, "retrieved": [47, 46, 176, 102, 171, 100, 99, 23, 26, 22]}
+{"method": "bm25_mixed_tokens", "query_id": "q012", "query": "大学物理下册历年期末卷答案解析", "expected": {"144": 2, "143": 2, "142": 2, "162": 1}, "retrieved": [144, 143, 142, 209, 206, 207, 208, 128, 127, 132]}
+{"method": "bm25_mixed_tokens", "query_id": "q028", "query": "电路分析知识点复习和自查", "expected": {"21": 2, "145": 1, "131": 1}, "retrieved": [21, 31, 145, 22, 23, 26, 24, 25, 47, 185]}
+{"method": "bm25_mixed_tokens", "query_id": "q038", "query": "AI ML 人工智能与机器学习期末复习", "expected": {"207": 2, "159": 2}, "retrieved": [159, 160, 41, 142, 87, 32, 213, 179, 99, 158]}
+{"method": "bge_m3_exact", "query_id": "q008", "query": "ADC 高阶数字通信期中样题答案", "expected": {"54": 2, "55": 1, "172": 1}, "retrieved": [54, 172, 113, 46, 48, 44, 45, 163, 23, 67]}
+{"method": "bge_m3_exact", "query_id": "q012", "query": "大学物理下册历年期末卷答案解析", "expected": {"144": 2, "143": 2, "142": 2, "162": 1}, "retrieved": [144, 142, 143, 33, 40, 32, 31, 39, 209, 30]}
+{"method": "bge_m3_exact", "query_id": "q028", "query": "电路分析知识点复习和自查", "expected": {"21": 2, "145": 1, "131": 1}, "retrieved": [21, 130, 129, 158, 25, 24, 91, 23, 208, 128]}
+{"method": "bge_m3_exact", "query_id": "q047", "query": "英文 Academic Poster 学术海报模板", "expected": {"197": 2, "117": 1}, "retrieved": [197, 41, 77, 23, 90, 74, 213, 45, 103, 70]}
+{"method": "bge_m3_hnsw", "query_id": "q008", "query": "ADC 高阶数字通信期中样题答案", "expected": {"54": 2, "55": 1, "172": 1}, "retrieved": [54, 172, 113, 46, 48, 44, 45, 163, 23, 67]}
+{"method": "bge_m3_hnsw", "query_id": "q012", "query": "大学物理下册历年期末卷答案解析", "expected": {"144": 2, "143": 2, "142": 2, "162": 1}, "retrieved": [144, 142, 143, 33, 40, 32, 31, 39, 209, 30]}
+{"method": "bge_m3_hnsw", "query_id": "q028", "query": "电路分析知识点复习和自查", "expected": {"21": 2, "145": 1, "131": 1}, "retrieved": [21, 130, 129, 158, 25, 24, 91, 23, 208, 128]}
+{"method": "bge_m3_hnsw", "query_id": "q047", "query": "英文 Academic Poster 学术海报模板", "expected": {"197": 2, "117": 1}, "retrieved": [197, 41, 77, 23, 90, 74, 213, 45, 103, 70]}
+{"method": "bge_m3_ivf", "query_id": "q008", "query": "ADC 高阶数字通信期中样题答案", "expected": {"54": 2, "55": 1, "172": 1}, "retrieved": [54, 172, 113, 46, 48, 44, 45, 163, 23, 67]}
+{"method": "bge_m3_ivf", "query_id": "q012", "query": "大学物理下册历年期末卷答案解析", "expected": {"144": 2, "143": 2, "142": 2, "162": 1}, "retrieved": [144, 143, 142, 33, 40, 32, 31, 39, 30, 29]}
+{"method": "bge_m3_ivf", "query_id": "q013", "query": "大学物理 II 例题讲解和重做", "expected": {"188": 2, "187": 2, "186": 2, "185": 1}, "retrieved": [187, 188, 186, 213, 143, 144, 32, 39, 31, 29]}
+{"method": "bge_m3_ivf", "query_id": "q015", "query": "大学物理教材作业答案", "expected": {"212": 2, "38": 2}, "retrieved": [38, 144, 142, 29, 40, 39, 33, 30, 139, 213]}
+{"method": "bge_m3_ivf", "query_id": "q022", "query": "微积分二期中真题自制解析", "expected": {"214": 2}, "retrieved": [80, 144, 99, 82, 79, 76, 100, 162, 81, 143]}
+{"method": "bge_m3_ivf", "query_id": "q023", "query": "Thomas Calculus 托马斯微积分教材答案", "expected": {"85": 2, "20": 2}, "retrieved": [161, 80, 79, 29, 82, 100, 48, 30, 45, 99]}
+{"method": "bge_m3_ivf", "query_id": "q028", "query": "电路分析知识点复习和自查", "expected": {"21": 2, "145": 1, "131": 1}, "retrieved": [21, 130, 129, 158, 25, 24, 91, 23, 208, 128]}
+{"method": "bge_m3_ivf", "query_id": "q047", "query": "英文 Academic Poster 学术海报模板", "expected": {"197": 2, "117": 1}, "retrieved": [197, 77, 23, 90, 74, 45, 103, 70, 192, 163]}
+{"method": "qwen3_embedding_06b_exact", "query_id": "q012", "query": "大学物理下册历年期末卷答案解析", "expected": {"144": 2, "143": 2, "142": 2, "162": 1}, "retrieved": [144, 142, 143, 33, 40, 39, 29, 42, 38, 28]}
+{"method": "qwen3_embedding_06b_exact", "query_id": "q028", "query": "电路分析知识点复习和自查", "expected": {"21": 2, "145": 1, "131": 1}, "retrieved": [21, 25, 23, 26, 145, 24, 22, 91, 47, 103]}
+{"method": "bm25_bge_weighted_06_04", "query_id": "q012", "query": "大学物理下册历年期末卷答案解析", "expected": {"144": 2, "143": 2, "142": 2, "162": 1}, "retrieved": [144, 142, 143, 209, 39, 206, 207, 208, 210, 127]}
+{"method": "bm25_bge_weighted_06_04", "query_id": "q028", "query": "电路分析知识点复习和自查", "expected": {"21": 2, "145": 1, "131": 1}, "retrieved": [21, 25, 24, 23, 22, 26, 145, 31, 91, 130]}
+{"method": "tfidf_bge_weighted_06_04", "query_id": "q012", "query": "大学物理下册历年期末卷答案解析", "expected": {"144": 2, "143": 2, "142": 2, "162": 1}, "retrieved": [144, 143, 142, 39, 40, 33, 30, 32, 209, 29]}
+{"method": "tfidf_bge_weighted_06_04", "query_id": "q028", "query": "电路分析知识点复习和自查", "expected": {"21": 2, "145": 1, "131": 1}, "retrieved": [21, 25, 26, 24, 23, 31, 22, 145, 91, 185]}
+{"method": "tfidf_bge_weighted_06_04", "query_id": "q047", "query": "英文 Academic Poster 学术海报模板", "expected": {"197": 2, "117": 1}, "retrieved": [197, 41, 77, 23, 90, 74, 213, 45, 103, 70]}
+{"method": "bm25_bge_rrf", "query_id": "q012", "query": "大学物理下册历年期末卷答案解析", "expected": {"144": 2, "143": 2, "142": 2, "162": 1}, "retrieved": [144, 142, 143, 209, 40, 39, 30, 29, 214, 210]}
+{"method": "bm25_bge_rrf", "query_id": "q028", "query": "电路分析知识点复习和自查", "expected": {"21": 2, "145": 1, "131": 1}, "retrieved": [21, 25, 24, 23, 22, 26, 145, 91, 47, 15]}
+{"method": "tfidf_bge_rrf", "query_id": "q012", "query": "大学物理下册历年期末卷答案解析", "expected": {"144": 2, "143": 2, "142": 2, "162": 1}, "retrieved": [144, 142, 143, 39, 40, 30, 32, 33, 209, 38]}
+{"method": "tfidf_bge_rrf", "query_id": "q028", "query": "电路分析知识点复习和自查", "expected": {"21": 2, "145": 1, "131": 1}, "retrieved": [21, 25, 24, 23, 26, 22, 91, 145, 47, 15]}
+{"method": "tfidf_bge_rrf", "query_id": "q047", "query": "英文 Academic Poster 学术海报模板", "expected": {"197": 2, "117": 1}, "retrieved": [197, 158, 53, 99, 41, 79, 77, 188, 23, 25]}
+{"method": "bm25_bge_rrf_bge_reranker", "query_id": "q012", "query": "大学物理下册历年期末卷答案解析", "expected": {"144": 2, "143": 2, "142": 2, "162": 1}, "retrieved": [142, 143, 144, 29, 33, 31, 39, 40, 30, 42]}
+{"method": "bm25_bge_rrf_bge_reranker", "query_id": "q028", "query": "电路分析知识点复习和自查", "expected": {"21": 2, "145": 1, "131": 1}, "retrieved": [21, 145, 25, 22, 26, 23, 24, 47, 158, 15]}
+{"method": "bm25_bge_rrf_bge_reranker", "query_id": "q047", "query": "英文 Academic Poster 学术海报模板", "expected": {"197": 2, "117": 1}, "retrieved": [197, 193, 198, 48, 213, 41, 18, 158, 90, 212]}

@@ -1,0 +1,33 @@
+{
+  "duration_seconds": 1657,
+  "eval_results": {
+    "epoch": 1.0,
+    "eval_accuracy": 0.9787827052709536,
+    "eval_loss": 0.09451410174369812,
+    "eval_runtime": 21.1665,
+    "eval_samples_per_second": 8.504,
+    "eval_steps_per_second": 2.126
+  },
+  "exit_code": 0,
+  "gpu": {
+    "mean_memory_mib": 30276.67,
+    "mean_power_w": 197.108,
+    "mean_utilization_percent": 65.12,
+    "peak_memory_mib": 64382.0,
+    "peak_temperature_c": 71.0,
+    "peak_utilization_percent": 83.0
+  },
+  "gpu_id": 0,
+  "output_dir": "/data/chengjin/studyhub/training_artifacts/studyhub_agent_sft/qwen35_2b_lora_v1_5_contract_aligned_from_7703_seed_7703",
+  "sample_count": 1563,
+  "schema_version": "studyhub.agent.sft.run_telemetry.v1",
+  "train_results": {
+    "epoch": 1.0,
+    "total_flos": 2.525736225718272e+16,
+    "train_loss": 0.1869048326473518,
+    "train_runtime": 1586.2799,
+    "train_samples_per_second": 1.021,
+    "train_steps_per_second": 0.128
+  },
+  "training_succeeded": true
+}

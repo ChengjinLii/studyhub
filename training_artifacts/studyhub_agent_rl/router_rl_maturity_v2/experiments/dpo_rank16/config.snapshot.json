@@ -1,0 +1,26 @@
+{
+  "algorithm": "constrained_token_dpo_baseline_v2",
+  "beta": 0.1,
+  "device": "cuda:0",
+  "gradient_checkpointing": true,
+  "isolation": {
+    "paid_material_allowed": false,
+    "production_access_allowed": false,
+    "production_final_holdout_allowed": false,
+    "sealed_read_allowed": false,
+    "test_read_allowed": false
+  },
+  "learning_rate": 1e-05,
+  "lora_alpha": 32,
+  "lora_dropout": 0.0,
+  "lora_rank": 16,
+  "max_grad_norm": 1.0,
+  "max_prompt_tokens": 4096,
+  "model_path": "/data/chengjin/studyhub/training_artifacts/studyhub_agent_sft/qwen35_2b_router_v1_7_merged",
+  "output_dir": "/data/chengjin/studyhub/training_artifacts/studyhub_agent_rl/router_rl_maturity_v2/experiments/dpo_rank16",
+  "reference_cache_path": "/data/chengjin/studyhub/training_artifacts/studyhub_agent_rl/router_rl_maturity_v2/reference/train_reference.jsonl",
+  "schema_version": "studyhub.agent.router_rl.dpo_config.v2",
+  "states_per_update": 4,
+  "train_path": "/data/chengjin/studyhub/training_artifacts/studyhub_agent_rl/router_rl_maturity_v2/train.jsonl",
+  "updates": 250
+}

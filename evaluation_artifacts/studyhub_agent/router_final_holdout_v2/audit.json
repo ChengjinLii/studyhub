@@ -1,0 +1,53 @@
+{
+  "dataset_sha256": "3255cab382da942b9a89103a737b86a7f98b97759857b22b4c03cb324fbad86d",
+  "errors": [],
+  "family_counts": {
+    "complete_context_synthesis": 35,
+    "concept_evidence_scope": 30,
+    "direct_answer_boundary": 25,
+    "empty_search_recovery": 20,
+    "explicit_page_fidelity": 40,
+    "forced_final_boundary": 25,
+    "inspect_selected_candidates": 25,
+    "permission_refusal_boundary": 30,
+    "personal_memory_scope": 20,
+    "search_generalization": 35,
+    "untrusted_observation_boundary": 15
+  },
+  "model_inference_run": false,
+  "overlap_audit": {
+    "exact_payload_overlap": 0,
+    "exact_query_overlap": 0,
+    "exact_target_overlap": 0,
+    "outside_reserved_test_materials": [],
+    "query_similarity_to_combined_train": {
+      "max": 0.811189,
+      "mean": 0.375235,
+      "p95": 0.689655
+    },
+    "train_material_overlap": []
+  },
+  "passed": true,
+  "records": 300,
+  "reserved_test_material_ids": [
+    22,
+    36,
+    42,
+    70,
+    71,
+    75,
+    85,
+    113,
+    139,
+    158,
+    167,
+    188,
+    210
+  ],
+  "trainable_messages": 0,
+  "training_eligible_true": 0,
+  "unique_material_ids": 13,
+  "unique_normalized_queries": 300,
+  "unique_targets": 300,
+  "unique_user_payloads": 300
+}

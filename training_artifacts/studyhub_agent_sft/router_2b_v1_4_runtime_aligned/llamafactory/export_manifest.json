@@ -1,0 +1,79 @@
+{
+  "assistant_only_loss": true,
+  "counts": {
+    "test": 0,
+    "train": 1620,
+    "validation": 180
+  },
+  "dataset_info_sha256": "b207782b9e2f9742c941527b39debcdc96ed046aafdd811335349362a1eaf259",
+  "family_counts": {
+    "test": {},
+    "train": {
+      "compare_complete_final_v1_4": 18,
+      "direct_answer_retention_v1_4": 45,
+      "evidence_pending_read_v1_4": 36,
+      "evidence_ready_synthesize_v1_4": 36,
+      "force_final_retention_v1_4": 45,
+      "injection_continue_readonly_v1_4": 54,
+      "inspect_after_search_v1_4": 108,
+      "material_id_fidelity_v1_4": 90,
+      "must_finish_without_tools_v1_4": 45,
+      "page_number_fidelity_v1_4": 90,
+      "permission_refusal_v1_4": 36,
+      "replay_direct_v1_4": 54,
+      "replay_identifier_v1_4": 54,
+      "replay_inspect_v1_4": 72,
+      "replay_memory_v1_4": 63,
+      "replay_read_evidence_v1_4": 90,
+      "replay_refusal_v1_4": 54,
+      "replay_rewrite_v1_4": 63,
+      "replay_search_v1_4": 90,
+      "replay_synthesis_v1_4": 90,
+      "search_before_candidate_use_v1_4": 117,
+      "strict_json_final_v1_4": 108,
+      "strict_json_tool_v1_4": 162
+    },
+    "validation": {
+      "compare_complete_final_v1_4": 2,
+      "direct_answer_retention_v1_4": 5,
+      "evidence_pending_read_v1_4": 4,
+      "evidence_ready_synthesize_v1_4": 4,
+      "force_final_retention_v1_4": 5,
+      "injection_continue_readonly_v1_4": 6,
+      "inspect_after_search_v1_4": 12,
+      "material_id_fidelity_v1_4": 10,
+      "must_finish_without_tools_v1_4": 5,
+      "page_number_fidelity_v1_4": 10,
+      "permission_refusal_v1_4": 4,
+      "replay_direct_v1_4": 6,
+      "replay_identifier_v1_4": 6,
+      "replay_inspect_v1_4": 8,
+      "replay_memory_v1_4": 7,
+      "replay_read_evidence_v1_4": 10,
+      "replay_refusal_v1_4": 6,
+      "replay_rewrite_v1_4": 7,
+      "replay_search_v1_4": 10,
+      "replay_synthesis_v1_4": 10,
+      "search_before_candidate_use_v1_4": 13,
+      "strict_json_final_v1_4": 12,
+      "strict_json_tool_v1_4": 18
+    }
+  },
+  "files": {
+    "router_tool_2b_test.jsonl": {
+      "records": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "router_tool_2b_train.jsonl": {
+      "records": 1620,
+      "sha256": "158a64546676d5529b4ff2f6a0f59306f2bd3d638a29660c5ac9d34f0a0f712b"
+    },
+    "router_tool_2b_validation.jsonl": {
+      "records": 180,
+      "sha256": "78000a303753c006cd8400bb845fc2bd21288bec2683bcceeec7dd8df6809955"
+    }
+  },
+  "source": "training_artifacts/studyhub_agent_sft/router_2b_v1_4_runtime_aligned/router_tool_2b_v1_4.jsonl",
+  "source_sha256": "371037241cf808639e6c15ca204244f78e6bcf0b897d9fd35e403c9cc8a61ebd",
+  "template": "qwen3_5_nothink"
+}

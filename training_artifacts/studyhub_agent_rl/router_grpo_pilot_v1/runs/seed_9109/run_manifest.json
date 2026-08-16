@@ -1,0 +1,12 @@
+{
+  "config_path": "/data/chengjin/studyhub/ml/agentic_platform/rl/configs/router_grpo_pilot_v1.json",
+  "config_sha256": "3e76746532f092fc2c17c8769381d8c89377a97a505ce0e357cfec2ded5bde7f",
+  "dataset_sha256": "b3e800dcb32ed8caf316587c04cbd8077b762c9788f2e5816f194d419d16e001",
+  "git_commit": "aa04b87cf987a5d7eb47c5e23df2b83592957a46",
+  "implementation_sha256": "a88d3fd3eb5c4ffc5b75e02dd4593b6bf1c241744ac48bcbac066862bf2961b9",
+  "input_lock_path": "/data/chengjin/studyhub/training_artifacts/studyhub_agent_rl/router_grpo_pilot_v1/input_lock.json",
+  "input_lock_sha256": "add17403d6e603ef68f59c1b0ede224f72eb20c0867bdcc05dd9449b48c11ef1",
+  "schema_version": "studyhub.agent.router_rl.run_manifest.v1",
+  "seed": 9109,
+  "summary_sha256": "f613ae69bd961181ca2b0fdd46faa2261f56ff75957bcef37423b7928146e9e3"
+}

@@ -32,6 +32,7 @@ from app.services.agent_orchestrator_service import (
     AgentOrchestratorService,
 )
 from app.services.agent_query_planner_service import AgentQueryPlan, AgentQueryPlannerService
+from app.services.agent_router_constraint_service import constrain_router_output
 from app.services.agent_safety_service import AgentSafetyService
 from app.services.agent_tool_loop_service import (
     AGENT_TOOL_LOOP_SYSTEM_PROMPT,
@@ -696,11 +697,15 @@ class AiService:
                 )
             except Exception:
                 return None
-            decision = (
-                self.tool_loop_service.parse_model_output(content, repair=True)
-                if runtime_constraints_enabled
-                else self.tool_loop_service.parse(self._loads_object(content))
-            )
+            if runtime_constraints_enabled:
+                constrained = constrain_router_output(
+                    content,
+                    safe_request_payload,
+                    protect_deterministic_arguments=True,
+                )
+                decision = self.tool_loop_service.parse(constrained.value)
+            else:
+                decision = self.tool_loop_service.parse(self._loads_object(content))
             if decision is None:
                 return None
             if decision.task_context:

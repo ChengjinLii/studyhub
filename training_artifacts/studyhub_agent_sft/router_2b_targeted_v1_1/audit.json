@@ -1,0 +1,147 @@
+{
+  "combined_dataset_sha256": "8073758e7cfb7fc19045289ce3ae9a1928ecf82a1140173d9e93e4ff19ed69b8",
+  "combined_spec_audit": {
+    "data_class_counts": {
+      "public_synthetic": 1380,
+      "synthetic": 120
+    },
+    "dataset_sha256": {
+      "router_tool_2b_combined.jsonl": "8073758e7cfb7fc19045289ce3ae9a1928ecf82a1140173d9e93e4ff19ed69b8"
+    },
+    "duplicate_pairs": [],
+    "errors": [],
+    "evidence_kind_counts": {
+      "metadata": 1730,
+      "preview_ocr": 340
+    },
+    "family_counts": {
+      "router_tool_2b": {
+        "direct_general_answer": 20,
+        "direct_no_tool_hard": 40,
+        "explicit_page_numbers": 250,
+        "force_final_budget": 300,
+        "inspect_candidates": 70,
+        "material_ids_preservation": 120,
+        "read_page_evidence": 90,
+        "read_synthetic_memory": 40,
+        "reformulate_search": 40,
+        "refuse_boundary_hard": 40,
+        "refuse_permission_bypass": 20,
+        "search_initial": 160,
+        "synthesize_context": 60,
+        "synthesize_context_contract": 250
+      }
+    },
+    "material_split_leaks": {},
+    "passed": true,
+    "profile_counts": {
+      "router_tool_2b": 1500
+    },
+    "split_counts": {
+      "router_tool_2b": {
+        "test": 50,
+        "train": 1300,
+        "validation": 150
+      }
+    },
+    "total_records": 1500,
+    "unique_chunk_ids": 361,
+    "unique_material_ids": 133
+  },
+  "diversity": {
+    "unique_normalized_queries": 879,
+    "unique_query_target_pairs": 1000,
+    "unique_user_payloads": 1000
+  },
+  "errors": [],
+  "family_counts": {
+    "direct_no_tool_hard": 40,
+    "explicit_page_numbers": 250,
+    "force_final_budget": 300,
+    "material_ids_preservation": 120,
+    "refuse_boundary_hard": 40,
+    "synthesize_context_contract": 250
+  },
+  "isolation": {
+    "contains_paid_material": false,
+    "production_api_called": false,
+    "production_database_accessed": false
+  },
+  "overlap_audit": {
+    "exact_payload_overlap_diagnostic": 0,
+    "exact_payload_overlap_reference": 0,
+    "exact_query_overlap_diagnostic": 0,
+    "exact_query_overlap_reference": 0,
+    "exact_target_overlap_diagnostic": 0,
+    "exact_target_overlap_reference": 0,
+    "material_split_mismatches": [],
+    "query_similarity_to_original_train": {
+      "max": 0.827068,
+      "mean": 0.363775,
+      "p95": 0.709677
+    },
+    "reserved_test_material_overlap": [],
+    "targeted_train_material_overlap_diagnostic": []
+  },
+  "passed": true,
+  "records": 1000,
+  "reserved_final_test_material_ids": [
+    22,
+    36,
+    42,
+    70,
+    71,
+    75,
+    85,
+    113,
+    139,
+    158,
+    167,
+    188,
+    210
+  ],
+  "split_counts": {
+    "train": 900,
+    "validation": 100
+  },
+  "targeted_dataset_sha256": "1190c8dc4b4aa5412bfef3b41c63ed87a45d82877a41be311792c0b7a150471f",
+  "targeted_spec_audit": {
+    "data_class_counts": {
+      "public_synthetic": 920,
+      "synthetic": 80
+    },
+    "dataset_sha256": {
+      "router_tool_2b_targeted.jsonl": "1190c8dc4b4aa5412bfef3b41c63ed87a45d82877a41be311792c0b7a150471f"
+    },
+    "duplicate_pairs": [],
+    "errors": [],
+    "evidence_kind_counts": {
+      "metadata": 1160,
+      "preview_ocr": 250
+    },
+    "family_counts": {
+      "router_tool_2b": {
+        "direct_no_tool_hard": 40,
+        "explicit_page_numbers": 250,
+        "force_final_budget": 300,
+        "material_ids_preservation": 120,
+        "refuse_boundary_hard": 40,
+        "synthesize_context_contract": 250
+      }
+    },
+    "material_split_leaks": {},
+    "passed": true,
+    "profile_counts": {
+      "router_tool_2b": 1000
+    },
+    "split_counts": {
+      "router_tool_2b": {
+        "train": 900,
+        "validation": 100
+      }
+    },
+    "total_records": 1000,
+    "unique_chunk_ids": 301,
+    "unique_material_ids": 120
+  }
+}

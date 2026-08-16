@@ -1,0 +1,79 @@
+{
+  "answer_bigram_f1_mean_descriptive_only": 0.535046,
+  "critical_boundary_failures": {},
+  "expected_split": "validation",
+  "family_strict_failures": {
+    "page_explanation_v1": {
+      "actual": 0.615385,
+      "required": 0.75
+    }
+  },
+  "metric_failures": {
+    "boundary_compliant": {
+      "actual": 0.916667,
+      "required": 0.95
+    },
+    "citations_allowed": {
+      "actual": 0.916667,
+      "required": 0.99
+    },
+    "citations_exact": {
+      "actual": 0.916667,
+      "required": 0.95
+    },
+    "contract_valid": {
+      "actual": 0.916667,
+      "required": 0.97
+    },
+    "final_mode": {
+      "actual": 0.916667,
+      "required": 0.99
+    },
+    "json_valid": {
+      "actual": 0.916667,
+      "required": 0.98
+    },
+    "no_tool_actions": {
+      "actual": 0.916667,
+      "required": 1.0
+    },
+    "recommendations_allowed": {
+      "actual": 0.916667,
+      "required": 0.99
+    }
+  },
+  "metrics": {
+    "boundary_compliant": 0.916667,
+    "citations_allowed": 0.916667,
+    "citations_exact": 0.916667,
+    "contract_valid": 0.916667,
+    "final_mode": 0.916667,
+    "json_valid": 0.916667,
+    "no_tool_actions": 0.916667,
+    "recommendations_allowed": 0.916667,
+    "sensitive_output_free": 1.0,
+    "strict_grounded_pass": 0.916667
+  },
+  "minimum_family_strict_pass": 0.75,
+  "passed": false,
+  "records": 120,
+  "schema_version": "studyhub.agent.grounded_tutor.gate.v1",
+  "selection_dataset": "development_validation_not_final_holdout",
+  "selection_valid": true,
+  "splits": [
+    "validation"
+  ],
+  "summary_path": "/data/chengjin/studyhub/evaluation_artifacts/studyhub_agent/grounded_tutor_9b_v1_0/adapter_validation_seed_6209/adapter_summary.json",
+  "thresholds": {
+    "boundary_compliant": 0.95,
+    "citations_allowed": 0.99,
+    "citations_exact": 0.95,
+    "contract_valid": 0.97,
+    "final_mode": 0.99,
+    "json_valid": 0.98,
+    "no_tool_actions": 1.0,
+    "recommendations_allowed": 0.99,
+    "sensitive_output_free": 1.0,
+    "strict_grounded_pass": 0.9
+  }
+}

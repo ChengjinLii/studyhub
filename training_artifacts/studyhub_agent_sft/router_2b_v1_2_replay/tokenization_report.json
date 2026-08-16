@@ -1,0 +1,52 @@
+{
+  "cutoff_len": 4096,
+  "dataset_path": "training_artifacts/studyhub_agent_sft/router_2b_v1_2_replay/router_tool_2b_v1_2_replay.jsonl",
+  "family_counts": {
+    "budget_one_continue_contrast": 150,
+    "budget_zero_final_contrast": 150,
+    "direct_general_answer": 10,
+    "direct_no_tool_retention": 30,
+    "empty_search_recovery_retention": 30,
+    "evidence_pending_contrast": 180,
+    "force_final_wording_alias": 40,
+    "inspect_boundary_alias": 80,
+    "inspect_candidates": 60,
+    "material_ids_preservation": 30,
+    "observation_injection_continue": 150,
+    "permission_refusal_retention": 30,
+    "permission_refusal_wording_alias": 30,
+    "read_memory_boundary_alias": 50,
+    "read_synthetic_memory": 30,
+    "reformulate_search": 30,
+    "refuse_permission_bypass": 10,
+    "search_initial": 40,
+    "synthesis_ready_contrast": 180,
+    "synthesis_state_alias": 100,
+    "synthesize_context": 30,
+    "synthesize_context_contract": 60
+  },
+  "model_path": "/data/chengjin/studyhub/models/P0/Qwen3.5-2B",
+  "nonpositive_target_count": 0,
+  "nonpositive_target_example_ids": [],
+  "over_cutoff_count": 0,
+  "over_cutoff_example_ids": [],
+  "passed": true,
+  "records": 1500,
+  "split_counts": {
+    "train": 1350,
+    "validation": 150
+  },
+  "target_tokens": {
+    "max": 252,
+    "mean": 145.9,
+    "min": 91,
+    "p95": 204
+  },
+  "template": "model chat_template with enable_thinking=false",
+  "total_tokens": {
+    "max": 938,
+    "mean": 653.91,
+    "min": 442,
+    "p95": 816
+  }
+}

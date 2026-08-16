@@ -1,0 +1,49 @@
+[transformers] The fast path is not available because one of the required library is not installed. Falling back to torch implementation. To install follow https://github.com/fla-org/flash-linear-attention#installation and https://github.com/Dao-AILab/causal-conv1d
+Loading weights:   0%|          | 0/617 [00:00<?, ?it/s]Loading weights: 100%|██████████| 617/617 [00:00<00:00, 7383.07it/s]
+{"completed": 4, "pending_run": 274, "total_discovered": 286, "parsed_total": 13}
+{"completed": 8, "pending_run": 274, "total_discovered": 286, "parsed_total": 17}
+{"completed": 12, "pending_run": 274, "total_discovered": 286, "parsed_total": 21}
+{"completed": 16, "pending_run": 274, "total_discovered": 286, "parsed_total": 24}
+{"completed": 20, "pending_run": 274, "total_discovered": 286, "parsed_total": 25}
+{"completed": 24, "pending_run": 274, "total_discovered": 286, "parsed_total": 28}
+{"completed": 28, "pending_run": 274, "total_discovered": 286, "parsed_total": 32}
+{"completed": 32, "pending_run": 274, "total_discovered": 286, "parsed_total": 36}
+{"completed": 36, "pending_run": 274, "total_discovered": 286, "parsed_total": 40}
+{"completed": 40, "pending_run": 274, "total_discovered": 286, "parsed_total": 43}
+{"completed": 44, "pending_run": 274, "total_discovered": 286, "parsed_total": 47}
+{"completed": 48, "pending_run": 274, "total_discovered": 286, "parsed_total": 51}
+{"completed": 52, "pending_run": 274, "total_discovered": 286, "parsed_total": 55}
+{"completed": 56, "pending_run": 274, "total_discovered": 286, "parsed_total": 59}
+{"completed": 60, "pending_run": 274, "total_discovered": 286, "parsed_total": 61}
+{"completed": 64, "pending_run": 274, "total_discovered": 286, "parsed_total": 61}
+{"completed": 68, "pending_run": 274, "total_discovered": 286, "parsed_total": 63}
+{"completed": 72, "pending_run": 274, "total_discovered": 286, "parsed_total": 66}
+{"completed": 76, "pending_run": 274, "total_discovered": 286, "parsed_total": 70}
+{"completed": 80, "pending_run": 274, "total_discovered": 286, "parsed_total": 73}
+{"completed": 84, "pending_run": 274, "total_discovered": 286, "parsed_total": 77}
+{"completed": 88, "pending_run": 274, "total_discovered": 286, "parsed_total": 81}
+{"completed": 92, "pending_run": 274, "total_discovered": 286, "parsed_total": 84}
+{"completed": 96, "pending_run": 274, "total_discovered": 286, "parsed_total": 88}
+{"completed": 100, "pending_run": 274, "total_discovered": 286, "parsed_total": 92}
+{"completed": 104, "pending_run": 274, "total_discovered": 286, "parsed_total": 96}
+{"completed": 108, "pending_run": 274, "total_discovered": 286, "parsed_total": 100}
+{"completed": 112, "pending_run": 274, "total_discovered": 286, "parsed_total": 103}
+{"completed": 116, "pending_run": 274, "total_discovered": 286, "parsed_total": 105}
+{"completed": 120, "pending_run": 274, "total_discovered": 286, "parsed_total": 109}
+{"completed": 124, "pending_run": 274, "total_discovered": 286, "parsed_total": 113}
+{"completed": 128, "pending_run": 274, "total_discovered": 286, "parsed_total": 117}
+{"completed": 132, "pending_run": 274, "total_discovered": 286, "parsed_total": 121}
+{"completed": 136, "pending_run": 274, "total_discovered": 286, "parsed_total": 125}
+{"completed": 140, "pending_run": 274, "total_discovered": 286, "parsed_total": 128}
+{"completed": 144, "pending_run": 274, "total_discovered": 286, "parsed_total": 132}
+{"completed": 148, "pending_run": 274, "total_discovered": 286, "parsed_total": 136}
+{"completed": 152, "pending_run": 274, "total_discovered": 286, "parsed_total": 140}
+{"completed": 156, "pending_run": 274, "total_discovered": 286, "parsed_total": 142}
+{"completed": 160, "pending_run": 274, "total_discovered": 286, "parsed_total": 144}
+{"completed": 164, "pending_run": 274, "total_discovered": 286, "parsed_total": 148}
+{"completed": 168, "pending_run": 274, "total_discovered": 286, "parsed_total": 152}
+{"completed": 172, "pending_run": 274, "total_discovered": 286, "parsed_total": 155}
+{"completed": 176, "pending_run": 274, "total_discovered": 286, "parsed_total": 159}
+{"completed": 180, "pending_run": 274, "total_discovered": 286, "parsed_total": 163}
+{"completed": 184, "pending_run": 274, "total_discovered": 286, "parsed_total": 166}
+{"completed": 188, "pending_run": 274, "total_discovered": 286, "parsed_total": 170}

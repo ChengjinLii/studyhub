@@ -1,0 +1,61 @@
+{
+  "alias_family_counts": {
+    "force_final_wording_alias": 40,
+    "inspect_boundary_alias": 80,
+    "permission_refusal_wording_alias": 30,
+    "read_memory_boundary_alias": 50,
+    "synthesis_state_alias": 100
+  },
+  "component_counts": {
+    "boundary_aliases": 300,
+    "targeted_v1_2": 900,
+    "v1_1_replay": 300
+  },
+  "dataset_version": "router_2b_v1_2_replay_balanced",
+  "files": {
+    "audit.json": {
+      "sha256": "27f2ba8e6221de8b85092390302af40e637bfecb8bd2997ec221dee2cabd1053"
+    },
+    "router_tool_2b_v1_2_replay.jsonl": {
+      "records": 1500,
+      "sha256": "d2a720a19a757c81a14f422acc7159036126665d97a847995adbe50252ccba7d"
+    }
+  },
+  "generated_at": "2026-07-31T08:42:44+00:00",
+  "purpose": "Replay-balanced continuation after the targeted-only v1.2 ablation showed read_pdf_evidence bias and old-capability loss.",
+  "records": 1500,
+  "release_status": "ablation_candidate_not_production",
+  "replay_family_counts": {
+    "direct_general_answer": 10,
+    "inspect_candidates": 60,
+    "material_ids_preservation": 30,
+    "read_synthetic_memory": 30,
+    "reformulate_search": 30,
+    "refuse_permission_bypass": 10,
+    "search_initial": 40,
+    "synthesize_context": 30,
+    "synthesize_context_contract": 60
+  },
+  "schema_version": "studyhub.agent.sft.spec.v0",
+  "sealed_final_holdout_read": false,
+  "sources": {
+    "/data/chengjin/studyhub/evaluation_artifacts/studyhub_agent/router_teacher_hidden_v1/router_hidden_300.jsonl": {
+      "sha256": "f122d47057bcb0f9239947ed02bde4cbd5bd73180cd98cf00c03fcb75b1a6009",
+      "usage": "overlap_audit_only_not_exported"
+    },
+    "/data/chengjin/studyhub/training_artifacts/studyhub_agent_sft/router_2b_targeted_v1_1/router_tool_2b_combined.jsonl": "8073758e7cfb7fc19045289ce3ae9a1928ecf82a1140173d9e93e4ff19ed69b8",
+    "/data/chengjin/studyhub/training_artifacts/studyhub_agent_sft/router_2b_targeted_v1_2/router_tool_2b_v1_2.jsonl": "9f10678c840358c9235a9df2cdf919c1b43f9ae88bcdb055ff17cf3cf680d7fb"
+  },
+  "split_counts": {
+    "test": 0,
+    "train": 1350,
+    "validation": 150
+  },
+  "teacher": {
+    "human_gold": false,
+    "model_requested": "gpt-5.6-thinking",
+    "runtime": "current_codex_session",
+    "runtime_model_verified": false
+  },
+  "validation_passed": true
+}
