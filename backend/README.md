@@ -219,6 +219,20 @@ STUDYHUB_AI_AGENT_PDF_EXTRACT_CACHE_ENABLED=true
 STUDYHUB_AI_AGENT_PDF_EXTRACT_CACHE_MAX_ENTRIES=64
 ```
 
+评论写操作使用 Nginx 和 Redis 双层防滥用保护。发布评论同时受 IP、用户分钟额度和用户小时额度约束；编辑、删除、点赞及举报按用户和动作独立计数。相同用户在同一资料或回复下重复提交相同内容时，Redis 会保留短期去重键；Redis 不可用时使用有容量上限的进程内缓存，不写入业务数据库。相关生产参数：
+
+```env
+STUDYHUB_RATE_LIMIT_COMMENT_CREATE_USER_MINUTE=6
+STUDYHUB_RATE_LIMIT_COMMENT_CREATE_USER_HOUR=30
+STUDYHUB_RATE_LIMIT_COMMENT_CREATE_IP_MINUTE=60
+STUDYHUB_RATE_LIMIT_COMMENT_ACTION_USER_MINUTE=30
+STUDYHUB_RATE_LIMIT_COMMENT_REPORT_USER_HOUR=10
+STUDYHUB_RATE_LIMIT_COMMENT_DUPLICATE_SECONDS=300
+STUDYHUB_COMMENTS_WRITE_ENABLED=true
+```
+
+遇到集中攻击时，可临时设置 `STUDYHUB_COMMENTS_WRITE_ENABLED=false` 并重启后端，使评论区进入只读模式；评论列表仍可访问，且不会修改或删除已有评论数据。
+
 启用动态工具后，主模型直接在受控预算内自主选择 `search_materials`、`inspect_materials`、`read_pdf_evidence`、`read_memory` 和 `synthesize_course_context`，可以根据前一轮工具结果继续换检索词、扩大召回、指定 PDF 页码或直接结束。任务标签和执行策略是开放文本，不再限制为固定意图与固定路由；轻量模型只负责最终语义审阅。原固定编排链路保留为模型或工具协议不可用时的兼容降级。
 
 `PDF_EVIDENCE_MAX_PAGES` 控制普通降级链路一次返回的证据页数，`PDF_EXTRACT_MAX_PAGES` 控制最多建立文本页块的文档范围；动态工具仍受 `TOOL_MAX_EVIDENCE_PAGES` 总预算和资料访问权限限制。二者分离后，Agent 可以请求第 20 页等后续页面，而不是只能查看文档最前面的若干页。

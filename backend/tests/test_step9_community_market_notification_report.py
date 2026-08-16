@@ -31,6 +31,14 @@ def test_step9_comments_write_flow_matches_current_contract(
     assert created["content"] == "Step 9 新评论"
     assert created["user"]["id"] == 1
 
+    duplicate_comment = client.post(
+        "/api/comments",
+        headers=alice_headers,
+        json={"materialId": 101, "content": "Step 9 新评论"},
+    )
+    assert duplicate_comment.status_code == 409
+    assert duplicate_comment.json()["error"]["code"] == "COMMENT_DUPLICATE"
+
     reply_response = client.post(
         "/api/comments",
         headers=baishan_headers,

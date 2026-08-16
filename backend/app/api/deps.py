@@ -598,6 +598,9 @@ def require_enabled_deep_research_admin_context(
 
 
 def clear_dependency_caches() -> None:
+    from app.core.comment_abuse import clear_comment_abuse_state
+
+    clear_comment_abuse_state()
     get_public_read_cache.cache_clear()
     get_material_catalog_repo.cache_clear()
     get_read_api_repo.cache_clear()

@@ -50,6 +50,7 @@ def strict_security_client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> T
     monkeypatch.setenv("STUDYHUB_RATE_LIMIT_VIEW", "2")
     monkeypatch.setenv("STUDYHUB_RATE_LIMIT_AI", "2")
     monkeypatch.setenv("STUDYHUB_RATE_LIMIT_MCP", "2")
+    monkeypatch.setenv("STUDYHUB_RATE_LIMIT_COMMENT_CREATE_IP_MINUTE", "2")
 
     get_settings.cache_clear()
     clear_dependency_caches()
@@ -150,6 +151,17 @@ def test_captcha_rate_limit_returns_429(strict_security_client: TestClient) -> N
 
     assert response.status_code == 429
     assert_error_envelope(response, "RATE_LIMITED", "Too many captcha requests")
+
+
+def test_comment_create_ip_rate_limit_runs_before_authentication(strict_security_client: TestClient) -> None:
+    payload = {"materialId": 101, "content": "unauthenticated comment"}
+
+    for _ in range(2):
+        assert strict_security_client.post("/api/comments", json=payload).status_code == 401
+    response = strict_security_client.post("/api/comments", json=payload)
+
+    assert response.status_code == 429
+    assert_error_envelope(response, "RATE_LIMITED", "Too many comment-create-ip requests")
 
 
 def test_mcp_rate_limit_returns_429(strict_security_client: TestClient) -> None:

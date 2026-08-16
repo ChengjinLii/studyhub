@@ -9,6 +9,12 @@ from app.api.deps import (
     get_public_read_cache,
     require_auth_context,
 )
+from app.core.comment_abuse import (
+    enforce_comment_user_rate_limit,
+    release_comment_content,
+    reserve_comment_content,
+)
+from app.core.config import Settings, get_settings
 from app.core.db import get_db_session
 from app.core.public_read_cache import PublicReadCache, cache_if_anonymous_async, invalidate_prefixes
 from app.core.response import api_ok
@@ -95,8 +101,22 @@ def create_comment(
     auth: AuthContext = Depends(require_auth_context),
     session: Session = Depends(get_db_session),
     service: CommentsService = Depends(get_comments_service),
+    settings: Settings = Depends(get_settings),
 ) -> dict[str, object]:
-    data = service.create(session, payload, auth.user_id or 0)
+    user_id = auth.user_id or 0
+    enforce_comment_user_rate_limit(settings, user_id=user_id, action="create")
+    reservation = reserve_comment_content(
+        settings,
+        user_id=user_id,
+        material_id=payload.materialId,
+        parent_id=payload.parentId,
+        content=payload.content,
+    )
+    try:
+        data = service.create(session, payload, user_id)
+    except Exception:
+        release_comment_content(reservation)
+        raise
     _invalidate_comment_content_caches()
     return api_ok(data)
 
@@ -108,7 +128,9 @@ def update_comment(
     auth: AuthContext = Depends(require_auth_context),
     session: Session = Depends(get_db_session),
     service: CommentsService = Depends(get_comments_service),
+    settings: Settings = Depends(get_settings),
 ) -> dict[str, object]:
+    enforce_comment_user_rate_limit(settings, user_id=auth.user_id or 0, action="update")
     can_moderate = bool(auth.role_mask and auth.role_mask & 24)
     data = service.update(session, id, payload, user_id=auth.user_id or 0, can_moderate=can_moderate)
     _invalidate_comment_content_caches()
@@ -121,7 +143,9 @@ def delete_comment(
     auth: AuthContext = Depends(require_auth_context),
     session: Session = Depends(get_db_session),
     service: CommentsService = Depends(get_comments_service),
+    settings: Settings = Depends(get_settings),
 ) -> dict[str, object]:
+    enforce_comment_user_rate_limit(settings, user_id=auth.user_id or 0, action="delete")
     can_moderate = bool(auth.role_mask and auth.role_mask & 24)
     service.delete(session, id, user_id=auth.user_id or 0, can_moderate=can_moderate)
     _invalidate_comment_content_caches()
@@ -135,7 +159,9 @@ def like_comment(
     auth: AuthContext = Depends(require_auth_context),
     session: Session = Depends(get_db_session),
     service: CommentsService = Depends(get_comments_service),
+    settings: Settings = Depends(get_settings),
 ) -> dict[str, object]:
+    enforce_comment_user_rate_limit(settings, user_id=auth.user_id or 0, action="like")
     like_count = service.like(session, id, auth.user_id or 0)
     _invalidate_comment_thread_caches()
     return api_ok({"likeCount": like_count})
@@ -147,7 +173,9 @@ def unlike_comment(
     auth: AuthContext = Depends(require_auth_context),
     session: Session = Depends(get_db_session),
     service: CommentsService = Depends(get_comments_service),
+    settings: Settings = Depends(get_settings),
 ) -> dict[str, object]:
+    enforce_comment_user_rate_limit(settings, user_id=auth.user_id or 0, action="unlike")
     like_count = service.unlike(session, id, auth.user_id or 0)
     _invalidate_comment_thread_caches()
     return api_ok({"likeCount": like_count})
@@ -161,7 +189,9 @@ def report_comment(
     auth: AuthContext = Depends(require_auth_context),
     session: Session = Depends(get_db_session),
     service: CommentsService = Depends(get_comments_service),
+    settings: Settings = Depends(get_settings),
 ) -> dict[str, object]:
+    enforce_comment_user_rate_limit(settings, user_id=auth.user_id or 0, action="report")
     service.report(session, id, auth.user_id or 0, payload)
     _invalidate_comment_thread_caches()
     return api_ok({"success": True})

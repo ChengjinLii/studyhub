@@ -214,6 +214,13 @@ class Settings(BaseSettings):
     rate_limit_view: int = 300
     rate_limit_ai: int = 12
     rate_limit_mcp: int = 120
+    rate_limit_comment_create_user_minute: int = 6
+    rate_limit_comment_create_user_hour: int = 30
+    rate_limit_comment_create_ip_minute: int = 60
+    rate_limit_comment_action_user_minute: int = 30
+    rate_limit_comment_report_user_hour: int = 10
+    rate_limit_comment_duplicate_seconds: int = 300
+    comments_write_enabled: bool = True
 
     lock_provider: str = "db_row"
     redis_url: str | None = None
