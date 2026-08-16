@@ -11,6 +11,7 @@ KEEP_RELEASES="${STUDYHUB_RELEASE_KEEP:-3}"
 BACKEND_SMOKE_PORT="${STUDYHUB_RELEASE_BACKEND_SMOKE_PORT:-18311}"
 FRONTEND_SMOKE_PORT="${STUDYHUB_RELEASE_FRONTEND_SMOKE_PORT:-13300}"
 LOCK_FILE="$RUNTIME_ROOT/deploy.lock"
+PIP_INDEX_URL="${STUDYHUB_RELEASE_PIP_INDEX_URL:-https://pypi.org/simple}"
 
 if ! [[ "$KEEP_RELEASES" =~ ^[2-9][0-9]*$ ]]; then
   echo "STUDYHUB_RELEASE_KEEP must be an integer >= 2"
@@ -41,7 +42,14 @@ cleanup_smoke() {
   [[ -z "$FRONTEND_PID" ]] || kill "$FRONTEND_PID" 2>/dev/null || true
   [[ -z "$BACKEND_PID" ]] || kill "$BACKEND_PID" 2>/dev/null || true
 }
-trap cleanup_smoke EXIT
+cleanup_on_exit() {
+  local status=$?
+  cleanup_smoke
+  if (( status != 0 )) && [[ -d "$RELEASE" && "$(readlink -f "$CURRENT_LINK" 2>/dev/null || true)" != "$RELEASE" ]]; then
+    rm -rf --one-file-system "$RELEASE"
+  fi
+}
+trap cleanup_on_exit EXIT
 
 if [[ -e "$RELEASE" ]]; then
   echo "release already exists: $RELEASE"
@@ -53,7 +61,8 @@ ln -s "$PRIVATE_DIR" "$RELEASE/private"
 
 echo "[1/5] install locked dependencies"
 python3.12 -m venv "$RELEASE/.venv"
-"$RELEASE/.venv/bin/python" -m pip install --disable-pip-version-check --require-hashes -r "$RELEASE/backend/requirements.lock"
+"$RELEASE/.venv/bin/python" -m pip install --disable-pip-version-check --index-url "$PIP_INDEX_URL" \
+  --require-hashes -r "$RELEASE/backend/requirements.lock"
 npm --prefix "$RELEASE/frontend" ci --no-audit --no-fund
 
 echo "[2/5] build frontend in isolated release"
