@@ -10,6 +10,7 @@ from sqlalchemy import inspect, text
 from app.core.config import get_settings
 from app.core.db import get_engine
 from app.models.finance import FinanceInstructionRecord
+from app.models.auth import AuthSessionStateRecord
 from app.models.materials import MaterialSecurityScanRecord
 from app.ops.schema_audit import require_recent_nonempty_backup
 
@@ -17,6 +18,7 @@ from app.ops.schema_audit import require_recent_nonempty_backup
 MODULE_TABLES = {
     "finance-outbox": (FinanceInstructionRecord.__table__,),
     "material-security": (MaterialSecurityScanRecord.__table__,),
+    "auth-session": (AuthSessionStateRecord.__table__,),
 }
 MODULE_DEFAULTS = {
     "finance-outbox": (
@@ -28,6 +30,7 @@ MODULE_DEFAULTS = {
         ("material_security_scans", "release_status", "'VISIBLE'"),
         ("material_security_scans", "attempt_count", "0"),
     ),
+    "auth-session": (("auth_session_states", "session_version", "0"),),
 }
 
 

@@ -33,7 +33,7 @@ class AuthCookieService:
             "emailPrivacy": user.email_privacy,
         }
 
-    def build_auth_response(self, user: AuthUser, remember_me: bool) -> dict[str, Any]:
+    def build_auth_response(self, user: AuthUser, remember_me: bool, *, session_version: int = 0) -> dict[str, Any]:
         ttl_seconds = self._resolve_ttl_seconds(remember_me)
         token = self.token_codec.encode(
             {
@@ -41,6 +41,7 @@ class AuthCookieService:
                 "roleMask": user.role_mask,
                 "nickname": user.nickname,
                 "remember": remember_me,
+                "sessionVersion": int(session_version),
             },
             ttl_seconds=ttl_seconds,
         )
@@ -79,8 +80,15 @@ class AuthCookieService:
             ),
         )
 
-    def write_auth_cookies_for_user(self, response: Response, user: AuthUser, remember_me: bool) -> dict[str, Any]:
-        payload = self.build_auth_response(user, remember_me)
+    def write_auth_cookies_for_user(
+        self,
+        response: Response,
+        user: AuthUser,
+        remember_me: bool,
+        *,
+        session_version: int = 0,
+    ) -> dict[str, Any]:
+        payload = self.build_auth_response(user, remember_me, session_version=session_version)
         self.write_auth_cookies(response, payload, remember_me)
         if self.settings.resolved_auth_response_include_token:
             return payload

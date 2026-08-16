@@ -77,3 +77,12 @@ class EmailVerification(TimestampMixin, Base):
     attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     max_attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=5)
     used: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+
+
+class AuthSessionStateRecord(TimestampMixin, Base):
+    __tablename__ = "auth_session_states"
+
+    user_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=False)
+    session_version: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    revoke_reason: Mapped[str | None] = mapped_column(String(64), nullable=True)

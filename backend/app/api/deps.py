@@ -541,6 +541,12 @@ def get_optional_auth_context(
     user = get_auth_repo().find_user_by_id(session, user_id)
     if user is None:
         return None
+    if str(user.status or "").strip().lower() != "active":
+        return None
+    token_session_version = int(claims.get("sessionVersion", 0) or 0)
+    current_session_version = get_auth_repo().get_session_version(session, user_id)
+    if token_session_version != current_session_version:
+        return None
     role_mask = user.role_mask
 
     return AuthContext(

@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+from datetime import UTC, datetime
+
 from sqlalchemy import func, inspect, select, text
 from sqlalchemy.orm import Session
 
-from app.models.auth import AuthUser, EmailVerification, LegacyAuthUser
+from app.models.auth import AuthSessionStateRecord, AuthUser, EmailVerification, LegacyAuthUser
 
 
 AuthUserModel = AuthUser | LegacyAuthUser
@@ -48,6 +50,22 @@ def _table_row_count(session: Session, table_name: str) -> int:
 
 
 class AuthRepository:
+    def get_session_version(self, session: Session, user_id: int) -> int:
+        state = session.get(AuthSessionStateRecord, user_id)
+        return int(state.session_version or 0) if state is not None else 0
+
+    def bump_session_version(self, session: Session, user_id: int, *, reason: str) -> int:
+        state = session.get(AuthSessionStateRecord, user_id)
+        if state is None:
+            state = AuthSessionStateRecord(user_id=user_id, session_version=1)
+        else:
+            state.session_version = int(state.session_version or 0) + 1
+        state.revoked_at = datetime.now(UTC)
+        state.revoke_reason = reason[:64]
+        session.add(state)
+        session.flush()
+        return int(state.session_version)
+
     def count_users(self, session: Session) -> int:
         stmt = select(func.count()).select_from(resolve_user_model(session))
         return int(session.scalar(stmt) or 0)

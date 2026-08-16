@@ -36,5 +36,10 @@ def patch_account(
 ) -> dict[str, object]:
     updated_user = service.update_account(session, auth.user_id or 0, payload)
     remember_me = auth_cookie_service.resolve_remember_flag(request)
-    auth_cookie_service.write_auth_cookies_for_user(response, updated_user, remember_me)
+    auth_cookie_service.write_auth_cookies_for_user(
+        response,
+        updated_user,
+        remember_me,
+        session_version=int(auth.claims.get("sessionVersion", 0) or 0),
+    )
     return api_ok(service.to_payload(updated_user))

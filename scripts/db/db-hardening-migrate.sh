@@ -5,7 +5,7 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 COMMAND="${1:-plan}"
 MODULE="${2:-}"
 if [[ "$COMMAND" != plan && "$COMMAND" != apply ]]; then
-  echo "usage: $0 {plan|apply} {finance-outbox|material-security}"
+  echo "usage: $0 {plan|apply} {finance-outbox|material-security|auth-session}"
   exit 2
 fi
 if [[ -z "$MODULE" ]]; then

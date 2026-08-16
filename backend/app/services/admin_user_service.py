@@ -67,6 +67,7 @@ class AdminUserService:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="用户不存在")
         user.role_mask = role_mask
         self.auth_repo.save_user(session, user)
+        self.auth_repo.bump_session_version(session, user.id, reason="roles_changed")
         session.commit()
         return self._to_summary(user)
 

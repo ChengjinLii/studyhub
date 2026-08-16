@@ -56,7 +56,12 @@ class AuthService:
         self.captcha_service.validate(payload.captchaId, payload.captchaCode)
         user = self._authenticate_local_user(session, payload.identifier, payload.password)
         remember_me = bool(payload.rememberMe)
-        return self.auth_cookie_service.write_auth_cookies_for_user(response, user, remember_me)
+        return self.auth_cookie_service.write_auth_cookies_for_user(
+            response,
+            user,
+            remember_me,
+            session_version=self.repo.get_session_version(session, user.id),
+        )
 
     def send_register_code(
         self,
@@ -143,7 +148,12 @@ class AuthService:
         self.repo.save_user(session, user)
         session.commit()
         session.refresh(user)
-        return self.auth_cookie_service.write_auth_cookies_for_user(response, user, remember_me=False)
+        return self.auth_cookie_service.write_auth_cookies_for_user(
+            response,
+            user,
+            remember_me=False,
+            session_version=self.repo.get_session_version(session, user.id),
+        )
 
     def send_reset_password_code(
         self,
@@ -190,6 +200,7 @@ class AuthService:
         )
         user.password_hash = self._hash_password(payload.newPassword)
         self.repo.save_user(session, user)
+        self.repo.bump_session_version(session, user.id, reason="password_reset")
         session.commit()
         self.auth_cookie_service.clear_auth_cookies(response)
 
@@ -248,6 +259,7 @@ class AuthService:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="旧密码不正确")
         user.password_hash = self._hash_password(new_password)
         self.repo.save_user(session, user)
+        self.repo.bump_session_version(session, user.id, reason="password_changed")
         session.commit()
         self.auth_cookie_service.clear_auth_cookies(response)
 
@@ -339,7 +351,12 @@ class AuthService:
         user = self.ensure_local_dev_user(session)
         if user is None:
             raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="local-dev 账号尚未初始化")
-        return self.auth_cookie_service.write_auth_cookies_for_user(response, user, remember_me=True)
+        return self.auth_cookie_service.write_auth_cookies_for_user(
+            response,
+            user,
+            remember_me=True,
+            session_version=self.repo.get_session_version(session, user.id),
+        )
 
     def peek_latest_verification_code_for_testing(
         self,
@@ -368,6 +385,9 @@ class AuthService:
         if not bcrypt.checkpw(raw_password.encode("utf-8"), user.password_hash.encode("utf-8")):
             self._log_login_failure(normalized, "password_mismatch", user_id=user.id)
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="用户名或密码错误")
+        if str(user.status or "").strip().lower() != "active":
+            self._log_login_failure(normalized, "account_inactive", user_id=user.id)
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="账号当前不可用")
         if "@" in normalized and user.verified is False:
             self._log_login_failure(normalized, "email_unverified", user_id=user.id)
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="邮箱未验证")

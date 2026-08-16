@@ -10,7 +10,7 @@ from app.models.agentic_runtime import (
     AgentThreadRecord,
     AgentWaitRecord,
 )
-from app.models.auth import AuthUser, EmailVerification
+from app.models.auth import AuthSessionStateRecord, AuthUser, EmailVerification
 from app.models.base import Base
 from app.models.comments import CommentLikeRecord, CommentRecord
 from app.models.community import FeedbackRecord, NotificationRecord, ReportRecord, VolunteerApplicationRecord
@@ -51,6 +51,7 @@ from app.models.social import UserFollow
 
 __all__ = [
     "AuthUser",
+    "AuthSessionStateRecord",
     "AdminMonthlyPayoutMarkRecord",
     "AgentArtifactRecord",
     "AgentJobRecord",

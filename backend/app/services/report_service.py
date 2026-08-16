@@ -184,6 +184,7 @@ class ReportService:
         if user is not None:
             user.status = "hidden"
             self.auth_repo.save_user(session, user)
+            self.auth_repo.bump_session_version(session, user.id, reason="account_hidden")
 
     def _restore_target(self, session: Session, target_type: str, target_id: int) -> None:
         if target_type == "MATERIAL":
@@ -215,6 +216,7 @@ class ReportService:
         if user is not None and user.status == "hidden":
             user.status = "active"
             self.auth_repo.save_user(session, user)
+            self.auth_repo.bump_session_version(session, user.id, reason="account_restored")
 
     def _build_report_lookups(self, session: Session, items: list[ReportRecord]) -> dict[str, dict[int, Any]]:
         lookups = {
