@@ -54,5 +54,13 @@ render_install "$ROOT_DIR/deploy/systemd/studyhub-atomic-worker.conf.in" \
   /etc/systemd/system/studyhub-worker.service.d/atomic-release.conf
 
 sudo -n systemctl daemon-reload
-sudo -n systemctl restart studyhub-backend.service studyhub-worker.service studyhub-frontend.service
+sudo -n systemctl restart studyhub-backend.service
+for _attempt in $(seq 1 45); do
+  if curl -fsS --max-time 2 http://127.0.0.1:8311/api/readyz >/dev/null; then
+    break
+  fi
+  sleep 1
+done
+curl -fsS --max-time 2 http://127.0.0.1:8311/api/readyz >/dev/null
+sudo -n systemctl restart studyhub-worker.service studyhub-frontend.service
 echo "atomic service paths installed; current=$CURRENT_ROOT -> $(readlink -f "$CURRENT_ROOT")"

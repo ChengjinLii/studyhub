@@ -114,24 +114,46 @@ switch_current() {
 rollback() {
   if [[ -n "$PREVIOUS" && -d "$PREVIOUS" ]]; then
     echo "deployment failed; rolling back to $PREVIOUS"
+    sudo -n systemctl stop studyhub-frontend.service studyhub-worker.service || true
     switch_current "$PREVIOUS"
-    sudo -n systemctl restart studyhub-backend.service studyhub-worker.service studyhub-frontend.service || true
+    sudo -n systemctl restart studyhub-backend.service || true
+    for _attempt in $(seq 1 45); do
+      if curl -fsS --max-time 2 http://127.0.0.1:8311/api/readyz >/dev/null; then
+        break
+      fi
+      sleep 1
+    done
+    sudo -n systemctl restart studyhub-worker.service studyhub-frontend.service || true
   fi
 }
 
 echo "[4/5] switch current and restart services"
+sudo -n systemctl stop studyhub-frontend.service studyhub-worker.service
 switch_current "$RELEASE"
-if ! sudo -n systemctl restart studyhub-backend.service studyhub-worker.service studyhub-frontend.service; then
+if ! sudo -n systemctl restart studyhub-backend.service; then
   rollback
   exit 1
 fi
 
 for _attempt in $(seq 1 45); do
-  if curl -fsS --max-time 2 http://127.0.0.1:8311/api/readyz >/dev/null \
-    && curl -fsS --max-time 2 http://127.0.0.1:3300/ >/dev/null; then
+  if curl -fsS --max-time 2 http://127.0.0.1:8311/api/readyz >/dev/null; then
     break
   fi
   sleep 2
+done
+if ! curl -fsS --max-time 2 http://127.0.0.1:8311/api/readyz >/dev/null; then
+  rollback
+  exit 1
+fi
+if ! sudo -n systemctl restart studyhub-worker.service studyhub-frontend.service; then
+  rollback
+  exit 1
+fi
+for _attempt in $(seq 1 30); do
+  if curl -fsS --max-time 2 http://127.0.0.1:3300/ >/dev/null; then
+    break
+  fi
+  sleep 1
 done
 if ! STUDYHUB_SMOKE_EXPECTED_GIT_SHA="$SHORT_SHA" bash "$RELEASE/scripts/runtime/production-smoke.sh"; then
   rollback
