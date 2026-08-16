@@ -72,6 +72,24 @@ class MaterialVersionRecord(TimestampMixin, Base):
     version_label: Mapped[str] = mapped_column(String(32), nullable=False)
 
 
+class MaterialSecurityScanRecord(TimestampMixin, Base):
+    __tablename__ = "material_security_scans"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    material_id: Mapped[int] = mapped_column(Integer, nullable=False, unique=True, index=True)
+    object_key: Mapped[str] = mapped_column(String(512), nullable=False)
+    status: Mapped[str] = mapped_column(String(24), nullable=False, default="PENDING", server_default="PENDING", index=True)
+    release_status: Mapped[str] = mapped_column(String(16), nullable=False, default="VISIBLE", server_default="VISIBLE")
+    release_review_status: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    attempt_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    next_attempt_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
+    claimed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    scanned_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    scanner_version: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    finding: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    last_error: Mapped[str | None] = mapped_column(String(512), nullable=True)
+
+
 class MaterialReviewRecord(TimestampMixin, Base):
     __tablename__ = "material_reviews"
 

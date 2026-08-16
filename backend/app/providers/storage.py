@@ -6,6 +6,7 @@ import mimetypes
 from pathlib import Path
 import re
 import secrets
+import shutil
 from typing import Any, Protocol
 from urllib.parse import quote
 
@@ -40,6 +41,8 @@ class StorageProvider(Protocol):
     def resolve_path(self, *, root: Path, key: str, invalid_detail: str) -> Path: ...
     def read_bytes(self, *, root: Path, key: str, max_size_bytes: int) -> bytes: ...
     async def read_bytes_async(self, *, root: Path, key: str, max_size_bytes: int) -> bytes: ...
+
+    def copy_to_path(self, *, root: Path, key: str, destination: Path, max_size_bytes: int) -> int: ...
 
     def guess_media_type(self, key: str | None, default: str = "application/octet-stream") -> str: ...
 
@@ -162,6 +165,17 @@ class LocalFileStorageProvider:
 
     async def read_bytes_async(self, *, root: Path, key: str, max_size_bytes: int) -> bytes:
         return await asyncio.to_thread(self.read_bytes, root=root, key=key, max_size_bytes=max_size_bytes)
+
+    def copy_to_path(self, *, root: Path, key: str, destination: Path, max_size_bytes: int) -> int:
+        source = self.resolve_path(root=root, key=key, invalid_detail="无效的文件路径")
+        if not source.exists() or not source.is_file():
+            raise FileNotFoundError(key)
+        if source.stat().st_size > max_size_bytes:
+            raise ValueError("file exceeds max_size_bytes")
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        with source.open("rb") as input_file, destination.open("wb") as output_file:
+            shutil.copyfileobj(input_file, output_file, length=UPLOAD_STREAM_CHUNK_SIZE)
+        return destination.stat().st_size
 
     def guess_media_type(self, key: str | None, default: str = "application/octet-stream") -> str:
         if not key:
@@ -314,6 +328,29 @@ class AliyunOssStorageProvider:
 
     async def read_bytes_async(self, *, root: Path, key: str, max_size_bytes: int) -> bytes:
         return await asyncio.to_thread(self.read_bytes, root=root, key=key, max_size_bytes=max_size_bytes)
+
+    def copy_to_path(self, *, root: Path, key: str, destination: Path, max_size_bytes: int) -> int:
+        del root
+        normalized_key = self._normalize_key_from_any(key)
+        if not normalized_key:
+            raise FileNotFoundError(key)
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        result = self._bucket().get_object(normalized_key)
+        size = 0
+        try:
+            with destination.open("wb") as output_file:
+                while True:
+                    chunk = result.read(UPLOAD_STREAM_CHUNK_SIZE)
+                    if not chunk:
+                        break
+                    size += len(chunk)
+                    if size > max_size_bytes:
+                        raise ValueError("file exceeds max_size_bytes")
+                    output_file.write(chunk)
+        except Exception:
+            destination.unlink(missing_ok=True)
+            raise
+        return size
 
     def guess_media_type(self, key: str | None, default: str = "application/octet-stream") -> str:
         if not key:

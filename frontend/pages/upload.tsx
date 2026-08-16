@@ -752,8 +752,13 @@ export default function UploadPage({ user, token, account }: UploadPageProps) {
       setUploadProgress(100);
       setSuccessPath(destination);
       setSubmissionStage('redirecting');
-      setStatus({ type: 'success', message: isEditing ? '更新成功。' : '投稿成功。' });
-      submissionToast.success(isEditing);
+      const successMessage = isEditing
+        ? '更新成功。'
+        : resolvedDelivery === 'FILE'
+          ? '投稿成功，文件安全检查中。'
+          : '投稿成功。';
+      setStatus({ type: 'success', message: successMessage });
+      submissionToast.success(isEditing, successMessage.replace(/。$/, ''));
       window.setTimeout(() => window.location.replace(destination), 80);
     } catch (error: unknown) {
       const errorMessage = toErrorMessage(error, '投稿失败');

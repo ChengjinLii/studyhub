@@ -4,7 +4,7 @@ import json
 from datetime import UTC, datetime
 from typing import Any
 
-from sqlalchemy import func, inspect, or_, select, text
+from sqlalchemy import and_, func, inspect, or_, select, text
 from sqlalchemy.orm import Session, load_only
 
 from app.models.materials import (
@@ -15,6 +15,7 @@ from app.models.materials import (
     MaterialRatingRecord,
     MaterialRecord,
     MaterialReviewRecord,
+    MaterialSecurityScanRecord,
     MaterialVersionRecord,
     MaterialViewRecord,
 )
@@ -78,6 +79,52 @@ def _escape_like(value: str) -> str:
 
 
 class MaterialRepository:
+    def get_security_scan(self, session: Session, material_id: int) -> MaterialSecurityScanRecord | None:
+        stmt = select(MaterialSecurityScanRecord).where(MaterialSecurityScanRecord.material_id == material_id).limit(1)
+        return session.scalar(stmt)
+
+    def save_security_scan(
+        self,
+        session: Session,
+        entity: MaterialSecurityScanRecord,
+    ) -> MaterialSecurityScanRecord:
+        session.add(entity)
+        session.flush()
+        return entity
+
+    def list_ready_security_scans(
+        self,
+        session: Session,
+        now: datetime,
+        *,
+        stale_before: datetime,
+        limit: int = 4,
+    ) -> list[MaterialSecurityScanRecord]:
+        stmt = (
+            select(MaterialSecurityScanRecord)
+            .where(
+                or_(
+                    and_(
+                        MaterialSecurityScanRecord.status == "PENDING",
+                        or_(
+                            MaterialSecurityScanRecord.next_attempt_at.is_(None),
+                            MaterialSecurityScanRecord.next_attempt_at <= now,
+                        ),
+                    ),
+                    and_(
+                        MaterialSecurityScanRecord.status == "SCANNING",
+                        or_(
+                            MaterialSecurityScanRecord.claimed_at.is_(None),
+                            MaterialSecurityScanRecord.claimed_at <= stale_before,
+                        ),
+                    ),
+                )
+            )
+            .order_by(MaterialSecurityScanRecord.created_at.asc(), MaterialSecurityScanRecord.id.asc())
+            .limit(max(1, min(limit, 20)))
+        )
+        return list(session.scalars(stmt))
+
     def _uses_legacy_material_likes(self, session: Session) -> bool:
         table_names = _table_names(session)
         return "material_likes" in table_names and not _has_table_column(session, "material_likes", "updated_at")

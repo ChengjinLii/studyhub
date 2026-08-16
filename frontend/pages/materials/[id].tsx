@@ -86,6 +86,8 @@ export default function MaterialDetailPage({ material, user }: MaterialDetailPag
   const isManualPreview = Boolean(material?.previewSource === 'MANUAL');
   const isPdfMaterial = Boolean(material?.hasFile && material?.fileType?.toLowerCase() === 'pdf');
   const isExperienceMaterial = Boolean(material?.tags?.includes('经验分享'));
+  const securityScanStatus = material?.securityScanStatus ?? null;
+  const securityScanBlocked = Boolean(securityScanStatus && securityScanStatus !== 'CLEAN');
 
   useEffect(() => {
     if (!material || isExperienceMaterial) {
@@ -93,13 +95,17 @@ export default function MaterialDetailPage({ material, user }: MaterialDetailPag
       return;
     }
     const shouldPurchase = !material.free && !canManage && !purchased;
-    const canDownload = material.hasFile || material.hasNetdisk;
+    const canDownload = (material.hasFile || material.hasNetdisk) && !securityScanBlocked;
     const primaryLabel = shouldPurchase
       ? ordering
         ? '下单中...'
         : '立即下单'
-      : !canDownload
-        ? '暂不可获取'
+        : !canDownload
+        ? securityScanBlocked
+          ? securityScanStatus === 'INFECTED'
+            ? '文件未通过安全检查'
+            : '安全检查中'
+          : '暂不可获取'
         : downloading
           ? material.hasNetdisk
             ? '处理中...'
@@ -130,6 +136,8 @@ export default function MaterialDetailPage({ material, user }: MaterialDetailPag
     material,
     ordering,
     purchased,
+    securityScanBlocked,
+    securityScanStatus,
     setDetailActions,
   ]);
   const experienceImages = useMemo(() => material?.customPreviewImages ?? [], [material?.customPreviewImages]);
@@ -521,6 +529,22 @@ export default function MaterialDetailPage({ material, user }: MaterialDetailPag
                       <p>购买后可查看链接。</p>
                     </div>
                   )}
+                  {securityScanBlocked && (
+                    <div className={`detail-security-status detail-security-status--${securityScanStatus?.toLowerCase()}`} role="status">
+                      <strong>
+                        {securityScanStatus === 'INFECTED'
+                          ? '文件未通过安全检查'
+                          : securityScanStatus === 'ERROR'
+                            ? '安全检查暂未完成'
+                            : '文件安全检查中'}
+                      </strong>
+                      <span>
+                        {securityScanStatus === 'INFECTED'
+                          ? '该文件已被隔离，无法下载。'
+                          : '检查通过后会自动开放，无需重复投稿。'}
+                      </span>
+                    </div>
+                  )}
                   {((!material.free && !canManage) || material.hasFile || material.hasNetdisk) && (
                     <div className="detail-price-card__actions">
 	                      {!material.free && !canManage && (
@@ -533,9 +557,13 @@ export default function MaterialDetailPage({ material, user }: MaterialDetailPag
 	                          className={`button detail-action-download ${material.free || canManage || purchased ? 'primary' : 'ghost'}`}
 	                          type="button"
 	                          onClick={handleDownload}
-	                          disabled={downloading}
+	                          disabled={downloading || securityScanBlocked}
                         >
-                          {downloading
+                          {securityScanBlocked
+                            ? securityScanStatus === 'INFECTED'
+                              ? '文件已隔离'
+                              : '安全检查中'
+                            : downloading
                             ? material.hasNetdisk
                               ? '处理中...'
                               : '生成链接中...'

@@ -18,7 +18,7 @@ from app.core.profile_metadata import DEFAULT_FREE_DOWNLOAD_QUOTA
 from app.core.storage_mutation import StorageMutation
 from app.integrations.material_asset_store import MaterialAssetStore
 from app.models.auth import AuthUser
-from app.models.materials import MaterialFavoriteRecord, MaterialRatingRecord, MaterialRecord
+from app.models.materials import MaterialFavoriteRecord, MaterialRatingRecord, MaterialRecord, MaterialSecurityScanRecord
 from app.repos.auth_repo import AuthRepository
 from app.repos.material_repo import MaterialRepository
 from app.repos.read_api_repo import ReadApiRepository
@@ -373,7 +373,9 @@ class MaterialsService(MaterialsStorageMutationMixin, MaterialsCompatMixin):
 
     def get_detail(self, session: Session, current_user_id: int | None, material_id: int, can_manage_all: bool = False) -> dict[str, Any]:
         if self.settings.requires_private_env_file:
-            return self._compat_get_detail(session, current_user_id, material_id, can_manage_all)
+            detail = self._compat_get_detail(session, current_user_id, material_id, can_manage_all)
+            detail["securityScanStatus"] = self._material_security_status(session, material_id)
+            return detail
         self._bootstrap(session)
         material = self._load_accessible_material(session, material_id, current_user_id, can_manage_all)
         purchased = self._has_paid_access(session, material, current_user_id, can_manage_all) or material.is_free
@@ -417,6 +419,7 @@ class MaterialsService(MaterialsStorageMutationMixin, MaterialsCompatMixin):
                     }
                     for review in self.material_repo.list_reviews(session, material_id)
                 ],
+                "securityScanStatus": self._material_security_status(session, material_id),
             }
         )
         return detail
@@ -537,6 +540,7 @@ class MaterialsService(MaterialsStorageMutationMixin, MaterialsCompatMixin):
                 "myRating": my_rating,
                 "versions": versions,
                 "reviews": reviews,
+                "securityScanStatus": self._material_security_status(session, material_id),
             }
         )
         return detail_base
@@ -714,6 +718,12 @@ class MaterialsService(MaterialsStorageMutationMixin, MaterialsCompatMixin):
                 is_create=True,
                 storage_mutation=storage_mutation,
             )
+            self._queue_material_security_scan(
+                session,
+                material,
+                release_status="VISIBLE",
+                release_review_status="APPROVED",
+            )
             self.material_repo.save_material(session, material)
             self.material_repo.add_version(session, material_id=material.id, version_label="v1.0")
             session.commit()
@@ -753,6 +763,12 @@ class MaterialsService(MaterialsStorageMutationMixin, MaterialsCompatMixin):
         self._bootstrap(session)
         material = self._load_accessible_material(session, material_id, operator_id, can_manage_all, require_owner=True)
         file_upload = zip_file or markdown_file
+        release_status = material.status or "VISIBLE"
+        release_review_status = material.review_status
+        existing_scan = self.material_repo.get_security_scan(session, material_id)
+        if existing_scan is not None and existing_scan.status in {"PENDING", "SCANNING"}:
+            release_status = existing_scan.release_status or "VISIBLE"
+            release_review_status = existing_scan.release_review_status
         storage_mutation = StorageMutation(self.asset_store.delete_key)
         try:
             self._apply_payload_to_material(
@@ -764,6 +780,13 @@ class MaterialsService(MaterialsStorageMutationMixin, MaterialsCompatMixin):
                 is_create=False,
                 storage_mutation=storage_mutation,
             )
+            if file_upload is not None:
+                self._queue_material_security_scan(
+                    session,
+                    material,
+                    release_status=release_status,
+                    release_review_status=release_review_status,
+                )
             version_index = len(self.material_repo.list_versions(session, material.id)) + 1
             self.material_repo.add_version(session, material_id=material.id, version_label=f"v{version_index}.0")
             self.material_repo.save_material(session, material)
@@ -1086,6 +1109,7 @@ class MaterialsService(MaterialsStorageMutationMixin, MaterialsCompatMixin):
         session.commit()
 
     def generate_download(self, session: Session, material_id: int, *, user_id: int, role_mask: int | None) -> dict[str, Any]:
+        self._assert_material_security_scan_complete(session, material_id)
         if self.settings.requires_private_env_file:
             return self._compat_generate_download(session, material_id, user_id=user_id, role_mask=role_mask)
         self._bootstrap(session)
@@ -1110,6 +1134,8 @@ class MaterialsService(MaterialsStorageMutationMixin, MaterialsCompatMixin):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="资料缺少有效的下载方式")
 
     def generate_batch_downloads(self, session: Session, material_ids: list[int], *, user_id: int, role_mask: int | None) -> list[dict[str, Any]]:
+        for material_id in dict.fromkeys(material_ids):
+            self._assert_material_security_scan_complete(session, material_id)
         if self.settings.requires_private_env_file:
             return self._compat_generate_batch_downloads(session, material_ids, user_id=user_id, role_mask=role_mask)
         self._bootstrap(session)
@@ -1209,6 +1235,48 @@ class MaterialsService(MaterialsStorageMutationMixin, MaterialsCompatMixin):
         seed = self.read_repo.load_seed()
         self.material_repo.ensure_seed_bootstrap(session, seed)
         return seed
+
+    def _queue_material_security_scan(
+        self,
+        session: Session,
+        material: MaterialRecord,
+        *,
+        release_status: str,
+        release_review_status: str | None,
+    ) -> None:
+        if not self.settings.resolved_material_security_scan_enabled or not material.file_storage_key:
+            return
+        scan = self.material_repo.get_security_scan(session, int(material.id))
+        if scan is None:
+            scan = MaterialSecurityScanRecord(material_id=int(material.id), object_key=material.file_storage_key)
+        scan.object_key = material.file_storage_key
+        scan.status = "PENDING"
+        scan.release_status = release_status
+        scan.release_review_status = release_review_status
+        scan.attempt_count = 0
+        scan.next_attempt_at = None
+        scan.claimed_at = None
+        scan.scanned_at = None
+        scan.scanner_version = None
+        scan.finding = None
+        scan.last_error = None
+        material.status = "HIDDEN"
+        material.review_status = "SECURITY_PENDING"
+        self.material_repo.save_security_scan(session, scan)
+
+    def _material_security_status(self, session: Session, material_id: int) -> str | None:
+        scan = self.material_repo.get_security_scan(session, material_id)
+        return scan.status if scan is not None else None
+
+    def _assert_material_security_scan_complete(self, session: Session, material_id: int) -> None:
+        scan = self.material_repo.get_security_scan(session, material_id)
+        if scan is None or scan.status == "CLEAN":
+            return
+        if scan.status == "INFECTED":
+            raise HTTPException(status_code=status.HTTP_423_LOCKED, detail="文件未通过安全检查，暂不可下载")
+        if scan.status == "ERROR":
+            raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="文件安全检查暂未完成，请稍后再试")
+        raise HTTPException(status_code=status.HTTP_423_LOCKED, detail="文件正在进行安全检查，请稍后再试")
 
     def _resolve_current_user(self, session: Session, current_user_id: int | None) -> dict[str, Any] | None:
         if current_user_id is None:

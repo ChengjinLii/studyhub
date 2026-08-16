@@ -35,6 +35,7 @@ from app.models.materials import (
     MaterialRatingRecord,
     MaterialRecord,
     MaterialReviewRecord,
+    MaterialSecurityScanRecord,
     MaterialVersionRecord,
     MaterialViewRecord,
 )
@@ -73,6 +74,7 @@ __all__ = [
     "MaterialRatingRecord",
     "MaterialRecord",
     "MaterialReviewRecord",
+    "MaterialSecurityScanRecord",
     "MaterialVersionRecord",
     "MaterialViewRecord",
     "MarketItemRecord",

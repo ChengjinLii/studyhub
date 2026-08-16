@@ -1,0 +1,11 @@
+[Unit]
+Description=Run StudyHub material security scans
+
+[Timer]
+OnBootSec=2m
+OnUnitActiveSec=2m
+RandomizedDelaySec=20s
+Persistent=true
+
+[Install]
+WantedBy=timers.target

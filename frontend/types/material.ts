@@ -121,6 +121,7 @@ export interface MaterialDetail extends MaterialListItem {
   favorited?: boolean;
   liked?: boolean;
   myRating?: number | null;
+  securityScanStatus?: 'PENDING' | 'SCANNING' | 'CLEAN' | 'INFECTED' | 'ERROR' | null;
   hasFile: boolean;
   versions: MaterialVersion[];
   reviews: MaterialReview[];

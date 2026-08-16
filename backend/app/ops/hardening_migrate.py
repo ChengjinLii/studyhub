@@ -10,15 +10,24 @@ from sqlalchemy import inspect, text
 from app.core.config import get_settings
 from app.core.db import get_engine
 from app.models.finance import FinanceInstructionRecord
+from app.models.materials import MaterialSecurityScanRecord
 from app.ops.schema_audit import require_recent_nonempty_backup
 
 
-MODULE_TABLES = {"finance-outbox": (FinanceInstructionRecord.__table__,)}
+MODULE_TABLES = {
+    "finance-outbox": (FinanceInstructionRecord.__table__,),
+    "material-security": (MaterialSecurityScanRecord.__table__,),
+}
 MODULE_DEFAULTS = {
     "finance-outbox": (
         ("finance_instructions", "status", "'PENDING'"),
         ("finance_instructions", "attempt_count", "0"),
-    )
+    ),
+    "material-security": (
+        ("material_security_scans", "status", "'PENDING'"),
+        ("material_security_scans", "release_status", "'VISIBLE'"),
+        ("material_security_scans", "attempt_count", "0"),
+    ),
 }
 
 

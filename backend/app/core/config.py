@@ -327,6 +327,10 @@ class Settings(BaseSettings):
     kyc_max_attempts_per_day: int = 2
     payout_qr_max_size_bytes: int = 5 * 1024 * 1024
     material_file_max_size_bytes: int = 50 * 1024 * 1024
+    material_security_scan_enabled: bool = False
+    material_security_scanner_command: str = "clamscan"
+    material_security_scan_timeout_seconds: int = 240
+    material_security_scan_max_attempts: int = 5
     material_preview_image_max_size_bytes: int = 5 * 1024 * 1024
     material_manual_preview_max_images: int = 10
     material_custom_preview_max_images: int = 5
@@ -462,6 +466,10 @@ class Settings(BaseSettings):
         if self.finance_outbox_enabled is not None:
             return bool(self.finance_outbox_enabled)
         return self.is_production
+
+    @property
+    def resolved_material_security_scan_enabled(self) -> bool:
+        return bool(self.material_security_scan_enabled)
 
     @property
     def resolved_contract_sample_dir(self) -> Path:

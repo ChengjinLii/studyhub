@@ -9873,6 +9873,38 @@ g.studyhub-popup-poster__hotspot:hover > text {
   overflow-wrap: anywhere;
 }
 
+.detail-security-status {
+  display: grid;
+  gap: 4px;
+  padding: 11px 12px;
+  border: 1px solid #b9cae8;
+  border-radius: 6px;
+  background: #f5f8fd;
+  color: #28446d;
+}
+
+.detail-security-status strong {
+  font-size: 14px;
+  color: #173f76;
+}
+
+.detail-security-status span {
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.detail-security-status--infected,
+.detail-security-status--error {
+  border-color: #e2b8b8;
+  background: #fff7f7;
+  color: #7b3030;
+}
+
+.detail-security-status--infected strong,
+.detail-security-status--error strong {
+  color: #8b2424;
+}
+
 .detail-price-card__actions {
   display: flex;
   flex-direction: column;

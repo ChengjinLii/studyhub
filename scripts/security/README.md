@@ -18,6 +18,7 @@ bash scripts/security/check-sensitive-files.sh
 - `deploy/nginx/studyhub-abuse-server.conf`：连接限制、慢请求保护、仅本机 metrics 与 Nginx status，以及前端和 API 统一安全响应头
 - `deploy/systemd/studyhub-backend-hardening.conf`：Uvicorn 并发和 backlog 上限
 - `runtime-abuse-monitor.py`：每分钟检查请求峰值、429、5xx、连接数、CPU、内存、磁盘、inode、证书、服务和本机探针
+- `install-material-scanner.sh`：在 ClamAV 签名库就绪后启用低优先级异步投稿扫描；新站内文件在扫描通过前保持隐藏且不能生成下载链接，旧资料不回溯改状态
 
 生产安装入口：
 

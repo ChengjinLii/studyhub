@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import json
 import math
+import shutil
 import socket
 from dataclasses import dataclass
 from pathlib import Path
@@ -130,6 +131,15 @@ def build_checks(settings: Settings, *, check_network: bool, timeout_seconds: fl
         _check_site_origin_consistency(settings),
         _check_csp_rollout(settings),
     ]
+    if settings.resolved_material_security_scan_enabled:
+        scanner_path = shutil.which(settings.material_security_scanner_command)
+        checks.append(
+            CheckResult(
+                "material-security-scanner",
+                scanner_path is not None,
+                scanner_path or f"command not found: {settings.material_security_scanner_command}",
+            )
+        )
 
     if settings.payment_provider == "alipay_page" or settings.payout_transfer_provider == "alipay_transfer":
         checks.extend(

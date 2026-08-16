@@ -1,0 +1,24 @@
+[Unit]
+Description=StudyHub isolated material malware scan worker
+After=network-online.target studyhub-backend.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/data/studyhub-runtime/current/backend
+Environment=STUDYHUB_ENVIRONMENT=production
+Environment=STUDYHUB_PRIVATE_DIR_PATH=/data/studyhub/private
+ExecStart=/data/studyhub-runtime/current/.venv/bin/python -m app.ops.material_security_scan
+Nice=15
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7
+CPUQuota=50%
+MemoryMax=1200M
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ReadOnlyPaths=/data/studyhub-runtime /data/studyhub/private /var/lib/clamav
+ReadWritePaths=/data/studyhub/private/quarantine

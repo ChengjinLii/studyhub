@@ -130,6 +130,14 @@ class MaterialAssetStore:
             max_size_bytes=max_size_bytes,
         )
 
+    def copy_to_path(self, key: str, destination: Path, *, max_size_bytes: int) -> int:
+        return self.storage_provider.copy_to_path(
+            root=self.settings.resolved_material_asset_dir,
+            key=key,
+            destination=destination,
+            max_size_bytes=max_size_bytes,
+        )
+
     def guess_media_type(self, key: str | None, default: str = "application/octet-stream") -> str:
         return self.storage_provider.guess_media_type(key, default=default)
 

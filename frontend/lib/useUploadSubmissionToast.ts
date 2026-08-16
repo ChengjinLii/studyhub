@@ -9,8 +9,8 @@ export const useUploadSubmissionToast = () => {
     preparing: () => toast.show('正在准备投稿内容…', { id, tone: 'loading' }),
     uploading: (editing: boolean) => toast.show(editing ? '正在上传更新内容…' : '正在上传资料…', { id, tone: 'loading' }),
     processing: () => toast.show('文件上传完成，正在保存资料…', { id, tone: 'loading' }),
-    success: (editing: boolean) => {
-      const message = editing ? '资料更新成功' : '资料投稿成功';
+    success: (editing: boolean, detail?: string) => {
+      const message = detail || (editing ? '资料更新成功' : '资料投稿成功');
       toast.show(`${message}，正在打开资料页`, { id, tone: 'success' });
       queueNextAppToast(message);
     },
