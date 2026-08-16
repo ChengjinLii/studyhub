@@ -12,6 +12,10 @@ BACKEND_SMOKE_PORT="${STUDYHUB_RELEASE_BACKEND_SMOKE_PORT:-18311}"
 FRONTEND_SMOKE_PORT="${STUDYHUB_RELEASE_FRONTEND_SMOKE_PORT:-13300}"
 LOCK_FILE="$RUNTIME_ROOT/deploy.lock"
 PIP_INDEX_URL="${STUDYHUB_RELEASE_PIP_INDEX_URL:-https://pypi.org/simple}"
+NODE_MAJOR="$(tr -d '[:space:]' < "$CONTROL_ROOT/.nvmrc")"
+DEFAULT_NPM_BIN="$(compgen -G "/opt/node-v${NODE_MAJOR}*/bin/npm" | sort -V | tail -1 || true)"
+NPM_BIN="${STUDYHUB_NPM_BIN:-${DEFAULT_NPM_BIN:-$(command -v npm)}}"
+NODE_BIN_DIR="$(dirname "$NPM_BIN")"
 
 if ! [[ "$KEEP_RELEASES" =~ ^[2-9][0-9]*$ ]]; then
   echo "STUDYHUB_RELEASE_KEEP must be an integer >= 2"
@@ -23,6 +27,14 @@ for port in "$BACKEND_SMOKE_PORT" "$FRONTEND_SMOKE_PORT"; do
     exit 2
   fi
 done
+if [[ ! -x "$NPM_BIN" || ! -x "$NODE_BIN_DIR/node" ]]; then
+  echo "project Node/npm executable not found: $NPM_BIN"
+  exit 1
+fi
+if [[ "$("$NODE_BIN_DIR/node" --version)" != v"$NODE_MAJOR".* ]]; then
+  echo "Node version does not match .nvmrc: $("$NODE_BIN_DIR/node" --version)"
+  exit 1
+fi
 
 mkdir -p "$RELEASES_ROOT"
 exec 9>"$LOCK_FILE"
@@ -63,14 +75,14 @@ echo "[1/5] install locked dependencies"
 python3.12 -m venv "$RELEASE/.venv"
 "$RELEASE/.venv/bin/python" -m pip install --disable-pip-version-check --index-url "$PIP_INDEX_URL" \
   --require-hashes -r "$RELEASE/backend/requirements.lock"
-npm --prefix "$RELEASE/frontend" ci --no-audit --no-fund
+PATH="$NODE_BIN_DIR:$PATH" "$NPM_BIN" --prefix "$RELEASE/frontend" ci --no-audit --no-fund
 
 echo "[2/5] build frontend in isolated release"
 (
   cd "$RELEASE/frontend"
   NEXT_PUBLIC_API_BASE=/api \
   NEXT_PUBLIC_BUILD_GIT_SHA="$SHORT_SHA" \
-  npm run build
+  PATH="$NODE_BIN_DIR:$PATH" "$NPM_BIN" run build
 )
 
 echo "[3/5] smoke isolated release"
@@ -89,7 +101,7 @@ BACKEND_PID=$!
   NEXT_PUBLIC_API_BASE=/api \
   API_BASE_URL="http://127.0.0.1:$BACKEND_SMOKE_PORT/api" \
   API_BASE_INTERNAL="http://127.0.0.1:$BACKEND_SMOKE_PORT/api" \
-  npm run start -- --hostname 127.0.0.1 --port "$FRONTEND_SMOKE_PORT"
+  PATH="$NODE_BIN_DIR:$PATH" "$NPM_BIN" run start -- --hostname 127.0.0.1 --port "$FRONTEND_SMOKE_PORT"
 ) >"$RELEASE/frontend-smoke.log" 2>&1 &
 FRONTEND_PID=$!
 

@@ -5,7 +5,9 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 RUNTIME_ROOT="${STUDYHUB_RELEASE_ROOT:-/data/studyhub-runtime}"
 CURRENT_ROOT="$RUNTIME_ROOT/current"
 APP_USER="${STUDYHUB_APP_USER:-$(id -un)}"
-NPM_BIN="${STUDYHUB_NPM_BIN:-$(command -v npm)}"
+NODE_MAJOR="$(tr -d '[:space:]' < "$ROOT_DIR/.nvmrc")"
+DEFAULT_NPM_BIN="$(compgen -G "/opt/node-v${NODE_MAJOR}*/bin/npm" | sort -V | tail -1 || true)"
+NPM_BIN="${STUDYHUB_NPM_BIN:-${DEFAULT_NPM_BIN:-$(command -v npm)}}"
 STAMP="$(date -u +%Y%m%dT%H%M%SZ)"
 BACKUP_DIR="$ROOT_DIR/private/backups/atomic-services-$STAMP"
 
@@ -15,6 +17,10 @@ if [[ "$EUID" -eq 0 ]]; then
 fi
 if [[ ! -x "$NPM_BIN" ]]; then
   echo "npm executable not found: $NPM_BIN"
+  exit 1
+fi
+if [[ "$("$(dirname "$NPM_BIN")/node" --version)" != v"$NODE_MAJOR".* ]]; then
+  echo "Node version does not match .nvmrc: $("$(dirname "$NPM_BIN")/node" --version)"
   exit 1
 fi
 
