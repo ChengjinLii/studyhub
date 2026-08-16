@@ -8,6 +8,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from pydantic import ValidationError
 
+from app.core.observability import get_runtime_metrics
 from app.core.response import api_fail
 
 
@@ -68,6 +69,17 @@ def _extract_http_error(ex: HTTPException) -> tuple[str, str]:
     return code, translate_reason(code, None)
 
 
+def _record_server_error(request: Request, ex: Exception, status_code: int) -> str:
+    route = request.scope.get("route")
+    route_path = getattr(route, "path", None) or request.url.path
+    exception_type = f"{type(ex).__module__}.{type(ex).__qualname__}"
+    return get_runtime_metrics().record_error(
+        exception_type=exception_type,
+        route=route_path,
+        status_code=status_code,
+    )
+
+
 def install_exception_handlers(app: FastAPI) -> None:
     @app.exception_handler(RequestValidationError)
     async def handle_request_validation(_: Request, ex: RequestValidationError) -> JSONResponse:
@@ -87,17 +99,19 @@ def install_exception_handlers(app: FastAPI) -> None:
         return JSONResponse(status_code=ex.status_code, content=api_fail(ex.code, ex.message))
 
     @app.exception_handler(HTTPException)
-    async def handle_http(_: Request, ex: HTTPException) -> JSONResponse:
+    async def handle_http(request: Request, ex: HTTPException) -> JSONResponse:
         code, message = _extract_http_error(ex)
         if ex.status_code >= 500:
-            logger.exception("HTTP exception [%s]", code)
+            fingerprint = _record_server_error(request, ex, ex.status_code)
+            logger.exception("HTTP exception [%s]", code, extra={"error_fingerprint": fingerprint})
         else:
             logger.info("HTTP exception [%s]: %s", code, message)
         return JSONResponse(status_code=ex.status_code, content=api_fail(code, message))
 
     @app.exception_handler(Exception)
-    async def handle_exception(_: Request, ex: Exception) -> JSONResponse:
-        logger.exception("Unexpected error", exc_info=ex)
+    async def handle_exception(request: Request, ex: Exception) -> JSONResponse:
+        fingerprint = _record_server_error(request, ex, 500)
+        logger.exception("Unexpected error", exc_info=ex, extra={"error_fingerprint": fingerprint})
         return JSONResponse(
             status_code=500,
             content=api_fail("SERVER_ERROR", "系统繁忙，请稍后再试"),

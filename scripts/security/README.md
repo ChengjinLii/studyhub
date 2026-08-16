@@ -17,7 +17,7 @@ bash scripts/security/check-sensitive-files.sh
 - `deploy/nginx/studyhub-abuse-zones.conf`：按全局、写请求、认证、AI、MCP 和 `/v1` 分桶限速
 - `deploy/nginx/studyhub-abuse-server.conf`：连接限制、慢请求保护、仅本机 metrics 与 Nginx status，以及前端和 API 统一安全响应头
 - `deploy/systemd/studyhub-backend-hardening.conf`：Uvicorn 并发和 backlog 上限
-- `runtime-abuse-monitor.py`：每分钟检查请求峰值、429、5xx、连接数、CPU、内存、磁盘、inode、证书、服务和本机探针
+- `runtime-abuse-monitor.py`：每分钟检查请求峰值、429、5xx、连接数、CPU、内存、磁盘、inode、证书、服务和本机探针，并保留 14 天精简趋势与错误指纹
 - `install-material-scanner.sh`：在 ClamAV 签名库就绪后启用低优先级异步投稿扫描；新站内文件在扫描通过前保持隐藏且不能生成下载链接，旧资料不回溯改状态
 
 生产安装入口：
@@ -30,7 +30,7 @@ sudo STUDYHUB_ENABLE_UFW=1 bash scripts/security/install-runtime-guards.sh --app
 
 应用限流默认保留校园 NAT 突发空间，同时收紧登录、邮件验证码、投稿、AI 和 MCP。Nginx 对投稿保留当前 128MB body 上限，不改变站内 50MB 文件加预览图的业务能力。详细 readiness 和 metrics 只允许源站本机访问，公网 health 只返回最小存活状态。
 
-监控复用 `private/.env.production` 中的 SMTP 配置，并从同一私有文件的 `STUDYHUB_ABUSE_MONITOR_ALERT_EMAILS` 读取逗号分隔的管理员地址。它会发送已确认告警、每小时持续告警提醒和恢复通知；异常默认连续出现 3 次才发首封，之后连续健康 2 次才发一次恢复，失败通知每五分钟重试。单次 CPU 抖动或一分钟内完成的正常部署不会发信。公开的 systemd unit 不应写入真实收件地址。私有配置示例：
+监控复用 `private/.env.production` 中的 SMTP 配置，并从同一私有文件的 `STUDYHUB_ABUSE_MONITOR_ALERT_EMAILS` 读取逗号分隔的管理员地址。它会发送已确认告警、每小时持续告警提醒和恢复通知；异常默认连续出现 3 次才发首封，之后连续健康 2 次才发一次恢复，失败通知每五分钟重试。告警集合会生成稳定指纹，同一指纹在冷却期内不会重复发送。单次 CPU 抖动或一分钟内完成的正常部署不会发信。公开的 systemd unit 不应写入真实收件地址。私有配置示例：
 
 ```dotenv
 STUDYHUB_ABUSE_MONITOR_ALERT_EMAILS=admin@example.com,ops@example.com
@@ -42,7 +42,10 @@ STUDYHUB_ABUSE_MONITOR_ALERT_EMAILS=admin@example.com,ops@example.com
 sudo systemctl status studyhub-abuse-monitor.timer
 sudo journalctl -u studyhub-abuse-monitor.service --since today
 sudo cat /var/lib/studyhub-security/runtime-abuse-status.json
+sudo tail -n 20 /var/lib/studyhub-security/history/runtime-history-$(date +%F).jsonl
 ```
+
+趋势记录按天写入 JSONL，并自动删除 14 天以前的文件。应用异常只记录异常类型、路由模板、状态码和 12 位稳定指纹，不保存异常消息、请求正文、用户身份或认证信息。应用进程重启后自身计数会重新开始，但历史文件同时保存进程启动时间，趋势分析可以识别重启边界。
 
 安装后可发送一次不改变告警状态的投递测试：
 

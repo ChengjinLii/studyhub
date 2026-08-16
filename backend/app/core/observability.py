@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 from dataclasses import dataclass, field
+import hashlib
 from threading import Lock
 import time
 
@@ -61,6 +62,7 @@ class RuntimeMetrics:
         self._mcp_tool_durations: dict[tuple[str, str], _Aggregate] = defaultdict(_Aggregate)
         self._cache_events_total: dict[tuple[str, str, str], int] = defaultdict(int)
         self._security_events_total: dict[tuple[str, str], int] = defaultdict(int)
+        self._errors_total: dict[tuple[str, str, str, str], int] = defaultdict(int)
         self._ai_agent_runs_total: dict[tuple[str, str, str, str, str], int] = defaultdict(int)
         self._ai_agent_run_durations: dict[tuple[str, str, str, str, str], _Aggregate] = defaultdict(_Aggregate)
         self._ai_agent_feedback_total: dict[tuple[str, str, str, str], int] = defaultdict(int)
@@ -75,6 +77,7 @@ class RuntimeMetrics:
             self._mcp_tool_durations.clear()
             self._cache_events_total.clear()
             self._security_events_total.clear()
+            self._errors_total.clear()
             self._ai_agent_runs_total.clear()
             self._ai_agent_run_durations.clear()
             self._ai_agent_feedback_total.clear()
@@ -133,6 +136,16 @@ class RuntimeMetrics:
         reason_key = reason or "unknown"
         with self._lock:
             self._security_events_total[(event_key, reason_key)] += 1
+
+    def record_error(self, *, exception_type: str, route: str, status_code: int) -> str:
+        kind = _bounded_label(exception_type or "unknown")
+        route_key = (route or "/")[:160]
+        status_key = str(int(status_code or 500))
+        canonical = f"{kind}|{route_key}|{status_key}"
+        fingerprint = hashlib.sha256(canonical.encode("utf-8")).hexdigest()[:12]
+        with self._lock:
+            self._errors_total[(fingerprint, kind, route_key, status_key)] += 1
+        return fingerprint
 
     def record_ai_agent_run(
         self,
@@ -277,6 +290,20 @@ class RuntimeMetrics:
             for (event, reason), count in sorted(self._security_events_total.items()):
                 labels = 'event="%s",reason="%s"' % (_sanitize_label(event), _sanitize_label(reason))
                 lines.append(f"studyhub_security_events_total{{{labels}}} {count}")
+            lines.extend(
+                [
+                    "# HELP studyhub_errors_total Handled server errors grouped by a stable privacy-safe fingerprint.",
+                    "# TYPE studyhub_errors_total counter",
+                ]
+            )
+            for (fingerprint, kind, route, status_code), count in sorted(self._errors_total.items()):
+                labels = 'fingerprint="%s",kind="%s",route="%s",status_code="%s"' % (
+                    _sanitize_label(fingerprint),
+                    _sanitize_label(kind),
+                    _sanitize_label(route),
+                    _sanitize_label(status_code),
+                )
+                lines.append(f"studyhub_errors_total{{{labels}}} {count}")
             lines.extend(
                 [
                     "# HELP studyhub_ai_agent_runs_total StudyHub Agent recommendation runs by provider, status, and bounded context usage.",

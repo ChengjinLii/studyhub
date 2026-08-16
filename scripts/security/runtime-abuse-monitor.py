@@ -5,6 +5,7 @@ import argparse
 from collections import Counter
 from datetime import datetime, timedelta, timezone
 from email.message import EmailMessage
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -23,6 +24,10 @@ ACCESS_PATTERN = re.compile(
     r'^(?P<ip>\S+) .* \[(?P<timestamp>[^\]]+)\] "(?P<method>\S+) (?P<path>\S+) [^"]+" '
     r'(?P<status>\d{3}) '
 )
+PROMETHEUS_LINE_PATTERN = re.compile(
+    r"^(?P<name>[A-Za-z_:][A-Za-z0-9_:]*)(?:\{(?P<labels>.*)\})?\s+(?P<value>-?[0-9.eE+]+)$"
+)
+PROMETHEUS_LABEL_PATTERN = re.compile(r'(?P<key>[A-Za-z_][A-Za-z0-9_]*)="(?P<value>(?:\\.|[^"])*)"')
 
 
 def positive_int(value: str) -> int:
@@ -44,6 +49,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--access-log", default="/var/log/nginx/access.log")
     parser.add_argument("--status-file")
     parser.add_argument("--alert-state-file")
+    parser.add_argument("--history-dir")
+    parser.add_argument("--history-retention-days", type=positive_int, default=14)
+    parser.add_argument("--metrics-url")
     parser.add_argument("--env-file")
     parser.add_argument("--alert-email", action="append", default=[])
     parser.add_argument("--alert-cooldown-seconds", type=positive_int, default=3600)
@@ -194,6 +202,94 @@ def probe_url(url: str) -> str | None:
     return None
 
 
+def collect_application_metrics(url: str | None) -> dict[str, object]:
+    if not url:
+        return {"available": False, "error": "not_configured"}
+    request = Request(url, headers={"User-Agent": "StudyHub-Runtime-Monitor/1.0"})
+    try:
+        with urlopen(request, timeout=5) as response:
+            body = response.read(2_000_000).decode("utf-8", errors="replace")
+    except Exception as exc:
+        return {"available": False, "error": type(exc).__name__}
+
+    return parse_application_metrics(body)
+
+
+def parse_application_metrics(body: str) -> dict[str, object]:
+
+    process_start: float | None = None
+    requests_total = 0
+    server_errors_total = 0
+    fingerprints: list[dict[str, object]] = []
+    for raw_line in body.splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#"):
+            continue
+        match = PROMETHEUS_LINE_PATTERN.match(line)
+        if match is None:
+            continue
+        name = match.group("name")
+        try:
+            value = float(match.group("value"))
+        except ValueError:
+            continue
+        labels = {
+            label.group("key"): label.group("value")
+            for label in PROMETHEUS_LABEL_PATTERN.finditer(match.group("labels") or "")
+        }
+        if name == "studyhub_process_start_time_seconds":
+            process_start = value
+        elif name == "studyhub_http_requests_total":
+            requests_total += int(value)
+            if labels.get("status_code", "").startswith("5"):
+                server_errors_total += int(value)
+        elif name == "studyhub_errors_total":
+            fingerprints.append(
+                {
+                    "fingerprint": labels.get("fingerprint", "unknown")[:24],
+                    "kind": labels.get("kind", "unknown")[:96],
+                    "route": labels.get("route", "/")[:160],
+                    "statusCode": labels.get("status_code", "500")[:3],
+                    "count": int(value),
+                }
+            )
+    fingerprints.sort(key=lambda item: int(item["count"]), reverse=True)
+    return {
+        "available": True,
+        "processStartTimeSeconds": process_start,
+        "requestsTotal": requests_total,
+        "serverErrorsTotal": server_errors_total,
+        "errorFingerprints": fingerprints[:20],
+    }
+
+
+def append_history(
+    history_dir: str | None,
+    *,
+    now: datetime,
+    retention_days: int,
+    payload: dict[str, object],
+) -> None:
+    if not history_dir:
+        return
+    directory = Path(history_dir)
+    directory.mkdir(parents=True, exist_ok=True, mode=0o750)
+    target = directory / f"runtime-history-{now.date().isoformat()}.jsonl"
+    with target.open("a", encoding="utf-8") as handle:
+        handle.write(json.dumps(payload, ensure_ascii=True, separators=(",", ":")) + "\n")
+    target.chmod(0o640)
+
+    cutoff = now.date() - timedelta(days=retention_days - 1)
+    for candidate in directory.glob("runtime-history-????-??-??.jsonl"):
+        date_text = candidate.name.removeprefix("runtime-history-").removesuffix(".jsonl")
+        try:
+            candidate_date = datetime.strptime(date_text, "%Y-%m-%d").date()
+        except ValueError:
+            continue
+        if candidate_date < cutoff:
+            candidate.unlink(missing_ok=True)
+
+
 def load_env_file(path: str | None) -> dict[str, str]:
     values: dict[str, str] = {}
     if not path:
@@ -302,6 +398,13 @@ def _parse_time(value: object) -> datetime | None:
         return None
 
 
+def _alert_fingerprint(codes: set[str]) -> str | None:
+    if not codes:
+        return None
+    canonical = "|".join(sorted(codes))
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()[:12]
+
+
 def notify(
     *,
     args: argparse.Namespace,
@@ -312,11 +415,14 @@ def notify(
     state = read_json(args.alert_state_file)
     previous_codes = {str(code) for code in state.get("activeAlertCodes", [])}
     current_codes = set(alerts)
+    alert_fingerprint = _alert_fingerprint(current_codes)
     observed_codes = {str(code) for code in state.get("observedAlertCodes", [])}
     observed_runs = int(state.get("observedAlertRuns", 0) or 0)
     healthy_runs = int(state.get("healthyRuns", 0) or 0)
     last_attempt = _parse_time(state.get("lastAttemptAt"))
-    last_sent = _parse_time(state.get("lastSentAt"))
+    raw_fingerprint_times = state.get("lastSentByFingerprint", {})
+    fingerprint_times = raw_fingerprint_times if isinstance(raw_fingerprint_times, dict) else {}
+    fingerprint_last_sent = _parse_time(fingerprint_times.get(alert_fingerprint)) if alert_fingerprint else None
     notification_type: str | None = None
     last_attempt_failed = state.get("lastAttemptFailed") is True
     retry_elapsed = (
@@ -333,9 +439,11 @@ def notify(
             observed_codes = current_codes
             observed_runs = 1
         if observed_runs >= args.alert_confirm_runs:
-            changed = current_codes != previous_codes
-            cooldown_elapsed = last_sent is None or (now - last_sent).total_seconds() >= args.alert_cooldown_seconds
-            if retry_elapsed and (changed or cooldown_elapsed):
+            cooldown_elapsed = (
+                fingerprint_last_sent is None
+                or (now - fingerprint_last_sent).total_seconds() >= args.alert_cooldown_seconds
+            )
+            if retry_elapsed and cooldown_elapsed:
                 notification_type = "alert"
     elif previous_codes:
         observed_codes = set()
@@ -391,11 +499,20 @@ def notify(
             state["lastSentAt"] = now.isoformat()
             if notification_type == "alert":
                 state["activeAlertCodes"] = sorted(current_codes)
+                if alert_fingerprint is not None:
+                    fingerprint_times[alert_fingerprint] = now.isoformat()
             else:
                 state["activeAlertCodes"] = []
                 healthy_runs = 0
             notification = {"status": "sent", "type": notification_type, "recipients": len(args.alert_email)}
 
+    fingerprint_cutoff = now - timedelta(days=30)
+    state["lastSentByFingerprint"] = {
+        str(fingerprint): str(sent_at)
+        for fingerprint, sent_at in fingerprint_times.items()
+        if (_parse_time(sent_at) or now) >= fingerprint_cutoff
+    }
+    state["currentAlertFingerprint"] = alert_fingerprint
     state["observedAlertCodes"] = sorted(observed_codes)
     state["observedAlertRuns"] = observed_runs
     state["healthyRuns"] = healthy_runs
@@ -461,6 +578,7 @@ def main() -> int:
     filesystems = [item for item in filesystems if item is not None]
     services = {name: service_is_active(name) for name in args.service}
     probes = {url: probe_url(url) for url in args.probe_url}
+    application_metrics = collect_application_metrics(args.metrics_url)
     certificate_days = certificate_days_remaining(args.certificate_file) if args.certificate_file else None
     alerts: dict[str, str] = {}
 
@@ -513,9 +631,17 @@ def main() -> int:
         "probes": probes,
         "certificateDaysRemaining": certificate_days,
         "alerts": [f"{code}={value}" for code, value in sorted(alerts.items())],
+        "alertFingerprint": _alert_fingerprint(set(alerts)),
+        "application": application_metrics,
     }
     payload["notification"] = notify(args=args, now=now, alerts=alerts, payload=payload)
     write_json(args.status_file, payload)
+    append_history(
+        args.history_dir,
+        now=now,
+        retention_days=args.history_retention_days,
+        payload=payload,
+    )
     prefix = "SECURITY_ALERT" if alerts else "security_monitor_ok"
     print(f"{prefix} {json.dumps(payload, ensure_ascii=True, separators=(',', ':'))}")
     return 2 if alerts and args.fail_on_alert else 0

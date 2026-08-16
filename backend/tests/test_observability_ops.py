@@ -58,6 +58,11 @@ def test_http_metrics_include_duration_histogram_buckets() -> None:
     metrics.record_http_request(method="GET", route="/api/materials", status_code=200, duration_seconds=0.28)
     metrics.record_worker_job(job="preview.generate", status="ok", duration_seconds=1.2)
     metrics.record_mcp_tool_call(tool="health.ready", status="ok", duration_seconds=0.04)
+    fingerprint = metrics.record_error(
+        exception_type="sqlalchemy.exc.OperationalError",
+        route="/api/materials/{id}",
+        status_code=500,
+    )
     metrics.record_ai_agent_run(
         provider="openai-compatible",
         status="model_success",
@@ -79,6 +84,11 @@ def test_http_metrics_include_duration_histogram_buckets() -> None:
     assert 'studyhub_http_request_duration_seconds_count{method="GET",route="/api/materials"} 2' in rendered
     assert 'studyhub_worker_job_duration_seconds_bucket{job="preview.generate",status="ok",le="2.5"} 1' in rendered
     assert 'studyhub_mcp_tool_duration_seconds_bucket{tool="health.ready",status="ok",le="0.05"} 1' in rendered
+    assert len(fingerprint) == 12
+    assert (
+        f'studyhub_errors_total{{fingerprint="{fingerprint}",kind="sqlalchemy.exc.operationalerror",'
+        'route="/api/materials/{id}",status_code="500"} 1'
+    ) in rendered
     assert (
         'studyhub_ai_agent_run_duration_seconds_bucket{provider="openai-compatible",status="model_success",'
         'pdf_evidence="yes",memory_context="no",course_memory_card="yes",le="2.5"} 1'
