@@ -16,7 +16,7 @@ export default function IdentityInfoPage({ user }: IdentityInfoPageProps) {
         <header className="legal-page__intro">
           <div className="legal-page__meta">
             <p className="legal-page__eyebrow">STUDYHUB SERVICE TERMS</p>
-            <span>生效日期：2026 年 8 月 9 日</span>
+            <span>生效日期：2026 年 8 月 16 日</span>
           </div>
           <h1>用户协议与隐私政策</h1>
           <p>
@@ -24,6 +24,7 @@ export default function IdentityInfoPage({ user }: IdentityInfoPageProps) {
           </p>
           <div className="legal-page__principles" aria-label="隐私处理原则">
             <span>投稿不采集身份信息</span>
+            <span>投稿文件先行风险扫描</span>
             <span>收款码用于收益结算</span>
             <span>个人信息最小必要</span>
           </div>
@@ -51,6 +52,7 @@ export default function IdentityInfoPage({ user }: IdentityInfoPageProps) {
                 <li>用户应依法使用账号和平台功能，不得冒用他人身份、破坏服务或规避平台权限与交易规则。</li>
                 <li>投稿者应确认对上传资料拥有合法来源、使用权或传播权，不得上传违法、侵权、虚假或危害网络安全的内容。</li>
                 <li>平台可以对投稿、评论、交易信息和举报进行审核，并在必要时采取限制展示、下架、冻结相关功能或配合争议处理等措施。</li>
+                <li>站内文件投稿后会先进入隔离状态，在自动风险扫描完成前暂不开放下载；未通过检查的文件可能被延迟发布、限制下载或拒绝展示。</li>
                 <li>付费资料的价格、交付方式和可见范围以资料详情页及支付页面展示为准；受控文件仍需在 StudyHub 完成登录、支付和权限校验后获取。</li>
               </ul>
             </section>
@@ -103,6 +105,8 @@ export default function IdentityInfoPage({ user }: IdentityInfoPageProps) {
                 <li>为完成文件存储、邮件验证、支付或收益结算，平台可能向对应的云存储、邮件和支付服务提供完成该功能所必需的信息。</li>
                 <li>除法律法规要求、用户明确授权或履行服务所必需的情况外，平台不会向无关第三方公开用户个人信息。</li>
                 <li>平台通过访问控制、传输保护、敏感信息脱敏、日志审计和备份等措施降低信息被未经授权访问、泄露或篡改的风险。</li>
+                <li>为识别恶意代码和异常文件结构，平台可能在受限隔离目录中处理投稿文件的临时副本，并对可疑文件、Office 文档和压缩包等执行恶意软件扫描；临时副本在检查完成后删除。</li>
+                <li>自动风险扫描用于降低已知安全风险，但不能保证识别全部未知威胁，也不改变投稿者对文件来源、内容合法性和安全性的责任。</li>
                 <li>信息保存期限以实现相应业务目的所需的合理期限为限；法律法规或交易争议处理另有要求的，按相应期限处理。</li>
               </ul>
             </section>

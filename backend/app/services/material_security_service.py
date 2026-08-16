@@ -6,6 +6,9 @@ from pathlib import Path
 import subprocess
 import tempfile
 
+from PIL import Image, UnidentifiedImageError
+from pypdf import PdfReader
+from pypdf.generic import ArrayObject, DictionaryObject, IndirectObject
 from sqlalchemy.orm import Session
 
 from app.core.config import Settings
@@ -19,6 +22,25 @@ class MalwareScanResult:
     version: str | None = None
     finding: str | None = None
     error: str | None = None
+
+
+LIGHTWEIGHT_SCANNER_VERSION = "studyhub-structural/1"
+LIGHTWEIGHT_IMAGE_SUFFIXES = {".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp"}
+PDF_ACTIVE_CONTENT_KEYS = {
+    "/AA",
+    "/EmbeddedFile",
+    "/EmbeddedFiles",
+    "/ImportData",
+    "/JavaScript",
+    "/JS",
+    "/Launch",
+    "/OpenAction",
+    "/RichMedia",
+    "/SubmitForm",
+    "/XFA",
+}
+PDF_OBJECT_INSPECTION_LIMIT = 20_000
+IMAGE_PIXEL_LIMIT = 100_000_000
 
 
 class MaterialSecurityService:
@@ -101,23 +123,93 @@ class MaterialSecurityService:
                 temporary,
                 max_size_bytes=self.settings.material_file_max_size_bytes,
             )
-            version = self._scanner_version()
-            completed = subprocess.run(
-                [self.settings.material_security_scanner_command, "--no-summary", "--stdout", str(temporary)],
-                check=False,
-                capture_output=True,
-                text=True,
-                timeout=max(30, self.settings.material_security_scan_timeout_seconds),
-            )
-            output = (completed.stdout or completed.stderr or "").strip()
-            if completed.returncode == 0:
-                return MalwareScanResult(status="CLEAN", version=version)
-            if completed.returncode == 1:
-                finding = output.rsplit(":", 1)[-1].replace("FOUND", "").strip()[:255]
-                return MalwareScanResult(status="INFECTED", version=version, finding=finding or "malware detected")
-            return MalwareScanResult(status="ERROR", version=version, error=output[-512:] or "scanner exited abnormally")
+            lightweight_result = self._lightweight_scan(temporary)
+            if lightweight_result is not None:
+                return lightweight_result
+            return self._clamav_scan(temporary)
         finally:
             temporary.unlink(missing_ok=True)
+
+    def _lightweight_scan(self, path: Path) -> MalwareScanResult | None:
+        suffix = path.suffix.lower()
+        if suffix == ".pdf":
+            return self._lightweight_pdf_scan(path)
+        if suffix in LIGHTWEIGHT_IMAGE_SUFFIXES:
+            return self._lightweight_image_scan(path)
+        return None
+
+    def _lightweight_pdf_scan(self, path: Path) -> MalwareScanResult | None:
+        try:
+            with path.open("rb") as handle:
+                if handle.read(8).lstrip()[:5] != b"%PDF-":
+                    return None
+            reader = PdfReader(str(path), strict=False)
+            if reader.is_encrypted or len(reader.pages) < 1:
+                return None
+            if self._pdf_contains_active_content(reader):
+                return None
+        except Exception:  # noqa: BLE001
+            return None
+        return MalwareScanResult(status="CLEAN", version=LIGHTWEIGHT_SCANNER_VERSION)
+
+    def _pdf_contains_active_content(self, reader: PdfReader) -> bool:
+        stack: list[object] = [reader.trailer]
+        seen_indirect: set[tuple[int, int]] = set()
+        seen_containers: set[int] = set()
+        inspected = 0
+        while stack:
+            current = stack.pop()
+            if isinstance(current, IndirectObject):
+                reference = (int(current.idnum), int(current.generation))
+                if reference in seen_indirect:
+                    continue
+                seen_indirect.add(reference)
+                current = current.get_object()
+            if isinstance(current, (DictionaryObject, ArrayObject)):
+                container_id = id(current)
+                if container_id in seen_containers:
+                    continue
+                seen_containers.add(container_id)
+            inspected += 1
+            if inspected > PDF_OBJECT_INSPECTION_LIMIT:
+                return True
+            if isinstance(current, DictionaryObject):
+                if PDF_ACTIVE_CONTENT_KEYS.intersection(str(key) for key in current.keys()):
+                    return True
+                stack.extend(current.values())
+            elif isinstance(current, ArrayObject):
+                stack.extend(current)
+        return False
+
+    def _lightweight_image_scan(self, path: Path) -> MalwareScanResult | None:
+        try:
+            with Image.open(path) as image:
+                width, height = image.size
+                if width <= 0 or height <= 0 or width * height > IMAGE_PIXEL_LIMIT:
+                    return None
+                if (image.format or "").upper() not in {"PNG", "JPEG", "WEBP", "GIF", "BMP"}:
+                    return None
+                image.verify()
+        except (Image.DecompressionBombError, UnidentifiedImageError, OSError, SyntaxError, ValueError):
+            return None
+        return MalwareScanResult(status="CLEAN", version=LIGHTWEIGHT_SCANNER_VERSION)
+
+    def _clamav_scan(self, path: Path) -> MalwareScanResult:
+        version = self._scanner_version()
+        completed = subprocess.run(
+            [self.settings.material_security_scanner_command, "--no-summary", "--stdout", str(path)],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=max(30, self.settings.material_security_scan_timeout_seconds),
+        )
+        output = (completed.stdout or completed.stderr or "").strip()
+        if completed.returncode == 0:
+            return MalwareScanResult(status="CLEAN", version=version)
+        if completed.returncode == 1:
+            finding = output.rsplit(":", 1)[-1].replace("FOUND", "").strip()[:255]
+            return MalwareScanResult(status="INFECTED", version=version, finding=finding or "malware detected")
+        return MalwareScanResult(status="ERROR", version=version, error=output[-512:] or "scanner exited abnormally")
 
     def _scanner_version(self) -> str | None:
         try:

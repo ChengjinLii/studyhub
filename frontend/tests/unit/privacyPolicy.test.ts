@@ -14,6 +14,10 @@ describe('public privacy and payout policy', () => {
     expect(policy).toContain('资料投稿本身不要求提交真实姓名、身份证号或同名支付宝账号');
     expect(policy).toContain('/me#payout-qr');
     expect(uploadPolicy).toContain('投稿无需提交真实姓名、身份证号或同名支付宝账号');
+    expect(uploadPolicy).toContain('文件风险扫描与隔离');
+    expect(uploadPolicy).toContain('临时副本会在处理完成后删除');
+    expect(policy).toContain('投稿文件先行风险扫描');
+    expect(policy).toContain('在自动风险扫描完成前暂不开放下载');
     expect(payoutSection).toContain('查看 / 更新收款码');
     expect(payoutSection).not.toContain('idCardNo');
     expect(payoutSection).not.toContain('alipayAccount');
