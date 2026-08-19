@@ -67,6 +67,6 @@ Run documented research commands from the standalone project root:
 cd /data/chengjin/studyhub/studyhub-agent
 ```
 
-The repository-level `ml/agentic_platform` and
-`reports/recagent/agentic-platform` entries are compatibility symlinks. They do
-not contain duplicate source or report files.
+Backend research tests add this project root to their Python path explicitly.
+The repository root contains no compatibility copy or symlink for Agent code or
+reports.

@@ -55,9 +55,8 @@ def test_domain_json_schemas_are_exportable_and_have_stable_golden_fingerprints(
 
     golden_manifest_path = (
         Path(__file__).resolve().parents[3]
+        / "studyhub-agent"
         / "reports"
-        / "recagent"
-        / "agentic-platform"
         / "contracts"
         / "agentic-domain-schema-golden-v1.json"
     )

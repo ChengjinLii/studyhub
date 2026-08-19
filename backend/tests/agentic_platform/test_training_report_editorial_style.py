@@ -5,7 +5,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[3]
-REPORT_DIR = ROOT / "reports/recagent/agentic-platform"
+REPORT_DIR = ROOT / "studyhub-agent/reports"
 REPORTS = (
     "STUDYHUB_AGENT_MODEL_SFT_RL_BRIEF.html",
     "STUDYHUB_AGENT_PROGRESS_2026-08-09.html",

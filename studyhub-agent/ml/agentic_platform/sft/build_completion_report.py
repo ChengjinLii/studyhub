@@ -849,8 +849,6 @@ def build_report(output: Path) -> Path:
             "数据与模型卡",
             ROOT
             / "reports"
-            / "recagent"
-            / "agentic-platform"
             / "STUDYHUB_SFT_CARDS.md",
         ),
         (

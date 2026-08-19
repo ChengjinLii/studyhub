@@ -53,6 +53,11 @@ def test_standalone_package_does_not_import_the_website() -> None:
     assert "import app." not in source
 
 
+def test_legacy_agent_paths_are_absent() -> None:
+    assert not (WORKSPACE_ROOT / "ml").exists()
+    assert not (WORKSPACE_ROOT / "reports/recagent/agentic-platform").exists()
+
+
 def test_bots_are_local_only() -> None:
     root_ignore = (WORKSPACE_ROOT / ".gitignore").read_text(encoding="utf-8").splitlines()
 
