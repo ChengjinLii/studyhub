@@ -29,6 +29,7 @@ frontend/tsconfig.tsbuildinfo
 frontend/test-results/
 frontend/playwright-report/
 backup/
+/bots/
 prototypes/
 training_artifacts/
 evaluation_artifacts/

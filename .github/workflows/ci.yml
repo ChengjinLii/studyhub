@@ -107,7 +107,7 @@ jobs:
       - name: Install backend dependencies
         run: python -m pip install --require-hashes -r backend/requirements.lock
       - name: Run offline Agentic smoke gate
-        run: STUDYHUB_PYTHON_BIN="$(command -v python)" bash scripts/research/agentic-smoke.sh
+        run: STUDYHUB_PYTHON_BIN="$(command -v python)" bash studyhub-agent/scripts/research/agentic-smoke.sh
 
   agentic-execution-e2e:
     runs-on: ubuntu-latest
@@ -120,7 +120,7 @@ jobs:
       - name: Install backend dependencies
         run: python -m pip install --require-hashes -r backend/requirements.lock
       - name: Run Agentic execution fixture integration
-        run: STUDYHUB_PYTHON_BIN="$(command -v python)" bash scripts/research/agentic-execution-e2e.sh
+        run: STUDYHUB_PYTHON_BIN="$(command -v python)" bash studyhub-agent/scripts/research/agentic-execution-e2e.sh
 
   trajectory-integrity:
     runs-on: ubuntu-latest
@@ -133,7 +133,7 @@ jobs:
       - name: Install backend dependencies
         run: python -m pip install --require-hashes -r backend/requirements.lock
       - name: Verify immutable trajectory and export contracts
-        run: STUDYHUB_PYTHON_BIN="$(command -v python)" bash scripts/research/trajectory-integrity.sh
+        run: STUDYHUB_PYTHON_BIN="$(command -v python)" bash studyhub-agent/scripts/research/trajectory-integrity.sh
 
   mysql-migration:
     runs-on: ubuntu-latest
@@ -163,4 +163,4 @@ jobs:
       - name: Upgrade and inspect MySQL Agentic schema
         env:
           STUDYHUB_DATABASE_URL: mysql+pymysql://studyhub:studyhub@127.0.0.1:3306/studyhub_agentic_ci?charset=utf8mb4
-        run: STUDYHUB_PYTHON_BIN="$(command -v python)" bash scripts/research/mysql-agentic-migration.sh
+        run: STUDYHUB_PYTHON_BIN="$(command -v python)" bash studyhub-agent/scripts/research/mysql-agentic-migration.sh

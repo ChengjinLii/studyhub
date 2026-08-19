@@ -23,9 +23,8 @@
 - 检查 shell 脚本语法：`bash scripts/check-shell-scripts.sh`
 - 检查敏感文件误提交：`bash scripts/security/check-sensitive-files.sh`
 - 推送前快速门禁：`bash scripts/pre-push-check.sh`
-- Agentic Platform 离线 smoke：`bash scripts/research/agentic-smoke.sh`
-- Agentic Pilot：`python scripts/research/run-agentic-pilot.py --help`
-- Agentic 数据集 Gate：`python scripts/research/validate-agentic-dataset.py --help`
+- StudyHub Agent 的训练、评测与离线脚本已经迁移到
+  `studyhub-agent/scripts/`，网站运行脚本继续保留在本目录。
 - 非生产 CI 检查：`bash scripts/ci-check.sh`
 - 发布前检查：`bash scripts/predeploy-check.sh`
 - 浏览器加载性能预算：`npm --prefix frontend run test:perf`
