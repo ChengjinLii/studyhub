@@ -5,6 +5,7 @@ from .domain_router import (
     ResearchDomainRouter,
     ResearchEnvironment,
     StudyHubResearchEnvironment,
+    WebResearchAdapter,
 )
 from .graph import DeepResearchGraph, DeepResearchRunResult, InMemoryResearchTraceStore
 from .policy import ModelResearchPolicy, ReplayResearchPolicy, ResearchPolicy
@@ -26,6 +27,7 @@ from .state import (
     ResearchReport,
     ResearchTaskPacket,
 )
+from .web_adapter import HttpWebResearchAdapter, PublicWebUrlPolicy, WebResearchAdapterConfig, validate_web_query
 
 __all__ = [
     "DeepResearchGraph",
@@ -52,4 +54,9 @@ __all__ = [
     "ResearchTaskPacket",
     "ResearchToolObservation",
     "StudyHubResearchEnvironment",
+    "WebResearchAdapter",
+    "HttpWebResearchAdapter",
+    "PublicWebUrlPolicy",
+    "WebResearchAdapterConfig",
+    "validate_web_query",
 ]

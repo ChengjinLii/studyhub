@@ -1,0 +1,7 @@
+{
+  "repository": "https://github.com/NousResearch/hermes-agent.git",
+  "commit": "75e1339d4cdb32652e560eccc3930cc9264ac67b",
+  "patch": "patches/0001-studyhub-branding.patch",
+  "patch_sha256": "18beb9f2d4c2a9a84bd51330879db5abcd13b8b64dd0f5ff94df61081150349e",
+  "skin": "skins/studyhub.yaml"
+}

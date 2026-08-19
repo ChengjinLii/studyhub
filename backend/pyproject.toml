@@ -47,7 +47,7 @@ include = ["app*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-pythonpath = [".", ".."]
+pythonpath = [".", "..", "../studyhub-agent"]
 addopts = "-q"
 markers = [
   "private_sft_corpus: requires the ignored frozen public-material corpus used for SFT reproducibility checks",

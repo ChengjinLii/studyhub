@@ -47,6 +47,7 @@ StudyHub 后端以 RESTful 风格作为公开 API 的主要设计约定，便于
 
 - `backend/`：FastAPI 后端、测试、fixtures 与运维辅助代码
 - `frontend/`：Next.js 前端
+- `studyhub-agent/`：与网站运行时隔离的 Agent、Hermes 适配、SFT/RL、评测与报告
 - `reports/`：技术报告、项目复盘材料
 - `scripts/`：开发、部署、worker 与数据库操作脚本
 
@@ -60,6 +61,7 @@ StudyHub 后端以 RESTful 风格作为公开 API 的主要设计约定，便于
 
 - [backend/README.md](backend/README.md)
 - [frontend/README.md](frontend/README.md)
+- [studyhub-agent/README.md](studyhub-agent/README.md)
 - [scripts/README.md](scripts/README.md)
 
 ## 提交前检查

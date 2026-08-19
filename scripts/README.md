@@ -23,9 +23,8 @@
 - 检查 shell 脚本语法：`bash scripts/check-shell-scripts.sh`
 - 检查敏感文件误提交：`bash scripts/security/check-sensitive-files.sh`
 - 推送前快速门禁：`bash scripts/pre-push-check.sh`
-- Agentic Platform 离线 smoke：`bash scripts/research/agentic-smoke.sh`
-- Agentic Pilot：`python scripts/research/run-agentic-pilot.py --help`
-- Agentic 数据集 Gate：`python scripts/research/validate-agentic-dataset.py --help`
+- StudyHub Agent 的训练、评测与离线脚本已经迁移到
+  `studyhub-agent/scripts/`，网站运行脚本继续保留在本目录。
 - 非生产 CI 检查：`bash scripts/ci-check.sh`
 - 发布前检查：`bash scripts/predeploy-check.sh`
 - 原子生产发布：先运行 `bash scripts/deploy/install-atomic-services.sh` 安装稳定的 `current` 服务路径，后续使用 `bash scripts/deploy/atomic-release.sh <commit>`。脚本在独立 release 安装锁定依赖、构建并以备用端口 smoke，通过后才切换软链接；启动或生产 smoke 失败会自动回滚。

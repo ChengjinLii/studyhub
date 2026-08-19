@@ -15,6 +15,7 @@ from app.agentic_platform.deepresearch import (
     StudyHubResearchEnvironment,
 )
 from app.agentic_platform.deepresearch.state import ResearchTaskPacket
+from app.agentic_platform.deepresearch.web_adapter import build_web_research_adapter
 from app.agentic_platform.persistence.durable_artifact_store import (
     DurableArtifactStore,
     DurableResearchArtifactStore,
@@ -144,8 +145,6 @@ def build_durable_agent_runtime_factory(
 
     if not settings.agentic_durable_storage_enabled or settings.agentic_checkpointer != "sqlite":
         raise AgentExecutionConfigurationError("agent_execution_durable_storage_not_configured")
-    if settings.deep_research_web_enabled or settings.deep_research_scholar_enabled:
-        raise AgentExecutionConfigurationError("agent_execution_external_research_adapter_not_configured")
     model_provider = build_agent_model_provider(settings)
     artifact_store = DurableArtifactStore(
         dependencies.session_factory,
@@ -166,6 +165,12 @@ def build_durable_agent_runtime_factory(
         try:
             metadata = _runtime_metadata(run, settings, skill_catalog_hash=catalog_hash)
             skill_executor = LiveSkillExecutor(dependencies.skill_registry)
+            research_environment = _build_research_environment(
+                run=run,
+                settings=settings,
+                dependencies=dependencies,
+                session=live_session,
+            )
 
             def context_factory(state, decision) -> SkillExecutionContext:
                 del decision
@@ -181,6 +186,7 @@ def build_durable_agent_runtime_factory(
                     material_repo=dependencies.material_repository,  # type: ignore[arg-type]
                     materials_service=dependencies.materials_service,  # type: ignore[arg-type]
                     pdf_evidence_service=dependencies.pdf_evidence_service,  # type: ignore[arg-type]
+                    research_environment=research_environment,
                     research_capability_flags=ResearchCapabilityFlags(
                         web_enabled=settings.deep_research_web_enabled,
                         scholar_enabled=settings.deep_research_scholar_enabled,
@@ -204,6 +210,7 @@ def build_durable_agent_runtime_factory(
                 session=live_session,
                 checkpointer=checkpoint.checkpointer,
                 skill_catalog_hash=catalog_hash,
+                environment=research_environment,
             )
             return AgentKernel(
                 policy=ModelPolicy(model_provider, raw_output_store=artifact_store),
@@ -294,6 +301,7 @@ def _build_research_agent(
     session: Session,
     checkpointer: Any,
     skill_catalog_hash: str,
+    environment: StudyHubResearchEnvironment | None = None,
 ) -> DeepResearchSearchAgent:
     research_artifacts = DurableResearchArtifactStore(
         artifact_store,
@@ -301,13 +309,11 @@ def _build_research_agent(
         run_id=run.id,
         admin_actor_id=run.admin_actor_id,
     )
-    environment = StudyHubResearchEnvironment(
+    environment = environment or _build_research_environment(
+        run=run,
+        settings=settings,
+        dependencies=dependencies,
         session=session,
-        material_repo=dependencies.material_repository,  # type: ignore[arg-type]
-        materials_service=dependencies.materials_service,  # type: ignore[arg-type]
-        pdf_evidence_service=dependencies.pdf_evidence_service,  # type: ignore[arg-type]
-        admin_actor_id=run.admin_actor_id,
-        role_mask=ROLE_ADMIN,
     )
     graph = DeepResearchGraph(
         policy=ModelResearchPolicy(
@@ -329,6 +335,24 @@ def _build_research_agent(
         metadata=_research_runtime_metadata(run, settings, skill_catalog_hash=skill_catalog_hash),
     )
     return DeepResearchSearchAgent(graph)
+
+
+def _build_research_environment(
+    *,
+    run: AgentRunRecord,
+    settings: Settings,
+    dependencies: DurableRuntimeDependencies,
+    session: Session,
+) -> StudyHubResearchEnvironment:
+    return StudyHubResearchEnvironment(
+        session=session,
+        material_repo=dependencies.material_repository,  # type: ignore[arg-type]
+        materials_service=dependencies.materials_service,  # type: ignore[arg-type]
+        pdf_evidence_service=dependencies.pdf_evidence_service,  # type: ignore[arg-type]
+        admin_actor_id=run.admin_actor_id,
+        role_mask=ROLE_ADMIN,
+        web_adapter=build_web_research_adapter(settings),
+    )
 
 
 def _build_blob_store(settings: Settings, *, dependencies: DurableRuntimeDependencies):

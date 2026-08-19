@@ -1,0 +1,266 @@
+diff --git a/hermes_cli/_parser.py b/hermes_cli/_parser.py
+index 29ac96c97..68f9486d7 100644
+--- a/hermes_cli/_parser.py
++++ b/hermes_cli/_parser.py
+@@ -83,11 +83,21 @@ def build_top_level_parser():
+     ``chat_parser.set_defaults(func=cmd_chat)`` and continues registering
+     other subparsers via ``subparsers.add_parser(...)``.
+     """
++    try:
++        from hermes_cli.skin_engine import get_active_skin
++
++        skin = get_active_skin()
++        agent_name = skin.get_branding("agent_name", "Hermes Agent")
++        cli_name = skin.get_branding("cli_name", "hermes")
++    except Exception:
++        agent_name = "Hermes Agent"
++        cli_name = "hermes"
++
+     parser = argparse.ArgumentParser(
+-        prog="hermes",
+-        description="Hermes Agent - AI assistant with tool-calling capabilities",
++        prog=cli_name,
++        description=f"{agent_name} - AI assistant with tool-calling capabilities",
+         formatter_class=argparse.RawDescriptionHelpFormatter,
+-        epilog=_EPILOGUE,
++        epilog=_EPILOGUE.replace("\n    hermes", f"\n    {cli_name}"),
+     )
+ 
+     parser.add_argument(
+diff --git a/hermes_cli/banner.py b/hermes_cli/banner.py
+index c8446f04d..d36dfd660 100644
+--- a/hermes_cli/banner.py
++++ b/hermes_cli/banner.py
+@@ -324,7 +324,8 @@ def get_latest_release_tag(repo_dir: Optional[Path] = None) -> Optional[tuple]:
+ 
+ def format_banner_version_label() -> str:
+     """Return the version label shown in the startup banner title."""
+-    base = f"Hermes Agent v{VERSION} ({RELEASE_DATE})"
++    agent_name = _skin_branding("agent_name", "Hermes Agent")
++    base = f"{agent_name} v{VERSION} ({RELEASE_DATE})"
+     state = get_git_banner_state()
+     if not state:
+         return base
+@@ -461,12 +462,14 @@ def build_welcome_banner(console: Console, model: str, cwd: str,
+     if len(model_short) > 28:
+         model_short = model_short[:25] + "..."
+     ctx_str = f" [dim {dim}]·[/] [dim {dim}]{_format_context_length(context_length)} context[/]" if context_length else ""
+-    left_lines.append(f"[{accent}]{model_short}[/]{ctx_str} [dim {dim}]·[/] [dim {dim}]Nous Research[/]")
++    brand_footer = _skin_branding("builder_label", "Nous Research")
++    left_lines.append(f"[{accent}]{model_short}[/]{ctx_str} [dim {dim}]·[/] [dim {dim}]{brand_footer}[/]")
+     left_lines.append(f"[dim {dim}]{cwd}[/]")
+     if session_id:
+         left_lines.append(f"[dim {session_color}]Session: {session_id}[/]")
+     left_content = "\n".join(left_lines)
+ 
++    banner_layout = _skin_branding("banner_layout", "default").strip().lower()
+     right_lines = [f"[bold {accent}]Available Tools[/]"]
+     toolsets_dict: Dict[str, list] = {}
+ 
+@@ -533,56 +536,92 @@ def build_welcome_banner(console: Console, model: str, cwd: str,
+     except Exception:
+         mcp_status = []
+ 
+-    if mcp_status:
+-        right_lines.append("")
+-        right_lines.append(f"[bold {accent}]MCP Servers[/]")
+-        for srv in mcp_status:
+-            if srv["connected"]:
+-                right_lines.append(
+-                    f"[dim {dim}]{srv['name']}[/] [{text}]({srv['transport']})[/] "
+-                    f"[dim {dim}]—[/] [{text}]{srv['tools']} tool(s)[/]"
+-                )
+-            else:
+-                right_lines.append(
+-                    f"[red]{srv['name']}[/] [dim]({srv['transport']})[/] "
+-                    f"[red]— failed[/]"
+-                )
+-
+-    right_lines.append("")
+-    right_lines.append(f"[bold {accent}]Available Skills[/]")
+     skills_by_category = get_available_skills()
+     total_skills = sum(len(s) for s in skills_by_category.values())
++    mcp_connected = sum(1 for s in mcp_status if s["connected"]) if mcp_status else 0
+ 
+-    if skills_by_category:
+-        for category in sorted(skills_by_category.keys()):
+-            skill_names = sorted(skills_by_category[category])
+-            if len(skill_names) > 8:
+-                display_names = skill_names[:8]
+-                skills_str = ", ".join(display_names) + f" +{len(skill_names) - 8} more"
+-            else:
+-                skills_str = ", ".join(skill_names)
+-            if len(skills_str) > 50:
+-                skills_str = skills_str[:47] + "..."
+-            right_lines.append(f"[dim {dim}]{category}:[/] [{text}]{skills_str}[/]")
++    if banner_layout == "compact":
++        connected_mcp = [s for s in mcp_status if s["connected"]]
++        connected_names = ", ".join(s["name"] for s in connected_mcp[:2]) if connected_mcp else "none"
++        if len(connected_mcp) > 2:
++            connected_names += f" +{len(connected_mcp) - 2} more"
++
++        right_lines = [f"[bold {accent}]Quick Start[/]"]
++        right_lines.append(
++            f"[{text}]Search materials, explain problems, and plan the next study step.[/]"
++        )
++        right_lines.append("")
++        right_lines.append(f"[bold {accent}]Workflow[/]")
++        right_lines.append(
++            f"[{text}]Search[/] [dim {dim}]→[/] "
++            f"[{text}]Compare[/] [dim {dim}]→[/] "
++            f"[{text}]Explain[/] [dim {dim}]→[/] "
++            f"[{text}]Decide[/]"
++        )
++        right_lines.append("")
++        right_lines.append(f"[bold {accent}]Guardrails[/]")
++        right_lines.append(f"[{text}]Readonly StudyHub MCP[/] [dim {dim}]·[/] [{text}]free materials only[/]")
++        right_lines.append(f"[dim {dim}]No paid-only links, purchase data, or write actions[/]")
++        right_lines.append("")
++        right_lines.append(f"[bold {accent}]Runtime[/]")
++        right_lines.append(
++            f"[{text}]{len(tools)} tools[/] [dim {dim}]·[/] "
++            f"[{text}]{total_skills} skills[/] [dim {dim}]·[/] "
++            f"[{text}]{mcp_connected} MCP[/]"
++        )
++        right_lines.append(
++            f"[dim {dim}]Connected:[/] [{text}]{connected_names}[/]"
++        )
++        right_lines.append(f"[dim {dim}]Use /help for commands[/]")
+     else:
+-        right_lines.append(f"[dim {dim}]No skills installed[/]")
++        if mcp_status:
++            right_lines.append("")
++            right_lines.append(f"[bold {accent}]MCP Servers[/]")
++            for srv in mcp_status:
++                if srv["connected"]:
++                    right_lines.append(
++                        f"[dim {dim}]{srv['name']}[/] [{text}]({srv['transport']})[/] "
++                        f"[dim {dim}]—[/] [{text}]{srv['tools']} tool(s)[/]"
++                    )
++                else:
++                    right_lines.append(
++                        f"[red]{srv['name']}[/] [dim]({srv['transport']})[/] "
++                        f"[red]— failed[/]"
++                    )
+ 
+-    right_lines.append("")
+-    mcp_connected = sum(1 for s in mcp_status if s["connected"]) if mcp_status else 0
+-    summary_parts = [f"{len(tools)} tools", f"{total_skills} skills"]
+-    if mcp_connected:
+-        summary_parts.append(f"{mcp_connected} MCP servers")
+-    summary_parts.append("/help for commands")
+-    # Show active profile name when not 'default'
+-    try:
+-        from hermes_cli.profiles import get_active_profile_name
+-        _profile_name = get_active_profile_name()
+-        if _profile_name and _profile_name != "default":
+-            right_lines.append(f"[bold {accent}]Profile:[/] [{text}]{_profile_name}[/]")
+-    except Exception:
+-        pass  # Never break the banner over a profiles.py bug
++        right_lines.append("")
++        right_lines.append(f"[bold {accent}]Available Skills[/]")
++
++        if skills_by_category:
++            for category in sorted(skills_by_category.keys()):
++                skill_names = sorted(skills_by_category[category])
++                if len(skill_names) > 8:
++                    display_names = skill_names[:8]
++                    skills_str = ", ".join(display_names) + f" +{len(skill_names) - 8} more"
++                else:
++                    skills_str = ", ".join(skill_names)
++                if len(skills_str) > 50:
++                    skills_str = skills_str[:47] + "..."
++                right_lines.append(f"[dim {dim}]{category}:[/] [{text}]{skills_str}[/]")
++        else:
++            right_lines.append(f"[dim {dim}]No skills installed[/]")
+ 
+-    right_lines.append(f"[dim {dim}]{' · '.join(summary_parts)}[/]")
++    if banner_layout != "compact":
++        right_lines.append("")
++        summary_parts = [f"{len(tools)} tools", f"{total_skills} skills"]
++        if mcp_connected:
++            summary_parts.append(f"{mcp_connected} MCP servers")
++        summary_parts.append("/help for commands")
++        # Show active profile name when not 'default'
++        try:
++            from hermes_cli.profiles import get_active_profile_name
++            _profile_name = get_active_profile_name()
++            if _profile_name and _profile_name != "default":
++                right_lines.append(f"[bold {accent}]Profile:[/] [{text}]{_profile_name}[/]")
++        except Exception:
++            pass  # Never break the banner over a profiles.py bug
++
++        right_lines.append(f"[dim {dim}]{' · '.join(summary_parts)}[/]")
+ 
+     # Update check — use prefetched result if available
+     try:
+diff --git a/hermes_cli/main.py b/hermes_cli/main.py
+index 5598a1f3f..9481d1504 100644
+--- a/hermes_cli/main.py
++++ b/hermes_cli/main.py
+@@ -216,6 +216,18 @@ try:
+ except Exception:
+     pass  # best-effort — don't crash if config isn't available yet
+ 
++# Initialize the skin engine from config for the main CLI path as well.
++# ``cli.py`` already does this, but direct entry via ``hermes_cli.main`` did
++# not, which meant custom ``display.skin`` branding silently fell back to the
++# default Hermes skin for commands like ``version`` and interactive chat.
++try:
++    from hermes_cli.config import load_config as _load_skin_cfg
++    from hermes_cli.skin_engine import init_skin_from_config as _init_skin_from_config
++
++    _init_skin_from_config(_load_skin_cfg())
++except Exception:
++    pass  # best-effort — default skin remains available on config errors
++
+ import logging
+ import time as _time
+ from datetime import datetime
+@@ -5103,7 +5115,14 @@ def cmd_import(args):
+ 
+ def cmd_version(args):
+     """Show version."""
+-    print(f"Hermes Agent v{__version__} ({__release_date__})")
++    try:
++        from hermes_cli.skin_engine import get_active_skin
++
++        agent_name = get_active_skin().get_branding("agent_name", "Hermes Agent")
++    except Exception:
++        agent_name = "Hermes Agent"
++
++    print(f"{agent_name} v{__version__} ({__release_date__})")
+     print(f"Project: {PROJECT_ROOT}")
+ 
+     # Show Python version
+diff --git a/hermes_cli/skin_engine.py b/hermes_cli/skin_engine.py
+index 6ca6f8adf..bf663362f 100644
+--- a/hermes_cli/skin_engine.py
++++ b/hermes_cli/skin_engine.py
+@@ -112,6 +112,7 @@ Activate with ``/skin <name>`` in the CLI or ``display.skin: <name>`` in config.
+ """
+ 
+ import logging
++import os
+ from dataclasses import dataclass, field
+ from pathlib import Path
+ from typing import Any, Dict, List, Optional, Tuple
+@@ -649,7 +650,8 @@ _active_skin_name: str = "default"
+ 
+ def _skins_dir() -> Path:
+     """User skins directory."""
+-    return get_hermes_home() / "skins"
++    configured = os.getenv("HERMES_SKINS_DIR", "").strip()
++    return Path(configured).expanduser() if configured else get_hermes_home() / "skins"
+ 
+ 
+ def _load_skin_from_yaml(path: Path) -> Optional[Dict[str, Any]]:
+@@ -768,7 +770,7 @@ def init_skin_from_config(config: dict) -> None:
+     display = config.get("display") or {}
+     if not isinstance(display, dict):
+         display = {}
+-    skin_name = display.get("skin", "default")
++    skin_name = os.getenv("HERMES_SKIN", "").strip() or display.get("skin", "default")
+     if isinstance(skin_name, str) and skin_name.strip():
+         set_active_skin(skin_name.strip())
+     else:

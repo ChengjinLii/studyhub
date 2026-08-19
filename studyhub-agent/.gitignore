@@ -1,0 +1,11 @@
+.venv/
+.vendor/
+.local/
+models/
+training_artifacts/
+evaluation_artifacts/
+artifacts/
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+*.pyc

@@ -1,2 +1,0 @@
-"""Standalone StudyHub bot integrations."""
-

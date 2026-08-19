@@ -188,6 +188,19 @@ class Settings(BaseSettings):
     deep_research_web_enabled: bool = False
     deep_research_scholar_enabled: bool = False
     deep_research_python_enabled: bool = False
+    # External research remains a separate, administrator-only capability.
+    # mediawiki is useful for keyless smoke tests; use searxng or serpapi for
+    # general Web coverage.
+    deep_research_web_provider: str = "disabled"
+    deep_research_web_search_url: str | None = None
+    deep_research_web_api_key: str | None = None
+    deep_research_web_search_engine: str = "google"
+    deep_research_web_timeout_seconds: float = 12.0
+    deep_research_web_max_response_bytes: int = 512 * 1024
+    deep_research_web_max_redirects: int = 2
+    deep_research_web_allowed_domains: str | None = None
+    deep_research_web_blocked_domains: str | None = None
+    deep_research_web_proxy_url: str | None = None
     agentic_max_turns: int = 8
     agentic_max_skill_calls: int = 12
     deep_research_max_search_turns: int = 4
