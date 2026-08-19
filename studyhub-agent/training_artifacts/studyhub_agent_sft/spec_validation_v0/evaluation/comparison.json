@@ -1,0 +1,1038 @@
+{
+  "splits": {
+    "test": {
+      "adapter": {
+        "family_metrics": {
+          "direct_general_answer": {
+            "arguments_exact": {
+              "passed": 2,
+              "rate": 1.0,
+              "total": 2
+            },
+            "contract_valid": {
+              "passed": 2,
+              "rate": 1.0,
+              "total": 2
+            },
+            "json_valid": {
+              "passed": 2,
+              "rate": 1.0,
+              "total": 2
+            },
+            "mode_correct": {
+              "passed": 2,
+              "rate": 1.0,
+              "total": 2
+            },
+            "tool_name_correct": {
+              "passed": 2,
+              "rate": 1.0,
+              "total": 2
+            }
+          },
+          "inspect_candidates": {
+            "arguments_exact": {
+              "passed": 7,
+              "rate": 1.0,
+              "total": 7
+            },
+            "contract_valid": {
+              "passed": 7,
+              "rate": 1.0,
+              "total": 7
+            },
+            "json_valid": {
+              "passed": 7,
+              "rate": 1.0,
+              "total": 7
+            },
+            "mode_correct": {
+              "passed": 7,
+              "rate": 1.0,
+              "total": 7
+            },
+            "tool_name_correct": {
+              "passed": 7,
+              "rate": 1.0,
+              "total": 7
+            }
+          },
+          "read_page_evidence": {
+            "arguments_exact": {
+              "passed": 2,
+              "rate": 0.222222,
+              "total": 9
+            },
+            "contract_valid": {
+              "passed": 9,
+              "rate": 1.0,
+              "total": 9
+            },
+            "json_valid": {
+              "passed": 9,
+              "rate": 1.0,
+              "total": 9
+            },
+            "mode_correct": {
+              "passed": 9,
+              "rate": 1.0,
+              "total": 9
+            },
+            "tool_name_correct": {
+              "passed": 9,
+              "rate": 1.0,
+              "total": 9
+            }
+          },
+          "read_synthetic_memory": {
+            "arguments_exact": {
+              "passed": 4,
+              "rate": 1.0,
+              "total": 4
+            },
+            "contract_valid": {
+              "passed": 4,
+              "rate": 1.0,
+              "total": 4
+            },
+            "json_valid": {
+              "passed": 4,
+              "rate": 1.0,
+              "total": 4
+            },
+            "mode_correct": {
+              "passed": 4,
+              "rate": 1.0,
+              "total": 4
+            },
+            "tool_name_correct": {
+              "passed": 4,
+              "rate": 1.0,
+              "total": 4
+            }
+          },
+          "reformulate_search": {
+            "arguments_exact": {
+              "passed": 0,
+              "rate": 0.0,
+              "total": 4
+            },
+            "contract_valid": {
+              "passed": 4,
+              "rate": 1.0,
+              "total": 4
+            },
+            "json_valid": {
+              "passed": 4,
+              "rate": 1.0,
+              "total": 4
+            },
+            "mode_correct": {
+              "passed": 4,
+              "rate": 1.0,
+              "total": 4
+            },
+            "tool_name_correct": {
+              "passed": 4,
+              "rate": 1.0,
+              "total": 4
+            }
+          },
+          "refuse_permission_bypass": {
+            "arguments_exact": {
+              "passed": 2,
+              "rate": 1.0,
+              "total": 2
+            },
+            "contract_valid": {
+              "passed": 2,
+              "rate": 1.0,
+              "total": 2
+            },
+            "json_valid": {
+              "passed": 2,
+              "rate": 1.0,
+              "total": 2
+            },
+            "mode_correct": {
+              "passed": 2,
+              "rate": 1.0,
+              "total": 2
+            },
+            "tool_name_correct": {
+              "passed": 2,
+              "rate": 1.0,
+              "total": 2
+            }
+          },
+          "search_initial": {
+            "arguments_exact": {
+              "passed": 2,
+              "rate": 0.125,
+              "total": 16
+            },
+            "contract_valid": {
+              "passed": 16,
+              "rate": 1.0,
+              "total": 16
+            },
+            "json_valid": {
+              "passed": 16,
+              "rate": 1.0,
+              "total": 16
+            },
+            "mode_correct": {
+              "passed": 16,
+              "rate": 1.0,
+              "total": 16
+            },
+            "tool_name_correct": {
+              "passed": 16,
+              "rate": 1.0,
+              "total": 16
+            }
+          },
+          "synthesize_context": {
+            "arguments_exact": {
+              "passed": 6,
+              "rate": 1.0,
+              "total": 6
+            },
+            "contract_valid": {
+              "passed": 6,
+              "rate": 1.0,
+              "total": 6
+            },
+            "json_valid": {
+              "passed": 6,
+              "rate": 1.0,
+              "total": 6
+            },
+            "mode_correct": {
+              "passed": 6,
+              "rate": 1.0,
+              "total": 6
+            },
+            "tool_name_correct": {
+              "passed": 6,
+              "rate": 1.0,
+              "total": 6
+            }
+          }
+        },
+        "metrics": {
+          "arguments_exact": {
+            "passed": 25,
+            "rate": 0.5,
+            "total": 50
+          },
+          "contract_valid": {
+            "passed": 50,
+            "rate": 1.0,
+            "total": 50
+          },
+          "json_valid": {
+            "passed": 50,
+            "rate": 1.0,
+            "total": 50
+          },
+          "mode_correct": {
+            "passed": 50,
+            "rate": 1.0,
+            "total": 50
+          },
+          "tool_name_correct": {
+            "passed": 50,
+            "rate": 1.0,
+            "total": 50
+          }
+        },
+        "policy_refusal": {
+          "passed": 2,
+          "rate": 1.0,
+          "total": 2
+        },
+        "predictions_path": "/data/chengjin/studyhub/studyhub-agent/training_artifacts/studyhub_agent_sft/spec_validation_v0/evaluation/test/adapter_predictions.jsonl",
+        "records": 50
+      },
+      "base": {
+        "family_metrics": {
+          "direct_general_answer": {
+            "arguments_exact": {
+              "passed": 1,
+              "rate": 0.5,
+              "total": 2
+            },
+            "contract_valid": {
+              "passed": 0,
+              "rate": 0.0,
+              "total": 2
+            },
+            "json_valid": {
+              "passed": 1,
+              "rate": 0.5,
+              "total": 2
+            },
+            "mode_correct": {
+              "passed": 1,
+              "rate": 0.5,
+              "total": 2
+            },
+            "tool_name_correct": {
+              "passed": 1,
+              "rate": 0.5,
+              "total": 2
+            }
+          },
+          "inspect_candidates": {
+            "arguments_exact": {
+              "passed": 0,
+              "rate": 0.0,
+              "total": 7
+            },
+            "contract_valid": {
+              "passed": 0,
+              "rate": 0.0,
+              "total": 7
+            },
+            "json_valid": {
+              "passed": 6,
+              "rate": 0.857143,
+              "total": 7
+            },
+            "mode_correct": {
+              "passed": 0,
+              "rate": 0.0,
+              "total": 7
+            },
+            "tool_name_correct": {
+              "passed": 0,
+              "rate": 0.0,
+              "total": 7
+            }
+          },
+          "read_page_evidence": {
+            "arguments_exact": {
+              "passed": 0,
+              "rate": 0.0,
+              "total": 9
+            },
+            "contract_valid": {
+              "passed": 0,
+              "rate": 0.0,
+              "total": 9
+            },
+            "json_valid": {
+              "passed": 6,
+              "rate": 0.666667,
+              "total": 9
+            },
+            "mode_correct": {
+              "passed": 0,
+              "rate": 0.0,
+              "total": 9
+            },
+            "tool_name_correct": {
+              "passed": 0,
+              "rate": 0.0,
+              "total": 9
+            }
+          },
+          "read_synthetic_memory": {
+            "arguments_exact": {
+              "passed": 0,
+              "rate": 0.0,
+              "total": 4
+            },
+            "contract_valid": {
+              "passed": 0,
+              "rate": 0.0,
+              "total": 4
+            },
+            "json_valid": {
+              "passed": 3,
+              "rate": 0.75,
+              "total": 4
+            },
+            "mode_correct": {
+              "passed": 0,
+              "rate": 0.0,
+              "total": 4
+            },
+            "tool_name_correct": {
+              "passed": 0,
+              "rate": 0.0,
+              "total": 4
+            }
+          },
+          "reformulate_search": {
+            "arguments_exact": {
+              "passed": 0,
+              "rate": 0.0,
+              "total": 4
+            },
+            "contract_valid": {
+              "passed": 0,
+              "rate": 0.0,
+              "total": 4
+            },
+            "json_valid": {
+              "passed": 3,
+              "rate": 0.75,
+              "total": 4
+            },
+            "mode_correct": {
+              "passed": 0,
+              "rate": 0.0,
+              "total": 4
+            },
+            "tool_name_correct": {
+              "passed": 0,
+              "rate": 0.0,
+              "total": 4
+            }
+          },
+          "refuse_permission_bypass": {
+            "arguments_exact": {
+              "passed": 2,
+              "rate": 1.0,
+              "total": 2
+            },
+            "contract_valid": {
+              "passed": 0,
+              "rate": 0.0,
+              "total": 2
+            },
+            "json_valid": {
+              "passed": 2,
+              "rate": 1.0,
+              "total": 2
+            },
+            "mode_correct": {
+              "passed": 2,
+              "rate": 1.0,
+              "total": 2
+            },
+            "tool_name_correct": {
+              "passed": 2,
+              "rate": 1.0,
+              "total": 2
+            }
+          },
+          "search_initial": {
+            "arguments_exact": {
+              "passed": 0,
+              "rate": 0.0,
+              "total": 16
+            },
+            "contract_valid": {
+              "passed": 0,
+              "rate": 0.0,
+              "total": 16
+            },
+            "json_valid": {
+              "passed": 12,
+              "rate": 0.75,
+              "total": 16
+            },
+            "mode_correct": {
+              "passed": 0,
+              "rate": 0.0,
+              "total": 16
+            },
+            "tool_name_correct": {
+              "passed": 0,
+              "rate": 0.0,
+              "total": 16
+            }
+          },
+          "synthesize_context": {
+            "arguments_exact": {
+              "passed": 0,
+              "rate": 0.0,
+              "total": 6
+            },
+            "contract_valid": {
+              "passed": 0,
+              "rate": 0.0,
+              "total": 6
+            },
+            "json_valid": {
+              "passed": 0,
+              "rate": 0.0,
+              "total": 6
+            },
+            "mode_correct": {
+              "passed": 0,
+              "rate": 0.0,
+              "total": 6
+            },
+            "tool_name_correct": {
+              "passed": 0,
+              "rate": 0.0,
+              "total": 6
+            }
+          }
+        },
+        "metrics": {
+          "arguments_exact": {
+            "passed": 3,
+            "rate": 0.06,
+            "total": 50
+          },
+          "contract_valid": {
+            "passed": 0,
+            "rate": 0.0,
+            "total": 50
+          },
+          "json_valid": {
+            "passed": 33,
+            "rate": 0.66,
+            "total": 50
+          },
+          "mode_correct": {
+            "passed": 3,
+            "rate": 0.06,
+            "total": 50
+          },
+          "tool_name_correct": {
+            "passed": 3,
+            "rate": 0.06,
+            "total": 50
+          }
+        },
+        "policy_refusal": {
+          "passed": 2,
+          "rate": 1.0,
+          "total": 2
+        },
+        "predictions_path": "/data/chengjin/studyhub/studyhub-agent/training_artifacts/studyhub_agent_sft/spec_validation_v0/evaluation/test/base_predictions.jsonl",
+        "records": 50
+      },
+      "delta_rate": {
+        "arguments_exact": 0.44,
+        "contract_valid": 1.0,
+        "json_valid": 0.34,
+        "mode_correct": 0.94,
+        "tool_name_correct": 0.94
+      }
+    },
+    "validation": {
+      "adapter": {
+        "family_metrics": {
+          "direct_general_answer": {
+            "arguments_exact": {
+              "passed": 2,
+              "rate": 1.0,
+              "total": 2
+            },
+            "contract_valid": {
+              "passed": 2,
+              "rate": 1.0,
+              "total": 2
+            },
+            "json_valid": {
+              "passed": 2,
+              "rate": 1.0,
+              "total": 2
+            },
+            "mode_correct": {
+              "passed": 2,
+              "rate": 1.0,
+              "total": 2
+            },
+            "tool_name_correct": {
+              "passed": 2,
+              "rate": 1.0,
+              "total": 2
+            }
+          },
+          "inspect_candidates": {
+            "arguments_exact": {
+              "passed": 7,
+              "rate": 1.0,
+              "total": 7
+            },
+            "contract_valid": {
+              "passed": 7,
+              "rate": 1.0,
+              "total": 7
+            },
+            "json_valid": {
+              "passed": 7,
+              "rate": 1.0,
+              "total": 7
+            },
+            "mode_correct": {
+              "passed": 7,
+              "rate": 1.0,
+              "total": 7
+            },
+            "tool_name_correct": {
+              "passed": 7,
+              "rate": 1.0,
+              "total": 7
+            }
+          },
+          "read_page_evidence": {
+            "arguments_exact": {
+              "passed": 1,
+              "rate": 0.111111,
+              "total": 9
+            },
+            "contract_valid": {
+              "passed": 9,
+              "rate": 1.0,
+              "total": 9
+            },
+            "json_valid": {
+              "passed": 9,
+              "rate": 1.0,
+              "total": 9
+            },
+            "mode_correct": {
+              "passed": 9,
+              "rate": 1.0,
+              "total": 9
+            },
+            "tool_name_correct": {
+              "passed": 9,
+              "rate": 1.0,
+              "total": 9
+            }
+          },
+          "read_synthetic_memory": {
+            "arguments_exact": {
+              "passed": 4,
+              "rate": 1.0,
+              "total": 4
+            },
+            "contract_valid": {
+              "passed": 4,
+              "rate": 1.0,
+              "total": 4
+            },
+            "json_valid": {
+              "passed": 4,
+              "rate": 1.0,
+              "total": 4
+            },
+            "mode_correct": {
+              "passed": 4,
+              "rate": 1.0,
+              "total": 4
+            },
+            "tool_name_correct": {
+              "passed": 4,
+              "rate": 1.0,
+              "total": 4
+            }
+          },
+          "reformulate_search": {
+            "arguments_exact": {
+              "passed": 1,
+              "rate": 0.25,
+              "total": 4
+            },
+            "contract_valid": {
+              "passed": 4,
+              "rate": 1.0,
+              "total": 4
+            },
+            "json_valid": {
+              "passed": 4,
+              "rate": 1.0,
+              "total": 4
+            },
+            "mode_correct": {
+              "passed": 4,
+              "rate": 1.0,
+              "total": 4
+            },
+            "tool_name_correct": {
+              "passed": 4,
+              "rate": 1.0,
+              "total": 4
+            }
+          },
+          "refuse_permission_bypass": {
+            "arguments_exact": {
+              "passed": 2,
+              "rate": 1.0,
+              "total": 2
+            },
+            "contract_valid": {
+              "passed": 2,
+              "rate": 1.0,
+              "total": 2
+            },
+            "json_valid": {
+              "passed": 2,
+              "rate": 1.0,
+              "total": 2
+            },
+            "mode_correct": {
+              "passed": 2,
+              "rate": 1.0,
+              "total": 2
+            },
+            "tool_name_correct": {
+              "passed": 2,
+              "rate": 1.0,
+              "total": 2
+            }
+          },
+          "search_initial": {
+            "arguments_exact": {
+              "passed": 7,
+              "rate": 0.4375,
+              "total": 16
+            },
+            "contract_valid": {
+              "passed": 16,
+              "rate": 1.0,
+              "total": 16
+            },
+            "json_valid": {
+              "passed": 16,
+              "rate": 1.0,
+              "total": 16
+            },
+            "mode_correct": {
+              "passed": 16,
+              "rate": 1.0,
+              "total": 16
+            },
+            "tool_name_correct": {
+              "passed": 16,
+              "rate": 1.0,
+              "total": 16
+            }
+          },
+          "synthesize_context": {
+            "arguments_exact": {
+              "passed": 6,
+              "rate": 1.0,
+              "total": 6
+            },
+            "contract_valid": {
+              "passed": 6,
+              "rate": 1.0,
+              "total": 6
+            },
+            "json_valid": {
+              "passed": 6,
+              "rate": 1.0,
+              "total": 6
+            },
+            "mode_correct": {
+              "passed": 6,
+              "rate": 1.0,
+              "total": 6
+            },
+            "tool_name_correct": {
+              "passed": 6,
+              "rate": 1.0,
+              "total": 6
+            }
+          }
+        },
+        "metrics": {
+          "arguments_exact": {
+            "passed": 30,
+            "rate": 0.6,
+            "total": 50
+          },
+          "contract_valid": {
+            "passed": 50,
+            "rate": 1.0,
+            "total": 50
+          },
+          "json_valid": {
+            "passed": 50,
+            "rate": 1.0,
+            "total": 50
+          },
+          "mode_correct": {
+            "passed": 50,
+            "rate": 1.0,
+            "total": 50
+          },
+          "tool_name_correct": {
+            "passed": 50,
+            "rate": 1.0,
+            "total": 50
+          }
+        },
+        "policy_refusal": {
+          "passed": 2,
+          "rate": 1.0,
+          "total": 2
+        },
+        "predictions_path": "/data/chengjin/studyhub/studyhub-agent/training_artifacts/studyhub_agent_sft/spec_validation_v0/evaluation/validation/adapter_predictions.jsonl",
+        "records": 50
+      },
+      "base": {
+        "family_metrics": {
+          "direct_general_answer": {
+            "arguments_exact": {
+              "passed": 2,
+              "rate": 1.0,
+              "total": 2
+            },
+            "contract_valid": {
+              "passed": 0,
+              "rate": 0.0,
+              "total": 2
+            },
+            "json_valid": {
+              "passed": 2,
+              "rate": 1.0,
+              "total": 2
+            },
+            "mode_correct": {
+              "passed": 2,
+              "rate": 1.0,
+              "total": 2
+            },
+            "tool_name_correct": {
+              "passed": 2,
+              "rate": 1.0,
+              "total": 2
+            }
+          },
+          "inspect_candidates": {
+            "arguments_exact": {
+              "passed": 0,
+              "rate": 0.0,
+              "total": 7
+            },
+            "contract_valid": {
+              "passed": 0,
+              "rate": 0.0,
+              "total": 7
+            },
+            "json_valid": {
+              "passed": 7,
+              "rate": 1.0,
+              "total": 7
+            },
+            "mode_correct": {
+              "passed": 0,
+              "rate": 0.0,
+              "total": 7
+            },
+            "tool_name_correct": {
+              "passed": 0,
+              "rate": 0.0,
+              "total": 7
+            }
+          },
+          "read_page_evidence": {
+            "arguments_exact": {
+              "passed": 0,
+              "rate": 0.0,
+              "total": 9
+            },
+            "contract_valid": {
+              "passed": 0,
+              "rate": 0.0,
+              "total": 9
+            },
+            "json_valid": {
+              "passed": 5,
+              "rate": 0.555556,
+              "total": 9
+            },
+            "mode_correct": {
+              "passed": 0,
+              "rate": 0.0,
+              "total": 9
+            },
+            "tool_name_correct": {
+              "passed": 0,
+              "rate": 0.0,
+              "total": 9
+            }
+          },
+          "read_synthetic_memory": {
+            "arguments_exact": {
+              "passed": 0,
+              "rate": 0.0,
+              "total": 4
+            },
+            "contract_valid": {
+              "passed": 0,
+              "rate": 0.0,
+              "total": 4
+            },
+            "json_valid": {
+              "passed": 3,
+              "rate": 0.75,
+              "total": 4
+            },
+            "mode_correct": {
+              "passed": 0,
+              "rate": 0.0,
+              "total": 4
+            },
+            "tool_name_correct": {
+              "passed": 0,
+              "rate": 0.0,
+              "total": 4
+            }
+          },
+          "reformulate_search": {
+            "arguments_exact": {
+              "passed": 0,
+              "rate": 0.0,
+              "total": 4
+            },
+            "contract_valid": {
+              "passed": 0,
+              "rate": 0.0,
+              "total": 4
+            },
+            "json_valid": {
+              "passed": 3,
+              "rate": 0.75,
+              "total": 4
+            },
+            "mode_correct": {
+              "passed": 0,
+              "rate": 0.0,
+              "total": 4
+            },
+            "tool_name_correct": {
+              "passed": 0,
+              "rate": 0.0,
+              "total": 4
+            }
+          },
+          "refuse_permission_bypass": {
+            "arguments_exact": {
+              "passed": 2,
+              "rate": 1.0,
+              "total": 2
+            },
+            "contract_valid": {
+              "passed": 0,
+              "rate": 0.0,
+              "total": 2
+            },
+            "json_valid": {
+              "passed": 2,
+              "rate": 1.0,
+              "total": 2
+            },
+            "mode_correct": {
+              "passed": 2,
+              "rate": 1.0,
+              "total": 2
+            },
+            "tool_name_correct": {
+              "passed": 2,
+              "rate": 1.0,
+              "total": 2
+            }
+          },
+          "search_initial": {
+            "arguments_exact": {
+              "passed": 0,
+              "rate": 0.0,
+              "total": 16
+            },
+            "contract_valid": {
+              "passed": 0,
+              "rate": 0.0,
+              "total": 16
+            },
+            "json_valid": {
+              "passed": 10,
+              "rate": 0.625,
+              "total": 16
+            },
+            "mode_correct": {
+              "passed": 0,
+              "rate": 0.0,
+              "total": 16
+            },
+            "tool_name_correct": {
+              "passed": 0,
+              "rate": 0.0,
+              "total": 16
+            }
+          },
+          "synthesize_context": {
+            "arguments_exact": {
+              "passed": 0,
+              "rate": 0.0,
+              "total": 6
+            },
+            "contract_valid": {
+              "passed": 0,
+              "rate": 0.0,
+              "total": 6
+            },
+            "json_valid": {
+              "passed": 1,
+              "rate": 0.166667,
+              "total": 6
+            },
+            "mode_correct": {
+              "passed": 0,
+              "rate": 0.0,
+              "total": 6
+            },
+            "tool_name_correct": {
+              "passed": 0,
+              "rate": 0.0,
+              "total": 6
+            }
+          }
+        },
+        "metrics": {
+          "arguments_exact": {
+            "passed": 4,
+            "rate": 0.08,
+            "total": 50
+          },
+          "contract_valid": {
+            "passed": 0,
+            "rate": 0.0,
+            "total": 50
+          },
+          "json_valid": {
+            "passed": 33,
+            "rate": 0.66,
+            "total": 50
+          },
+          "mode_correct": {
+            "passed": 4,
+            "rate": 0.08,
+            "total": 50
+          },
+          "tool_name_correct": {
+            "passed": 4,
+            "rate": 0.08,
+            "total": 50
+          }
+        },
+        "policy_refusal": {
+          "passed": 2,
+          "rate": 1.0,
+          "total": 2
+        },
+        "predictions_path": "/data/chengjin/studyhub/studyhub-agent/training_artifacts/studyhub_agent_sft/spec_validation_v0/evaluation/validation/base_predictions.jsonl",
+        "records": 50
+      },
+      "delta_rate": {
+        "arguments_exact": 0.52,
+        "contract_valid": 1.0,
+        "json_valid": 0.34,
+        "mode_correct": 0.92,
+        "tool_name_correct": 0.92
+      }
+    }
+  }
+}

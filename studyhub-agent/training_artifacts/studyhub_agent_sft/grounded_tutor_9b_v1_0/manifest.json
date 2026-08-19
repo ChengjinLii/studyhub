@@ -1,0 +1,48 @@
+{
+  "audit_sha256": "127c292ff9a42c0a43d595718aafc9f8db6a3a56a89652e67473bddcc0f6a016",
+  "chunks_path": "/data/chengjin/studyhub/studyhub-agent/training_artifacts/studyhub_agent_sft/grounded_tutor_9b_v1_0/clean_preview_chunks.jsonl",
+  "chunks_sha256": "26a0cf8878b69b912988700a8ec02c6e2151bab55783bc830cf4fe766f549227",
+  "clean_materials": 69,
+  "clean_pages": 223,
+  "contains_paid_material": false,
+  "dataset_path": "/data/chengjin/studyhub/studyhub-agent/training_artifacts/studyhub_agent_sft/grounded_tutor_9b_v1_0/grounded_tutor_9b_v1_0_trainval.jsonl",
+  "dataset_sha256": "85f5f211b913991beffbfea88daf45c4cf3291c5cf802d5b2d49ddb6befca0e4",
+  "excluded_nonfree_or_unknown_pages": 0,
+  "family_counts": {
+    "active_recall_v1": 126,
+    "citation_fidelity_v1": 90,
+    "evidence_scope_v1": 90,
+    "grounded_study_plan_v1": 108,
+    "insufficient_evidence_v1": 72,
+    "material_comparison_v1": 90,
+    "page_explanation_v1": 234,
+    "page_summary_v1": 162,
+    "unsupported_claim_correction_v1": 54,
+    "untrusted_observation_v1": 54
+  },
+  "generated_at": "2026-08-11T05:07:02+00:00",
+  "holdout": {
+    "evaluated": false,
+    "records": 120,
+    "seal_path": "/data/chengjin/studyhub/studyhub-agent/evaluation_artifacts/studyhub_agent/grounded_tutor_9b_holdout_v1/seal.json",
+    "seal_sha256": "199322aba4b3645329bdc2b8cc045c3ae223f796d93b72f7119fad42e6f76b5d",
+    "training_eligible": false
+  },
+  "human_gold": false,
+  "material_split_counts": {
+    "holdout": 7,
+    "train": 55,
+    "validation": 7
+  },
+  "production_api_called": false,
+  "production_database_accessed": false,
+  "records": 1080,
+  "release_status": "formal_offline_sft_candidate_not_production",
+  "schema_version": "studyhub.agent.grounded_tutor.dataset_manifest.v1",
+  "seed": 20260811,
+  "split_counts": {
+    "train": 960,
+    "validation": 120
+  },
+  "system_prompt_sha256": "5831319b198c6d2e2e22c6f4da58793e47850a8966d4ef7f05252f71f7198e27"
+}

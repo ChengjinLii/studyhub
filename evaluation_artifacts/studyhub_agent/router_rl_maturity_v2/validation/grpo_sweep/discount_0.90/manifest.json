@@ -1,9 +1,0 @@
-{
-  "predictions_sha256": "f64e1a7f43e84a260bca921fc1a374867c8e64726cb2514283b42b935321ddf6",
-  "production_access": false,
-  "schema_version": "studyhub.agent.router_rl.evaluation_manifest.v2",
-  "single_pass": false,
-  "split": "validation",
-  "summary_path": "/data/chengjin/studyhub/evaluation_artifacts/studyhub_agent/router_rl_maturity_v2/validation/grpo_sweep/discount_0.90/summary.json",
-  "summary_sha256": "57e4bd96abc898d281ddc42f98ea7b9e8f747d0ac960ca0e685fa91797bc86f9"
-}

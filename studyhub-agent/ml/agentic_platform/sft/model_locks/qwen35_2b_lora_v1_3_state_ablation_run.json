@@ -11,7 +11,7 @@
   },
   "continuation_source": {
     "seed": 7703,
-    "adapter_path": "/data/chengjin/studyhub/training_artifacts/studyhub_agent_sft/qwen35_2b_lora_v1_1_seed_7703",
+    "adapter_path": "/data/chengjin/studyhub/studyhub-agent/training_artifacts/studyhub_agent_sft/qwen35_2b_lora_v1_1_seed_7703",
     "adapter_sha256": "31815c3e0ba9d030aac527638e6bd1e37d5874e6266a1f5c6d9a88b62dc9d791",
     "failed_v1_2_adapter_used_as_source": false
   },
@@ -93,7 +93,7 @@
     "eval_loss": 0.04537907615303993,
     "eval_token_accuracy": 0.9888200680944519,
     "runtime_seconds": 1029.3701,
-    "adapter_path": "/data/chengjin/studyhub/training_artifacts/studyhub_agent_sft/qwen35_2b_lora_v1_3_state_ablation_from_7703",
+    "adapter_path": "/data/chengjin/studyhub/studyhub-agent/training_artifacts/studyhub_agent_sft/qwen35_2b_lora_v1_3_state_ablation_from_7703",
     "adapter_sha256": "458256e929f2ee3560712912bffc4eb97d69df6fbd6ec4d3272e673616ec8ee6"
   },
   "v1_3_validation": {

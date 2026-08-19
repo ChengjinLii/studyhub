@@ -1,0 +1,247 @@
+{
+  "adapter_path": "/data/chengjin/studyhub/studyhub-agent/training_artifacts/studyhub_agent_rl/router_rl_maturity_v2/experiments/grpo_sweep/runs/discount_0.90/seed_26081211/adapter",
+  "adapter_sha256": "f80e4f41bf887d9e744a1d82fc8d8080b2c0b5245079a747f9a414b5ba6acf88",
+  "constraint": {
+    "correction_rate": 0.845455,
+    "corrections": {
+      "canonicalize_contract": 214,
+      "enforce_permission_boundary": 30,
+      "force_final_budget": 30,
+      "honor_explicit_candidate_inspection": 120,
+      "honor_explicit_final": 90,
+      "honor_explicit_memory_read": 30,
+      "honor_explicit_search": 18,
+      "honor_explicit_synthesis": 30,
+      "protect_explicit_page_route": 120,
+      "protect_material_ids": 90,
+      "recover_empty_search": 60,
+      "safe_untrusted_continuation": 30
+    },
+    "severity_max": 4,
+    "severity_mean": 2.151515
+  },
+  "dataset_path": "/data/chengjin/studyhub/studyhub-agent/training_artifacts/studyhub_agent_rl/router_rl_maturity_v2/validation.jsonl",
+  "dataset_sha256": "62c92a2e97c0a3d5c5ac9345a14b8e4e45edea58fd41d4fc6f2605f1292fdb0b",
+  "decoding": {
+    "action_temperature": 1.0,
+    "batch_size": 1,
+    "decode_limit_rate": 0.0,
+    "max_prompt_tokens": 4096,
+    "type": "constrained_single_token_argmax"
+  },
+  "entropy": {
+    "action_mean": 0.10482638,
+    "true_token_mean": 0.3416381
+  },
+  "episodes": 390,
+  "executable": {
+    "choice_success_rate": 0.998485,
+    "episode_success_rate": 0.997436,
+    "families": {
+      "candidate_before_read": {
+        "choice_success_rate": 1.0,
+        "reward_mean": 1.0,
+        "samples": 30
+      },
+      "direct_general_answer": {
+        "choice_success_rate": 0.966667,
+        "reward_mean": 0.966667,
+        "samples": 30
+      },
+      "duplicate_search_avoidance": {
+        "choice_success_rate": 1.0,
+        "reward_mean": 1.0,
+        "samples": 30
+      },
+      "empty_search_rewrite": {
+        "choice_success_rate": 1.0,
+        "reward_mean": 1.0,
+        "samples": 30
+      },
+      "explicit_page_read": {
+        "choice_success_rate": 1.0,
+        "reward_mean": 1.0,
+        "samples": 30
+      },
+      "force_final_budget": {
+        "choice_success_rate": 1.0,
+        "reward_mean": 1.0,
+        "samples": 30
+      },
+      "grounded_final": {
+        "choice_success_rate": 1.0,
+        "reward_mean": 0.846154,
+        "samples": 90
+      },
+      "initial_search": {
+        "choice_success_rate": 1.0,
+        "reward_mean": 1.0,
+        "samples": 90
+      },
+      "inspect_candidates": {
+        "choice_success_rate": 1.0,
+        "reward_mean": 1.0,
+        "samples": 90
+      },
+      "memory_read": {
+        "choice_success_rate": 1.0,
+        "reward_mean": 1.0,
+        "samples": 30
+      },
+      "permission_boundary": {
+        "choice_success_rate": 1.0,
+        "reward_mean": 1.0,
+        "samples": 30
+      },
+      "read_evidence": {
+        "choice_success_rate": 1.0,
+        "reward_mean": 1.0,
+        "samples": 90
+      },
+      "synthesize_context": {
+        "choice_success_rate": 1.0,
+        "reward_mean": 1.0,
+        "samples": 30
+      },
+      "untrusted_observation": {
+        "choice_success_rate": 1.0,
+        "reward_mean": 0.982222,
+        "samples": 30
+      }
+    },
+    "hard_gates": {
+      "budget_respected": 1.0,
+      "contract_valid": 1.0,
+      "explicit_pages_preserved": 1.0,
+      "permission_safe": 1.0,
+      "readonly_tool": 1.0,
+      "sensitive_output_absent": 1.0,
+      "strict_json": 1.0,
+      "trusted_references": 1.0
+    },
+    "policy_reward_mean": 0.976698,
+    "reward_hacking_flags": {},
+    "reward_hacking_rate": 0.0
+  },
+  "gpu": {
+    "name": "NVIDIA H100 PCIe",
+    "peak_memory_mib": 5137.285
+  },
+  "isolation": {
+    "legacy_v1_test_used": false,
+    "paid_material_used": false,
+    "production_api_called": false,
+    "production_database_accessed": false,
+    "production_final_holdout_read": false,
+    "production_oss_write_called": false
+  },
+  "model_path": "/data/chengjin/studyhub/studyhub-agent/training_artifacts/studyhub_agent_sft/qwen35_2b_router_v1_7_merged",
+  "predictions_path": "/data/chengjin/studyhub/studyhub-agent/evaluation_artifacts/studyhub_agent/router_rl_maturity_v2/validation/grpo_sweep/discount_0.90/predictions.jsonl",
+  "predictions_sha256": "f64e1a7f43e84a260bca921fc1a374867c8e64726cb2514283b42b935321ddf6",
+  "prompt_tokens": {
+    "maximum": 1713,
+    "mean": 1340.632,
+    "minimum": 1175
+  },
+  "raw": {
+    "choice_success_rate": 0.856061,
+    "episode_success_rate": 0.75641,
+    "families": {
+      "candidate_before_read": {
+        "choice_success_rate": 1.0,
+        "reward_mean": 1.0,
+        "samples": 30
+      },
+      "direct_general_answer": {
+        "choice_success_rate": 0.966667,
+        "reward_mean": 0.966667,
+        "samples": 30
+      },
+      "duplicate_search_avoidance": {
+        "choice_success_rate": 1.0,
+        "reward_mean": 1.0,
+        "samples": 30
+      },
+      "empty_search_rewrite": {
+        "choice_success_rate": 1.0,
+        "reward_mean": 1.0,
+        "samples": 30
+      },
+      "explicit_page_read": {
+        "choice_success_rate": 1.0,
+        "reward_mean": 1.0,
+        "samples": 30
+      },
+      "force_final_budget": {
+        "choice_success_rate": 1.0,
+        "reward_mean": 1.0,
+        "samples": 30
+      },
+      "grounded_final": {
+        "choice_success_rate": 0.0,
+        "reward_mean": 0.0,
+        "samples": 90
+      },
+      "initial_search": {
+        "choice_success_rate": 1.0,
+        "reward_mean": 1.0,
+        "samples": 90
+      },
+      "inspect_candidates": {
+        "choice_success_rate": 1.0,
+        "reward_mean": 1.0,
+        "samples": 90
+      },
+      "memory_read": {
+        "choice_success_rate": 1.0,
+        "reward_mean": 1.0,
+        "samples": 30
+      },
+      "permission_boundary": {
+        "choice_success_rate": 1.0,
+        "reward_mean": 1.0,
+        "samples": 30
+      },
+      "read_evidence": {
+        "choice_success_rate": 1.0,
+        "reward_mean": 1.0,
+        "samples": 90
+      },
+      "synthesize_context": {
+        "choice_success_rate": 1.0,
+        "reward_mean": 1.0,
+        "samples": 30
+      },
+      "untrusted_observation": {
+        "choice_success_rate": 0.866667,
+        "reward_mean": 0.84,
+        "samples": 30
+      }
+    },
+    "hard_gates": {
+      "budget_respected": 1.0,
+      "contract_valid": 1.0,
+      "explicit_pages_preserved": 1.0,
+      "permission_safe": 1.0,
+      "readonly_tool": 1.0,
+      "sensitive_output_absent": 1.0,
+      "strict_json": 1.0,
+      "trusted_references": 1.0
+    },
+    "policy_reward_mean": 0.854848,
+    "reward_hacking_flags": {
+      "premature_final": 4
+    },
+    "reward_hacking_rate": 0.006061
+  },
+  "raw_executable": {
+    "choice_success_gap": 0.142424,
+    "choice_success_gap_absolute": 0.142424,
+    "reward_delta_absolute_mean": 0.121849,
+    "reward_delta_mean": 0.121849
+  },
+  "schema_version": "studyhub.agent.router_rl.evaluation.v2",
+  "seed": 26081201,
+  "split": "validation",
+  "states": 660
+}

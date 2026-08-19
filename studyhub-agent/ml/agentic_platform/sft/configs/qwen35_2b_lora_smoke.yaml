@@ -17,7 +17,7 @@ freeze_multi_modal_projector: true
 ### dataset
 dataset: studyhub_router_2b_train
 eval_dataset: studyhub_router_2b_validation
-dataset_dir: /data/chengjin/studyhub/training_artifacts/studyhub_agent_sft/spec_validation_v0/llamafactory
+dataset_dir: /data/chengjin/studyhub/studyhub-agent/training_artifacts/studyhub_agent_sft/spec_validation_v0/llamafactory
 template: qwen3_5_nothink
 cutoff_len: 4096
 overwrite_cache: true
@@ -28,7 +28,7 @@ mask_history: false
 packing: false
 
 ### output
-output_dir: /data/chengjin/studyhub/training_artifacts/studyhub_agent_sft/qwen35_2b_lora_smoke
+output_dir: /data/chengjin/studyhub/studyhub-agent/training_artifacts/studyhub_agent_sft/qwen35_2b_lora_smoke
 logging_steps: 1
 save_strategy: epoch
 plot_loss: true

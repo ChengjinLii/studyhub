@@ -1,5 +1,5 @@
 model_name_or_path: /data/chengjin/studyhub/models/P0/Qwen3.5-2B
-adapter_name_or_path: /data/chengjin/studyhub/training_artifacts/studyhub_agent_sft/web_router_v3_multiturn/qwen35_2b_lora_seed_7703
+adapter_name_or_path: /data/chengjin/studyhub/studyhub-agent/training_artifacts/studyhub_agent_sft/web_router_v3_multiturn/qwen35_2b_lora_seed_7703
 trust_remote_code: true
 use_v1_kernels: false
 stage: sft
@@ -14,7 +14,7 @@ freeze_vision_tower: true
 freeze_multi_modal_projector: true
 dataset: studyhub_web_router_train
 eval_dataset: studyhub_web_router_validation
-dataset_dir: /data/chengjin/studyhub/training_artifacts/studyhub_agent_sft/web_router_v3_state_signals/llamafactory
+dataset_dir: /data/chengjin/studyhub/studyhub-agent/training_artifacts/studyhub_agent_sft/web_router_v3_state_signals/llamafactory
 template: qwen3_5_nothink
 cutoff_len: 4096
 overwrite_cache: true
@@ -23,7 +23,7 @@ dataloader_num_workers: 4
 train_on_prompt: false
 mask_history: false
 packing: false
-output_dir: /data/chengjin/studyhub/training_artifacts/studyhub_agent_sft/web_router_v4_state_signals/qwen35_2b_lora_seed_7703
+output_dir: /data/chengjin/studyhub/studyhub-agent/training_artifacts/studyhub_agent_sft/web_router_v4_state_signals/qwen35_2b_lora_seed_7703
 logging_steps: 5
 save_strategy: epoch
 save_total_limit: 1

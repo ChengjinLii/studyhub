@@ -1,0 +1,9 @@
+{
+  "predictions_sha256": "ff8f4b36dc391f6c065a21f206832690f887c492ca651fd1d5a3d2f78568fa3f",
+  "production_access": false,
+  "schema_version": "studyhub.agent.router_rl.evaluation_manifest.v2",
+  "single_pass": false,
+  "split": "validation",
+  "summary_path": "/data/chengjin/studyhub/studyhub-agent/evaluation_artifacts/studyhub_agent/router_rl_maturity_v2/validation/grpo_scale_sweep/group20_entropy002/summary.json",
+  "summary_sha256": "e138cd1c6dae51678ddace19752d8df1365cf9f9c97e12de3d21a96c14e68637"
+}

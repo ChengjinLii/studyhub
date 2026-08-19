@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from pathlib import Path
 
 from ml.agentic_platform.paths import AGENT_ROOT, BACKEND_ROOT, WORKSPACE_ROOT
 
@@ -56,10 +57,28 @@ def test_standalone_package_does_not_import_the_website() -> None:
 def test_legacy_agent_paths_are_absent() -> None:
     assert not (WORKSPACE_ROOT / "ml").exists()
     assert not (WORKSPACE_ROOT / "reports/recagent/agentic-platform").exists()
+    assert not (WORKSPACE_ROOT / "ai_platform").exists()
+    assert not (WORKSPACE_ROOT / "training_artifacts").exists()
+    assert not (WORKSPACE_ROOT / "evaluation_artifacts").exists()
+    assert (AGENT_ROOT / "ai_platform/rag_experiments").is_dir()
+    assert (AGENT_ROOT / "training_artifacts").is_dir()
+    assert (AGENT_ROOT / "evaluation_artifacts").is_dir()
 
 
 def test_bots_are_local_only() -> None:
     root_ignore = (WORKSPACE_ROOT / ".gitignore").read_text(encoding="utf-8").splitlines()
 
     assert "/bots/" in root_ignore
-    assert (WORKSPACE_ROOT / "bots/qq_studyhub_bot/server.py").is_file()
+    assert not any(path.parts[0] == "bots" for path in _tracked_workspace_paths())
+
+
+def _tracked_workspace_paths() -> list[Path]:
+    import subprocess
+
+    output = subprocess.run(
+        ["git", "ls-files", "-z"],
+        cwd=WORKSPACE_ROOT,
+        check=True,
+        capture_output=True,
+    ).stdout
+    return [Path(raw.decode()) for raw in output.split(b"\0") if raw]

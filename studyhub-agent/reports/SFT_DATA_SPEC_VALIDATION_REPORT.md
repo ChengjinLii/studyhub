@@ -17,7 +17,7 @@
 数据生成物位于：
 
 ```text
-/data/chengjin/studyhub/training_artifacts/studyhub_agent_sft/spec_validation_v0/
+/data/chengjin/studyhub/studyhub-agent/training_artifacts/studyhub_agent_sft/spec_validation_v0/
 ```
 
 该目录已加入 `.gitignore`，不会把资料文本、训练样本或后续 checkpoint

@@ -11,9 +11,11 @@ StudyHub. It is intentionally separated from the website runtime in
   offline snapshots.
 - Paid-only material links, purchase data, database credentials, and write
   operations are outside the Agent contract.
-- Training, evaluation, reports, and Hermes integration live in this directory.
-- Model weights, generated datasets, run artifacts, local state, and the Hermes
-  checkout are ignored by Git.
+- RAG research, training, evaluation, reports, and Hermes integration live in
+  this directory.
+- Compact datasets, manifests, and evaluation evidence already selected for
+  version control remain tracked. Model weights, checkpoints, caches, new run
+  artifacts, local state, and the Hermes checkout are ignored by Git.
 
 The website keeps its existing API, authorization, persistence, and UI code.
 Nothing in this project is loaded by the website unless a separate integration
@@ -31,7 +33,10 @@ written below this project.
 ```text
 studyhub-agent/
 ├── studyhub_agent/       # Standalone package and CLI support
+├── ai_platform/          # Read-only RAG experiments
 ├── ml/agentic_platform/  # SFT, RL, collection, and evaluation code
+├── training_artifacts/   # Versioned evidence plus ignored local model outputs
+├── evaluation_artifacts/ # Versioned evaluation evidence plus local runs
 ├── integrations/hermes/  # Pinned upstream metadata and minimal patches
 ├── scripts/              # Agent and research entry points
 ├── reports/              # Versioned technical reports

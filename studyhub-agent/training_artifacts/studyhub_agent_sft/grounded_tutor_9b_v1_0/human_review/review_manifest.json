@@ -1,0 +1,28 @@
+{
+  "dataset_path": "/data/chengjin/studyhub/studyhub-agent/training_artifacts/studyhub_agent_sft/grounded_tutor_9b_v1_0/grounded_tutor_9b_v1_0_trainval.jsonl",
+  "dataset_sha256": "85f5f211b913991beffbfea88daf45c4cf3291c5cf802d5b2d49ddb6befca0e4",
+  "family_counts": {
+    "active_recall_v1": 14,
+    "citation_fidelity_v1": 10,
+    "evidence_scope_v1": 10,
+    "grounded_study_plan_v1": 12,
+    "insufficient_evidence_v1": 8,
+    "material_comparison_v1": 10,
+    "page_explanation_v1": 26,
+    "page_summary_v1": 18,
+    "unsupported_claim_correction_v1": 6,
+    "untrusted_observation_v1": 6
+  },
+  "generated_at": "2026-08-11T05:07:14+00:00",
+  "human_gold": false,
+  "human_review_complete": false,
+  "profile_counts": {
+    "grounded_tutor_9b": 120
+  },
+  "records": 120,
+  "review_csv": "/data/chengjin/studyhub/studyhub-agent/training_artifacts/studyhub_agent_sft/grounded_tutor_9b_v1_0/human_review/validation_review.csv",
+  "review_csv_sha256": "cf2115e9c127f6af46ad06edd447286bc7c09f3688c04a9ea61e4dcd769bda44",
+  "runtime_path_counts": {},
+  "schema_version": "studyhub.agent.sft.human_review_packet.v1",
+  "split": "validation"
+}

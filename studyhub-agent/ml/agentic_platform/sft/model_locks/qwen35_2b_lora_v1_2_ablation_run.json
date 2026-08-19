@@ -11,7 +11,7 @@
   },
   "continuation_source": {
     "seed": 7703,
-    "adapter_path": "/data/chengjin/studyhub/training_artifacts/studyhub_agent_sft/qwen35_2b_lora_v1_1_seed_7703",
+    "adapter_path": "/data/chengjin/studyhub/studyhub-agent/training_artifacts/studyhub_agent_sft/qwen35_2b_lora_v1_1_seed_7703",
     "adapter_sha256": "31815c3e0ba9d030aac527638e6bd1e37d5874e6266a1f5c6d9a88b62dc9d791",
     "failed_targeted_only_adapter_used_as_source": false
   },

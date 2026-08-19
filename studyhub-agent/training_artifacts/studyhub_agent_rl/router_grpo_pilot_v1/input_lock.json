@@ -1,0 +1,46 @@
+{
+  "config": {
+    "path": "/data/chengjin/studyhub/ml/agentic_platform/rl/configs/router_grpo_pilot_v1.json",
+    "sha256": "3e76746532f092fc2c17c8769381d8c89377a97a505ce0e357cfec2ded5bde7f"
+  },
+  "created_at": "2026-08-11T18:13:30.302000+00:00",
+  "dataset": {
+    "audit_sha256": "58f96dceff6c9cca1db71ecbce5283f6159b8937ca6c1cb55fd3bd68591471d5",
+    "manifest_sha256": "0c3d471734775c9271a544504edf7a7cbc20b959591629acbc03b1231971d406",
+    "material_split_leaks": {},
+    "path": "/data/chengjin/studyhub/studyhub-agent/training_artifacts/studyhub_agent_rl/router_grpo_pilot_v1/states.jsonl",
+    "query_split_leaks": [],
+    "sha256": "b3e800dcb32ed8caf316587c04cbd8077b762c9788f2e5816f194d419d16e001",
+    "states": 269
+  },
+  "git_commit": "aa04b87cf987a5d7eb47c5e23df2b83592957a46",
+  "implementation_sha256": {
+    "backend/app/services/agent_router_constraint_service.py": "79b272f3e11d9d2b96c73e93b6053dee4bf0a7daadbbfbb6542dfe9b7c8005c5",
+    "ml/agentic_platform/rl/environment.py": "56d830eafb7ae7984bdb68531b6947c273d5f3d828b5b88ed47f9a68f61718a5",
+    "ml/agentic_platform/rl/reward.py": "ef65a1b96c1372ef18f5f34d119e3d16c3b01e877935221f5a894dda2da5a529",
+    "ml/agentic_platform/rl/trainer.py": "a88d3fd3eb5c4ffc5b75e02dd4593b6bf1c241744ac48bcbac066862bf2961b9"
+  },
+  "isolation": {
+    "development_diagnostic_read": false,
+    "final_holdout_read": false,
+    "network_mode": "offline",
+    "paid_material_used": false,
+    "production_api_called": false,
+    "production_database_accessed": false,
+    "production_oss_write_called": false
+  },
+  "policy": {
+    "base_config_sha256": "ed1c1723241f23f7f4e23430759cbd7dcfb4103cbdfe052bfe7626b57c2615b4",
+    "base_model_path": "/data/chengjin/studyhub/models/P0/Qwen3.5-2B",
+    "base_weight_index_sha256": "aca8afed9da75b0f050b408d270766fd77627f1af401e240f61c3b47d0db02f9",
+    "sft_adapter_path": "/data/chengjin/studyhub/studyhub-agent/training_artifacts/studyhub_agent_sft/qwen35_2b_lora_v1_7_state_transitions_from_v1_6_seed_7703",
+    "sft_adapter_sha256": "6d2428abf3686be600509c5dff8fae34bb43076f391d86c90eab9b1971797eb1",
+    "tokenizer_config_sha256": "49e2b6e395f959f077f1e992b338919c0d4a9732fc6e613995e06557f843500c"
+  },
+  "reference_policy": {
+    "adapter_sha256": "6d2428abf3686be600509c5dff8fae34bb43076f391d86c90eab9b1971797eb1",
+    "frozen_from_same_sft_adapter": true,
+    "updated_by_optimizer": false
+  },
+  "schema_version": "studyhub.agent.router_rl.input_lock.v1"
+}

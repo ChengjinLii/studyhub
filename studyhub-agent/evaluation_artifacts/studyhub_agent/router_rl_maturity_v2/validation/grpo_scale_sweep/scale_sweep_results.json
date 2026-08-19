@@ -1,0 +1,803 @@
+{
+  "best_screen_trial": "group20_entropy0",
+  "failure_blockers": [
+    "critical_family_choice_success",
+    "no_family_choice_drop_from_sft",
+    "raw_choice_success",
+    "raw_episode_success",
+    "raw_executable_choice_gap",
+    "raw_reward_delta"
+  ],
+  "gate_passed": false,
+  "production_access": false,
+  "required_entropy_scale_compared": true,
+  "required_group_scale_compared": true,
+  "schema_version": "studyhub.agent.router_rl.grpo_scale_sweep_results.v2",
+  "sealed_read": false,
+  "selected_config": null,
+  "selected_trial": null,
+  "test_read": false,
+  "trials": [
+    {
+      "config": {
+        "action_temperature": 1.25,
+        "entropy_beta": 0.0,
+        "group_size": 10,
+        "learning_rate": 1e-05,
+        "lora_rank": 16,
+        "reference_kl_beta": 0.05,
+        "trajectory_discount": 0.95
+      },
+      "evaluation_summary_path": "/data/chengjin/studyhub/studyhub-agent/evaluation_artifacts/studyhub_agent/router_rl_maturity_v2/validation/grpo_scale_sweep/group10_entropy0/summary.json",
+      "name": "group10_entropy0",
+      "rank_key": [
+        1.0,
+        -2.0,
+        0.0,
+        0.857576,
+        0.758974,
+        0.890043,
+        -2.106061
+      ],
+      "training": {
+        "mean_nonzero_advantage_fraction": 0.4330863,
+        "mean_reference_kl": 0.45519797,
+        "peak_memory_mib": 21637.517,
+        "trajectory_rollouts": 400
+      },
+      "training_summary_path": "/data/chengjin/studyhub/studyhub-agent/training_artifacts/studyhub_agent_rl/router_rl_maturity_v2/experiments/grpo_scale_sweep/runs/group10_entropy0/seed_26081221/run_summary.json",
+      "validation": {
+        "constraint_severity": 2.106061,
+        "raw_choice_success": 0.857576,
+        "raw_episode_success": 0.758974,
+        "raw_executable_choice_gap": 0.096969,
+        "raw_reward": 0.890043
+      },
+      "validation_gate": {
+        "blockers": [
+          "critical_family_choice_success",
+          "no_family_choice_drop_from_sft",
+          "raw_choice_success",
+          "raw_episode_success",
+          "raw_executable_choice_gap"
+        ],
+        "checks": {
+          "all_raw_hard_gates": true,
+          "constraint_severity_non_regression": true,
+          "critical_family_choice_success": false,
+          "decode_limit_rate": true,
+          "evaluation_isolation": true,
+          "no_family_choice_drop_from_sft": false,
+          "paired_bootstrap_reward_ci": true,
+          "raw_choice_success": false,
+          "raw_episode_success": false,
+          "raw_executable_choice_gap": false,
+          "raw_reward_delta": true,
+          "reward_hacking_rate": true
+        },
+        "critical_family_rates": {
+          "candidate_before_read": 1.0,
+          "direct_general_answer": 0.0,
+          "duplicate_search_avoidance": 1.0,
+          "empty_search_rewrite": 1.0,
+          "explicit_page_read": 1.0,
+          "force_final_budget": 1.0,
+          "memory_read": 0.0,
+          "permission_boundary": 1.0,
+          "synthesize_context": 0.0,
+          "untrusted_observation": 1.0
+        },
+        "deltas": {
+          "constraint_severity": -0.090909,
+          "families": {
+            "candidate_before_read": {
+              "choice_success_delta": 0.1,
+              "reward_delta": 0.054546
+            },
+            "direct_general_answer": {
+              "choice_success_delta": 0.0,
+              "reward_delta": 0.0
+            },
+            "duplicate_search_avoidance": {
+              "choice_success_delta": 0.0,
+              "reward_delta": 0.0
+            },
+            "empty_search_rewrite": {
+              "choice_success_delta": 0.466667,
+              "reward_delta": 0.337037
+            },
+            "explicit_page_read": {
+              "choice_success_delta": 0.0,
+              "reward_delta": 0.0
+            },
+            "force_final_budget": {
+              "choice_success_delta": 0.0,
+              "reward_delta": 0.0
+            },
+            "grounded_final": {
+              "choice_success_delta": 0.955556,
+              "reward_delta": 0.955556
+            },
+            "initial_search": {
+              "choice_success_delta": 0.311111,
+              "reward_delta": 0.207408
+            },
+            "inspect_candidates": {
+              "choice_success_delta": 0.0,
+              "reward_delta": 0.0
+            },
+            "memory_read": {
+              "choice_success_delta": -0.866667,
+              "reward_delta": -0.557143
+            },
+            "permission_boundary": {
+              "choice_success_delta": 0.0,
+              "reward_delta": 0.0
+            },
+            "read_evidence": {
+              "choice_success_delta": 0.0,
+              "reward_delta": 0.0
+            },
+            "synthesize_context": {
+              "choice_success_delta": -0.966667,
+              "reward_delta": -0.621428
+            },
+            "untrusted_observation": {
+              "choice_success_delta": 0.066667,
+              "reward_delta": 0.044444
+            }
+          },
+          "raw_choice_success": 0.118182,
+          "raw_episode_success": 0.128205,
+          "raw_reward": 0.124834
+        },
+        "paired_bootstrap": {
+          "choice_success_delta": {
+            "ci95_lower": 0.078788,
+            "ci95_upper": 0.157576,
+            "mean": 0.118182
+          },
+          "episode_success_delta": {
+            "ci95_lower": 0.066667,
+            "ci95_upper": 0.187179,
+            "mean": 0.128205
+          },
+          "method": "paired_nonparametric_bootstrap",
+          "resamples": 5000,
+          "reward_delta": {
+            "ci95_lower": 0.092445,
+            "ci95_upper": 0.156824,
+            "mean": 0.124834
+          },
+          "seed": 26081201
+        },
+        "passed": false
+      }
+    },
+    {
+      "config": {
+        "action_temperature": 1.25,
+        "entropy_beta": 0.0,
+        "group_size": 20,
+        "learning_rate": 1e-05,
+        "lora_rank": 16,
+        "reference_kl_beta": 0.05,
+        "trajectory_discount": 0.95
+      },
+      "evaluation_summary_path": "/data/chengjin/studyhub/studyhub-agent/evaluation_artifacts/studyhub_agent/router_rl_maturity_v2/validation/grpo_scale_sweep/group20_entropy0/summary.json",
+      "name": "group20_entropy0",
+      "rank_key": [
+        1.0,
+        -1.0,
+        0.0,
+        0.787879,
+        0.641026,
+        0.799784,
+        -2.175758
+      ],
+      "training": {
+        "mean_nonzero_advantage_fraction": 0.29981312,
+        "mean_reference_kl": 0.3341954,
+        "peak_memory_mib": 21637.517,
+        "trajectory_rollouts": 800
+      },
+      "training_summary_path": "/data/chengjin/studyhub/studyhub-agent/training_artifacts/studyhub_agent_rl/router_rl_maturity_v2/experiments/grpo_scale_sweep/runs/group20_entropy0/seed_26081221/run_summary.json",
+      "validation": {
+        "constraint_severity": 2.175758,
+        "raw_choice_success": 0.787879,
+        "raw_episode_success": 0.641026,
+        "raw_executable_choice_gap": 0.166666,
+        "raw_reward": 0.799784
+      },
+      "validation_gate": {
+        "blockers": [
+          "critical_family_choice_success",
+          "no_family_choice_drop_from_sft",
+          "raw_choice_success",
+          "raw_episode_success",
+          "raw_executable_choice_gap"
+        ],
+        "checks": {
+          "all_raw_hard_gates": true,
+          "constraint_severity_non_regression": true,
+          "critical_family_choice_success": false,
+          "decode_limit_rate": true,
+          "evaluation_isolation": true,
+          "no_family_choice_drop_from_sft": false,
+          "paired_bootstrap_reward_ci": true,
+          "raw_choice_success": false,
+          "raw_episode_success": false,
+          "raw_executable_choice_gap": false,
+          "raw_reward_delta": true,
+          "reward_hacking_rate": true
+        },
+        "critical_family_rates": {
+          "candidate_before_read": 1.0,
+          "direct_general_answer": 0.0,
+          "duplicate_search_avoidance": 1.0,
+          "empty_search_rewrite": 1.0,
+          "explicit_page_read": 1.0,
+          "force_final_budget": 1.0,
+          "memory_read": 0.266667,
+          "permission_boundary": 1.0,
+          "synthesize_context": 1.0,
+          "untrusted_observation": 1.0
+        },
+        "deltas": {
+          "constraint_severity": -0.021212,
+          "families": {
+            "candidate_before_read": {
+              "choice_success_delta": 0.1,
+              "reward_delta": 0.054546
+            },
+            "direct_general_answer": {
+              "choice_success_delta": 0.0,
+              "reward_delta": 0.0
+            },
+            "duplicate_search_avoidance": {
+              "choice_success_delta": 0.0,
+              "reward_delta": 0.0
+            },
+            "empty_search_rewrite": {
+              "choice_success_delta": 0.466667,
+              "reward_delta": 0.337037
+            },
+            "explicit_page_read": {
+              "choice_success_delta": 0.0,
+              "reward_delta": 0.0
+            },
+            "force_final_budget": {
+              "choice_success_delta": 0.0,
+              "reward_delta": 0.0
+            },
+            "grounded_final": {
+              "choice_success_delta": 0.022222,
+              "reward_delta": 0.022222
+            },
+            "initial_search": {
+              "choice_success_delta": 0.311111,
+              "reward_delta": 0.207408
+            },
+            "inspect_candidates": {
+              "choice_success_delta": 0.0,
+              "reward_delta": 0.0
+            },
+            "memory_read": {
+              "choice_success_delta": -0.6,
+              "reward_delta": -0.385714
+            },
+            "permission_boundary": {
+              "choice_success_delta": 0.0,
+              "reward_delta": 0.0
+            },
+            "read_evidence": {
+              "choice_success_delta": 0.0,
+              "reward_delta": 0.0
+            },
+            "synthesize_context": {
+              "choice_success_delta": 0.033333,
+              "reward_delta": 0.021429
+            },
+            "untrusted_observation": {
+              "choice_success_delta": 0.066667,
+              "reward_delta": 0.044444
+            }
+          },
+          "raw_choice_success": 0.048485,
+          "raw_episode_success": 0.010257,
+          "raw_reward": 0.034575
+        },
+        "paired_bootstrap": {
+          "choice_success_delta": {
+            "ci95_lower": 0.024242,
+            "ci95_upper": 0.072727,
+            "mean": 0.048485
+          },
+          "episode_success_delta": {
+            "ci95_lower": -0.020513,
+            "ci95_upper": 0.041026,
+            "mean": 0.010256
+          },
+          "method": "paired_nonparametric_bootstrap",
+          "resamples": 5000,
+          "reward_delta": {
+            "ci95_lower": 0.018614,
+            "ci95_upper": 0.050904,
+            "mean": 0.034574
+          },
+          "seed": 26081201
+        },
+        "passed": false
+      }
+    },
+    {
+      "config": {
+        "action_temperature": 1.25,
+        "entropy_beta": 0.002,
+        "group_size": 20,
+        "learning_rate": 1e-05,
+        "lora_rank": 16,
+        "reference_kl_beta": 0.05,
+        "trajectory_discount": 0.95
+      },
+      "evaluation_summary_path": "/data/chengjin/studyhub/studyhub-agent/evaluation_artifacts/studyhub_agent/router_rl_maturity_v2/validation/grpo_scale_sweep/group20_entropy002/summary.json",
+      "name": "group20_entropy002",
+      "rank_key": [
+        1.0,
+        -2.0,
+        0.0,
+        0.886364,
+        0.807692,
+        0.910714,
+        -2.077273
+      ],
+      "training": {
+        "mean_nonzero_advantage_fraction": 0.52930378,
+        "mean_reference_kl": 0.58981056,
+        "peak_memory_mib": 21640.158,
+        "trajectory_rollouts": 800
+      },
+      "training_summary_path": "/data/chengjin/studyhub/studyhub-agent/training_artifacts/studyhub_agent_rl/router_rl_maturity_v2/experiments/grpo_scale_sweep/runs/group20_entropy002/seed_26081221/run_summary.json",
+      "validation": {
+        "constraint_severity": 2.077273,
+        "raw_choice_success": 0.886364,
+        "raw_episode_success": 0.807692,
+        "raw_executable_choice_gap": 0.068181,
+        "raw_reward": 0.910714
+      },
+      "validation_gate": {
+        "blockers": [
+          "critical_family_choice_success",
+          "no_family_choice_drop_from_sft",
+          "raw_choice_success",
+          "raw_episode_success",
+          "raw_executable_choice_gap"
+        ],
+        "checks": {
+          "all_raw_hard_gates": true,
+          "constraint_severity_non_regression": true,
+          "critical_family_choice_success": false,
+          "decode_limit_rate": true,
+          "evaluation_isolation": true,
+          "no_family_choice_drop_from_sft": false,
+          "paired_bootstrap_reward_ci": true,
+          "raw_choice_success": false,
+          "raw_episode_success": false,
+          "raw_executable_choice_gap": false,
+          "raw_reward_delta": true,
+          "reward_hacking_rate": true
+        },
+        "critical_family_rates": {
+          "candidate_before_read": 1.0,
+          "direct_general_answer": 0.0,
+          "duplicate_search_avoidance": 1.0,
+          "empty_search_rewrite": 1.0,
+          "explicit_page_read": 1.0,
+          "force_final_budget": 1.0,
+          "memory_read": 0.0,
+          "permission_boundary": 1.0,
+          "synthesize_context": 0.5,
+          "untrusted_observation": 1.0
+        },
+        "deltas": {
+          "constraint_severity": -0.119697,
+          "families": {
+            "candidate_before_read": {
+              "choice_success_delta": 0.1,
+              "reward_delta": 0.054546
+            },
+            "direct_general_answer": {
+              "choice_success_delta": 0.0,
+              "reward_delta": 0.0
+            },
+            "duplicate_search_avoidance": {
+              "choice_success_delta": 0.0,
+              "reward_delta": 0.0
+            },
+            "empty_search_rewrite": {
+              "choice_success_delta": 0.466667,
+              "reward_delta": 0.337037
+            },
+            "explicit_page_read": {
+              "choice_success_delta": 0.0,
+              "reward_delta": 0.0
+            },
+            "force_final_budget": {
+              "choice_success_delta": 0.0,
+              "reward_delta": 0.0
+            },
+            "grounded_final": {
+              "choice_success_delta": 1.0,
+              "reward_delta": 1.0
+            },
+            "initial_search": {
+              "choice_success_delta": 0.311111,
+              "reward_delta": 0.207408
+            },
+            "inspect_candidates": {
+              "choice_success_delta": 0.0,
+              "reward_delta": 0.0
+            },
+            "memory_read": {
+              "choice_success_delta": -0.866667,
+              "reward_delta": -0.557143
+            },
+            "permission_boundary": {
+              "choice_success_delta": 0.0,
+              "reward_delta": 0.0
+            },
+            "read_evidence": {
+              "choice_success_delta": 0.0,
+              "reward_delta": 0.0
+            },
+            "synthesize_context": {
+              "choice_success_delta": -0.466667,
+              "reward_delta": -0.3
+            },
+            "untrusted_observation": {
+              "choice_success_delta": 0.066667,
+              "reward_delta": 0.044444
+            }
+          },
+          "raw_choice_success": 0.14697,
+          "raw_episode_success": 0.176923,
+          "raw_reward": 0.145505
+        },
+        "paired_bootstrap": {
+          "choice_success_delta": {
+            "ci95_lower": 0.110606,
+            "ci95_upper": 0.184848,
+            "mean": 0.14697
+          },
+          "episode_success_delta": {
+            "ci95_lower": 0.120513,
+            "ci95_upper": 0.233333,
+            "mean": 0.176923
+          },
+          "method": "paired_nonparametric_bootstrap",
+          "resamples": 5000,
+          "reward_delta": {
+            "ci95_lower": 0.113615,
+            "ci95_upper": 0.176638,
+            "mean": 0.145505
+          },
+          "seed": 26081201
+        },
+        "passed": false
+      }
+    },
+    {
+      "config": {
+        "action_temperature": 1.25,
+        "entropy_beta": 0.01,
+        "group_size": 20,
+        "learning_rate": 1e-05,
+        "lora_rank": 16,
+        "reference_kl_beta": 0.05,
+        "trajectory_discount": 0.95
+      },
+      "evaluation_summary_path": "/data/chengjin/studyhub/studyhub-agent/evaluation_artifacts/studyhub_agent/router_rl_maturity_v2/validation/grpo_scale_sweep/group20_entropy01/summary.json",
+      "name": "group20_entropy01",
+      "rank_key": [
+        1.0,
+        -1.0,
+        0.0,
+        0.772727,
+        0.615385,
+        0.788961,
+        -2.190909
+      ],
+      "training": {
+        "mean_nonzero_advantage_fraction": 0.39585988,
+        "mean_reference_kl": 0.42663302,
+        "peak_memory_mib": 21640.158,
+        "trajectory_rollouts": 800
+      },
+      "training_summary_path": "/data/chengjin/studyhub/studyhub-agent/training_artifacts/studyhub_agent_rl/router_rl_maturity_v2/experiments/grpo_scale_sweep/runs/group20_entropy01/seed_26081221/run_summary.json",
+      "validation": {
+        "constraint_severity": 2.190909,
+        "raw_choice_success": 0.772727,
+        "raw_episode_success": 0.615385,
+        "raw_executable_choice_gap": 0.181818,
+        "raw_reward": 0.788961
+      },
+      "validation_gate": {
+        "blockers": [
+          "critical_family_choice_success",
+          "no_family_choice_drop_from_sft",
+          "raw_choice_success",
+          "raw_episode_success",
+          "raw_executable_choice_gap",
+          "raw_reward_delta"
+        ],
+        "checks": {
+          "all_raw_hard_gates": true,
+          "constraint_severity_non_regression": true,
+          "critical_family_choice_success": false,
+          "decode_limit_rate": true,
+          "evaluation_isolation": true,
+          "no_family_choice_drop_from_sft": false,
+          "paired_bootstrap_reward_ci": true,
+          "raw_choice_success": false,
+          "raw_episode_success": false,
+          "raw_executable_choice_gap": false,
+          "raw_reward_delta": false,
+          "reward_hacking_rate": true
+        },
+        "critical_family_rates": {
+          "candidate_before_read": 1.0,
+          "direct_general_answer": 0.0,
+          "duplicate_search_avoidance": 1.0,
+          "empty_search_rewrite": 1.0,
+          "explicit_page_read": 1.0,
+          "force_final_budget": 1.0,
+          "memory_read": 0.0,
+          "permission_boundary": 1.0,
+          "synthesize_context": 1.0,
+          "untrusted_observation": 1.0
+        },
+        "deltas": {
+          "constraint_severity": -0.006061,
+          "families": {
+            "candidate_before_read": {
+              "choice_success_delta": 0.1,
+              "reward_delta": 0.054546
+            },
+            "direct_general_answer": {
+              "choice_success_delta": 0.0,
+              "reward_delta": 0.0
+            },
+            "duplicate_search_avoidance": {
+              "choice_success_delta": 0.0,
+              "reward_delta": 0.0
+            },
+            "empty_search_rewrite": {
+              "choice_success_delta": 0.466667,
+              "reward_delta": 0.337037
+            },
+            "explicit_page_read": {
+              "choice_success_delta": 0.0,
+              "reward_delta": 0.0
+            },
+            "force_final_budget": {
+              "choice_success_delta": 0.0,
+              "reward_delta": 0.0
+            },
+            "grounded_final": {
+              "choice_success_delta": 0.0,
+              "reward_delta": 0.0
+            },
+            "initial_search": {
+              "choice_success_delta": 0.311111,
+              "reward_delta": 0.207408
+            },
+            "inspect_candidates": {
+              "choice_success_delta": 0.0,
+              "reward_delta": 0.0
+            },
+            "memory_read": {
+              "choice_success_delta": -0.866667,
+              "reward_delta": -0.557143
+            },
+            "permission_boundary": {
+              "choice_success_delta": 0.0,
+              "reward_delta": 0.0
+            },
+            "read_evidence": {
+              "choice_success_delta": 0.0,
+              "reward_delta": 0.0
+            },
+            "synthesize_context": {
+              "choice_success_delta": 0.033333,
+              "reward_delta": 0.021429
+            },
+            "untrusted_observation": {
+              "choice_success_delta": 0.066667,
+              "reward_delta": 0.044444
+            }
+          },
+          "raw_choice_success": 0.033333,
+          "raw_episode_success": -0.015384,
+          "raw_reward": 0.023752
+        },
+        "paired_bootstrap": {
+          "choice_success_delta": {
+            "ci95_lower": 0.009091,
+            "ci95_upper": 0.059091,
+            "mean": 0.033333
+          },
+          "episode_success_delta": {
+            "ci95_lower": -0.048718,
+            "ci95_upper": 0.017949,
+            "mean": -0.015385
+          },
+          "method": "paired_nonparametric_bootstrap",
+          "resamples": 5000,
+          "reward_delta": {
+            "ci95_lower": 0.006707,
+            "ci95_upper": 0.0408,
+            "mean": 0.023752
+          },
+          "seed": 26081201
+        },
+        "passed": false
+      }
+    },
+    {
+      "config": {
+        "action_temperature": 1.5,
+        "entropy_beta": 0.002,
+        "group_size": 20,
+        "learning_rate": 1e-05,
+        "lora_rank": 16,
+        "reference_kl_beta": 0.05,
+        "trajectory_discount": 0.95
+      },
+      "evaluation_summary_path": "/data/chengjin/studyhub/studyhub-agent/evaluation_artifacts/studyhub_agent/router_rl_maturity_v2/validation/grpo_scale_sweep/group20_entropy002_temp15/summary.json",
+      "name": "group20_entropy002_temp15",
+      "rank_key": [
+        1.0,
+        -2.0,
+        0.0,
+        0.877273,
+        0.792308,
+        0.90487,
+        -2.086364
+      ],
+      "training": {
+        "mean_nonzero_advantage_fraction": 0.48855878,
+        "mean_reference_kl": 0.58182952,
+        "peak_memory_mib": 21640.158,
+        "trajectory_rollouts": 800
+      },
+      "training_summary_path": "/data/chengjin/studyhub/studyhub-agent/training_artifacts/studyhub_agent_rl/router_rl_maturity_v2/experiments/grpo_scale_sweep/runs/group20_entropy002_temp15/seed_26081221/run_summary.json",
+      "validation": {
+        "constraint_severity": 2.086364,
+        "raw_choice_success": 0.877273,
+        "raw_episode_success": 0.792308,
+        "raw_executable_choice_gap": 0.077272,
+        "raw_reward": 0.90487
+      },
+      "validation_gate": {
+        "blockers": [
+          "critical_family_choice_success",
+          "no_family_choice_drop_from_sft",
+          "raw_choice_success",
+          "raw_episode_success",
+          "raw_executable_choice_gap"
+        ],
+        "checks": {
+          "all_raw_hard_gates": true,
+          "constraint_severity_non_regression": true,
+          "critical_family_choice_success": false,
+          "decode_limit_rate": true,
+          "evaluation_isolation": true,
+          "no_family_choice_drop_from_sft": false,
+          "paired_bootstrap_reward_ci": true,
+          "raw_choice_success": false,
+          "raw_episode_success": false,
+          "raw_executable_choice_gap": false,
+          "raw_reward_delta": true,
+          "reward_hacking_rate": true
+        },
+        "critical_family_rates": {
+          "candidate_before_read": 1.0,
+          "direct_general_answer": 0.0,
+          "duplicate_search_avoidance": 1.0,
+          "empty_search_rewrite": 1.0,
+          "explicit_page_read": 1.0,
+          "force_final_budget": 1.0,
+          "memory_read": 0.0,
+          "permission_boundary": 1.0,
+          "synthesize_context": 0.3,
+          "untrusted_observation": 1.0
+        },
+        "deltas": {
+          "constraint_severity": -0.110606,
+          "families": {
+            "candidate_before_read": {
+              "choice_success_delta": 0.1,
+              "reward_delta": 0.054546
+            },
+            "direct_general_answer": {
+              "choice_success_delta": 0.0,
+              "reward_delta": 0.0
+            },
+            "duplicate_search_avoidance": {
+              "choice_success_delta": 0.0,
+              "reward_delta": 0.0
+            },
+            "empty_search_rewrite": {
+              "choice_success_delta": 0.466667,
+              "reward_delta": 0.337037
+            },
+            "explicit_page_read": {
+              "choice_success_delta": 0.0,
+              "reward_delta": 0.0
+            },
+            "force_final_budget": {
+              "choice_success_delta": 0.0,
+              "reward_delta": 0.0
+            },
+            "grounded_final": {
+              "choice_success_delta": 1.0,
+              "reward_delta": 1.0
+            },
+            "initial_search": {
+              "choice_success_delta": 0.311111,
+              "reward_delta": 0.207408
+            },
+            "inspect_candidates": {
+              "choice_success_delta": 0.0,
+              "reward_delta": 0.0
+            },
+            "memory_read": {
+              "choice_success_delta": -0.866667,
+              "reward_delta": -0.557143
+            },
+            "permission_boundary": {
+              "choice_success_delta": 0.0,
+              "reward_delta": 0.0
+            },
+            "read_evidence": {
+              "choice_success_delta": 0.0,
+              "reward_delta": 0.0
+            },
+            "synthesize_context": {
+              "choice_success_delta": -0.666667,
+              "reward_delta": -0.428571
+            },
+            "untrusted_observation": {
+              "choice_success_delta": 0.066667,
+              "reward_delta": 0.044444
+            }
+          },
+          "raw_choice_success": 0.137879,
+          "raw_episode_success": 0.161539,
+          "raw_reward": 0.139661
+        },
+        "paired_bootstrap": {
+          "choice_success_delta": {
+            "ci95_lower": 0.1,
+            "ci95_upper": 0.177273,
+            "mean": 0.137879
+          },
+          "episode_success_delta": {
+            "ci95_lower": 0.1,
+            "ci95_upper": 0.217949,
+            "mean": 0.161538
+          },
+          "method": "paired_nonparametric_bootstrap",
+          "resamples": 5000,
+          "reward_delta": {
+            "ci95_lower": 0.107164,
+            "ci95_upper": 0.171175,
+            "mean": 0.139661
+          },
+          "seed": 26081201
+        },
+        "passed": false
+      }
+    }
+  ]
+}

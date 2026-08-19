@@ -1,0 +1,105 @@
+{
+  "acceptance": {
+    "checks": {
+      "all_leak_classes_zero": true,
+      "boundary:sealed:candidate_before_read": true,
+      "boundary:sealed:direct_general_answer": true,
+      "boundary:sealed:duplicate_search_avoidance": true,
+      "boundary:sealed:empty_search_rewrite": true,
+      "boundary:sealed:explicit_page_read": true,
+      "boundary:sealed:force_final_budget": true,
+      "boundary:sealed:memory_read": true,
+      "boundary:sealed:permission_boundary": true,
+      "boundary:sealed:synthesize_context": true,
+      "boundary:sealed:untrusted_observation": true,
+      "boundary:test:candidate_before_read": true,
+      "boundary:test:direct_general_answer": true,
+      "boundary:test:duplicate_search_avoidance": true,
+      "boundary:test:empty_search_rewrite": true,
+      "boundary:test:explicit_page_read": true,
+      "boundary:test:force_final_budget": true,
+      "boundary:test:memory_read": true,
+      "boundary:test:permission_boundary": true,
+      "boundary:test:synthesize_context": true,
+      "boundary:test:untrusted_observation": true,
+      "boundary:validation:candidate_before_read": true,
+      "boundary:validation:direct_general_answer": true,
+      "boundary:validation:duplicate_search_avoidance": true,
+      "boundary:validation:empty_search_rewrite": true,
+      "boundary:validation:explicit_page_read": true,
+      "boundary:validation:force_final_budget": true,
+      "boundary:validation:memory_read": true,
+      "boundary:validation:permission_boundary": true,
+      "boundary:validation:synthesize_context": true,
+      "boundary:validation:untrusted_observation": true,
+      "dataset_audit_passed": true,
+      "only_train_export_allowed": true,
+      "required_splits_present": true,
+      "sealed_episodes": true,
+      "sealed_states": true,
+      "test_episodes": true,
+      "test_states": true,
+      "train_episodes": true,
+      "train_states": true,
+      "validation_episodes": true,
+      "validation_states": true
+    },
+    "path": "/data/chengjin/studyhub/ml/agentic_platform/rl/configs/router_rl_maturity_v2_acceptance.json",
+    "sha256": "f664510eb2c465ba133c407608344099fb98e7624fb8b9c2e0add5ab6d370503"
+  },
+  "audit_path": "/data/chengjin/studyhub/studyhub-agent/training_artifacts/studyhub_agent_rl/router_rl_maturity_v2/audit.json",
+  "audit_sha256": "fa535197bf6eb683cb8e03999b6b41e05cc67ddc5cfc85bd54b656377da7322a",
+  "build_seed": 26081201,
+  "dataset_version": "router_rl_maturity_v2",
+  "files": {
+    "sealed": {
+      "path": "/data/chengjin/studyhub/studyhub-agent/training_artifacts/studyhub_agent_rl/router_rl_maturity_v2/sealed.jsonl",
+      "records": 684,
+      "sha256": "b7caeb12daafd6ab2123a6d5f381dc74e702fd16550e100848cb5d12a4b1c32a",
+      "training_export_allowed": false
+    },
+    "test": {
+      "path": "/data/chengjin/studyhub/studyhub-agent/training_artifacts/studyhub_agent_rl/router_rl_maturity_v2/test.jsonl",
+      "records": 660,
+      "sha256": "121f0a578292a4f2d68240c10ea2878bb810c93b881b752f1d2e850867ae4c5f",
+      "training_export_allowed": false
+    },
+    "train": {
+      "path": "/data/chengjin/studyhub/studyhub-agent/training_artifacts/studyhub_agent_rl/router_rl_maturity_v2/train.jsonl",
+      "records": 2028,
+      "sha256": "f98224288030647d1b129bda7dd6e77e6cfdbdae591a494325b0b55ddd38b752",
+      "training_export_allowed": true
+    },
+    "validation": {
+      "path": "/data/chengjin/studyhub/studyhub-agent/training_artifacts/studyhub_agent_rl/router_rl_maturity_v2/validation.jsonl",
+      "records": 660,
+      "sha256": "62c92a2e97c0a3d5c5ac9345a14b8e4e45edea58fd41d4fc6f2605f1292fdb0b",
+      "training_export_allowed": false
+    }
+  },
+  "generated_at": "2026-08-12T04:07:47.390894+00:00",
+  "isolation": {
+    "legacy_v1_test_used": false,
+    "paid_material_used": false,
+    "production_api_called": false,
+    "production_database_accessed": false,
+    "production_final_holdout_read": false,
+    "production_oss_write_called": false
+  },
+  "label_policy": {
+    "human_gold": false,
+    "open_ended_answer_utility": "teacher_silver",
+    "oracle_output_never_in_prompt": true,
+    "route_and_arguments": "deterministic_contract_gold"
+  },
+  "schema_version": "studyhub.agent.router_rl.maturity_dataset_manifest.v2",
+  "sealed_access_path": "/data/chengjin/studyhub/studyhub-agent/training_artifacts/studyhub_agent_rl/router_rl_maturity_v2/sealed_access.json",
+  "sealed_access_sha256": "4e80332ae4ce391a38424c67c491732f40988434b0ae93cd5dab5dba8aa80e40",
+  "source": {
+    "access_scope": "frozen_free_public_only",
+    "chunks_path": "/data/chengjin/studyhub/studyhub-agent/training_artifacts/studyhub_agent_sft/grounded_tutor_9b_v1_0/clean_preview_chunks.jsonl",
+    "chunks_sha256": "26a0cf8878b69b912988700a8ec02c6e2151bab55783bc830cf4fe766f549227",
+    "materials_path": "/data/chengjin/studyhub/backup/oss_materials/metadata/materials.jsonl",
+    "materials_sha256": "5675b7d441b09daa59e14cceaf73a3a4864bf9a482239b1c455c84a1fb996e72"
+  }
+}

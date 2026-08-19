@@ -1,0 +1,91 @@
+{
+  "action_rollouts": 1875,
+  "algorithm": "trajectory_constrained_token_grpo_v2",
+  "artifacts": {
+    "adapter_path": "/data/chengjin/studyhub/studyhub-agent/training_artifacts/studyhub_agent_rl/router_rl_maturity_v2/experiments/grpo_scale_sweep/runs/group20_entropy002_temp15/seed_26081221/adapter",
+    "adapter_sha256": "5727cbdaf27ace2082d68debf57d9704ea6bc6124f0da265254d32781e2289a9",
+    "invocation_history_path": "/data/chengjin/studyhub/studyhub-agent/training_artifacts/studyhub_agent_rl/router_rl_maturity_v2/experiments/grpo_scale_sweep/runs/group20_entropy002_temp15/seed_26081221/invocation_history.jsonl",
+    "invocation_history_sha256": "ae17f0fb182d4f496822d5c4d0b19144a054c590bb0f16c08b1cc6baa684f8c4",
+    "metrics_path": "/data/chengjin/studyhub/studyhub-agent/training_artifacts/studyhub_agent_rl/router_rl_maturity_v2/experiments/grpo_scale_sweep/runs/group20_entropy002_temp15/seed_26081221/trainer_metrics.jsonl",
+    "metrics_sha256": "b6a3c3e8436757023b6ae3e9d14ededfac397e5519ca0df15c1831fe31f7c10d",
+    "trajectories_path": "/data/chengjin/studyhub/studyhub-agent/training_artifacts/studyhub_agent_rl/router_rl_maturity_v2/experiments/grpo_scale_sweep/runs/group20_entropy002_temp15/seed_26081221/trajectory_rollouts.jsonl",
+    "trajectories_sha256": "b9054a97e7ec1129108b879c4679cb63f64c492f2d1354f4d782b898e3a427b0"
+  },
+  "checkpoint_resume_exercised": false,
+  "checkpoint_resume_supported": true,
+  "constraint_corrections": {
+    "canonicalize_contract": 633,
+    "force_final_budget": 40,
+    "honor_explicit_candidate_inspection": 375,
+    "honor_explicit_final": 350,
+    "honor_explicit_memory_read": 40,
+    "honor_explicit_search": 200,
+    "honor_explicit_synthesis": 20,
+    "protect_explicit_page_route": 410,
+    "protect_material_ids": 375,
+    "recover_empty_search": 100,
+    "safe_untrusted_continuation": 80
+  },
+  "duration_seconds_this_invocation": 290.206,
+  "duration_seconds_total": 290.206,
+  "formal_run": false,
+  "gpu": {
+    "name": "NVIDIA H100 PCIe",
+    "peak_memory_mib": 21640.158
+  },
+  "isolation": {
+    "paid_material_used": false,
+    "production_api_called": false,
+    "production_database_accessed": false,
+    "production_final_holdout_read": false,
+    "production_oss_write_called": false,
+    "sealed_read": false,
+    "test_read": false
+  },
+  "lora": {
+    "alpha": 32,
+    "dropout": 0.0,
+    "rank": 16,
+    "trainable_parameters": 16819200
+  },
+  "minimum_optimizer_updates_satisfied": false,
+  "minimum_trajectory_rollouts_satisfied": false,
+  "objective": {
+    "clipped_post_update_policy_ratio": true,
+    "deterministic_constraints_rewarded": false,
+    "executable_ledger_used_for_gradient": false,
+    "frozen_reference_kl": true,
+    "group_relative_advantage": true,
+    "raw_policy_reward_only": true,
+    "reference_kl_beta": 0.05,
+    "trajectory_discount": 0.95,
+    "trajectory_return_to_go": true,
+    "true_token_entropy": true
+  },
+  "optimizer_updates": 40,
+  "raw_hard_gate_failures": {},
+  "reward_hacking_flags": {
+    "premature_final": 13
+  },
+  "rollout_updates": 20,
+  "schema_version": "studyhub.agent.router_rl.trajectory_grpo_run.v2",
+  "seed": 26081221,
+  "stability": {
+    "clip_fraction_measured": true,
+    "finite": true,
+    "max_reference_kl": 1.49035661,
+    "mean_clip_fraction": 0.10543114,
+    "mean_nonzero_advantage_fraction": 0.48855878,
+    "mean_post_update_policy_ratio": 0.99401277,
+    "mean_reference_kl": 0.58182952,
+    "mean_true_token_entropy": 0.28106874,
+    "post_update_policy_ratio_observed": true,
+    "trajectory_credit_signal_observed": true,
+    "true_token_entropy_observed": true
+  },
+  "training_succeeded": true,
+  "trajectory_rollouts": 800,
+  "trajectory_rollouts_per_second_this_invocation": 2.756661,
+  "trajectory_rollouts_per_second_total": 2.756663,
+  "trajectory_success_rate": 0.555
+}

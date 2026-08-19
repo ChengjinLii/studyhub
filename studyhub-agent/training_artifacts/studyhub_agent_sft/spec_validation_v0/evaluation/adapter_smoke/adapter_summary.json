@@ -1,0 +1,59 @@
+{
+  "adapter_path": "training_artifacts/studyhub_agent_sft/qwen35_2b_lora_smoke",
+  "batch_size": 4,
+  "dataset_path": "/data/chengjin/studyhub/studyhub-agent/training_artifacts/studyhub_agent_sft/spec_validation_v0/router_tool_2b.jsonl",
+  "elapsed_seconds": 6.154,
+  "family_metrics": {
+    "search_initial": {
+      "arguments_exact": {
+        "passed": 2,
+        "total": 4
+      },
+      "json_valid": {
+        "passed": 4,
+        "total": 4
+      },
+      "mode_correct": {
+        "passed": 4,
+        "total": 4
+      },
+      "tool_name_correct": {
+        "passed": 4,
+        "total": 4
+      }
+    }
+  },
+  "max_new_tokens": 384,
+  "metrics": {
+    "arguments_exact": {
+      "passed": 2,
+      "rate": 0.5,
+      "total": 4
+    },
+    "json_valid": {
+      "passed": 4,
+      "rate": 1.0,
+      "total": 4
+    },
+    "mode_correct": {
+      "passed": 4,
+      "rate": 1.0,
+      "total": 4
+    },
+    "tool_name_correct": {
+      "passed": 4,
+      "rate": 1.0,
+      "total": 4
+    }
+  },
+  "model_path": "/data/chengjin/studyhub/models/P0/Qwen3.5-2B",
+  "policy_refusal": {
+    "passed": 0,
+    "total": 0
+  },
+  "records": 4,
+  "seconds_per_record": 1.5386,
+  "splits": [
+    "validation"
+  ]
+}

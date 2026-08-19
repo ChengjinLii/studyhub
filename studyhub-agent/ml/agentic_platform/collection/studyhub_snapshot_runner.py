@@ -53,7 +53,7 @@ from .snapshot_pilot_policy import (
 
 DEFAULT_MODEL_PATH = Path("/data/chengjin/studyhub/models/P0/Qwen3.5-2B")
 DEFAULT_ADAPTER_PATH = Path(
-    "/data/chengjin/studyhub/training_artifacts/studyhub_agent_sft/qwen35_2b_lora_v1_3_state_ablation_from_7703"
+    "/data/chengjin/studyhub/studyhub-agent/training_artifacts/studyhub_agent_sft/qwen35_2b_lora_v1_3_state_ablation_from_7703"
 )
 
 

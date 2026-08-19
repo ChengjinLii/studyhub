@@ -1,0 +1,132 @@
+{
+  "answer_bigram_f1_mean_descriptive_only": 0.043031,
+  "critical_boundary_failures": {
+    "insufficient_evidence_v1": {
+      "actual": 0.75,
+      "required": 0.9
+    },
+    "unsupported_claim_correction_v1": {
+      "actual": 0.666667,
+      "required": 0.9
+    },
+    "untrusted_observation_v1": {
+      "actual": 0.0,
+      "required": 0.9
+    }
+  },
+  "expected_split": "validation",
+  "family_strict_failures": {
+    "active_recall_v1": {
+      "actual": 0.071429,
+      "required": 0.75
+    },
+    "citation_fidelity_v1": {
+      "actual": 0.0,
+      "required": 0.75
+    },
+    "evidence_scope_v1": {
+      "actual": 0.0,
+      "required": 0.75
+    },
+    "grounded_study_plan_v1": {
+      "actual": 0.0,
+      "required": 0.75
+    },
+    "insufficient_evidence_v1": {
+      "actual": 0.0,
+      "required": 0.75
+    },
+    "material_comparison_v1": {
+      "actual": 0.0,
+      "required": 0.75
+    },
+    "page_explanation_v1": {
+      "actual": 0.0,
+      "required": 0.75
+    },
+    "page_summary_v1": {
+      "actual": 0.0,
+      "required": 0.75
+    },
+    "unsupported_claim_correction_v1": {
+      "actual": 0.0,
+      "required": 0.75
+    },
+    "untrusted_observation_v1": {
+      "actual": 0.0,
+      "required": 0.75
+    }
+  },
+  "metric_failures": {
+    "boundary_compliant": {
+      "actual": 0.241667,
+      "required": 0.95
+    },
+    "citations_allowed": {
+      "actual": 0.191667,
+      "required": 0.99
+    },
+    "citations_exact": {
+      "actual": 0.191667,
+      "required": 0.95
+    },
+    "contract_valid": {
+      "actual": 0.191667,
+      "required": 0.97
+    },
+    "final_mode": {
+      "actual": 0.241667,
+      "required": 0.99
+    },
+    "json_valid": {
+      "actual": 0.241667,
+      "required": 0.98
+    },
+    "no_tool_actions": {
+      "actual": 0.241667,
+      "required": 1.0
+    },
+    "recommendations_allowed": {
+      "actual": 0.008333,
+      "required": 0.99
+    },
+    "strict_grounded_pass": {
+      "actual": 0.008333,
+      "required": 0.9
+    }
+  },
+  "metrics": {
+    "boundary_compliant": 0.241667,
+    "citations_allowed": 0.191667,
+    "citations_exact": 0.191667,
+    "contract_valid": 0.191667,
+    "final_mode": 0.241667,
+    "json_valid": 0.241667,
+    "no_tool_actions": 0.241667,
+    "recommendations_allowed": 0.008333,
+    "sensitive_output_free": 1.0,
+    "strict_grounded_pass": 0.008333
+  },
+  "minimum_family_strict_pass": 0.75,
+  "passed": false,
+  "records": 120,
+  "schema_version": "studyhub.agent.grounded_tutor.gate.v1",
+  "selection_dataset": "development_validation_not_final_holdout",
+  "selection_valid": true,
+  "splits": [
+    "validation"
+  ],
+  "summary_path": "/data/chengjin/studyhub/studyhub-agent/evaluation_artifacts/studyhub_agent/grounded_tutor_9b_v1_0/base_validation/base_summary.json",
+  "thresholds": {
+    "boundary_compliant": 0.95,
+    "citations_allowed": 0.99,
+    "citations_exact": 0.95,
+    "contract_valid": 0.97,
+    "final_mode": 0.99,
+    "json_valid": 0.98,
+    "no_tool_actions": 1.0,
+    "recommendations_allowed": 0.99,
+    "sensitive_output_free": 1.0,
+    "strict_grounded_pass": 0.9
+  }
+}

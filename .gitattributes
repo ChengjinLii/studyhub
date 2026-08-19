@@ -1,9 +1,9 @@
 # Keep research evidence in Git without overwhelming code-review diffs.
-training_artifacts/** linguist-generated=true
-evaluation_artifacts/** linguist-generated=true
-training_artifacts/**/*.jsonl -diff
-evaluation_artifacts/**/*.jsonl -diff
-training_artifacts/**/*.log -diff
-evaluation_artifacts/**/*.log -diff
-training_artifacts/**/*.csv -diff
-evaluation_artifacts/**/*.csv -diff
+studyhub-agent/training_artifacts/** linguist-generated=true
+studyhub-agent/evaluation_artifacts/** linguist-generated=true
+studyhub-agent/training_artifacts/**/*.jsonl -diff
+studyhub-agent/evaluation_artifacts/**/*.jsonl -diff
+studyhub-agent/training_artifacts/**/*.log -diff
+studyhub-agent/evaluation_artifacts/**/*.log -diff
+studyhub-agent/training_artifacts/**/*.csv -diff
+studyhub-agent/evaluation_artifacts/**/*.csv -diff

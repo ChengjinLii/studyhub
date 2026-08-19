@@ -5,6 +5,8 @@ models/
 training_artifacts/
 evaluation_artifacts/
 artifacts/
+ai_platform/data/*.local.json
+ai_platform/logs/
 __pycache__/
 .pytest_cache/
 .ruff_cache/

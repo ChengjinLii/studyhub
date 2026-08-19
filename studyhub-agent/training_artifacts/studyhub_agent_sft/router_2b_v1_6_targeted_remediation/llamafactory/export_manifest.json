@@ -1,0 +1,63 @@
+{
+  "assistant_only_loss": true,
+  "counts": {
+    "test": 0,
+    "train": 1296,
+    "validation": 144
+  },
+  "dataset_info_sha256": "b207782b9e2f9742c941527b39debcdc96ed046aafdd811335349362a1eaf259",
+  "dataset_names": {
+    "test": "studyhub_router_2b_test",
+    "train": "studyhub_router_2b_train",
+    "validation": "studyhub_router_2b_validation"
+  },
+  "family_counts": {
+    "test": {},
+    "train": {
+      "direct_complete_final_v1_6": 108,
+      "empty_search_recovery_v1_6": 36,
+      "explicit_page_replay_v1_6": 108,
+      "force_final_strict_json_v1_6": 144,
+      "injection_after_inspect_read_v1_6": 144,
+      "injection_after_search_inspect_v1_6": 144,
+      "material_id_replay_v1_6": 108,
+      "memory_replay_v1_6": 36,
+      "natural_concept_read_v1_6": 216,
+      "permission_refusal_replay_v1_6": 72,
+      "search_contract_replay_v1_6": 108,
+      "synthesis_replay_v1_6": 72
+    },
+    "validation": {
+      "direct_complete_final_v1_6": 12,
+      "empty_search_recovery_v1_6": 4,
+      "explicit_page_replay_v1_6": 12,
+      "force_final_strict_json_v1_6": 16,
+      "injection_after_inspect_read_v1_6": 16,
+      "injection_after_search_inspect_v1_6": 16,
+      "material_id_replay_v1_6": 12,
+      "memory_replay_v1_6": 4,
+      "natural_concept_read_v1_6": 24,
+      "permission_refusal_replay_v1_6": 8,
+      "search_contract_replay_v1_6": 12,
+      "synthesis_replay_v1_6": 8
+    }
+  },
+  "files": {
+    "router_tool_2b_test.jsonl": {
+      "records": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "router_tool_2b_train.jsonl": {
+      "records": 1296,
+      "sha256": "e8fedc0d6584e01d17566f98ce8f43f5771358ed7fb917c2454e332fd8fdd037"
+    },
+    "router_tool_2b_validation.jsonl": {
+      "records": 144,
+      "sha256": "6ed77a3086a46c25b424236310608259e8c95ed58b87712e4bab75c280fede1e"
+    }
+  },
+  "source": "/data/chengjin/studyhub/studyhub-agent/training_artifacts/studyhub_agent_sft/router_2b_v1_6_targeted_remediation/router_tool_2b_v1_6.jsonl",
+  "source_sha256": "9a24ee82510c6c9b11ad598f0dd5399d348cbdd1b790dbab858c3e6e7bf6f79b",
+  "target_profile": "router_tool_2b",
+  "template": "qwen3_5_nothink"
+}

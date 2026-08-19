@@ -8,7 +8,7 @@ import pytest
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 PRIVATE_SFT_CORPUS_FILES = (
     PROJECT_ROOT / "backup/oss_materials/metadata/materials.jsonl",
-    PROJECT_ROOT / "ai_platform/rag_experiments/artifacts/corpus/chunks.jsonl",
+    PROJECT_ROOT / "studyhub-agent/ai_platform/rag_experiments/artifacts/corpus/chunks.jsonl",
 )
 
 

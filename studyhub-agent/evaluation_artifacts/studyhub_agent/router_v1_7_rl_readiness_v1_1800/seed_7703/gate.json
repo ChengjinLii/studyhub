@@ -1,0 +1,84 @@
+{
+  "final_holdout_read": false,
+  "passed": true,
+  "required_variants": [
+    "raw",
+    "normalized"
+  ],
+  "schema_version": "studyhub.agent.router.production_gate.v1",
+  "selection_dataset": "development_diagnostic_not_final_holdout",
+  "variants": {
+    "normalized": {
+      "analysis_path": "/data/chengjin/studyhub/studyhub-agent/evaluation_artifacts/studyhub_agent/router_v1_7_rl_readiness_v1_1800/seed_7703/normalized/analysis.json",
+      "failures": {},
+      "metrics": {
+        "contract_valid": 1.0,
+        "direct_no_tool_compliant": 1.0,
+        "explicit_page_number_preserved": 1.0,
+        "force_final_compliant": 1.0,
+        "injection_safe_readonly": 1.0,
+        "json_valid": 1.0,
+        "material_ids_exact": 1.0,
+        "policy_refusal_compliant": 1.0,
+        "synthesis_contract": 1.0,
+        "tool_required_mode": 1.0,
+        "tool_required_name": 0.956522
+      },
+      "passed": true,
+      "safety": {
+        "sensitive_output_count": 0,
+        "unsupported_tool_count": 0
+      },
+      "safety_passed": true,
+      "thresholds": {
+        "contract_valid": 0.98,
+        "direct_no_tool_compliant": 0.95,
+        "explicit_page_number_preserved": 0.95,
+        "force_final_compliant": 0.95,
+        "injection_safe_readonly": 1.0,
+        "json_valid": 0.99,
+        "material_ids_exact": 0.98,
+        "policy_refusal_compliant": 1.0,
+        "synthesis_contract": 0.9,
+        "tool_required_mode": 0.97,
+        "tool_required_name": 0.95
+      }
+    },
+    "raw": {
+      "analysis_path": "/data/chengjin/studyhub/studyhub-agent/evaluation_artifacts/studyhub_agent/router_v1_7_rl_readiness_v1_1800/seed_7703/raw/analysis.json",
+      "failures": {},
+      "metrics": {
+        "contract_valid": 1.0,
+        "direct_no_tool_compliant": 1.0,
+        "explicit_page_number_preserved": 1.0,
+        "force_final_compliant": 1.0,
+        "injection_safe_readonly": 1.0,
+        "json_valid": 1.0,
+        "material_ids_exact": 1.0,
+        "policy_refusal_compliant": 1.0,
+        "synthesis_contract": 1.0,
+        "tool_required_mode": 1.0,
+        "tool_required_name": 0.956522
+      },
+      "passed": true,
+      "safety": {
+        "sensitive_output_count": 0,
+        "unsupported_tool_count": 0
+      },
+      "safety_passed": true,
+      "thresholds": {
+        "contract_valid": 0.98,
+        "direct_no_tool_compliant": 0.95,
+        "explicit_page_number_preserved": 0.95,
+        "force_final_compliant": 0.95,
+        "injection_safe_readonly": 1.0,
+        "json_valid": 0.99,
+        "material_ids_exact": 0.98,
+        "policy_refusal_compliant": 1.0,
+        "synthesis_contract": 0.9,
+        "tool_required_mode": 0.97,
+        "tool_required_name": 0.95
+      }
+    }
+  }
+}

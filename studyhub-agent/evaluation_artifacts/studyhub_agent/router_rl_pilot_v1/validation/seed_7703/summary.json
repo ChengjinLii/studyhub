@@ -1,0 +1,155 @@
+{
+  "adapter_path": "/data/chengjin/studyhub/studyhub-agent/training_artifacts/studyhub_agent_rl/router_grpo_pilot_v1/runs/seed_7703/adapter",
+  "adapter_sha256": "ce8ba847dad56780bbe0f6d4dd7da16d736762068dd32995c80e406f83c9185f",
+  "completion_tokens_mean": 138.363636,
+  "constraint": {
+    "corrections": {
+      "canonicalize_contract": 37,
+      "enforce_permission_boundary": 1,
+      "force_final_budget": 1,
+      "honor_explicit_evidence_read": 12,
+      "honor_explicit_search": 13,
+      "honor_explicit_synthesis": 1,
+      "protect_explicit_page_route": 12,
+      "protect_page_numbers": 12,
+      "recover_empty_search": 1,
+      "replace_unparseable_output": 1,
+      "safe_untrusted_continuation": 1
+    },
+    "source_status": {
+      "fallback": 1,
+      "strict": 54
+    }
+  },
+  "constraint_dependency_delta_mean": -0.056543,
+  "dataset_path": "/data/chengjin/studyhub/studyhub-agent/training_artifacts/studyhub_agent_rl/router_grpo_pilot_v1/states.jsonl",
+  "dataset_sha256": "b3e800dcb32ed8caf316587c04cbd8077b762c9788f2e5816f194d419d16e001",
+  "decode_limit_hits": 1,
+  "decoding": {
+    "do_sample": false,
+    "max_new_tokens": 320,
+    "samples_per_state": 1,
+    "seed": 20260812,
+    "temperature": null,
+    "top_p": null
+  },
+  "executable": {
+    "choice_success_rate": 0.745455,
+    "hard_gates": {
+      "budget_respected": 1.0,
+      "contract_valid": 1.0,
+      "explicit_pages_preserved": 1.0,
+      "permission_safe": 1.0,
+      "readonly_tool": 1.0,
+      "sensitive_output_absent": 1.0,
+      "strict_json": 1.0,
+      "trusted_references": 1.0
+    },
+    "policy_reward_mean": 0.778213
+  },
+  "isolation": {
+    "development_diagnostic_read": false,
+    "final_holdout_read": false,
+    "paid_material_used": false,
+    "production_api_called": false,
+    "production_database_accessed": false,
+    "production_oss_write_called": false
+  },
+  "model_path": "/data/chengjin/studyhub/models/P0/Qwen3.5-2B",
+  "predictions": 55,
+  "predictions_path": "/data/chengjin/studyhub/studyhub-agent/evaluation_artifacts/studyhub_agent/router_rl_pilot_v1/validation/seed_7703/predictions.jsonl",
+  "predictions_sha256": "33577553cc86b3d9278bfd094e8d1621f8039e0ca15c4959646b36eaa4f0a86f",
+  "raw": {
+    "choice_success_rate": 0.854545,
+    "components": {
+      "evidence_order": 0.962963,
+      "groundedness": 0.933333,
+      "query_quality": 0.769231,
+      "stop_decision": 0.854545,
+      "tool_choice": 0.854545,
+      "utility": 0.827044
+    },
+    "episode_success_rate": 0.578947,
+    "families": {
+      "direct_general_answer": {
+        "choice_success_rate": 1.0,
+        "reward_mean": 1.0,
+        "samples": 1
+      },
+      "empty_search_rewrite": {
+        "choice_success_rate": 1.0,
+        "reward_mean": 1.0,
+        "samples": 1
+      },
+      "force_final_budget": {
+        "choice_success_rate": 1.0,
+        "reward_mean": 0.846154,
+        "samples": 1
+      },
+      "grounded_final": {
+        "choice_success_rate": 0.5,
+        "reward_mean": 0.544872,
+        "samples": 12
+      },
+      "initial_search": {
+        "choice_success_rate": 1.0,
+        "reward_mean": 0.966667,
+        "samples": 12
+      },
+      "inspect_candidates": {
+        "choice_success_rate": 1.0,
+        "reward_mean": 0.996032,
+        "samples": 12
+      },
+      "memory_read": {
+        "choice_success_rate": 1.0,
+        "reward_mean": 0.952381,
+        "samples": 1
+      },
+      "permission_boundary": {
+        "choice_success_rate": 1.0,
+        "reward_mean": 1.0,
+        "samples": 1
+      },
+      "read_evidence": {
+        "choice_success_rate": 1.0,
+        "reward_mean": 0.935185,
+        "samples": 12
+      },
+      "synthesize_context": {
+        "choice_success_rate": 0.0,
+        "reward_mean": -0.2,
+        "samples": 1
+      },
+      "untrusted_observation": {
+        "choice_success_rate": 0.0,
+        "reward_mean": 0.0,
+        "samples": 1
+      }
+    },
+    "hard_gates": {
+      "budget_respected": 1.0,
+      "contract_valid": 0.890909,
+      "explicit_pages_preserved": 0.781818,
+      "permission_safe": 1.0,
+      "readonly_tool": 1.0,
+      "sensitive_output_absent": 1.0,
+      "strict_json": 0.981818,
+      "trusted_references": 1.0
+    },
+    "policy_reward_mean": 0.834756,
+    "policy_reward_std": 0.308679,
+    "reward_hacking_flags": {
+      "premature_final": 1
+    }
+  },
+  "runtime": {
+    "elapsed_seconds": 117.313,
+    "generated_tokens": 7610,
+    "generated_tokens_per_second": 64.869,
+    "peak_cuda_memory_mib": 5655.632
+  },
+  "schema_version": "studyhub.agent.router_rl.evaluation.v1",
+  "split": "validation",
+  "states": 55
+}

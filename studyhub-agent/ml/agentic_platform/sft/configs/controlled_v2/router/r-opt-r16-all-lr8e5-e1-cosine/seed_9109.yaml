@@ -12,7 +12,7 @@ freeze_vision_tower: true
 freeze_multi_modal_projector: true
 dataset: studyhub_router_2b_train
 eval_dataset: studyhub_router_2b_validation
-dataset_dir: /data/chengjin/studyhub/training_artifacts/studyhub_agent_sft/router_2b_v1_7_state_transitions/llamafactory
+dataset_dir: /data/chengjin/studyhub/studyhub-agent/training_artifacts/studyhub_agent_sft/router_2b_v1_7_state_transitions/llamafactory
 template: qwen3_5_nothink
 cutoff_len: 4096
 overwrite_cache: true
@@ -21,7 +21,7 @@ dataloader_num_workers: 4
 train_on_prompt: false
 mask_history: false
 packing: false
-output_dir: /data/chengjin/studyhub/training_artifacts/studyhub_agent_sft/controlled_v2/router/r-opt-r16-all-lr8e5-e1-cosine/9109
+output_dir: /data/chengjin/studyhub/studyhub-agent/training_artifacts/studyhub_agent_sft/controlled_v2/router/r-opt-r16-all-lr8e5-e1-cosine/9109
 logging_steps: 5
 save_strategy: epoch
 save_total_limit: 3

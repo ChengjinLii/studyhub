@@ -1,0 +1,115 @@
+{
+  "failed_scale_results_path": "/data/chengjin/studyhub/studyhub-agent/evaluation_artifacts/studyhub_agent/router_rl_maturity_v2/validation/grpo_scale_sweep/scale_sweep_results.json",
+  "failed_scale_results_sha256": "f5749ecd2f1ebef277b22404770f931fe71fde543ecc89a04ca56472157662e6",
+  "primary_results_path": "/data/chengjin/studyhub/studyhub-agent/evaluation_artifacts/studyhub_agent/router_rl_maturity_v2/validation/grpo_sweep/sweep_results.json",
+  "primary_results_sha256": "939ac6d50e16bb82b3bbe5791f57f77c1b891a4f25832620e390a34b48d8f924",
+  "production_access": false,
+  "schema_version": "studyhub.agent.router_rl.grpo_stability_sweep.v2",
+  "sealed_read": false,
+  "selection_split": "validation",
+  "status": "prepared_after_failed_scale_gate",
+  "test_read": false,
+  "trials": [
+    {
+      "config_path": "/data/chengjin/studyhub/studyhub-agent/training_artifacts/studyhub_agent_rl/router_rl_maturity_v2/experiments/grpo_stability_sweep/configs/00_mix12_constant_control.json",
+      "config_sha256": "cd7af750e00867a8ab249269cde76c38e8f102f7fad9db068b9004f903d9cfcf",
+      "formal_eligible": false,
+      "index": 0,
+      "name": "mix12_constant_control",
+      "overrides": {
+        "learning_rate_decay_optimizer_updates": 40,
+        "learning_rate_min_ratio": 1.0,
+        "learning_rate_schedule": "constant",
+        "rollout_updates": 20
+      },
+      "seed": 26081231,
+      "shard": 0
+    },
+    {
+      "config_path": "/data/chengjin/studyhub/studyhub-agent/training_artifacts/studyhub_agent_rl/router_rl_maturity_v2/experiments/grpo_stability_sweep/configs/01_cosine_decay40.json",
+      "config_sha256": "557dca72d00c21b3c957c8b4af26e27161cf541c23959d7954f408409606e8fe",
+      "formal_eligible": true,
+      "index": 1,
+      "name": "cosine_decay40",
+      "overrides": {
+        "learning_rate_decay_optimizer_updates": 40,
+        "learning_rate_min_ratio": 0.02,
+        "learning_rate_schedule": "cosine"
+      },
+      "seed": 26081231,
+      "shard": 1
+    },
+    {
+      "config_path": "/data/chengjin/studyhub/studyhub-agent/training_artifacts/studyhub_agent_rl/router_rl_maturity_v2/experiments/grpo_stability_sweep/configs/02_cosine_decay80.json",
+      "config_sha256": "9056f363a7cfb3deebc5c81151e93d3aadb5d337ba117f8738dbc3271b1cf08e",
+      "formal_eligible": true,
+      "index": 2,
+      "name": "cosine_decay80",
+      "overrides": {
+        "learning_rate_decay_optimizer_updates": 80,
+        "learning_rate_min_ratio": 0.02,
+        "learning_rate_schedule": "cosine"
+      },
+      "seed": 26081231,
+      "shard": 0
+    },
+    {
+      "config_path": "/data/chengjin/studyhub/studyhub-agent/training_artifacts/studyhub_agent_rl/router_rl_maturity_v2/experiments/grpo_stability_sweep/configs/03_cosine_decay120.json",
+      "config_sha256": "b2308d6a65c492c4af32ee9bbf7e96d56dc7e55b17fcd2f9ea52e30fbe44f917",
+      "formal_eligible": true,
+      "index": 3,
+      "name": "cosine_decay120",
+      "overrides": {
+        "learning_rate_decay_optimizer_updates": 120,
+        "learning_rate_min_ratio": 0.02,
+        "learning_rate_schedule": "cosine"
+      },
+      "seed": 26081231,
+      "shard": 1
+    },
+    {
+      "config_path": "/data/chengjin/studyhub/studyhub-agent/training_artifacts/studyhub_agent_rl/router_rl_maturity_v2/experiments/grpo_stability_sweep/configs/04_lr5e6_cosine80.json",
+      "config_sha256": "e806b103ce57828d24502cedd69d939032b82089182472943cc41f6f1708a564",
+      "formal_eligible": true,
+      "index": 4,
+      "name": "lr5e6_cosine80",
+      "overrides": {
+        "learning_rate": 5e-06,
+        "learning_rate_decay_optimizer_updates": 80,
+        "learning_rate_min_ratio": 0.02,
+        "learning_rate_schedule": "cosine"
+      },
+      "seed": 26081231,
+      "shard": 0
+    },
+    {
+      "config_path": "/data/chengjin/studyhub/studyhub-agent/training_artifacts/studyhub_agent_rl/router_rl_maturity_v2/experiments/grpo_stability_sweep/configs/05_kl010_cosine80.json",
+      "config_sha256": "95e25dfeda33d94a6b18293784d03ad1e192f6650bdf9323444d772e2c005f4e",
+      "formal_eligible": true,
+      "index": 5,
+      "name": "kl010_cosine80",
+      "overrides": {
+        "learning_rate_decay_optimizer_updates": 80,
+        "learning_rate_min_ratio": 0.02,
+        "learning_rate_schedule": "cosine",
+        "reference_kl_beta": 0.1
+      },
+      "seed": 26081231,
+      "shard": 1
+    },
+    {
+      "config_path": "/data/chengjin/studyhub/studyhub-agent/training_artifacts/studyhub_agent_rl/router_rl_maturity_v2/experiments/grpo_stability_sweep/configs/06_linear_decay80.json",
+      "config_sha256": "6f8bf018396bd1f874e27c1216348f0d7c8d31e0f388fb47e167c22aca79293a",
+      "formal_eligible": true,
+      "index": 6,
+      "name": "linear_decay80",
+      "overrides": {
+        "learning_rate_decay_optimizer_updates": 80,
+        "learning_rate_min_ratio": 0.02,
+        "learning_rate_schedule": "linear"
+      },
+      "seed": 26081231,
+      "shard": 0
+    }
+  ]
+}

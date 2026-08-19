@@ -1,0 +1,77 @@
+{
+  "algorithm": "group_relative_policy_optimization_contextual_bandit_v1",
+  "artifacts": {
+    "adapter_path": "/data/chengjin/studyhub/studyhub-agent/training_artifacts/studyhub_agent_rl/router_grpo_pilot_v1/runs/seed_3407/adapter",
+    "adapter_sha256": "1d6e2de07259d7eff5bb4f1f5f814bfb1482b5c55701c5e56de4e5d07b00a1d6",
+    "metrics_path": "/data/chengjin/studyhub/studyhub-agent/training_artifacts/studyhub_agent_rl/router_grpo_pilot_v1/runs/seed_3407/trainer_metrics.jsonl",
+    "metrics_sha256": "b5951e16356688c6161fdfbaa47b9d5afd89766aec589847c298784a608f74c6",
+    "samples_path": "/data/chengjin/studyhub/studyhub-agent/training_artifacts/studyhub_agent_rl/router_grpo_pilot_v1/runs/seed_3407/rollout_samples.jsonl",
+    "samples_sha256": "ae1b272cf20236c4650a536b083d3df3cb76bccf1a47ca0ad36101ec7efda135"
+  },
+  "constraint_corrections": {
+    "canonicalize_contract": 32,
+    "honor_explicit_evidence_read": 9,
+    "honor_explicit_search": 12,
+    "honor_explicit_synthesis": 3,
+    "protect_explicit_page_route": 9,
+    "protect_page_numbers": 9,
+    "recover_empty_search": 3,
+    "recover_invalid_json": 2
+  },
+  "duration_seconds": 187.031,
+  "generated_tokens": 5920,
+  "gpu": {
+    "device": "cuda:0",
+    "name": "NVIDIA H100 PCIe",
+    "peak_memory_mib": 59645.555
+  },
+  "group_size": 3,
+  "isolation": {
+    "development_diagnostic_read": false,
+    "final_holdout_read": false,
+    "paid_material_used": false,
+    "production_api_called": false,
+    "production_database_accessed": false,
+    "production_oss_write_called": false
+  },
+  "objective": {
+    "clipped_policy_ratio": true,
+    "deterministic_constraints_rewarded": false,
+    "executable_ledger_used_for_gradient": false,
+    "group_relative_advantage": true,
+    "reference_kl_beta": 0.02,
+    "reward_ledger_used_for_gradient": "raw_policy_proposal"
+  },
+  "optimizer": "AdamW",
+  "reward": {
+    "families": {
+      "direct_general_answer": 1.0,
+      "empty_search_rewrite": 0.6,
+      "grounded_final": 0.675214,
+      "initial_search": 0.97037,
+      "inspect_candidates": 0.990741,
+      "memory_read": 0.972222,
+      "read_evidence": 0.938272,
+      "synthesize_context": -0.2
+    },
+    "mean": 0.818501
+  },
+  "reward_hacking_flags": {
+    "premature_final": 4
+  },
+  "rollouts": 48,
+  "schema_version": "studyhub.agent.router_rl.train_run.v1",
+  "seed": 3407,
+  "stability": {
+    "final_policy_loss": -0.0,
+    "max_grad_norm": 15.97613907,
+    "max_kl": 4.025e-05,
+    "mean_clip_fraction": 0.0,
+    "mean_completion_tokens": 123.333,
+    "mean_entropy_proxy": 0.12936131,
+    "mean_kl": 6.93e-06
+  },
+  "states": 16,
+  "trainable_parameters": 16819200,
+  "training_succeeded": true
+}

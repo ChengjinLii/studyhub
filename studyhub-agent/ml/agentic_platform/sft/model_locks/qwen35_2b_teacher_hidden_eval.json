@@ -38,7 +38,7 @@
     "weight_sha256": "aa33250c4fc64891ddfaba3a314fd9542ea371843c387178b425fbcc5ed680b1"
   },
   "adapter": {
-    "local_path": "/data/chengjin/studyhub/training_artifacts/studyhub_agent_sft/qwen35_2b_lora_smoke",
+    "local_path": "/data/chengjin/studyhub/studyhub-agent/training_artifacts/studyhub_agent_sft/qwen35_2b_lora_smoke",
     "weight_sha256": "1fdd5ba95048cf152d958949e8743a2df9722737358a69217db941988ec68347"
   },
   "generation": {

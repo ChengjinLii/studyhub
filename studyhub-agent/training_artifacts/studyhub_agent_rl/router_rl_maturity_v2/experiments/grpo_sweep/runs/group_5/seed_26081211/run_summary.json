@@ -1,0 +1,88 @@
+{
+  "action_rollouts": 573,
+  "algorithm": "trajectory_constrained_token_grpo_v2",
+  "artifacts": {
+    "adapter_path": "/data/chengjin/studyhub/studyhub-agent/training_artifacts/studyhub_agent_rl/router_rl_maturity_v2/experiments/grpo_sweep/runs/group_5/seed_26081211/adapter",
+    "adapter_sha256": "ab18a4b405548dcfcacc9f3748677bde3871ccf196d29a78328fd00be3af8d88",
+    "metrics_path": "/data/chengjin/studyhub/studyhub-agent/training_artifacts/studyhub_agent_rl/router_rl_maturity_v2/experiments/grpo_sweep/runs/group_5/seed_26081211/trainer_metrics.jsonl",
+    "metrics_sha256": "57c9da2fd5c7cef695ef68fbdcf91f5a3605bac89fe68f39794745104f33d193",
+    "trajectories_path": "/data/chengjin/studyhub/studyhub-agent/training_artifacts/studyhub_agent_rl/router_rl_maturity_v2/experiments/grpo_sweep/runs/group_5/seed_26081211/trajectory_rollouts.jsonl",
+    "trajectories_sha256": "e7b658a8f83cde55fd65b124bb3b27c5ecd4cf762a50ee1dd34ec2b620373ec5"
+  },
+  "checkpoint_resume_exercised": false,
+  "checkpoint_resume_supported": true,
+  "constraint_corrections": {
+    "canonicalize_contract": 211,
+    "enforce_permission_boundary": 15,
+    "force_final_budget": 20,
+    "honor_explicit_candidate_inspection": 113,
+    "honor_explicit_final": 90,
+    "honor_explicit_memory_read": 25,
+    "honor_explicit_search": 65,
+    "honor_explicit_synthesis": 15,
+    "protect_explicit_page_route": 120,
+    "protect_material_ids": 93,
+    "recover_empty_search": 45,
+    "safe_untrusted_continuation": 10
+  },
+  "duration_seconds_this_invocation": 362.06,
+  "formal_run": false,
+  "gpu": {
+    "name": "NVIDIA H100 PCIe",
+    "peak_memory_mib": 21581.755
+  },
+  "isolation": {
+    "paid_material_used": false,
+    "production_api_called": false,
+    "production_database_accessed": false,
+    "production_final_holdout_read": false,
+    "production_oss_write_called": false,
+    "sealed_read": false,
+    "test_read": false
+  },
+  "lora": {
+    "alpha": 32,
+    "dropout": 0.0,
+    "rank": 16,
+    "trainable_parameters": 16819200
+  },
+  "minimum_optimizer_updates_satisfied": false,
+  "minimum_trajectory_rollouts_satisfied": false,
+  "objective": {
+    "clipped_post_update_policy_ratio": true,
+    "deterministic_constraints_rewarded": false,
+    "executable_ledger_used_for_gradient": false,
+    "frozen_reference_kl": true,
+    "group_relative_advantage": true,
+    "raw_policy_reward_only": true,
+    "reference_kl_beta": 0.02,
+    "trajectory_discount": 0.95,
+    "trajectory_return_to_go": true,
+    "true_token_entropy": true
+  },
+  "optimizer_updates": 40,
+  "raw_hard_gate_failures": {},
+  "reward_hacking_flags": {
+    "premature_final": 3
+  },
+  "rollout_updates": 20,
+  "schema_version": "studyhub.agent.router_rl.trajectory_grpo_run.v2",
+  "seed": 26081211,
+  "stability": {
+    "clip_fraction_measured": true,
+    "finite": true,
+    "max_reference_kl": 0.7494921,
+    "mean_clip_fraction": 0.06681602,
+    "mean_nonzero_advantage_fraction": 0.10848341,
+    "mean_post_update_policy_ratio": 0.99953869,
+    "mean_reference_kl": 0.31681116,
+    "mean_true_token_entropy": 0.29707589,
+    "post_update_policy_ratio_observed": true,
+    "trajectory_credit_signal_observed": true,
+    "true_token_entropy_observed": true
+  },
+  "training_succeeded": true,
+  "trajectory_rollouts": 300,
+  "trajectory_rollouts_per_second_this_invocation": 0.828593,
+  "trajectory_success_rate": 0.573333
+}

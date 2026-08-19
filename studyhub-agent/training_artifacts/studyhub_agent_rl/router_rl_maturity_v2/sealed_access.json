@@ -1,0 +1,14 @@
+{
+  "evaluation_runs": 0,
+  "production_final_holdout_read": false,
+  "schema_version": "studyhub.agent.router_rl.sealed_access.v2",
+  "sealed_path": "/data/chengjin/studyhub/studyhub-agent/training_artifacts/studyhub_agent_rl/router_rl_maturity_v2/sealed.jsonl",
+  "sealed_sha256": "b7caeb12daafd6ab2123a6d5f381dc74e702fd16550e100848cb5d12a4b1c32a",
+  "status": "locked",
+  "unlock_requires": [
+    "frozen_candidate_manifest",
+    "validation_gate_pass",
+    "single_test_gate_pass",
+    "explicit_sealed_authorization_artifact"
+  ]
+}

@@ -19,7 +19,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from ..paths import SHARED_BACKUP_ROOT, WORKSPACE_ROOT
+from ..paths import AGENT_ROOT, SHARED_BACKUP_ROOT
 from .spec import (
     ALLOWED_TOOLS,
     SCHEMA_VERSION,
@@ -32,7 +32,7 @@ from .spec import (
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 DEFAULT_MATERIALS_PATH = SHARED_BACKUP_ROOT / "oss_materials/metadata/materials.jsonl"
-DEFAULT_CHUNKS_PATH = WORKSPACE_ROOT / "ai_platform/rag_experiments/artifacts/corpus/chunks.jsonl"
+DEFAULT_CHUNKS_PATH = AGENT_ROOT / "ai_platform/rag_experiments/artifacts/corpus/chunks.jsonl"
 DEFAULT_OUTPUT_DIR = (
     PROJECT_ROOT / "training_artifacts/studyhub_agent_sft/spec_validation_v0"
 )
