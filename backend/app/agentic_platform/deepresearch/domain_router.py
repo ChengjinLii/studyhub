@@ -56,6 +56,19 @@ class ResearchEnvironment(Protocol):
         ...
 
 
+class WebResearchAdapter(Protocol):
+    """Narrow external capability contract injected into a research run."""
+
+    async def search_web(self, query: str, *, limit: int) -> list[ResearchSourceRef]:
+        ...
+
+    async def read_web(self, source_ids: list[str], query: str) -> list[EvidenceRecord]:
+        ...
+
+    async def search_scholar(self, query: str, *, limit: int) -> list[ResearchSourceRef]:
+        ...
+
+
 @dataclass(frozen=True, slots=True)
 class ResearchCapabilityFlags:
     web_enabled: bool = False
@@ -226,7 +239,10 @@ class ResearchDomainRouter:
         else:
             if not self.flags.web_enabled:
                 raise ResearchCapabilityDisabledError("Web research is disabled by configuration.")
-            evidence = await self.environment.read_web(decision.source_ids, query)
+            evidence = await self.environment.read_web(
+                decision.source_ids[: state.budget.remaining_page_reads],
+                query,
+            )
         if not evidence:
             raise ResearchEnvironmentError("source_unreadable", "Requested sources produced no readable evidence.", recoverable=True)
         activation = self.context_manager.activate_evidence(state, [record.evidence_id for record in evidence])
@@ -280,7 +296,7 @@ class StudyHubResearchEnvironment:
         pdf_evidence_service: MaterialPdfEvidenceService,
         admin_actor_id: int,
         role_mask: int,
-        web_adapter: ResearchEnvironment | None = None,
+        web_adapter: WebResearchAdapter | None = None,
     ) -> None:
         self.session = session
         self.material_repo = material_repo

@@ -40,10 +40,13 @@ from app.services.material_pdf_evidence_service import MaterialPageEvidence
 @dataclass
 class FixtureResearchEnvironment:
     sources_by_query: dict[str, list[ResearchSourceRef]] = field(default_factory=dict)
+    web_sources_by_query: dict[str, list[ResearchSourceRef]] = field(default_factory=dict)
     read_outcomes: dict[tuple[str, ...], deque[object]] = field(default_factory=dict)
+    web_read_outcomes: dict[tuple[str, ...], deque[object]] = field(default_factory=dict)
     internal_searches: list[str] = field(default_factory=list)
     internal_reads: list[tuple[str, ...]] = field(default_factory=list)
     web_searches: list[str] = field(default_factory=list)
+    web_reads: list[tuple[str, ...]] = field(default_factory=list)
     scholar_searches: list[str] = field(default_factory=list)
 
     async def search_internal(self, query: str, *, limit: int) -> list[ResearchSourceRef]:
@@ -67,11 +70,20 @@ class FixtureResearchEnvironment:
     async def search_web(self, query: str, *, limit: int) -> list[ResearchSourceRef]:
         del limit
         self.web_searches.append(query)
-        return []
+        return [item.model_copy(deep=True) for item in self.web_sources_by_query.get(query, [])]
 
     async def read_web(self, source_ids: list[str], query: str) -> list[EvidenceRecord]:
-        del source_ids, query
-        return []
+        del query
+        key = tuple(source_ids)
+        self.web_reads.append(key)
+        outcomes = self.web_read_outcomes.get(key)
+        if not outcomes:
+            return []
+        outcome = outcomes.popleft()
+        if isinstance(outcome, Exception):
+            raise outcome
+        assert isinstance(outcome, list)
+        return [item.model_copy(deep=True) for item in outcome]
 
     async def search_scholar(self, query: str, *, limit: int) -> list[ResearchSourceRef]:
         del limit
@@ -149,6 +161,17 @@ def _source(material_id: int, title: str = "采样理论讲义") -> ResearchSour
     )
 
 
+def _web_source(source_id: str = "web:nyquist") -> ResearchSourceRef:
+    return ResearchSourceRef(
+        source_id=source_id,
+        source_type=ResearchSourceType.WEB,
+        title="Nyquist sampling theorem",
+        source_uri="https://example.org/nyquist",
+        reliability=0.7,
+        access_scope="admin:research.web",
+    )
+
+
 def _evidence(
     evidence_id: str,
     *,
@@ -168,6 +191,18 @@ def _evidence(
         contradicts_claim_ids=contradicts or [],
         reliability=0.9,
         access_scope="admin:materials.read",
+    )
+
+
+def _web_evidence(evidence_id: str = "web-evidence-1") -> EvidenceRecord:
+    return EvidenceRecord(
+        evidence_id=evidence_id,
+        source_type=ResearchSourceType.WEB,
+        source_uri="https://example.org/nyquist",
+        title="Nyquist sampling theorem",
+        excerpt="[Untrusted external evidence] The sampling rate must exceed twice the bandwidth.",
+        reliability=0.7,
+        access_scope="admin:research.web",
     )
 
 
@@ -420,6 +455,33 @@ def test_disabled_web_capability_never_calls_the_external_adapter() -> None:
 
     assert environment.web_searches == []
     assert "search_web:capability_disabled" in result.state.rejected_paths
+
+
+def test_enabled_web_capability_supports_search_then_bounded_read() -> None:
+    environment = FixtureResearchEnvironment(
+        web_sources_by_query={"Nyquist sampling theorem": [_web_source()]},
+        web_read_outcomes={("web:nyquist",): deque([[_web_evidence()]])},
+    )
+    task = _task(
+        "research-web-enabled",
+        allowed=[ResearchSourceType.INTERNAL_MATERIAL, ResearchSourceType.WEB],
+    ).model_copy(update={"max_page_reads": 1})
+
+    result = _run(
+        task,
+        environment,
+        [
+            _decision(ResearchActionType.SEARCH_WEB, query="Nyquist sampling theorem"),
+            _decision(ResearchActionType.READ_WEB, source_ids=["web:nyquist", "web:unused"]),
+            _decision(ResearchActionType.FINALIZE),
+        ],
+        flags=ResearchCapabilityFlags(web_enabled=True),
+    )
+
+    assert environment.web_searches == ["Nyquist sampling theorem"]
+    assert environment.web_reads == [("web:nyquist",)]
+    assert [item.evidence_id for item in result.state.evidence_ledger] == ["web-evidence-1"]
+    assert result.state.budget.remaining_page_reads == 0
 
 
 def test_non_admin_cannot_invoke_research_skills_even_with_a_valid_typed_state() -> None:

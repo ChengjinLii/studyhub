@@ -91,6 +91,7 @@ def test_agentic_platform_configuration_defaults_to_safe_values() -> None:
     assert settings.deep_research_web_enabled is False
     assert settings.deep_research_scholar_enabled is False
     assert settings.deep_research_python_enabled is False
+    assert settings.deep_research_web_provider == "disabled"
     assert settings.agentic_retriever_version is None
 
 
@@ -101,8 +102,8 @@ def test_agentic_platform_configuration_defaults_to_safe_values() -> None:
         (Settings(agentic_runtime="unsupported"), "AGENTIC_RUNTIME"),
         (Settings(agentic_max_turns=0), "AGENTIC_MAX_TURNS"),
         (Settings(deep_research_enabled=True), "DEEP_RESEARCH_ENABLED"),
-        (Settings(deep_research_web_enabled=True), "Web/Scholar Research"),
-        (Settings(deep_research_scholar_enabled=True), "Web/Scholar Research"),
+        (Settings(deep_research_web_enabled=True), "DEEP_RESEARCH_WEB_ENABLED"),
+        (Settings(deep_research_scholar_enabled=True), "Scholar Research"),
     ],
 )
 def test_agentic_platform_configuration_rejects_unsafe_values(settings: Settings, message: str) -> None:
@@ -124,6 +125,29 @@ def test_agent_execution_requires_an_explicit_retriever_build_version() -> None:
     )
 
     with pytest.raises(RuntimeError, match="RETRIEVER_VERSION"):
+        settings.validate_runtime_configuration()
+
+
+def test_keyless_mediawiki_web_research_configuration_is_valid_when_explicitly_enabled() -> None:
+    settings = Settings(
+        agentic_platform_enabled=True,
+        deep_research_enabled=True,
+        deep_research_web_enabled=True,
+        deep_research_web_provider="mediawiki",
+    )
+
+    settings.validate_runtime_configuration()
+
+
+def test_searxng_requires_an_explicit_search_endpoint() -> None:
+    settings = Settings(
+        agentic_platform_enabled=True,
+        deep_research_enabled=True,
+        deep_research_web_enabled=True,
+        deep_research_web_provider="searxng",
+    )
+
+    with pytest.raises(RuntimeError, match="WEB_SEARCH_URL"):
         settings.validate_runtime_configuration()
 
 
