@@ -1,0 +1,23 @@
+schema_version: studyhub.areal.config.v1
+job_name: studyhub-agent-v2-best-of-n-9b
+model:
+  name_or_path: models/Qwen3.5-9B
+  tokenizer_path: models/Qwen3.5-9B
+  dtype: bfloat16
+  max_sequence_length: 8192
+data:
+  train_path: artifacts/training/best-of-n-prompts.jsonl
+  eval_path: eval/agentbench/v1/cases.jsonl
+  trajectory_schema: studyhub.trajectory.v1
+runtime:
+  output_dir: artifacts/rollouts/best-9b
+  seed: 6213
+  per_device_batch_size: 1
+  gradient_accumulation_steps: 1
+  gradient_checkpointing: false
+  requires_cuda: true
+algorithm:
+  name: best_of_n
+  parameters:
+    candidates: 4
+    reward_version: v1

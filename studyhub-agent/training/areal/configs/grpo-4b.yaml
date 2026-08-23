@@ -1,0 +1,24 @@
+schema_version: studyhub.areal.config.v1
+job_name: studyhub-agent-v2-grpo-4b
+model:
+  name_or_path: artifacts/checkpoints/sft-4b
+  tokenizer_path: models/Qwen3.5-4B
+  dtype: bfloat16
+  max_sequence_length: 8192
+data:
+  train_path: artifacts/training/grpo-tasks.jsonl
+  eval_path: eval/agentbench/v1/cases.jsonl
+  trajectory_schema: studyhub.trajectory.v1
+runtime:
+  output_dir: artifacts/checkpoints/grpo-4b
+  seed: 6210
+  per_device_batch_size: 1
+  gradient_accumulation_steps: 16
+  gradient_checkpointing: true
+  requires_cuda: true
+algorithm:
+  name: grpo
+  parameters:
+    group_size: 4
+    learning_rate: 0.000005
+    kl_coefficient: 0.02

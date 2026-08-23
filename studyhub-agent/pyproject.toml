@@ -25,7 +25,7 @@ packages = ["src/studyhub_agent"]
 [tool.pytest.ini_options]
 addopts = "-q"
 testpaths = ["tests"]
-pythonpath = ["src", "ai_platform/rag_experiments/src"]
+pythonpath = [".", "src", "ai_platform/rag_experiments/src"]
 
 [tool.ruff]
 line-length = 120

@@ -1,0 +1,23 @@
+schema_version: studyhub.areal.config.v1
+job_name: studyhub-agent-v2-sft-4b
+model:
+  name_or_path: models/Qwen3.5-4B
+  tokenizer_path: models/Qwen3.5-4B
+  dtype: bfloat16
+  max_sequence_length: 8192
+data:
+  train_path: artifacts/training/sft-train.jsonl
+  eval_path: artifacts/training/sft-eval.jsonl
+  trajectory_schema: studyhub.trajectory.v1
+runtime:
+  output_dir: artifacts/checkpoints/sft-4b
+  seed: 6209
+  per_device_batch_size: 1
+  gradient_accumulation_steps: 16
+  gradient_checkpointing: true
+  requires_cuda: true
+algorithm:
+  name: sft
+  parameters:
+    learning_rate: 0.00002
+    epochs: 2
