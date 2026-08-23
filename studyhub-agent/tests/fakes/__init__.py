@@ -1,0 +1,1 @@
+"""Deterministic external-service fixtures."""
