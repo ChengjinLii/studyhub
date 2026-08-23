@@ -50,10 +50,10 @@ class _DeterministicPolicy:
 
 
 def test_agentbench_runner_computes_metrics_without_writing_fake_results() -> None:
-    cases = load_cases(CASES_PATH)[:3]
+    cases = load_cases(CASES_PATH)
     metrics = asyncio.run(AgentBenchRunner(_DeterministicPolicy()).run(cases))
 
-    assert metrics.cases == 3
+    assert metrics.cases == 100
     assert metrics.task_success == 1.0
     assert metrics.valid_tool_rate == 1.0
     assert metrics.average_steps == 3.0

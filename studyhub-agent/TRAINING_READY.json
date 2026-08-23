@@ -1,0 +1,19 @@
+{
+  "version": "agent-v2-training-ready-v1",
+  "hermes_commit": "5c1a304ce890276a4334d8ced3f29ffeedbbbf93",
+  "agent_profile": "studyhub-v2",
+  "tool_schema_version": "v1",
+  "trajectory_schema_version": "studyhub.trajectory.v1",
+  "reward_version": "v1",
+  "agentbench_version": "studyhub.agentbench.v1",
+  "agentbench_cases": 100,
+  "rag_version": "0.1.0",
+  "verification": {
+    "agent_tests": 34,
+    "rag_tests": 13,
+    "status": "passed",
+    "hardware": "cpu-only-single-process"
+  },
+  "training_executed": false,
+  "model_weights_downloaded": false
+}
