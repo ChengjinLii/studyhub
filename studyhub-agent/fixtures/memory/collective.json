@@ -1,0 +1,20 @@
+[
+  {
+    "memory_id": "collective:cps:001",
+    "course": "通信原理",
+    "scenario": "基础弱+两周冲刺",
+    "pattern": "第一周按模块补概念和公式，第二周按年份限时刷真题并复盘错题。",
+    "support_users": 30,
+    "support_episodes": 48,
+    "confidence": 0.87
+  },
+  {
+    "memory_id": "collective:esd:001",
+    "course": "ESD",
+    "scenario": "两周复习",
+    "pattern": "先区分 HBM、CDM 与失效机理，再学习版图防护，最后做样卷和错题复盘。",
+    "support_users": 12,
+    "support_episodes": 19,
+    "confidence": 0.81
+  }
+]

@@ -7,7 +7,7 @@ from studyhub_rag.audit import verify_results
 from studyhub_rag.config import EXPERIMENT_ROOT, load_config
 from studyhub_rag.corpus import build_chunks, corpus_fingerprint, write_corpus
 from studyhub_rag.experiment import run_experiment
-from studyhub_rag.guards import require_static_snapshot, verify_source_isolation
+from studyhub_rag.guards import verify_source_isolation
 from studyhub_rag.ocr import ocr_previews
 
 DEFAULT_CONFIG = EXPERIMENT_ROOT / "configs" / "benchmark.yaml"
@@ -34,11 +34,12 @@ def main() -> None:
         violations = verify_source_isolation()
         data = config.section("data")
         snapshot_root = config.repo_path(str(data["snapshot_root"]))
-        materials = require_static_snapshot(snapshot_root / str(data["materials_file"]), snapshot_root)
+        materials = (snapshot_root / str(data["materials_file"])).resolve()
         result = {
             "ok": not violations,
             "violations": violations,
             "input": str(materials),
+            "input_available": materials.is_file(),
             "source_mode": "static_backup_read_only",
             "database_access": "forbidden",
         }

@@ -1,0 +1,10 @@
+[
+  {
+    "content": "用户偏好按题型刷真题，并把错题按原因分类。",
+    "metadata": {"kind": "study_preference"}
+  },
+  {
+    "content": "用户每天通常可安排两小时复习。",
+    "metadata": {"kind": "time_budget"}
+  }
+]

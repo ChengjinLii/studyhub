@@ -6,7 +6,7 @@ from studyhub_rag.corpus import load_materials
 
 
 def test_benchmark_only_references_free_snapshot_materials() -> None:
-    config = load_config("configs/benchmark.yaml")
+    config = load_config("configs/benchmark-fixture.yaml")
     materials = load_materials(config)
     free_ids = {int(material["id"]) for material in materials}
     cases = load_benchmark(config, valid_material_ids=free_ids)

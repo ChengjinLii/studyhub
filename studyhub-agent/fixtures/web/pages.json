@@ -1,0 +1,16 @@
+[
+  {
+    "url": "https://docs.example.edu/communications/review",
+    "title": "通信系统复习方法",
+    "content": "建议先建立知识框架，再完成分题型训练，最后使用限时真题检查薄弱点。",
+    "content_type": "text/html",
+    "redirects": []
+  },
+  {
+    "url": "https://standards.example.org/esd/terminology",
+    "title": "ESD terminology",
+    "content": "HBM models a charged human discharge while CDM models a charged device discharge.",
+    "content_type": "text/plain",
+    "redirects": []
+  }
+]

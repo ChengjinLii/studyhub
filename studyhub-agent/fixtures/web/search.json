@@ -1,0 +1,20 @@
+[
+  {
+    "title": "通信系统复习方法",
+    "url": "https://docs.example.edu/communications/review",
+    "snippet": "公开课程页面介绍通信原理复习顺序、典型题型和时间安排。",
+    "keywords": ["通信原理", "复习", "期末"]
+  },
+  {
+    "title": "ESD Association terminology",
+    "url": "https://standards.example.org/esd/terminology",
+    "snippet": "Public terminology for electrostatic discharge models and testing.",
+    "keywords": ["ESD", "HBM", "CDM", "测试"]
+  },
+  {
+    "title": "Blocked internal result",
+    "url": "http://127.0.0.1/internal",
+    "snippet": "This record verifies that unsafe search results are filtered.",
+    "keywords": ["internal", "blocked"]
+  }
+]

@@ -1,0 +1,21 @@
+schema_version: 1
+seed: 20260716
+
+data:
+  snapshot_root: studyhub-agent/ai_platform/rag_experiments/tests/fixtures/public_snapshot
+  materials_file: metadata/materials.json
+  preview_root: objects/materials
+  free_only: true
+  include_metadata: true
+  include_ocr: false
+  chunk_size_chars: 700
+  chunk_overlap_chars: 100
+
+benchmark:
+  dataset_path: datasets/benchmark_v1.jsonl
+  top_k: 10
+  candidate_k: 40
+
+outputs:
+  artifact_root: artifacts
+  report_root: reports
