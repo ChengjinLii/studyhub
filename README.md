@@ -39,15 +39,13 @@ StudyHub 后端以 RESTful 风格作为公开 API 的主要设计约定，便于
   - 登录：`POST /api/session`
   - 登出：`DELETE /api/session`
   - 资料下载授权：`POST /api/materials/{id}/downloads`
-  - AI 对话：`POST /api/ai-chats`
-  - AI 推荐：`POST /api/ai-recommendations`
 - 为了避免破坏历史调用，旧的动作型路径会保留兼容，但不作为公开 OpenAPI 的首选路径；面向 MCP 或新客户端时应优先使用 OpenAPI 中暴露的 RESTful 路径。
 
 ## 仓库结构
 
 - `backend/`：FastAPI 后端、测试、fixtures 与运维辅助代码
 - `frontend/`：Next.js 前端
-- `studyhub-agent/`：与网站运行时隔离的 Agent、Hermes 适配、SFT/RL、评测与报告
+- `studyhub-agent/`：与网站运行时隔离的 RAG 实验及后续 Agent V2 集成区
 - `reports/`：技术报告、项目复盘材料
 - `scripts/`：开发、部署、worker 与数据库操作脚本
 

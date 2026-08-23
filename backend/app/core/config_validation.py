@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from typing import Any
-from urllib.parse import urlparse
 
 
 LOCAL_MAIL_PROVIDERS = {"local_outbox"}
@@ -34,7 +33,6 @@ def validate_runtime_configuration(settings: Any, *, default_dev_jwt_secret: str
     _validate_payment(settings)
     _validate_kyc(settings)
     _validate_mcp(settings)
-    _validate_agentic_platform(settings)
     _validate_production_providers(settings)
     _validate_redis(settings)
 
@@ -84,7 +82,7 @@ def _validate_redis(settings: Any) -> None:
 
 
 def _validate_storage(settings: Any) -> None:
-    if settings.storage_provider != "oss" and settings.agentic_artifact_storage_provider != "oss":
+    if settings.storage_provider != "oss":
         return
     missing_keys: list[str] = []
     if not settings.oss_endpoint:
@@ -185,140 +183,6 @@ def _validate_mcp(settings: Any) -> None:
         ]
         if any(not str(value or "").startswith("https://") for value in oauth_urls):
             raise RuntimeError("preview/production 的 MCP OAuth issuer、JWKS、audience 和授权服务器必须使用 HTTPS。")
-
-
-def _validate_agentic_platform(settings: Any) -> None:
-    if not settings.agentic_admin_only:
-        raise RuntimeError("Agentic Platform 必须保持 STUDYHUB_AGENTIC_ADMIN_ONLY=true。")
-    if settings.agentic_runtime not in {"legacy", "langgraph"}:
-        raise RuntimeError("STUDYHUB_AGENTIC_RUNTIME 只允许为 legacy 或 langgraph。")
-    if settings.agentic_checkpointer not in {"memory", "sqlite", "redis"}:
-        raise RuntimeError("STUDYHUB_AGENTIC_CHECKPOINTER 只允许为 memory、sqlite 或 redis。")
-    positive_limits = {
-        "STUDYHUB_AGENTIC_MAX_TURNS": settings.agentic_max_turns,
-        "STUDYHUB_AGENTIC_MAX_SKILL_CALLS": settings.agentic_max_skill_calls,
-        "STUDYHUB_DEEP_RESEARCH_MAX_SEARCH_TURNS": settings.deep_research_max_search_turns,
-        "STUDYHUB_DEEP_RESEARCH_MAX_PAGE_READS": settings.deep_research_max_page_reads,
-        "STUDYHUB_AGENTIC_MAX_CONTEXT_TOKENS": settings.agentic_max_context_tokens,
-    }
-    for variable, value in positive_limits.items():
-        if int(value) <= 0:
-            raise RuntimeError(f"{variable} 必须大于 0。")
-    if settings.agentic_proactive_enabled:
-        if not settings.agentic_platform_enabled:
-            raise RuntimeError("STUDYHUB_AGENTIC_PROACTIVE_ENABLED 需要先启用 STUDYHUB_AGENTIC_PLATFORM_ENABLED。")
-        if settings.agentic_shadow_admin_actor_id is None or int(settings.agentic_shadow_admin_actor_id) <= 0:
-            raise RuntimeError("STUDYHUB_AGENTIC_SHADOW_ADMIN_ACTOR_ID 必须是正数管理员 ID。")
-    if settings.deep_research_enabled and not settings.agentic_platform_enabled:
-        raise RuntimeError("STUDYHUB_DEEP_RESEARCH_ENABLED 需要先启用 STUDYHUB_AGENTIC_PLATFORM_ENABLED。")
-    web_provider = str(settings.deep_research_web_provider or "disabled").strip().lower()
-    if web_provider not in {"disabled", "mediawiki", "searxng", "serpapi"}:
-        raise RuntimeError("STUDYHUB_DEEP_RESEARCH_WEB_PROVIDER 只允许为 disabled、mediawiki、searxng 或 serpapi。")
-    if settings.deep_research_web_timeout_seconds <= 0:
-        raise RuntimeError("STUDYHUB_DEEP_RESEARCH_WEB_TIMEOUT_SECONDS 必须大于 0。")
-    if not 0 < int(settings.deep_research_web_max_response_bytes) <= 8 * 1024 * 1024:
-        raise RuntimeError("STUDYHUB_DEEP_RESEARCH_WEB_MAX_RESPONSE_BYTES 必须在 1 到 8388608 之间。")
-    if not 0 <= int(settings.deep_research_web_max_redirects) <= 5:
-        raise RuntimeError("STUDYHUB_DEEP_RESEARCH_WEB_MAX_REDIRECTS 必须在 0 到 5 之间。")
-    if settings.deep_research_web_enabled:
-        if not settings.deep_research_enabled:
-            raise RuntimeError("STUDYHUB_DEEP_RESEARCH_WEB_ENABLED 需要先启用 STUDYHUB_DEEP_RESEARCH_ENABLED。")
-        if web_provider == "disabled":
-            raise RuntimeError("启用 Web Research 前必须配置 STUDYHUB_DEEP_RESEARCH_WEB_PROVIDER。")
-        if web_provider == "searxng" and not settings.deep_research_web_search_url:
-            raise RuntimeError("SearxNG Web Research 缺少 STUDYHUB_DEEP_RESEARCH_WEB_SEARCH_URL。")
-        if web_provider == "serpapi" and not settings.deep_research_web_api_key:
-            raise RuntimeError("SerpAPI Web Research 缺少 STUDYHUB_DEEP_RESEARCH_WEB_API_KEY。")
-        default_search_urls = {
-            "mediawiki": "https://zh.wikipedia.org/w/api.php",
-            "serpapi": "https://serpapi.com/search.json",
-        }
-        search_url = str(settings.deep_research_web_search_url or default_search_urls.get(web_provider, ""))
-        _validate_external_research_url(
-            settings,
-            search_url,
-            variable="STUDYHUB_DEEP_RESEARCH_WEB_SEARCH_URL",
-            allow_local_http=web_provider == "searxng",
-        )
-        if not str(settings.deep_research_web_search_engine or "").strip():
-            raise RuntimeError("STUDYHUB_DEEP_RESEARCH_WEB_SEARCH_ENGINE 不能为空。")
-    if settings.deep_research_web_proxy_url:
-        proxy = urlparse(str(settings.deep_research_web_proxy_url))
-        if proxy.scheme not in {"http", "https"} or not proxy.hostname:
-            raise RuntimeError("STUDYHUB_DEEP_RESEARCH_WEB_PROXY_URL 必须是有效的 HTTP(S) URL。")
-    if settings.deep_research_scholar_enabled:
-        raise RuntimeError("Scholar Research 适配器尚未接入，不能启用 STUDYHUB_DEEP_RESEARCH_SCHOLAR_ENABLED。")
-    if settings.agentic_execution_enabled and not settings.agentic_platform_enabled:
-        raise RuntimeError("STUDYHUB_AGENTIC_EXECUTION_ENABLED 需要先启用 STUDYHUB_AGENTIC_PLATFORM_ENABLED。")
-    if settings.agentic_artifact_storage_provider not in {"local_fs", "oss"}:
-        raise RuntimeError("STUDYHUB_AGENTIC_ARTIFACT_STORAGE_PROVIDER 只允许为 local_fs 或 oss。")
-    if settings.agentic_model_provider not in {"disabled", "openai_compatible"}:
-        raise RuntimeError("STUDYHUB_AGENTIC_MODEL_PROVIDER 只允许为 disabled 或 openai_compatible。")
-    if settings.agentic_model_token_trace_source not in {"local", "teacher_api", "unavailable"}:
-        raise RuntimeError("STUDYHUB_AGENTIC_MODEL_TOKEN_TRACE_SOURCE 配置非法。")
-    if settings.agentic_model_timeout_seconds <= 0:
-        raise RuntimeError("STUDYHUB_AGENTIC_MODEL_TIMEOUT_SECONDS 必须大于 0。")
-    if int(settings.agentic_model_max_retries) < 0:
-        raise RuntimeError("STUDYHUB_AGENTIC_MODEL_MAX_RETRIES 不能小于 0。")
-    if settings.agentic_execution_enabled:
-        required_model_settings = {
-            "STUDYHUB_AGENTIC_MODEL_BASE_URL": settings.agentic_model_base_url,
-            "STUDYHUB_AGENTIC_MODEL_API_KEY": settings.agentic_model_api_key,
-            "STUDYHUB_AGENTIC_MODEL_ID": settings.agentic_model_id,
-        }
-        if settings.agentic_model_provider != "openai_compatible" or any(
-            not isinstance(value, str) or not value.strip() for value in required_model_settings.values()
-        ):
-            raise RuntimeError("启用 Agent Execution 前必须完整配置 OpenAI-compatible Agentic Model Provider。")
-        if not isinstance(settings.agentic_retriever_version, str) or not settings.agentic_retriever_version.strip():
-            raise RuntimeError("启用 Agent Execution 前必须配置 STUDYHUB_AGENTIC_RETRIEVER_VERSION。")
-        if settings.agentic_runtime != "langgraph":
-            raise RuntimeError("启用 Agent Execution 时必须使用 STUDYHUB_AGENTIC_RUNTIME=langgraph。")
-        if settings.agentic_checkpointer != "sqlite":
-            raise RuntimeError("启用 Agent Execution 时必须使用可恢复的 STUDYHUB_AGENTIC_CHECKPOINTER=sqlite。")
-        if not settings.agentic_durable_storage_enabled:
-            raise RuntimeError("启用 Agent Execution 前必须设置 STUDYHUB_AGENTIC_DURABLE_STORAGE_ENABLED=true。")
-        if settings.lock_provider != "redis":
-            raise RuntimeError("启用 Agent Execution 时必须使用 STUDYHUB_LOCK_PROVIDER=redis 以保证跨进程租约安全。")
-        if settings.is_production and settings.agentic_artifact_storage_provider != "oss":
-            raise RuntimeError("production Agent Execution 必须使用 STUDYHUB_AGENTIC_ARTIFACT_STORAGE_PROVIDER=oss。")
-    positive_worker_limits = {
-        "STUDYHUB_AGENTIC_WORKER_LOCK_TIMEOUT_SECONDS": settings.agentic_worker_lock_timeout_seconds,
-        "STUDYHUB_AGENTIC_WORKER_BATCH_SIZE": settings.agentic_worker_batch_size,
-        "STUDYHUB_AGENTIC_WORKER_CLAIM_TTL_SECONDS": settings.agentic_worker_claim_ttl_seconds,
-        "STUDYHUB_AGENTIC_WORKER_MAX_ATTEMPTS": settings.agentic_worker_max_attempts,
-    }
-    for variable, value in positive_worker_limits.items():
-        if int(value) <= 0:
-            raise RuntimeError(f"{variable} 必须大于 0。")
-    if int(settings.agentic_worker_retry_delay_seconds) < 0:
-        raise RuntimeError("STUDYHUB_AGENTIC_WORKER_RETRY_DELAY_SECONDS 不能小于 0。")
-    positive_execution_limits = {
-        "STUDYHUB_AGENTIC_EXECUTION_BATCH_SIZE": settings.agentic_execution_batch_size,
-        "STUDYHUB_AGENTIC_EXECUTION_CLAIM_TTL_SECONDS": settings.agentic_execution_claim_ttl_seconds,
-        "STUDYHUB_AGENTIC_EXECUTION_MAX_ATTEMPTS": settings.agentic_execution_max_attempts,
-    }
-    for variable, value in positive_execution_limits.items():
-        if int(value) <= 0:
-            raise RuntimeError(f"{variable} 必须大于 0。")
-
-
-def _validate_external_research_url(
-    settings: Any,
-    value: str,
-    *,
-    variable: str,
-    allow_local_http: bool,
-) -> None:
-    parsed = urlparse(value)
-    if not parsed.hostname or parsed.username is not None or parsed.password is not None:
-        raise RuntimeError(f"{variable} 必须是无内嵌凭据的有效 URL。")
-    if parsed.scheme == "https":
-        return
-    local_hosts = {"127.0.0.1", "localhost", "::1"}
-    if allow_local_http and settings.is_local_dev and parsed.scheme == "http" and parsed.hostname in local_hosts:
-        return
-    raise RuntimeError(f"{variable} 必须使用 HTTPS；仅 local-dev 的本机 SearxNG 可使用 HTTP。")
 
 
 def _validate_production_providers(settings: Any) -> None:

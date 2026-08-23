@@ -17,26 +17,6 @@ LEGACY_TABLE_COMPATIBILITY: dict[str, tuple[str, ...]] = {
     "material_reviews": ("reviews",),
     "material_purchases": ("orders",),
 }
-AGENTIC_DURABLE_TABLES = frozenset(
-    {
-        "agent_artifacts",
-        "agent_jobs",
-        "agent_outbox_events",
-        "agent_runs",
-        "agent_steps",
-        "agent_threads",
-        "agent_waits",
-    }
-)
-AGENTIC_TABLE_FEATURE_FLAGS = (
-    "agentic_platform_enabled",
-    "agentic_proactive_enabled",
-    "agentic_execution_enabled",
-    "agentic_durable_storage_enabled",
-    "deep_research_enabled",
-)
-
-
 def get_engine():
     global _ENGINE
     if _ENGINE is None:
@@ -107,11 +87,7 @@ def expected_table_names() -> list[str]:
 
 
 def required_table_names() -> list[str]:
-    table_names = expected_table_names()
-    settings = get_settings()
-    if any(bool(getattr(settings, flag, False)) for flag in AGENTIC_TABLE_FEATURE_FLAGS):
-        return table_names
-    return [name for name in table_names if name not in AGENTIC_DURABLE_TABLES]
+    return expected_table_names()
 
 
 def has_compatible_legacy_table(table_name: str, actual_tables: set[str]) -> bool:

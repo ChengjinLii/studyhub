@@ -94,7 +94,7 @@ def test_private_synonym_file_expands_short_course_names(monkeypatch, tmp_path) 
     assert material_matches_search(material, query, _load_tags) is True
 
 
-def test_private_synonyms_supply_agent_platform_glossary(monkeypatch, tmp_path) -> None:
+def test_private_synonyms_supply_search_glossary(monkeypatch, tmp_path) -> None:
     synonym_file = tmp_path / "synonyms.json"
     synonym_file.write_text('{"ESD": ["电子系统设计"], "CPS": ["通信原理"]}', encoding="utf-8")
     monkeypatch.setenv(SYNONYM_FILE_ENV, str(synonym_file))

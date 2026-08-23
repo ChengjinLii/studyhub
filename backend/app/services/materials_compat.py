@@ -473,14 +473,7 @@ class MaterialsCompatMixin:
         self._compat_assert_download_access(session, row, user_id, role_mask)
         if self._compat_should_consume_download_quota(row, user_id, role_mask):
             self._compat_consume_download_quota(session, user_id, 1)
-        registered = self._compat_register_download(session, material_id, user_id)
-        if registered:
-            self._enqueue_proactive_material_download(
-                session,
-                material_id=material_id,
-                material_title=str(row["title"]),
-                user_id=user_id,
-            )
+        self._compat_register_download(session, material_id, user_id)
         session.commit()
         self.invalidate_material_summary_cache()
         return self._compat_download_payload(row)
@@ -504,14 +497,7 @@ class MaterialsCompatMixin:
             self._compat_consume_download_quota(session, user_id, quota_needed)
         for row in rows:
             material_id = int(row["id"])
-            registered = self._compat_register_download(session, material_id, user_id)
-            if registered:
-                self._enqueue_proactive_material_download(
-                    session,
-                    material_id=material_id,
-                    material_title=str(row["title"]),
-                    user_id=user_id,
-                )
+            self._compat_register_download(session, material_id, user_id)
         session.commit()
         self.invalidate_material_summary_cache()
         return [self._compat_batch_download_payload(row) for row in rows]

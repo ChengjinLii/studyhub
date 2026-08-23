@@ -63,9 +63,6 @@ class RuntimeMetrics:
         self._cache_events_total: dict[tuple[str, str, str], int] = defaultdict(int)
         self._security_events_total: dict[tuple[str, str], int] = defaultdict(int)
         self._errors_total: dict[tuple[str, str, str, str], int] = defaultdict(int)
-        self._ai_agent_runs_total: dict[tuple[str, str, str, str, str], int] = defaultdict(int)
-        self._ai_agent_run_durations: dict[tuple[str, str, str, str, str], _Aggregate] = defaultdict(_Aggregate)
-        self._ai_agent_feedback_total: dict[tuple[str, str, str, str], int] = defaultdict(int)
 
     def clear(self) -> None:
         with self._lock:
@@ -78,9 +75,6 @@ class RuntimeMetrics:
             self._cache_events_total.clear()
             self._security_events_total.clear()
             self._errors_total.clear()
-            self._ai_agent_runs_total.clear()
-            self._ai_agent_run_durations.clear()
-            self._ai_agent_feedback_total.clear()
             self.started_at = time.time()
 
     def record_http_request(
@@ -146,44 +140,6 @@ class RuntimeMetrics:
         with self._lock:
             self._errors_total[(fingerprint, kind, route_key, status_key)] += 1
         return fingerprint
-
-    def record_ai_agent_run(
-        self,
-        *,
-        provider: str,
-        status: str,
-        pdf_evidence: bool,
-        memory_context: bool,
-        course_memory_card: bool,
-        duration_seconds: float,
-    ) -> None:
-        labels = (
-            _bounded_label(provider or "local"),
-            _bounded_label((status or "unknown").lower()),
-            "yes" if pdf_evidence else "no",
-            "yes" if memory_context else "no",
-            "yes" if course_memory_card else "no",
-        )
-        with self._lock:
-            self._ai_agent_runs_total[labels] += 1
-            self._ai_agent_run_durations[labels].observe(duration_seconds)
-
-    def record_ai_agent_feedback(
-        self,
-        *,
-        hook: str,
-        status: str,
-        personal_memory: bool,
-        selected_materials: bool,
-    ) -> None:
-        labels = (
-            _bounded_label(hook or "unknown"),
-            _bounded_label((status or "unknown").lower()),
-            "yes" if personal_memory else "no",
-            "yes" if selected_materials else "no",
-        )
-        with self._lock:
-            self._ai_agent_feedback_total[labels] += 1
 
     def render_prometheus(self, settings: Settings) -> str:
         lines: list[str] = [
@@ -304,51 +260,6 @@ class RuntimeMetrics:
                     _sanitize_label(status_code),
                 )
                 lines.append(f"studyhub_errors_total{{{labels}}} {count}")
-            lines.extend(
-                [
-                    "# HELP studyhub_ai_agent_runs_total StudyHub Agent recommendation runs by provider, status, and bounded context usage.",
-                    "# TYPE studyhub_ai_agent_runs_total counter",
-                    "# HELP studyhub_ai_agent_run_duration_seconds StudyHub Agent run duration histogram by provider, status, and bounded context usage.",
-                    "# TYPE studyhub_ai_agent_run_duration_seconds histogram",
-                    "# HELP studyhub_ai_agent_run_duration_seconds_max StudyHub Agent run max duration by provider, status, and bounded context usage.",
-                    "# TYPE studyhub_ai_agent_run_duration_seconds_max gauge",
-                ]
-            )
-            for (provider, status, pdf_evidence, memory_context, course_memory_card), count in sorted(
-                self._ai_agent_runs_total.items()
-            ):
-                labels = 'provider="%s",status="%s",pdf_evidence="%s",memory_context="%s",course_memory_card="%s"' % (
-                    _sanitize_label(provider),
-                    _sanitize_label(status),
-                    _sanitize_label(pdf_evidence),
-                    _sanitize_label(memory_context),
-                    _sanitize_label(course_memory_card),
-                )
-                lines.append(f"studyhub_ai_agent_runs_total{{{labels}}} {count}")
-                aggregate = self._ai_agent_run_durations[(provider, status, pdf_evidence, memory_context, course_memory_card)]
-                _append_duration_buckets(
-                    lines,
-                    metric_name="studyhub_ai_agent_run_duration_seconds",
-                    labels=labels,
-                    aggregate=aggregate,
-                )
-                lines.append(f"studyhub_ai_agent_run_duration_seconds_count{{{labels}}} {aggregate.count}")
-                lines.append(f"studyhub_ai_agent_run_duration_seconds_sum{{{labels}}} {aggregate.total_seconds:.6f}")
-                lines.append(f"studyhub_ai_agent_run_duration_seconds_max{{{labels}}} {aggregate.max_seconds:.6f}")
-            lines.extend(
-                [
-                    "# HELP studyhub_ai_agent_feedback_total StudyHub Agent explicit feedback events by hook, status, and bounded memory context.",
-                    "# TYPE studyhub_ai_agent_feedback_total counter",
-                ]
-            )
-            for (hook, status, personal_memory, selected_materials), count in sorted(self._ai_agent_feedback_total.items()):
-                labels = 'hook="%s",status="%s",personal_memory="%s",selected_materials="%s"' % (
-                    _sanitize_label(hook),
-                    _sanitize_label(status),
-                    _sanitize_label(personal_memory),
-                    _sanitize_label(selected_materials),
-                )
-                lines.append(f"studyhub_ai_agent_feedback_total{{{labels}}} {count}")
         lines.append("")
         return "\n".join(lines)
 

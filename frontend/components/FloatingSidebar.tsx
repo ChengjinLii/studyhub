@@ -4,25 +4,10 @@ import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { hasRole } from '../lib/auth';
 import { formatDateTime } from '../lib/format';
-import { materialPath } from '../lib/slug';
-import { fetchStudyHubAgentMaterial, requestStudyHubAgentRecommendations } from '../lib/studyHubAgentApi';
 import { RoleMask } from '../types/user';
-import { MaterialListItem } from '../types/material';
-import SafeMarkdown from './SafeMarkdown';
 import { useSession } from './SessionProvider';
 
 type EyeOffset = { x: number; y: number };
-type AiRecommendation = {
-  material_id: number;
-  title?: string;
-  tags?: string[];
-  reason?: string;
-  explain?: string;
-  match_reason?: string;
-  note?: string;
-  summary?: string;
-  citations?: string[];
-};
 
 const POS_STORAGE_KEY = 'floating-sidebar-pos';
 const HAT_STORAGE_KEY = 'studyhub-bot-hat';
@@ -69,15 +54,6 @@ export default function FloatingSidebar() {
   const [bubbleMood, setBubbleMood] = useState<'neutral' | 'happy' | 'wink'>('neutral');
   const [eyeOffset, setEyeOffset] = useState<EyeOffset>({ x: 0, y: 0 });
   const eyeTrackingEnabled = true; // 眼睛跟随默认开启（无开关）
-  const [chatQuery, setChatQuery] = useState('');
-  const [chatLoading, setChatLoading] = useState(false);
-  const [chatStage, setChatStage] = useState('');
-  const [chatError, setChatError] = useState<string | null>(null);
-  const [aiAnswer, setAiAnswer] = useState('');
-  const [aiContextQuery, setAiContextQuery] = useState('');
-  const [aiRecommendations, setAiRecommendations] = useState<AiRecommendation[]>([]);
-  const [aiFollowups, setAiFollowups] = useState<string[]>([]);
-  const [aiDetails, setAiDetails] = useState<Record<number, MaterialListItem>>({});
 
   const getMobileRestingPosition = useCallback(() => {
     if (typeof window === 'undefined') return null;
@@ -317,13 +293,6 @@ export default function FloatingSidebar() {
       .filter((role) => role.label && hasRole(user.roleMask, role.mask))
       .map((role) => role.label);
   }, [user]);
-  const canShowAiRecommendations = useMemo(() => {
-    if (!user) return false;
-    return [RoleMask.CONTRIBUTOR, RoleMask.REVIEWER, RoleMask.ADMIN, RoleMask.DEVELOPER].some((role) =>
-      hasRole(user.roleMask, role)
-    );
-  }, [user]);
-
   useEffect(() => {
     const handleOpen = (event: Event) => {
       const custom = event as CustomEvent<string>;
@@ -333,95 +302,6 @@ export default function FloatingSidebar() {
     window.addEventListener('floating-sidebar:toggle', handleOpen as EventListener);
     return () => window.removeEventListener('floating-sidebar:toggle', handleOpen as EventListener);
   }, [refreshSession]);
-
-  const extractAiJson = (raw: string) => {
-    if (!raw) return '';
-    const start = raw.indexOf('<json>');
-    const end = raw.indexOf('</json>');
-    if (start >= 0 && end > start) {
-      return raw.slice(start + 6, end).trim();
-    }
-    return raw.trim();
-  };
-
-  const normalizeRecommendations = (value: unknown) => {
-    if (!Array.isArray(value)) return [] as AiRecommendation[];
-    return value
-      .map((item) => {
-        if (!item || typeof item !== 'object') return null;
-        const rec = item as Record<string, unknown>;
-        const idRaw = rec.material_id ?? rec.materialId ?? rec.id;
-        const id = Number(idRaw);
-        if (!Number.isFinite(id)) return null;
-        return {
-          material_id: id,
-          title: typeof rec.title === 'string' ? rec.title : undefined,
-          tags: Array.isArray(rec.tags) ? (rec.tags as string[]) : undefined,
-          reason: typeof rec.reason === 'string' ? rec.reason : undefined,
-          explain: typeof rec.explain === 'string' ? rec.explain : undefined,
-          match_reason: typeof rec.match_reason === 'string' ? rec.match_reason : undefined,
-          note: typeof rec.note === 'string' ? rec.note : undefined,
-          summary: typeof rec.summary === 'string' ? rec.summary : undefined,
-          citations: Array.isArray(rec.citations) ? (rec.citations as string[]) : undefined,
-        } as AiRecommendation;
-      })
-      .filter((item): item is AiRecommendation => Boolean(item));
-  };
-
-  const loadMaterialDetail = useCallback(async (materialId: number) => {
-    if (aiDetails[materialId]) return;
-    try {
-      const detail = await fetchStudyHubAgentMaterial(materialId);
-      setAiDetails((prev) => ({ ...prev, [materialId]: detail }));
-    } catch {
-      // ignore detail fetch errors
-    }
-  }, [aiDetails]);
-
-  const handleAiSubmit = useCallback(
-    async (event: React.FormEvent<HTMLFormElement>) => {
-      event.preventDefault();
-      if (!chatQuery.trim() || chatLoading) return;
-      if (!user) {
-        setChatError('登录后可使用资料推荐');
-        return;
-      }
-      const currentQuery = chatQuery.trim();
-      setChatLoading(true);
-      setChatStage('理解问题中');
-      setChatError(null);
-      try {
-        const data = await requestStudyHubAgentRecommendations(currentQuery, aiContextQuery);
-        const output = data.output;
-        if (!output || typeof output !== 'string') {
-          setChatError('AI 响应为空，请稍后再试');
-          setChatLoading(false);
-          return;
-        }
-        const parsed = JSON.parse(extractAiJson(output));
-        const recs = normalizeRecommendations(parsed?.recommendations);
-        const answer = typeof parsed?.answer === 'string' ? parsed.answer.trim() : '';
-        const followups = normalizeAiFollowups(parsed?.followup_questions, currentQuery);
-        setAiAnswer(answer);
-        setAiRecommendations(recs);
-        setAiFollowups(followups);
-        setAiContextQuery(buildSidebarAiContext(currentQuery, answer, recs));
-        await Promise.all(recs.map((rec) => loadMaterialDetail(rec.material_id)));
-        if (recs.length === 0 && !answer) {
-          setChatError('没有匹配到合适的资料，可以换个关键词试试');
-        }
-      } catch (err) {
-        setChatError(err instanceof Error ? err.message : '推荐失败，请稍后重试');
-      } finally {
-        setChatLoading(false);
-        setChatStage('');
-      }
-    },
-    [chatQuery, chatLoading, user, loadMaterialDetail, aiContextQuery]
-  );
-
-  const pickRecommendationReason = (rec: AiRecommendation) =>
-    rec.reason || rec.explain || rec.match_reason || rec.note || rec.summary || '';
 
   const handlePointerMoveDrag = useCallback(
     (event: PointerEvent) => {
@@ -674,89 +554,6 @@ export default function FloatingSidebar() {
                   </>
                 )}
               </div>
-              {canShowAiRecommendations && (
-                <div className="sidebar-section sidebar-chat">
-                  <h4 className="sidebar-section-title">AI 资料推荐</h4>
-                  <p className="sidebar-muted">输入关键词，AI 只会推荐资料库内的内容。</p>
-                  {chatError && <p className="sidebar-chat__error">{chatError}</p>}
-                  {chatLoading && (
-                    <div className="sidebar-chat__loading" role="status" aria-live="polite">
-                      <span className="sidebar-chat__loading-dot" aria-hidden="true" />
-                      <span>{chatStage || '处理中'}</span>
-                    </div>
-                  )}
-                  {aiAnswer && (
-                    <div className="sidebar-ai-answer">
-                      <SafeMarkdown>{aiAnswer}</SafeMarkdown>
-                    </div>
-                  )}
-                  {aiRecommendations.length > 0 && (
-                    <ul className="sidebar-ai-list">
-                      {aiRecommendations.map((rec) => {
-                        const detail = aiDetails[rec.material_id];
-                        const title = detail?.title || rec.title || `资料 #${rec.material_id}`;
-                        const reason = pickRecommendationReason(rec);
-                        const link = materialPath(rec.material_id, detail?.title || rec.title);
-                        const tags = detail?.tags || rec.tags || [];
-                        return (
-                          <li key={rec.material_id} className="sidebar-ai-card">
-                            <div className="sidebar-ai-title">
-                              <Link href={link}>{title}</Link>
-                            </div>
-                            <div className="sidebar-ai-meta">
-                              <span>{detail?.school || 'StudyHub'}</span>
-                              {detail?.gradeValue && <span>· {detail.gradeValue}</span>}
-                              {detail && (
-                                <span className="sidebar-ai-price">
-                                  {detail.free ? '免费' : `¥${detail.price?.toFixed(2)}`}
-                                </span>
-                              )}
-                            </div>
-                            {tags.length > 0 && (
-                              <div className="sidebar-ai-tags">
-                                {tags.slice(0, 4).map((tag) => (
-                                  <span key={tag} className="sidebar-ai-pill">{tag}</span>
-                                ))}
-                              </div>
-                            )}
-                            {reason && <p className="sidebar-ai-reason">{reason}</p>}
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  )}
-                  {aiFollowups.length > 0 && (
-                    <div className="sidebar-ai-followups">
-                      <span>可以补充：</span>
-                      {aiFollowups.map((item, index) => (
-                        <button
-                          key={`${item}-${index}`}
-                          type="button"
-                          className="sidebar-ai-followup"
-                          onClick={() => {
-                            setChatQuery(item);
-                            setChatError(null);
-                          }}
-                        >
-                          {item}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                  <form className="sidebar-chat__form" onSubmit={handleAiSubmit}>
-                    <input
-                      className="sidebar-chat__input"
-                      value={chatQuery}
-                      onChange={(event) => setChatQuery(event.target.value)}
-                      placeholder="例如：信号与系统 期末 真题"
-                      disabled={chatLoading}
-                    />
-                    <button type="submit" className="button primary small" disabled={chatLoading || !chatQuery.trim()}>
-                      {chatLoading ? '推荐中' : '推荐'}
-                    </button>
-                  </form>
-                </div>
-              )}
             </div>
           </div>
         )}
@@ -781,46 +578,4 @@ function maskLabel(mask: RoleMask): string | null {
     default:
       return null;
   }
-}
-
-function normalizeAiFollowups(value: unknown, currentQuery: string) {
-  if (!Array.isArray(value)) return [];
-  const currentKey = followupKey(currentQuery);
-  const seen = new Set<string>();
-  return value
-    .map((item) => (typeof item === 'string' ? item.trim().replace(/\s+/g, ' ') : ''))
-    .filter((item): item is string => {
-      if (!item) return false;
-      const key = followupKey(item);
-      if (!key || key === currentKey || seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    })
-    .slice(0, 3);
-}
-
-function buildSidebarAiContext(query: string, answer: string, recommendations: AiRecommendation[]) {
-  const titles = recommendations
-    .map((item) => item.title)
-    .filter((title): title is string => Boolean(title && title.trim()))
-    .slice(0, 4);
-  return [
-    `用户：${redactSidebarContext(query).slice(0, 220)}`,
-    answer ? `助手：${redactSidebarContext(answer).slice(0, 420)}` : '',
-    titles.length > 0 ? `推荐资料：${titles.map(redactSidebarContext).join('；')}` : '',
-  ]
-    .filter(Boolean)
-    .join(' ')
-    .slice(-1000);
-}
-
-function followupKey(value: string) {
-  return value.replace(/[^\u4e00-\u9fa5A-Za-z0-9]+/g, '').toLowerCase();
-}
-
-function redactSidebarContext(value: string) {
-  return value
-    .replace(/https?:\/\/[^\s,;，；。]+|www\.[^\s,;，；。]+/gi, '[redacted-url]')
-    .replace(/[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}/g, '[redacted-email]')
-    .replace(/(^|[^\d])(1[3-9]\d{9})(?!\d)/g, '$1[redacted-phone]');
 }

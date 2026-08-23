@@ -5,7 +5,6 @@ from fastapi.testclient import TestClient
 
 from app.api.routes import (
     admin,
-    ai,
     auth,
     comments,
     community,
@@ -24,7 +23,6 @@ from app.api.routes import (
 
 ROUTE_MODULES = (
     admin,
-    ai,
     auth,
     comments,
     community,
@@ -100,11 +98,6 @@ def test_restful_alias_routes_are_registered() -> None:
         ("PUT", "/api/comments/{id}/like"),
         ("POST", "/api/comments/{id}/reports"),
         ("PUT", "/api/users/{id}/follow"),
-        ("POST", "/api/ai-chats"),
-        ("POST", "/api/ai-recommendations"),
-        ("POST", "/api/ai/feedback"),
-        ("GET", "/api/ai/memory"),
-        ("PUT", "/api/ai/memory-preferences"),
         ("GET", "/api/free-download"),
     }
     registered = _registered_routes()

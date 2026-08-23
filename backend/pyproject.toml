@@ -23,8 +23,6 @@ dependencies = [
   "pypdf>=5.1,<7.0",
   "httpx>=0.28,<0.29",
   "mcp>=1.27,<2.0",
-  "langgraph==1.2.9",
-  "langgraph-checkpoint-sqlite==3.1.0",
   "python-multipart>=0.0.20,<0.1",
   "cryptography>=44.0,<45.0",
   "redis>=5.2,<6.0",
@@ -47,7 +45,7 @@ include = ["app*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-pythonpath = [".", "..", "../studyhub-agent"]
+pythonpath = [".", ".."]
 addopts = "-q"
 markers = [
   "private_sft_corpus: requires the ignored frozen public-material corpus used for SFT reproducibility checks",

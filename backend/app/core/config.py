@@ -99,113 +99,6 @@ class Settings(BaseSettings):
     mcp_client_rate_limit: int = 60
     mcp_client_quota: int = 1000
     mcp_client_quota_window_seconds: int = 86400
-    ai_agent_provider: str = "local"
-    ai_agent_base_url: str | None = None
-    ai_agent_api_key: str | None = None
-    ai_agent_model: str | None = None
-    ai_agent_thinking_enabled: bool = False
-    ai_agent_reasoning_effort: str = "none"
-    ai_agent_timeout_seconds: float = 20.0
-    ai_agent_max_output_tokens: int = 1800
-    ai_agent_stream_max_concurrency: int = 4
-    ai_agent_stream_buffer_size: int = 16
-    ai_agent_stream_heartbeat_seconds: float = 10.0
-    ai_agent_dynamic_tools_enabled: bool = False
-    ai_agent_runtime_constraints_enabled: bool = False
-    ai_agent_tool_max_rounds: int = 4
-    ai_agent_tool_max_calls: int = 8
-    ai_agent_tool_max_search_calls: int = 3
-    ai_agent_tool_max_candidates: int = 18
-    ai_agent_tool_max_evidence_pages: int = 12
-    ai_agent_orchestrator_provider: str | None = None
-    ai_agent_orchestrator_base_url: str | None = None
-    ai_agent_orchestrator_api_key: str | None = None
-    ai_agent_orchestrator_model: str = "deepseek-v4-flash"
-    ai_agent_orchestrator_timeout_seconds: float = 8.0
-    ai_agent_orchestrator_max_output_tokens: int = 1600
-    ai_agent_validator_provider: str | None = None
-    ai_agent_validator_base_url: str | None = None
-    ai_agent_validator_api_key: str | None = None
-    ai_agent_validator_model: str = "v4-flash"
-    ai_agent_validator_timeout_seconds: float = 8.0
-    ai_agent_max_context_materials: int = 6
-    ai_agent_pdf_evidence_enabled: bool = True
-    ai_agent_pdf_evidence_max_materials: int = 2
-    ai_agent_pdf_evidence_max_pages: int = 6
-    ai_agent_pdf_extract_max_pages: int = 80
-    ai_agent_pdf_evidence_max_bytes: int = 4 * 1024 * 1024
-    ai_agent_pdf_extract_cache_enabled: bool = True
-    ai_agent_pdf_extract_cache_max_entries: int = 64
-    ai_agent_memory_context_enabled: bool = True
-    ai_agent_memory_max_materials: int = 8
-    ai_agent_memory_max_interaction_checks: int = 6
-    ai_agent_memory_cookie_name: str = "studyhub_ai_memory"
-    ai_agent_session_memory_enabled: bool = True
-    ai_agent_session_memory_ttl_seconds: int = 604800
-    ai_agent_session_memory_max_turns: int = 12
-    ai_agent_session_memory_max_context_chars: int = 6000
-    ai_agent_session_memory_max_sessions: int = 1024
-    agentic_platform_enabled: bool = False
-    agentic_admin_only: bool = True
-    agentic_runtime: str = "legacy"
-    agentic_checkpointer: str = "sqlite"
-    agentic_transition_export_enabled: bool = True
-    # Proactive work is a separately activated Shadow Mode.  It never turns on
-    # merely because the admin control plane is available.
-    agentic_proactive_enabled: bool = False
-    agentic_shadow_admin_actor_id: int | None = None
-    agentic_worker_lock_name: str = "studyhub:agentic"
-    agentic_worker_lock_timeout_seconds: int = 10
-    agentic_worker_batch_size: int = 8
-    agentic_worker_claim_ttl_seconds: int = 300
-    agentic_worker_retry_delay_seconds: int = 60
-    agentic_worker_max_attempts: int = 3
-    # The generic execution plane is independently opt-in.  Keeping it
-    # separate from proactive Shadow Mode prevents an admin control-plane
-    # deploy from accidentally starting model-backed work.
-    agentic_execution_enabled: bool = False
-    agentic_execution_batch_size: int = 4
-    agentic_execution_claim_ttl_seconds: int = 900
-    agentic_execution_max_attempts: int = 3
-    # Execution data is intentionally a separate opt-in from the admin API.
-    # Once enabled, it requires the durable SQL/artifact/segment path below.
-    agentic_durable_storage_enabled: bool = False
-    agentic_artifact_storage_provider: str = "local_fs"
-    agentic_artifact_root_dir: str | None = None
-    # A distinct provider namespace keeps the legacy AiService path isolated.
-    agentic_model_provider: str = "disabled"
-    agentic_model_base_url: str | None = None
-    agentic_model_api_key: str | None = None
-    agentic_model_id: str | None = None
-    agentic_model_revision: str | None = None
-    # A stable index/build identifier is required for executable runs so every
-    # trajectory can be traced back to the retrieval corpus and implementation.
-    agentic_retriever_version: str | None = None
-    agentic_model_timeout_seconds: float = 30.0
-    agentic_model_max_retries: int = 2
-    agentic_model_token_trace_source: str = "teacher_api"
-    deep_research_enabled: bool = False
-    deep_research_web_enabled: bool = False
-    deep_research_scholar_enabled: bool = False
-    deep_research_python_enabled: bool = False
-    # External research remains a separate, administrator-only capability.
-    # mediawiki is useful for keyless smoke tests; use searxng or serpapi for
-    # general Web coverage.
-    deep_research_web_provider: str = "disabled"
-    deep_research_web_search_url: str | None = None
-    deep_research_web_api_key: str | None = None
-    deep_research_web_search_engine: str = "google"
-    deep_research_web_timeout_seconds: float = 12.0
-    deep_research_web_max_response_bytes: int = 512 * 1024
-    deep_research_web_max_redirects: int = 2
-    deep_research_web_allowed_domains: str | None = None
-    deep_research_web_blocked_domains: str | None = None
-    deep_research_web_proxy_url: str | None = None
-    agentic_max_turns: int = 8
-    agentic_max_skill_calls: int = 12
-    deep_research_max_search_turns: int = 4
-    deep_research_max_page_reads: int = 10
-    agentic_max_context_tokens: int = 16000
     public_site_base_url: str = "https://study-hub.cn"
     security_headers_enabled: bool = True
     security_hsts_enabled: bool | None = None
@@ -226,7 +119,6 @@ class Settings(BaseSettings):
     rate_limit_email_verification: int = 10
     rate_limit_upload: int = 20
     rate_limit_view: int = 300
-    rate_limit_ai: int = 12
     rate_limit_mcp: int = 120
     rate_limit_comment_create_user_minute: int = 6
     rate_limit_comment_create_user_hour: int = 30
@@ -535,25 +427,6 @@ class Settings(BaseSettings):
             return Path(self.mail_outbox_dir)
         runtime_root = self.local_dev_root if self.is_local_dev else self.private_dir
         return runtime_root / "outbox" / "mail"
-
-    @property
-    def resolved_agentic_artifact_root_dir(self) -> Path:
-        if self.agentic_artifact_root_dir:
-            return Path(self.agentic_artifact_root_dir)
-        runtime_root = self.local_dev_root if self.is_local_dev else self.private_dir
-        return runtime_root / "artifacts" / "agentic_platform"
-
-    @property
-    def resolved_agentic_transition_root_dir(self) -> Path:
-        return self.resolved_agentic_artifact_root_dir / "trajectories"
-
-    @property
-    def resolved_agentic_blob_root_dir(self) -> Path:
-        return self.resolved_agentic_artifact_root_dir / "blobs"
-
-    @property
-    def resolved_agentic_checkpoint_path(self) -> Path:
-        return self.resolved_agentic_artifact_root_dir / "checkpoints" / "agentic-langgraph.sqlite3"
 
     @property
     def resolved_cors_allowed_origins(self) -> list[str]:

@@ -63,15 +63,6 @@ def test_http_metrics_include_duration_histogram_buckets() -> None:
         route="/api/materials/{id}",
         status_code=500,
     )
-    metrics.record_ai_agent_run(
-        provider="openai-compatible",
-        status="model_success",
-        pdf_evidence=True,
-        memory_context=False,
-        course_memory_card=True,
-        duration_seconds=2.2,
-    )
-
     rendered = metrics.render_prometheus(
         SimpleNamespace(app_name="test", environment="test", resolved_build_git_sha="test")
     )
@@ -88,10 +79,6 @@ def test_http_metrics_include_duration_histogram_buckets() -> None:
     assert (
         f'studyhub_errors_total{{fingerprint="{fingerprint}",kind="sqlalchemy.exc.operationalerror",'
         'route="/api/materials/{id}",status_code="500"} 1'
-    ) in rendered
-    assert (
-        'studyhub_ai_agent_run_duration_seconds_bucket{provider="openai-compatible",status="model_success",'
-        'pdf_evidence="yes",memory_context="no",course_memory_card="yes",le="2.5"} 1'
     ) in rendered
     metrics.clear()
 

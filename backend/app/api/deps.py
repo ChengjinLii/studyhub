@@ -5,21 +5,8 @@ from functools import lru_cache
 from fastapi import Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
-from app.agentic_platform.application import AdminAgentRunService
-from app.agentic_platform.application.runtime_events import RuntimeEventStore
-from app.agentic_platform.execution import (
-    AgentExecutionWorker,
-    AgentRuntimeFactory,
-    DurableRuntimeDependencies,
-    build_durable_agent_runtime_factory,
-)
-from app.agentic_platform.proactive.dispatcher import ProactiveDispatcher
-from app.agentic_platform.proactive.jobs import ProactiveAgentWorker
-from app.agentic_platform.proactive.outbox import AgentOutboxRepository
-from app.agentic_platform.proactive.triggers import ProactiveTriggerService
-from app.agentic_platform.skills.registry import SkillRegistry, build_default_skill_registry
 from app.core.config import get_settings
-from app.core.db import get_db_session, get_session_factory
+from app.core.db import get_db_session
 from app.core.public_read_cache import PublicReadCache
 from app.core.security import AuthContext, JwtTokenCodec, resolve_token_from_request
 from app.integrations.material_asset_store import MaterialAssetStore
@@ -32,8 +19,6 @@ from app.providers.payment import AlipayPagePaymentProvider, LocalAlipayPaymentP
 from app.providers.storage import AliyunOssStorageProvider, LocalFileStorageProvider, StorageProvider
 from app.providers.transfer import AlipayTransferProvider, LocalTransferProvider, PayoutTransferProvider
 from app.repos.auth_repo import AuthRepository
-from app.repos.agentic_artifact_repo import AgentArtifactRepository
-from app.repos.agentic_run_repo import AgentRunRepository
 from app.repos.admin_repo import AdminRepository
 from app.repos.comment_repo import CommentRepository
 from app.repos.community_repo import CommunityRepository
@@ -47,12 +32,6 @@ from app.repos.system_repo import SystemRepository
 from app.repos.user_follow_repo import UserFollowRepository
 from app.services.account_service import AccountService
 from app.services.admin_user_service import AdminUserService
-from app.services.agent_course_memory_service import AgentCourseMemoryService
-from app.services.agent_conversation_memory_service import AgentConversationMemoryService
-from app.services.agent_feedback_service import AgentFeedbackService
-from app.services.agent_memory_service import AgentMemoryService
-from app.services.agent_query_planner_service import AgentQueryPlannerService
-from app.services.ai_service import AiService
 from app.services.auth_cookie_service import AuthCookieService
 from app.services.auth_service import AuthService
 from app.services.captcha_service import CaptchaService
@@ -62,7 +41,6 @@ from app.services.health_service import HealthService
 from app.services.leaderboard_read_service import LeaderboardReadService
 from app.services.materials_service import MaterialsService
 from app.services.materials_column_service import MaterialsColumnService
-from app.services.material_pdf_evidence_service import MaterialPdfEvidenceService
 from app.services.market_service import MarketService
 from app.services.payment_service import PaymentService
 from app.services.notification_service import NotificationService
@@ -114,90 +92,6 @@ def get_admin_repo() -> AdminRepository:
 @lru_cache(maxsize=1)
 def get_material_repo() -> MaterialRepository:
     return MaterialRepository()
-
-
-@lru_cache(maxsize=1)
-def get_agentic_skill_registry() -> SkillRegistry:
-    """Build the dormant registry without enabling or exposing the platform."""
-
-    return build_default_skill_registry()
-
-
-@lru_cache(maxsize=1)
-def get_admin_agent_run_service() -> AdminAgentRunService:
-    """The admin control plane is inert until the feature flags allow its routes."""
-
-    return AdminAgentRunService(get_settings())
-
-
-@lru_cache(maxsize=1)
-def get_proactive_trigger_service() -> ProactiveTriggerService:
-    return ProactiveTriggerService(get_settings())
-
-
-@lru_cache(maxsize=1)
-def get_proactive_agent_worker() -> ProactiveAgentWorker:
-    settings = get_settings()
-    outbox = AgentOutboxRepository()
-    runs = AgentRunRepository()
-    artifacts = AgentArtifactRepository()
-    events = RuntimeEventStore(artifacts)
-    triggers = ProactiveTriggerService(settings, outbox_repository=outbox)
-    dispatcher = ProactiveDispatcher(
-        settings,
-        run_repository=runs,
-        outbox_repository=outbox,
-        events=events,
-    )
-    return ProactiveAgentWorker(
-        settings,
-        triggers=triggers,
-        dispatcher=dispatcher,
-        outbox_repository=outbox,
-        run_repository=runs,
-        artifact_repository=artifacts,
-        material_repository=get_material_repo(),
-        pdf_evidence_service=MaterialPdfEvidenceService(settings, get_material_asset_store()),
-        events=events,
-    )
-
-
-@lru_cache(maxsize=1)
-def get_agent_runtime_factory() -> AgentRuntimeFactory:
-    """Bind the real model/runtime only after its independent opt-in is on."""
-
-    settings = get_settings()
-    if not settings.agentic_execution_enabled:
-        return AgentRuntimeFactory()
-    return build_durable_agent_runtime_factory(
-        settings,
-        dependencies=DurableRuntimeDependencies(
-            session_factory=get_session_factory(),
-            skill_registry=get_agentic_skill_registry(),
-            material_repository=get_material_repo(),
-            materials_service=get_materials_service(),
-            pdf_evidence_service=MaterialPdfEvidenceService(settings, get_material_asset_store()),
-            storage_provider=(
-                AliyunOssStorageProvider(settings)
-                if settings.agentic_artifact_storage_provider == "oss"
-                else get_storage_provider()
-            ),
-        ),
-    )
-
-
-@lru_cache(maxsize=1)
-def get_agent_execution_worker() -> AgentExecutionWorker:
-    settings = get_settings()
-    artifacts = AgentArtifactRepository()
-    return AgentExecutionWorker(
-        settings,
-        runtime_factory=get_agent_runtime_factory(),
-        lock_provider=get_lock_provider(),
-        run_repository=AgentRunRepository(),
-        artifact_repository=artifacts,
-        events=RuntimeEventStore(artifacts),
-    )
 
 
 @lru_cache(maxsize=1)
@@ -380,7 +274,6 @@ def get_materials_service() -> MaterialsService:
         get_auth_repo(),
         get_material_repo(),
         get_material_asset_store(),
-        get_proactive_trigger_service(),
     )
 
 
@@ -474,32 +367,12 @@ def get_worker_service() -> WorkerService:
         get_payout_service(),
         get_requests_service(),
         get_lock_provider(),
-        agentic_worker=get_proactive_agent_worker(),
-        agentic_execution_worker=get_agent_execution_worker(),
     )
 
 
 @lru_cache(maxsize=1)
 def get_admin_user_service() -> AdminUserService:
     return AdminUserService(get_read_api_repo(), get_admin_repo(), get_auth_repo(), get_auth_service())
-
-
-@lru_cache(maxsize=1)
-def get_ai_service() -> AiService:
-    return AiService(
-        get_read_api_repo(),
-        get_material_repo(),
-        MaterialPdfEvidenceService(get_settings(), get_material_asset_store()),
-        AgentMemoryService(get_settings(), get_auth_repo(), get_material_repo()),
-        AgentQueryPlannerService(),
-        AgentCourseMemoryService(),
-        conversation_memory_service=AgentConversationMemoryService(get_settings()),
-    )
-
-
-@lru_cache(maxsize=1)
-def get_agent_feedback_service() -> AgentFeedbackService:
-    return AgentFeedbackService(get_material_repo())
 
 
 @lru_cache(maxsize=1)
@@ -570,39 +443,6 @@ def require_privileged_auth_context(auth: AuthContext = Depends(require_auth_con
     return auth
 
 
-def require_admin_agent_context(auth: AuthContext = Depends(require_auth_context)) -> AuthContext:
-    """Strict boundary for the new agentic platform; developers are not administrators here."""
-
-    if not has_role(auth.role_mask, ROLE_ADMIN):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Agentic research platform is admin-only",
-        )
-    return auth
-
-
-def require_enabled_admin_agent_context(
-    auth: AuthContext = Depends(require_admin_agent_context),
-) -> AuthContext:
-    if not get_settings().agentic_platform_enabled:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Agentic research platform is disabled",
-        )
-    return auth
-
-
-def require_enabled_deep_research_admin_context(
-    auth: AuthContext = Depends(require_enabled_admin_agent_context),
-) -> AuthContext:
-    if not get_settings().deep_research_enabled:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Deep research is disabled",
-        )
-    return auth
-
-
 def clear_dependency_caches() -> None:
     from app.core.comment_abuse import clear_comment_abuse_state
 
@@ -614,12 +454,6 @@ def clear_dependency_caches() -> None:
     get_auth_repo.cache_clear()
     get_admin_repo.cache_clear()
     get_material_repo.cache_clear()
-    get_agentic_skill_registry.cache_clear()
-    get_admin_agent_run_service.cache_clear()
-    get_proactive_trigger_service.cache_clear()
-    get_proactive_agent_worker.cache_clear()
-    get_agent_runtime_factory.cache_clear()
-    get_agent_execution_worker.cache_clear()
     get_comment_repo.cache_clear()
     get_market_repo.cache_clear()
     get_community_repo.cache_clear()
@@ -657,8 +491,6 @@ def clear_dependency_caches() -> None:
     get_payout_service.cache_clear()
     get_worker_service.cache_clear()
     get_admin_user_service.cache_clear()
-    get_ai_service.cache_clear()
-    get_agent_feedback_service.cache_clear()
     get_auth_service.cache_clear()
     get_user_follow_service.cache_clear()
     get_account_service.cache_clear()

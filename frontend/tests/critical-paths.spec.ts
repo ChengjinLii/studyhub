@@ -1,4 +1,4 @@
-import { expect, test, type APIRequestContext, type Locator, type Page } from '@playwright/test';
+import { expect, test, type APIRequestContext, type Page } from '@playwright/test';
 
 const apiPath = (path: string) => (path.startsWith('/') ? path : `/${path}`);
 const browserBaseUrl = process.env.SMOKE_BASE_URL || 'http://127.0.0.1:3100';
@@ -40,32 +40,6 @@ const closeEntryModalIfPresent = async (page: Page) => {
   if (await closeButton.isVisible().catch(() => false)) {
     await closeButton.click({ force: true });
   }
-};
-
-const dragLauncher = async (page: Page, launcher: Locator, deltaX: number, deltaY: number) => {
-  const initialBox = await launcher.boundingBox();
-  if (!initialBox) {
-    throw new Error('StudyHub Agent launcher should have a bounding box before dragging');
-  }
-  const startX = initialBox.x + initialBox.width / 2;
-  const startY = initialBox.y + initialBox.height / 2;
-
-  await page.mouse.move(startX, startY);
-  await page.mouse.down({ button: 'left' });
-  await page.mouse.move(startX + deltaX * 0.35, startY + deltaY * 0.35, { steps: 4 });
-  await page.mouse.move(startX + deltaX, startY + deltaY, { steps: 8 });
-  await page.mouse.up({ button: 'left' });
-  await page.waitForTimeout(120);
-
-  const movedBox = await launcher.boundingBox();
-  if (!movedBox) {
-    throw new Error('StudyHub Agent launcher should have a bounding box after dragging');
-  }
-  return {
-    initialBox,
-    movedBox,
-    distance: Math.hypot(movedBox.x - initialBox.x, movedBox.y - initialBox.y),
-  };
 };
 
 test('mock API mode covers login and upload failure envelopes', async ({ page }) => {
@@ -167,113 +141,6 @@ test('mock API mode covers payment status fallback envelope', async ({ page }) =
   expect(result).toEqual({ fallbackUsed: true, paid: true, requestId: 401 });
 });
 
-test('mock page mode covers StudyHub Agent open, fallback, drag and collapse', async ({ page }) => {
-  await setMockSessionCookie(page, {
-    id: 3,
-    username: 'mock-admin',
-    nickname: 'Mock Admin',
-    roleMask: 8,
-  });
-  await page.route('**/api/session', async (route) => {
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({
-        ok: true,
-        data: { user: { id: 3, username: 'mock-admin', nickname: 'Mock Admin', roleMask: 8 } },
-      }),
-    });
-  });
-  await page.route('**/api/ai-recommendations', async (route) => {
-    await new Promise((resolve) => setTimeout(resolve, 300));
-    await route.fulfill({
-      status: 503,
-      contentType: 'application/json',
-      body: JSON.stringify({ ok: false, msg: '推荐失败，请稍后重试' }),
-    });
-  });
-  await page.route('**/api/**', async (route) => {
-    const url = route.request().url();
-    if (url.includes('/api/session') || url.includes('/api/ai-recommendations')) {
-      await route.fallback();
-      return;
-    }
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({ ok: true, data: {} }),
-    });
-  });
-
-  await page.goto('/more');
-  await closeEntryModalIfPresent(page);
-  const launcher = page.locator('.hermes-agent__launcher');
-  await expect(launcher).toBeVisible();
-
-  let dragResult = await dragLauncher(page, launcher, -120, -70);
-  if (dragResult.distance <= 20) {
-    dragResult = await dragLauncher(page, launcher, -140, -80);
-  }
-  expect(dragResult.distance).toBeGreaterThan(20);
-  const movedBox = dragResult.movedBox;
-
-  await launcher.click();
-  await expect(page.getByRole('heading', { name: 'StudyHub 学习辅导' })).toBeVisible();
-  await page.getByPlaceholder('描述你要学什么、多久考试、哪里卡住').fill('ESD 怎么复习');
-  await page.getByRole('button', { name: '发送' }).click();
-  const thinking = page.locator('.hermes-agent__message--thinking');
-  await expect(thinking).toBeVisible();
-  await expect(thinking).toContainText('StudyHub 正在处理');
-  await expect(thinking.locator('.hermes-agent__thinking-steps span')).toHaveCount(1);
-  await expect(page.getByText('推荐失败，请稍后重试')).toBeVisible();
-
-  await page.getByLabel('收起 StudyHub 学习辅导').click({ force: true });
-  await expect(launcher).toBeVisible();
-  const collapsedBox = await launcher.boundingBox();
-  expect(collapsedBox).not.toBeNull();
-  const movedCenter = { x: movedBox.x + movedBox.width / 2, y: movedBox.y + movedBox.height / 2 };
-  const collapsedCenter = {
-    x: (collapsedBox?.x ?? 0) + (collapsedBox?.width ?? 0) / 2,
-    y: (collapsedBox?.y ?? 0) + (collapsedBox?.height ?? 0) / 2,
-  };
-  expect(Math.abs(collapsedCenter.x - movedCenter.x)).toBeLessThan(4);
-  expect(Math.abs(collapsedCenter.y - movedCenter.y)).toBeLessThan(4);
-});
-
-test('mock page mode hides StudyHub Agent from non-admin users', async ({ page }) => {
-  await setMockSessionCookie(page, {
-    id: 1,
-    username: 'mock-user',
-    nickname: 'Mock User',
-    roleMask: 1,
-  });
-  await page.route('**/api/session', async (route) => {
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({
-        ok: true,
-        data: { user: { id: 1, username: 'mock-user', nickname: 'Mock User', roleMask: 1 } },
-      }),
-    });
-  });
-  await page.route('**/api/**', async (route) => {
-    if (route.request().url().includes('/api/session')) {
-      await route.fallback();
-      return;
-    }
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({ ok: true, data: {} }),
-    });
-  });
-
-  await page.goto('/more');
-  await closeEntryModalIfPresent(page);
-  await expect(page.getByRole('heading', { name: '其他功能' })).toBeVisible();
-  await expect(page.locator('.hermes-agent__launcher')).toHaveCount(0, { timeout: 3000 });
-});
 
 test('mobile StudyHub Bot stays fully above the bottom navigation', async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 780 });

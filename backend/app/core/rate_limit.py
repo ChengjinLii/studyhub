@@ -163,15 +163,6 @@ def _rule_for_request(settings: Settings, request: Request) -> RateLimitRule | N
         return RateLimitRule("upload", settings.rate_limit_upload)
     if method == "POST" and path.startswith("/api/materials/") and path.endswith(("/view", "/views")):
         return RateLimitRule("view", settings.rate_limit_view)
-    if method == "POST" and path in {
-        "/api/ai-chats",
-        "/api/ai/chat",
-        "/api/ai-recommendations",
-        "/api/ai/recommend",
-        "/api/ai-recommendations/stream",
-        "/api/ai/recommend/stream",
-    }:
-        return RateLimitRule("ai", settings.rate_limit_ai)
     return None
 
 

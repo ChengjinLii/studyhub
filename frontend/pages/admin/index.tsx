@@ -200,7 +200,6 @@ export default function AdminPage({
   const reportTotalItems = reportsMeta?.total || 0;
   const currentReportPage = Math.max(1, (reportsMeta?.page ?? 0) + 1);
   const isSuperAdmin = hasRole(user.roleMask, RoleMask.DEVELOPER);
-  const isAgenticAdmin = hasRole(user.roleMask, RoleMask.ADMIN);
   const roleLabel = isSuperAdmin ? '超级管理员' : '管理员';
   const totalEarnings = users.reduce((sum, item) => sum + Number(item.totalEarnings ?? 0), 0);
   const scaleToActual = (amountCents: number) =>
@@ -499,11 +498,6 @@ export default function AdminPage({
                 <span className="admin-meta-chip">角色：{roleLabel}</span>
                 <span className="admin-meta-chip">ID：{user.id}</span>
               </div>
-              {isAgenticAdmin && (
-                <Link className="button ghost small admin-agentic-platform-link" href="/admin/agentic-platform">
-                  进入 Agent 运行控制台
-                </Link>
-              )}
             </div>
           </div>
         </section>

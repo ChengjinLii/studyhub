@@ -21,12 +21,10 @@ describe('public UX regressions', () => {
   it('uses one shared session source for global interactive components', () => {
     const app = readSource('pages/_app.tsx');
     const bot = readSource('components/FloatingSidebar.tsx');
-    const agent = readSource('components/studyHubAgent/useStudyHubAgentChat.ts');
 
     expect(app).toContain('<AppProviders initialUser={initialSessionUser}>');
     expect(app).not.toContain('fetchOptionalSessionUser');
     expect(bot).not.toContain('fetchOptionalSessionUser');
-    expect(agent).not.toContain('fetchOptionalSessionUser');
   });
 
   it('keeps request creation wording consistent', () => {

@@ -313,7 +313,7 @@ class MaterialRepository:
         )
         return list(session.scalars(stmt))
 
-    def list_visible_materials_for_agent_memory(
+    def list_ranked_visible_materials(
         self,
         session: Session,
         *,
@@ -372,7 +372,7 @@ class MaterialRepository:
             )
         if not search_filters and not constraint_filters:
             if limit is not None:
-                return self.list_visible_materials_for_agent_memory(session, limit=limit)
+                return self.list_ranked_visible_materials(session, limit=limit)
             return self.list_visible_materials(session)
         where_filters = [
             MaterialRecord.deleted_at.is_(None),

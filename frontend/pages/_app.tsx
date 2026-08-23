@@ -4,18 +4,16 @@ import Head from 'next/head';
 import Link from 'next/link';
 import { ReactNode, useEffect, useState } from 'react';
 import { fetchBackend } from '../lib/apiBase';
-import { hasRole } from '../lib/auth';
 import '../styles/globals.css';
 import AppImage from '../components/AppImage';
 import { AppDialogProvider } from '../components/AppDialogProvider';
 import { AppToastProvider } from '../components/AppToastProvider';
-import { SessionProvider, useSession } from '../components/SessionProvider';
+import { SessionProvider } from '../components/SessionProvider';
 import BottomTabBar from '../components/mobile/BottomTabBar';
 import { MobileBottomBarProvider } from '../components/mobile/MobileBottomBarProvider';
-import { RoleMask, SessionUser } from '../types/user';
+import { SessionUser } from '../types/user';
 
 const FloatingSidebar = dynamic(() => import('../components/FloatingSidebar'), { ssr: false });
-const HermesAgentWidget = dynamic(() => import('../components/HermesAgentWidget'), { ssr: false });
 
 const PUBLIC_API_ORIGIN = process.env.NEXT_PUBLIC_API_ORIGIN || '';
 const scheduleAfterFirstPaint = (task: () => void) => {
@@ -56,18 +54,8 @@ interface RuntimeInfo {
 type EntryModalVariant = 'stable' | 'welcome' | null;
 
 function GlobalInteractiveChrome({ ready }: { ready: boolean }) {
-  const { user } = useSession();
   if (!ready) return null;
-  const canShowAiAgent =
-    user !== null &&
-    (hasRole(user.roleMask, RoleMask.ADMIN) || hasRole(user.roleMask, RoleMask.DEVELOPER));
-
-  return (
-    <>
-      <FloatingSidebar />
-      {canShowAiAgent && <HermesAgentWidget />}
-    </>
-  );
+  return <FloatingSidebar />;
 }
 
 function AppProviders({

@@ -1,8 +1,0 @@
-{
-  "content-type": {
-    "contains": "application/json"
-  },
-  "set-cookie": {
-    "count": 0
-  }
-}

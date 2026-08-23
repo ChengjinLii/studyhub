@@ -170,54 +170,8 @@ cp .env.example .env
 - payout transfer：`local_transfer` / `alipay_transfer`
 - kyc：`mock_local` / `aliyun_cloud_auth`
 - lock：`db_row` / `redis`
-- ai agent：`local` / `openai-compatible` / `sub2api`
 
 真实密钥、证书、Redis URL、OSS 凭据、支付宝证书路径、KYC 凭据都必须只放在 `private/`。
-
-AI 学习辅导默认可以保持 `local` 兼容回复；如果要接本机 sub2api，生产私有配置示例：
-
-```env
-STUDYHUB_AI_AGENT_PROVIDER=sub2api
-STUDYHUB_AI_AGENT_BASE_URL=http://127.0.0.1:8787/v1
-STUDYHUB_AI_AGENT_API_KEY=CHANGE_ME
-STUDYHUB_AI_AGENT_MODEL=gpt-5.4-mini
-STUDYHUB_AI_AGENT_THINKING_ENABLED=false
-STUDYHUB_AI_AGENT_REASONING_EFFORT=none
-STUDYHUB_AI_AGENT_TIMEOUT_SECONDS=60
-STUDYHUB_AI_AGENT_MAX_OUTPUT_TOKENS=1800
-STUDYHUB_AI_AGENT_STREAM_MAX_CONCURRENCY=4
-STUDYHUB_AI_AGENT_STREAM_BUFFER_SIZE=16
-STUDYHUB_AI_AGENT_STREAM_HEARTBEAT_SECONDS=10
-STUDYHUB_AI_AGENT_DYNAMIC_TOOLS_ENABLED=true
-STUDYHUB_AI_AGENT_TOOL_MAX_ROUNDS=4
-STUDYHUB_AI_AGENT_TOOL_MAX_CALLS=8
-STUDYHUB_AI_AGENT_TOOL_MAX_CANDIDATES=18
-STUDYHUB_AI_AGENT_TOOL_MAX_EVIDENCE_PAGES=12
-STUDYHUB_AI_AGENT_ORCHESTRATOR_PROVIDER=custom
-STUDYHUB_AI_AGENT_ORCHESTRATOR_BASE_URL=https://api.deepseek.com
-STUDYHUB_AI_AGENT_ORCHESTRATOR_API_KEY=CHANGE_ME
-STUDYHUB_AI_AGENT_ORCHESTRATOR_MODEL=deepseek-v4-flash
-STUDYHUB_AI_AGENT_ORCHESTRATOR_TIMEOUT_SECONDS=12
-STUDYHUB_AI_AGENT_ORCHESTRATOR_MAX_OUTPUT_TOKENS=1600
-```
-
-学习辅导 Agent 支持双层记忆和 PDF 页级证据读取。会话记忆按 `user_id + session_id` 隔离，优先存入 Redis，Redis 不可用时使用带 TTL、轮数和会话数上限的进程内缓存；不会新增或修改业务数据库表。平台记忆只从可见资料和证据生成匿名聚合信号，不混入用户对话。生产环境可按服务器余量调整：
-
-```env
-STUDYHUB_AI_AGENT_MEMORY_CONTEXT_ENABLED=true
-STUDYHUB_AI_AGENT_MEMORY_MAX_MATERIALS=8
-STUDYHUB_AI_AGENT_MEMORY_MAX_INTERACTION_CHECKS=6
-STUDYHUB_AI_AGENT_SESSION_MEMORY_ENABLED=true
-STUDYHUB_AI_AGENT_SESSION_MEMORY_TTL_SECONDS=604800
-STUDYHUB_AI_AGENT_SESSION_MEMORY_MAX_TURNS=12
-STUDYHUB_AI_AGENT_PDF_EVIDENCE_ENABLED=true
-STUDYHUB_AI_AGENT_PDF_EVIDENCE_MAX_MATERIALS=2
-STUDYHUB_AI_AGENT_PDF_EVIDENCE_MAX_PAGES=6
-STUDYHUB_AI_AGENT_PDF_EXTRACT_MAX_PAGES=80
-STUDYHUB_AI_AGENT_PDF_EVIDENCE_MAX_BYTES=4194304
-STUDYHUB_AI_AGENT_PDF_EXTRACT_CACHE_ENABLED=true
-STUDYHUB_AI_AGENT_PDF_EXTRACT_CACHE_MAX_ENTRIES=64
-```
 
 评论写操作使用 Nginx 和 Redis 双层防滥用保护。发布评论同时受 IP、用户分钟额度和用户小时额度约束；编辑、删除、点赞及举报按用户和动作独立计数。相同用户在同一资料或回复下重复提交相同内容时，Redis 会保留短期去重键；Redis 不可用时使用有容量上限的进程内缓存，不写入业务数据库。相关生产参数：
 
@@ -233,15 +187,7 @@ STUDYHUB_COMMENTS_WRITE_ENABLED=true
 
 遇到集中攻击时，可临时设置 `STUDYHUB_COMMENTS_WRITE_ENABLED=false` 并重启后端，使评论区进入只读模式；评论列表仍可访问，且不会修改或删除已有评论数据。
 
-启用动态工具后，主模型直接在受控预算内自主选择 `search_materials`、`inspect_materials`、`read_pdf_evidence`、`read_memory` 和 `synthesize_course_context`，可以根据前一轮工具结果继续换检索词、扩大召回、指定 PDF 页码或直接结束。任务标签和执行策略是开放文本，不再限制为固定意图与固定路由；轻量模型只负责最终语义审阅。原固定编排链路保留为模型或工具协议不可用时的兼容降级。
-
-`PDF_EVIDENCE_MAX_PAGES` 控制普通降级链路一次返回的证据页数，`PDF_EXTRACT_MAX_PAGES` 控制最多建立文本页块的文档范围；动态工具仍受 `TOOL_MAX_EVIDENCE_PAGES` 总预算和资料访问权限限制。二者分离后，Agent 可以请求第 20 页等后续页面，而不是只能查看文档最前面的若干页。
-
-外部模型输出仍经过结构化 Safety Harness：只允许推荐候选资料中的 `material_id`，正文资料 ID 也必须属于候选白名单，只允许引用已读取的 PDF 页码，并过滤敏感信息与内部上下文字段泄露。学习意图、追问口吻和答题方向交由模型提示词与语义审阅处理，不再使用前后端字符串改写器。
-
-PDF 页级证据会尽量抽取年份、题型、题号、知识点线索和来源类型，用于支撑往年常考分析和可核验引用。
-
-Agent 还会从当前请求的候选资料、PDF 证据、语义计划和双层记忆生成临时课程记忆卡片，汇总课程级年份、题型、知识点、页码引用和推荐学习顺序；课程卡片本身不持久化。站内课程缩写由 `private/material_search_synonyms.json` 提供给检索和模型，避免 ESD、CPS 等缩写被解释成其他学科含义。
+旧站内 Agent 的动态工具、编排、记忆、页级证据和模型路由已经从后端运行时移除。RAG 检索实验保留在独立的 `studyhub-agent/ai_platform/rag_experiments/`，不由本服务导入；后续 Agent V2 集成不得绕过这里已有的用户权限、资料可见性、订单和下载授权边界。
 
 ## RESTful API 约定
 
@@ -252,13 +198,13 @@ Agent 还会从当前请求的候选资料、PDF 证据、语义计划和双层�
 - 路径表达资源，不把业务动作直接放进公开路径中。
 - HTTP Method 表达操作语义：
   - `GET`：读取资源或资源集合
-  - `POST`：创建资源，例如创建订单、创建求购贡献、创建 AI 对话
+  - `POST`：创建资源，例如创建订单或创建求购贡献
   - `PUT`：创建或确认一个确定的子资源，例如关注关系、订单确认
   - `PATCH`：局部更新资源或集合，例如批量修改资料元信息、标记通知已读
   - `DELETE`：删除资源、取消关系或取消贡献
 - 关系和派生能力使用子资源表达，例如 `/api/users/{id}/follow`、`/api/materials/{id}/downloads`、`/api/requests/{id}/responses`。
 - 管理后台批量操作优先放在集合资源上，例如 `PATCH /api/admin/materials`、`DELETE /api/admin/market`。
-- 支付、AI、通知、收款码等能力也按资源建模，例如 `/api/alipay-payments`、`/api/ai-chats`、`/api/notifications`、`/api/admin/users/{id}/payout-qr`。
+- 支付、通知、收款码等能力也按资源建模，例如 `/api/alipay-payments`、`/api/notifications`、`/api/admin/users/{id}/payout-qr`。
 
 兼容策略：
 
@@ -280,8 +226,6 @@ PUT    /api/materials/{id}/like             点赞资料
 POST   /api/requests/{id}/contributions     跟购求购
 PUT    /api/requests/{id}/accepted-response 采纳求购应答
 PATCH  /api/notifications                   标记通知已读
-POST   /api/ai-chats                        AI 对话
-POST   /api/ai-recommendations              AI 推荐
 ```
 
 ## 当前已经做的性能优化

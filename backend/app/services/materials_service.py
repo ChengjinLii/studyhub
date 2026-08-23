@@ -5,7 +5,7 @@ from datetime import UTC, datetime
 import hashlib
 import json
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 from fastapi import HTTPException, UploadFile, status
 from sqlalchemy import bindparam, func, text, update
@@ -57,10 +57,6 @@ from app.services.read_support import (
     serialize_user_snapshot,
 )
 
-if TYPE_CHECKING:
-    from app.agentic_platform.proactive.triggers import ProactiveTriggerService
-
-
 ROLE_ADMIN = 8
 ROLE_DEVELOPER = 16
 VISIBLE_STATUSES = {"VISIBLE", "visible", "", None}
@@ -75,14 +71,12 @@ class MaterialsService(MaterialSecurityPolicyMixin, MaterialsStorageMutationMixi
         auth_repo: AuthRepository,
         material_repo: MaterialRepository,
         asset_store: MaterialAssetStore,
-        proactive_triggers: "ProactiveTriggerService | None" = None,
     ) -> None:
         self.settings = settings
         self.read_repo = read_repo
         self.auth_repo = auth_repo
         self.material_repo = material_repo
         self.asset_store = asset_store
-        self.proactive_triggers = proactive_triggers
 
     def list_materials(
         self,
@@ -1128,13 +1122,6 @@ class MaterialsService(MaterialSecurityPolicyMixin, MaterialsStorageMutationMixi
         self._assert_can_download(session, material, user_id, role_mask)
         self._consume_quota_if_needed(session, material, user_id, role_mask)
         registered = self._register_download(session, material, user_id)
-        if registered:
-            self._enqueue_proactive_material_download(
-                session,
-                material_id=material.id,
-                material_title=material.title,
-                user_id=user_id,
-            )
         session.commit()
         self.invalidate_material_summary_cache()
         if self._has_file(material):
@@ -1160,14 +1147,7 @@ class MaterialsService(MaterialSecurityPolicyMixin, MaterialsStorageMutationMixi
         results: list[dict[str, Any]] = []
         for material in materials:
             self._assert_download_access_without_quota(session, material, user_id, role_mask)
-            registered = self._register_download(session, material, user_id)
-            if registered:
-                self._enqueue_proactive_material_download(
-                    session,
-                    material_id=material.id,
-                    material_title=material.title,
-                    user_id=user_id,
-                )
+            self._register_download(session, material, user_id)
             if self._has_file(material):
                 url, expires_at = self.asset_store.build_download_url(material_id=material.id, key=material.file_storage_key or "", filename=material.original_filename)
                 results.append(
@@ -1385,25 +1365,6 @@ class MaterialsService(MaterialSecurityPolicyMixin, MaterialsStorageMutationMixi
         material.download_count = int(material.download_count or 0) + 1
         self.material_repo.save_material(session, material)
         return True
-
-    def _enqueue_proactive_material_download(
-        self,
-        session: Session,
-        *,
-        material_id: int,
-        material_title: str,
-        user_id: int,
-    ) -> None:
-        """Write Shadow Mode input in the same download transaction when enabled."""
-
-        if self.proactive_triggers is None:
-            return
-        self.proactive_triggers.enqueue_material_downloaded(
-            session,
-            material_id=material_id,
-            material_title=material_title,
-            downloaded_by_user_id=user_id,
-        )
 
     def _preview_image_payload(self, material_id: int, index: int, *, key: str | None, placeholder: bool) -> dict[str, Any]:
         return {

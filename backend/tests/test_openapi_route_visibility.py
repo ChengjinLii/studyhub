@@ -17,8 +17,6 @@ def test_openapi_exposes_first_stable_user_alias_batch(client: TestClient) -> No
         "/api/auth/password",
         "/api/auth/bind-email",
         "/api/logout",
-        "/api/ai/chat",
-        "/api/ai/recommend",
         "/api/materials/{id}/view",
         "/api/materials/{id}/review",
         "/api/materials/{id}/favorite",
