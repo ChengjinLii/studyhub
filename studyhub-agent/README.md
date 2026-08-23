@@ -14,6 +14,12 @@ It is a standalone retrieval research project and is not imported by
 `backend/` or `frontend/`. Website data, authentication, authorization,
 payments, storage, and database access remain owned by the main application.
 
-Hermes integration will be bootstrapped separately from a clean pinned
-upstream checkout. No legacy StudyHub router, memory implementation, patch, or
-skin is carried into V2.
+Hermes is bootstrapped separately from a clean pinned upstream checkout:
+
+```bash
+bash studyhub-agent/scripts/setup-hermes.sh
+```
+
+The checkout is stored under the ignored `.vendor/` directory. No legacy
+StudyHub router, memory implementation, patch, or skin is carried into V2. See
+`integrations/hermes/README.md` for the integration boundary.
