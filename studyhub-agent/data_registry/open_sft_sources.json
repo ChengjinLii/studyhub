@@ -1,0 +1,74 @@
+{
+  "schema_version": "studyhub.open-source-registry.v1",
+  "updated_at": "2026-08-24",
+  "default_proxy": "http://127.0.0.1:7892",
+  "sources": [
+    {
+      "id": "toolace",
+      "repository": "Team-ACE/ToolACE",
+      "revision": "6bda777c88d21e5a204703c1ee45597a8fa4f734",
+      "source_url": "https://huggingface.co/datasets/Team-ACE/ToolACE",
+      "license": "Apache-2.0",
+      "attribution": "Team-ACE, ToolACE",
+      "usage": "Tool-call protocol bootstrap; synthetic observations are never executed.",
+      "files": {
+        "data.json": "ba12c083fca7e8da48c67ad5b895e495447da7c66e39a2e19742c082e6cb537e",
+        "README.md": null
+      }
+    },
+    {
+      "id": "hermes_function_calling",
+      "repository": "NousResearch/hermes-function-calling-v1",
+      "revision": "dae3e1d28cfbcf4b915c04ea1e072030529b4bda",
+      "source_url": "https://huggingface.co/datasets/NousResearch/hermes-function-calling-v1",
+      "license": "Apache-2.0",
+      "attribution": "NousResearch, hermes-function-calling-v1",
+      "usage": "Function-call and JSON serialization bootstrap.",
+      "files": {
+        "func-calling.json": "769478035a886678d525d057ea66e3fd1e247f43e35c8d6d7cc866e080b6742b",
+        "func-calling-singleturn.json": "fb2df9fe3f295dfd65b223c2dbf04d6b90006357d737f8f8927749f0bea09527",
+        "json-mode-agentic.json": "7343a1ce0b3c1e894978fc15bb79c695a925f835c91a81786bf59e7379eb5da2",
+        "README.md": null
+      }
+    },
+    {
+      "id": "2wiki",
+      "repository": "xanhho/2WikiMultihopQA",
+      "revision": "612bc5039a457880d9e7d84c3b0a4cf154b70e4f",
+      "source_url": "https://huggingface.co/datasets/xanhho/2WikiMultihopQA",
+      "license": "Apache-2.0",
+      "attribution": "Ho et al., 2WikiMultihopQA",
+      "usage": "Grounded multi-hop QA bootstrap from frozen supporting facts.",
+      "files": {
+        "train.parquet": "a0f464f1604edf40ad990b605c61c03d56911c106d09ad32becf6afcf3201d52",
+        "README.md": null
+      }
+    },
+    {
+      "id": "qasper",
+      "repository": null,
+      "revision": "v0.3",
+      "source_url": "https://allenai.org/data/qasper",
+      "download_url": "https://qasper-dataset.s3.us-west-2.amazonaws.com/qasper-train-dev-v0.3.tgz",
+      "license": "CC-BY-4.0",
+      "attribution": "Dasigi et al., QASPER, NAACL 2021",
+      "usage": "Evidence-grounded long-document QA; attribution must be retained.",
+      "files": {
+        "qasper-train-dev-v0.3.tgz": "a28fdf966db827bcee3d873107d6b6669864fb7ca8fbf73a192f5e39191bdb5a"
+      }
+    },
+    {
+      "id": "coig_exam",
+      "repository": "BAAI/COIG",
+      "revision": "9f25758ec94f82762fb9c09a5c60e908cfb83632",
+      "source_url": "https://huggingface.co/datasets/BAAI/COIG",
+      "license": "Apache-2.0 (dataset-level; mixed-source notice retained)",
+      "attribution": "BAAI, Chinese Open Instruction Generalist (exam_instructions subset)",
+      "usage": "Chinese educational explanation bootstrap; only the declared exam subset is selected.",
+      "files": {
+        "exam_instructions.jsonl": "32ad25498eb592c7948299a3e66915f4917752949658a147cf7567af5541362b",
+        "README.md": null
+      }
+    }
+  ]
+}

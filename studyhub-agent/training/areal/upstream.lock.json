@@ -1,0 +1,14 @@
+{
+  "name": "AReaL",
+  "repository": "https://github.com/areal-project/AReaL.git",
+  "commit": "cbff54d645d2cd8ee1f1c358a82f3f473588433d",
+  "version": "2.0.0",
+  "environment": {
+    "python": "3.12",
+    "torch": "2.9.1+cu129",
+    "transformers": "5.3.0",
+    "peft": "0.18.1"
+  },
+  "install_profile": "uv sync --frozen --no-dev",
+  "notes": "Official locked base environment for single-GPU FSDP LoRA SFT; SGLang and Megatron extras are intentionally omitted from this Pilot."
+}

@@ -31,4 +31,10 @@ frontend/playwright-report/
 /ai_platform/
 /training_artifacts/
 /evaluation_artifacts/
+studyhub-agent/training_artifacts/
+studyhub-agent/evaluation_artifacts/
+studyhub-agent/datasets/
+studyhub-agent/artifacts/
+studyhub-agent/.cache/
+studyhub-agent/.venv-train/
 prototypes/
