@@ -1,0 +1,5 @@
+environment:
+  name: train
+  artifact_root: artifacts/train
+  fixture_mode: true
+  allow_network: false

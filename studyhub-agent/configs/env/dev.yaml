@@ -1,0 +1,5 @@
+environment:
+  name: dev
+  artifact_root: artifacts/dev
+  fixture_mode: true
+  allow_network: false

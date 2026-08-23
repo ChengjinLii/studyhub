@@ -1,0 +1,10 @@
+profile:
+  prompt_version: studyhub-v2
+  tool_schema_version: v1
+  max_turns: 12
+  max_tool_calls: 8
+  enabled_capabilities:
+    - knowledge
+    - web
+    - personal_memory
+    - collective_memory
