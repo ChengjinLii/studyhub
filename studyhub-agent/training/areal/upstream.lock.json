@@ -9,6 +9,6 @@
     "transformers": "5.3.0",
     "peft": "0.18.1"
   },
-  "install_profile": "uv sync --frozen --no-dev",
-  "notes": "Official locked base environment for single-GPU FSDP LoRA SFT; SGLang and Megatron extras are intentionally omitted from this Pilot."
+  "install_profile": "uv sync --frozen --no-dev --extra sglang",
+  "notes": "Official locked environment for single-GPU FSDP LoRA SFT and two-GPU FSDP plus SGLang GRPO. Megatron is intentionally omitted."
 }

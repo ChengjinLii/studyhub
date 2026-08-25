@@ -1,0 +1,515 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="StudyHub Agent 4B 与 9B AReaL SFT / RL 对照实验计划">
+  <title>StudyHub 4B / 9B AReaL 训练计划</title>
+  <style>
+    :root {
+      --paper: #f2efe5;
+      --paper-strong: #faf8f0;
+      --ink: #14211b;
+      --muted: #69716c;
+      --line: #c8c7bc;
+      --green: #2f7d62;
+      --green-deep: #1f5745;
+      --green-soft: #dce9e1;
+      --gold: #d3a73c;
+      --gold-soft: #f0e4bd;
+      --rust: #9e4d39;
+      --shadow: rgba(20, 33, 27, 0.1);
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      color: var(--ink);
+      background:
+        linear-gradient(rgba(47, 125, 98, 0.045) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(47, 125, 98, 0.045) 1px, transparent 1px),
+        var(--paper);
+      background-size: 34px 34px;
+      font-family: "IBM Plex Sans", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif;
+      line-height: 1.65;
+    }
+
+    a { color: inherit; }
+    code, .mono {
+      font-family: "IBM Plex Mono", "Cascadia Mono", monospace;
+      font-size: 0.9em;
+    }
+    .page {
+      width: min(1180px, calc(100% - 48px));
+      margin: 0 auto;
+      padding-bottom: 80px;
+    }
+
+    .hero {
+      min-height: 82vh;
+      display: grid;
+      grid-template-columns: 1.2fr 0.8fr;
+      gap: 64px;
+      align-items: center;
+      border-bottom: 1px solid var(--ink);
+      position: relative;
+    }
+    .hero::before {
+      content: "SH / EXP 02";
+      position: absolute;
+      top: 30px;
+      left: 0;
+      color: var(--green);
+      font: 700 11px/1 "IBM Plex Mono", monospace;
+      letter-spacing: 0.18em;
+    }
+    .hero h1 {
+      margin: 0 0 28px;
+      font-family: "Source Han Serif SC", "Noto Serif CJK SC", STSong, serif;
+      font-size: clamp(58px, 9vw, 126px);
+      font-weight: 600;
+      letter-spacing: -0.07em;
+      line-height: 0.82;
+    }
+    .hero h1 span { color: var(--green); }
+    .hero .lead {
+      max-width: 720px;
+      margin: 0;
+      color: #3e4943;
+      font-size: clamp(17px, 2vw, 23px);
+    }
+    .hero-note {
+      border-top: 6px solid var(--gold);
+      background: rgba(250, 248, 240, 0.88);
+      box-shadow: 0 22px 60px var(--shadow);
+      padding: 30px;
+    }
+    .hero-note .formula {
+      display: block;
+      margin: 18px 0 24px;
+      font-family: "Source Han Serif SC", STSong, serif;
+      font-size: clamp(30px, 4vw, 48px);
+      line-height: 1.1;
+    }
+    .hero-note p { margin: 0; color: var(--muted); }
+    .status-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 28px; }
+    .pill {
+      border: 1px solid var(--ink);
+      border-radius: 999px;
+      padding: 7px 12px;
+      background: var(--paper-strong);
+      font: 700 11px/1.2 "IBM Plex Mono", monospace;
+    }
+    .pill.ready { color: #fff; border-color: var(--green); background: var(--green); }
+    .pill.pending { background: var(--gold-soft); }
+
+    .nav {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      display: flex;
+      gap: 24px;
+      overflow-x: auto;
+      padding: 14px 0;
+      border-bottom: 1px solid var(--line);
+      background: rgba(242, 239, 229, 0.94);
+      backdrop-filter: blur(14px);
+    }
+    .nav a {
+      flex: 0 0 auto;
+      color: var(--ink);
+      font-size: 12px;
+      font-weight: 700;
+      text-decoration: none;
+    }
+
+    section { padding: 74px 0; border-bottom: 1px solid var(--line); scroll-margin-top: 48px; }
+    .section-head {
+      display: grid;
+      grid-template-columns: 120px 1fr;
+      gap: 24px;
+      margin-bottom: 36px;
+    }
+    .section-no {
+      color: var(--gold);
+      font: 700 12px/1.4 "IBM Plex Mono", monospace;
+      letter-spacing: 0.08em;
+    }
+    h2, h3 { font-family: "Source Han Serif SC", "Noto Serif CJK SC", STSong, serif; }
+    h2 {
+      margin: 0;
+      font-size: clamp(34px, 5vw, 58px);
+      font-weight: 600;
+      letter-spacing: -0.045em;
+      line-height: 1;
+    }
+    h3 { margin: 0 0 10px; font-size: 21px; }
+    p { margin: 0 0 14px; }
+    .note { max-width: 820px; color: var(--muted); }
+
+    .matrix-labels {
+      display: grid;
+      grid-template-columns: 90px repeat(4, 1fr);
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+    .matrix-labels span {
+      color: var(--muted);
+      font: 700 10px/1.3 "IBM Plex Mono", monospace;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+    .model-row {
+      display: grid;
+      grid-template-columns: 90px repeat(4, 1fr);
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+    .scale {
+      display: grid;
+      place-items: center;
+      min-height: 160px;
+      border: 1px solid var(--ink);
+      background: var(--ink);
+      color: var(--paper);
+      font-family: "Source Han Serif SC", STSong, serif;
+      font-size: 31px;
+    }
+    .cell {
+      min-height: 160px;
+      padding: 20px;
+      border: 1px solid var(--line);
+      background: rgba(250, 248, 240, 0.82);
+      position: relative;
+      transition: transform 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
+    }
+    .cell:hover { transform: translateY(-4px); border-color: var(--green); box-shadow: 0 14px 30px var(--shadow); }
+    .cell.primary { border-top: 5px solid var(--green); }
+    .cell.rl { border-top: 5px solid var(--gold); }
+    .cell .id { color: var(--green); font: 700 11px/1 "IBM Plex Mono", monospace; }
+    .cell strong { display: block; margin: 22px 0 7px; font-size: 20px; }
+    .cell small { display: block; color: var(--muted); line-height: 1.45; }
+    .cell .flags { position: absolute; right: 14px; top: 14px; color: var(--muted); font: 700 10px/1 monospace; }
+
+    .purpose-grid, .data-grid, .metric-grid { display: grid; gap: 1px; background: var(--line); border: 1px solid var(--line); }
+    .purpose-grid { grid-template-columns: repeat(4, 1fr); }
+    .purpose, .dataset, .metric { background: var(--paper-strong); padding: 24px; }
+    .purpose b, .dataset b, .metric b { display: block; margin-bottom: 8px; }
+    .purpose span, .dataset span, .metric span { color: var(--muted); font-size: 13px; }
+    .purpose .mark {
+      display: block;
+      margin-bottom: 22px;
+      color: var(--gold);
+      font: 700 12px/1 "IBM Plex Mono", monospace;
+    }
+
+    .data-grid { grid-template-columns: repeat(5, 1fr); }
+    .dataset { min-height: 190px; }
+    .dataset .count {
+      display: block;
+      margin: 18px 0 10px;
+      color: var(--green);
+      font-family: "Source Han Serif SC", STSong, serif;
+      font-size: 34px;
+      line-height: 1;
+    }
+    .dataset a { text-underline-offset: 3px; }
+    .split-bar {
+      display: grid;
+      grid-template-columns: 85fr 10fr 5fr;
+      height: 34px;
+      margin-top: 24px;
+      color: #fff;
+      font: 700 10px/34px "IBM Plex Mono", monospace;
+      text-align: center;
+    }
+    .split-bar span:nth-child(1) { background: var(--green-deep); }
+    .split-bar span:nth-child(2) { background: var(--green); }
+    .split-bar span:nth-child(3) { background: var(--gold); color: var(--ink); }
+
+    .rl-flow {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 10px;
+      margin-top: 30px;
+    }
+    .step {
+      min-height: 140px;
+      padding: 18px;
+      border: 1px solid var(--line);
+      background: rgba(250, 248, 240, 0.84);
+    }
+    .step em { color: var(--gold); font: normal 700 11px/1 monospace; }
+    .step b { display: block; margin: 24px 0 7px; }
+    .step span { color: var(--muted); font-size: 12px; }
+    .callout {
+      display: grid;
+      grid-template-columns: 180px 1fr;
+      gap: 24px;
+      margin-top: 22px;
+      padding: 22px;
+      border-left: 6px solid var(--gold);
+      background: var(--ink);
+      color: var(--paper);
+    }
+    .callout span { color: #b8c0bb; font-size: 13px; }
+
+    .table-wrap { overflow-x: auto; border: 1px solid var(--line); }
+    table { width: 100%; border-collapse: collapse; background: rgba(250, 248, 240, 0.78); font-size: 13px; }
+    th {
+      padding: 12px;
+      border-bottom: 1px solid var(--ink);
+      color: var(--muted);
+      font: 700 10px/1.3 "IBM Plex Mono", monospace;
+      text-align: left;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+    td { padding: 14px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+    tr:last-child td { border-bottom: 0; }
+    .metric-grid { grid-template-columns: repeat(4, 1fr); margin-top: 24px; }
+    .metric { min-height: 140px; }
+    .metric i { display: block; width: 24px; height: 4px; margin-bottom: 18px; background: var(--gold); }
+
+    .gates { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; }
+    .gate { padding: 18px; border: 1px solid var(--line); background: var(--paper-strong); }
+    .gate b { display: block; color: var(--green); font: 700 11px/1 monospace; }
+    .gate span { display: block; margin-top: 16px; font-size: 13px; }
+
+    footer {
+      display: flex;
+      justify-content: space-between;
+      gap: 20px;
+      padding-top: 34px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .reveal { animation: rise 560ms both; }
+    .reveal:nth-child(2) { animation-delay: 70ms; }
+    .reveal:nth-child(3) { animation-delay: 140ms; }
+    @keyframes rise {
+      from { opacity: 0; transform: translateY(12px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    @media (max-width: 920px) {
+      .hero { grid-template-columns: 1fr; gap: 36px; padding: 140px 0 70px; }
+      .hero-note { max-width: 620px; }
+      .purpose-grid, .metric-grid { grid-template-columns: 1fr 1fr; }
+      .data-grid { grid-template-columns: 1fr 1fr; }
+      .dataset:last-child { grid-column: 1 / -1; }
+      .matrix-labels { display: none; }
+      .model-row { grid-template-columns: 72px 1fr 1fr; }
+      .model-row .cell:nth-of-type(n+4) { grid-column: auto; }
+      .scale { grid-row: span 2; min-height: 100%; }
+      .rl-flow { grid-template-columns: 1fr 1fr; }
+      .step:last-child { grid-column: 1 / -1; }
+      .gates { grid-template-columns: repeat(3, 1fr); }
+    }
+
+    @media (max-width: 600px) {
+      .page { width: min(100% - 28px, 1180px); }
+      .hero h1 { font-size: 58px; }
+      .section-head { grid-template-columns: 1fr; gap: 8px; }
+      .model-row { grid-template-columns: 1fr; }
+      .scale { min-height: 66px; grid-row: auto; }
+      .purpose-grid, .data-grid, .metric-grid, .rl-flow, .gates { grid-template-columns: 1fr; }
+      .dataset:last-child, .step:last-child { grid-column: auto; }
+      .callout { grid-template-columns: 1fr; }
+      footer { flex-direction: column; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+      .reveal { animation: none; }
+      .cell { transition: none; }
+    }
+
+    @media print {
+      body { background: #fff; }
+      .page { width: 100%; padding: 0; }
+      .hero { min-height: auto; padding: 70px 0; }
+      .nav { display: none; }
+      section { padding: 38px 0; break-inside: avoid; }
+      .cell:hover { transform: none; box-shadow: none; }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <header class="hero">
+      <div class="reveal">
+        <h1><span>4B</span> × 9B</h1>
+        <p class="lead">AReaL SFT / GRPO 的八组受控实验。用同一批数据、同一套工具环境和同一评测协议，分离模型规模、监督学习与强化学习的贡献。</p>
+        <div class="status-row">
+          <span class="pill ready">4B 权重已就绪</span>
+          <span class="pill ready">9B 权重已就绪</span>
+          <span class="pill ready">训练数据已审计</span>
+          <span class="pill">先 4B / 后 9B</span>
+          <span class="pill">AReaL 2.0.0</span>
+          <span class="pill">LoRA / BF16</span>
+        </div>
+      </div>
+      <aside class="hero-note reveal">
+        <span class="mono">CONTROLLED STUDY</span>
+        <strong class="formula">Scale × SFT × RL</strong>
+        <p>统计上保留完整的 <b>2 × 2 × 2</b> 设计；工程上先完成 4B 的 2 × 2，Reward 与运行时通过 Gate 后再复制到 9B。</p>
+      </aside>
+    </header>
+
+    <nav class="nav" aria-label="页面目录">
+      <a href="#matrix">实验矩阵</a>
+      <a href="#purpose">训练目的</a>
+      <a href="#sft-data">SFT 数据</a>
+      <a href="#rl-data">RL 数据</a>
+      <a href="#evaluation">统一评测</a>
+      <a href="#execution">执行顺序</a>
+    </nav>
+
+    <section id="matrix">
+      <div class="section-head">
+        <span class="section-no">01 / MATRIX</span>
+        <div><h2>八个逻辑模型</h2><p class="note">每个规模只保留一份基础权重。B1/B3 共享 SFT checkpoint，B2 从初始模型直接 RL；训练产物使用独立 LoRA adapter。</p></div>
+      </div>
+      <div class="matrix-labels" aria-hidden="true">
+        <span>Scale</span><span>Init</span><span>SFT only</span><span>RL only</span><span>SFT then RL</span>
+      </div>
+      <div class="model-row">
+        <div class="scale">4B</div>
+        <article class="cell"><span class="id">4B-B0</span><span class="flags">S0 / R0</span><strong>Init</strong><small>官方 Qwen3.5-4B，未经 StudyHub 训练，直接评测。</small></article>
+        <article class="cell primary"><span class="id">4B-B1</span><span class="flags">S1 / R0</span><strong>SFT</strong><small>五类开放数据，AReaL SFT，作为行为冷启动基线。</small></article>
+        <article class="cell rl"><span class="id">4B-B2</span><span class="flags">S0 / R1</span><strong>Direct RL</strong><small>从 Init 直接 GRPO，检验无 SFT 时的探索效率和稳定性。</small></article>
+        <article class="cell primary"><span class="id">4B-B3</span><span class="flags">S1 / R1</span><strong>SFT → RL</strong><small>从 4B-B1 的同一 checkpoint 继续 GRPO，作为 4B 主方法。</small></article>
+      </div>
+      <div class="model-row">
+        <div class="scale">9B</div>
+        <article class="cell"><span class="id">9B-B0</span><span class="flags">S0 / R0</span><strong>Init</strong><small>本地 Qwen3.5-9B，未经 StudyHub 训练，直接评测。</small></article>
+        <article class="cell primary"><span class="id">9B-B1</span><span class="flags">S1 / R0</span><strong>SFT</strong><small>与 4B 完全相同的 source records 和 split，按 9B tokenizer 重编译。</small></article>
+        <article class="cell rl"><span class="id">9B-B2</span><span class="flags">S0 / R1</span><strong>Direct RL</strong><small>共享 RL Task、Reward 和 rollout budget，测量规模对直接 RL 的影响。</small></article>
+        <article class="cell primary"><span class="id">9B-B3</span><span class="flags">S1 / R1</span><strong>SFT → RL</strong><small>从 9B-B1 分叉继续 GRPO，作为 9B 主方法。</small></article>
+      </div>
+    </section>
+
+    <section id="purpose">
+      <div class="section-head">
+        <span class="section-no">02 / PURPOSE</span>
+        <div><h2>训练目的</h2><p class="note">不以训练 reward 的最高点作为结论，而是回答四个明确问题。</p></div>
+      </div>
+      <div class="purpose-grid">
+        <article class="purpose"><span class="mark">P1</span><b>SFT 的作用</b><span>验证示范轨迹能否提高工具格式、证据引用与中文讲解的稳定性。</span></article>
+        <article class="purpose"><span class="mark">P2</span><b>Direct RL</b><span>验证初始模型是否能仅依靠环境反馈学会工具选择、搜索与停止策略。</span></article>
+        <article class="purpose"><span class="mark">P3</span><b>顺序协同</b><span>检验 SFT 是否把策略带入有效探索区域，从而提升后续 GRPO 的效率与上限。</span></article>
+        <article class="purpose"><span class="mark">P4</span><b>规模效应</b><span>比较 4B 与 9B 的收益、稳定性、显存、延迟和单位成功成本。</span></article>
+      </div>
+    </section>
+
+    <section id="sft-data">
+      <div class="section-head">
+        <span class="section-no">03 / SFT DATA</span>
+        <div><h2>五类开放数据</h2><p class="note">4B 与 9B 使用同一组 3,000 条规范化记录和同一分组切分；只因 tokenizer 不同分别编译张量。训练、验证、测试按 source group 隔离。</p></div>
+      </div>
+      <div class="data-grid">
+        <article class="dataset"><b><a href="https://huggingface.co/datasets/Team-ACE/ToolACE">ToolACE</a></b><span class="count">300</span><span>工具协议、多轮 function call 与参数结构。</span></article>
+        <article class="dataset"><b><a href="https://huggingface.co/datasets/NousResearch/hermes-function-calling-v1">Hermes FC</a></b><span class="count">300</span><span>函数调用序列化、JSON mode 与工具格式。</span></article>
+        <article class="dataset"><b><a href="https://huggingface.co/datasets/xanhho/2WikiMultihopQA">2Wiki</a></b><span class="count">900</span><span>给定 supporting facts 条件下的多跳推理与证据组合。</span></article>
+        <article class="dataset"><b><a href="https://allenai.org/data/qasper">QASPER</a></b><span class="count">600</span><span>给定论文 evidence 条件下的 grounded QA 与证据不足处理。</span></article>
+        <article class="dataset"><b><a href="https://huggingface.co/datasets/BAAI/COIG">COIG Exam</a></b><span class="count">900</span><span>中文教育问答、题目讲解与结构化解释。</span></article>
+      </div>
+      <div class="split-bar" aria-label="SFT 数据切分：训练 85%，验证 10%，测试 5%">
+        <span>TRAIN 2,550</span><span>VAL 300</span><span>TEST 150</span>
+      </div>
+      <div class="callout">
+        <b>SFT 能力边界</b>
+        <span>这批开放 SFT 主要学习工具协议、给定证据下的推理、grounded QA 和中文讲解，不把它描述成已经学会 Search Policy。何时搜索、如何改写 query、读取什么以及何时停止，主要由后续原生 Agent 轨迹与 RL 学习。</span>
+      </div>
+    </section>
+
+    <section id="rl-data">
+      <div class="section-head">
+        <span class="section-no">04 / RL DATA</span>
+        <div><h2>Task，而非答案轨迹</h2><p class="note">RL 从开放数据的不重叠 source group 中抽取 Task、tool schema、corpus 和 verifier。模型通过当前 StudyHub 的 Hermes Agent Harness 与冻结工具环境生成轨迹；开放数据中的既有 Assistant / Tool 轨迹不作为 RL target。</p></div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>RL family</th><th>数量</th><th>来源</th><th>环境与评分</th></tr></thead>
+          <tbody>
+            <tr><td>Function calling</td><td>800</td><td>Hermes FC / ToolACE</td><td>确定性 fixture tools；验证函数、参数、顺序和结果一致性。</td></tr>
+            <tr><td>Search / multi-hop</td><td>1,000</td><td>2Wiki</td><td>冻结本地语料与 Retriever；验证答案、隐藏证据命中和搜索预算。</td></tr>
+            <tr><td>Evidence grounding</td><td>600</td><td>QASPER</td><td>冻结论文库；验证 claim-support、引用范围、证据不足和伪引用。</td></tr>
+            <tr><td>Chinese tutoring</td><td>第一阶段 0</td><td>COIG Exam</td><td>保留用于 SFT 与评测；Reward v2 的主观 judge 校准后再决定是否加入 RL。</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="rl-flow">
+        <div class="step"><em>01</em><b>TaskSpec</b><span>2,000 train / 400 dev，固定环境 seed、工具和预算。</span></div>
+        <div class="step"><em>02</em><b>Hermes rollout</b><span>Hermes Agent Harness 驱动同一任务采样 4 条轨迹。</span></div>
+        <div class="step"><em>03</em><b>Frozen environment</b><span>真实执行 fixture tools、Retriever、语料库与离线 Observation。</span></div>
+        <div class="step"><em>04</em><b>Reward v2</b><span>使用隐藏 gold 信息，对任务、证据、引用、工具、安全和效率评分。</span></div>
+        <div class="step"><em>05</em><b>AReaL GRPO</b><span>记录 action token/logprob，屏蔽工具返回 token 后更新 LoRA。</span></div>
+      </div>
+      <div class="callout">
+        <b>Oracle 信息防火墙</b>
+        <span>Gold answer、gold tool sequence 和 oracle evidence 不进入 Agent rollout context，只供 verifier / reward 使用。2Wiki 仅向 Agent 暴露可搜索语料，QASPER 仅暴露冻结论文库，ToolACE / Hermes FC 仅暴露用户请求和 tool schema。</span>
+      </div>
+      <div class="callout">
+        <b>公平性约束</b>
+        <span>4B-B2、4B-B3、9B-B2、9B-B3 必须共享 RL Task 顺序、Environment、Reward、group size、总 rollout 数和优化 token 预算。SFT 与 RL 不得由同一 source_id、paper 或问题改写派生。</span>
+      </div>
+    </section>
+
+    <section id="evaluation">
+      <div class="section-head">
+        <span class="section-no">05 / EVALUATION</span>
+        <div><h2>统一评测</h2><p class="note">先冻结评测，再训练模型。所有模型使用同一 system prompt、工具、Retriever、快照、解码参数和预算。</p></div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>评测集</th><th>规模</th><th>作用</th><th>污染控制</th></tr></thead>
+          <tbody>
+            <tr><td>Open-ID holdout</td><td>300</td><td>检验五个开放数据域内泛化。</td><td>按 source group 封存，不参与 SFT 或 RL。</td></tr>
+            <tr><td>StudyHub sealed</td><td>400</td><td>160 ID / 120 OOD / 120 Hard，覆盖 RAG、Web、Memory 与权限。</td><td>只使用冻结免费语料与合成记忆，不接生产环境。</td></tr>
+            <tr><td>External OOD</td><td>固定版本</td><td>MCP-Atlas、TeachArena、LongMemEval-v2。</td><td>保持 evaluation-only，不进入教师上下文。</td></tr>
+            <tr><td>AgentBench smoke</td><td>100</td><td>验证 schema、工具和运行时 contract。</td><td>不作为模型质量主结论。</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="metric-grid">
+        <article class="metric"><i></i><b>任务与工具</b><span>Task Success、Tool Validity、Required Tool Recall、参数准确率。</span></article>
+        <article class="metric"><i></i><b>证据与安全</b><span>Groundedness、Citation P/R、ACL、隐私和伪造引用。</span></article>
+        <article class="metric"><i></i><b>效率与稳定性</b><span>工具次数、token、延迟、tokens/success、跨 seed 方差。</span></article>
+        <article class="metric"><i></i><b>RL 诊断</b><span>Reward 方差、KL、entropy、clip fraction、有效 rollout 率。</span></article>
+      </div>
+      <div class="callout">
+        <b>统计协议</b>
+        <span>4B 兼容性 Pilot 先使用 1 个 seed；通过 Gate 后，正式训练单元至少运行 3 个 seed，再复制到 9B。报告 paired bootstrap 95% CI。主模型使用 <code>score ~ scale + SFT + RL + SFT×RL + scale×SFT + scale×RL + scale×SFT×RL</code>，checkpoint 只依据 dev 集选择，final test 最后统一运行一次。</span>
+      </div>
+    </section>
+
+    <section id="execution">
+      <div class="section-head">
+        <span class="section-no">06 / EXECUTION</span>
+        <div><h2>先 4B，后 9B</h2><p class="note">统计设计仍是完整的 2 × 2 × 2；工程上先用 4B 验证数据、环境、Reward 和对照关系，再以同一协议复现到 9B。</p></div>
+      </div>
+      <div class="gates">
+        <div class="gate"><b>G0</b><span>固定 4B/9B revision、全局 group split、TaskSpec、环境和 Reward。</span></div>
+        <div class="gate"><b>G1 · 4B</b><span>评测 B0；只做一次 SFT，保存 B1 并从同一 checkpoint 分叉 B3。</span></div>
+        <div class="gate"><b>G2 · Pilot</b><span>对 4B-B2 / B3 各跑 200-task、1-seed GRPO Pilot。</span></div>
+        <div class="gate"><b>G3 · Gate</b><span>确认 Reward 可辨别、无 oracle 泄漏与 reward hacking，运行时约束稳定。</span></div>
+        <div class="gate"><b>G4 · 4B</b><span>完成 4B 正式 2 × 2 与多 seed 评测，验证主效应和交互作用。</span></div>
+        <div class="gate"><b>G5 · 9B</b><span>用相同 Task、环境、预算和协议复现 9B，最后联合分析八组模型。</span></div>
+      </div>
+      <div class="callout">
+        <b>准备状态</b>
+        <span>官方 4B / 9B 权重、两套 SFT 张量、2,400 条 RL Task、冻结环境、隐藏 verifier、Reward v2、Hermes rollout 接线和 AReaL 启动脚本均已通过静态预检。当前未启动训练；下一步从 4B 单步 Gate 开始，先校准 Reward 与运行时，再进入 Pilot。</span>
+      </div>
+    </section>
+
+    <footer>
+      <span>StudyHub Agent / AReaL 4B + 9B Controlled Study</span>
+      <span>计划版本 1.2 / 2026-08-25</span>
+    </footer>
+  </main>
+</body>
+</html>

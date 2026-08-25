@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import subprocess
 from pathlib import Path
@@ -16,6 +17,7 @@ from studyhub_agent.runtime import AgentIdentity, TaskSpec
 from studyhub_agent.tools.factory import ToolServices, build_tool_registry
 from studyhub_agent.tools.registry import ToolExecutionContext
 from tests.fakes.openai_server import ScriptedOpenAIServer, ToolTurn
+from training.rl.hermes_workflow import StudyHubHermesWorkflow
 
 ROOT = Path(__file__).resolve().parents[2]
 IDENTITY_SECRET = "hermes-integration-fixture-secret"
@@ -155,3 +157,87 @@ def test_real_hermes_runs_all_fixture_tool_combinations(monkeypatch, tmp_path) -
     from tools.registry import registry as hermes_registry
 
     assert hermes_registry.get_entry("web_search").toolset == "web"
+
+
+def test_training_workflow_runs_real_hermes_against_frozen_tool(monkeypatch, tmp_path) -> None:
+    hermes_home = tmp_path / "hermes-home"
+    hermes_home.mkdir()
+    (hermes_home / "config.yaml").write_text(
+        "tools:\n  tool_search:\n    enabled: off\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+    monkeypatch.setenv("NO_PROXY", "127.0.0.1,localhost")
+    monkeypatch.setenv("no_proxy", "127.0.0.1,localhost")
+
+    task_id = "fixture-training-workflow"
+    environment_root = tmp_path / "rl-data"
+    for name in ("environments", "fixtures", "verifiers"):
+        (environment_root / name).mkdir(parents=True)
+    tool_schema = {
+        "name": "fixture_training_lookup",
+        "description": "Look up one deterministic fixture value.",
+        "capability": "function_call",
+        "parameters": {
+            "type": "object",
+            "properties": {"key": {"type": "string"}},
+            "required": ["key"],
+        },
+    }
+    (environment_root / "environments" / f"{task_id}.json").write_text(
+        json.dumps({"tools": [tool_schema], "documents": []}),
+        encoding="utf-8",
+    )
+    expected_call = {"name": tool_schema["name"], "arguments": {"key": "alpha"}}
+    (environment_root / "fixtures" / f"{task_id}.json").write_text(
+        json.dumps({"routes": [{**expected_call, "result": "42"}]}),
+        encoding="utf-8",
+    )
+    (environment_root / "verifiers" / "validation.jsonl").write_text(
+        json.dumps(
+            {
+                "verifier_id": "verifier-fixture",
+                "family": "function_calling",
+                "expected_calls": [expected_call],
+                "expected_answers": ["42"],
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    workflow = StudyHubHermesWorkflow(
+        environment_root=str(environment_root),
+        verifier_root=str(environment_root / "verifiers"),
+        hermes_checkout=str(ROOT / ".vendor/hermes-agent"),
+        reward_artifact_root=str(tmp_path / "rewards"),
+        max_turns=4,
+        max_tokens=128,
+    )
+    data = {
+        "task_id": task_id,
+        "user_request": "Look up alpha, then answer with the observed value.",
+        "max_steps": 4,
+        "max_tool_calls": 2,
+        "metadata": {"verifier_id": "verifier-fixture"},
+        "verifier": {},
+    }
+
+    with ScriptedOpenAIServer(
+        [ToolTurn(tool_schema["name"], {"key": "alpha"})],
+        "42",
+    ) as server:
+        reward = asyncio.run(
+            workflow.run(
+                data,
+                base_url=server.base_url,
+                api_key="fixture-session-key",
+            )
+        )
+
+    assert reward > 0.8
+    assert len(server.requests) == 2
+    reward_rows = (tmp_path / "rewards/reward-v2.jsonl").read_text(encoding="utf-8").splitlines()
+    recorded = json.loads(reward_rows[0])
+    assert recorded["task_id"] == task_id
+    assert recorded["tool_calls"] == 1
+    assert recorded["reward"]["task_success"] == 1.0

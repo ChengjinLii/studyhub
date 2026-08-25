@@ -61,8 +61,7 @@ def start(args: argparse.Namespace) -> None:
             "path": str(model),
             "config_sha256": sha256(model / "config.json"),
             "weight_files": [
-                {"name": path.name, "bytes": path.stat().st_size, "sha256": sha256(path)}
-                for path in weight_files
+                {"name": path.name, "bytes": path.stat().st_size, "sha256": sha256(path)} for path in weight_files
             ],
         },
         "software": package_versions(),
@@ -74,10 +73,10 @@ def start(args: argparse.Namespace) -> None:
             "--format=csv,noheader,nounits",
         ),
         "resource_guard": {
-            "physical_gpu": args.gpu,
+            "physical_gpus": args.gpu,
             "max_used_mib": args.max_used_mib,
             "min_free_mib": args.min_free_mib,
-            "foreign_process_policy": "stop only the StudyHub process group when a foreign owner appears",
+            "foreign_process_policy": "stop only the StudyHub process group when an unrelated GPU process appears",
         },
         "log_file": str(args.log_file.resolve()),
         "gpu_csv": str(args.gpu_csv.resolve()),
@@ -113,7 +112,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--dataset-manifest", type=Path)
     parser.add_argument("--model", type=Path)
     parser.add_argument("--areal-lock", type=Path)
-    parser.add_argument("--gpu", type=int, default=0)
+    parser.add_argument("--gpu", default="0")
     parser.add_argument("--max-used-mib", type=int, default=28672)
     parser.add_argument("--min-free-mib", type=int, default=60000)
     parser.add_argument("--log-file", type=Path)

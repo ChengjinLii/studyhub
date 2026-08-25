@@ -46,3 +46,18 @@ StudyHub-AgentBench v1
 ```
 
 See `docs/phase1-completion.md` for the verified boundaries and GPU handoff steps.
+
+## Controlled 4B / 9B training
+
+The official Qwen3.5-4B and Qwen3.5-9B checkpoints, tokenizer-specific SFT
+datasets, isolated RL tasks, and AReaL launchers are prepared. Verification is
+CPU-only and never starts a trainer:
+
+```bash
+bash studyhub-agent/scripts/train/prepare_controlled_experiment.sh verify
+```
+
+Actual SFT or GRPO runs require both an explicit non-`check` mode and
+`STUDYHUB_ALLOW_TRAINING=YES`. See
+`docs/controlled-4b-9b-training-readiness.md` for the experiment matrix,
+dataset counts, checkpoint handoff, and launch commands.
