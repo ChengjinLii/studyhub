@@ -6,15 +6,28 @@ from typing import Any
 
 from training.rl.frozen_environment import ExecutionTrace, canonical_arguments
 
+HARD_GATE_ERRORS = frozenset(
+    {
+        "invalid_citation",
+        "source_not_found",
+        "tool_call_budget_exhausted",
+        "unknown_tool",
+        "unsupported_capability",
+    }
+)
+
 
 @dataclass(frozen=True, slots=True)
 class RewardV2Result:
     total: float
     task_success: float
+    answer_quality: float
+    function_call_quality: float | None
     evidence: float
     citation: float
     tool_quality: float
     efficiency: float
+    hard_gate_triggered: bool
     violations: tuple[str, ...]
 
     def to_dict(self) -> dict[str, Any]:
@@ -93,10 +106,12 @@ def evaluate_reward_v2(
     family = verifier["family"]
     answer_score = _answer_score(final_answer, verifier.get("expected_answers", []))
     if family == "function_calling":
-        task_success = _function_score(trace, verifier)
+        function_call_score = _function_score(trace, verifier)
+        task_success = 0.70 * function_call_score + 0.30 * answer_score
         evidence = 1.0
         citation = 1.0
     else:
+        function_call_score = None
         task_success = answer_score
         gold_sources = set(verifier.get("gold_source_ids", []))
         if gold_sources:
@@ -118,18 +133,27 @@ def evaluate_reward_v2(
         violations.append("no_tool_call")
     if trace.invalid_tool_calls:
         violations.append("invalid_tool_call")
+    violations.extend(sorted(set(trace.error_codes) & HARD_GATE_ERRORS))
     if not final_answer.strip():
         violations.append("empty_final_answer")
     efficiency = 1.0 - min(2.0, 2 * total_calls / max(1, max_tool_calls))
     weighted = 0.40 * task_success + 0.25 * evidence + 0.15 * citation + 0.15 * tool_quality + 0.05 * efficiency
     penalty = min(0.75, 0.15 * len(set(violations)))
     total = max(-1.0, min(1.0, weighted - penalty))
+    hard_gate_triggered = bool(set(violations) & HARD_GATE_ERRORS)
+    if hard_gate_triggered:
+        total = -1.0
+    elif set(violations) & {"empty_final_answer", "missing_citation", "no_tool_call"}:
+        total = min(total, 0.0)
     return RewardV2Result(
         total=round(total, 6),
         task_success=round(task_success, 6),
+        answer_quality=round(answer_score, 6),
+        function_call_quality=(round(function_call_score, 6) if function_call_score is not None else None),
         evidence=round(evidence, 6),
         citation=round(citation, 6),
         tool_quality=round(tool_quality, 6),
         efficiency=round(efficiency, 6),
+        hard_gate_triggered=hard_gate_triggered,
         violations=tuple(dict.fromkeys(violations)),
     )

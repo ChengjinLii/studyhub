@@ -38,7 +38,8 @@ environment data to the model:
 
 Gold answers, tool sequences, and evidence labels remain in server-side
 verifiers. The RL audit confirms zero SFT overlap and zero train/validation
-group overlap.
+group overlap. ToolACE multi-round conversations are converted as one complete
+tool trajectory; an intermediate tool call is never treated as the final answer.
 
 ## Experiment branches
 
@@ -77,7 +78,40 @@ STUDYHUB_ALLOW_TRAINING=YES \
   bash studyhub-agent/scripts/train/run_controlled_grpo.sh 4b direct gate 6209
 ```
 
+GRPO modes have distinct budgets with `batch_size=8` and `n_samples=4`:
+
+| Mode | Optimizer steps | Tasks | Expected trajectories | Purpose |
+| --- | ---: | ---: | ---: | --- |
+| `gate` | 1 | 8 | 32 | End-to-end runtime and GPU-guard check |
+| `smoke` | 10 | 80 | 320 | Short reward-distribution check |
+| `pilot` | 25 | 200 | 800 | The controlled 200-task pilot |
+| `run` | Full epoch | 2,000 | 8,000 | Formal run after gates pass |
+
+Counts assume complete four-sample groups. AReaL retries rejected groups, while
+the reward diagnostics report incomplete groups explicitly.
+
+Each launch writes rewards to a trial-specific directory under
+`artifacts/areal/reward-v2/<scale>/<trial>/`. The log records task, rollout-group,
+rollout, family, seed, trace errors, and every reward component without storing
+the raw final answer. Training rewards stay at the trial root; evaluator rewards
+use its `validation/` child directory so the two distributions cannot mix.
+Summarize a completed training trial with:
+
+```bash
+studyhub-agent/.venv-train/bin/python \
+  studyhub-agent/scripts/train/summarize_reward_groups.py \
+  studyhub-agent/artifacts/areal/reward-v2/4b/<trial>
+```
+
+Reward v2 combines function-call correctness and final-answer quality at
+`70% / 30%`. Empty answers, missing required citations, or no tool call cannot
+receive positive reward. Invalid citations, nonexistent sources, unknown tools,
+unsupported capabilities, and tool-budget overruns are hard-gated to `-1`.
+Corpus reads are accepted only for source IDs returned by an earlier search in
+the same rollout; unmatched fixture arguments return a deterministic error.
+
 SFT reserves one otherwise idle GPU. GRPO reserves two otherwise idle GPUs.
 The guard refuses to start on a busy GPU, samples memory every five seconds,
 and stops only its own process group if the configured memory ceiling is
-crossed or another GPU process appears.
+crossed or another GPU process appears. Child-process PGID handling still needs
+to be observed in the one-step Gate before any longer run.

@@ -21,6 +21,7 @@ class ExecutionTrace:
     search_result_ids: set[str] = field(default_factory=set)
     read_source_ids: set[str] = field(default_factory=set)
     invalid_tool_calls: int = 0
+    error_codes: list[str] = field(default_factory=list)
 
 
 class FrozenTaskEnvironment:
@@ -75,13 +76,13 @@ class FrozenTaskEnvironment:
         tool = self._tools.get(name)
         self.trace.tool_calls.append({"name": name, "arguments": dict(arguments)})
         if self.max_tool_calls is not None and len(self.trace.tool_calls) > self.max_tool_calls:
-            self.trace.invalid_tool_calls += 1
+            self._record_error("tool_call_budget_exhausted")
             return self._result(
                 error="tool_call_budget_exhausted",
                 max_tool_calls=self.max_tool_calls,
             )
         if tool is None:
-            self.trace.invalid_tool_calls += 1
+            self._record_error("unknown_tool")
             return self._result(error="unknown_tool", tool=name)
         capability = tool.get("capability")
         if capability == "knowledge_search":
@@ -90,7 +91,7 @@ class FrozenTaskEnvironment:
             return self._read(arguments)
         if capability == "function_call":
             return self._fixture_call(name, arguments, tool)
-        self.trace.invalid_tool_calls += 1
+        self._record_error("unsupported_capability")
         return self._result(error="unsupported_capability", tool=name)
 
     def _search(self, arguments: dict[str, Any]) -> str:
@@ -100,7 +101,7 @@ class FrozenTaskEnvironment:
         except (TypeError, ValueError):
             limit = 5
         if not query:
-            self.trace.invalid_tool_calls += 1
+            self._record_error("query_required")
             return self._result(error="query_required")
         query_terms = _terms(query)
         scored = []
@@ -133,8 +134,11 @@ class FrozenTaskEnvironment:
         source_id = str(arguments.get("source_id", "")).strip()
         document = self._documents.get(source_id)
         if document is None:
-            self.trace.invalid_tool_calls += 1
+            self._record_error("source_not_found")
             return self._result(error="source_not_found", source_id=source_id)
+        if source_id not in self.trace.search_result_ids:
+            self._record_error("source_not_discovered")
+            return self._result(error="source_not_discovered", source_id=source_id)
         self.trace.read_source_ids.add(source_id)
         return self._result(
             source_id=source_id,
@@ -147,12 +151,23 @@ class FrozenTaskEnvironment:
         required = set(tool.get("parameters", {}).get("required", []))
         missing = sorted(required - arguments.keys())
         if missing:
-            self.trace.invalid_tool_calls += 1
+            self._record_error("missing_required_arguments")
             return self._result(error="missing_required_arguments", missing=missing)
-        route = self._routes.get((name, canonical_arguments(arguments)))
-        if route is None:
-            return self._result(ok=True, tool=name, arguments=arguments, fixture_match=False)
+        route_key = (name, canonical_arguments(arguments))
+        if route_key not in self._routes:
+            self._record_error("fixture_route_not_found")
+            return self._result(
+                ok=False,
+                error="fixture_route_not_found",
+                tool=name,
+                fixture_match=False,
+            )
+        route = self._routes[route_key]
         return self._result(ok=True, tool=name, content=route, fixture_match=True)
+
+    def _record_error(self, code: str) -> None:
+        self.trace.invalid_tool_calls += 1
+        self.trace.error_codes.append(code)
 
     @staticmethod
     def _result(**value: Any) -> str:

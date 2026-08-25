@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from areal import PPOTrainer
 from areal.api.cli_args import load_expr_config
 from areal.dataset import get_custom_dataset
@@ -28,12 +30,21 @@ def main(args: list[str]) -> int:
         "verifier_root": config.verifier_root,
         "hermes_checkout": config.hermes_checkout,
         "reward_artifact_root": config.reward_artifact_root,
+        "experiment_name": config.experiment_name,
+        "trial_name": config.trial_name,
+        "run_kind": "train",
+        "seed": config.seed,
         "max_turns": config.max_turns,
         "temperature": config.gconfig.temperature,
         "top_p": config.gconfig.top_p,
         "max_completion_tokens": config.gconfig.max_new_tokens,
     }
-    eval_workflow_kwargs = {**workflow_kwargs, "temperature": 0.6}
+    eval_workflow_kwargs = {
+        **workflow_kwargs,
+        "reward_artifact_root": str(Path(config.reward_artifact_root) / "validation"),
+        "run_kind": "validation",
+        "temperature": 0.6,
+    }
     with PPOTrainer(
         config,
         train_dataset=train_dataset,

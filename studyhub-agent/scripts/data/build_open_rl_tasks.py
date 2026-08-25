@@ -227,6 +227,8 @@ def finalize_function_candidate(
         for tool in tools
     ]
     expected_calls = [{"name": tool_map[call["original_name"]], "arguments": call["arguments"]} for call in calls]
+    if len(expected_calls) > 8:
+        return None
     response_queues: dict[str, list[Any]] = defaultdict(list)
     for response in responses:
         response_queues[clean(response.get("original_name"))].append(response.get("result"))
@@ -266,6 +268,47 @@ def finalize_function_candidate(
     }
 
 
+def parse_toolace_trajectory(
+    conversations: list[dict[str, Any]], tool_names: list[str]
+) -> tuple[str, list[dict[str, Any]], list[dict[str, Any]], str] | None:
+    """Collect every tool round after one user request, not only the first call."""
+    for user_index, message in enumerate(conversations):
+        if message.get("from") != "user":
+            continue
+        calls: list[dict[str, Any]] = []
+        responses: list[dict[str, Any]] = []
+        final = ""
+        for turn in conversations[user_index + 1 :]:
+            role = turn.get("from")
+            if role == "user":
+                break
+            if role == "assistant":
+                parsed_calls = parse_toolace_calls(turn.get("value", ""), tool_names)
+                if parsed_calls:
+                    calls.extend(parsed_calls)
+                elif calls and clean(turn.get("value", "")):
+                    final = turn.get("value", "")
+                    break
+            elif role == "tool" and calls:
+                try:
+                    response_rows = json.loads(turn.get("value", ""))
+                except (TypeError, json.JSONDecodeError):
+                    response_rows = []
+                if isinstance(response_rows, dict):
+                    response_rows = [response_rows]
+                responses.extend(
+                    {
+                        "original_name": clean(item.get("name")),
+                        "result": item.get("results", item),
+                    }
+                    for item in response_rows
+                    if isinstance(item, dict)
+                )
+        if calls:
+            return message.get("value", ""), calls, responses, final
+    return None
+
+
 def iter_toolace(root: Path, excluded_ids: set[str]) -> Iterable[dict[str, Any]]:
     rows = json.loads((root / "toolace/data.json").read_text(encoding="utf-8"))
     for index, row in enumerate(rows):
@@ -275,41 +318,25 @@ def iter_toolace(root: Path, excluded_ids: set[str]) -> Iterable[dict[str, Any]]
         tools = parse_toolace_tools(row.get("system", ""))
         if not tools:
             continue
-        conversations = row.get("conversations", [])
-        for message_index, message in enumerate(conversations[:-1]):
-            if message.get("from") != "assistant" or conversations[message_index + 1].get("from") != "tool":
-                continue
-            previous_users = [
-                item.get("value", "") for item in conversations[:message_index] if item.get("from") == "user"
-            ]
-            if not previous_users:
-                break
-            calls = parse_toolace_calls(message.get("value", ""), [tool["original_name"] for tool in tools])
-            try:
-                response_rows = json.loads(conversations[message_index + 1].get("value", ""))
-            except json.JSONDecodeError:
-                response_rows = []
-            responses = [
-                {"original_name": clean(item.get("name")), "result": item.get("results", item)}
-                for item in response_rows
-                if isinstance(item, dict)
-            ]
-            final = ""
-            if message_index + 2 < len(conversations) and conversations[message_index + 2].get("from") == "assistant":
-                final = conversations[message_index + 2].get("value", "")
-            candidate = finalize_function_candidate(
-                source="toolace",
-                source_id=source_id,
-                group_id=source_id,
-                user_request=previous_users[-1],
-                tools=tools,
-                calls=calls,
-                responses=responses,
-                expected_final=final,
-            )
-            if candidate:
-                yield candidate
-            break
+        trajectory = parse_toolace_trajectory(
+            row.get("conversations", []),
+            [tool["original_name"] for tool in tools],
+        )
+        if trajectory is None:
+            continue
+        user_request, calls, responses, final = trajectory
+        candidate = finalize_function_candidate(
+            source="toolace",
+            source_id=source_id,
+            group_id=source_id,
+            user_request=user_request,
+            tools=tools,
+            calls=calls,
+            responses=responses,
+            expected_final=final,
+        )
+        if candidate:
+            yield candidate
 
 
 def iter_hermes(root: Path, excluded_ids: set[str]) -> Iterable[dict[str, Any]]:

@@ -445,8 +445,8 @@
       <div class="rl-flow">
         <div class="step"><em>01</em><b>TaskSpec</b><span>2,000 train / 400 dev，固定环境 seed、工具和预算。</span></div>
         <div class="step"><em>02</em><b>Hermes rollout</b><span>Hermes Agent Harness 驱动同一任务采样 4 条轨迹。</span></div>
-        <div class="step"><em>03</em><b>Frozen environment</b><span>真实执行 fixture tools、Retriever、语料库与离线 Observation。</span></div>
-        <div class="step"><em>04</em><b>Reward v2</b><span>使用隐藏 gold 信息，对任务、证据、引用、工具、安全和效率评分。</span></div>
+        <div class="step"><em>03</em><b>Frozen environment</b><span>fixture 参数必须命中确定性路由；语料读取必须先由本轮 Search 发现 source ID。</span></div>
+        <div class="step"><em>04</em><b>Reward v2</b><span>函数调用与最终回答按 70% / 30% 合成任务分；伪引用、越权 source 和预算越界触发 hard gate。</span></div>
         <div class="step"><em>05</em><b>AReaL GRPO</b><span>记录 action token/logprob，屏蔽工具返回 token 后更新 LoRA。</span></div>
       </div>
       <div class="callout">
@@ -495,20 +495,20 @@
       <div class="gates">
         <div class="gate"><b>G0</b><span>固定 4B/9B revision、全局 group split、TaskSpec、环境和 Reward。</span></div>
         <div class="gate"><b>G1 · 4B</b><span>评测 B0；只做一次 SFT，保存 B1 并从同一 checkpoint 分叉 B3。</span></div>
-        <div class="gate"><b>G2 · Pilot</b><span>对 4B-B2 / B3 各跑 200-task、1-seed GRPO Pilot。</span></div>
-        <div class="gate"><b>G3 · Gate</b><span>确认 Reward 可辨别、无 oracle 泄漏与 reward hacking，运行时约束稳定。</span></div>
+        <div class="gate"><b>G2 · Gate</b><span>先跑 1-step / 8-task Gate，确认 Hermes、工具、Reward、LoRA 更新和 GPU guard 全链路。</span></div>
+        <div class="gate"><b>G3 · Pilot</b><span>再跑 10-step Smoke 与 200-task Pilot，检查 group reward 方差、无 oracle 泄漏与 reward hacking。</span></div>
         <div class="gate"><b>G4 · 4B</b><span>完成 4B 正式 2 × 2 与多 seed 评测，验证主效应和交互作用。</span></div>
         <div class="gate"><b>G5 · 9B</b><span>用相同 Task、环境、预算和协议复现 9B，最后联合分析八组模型。</span></div>
       </div>
       <div class="callout">
         <b>准备状态</b>
-        <span>官方 4B / 9B 权重、两套 SFT 张量、2,400 条 RL Task、冻结环境、隐藏 verifier、Reward v2、Hermes rollout 接线和 AReaL 启动脚本均已通过静态预检。当前未启动训练；下一步从 4B 单步 Gate 开始，先校准 Reward 与运行时，再进入 Pilot。</span>
+        <span>官方 4B / 9B 权重、两套 SFT 张量、2,400 条 RL Task、冻结环境、隐藏 verifier、Reward v2、Hermes rollout 接线和 AReaL 启动脚本均已准备。Reward 已补最终回答约束、Search → Read 强制顺序、trial 级日志隔离与 group 诊断；当前未启动训练，下一步仍是 4B 单步 Gate。</span>
       </div>
     </section>
 
     <footer>
       <span>StudyHub Agent / AReaL 4B + 9B Controlled Study</span>
-      <span>计划版本 1.2 / 2026-08-25</span>
+      <span>计划版本 1.3 / 2026-08-25</span>
     </footer>
   </main>
 </body>

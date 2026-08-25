@@ -239,5 +239,11 @@ def test_training_workflow_runs_real_hermes_against_frozen_tool(monkeypatch, tmp
     reward_rows = (tmp_path / "rewards/reward-v2.jsonl").read_text(encoding="utf-8").splitlines()
     recorded = json.loads(reward_rows[0])
     assert recorded["task_id"] == task_id
-    assert recorded["tool_calls"] == 1
+    assert recorded["rollout_group_id"]
+    assert recorded["rollout_id"]
+    assert recorded["final_answer_empty"] is False
+    assert recorded["trace"]["tool_calls"] == 1
+    assert recorded["trace"]["invalid_tool_calls"] == 0
     assert recorded["reward"]["task_success"] == 1.0
+    assert recorded["reward"]["answer_quality"] == 1.0
+    assert recorded["reward"]["function_call_quality"] == 1.0

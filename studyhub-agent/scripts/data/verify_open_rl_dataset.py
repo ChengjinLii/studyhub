@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import re
 from collections import Counter, defaultdict
 from datetime import datetime
 from pathlib import Path
@@ -23,6 +24,7 @@ FORBIDDEN_PUBLIC_KEYS = {
     "gold_tool_sequence",
     "supporting_facts",
 }
+TOOL_CALL_SHAPED_ANSWER = re.compile(r"^\s*\[?[A-Za-z_][A-Za-z0-9_]*\s*\(")
 
 
 def sha256(path: Path) -> str:
@@ -162,6 +164,17 @@ def main() -> int:
             fixture_path = args.dataset / "fixtures" / f"{task_id}.json"
             fixture_hash = environment_index[task_id].get("fixture_sha256")
             if task["family"] == "function_calling":
+                expected_calls = verifier.get("expected_calls", [])
+                check(
+                    len(expected_calls) <= task["max_tool_calls"],
+                    f"{task_id}: expected calls exceed tool budget",
+                )
+                if source == "toolace":
+                    for answer in verifier.get("expected_answers", []):
+                        check(
+                            not TOOL_CALL_SHAPED_ANSWER.match(str(answer)),
+                            f"{task_id}: expected final answer is an unexecuted tool call",
+                        )
                 check(fixture_path.is_file(), f"{task_id}: function fixture missing")
                 if fixture_path.is_file():
                     check(sha256(fixture_path) == fixture_hash, f"{task_id}: fixture hash mismatch")

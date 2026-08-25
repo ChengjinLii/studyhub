@@ -3,10 +3,12 @@ from __future__ import annotations
 import asyncio
 import fcntl
 import functools
+import hashlib
 import json
 import os
 import sys
 import uuid
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -46,6 +48,10 @@ class StudyHubHermesWorkflow:
         verifier_root: str,
         hermes_checkout: str,
         reward_artifact_root: str,
+        experiment_name: str = "studyhub-open-grpo",
+        trial_name: str = "unscoped",
+        run_kind: str = "train",
+        seed: int = 0,
         max_turns: int = 10,
         max_tokens: int = 1536,
         max_completion_tokens: int | None = None,
@@ -57,6 +63,10 @@ class StudyHubHermesWorkflow:
         self.verifier_root = Path(verifier_root).resolve()
         self.hermes_checkout = Path(hermes_checkout).resolve()
         self.reward_artifact_root = Path(reward_artifact_root).resolve()
+        self.experiment_name = experiment_name
+        self.trial_name = trial_name
+        self.run_kind = run_kind
+        self.seed = seed
         self.max_turns = max_turns
         self.max_tokens = max_completion_tokens or max_tokens
         self.temperature = temperature
@@ -153,23 +163,62 @@ class StudyHubHermesWorkflow:
             verifier=verifier,
             max_tool_calls=max_tool_calls,
         )
-        self._record_reward(task_id, final_answer, environment, result)
+        self._record_reward(
+            data=data,
+            metadata=metadata,
+            verifier=verifier,
+            final_answer=final_answer,
+            environment=environment,
+            result=result,
+            session_api_key=str(api_key),
+        )
         return result.total
 
     def _record_reward(
         self,
-        task_id: str,
+        *,
+        data: dict[str, Any],
+        metadata: dict[str, Any],
+        verifier: dict[str, Any],
         final_answer: str,
         environment: FrozenTaskEnvironment,
         result: RewardV2Result,
+        session_api_key: str,
     ) -> None:
         self.reward_artifact_root.mkdir(parents=True, exist_ok=True)
         path = self.reward_artifact_root / "reward-v2.jsonl"
+        task_id = str(data["task_id"])
+        rollout_id = hashlib.sha256(session_api_key.encode()).hexdigest()[:20]
+        rollout_group_id = hashlib.sha256(f"{self.experiment_name}:{self.trial_name}:{task_id}".encode()).hexdigest()[
+            :20
+        ]
         row = {
+            "schema_version": "studyhub.reward-log.v2",
+            "recorded_at": datetime.now(UTC).isoformat(timespec="milliseconds"),
+            "experiment_name": self.experiment_name,
+            "trial_name": self.trial_name,
+            "run_kind": self.run_kind,
+            "seed": self.seed,
             "task_id": task_id,
-            "final_answer_sha256": __import__("hashlib").sha256(final_answer.encode()).hexdigest(),
-            "tool_calls": len(environment.trace.tool_calls),
-            "read_sources": sorted(environment.trace.read_source_ids),
+            "task_family": verifier["family"],
+            "source_dataset": metadata.get("source_dataset"),
+            "source_group_id": metadata.get("group_id"),
+            "split": metadata.get("split"),
+            "rollout_group_id": rollout_group_id,
+            "rollout_id": rollout_id,
+            "final_answer_sha256": hashlib.sha256(final_answer.encode()).hexdigest(),
+            "final_answer_length": len(final_answer),
+            "final_answer_empty": not final_answer.strip(),
+            "max_steps": int(data["max_steps"]),
+            "max_tool_calls": int(data["max_tool_calls"]),
+            "trace": {
+                "tool_calls": len(environment.trace.tool_calls),
+                "tool_names": [row["name"] for row in environment.trace.tool_calls],
+                "invalid_tool_calls": environment.trace.invalid_tool_calls,
+                "error_codes": list(environment.trace.error_codes),
+                "search_results": len(environment.trace.search_result_ids),
+                "read_sources": sorted(environment.trace.read_source_ids),
+            },
             "reward": result.to_dict(),
         }
         with path.open("a", encoding="utf-8") as stream:

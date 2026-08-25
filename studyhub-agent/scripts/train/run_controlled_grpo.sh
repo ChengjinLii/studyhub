@@ -20,16 +20,16 @@ case "${SIZE}" in
     BASE_MODEL="${PROJECT_ROOT}/../models/P1/Qwen3.5-9B"
     DEFAULT_MERGED="${PROJECT_ROOT}/artifacts/areal/merged-sft-qwen35-9b"
     ;;
-  *) echo "Usage: $0 <4b|9b> <direct|sft> [check|gate|pilot|run] [seed]" >&2; exit 2 ;;
+  *) echo "Usage: $0 <4b|9b> <direct|sft> [check|gate|smoke|pilot|run] [seed]" >&2; exit 2 ;;
 esac
 case "${BRANCH}" in
   direct) MODEL="${BASE_MODEL}" ;;
   sft) MODEL="${STUDYHUB_SFT_MERGED_MODEL:-${DEFAULT_MERGED}}" ;;
-  *) echo "Usage: $0 <4b|9b> <direct|sft> [check|gate|pilot|run] [seed]" >&2; exit 2 ;;
+  *) echo "Usage: $0 <4b|9b> <direct|sft> [check|gate|smoke|pilot|run] [seed]" >&2; exit 2 ;;
 esac
 case "${MODE}" in
-  check|gate|pilot|run) ;;
-  *) echo "Usage: $0 <4b|9b> <direct|sft> [check|gate|pilot|run] [seed]" >&2; exit 2 ;;
+  check|gate|smoke|pilot|run) ;;
+  *) echo "Usage: $0 <4b|9b> <direct|sft> [check|gate|smoke|pilot|run] [seed]" >&2; exit 2 ;;
 esac
 
 if [[ ! -x "${VENV_DIR}/bin/areal" ]]; then
@@ -58,7 +58,7 @@ if [[ "${MODE}" == "check" ]]; then
   exit 0
 fi
 if [[ "${STUDYHUB_ALLOW_TRAINING:-}" != "YES" ]]; then
-  echo "Refusing to train. Set STUDYHUB_ALLOW_TRAINING=YES for gate/pilot/run." >&2
+  echo "Refusing to train. Set STUDYHUB_ALLOW_TRAINING=YES for gate/smoke/pilot/run." >&2
   exit 3
 fi
 
@@ -67,6 +67,7 @@ MAX_USED="${STUDYHUB_MAX_GPU_USED_MIB:-68000}"
 TIMESTAMP="$(date +%Y%m%d_%H%M%S)"
 TRIAL="${BRANCH}-${MODE}-seed-${SEED}-${TIMESTAMP}"
 LOG_ROOT="${PROJECT_ROOT}/artifacts/areal/launcher_logs/grpo-${SIZE}"
+REWARD_ROOT="${PROJECT_ROOT}/artifacts/areal/reward-v2/${SIZE}/${TRIAL}"
 LOG_FILE="${LOG_ROOT}/${TRIAL}.log"
 GPU_CSV="${LOG_ROOT}/${TRIAL}.gpu.csv"
 RUN_METADATA="${LOG_ROOT}/${TRIAL}.run.json"
@@ -76,10 +77,12 @@ OVERRIDES=(
   "trial_name=${TRIAL}"
   "actor.path=${MODEL}"
   "experiment_name=studyhub-open-grpo-${SIZE}-${BRANCH}"
+  "reward_artifact_root=${REWARD_ROOT}"
 )
 case "${MODE}" in
   gate) OVERRIDES+=("total_train_steps=1" "saver.freq_steps=1" "recover.mode=disabled") ;;
-  pilot) OVERRIDES+=("total_train_steps=10" "saver.freq_steps=5" "recover.mode=disabled") ;;
+  smoke) OVERRIDES+=("total_train_steps=10" "saver.freq_steps=5" "recover.mode=disabled") ;;
+  pilot) OVERRIDES+=("total_train_steps=25" "saver.freq_steps=5" "recover.mode=disabled") ;;
 esac
 
 mkdir -p "${LOG_ROOT}"
