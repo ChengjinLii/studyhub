@@ -342,8 +342,23 @@ def check_runtime(project: Path) -> dict[str, Any]:
     torch_fallbacks = (
         os.environ.get("STUDYHUB_SGLANG_TORCH_FALLBACKS_WITHOUT_NVCC") == "1"
     )
+    metadata_bridge = (
+        os.environ.get("STUDYHUB_AREAL_CHAT_TEMPLATE_METADATA_BRIDGE") == "1"
+    )
     if nvcc is None and deep_gemm_fallback and not torch_fallbacks:
         raise RuntimeError("SGLang torch fallbacks are required when nvcc is unavailable")
+    if not metadata_bridge:
+        raise RuntimeError(
+            "AReaL chat-template metadata bridge is required for bounded final turns"
+        )
+    from areal.experimental.openai.client import AsyncCompletionsWithReward
+
+    if not getattr(
+        AsyncCompletionsWithReward.create,
+        "_studyhub_metadata_bridge_v1",
+        False,
+    ):
+        raise RuntimeError("AReaL chat-template metadata bridge was not installed")
 
     config_root = project / "configs/train"
     admin_key_was_missing = AREAL_ADMIN_KEY_ENV not in os.environ

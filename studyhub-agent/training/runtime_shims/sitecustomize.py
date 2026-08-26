@@ -7,6 +7,12 @@ import shutil
 import sys
 
 
+if os.environ.get("STUDYHUB_AREAL_CHAT_TEMPLATE_METADATA_BRIDGE") == "1":
+    from areal_metadata_bridge import install_areal_metadata_bridge
+
+    install_areal_metadata_bridge()
+
+
 if (
     os.environ.get("STUDYHUB_DISABLE_DEEP_GEMM_WITHOUT_NVCC") == "1"
     and shutil.which("nvcc") is None

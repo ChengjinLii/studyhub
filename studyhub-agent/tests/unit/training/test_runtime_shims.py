@@ -56,3 +56,41 @@ def test_sglang_clamp_position_uses_torch_without_nvcc() -> None:
     )
 
     assert result.stdout.strip() == "[0, 1, 4]"
+
+
+def test_areal_metadata_bridge_preserves_signature_and_disables_thinking() -> None:
+    env = dict(os.environ)
+    env["PYTHONPATH"] = os.pathsep.join(
+        [str(ROOT / "training/runtime_shims"), str(ROOT)]
+    )
+    env["STUDYHUB_AREAL_CHAT_TEMPLATE_METADATA_BRIDGE"] = "1"
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            (
+                "import inspect, json; "
+                "from areal.experimental.openai.client import AsyncCompletionsWithReward; "
+                "from areal_metadata_bridge import bridge_request_kwargs; "
+                "kw=bridge_request_kwargs({'metadata': "
+                "{'studyhub_chat_template':'disable_thinking_v1'}}); "
+                "print(json.dumps({'patched': bool(getattr("
+                "AsyncCompletionsWithReward.create, "
+                "'_studyhub_metadata_bridge_v1', False)), "
+                "'messages_in_signature': 'messages' in inspect.signature("
+                "AsyncCompletionsWithReward.create).parameters, "
+                "'enable_thinking': kw['extra_body']['chat_template_kwargs']"
+                "['enable_thinking']}, sort_keys=True))"
+            ),
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+        env=env,
+    )
+
+    assert result.stdout.strip() == (
+        '{"enable_thinking": false, "messages_in_signature": true, '
+        '"patched": true}'
+    )

@@ -26,9 +26,12 @@ CONTEXT_FINALIZATION_GUIDANCE = (
     "[StudyHub runtime: the remaining model-turn or context budget permits only "
     "a final answer. Do not call more "
     "tools. Use only the observations already shown and provide the best supported "
-    "final answer now. Keep required [source_id] citations.]"
+    "final answer now. Do not show analysis. Keep the answer under 300 words and "
+    "include required [source_id] citations.]"
 )
 _CONTEXT_LIMIT_PATTERN = "exceeds max_total_tokens"
+_AREAL_CHAT_TEMPLATE_METADATA_KEY = "studyhub_chat_template"
+_AREAL_DISABLE_THINKING_VALUE = "disable_thinking_v1"
 
 
 def _request_token_count(tokenizer: Any, api_kwargs: dict[str, Any]) -> int:
@@ -140,6 +143,7 @@ class ContextBudgetTelemetry:
     dropped_tool_exchanges: int = 0
     counter_failures: int = 0
     guard_failures: int = 0
+    final_completion_cap_tokens: int = 0
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -158,6 +162,7 @@ class ContextBudgetTelemetry:
             "dropped_tool_exchanges": self.dropped_tool_exchanges,
             "counter_failures": self.counter_failures,
             "guard_failures": self.guard_failures,
+            "final_completion_cap_tokens": self.final_completion_cap_tokens,
         }
 
 
@@ -248,6 +253,17 @@ class ContextBudgetController:
                 chat_template_kwargs = {}
                 extra_body["chat_template_kwargs"] = chat_template_kwargs
             chat_template_kwargs["enable_thinking"] = False
+            metadata = api_kwargs.get("metadata")
+            if not isinstance(metadata, dict):
+                metadata = {}
+                api_kwargs["metadata"] = metadata
+            # The OpenAI SDK consumes its own `extra_body` before forwarding
+            # the HTTP request. This supported metadata field survives the
+            # proxy boundary and is translated back by the process-local
+            # AReaL runtime shim.
+            metadata[_AREAL_CHAT_TEMPLATE_METADATA_KEY] = (
+                _AREAL_DISABLE_THINKING_VALUE
+            )
             self.telemetry.finalization_thinking_disabled = True
             messages = api_kwargs["messages"]
             _append_context_finalization_guidance(messages)
@@ -281,7 +297,16 @@ class ContextBudgetController:
                 requested_cap = int(existing_cap)
             except (TypeError, ValueError):
                 requested_cap = remaining
-            api_kwargs[cap_key] = max(1, min(requested_cap, remaining))
+            final_cap = max(
+                1,
+                min(
+                    requested_cap,
+                    remaining,
+                    self.telemetry.safety_margin_tokens,
+                ),
+            )
+            api_kwargs[cap_key] = final_cap
+            self.telemetry.final_completion_cap_tokens = final_cap
             self.telemetry.max_sent_prompt_tokens = max(
                 self.telemetry.max_sent_prompt_tokens,
                 sent,

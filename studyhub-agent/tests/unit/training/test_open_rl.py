@@ -242,11 +242,14 @@ def test_context_budget_guard_forces_a_final_turn_before_engine_limit(monkeypatc
 
     assert "tools" not in kwargs
     assert kwargs["extra_body"]["chat_template_kwargs"]["enable_thinking"] is False
+    assert kwargs["metadata"]["studyhub_chat_template"] == "disable_thinking_v1"
     assert CONTEXT_FINALIZATION_GUIDANCE in kwargs["messages"][-1]["content"]
     assert kwargs["max_tokens"] <= 4096 - fake_count(None, kwargs)
+    assert kwargs["max_tokens"] <= 256
     assert controller.telemetry.forced_final_count == 1
     assert controller.telemetry.forced_final_reasons == ["context_threshold"]
     assert controller.telemetry.finalization_thinking_disabled is True
+    assert controller.telemetry.final_completion_cap_tokens == kwargs["max_tokens"]
     assert controller.telemetry.max_sent_prompt_tokens < 4096
     assert runtime_errors == []
 
