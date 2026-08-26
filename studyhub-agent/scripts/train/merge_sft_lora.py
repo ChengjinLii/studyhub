@@ -8,6 +8,13 @@ import hashlib
 import json
 from datetime import datetime
 from pathlib import Path
+from typing import Any
+
+
+PROCESSOR_CONFIG_FILES = (
+    "preprocessor_config.json",
+    "video_preprocessor_config.json",
+)
 
 
 def sha256(path: Path) -> str:
@@ -16,6 +23,41 @@ def sha256(path: Path) -> str:
         for block in iter(lambda: stream.read(4 * 1024 * 1024), b""):
             digest.update(block)
     return digest.hexdigest()
+
+
+def save_model_io_assets(
+    base: Path,
+    output: Path,
+    *,
+    tokenizer_class: Any,
+    processor_class: Any,
+) -> list[str]:
+    tokenizer = tokenizer_class.from_pretrained(
+        base,
+        local_files_only=True,
+        trust_remote_code=True,
+    )
+    tokenizer.save_pretrained(output)
+
+    # Qwen3.5 is a composite vision-language model even for text-only runs.
+    # SGLang initializes its processor before serving, so merged checkpoints
+    # must preserve the image/video processor configs from the fixed base.
+    processor = processor_class.from_pretrained(
+        base,
+        local_files_only=True,
+        trust_remote_code=True,
+    )
+    processor.save_pretrained(output)
+    for component_name in ("image_processor", "video_processor"):
+        component = getattr(processor, component_name, None)
+        if component is None:
+            raise RuntimeError(f"base processor has no {component_name}")
+        component.save_pretrained(output)
+
+    missing = [name for name in PROCESSOR_CONFIG_FILES if not (output / name).is_file()]
+    if missing:
+        raise RuntimeError(f"merged checkpoint is missing processor assets: {missing}")
+    return sorted(path.name for path in output.iterdir() if path.is_file())
 
 
 def parse_args() -> argparse.Namespace:
@@ -39,7 +81,7 @@ def main() -> int:
 
     import torch
     from peft import PeftModel
-    from transformers import AutoModelForImageTextToText, AutoTokenizer
+    from transformers import AutoModelForImageTextToText, AutoProcessor, AutoTokenizer
 
     base = AutoModelForImageTextToText.from_pretrained(
         args.base,
@@ -58,12 +100,12 @@ def main() -> int:
         safe_serialization=True,
         max_shard_size=args.max_shard_size,
     )
-    tokenizer = AutoTokenizer.from_pretrained(
+    model_io_assets = save_model_io_assets(
         args.base,
-        local_files_only=True,
-        trust_remote_code=True,
+        args.output,
+        tokenizer_class=AutoTokenizer,
+        processor_class=AutoProcessor,
     )
-    tokenizer.save_pretrained(args.output)
     shards = sorted(args.output.glob("model*.safetensors"))
     if not shards:
         raise RuntimeError("merged checkpoint contains no safetensors weights")
@@ -76,6 +118,7 @@ def main() -> int:
         "adapter_sha256": sha256(adapter_weights),
         "dtype": "bfloat16",
         "weight_shards": [{"name": path.name, "bytes": path.stat().st_size} for path in shards],
+        "model_io_assets": model_io_assets,
     }
     (args.output / "studyhub_merged_manifest.json").write_text(
         json.dumps(manifest, ensure_ascii=False, indent=2) + "\n",
