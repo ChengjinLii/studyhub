@@ -10,13 +10,26 @@ import heapq
 import json
 import re
 import shutil
-from collections import defaultdict
+import sys
+from collections import Counter, defaultdict
 from collections.abc import Iterable
 from pathlib import Path
 from typing import Any
 
-SCHEMA_VERSION = "studyhub.open-rl-dataset.v1"
-TRANSFORM_VERSION = "open-agent-rl-v1"
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+from training.rl.budget_contract import (
+    BUDGET_CONTRACT_SCHEMA,
+    CONTROLLED_TASK_MAX_TOOL_CALLS,
+    RUNTIME_MAX_MODEL_TURNS,
+    make_budget_contract,
+    search_budget_contract,
+)
+
+SCHEMA_VERSION = "studyhub.open-rl-dataset.v2"
+TRANSFORM_VERSION = "open-agent-rl-v2"
 SOURCE_TARGETS = {
     "toolace": {"train": 333, "validation": 67},
     "hermes_function_calling": {"train": 334, "validation": 66},
@@ -212,6 +225,7 @@ def finalize_function_candidate(
     calls: list[dict[str, Any]],
     responses: list[dict[str, Any]],
     expected_final: str,
+    reference_model_turns: int,
 ) -> dict[str, Any] | None:
     task_id, suffix = task_identity(source, source_id)
     tool_map = {tool["original_name"]: safe_tool_name(tool["original_name"], suffix) for tool in tools}
@@ -227,7 +241,10 @@ def finalize_function_candidate(
         for tool in tools
     ]
     expected_calls = [{"name": tool_map[call["original_name"]], "arguments": call["arguments"]} for call in calls]
-    if len(expected_calls) > 8:
+    if (
+        len(expected_calls) > CONTROLLED_TASK_MAX_TOOL_CALLS
+        or reference_model_turns > RUNTIME_MAX_MODEL_TURNS
+    ):
         return None
     response_queues: dict[str, list[Any]] = defaultdict(list)
     for response in responses:
@@ -243,7 +260,10 @@ def finalize_function_candidate(
                 "result": result,
             }
         )
-    max_tool_calls = min(8, max(2, len(expected_calls) + 1))
+    budget_contract = make_budget_contract(
+        reference_model_turns=reference_model_turns,
+        required_tool_calls=len(expected_calls),
+    )
     return {
         "source_dataset": source,
         "source_id": source_id,
@@ -256,21 +276,22 @@ def finalize_function_candidate(
         "documents": [],
         "fixture": {"schema_version": "studyhub.fixture-environment.v1", "routes": routes},
         "verifier": {
-            "schema_version": "studyhub.hidden-verifier.v1",
+            "schema_version": "studyhub.hidden-verifier.v2",
             "family": "function_calling",
             "expected_calls": expected_calls,
             "expected_answers": [clean(expected_final)] if clean(expected_final) else [],
             "gold_source_ids": [],
             "citations_required": False,
+            "budget_contract": budget_contract,
         },
-        "max_steps": min(10, max_tool_calls + 2),
-        "max_tool_calls": max_tool_calls,
+        "max_steps": RUNTIME_MAX_MODEL_TURNS,
+        "max_tool_calls": CONTROLLED_TASK_MAX_TOOL_CALLS,
     }
 
 
 def parse_toolace_trajectory(
     conversations: list[dict[str, Any]], tool_names: list[str]
-) -> tuple[str, list[dict[str, Any]], list[dict[str, Any]], str] | None:
+) -> tuple[str, list[dict[str, Any]], list[dict[str, Any]], str, int] | None:
     """Collect every tool round after one user request, not only the first call."""
     for user_index, message in enumerate(conversations):
         if message.get("from") != "user":
@@ -278,6 +299,7 @@ def parse_toolace_trajectory(
         calls: list[dict[str, Any]] = []
         responses: list[dict[str, Any]] = []
         final = ""
+        tool_rounds = 0
         for turn in conversations[user_index + 1 :]:
             role = turn.get("from")
             if role == "user":
@@ -285,6 +307,7 @@ def parse_toolace_trajectory(
             if role == "assistant":
                 parsed_calls = parse_toolace_calls(turn.get("value", ""), tool_names)
                 if parsed_calls:
+                    tool_rounds += 1
                     calls.extend(parsed_calls)
                 elif calls and clean(turn.get("value", "")):
                     final = turn.get("value", "")
@@ -305,7 +328,7 @@ def parse_toolace_trajectory(
                     if isinstance(item, dict)
                 )
         if calls:
-            return message.get("value", ""), calls, responses, final
+            return message.get("value", ""), calls, responses, final, tool_rounds + 1
     return None
 
 
@@ -324,7 +347,7 @@ def iter_toolace(root: Path, excluded_ids: set[str]) -> Iterable[dict[str, Any]]
         )
         if trajectory is None:
             continue
-        user_request, calls, responses, final = trajectory
+        user_request, calls, responses, final, reference_model_turns = trajectory
         candidate = finalize_function_candidate(
             source="toolace",
             source_id=source_id,
@@ -334,9 +357,53 @@ def iter_toolace(root: Path, excluded_ids: set[str]) -> Iterable[dict[str, Any]]
             calls=calls,
             responses=responses,
             expected_final=final,
+            reference_model_turns=reference_model_turns,
         )
         if candidate:
             yield candidate
+
+
+def parse_hermes_trajectory(
+    conversations: list[dict[str, Any]],
+) -> tuple[str, list[dict[str, Any]], list[dict[str, Any]], str, int] | None:
+    for user_index, message in enumerate(conversations):
+        if message.get("from") != "human":
+            continue
+        calls: list[dict[str, Any]] = []
+        responses: list[dict[str, Any]] = []
+        final = ""
+        tool_rounds = 0
+        for turn in conversations[user_index + 1 :]:
+            role = turn.get("from")
+            value = str(turn.get("value", ""))
+            if role == "human":
+                break
+            if role == "gpt":
+                parsed_calls = [
+                    {
+                        "original_name": clean(item.get("name")),
+                        "arguments": item.get("arguments", {}),
+                    }
+                    for item in parse_hermes_tagged_json(value, "tool_call")
+                    if isinstance(item.get("arguments"), dict)
+                ]
+                if parsed_calls:
+                    tool_rounds += 1
+                    calls.extend(parsed_calls)
+                elif calls and clean(value):
+                    final = value
+                    break
+            elif role == "tool" and calls:
+                responses.extend(
+                    {
+                        "original_name": clean(item.get("name")),
+                        "result": item.get("content", item),
+                    }
+                    for item in parse_hermes_tagged_json(value, "tool_response")
+                )
+        if calls:
+            return str(message.get("value", "")), calls, responses, final, tool_rounds + 1
+    return None
 
 
 def iter_hermes(root: Path, excluded_ids: set[str]) -> Iterable[dict[str, Any]]:
@@ -348,30 +415,10 @@ def iter_hermes(root: Path, excluded_ids: set[str]) -> Iterable[dict[str, Any]]:
             continue
         tools = parse_hermes_tools(row.get("tools"))
         conversations = row.get("conversations", [])
-        user_request = next((item.get("value", "") for item in conversations if item.get("from") == "human"), "")
-        call_message = next(
-            (
-                item.get("value", "")
-                for item in conversations
-                if item.get("from") == "gpt" and "<tool_call>" in item.get("value", "")
-            ),
-            "",
-        )
-        calls = [
-            {"original_name": clean(item.get("name")), "arguments": item.get("arguments", {})}
-            for item in parse_hermes_tagged_json(call_message, "tool_call")
-            if isinstance(item.get("arguments"), dict)
-        ]
-        response_message = next((item.get("value", "") for item in conversations if item.get("from") == "tool"), "")
-        responses = [
-            {"original_name": clean(item.get("name")), "result": item.get("content", item)}
-            for item in parse_hermes_tagged_json(response_message, "tool_response")
-        ]
-        final_messages = [
-            item.get("value", "")
-            for item in conversations
-            if item.get("from") == "gpt" and "<tool_call>" not in item.get("value", "")
-        ]
+        trajectory = parse_hermes_trajectory(conversations)
+        if trajectory is None:
+            continue
+        user_request, calls, responses, final, reference_model_turns = trajectory
         candidate = finalize_function_candidate(
             source="hermes_function_calling",
             source_id=source_id,
@@ -380,7 +427,8 @@ def iter_hermes(root: Path, excluded_ids: set[str]) -> Iterable[dict[str, Any]]:
             tools=tools,
             calls=calls,
             responses=responses,
-            expected_final=final_messages[-1] if final_messages else "",
+            expected_final=final,
+            reference_model_turns=reference_model_turns,
         )
         if candidate:
             yield candidate
@@ -447,6 +495,12 @@ def iter_2wiki(root: Path, excluded_ids: set[str]) -> Iterable[dict[str, Any]]:
             gold_source_ids = sorted({title_to_source[title] for title, _ in supporting if title in title_to_source})
             if len(gold_source_ids) < 2:
                 continue
+            budget_contract = search_budget_contract(gold_source_ids)
+            if (
+                budget_contract["reference_model_turns"] > RUNTIME_MAX_MODEL_TURNS
+                or budget_contract["required_tool_calls"] > CONTROLLED_TASK_MAX_TOOL_CALLS
+            ):
+                continue
             tools = search_tools(suffix)
             yield {
                 "source_dataset": "2wiki",
@@ -460,15 +514,16 @@ def iter_2wiki(root: Path, excluded_ids: set[str]) -> Iterable[dict[str, Any]]:
                 "documents": documents,
                 "fixture": None,
                 "verifier": {
-                    "schema_version": "studyhub.hidden-verifier.v1",
+                    "schema_version": "studyhub.hidden-verifier.v2",
                     "family": "search_multihop",
                     "expected_calls": [],
                     "expected_answers": [clean(row["answer"])],
                     "gold_source_ids": gold_source_ids,
                     "citations_required": True,
+                    "budget_contract": budget_contract,
                 },
-                "max_steps": 10,
-                "max_tool_calls": 8,
+                "max_steps": RUNTIME_MAX_MODEL_TURNS,
+                "max_tool_calls": CONTROLLED_TASK_MAX_TOOL_CALLS,
             }
 
 
@@ -507,6 +562,51 @@ def evidence_source_ids(evidence: list[str], documents: list[dict[str, str]]) ->
     return sorted(matched)
 
 
+def select_qasper_annotation(
+    entries: list[dict[str, Any]], documents: list[dict[str, str]]
+) -> dict[str, Any] | None:
+    """Bind one deterministic answer annotation to only its own evidence."""
+
+    candidates = []
+    for entry in entries:
+        answer = entry.get("answer", {})
+        expected_answer = qasper_answer(answer)
+        if not expected_answer:
+            continue
+        unanswerable = bool(answer.get("unanswerable"))
+        evidence = [clean(item) for item in answer.get("evidence", []) if clean(item)]
+        gold_source_ids = [] if unanswerable else evidence_source_ids(evidence, documents)
+        if not unanswerable and not gold_source_ids:
+            continue
+        budget_contract = search_budget_contract(gold_source_ids)
+        if (
+            budget_contract["reference_model_turns"] > RUNTIME_MAX_MODEL_TURNS
+            or budget_contract["required_tool_calls"] > CONTROLLED_TASK_MAX_TOOL_CALLS
+        ):
+            continue
+        annotation_id = clean(entry.get("annotation_id")) or stable_digest(
+            expected_answer, salt="qasper-annotation"
+        )
+        rank = (
+            unanswerable,
+            len(gold_source_ids),
+            stable_digest(annotation_id, salt="qasper-canonical"),
+        )
+        candidates.append(
+            (
+                rank,
+                {
+                    "annotation_id": annotation_id,
+                    "expected_answer": expected_answer,
+                    "gold_source_ids": gold_source_ids,
+                    "citations_required": bool(gold_source_ids),
+                    "budget_contract": budget_contract,
+                },
+            )
+        )
+    return min(candidates, default=(None, None), key=lambda item: item[0])[1]
+
+
 def iter_qasper(root: Path, excluded_groups: set[str]) -> Iterable[dict[str, Any]]:
     for split in ("train", "dev"):
         papers = json.loads((root / f"qasper/qasper-{split}-v0.3.json").read_text(encoding="utf-8"))
@@ -540,12 +640,8 @@ def iter_qasper(root: Path, excluded_groups: set[str]) -> Iterable[dict[str, Any
                 continue
             qas = sorted(paper.get("qas", []), key=lambda row: stable_digest(clean(row.get("question_id"))))
             for qa in qas:
-                answers = [entry.get("answer", {}) for entry in qa.get("answers", [])]
-                expected_answers = sorted({qasper_answer(answer) for answer in answers if qasper_answer(answer)})
-                answerable = [answer for answer in answers if not answer.get("unanswerable") and qasper_answer(answer)]
-                evidence = [clean(item) for answer in answerable for item in answer.get("evidence", []) if clean(item)]
-                gold_source_ids = evidence_source_ids(evidence, documents)
-                if not expected_answers or (answerable and not gold_source_ids):
+                annotation = select_qasper_annotation(qa.get("answers", []), documents)
+                if annotation is None:
                     continue
                 tools = search_tools(suffix)
                 yield {
@@ -560,15 +656,17 @@ def iter_qasper(root: Path, excluded_groups: set[str]) -> Iterable[dict[str, Any
                     "documents": documents,
                     "fixture": None,
                     "verifier": {
-                        "schema_version": "studyhub.hidden-verifier.v1",
+                        "schema_version": "studyhub.hidden-verifier.v2",
                         "family": "evidence_grounding",
                         "expected_calls": [],
-                        "expected_answers": expected_answers,
-                        "gold_source_ids": gold_source_ids,
-                        "citations_required": bool(gold_source_ids),
+                        "expected_answers": [annotation["expected_answer"]],
+                        "gold_source_ids": annotation["gold_source_ids"],
+                        "citations_required": annotation["citations_required"],
+                        "canonical_annotation_id": annotation["annotation_id"],
+                        "budget_contract": annotation["budget_contract"],
                     },
-                    "max_steps": 10,
-                    "max_tool_calls": 8,
+                    "max_steps": RUNTIME_MAX_MODEL_TURNS,
+                    "max_tool_calls": CONTROLLED_TASK_MAX_TOOL_CALLS,
                 }
                 break
 
@@ -607,6 +705,71 @@ def top_candidates(rows: Iterable[dict[str, Any]], count: int, source: str) -> l
     return [item[2] for item in sorted(heap, key=lambda item: -item[0])]
 
 
+def summarize_selected_budgets(
+    selected_by_split: dict[str, list[dict[str, Any]]]
+) -> dict[str, Any]:
+    violations = []
+    splits = {}
+    for split, rows in selected_by_split.items():
+        turns = Counter()
+        calls = Counter()
+        family_rows: dict[str, list[dict[str, Any]]] = defaultdict(list)
+        for row in rows:
+            contract = row["verifier"].get("budget_contract", {})
+            if contract.get("schema_version") != BUDGET_CONTRACT_SCHEMA:
+                violations.append(f"{row['task_id']}: invalid budget-contract schema")
+                continue
+            reference_model_turns = int(contract["reference_model_turns"])
+            required_tool_calls = int(contract["required_tool_calls"])
+            turns[reference_model_turns] += 1
+            calls[required_tool_calls] += 1
+            family_rows[row["family"]].append(row)
+            if reference_model_turns > min(row["max_steps"], RUNTIME_MAX_MODEL_TURNS):
+                violations.append(f"{row['task_id']}: reference turns exceed runtime")
+            if required_tool_calls > min(
+                row["max_tool_calls"], CONTROLLED_TASK_MAX_TOOL_CALLS
+            ):
+                violations.append(f"{row['task_id']}: required calls exceed runtime")
+        splits[split] = {
+            "tasks": len(rows),
+            "reference_model_turn_distribution": {
+                str(key): value for key, value in sorted(turns.items())
+            },
+            "required_tool_call_distribution": {
+                str(key): value for key, value in sorted(calls.items())
+            },
+            "by_family": {
+                family: {
+                    "tasks": len(family_items),
+                    "max_reference_model_turns": max(
+                        int(item["verifier"]["budget_contract"]["reference_model_turns"])
+                        for item in family_items
+                    ),
+                    "max_required_tool_calls": max(
+                        int(item["verifier"]["budget_contract"]["required_tool_calls"])
+                        for item in family_items
+                    ),
+                }
+                for family, family_items in sorted(family_rows.items())
+            },
+        }
+    result = {
+        "schema_version": "studyhub.rl-budget-audit.v1",
+        "policy": {
+            "runtime_max_model_turns": RUNTIME_MAX_MODEL_TURNS,
+            "controlled_task_max_tool_calls": CONTROLLED_TASK_MAX_TOOL_CALLS,
+            "search_reference": "one search + one read per gold source + one final model turn",
+            "function_reference": "source trajectory tool rounds + one final model turn",
+        },
+        "splits": splits,
+        "violations": violations,
+        "status": "passed" if not violations else "failed",
+    }
+    if violations:
+        raise RuntimeError(f"Selected RL tasks violate budget contract: {violations[:3]}")
+    return result
+
+
 def public_task(row: dict[str, Any], split: str, source_revision: str) -> dict[str, Any]:
     environment_seed = int(stable_digest(row["task_id"], salt="environment-seed")[:8], 16)
     return {
@@ -619,7 +782,7 @@ def public_task(row: dict[str, Any], split: str, source_revision: str) -> dict[s
         "max_steps": row["max_steps"],
         "max_tool_calls": row["max_tool_calls"],
         "metadata": {
-            "schema_version": "studyhub.open-rl-task.v1",
+            "schema_version": "studyhub.open-rl-task.v2",
             "source_dataset": row["source_dataset"],
             "source_id": row["source_id"],
             "group_id": row["group_id"],
@@ -634,14 +797,14 @@ def public_task(row: dict[str, Any], split: str, source_revision: str) -> dict[s
 
 
 def parse_args() -> argparse.Namespace:
-    project = Path(__file__).resolve().parents[2]
+    project = PROJECT_ROOT
     parser = argparse.ArgumentParser()
     parser.add_argument("--raw-root", type=Path, default=project / "datasets/raw/open_source")
     parser.add_argument(
         "--sft-metadata", type=Path, default=project / "datasets/processed/open_sft_bootstrap_v2/metadata"
     )
     parser.add_argument("--registry", type=Path, default=project / "data_registry/open_sft_sources.json")
-    parser.add_argument("--output", type=Path, default=project / "datasets/processed/open_agent_rl_v1")
+    parser.add_argument("--output", type=Path, default=project / "datasets/processed/open_agent_rl_v2")
     parser.add_argument("--overwrite", action="store_true")
     return parser.parse_args()
 
@@ -679,6 +842,8 @@ def main() -> int:
             selected_by_split[split].extend(rows)
             source_split_counts[source][split] = len(rows)
             offset += target
+
+    budget_audit = summarize_selected_budgets(selected_by_split)
 
     environments_dir = staging / "environments"
     fixtures_dir = staging / "fixtures"
@@ -728,6 +893,7 @@ def main() -> int:
 
     DatasetDict(hf_splits).save_to_disk(staging / "hf_dataset")
     write_jsonl(staging / "environment_manifest.jsonl", sorted(environment_manifest, key=lambda row: row["task_id"]))
+    write_json(staging / "budget-audit.json", budget_audit)
     task_ids = {split: {row["task_id"] for row in rows} for split, rows in public_rows.items()}
     overlap = len(task_ids["train"] & task_ids["validation"])
     if overlap:
@@ -768,6 +934,9 @@ def main() -> int:
         "task_sha256": {split: sha256(tasks_dir / f"{split}.jsonl") for split in public_rows},
         "verifier_sha256": verifier_hashes,
         "environment_manifest_sha256": sha256(staging / "environment_manifest.jsonl"),
+        "budget_audit_sha256": sha256(staging / "budget-audit.json"),
+        "budget_policy": budget_audit["policy"],
+        "budget_status": budget_audit["status"],
         "registry_sha256": sha256(args.registry),
     }
     write_json(staging / "manifest.json", manifest)

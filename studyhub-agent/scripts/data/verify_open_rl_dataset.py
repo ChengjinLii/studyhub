@@ -7,10 +7,22 @@ import argparse
 import hashlib
 import json
 import re
+import sys
 from collections import Counter, defaultdict
 from datetime import datetime
 from pathlib import Path
 from typing import Any
+
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+for import_root in (PROJECT_ROOT, PROJECT_ROOT / "src"):
+    if str(import_root) not in sys.path:
+        sys.path.insert(0, str(import_root))
+
+from training.rl.budget_contract import (
+    CONTROLLED_TASK_MAX_TOOL_CALLS,
+    RUNTIME_MAX_MODEL_TURNS,
+    validate_task_budget,
+)
 
 FORBIDDEN_PUBLIC_KEYS = {
     "answer",
@@ -23,6 +35,8 @@ FORBIDDEN_PUBLIC_KEYS = {
     "gold_source_ids",
     "gold_tool_sequence",
     "supporting_facts",
+    "budget_contract",
+    "canonical_annotation_id",
 }
 TOOL_CALL_SHAPED_ANSWER = re.compile(r"^\s*\[?[A-Za-z_][A-Za-z0-9_]*\s*\(")
 
@@ -63,13 +77,13 @@ def load_sft_groups(metadata_root: Path) -> tuple[dict[str, set[str]], dict[str,
 
 
 def parse_args() -> argparse.Namespace:
-    project = Path(__file__).resolve().parents[2]
+    project = PROJECT_ROOT
     parser = argparse.ArgumentParser()
-    parser.add_argument("--dataset", type=Path, default=project / "datasets/processed/open_agent_rl_v1")
+    parser.add_argument("--dataset", type=Path, default=project / "datasets/processed/open_agent_rl_v2")
     parser.add_argument(
         "--sft-metadata", type=Path, default=project / "datasets/processed/open_sft_bootstrap_v2/metadata"
     )
-    parser.add_argument("--output", type=Path, default=project / "artifacts/areal/open-rl-dataset-audit-v1.json")
+    parser.add_argument("--output", type=Path, default=project / "artifacts/areal/open-rl-dataset-audit-v2.json")
     return parser.parse_args()
 
 
@@ -80,6 +94,8 @@ def main() -> int:
 
     manifest_path = args.dataset / "manifest.json"
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    budget_audit_path = args.dataset / "budget-audit.json"
+    budget_audit = json.loads(budget_audit_path.read_text(encoding="utf-8"))
     dataset = load_from_disk(args.dataset / "hf_dataset")
     environment_index = {row["task_id"]: row for row in read_jsonl(args.dataset / "environment_manifest.jsonl")}
     sft_ids, sft_groups = load_sft_groups(args.sft_metadata)
@@ -88,6 +104,24 @@ def main() -> int:
     def check(condition: bool, message: str) -> None:
         if not condition:
             failures.append(message)
+
+    check(manifest.get("schema_version") == "studyhub.open-rl-dataset.v2", "dataset schema")
+    check(manifest.get("budget_status") == "passed", "manifest budget status")
+    check(budget_audit.get("status") == "passed", "budget audit status")
+    check(
+        sha256(budget_audit_path) == manifest.get("budget_audit_sha256"),
+        "budget audit hash mismatch",
+    )
+    check(
+        manifest.get("budget_policy", {}).get("runtime_max_model_turns")
+        == RUNTIME_MAX_MODEL_TURNS,
+        "runtime model-turn policy mismatch",
+    )
+    check(
+        manifest.get("budget_policy", {}).get("controlled_task_max_tool_calls")
+        == CONTROLLED_TASK_MAX_TOOL_CALLS,
+        "controlled tool-call policy mismatch",
+    )
 
     observed_ids = set()
     split_groups: dict[str, set[tuple[str, str]]] = {}
@@ -107,6 +141,8 @@ def main() -> int:
 
         family_counts = Counter()
         source_counts = Counter()
+        reference_turn_counts = Counter()
+        required_tool_counts = Counter()
         groups = set()
         for index, task in enumerate(tasks):
             task_id = task.get("task_id", "")
@@ -154,6 +190,11 @@ def main() -> int:
             if verifier is None:
                 continue
             check(verifier.get("task_id") == task_id, f"{task_id}: verifier task mismatch")
+            failures.extend(validate_task_budget(task, verifier))
+            contract = verifier.get("budget_contract", {})
+            if isinstance(contract, dict):
+                reference_turn_counts[contract.get("reference_model_turns")] += 1
+                required_tool_counts[contract.get("required_tool_calls")] += 1
             check(
                 set(verifier.get("gold_source_ids", [])).issubset(document_ids),
                 f"{task_id}: verifier references unknown document",
@@ -196,6 +237,12 @@ def main() -> int:
             "groups": len(groups),
             "source_counts": dict(sorted(source_counts.items())),
             "family_counts": dict(sorted(family_counts.items())),
+            "reference_model_turn_distribution": {
+                str(key): value for key, value in sorted(reference_turn_counts.items())
+            },
+            "required_tool_call_distribution": {
+                str(key): value for key, value in sorted(required_tool_counts.items())
+            },
         }
 
     group_overlap = len(split_groups["train"] & split_groups["validation"])
@@ -206,7 +253,7 @@ def main() -> int:
         "environment manifest hash mismatch",
     )
     result = {
-        "schema_version": "studyhub.open-rl-dataset-audit.v1",
+        "schema_version": "studyhub.open-rl-dataset-audit.v2",
         "checked_at": datetime.now().astimezone().isoformat(timespec="seconds"),
         "dataset": str(args.dataset.resolve()),
         "dataset_manifest_sha256": sha256(manifest_path),
@@ -217,6 +264,7 @@ def main() -> int:
         "unique_tasks": len(observed_ids),
         "oracle_separation": "passed" if not any("oracle" in item for item in failures) else "failed",
         "sft_overlap": "passed" if not any("overlaps SFT" in item for item in failures) else "failed",
+        "budget_contract": "passed" if not any("budget" in item or "requirement" in item or "reference" in item for item in failures) else "failed",
     }
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(result, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")

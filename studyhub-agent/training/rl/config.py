@@ -4,9 +4,11 @@ from dataclasses import dataclass, field
 
 from areal.api.cli_args import AgentConfig, GRPOConfig, InferenceEngineConfig, SGLangConfig
 
+from training.rl.budget_contract import RUNTIME_MAX_MODEL_TURNS
+
 
 AGENT_ENGINE_MAX_TOKENS = 4096
-AGENT_MAX_TURNS = 6
+AGENT_MAX_TURNS = RUNTIME_MAX_MODEL_TURNS
 
 
 @dataclass

@@ -29,6 +29,7 @@ USER_MESSAGE = re.compile(
 SYSTEM_PROMPT_MARKER = (
     "You are StudyHub Agent in an isolated training environment."
 )
+GLOBAL_STEP = re.compile(r"globalstep(\d+)")
 
 
 def _now() -> str:
@@ -134,15 +135,47 @@ def checkpoint_index(root: Path | None) -> list[dict[str, Any]]:
         return []
     indexed = []
     for path in sorted(root.rglob("adapter_model.safetensors")):
+        step_match = GLOBAL_STEP.search(str(path))
         indexed.append(
             {
                 "path": str(path.resolve()),
                 "relative_path": str(path.relative_to(root)),
                 "bytes": path.stat().st_size,
                 "sha256": _sha256(path),
+                "global_step": int(step_match.group(1)) if step_match else None,
             }
         )
     return indexed
+
+
+def summarize_lora_immutability(
+    checkpoints: list[dict[str, Any]], *, required: bool
+) -> dict[str, Any]:
+    initial = next(
+        (
+            row
+            for row in checkpoints
+            if row["relative_path"] == "actor/initial_lora/adapter_model.safetensors"
+        ),
+        None,
+    )
+    trained = [row for row in checkpoints if row.get("global_step") is not None]
+    final = max(trained, key=lambda row: int(row["global_step"])) if trained else None
+    unchanged = bool(initial and final and initial["sha256"] == final["sha256"])
+    return {
+        "schema_version": "studyhub.lora-immutability.v1",
+        "required": required,
+        "initial": initial,
+        "final": final,
+        "unchanged": unchanged,
+        "status": (
+            "passed"
+            if required and unchanged
+            else "failed"
+            if required
+            else "diagnostic"
+        ),
+    }
 
 
 def _percentile(values: list[float], fraction: float) -> float | None:
@@ -392,6 +425,10 @@ def build_bundle(args: argparse.Namespace) -> dict[str, Any]:
             _write_json(output / "metrics" / "reward-groups.json", reward_summary)
 
     checkpoints = checkpoint_index(args.checkpoint_root)
+    lora_immutability = summarize_lora_immutability(
+        checkpoints, required=args.require_unchanged_lora
+    )
+    _write_json(output / "metrics" / "lora-immutability.json", lora_immutability)
     checkpoint_path = output / "checkpoints" / "checkpoint-index.jsonl"
     checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
     checkpoint_path.write_text(
@@ -441,6 +478,9 @@ def build_bundle(args: argparse.Namespace) -> dict[str, Any]:
         "reward_log": reward_log is None or reward_log.is_file(),
         "reward_summary": reward_log is None or reward_summary is not None,
         "checkpoint_index": bool(checkpoints),
+        "lora_unchanged": (
+            not args.require_unchanged_lora or lora_immutability["unchanged"]
+        ),
         "trajectory_index": args.trajectory_root is None or bool(trajectory_records),
         "trajectory_task_mapping": (
             args.trajectory_root is None
@@ -486,6 +526,7 @@ def build_bundle(args: argparse.Namespace) -> dict[str, Any]:
                 "metrics/reward-groups.json" if reward_summary is not None else None
             ),
             "checkpoint_index": "checkpoints/checkpoint-index.jsonl",
+            "lora_immutability": "metrics/lora-immutability.json",
             "trajectory_root": (
                 str(args.trajectory_root.resolve()) if args.trajectory_root else None
             ),
@@ -499,6 +540,7 @@ def build_bundle(args: argparse.Namespace) -> dict[str, Any]:
                 "metrics/rollout-interactions.json" if trajectory_summary else None
             ),
         },
+        "lora_immutability": lora_immutability,
         "completeness": completeness,
     }
     _write_json(output / "manifest.json", manifest)
@@ -512,6 +554,7 @@ def build_bundle(args: argparse.Namespace) -> dict[str, Any]:
         output / "artifact-completeness.json",
         output / "metrics" / "trainer.json",
         output / "metrics" / "system.json",
+        output / "metrics" / "lora-immutability.json",
         checkpoint_path,
     ]
     if reward_log:
@@ -540,6 +583,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--max-sequence-tokens", type=int, default=4096)
     parser.add_argument("--output", type=Path)
     parser.add_argument("--expected-group-size", type=int, default=4)
+    parser.add_argument("--require-unchanged-lora", action="store_true")
     parser.add_argument(
         "--evidence-tier",
         choices=("SCRATCH", "DIAGNOSTIC", "CLAIM"),
@@ -554,8 +598,11 @@ def parse_args() -> argparse.Namespace:
 
 
 def main() -> int:
-    manifest = build_bundle(parse_args())
+    args = parse_args()
+    manifest = build_bundle(args)
     print(json.dumps(manifest, ensure_ascii=False, indent=2))
+    if args.require_unchanged_lora and not manifest["lora_immutability"]["unchanged"]:
+        return 1
     return 0
 
 

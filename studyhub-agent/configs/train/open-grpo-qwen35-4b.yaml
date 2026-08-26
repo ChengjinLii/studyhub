@@ -9,8 +9,8 @@ tokenizer_path: ${actor.path}
 workflow: training.rl.hermes_workflow.StudyHubHermesWorkflow
 eval_workflow: ${workflow}
 max_turns: 6
-environment_root: /data/chengjin/studyhub/studyhub-agent/datasets/processed/open_agent_rl_v1
-verifier_root: /data/chengjin/studyhub/studyhub-agent/datasets/processed/open_agent_rl_v1/verifiers
+environment_root: /data/chengjin/studyhub/studyhub-agent/datasets/processed/open_agent_rl_v2
+verifier_root: /data/chengjin/studyhub/studyhub-agent/datasets/processed/open_agent_rl_v2/verifiers
 hermes_checkout: /data/chengjin/studyhub/studyhub-agent/.vendor/hermes-agent
 reward_artifact_root: /data/chengjin/studyhub/studyhub-agent/artifacts/areal/reward-v2/4b
 
@@ -33,6 +33,7 @@ rollout:
   queue_size: null
   consumer_batch_size: ${train_dataset.batch_size}
   max_head_offpolicyness: 0
+  deterministic_sampling: false
   enable_rollout_tracing: false
   scheduling_spec: ${actor.scheduling_spec}
   use_lora: true
@@ -145,6 +146,7 @@ sglang:
   skip_tokenizer_init: true
   dtype: ${actor.dtype}
   disable_overlap_schedule: true
+  enable_deterministic_inference: false
   sampling_backend: pytorch
   max_running_requests: 8
   context_length: 8192
@@ -170,7 +172,7 @@ train_dataset:
   drop_last: true
   pin_memory: true
   num_workers: 2
-  path: /data/chengjin/studyhub/studyhub-agent/datasets/processed/open_agent_rl_v1/hf_dataset
+  path: /data/chengjin/studyhub/studyhub-agent/datasets/processed/open_agent_rl_v2/hf_dataset
   type: rl
   max_length: 8192
 
@@ -180,7 +182,7 @@ valid_dataset:
   drop_last: false
   pin_memory: true
   num_workers: 2
-  path: /data/chengjin/studyhub/studyhub-agent/datasets/processed/open_agent_rl_v1/hf_dataset
+  path: /data/chengjin/studyhub/studyhub-agent/datasets/processed/open_agent_rl_v2/hf_dataset
   type: rl
   max_length: 8192
 

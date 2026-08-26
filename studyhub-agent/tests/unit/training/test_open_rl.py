@@ -96,6 +96,21 @@ def test_grpo_config_caps_exported_interactions_at_microbatch_capacity() -> None
     assert config.rollout.agent.export_style == "individual"
 
 
+def test_eval_launcher_enforces_deterministic_non_updating_protocol() -> None:
+    project_root = Path(__file__).parents[3]
+    launcher = (project_root / "scripts/train/run_controlled_grpo.sh").read_text()
+
+    for contract in (
+        "actor.optimizer.lr=0.0",
+        "rollout.deterministic_sampling=true",
+        "rollout.max_head_offpolicyness=0",
+        "sglang.enable_deterministic_inference=true",
+        "open_agent_rl_dev_eval32_v2",
+        "--require-unchanged-lora",
+    ):
+        assert contract in launcher
+
+
 def test_training_prompt_keeps_only_studyhub_constraints() -> None:
     agent = SimpleNamespace(
         _build_system_prompt=lambda _message=None: "Hermes interactive prompt",
@@ -115,7 +130,7 @@ def test_training_prompt_keeps_only_studyhub_constraints() -> None:
     assert agent.ephemeral_system_prompt is None
 
 
-def test_grpo_masks_truncated_generations_from_training() -> None:
+def test_grpo_zeros_outcome_reward_for_truncated_no_eos_generations() -> None:
     project_root = Path(__file__).parents[3]
     config = yaml.safe_load(
         (project_root / "configs/train/open-grpo-qwen35-4b.yaml").read_text()
@@ -470,8 +485,9 @@ def test_toolace_parser_keeps_all_tool_rounds_and_only_the_final_answer() -> Non
     parsed = parse_toolace_trajectory(conversations, ["weather", "layout"])
 
     assert parsed is not None
-    user_request, calls, responses, final = parsed
+    user_request, calls, responses, final, reference_model_turns = parsed
     assert user_request == "Plan an outdoor party."
     assert [call["original_name"] for call in calls] == ["weather", "layout"]
     assert [response["original_name"] for response in responses] == ["weather", "layout"]
     assert final == "The weather is dry and the layout is ready."
+    assert reference_model_turns == 3

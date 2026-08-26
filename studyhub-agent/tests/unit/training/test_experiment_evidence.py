@@ -6,6 +6,7 @@ from scripts.train.build_experiment_evidence import (
     SYSTEM_PROMPT_MARKER,
     index_rollout_interactions,
     parse_metric_series,
+    summarize_lora_immutability,
     summarize_metric_series,
 )
 
@@ -40,6 +41,26 @@ def test_summarize_metric_series_preserves_endpoints_and_range() -> None:
         "max": 3.0,
         "mean": 2.0,
     }
+
+
+def test_eval_lora_immutability_compares_initial_and_latest_step() -> None:
+    checkpoints = [
+        {
+            "relative_path": "actor/initial_lora/adapter_model.safetensors",
+            "sha256": "same",
+            "global_step": None,
+        },
+        {
+            "relative_path": "default/epoch0epochstep0globalstep0/adapter_model.safetensors",
+            "sha256": "same",
+            "global_step": 0,
+        },
+    ]
+
+    result = summarize_lora_immutability(checkpoints, required=True)
+
+    assert result["unchanged"] is True
+    assert result["status"] == "passed"
 
 
 def test_rollout_index_preserves_policy_version_and_task_lineage(tmp_path) -> None:

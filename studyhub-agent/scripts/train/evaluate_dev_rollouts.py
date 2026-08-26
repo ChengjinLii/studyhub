@@ -14,8 +14,10 @@ from pathlib import Path
 from typing import Any
 
 
+ROLLOUTS_PER_TASK = 4
+
 PROTOCOL = {
-    "schema_version": "studyhub.dev-eval.v1",
+    "schema_version": "studyhub.dev-eval.v2",
     "scope": "verifier-aligned development evaluation; not a sealed final test",
     "strict_success": {
         "all": ["nonempty final answer", "no hard gate", "no violations"],
@@ -93,6 +95,16 @@ def _summarize_rows(rows: list[dict[str, Any]]) -> dict[str, Any]:
     for row in rows:
         by_task[str(row["task_id"])].append(row)
     group_sizes = Counter(len(group) for group in by_task.values())
+    invalid_groups = {
+        task_id: len(group)
+        for task_id, group in sorted(by_task.items())
+        if len(group) != ROLLOUTS_PER_TASK
+    }
+    if invalid_groups:
+        raise RuntimeError(
+            f"development evaluation requires exactly {ROLLOUTS_PER_TASK} rollouts "
+            f"per task; invalid groups: {dict(list(invalid_groups.items())[:5])}"
+        )
     per_task = []
     for task_id, group in sorted(by_task.items()):
         strict = [_strict_success(row) for row in group]
@@ -241,7 +253,7 @@ def main() -> int:
             **summary,
         }
     result: dict[str, Any] = {
-        "schema_version": "studyhub.dev-eval-results.v1",
+        "schema_version": "studyhub.dev-eval-results.v2",
         "generated_at": datetime.now(UTC).isoformat(timespec="seconds"),
         "protocol": PROTOCOL,
         "runs": runs,

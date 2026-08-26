@@ -1,8 +1,15 @@
 from __future__ import annotations
 
+import json
+from pathlib import Path
+
 import pytest
 
-from scripts.train.evaluate_dev_rollouts import _strict_success, compare_runs
+from scripts.train.evaluate_dev_rollouts import (
+    _strict_success,
+    _summarize_rows,
+    compare_runs,
+)
 
 
 def _row(family: str, **reward_overrides):
@@ -62,4 +69,40 @@ def test_paired_comparison_uses_matching_task_ids() -> None:
         "strict_improved": 1,
         "strict_unchanged": 0,
         "strict_regressed": 0,
+    }
+
+
+def test_dev_evaluation_rejects_incomplete_four_rollout_group() -> None:
+    rows = []
+    for index in range(3):
+        row = _row("function_calling")
+        row.update(
+            {
+                "task_id": "task-a",
+                "source_dataset": "fixture",
+                "trace": {"tool_calls": 1, "hermes": {"total_tokens": 10}},
+                "rollout_id": f"rollout-{index}",
+            }
+        )
+        rows.append(row)
+
+    with pytest.raises(RuntimeError, match="exactly 4 rollouts"):
+        _summarize_rows(rows)
+
+
+def test_frozen_v2_protocol_records_reproducibility_contract() -> None:
+    project_root = Path(__file__).parents[3]
+    protocol = json.loads(
+        (project_root / "configs/eval/studyhub-dev-eval-v2.json").read_text()
+    )
+
+    assert protocol["schema_version"] == "studyhub.dev-eval.v2"
+    assert protocol["subset"]["tasks"] == 32
+    assert protocol["subset"]["rollouts_per_task"] == 4
+    assert protocol["generation"]["deterministic_sampling"] is True
+    assert protocol["generation"]["deterministic_inference"] is True
+    assert protocol["execution"] == {
+        "optimizer_lr": 0.0,
+        "require_unchanged_lora": True,
+        "exact_rollout_group_size": 4,
     }

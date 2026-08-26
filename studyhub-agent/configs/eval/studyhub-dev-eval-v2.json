@@ -1,21 +1,35 @@
 {
-  "schema_version": "studyhub.dev-eval.v1",
-  "frozen_at": "2026-08-26T03:49:00+08:00",
+  "schema_version": "studyhub.dev-eval.v2",
+  "frozen_at": "2026-08-26T14:54:35+08:00",
   "scope": "verifier-aligned development evaluation; not a sealed final test",
   "subset": {
     "builder": "scripts/data/build_rl_dev_eval_subset.py",
     "seed": 6209,
     "tasks": 32,
     "rollouts_per_task": 4,
-    "manifest_sha256": "0f4d992d9610dba78a1ebe4902276654b0a26464322988ae6d943470055db3f3",
-    "tasks_jsonl_sha256": "317643b60e7d5931c4414af0e1dc701f314bd21019f4ccdfa27d9c620d9339ea"
+    "source_manifest_sha256": "6de6d07e9543919379de9d230dce479df929bd8d277558409fc673aa20f5a89a",
+    "manifest_sha256": "2877c36a31575908cc3423a17c18bbfd24491789dded7f637938522217d6844e",
+    "tasks_jsonl_sha256": "1ad80d36bd45e88dcf90415398548210ce054417d14774f3780d2f853735153c"
+  },
+  "budget_contract": {
+    "runtime_max_model_turns": 6,
+    "controlled_task_max_tool_calls": 6,
+    "infeasible_tasks_allowed": false
   },
   "generation": {
     "temperature": 1.0,
     "top_p": 1.0,
     "max_new_tokens": 1536,
     "max_sequence_tokens": 4096,
-    "max_turns": 6
+    "max_turns": 6,
+    "deterministic_sampling": true,
+    "deterministic_inference": true,
+    "max_head_offpolicyness": 0
+  },
+  "execution": {
+    "optimizer_lr": 0.0,
+    "require_unchanged_lora": true,
+    "exact_rollout_group_size": 4
   },
   "strict_success": {
     "common": [
@@ -44,5 +58,5 @@
     "family slices",
     "paired task bootstrap confidence intervals"
   ],
-  "comparison_rule": "All candidates use the same task IDs, environment/verifier snapshot, generation settings and seed. A scalar reward increase alone is not sufficient for promotion."
+  "comparison_rule": "All candidates use the same task IDs, environment/verifier snapshot, deterministic generation settings and seed. A scalar reward increase alone is not sufficient for promotion."
 }

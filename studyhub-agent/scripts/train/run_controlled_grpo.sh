@@ -92,10 +92,10 @@ REWARD_ROOT="${PROJECT_ROOT}/artifacts/areal/reward-v2/${SIZE}/${TRIAL}"
 LOG_FILE="${LOG_ROOT}/${TRIAL}.log"
 GPU_CSV="${LOG_ROOT}/${TRIAL}.gpu.csv"
 RUN_METADATA="${LOG_ROOT}/${TRIAL}.run.json"
-DATASET="${PROJECT_ROOT}/datasets/processed/open_agent_rl_v1/manifest.json"
+DATASET="${PROJECT_ROOT}/datasets/processed/open_agent_rl_v2/manifest.json"
 EXPERIMENT="studyhub-open-grpo-${SIZE}-${BRANCH}"
 if [[ "${MODE}" == "eval" ]]; then
-  DATASET="${PROJECT_ROOT}/datasets/processed/open_agent_rl_dev_eval32_v1/manifest.json"
+  DATASET="${PROJECT_ROOT}/datasets/processed/open_agent_rl_dev_eval32_v2/manifest.json"
   EXPERIMENT="studyhub-open-grpo-${SIZE}-evaluation"
 fi
 
@@ -126,7 +126,10 @@ case "${MODE}" in
     "recover.mode=disabled"
     "actor.optimizer.lr=0.0"
     "actor.optimizer.warmup_steps_proportion=0.0"
-    "valid_dataset.path=${PROJECT_ROOT}/datasets/processed/open_agent_rl_dev_eval32_v1/hf_dataset"
+    "rollout.deterministic_sampling=true"
+    "rollout.max_head_offpolicyness=0"
+    "sglang.enable_deterministic_inference=true"
+    "valid_dataset.path=${PROJECT_ROOT}/datasets/processed/open_agent_rl_dev_eval32_v2/hf_dataset"
     "evaluator.freq_epochs=null"
     "evaluator.freq_steps=1"
   ) ;;
@@ -187,15 +190,19 @@ trap - EXIT
 CHECKPOINT_ROOT="${PROJECT_ROOT}/artifacts/areal/checkpoints/chengjin/${EXPERIMENT}/${TRIAL}"
 TRAJECTORY_ROOT="${PROJECT_ROOT}/artifacts/areal/logs/chengjin/${EXPERIMENT}/${TRIAL}/rollout"
 EVIDENCE_REWARD_ROOT="${REWARD_ROOT}"
-EVIDENCE_TASK_ROOT="${PROJECT_ROOT}/datasets/processed/open_agent_rl_v1/tasks"
+EVIDENCE_TASK_ROOT="${PROJECT_ROOT}/datasets/processed/open_agent_rl_v2/tasks"
 if [[ "${MODE}" == "eval" ]]; then
   TRAJECTORY_ROOT="${PROJECT_ROOT}/artifacts/areal/logs/chengjin/${EXPERIMENT}/${TRIAL}/eval-rollout"
   EVIDENCE_REWARD_ROOT="${REWARD_ROOT}/validation"
-  EVIDENCE_TASK_ROOT="${PROJECT_ROOT}/datasets/processed/open_agent_rl_dev_eval32_v1/tasks.jsonl"
+  EVIDENCE_TASK_ROOT="${PROJECT_ROOT}/datasets/processed/open_agent_rl_dev_eval32_v2/tasks.jsonl"
 fi
 EVIDENCE_TIER="DIAGNOSTIC"
 if [[ "${MODE}" == "run" ]]; then
   EVIDENCE_TIER="CLAIM"
+fi
+EVIDENCE_ARGS=()
+if [[ "${MODE}" == "eval" ]]; then
+  EVIDENCE_ARGS+=(--require-unchanged-lora)
 fi
 if ! "${VENV_DIR}/bin/python" "${PROJECT_ROOT}/scripts/train/build_experiment_evidence.py" \
   --run-metadata "${RUN_METADATA}" \
@@ -204,7 +211,8 @@ if ! "${VENV_DIR}/bin/python" "${PROJECT_ROOT}/scripts/train/build_experiment_ev
   --trajectory-root "${TRAJECTORY_ROOT}" \
   --task-root "${EVIDENCE_TASK_ROOT}" \
   --max-sequence-tokens 4096 \
-  --evidence-tier "${EVIDENCE_TIER}" >/dev/null; then
+  --evidence-tier "${EVIDENCE_TIER}" \
+  "${EVIDENCE_ARGS[@]}" >/dev/null; then
   echo "Failed to finalize the evidence bundle for ${TRIAL}." >&2
   if [[ "${STATUS}" -eq 0 ]]; then
     STATUS=74

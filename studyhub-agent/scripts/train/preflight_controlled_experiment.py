@@ -26,7 +26,7 @@ PROXY_ENV = (
     "https_proxy",
 )
 
-SGLANG_LORA_TARGET_MODULES = {
+CONTROLLED_V1_LORA_TARGET_MODULES = {
     "o_proj",
     "gate_proj",
     "up_proj",
@@ -78,6 +78,11 @@ def canonical_repository(value: str) -> str:
 def count_jsonl(path: Path) -> int:
     with path.open(encoding="utf-8") as stream:
         return sum(1 for line in stream if line.strip())
+
+
+def read_jsonl(path: Path) -> list[dict[str, Any]]:
+    with path.open(encoding="utf-8") as stream:
+        return [json.loads(line) for line in stream if line.strip()]
 
 
 def check_models(repo_root: Path) -> dict[str, Any]:
@@ -153,9 +158,29 @@ def check_sft_data(project: Path) -> dict[str, Any]:
 def check_rl_data(project: Path) -> dict[str, Any]:
     from datasets import DatasetDict, load_from_disk
 
-    root = project / "datasets/processed/open_agent_rl_v1"
+    from training.rl.budget_contract import (
+        CONTROLLED_TASK_MAX_TOOL_CALLS,
+        RUNTIME_MAX_MODEL_TURNS,
+        validate_task_budget,
+    )
+
+    root = project / "datasets/processed/open_agent_rl_v2"
     expected = {"train": 2000, "validation": 400}
     manifest = json_file(root / "manifest.json")
+    if manifest.get("schema_version") != "studyhub.open-rl-dataset.v2":
+        raise RuntimeError("RL dataset schema is not v2")
+    budget_audit = json_file(root / "budget-audit.json")
+    if budget_audit.get("status") != "passed" or manifest.get("budget_status") != "passed":
+        raise RuntimeError("RL task budget audit did not pass")
+    if sha256(root / "budget-audit.json") != manifest.get("budget_audit_sha256"):
+        raise RuntimeError("RL task budget audit hash mismatch")
+    expected_budget_policy = {
+        "runtime_max_model_turns": RUNTIME_MAX_MODEL_TURNS,
+        "controlled_task_max_tool_calls": CONTROLLED_TASK_MAX_TOOL_CALLS,
+    }
+    for key, value in expected_budget_policy.items():
+        if manifest.get("budget_policy", {}).get(key) != value:
+            raise RuntimeError(f"RL budget policy mismatch: {key}")
     dataset = load_from_disk(str(root / "hf_dataset"))
     if not isinstance(dataset, DatasetDict):
         raise TypeError("RL dataset is not a DatasetDict")
@@ -177,6 +202,18 @@ def check_rl_data(project: Path) -> dict[str, Any]:
             raise RuntimeError(f"RL public task count mismatch for {split}")
         if count_jsonl(root / "verifiers" / f"{split}.jsonl") != count:
             raise RuntimeError(f"RL hidden verifier count mismatch for {split}")
+        tasks = read_jsonl(root / "tasks" / f"{split}.jsonl")
+        verifiers = {
+            row["task_id"]: row
+            for row in read_jsonl(root / "verifiers" / f"{split}.jsonl")
+        }
+        budget_failures = [
+            failure
+            for task in tasks
+            for failure in validate_task_budget(task, verifiers.get(task["task_id"], {}))
+        ]
+        if budget_failures:
+            raise RuntimeError(f"RL task budget violations: {budget_failures[:3]}")
     environment_count = len(list((root / "environments").glob("*.json")))
     if environment_count != sum(expected.values()):
         raise RuntimeError(f"RL environment count mismatch: {environment_count}")
@@ -186,15 +223,21 @@ def check_rl_data(project: Path) -> dict[str, Any]:
         "families": manifest["family_counts"],
         "environment_count": environment_count,
         "oracle_policy": oracle_policy,
+        "budget_policy": manifest["budget_policy"],
+        "budget_status": "passed",
     }
 
 
 def check_rl_dev_eval(project: Path) -> dict[str, Any]:
     from datasets import DatasetDict, load_from_disk
 
-    root = project / "datasets/processed/open_agent_rl_dev_eval32_v1"
-    source = project / "datasets/processed/open_agent_rl_v1"
+    root = project / "datasets/processed/open_agent_rl_dev_eval32_v2"
+    source = project / "datasets/processed/open_agent_rl_v2"
     manifest = json_file(root / "manifest.json")
+    protocol_path = project / "configs/eval/studyhub-dev-eval-v2.json"
+    protocol = json_file(protocol_path)
+    if manifest.get("schema_version") != "studyhub.rl-dev-eval-subset.v2":
+        raise RuntimeError("RL development evaluation schema is not v2")
     if sha256(source / "manifest.json") != manifest.get("source_manifest_sha256"):
         raise RuntimeError("RL development evaluation source manifest changed")
     dataset = load_from_disk(str(root / "hf_dataset"))
@@ -216,9 +259,50 @@ def check_rl_dev_eval(project: Path) -> dict[str, Any]:
     eval_groups = {str(row["metadata"]["group_id"]) for row in rows}
     if train_groups & eval_groups or manifest.get("rl_train_group_overlap") != 0:
         raise RuntimeError("RL development evaluation overlaps RL train lineage")
+    source_manifest = json_file(source / "manifest.json")
+    if manifest.get("budget_policy") != source_manifest.get("budget_policy"):
+        raise RuntimeError("RL development evaluation budget policy changed")
     for task_id in task_ids:
         if not (source / "environments" / f"{task_id}.json").is_file():
             raise RuntimeError(f"missing evaluation environment: {task_id}")
+    subset = protocol.get("subset", {})
+    if protocol.get("schema_version") != "studyhub.dev-eval.v2":
+        raise RuntimeError("RL development evaluation protocol is not v2")
+    expected_subset = {
+        "seed": manifest.get("seed"),
+        "tasks": 32,
+        "rollouts_per_task": 4,
+        "source_manifest_sha256": sha256(source / "manifest.json"),
+        "manifest_sha256": sha256(root / "manifest.json"),
+        "tasks_jsonl_sha256": sha256(task_path),
+    }
+    for key, value in expected_subset.items():
+        if subset.get(key) != value:
+            raise RuntimeError(f"RL development evaluation protocol mismatch: subset.{key}")
+    budget_contract = protocol.get("budget_contract", {})
+    if budget_contract != {
+        "runtime_max_model_turns": 6,
+        "controlled_task_max_tool_calls": 6,
+        "infeasible_tasks_allowed": False,
+    }:
+        raise RuntimeError("RL development evaluation protocol budget changed")
+    generation = protocol.get("generation", {})
+    required_generation = {
+        "max_turns": 6,
+        "deterministic_sampling": True,
+        "deterministic_inference": True,
+        "max_head_offpolicyness": 0,
+    }
+    for key, value in required_generation.items():
+        if generation.get(key) != value:
+            raise RuntimeError(f"RL development evaluation generation mismatch: {key}")
+    execution = protocol.get("execution", {})
+    if execution != {
+        "optimizer_lr": 0.0,
+        "require_unchanged_lora": True,
+        "exact_rollout_group_size": 4,
+    }:
+        raise RuntimeError("RL development evaluation execution contract changed")
     return {
         "path": str(root),
         "role": manifest.get("role"),
@@ -227,6 +311,11 @@ def check_rl_dev_eval(project: Path) -> dict[str, Any]:
         "sources": manifest.get("source_counts"),
         "train_group_overlap": 0,
         "public_verifier_fields_empty": True,
+        "protocol": str(protocol_path),
+        "protocol_sha256": sha256(protocol_path),
+        "deterministic_sampling": True,
+        "deterministic_inference": True,
+        "rollouts_per_task": 4,
     }
 
 
@@ -264,9 +353,9 @@ def check_runtime(project: Path) -> dict[str, Any]:
             sft_path = config_root / f"open-sft-qwen35-{size}.yaml"
             sft_config, _ = load_expr_config(["--config", str(sft_path)], SFTConfig)
             sft_target_modules = set(sft_config.actor.target_modules)
-            if sft_target_modules != SGLANG_LORA_TARGET_MODULES:
+            if sft_target_modules != CONTROLLED_V1_LORA_TARGET_MODULES:
                 raise RuntimeError(
-                    f"{size} SFT LoRA targets are not SGLang-compatible: "
+                    f"{size} SFT LoRA targets differ from the controlled-v1 recipe: "
                     f"{sorted(sft_target_modules)}"
                 )
             parsed[f"sft_{size}"] = {
@@ -278,6 +367,21 @@ def check_runtime(project: Path) -> dict[str, Any]:
             grpo_path = config_root / f"open-grpo-qwen35-{size}.yaml"
             grpo_config, _ = load_expr_config(
                 ["--config", str(grpo_path)], StudyHubAgentGRPOConfig
+            )
+            eval_config, _ = load_expr_config(
+                [
+                    "--config",
+                    str(grpo_path),
+                    "actor.optimizer.lr=0.0",
+                    "rollout.deterministic_sampling=true",
+                    "rollout.max_head_offpolicyness=0",
+                    "sglang.enable_deterministic_inference=true",
+                    (
+                        "valid_dataset.path="
+                        f"{project}/datasets/processed/open_agent_rl_dev_eval32_v2/hf_dataset"
+                    ),
+                ],
+                StudyHubAgentGRPOConfig,
             )
             workflow = StudyHubHermesWorkflow(
                 environment_root=grpo_config.environment_root,
@@ -304,7 +408,7 @@ def check_runtime(project: Path) -> dict[str, Any]:
                 )
             if not grpo_config.actor.mask_no_eos_with_zero:
                 raise RuntimeError(
-                    f"{size} GRPO must exclude truncated no-EOS trajectories"
+                    f"{size} GRPO must zero outcome reward for truncated no-EOS trajectories"
                 )
             if grpo_config.rollout.agent.chat_template_type != "hf":
                 raise RuntimeError(
@@ -321,6 +425,14 @@ def check_runtime(project: Path) -> dict[str, Any]:
                 raise RuntimeError(f"{size} GRPO uses an unsafe AReaL admin key")
             if not grpo_config.gconfig.drop_incomplete_group:
                 raise RuntimeError(f"{size} GRPO must drop incomplete rollout groups")
+            if eval_config.actor.optimizer.lr != 0.0:
+                raise RuntimeError(f"{size} evaluation must use a zero optimizer learning rate")
+            if not eval_config.rollout.deterministic_sampling:
+                raise RuntimeError(f"{size} evaluation must use deterministic request sampling")
+            if eval_config.rollout.max_head_offpolicyness != 0:
+                raise RuntimeError(f"{size} evaluation must start from an on-policy rollout config")
+            if not eval_config.sglang.enable_deterministic_inference:
+                raise RuntimeError(f"{size} evaluation must enable deterministic SGLang inference")
             if grpo_config.sglang.max_loras_per_batch != 1:
                 raise RuntimeError(f"{size} SGLang must reserve exactly one active LoRA slot")
             if grpo_config.sglang.max_loaded_loras != 1:
@@ -334,9 +446,9 @@ def check_runtime(project: Path) -> dict[str, Any]:
                     f"{size} SGLang sampling must use the PyTorch backend when nvcc is unavailable"
                 )
             grpo_target_modules = set(grpo_config.actor.target_modules)
-            if grpo_target_modules != SGLANG_LORA_TARGET_MODULES:
+            if grpo_target_modules != CONTROLLED_V1_LORA_TARGET_MODULES:
                 raise RuntimeError(
-                    f"{size} GRPO LoRA targets are not SGLang-compatible: "
+                    f"{size} GRPO LoRA targets differ from the controlled-v1 recipe: "
                     f"{sorted(grpo_target_modules)}"
                 )
             if grpo_target_modules != sft_target_modules:
@@ -367,6 +479,15 @@ def check_runtime(project: Path) -> dict[str, Any]:
                 "actor_microbatch_tokens": grpo_config.actor.mb_spec.max_tokens_per_mb,
                 "reference_microbatch_tokens": grpo_config.ref.mb_spec.max_tokens_per_mb,
                 "lora_target_modules": sorted(grpo_target_modules),
+                "evaluation": {
+                    "optimizer_lr": eval_config.actor.optimizer.lr,
+                    "deterministic_sampling": eval_config.rollout.deterministic_sampling,
+                    "max_head_offpolicyness": eval_config.rollout.max_head_offpolicyness,
+                    "deterministic_inference": (
+                        eval_config.sglang.enable_deterministic_inference
+                    ),
+                    "dataset": eval_config.valid_dataset.path,
+                },
             }
     finally:
         if admin_key_was_missing:

@@ -5,6 +5,8 @@ import json
 import subprocess
 from pathlib import Path
 
+import pytest
+
 from studyhub_agent.adapters.collective_memory import FixtureCollectiveMemoryReader
 from studyhub_agent.adapters.personal_memory import InMemoryPersonalMemoryProvider
 from studyhub_agent.adapters.rag import RagExperimentKnowledgeRetriever
@@ -21,6 +23,23 @@ from training.rl.hermes_workflow import StudyHubHermesWorkflow
 
 ROOT = Path(__file__).resolve().parents[2]
 IDENTITY_SECRET = "hermes-integration-fixture-secret"
+PROXY_ENV = (
+    "ALL_PROXY",
+    "all_proxy",
+    "HTTP_PROXY",
+    "http_proxy",
+    "HTTPS_PROXY",
+    "https_proxy",
+)
+
+
+def _prepare_hermes_test_runtime(monkeypatch) -> None:
+    checkout = ROOT / ".vendor/hermes-agent"
+    if not (checkout / "run_agent.py").is_file():
+        pytest.skip("pinned Hermes checkout is not installed")
+    monkeypatch.syspath_prepend(str(checkout))
+    for key in PROXY_ENV:
+        monkeypatch.delenv(key, raising=False)
 
 
 def _resolver(hostname: str) -> list[str]:
@@ -95,6 +114,7 @@ def test_hermes_checkout_matches_clean_unpatched_upstream() -> None:
 
 
 def test_real_hermes_runs_all_fixture_tool_combinations(monkeypatch, tmp_path) -> None:
+    _prepare_hermes_test_runtime(monkeypatch)
     monkeypatch.setenv("HERMES_HOME", str(tmp_path / "hermes-home"))
     monkeypatch.setenv("NO_PROXY", "127.0.0.1,localhost")
     monkeypatch.setenv("no_proxy", "127.0.0.1,localhost")
@@ -160,6 +180,7 @@ def test_real_hermes_runs_all_fixture_tool_combinations(monkeypatch, tmp_path) -
 
 
 def test_training_workflow_runs_real_hermes_against_frozen_tool(monkeypatch, tmp_path) -> None:
+    _prepare_hermes_test_runtime(monkeypatch)
     hermes_home = tmp_path / "hermes-home"
     hermes_home.mkdir()
     (hermes_home / "config.yaml").write_text(

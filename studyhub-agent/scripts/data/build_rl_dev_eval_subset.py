@@ -50,6 +50,9 @@ def build_subset(source: Path, output: Path, seed: int) -> dict[str, Any]:
     source = source.resolve()
     output = output.resolve()
     dataset = load_from_disk(str(source / "hf_dataset"))
+    source_manifest_data = json.loads((source / "manifest.json").read_text(encoding="utf-8"))
+    if source_manifest_data.get("schema_version") != "studyhub.open-rl-dataset.v2":
+        raise RuntimeError("development evaluation requires the v2 RL dataset")
     validation = dataset["validation"]
     train_group_ids = {str(row["metadata"]["group_id"]) for row in dataset["train"]}
 
@@ -97,7 +100,7 @@ def build_subset(source: Path, output: Path, seed: int) -> dict[str, Any]:
     )
     source_manifest = source / "manifest.json"
     manifest = {
-        "schema_version": "studyhub.rl-dev-eval-subset.v1",
+        "schema_version": "studyhub.rl-dev-eval-subset.v2",
         "generated_at": datetime.now(UTC).isoformat(timespec="seconds"),
         "seed": seed,
         "role": "development evaluation; not the sealed final test",
@@ -115,6 +118,7 @@ def build_subset(source: Path, output: Path, seed: int) -> dict[str, Any]:
         "difficulty_counts": dict(Counter(str(row["difficulty"]) for row in selected)),
         "rl_train_group_overlap": 0,
         "public_verifier_fields_empty": True,
+        "budget_policy": source_manifest_data["budget_policy"],
     }
     manifest_path = output / "manifest.json"
     manifest_path.write_text(
@@ -129,12 +133,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--source",
         type=Path,
-        default=Path("datasets/processed/open_agent_rl_v1"),
+        default=Path("datasets/processed/open_agent_rl_v2"),
     )
     parser.add_argument(
         "--output",
         type=Path,
-        default=Path("datasets/processed/open_agent_rl_dev_eval32_v1"),
+        default=Path("datasets/processed/open_agent_rl_dev_eval32_v2"),
     )
     parser.add_argument("--seed", type=int, default=6209)
     return parser.parse_args()

@@ -6,7 +6,9 @@
 - `Qwen/Qwen3.5-9B` is fixed at revision `c202236235762e1c871ad0ccb60c8ee5ba337b9a` under `models/P1/Qwen3.5-9B`.
 - AReaL `2.0.0` is fixed at commit `cbff54d645d2cd8ee1f1c358a82f3f473588433d`; SGLang is `0.5.10.post1`.
 - Hermes is a clean checkout fixed at commit `5c1a304ce890276a4334d8ced3f29ffeedbbbf93`.
-- No SFT or RL training has been started.
+- A real 4B Direct GRPO Gate and 10-step Smoke have completed as diagnostic runtime
+  evidence. Full SFT, the v2 paired evaluations, and claim-bearing RL runs have not
+  completed yet.
 
 Models, datasets, checkpoints, logs, and generated audits are Git-ignored.
 Configs, builders, verifiers, launchers, and this document are tracked source.
@@ -40,6 +42,13 @@ Gold answers, tool sequences, and evidence labels remain in server-side
 verifiers. The RL audit confirms zero SFT overlap and zero train/validation
 group overlap. ToolACE multi-round conversations are converted as one complete
 tool trajectory; an intermediate tool call is never treated as the final answer.
+RL v2 also binds each QASPER answer to one canonical annotation and rejects any
+task that cannot complete within the shared six-model-turn/six-tool-call budget.
+
+The frozen 32-task development evaluation uses four rollouts per task. Its v2
+protocol requires stable request seeds, deterministic SGLang inference, exact
+four-sample groups, a zero optimizer learning rate, and identical initial/final
+LoRA hashes. It is a development set, not a sealed final benchmark.
 
 ## Experiment branches
 
@@ -113,5 +122,6 @@ the same rollout; unmatched fixture arguments return a deterministic error.
 SFT reserves one otherwise idle GPU. GRPO reserves two otherwise idle GPUs.
 The guard refuses to start on a busy GPU, samples memory every five seconds,
 and stops only its own process group if the configured memory ceiling is
-crossed or another GPU process appears. Child-process PGID handling still needs
-to be observed in the one-step Gate before any longer run.
+crossed or another GPU process appears. The one-step Gate and 10-step Smoke
+observed AReaL/SGLang child-process handling without crossing the 68,000 MiB
+ceiling; each new scale or materially changed recipe still starts with a Gate.

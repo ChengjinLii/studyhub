@@ -37,6 +37,9 @@ if [[ "${MODE}" == "rebuild" ]]; then
     --overwrite
   "${VENV_DIR}/bin/python" "${PROJECT_ROOT}/scripts/data/build_open_rl_tasks.py" \
     --overwrite
+  "${VENV_DIR}/bin/python" "${PROJECT_ROOT}/scripts/data/build_rl_dev_eval_subset.py" \
+    --source "${PROJECT_ROOT}/datasets/processed/open_agent_rl_v2" \
+    --output "${PROJECT_ROOT}/datasets/processed/open_agent_rl_dev_eval32_v2"
 else
   bash "${PROJECT_ROOT}/scripts/models/download_qwen35_controlled.sh" verify
 fi
@@ -48,8 +51,8 @@ fi
   --dataset "${PROJECT_ROOT}/datasets/processed/open_sft_bootstrap_v2_qwen35_9b" \
   --output "${PROJECT_ROOT}/artifacts/areal/dataset-audit-qwen35-9b.json"
 "${VENV_DIR}/bin/python" "${PROJECT_ROOT}/scripts/data/verify_open_rl_dataset.py" \
-  --dataset "${PROJECT_ROOT}/datasets/processed/open_agent_rl_v1" \
-  --output "${PROJECT_ROOT}/artifacts/areal/open-rl-dataset-audit-v1.json"
+  --dataset "${PROJECT_ROOT}/datasets/processed/open_agent_rl_v2" \
+  --output "${PROJECT_ROOT}/artifacts/areal/open-rl-dataset-audit-v2.json"
 "${VENV_DIR}/bin/python" "${PROJECT_ROOT}/scripts/train/preflight_controlled_experiment.py"
 
 printf 'Preparation complete. No training command was executed.\n'
