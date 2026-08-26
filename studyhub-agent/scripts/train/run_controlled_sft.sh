@@ -3,6 +3,7 @@ set -euo pipefail
 
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 VENV_DIR="${PROJECT_ROOT}/.venv-train"
+RUNTIME_SHIM="${PROJECT_ROOT}/training/runtime_shims"
 SIZE="${1:-}"
 MODE="${2:-check}"
 SEED="${3:-6209}"
@@ -37,8 +38,9 @@ fi
 # pinned 3.12 training interpreter instead of the caller's Conda Python.
 export PATH="${VENV_DIR}/bin:${PATH}"
 unset PYTHONHOME
+export STUDYHUB_AREAL_CHAT_TEMPLATE_METADATA_BRIDGE=1
 
-PYTHONPATH="${PROJECT_ROOT}:${PROJECT_ROOT}/src${PYTHONPATH:+:${PYTHONPATH}}" \
+PYTHONPATH="${RUNTIME_SHIM}:${PROJECT_ROOT}:${PROJECT_ROOT}/src${PYTHONPATH:+:${PYTHONPATH}}" \
   "${VENV_DIR}/bin/python" "${PROJECT_ROOT}/scripts/train/preflight_controlled_experiment.py"
 
 if [[ "${MODE}" == "check" ]]; then
@@ -92,7 +94,7 @@ export WANDB_MODE=disabled
 export HF_HUB_OFFLINE=1
 export TRANSFORMERS_OFFLINE=1
 export TOKENIZERS_PARALLELISM=false
-export PYTHONPATH="${PROJECT_ROOT}:${PROJECT_ROOT}/src${PYTHONPATH:+:${PYTHONPATH}}"
+export PYTHONPATH="${RUNTIME_SHIM}:${PROJECT_ROOT}:${PROJECT_ROOT}/src${PYTHONPATH:+:${PYTHONPATH}}"
 export PYTORCH_ALLOC_CONF=expandable_segments:True
 
 set +e
