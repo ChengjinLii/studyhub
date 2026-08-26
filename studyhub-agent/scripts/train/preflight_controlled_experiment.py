@@ -10,6 +10,7 @@ import importlib.util
 import json
 import os
 import pickle
+import shutil
 import subprocess
 import sys
 from datetime import datetime
@@ -24,6 +25,18 @@ PROXY_ENV = (
     "HTTPS_PROXY",
     "https_proxy",
 )
+
+SGLANG_LORA_TARGET_MODULES = {
+    "o_proj",
+    "gate_proj",
+    "up_proj",
+    "down_proj",
+}
+
+AREAL_ADMIN_KEY_ENV = "STUDYHUB_AREAL_ADMIN_API_KEY"
+PREFLIGHT_ADMIN_KEY = "studyhub-preflight-only-key-not-used-by-a-server"
+EXPECTED_TOOL_CALL_PARSER = "qwen3_coder"
+MAX_GRPO_MICROBATCH_TOKENS = 4096
 
 
 def sha256(path: Path) -> str:
@@ -176,41 +189,188 @@ def check_rl_data(project: Path) -> dict[str, Any]:
     }
 
 
+def check_rl_dev_eval(project: Path) -> dict[str, Any]:
+    from datasets import DatasetDict, load_from_disk
+
+    root = project / "datasets/processed/open_agent_rl_dev_eval32_v1"
+    source = project / "datasets/processed/open_agent_rl_v1"
+    manifest = json_file(root / "manifest.json")
+    if sha256(source / "manifest.json") != manifest.get("source_manifest_sha256"):
+        raise RuntimeError("RL development evaluation source manifest changed")
+    dataset = load_from_disk(str(root / "hf_dataset"))
+    if not isinstance(dataset, DatasetDict) or set(dataset) != {"validation"}:
+        raise TypeError("RL development evaluation must contain only validation")
+    rows = list(dataset["validation"])
+    if len(rows) != 32 or manifest.get("task_count") != 32:
+        raise RuntimeError(f"RL development evaluation count mismatch: {len(rows)}")
+    task_path = root / "tasks.jsonl"
+    if count_jsonl(task_path) != 32 or sha256(task_path) != manifest.get("task_jsonl_sha256"):
+        raise RuntimeError("RL development evaluation task JSONL mismatch")
+    task_ids = [str(row["task_id"]) for row in rows]
+    if task_ids != manifest.get("task_ids") or len(task_ids) != len(set(task_ids)):
+        raise RuntimeError("RL development evaluation task IDs mismatch")
+    if any(row.get("verifier") for row in rows):
+        raise RuntimeError("RL development evaluation exposes hidden verifier fields")
+    train_dataset = load_from_disk(str(source / "hf_dataset"))["train"]
+    train_groups = {str(row["metadata"]["group_id"]) for row in train_dataset}
+    eval_groups = {str(row["metadata"]["group_id"]) for row in rows}
+    if train_groups & eval_groups or manifest.get("rl_train_group_overlap") != 0:
+        raise RuntimeError("RL development evaluation overlaps RL train lineage")
+    for task_id in task_ids:
+        if not (source / "environments" / f"{task_id}.json").is_file():
+            raise RuntimeError(f"missing evaluation environment: {task_id}")
+    return {
+        "path": str(root),
+        "role": manifest.get("role"),
+        "tasks": len(rows),
+        "families": manifest.get("family_counts"),
+        "sources": manifest.get("source_counts"),
+        "train_group_overlap": 0,
+        "public_verifier_fields_empty": True,
+    }
+
+
 def check_runtime(project: Path) -> dict[str, Any]:
     from areal.api.cli_args import SFTConfig, load_expr_config
 
-    from training.rl.config import StudyHubAgentGRPOConfig
+    from training.rl.config import (
+        AGENT_ENGINE_MAX_TOKENS,
+        AGENT_MAX_TURNS,
+        StudyHubAgentGRPOConfig,
+    )
     from training.rl.hermes_workflow import StudyHubHermesWorkflow
 
-    config_root = project / "configs/train"
-    parsed = {}
-    for size in ("4b", "9b"):
-        sft_path = config_root / f"open-sft-qwen35-{size}.yaml"
-        sft_config, _ = load_expr_config(["--config", str(sft_path)], SFTConfig)
-        parsed[f"sft_{size}"] = {
-            "config": str(sft_path),
-            "model": sft_config.actor.path,
-            "epochs": sft_config.total_train_epochs,
-        }
-        grpo_path = config_root / f"open-grpo-qwen35-{size}.yaml"
-        grpo_config, _ = load_expr_config(["--config", str(grpo_path)], StudyHubAgentGRPOConfig)
-        workflow = StudyHubHermesWorkflow(
-            environment_root=grpo_config.environment_root,
-            verifier_root=grpo_config.verifier_root,
-            hermes_checkout=grpo_config.hermes_checkout,
-            reward_artifact_root=grpo_config.reward_artifact_root,
-            max_turns=grpo_config.max_turns,
+    nested_python = shutil.which("python3")
+    if nested_python is None or Path(nested_python).resolve() != Path(sys.executable).resolve():
+        raise RuntimeError(
+            "nested python3 does not resolve to the pinned training interpreter: "
+            f"python3={nested_python}, current={sys.executable}"
         )
-        if grpo_config.rollout.agent.mode != "subproc":
-            raise RuntimeError(f"{size} GRPO must isolate Hermes in subproc mode")
-        pickle.dumps(workflow)
-        parsed[f"grpo_{size}"] = {
-            "config": str(grpo_path),
-            "model": grpo_config.actor.path,
-            "group_size": grpo_config.gconfig.n_samples,
-            "gpus": grpo_config.cluster.n_gpus_per_node,
-            "agent_mode": grpo_config.rollout.agent.mode,
-        }
+    nvcc = shutil.which("nvcc")
+    deep_gemm_fallback = os.environ.get("STUDYHUB_DISABLE_DEEP_GEMM_WITHOUT_NVCC") == "1"
+    torch_fallbacks = (
+        os.environ.get("STUDYHUB_SGLANG_TORCH_FALLBACKS_WITHOUT_NVCC") == "1"
+    )
+    if nvcc is None and deep_gemm_fallback and not torch_fallbacks:
+        raise RuntimeError("SGLang torch fallbacks are required when nvcc is unavailable")
+
+    config_root = project / "configs/train"
+    admin_key_was_missing = AREAL_ADMIN_KEY_ENV not in os.environ
+    if admin_key_was_missing:
+        os.environ[AREAL_ADMIN_KEY_ENV] = PREFLIGHT_ADMIN_KEY
+    parsed = {}
+    try:
+        for size in ("4b", "9b"):
+            sft_path = config_root / f"open-sft-qwen35-{size}.yaml"
+            sft_config, _ = load_expr_config(["--config", str(sft_path)], SFTConfig)
+            sft_target_modules = set(sft_config.actor.target_modules)
+            if sft_target_modules != SGLANG_LORA_TARGET_MODULES:
+                raise RuntimeError(
+                    f"{size} SFT LoRA targets are not SGLang-compatible: "
+                    f"{sorted(sft_target_modules)}"
+                )
+            parsed[f"sft_{size}"] = {
+                "config": str(sft_path),
+                "model": sft_config.actor.path,
+                "epochs": sft_config.total_train_epochs,
+                "lora_target_modules": sorted(sft_target_modules),
+            }
+            grpo_path = config_root / f"open-grpo-qwen35-{size}.yaml"
+            grpo_config, _ = load_expr_config(
+                ["--config", str(grpo_path)], StudyHubAgentGRPOConfig
+            )
+            workflow = StudyHubHermesWorkflow(
+                environment_root=grpo_config.environment_root,
+                verifier_root=grpo_config.verifier_root,
+                hermes_checkout=grpo_config.hermes_checkout,
+                reward_artifact_root=grpo_config.reward_artifact_root,
+                max_turns=grpo_config.max_turns,
+            )
+            if grpo_config.rollout.agent.mode != "subproc":
+                raise RuntimeError(f"{size} GRPO must isolate Hermes in subproc mode")
+            if grpo_config.rollout.agent.tool_call_parser != EXPECTED_TOOL_CALL_PARSER:
+                raise RuntimeError(
+                    f"{size} GRPO must use the Qwen3-Coder XML tool parser"
+                )
+            if grpo_config.rollout.agent.engine_max_tokens != AGENT_ENGINE_MAX_TOKENS:
+                raise RuntimeError(
+                    f"{size} GRPO must cap each exported interaction at "
+                    f"{AGENT_ENGINE_MAX_TOKENS} tokens"
+                )
+            if grpo_config.max_turns != AGENT_MAX_TURNS:
+                raise RuntimeError(
+                    f"{grpo_path} must cap frozen Hermes rollouts at "
+                    f"{AGENT_MAX_TURNS} model calls"
+                )
+            if not grpo_config.actor.mask_no_eos_with_zero:
+                raise RuntimeError(
+                    f"{size} GRPO must exclude truncated no-EOS trajectories"
+                )
+            if grpo_config.rollout.agent.chat_template_type != "hf":
+                raise RuntimeError(
+                    f"{size} GRPO must use the Hermes-compatible hf chat template"
+                )
+            if grpo_config.rollout.agent.export_style != "individual":
+                raise RuntimeError(
+                    f"{size} GRPO must export individually credited Hermes turns"
+                )
+            if grpo_config.rollout.agent.admin_api_key in {
+                "",
+                "areal-admin-key",
+            }:
+                raise RuntimeError(f"{size} GRPO uses an unsafe AReaL admin key")
+            if not grpo_config.gconfig.drop_incomplete_group:
+                raise RuntimeError(f"{size} GRPO must drop incomplete rollout groups")
+            if grpo_config.sglang.max_loras_per_batch != 1:
+                raise RuntimeError(f"{size} SGLang must reserve exactly one active LoRA slot")
+            if grpo_config.sglang.max_loaded_loras != 1:
+                raise RuntimeError(f"{size} SGLang must retain exactly one LoRA adapter")
+            if nvcc is None and not grpo_config.sglang.disable_overlap_schedule:
+                raise RuntimeError(
+                    f"{size} SGLang overlap schedule requires CUDA JIT support on this host"
+                )
+            if nvcc is None and grpo_config.sglang.sampling_backend != "pytorch":
+                raise RuntimeError(
+                    f"{size} SGLang sampling must use the PyTorch backend when nvcc is unavailable"
+                )
+            grpo_target_modules = set(grpo_config.actor.target_modules)
+            if grpo_target_modules != SGLANG_LORA_TARGET_MODULES:
+                raise RuntimeError(
+                    f"{size} GRPO LoRA targets are not SGLang-compatible: "
+                    f"{sorted(grpo_target_modules)}"
+                )
+            if grpo_target_modules != sft_target_modules:
+                raise RuntimeError(f"{size} SFT and GRPO LoRA targets differ")
+            if grpo_config.actor.mb_spec.max_tokens_per_mb > MAX_GRPO_MICROBATCH_TOKENS:
+                raise RuntimeError(f"{size} GRPO actor microbatch exceeds the GPU guard budget")
+            if grpo_config.ref.mb_spec.max_tokens_per_mb > MAX_GRPO_MICROBATCH_TOKENS:
+                raise RuntimeError(f"{size} GRPO reference microbatch exceeds the GPU guard budget")
+            pickle.dumps(workflow)
+            parsed[f"grpo_{size}"] = {
+                "config": str(grpo_path),
+                "model": grpo_config.actor.path,
+                "group_size": grpo_config.gconfig.n_samples,
+                "drop_incomplete_group": grpo_config.gconfig.drop_incomplete_group,
+                "gpus": grpo_config.cluster.n_gpus_per_node,
+                "agent_mode": grpo_config.rollout.agent.mode,
+                "tool_call_parser": grpo_config.rollout.agent.tool_call_parser,
+                "engine_max_tokens": grpo_config.rollout.agent.engine_max_tokens,
+                "max_turns": grpo_config.max_turns,
+                "mask_no_eos_with_zero": grpo_config.actor.mask_no_eos_with_zero,
+                "chat_template_type": grpo_config.rollout.agent.chat_template_type,
+                "export_style": grpo_config.rollout.agent.export_style,
+                "ephemeral_admin_key": True,
+                "max_loaded_loras": grpo_config.sglang.max_loaded_loras,
+                "max_loras_per_batch": grpo_config.sglang.max_loras_per_batch,
+                "overlap_schedule": not grpo_config.sglang.disable_overlap_schedule,
+                "sampling_backend": grpo_config.sglang.sampling_backend,
+                "actor_microbatch_tokens": grpo_config.actor.mb_spec.max_tokens_per_mb,
+                "reference_microbatch_tokens": grpo_config.ref.mb_spec.max_tokens_per_mb,
+                "lora_target_modules": sorted(grpo_target_modules),
+            }
+    finally:
+        if admin_key_was_missing:
+            os.environ.pop(AREAL_ADMIN_KEY_ENV, None)
 
     areal_lock = json_file(project / "training/areal/upstream.lock.json")
     areal_checkout = project / ".cache/areal-src"
@@ -235,6 +395,15 @@ def check_runtime(project: Path) -> dict[str, Any]:
         raise RuntimeError("SGLang is missing; run setup_areal_env.sh rl")
 
     return {
+        "python": {
+            "executable": sys.executable,
+            "nested_python3": nested_python,
+        },
+        "cuda_toolkit": {
+            "nvcc": nvcc,
+            "deep_gemm_fallback": deep_gemm_fallback,
+            "sglang_torch_fallbacks": torch_fallbacks,
+        },
         "areal": {
             "version": importlib.metadata.version("areal"),
             "commit": areal_lock["commit"],
@@ -285,6 +454,7 @@ def main() -> int:
         result["models"] = check_models(repo_root)
         result["sft_data"] = check_sft_data(project)
         result["rl_data"] = check_rl_data(project)
+        result["rl_dev_eval"] = check_rl_dev_eval(project)
         result["runtime"] = check_runtime(project)
         result["active_training_processes"] = active_trainers()
         if result["active_training_processes"]:

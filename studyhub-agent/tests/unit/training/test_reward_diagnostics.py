@@ -21,6 +21,14 @@ def test_reward_summary_reports_group_variance_and_quality_rates(tmp_path) -> No
                 "trace": {
                     "tool_calls": 1,
                     "invalid_tool_calls": int(index == 2),
+                    "hermes": {
+                        "api_calls": index + 1,
+                        "last_prompt_tokens": 1000 + 100 * index,
+                        "total_tokens": 2000 + 100 * index,
+                        "guardrail_halt": (
+                            {"code": "fixture_loop_halt"} if index == 3 else None
+                        ),
+                    },
                 },
                 "reward": {
                     "total": reward,
@@ -50,4 +58,16 @@ def test_reward_summary_reports_group_variance_and_quality_rates(tmp_path) -> No
         "invalid_tool_call": 0.25,
         "no_tool_call": 0.0,
         "hard_gate": 0.25,
+    }
+    assert result["by_family"]["function_calling"]["reward"]["mean"] == 0.0
+    assert result["by_family"]["function_calling"]["violations"] == {
+        "empty_final_answer": 1
+    }
+    assert result["runtime"] == {
+        "api_calls": {"mean": 2.5, "p95": 4.0, "max": 4.0},
+        "last_prompt_tokens": {"mean": 1150.0, "p95": 1300.0, "max": 1300.0},
+        "total_tokens": {"mean": 2150.0, "p95": 2300.0, "max": 2300.0},
+        "guardrail_halts": 1,
+        "guardrail_halt_rate": 0.25,
+        "guardrail_halt_codes": {"fixture_loop_halt": 1},
     }

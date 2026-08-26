@@ -1,0 +1,48 @@
+{
+  "schema_version": "studyhub.dev-eval.v1",
+  "frozen_at": "2026-08-26T03:49:00+08:00",
+  "scope": "verifier-aligned development evaluation; not a sealed final test",
+  "subset": {
+    "builder": "scripts/data/build_rl_dev_eval_subset.py",
+    "seed": 6209,
+    "tasks": 32,
+    "rollouts_per_task": 4,
+    "manifest_sha256": "0f4d992d9610dba78a1ebe4902276654b0a26464322988ae6d943470055db3f3",
+    "tasks_jsonl_sha256": "317643b60e7d5931c4414af0e1dc701f314bd21019f4ccdfa27d9c620d9339ea"
+  },
+  "generation": {
+    "temperature": 1.0,
+    "top_p": 1.0,
+    "max_new_tokens": 1536,
+    "max_sequence_tokens": 4096,
+    "max_turns": 6
+  },
+  "strict_success": {
+    "common": [
+      "nonempty final answer",
+      "no hard gate",
+      "no reward violation",
+      "tool_quality == 1"
+    ],
+    "function_calling": [
+      "function_call_quality == 1",
+      "answer_quality >= 0.8"
+    ],
+    "search_multihop_and_evidence_grounding": [
+      "task_success == 1",
+      "evidence == 1",
+      "citation == 1"
+    ]
+  },
+  "reported_metrics": [
+    "strict rollout success rate",
+    "pass@4",
+    "consistent@4",
+    "mean scalar reward as a diagnostic only",
+    "hard-gate and violation rates",
+    "tool calls and total tokens",
+    "family slices",
+    "paired task bootstrap confidence intervals"
+  ],
+  "comparison_rule": "All candidates use the same task IDs, environment/verifier snapshot, generation settings and seed. A scalar reward increase alone is not sufficient for promotion."
+}

@@ -33,6 +33,11 @@ if [[ ! -x "${VENV_DIR}/bin/areal" ]]; then
   exit 1
 fi
 
+# AReaL launches some nested services through `python3`; keep them on the
+# pinned 3.12 training interpreter instead of the caller's Conda Python.
+export PATH="${VENV_DIR}/bin:${PATH}"
+unset PYTHONHOME
+
 PYTHONPATH="${PROJECT_ROOT}:${PROJECT_ROOT}/src${PYTHONPATH:+:${PYTHONPATH}}" \
   "${VENV_DIR}/bin/python" "${PROJECT_ROOT}/scripts/train/preflight_controlled_experiment.py"
 
@@ -54,9 +59,10 @@ LOG_ROOT="${PROJECT_ROOT}/artifacts/areal/launcher_logs/sft-${SIZE}"
 LOG_FILE="${LOG_ROOT}/${TRIAL}.log"
 GPU_CSV="${LOG_ROOT}/${TRIAL}.gpu.csv"
 RUN_METADATA="${LOG_ROOT}/${TRIAL}.run.json"
+EXPERIMENT="studyhub-open-sft-${SIZE}"
 OVERRIDES=("seed=${SEED}" "trial_name=${TRIAL}")
 if [[ "${MODE}" == "gate" ]]; then
-  OVERRIDES+=("total_train_steps=1" "saver.freq_steps=1" "recover.mode=disabled")
+  OVERRIDES+=("total_train_steps=1" "saver.freq_steps=1" "recover.mode=disabled" "actor.optimizer.warmup_steps_proportion=0.0")
 fi
 
 mkdir -p "${LOG_ROOT}"
@@ -72,6 +78,7 @@ done
   --dataset-manifest "${DATASET}" \
   --model "${MODEL}" \
   --areal-lock "${PROJECT_ROOT}/training/areal/upstream.lock.json" \
+  --hermes-lock "${PROJECT_ROOT}/integrations/hermes/upstream.lock.json" \
   --gpu "${GPU}" \
   --max-used-mib "${MAX_USED}" \
   --min-free-mib "${MIN_FREE}" \
@@ -106,5 +113,23 @@ set -e
   --output "${RUN_METADATA}" \
   --gpu-csv "${GPU_CSV}" \
   --status "${STATUS}"
+CHECKPOINT_ROOT="${PROJECT_ROOT}/artifacts/areal/checkpoints/chengjin/${EXPERIMENT}/${TRIAL}"
+EVIDENCE_TIER="DIAGNOSTIC"
+if [[ "${MODE}" == "run" ]]; then
+  EVIDENCE_TIER="CLAIM"
+fi
+if ! "${VENV_DIR}/bin/python" "${PROJECT_ROOT}/scripts/train/build_experiment_evidence.py" \
+  --run-metadata "${RUN_METADATA}" \
+  --checkpoint-root "${CHECKPOINT_ROOT}" \
+  --evidence-tier "${EVIDENCE_TIER}" >/dev/null; then
+  echo "Failed to finalize the evidence bundle for ${TRIAL}." >&2
+  if [[ "${STATUS}" -eq 0 ]]; then
+    STATUS=74
+    "${VENV_DIR}/bin/python" "${PROJECT_ROOT}/scripts/train/capture_run_metadata.py" finish \
+      --output "${RUN_METADATA}" \
+      --gpu-csv "${GPU_CSV}" \
+      --status "${STATUS}"
+  fi
+fi
 tail -80 "${LOG_FILE}"
 exit "${STATUS}"

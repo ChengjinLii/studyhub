@@ -22,6 +22,73 @@ read the necessary evidence, and cite every used source as [source_id]. Stop whe
 answer is supported; do not invent observations or citations."""
 
 
+def _disabled_hermes_tool_search_config():
+    from tools.tool_search import ToolSearchConfig
+
+    return ToolSearchConfig.from_raw({"enabled": "off"})
+
+
+def _install_training_system_prompt(agent: Any) -> None:
+    """Keep the Hermes loop while removing unrelated interactive-host guidance."""
+
+    def build_prompt(system_message: str | None = None) -> str:
+        parts = [SYSTEM_PROMPT]
+        if system_message and system_message.strip() != SYSTEM_PROMPT:
+            parts.append(system_message.strip())
+        return "\n\n".join(parts)
+
+    agent._build_system_prompt = build_prompt
+    agent._cached_system_prompt = None
+    agent._cached_system_prompt_static = None
+    # Hermes appends this field after `_build_system_prompt`. The training
+    # prompt is already supplied by the replacement builder above, so keeping
+    # an ephemeral copy would duplicate the policy-visible system message.
+    agent.ephemeral_system_prompt = None
+
+
+def _enable_training_tool_guardrails(agent: Any, tool_names: list[str]) -> None:
+    """Apply stricter Hermes loop stops only inside frozen RL rollouts."""
+
+    from agent.tool_guardrails import (
+        ToolCallGuardrailConfig,
+        ToolCallGuardrailController,
+    )
+
+    agent._tool_guardrails = ToolCallGuardrailController(
+        ToolCallGuardrailConfig(
+            warnings_enabled=True,
+            hard_stop_enabled=True,
+            exact_failure_block_after=3,
+            same_tool_failure_halt_after=5,
+            no_progress_block_after=3,
+            idempotent_tools=frozenset(tool_names),
+            mutating_tools=frozenset(),
+        )
+    )
+    agent._tool_guardrail_halt_decision = None
+
+
+def _training_runtime_metadata(agent: Any) -> dict[str, Any]:
+    halt_decision = getattr(agent, "_tool_guardrail_halt_decision", None)
+    context_compressor = getattr(agent, "context_compressor", None)
+    return {
+        "guardrail_halt": (
+            halt_decision.to_metadata() if halt_decision is not None else None
+        ),
+        "api_calls": int(getattr(agent, "_api_call_count", 0) or 0),
+        "input_tokens": int(getattr(agent, "session_input_tokens", 0) or 0),
+        "output_tokens": int(getattr(agent, "session_output_tokens", 0) or 0),
+        "prompt_tokens": int(getattr(agent, "session_prompt_tokens", 0) or 0),
+        "completion_tokens": int(
+            getattr(agent, "session_completion_tokens", 0) or 0
+        ),
+        "total_tokens": int(getattr(agent, "session_total_tokens", 0) or 0),
+        "last_prompt_tokens": int(
+            getattr(context_compressor, "last_prompt_tokens", 0) or 0
+        ),
+    }
+
+
 @functools.lru_cache(maxsize=8)
 def _load_verifier_store(verifier_root: Path) -> dict[str, dict[str, Any]]:
     verifiers = {}
@@ -77,8 +144,26 @@ class StudyHubHermesWorkflow:
         checkout = str(self.hermes_checkout)
         if checkout not in sys.path:
             sys.path.insert(0, checkout)
+        from agent import relay_runtime
         from run_agent import AIAgent
+        from tools import tool_search
         from tools.registry import registry
+
+        # Frozen RL rollouts intentionally expose only per-task tools. Keep the
+        # optional Relay/plugin runtime out of this isolated execution path.
+        profile_key = relay_runtime.current_profile_key()
+        with relay_runtime.HOST_REGISTRY._lock:
+            relay_runtime.HOST_REGISTRY._hosts.setdefault(
+                profile_key,
+                relay_runtime.NoopRelayRuntime(
+                    profile_key=profile_key,
+                    reason="disabled for StudyHub frozen RL rollout",
+                ),
+            )
+
+        # Each frozen task exposes only a few schemas. Direct disclosure keeps
+        # the learned action space aligned with the environment and verifier.
+        tool_search.load_config = _disabled_hermes_tool_search_config
 
         return AIAgent, registry
 
@@ -105,6 +190,7 @@ class StudyHubHermesWorkflow:
         AIAgent, registry = self._load_hermes()
         toolset = f"studyhub-rl-{task_id}"
         installed = []
+        hermes_runtime: dict[str, Any] = {}
         for schema in environment.tool_schemas:
             name = schema["name"]
 
@@ -140,10 +226,10 @@ class StudyHubHermesWorkflow:
                 save_trajectories=False,
                 quiet_mode=True,
                 tool_progress_mode="off",
-                ephemeral_system_prompt=SYSTEM_PROMPT,
                 session_id=f"{task_id}-{uuid.uuid4().hex[:12]}",
                 max_tokens=self.max_tokens,
                 request_overrides={"temperature": self.temperature, "top_p": self.top_p},
+                platform="batch",
                 skip_context_files=True,
                 load_soul_identity=False,
                 skip_memory=True,
@@ -151,8 +237,15 @@ class StudyHubHermesWorkflow:
                 session_db=None,
                 checkpoints_enabled=False,
             )
+            agent._task_completion_guidance = False
+            agent._parallel_tool_call_guidance = False
+            agent._execution_guidance = False
+            agent._environment_probe = False
             agent._disable_streaming = True
+            _install_training_system_prompt(agent)
+            _enable_training_tool_guardrails(agent, installed)
             final_answer = str(await asyncio.to_thread(agent.chat, str(data["user_request"])))
+            hermes_runtime = _training_runtime_metadata(agent)
         finally:
             for name in installed:
                 registry.deregister(name)
@@ -171,6 +264,7 @@ class StudyHubHermesWorkflow:
             environment=environment,
             result=result,
             session_api_key=str(api_key),
+            hermes_runtime=hermes_runtime,
         )
         return result.total
 
@@ -184,6 +278,7 @@ class StudyHubHermesWorkflow:
         environment: FrozenTaskEnvironment,
         result: RewardV2Result,
         session_api_key: str,
+        hermes_runtime: dict[str, Any],
     ) -> None:
         self.reward_artifact_root.mkdir(parents=True, exist_ok=True)
         path = self.reward_artifact_root / "reward-v2.jsonl"
@@ -218,6 +313,7 @@ class StudyHubHermesWorkflow:
                 "error_codes": list(environment.trace.error_codes),
                 "search_results": len(environment.trace.search_result_ids),
                 "read_sources": sorted(environment.trace.read_source_ids),
+                "hermes": hermes_runtime,
             },
             "reward": result.to_dict(),
         }

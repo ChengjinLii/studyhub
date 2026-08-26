@@ -7,6 +7,9 @@ from pathlib import Path
 from typing import Any
 
 
+SEARCH_SNIPPET_CHARS = 200
+
+
 def canonical_arguments(value: dict[str, Any]) -> str:
     return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
 
@@ -125,7 +128,7 @@ class FrozenTaskEnvironment:
                     "source_id": source_id,
                     "title": document.get("title", ""),
                     "score": score,
-                    "snippet": str(document.get("text", ""))[:500],
+                    "snippet": str(document.get("text", ""))[:SEARCH_SNIPPET_CHARS],
                 }
             )
         return self._result(query=query, results=results)

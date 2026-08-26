@@ -43,7 +43,9 @@ def main(args: list[str]) -> int:
         **workflow_kwargs,
         "reward_artifact_root": str(Path(config.reward_artifact_root) / "validation"),
         "run_kind": "validation",
-        "temperature": 0.6,
+        "temperature": config.eval_gconfig.temperature,
+        "top_p": config.eval_gconfig.top_p,
+        "max_completion_tokens": config.eval_gconfig.max_new_tokens,
     }
     with PPOTrainer(
         config,

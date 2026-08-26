@@ -17,6 +17,9 @@ if [[ ! -x "${VENV_DIR}/bin/python" ]]; then
   exit 1
 fi
 
+export PATH="${VENV_DIR}/bin:${PATH}"
+unset PYTHONHOME
+
 if [[ "${MODE}" == "rebuild" ]]; then
   bash "${PROJECT_ROOT}/scripts/models/download_qwen35_controlled.sh" all
   "${VENV_DIR}/bin/python" "${PROJECT_ROOT}/scripts/data/download_open_sft_sources.py" \

@@ -31,7 +31,7 @@ actor:
   peft_type: lora
   lora_rank: 16
   lora_alpha: 16
-  target_modules: [all-linear]
+  target_modules: [o_proj, gate_proj, up_proj, down_proj]
   mb_spec:
     max_tokens_per_mb: 2048
   optimizer:

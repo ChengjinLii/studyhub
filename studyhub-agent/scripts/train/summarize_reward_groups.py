@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import statistics
 from collections import Counter, defaultdict
 from datetime import datetime
@@ -33,6 +34,100 @@ def _mean(values: list[float]) -> float | None:
 
 def _resolve_log(path: Path) -> Path:
     return path / "reward-v2.jsonl" if path.is_dir() else path
+
+
+def _distribution(values: list[float]) -> dict[str, float] | None:
+    if not values:
+        return None
+    ordered = sorted(values)
+    p95_index = max(0, math.ceil(len(ordered) * 0.95) - 1)
+    return {
+        "mean": round(statistics.fmean(ordered), 6),
+        "p95": round(ordered[p95_index], 6),
+        "max": round(ordered[-1], 6),
+    }
+
+
+def _runtime_summary(rows: list[dict[str, Any]]) -> dict[str, Any]:
+    values: dict[str, list[float]] = defaultdict(list)
+    halt_codes: Counter[str] = Counter()
+    halts = 0
+    for row in rows:
+        runtime = row.get("trace", {}).get("hermes", {})
+        if not isinstance(runtime, dict):
+            continue
+        for field in ("api_calls", "last_prompt_tokens", "total_tokens"):
+            value = runtime.get(field)
+            if isinstance(value, (int, float)) and not isinstance(value, bool):
+                values[field].append(float(value))
+        halt = runtime.get("guardrail_halt")
+        if isinstance(halt, dict):
+            halts += 1
+            halt_codes[str(halt.get("code") or "unknown")] += 1
+    return {
+        "api_calls": _distribution(values["api_calls"]),
+        "last_prompt_tokens": _distribution(values["last_prompt_tokens"]),
+        "total_tokens": _distribution(values["total_tokens"]),
+        "guardrail_halts": halts,
+        "guardrail_halt_rate": _rate(halts, len(rows)),
+        "guardrail_halt_codes": dict(sorted(halt_codes.items())),
+    }
+
+
+def _slice_summary(
+    rows: list[dict[str, Any]], *, expected_group_size: int
+) -> dict[str, Any]:
+    groups: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    components: dict[str, list[float]] = defaultdict(list)
+    violations: Counter[str] = Counter()
+    empty_answers = invalid_rollouts = no_tool_rollouts = hard_gates = 0
+    for row in rows:
+        groups[str(row.get("rollout_group_id") or row["task_id"])].append(row)
+        reward = row["reward"]
+        for component in REWARD_COMPONENTS:
+            value = reward.get(component)
+            if isinstance(value, (int, float)) and not isinstance(value, bool):
+                components[component].append(float(value))
+        violations.update(map(str, reward.get("violations", [])))
+        trace = row.get("trace", {})
+        empty_answers += int(bool(row.get("final_answer_empty")))
+        invalid_rollouts += int(int(trace.get("invalid_tool_calls", 0)) > 0)
+        no_tool_rollouts += int(int(trace.get("tool_calls", 0)) == 0)
+        hard_gates += int(bool(reward.get("hard_gate_triggered")))
+
+    complete = [group for group in groups.values() if len(group) == expected_group_size]
+    group_stds = [
+        statistics.pstdev(float(row["reward"]["total"]) for row in group)
+        for group in complete
+    ]
+    totals = components["total"]
+    zero_variance = sum(value <= 1e-12 for value in group_stds)
+    return {
+        "rollouts": len(rows),
+        "groups": len(groups),
+        "complete_groups": len(complete),
+        "incomplete_groups": len(groups) - len(complete),
+        "zero_variance_group_rate": _rate(zero_variance, len(complete)),
+        "mean_group_reward_std": _mean(group_stds),
+        "reward": {
+            "mean": _mean(totals),
+            "std": round(statistics.pstdev(totals), 6) if totals else None,
+            "min": round(min(totals), 6) if totals else None,
+            "max": round(max(totals), 6) if totals else None,
+            "component_means": {
+                component: _mean(values)
+                for component, values in sorted(components.items())
+            },
+        },
+        "quality_rates": {
+            "empty_final_answer": _rate(empty_answers, len(rows)),
+            "invalid_tool_call": _rate(invalid_rollouts, len(rows)),
+            "no_tool_call": _rate(no_tool_rollouts, len(rows)),
+            "hard_gate": _rate(hard_gates, len(rows)),
+        },
+        "runtime": _runtime_summary(rows),
+        "violations": dict(sorted(violations.items())),
+    }
 
 
 def summarize(path: Path, *, expected_group_size: int) -> dict[str, Any]:
@@ -71,6 +166,13 @@ def summarize(path: Path, *, expected_group_size: int) -> dict[str, Any]:
     zero_variance = sum(value <= 1e-12 for value in group_stds)
     totals = component_values["total"]
     duplicate_rollouts = sum(count - 1 for count in rollout_ids.values() if count > 1)
+    family_summaries = {
+        family: _slice_summary(
+            [row for row in rows if str(row.get("task_family") or "unknown") == family],
+            expected_group_size=expected_group_size,
+        )
+        for family in sorted(families)
+    }
 
     return {
         "schema_version": "studyhub.reward-diagnostics.v1",
@@ -102,7 +204,9 @@ def summarize(path: Path, *, expected_group_size: int) -> dict[str, Any]:
             "no_tool_call": _rate(no_tool_rollouts, len(rows)),
             "hard_gate": _rate(hard_gates, len(rows)),
         },
+        "runtime": _runtime_summary(rows),
         "families": dict(sorted(families.items())),
+        "by_family": family_summaries,
         "violations": dict(sorted(violations.items())),
     }
 

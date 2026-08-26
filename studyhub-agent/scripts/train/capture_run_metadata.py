@@ -8,7 +8,9 @@ import csv
 import hashlib
 import importlib.metadata
 import json
+import platform
 import subprocess
+import sys
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -23,6 +25,15 @@ def command(*args: str) -> str:
     return result.stdout.strip()
 
 
+def command_bytes(*args: str) -> bytes:
+    result = subprocess.run(args, check=False, capture_output=True)
+    return result.stdout
+
+
+def sha256_bytes(value: bytes) -> str:
+    return hashlib.sha256(value).hexdigest()
+
+
 def sha256(path: Path) -> str:
     digest = hashlib.sha256()
     with path.open("rb") as stream:
@@ -33,22 +44,48 @@ def sha256(path: Path) -> str:
 
 def package_versions() -> dict[str, str]:
     names = ["areal", "torch", "transformers", "datasets", "peft", "tokenizers", "pyarrow"]
-    return {name: importlib.metadata.version(name) for name in names}
+    versions = {name: importlib.metadata.version(name) for name in names}
+    versions.update(
+        {
+            "python": platform.python_version(),
+            "python_executable": str(Path(sys.executable).resolve()),
+        }
+    )
+    try:
+        import torch
+
+        versions["cuda_runtime"] = str(torch.version.cuda)
+    except ImportError:
+        versions["cuda_runtime"] = "unavailable"
+    return versions
 
 
 def start(args: argparse.Namespace) -> None:
     project = args.project.resolve()
+    repository = project.parent
     model = args.model.resolve()
     weight_files = sorted(model.glob("*.safetensors"))
+    dirty_patch = command_bytes("git", "-C", str(repository), "diff", "--binary", "HEAD")
+    untracked = command(
+        "git", "-C", str(repository), "ls-files", "--others", "--exclude-standard"
+    ).splitlines()
+    untracked_hashes = {}
+    for relative in untracked:
+        path = repository / relative
+        if path.is_file():
+            untracked_hashes[relative] = sha256(path)
     metadata: dict[str, Any] = {
         "schema_version": "studyhub.areal-run-metadata.v1",
         "run_mode": args.run_mode,
         "started_at": now(),
         "project": str(project),
         "git": {
-            "commit": command("git", "-C", str(project.parent), "rev-parse", "HEAD"),
-            "branch": command("git", "-C", str(project.parent), "branch", "--show-current"),
-            "status": command("git", "-C", str(project.parent), "status", "--short"),
+            "commit": command("git", "-C", str(repository), "rev-parse", "HEAD"),
+            "branch": command("git", "-C", str(repository), "branch", "--show-current"),
+            "status": command("git", "-C", str(repository), "status", "--short"),
+            "dirty_patch_sha256": sha256_bytes(dirty_patch),
+            "dirty_patch_bytes": len(dirty_patch),
+            "untracked_file_sha256": untracked_hashes,
         },
         "config": {
             "path": str(args.config.resolve()),
@@ -81,6 +118,10 @@ def start(args: argparse.Namespace) -> None:
         "log_file": str(args.log_file.resolve()),
         "gpu_csv": str(args.gpu_csv.resolve()),
     }
+    if args.hermes_lock:
+        metadata["hermes_upstream"] = json.loads(
+            args.hermes_lock.read_text(encoding="utf-8")
+        )
     args.output.write_text(json.dumps(metadata, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 
@@ -112,6 +153,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--dataset-manifest", type=Path)
     parser.add_argument("--model", type=Path)
     parser.add_argument("--areal-lock", type=Path)
+    parser.add_argument("--hermes-lock", type=Path)
     parser.add_argument("--gpu", default="0")
     parser.add_argument("--max-used-mib", type=int, default=28672)
     parser.add_argument("--min-free-mib", type=int, default=60000)

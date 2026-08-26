@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Merge one completed AReaL SFT LoRA adapter into its fixed base checkpoint."""
+"""Merge one completed AReaL LoRA adapter into its fixed base checkpoint."""
 
 from __future__ import annotations
 
@@ -24,6 +24,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--adapter", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--max-shard-size", default="4GB")
+    parser.add_argument("--stage", choices=("sft", "grpo"), default="sft")
     return parser.parse_args()
 
 
@@ -67,8 +68,9 @@ def main() -> int:
     if not shards:
         raise RuntimeError("merged checkpoint contains no safetensors weights")
     manifest = {
-        "schema_version": "studyhub.merged-sft-checkpoint.v1",
+        "schema_version": "studyhub.merged-lora-checkpoint.v1",
         "created_at": datetime.now().astimezone().isoformat(timespec="seconds"),
+        "training_stage": args.stage,
         "base": str(args.base.resolve()),
         "adapter": str(args.adapter.resolve()),
         "adapter_sha256": sha256(adapter_weights),

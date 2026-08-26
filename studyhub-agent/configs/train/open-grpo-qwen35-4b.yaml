@@ -8,7 +8,7 @@ total_train_steps: null
 tokenizer_path: ${actor.path}
 workflow: training.rl.hermes_workflow.StudyHubHermesWorkflow
 eval_workflow: ${workflow}
-max_turns: 10
+max_turns: 6
 environment_root: /data/chengjin/studyhub/studyhub-agent/datasets/processed/open_agent_rl_v1
 verifier_root: /data/chengjin/studyhub/studyhub-agent/datasets/processed/open_agent_rl_v1/verifiers
 hermes_checkout: /data/chengjin/studyhub/studyhub-agent/.vendor/hermes-agent
@@ -41,14 +41,18 @@ rollout:
   dump_to_file: true
   agent:
     mode: subproc
+    admin_api_key: ${oc.env:STUDYHUB_AREAL_ADMIN_API_KEY}
     subproc_max_workers: 4
-    tool_call_parser: qwen
+    engine_max_tokens: 4096
+    tool_call_parser: qwen3_coder
     reasoning_parser: qwen3
+    chat_template_type: hf
     export_style: individual
     turn_discount: 1.0
 
 gconfig:
   n_samples: 4
+  drop_incomplete_group: true
   min_new_tokens: 0
   max_new_tokens: 1536
   max_tokens: 4096
@@ -68,7 +72,7 @@ actor:
   gradient_checkpointing: true
   dtype: bfloat16
   mb_spec:
-    max_tokens_per_mb: 8192
+    max_tokens_per_mb: 4096
   optimizer:
     type: adam
     lr: 5.0e-6
@@ -84,6 +88,7 @@ actor:
   reward_scaling: 1.0
   reward_bias: 0.0
   kl_ctl: 0.02
+  mask_no_eos_with_zero: true
   ppo_n_minibatches: 1
   recompute_logprob: true
   use_decoupled_loss: true
@@ -105,7 +110,7 @@ actor:
   peft_type: lora
   lora_rank: 16
   lora_alpha: 16
-  target_modules: [all-linear]
+  target_modules: [o_proj, gate_proj, up_proj, down_proj]
   scheduling_spec:
     - task_type: worker
       port_count: 2
@@ -127,7 +132,7 @@ ref:
   disable_dropout: true
   dtype: ${actor.dtype}
   mb_spec:
-    max_tokens_per_mb: 8192
+    max_tokens_per_mb: 4096
   optimizer: null
   scheduling_strategy:
     type: colocation
@@ -139,11 +144,15 @@ sglang:
   random_seed: ${seed}
   skip_tokenizer_init: true
   dtype: ${actor.dtype}
+  disable_overlap_schedule: true
+  sampling_backend: pytorch
   max_running_requests: 8
   context_length: 8192
   mem_fraction_static: 0.55
   enable_lora: ${actor.use_lora}
   max_lora_rank: ${actor.lora_rank}
+  max_loaded_loras: 1
+  max_loras_per_batch: 1
 
 vllm:
   model: ${actor.path}

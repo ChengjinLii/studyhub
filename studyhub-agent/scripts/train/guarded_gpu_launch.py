@@ -58,19 +58,37 @@ def process_group(pid: int) -> int | None:
         return None
 
 
+def process_group_exists(pgid: int) -> bool:
+    try:
+        os.killpg(pgid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    return True
+
+
 def terminate_group(process: subprocess.Popen[str]) -> None:
-    if process.poll() is not None:
+    pgid = process.pid
+    if not process_group_exists(pgid):
         return
     try:
-        os.killpg(process.pid, signal.SIGTERM)
+        os.killpg(pgid, signal.SIGTERM)
     except ProcessLookupError:
         return
-    try:
-        process.wait(timeout=8)
-    except subprocess.TimeoutExpired:
+
+    deadline = time.monotonic() + 8
+    while process_group_exists(pgid) and time.monotonic() < deadline:
+        time.sleep(0.1)
+    if process_group_exists(pgid):
         try:
-            os.killpg(process.pid, signal.SIGKILL)
+            os.killpg(pgid, signal.SIGKILL)
         except ProcessLookupError:
+            pass
+    if process.poll() is None:
+        try:
+            process.wait(timeout=2)
+        except subprocess.TimeoutExpired:
             pass
 
 
@@ -151,7 +169,9 @@ def main() -> int:
             print(f"GPU guard stopped only process group {process.pid}: {exc}", file=sys.stderr)
             terminate_group(process)
             return 130 if isinstance(exc, KeyboardInterrupt) else 70
-        return process.wait()
+        status = process.wait()
+        terminate_group(process)
+        return status
 
 
 if __name__ == "__main__":
