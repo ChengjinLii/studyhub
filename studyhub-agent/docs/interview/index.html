@@ -1,0 +1,907 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>StudyHub Agent · SFT &amp; Agentic RL 面试知识档案</title>
+  <style>
+    :root {
+      --ink: #15372f;
+      --ink-soft: #4d625b;
+      --paper: #f3f0e6;
+      --paper-deep: #e5dfcf;
+      --green: #2f7d61;
+      --green-dark: #174d3d;
+      --gold: #d5a72f;
+      --rust: #b95f3d;
+      --blue: #3e6680;
+      --line: rgba(21, 55, 47, .18);
+      --shadow: 0 24px 60px rgba(31, 55, 47, .12);
+      --serif: "Iowan Old Style", "Noto Serif SC", "Source Han Serif SC", Georgia, serif;
+      --sans: "IBM Plex Sans", "Noto Sans SC", "Source Han Sans SC", sans-serif;
+      --mono: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      color: var(--ink);
+      background:
+        linear-gradient(90deg, transparent 0 49.7%, rgba(21,55,47,.025) 49.7% 50.3%, transparent 50.3%),
+        repeating-linear-gradient(0deg, rgba(21,55,47,.025) 0 1px, transparent 1px 28px),
+        var(--paper);
+      font-family: var(--sans);
+      line-height: 1.72;
+    }
+
+    a { color: inherit; }
+    code, pre { font-family: var(--mono); }
+    code {
+      padding: .12rem .34rem;
+      border-radius: .28rem;
+      background: rgba(23, 77, 61, .08);
+      color: var(--green-dark);
+      font-size: .9em;
+      overflow-wrap: anywhere;
+    }
+    pre {
+      margin: 1rem 0 0;
+      padding: 1.1rem 1.25rem;
+      overflow: auto;
+      color: #edf4ef;
+      background: var(--ink);
+      border-left: 5px solid var(--gold);
+      border-radius: 0 .4rem .4rem 0;
+      font-size: .82rem;
+      line-height: 1.58;
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,.07);
+    }
+
+    .top-rule {
+      position: fixed;
+      inset: 0 0 auto 0;
+      z-index: 100;
+      height: 5px;
+      background: linear-gradient(90deg, var(--green-dark) 0 52%, var(--gold) 52% 75%, var(--rust) 75% 100%);
+    }
+    .page {
+      width: min(1500px, 100%);
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: 290px minmax(0, 1fr);
+      min-height: 100vh;
+    }
+
+    aside {
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      overflow: auto;
+      padding: 3rem 1.8rem 2rem;
+      color: #f0f2e9;
+      background:
+        radial-gradient(circle at 20% 5%, rgba(213,167,47,.19), transparent 28%),
+        linear-gradient(165deg, #173d33, #102c26 74%);
+      border-right: 1px solid rgba(255,255,255,.09);
+    }
+    .mark {
+      display: grid;
+      grid-template-columns: 42px 1fr;
+      gap: .8rem;
+      align-items: center;
+      margin-bottom: 2rem;
+    }
+    .mark svg { width: 42px; height: 42px; }
+    .mark strong {
+      display: block;
+      font-family: var(--serif);
+      font-size: 1.05rem;
+      letter-spacing: .02em;
+    }
+    .mark span { display: block; color: rgba(240,242,233,.57); font-size: .69rem; letter-spacing: .16em; }
+    .nav-label {
+      margin: 1.7rem 0 .65rem;
+      color: var(--gold);
+      font-size: .65rem;
+      font-weight: 800;
+      letter-spacing: .17em;
+      text-transform: uppercase;
+    }
+    nav a {
+      position: relative;
+      display: block;
+      padding: .42rem 0 .42rem 1rem;
+      color: rgba(240,242,233,.72);
+      text-decoration: none;
+      font-size: .78rem;
+      border-left: 1px solid rgba(255,255,255,.15);
+      transition: color .2s, border-color .2s, transform .2s;
+    }
+    nav a:hover, nav a.active {
+      color: #fff;
+      border-color: var(--gold);
+      transform: translateX(3px);
+    }
+    .aside-note {
+      margin-top: 2rem;
+      padding-top: 1.2rem;
+      border-top: 1px solid rgba(255,255,255,.12);
+      color: rgba(240,242,233,.52);
+      font-size: .67rem;
+    }
+
+    main { min-width: 0; padding-bottom: 6rem; }
+    .hero {
+      position: relative;
+      min-height: 700px;
+      padding: 6.7rem clamp(2rem, 6vw, 6rem) 4.5rem;
+      overflow: hidden;
+      background:
+        radial-gradient(circle at 86% 20%, rgba(213,167,47,.28), transparent 25%),
+        linear-gradient(140deg, rgba(255,255,255,.63), rgba(243,240,230,.5));
+      border-bottom: 1px solid var(--line);
+    }
+    .hero::after {
+      content: "";
+      position: absolute;
+      right: -7rem;
+      bottom: -10rem;
+      width: 34rem;
+      height: 34rem;
+      border: 1px solid rgba(23,77,61,.18);
+      border-radius: 50%;
+      box-shadow: 0 0 0 3rem rgba(23,77,61,.035), 0 0 0 7rem rgba(23,77,61,.025);
+    }
+    .eyebrow {
+      display: flex;
+      align-items: center;
+      gap: .7rem;
+      color: var(--green-dark);
+      font-size: .73rem;
+      font-weight: 800;
+      letter-spacing: .18em;
+      text-transform: uppercase;
+    }
+    .eyebrow::before { content: ""; width: 3.5rem; height: 3px; background: var(--gold); }
+    h1 {
+      max-width: 900px;
+      margin: 1.5rem 0 1rem;
+      font-family: var(--serif);
+      font-size: clamp(3.2rem, 7.5vw, 7.6rem);
+      font-weight: 700;
+      line-height: .93;
+      letter-spacing: -.055em;
+    }
+    h1 em { color: var(--green); font-style: normal; }
+    .hero-lead {
+      max-width: 820px;
+      margin: 2rem 0 2.8rem;
+      color: var(--ink-soft);
+      font-family: var(--serif);
+      font-size: clamp(1.1rem, 2vw, 1.45rem);
+      line-height: 1.62;
+    }
+    .hero-meta {
+      position: relative;
+      z-index: 2;
+      display: grid;
+      grid-template-columns: repeat(5, minmax(100px, 1fr));
+      max-width: 1000px;
+      border-top: 1px solid var(--line);
+      border-bottom: 1px solid var(--line);
+    }
+    .metric { padding: 1rem 1.1rem 1.1rem 0; }
+    .metric + .metric { padding-left: 1.1rem; border-left: 1px solid var(--line); }
+    .metric strong { display: block; font-family: var(--serif); font-size: 1.65rem; line-height: 1.1; }
+    .metric span { color: var(--ink-soft); font-size: .67rem; letter-spacing: .08em; }
+
+    .toolbar {
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      display: flex;
+      gap: .7rem;
+      align-items: center;
+      padding: .85rem clamp(2rem, 6vw, 6rem);
+      background: rgba(243,240,230,.9);
+      border-bottom: 1px solid var(--line);
+      backdrop-filter: blur(14px);
+    }
+    .search {
+      flex: 1;
+      min-width: 160px;
+      padding: .68rem .85rem;
+      color: var(--ink);
+      background: rgba(255,255,255,.55);
+      border: 1px solid var(--line);
+      border-radius: 2rem;
+      outline: none;
+      font-family: var(--sans);
+    }
+    .search:focus { border-color: var(--green); box-shadow: 0 0 0 3px rgba(47,125,97,.1); }
+    .filter {
+      padding: .55rem .8rem;
+      color: var(--ink-soft);
+      background: transparent;
+      border: 1px solid var(--line);
+      border-radius: 2rem;
+      cursor: pointer;
+      font-size: .72rem;
+    }
+    .filter.on { color: #fff; background: var(--green-dark); border-color: var(--green-dark); }
+
+    .content { padding: 4rem clamp(2rem, 6vw, 6rem); }
+    .section-intro {
+      display: grid;
+      grid-template-columns: minmax(170px, .35fr) 1fr;
+      gap: 3rem;
+      align-items: start;
+      margin: 0 0 2.7rem;
+      padding-top: 1.5rem;
+      border-top: 3px solid var(--ink);
+    }
+    .section-intro .number { color: var(--gold); font-family: var(--serif); font-size: 4rem; line-height: 1; }
+    .section-intro h2 { margin: 0; font-family: var(--serif); font-size: clamp(2rem, 4vw, 3.6rem); line-height: 1.05; }
+    .section-intro p { margin: .8rem 0 0; color: var(--ink-soft); max-width: 780px; }
+
+    .topic {
+      scroll-margin-top: 5rem;
+      margin: 0 0 4.8rem;
+      animation: reveal .55s both;
+    }
+    @keyframes reveal { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+    .topic.hidden { display: none; }
+    .topic-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 1rem;
+      align-items: flex-start;
+      margin-bottom: 1.2rem;
+    }
+    .topic h3 { margin: 0; font-family: var(--serif); font-size: clamp(1.55rem, 3vw, 2.55rem); line-height: 1.2; }
+    .badges { display: flex; gap: .35rem; flex-wrap: wrap; justify-content: flex-end; }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      min-height: 1.65rem;
+      padding: .18rem .55rem;
+      border: 1px solid currentColor;
+      border-radius: 2rem;
+      font-size: .61rem;
+      font-weight: 800;
+      letter-spacing: .08em;
+      white-space: nowrap;
+    }
+    .a { color: var(--green-dark); background: rgba(47,125,97,.08); }
+    .b { color: var(--rust); background: rgba(185,95,61,.08); }
+    .c { color: var(--blue); background: rgba(62,102,128,.08); }
+    .d { color: #71694d; background: rgba(113,105,77,.08); }
+    .pending { color: #815e17; background: rgba(213,167,47,.12); }
+
+    .answer-30 {
+      position: relative;
+      margin: 1rem 0 1.4rem;
+      padding: 1.4rem 1.6rem 1.45rem 4.2rem;
+      background: rgba(255,255,255,.52);
+      border: 1px solid var(--line);
+      border-radius: .55rem;
+      box-shadow: var(--shadow);
+    }
+    .answer-30::before {
+      content: "30\A SEC";
+      white-space: pre;
+      position: absolute;
+      left: 1.1rem;
+      top: 1.25rem;
+      color: var(--gold);
+      font-family: var(--mono);
+      font-size: .65rem;
+      font-weight: 800;
+      line-height: 1.2;
+    }
+    .answer-30 p { margin: 0; font-family: var(--serif); font-size: 1.05rem; line-height: 1.72; }
+    .grid-2, .grid-3 { display: grid; gap: 1rem; margin-top: 1rem; }
+    .grid-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .grid-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .panel {
+      padding: 1.15rem 1.25rem;
+      background: rgba(255,255,255,.33);
+      border-top: 2px solid var(--green);
+      border-bottom: 1px solid var(--line);
+    }
+    .panel.gold { border-top-color: var(--gold); }
+    .panel.rust { border-top-color: var(--rust); }
+    .panel h4 { margin: 0 0 .55rem; font-family: var(--serif); font-size: 1.03rem; }
+    .panel p, .panel ul { margin: 0; color: var(--ink-soft); font-size: .82rem; }
+    ul.clean { padding-left: 1.15rem; }
+    ul.clean li + li { margin-top: .3rem; }
+    .evidence {
+      margin-top: 1rem;
+      padding: .9rem 1rem;
+      background: rgba(47,125,97,.055);
+      border-left: 3px solid var(--green);
+      color: var(--ink-soft);
+      font-size: .76rem;
+    }
+    .evidence strong { color: var(--ink); }
+    details {
+      margin-top: .8rem;
+      border-bottom: 1px solid var(--line);
+    }
+    summary { padding: .75rem 0; cursor: pointer; font-weight: 700; font-size: .84rem; }
+    details > div { padding: 0 0 1rem; color: var(--ink-soft); font-size: .82rem; }
+
+    table { width: 100%; margin-top: 1rem; border-collapse: collapse; font-size: .78rem; }
+    th { padding: .7rem .65rem; color: var(--paper); background: var(--ink); text-align: left; font-size: .67rem; letter-spacing: .05em; }
+    td { padding: .72rem .65rem; vertical-align: top; border-bottom: 1px solid var(--line); }
+    tbody tr:hover { background: rgba(255,255,255,.35); }
+    .status-dot { display: inline-block; width: .48rem; height: .48rem; margin-right: .35rem; border-radius: 50%; background: var(--gold); }
+    .status-dot.ok { background: var(--green); }
+    .status-dot.no { background: var(--rust); }
+
+    .incident-strip {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0,1fr));
+      gap: 1rem;
+      margin-top: 1rem;
+    }
+    .incident {
+      position: relative;
+      display: block;
+      min-height: 210px;
+      padding: 1.4rem;
+      color: #eef2ea;
+      text-decoration: none;
+      background: var(--ink);
+      overflow: hidden;
+    }
+    .incident::after { content: "↗"; position: absolute; right: 1.2rem; top: .8rem; color: var(--gold); font-size: 1.5rem; }
+    .incident small { color: var(--gold); letter-spacing: .1em; }
+    .incident h4 { max-width: 85%; margin: 2.2rem 0 .7rem; font-family: var(--serif); font-size: 1.35rem; }
+    .incident p { color: rgba(238,242,234,.65); font-size: .77rem; }
+
+    .coverage-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0,1fr));
+      gap: 1px;
+      margin-top: 1rem;
+      background: var(--line);
+      border: 1px solid var(--line);
+    }
+    .gap { padding: 1rem; background: var(--paper); }
+    .gap b { display: block; color: var(--green-dark); font-family: var(--mono); font-size: .7rem; }
+    .gap span { display: block; margin-top: .25rem; font-size: .76rem; }
+    .gap small { color: var(--ink-soft); }
+
+    .claim-wall {
+      padding: 1.4rem;
+      color: #f2eee2;
+      background: linear-gradient(135deg, #683622, #8d442b);
+      border-radius: .55rem;
+    }
+    .claim-wall h4 { margin: 0 0 .7rem; font-family: var(--serif); font-size: 1.3rem; }
+    .claim-wall ul { margin: 0; padding-left: 1.2rem; font-size: .82rem; }
+
+    .question-bank { columns: 2; column-gap: 1.5rem; }
+    .question {
+      break-inside: avoid;
+      margin: 0 0 .7rem;
+      padding: .8rem .9rem;
+      background: rgba(255,255,255,.34);
+      border-left: 2px solid var(--gold);
+      font-size: .79rem;
+    }
+    .question b { color: var(--green-dark); font-family: var(--mono); font-size: .64rem; }
+
+    footer {
+      margin-top: 5rem;
+      padding-top: 1.4rem;
+      color: var(--ink-soft);
+      border-top: 1px solid var(--line);
+      font-size: .72rem;
+    }
+
+    @media (max-width: 980px) {
+      .page { grid-template-columns: 1fr; }
+      aside { position: relative; height: auto; padding: 1.5rem; }
+      aside nav, .aside-note { display: none; }
+      .mark { margin: 0; }
+      .hero { min-height: auto; padding-top: 4rem; }
+      .hero-meta { grid-template-columns: repeat(2, 1fr); }
+      .metric:nth-child(odd) { border-left: 0; padding-left: 0; }
+      .metric:nth-child(even) { padding-left: 1rem; border-left: 1px solid var(--line); }
+      .section-intro { grid-template-columns: 1fr; gap: .6rem; }
+      .section-intro .number { font-size: 2.5rem; }
+      .grid-3, .coverage-grid { grid-template-columns: repeat(2, minmax(0,1fr)); }
+    }
+    @media (max-width: 680px) {
+      .toolbar { overflow-x: auto; padding-inline: 1rem; }
+      .filter { white-space: nowrap; }
+      .content { padding-inline: 1.1rem; }
+      .hero { padding-inline: 1.25rem; }
+      h1 { font-size: 3.35rem; }
+      table { display: block; overflow-x: auto; white-space: normal; }
+      .grid-2, .grid-3, .incident-strip, .coverage-grid { grid-template-columns: 1fr; }
+      .topic-head { display: block; }
+      .badges { margin-top: .7rem; justify-content: flex-start; }
+      .question-bank { columns: 1; }
+      .answer-30 { padding-left: 1.25rem; padding-top: 3rem; }
+      .answer-30::before { left: 1.25rem; top: .9rem; }
+    }
+    @media print {
+      .top-rule, aside, .toolbar { display: none !important; }
+      .page { display: block; }
+      .hero { min-height: auto; padding: 2rem; }
+      .content { padding: 1rem 2rem; }
+      .topic { break-inside: avoid; }
+      body { background: white; }
+    }
+  </style>
+</head>
+<body>
+  <div class="top-rule"></div>
+  <div class="page">
+    <aside>
+      <div class="mark">
+        <svg viewBox="0 0 48 48" aria-hidden="true">
+          <path d="M8 18V8h10v7h12V8h10v10" fill="none" stroke="#d5a72f" stroke-width="3"/>
+          <rect x="7" y="17" width="34" height="24" rx="3" fill="none" stroke="#e9eee7" stroke-width="2"/>
+          <path d="M15 26h18M15 32h12" stroke="#67ad8e" stroke-width="3"/>
+        </svg>
+        <div><strong>StudyHub Agent</strong><span>EVIDENCE DOSSIER</span></div>
+      </div>
+      <div class="nav-label">Core</div>
+      <nav>
+        <a href="#architecture">01 · 架构与任务</a>
+        <a href="#data">02 · 数据与隔离</a>
+        <a href="#sft">03 · SFT 与 Readiness</a>
+        <a href="#tools">04 · Tool Loop</a>
+        <a href="#grpo">05 · GRPO</a>
+        <a href="#reward">06 · Reward</a>
+        <a href="#evaluation">07 · 评测</a>
+        <a href="#repro">08 · 可复现</a>
+        <a href="#infra">09 · 训练系统</a>
+        <a href="#rag">10 · RAG / Memory</a>
+        <a href="#algorithms">11 · 算法边界</a>
+      </nav>
+      <div class="nav-label">Interview</div>
+      <nav>
+        <a href="#failures">12 · 故障诊断</a>
+        <a href="#incidents">13 · 真实事故</a>
+        <a href="#coverage">14 · 防漏审计</a>
+        <a href="#questions">15 · 高频追问</a>
+        <a href="#claims">16 · 表述边界</a>
+      </nav>
+      <div class="aside-note">
+        来源：StudyHub 代码与本地实验产物；面试 Goal Pack 的 52 张截图、S01–S14 主题和 G01–G18 缺口仅用于覆盖审计。<br><br>
+        更新日期：2026-08-26
+      </div>
+    </aside>
+
+    <main>
+      <header class="hero">
+        <div class="eyebrow">SFT · Agentic RL · Evidence Engineering</div>
+        <h1>从一次工具调用，<br>到一条<em>可证明</em>的训练结论。</h1>
+        <p class="hero-lead">这不是通用八股汇编。每个答案都先说明 StudyHub 实际做了什么，再区分自然复现、受控实验、机制验证和理论理解；无法由当前证据支持的结论明确留白。</p>
+        <div class="hero-meta">
+          <div class="metric"><strong>5</strong><span>OPEN SFT SOURCES</span></div>
+          <div class="metric"><strong>2,400</strong><span>FROZEN RL TASKS</span></div>
+          <div class="metric"><strong>32 × 4</strong><span>DEV EVAL PROTOCOL</span></div>
+          <div class="metric"><strong>128 / 128</strong><span>EXACT REPLAY</span></div>
+          <div class="metric"><strong>74 / 74</strong><span>PROJECT TESTS</span></div>
+        </div>
+      </header>
+
+      <div class="toolbar" aria-label="知识点筛选">
+        <input class="search" id="search" type="search" placeholder="搜索：GRPO、泄漏、Reward hacking、显存……">
+        <button class="filter on" data-level="all">全部</button>
+        <button class="filter" data-level="a">A 真实</button>
+        <button class="filter" data-level="b">B 受控</button>
+        <button class="filter" data-level="c">C 机制</button>
+        <button class="filter" data-level="d">D 理论</button>
+      </div>
+
+      <div class="content">
+        <div class="section-intro">
+          <div class="number">00</div>
+          <div><h2>先读证据等级</h2><p>只有 A/B 可以说“在项目中观察到”。C 只能说做过少步或局部机制验证；D 只能陈述论文、源码或理论理解。截图和经验帖用于生成追问，不自动升级为项目事实。</p></div>
+        </div>
+        <div class="grid-4 grid-2" style="margin-bottom:4.5rem">
+          <div class="panel"><h4>A · REAL REPRODUCED</h4><p>正式项目运行中自然发生，保留原始 trial、根因、修复与同协议回归。</p></div>
+          <div class="panel rust"><h4>B · CONTROLLED PROJECT</h4><p>从健康 checkpoint 分叉的隔离故障或对照，必须标记注入变量，不能冒充自然事故。</p></div>
+          <div class="panel"><h4>C · MECHANISM SMOKE</h4><p>少步、fixture 或局部验证，只证明链路接通，不外推规模和能力。</p></div>
+          <div class="panel gold"><h4>D · LITERATURE ONLY</h4><p>理解算法与取舍，但当前仓库未实跑；面试时直接说明边界。</p></div>
+        </div>
+
+        <article class="topic a" id="architecture" data-level="a" data-keywords="架构 Hermes AReaL SGLang Agentic reasoning RL 网站隔离">
+          <div class="topic-head"><h3>为什么是 Agent？训练链路怎样拆分？</h3><div class="badges"><span class="badge a">A · 真实链路</span></div></div>
+          <div class="answer-30"><p>StudyHub 需要模型在不完整信息下自主决定是否搜索、如何改写 query、读取哪个证据、是否继续以及何时停止；这比一次固定 RAG 调用多了环境状态和行动反馈。Hermes 负责工具循环，SGLang 服务当前策略，Frozen Environment 执行任务级工具，Reward v2 用隐藏 verifier 打分，AReaL 完成 GRPO 与 LoRA 更新。</p></div>
+          <pre>AReaL Task → StudyHubHermesWorkflow → Hermes AIAgent
+      → SGLang / Qwen3.5 Policy → Tool Call
+      → FrozenTaskEnvironment → Observation → Final Answer
+      → Hidden Verifier / Reward v2 → GRPO LoRA Update</pre>
+          <div class="grid-3">
+            <div class="panel"><h4>Hermes</h4><p>消息状态、工具循环、停止条件、重复失败与 no-progress guardrail；不负责 optimizer。</p></div>
+            <div class="panel gold"><h4>StudyHub Runtime</h4><p>安装冻结 prompt、注册任务工具、隔离宿主能力、落 Reward 和轨迹证据；不重写 Hermes 核心。</p></div>
+            <div class="panel"><h4>AReaL + SGLang</h4><p>前者组织 rollout/logprob/advantage/update，后者做高吞吐推理和 LoRA hot load。</p></div>
+          </div>
+          <details><summary>追问：Agentic RL 与普通 reasoning RL 有何区别？</summary><div>reasoning RL 常在单次文本生成后由答案 verifier 打分；Agentic RL 的轨迹包含状态、动作、工具 observation、错误恢复和停止决策。Reward 既评价 outcome，也要约束调用、证据、引用和权限。长轨迹还带来 credit assignment、环境确定性和 policy staleness 问题。</div></details>
+          <details><summary>追问：为什么不在 AReaL 里手写 loop？</summary><div>保留 Hermes 能复用既有工具 schema、消息回放、停止和 guardrail 语义，避免生产 Agent 与训练 harness 演化成两套不一致的行为协议。StudyHub 只在训练边界做最小配置。</div></details>
+          <div class="evidence"><strong>代码：</strong> <code>training/rl/hermes_workflow.py</code>、<code>training/rl/frozen_environment.py</code>、<code>training/rl/open_agent_driver.py</code>。网站 <code>backend/</code>、<code>frontend/</code>、数据库、OSS 与支付不在 rollout 可达边界。</div>
+        </article>
+
+        <article class="topic a" id="data" data-level="a" data-keywords="数据 开源 ToolACE Hermes 2Wiki QASPER COIG split 泄漏 oracle adapter mixture">
+          <div class="topic-head"><h3>同一批开放数据，SFT 与 RL 为什么不能同样使用？</h3><div class="badges"><span class="badge a">A · 数据审计</span></div></div>
+          <div class="answer-30"><p>SFT 看专家示范；RL 只拿任务、工具和冻结环境，让策略自己 rollout。Gold answer、gold tool sequence 和 gold evidence 从 policy context 隐藏，只进入 verifier。具体样本再按 source/group lineage 隔离，避免“同来源体系”变成“同样本泄漏”。</p></div>
+          <table>
+            <thead><tr><th>来源</th><th>SFT 用法</th><th>RL 改造</th><th>主要能力</th></tr></thead>
+            <tbody>
+              <tr><td>ToolACE</td><td>模仿工具调用轨迹</td><td>隐藏 expected calls，fixture 真执行</td><td>函数、参数、多轮调用</td></tr>
+              <tr><td>Hermes FC</td><td>JSON / observation 协议</td><td>只公开 request + schema</td><td>Function Calling</td></tr>
+              <tr><td>2Wiki</td><td>给定 evidence 做多跳组合</td><td>全文进入 Frozen Corpus，gold source 只给 verifier</td><td>Search → Read → 多跳</td></tr>
+              <tr><td>QASPER</td><td>给定论文 evidence 回答</td><td>整篇论文可查，canonical annotation 绑定自己的 evidence</td><td>Grounding / Citation</td></tr>
+              <tr><td>COIG</td><td>中文教育问答与解释</td><td>首轮不作为核心 Agent RL</td><td>教学表达</td></tr>
+            </tbody>
+          </table>
+          <div class="grid-3">
+            <div class="panel"><h4>不可变来源</h4><p>记录 repository/dataset、revision、license、raw hash、adapter commit 和过滤前后数量。</p></div>
+            <div class="panel gold"><h4>Lineage Split</h4><p>按 paper/source/tool-template group 切分；检查 exact、normalized、near-duplicate 和 SFT/RL overlap。</p></div>
+            <div class="panel rust"><h4>Oracle Isolation</h4><p>公开 task 的 verifier 字段必须为空；环境、verifier 与 public task 分开 hash。</p></div>
+          </div>
+          <details><summary>压缩包提醒：数据何时算“够”？</summary><div>不是达到某个条数就算够。要同时看 coverage cell、模板/近重复、learning curve、per-source retention、mixed/all-fail/all-success group、有效 action token、rollout 成本和新增数据的边际收益。当前 3,000 条 SFT 与 2,400 条 RL 是受控实验规模，不代表覆盖真实 StudyHub 用户分布。</div></details>
+          <div class="evidence"><strong>当前事实：</strong> SFT 共 3,000 条；RL v2 为 2,000 train / 400 validation，公开 Oracle 字段为空，SFT/RL lineage overlap 为 0，train/validation group overlap 为 0。<strong>依据：</strong> <code>datasets/processed/*/manifest.json</code>、<code>scripts/data/audit_open_rl_tasks.py</code>、<code>training/rl/budget_contract.py</code>。</div>
+        </article>
+
+        <article class="topic a" id="sft" data-level="a" data-keywords="SFT LoRA loss cross entropy assistant-only readiness Base RL-only 4B 9B">
+          <div class="topic-head"><h3>SFT 学什么？训练到什么程度才进入 RL？</h3><div class="badges"><span class="badge a">A · 配方与数据</span><span class="badge pending">结果进行中</span></div></div>
+          <div class="answer-30"><p>SFT 先提供稳定的行为先验：聊天模板、Tool Call JSON、给定证据下的多跳推理、grounded QA 和中文解释。Loss 只计算 assistant token 的交叉熵。是否进入 RL 不能只看 loss，而要在冻结 suite 上重复采样，检查格式有效率、工具行为、pass@k、失败结构和 group 是否产生可学习方差。</p></div>
+          <pre>L_SFT = - Σ_t m_t · log pθ(y_t | x, y&lt;t) / Σ_t m_t
+m_t = 1 仅对 assistant action / final answer token 生效</pre>
+          <div class="grid-2">
+            <div class="panel"><h4>4B 固定配方</h4><p>Qwen3.5-4B、BF16、LoRA r/α=16、<code>o_proj/gate_proj/up_proj/down_proj</code>、gradient checkpointing、2 epochs、Adam、cosine LR 2e-5。</p></div>
+            <div class="panel gold"><h4>2×2 对照</h4><p>B0 Base；B1 SFT-only；B2 RL-only；B3 SFT→RL。B1/B3 共享同一 SFT checkpoint，RL 两支共享 task 顺序、Reward、环境和 rollout 预算。</p></div>
+          </div>
+          <details><summary>Readiness 四种决策</summary><div><b>继续 SFT：</b>协议/格式错误主导且新增示范仍有边际收益。<br><b>先修评测：</b>parser、verifier 或输入视图不一致。<br><b>进入 RL：</b>基本协议稳定、存在 mixed outcomes 和可学习搜索/恢复策略。<br><b>已饱和：</b>多次扩数据和训练不再改善冻结能力/成本曲线。</div></details>
+          <details><summary>为什么保留 RL-only？</summary><div>它量化 Base 能否直接通过环境反馈学会策略，并检验 SFT 是否主要提供 policy initialization。若只比较 SFT 与 SFT→RL，就无法区分 RL 本身的增益与 SFT 初始化的协同作用。</div></details>
+          <div class="evidence"><strong>实验边界：</strong> 4B 正式 SFT 结果尚未完成，9B 当前只完成模型、数据和脚本准备。不得把 2B Pilot 外推为 4B/9B 结论。</div>
+        </article>
+
+        <article class="topic a" id="tools" data-level="a" data-keywords="Tool Call parser schema Search Read budget guardrail JSON fixture">
+          <div class="topic-head"><h3>模型生成 Tool Call 后，系统到底做了什么？</h3><div class="badges"><span class="badge a">A · 真实实现</span></div></div>
+          <div class="answer-30"><p>模型只看到当前任务公开的 schema。Hermes 用 Qwen3 parser 解析调用，经临时异步 handler 交给 Frozen Environment；环境校验工具、参数、Search→Read 状态和预算，返回确定性 observation。Gold 调用或证据不在模型输入中，只由 Reward 侧核验。</p></div>
+          <pre>knowledge_search(query) → discovered source_ids
+knowledge_read(source_id) → only if source_id was discovered in this rollout
+unknown / wrong args / direct read / over budget → deterministic error + trace</pre>
+          <div class="grid-3">
+            <div class="panel"><h4>Parser parity</h4><p><code>tool_call_parser=qwen3_coder</code>、HF chat template、统一 tool serialization，避免 policy 与环境解释不同。</p></div>
+            <div class="panel gold"><h4>Task scope</h4><p>每题只注册允许工具，结束立即注销；不能访问 shell、文件系统、网络、凭证或生产服务。</p></div>
+            <div class="panel rust"><h4>双层停止</h4><p>6 turns / 6 calls 的数据合同，加上重复失败、同工具失败和 no-progress guardrail。</p></div>
+          </div>
+          <details><summary>为什么不能只在 prompt 中写“先搜后读”？</summary><div>RL 会优化 Reward，而不是遵守意图。若环境允许猜 source ID 直接读，策略可能找到 shortcut。约束必须进入状态机，并把违规写入 trace 与 Reward hard gate。</div></details>
+          <div class="evidence"><strong>代码：</strong> <code>training/rl/frozen_environment.py</code>、<code>training/rl/hermes_workflow.py</code>、<code>training/rl/budget_contract.py</code>。ToolACE 连续 assistant/tool rounds 会全部保留，中间 tool call 不会被当作 final。</div>
+        </article>
+
+        <article class="topic a" id="grpo" data-level="a" data-keywords="GRPO PPO advantage group variance KL clip entropy ratio staleness">
+          <div class="topic-head"><h3>GRPO 的学习信号从哪里来？</h3><div class="badges"><span class="badge a">A · 真实 Gate/Smoke</span></div></div>
+          <div class="answer-30"><p>同一任务采样 4 条轨迹，用组内 Reward 均值和标准差构造相对 advantage。高于组平均的行为被增强，低于平均的被抑制；若四条 Reward 相同，zero-variance group 几乎没有相对信号。因此要同时看平均 Reward、组内方差、best–worst gap 和有效 group 数。</p></div>
+          <pre>A_i = (r_i - mean(r_G)) / (std(r_G) + ε)
+ratio_t = exp(log πθ(a_t|s_t) - log πold(a_t|s_t))
+L_clip = min(ratio_t A_t, clip(ratio_t, 1-ε, 1+ε) A_t)</pre>
+          <div class="grid-3">
+            <div class="panel"><h4>Group</h4><p><code>n_samples=4</code>，<code>drop_incomplete_group=true</code>；缺样本时拒绝训练，不改变 advantage 语义。</p></div>
+            <div class="panel gold"><h4>Stability</h4><p>clip 0.2、KL control 0.02、token-level ratio rejection；无 EOS 轨迹把 outcome reward 清零。</p></div>
+            <div class="panel rust"><h4>Stage</h4><p>Gate 1 step / 32 trajectories；Smoke 10 / 320；Pilot 25 / 800。分别验证链路、分布和短趋势。</p></div>
+          </div>
+          <table>
+            <thead><tr><th>4B Direct GRPO v2 Gate</th><th>实测</th><th>判定</th></tr></thead>
+            <tbody>
+              <tr><td>Rollout / group</td><td>32 / 8，全部为 4 条完整组</td><td>可计算组相对 advantage</td></tr>
+              <tr><td>Reward</td><td>mean -0.1274，std 0.6196，min -1，max 0.9833</td><td>不是常数 Reward</td></tr>
+              <tr><td>Group signal</td><td>mean std 0.2663；zero-variance 2/8</td><td>6/8 组存在相对排序信号</td></tr>
+              <tr><td>Policy update</td><td>initial/final LoRA SHA-256 不同</td><td>1 次 PPO update 确实改变参数</td></tr>
+              <tr><td>Runtime</td><td>456.86 秒；GPU 峰值 66,834 MiB</td><td>低于 68,000 MiB 运行上限</td></tr>
+              <tr><td>Evidence</td><td>32 rewards、123 interactions、bundle COMPLETE</td><td>Prompt 123/123 恰好一次</td></tr>
+            </tbody>
+          </table>
+          <details><summary>GRPO 与 PPO 的主要区别？</summary><div>当前配方不训练 value critic，而用同 prompt 多样本的相对 Reward 估计 advantage；policy update 仍保留 PPO 风格 ratio、clip、KL 和 off-policy 处理。不能简单说“GRPO 完全不是 PPO”。</div></details>
+          <details><summary>什么是健康探索，什么是失控？</summary><div>短期成功率下降但 entropy、KL、长度、ratio 和 holdout 未越界，且 group 有方差，可能是健康探索；若 Reward 与独立 eval 背离、entropy 快速坍塌、ratio tail/clip 激增或输出模式化，则应暂停并做 LR/KL/reward/data 对照。</div></details>
+          <div class="evidence"><strong>v2 Gate：</strong> <code>direct-gate-seed-7401-20260826_155650</code>，Git <code>2bbc37b</code>，证据包完整。<strong>历史边界：</strong>旧 v1 10-step Smoke 为 80 tasks / 320 rollouts，Reward mean 0.1292、std 0.5035、zero-variance 0.2875；它只证明旧链路有信号，不进入 v2 能力对照。</div>
+        </article>
+
+        <article class="topic a b" id="reward" data-level="a b" data-keywords="Reward hacking verifier hard gate citation evidence efficiency process outcome parser">
+          <div class="topic-head"><h3>Reward 怎样既可学习，又不鼓励走捷径？</h3><div class="badges"><span class="badge a">A · Reward v2</span><span class="badge b">B · Hacking 待受控</span></div></div>
+          <div class="answer-30"><p>总分拆成任务成功、证据、引用、工具质量和效率，每项单独落盘。明确的协议/环境错误使用 hard gate；空回答、缺必要引用、完全不调工具最多为 0。Function Calling 把调用正确性与最终答案按 70/30 合成，修复“调对工具但不回答也能高分”的 shortcut。</p></div>
+          <pre>R = .40 task_success + .25 evidence + .15 citation
+  + .15 tool_quality + .05 efficiency - violations
+
+Function task_success = .70 call_correctness + .30 answer_quality</pre>
+          <div class="grid-2">
+            <div class="panel rust"><h4>Hard gate</h4><p>非法引用、source 不存在、工具预算耗尽、未知工具、不支持 capability → Reward = -1。</p></div>
+            <div class="panel"><h4>四层防线</h4><p>Oracle 隔离 → 环境状态机 → 多分量 Reward → 固定独立 Eval。任何单层都不足以防 hacking。</p></div>
+          </div>
+          <details><summary>Outcome 与 Process Reward 如何取舍？</summary><div>当前优先可验证 outcome；证据、引用和工具质量提供轻量 process constraint。不对不可可靠验证的自然语言 CoT 强行逐步打分，避免把 judge 偏差变成训练目标。</div></details>
+          <details><summary>如何识别 Reward hacking？</summary><div>检查 component domination、Reward 与 strict eval 背离、异常短答/长答、无工具高分、parser FP/FN、高分错误轨迹和 per-family 回归。自然训练未出现时，从健康 checkpoint 做短时、单变量、明确标记的 CONTROLLED_FAULT，再恢复 Reward 并在同一 suite 回归。</div></details>
+          <div class="evidence"><strong>局限：</strong> QASPER 的 token-F1/字符串匹配可能低估语义等价回答；当前没有大规模人工校准的 learned RM。<strong>代码：</strong> <code>training/rl/reward_v2.py</code>、Reward 单测与每 trial 的 <code>reward-v2.jsonl</code>。</div>
+        </article>
+
+        <article class="topic a" id="evaluation" data-level="a" data-keywords="Eval32 strict success pass@4 consistent@4 bootstrap deterministic holdout">
+          <div class="topic-head"><h3>为什么平均 Reward 不能代表 Agent 变好？</h3><div class="badges"><span class="badge a">A · Base Eval32 v2</span></div></div>
+          <div class="answer-30"><p>Reward 是训练诊断，会混合 family，也可能被权重或 shortcut 推高。StudyHub 固定 32 个开发任务、每题 4 次 rollout，报告 strict success、pass@4、consistent@4、hard-gate、工具成本和 family slice；所有候选必须使用相同任务、环境、verifier、预算与解析协议。</p></div>
+          <div class="grid-3">
+            <div class="panel"><h4>Strict</h4><p>单条轨迹同时满足任务、工具、证据、引用与无违规要求。</p></div>
+            <div class="panel gold"><h4>Pass@4</h4><p>四条中至少一条严格成功，反映能力上限与探索覆盖。</p></div>
+            <div class="panel rust"><h4>Consistent@4</h4><p>四条全部严格成功，反映可靠性；缺任意 rollout 时评测器 fail closed。</p></div>
+          </div>
+          <table>
+            <thead><tr><th>Base-4B / Eval32 v2</th><th>结果</th><th>解释</th></tr></thead>
+            <tbody>
+              <tr><td>Strict rollout success</td><td>4.69%</td><td>128 条中 6 条严格成功</td></tr>
+              <tr><td>Pass@4</td><td>9.38%</td><td>32 题中 3 题至少一次成功</td></tr>
+              <tr><td>Consistent@4</td><td>3.13%</td><td>32 题中 1 题四次均成功</td></tr>
+              <tr><td>Hard gate</td><td>10.94%</td><td>协议/环境硬失败仍较多</td></tr>
+              <tr><td>Mean Reward</td><td>-0.0429</td><td>只作诊断，不作为能力结论</td></tr>
+            </tbody>
+          </table>
+          <details><summary>Base 的主要失败分布</summary><div>missing citation 60、invalid tool call 43、tool-call budget exhausted 11、invalid citation 4、no tool call 2。QASPER strict success 为 0，说明证据定位与引用是主要短板；这提供训练 headroom，但不保证 Pilot 一定提升。</div></details>
+          <details><summary>最终比较怎样做？</summary><div>B0/B1/B2/B3 用 per-task paired delta、改善/不变/退化数和 paired bootstrap CI。Eval32 是开发集，不是密封 final benchmark；最终 claim 还需要不参与调参的 sealed test 与 incident regression。</div></details>
+          <div class="evidence"><strong>Run：</strong> <code>direct-eval-seed-7301-20260826_150452</code> 与 <code>...153009</code>。两次聚合指标和逐 rollout 行为完全一致。</div>
+        </article>
+
+        <article class="topic a" id="repro" data-level="a" data-keywords="reproducibility hash manifest seed deterministic checkpoint evidence LoRA">
+          <div class="topic-head"><h3>怎样证明实验真的发生，而且能复核？</h3><div class="badges"><span class="badge a">A · 证据闭环</span></div></div>
+          <div class="answer-30"><p>进程退出 0 不是完成条件。每个 run 必须绑定 Git commit/dirty state、模型 revision、数据/环境/verifier hash、resolved config、seed、GPU 时间线、轨迹、Reward 分项和 checkpoint hash；证据包通过完整性检查，并证明训练 LoRA 改变、评测 LoRA 不变。</p></div>
+          <div class="grid-2">
+            <div class="panel"><h4>四层证据</h4><p>输入 lineage → 运行环境与配置 → policy 行为轨迹 → checkpoint 与评测输出。</p></div>
+            <div class="panel gold"><h4>秘密处理</h4><p>每次运行生成临时 AReaL admin key，结束后脱敏；公共 Reward 日志只保留答案长度与 SHA。</p></div>
+          </div>
+          <table>
+            <thead><tr><th>复现检查</th><th>Base Eval32 v2 结果</th></tr></thead>
+            <tbody>
+              <tr><td>相同 task / model / data / config / seed</td><td><span class="status-dot ok"></span>通过</td></tr>
+              <tr><td>每题恰好 4 条</td><td><span class="status-dot ok"></span>32/32 groups</td></tr>
+              <tr><td>LoRA 初始/最终哈希</td><td><span class="status-dot ok"></span>完全相同</td></tr>
+              <tr><td>System prompt marker</td><td><span class="status-dot ok"></span>455/455 恰好一次</td></tr>
+              <tr><td>两次行为签名</td><td><span class="status-dot ok"></span>128/128 EXACT</td></tr>
+              <tr><td>Evidence bundle</td><td><span class="status-dot ok"></span>COMPLETE</td></tr>
+            </tbody>
+          </table>
+          <details><summary>固定 seed 为什么还不够？</summary><div>并发请求调度、CUDA kernel 和 sampling backend 仍可能漂移。Dev Eval 同时开启 AReaL deterministic sampling、SGLang deterministic inference、固定 request ordering 和 <code>max_head_offpolicyness=0</code>；然后用答案 SHA、完整 Reward、工具轨迹和 token 元数据做双跑签名比较。</div></details>
+          <div class="evidence"><strong>代码：</strong> <code>capture_run_metadata.py</code>、<code>build_experiment_evidence.py</code>、<code>compare_eval_reproducibility.py</code>。第二次 Eval 峰值 66,708 MiB，证据包 <code>artifact-completeness.json=COMPLETE</code>。</div>
+        </article>
+
+        <article class="topic a c" id="infra" data-level="a c" data-keywords="GPU H100 memory FSDP SGLang KV cache LoRA watchdog process group">
+          <div class="topic-head"><h3>双卡 Agentic RL 的显存与故障边界怎样控制？</h3><div class="badges"><span class="badge a">A · 双 H100 实测</span><span class="badge c">C · 扩展边界</span></div></div>
+          <div class="answer-30"><p>GPU0 放 AReaL actor/reference 的 FSDP 训练，GPU1 放 SGLang rollout。LoRA、BF16、gradient checkpointing 和 4096-token microbatch 控制峰值。启动前每卡至少 76,000 MiB 空闲；运行超过 68,000 MiB 或出现外来进程时，仅终止本 trial 的 PGID。</p></div>
+          <div class="grid-3">
+            <div class="panel"><h4>GPU0</h4><p>Actor + reference，参数、optimizer、gradient、activation、FSDP buffer 与 CUDA reserved memory。</p></div>
+            <div class="panel gold"><h4>GPU1</h4><p>SGLang policy rollout、KV cache、并发请求与 LoRA hot load。</p></div>
+            <div class="panel rust"><h4>Guard</h4><p>5 秒采样、显存阈值、foreign PID 检测、仅清理自己进程树，失败 run 也保留 exit reason。</p></div>
+          </div>
+          <details><summary>显存为什么不能只按权重大小估算？</summary><div>还包括梯度、optimizer state、activation、reference forward、通信 buffer、KV cache、CUDA allocator reserved memory 和临时 kernel workspace。不同阶段峰值不同，必须用 Gate 实测并保留分 GPU 时间线。</div></details>
+          <details><summary>为什么不是 VeRL/TRL/Unsloth？</summary><div>当前选择 AReaL 是因为它已提供 AgentWorkflow、解耦 rollout/update、FSDP 与 SGLang 接线；Hermes 提供成熟工具 loop。未对所有框架做同硬件 benchmark，因此只能陈述需求匹配和已验证链路，不能宣称全局最优。</div></details>
+          <div class="evidence"><strong>边界：</strong> 双 H100 的 4B Gate/Smoke/Eval 只能证明该配方可运行；不证明 9B、百卡扩展或其他 GPU 有同样吞吐和稳定性。</div>
+        </article>
+
+        <article class="topic a c" id="rag" data-level="a c" data-keywords="RAG BM25 BGE-M3 Dense Hybrid RRF reranker Memory MCP Search-R1">
+          <div class="topic-head"><h3>RAG、Web、Memory 与 Agent Policy 是什么关系？</h3><div class="badges"><span class="badge a">A · 离线 RAG</span><span class="badge c">C · RL 环境边界</span></div></div>
+          <div class="answer-30"><p>StudyHub 确实在隔离的离线项目中实现过 BM25、BGE-M3/Qwen embedding、FAISS、Hybrid/RRF 和 cross-encoder rerank；当前 RL Frozen Environment 为控制变量使用简化词法检索。Retriever 解决“候选是否相关”，Agent RL 解决“何时搜、搜什么、读什么、是否继续和怎样引用”，二者不能混称。</p></div>
+          <table>
+            <thead><tr><th>层</th><th>当前真实状态</th><th>不应宣称</th></tr></thead>
+            <tbody>
+              <tr><td>离线 RAG 实验</td><td>BM25 / Dense / FAISS / Hybrid / RRF / Reranker 已实现并比较</td><td>已经成为线上搜索</td></tr>
+              <tr><td>RL Frozen Search</td><td>冻结 corpus + 确定性词法 search/read</td><td>就是 BM25 或 BGE-M3</td></tr>
+              <tr><td>Web Adapter</td><td>训练方案中按冻结环境设计</td><td>已进行生产联网 RL</td></tr>
+              <tr><td>Memory</td><td>训练主线暂时关闭，待独立消融</td><td>已训练跨用户长期记忆</td></tr>
+            </tbody>
+          </table>
+          <details><summary>为什么 Pilot 不临时换 Hybrid Retriever？</summary><div>同时改变 policy 与 retriever，就无法归因提升来自训练还是召回器。先固定环境比较 B0/B1/B2/B3，再将 sparse/dense/fusion/rerank 作为独立环境变量做 ablation。</div></details>
+          <details><summary>Search-R1 借鉴了什么？</summary><div>借鉴模型自主提出 search query、观察结果并继续推理的多轮策略研究问题；当前实际 harness 是 Hermes、trainer 是 AReaL、环境是 StudyHub FrozenTaskEnvironment，不能说原样复现并训练 Search-R1。</div></details>
+          <div class="evidence"><strong>代码：</strong> <code>ai_platform/rag_experiments/</code> 与 <code>training/rl/frozen_environment.py</code>。权限过滤必须在候选返回前 fail closed，不能依赖 LLM 最后自行隐藏付费资料。</div>
+        </article>
+
+        <article class="topic c d" id="algorithms" data-level="c d" data-keywords="PPO DAPO OPD KDRL DPO KTO IPO GSPO DrGRPO KL distillation">
+          <div class="topic-head"><h3>为什么先做 GRPO，而不是把所有算法都跑一遍？</h3><div class="badges"><span class="badge c">C · 选型理解</span><span class="badge d">D · 未实跑算法</span></div></div>
+          <div class="answer-30"><p>当前最需要验证的是“冻结工具环境能否给 4B policy 提供稳定的相对信号”。GRPO 不需要 learned critic，适合有可验证 outcome、同题多轨迹和较高 rollout 成本的场景。其他算法只在对应症状出现、且能保持公平对照时进入，不为凑题面消耗训练预算。</p></div>
+          <table>
+            <thead><tr><th>算法</th><th>核心变化</th><th>何时考虑</th><th>当前等级</th></tr></thead>
+            <tbody>
+              <tr><td>PPO</td><td>Actor/Critic/Reference，GAE 与 clipped objective</td><td>需要 learned value baseline，且资源允许</td><td>C/D</td></tr>
+              <tr><td>GRPO</td><td>同 prompt group-relative advantage</td><td>可验证任务、多样 rollout、无 critic</td><td>A</td></tr>
+              <tr><td>DAPO</td><td>非对称 clip、动态采样/batch、overlong shaping</td><td>zero-variance、长度和采样效率成为主瓶颈</td><td>D</td></tr>
+              <tr><td>OPD</td><td>student on-policy token + teacher logprob / reverse KL</td><td>有合格 teacher，需保能力并纠正探索</td><td>D</td></tr>
+              <tr><td>KDRL</td><td>环境 Reward 与 distillation loss 联合</td><td>RL 成功但通用能力遗忘</td><td>D</td></tr>
+              <tr><td>DPO/KTO/IPO</td><td>离线 preference objective</td><td>有可靠偏好对，但不需要实时环境交互</td><td>D</td></tr>
+            </tbody>
+          </table>
+          <details><summary>KL 与交叉熵 / MLE 有何关系？</summary><div>MLE 最小化数据分布到模型的交叉熵，等价于忽略常数后的 forward KL；RL 中常用相对 reference policy 的 KL 作为 trust-region 约束。Reverse/forward KL 的 mode-seeking/coverage 性质不同；k1/k3 是 KL estimator 的数值取舍，不应与 KL 方向混为一谈。</div></details>
+          <div class="evidence"><strong>诚实边界：</strong> 当前正式主线是 AReaL 的 PPO/GRPO 配方。DAPO、OPD、KDRL、GSPO、Dr.GRPO、CISPO、SAPO、DPPO、MaxRL、SimKO 等未在本项目形成 A/B 级结果。</div>
+        </article>
+
+        <article class="topic a b" id="failures" data-level="a b" data-keywords="failure entropy collapse hacking KL LR clip length zero variance staleness parser OOM incident">
+          <div class="topic-head"><h3>故障怎样从“曲线不对”变成可解释的面试故事？</h3><div class="badges"><span class="badge a">A · 自然优先</span><span class="badge b">B · 受控补缺</span></div></div>
+          <div class="answer-30"><p>先在正常 Gate/Smoke/Pilot 中保存数据、Reward、optimizer、环境和评测五个面的共同时间轴；再用最便宜的单变量实验区分竞争假设。自然未出现的高频故障只能从健康 checkpoint 做短时 CONTROLLED_FAULT，必须包含注入、检测、定位、修复和同协议回归。</p></div>
+          <div class="grid-3">
+            <div class="panel rust"><h4>Reward / Eval</h4><p>hacking、component domination、parser FP/FN、judge drift、Reward 涨而 strict success 降。</p></div>
+            <div class="panel gold"><h4>Optimization</h4><p>entropy collapse、KL/LR/clip 失控、zero variance、ratio tail、staleness、NaN。</p></div>
+            <div class="panel"><h4>Agent / Infra</h4><p>tool loop、bad query、伪引用、memory 串扰、长度膨胀、OOM、队列与 checkpoint 恢复。</p></div>
+          </div>
+          <table>
+            <thead><tr><th>P0 故障</th><th>关键指标</th><th>受控方式（自然未出现时）</th><th>停止条件</th></tr></thead>
+            <tbody>
+              <tr><td>Reward hacking</td><td>Reward↑ / strict↓、高分错误、长度/格式相关</td><td>短时放宽 parser 或提高辅助分量</td><td>出现预期背离立即停止</td></tr>
+              <tr><td>Entropy collapse</td><td>entropy、unique answer、KL、ratio、长度</td><td>同 checkpoint 短时高 LR / 弱约束</td><td>多样性越过预设阈值</td></tr>
+              <tr><td>KL–LR–clip</td><td>KL、clip fraction、grad norm、early eval</td><td>单独改变一个强/弱配置</td><td>离开健康 Pilot 区间</td></tr>
+              <tr><td>长度/截断</td><td>p50/p95/p99、no-EOS、Reward/token</td><td>放宽长度或错误效率 Reward</td><td>p99/截断突增</td></tr>
+              <tr><td>Zero variance</td><td>全对/全错、effective groups</td><td>easy-only / hard-only 或 group size 对照</td><td>已证明方差与学习信号关系</td></tr>
+              <tr><td>Staleness</td><td>policy age、reuse、ratio tail、publish ACK</td><td>延迟一次 refresh 或有限复用</td><td>检测器触发且能回滚</td></tr>
+            </tbody>
+          </table>
+          <details><summary>Goal Pack 的 F01–F27 怎样映射到当前排障？</summary><div>
+            <table>
+              <thead><tr><th>槽位</th><th>问题面</th><th>当前处理</th></tr></thead>
+              <tbody>
+                <tr><td>F01 / F13 / F16 / F27</td><td>Reward hacking、分量支配、parser 误判、Reward-chain 回归</td><td>保存分量与独立 strict eval；自然未出现时做短时受控对抗。</td></tr>
+                <tr><td>F02 / F03 / F04</td><td>熵坍塌、KL 失控、长度膨胀/截断</td><td>Pilot 同轴记录 entropy、KL、ratio/clip、长度和 no-EOS。</td></tr>
+                <tr><td>F05 / F12</td><td>zero variance、难度/动态采样偏差</td><td>记录全对/全错、有效组、family 与难度分布，不只看均值。</td></tr>
+                <tr><td>F06 / F18</td><td>logprob/off-policy mismatch、权重发布滞后</td><td>保存 policy version/age、reuse、publish 和 ratio tail。</td></tr>
+                <tr><td>F07 / F23 / F24 / F25</td><td>Tool loop、RAG、Memory、工具策略失衡</td><td>Tool/RAG 已有 trace；Memory 未进入首轮训练，保持待验证。</td></tr>
+                <tr><td>F08 / F19 / F20</td><td>污染、能力遗忘、CoT/答案 shortcut</td><td>lineage split 与 Oracle 审计已做；retention 与 rationale 审计待补。</td></tr>
+                <tr><td>F09 / F17 / F22</td><td>loss mask、输入视图、batch/rank 归约</td><td>mask/template 单测已做；跨 rank invariance 尚未形成 A 级结果。</td></tr>
+                <tr><td>F10 / F14</td><td>环境非确定性、Infra 吞吐瓶颈</td><td>Eval 精确双跑和 GPU 时间线已保存；完整吞吐分解待 Pilot。</td></tr>
+                <tr><td>F11 / F15 / F21</td><td>Teacher mismatch、算法误选、judge 漂移</td><td>当前不让 teacher/judge 主导 GRPO；未实跑算法保持 D。</td></tr>
+                <tr><td>F26</td><td>Multi-agent credit 错配</td><td>当前是单 Agent offline RL，不制造虚假的多 Agent 经验。</td></tr>
+              </tbody>
+            </table>
+            <p>F01–F27 是诊断菜单，不是必须逐项制造故障的配额。任何 B 级实验都从健康 checkpoint 分叉，标记 <code>CONTROLLED_FAULT</code>，触发预期症状即停止，并完成修复和同协议回归。</p>
+          </div></details>
+          <div class="evidence"><strong>归因纪律：</strong> 固定模型只换数据；固定数据只换 Reward；固定前两者只换 optimizer；重放同一 trajectory 只换环境/评估器。负结果也保留，不挑最好曲线。</div>
+        </article>
+
+        <article class="topic a" id="incidents" data-level="a" data-keywords="incident duplicate system prompt QASPER budget contract bug root cause">
+          <div class="topic-head"><h3>目前有哪些真实发生、已闭环的事故？</h3><div class="badges"><span class="badge a">A · 两个自然事件</span></div></div>
+          <div class="answer-30"><p>一个来自运行时：StudyHub training prompt 同时通过 Hermes builder 和 ephemeral prompt 注入，导致每次请求重复两份。另一个来自数据合同：runtime 降到 6 turns，但 RL v1 的 QASPER 多标注 evidence 并集使部分任务在预算内不可完成。两者都有竞争假设、修复、回归和残余风险。</p></div>
+          <div class="incident-strip">
+            <a class="incident" href="incidents/2026-08-26-duplicate-training-system-prompt.html"><small>A_REAL_REPRODUCED · RUNTIME</small><h4>Duplicate Training System Prompt</h4><p>1160/1160 重复 → 修复后 118/118 恰好一次；保留真实 Smoke 与 Gate。</p></a>
+            <a class="incident" href="incidents/2026-08-26-rl-task-budget-contract.html"><small>A_REAL_REPRODUCED · DATA CONTRACT</small><h4>RL Task Budget Contract</h4><p>v1 的 35 个任务超 6 turns、15 个超工具预算 → v2 全量 2400 条审计通过。</p></a>
+          </div>
+          <div class="evidence"><strong>当前自然素材：</strong> 还包括 Base Eval 中的重复工具失败、预算耗尽与缺引用，但它们暂时是失败样本，不自动升级为“事故”；需要根因、修复和回归后再登记。</div>
+        </article>
+
+        <article class="topic a c d" id="coverage" data-level="a c d" data-keywords="coverage gap parser parity staleness forgetting teacher judge multi-agent G01 G18">
+          <div class="topic-head"><h3>压缩包第二遍审计的 G01–G18，当前覆盖到哪里？</h3><div class="badges"><span class="badge a">A · 已覆盖</span><span class="badge c">C · 部分</span><span class="badge d">D · 待验证</span></div></div>
+          <div class="answer-30"><p>Goal Pack 的 52 张截图被归为 S01–S14，并在第二遍审计中提炼出 18 个容易遗漏的追问。下面不是“全部完成”表，而是当前证据状态：已做的给路径，部分覆盖的说明缺口，未实跑的保留 D/待办。</p></div>
+          <div class="coverage-grid">
+            <div class="gap"><b>G01 · Parser</b><span>Reward parser 有单测；FP/FN 人工校准未完成。</span><small>C / pending</small></div>
+            <div class="gap"><b>G02 · Input parity</b><span>HF template + Qwen parser 已锁；全链路 parity report 待补。</span><small>A/C</small></div>
+            <div class="gap"><b>G03 · Staleness</b><span>policy version 与 reuse 已落盘；publish lag/age 曲线待 Pilot。</span><small>A/C</small></div>
+            <div class="gap"><b>G04 · Retention</b><span>多来源 slice 已有；通用能力遗忘 canary 未完成。</span><small>pending</small></div>
+            <div class="gap"><b>G05 · CoT shortcut</b><span>Oracle 可见字段审计已做；teacher rationale 审计仍需扩展。</span><small>A/C</small></div>
+            <div class="gap"><b>G06 · Reward chain</b><span>版本化 Reward/Verifier/单测已接通；开放 judge 边界明确。</span><small>A</small></div>
+            <div class="gap"><b>G07 · Judge drift</b><span>当前没有 learned judge 主导训练；disagreement 校准待做。</span><small>D / pending</small></div>
+            <div class="gap"><b>G08 · Rollout lifecycle</b><span>discard/truncate/reuse 字段已有；更复杂 replay 尚未实跑。</span><small>A/C</small></div>
+            <div class="gap"><b>G09 · Batch / rank</b><span>单 rank 配方可复现；跨 rank invariance 未验证。</span><small>C / pending</small></div>
+            <div class="gap"><b>G10 · Memory</b><span>GPU 时间线与总峰值已保存；完整分项 profiling 待补。</span><small>A/C</small></div>
+            <div class="gap"><b>G11 · Framework</b><span>AReaL+Hermes 链路已证实；未做全框架同机 benchmark。</span><small>A/C</small></div>
+            <div class="gap"><b>G12 · RLHF theory</b><span>Actor-Critic/GAE/KL/采样可解释，当前无 PPO critic 实跑。</span><small>D</small></div>
+            <div class="gap"><b>G13 · Adjacent RL</b><span>算法谱系只做理论边界，不伪装项目结果。</span><small>D</small></div>
+            <div class="gap"><b>G14 · Agent failures</b><span>tool/citation 已有真实样本；Web/Memory 故障未完成。</span><small>A / pending</small></div>
+            <div class="gap"><b>G15 · Multi-agent</b><span>当前为单 Agent offline RL；credit 与 online feedback 仅理论。</span><small>D</small></div>
+            <div class="gap"><b>G16 · Data sufficient</b><span>规模与 coverage 已记录；learning/saturation curve 尚未完成。</span><small>pending</small></div>
+            <div class="gap"><b>G17 · Model migration</b><span>4B 主实验进行中；9B replication 尚未产生结果。</span><small>pending</small></div>
+            <div class="gap"><b>G18 · RL readiness</b><span>Base Eval 可复现，SFT/Pilot 对照完成后才能最终判定。</span><small>A / ongoing</small></div>
+          </div>
+          <details><summary>S01–S14 的 52 张截图具体用于发现哪些追问？</summary><div>
+            <table>
+              <thead><tr><th>来源组</th><th>问题线索</th></tr></thead>
+              <tbody>
+                <tr><td>S01–S03</td><td>从日志还原实验、parser/reward、GRPO loss、on/off-policy、KL 与全易/全难 group。</td></tr>
+                <tr><td>S04–S06</td><td>真实 Agentic 行动、长轨迹 credit、partial rollout、KL estimator、ratio tail 与 RL 初期退化。</td></tr>
+                <tr><td>S07–S09</td><td>OPD、精度/显存/框架/确定性、tool call、format reward、mask、dynamic batch 与 reward-eval 背离。</td></tr>
+                <tr><td>S10–S12</td><td>Reasoning/Agentic RL 边界、最终对但过程错、CoT 泄漏、多工具分配、hacking 回退与多 Agent credit。</td></tr>
+                <tr><td>S13–S14</td><td>何时使用 RL、数据梯度、Reward/环境、规模先验、业务指标以及 offline/online 边界。</td></tr>
+              </tbody>
+            </table>
+            <p>这些截图只负责发现问题面；其中的算法、参数和规模结论若没有锁定源码、论文或项目实测支持，均保持 D 级。</p>
+          </div></details>
+          <div class="evidence"><strong>来源纪律：</strong> 截图原帖缺页、模糊文字和经验参数不得补成事实。算法定义、默认参数和规模建议必须回到锁定源码、官方文档或论文；否则保持 D。</div>
+        </article>
+
+        <article class="topic a c d" id="questions" data-level="a c d" data-keywords="question bank interview 面试 追问">
+          <div class="topic-head"><h3>高频追问速查</h3><div class="badges"><span class="badge a">按证据回答</span></div></div>
+          <div class="answer-30"><p>每题至少准备三个长度：30 秒给结论、关键决策和一项证据；60 秒补背景—动作—结果—取舍；3 分钟展开公式、竞争假设、before/after、复现路径和残余风险。</p></div>
+          <div class="question-bank">
+            <div class="question"><b>ARCH</b><br>为什么需要 Agent，而不是固定 RAG pipeline？</div>
+            <div class="question"><b>ARCH</b><br>Hermes、StudyHub workflow、AReaL、SGLang 的职责边界？</div>
+            <div class="question"><b>DATA</b><br>开源数据怎样固定 revision、镜像、adapter 和 lineage？</div>
+            <div class="question"><b>DATA</b><br>同一来源为什么能同时用于 SFT/RL，却不能复用同样本？</div>
+            <div class="question"><b>SFT</b><br>assistant-only loss mask 怎样实现和验证？</div>
+            <div class="question"><b>SFT</b><br>什么时候继续 SFT，什么时候开始 RL？</div>
+            <div class="question"><b>SFT</b><br>为什么 B1 与 B3 必须共享一个 SFT checkpoint？</div>
+            <div class="question"><b>TOOL</b><br>Tool Call 从 token 到环境执行经过哪些层？</div>
+            <div class="question"><b>TOOL</b><br>为什么 Search→Read 必须由状态机强制？</div>
+            <div class="question"><b>GRPO</b><br>Group advantage 如何计算，zero variance 意味着什么？</div>
+            <div class="question"><b>GRPO</b><br>GRPO 与 PPO 的主要区别和共同点？</div>
+            <div class="question"><b>GRPO</b><br>KL、entropy、ratio、clip 各自诊断什么？</div>
+            <div class="question"><b>REWARD</b><br>为什么 Function Calling 还必须约束 final answer？</div>
+            <div class="question"><b>REWARD</b><br>Hard gate 与软 penalty 怎样分工？</div>
+            <div class="question"><b>REWARD</b><br>Reward 上升、holdout 下降时如何归因？</div>
+            <div class="question"><b>EVAL</b><br>strict、pass@4、consistent@4 分别说明什么？</div>
+            <div class="question"><b>EVAL</b><br>为什么 Eval 每题不足 4 条时必须拒绝出结果？</div>
+            <div class="question"><b>REPRO</b><br>固定 seed 为什么仍不保证确定性？</div>
+            <div class="question"><b>REPRO</b><br>怎样证明训练更新了 LoRA、评测没有更新？</div>
+            <div class="question"><b>RAG</b><br>离线 Hybrid RAG 与 RL Frozen Search 的区别？</div>
+            <div class="question"><b>MEMORY</b><br>为什么第一轮训练关闭 Hermes memory？</div>
+            <div class="question"><b>INFRA</b><br>参数、optimizer、activation、KV cache 如何占显存？</div>
+            <div class="question"><b>INFRA</b><br>共享服务器如何避免误杀他人进程？</div>
+            <div class="question"><b>INCIDENT</b><br>讲一个真实 runtime Bug 及竞争假设。</div>
+            <div class="question"><b>INCIDENT</b><br>讲一个数据与 runtime 契约不一致的案例。</div>
+            <div class="question"><b>FAILURE</b><br>熵坍塌从哪些曲线发现，如何受控复现？</div>
+            <div class="question"><b>FAILURE</b><br>如何区分 Reward hacking 与 parser 误判？</div>
+            <div class="question"><b>ALGO</b><br>什么时候 DAPO/OPD/KDRL 比继续 GRPO 更合理？</div>
+            <div class="question"><b>BOUNDARY</b><br>当前双 H100 的结果能证明什么、不能证明什么？</div>
+            <div class="question"><b>BUSINESS</b><br>模型指标如何映射到真实学习体验和业务指标？</div>
+          </div>
+        </article>
+
+        <article class="topic a d" id="claims" data-level="a d" data-keywords="unsupported claims boundary 不能宣称 局限">
+          <div class="topic-head"><h3>哪些话现在不能说？</h3><div class="badges"><span class="badge a">事实边界</span></div></div>
+          <div class="claim-wall">
+            <h4>Unsupported claims · 当前禁止外推</h4>
+            <ul class="clean">
+              <li>不能宣称 4B SFT、Direct RL 或 SFT→RL 已提升 Eval32，直到 checkpoint 与成对评测完成。</li>
+              <li>不能用训练 Reward 上升替代 strict success、pass@4、consistent@4 或 sealed test。</li>
+              <li>不能宣称 9B 优于 4B；9B 当前只有模型、数据、脚本和配方准备。</li>
+              <li>不能把 Frozen Search 称作 BM25/Dense/Hybrid，也不能说离线 RAG 已上线。</li>
+              <li>不能说 Search-R1 已被原样复现训练；当前借鉴的是研究问题与多轮检索思想。</li>
+              <li>不能把 Reward v2 称为大规模人工校准的教育 Reward Model。</li>
+              <li>不能把 fixture/offline RL 外推为生产网络、数据库、权限和真实用户 online RL 安全性。</li>
+              <li>不能把受控 entropy collapse/reward hacking 描述为自然生产事故。</li>
+            </ul>
+          </div>
+          <details><summary>怎样把限制说得专业，而不是显得“没做完”？</summary><div>先说证据支持的范围，再说明剩余变量和下一步验证。例如：“双 H100 上 4B 的 Hermes→SGLang→Frozen Env→Reward→LoRA 链路已经完成真实 Gate；这证明配方可运行，但 9B scale effect 和业务收益仍需同协议复现。”</div></details>
+        </article>
+
+        <footer>
+          <p><strong>证据来源。</strong> StudyHub 仓库代码、Git commit、Git-ignored 本地 artifacts、模型/数据 manifests，以及 <code>artifacts/interview-goal-source/</code> 中已校验的 Goal Pack。原压缩包在双 manifest 校验后删除。</p>
+          <p><strong>当前基线。</strong> Base-4B Eval32 v2 两次固定 seed 运行获得 128/128 精确行为复现；Eval32 是开发评测，不是 sealed final benchmark。后续结果必须按 B0/B1/B2/B3 同协议追加。</p>
+        </footer>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    const topics = [...document.querySelectorAll('.topic')];
+    const search = document.getElementById('search');
+    const filters = [...document.querySelectorAll('.filter')];
+    let level = 'all';
+
+    function applyFilter() {
+      const query = search.value.trim().toLowerCase();
+      topics.forEach(topic => {
+        const levels = (topic.dataset.level || '').split(/\s+/);
+        const haystack = `${topic.dataset.keywords || ''} ${topic.textContent}`.toLowerCase();
+        const levelMatch = level === 'all' || levels.includes(level);
+        const textMatch = !query || haystack.includes(query);
+        topic.classList.toggle('hidden', !(levelMatch && textMatch));
+      });
+    }
+    search.addEventListener('input', applyFilter);
+    filters.forEach(button => button.addEventListener('click', () => {
+      level = button.dataset.level;
+      filters.forEach(item => item.classList.toggle('on', item === button));
+      applyFilter();
+    }));
+
+    const navLinks = [...document.querySelectorAll('aside nav a')];
+    const observer = new IntersectionObserver(entries => {
+      entries.forEach(entry => {
+        if (!entry.isIntersecting) return;
+        navLinks.forEach(link => link.classList.toggle('active', link.getAttribute('href') === `#${entry.target.id}`));
+      });
+    }, { rootMargin: '-20% 0px -70% 0px' });
+    topics.forEach(topic => observer.observe(topic));
+  </script>
+</body>
+</html>

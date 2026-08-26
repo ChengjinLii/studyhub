@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Incident · Duplicate Training System Prompt</title>
+  <style>
+    :root{--ink:#15372f;--paper:#f3f0e6;--green:#2f7d61;--gold:#d5a72f;--rust:#b95f3d;--line:rgba(21,55,47,.18);--serif:"Iowan Old Style","Noto Serif SC","Source Han Serif SC",Georgia,serif;--sans:"IBM Plex Sans","Noto Sans SC","Source Han Sans SC",sans-serif;--mono:"IBM Plex Mono",Consolas,monospace}
+    *{box-sizing:border-box}body{margin:0;color:var(--ink);background:repeating-linear-gradient(0deg,rgba(21,55,47,.025) 0 1px,transparent 1px 28px),var(--paper);font-family:var(--sans);line-height:1.7}code{font-family:var(--mono);font-size:.86em;padding:.1rem .3rem;background:rgba(47,125,97,.09);border-radius:.25rem;overflow-wrap:anywhere}a{color:inherit}.rail{height:6px;background:linear-gradient(90deg,var(--rust) 0 30%,var(--gold) 30% 55%,var(--green) 55%)}header{padding:5rem max(1.2rem,calc((100vw - 1050px)/2));color:#eff3e9;background:radial-gradient(circle at 85% 15%,rgba(213,167,47,.2),transparent 25%),var(--ink)}.back{display:inline-block;margin-bottom:3rem;color:rgba(239,243,233,.64);font-size:.75rem;text-decoration:none}.kicker{color:var(--gold);font-size:.7rem;font-weight:800;letter-spacing:.16em}h1{max-width:850px;margin:1rem 0;font-family:var(--serif);font-size:clamp(2.8rem,7vw,6.4rem);line-height:.95;letter-spacing:-.045em}.lead{max-width:750px;color:rgba(239,243,233,.68);font-family:var(--serif);font-size:1.2rem}.facts{display:grid;grid-template-columns:repeat(4,1fr);margin-top:3rem;border-top:1px solid rgba(255,255,255,.18);border-bottom:1px solid rgba(255,255,255,.18)}.fact{padding:1rem 1rem 1rem 0}.fact+.fact{padding-left:1rem;border-left:1px solid rgba(255,255,255,.18)}.fact strong{display:block;color:#fff;font-family:var(--serif);font-size:1.25rem}.fact span{color:rgba(239,243,233,.5);font-size:.65rem}.wrap{width:min(1050px,calc(100% - 2.4rem));margin:4rem auto}.summary{padding:1.4rem 1.5rem;background:rgba(255,255,255,.55);border-left:5px solid var(--gold);box-shadow:0 18px 45px rgba(21,55,47,.1)}h2{margin:4rem 0 1rem;padding-top:1rem;border-top:3px solid var(--ink);font-family:var(--serif);font-size:2rem}h3{font-family:var(--serif)}table{width:100%;border-collapse:collapse;font-size:.82rem}th{padding:.75rem;color:var(--paper);background:var(--ink);text-align:left}td{padding:.75rem;border-bottom:1px solid var(--line)}.timeline{display:grid;grid-template-columns:120px 1fr;gap:0 1.4rem}.time{padding:1rem 0;color:var(--rust);font-family:var(--mono);font-size:.72rem;border-top:1px solid var(--line)}.event{padding:1rem 0;border-top:1px solid var(--line)}.hyp{display:grid;grid-template-columns:repeat(3,1fr);gap:1rem}.card{padding:1rem;background:rgba(255,255,255,.38);border-top:2px solid var(--green);font-size:.82rem}.card b{display:block;margin-bottom:.35rem}.answer{margin-top:4rem;padding:1.5rem;color:#edf2e9;background:var(--ink)}.answer strong{color:var(--gold)}pre{overflow:auto;padding:1rem;color:#edf2e9;background:#102b25;border-left:4px solid var(--gold);font-family:var(--mono);font-size:.78rem}footer{margin-top:4rem;padding-top:1rem;border-top:1px solid var(--line);color:#60736c;font-size:.72rem}@media(max-width:700px){.facts{grid-template-columns:1fr 1fr}.hyp{grid-template-columns:1fr}.timeline{grid-template-columns:1fr}.event{padding-top:.2rem}.fact:nth-child(3){border-left:0}.wrap{margin-top:2rem}}@media print{header{padding:2rem}.wrap{width:auto;margin:1rem 2rem}.back{display:none}}
+  </style>
+</head>
+<body>
+  <div class="rail"></div>
+  <header>
+    <a class="back" href="../index.html#incidents">← 返回 StudyHub 面试知识档案</a>
+    <div class="kicker">A_REAL_REPRODUCED · RUNTIME DEFECT · 2026-08-26</div>
+    <h1>Duplicate Training<br>System Prompt</h1>
+    <p class="lead">真实 10-step Direct GRPO Smoke 暴露：同一 StudyHub training policy 在 Hermes 的两个注入路径中重复出现。事故完成了发现、竞争假设、代码修复和真实 Gate 回归。</p>
+    <div class="facts">
+      <div class="fact"><strong>1,160 / 1,160</strong><span>BEFORE · DUPLICATED</span></div>
+      <div class="fact"><strong>118 / 118</strong><span>AFTER · EXACTLY ONCE</span></div>
+      <div class="fact"><strong>1 PPO update</strong><span>REGRESSION GATE</span></div>
+      <div class="fact"><strong>66,714 MiB</strong><span>GPU0 PEAK</span></div>
+    </div>
+  </header>
+  <main class="wrap">
+    <div class="summary"><strong>30 秒回答。</strong> Hermes 正常通过 <code>_build_system_prompt()</code> 构建 system message，而 StudyHub workflow 又把同一文本作为 <code>ephemeral_system_prompt</code> 传入，导致每个模型请求看到两份训练策略。通过原始 rollout marker 审计定位后，保留 builder、清空 prompt cache 并将 ephemeral 字段设为 <code>None</code>；真实 Gate 的 118 条交互全部恢复为恰好一次，LoRA 也完成更新。</div>
+
+    <h2>问题与影响</h2>
+    <p>重复 system prompt 会浪费上下文，并可能非线性强化格式、停止和工具约束。即使 loss 或 Reward 看起来正常，也无法确认学到的是目标 policy，还是被重复提示扭曲的行为。因此原 Smoke checkpoint 只保留为诊断证据，不进入健康 Pilot lineage。</p>
+
+    <h2>证据</h2>
+    <table>
+      <thead><tr><th>Trial</th><th>交互数</th><th>缺失 marker</th><th>重复 marker</th><th>恰好一次</th></tr></thead>
+      <tbody>
+        <tr><td><code>direct-smoke-seed-6209-20260825_230016</code></td><td>1,160</td><td>0</td><td>1,160</td><td>0%</td></tr>
+        <tr><td><code>direct-gate-seed-6210-20260826_033013</code></td><td>118</td><td>0</td><td>0</td><td>100%</td></tr>
+      </tbody>
+    </table>
+
+    <h2>定位时间线</h2>
+    <div class="timeline">
+      <div class="time">OBSERVE</div><div class="event">10-step Smoke 的原始请求中，固定 StudyHub marker 在每条 rendered interaction 出现两次。</div>
+      <div class="time">TRACE</div><div class="event">沿 Hermes message construction 追踪到 builder 与 ephemeral append 两条相同文本路径。</div>
+      <div class="time">PATCH</div><div class="event">覆盖 builder，清空 <code>_cached_system_prompt</code> 与 static cache，并将 <code>ephemeral_system_prompt=None</code>。</div>
+      <div class="time">REGRESS</div><div class="event">重跑 1-step Gate；118 条交互 marker 恰好一次，PPO update 完成，LoRA SHA 变化。</div>
+    </div>
+
+    <h2>排除的竞争假设</h2>
+    <div class="hyp">
+      <div class="card"><b>只是导出格式重复？</b>检查索引前的原始 request prompt，第一条交互中已存在两份，因此不是报告拼接。</div>
+      <div class="card"><b>Conversation replay？</b>每个任务的第一条交互即重复，排除由历史回放复制 prior turn。</div>
+      <div class="card"><b>AReaL 额外 prepend？</b>两份完全相同文本可分别追踪到 Hermes builder 与 ephemeral append。</div>
+    </div>
+
+    <h2>修复</h2>
+    <pre>agent._build_system_prompt = build_prompt
+agent._cached_system_prompt = None
+agent._cached_system_prompt_static = None
+agent.ephemeral_system_prompt = None</pre>
+    <p>修复保留 Hermes loop，不重写其消息和工具机制。单测断言 builder 输出与 ephemeral 字段状态；实验证据再从真实 rollout 验证最终 rendered input。</p>
+
+    <h2>残余风险</h2>
+    <p>Hermes/AReaL 在多轮工具调用中仍可能输出 prefix-cache mismatch warning。回归证据说明它不是 system prompt 重复事件，但 cache 行为仍属于上游 runtime 诊断，不能被描述为已经完全解决。</p>
+
+    <div class="answer"><strong>3 分钟回答结构。</strong><br>背景：真实 Direct Smoke → 症状：每个请求 marker×2 → 三个竞争假设 → 追踪 Hermes 两条注入路径 → 最小 patch → 同协议 Gate → 1160/1160 重复变为 118/118 恰好一次，同时 LoRA 更新 → 原 Smoke 从健康 lineage 移除 → 保留 prefix-cache residual risk。</div>
+
+    <footer>证据路径：<code>artifacts/experiments/direct-smoke-seed-6209-20260825_230016/</code>、<code>artifacts/experiments/direct-gate-seed-6210-20260826_033013/</code>、<code>training/rl/hermes_workflow.py</code>。</footer>
+  </main>
+</body>
+</html>

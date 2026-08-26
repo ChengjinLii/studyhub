@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Incident · RL Task Budget Contract</title>
+  <style>
+    :root{--ink:#15372f;--paper:#f3f0e6;--green:#2f7d61;--gold:#d5a72f;--rust:#b95f3d;--line:rgba(21,55,47,.18);--serif:"Iowan Old Style","Noto Serif SC","Source Han Serif SC",Georgia,serif;--sans:"IBM Plex Sans","Noto Sans SC","Source Han Sans SC",sans-serif;--mono:"IBM Plex Mono",Consolas,monospace}*{box-sizing:border-box}body{margin:0;color:var(--ink);background:repeating-linear-gradient(0deg,rgba(21,55,47,.025) 0 1px,transparent 1px 28px),var(--paper);font-family:var(--sans);line-height:1.7}code{font-family:var(--mono);font-size:.86em;padding:.1rem .3rem;background:rgba(47,125,97,.09);border-radius:.25rem;overflow-wrap:anywhere}a{color:inherit}.rail{height:6px;background:linear-gradient(90deg,var(--rust) 0 30%,var(--gold) 30% 55%,var(--green) 55%)}header{padding:5rem max(1.2rem,calc((100vw - 1050px)/2));color:#eff3e9;background:radial-gradient(circle at 85% 15%,rgba(213,167,47,.2),transparent 25%),var(--ink)}.back{display:inline-block;margin-bottom:3rem;color:rgba(239,243,233,.64);font-size:.75rem;text-decoration:none}.kicker{color:var(--gold);font-size:.7rem;font-weight:800;letter-spacing:.16em}h1{max-width:900px;margin:1rem 0;font-family:var(--serif);font-size:clamp(2.8rem,7vw,6.1rem);line-height:.95;letter-spacing:-.045em}.lead{max-width:760px;color:rgba(239,243,233,.68);font-family:var(--serif);font-size:1.2rem}.facts{display:grid;grid-template-columns:repeat(4,1fr);margin-top:3rem;border-top:1px solid rgba(255,255,255,.18);border-bottom:1px solid rgba(255,255,255,.18)}.fact{padding:1rem 1rem 1rem 0}.fact+.fact{padding-left:1rem;border-left:1px solid rgba(255,255,255,.18)}.fact strong{display:block;color:#fff;font-family:var(--serif);font-size:1.25rem}.fact span{color:rgba(239,243,233,.5);font-size:.65rem}.wrap{width:min(1050px,calc(100% - 2.4rem));margin:4rem auto}.summary{padding:1.4rem 1.5rem;background:rgba(255,255,255,.55);border-left:5px solid var(--gold);box-shadow:0 18px 45px rgba(21,55,47,.1)}h2{margin:4rem 0 1rem;padding-top:1rem;border-top:3px solid var(--ink);font-family:var(--serif);font-size:2rem}table{width:100%;border-collapse:collapse;font-size:.82rem}th{padding:.75rem;color:var(--paper);background:var(--ink);text-align:left}td{padding:.75rem;border-bottom:1px solid var(--line)}.root{display:grid;grid-template-columns:repeat(3,1fr);gap:1rem}.card{padding:1rem;background:rgba(255,255,255,.38);border-top:2px solid var(--green);font-size:.82rem}.card b{display:block;margin-bottom:.35rem}.flow{overflow:auto;padding:1rem;color:#edf2e9;background:#102b25;border-left:4px solid var(--gold);font-family:var(--mono);font-size:.78rem}.answer{margin-top:4rem;padding:1.5rem;color:#edf2e9;background:var(--ink)}.answer strong{color:var(--gold)}footer{margin-top:4rem;padding-top:1rem;border-top:1px solid var(--line);color:#60736c;font-size:.72rem}@media(max-width:700px){.facts{grid-template-columns:1fr 1fr}.root{grid-template-columns:1fr}.fact:nth-child(3){border-left:0}.wrap{margin-top:2rem}}@media print{header{padding:2rem}.wrap{width:auto;margin:1rem 2rem}.back{display:none}}
+  </style>
+</head>
+<body>
+  <div class="rail"></div>
+  <header>
+    <a class="back" href="../index.html#incidents">← 返回 StudyHub 面试知识档案</a>
+    <div class="kicker">A_REAL_REPRODUCED · DATA CONTRACT · 2026-08-26</div>
+    <h1>RL Task Budget<br>Contract</h1>
+    <p class="lead">运行时已经降到 6 个 model turns，但 RL v1 仍声明 10 steps / 8 calls；QASPER adapter 又把不同 annotator 的答案与 evidence 合并，使部分任务从定义上不可完成。</p>
+    <div class="facts">
+      <div class="fact"><strong>35</strong><span>V1 TASKS OVER 6 TURNS</span></div>
+      <div class="fact"><strong>15</strong><span>V1 TASKS OVER TOOL BUDGET</span></div>
+      <div class="fact"><strong>2,400</strong><span>V2 TASKS AUDITED</span></div>
+      <div class="fact"><strong>0</strong><span>V2 BUDGET VIOLATIONS</span></div>
+    </div>
+  </header>
+  <main class="wrap">
+    <div class="summary"><strong>30 秒回答。</strong> 静态审计发现运行时和数据任务预算由两处独立配置，且 QASPER 多标注被错误做并集，导致 35 条参考路径超过 6 turns、15 条超过工具预算。修复后以 <code>budget_contract.py</code> 作为单一事实源，QASPER 选择一个 deterministic canonical annotation，并在构建、verifier、preflight 和单测中独立重算可行性；v2 的 2,400 条任务全部通过。</div>
+
+    <h2>问题</h2>
+    <div class="flow">Reference path = one search + one read per required source + one final model turn
+
+Runtime: max 6 model turns / 6 tool calls
+V1 QASPER: answer/evidence union across annotators → up to 21 gold sources</div>
+    <p>静态“有答案”不等于环境中可完成。若 verifier 要求读取的 source 数量超过公开预算，任何 policy 都会被惩罚；RL 会把数据合同错误当作策略失败，污染 Reward 分布和 zero-variance 诊断。</p>
+
+    <h2>审计结果</h2>
+    <table>
+      <thead><tr><th>Dataset</th><th>QASPER tasks</th><th>Reference path &gt; 6 turns</th><th>Required calls &gt; 8</th><th>Max gold sources</th></tr></thead>
+      <tbody>
+        <tr><td>RL v1</td><td>600</td><td>35</td><td>15</td><td>21</td></tr>
+        <tr><td>RL v2</td><td>600</td><td>0</td><td>0</td><td>4</td></tr>
+      </tbody>
+    </table>
+
+    <h2>排除的替代解释</h2>
+    <div class="root">
+      <div class="card"><b>并行 Tool Call 能解决？</b>不能解决 15 条调用总数已超过公开预算的任务，也不能假设 search/read 可以任意并行。</div>
+      <div class="card"><b>模型可以少读 source？</b>Reward v2 要求隐藏 gold evidence set；跳过 source 不能被当作参考成功路径。</div>
+      <div class="card"><b>把 max_turns 改回 10？</b>仍保留 15 条 tool-budget 违规和 annotation mismatch，并显著提高 sequence cost。</div>
+    </div>
+
+    <h2>根因</h2>
+    <ul>
+      <li>Runtime 与 dataset task budget 独立配置，没有共享合同。</li>
+      <li>QASPER answer 与 evidence 跨 annotator 做并集，而不是保持 annotation binding。</li>
+      <li>构建阶段没有 fail-closed feasibility audit，将 verifier 要求与公开预算比较。</li>
+    </ul>
+
+    <h2>修复与回归</h2>
+    <p><code>training/rl/budget_contract.py</code> 统一定义 6 turns / 6 calls。每条任务保存隐藏预算合同；构建器拒绝参考路径超限的 candidate。QASPER adapter 选择一个规范 annotation，并只绑定该 annotation 的 evidence；Function Calling 保留连续 assistant tool rounds，并额外计入 final-answer turn。</p>
+    <p>v2 生成 2,000 train / 400 validation：SFT overlap=0、train/validation group overlap=0、公开 Oracle 字段为空，参考 turns 与 calls 均在 [1,6] 范围内。旧 v1 Smoke 只作为 runtime 诊断，不进入 v2 paired comparison。</p>
+
+    <h2>残余风险</h2>
+    <p>参考路径是保守可行性证明，不保证模型实际能完成。模型可能通过并行 function calls 减少 turns，也可能因 query reformulation 消耗更多步骤；Pilot 仍必须报告 budget exhaustion、premature final、tool loop、family success 和 sequence truncation。</p>
+
+    <div class="answer"><strong>3 分钟回答结构。</strong><br>Runtime 配方变化 → 静态审计发现 6-turn 合同与 v1 task 不一致 → 追到 QASPER annotation union → 排除并行调用与简单放宽预算 → 建立共享 budget contract 和 canonical binding → 重建 2,400 条 v2 数据 → 全量 audit/preflight/单测通过 → 旧 GPU 结果不复用 → 在 Pilot 继续观察实际预算失败。</div>
+
+    <footer>证据路径：<code>artifacts/areal/rl-budget-transition-v1-v2.json</code>、<code>datasets/processed/open_agent_rl_v2/budget-audit.json</code>、<code>training/rl/budget_contract.py</code>、<code>scripts/train/prepare_controlled_experiment.sh verify</code>。</footer>
+  </main>
+</body>
+</html>
