@@ -1,0 +1,371 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>Incident · Agent Context Budget Overflow</title>
+  <style>
+    :root {
+      --ink: #15372f;
+      --ink-2: #214b40;
+      --muted: #5f7069;
+      --paper: #f3f0e6;
+      --paper-2: #e7e0ce;
+      --green: #2f7d61;
+      --gold: #d5a72f;
+      --rust: #b95f3d;
+      --line: rgba(21, 55, 47, .18);
+      --serif: "Iowan Old Style", "Noto Serif SC", "Source Han Serif SC", Georgia, serif;
+      --sans: "IBM Plex Sans", "Noto Sans SC", "Source Han Sans SC", sans-serif;
+      --mono: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      color: var(--ink);
+      background:
+        linear-gradient(90deg, transparent 0 49.8%, rgba(21,55,47,.025) 49.8% 50.2%, transparent 50.2%),
+        repeating-linear-gradient(0deg, rgba(21,55,47,.026) 0 1px, transparent 1px 28px),
+        var(--paper);
+      font-family: var(--sans);
+      line-height: 1.72;
+    }
+    a { color: inherit; }
+    code, pre { font-family: var(--mono); }
+    code {
+      padding: .12rem .34rem;
+      color: var(--ink-2);
+      background: rgba(47,125,97,.09);
+      border-radius: .28rem;
+      font-size: .88em;
+      overflow-wrap: anywhere;
+    }
+    pre {
+      margin: 1rem 0 0;
+      padding: 1.15rem 1.25rem;
+      overflow: auto;
+      color: #edf3ea;
+      background: #102b25;
+      border-left: 5px solid var(--gold);
+      border-radius: 0 .4rem .4rem 0;
+      font-size: .79rem;
+      line-height: 1.62;
+    }
+
+    .rail {
+      height: 6px;
+      background: linear-gradient(90deg, var(--rust) 0 27%, var(--gold) 27% 52%, var(--green) 52% 100%);
+    }
+    header {
+      position: relative;
+      overflow: hidden;
+      padding: 4.8rem max(1.2rem, calc((100vw - 1120px) / 2)) 4rem;
+      color: #eef3e9;
+      background:
+        radial-gradient(circle at 82% 17%, rgba(213,167,47,.24), transparent 24%),
+        linear-gradient(145deg, #173f34, #102c26 72%);
+    }
+    header::after {
+      content: "4096";
+      position: absolute;
+      right: max(1rem, calc((100vw - 1120px) / 2));
+      bottom: -3.8rem;
+      color: rgba(255,255,255,.035);
+      font-family: var(--serif);
+      font-size: clamp(9rem, 22vw, 18rem);
+      font-weight: 800;
+      line-height: 1;
+      letter-spacing: -.08em;
+      pointer-events: none;
+    }
+    .back {
+      position: relative;
+      z-index: 1;
+      display: inline-block;
+      margin-bottom: 3rem;
+      color: rgba(238,243,233,.62);
+      font-size: .75rem;
+      text-decoration: none;
+    }
+    .kicker {
+      position: relative;
+      z-index: 1;
+      color: var(--gold);
+      font-size: .69rem;
+      font-weight: 800;
+      letter-spacing: .16em;
+      text-transform: uppercase;
+    }
+    h1 {
+      position: relative;
+      z-index: 1;
+      max-width: 900px;
+      margin: 1rem 0 1.25rem;
+      font-family: var(--serif);
+      font-size: clamp(3rem, 7vw, 6.5rem);
+      line-height: .93;
+      letter-spacing: -.05em;
+    }
+    .lead {
+      position: relative;
+      z-index: 1;
+      max-width: 780px;
+      margin: 0;
+      color: rgba(238,243,233,.68);
+      font-family: var(--serif);
+      font-size: clamp(1rem, 2vw, 1.25rem);
+    }
+    .facts {
+      position: relative;
+      z-index: 1;
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      margin-top: 3rem;
+      border-top: 1px solid rgba(255,255,255,.17);
+      border-bottom: 1px solid rgba(255,255,255,.17);
+    }
+    .fact { padding: 1rem .9rem 1rem 0; }
+    .fact + .fact { padding-left: .9rem; border-left: 1px solid rgba(255,255,255,.17); }
+    .fact strong { display: block; color: #fff; font-family: var(--serif); font-size: 1.45rem; line-height: 1.1; }
+    .fact span { color: rgba(238,243,233,.5); font-size: .61rem; letter-spacing: .07em; }
+
+    .wrap { width: min(1120px, calc(100% - 2.4rem)); margin: 3.8rem auto 5rem; }
+    .summary {
+      position: relative;
+      padding: 1.45rem 1.6rem 1.45rem 4.8rem;
+      background: rgba(255,255,255,.55);
+      border: 1px solid rgba(21,55,47,.1);
+      border-left: 5px solid var(--gold);
+      box-shadow: 0 20px 50px rgba(21,55,47,.1);
+    }
+    .summary::before {
+      content: "30s";
+      position: absolute;
+      left: 1.3rem;
+      top: 1.35rem;
+      color: var(--rust);
+      font-family: var(--serif);
+      font-size: 1.4rem;
+      font-weight: 800;
+    }
+    h2 {
+      margin: 4.5rem 0 1.25rem;
+      padding-top: 1rem;
+      border-top: 3px solid var(--ink);
+      font-family: var(--serif);
+      font-size: clamp(1.9rem, 4vw, 2.8rem);
+      line-height: 1.1;
+    }
+    h3 { margin: 0 0 .45rem; font-family: var(--serif); font-size: 1.25rem; }
+    p { margin: .7rem 0; }
+    ul { padding-left: 1.2rem; }
+
+    .timeline { position: relative; display: grid; gap: 1rem; margin-top: 1.4rem; }
+    .timeline::before { content: ""; position: absolute; left: 1.3rem; top: 1rem; bottom: 1rem; width: 2px; background: var(--line); }
+    .phase {
+      position: relative;
+      display: grid;
+      grid-template-columns: 2.7rem minmax(0, 1fr);
+      gap: 1rem;
+      padding: 1.15rem 1.2rem;
+      background: rgba(255,255,255,.37);
+      border: 1px solid rgba(21,55,47,.09);
+    }
+    .phase .node {
+      z-index: 1;
+      display: grid;
+      place-items: center;
+      width: 2.7rem;
+      height: 2.7rem;
+      color: #fff;
+      background: var(--green);
+      border: 4px solid var(--paper);
+      border-radius: 50%;
+      font-family: var(--mono);
+      font-size: .68rem;
+      font-weight: 800;
+    }
+    .phase.warn .node { background: var(--rust); }
+    .phase.mid .node { color: var(--ink); background: var(--gold); }
+    .phase small { color: var(--rust); font-family: var(--mono); font-size: .68rem; }
+
+    table { width: 100%; border-collapse: collapse; font-size: .79rem; }
+    th { padding: .8rem; color: var(--paper); background: var(--ink); text-align: left; vertical-align: top; }
+    td { padding: .8rem; border-bottom: 1px solid var(--line); vertical-align: top; }
+    tbody tr:hover { background: rgba(255,255,255,.34); }
+    .yes { color: var(--green); font-weight: 800; }
+    .no { color: var(--rust); font-weight: 800; }
+
+    .matrix { display: grid; grid-template-columns: repeat(5, minmax(0,1fr)); gap: .75rem; }
+    .hypothesis { padding: 1rem; background: rgba(255,255,255,.4); border-top: 3px solid var(--green); font-size: .77rem; }
+    .hypothesis.ruled { border-color: var(--rust); }
+    .hypothesis b { display: block; margin-bottom: .45rem; font-family: var(--serif); font-size: 1rem; }
+    .hypothesis .verdict { display: inline-block; margin-top: .55rem; color: var(--rust); font-family: var(--mono); font-size: .62rem; }
+    .hypothesis.confirmed .verdict { color: var(--green); }
+
+    .fix-grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 1rem; }
+    .fix { padding: 1.1rem; background: rgba(255,255,255,.4); border-left: 4px solid var(--green); }
+    .fix b { display: block; margin-bottom: .35rem; }
+    .fix p { margin: 0; color: var(--muted); font-size: .8rem; }
+
+    .answers { display: grid; grid-template-columns: .75fr 1.25fr; gap: 1rem; margin-top: 4rem; }
+    .answer {
+      padding: 1.35rem;
+      color: #edf3ea;
+      background: var(--ink);
+      border-top: 4px solid var(--gold);
+      font-size: .82rem;
+    }
+    .answer.long { border-color: var(--green); }
+    .answer strong { display: block; margin-bottom: .55rem; color: var(--gold); font-family: var(--serif); font-size: 1.2rem; }
+    .answer.long strong { color: #8ed0b4; }
+
+    .coverage { display: flex; flex-wrap: wrap; gap: .55rem; margin-top: 1rem; }
+    .tag { padding: .42rem .65rem; color: var(--ink-2); background: var(--paper-2); border: 1px solid var(--line); border-radius: 2rem; font-family: var(--mono); font-size: .65rem; }
+    .boundary { padding: 1.2rem 1.35rem; background: rgba(185,95,61,.08); border-left: 5px solid var(--rust); }
+    footer { margin-top: 4rem; padding-top: 1.2rem; color: var(--muted); border-top: 1px solid var(--line); font-size: .72rem; }
+
+    @media (max-width: 900px) {
+      .facts { grid-template-columns: repeat(2, minmax(0,1fr)); }
+      .fact:nth-child(odd) { border-left: 0; }
+      .matrix { grid-template-columns: repeat(2, minmax(0,1fr)); }
+      .answers { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 650px) {
+      header { padding-top: 3rem; }
+      .wrap { width: min(100% - 1.4rem, 1120px); margin-top: 2rem; }
+      .facts, .matrix, .fix-grid { grid-template-columns: 1fr; }
+      .fact + .fact { padding-left: 0; border-left: 0; border-top: 1px solid rgba(255,255,255,.12); }
+      .summary { padding-left: 1.2rem; padding-top: 4rem; }
+      .summary::before { left: 1.2rem; }
+      table { display: block; overflow-x: auto; }
+    }
+    @media print {
+      header { padding: 2rem; }
+      .back { display: none; }
+      .wrap { width: auto; margin: 1rem 2rem; }
+      .phase, .hypothesis, .fix { break-inside: avoid; }
+    }
+  </style>
+</head>
+<body>
+  <div class="rail"></div>
+  <header>
+    <a class="back" href="../index.html#incidents">← 返回 StudyHub 面试知识档案</a>
+    <div class="kicker">A_REAL_REPRODUCED · NATURAL_A · F04 / F09 / F17 / F25</div>
+    <h1>Agent Context<br>Budget Overflow</h1>
+    <p class="lead">初始数据全部低于窗口上限，但多轮 Search/Read 让真实渲染后的 prompt 穿过 4,096 tokens。第一轮修复挡住了 provider 500，却仍给强制收尾留下了一个会耗尽窗口的 thinking 路径。</p>
+    <div class="facts">
+      <div class="fact"><strong>9</strong><span>FAILED REQUESTS IN NATURAL PILOT</span></div>
+      <div class="fact"><strong>4,096</strong><span>TRAINING SEQUENCE LIMIT</span></div>
+      <div class="fact"><strong>2,400 / 2,400</strong><span>INITIAL PROMPTS AUDITED</span></div>
+      <div class="fact"><strong>5 / 5</strong><span>FORCED FINALS COMPLETED</span></div>
+      <div class="fact"><strong>0</strong><span>FINAL GATE RUNTIME ERRORS</span></div>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <div class="summary"><strong>结论。</strong> 自然 Direct Pilot 出现 9 个超长请求，每个重试 3 次，共 27 次失败调用；精确 tokenizer 审计排除了初始数据过长。第一轮运行时保护把 prompt 压回窗口内，但一次强制收尾仍以 <code>&lt;think&gt;</code> 开始，形成 <code>3777 + 319 = 4096</code> 的截断。最终只对强制收尾关闭 thinking，并把答案保留量从 256 提高到 768 tokens；回归 Gate 的 5 次强制收尾全部成功，runtime error 和 sequence-at-limit 都为 0。</div>
+
+    <h2>事件时间线</h2>
+    <div class="timeline">
+      <section class="phase warn">
+        <div class="node">A0</div>
+        <div><small>NATURAL PILOT · seed 7401 · commit 1d5e70a</small><h3>多轮 prompt 穿过 provider 上限</h3><p>计划中的 25-step Pilot 在完成 3 次 PPO 更新后人工终止并封存。日志记录 9 个不同请求，每个经历 3 次失败调用，prompt 长度为 4,105 至 4,172 tokens。证据包仍为 <code>COMPLETE</code>，但该 run 只保留为 <code>DIAGNOSTIC</code>，不进入正式 Pilot lineage。</p></div>
+      </section>
+      <section class="phase mid">
+        <div class="node">G1</div>
+        <div><small>CONTROLLED GATE · seed 7402 · commit e4056fa</small><h3>精确计数修掉 provider 500，暴露二阶收尾问题</h3><p>32 条 rollout、8 个完整 group 和 1 次 PPO 更新成功；provider overflow 为 0。但一条 2Wiki rollout 在 finalization prompt 为 3,777 tokens 时仍开启 thinking，319-token completion 正好触顶 4,096，触发 <code>context_budget_finalization_failed</code>。</p></div>
+      </section>
+      <section class="phase">
+        <div class="node">G2</div>
+        <div><small>REGRESSION GATE · seed 7403 · commit 45f775a</small><h3>为答案保留独立、有限的收尾通道</h3><p>再次完成 32 条 rollout、8 个完整 group 和 1 次 PPO 更新。5 条因 model-turn budget 强制收尾的轨迹全部设置 <code>enable_thinking=false</code>；整体最大 sent prompt 为 2,986，强制收尾最大为 2,981，最长序列 3,789，runtime error 为 0。</p></div>
+      </section>
+    </div>
+
+    <h2>为什么初始数据审计没有发现它</h2>
+    <p>静态审计使用与 AReaL/SGLang 一致的 Qwen3.5 chat template 和 tokenizer，覆盖 train/validation 共 2,400 条任务。初始 prompt 最大只有 1,908 tokens，超过 3,276 收尾阈值、3,328 安全目标或 4,096 引擎上限的数量均为 0。</p>
+    <pre>initial prompt
+ assistant reasoning
+ tool call serialization
+ tool observation
+ repeated search/read rounds
+ forced-final instruction
+ final completion
+--------------------------------
+must remain within 4,096 training tokens</pre>
+    <p>事故发生在动态增长部分。只验证 dataset record 的长度，不能证明真实 Agent rollout 的 rendered input 安全；必须在每次模型调用前，用同一 tokenizer、同一 tool serialization 和同一 chat template 重新计数。</p>
+
+    <h2>五个方向的竞争假设</h2>
+    <div class="matrix">
+      <div class="hypothesis ruled"><b>数据</b>任务原始 prompt 过长。全量 2,400 条初始 prompt 最大 1,908，排除静态数据越界。<span class="verdict">RULED OUT</span></div>
+      <div class="hypothesis ruled"><b>Reward</b>效率项鼓励冗长输出。它可能影响行为，但 provider 在 Reward 计算前已拒绝请求，不能解释 500。<span class="verdict">NOT ROOT</span></div>
+      <div class="hypothesis ruled"><b>优化器</b>KL、LR 或熵异常造成退化。事故在 rollout 阶段发生，且 3 次 update 的 entropy、grad norm 均为有限值。<span class="verdict">NOT ROOT</span></div>
+      <div class="hypothesis ruled"><b>基础设施</b>OOM、外来进程或网络抖动。GPU 峰值 67,008 MiB 未越过 68,000 MiB；服务明确返回 token-limit 细节。<span class="verdict">RULED OUT</span></div>
+      <div class="hypothesis confirmed"><b>输入与运行时</b>多轮渲染增长没有 final-answer reserve，第一轮收尾仍走 thinking 模板。原始轨迹直接复现 3,777 + 319。<span class="verdict">CONFIRMED</span></div>
+    </div>
+
+    <h2>最小修复</h2>
+    <div class="fix-grid">
+      <div class="fix"><b>每次调用做精确计数</b><p>不依赖字符数或粗略 token 估算；计数器使用与实际模型请求一致的 template、tools 和 tokenizer。</p></div>
+      <div class="fix"><b>将收尾阈值写入运行时</b><p>达到 80% 窗口或 model-turn budget 时，不再开放工具，只允许基于已有 observation 作答。</p></div>
+      <div class="fix"><b>保留 768-token 答案空间</b><p>从 256 提高到 768，使“进入收尾”与“答案可以完整结束”成为两个独立约束。</p></div>
+      <div class="fix"><b>只在强制收尾关闭 thinking</b><p>常规推理和工具选择保持原配方；仅 finalization request 设 <code>enable_thinking=false</code>，避免全局改变策略能力。</p></div>
+      <div class="fix"><b>失败时 fail closed</b><p>若压缩或收尾仍不能满足精确预算，写入明确 runtime error 并 hard gate，不把截断文本当作正常答案。</p></div>
+      <div class="fix"><b>把上下文预算写入证据</b><p>逐 rollout 保存 pre-guard、sent prompt、压缩量、forced-final 原因、thinking 状态和 guard failure。</p></div>
+    </div>
+
+    <h2>Before / After</h2>
+    <table>
+      <thead><tr><th>证据</th><th>自然 Pilot 7401</th><th>Gate 7402</th><th>Gate 7403</th></tr></thead>
+      <tbody>
+        <tr><td>上下文策略</td><td>无精确多轮保护</td><td>精确计数，256-token reserve</td><td>精确计数，768-token reserve；强制收尾关闭 thinking</td></tr>
+        <tr><td>Provider overflow</td><td class="no">9 requests / 27 failed calls</td><td class="yes">0</td><td class="yes">0</td></tr>
+        <tr><td>Sequence at 4,096</td><td>9 / 458 interactions</td><td class="no">1 / 125</td><td class="yes">0 / 126</td></tr>
+        <tr><td>Runtime context error</td><td>旧 telemetry 尚未结构化</td><td class="no">1 finalization failure</td><td class="yes">0</td></tr>
+        <tr><td>强制收尾</td><td>未结构化</td><td>6 次，1 次失败</td><td class="yes">5 次，5 次 thinking-disabled，全部完成</td></tr>
+        <tr><td>训练更新</td><td>3 次后人工停止</td><td>1 次成功</td><td>1 次成功</td></tr>
+        <tr><td>LoRA 权重</td><td>中断 run，不作最终 lineage 结论</td><td class="yes">SHA-256 改变</td><td class="yes">SHA-256 改变</td></tr>
+        <tr><td>GPU0 峰值</td><td>67,008 MiB</td><td>65,014 MiB</td><td>65,014 MiB</td></tr>
+      </tbody>
+    </table>
+
+    <h2>为什么没有采用更大的改动</h2>
+    <ul>
+      <li>没有全局关闭 thinking：这会改变所有 Search/Read 决策，不再是上下文修复。</li>
+      <li>没有把训练序列直接改到 8,192：rollout server 的上下文容量不等于 PPO 训练序列配方，扩大窗口也会提高显存与计算成本。</li>
+      <li>没有粗暴删除全部 tool observation：证据会被破坏，Reward 和引用校验失去意义。</li>
+      <li>没有用降低 max turns 掩盖问题：任务预算已经单独审计，输入预算仍需在真实渲染后强制执行。</li>
+    </ul>
+
+    <h2>Goal Pack 覆盖映射</h2>
+    <p>本案例按压缩包中的证据合同、故障 playbook 和回答长度要求整理。自然异常优先，不另行制造同类故障；受控 Gate 只改变单一修复变量，并保留修复前后原始 artifacts。</p>
+    <div class="coverage">
+      <span class="tag">F04 · 长度膨胀 / 截断</span>
+      <span class="tag">F09 · Context / mask 边界</span>
+      <span class="tag">F17 · Rendered-input parity</span>
+      <span class="tag">F25 · Tool / stop budget</span>
+      <span class="tag">G02 · Policy 与 template 同视图</span>
+      <span class="tag">G14 · Over-search / premature final</span>
+      <span class="tag">A_REAL_REPRODUCED</span>
+      <span class="tag">NATURAL_A + CONTROLLED GATES</span>
+    </div>
+
+    <div class="answers">
+      <div class="answer"><strong>60 秒回答</strong>在 4B Direct GRPO Pilot 中，SGLang 连续返回 prompt 超过 4,096 的 500。先用固定 tokenizer 审计 2,400 条初始任务，最大仅 1,908，排除数据本身过长；再看真实轨迹，确认是多轮工具 observation 增长。第一版加入每轮精确计数和强制收尾后，provider 500 消失，但一条轨迹以 3,777-token prompt 进入 thinking，319 tokens 后正好触顶。最终只对强制收尾关闭 thinking，并预留 768 tokens。新的 32-rollout Gate 中 5 次强制收尾全部完成，runtime error 为 0，LoRA 也完成一次真实更新。</div>
+      <div class="answer long"><strong>3 分钟回答</strong>先交代症状与证据层级：自然 Pilot 有 9 个超长请求、27 次失败调用，run 完成 3 次 PPO update 后被主动停止并封存，不纳入正式性能比较。然后讲五类归因：初始数据全量审计排除静态长度；Reward 在 provider 拒绝之后才计算；entropy 和 grad norm 没有非有限值；GPU 与外来进程均正常；最终锁定真实 rendered prompt 的多轮增长。第一轮最小修复验证 exact count 有效，但 raw trajectory 又暴露二阶问题：收尾提示后仍输出未闭合 thinking。第二轮没有改 Agent 核心，只在 finalization request 关闭 thinking，并扩大答案 reserve。回归 Gate 证明链路、预算和更新都能完成，但它仍只是单步诊断；下一步必须跑全新的 200-task Pilot，继续观察 forced-final rate、zero-variance group、hard gate、序列 p95/p99 和 family success，不能用本次 Reward 均值宣称能力提升。</div>
+    </div>
+
+    <h2>残余风险与证据边界</h2>
+    <div class="boundary"><strong>本次能证明：</strong> 4B Direct RL 的上下文保护可以在真实 Hermes → SGLang → Frozen Environment → Reward → PPO 链路中阻止 provider overflow，并让强制收尾完成。<br><strong>本次不能证明：</strong> 策略质量已经提升，或 25-step Pilot 已健康。Gate 仍有 4/8 zero-variance groups、21.875% hard-gate rate 和 OpenAICache prefix mismatch warning；它们需要分别按 Reward/Policy 与上游缓存问题处理，不能混入本事故的根因。</div>
+
+    <footer>
+      证据路径：<code>artifacts/experiments/direct-pilot-seed-7401-20260826_162402/</code>、<code>artifacts/experiments/direct-gate-seed-7402-20260826_171737/</code>、<code>artifacts/experiments/direct-gate-seed-7403-20260826_173616/</code>、<code>artifacts/areal/context-budget/initial-prompts-qwen35-4b-v3.json</code>。<br>
+      代码节点：<code>1d5e70a</code> → <code>e4056fa</code> → <code>45f775a</code>。三次 evidence bundle 均完整；Pilot 与 Gate 的 manifest evidence tier 均为 <code>DIAGNOSTIC</code>，本页不据此作模型性能结论。
+    </footer>
+  </main>
+</body>
+</html>

@@ -343,7 +343,7 @@
 
     .incident-strip {
       display: grid;
-      grid-template-columns: repeat(2, minmax(0,1fr));
+      grid-template-columns: repeat(3, minmax(0,1fr));
       gap: 1rem;
       margin-top: 1rem;
     }
@@ -490,7 +490,7 @@
           <div class="metric"><strong>2,400</strong><span>FROZEN RL TASKS</span></div>
           <div class="metric"><strong>32 × 4</strong><span>DEV EVAL PROTOCOL</span></div>
           <div class="metric"><strong>128 / 128</strong><span>EXACT REPLAY</span></div>
-          <div class="metric"><strong>74 / 74</strong><span>PROJECT TESTS</span></div>
+          <div class="metric"><strong>81 / 81</strong><span>PROJECT TESTS</span></div>
         </div>
       </header>
 
@@ -759,12 +759,13 @@ Function task_success = .70 call_correctness + .30 answer_quality</pre>
           <div class="evidence"><strong>归因纪律：</strong> 固定模型只换数据；固定数据只换 Reward；固定前两者只换 optimizer；重放同一 trajectory 只换环境/评估器。负结果也保留，不挑最好曲线。</div>
         </article>
 
-        <article class="topic a" id="incidents" data-level="a" data-keywords="incident duplicate system prompt QASPER budget contract bug root cause">
-          <div class="topic-head"><h3>目前有哪些真实发生、已闭环的事故？</h3><div class="badges"><span class="badge a">A · 两个自然事件</span></div></div>
-          <div class="answer-30"><p>一个来自运行时：StudyHub training prompt 同时通过 Hermes builder 和 ephemeral prompt 注入，导致每次请求重复两份。另一个来自数据合同：runtime 降到 6 turns，但 RL v1 的 QASPER 多标注 evidence 并集使部分任务在预算内不可完成。两者都有竞争假设、修复、回归和残余风险。</p></div>
+        <article class="topic a" id="incidents" data-level="a" data-keywords="incident duplicate system prompt QASPER budget contract context overflow truncation thinking bug root cause">
+          <div class="topic-head"><h3>目前有哪些真实发生、已闭环的事故？</h3><div class="badges"><span class="badge a">A · 三个自然事件</span></div></div>
+          <div class="answer-30"><p>三个案例分别覆盖输入重复、任务不可完成和动态上下文越界：Hermes 双路径注入重复 system prompt；QASPER 多标注 evidence 并集突破 6-turn 合同；多轮 Search/Read prompt 穿过 4,096，并在第一轮修复后暴露 thinking 收尾截断。每个案例都保存竞争假设、原始证据、最小修复、同协议回归和残余风险。</p></div>
           <div class="incident-strip">
             <a class="incident" href="incidents/2026-08-26-duplicate-training-system-prompt.html"><small>A_REAL_REPRODUCED · RUNTIME</small><h4>Duplicate Training System Prompt</h4><p>1160/1160 重复 → 修复后 118/118 恰好一次；保留真实 Smoke 与 Gate。</p></a>
             <a class="incident" href="incidents/2026-08-26-rl-task-budget-contract.html"><small>A_REAL_REPRODUCED · DATA CONTRACT</small><h4>RL Task Budget Contract</h4><p>v1 的 35 个任务超 6 turns、15 个超工具预算 → v2 全量 2400 条审计通过。</p></a>
+            <a class="incident" href="incidents/2026-08-26-agent-context-budget-overflow.html"><small>A_REAL_REPRODUCED · CONTEXT</small><h4>Agent Context Budget Overflow</h4><p>自然 Pilot 有 9 个超长请求；两轮最小修复后，5/5 强制收尾完成且 runtime error 为 0。</p></a>
           </div>
           <div class="evidence"><strong>当前自然素材：</strong> 还包括 Base Eval 中的重复工具失败、预算耗尽与缺引用，但它们暂时是失败样本，不自动升级为“事故”；需要根因、修复和回归后再登记。</div>
         </article>
@@ -821,6 +822,8 @@ Function task_success = .70 call_correctness + .30 answer_quality</pre>
             <div class="question"><b>SFT</b><br>为什么 B1 与 B3 必须共享一个 SFT checkpoint？</div>
             <div class="question"><b>TOOL</b><br>Tool Call 从 token 到环境执行经过哪些层？</div>
             <div class="question"><b>TOOL</b><br>为什么 Search→Read 必须由状态机强制？</div>
+            <div class="question"><b>CONTEXT</b><br>为什么初始 prompt 全量合格，Agent 多轮 rollout 仍会越过窗口？</div>
+            <div class="question"><b>CONTEXT</b><br>精确 tokenizer、final-answer reserve 和 forced-final no-thinking 如何配合？</div>
             <div class="question"><b>GRPO</b><br>Group advantage 如何计算，zero variance 意味着什么？</div>
             <div class="question"><b>GRPO</b><br>GRPO 与 PPO 的主要区别和共同点？</div>
             <div class="question"><b>GRPO</b><br>KL、entropy、ratio、clip 各自诊断什么？</div>
