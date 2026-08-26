@@ -13,10 +13,14 @@ from training.rl.frozen_environment import SEARCH_SNIPPET_CHARS, FrozenTaskEnvir
 from training.rl.config import (
     AGENT_ENGINE_MAX_TOKENS,
     AGENT_MAX_TURNS,
+    CONTEXT_FINALIZATION_RATIO,
+    CONTEXT_SAFETY_MARGIN_TOKENS,
     StudyHubAgentGRPOConfig,
 )
 from training.rl.hermes_workflow import (
+    CONTEXT_FINALIZATION_GUIDANCE,
     SYSTEM_PROMPT,
+    ContextBudgetController,
     StudyHubHermesWorkflow,
     _enable_training_tool_guardrails,
     _install_training_system_prompt,
@@ -94,6 +98,8 @@ def test_grpo_config_caps_exported_interactions_at_microbatch_capacity() -> None
     assert config.max_turns == AGENT_MAX_TURNS == 6
     assert config.rollout.agent.chat_template_type == "hf"
     assert config.rollout.agent.export_style == "individual"
+    assert config.context_finalization_ratio == CONTEXT_FINALIZATION_RATIO == 0.80
+    assert config.context_safety_margin_tokens == CONTEXT_SAFETY_MARGIN_TOKENS == 256
 
 
 def test_eval_launcher_enforces_deterministic_non_updating_protocol() -> None:
@@ -194,7 +200,262 @@ def test_training_runtime_metadata_records_guardrail_and_token_usage() -> None:
         "completion_tokens": 10,
         "total_tokens": 120,
         "last_prompt_tokens": 88,
+        "context_budget": None,
     }
+
+
+def test_context_budget_guard_forces_a_final_turn_before_engine_limit(monkeypatch) -> None:
+    def fake_count(_tokenizer, kwargs):
+        message_chars = sum(len(str(row.get("content", ""))) for row in kwargs["messages"])
+        return message_chars + (1000 if kwargs.get("tools") else 0)
+
+    monkeypatch.setattr("training.rl.hermes_workflow._request_token_count", fake_count)
+    tools = [{"type": "function", "function": {"name": "knowledge_read"}}]
+    agent = SimpleNamespace(
+        tools=tools,
+        max_iterations=6,
+        _handle_max_iterations=lambda _messages, _count: "upstream-summary",
+    )
+
+    def original(messages, tools_for_api=None):
+        selected = tools if tools_for_api is None else tools_for_api
+        return {"messages": messages, "tools": selected, "max_tokens": 1536}
+
+    agent._build_api_kwargs = original
+    runtime_errors = []
+    controller = ContextBudgetController(
+        tokenizer=object(),
+        engine_max_tokens=4096,
+        finalization_ratio=0.80,
+        safety_margin_tokens=256,
+        runtime_error_callback=runtime_errors.append,
+    )
+    controller.install(agent)
+    messages = [
+        {"role": "system", "content": "s" * 300},
+        {"role": "user", "content": "u" * 300},
+        {"role": "assistant", "content": "", "tool_calls": [{"id": "1"}]},
+        {"role": "tool", "content": "e" * 1800, "tool_call_id": "1"},
+    ]
+
+    kwargs = agent._build_api_kwargs(messages)
+
+    assert "tools" not in kwargs
+    assert CONTEXT_FINALIZATION_GUIDANCE in kwargs["messages"][-1]["content"]
+    assert kwargs["max_tokens"] <= 4096 - fake_count(None, kwargs)
+    assert controller.telemetry.forced_final_count == 1
+    assert controller.telemetry.forced_final_reasons == ["context_threshold"]
+    assert controller.telemetry.max_sent_prompt_tokens < 4096
+    assert runtime_errors == []
+
+
+def test_context_budget_guard_compacts_large_tool_observations(monkeypatch) -> None:
+    def fake_count(_tokenizer, kwargs):
+        return sum(len(str(row.get("content", ""))) for row in kwargs["messages"])
+
+    monkeypatch.setattr("training.rl.hermes_workflow._request_token_count", fake_count)
+    agent = SimpleNamespace(
+        tools=[],
+        max_iterations=6,
+        _handle_max_iterations=lambda _messages, _count: "upstream-summary",
+    )
+    agent._build_api_kwargs = lambda messages, tools_for_api=None: {
+        "messages": messages,
+        "tools": tools_for_api or [],
+        "max_tokens": 1536,
+    }
+    runtime_errors = []
+    controller = ContextBudgetController(
+        tokenizer=object(),
+        engine_max_tokens=4096,
+        finalization_ratio=0.80,
+        safety_margin_tokens=256,
+        runtime_error_callback=runtime_errors.append,
+    )
+    controller.install(agent)
+    messages = [
+        {"role": "system", "content": "s" * 600},
+        {"role": "user", "content": "u" * 600},
+        {"role": "assistant", "content": "", "tool_calls": [{"id": "1"}]},
+        {
+            "role": "tool",
+            "content": json.dumps({"source_id": "src-abc", "text": "e" * 4000}),
+            "tool_call_id": "1",
+        },
+    ]
+
+    kwargs = agent._build_api_kwargs(messages)
+
+    assert fake_count(None, kwargs) <= 4096 - 256
+    assert controller.telemetry.compacted_tool_messages == 1
+    assert controller.telemetry.dropped_tool_exchanges == 0
+    assert runtime_errors == []
+
+
+def test_context_budget_counter_failure_stops_without_provider_retry(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "training.rl.hermes_workflow._request_token_count",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(ValueError("bad template")),
+    )
+    agent = SimpleNamespace(
+        tools=[],
+        max_iterations=6,
+        _handle_max_iterations=lambda _messages, _count: "upstream-summary",
+    )
+    agent._build_api_kwargs = lambda messages, tools_for_api=None: {
+        "messages": messages,
+        "max_tokens": 128,
+    }
+    runtime_errors = []
+    controller = ContextBudgetController(
+        tokenizer=object(),
+        engine_max_tokens=4096,
+        finalization_ratio=0.80,
+        safety_margin_tokens=256,
+        runtime_error_callback=runtime_errors.append,
+    )
+    controller.install(agent)
+
+    try:
+        agent._build_api_kwargs([{"role": "user", "content": "hello"}])
+    except ValueError as error:
+        assert str(error) == "bad template"
+    else:
+        raise AssertionError("context tokenization failure must fail closed")
+
+    assert agent.max_iterations == 0
+    assert runtime_errors == ["context_budget_counter_failed"]
+
+
+def test_context_budget_uses_last_model_turn_for_final_answer(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "training.rl.hermes_workflow._request_token_count",
+        lambda _tokenizer, kwargs: sum(
+            len(str(row.get("content", ""))) for row in kwargs["messages"]
+        ),
+    )
+    tools = [{"type": "function", "function": {"name": "knowledge_search"}}]
+    agent = SimpleNamespace(
+        tools=tools,
+        max_iterations=6,
+        iteration_budget=SimpleNamespace(remaining=0),
+        _handle_max_iterations=lambda _messages, _count: "provider-summary",
+    )
+    agent._build_api_kwargs = lambda messages, tools_for_api=None: {
+        "messages": messages,
+        "tools": tools if tools_for_api is None else tools_for_api,
+        "max_tokens": 1536,
+    }
+    runtime_errors = []
+    controller = ContextBudgetController(
+        tokenizer=object(),
+        engine_max_tokens=4096,
+        finalization_ratio=0.80,
+        safety_margin_tokens=256,
+        runtime_error_callback=runtime_errors.append,
+    )
+    controller.install(agent)
+
+    kwargs = agent._build_api_kwargs([{"role": "user", "content": "short task"}])
+
+    assert "tools" not in kwargs
+    assert controller.telemetry.forced_final_reasons == ["model_turn_budget"]
+    assert CONTEXT_FINALIZATION_GUIDANCE in kwargs["messages"][-1]["content"]
+    assert runtime_errors == []
+
+    # Hermes' separate max-iteration summary path bypasses normal request
+    # building upstream. Controlled training must fail closed instead.
+    assert agent._handle_max_iterations([], 6) == ""
+    assert runtime_errors == ["context_budget_finalization_failed"]
+
+
+def test_context_budget_requires_the_configured_safety_margin(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "training.rl.hermes_workflow._request_token_count",
+        lambda _tokenizer, kwargs: sum(
+            len(str(row.get("content", ""))) for row in kwargs["messages"]
+        ),
+    )
+    agent = SimpleNamespace(
+        tools=[],
+        max_iterations=6,
+        _handle_max_iterations=lambda _messages, _count: "upstream-summary",
+    )
+    agent._build_api_kwargs = lambda messages, tools_for_api=None: {
+        "messages": messages,
+        "max_tokens": 1536,
+    }
+    runtime_errors = []
+    controller = ContextBudgetController(
+        tokenizer=object(),
+        engine_max_tokens=4096,
+        finalization_ratio=0.80,
+        safety_margin_tokens=256,
+        runtime_error_callback=runtime_errors.append,
+    )
+    controller.install(agent)
+
+    try:
+        agent._build_api_kwargs([{"role": "user", "content": "x" * 3800}])
+    except RuntimeError as error:
+        assert "safe target 3840" in str(error)
+    else:
+        raise AssertionError("request without a 256-token safety margin must fail closed")
+
+    assert agent.max_iterations == 0
+    assert runtime_errors == ["context_budget_guard_failed"]
+
+
+def test_context_budget_does_not_mislabel_request_builder_failures(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "training.rl.hermes_workflow._request_token_count",
+        lambda *_args, **_kwargs: 1,
+    )
+    agent = SimpleNamespace(
+        tools=[],
+        max_iterations=6,
+        _handle_max_iterations=lambda _messages, _count: "upstream-summary",
+    )
+
+    def broken_builder(_messages, tools_for_api=None):
+        raise RuntimeError("transport configuration failed")
+
+    agent._build_api_kwargs = broken_builder
+    runtime_errors = []
+    controller = ContextBudgetController(
+        tokenizer=object(),
+        engine_max_tokens=4096,
+        finalization_ratio=0.80,
+        safety_margin_tokens=256,
+        runtime_error_callback=runtime_errors.append,
+    )
+    controller.install(agent)
+
+    try:
+        agent._build_api_kwargs([{"role": "user", "content": "hello"}])
+    except RuntimeError as error:
+        assert str(error) == "transport configuration failed"
+    else:
+        raise AssertionError("request builder failure must propagate")
+
+    assert controller.telemetry.counter_failures == 0
+    assert runtime_errors == []
+
+
+def test_context_runtime_error_is_a_reward_hard_gate() -> None:
+    runtime = FrozenTaskEnvironment({"tools": [], "documents": []}, max_tool_calls=1)
+    runtime.record_runtime_error("context_budget_provider_rejection")
+
+    result = evaluate_reward_v2(
+        final_answer="A provider error string must not count as an answer.",
+        trace=runtime.trace,
+        verifier={"family": "function_calling", "expected_calls": []},
+        max_tool_calls=1,
+    )
+
+    assert result.total == -1.0
+    assert result.hard_gate_triggered is True
+    assert "context_budget_provider_rejection" in result.violations
 
 
 def test_fixture_environment_enforces_tool_budget() -> None:

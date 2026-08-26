@@ -51,9 +51,16 @@ def _distribution(values: list[float]) -> dict[str, float] | None:
 def _runtime_summary(rows: list[dict[str, Any]]) -> dict[str, Any]:
     values: dict[str, list[float]] = defaultdict(list)
     halt_codes: Counter[str] = Counter()
+    runtime_errors: Counter[str] = Counter()
+    forced_final_reasons: Counter[str] = Counter()
     halts = 0
+    forced_finals = compacted_rollouts = dropped_exchange_rollouts = 0
+    compacted_tool_messages = compacted_tool_chars = 0
+    counter_failures = guard_failures = 0
     for row in rows:
-        runtime = row.get("trace", {}).get("hermes", {})
+        trace = row.get("trace", {})
+        runtime_errors.update(map(str, trace.get("runtime_errors", [])))
+        runtime = trace.get("hermes", {})
         if not isinstance(runtime, dict):
             continue
         for field in ("api_calls", "last_prompt_tokens", "total_tokens"):
@@ -64,6 +71,24 @@ def _runtime_summary(rows: list[dict[str, Any]]) -> dict[str, Any]:
         if isinstance(halt, dict):
             halts += 1
             halt_codes[str(halt.get("code") or "unknown")] += 1
+        context = runtime.get("context_budget")
+        if isinstance(context, dict):
+            for field in ("max_pre_guard_prompt_tokens", "max_sent_prompt_tokens"):
+                value = context.get(field)
+                if isinstance(value, (int, float)) and not isinstance(value, bool):
+                    values[field].append(float(value))
+            forced_finals += int(bool(context.get("forced_final")))
+            forced_final_reasons.update(
+                map(str, context.get("forced_final_reasons", []))
+            )
+            compacted = int(context.get("compacted_tool_messages", 0) or 0)
+            dropped = int(context.get("dropped_tool_exchanges", 0) or 0)
+            compacted_rollouts += int(compacted > 0)
+            dropped_exchange_rollouts += int(dropped > 0)
+            compacted_tool_messages += compacted
+            compacted_tool_chars += int(context.get("compacted_tool_chars", 0) or 0)
+            counter_failures += int(context.get("counter_failures", 0) or 0)
+            guard_failures += int(context.get("guard_failures", 0) or 0)
     return {
         "api_calls": _distribution(values["api_calls"]),
         "last_prompt_tokens": _distribution(values["last_prompt_tokens"]),
@@ -71,6 +96,23 @@ def _runtime_summary(rows: list[dict[str, Any]]) -> dict[str, Any]:
         "guardrail_halts": halts,
         "guardrail_halt_rate": _rate(halts, len(rows)),
         "guardrail_halt_codes": dict(sorted(halt_codes.items())),
+        "context_budget": {
+            "max_pre_guard_prompt_tokens": _distribution(
+                values["max_pre_guard_prompt_tokens"]
+            ),
+            "max_sent_prompt_tokens": _distribution(values["max_sent_prompt_tokens"]),
+            "forced_final_rollouts": forced_finals,
+            "forced_final_rate": _rate(forced_finals, len(rows)),
+            "forced_final_reasons": dict(sorted(forced_final_reasons.items())),
+            "compacted_rollouts": compacted_rollouts,
+            "compacted_rollout_rate": _rate(compacted_rollouts, len(rows)),
+            "compacted_tool_messages": compacted_tool_messages,
+            "compacted_tool_chars": compacted_tool_chars,
+            "dropped_exchange_rollouts": dropped_exchange_rollouts,
+            "counter_failures": counter_failures,
+            "guard_failures": guard_failures,
+            "runtime_errors": dict(sorted(runtime_errors.items())),
+        },
     }
 
 

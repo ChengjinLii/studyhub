@@ -13,6 +13,11 @@ HARD_GATE_ERRORS = frozenset(
         "tool_call_budget_exhausted",
         "unknown_tool",
         "unsupported_capability",
+        "context_budget_counter_failed",
+        "context_budget_emergency_compaction",
+        "context_budget_guard_failed",
+        "context_budget_finalization_failed",
+        "context_budget_provider_rejection",
     }
 )
 
@@ -134,6 +139,7 @@ def evaluate_reward_v2(
     if trace.invalid_tool_calls:
         violations.append("invalid_tool_call")
     violations.extend(sorted(set(trace.error_codes) & HARD_GATE_ERRORS))
+    violations.extend(sorted(set(trace.runtime_errors) & HARD_GATE_ERRORS))
     if not final_answer.strip():
         violations.append("empty_final_answer")
     efficiency = 1.0 - min(2.0, 2 * total_calls / max(1, max_tool_calls))

@@ -25,6 +25,7 @@ class ExecutionTrace:
     read_source_ids: set[str] = field(default_factory=set)
     invalid_tool_calls: int = 0
     error_codes: list[str] = field(default_factory=list)
+    runtime_errors: list[str] = field(default_factory=list)
 
 
 class FrozenTaskEnvironment:
@@ -96,6 +97,10 @@ class FrozenTaskEnvironment:
             return self._fixture_call(name, arguments, tool)
         self._record_error("unsupported_capability")
         return self._result(error="unsupported_capability", tool=name)
+
+    def record_runtime_error(self, code: str) -> None:
+        if code not in self.trace.runtime_errors:
+            self.trace.runtime_errors.append(code)
 
     def _search(self, arguments: dict[str, Any]) -> str:
         query = str(arguments.get("query", "")).strip()

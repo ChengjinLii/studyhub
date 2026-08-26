@@ -325,6 +325,8 @@ def check_runtime(project: Path) -> dict[str, Any]:
     from training.rl.config import (
         AGENT_ENGINE_MAX_TOKENS,
         AGENT_MAX_TURNS,
+        CONTEXT_FINALIZATION_RATIO,
+        CONTEXT_SAFETY_MARGIN_TOKENS,
         StudyHubAgentGRPOConfig,
     )
     from training.rl.hermes_workflow import StudyHubHermesWorkflow
@@ -389,6 +391,12 @@ def check_runtime(project: Path) -> dict[str, Any]:
                 hermes_checkout=grpo_config.hermes_checkout,
                 reward_artifact_root=grpo_config.reward_artifact_root,
                 max_turns=grpo_config.max_turns,
+                tokenizer_path=grpo_config.tokenizer_path,
+                engine_max_tokens=grpo_config.rollout.agent.engine_max_tokens,
+                context_finalization_ratio=grpo_config.context_finalization_ratio,
+                context_safety_margin_tokens=(
+                    grpo_config.context_safety_margin_tokens
+                ),
             )
             if grpo_config.rollout.agent.mode != "subproc":
                 raise RuntimeError(f"{size} GRPO must isolate Hermes in subproc mode")
@@ -406,6 +414,33 @@ def check_runtime(project: Path) -> dict[str, Any]:
                     f"{grpo_path} must cap frozen Hermes rollouts at "
                     f"{AGENT_MAX_TURNS} model calls"
                 )
+            if grpo_config.context_finalization_ratio != CONTEXT_FINALIZATION_RATIO:
+                raise RuntimeError(
+                    f"{size} GRPO context finalization ratio changed from "
+                    f"{CONTEXT_FINALIZATION_RATIO}"
+                )
+            if (
+                grpo_config.context_safety_margin_tokens
+                != CONTEXT_SAFETY_MARGIN_TOKENS
+            ):
+                raise RuntimeError(
+                    f"{size} GRPO context safety margin changed from "
+                    f"{CONTEXT_SAFETY_MARGIN_TOKENS} tokens"
+                )
+            finalization_threshold = int(
+                AGENT_ENGINE_MAX_TOKENS * grpo_config.context_finalization_ratio
+            )
+            if finalization_threshold >= (
+                AGENT_ENGINE_MAX_TOKENS
+                - grpo_config.context_safety_margin_tokens
+            ):
+                raise RuntimeError(
+                    f"{size} GRPO finalization threshold leaves no safe final turn"
+                )
+            if workflow.tokenizer_path != str(Path(grpo_config.tokenizer_path).resolve()):
+                raise RuntimeError(f"{size} workflow tokenizer differs from AReaL")
+            if workflow.engine_max_tokens != AGENT_ENGINE_MAX_TOKENS:
+                raise RuntimeError(f"{size} workflow and AReaL token caps differ")
             if not grpo_config.actor.mask_no_eos_with_zero:
                 raise RuntimeError(
                     f"{size} GRPO must zero outcome reward for truncated no-EOS trajectories"
@@ -467,6 +502,13 @@ def check_runtime(project: Path) -> dict[str, Any]:
                 "agent_mode": grpo_config.rollout.agent.mode,
                 "tool_call_parser": grpo_config.rollout.agent.tool_call_parser,
                 "engine_max_tokens": grpo_config.rollout.agent.engine_max_tokens,
+                "context_finalization_ratio": (
+                    grpo_config.context_finalization_ratio
+                ),
+                "context_finalization_threshold_tokens": finalization_threshold,
+                "context_safety_margin_tokens": (
+                    grpo_config.context_safety_margin_tokens
+                ),
                 "max_turns": grpo_config.max_turns,
                 "mask_no_eos_with_zero": grpo_config.actor.mask_no_eos_with_zero,
                 "chat_template_type": grpo_config.rollout.agent.chat_template_type,

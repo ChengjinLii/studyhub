@@ -9,6 +9,8 @@ tokenizer_path: ${actor.path}
 workflow: training.rl.hermes_workflow.StudyHubHermesWorkflow
 eval_workflow: ${workflow}
 max_turns: 6
+context_finalization_ratio: 0.80
+context_safety_margin_tokens: 256
 environment_root: /data/chengjin/studyhub/studyhub-agent/datasets/processed/open_agent_rl_v2
 verifier_root: /data/chengjin/studyhub/studyhub-agent/datasets/processed/open_agent_rl_v2/verifiers
 hermes_checkout: /data/chengjin/studyhub/studyhub-agent/.vendor/hermes-agent

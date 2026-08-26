@@ -9,6 +9,8 @@ from training.rl.budget_contract import RUNTIME_MAX_MODEL_TURNS
 
 AGENT_ENGINE_MAX_TOKENS = 4096
 AGENT_MAX_TURNS = RUNTIME_MAX_MODEL_TURNS
+CONTEXT_FINALIZATION_RATIO = 0.80
+CONTEXT_SAFETY_MARGIN_TOKENS = 256
 
 
 @dataclass
@@ -50,3 +52,5 @@ class StudyHubAgentGRPOConfig(GRPOConfig):
     verifier_root: str = field(default="")
     hermes_checkout: str = field(default="")
     reward_artifact_root: str = field(default="")
+    context_finalization_ratio: float = field(default=CONTEXT_FINALIZATION_RATIO)
+    context_safety_margin_tokens: int = field(default=CONTEXT_SAFETY_MARGIN_TOKENS)

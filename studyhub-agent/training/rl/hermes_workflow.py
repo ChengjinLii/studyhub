@@ -8,6 +8,7 @@ import json
 import os
 import sys
 import uuid
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -20,6 +21,331 @@ Use only the tools exposed for this task. Never access the network, filesystem, 
 credentials, or production StudyHub services. For corpus tasks, search before reading,
 read the necessary evidence, and cite every used source as [source_id]. Stop when the
 answer is supported; do not invent observations or citations."""
+
+CONTEXT_FINALIZATION_GUIDANCE = (
+    "[StudyHub runtime: the remaining model-turn or context budget permits only "
+    "a final answer. Do not call more "
+    "tools. Use only the observations already shown and provide the best supported "
+    "final answer now. Keep required [source_id] citations.]"
+)
+_CONTEXT_LIMIT_PATTERN = "exceeds max_total_tokens"
+
+
+def _request_token_count(tokenizer: Any, api_kwargs: dict[str, Any]) -> int:
+    """Render the request with the same HF path used by the pinned AReaL proxy."""
+
+    from areal.experimental.openai.client import (
+        _align_tools_with_sglang,
+        _parse_tool_call_arguments,
+    )
+    from areal.utils.hf_utils import apply_chat_template
+
+    messages = api_kwargs.get("messages")
+    if not isinstance(messages, list):
+        raise TypeError("StudyHub context guard requires chat-completions messages")
+    normalized_messages = _parse_tool_call_arguments(messages)
+    tools = api_kwargs.get("tools")
+    aligned_tools = _align_tools_with_sglang(list(tools)) if tools else None
+    extra_body = api_kwargs.get("extra_body")
+    chat_template_kwargs = (
+        extra_body.get("chat_template_kwargs", {})
+        if isinstance(extra_body, dict)
+        else {}
+    )
+    token_ids = apply_chat_template(
+        tokenizer,
+        normalized_messages,
+        tools=aligned_tools,
+        add_generation_prompt=True,
+        tokenize=True,
+        **chat_template_kwargs,
+    )
+    return len(token_ids)
+
+
+def _append_context_finalization_guidance(messages: list[dict[str, Any]]) -> None:
+    if any(CONTEXT_FINALIZATION_GUIDANCE in str(row.get("content", "")) for row in messages):
+        return
+    for row in reversed(messages):
+        if row.get("role") == "tool":
+            row["content"] = f"{row.get('content', '')}\n\n{CONTEXT_FINALIZATION_GUIDANCE}"
+            return
+    for row in reversed(messages):
+        if row.get("role") == "user":
+            row["content"] = f"{row.get('content', '')}\n\n{CONTEXT_FINALIZATION_GUIDANCE}"
+            return
+    messages.append({"role": "user", "content": CONTEXT_FINALIZATION_GUIDANCE})
+
+
+def _head_tail(value: str, limit: int) -> str:
+    if len(value) <= limit:
+        return value
+    head = max(1, (limit - 48) // 2)
+    tail = max(1, limit - 48 - head)
+    return f"{value[:head]}\n...[context compacted]...\n{value[-tail:]}"
+
+
+def _compact_tool_content(content: Any, limit: int = 480) -> str:
+    raw = str(content or "")
+    digest = hashlib.sha256(raw.encode()).hexdigest()[:16]
+    try:
+        payload = json.loads(raw)
+    except (TypeError, ValueError):
+        payload = None
+    preserved: dict[str, Any] = {}
+    if isinstance(payload, dict):
+        for key in (
+            "source_id",
+            "title",
+            "citation",
+            "tool",
+            "ok",
+            "error",
+            "fixture_match",
+            "query",
+        ):
+            if key in payload:
+                preserved[key] = payload[key]
+        body = next(
+            (
+                str(payload[key])
+                for key in ("text", "content", "result", "results")
+                if key in payload
+            ),
+            raw,
+        )
+    else:
+        body = raw
+    preserved["observation_excerpt"] = _head_tail(body, limit)
+    preserved["_studyhub_context_compacted"] = {
+        "original_chars": len(raw),
+        "sha256": digest,
+    }
+    return json.dumps(preserved, ensure_ascii=False, sort_keys=True)
+
+
+@dataclass(slots=True)
+class ContextBudgetTelemetry:
+    engine_max_tokens: int
+    finalization_threshold_tokens: int
+    safety_margin_tokens: int
+    exact_counter_calls: int = 0
+    max_pre_guard_prompt_tokens: int = 0
+    max_sent_prompt_tokens: int = 0
+    forced_final_count: int = 0
+    forced_final_reasons: list[str] = field(default_factory=list)
+    compacted_tool_messages: int = 0
+    compacted_tool_chars: int = 0
+    dropped_tool_exchanges: int = 0
+    counter_failures: int = 0
+    guard_failures: int = 0
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "engine_max_tokens": self.engine_max_tokens,
+            "finalization_threshold_tokens": self.finalization_threshold_tokens,
+            "safety_margin_tokens": self.safety_margin_tokens,
+            "exact_counter_calls": self.exact_counter_calls,
+            "max_pre_guard_prompt_tokens": self.max_pre_guard_prompt_tokens,
+            "max_sent_prompt_tokens": self.max_sent_prompt_tokens,
+            "forced_final": self.forced_final_count > 0,
+            "forced_final_count": self.forced_final_count,
+            "forced_final_reasons": list(self.forced_final_reasons),
+            "compacted_tool_messages": self.compacted_tool_messages,
+            "compacted_tool_chars": self.compacted_tool_chars,
+            "dropped_tool_exchanges": self.dropped_tool_exchanges,
+            "counter_failures": self.counter_failures,
+            "guard_failures": self.guard_failures,
+        }
+
+
+class ContextBudgetController:
+    """Force a final Hermes turn before AReaL's exported-token hard limit."""
+
+    def __init__(
+        self,
+        *,
+        tokenizer: Any,
+        engine_max_tokens: int,
+        finalization_ratio: float,
+        safety_margin_tokens: int,
+        runtime_error_callback: Any,
+    ) -> None:
+        if engine_max_tokens < 512:
+            raise ValueError("engine_max_tokens must leave room for an agent turn")
+        if not 0.5 <= finalization_ratio < 1.0:
+            raise ValueError("context finalization ratio must be in [0.5, 1.0)")
+        if not 64 <= safety_margin_tokens < engine_max_tokens // 2:
+            raise ValueError("invalid context safety margin")
+        threshold = int(engine_max_tokens * finalization_ratio)
+        if threshold >= engine_max_tokens - safety_margin_tokens:
+            raise ValueError("context finalization threshold must precede the safety margin")
+        self.tokenizer = tokenizer
+        self.runtime_error_callback = runtime_error_callback
+        self.telemetry = ContextBudgetTelemetry(
+            engine_max_tokens=engine_max_tokens,
+            finalization_threshold_tokens=threshold,
+            safety_margin_tokens=safety_margin_tokens,
+        )
+        self._forced_final = False
+        self._fail_closed = False
+
+    def install(self, agent: Any) -> None:
+        original_build = agent._build_api_kwargs
+        original_summary = agent._handle_max_iterations
+        agent._studyhub_context_budget = self
+
+        def guarded_build(
+            api_messages: list[dict[str, Any]],
+            tools_for_api: list[dict[str, Any]] | None = None,
+        ) -> dict[str, Any]:
+            if tools_for_api is None:
+                api_kwargs = original_build(api_messages)
+            else:
+                api_kwargs = original_build(
+                    api_messages,
+                    tools_for_api=tools_for_api,
+                )
+            try:
+                before = self._count(api_kwargs)
+            except Exception:
+                self.telemetry.counter_failures += 1
+                self.runtime_error_callback("context_budget_counter_failed")
+                self._fail_closed = True
+                agent.max_iterations = 0
+                raise
+
+            on_last_model_turn = self._on_last_model_turn(agent)
+            should_force_final = (
+                self._forced_final
+                or on_last_model_turn
+                or before >= self.telemetry.finalization_threshold_tokens
+            )
+            if not should_force_final:
+                self.telemetry.max_sent_prompt_tokens = max(
+                    self.telemetry.max_sent_prompt_tokens,
+                    before,
+                )
+                return api_kwargs
+
+            if not self._forced_final:
+                self._forced_final = True
+                self.telemetry.forced_final_count += 1
+                reason = "model_turn_budget" if on_last_model_turn else "context_threshold"
+                self.telemetry.forced_final_reasons.append(reason)
+            api_kwargs.pop("tools", None)
+            api_kwargs.pop("tool_choice", None)
+            api_kwargs.pop("parallel_tool_calls", None)
+            messages = api_kwargs["messages"]
+            _append_context_finalization_guidance(messages)
+            target = (
+                self.telemetry.engine_max_tokens
+                - self.telemetry.safety_margin_tokens
+            )
+            sent = self._count(api_kwargs)
+            if sent > target:
+                sent = self._compact_observations(api_kwargs, target)
+            if sent > target:
+                sent = self._drop_oldest_tool_exchanges(api_kwargs, target)
+            if sent > target:
+                self.telemetry.guard_failures += 1
+                self.runtime_error_callback("context_budget_guard_failed")
+                self._fail_closed = True
+                agent.max_iterations = 0
+                raise RuntimeError(
+                    f"StudyHub context guard could not reduce {sent} prompt tokens "
+                    f"to the safe target {target}"
+                )
+
+            remaining = self.telemetry.engine_max_tokens - sent
+            cap_key = (
+                "max_completion_tokens"
+                if "max_completion_tokens" in api_kwargs
+                else "max_tokens"
+            )
+            existing_cap = api_kwargs.get(cap_key)
+            try:
+                requested_cap = int(existing_cap)
+            except (TypeError, ValueError):
+                requested_cap = remaining
+            api_kwargs[cap_key] = max(1, min(requested_cap, remaining))
+            self.telemetry.max_sent_prompt_tokens = max(
+                self.telemetry.max_sent_prompt_tokens,
+                sent,
+            )
+            return api_kwargs
+
+        def guarded_summary(messages: list[dict[str, Any]], api_call_count: int) -> str:
+            if self._forced_final or self._fail_closed:
+                self.telemetry.guard_failures += 1
+                self.runtime_error_callback("context_budget_finalization_failed")
+                return ""
+            return original_summary(messages, api_call_count)
+
+        agent._build_api_kwargs = guarded_build
+        agent._handle_max_iterations = guarded_summary
+
+    @staticmethod
+    def _on_last_model_turn(agent: Any) -> bool:
+        budget = getattr(agent, "iteration_budget", None)
+        remaining = getattr(budget, "remaining", None)
+        return isinstance(remaining, int) and not isinstance(remaining, bool) and remaining <= 0
+
+    def _count(self, api_kwargs: dict[str, Any]) -> int:
+        self.telemetry.exact_counter_calls += 1
+        count = _request_token_count(self.tokenizer, api_kwargs)
+        self.telemetry.max_pre_guard_prompt_tokens = max(
+            self.telemetry.max_pre_guard_prompt_tokens,
+            count,
+        )
+        return count
+
+    def _compact_observations(
+        self,
+        api_kwargs: dict[str, Any],
+        target: int,
+    ) -> int:
+        messages = api_kwargs["messages"]
+        count = self._count(api_kwargs)
+        for row in messages:
+            if row.get("role") != "tool":
+                continue
+            original = str(row.get("content", ""))
+            compacted = _compact_tool_content(original)
+            if len(compacted) >= len(original):
+                continue
+            row["content"] = compacted
+            self.telemetry.compacted_tool_messages += 1
+            self.telemetry.compacted_tool_chars += len(original) - len(compacted)
+            count = self._count(api_kwargs)
+            if count <= target:
+                break
+        return count
+
+    def _drop_oldest_tool_exchanges(
+        self,
+        api_kwargs: dict[str, Any],
+        target: int,
+    ) -> int:
+        messages = api_kwargs["messages"]
+        count = self._count(api_kwargs)
+        while count > target:
+            removed = False
+            for index, row in enumerate(messages):
+                if row.get("role") != "assistant" or not row.get("tool_calls"):
+                    continue
+                end = index + 1
+                while end < len(messages) and messages[end].get("role") == "tool":
+                    end += 1
+                del messages[index:end]
+                self.telemetry.dropped_tool_exchanges += 1
+                self.runtime_error_callback("context_budget_emergency_compaction")
+                removed = True
+                break
+            if not removed:
+                break
+            count = self._count(api_kwargs)
+        return count
 
 
 def _disabled_hermes_tool_search_config():
@@ -71,6 +397,7 @@ def _enable_training_tool_guardrails(agent: Any, tool_names: list[str]) -> None:
 def _training_runtime_metadata(agent: Any) -> dict[str, Any]:
     halt_decision = getattr(agent, "_tool_guardrail_halt_decision", None)
     context_compressor = getattr(agent, "context_compressor", None)
+    context_budget = getattr(agent, "_studyhub_context_budget", None)
     return {
         "guardrail_halt": (
             halt_decision.to_metadata() if halt_decision is not None else None
@@ -85,6 +412,9 @@ def _training_runtime_metadata(agent: Any) -> dict[str, Any]:
         "total_tokens": int(getattr(agent, "session_total_tokens", 0) or 0),
         "last_prompt_tokens": int(
             getattr(context_compressor, "last_prompt_tokens", 0) or 0
+        ),
+        "context_budget": (
+            context_budget.telemetry.to_dict() if context_budget is not None else None
         ),
     }
 
@@ -122,6 +452,10 @@ class StudyHubHermesWorkflow:
         max_turns: int = 10,
         max_tokens: int = 1536,
         max_completion_tokens: int | None = None,
+        tokenizer_path: str = "",
+        engine_max_tokens: int = 4096,
+        context_finalization_ratio: float = 0.80,
+        context_safety_margin_tokens: int = 256,
         temperature: float = 1.0,
         top_p: float = 1.0,
         **_: Any,
@@ -136,9 +470,20 @@ class StudyHubHermesWorkflow:
         self.seed = seed
         self.max_turns = max_turns
         self.max_tokens = max_completion_tokens or max_tokens
+        self.tokenizer_path = str(Path(tokenizer_path).resolve()) if tokenizer_path else ""
+        self.engine_max_tokens = int(engine_max_tokens)
+        self.context_finalization_ratio = float(context_finalization_ratio)
+        self.context_safety_margin_tokens = int(context_safety_margin_tokens)
         self.temperature = temperature
         self.top_p = top_p
         _load_verifier_store(self.verifier_root)
+
+    def _load_tokenizer(self):
+        if not self.tokenizer_path:
+            raise ValueError("tokenizer_path is required for exact context budgeting")
+        from areal.utils.hf_utils import load_hf_tokenizer
+
+        return load_hf_tokenizer(self.tokenizer_path)
 
     def _load_hermes(self):
         checkout = str(self.hermes_checkout)
@@ -244,11 +589,22 @@ class StudyHubHermesWorkflow:
             agent._disable_streaming = True
             _install_training_system_prompt(agent)
             _enable_training_tool_guardrails(agent, installed)
+            ContextBudgetController(
+                tokenizer=self._load_tokenizer(),
+                engine_max_tokens=self.engine_max_tokens,
+                finalization_ratio=self.context_finalization_ratio,
+                safety_margin_tokens=self.context_safety_margin_tokens,
+                runtime_error_callback=environment.record_runtime_error,
+            ).install(agent)
             final_answer = str(await asyncio.to_thread(agent.chat, str(data["user_request"])))
             hermes_runtime = _training_runtime_metadata(agent)
         finally:
             for name in installed:
                 registry.deregister(name)
+
+        if _CONTEXT_LIMIT_PATTERN in final_answer:
+            environment.record_runtime_error("context_budget_provider_rejection")
+            final_answer = ""
 
         result = evaluate_reward_v2(
             final_answer=final_answer,
@@ -311,6 +667,7 @@ class StudyHubHermesWorkflow:
                 "tool_names": [row["name"] for row in environment.trace.tool_calls],
                 "invalid_tool_calls": environment.trace.invalid_tool_calls,
                 "error_codes": list(environment.trace.error_codes),
+                "runtime_errors": list(environment.trace.runtime_errors),
                 "search_results": len(environment.trace.search_result_ids),
                 "read_sources": sorted(environment.trace.read_source_ids),
                 "hermes": hermes_runtime,

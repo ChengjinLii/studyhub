@@ -181,6 +181,15 @@ def test_real_hermes_runs_all_fixture_tool_combinations(monkeypatch, tmp_path) -
 
 def test_training_workflow_runs_real_hermes_against_frozen_tool(monkeypatch, tmp_path) -> None:
     _prepare_hermes_test_runtime(monkeypatch)
+    monkeypatch.setattr(
+        StudyHubHermesWorkflow,
+        "_load_tokenizer",
+        lambda _self: object(),
+    )
+    monkeypatch.setattr(
+        "training.rl.hermes_workflow._request_token_count",
+        lambda _tokenizer, _kwargs: 256,
+    )
     hermes_home = tmp_path / "hermes-home"
     hermes_home.mkdir()
     (hermes_home / "config.yaml").write_text(

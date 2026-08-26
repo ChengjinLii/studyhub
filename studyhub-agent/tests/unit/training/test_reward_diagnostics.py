@@ -28,7 +28,21 @@ def test_reward_summary_reports_group_variance_and_quality_rates(tmp_path) -> No
                         "guardrail_halt": (
                             {"code": "fixture_loop_halt"} if index == 3 else None
                         ),
+                        "context_budget": {
+                            "max_pre_guard_prompt_tokens": 1200 + 100 * index,
+                            "max_sent_prompt_tokens": 1100 + 100 * index,
+                            "forced_final": index == 3,
+                            "forced_final_reasons": (
+                                ["context_threshold"] if index == 3 else []
+                            ),
+                            "compacted_tool_messages": int(index == 3),
+                            "compacted_tool_chars": 250 if index == 3 else 0,
+                            "dropped_tool_exchanges": 0,
+                            "counter_failures": 0,
+                            "guard_failures": 0,
+                        },
                     },
+                    "runtime_errors": [],
                 },
                 "reward": {
                     "total": reward,
@@ -70,4 +84,27 @@ def test_reward_summary_reports_group_variance_and_quality_rates(tmp_path) -> No
         "guardrail_halts": 1,
         "guardrail_halt_rate": 0.25,
         "guardrail_halt_codes": {"fixture_loop_halt": 1},
+        "context_budget": {
+            "max_pre_guard_prompt_tokens": {
+                "mean": 1350.0,
+                "p95": 1500.0,
+                "max": 1500.0,
+            },
+            "max_sent_prompt_tokens": {
+                "mean": 1250.0,
+                "p95": 1400.0,
+                "max": 1400.0,
+            },
+            "forced_final_rollouts": 1,
+            "forced_final_rate": 0.25,
+            "forced_final_reasons": {"context_threshold": 1},
+            "compacted_rollouts": 1,
+            "compacted_rollout_rate": 0.25,
+            "compacted_tool_messages": 1,
+            "compacted_tool_chars": 250,
+            "dropped_exchange_rollouts": 0,
+            "counter_failures": 0,
+            "guard_failures": 0,
+            "runtime_errors": {},
+        },
     }
