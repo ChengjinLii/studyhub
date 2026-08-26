@@ -1,0 +1,237 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>StudyHub 4B · AReaL SFT 与 Agentic RL 实验报告</title>
+  <style>
+    :root {
+      --ink:#15372f; --ink2:#31544a; --muted:#66766f; --paper:#f3f0e6;
+      --paper2:#e8e2d3; --green:#2f7d61; --dark:#123a30; --gold:#d5a72f;
+      --rust:#b95f3d; --blue:#3e6680; --line:rgba(21,55,47,.18);
+      --serif:"Iowan Old Style","Noto Serif SC","Source Han Serif SC",Georgia,serif;
+      --sans:"IBM Plex Sans","Noto Sans SC","Source Han Sans SC",sans-serif;
+      --mono:"IBM Plex Mono","SFMono-Regular",Consolas,monospace;
+    }
+    *{box-sizing:border-box} html{scroll-behavior:smooth}
+    body{margin:0;color:var(--ink);background:repeating-linear-gradient(0deg,rgba(21,55,47,.024) 0 1px,transparent 1px 28px),var(--paper);font-family:var(--sans);line-height:1.72}
+    a{color:inherit} code,pre{font-family:var(--mono)} code{padding:.12rem .34rem;background:rgba(47,125,97,.09);border-radius:.28rem;font-size:.86em;overflow-wrap:anywhere}
+    .rail{position:fixed;inset:0 0 auto;height:6px;z-index:30;background:linear-gradient(90deg,var(--dark) 0 48%,var(--gold) 48% 72%,var(--rust) 72%)}
+    .layout{display:grid;grid-template-columns:260px minmax(0,1fr);width:min(1480px,100%);margin:auto}
+    aside{position:sticky;top:0;height:100vh;padding:3.2rem 1.5rem 2rem;overflow:auto;color:#eef2e9;background:linear-gradient(160deg,#173f34,#102c26 78%)}
+    .brand{margin-bottom:2.3rem;font-family:var(--serif);font-size:1.15rem}.brand small{display:block;margin-top:.25rem;color:rgba(255,255,255,.48);font-family:var(--sans);font-size:.62rem;letter-spacing:.16em}
+    .nav-title{margin:1.4rem 0 .5rem;color:var(--gold);font-size:.62rem;font-weight:800;letter-spacing:.16em}.nav a{display:block;padding:.38rem 0 .38rem .8rem;color:rgba(255,255,255,.67);border-left:1px solid rgba(255,255,255,.14);font-size:.73rem;text-decoration:none}.nav a:hover{color:white;border-color:var(--gold)}
+    .side-note{margin-top:2rem;padding-top:1rem;color:rgba(255,255,255,.45);border-top:1px solid rgba(255,255,255,.12);font-size:.63rem}
+    main{min-width:0}.hero{position:relative;min-height:610px;padding:6.8rem clamp(1.5rem,6vw,6rem) 4rem;overflow:hidden;background:radial-gradient(circle at 88% 16%,rgba(213,167,47,.3),transparent 25%),linear-gradient(145deg,rgba(255,255,255,.66),rgba(243,240,230,.6));border-bottom:1px solid var(--line)}
+    .hero:after{content:"4B";position:absolute;right:2vw;bottom:-4.5rem;color:rgba(21,55,47,.045);font-family:var(--serif);font-size:clamp(13rem,28vw,25rem);font-weight:800;line-height:1}
+    .kicker{position:relative;z-index:1;color:var(--green);font-size:.68rem;font-weight:800;letter-spacing:.17em;text-transform:uppercase}.kicker:before{content:"";display:inline-block;width:3rem;height:3px;margin:0 .7rem .18rem 0;background:var(--gold)}
+    h1{position:relative;z-index:1;max-width:940px;margin:1.4rem 0 1.5rem;font-family:var(--serif);font-size:clamp(3.1rem,7vw,7rem);line-height:.94;letter-spacing:-.055em}h1 em{color:var(--green);font-style:normal}
+    .lead{position:relative;z-index:1;max-width:840px;color:var(--ink2);font-family:var(--serif);font-size:clamp(1rem,2vw,1.35rem)}
+    .hero-grid{position:relative;z-index:2;display:grid;grid-template-columns:repeat(5,1fr);max-width:1060px;margin-top:3rem;border-block:1px solid var(--line)}
+    .hero-metric{padding:1rem}.hero-metric+ .hero-metric{border-left:1px solid var(--line)}.hero-metric b{display:block;font-family:var(--serif);font-size:1.6rem;line-height:1.1}.hero-metric span{color:var(--muted);font-size:.6rem;letter-spacing:.09em}
+    .content{padding:4rem clamp(1.5rem,6vw,6rem) 7rem}.section{scroll-margin-top:1.5rem;margin-bottom:5.5rem}.section-head{display:grid;grid-template-columns:110px 1fr;gap:1.5rem;padding-top:1.3rem;border-top:3px solid var(--ink)}
+    .num{color:var(--gold);font-family:var(--serif);font-size:3.5rem;line-height:1}.section h2{margin:0;font-family:var(--serif);font-size:clamp(2rem,4vw,3.5rem);line-height:1.05}.section-head p{max-width:850px;margin:.7rem 0 0;color:var(--muted)}
+    .verdict{margin-top:2rem;padding:1.5rem 1.65rem;background:rgba(255,255,255,.5);border:1px solid rgba(21,55,47,.1);border-left:6px solid var(--green);box-shadow:0 18px 45px rgba(21,55,47,.08)}.verdict.warn{border-left-color:var(--rust)}
+    .grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:1rem;margin-top:1.5rem}.grid.two{grid-template-columns:repeat(2,minmax(0,1fr))}.card{padding:1.15rem 1.2rem;background:rgba(255,255,255,.42);border:1px solid rgba(21,55,47,.1);border-top:4px solid var(--green)}.card.gold{border-top-color:var(--gold)}.card.rust{border-top-color:var(--rust)}.card h3{margin:0 0 .45rem;font-family:var(--serif);font-size:1.18rem}.card p{margin:0;color:var(--ink2);font-size:.82rem}
+    .flow{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;margin:1.7rem 0;background:var(--line);border:1px solid var(--line)}.flow div{padding:1.1rem;background:var(--paper)}.flow b{display:block;color:var(--green);font-family:var(--mono);font-size:.68rem}.flow span{font-size:.78rem}
+    table{width:100%;margin-top:1.4rem;border-collapse:collapse;font-size:.76rem}th{padding:.78rem;color:#eef2e9;background:var(--ink);text-align:left;white-space:nowrap}td{padding:.76rem;border-bottom:1px solid var(--line);vertical-align:top}tbody tr:hover{background:rgba(255,255,255,.35)}
+    .best{color:var(--green);font-weight:800}.bad{color:var(--rust);font-weight:800}.neutral{color:var(--blue);font-weight:800}
+    .formula{margin:1.2rem 0;padding:1.15rem 1.3rem;color:#eef2e9;background:var(--dark);border-left:5px solid var(--gold);font-family:var(--mono);font-size:.8rem;overflow:auto}
+    .bar-row{display:grid;grid-template-columns:120px minmax(0,1fr) 80px;gap:.8rem;align-items:center;margin:.62rem 0;font-size:.73rem}.bar{height:12px;background:rgba(21,55,47,.08);overflow:hidden}.bar i{display:block;height:100%;background:var(--green)}.bar i.gold{background:var(--gold)}.bar i.rust{background:var(--rust)}
+    .callout{margin:1.5rem 0;padding:1.1rem 1.3rem;background:rgba(185,95,61,.08);border-left:5px solid var(--rust)}
+    .evidence-list{display:grid;gap:.7rem;margin-top:1.3rem}.evidence{padding:.9rem 1rem;background:rgba(255,255,255,.38);border-left:4px solid var(--green);font-size:.75rem}.evidence b{display:inline-block;min-width:8rem}.tag{display:inline-block;margin:.15rem;padding:.25rem .48rem;border:1px solid var(--line);border-radius:1rem;font-family:var(--mono);font-size:.62rem}.tag.a{color:white;background:var(--green)}.tag.b{color:white;background:var(--rust)}
+    .foot{margin-top:5rem;padding-top:1.4rem;color:var(--muted);border-top:1px solid var(--line);font-size:.7rem}
+    @media(max-width:900px){.layout{display:block}aside{position:relative;height:auto}.nav{columns:2}.hero-grid,.flow{grid-template-columns:repeat(2,1fr)}.grid,.grid.two{grid-template-columns:1fr}.section-head{grid-template-columns:70px 1fr}}
+    @media(max-width:560px){.hero{padding-top:4rem}.hero-grid,.flow{grid-template-columns:1fr}.hero-metric+.hero-metric{border-left:0;border-top:1px solid var(--line)}.section-head{display:block}.num{margin-bottom:.8rem}.bar-row{grid-template-columns:90px 1fr 55px}table{display:block;overflow-x:auto}}
+    @media print{aside,.rail{display:none}.layout{display:block}.hero{min-height:auto;padding:2rem}.content{padding:2rem}.section,.card{break-inside:avoid}}
+  </style>
+</head>
+<body>
+  <div class="rail"></div>
+  <div class="layout">
+    <aside>
+      <div class="brand">StudyHub Agent<small>CONTROLLED 4B EXPERIMENT</small></div>
+      <div class="nav-title">REPORT</div>
+      <nav class="nav">
+        <a href="#verdict">01 · 实验结论</a><a href="#design">02 · 受控设计</a>
+        <a href="#data">03 · 数据与隔离</a><a href="#sft">04 · SFT</a>
+        <a href="#rl">05 · Agentic RL</a><a href="#eval">06 · Eval32</a>
+        <a href="#diagnosis">07 · 训练诊断</a><a href="#incidents">08 · 故障闭环</a>
+        <a href="#evidence">09 · 证据与复现</a><a href="#boundary">10 · 结论边界</a>
+      </nav>
+      <div class="side-note">证据快照：2026-08-27<br>Git：<code>980fbd6</code><br>范围：隔离训练环境，不含模型权重。</div>
+    </aside>
+    <main>
+      <header class="hero">
+        <div class="kicker">AReaL · Hermes · Qwen3.5-4B · Evidence Grade A</div>
+        <h1>行为冷启动完成，<br><em>策略增益尚未成立。</em></h1>
+        <p class="lead">本报告记录同一 Qwen3.5-4B 初始模型上的 Base / SFT / Direct RL / SFT→RL 受控 2×2。训练链路、权重更新、确定性评测和事故回归均已跑通；32 题开发集没有给出任何置信区间排除 0 的广泛能力增益。</p>
+        <div class="hero-grid">
+          <div class="hero-metric"><b>3,000</b><span>SFT SAMPLES</span></div>
+          <div class="hero-metric"><b>2 × 800</b><span>RL ROLLOUTS</span></div>
+          <div class="hero-metric"><b>4 × 128</b><span>EVAL ROLLOUTS</span></div>
+          <div class="hero-metric"><b>128 / 128</b><span>EXACT REPLAY</span></div>
+          <div class="hero-metric"><b>0</b><span>SIGNIFICANT EFFECTS</span></div>
+        </div>
+      </header>
+
+      <div class="content">
+        <section class="section" id="verdict">
+          <div class="section-head"><div class="num">01</div><div><h2>实验结论</h2><p>先区分“链路跑通”“模型被更新”和“能力显著提升”三个不同命题。</p></div></div>
+          <div class="verdict"><b>已证实：</b>4B SFT 完成 318 次更新并降低验证损失；Direct RL 与 SFT→RL 各完成 25 次 PPO/GRPO 更新、800 条 rollout、200 个完整 group；LoRA hash 均发生变化；四个 checkpoint 均完成同协议 Eval32；SFT→RL 评测完成 128/128 精确复现。</div>
+          <div class="verdict warn"><b>未证实：</b>没有一个 SFT、RL 或交互效应的配对 bootstrap 95% CI 排除 0。Direct RL 的 <code>pass@4=15.625%</code> 是最高点估计，但 <code>consistent@4</code> 四组均为 3.125%，grounding 仍是主要失败面。</div>
+          <div class="grid">
+            <article class="card"><h3>当前最佳工程方案</h3><p>保留 SFT checkpoint 作为行为冷启动；冻结当前 Reward/环境/评测版本；下一轮优先修 citation 与 function fixture 的任务设计，而不是直接扩大 RL 步数。</p></article>
+            <article class="card gold"><h3>当前研究判断</h3><p>25-step Pilot 足以证明可训练性和暴露失败结构，不足以证明训练策略具有稳定收益。2×2 交互点估计也不支持“SFT 明显促进后续 RL”。</p></article>
+            <article class="card rust"><h3>停止扩张的理由</h3><p>两条 RL 的末段 Reward 均下降，Eval32 CI 较宽，9B 复制只会放大成本而不会先解决 verifier、citation 与任务可学性问题。</p></article>
+          </div>
+        </section>
+
+        <section class="section" id="design">
+          <div class="section-head"><div class="num">02</div><div><h2>受控 2×2 设计</h2><p>唯一两个处理变量是是否 SFT、是否 RL；B1 与 B3 共享同一 SFT checkpoint，B2 与 B3 使用相同 RL Task、环境、Reward、group size 和 rollout 预算。</p></div></div>
+          <div class="flow"><div><b>B0 · 00</b><span>Base-4B<br>不训练，直接评测</span></div><div><b>B1 · 10</b><span>SFT-only<br>3,000 条示范</span></div><div><b>B2 · 01</b><span>RL-only<br>Base 直接 GRPO</span></div><div><b>B3 · 11</b><span>SFT→RL<br>共享 B1 checkpoint</span></div></div>
+          <div class="formula">SFT effect = B1 − B0<br>Direct RL effect = B2 − B0<br>RL after SFT = B3 − B1<br>Interaction = B3 − B2 − B1 + B0</div>
+          <table><thead><tr><th>控制项</th><th>固定内容</th><th>目的</th></tr></thead><tbody>
+            <tr><td>初始模型</td><td>Qwen3.5-4B，同一本地 revision</td><td>排除模型来源差异</td></tr>
+            <tr><td>RL 数据</td><td>2,000 train / 400 validation，任务顺序与 seed 统一</td><td>让 B2/B3 仅在初始化上不同</td></tr>
+            <tr><td>Rollout</td><td>Hermes loop，group size 4，25 steps，800 trajectories</td><td>统一探索与优化预算</td></tr>
+            <tr><td>评测</td><td>固定 Eval32，32 tasks × 4 deterministic rollouts</td><td>比较 strict / pass@4 / consistent@4</td></tr>
+            <tr><td>统计</td><td>按 task 配对 bootstrap，10,000 次，seed 6209</td><td>报告不确定性，不只比较点估计</td></tr>
+          </tbody></table>
+        </section>
+
+        <section class="section" id="data">
+          <div class="section-head"><div class="num">03</div><div><h2>数据与 Oracle 隔离</h2><p>同一开放数据源可同时服务 SFT 与 RL，但输入视图不同：SFT 看示范，RL 只看 Task、工具和环境，Gold 只进入隐藏 verifier。</p></div></div>
+          <table><thead><tr><th>来源</th><th>SFT</th><th>RL Task 改造</th><th>主要能力</th></tr></thead><tbody>
+            <tr><td>ToolACE</td><td>300</td><td>400；隐藏调用序列，fixture 执行</td><td>单/多轮工具调用</td></tr>
+            <tr><td>Hermes Function Calling</td><td>300</td><td>400；隐藏函数与参数</td><td>JSON、schema、Observation</td></tr>
+            <tr><td>2WikiMultihopQA</td><td>900</td><td>1,000；上下文变为 Search/Read corpus</td><td>多跳检索与证据组合</td></tr>
+            <tr><td>QASPER</td><td>600</td><td>600；论文变为冻结文档库</td><td>证据定位与 citation</td></tr>
+            <tr><td>COIG</td><td>900</td><td>不进入第一阶段 RL</td><td>中文教学解释</td></tr>
+          </tbody></table>
+          <div class="grid two">
+            <article class="card"><h3>SFT Split</h3><p>2,550 train / 300 validation / 150 sealed test；按 paper、source、tool template group 切分；五个来源共 3,000 条。</p></article>
+            <article class="card"><h3>RL Split</h3><p>2,000 train / 400 validation；SFT source/group overlap、RL train/validation group overlap 均为 0；公开任务禁止 Oracle 字段。</p></article>
+            <article class="card gold"><h3>可见信息</h3><p>Policy 只看到问题、allowed tools 和工具返回；gold answer、expected calls、supporting facts、gold source IDs 不进入 rollout context。</p></article>
+            <article class="card rust"><h3>仍有限制</h3><p>这是开放数据适配的冻结环境，不等价于真实 StudyHub 在线用户分布；Eval32 是开发集，不是 sealed final benchmark。</p></article>
+          </div>
+        </section>
+
+        <section class="section" id="sft">
+          <div class="section-head"><div class="num">04</div><div><h2>4B SFT</h2><p>SFT 目标是稳定协议与行为先验，不承担搜索策略优化。Loss 仅作用于 assistant token。</p></div></div>
+          <div class="formula">L_SFT = − Σ m_t log pθ(y_t | x, y&lt;t) / Σ m_t<br>m_t = 1 only for assistant action/answer tokens</div>
+          <div class="grid">
+            <article class="card"><h3>训练配方</h3><p>BF16；LoRA r=16、α=16；目标模块 o/gate/up/down；Adam；cosine LR 2e-5；2 epochs；gradient checkpointing。</p></article>
+            <article class="card gold"><h3>数据长度</h3><p>assistant token 占比 18.87%；输入 token p50=238、p95=1,098、max=2,021；没有依赖训练中联网加载。</p></article>
+            <article class="card"><h3>资源</h3><p>318/318 updates；GPU 峰值 38,113 MiB，峰值利用率 62%；证据包状态 COMPLETE。</p></article>
+          </div>
+          <table><thead><tr><th>Checkpoint</th><th>Validation loss</th><th>Adapter SHA256</th><th>判断</th></tr></thead><tbody>
+            <tr><td>Epoch 1</td><td>0.57391</td><td><code>50f39879…</code></td><td>建立稳定基线</td></tr>
+            <tr><td>Epoch 2</td><td class="best">0.56247</td><td><code>74702dca…</code></td><td>loss 相对改善约 1.99%，选为 B1/B3 共享 checkpoint</td></tr>
+          </tbody></table>
+          <div class="callout"><b>选择规则：</b>Epoch 2 的验证损失更低，因此作为 B1/B3 的共同 SFT 父节点；SFT 是否带来能力收益仍以 Eval32 为准，而不是只看训练 loss。</div>
+        </section>
+
+        <section class="section" id="rl">
+          <div class="section-head"><div class="num">05</div><div><h2>Agentic RL</h2><p>AReaL 负责 rollout/update，SGLang 服务策略，Hermes 保留原生工具循环，StudyHub 薄层注入冻结环境、预算、Reward 与证据记录。</p></div></div>
+          <div class="flow"><div><b>01 · TASK</b><span>只读 public task<br>隐藏 Oracle</span></div><div><b>02 · ROLLOUT</b><span>Hermes 自主 Search / Read / Call / Final</span></div><div><b>03 · VERIFY</b><span>Frozen Env + Reward v2</span></div><div><b>04 · UPDATE</b><span>AReaL GRPO<br>LoRA publish</span></div></div>
+          <table><thead><tr><th>项目</th><th>Direct RL</th><th>SFT→RL</th></tr></thead><tbody>
+            <tr><td>Trial</td><td><code>direct-pilot-seed-7406-20260826_193153</code></td><td><code>sft-pilot-seed-7406-20260827_013500</code></td></tr>
+            <tr><td>更新 / Rollout / Group</td><td>25 / 800 / 200</td><td>25 / 800 / 200</td></tr>
+            <tr><td>完整 Group</td><td>200 / 200</td><td>200 / 200</td></tr>
+            <tr><td>Reward mean</td><td>0.03630</td><td>0.00453</td></tr>
+            <tr><td>Zero-variance group</td><td>31.0%</td><td>36.5%</td></tr>
+            <tr><td>Entropy mean</td><td>0.33409</td><td>0.40956</td></tr>
+            <tr><td>Direct KL mean</td><td>0.04321</td><td>0.02012</td></tr>
+            <tr><td>末 5 step Reward</td><td>-0.02253</td><td>-0.08451</td></tr>
+            <tr><td>GPU 峰值</td><td>66,782 / 47,161 MiB</td><td>65,214 / 47,259 MiB</td></tr>
+            <tr><td>LoRA hash 变化</td><td><span class="best">是</span></td><td><span class="best">是</span></td></tr>
+          </tbody></table>
+          <div class="callout"><b>训练动力学：</b>两条 Pilot 都没有出现 entropy collapse、NaN/Inf 或不完整 group，但 Reward 没有上升趋势。这里能说“优化链路稳定执行”，不能说“策略已经变好”。</div>
+        </section>
+
+        <section class="section" id="eval">
+          <div class="section-head"><div class="num">06</div><div><h2>固定 Eval32</h2><p>每个模型在同一 32 tasks 上进行 4 次确定性 rollout。Strict success 不使用 scalar Reward 阈值，而要求 final、工具、证据、引用和 hard gate 同时满足协议。</p></div></div>
+          <table><thead><tr><th>模型</th><th>Strict rollout</th><th>Pass@4</th><th>Consistent@4</th><th>Mean Reward</th><th>Hard Gate</th></tr></thead><tbody>
+            <tr><td>B0 Base</td><td>4.688%</td><td>9.375%</td><td>3.125%</td><td>-0.04289</td><td>10.938%</td></tr>
+            <tr><td>B1 SFT</td><td class="best">6.250%</td><td>12.500%</td><td>3.125%</td><td>-0.05199</td><td class="best">9.375%</td></tr>
+            <tr><td>B2 Direct RL</td><td class="best">6.250%</td><td class="best">15.625%</td><td>3.125%</td><td>-0.08457</td><td class="bad">14.844%</td></tr>
+            <tr><td>B3 SFT→RL</td><td>5.469%</td><td>12.500%</td><td>3.125%</td><td>-0.07865</td><td>10.156%</td></tr>
+          </tbody></table>
+          <h3 style="margin-top:2rem;font-family:var(--serif)">2×2 效应与 95% 配对 bootstrap CI</h3>
+          <table><thead><tr><th>指标</th><th>SFT / no RL</th><th>RL / no SFT</th><th>RL after SFT</th><th>Interaction</th></tr></thead><tbody>
+            <tr><td>Strict</td><td>+1.563 pp<br>[-2.344, 6.250]</td><td>+1.563 pp<br>[0, 3.906]</td><td>-0.781 pp<br>[-5.469, 3.906]</td><td>-2.344 pp<br>[-8.594, 3.125]</td></tr>
+            <tr><td>Pass@4</td><td>+3.125 pp<br>[-9.375, 15.625]</td><td>+6.250 pp<br>[0, 15.625]</td><td>0 pp<br>[-15.625, 15.625]</td><td>-6.250 pp<br>[-25.000, 12.500]</td></tr>
+            <tr><td>Consistent@4</td><td>0 [0, 0]</td><td>0 [0, 0]</td><td>0 [0, 0]</td><td>0 [0, 0]</td></tr>
+            <tr><td>Mean Reward</td><td>-0.0091<br>[-0.0749, 0.0626]</td><td>-0.0417<br>[-0.0974, 0.0123]</td><td>-0.0267<br>[-0.0917, 0.0345]</td><td>+0.0150<br>[-0.0791, 0.1043]</td></tr>
+          </tbody></table>
+          <div class="verdict warn"><b>统计判断：</b>所有区间均包含 0，不能据此声称 SFT、Direct RL、SFT→RL 或二者协同具有可信的总体提升。Eval32 还是开发集，样本量小，结论只能用于下一轮工程决策。</div>
+          <div class="bar-row"><span>Base · Pass@4</span><div class="bar"><i style="width:60%"></i></div><b>9.38%</b></div>
+          <div class="bar-row"><span>SFT · Pass@4</span><div class="bar"><i class="gold" style="width:80%"></i></div><b>12.50%</b></div>
+          <div class="bar-row"><span>Direct RL</span><div class="bar"><i style="width:100%"></i></div><b>15.63%</b></div>
+          <div class="bar-row"><span>SFT→RL</span><div class="bar"><i class="rust" style="width:80%"></i></div><b>12.50%</b></div>
+        </section>
+
+        <section class="section" id="diagnosis">
+          <div class="section-head"><div class="num">07</div><div><h2>失败结构与训练诊断</h2><p>平均 Reward 掩盖了三个任务族完全不同的问题；下一轮应按 family 修数据与 verifier，而不是统一加训练步数。</p></div></div>
+          <table><thead><tr><th>SFT→RL Pilot family</th><th>Reward</th><th>Zero-var</th><th>主要信号</th><th>判断</th></tr></thead><tbody>
+            <tr><td>Evidence grounding</td><td class="bad">-0.34861</td><td>5.88%</td><td>149 missing citation；强制收尾 39.22%</td><td>有组内方差，但证据链和引用未学会</td></tr>
+            <tr><td>Function calling</td><td class="best">0.35168</td><td>17.86%</td><td>invalid tool call 53.13%</td><td>Reward 高不等于协议稳定，fixture/参数仍困难</td></tr>
+            <tr><td>Search multihop</td><td>-0.01086</td><td class="bad">64.52%</td><td>task success 96.84%，citation -0.8513</td><td>答案判定过易、引用约束失败，学习信号稀薄</td></tr>
+          </tbody></table>
+          <div class="grid">
+            <article class="card"><h3>没有熵崩塌</h3><p>SFT→RL entropy mean=0.4096，末段未向 0 收缩；Direct RL mean=0.3341。当前只能报告“未观察到”，不能制造事故故事。</p></article>
+            <article class="card gold"><h3>有 Zero-variance 风险</h3><p>SFT→RL 73/200 groups 无方差，Search family 达 64.52%。这会让组内 advantage 缺少方向，是当前最明确的 RL 数据/Reward 风险。</p></article>
+            <article class="card rust"><h3>Reward 没有改善</h3><p>SFT→RL 前 5 step 均值 0.0091，末 5 step -0.0845；Direct RL 也从 0.0877 降至 -0.0225。不能用“训练稳定”替代“效果提升”。</p></article>
+          </div>
+          <div class="grid two">
+            <article class="card"><h3>上下文与长度</h3><p>SFT→RL 2,863 interactions；sequence p95=3,174、max=4,096，仅 9 条触顶；135 条强制收尾均关闭 thinking；14 条压缩，10 条紧急压缩被记录为诊断信号。</p></article>
+            <article class="card"><h3>策略新鲜度</h3><p>policy version 0–24 均有记录，无 mixed-policy records，trajectory reuse=1；当前 pinned proxy 没有暴露逐 rollout seed，这一项保留为边界。</p></article>
+          </div>
+        </section>
+
+        <section class="section" id="incidents">
+          <div class="section-head"><div class="num">08</div><div><h2>高价值故障闭环</h2><p>按 Goal Pack 要求，自然故障与受控漏洞分开标注；没有发生的熵崩塌不伪造成项目经历。</p></div></div>
+          <table><thead><tr><th>等级</th><th>故障</th><th>根因</th><th>同协议证明</th></tr></thead><tbody>
+            <tr><td><span class="tag a">A_REAL</span></td><td>Hermes system prompt 重复</td><td><code>_build_system_prompt</code> 与 ephemeral prompt 双重注入</td><td>1160/1160 重复 → 修复后 118/118 恰好一次</td></tr>
+            <tr><td><span class="tag a">A_REAL</span></td><td>Agent context budget overflow</td><td>多轮渲染增长 + 强制收尾仍启用 thinking</td><td>27 次 provider 失败 → final Gate runtime error=0</td></tr>
+            <tr><td><span class="tag a">A_REAL</span></td><td>RL task budget contract</td><td>max_turns 与任务顺序轮数可能冲突</td><td>全量任务审计后冻结可完成集合</td></tr>
+            <tr><td><span class="tag a">A_REAL</span></td><td>Merged checkpoint 缺 processor assets</td><td>LoRA merge 只保存 model/tokenizer，遗漏 multimodal processor 配置</td><td>失败 eval 0 rollout；补 2 份资产后 128/128 精确复现</td></tr>
+            <tr><td><span class="tag b">B_CONTROLLED</span></td><td>正确 Tool Call + 空 Final 的 Reward shortcut</td><td>旧 function 分支未把 answer score 纳入 task success</td><td>回归测试要求空答案 total≤0，并记录 <code>empty_final_answer</code></td></tr>
+          </tbody></table>
+        </section>
+
+        <section class="section" id="evidence">
+          <div class="section-head"><div class="num">09</div><div><h2>证据与复现入口</h2><p>权重和大型运行产物保持 Git-ignored；报告保留 trial、hash、配置和脚本入口，代码可重新生成同口径证据。</p></div></div>
+          <div class="evidence-list">
+            <div class="evidence"><b>SFT claim bundle</b><code>artifacts/experiments/run-seed-6209-20260826_234708/</code> · COMPLETE</div>
+            <div class="evidence"><b>Direct RL bundle</b><code>artifacts/experiments/direct-pilot-seed-7406-20260826_193153/</code> · COMPLETE</div>
+            <div class="evidence"><b>SFT→RL bundle</b><code>artifacts/experiments/sft-pilot-seed-7406-20260827_013500/</code> · COMPLETE</div>
+            <div class="evidence"><b>四模型评测</b><code>artifacts/experiments/eval32-v2/4b-controlled-2x2-eval32.json</code></div>
+            <div class="evidence"><b>Factorial CI</b><code>artifacts/experiments/eval32-v2/4b-controlled-2x2-factorial-bootstrap.json</code></div>
+            <div class="evidence"><b>精确复现</b><code>artifacts/experiments/eval32-v2/sft-rl-pilot7406-reproducibility.json</code></div>
+          </div>
+          <div class="formula"># Rebuild paired factorial statistics
+.venv/bin/python scripts/train/summarize_factorial_eval.py \
+  --input artifacts/experiments/eval32-v2/4b-controlled-2x2-eval32.json \
+  --output artifacts/experiments/eval32-v2/4b-controlled-2x2-factorial-bootstrap.json \
+  --bootstrap-samples 10000 --seed 6209</div>
+          <p>主线 Git commit：<code>980fbd63561e0a551da8eaed66caa98ac240fce6</code>。SFT epoch-2 adapter SHA256：<code>74702dca…</code>；SFT→RL 初始/最终 LoRA SHA256：<code>2860e2eb… → eae13236…</code>。</p>
+        </section>
+
+        <section class="section" id="boundary">
+          <div class="section-head"><div class="num">10</div><div><h2>可以说什么，不能说什么</h2><p>这是 Goal Pack 的证据合同在最终报告中的落地。</p></div></div>
+          <div class="grid two">
+            <article class="card"><h3>可以陈述</h3><p>完成 4B SFT 与两条 25-step Agentic RL Pilot；训练/工具/环境/Reward/LoRA 发布链路可复现；Eval32 显示点估计差异但无显著总体增益；已定位 citation、zero variance、function invalid calls 等具体瓶颈。</p></article>
+            <article class="card rust"><h3>不能陈述</h3><p>不能说 SFT→RL 显著优于其他方案；不能把 Eval32 当 sealed benchmark；不能声称 9B、DAPO、PPO、OPD/KDRL 已训练；不能把双卡 Pilot 外推为大规模集群经验。</p></article>
+            <article class="card gold"><h3>下一轮最小实验</h3><p>先固定模型，修正 Search 的 citation/verifier 契约与 Function fixture；重做小型 Reward calibration；降低 Search zero-variance；再以同一 Eval32 + 新 sealed set 运行 200-task Pilot。</p></article>
+            <article class="card"><h3>9B 条件</h3><p>只有当 4B 的 family-level 失败得到修复、Pilot 显示可学习趋势且 Eval CI 开始收窄时，9B 复制才有信息增益。当前不启动 9B 是实验决策，不是遗漏。</p></article>
+          </div>
+          <div class="foot">StudyHub Agent · Controlled 4B AReaL Experiment · 2026-08-27<br>关联面试材料：<a href="interview/index.html">知识档案首页</a> · <a href="interview/answer-bank.html">HTML 回答库</a></div>
+        </section>
+      </div>
+    </main>
+  </div>
+</body>
+</html>

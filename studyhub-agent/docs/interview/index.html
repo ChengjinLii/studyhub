@@ -473,10 +473,12 @@
         <a href="#coverage">14 · 防漏审计</a>
         <a href="#questions">15 · 高频追问</a>
         <a href="#claims">16 · 表述边界</a>
+        <a href="answer-bank.html">HTML · 完整回答库</a>
+        <a href="../StudyHub_4B_AReaL_Agentic_RL_Experiment_Report.html">HTML · 4B 实验报告</a>
       </nav>
       <div class="aside-note">
         来源：StudyHub 代码与本地实验产物；面试 Goal Pack 的 52 张截图、S01–S14 主题和 G01–G18 缺口仅用于覆盖审计。<br><br>
-        更新日期：2026-08-26
+        更新日期：2026-08-27
       </div>
     </aside>
 
@@ -490,7 +492,7 @@
           <div class="metric"><strong>2,400</strong><span>FROZEN RL TASKS</span></div>
           <div class="metric"><strong>32 × 4</strong><span>DEV EVAL PROTOCOL</span></div>
           <div class="metric"><strong>128 / 128</strong><span>EXACT REPLAY</span></div>
-          <div class="metric"><strong>81 / 81</strong><span>PROJECT TESTS</span></div>
+          <div class="metric"><strong>4</strong><span>CONTROLLED MODEL ARMS</span></div>
         </div>
       </header>
 
@@ -555,7 +557,7 @@
         </article>
 
         <article class="topic a" id="sft" data-level="a" data-keywords="SFT LoRA loss cross entropy assistant-only readiness Base RL-only 4B 9B">
-          <div class="topic-head"><h3>SFT 学什么？训练到什么程度才进入 RL？</h3><div class="badges"><span class="badge a">A · 配方与数据</span><span class="badge pending">结果进行中</span></div></div>
+          <div class="topic-head"><h3>SFT 学什么？训练到什么程度才进入 RL？</h3><div class="badges"><span class="badge a">A · 4B 正式训练</span><span class="badge a">318 / 318 updates</span></div></div>
           <div class="answer-30"><p>SFT 先提供稳定的行为先验：聊天模板、Tool Call JSON、给定证据下的多跳推理、grounded QA 和中文解释。Loss 只计算 assistant token 的交叉熵。是否进入 RL 不能只看 loss，而要在冻结 suite 上重复采样，检查格式有效率、工具行为、pass@k、失败结构和 group 是否产生可学习方差。</p></div>
           <pre>L_SFT = - Σ_t m_t · log pθ(y_t | x, y&lt;t) / Σ_t m_t
 m_t = 1 仅对 assistant action / final answer token 生效</pre>
@@ -565,7 +567,16 @@ m_t = 1 仅对 assistant action / final answer token 生效</pre>
           </div>
           <details><summary>Readiness 四种决策</summary><div><b>继续 SFT：</b>协议/格式错误主导且新增示范仍有边际收益。<br><b>先修评测：</b>parser、verifier 或输入视图不一致。<br><b>进入 RL：</b>基本协议稳定、存在 mixed outcomes 和可学习搜索/恢复策略。<br><b>已饱和：</b>多次扩数据和训练不再改善冻结能力/成本曲线。</div></details>
           <details><summary>为什么保留 RL-only？</summary><div>它量化 Base 能否直接通过环境反馈学会策略，并检验 SFT 是否主要提供 policy initialization。若只比较 SFT 与 SFT→RL，就无法区分 RL 本身的增益与 SFT 初始化的协同作用。</div></details>
-          <div class="evidence"><strong>实验边界：</strong> 4B 正式 SFT 结果尚未完成，9B 当前只完成模型、数据和脚本准备。不得把 2B Pilot 外推为 4B/9B 结论。</div>
+          <table>
+            <thead><tr><th>4B SFT</th><th>实测</th><th>判断</th></tr></thead>
+            <tbody>
+              <tr><td>数据</td><td>2,550 train / 300 validation / 150 sealed test</td><td>五来源 group split；SFT/RL lineage overlap=0</td></tr>
+              <tr><td>训练</td><td>2 epochs，318/318 updates，BF16 + LoRA</td><td>Evidence bundle COMPLETE</td></tr>
+              <tr><td>Validation loss</td><td>0.57391 → 0.56247</td><td>相对改善约 1.99%，不能替代能力评测</td></tr>
+              <tr><td>资源</td><td>GPU 峰值 38,113 MiB</td><td>低显存配方按计划完成</td></tr>
+            </tbody>
+          </table>
+          <div class="evidence"><strong>当前结论：</strong> 4B SFT 已完成，epoch-2 checkpoint 同时作为 B1 和 B3 的共享父节点。Eval32 的 SFT strict 为 6.25%、pass@4 为 12.5%，相对 Base 的配对 CI 均跨 0；因此只能说行为冷启动完成，不能说总体能力显著提升。9B 仍未训练。</div>
         </article>
 
         <article class="topic a" id="tools" data-level="a" data-keywords="Tool Call parser schema Search Read budget guardrail JSON fixture">
@@ -584,7 +595,7 @@ unknown / wrong args / direct read / over budget → deterministic error + trace
         </article>
 
         <article class="topic a" id="grpo" data-level="a" data-keywords="GRPO PPO advantage group variance KL clip entropy ratio staleness">
-          <div class="topic-head"><h3>GRPO 的学习信号从哪里来？</h3><div class="badges"><span class="badge a">A · 真实 Gate/Smoke</span></div></div>
+          <div class="topic-head"><h3>GRPO 的学习信号从哪里来？</h3><div class="badges"><span class="badge a">A · 两条 25-step Pilot</span></div></div>
           <div class="answer-30"><p>同一任务采样 4 条轨迹，用组内 Reward 均值和标准差构造相对 advantage。高于组平均的行为被增强，低于平均的被抑制；若四条 Reward 相同，zero-variance group 几乎没有相对信号。因此要同时看平均 Reward、组内方差、best–worst gap 和有效 group 数。</p></div>
           <pre>A_i = (r_i - mean(r_G)) / (std(r_G) + ε)
 ratio_t = exp(log πθ(a_t|s_t) - log πold(a_t|s_t))
@@ -592,26 +603,29 @@ L_clip = min(ratio_t A_t, clip(ratio_t, 1-ε, 1+ε) A_t)</pre>
           <div class="grid-3">
             <div class="panel"><h4>Group</h4><p><code>n_samples=4</code>，<code>drop_incomplete_group=true</code>；缺样本时拒绝训练，不改变 advantage 语义。</p></div>
             <div class="panel gold"><h4>Stability</h4><p>clip 0.2、KL control 0.02、token-level ratio rejection；无 EOS 轨迹把 outcome reward 清零。</p></div>
-            <div class="panel rust"><h4>Stage</h4><p>Gate 1 step / 32 trajectories；Smoke 10 / 320；Pilot 25 / 800。分别验证链路、分布和短趋势。</p></div>
+            <div class="panel rust"><h4>Stage</h4><p>Direct RL 与 SFT→RL 均完成 Pilot 25 steps / 800 trajectories / 200 complete groups；Gate 和 Smoke 只用于链路诊断。</p></div>
           </div>
           <table>
-            <thead><tr><th>4B Direct GRPO v2 Gate</th><th>实测</th><th>判定</th></tr></thead>
+            <thead><tr><th>4B GRPO Pilot</th><th>Direct RL</th><th>SFT→RL</th></tr></thead>
             <tbody>
-              <tr><td>Rollout / group</td><td>32 / 8，全部为 4 条完整组</td><td>可计算组相对 advantage</td></tr>
-              <tr><td>Reward</td><td>mean -0.1274，std 0.6196，min -1，max 0.9833</td><td>不是常数 Reward</td></tr>
-              <tr><td>Group signal</td><td>mean std 0.2663；zero-variance 2/8</td><td>6/8 组存在相对排序信号</td></tr>
-              <tr><td>Policy update</td><td>initial/final LoRA SHA-256 不同</td><td>1 次 PPO update 确实改变参数</td></tr>
-              <tr><td>Runtime</td><td>456.86 秒；GPU 峰值 66,834 MiB</td><td>低于 68,000 MiB 运行上限</td></tr>
-              <tr><td>Evidence</td><td>32 rewards、123 interactions、bundle COMPLETE</td><td>Prompt 123/123 恰好一次</td></tr>
+              <tr><td>Update / rollout / group</td><td>25 / 800 / 200</td><td>25 / 800 / 200</td></tr>
+              <tr><td>完整 group</td><td>200 / 200</td><td>200 / 200</td></tr>
+              <tr><td>Reward mean</td><td>0.03630</td><td>0.00453</td></tr>
+              <tr><td>Zero-variance</td><td>31.0%</td><td>36.5%</td></tr>
+              <tr><td>Entropy mean</td><td>0.33409</td><td>0.40956</td></tr>
+              <tr><td>Direct KL mean</td><td>0.04321</td><td>0.02012</td></tr>
+              <tr><td>末 5 step Reward</td><td>-0.02253</td><td>-0.08451</td></tr>
+              <tr><td>GPU 高卡峰值</td><td>66,782 MiB</td><td>65,214 MiB</td></tr>
+              <tr><td>Evidence / LoRA</td><td>COMPLETE / hash changed</td><td>COMPLETE / hash changed</td></tr>
             </tbody>
           </table>
           <details><summary>GRPO 与 PPO 的主要区别？</summary><div>当前配方不训练 value critic，而用同 prompt 多样本的相对 Reward 估计 advantage；policy update 仍保留 PPO 风格 ratio、clip、KL 和 off-policy 处理。不能简单说“GRPO 完全不是 PPO”。</div></details>
           <details><summary>什么是健康探索，什么是失控？</summary><div>短期成功率下降但 entropy、KL、长度、ratio 和 holdout 未越界，且 group 有方差，可能是健康探索；若 Reward 与独立 eval 背离、entropy 快速坍塌、ratio tail/clip 激增或输出模式化，则应暂停并做 LR/KL/reward/data 对照。</div></details>
-          <div class="evidence"><strong>v2 Gate：</strong> <code>direct-gate-seed-7401-20260826_155650</code>，Git <code>2bbc37b</code>，证据包完整。<strong>历史边界：</strong>旧 v1 10-step Smoke 为 80 tasks / 320 rollouts，Reward mean 0.1292、std 0.5035、zero-variance 0.2875；它只证明旧链路有信号，不进入 v2 能力对照。</div>
+          <div class="evidence"><strong>结论：</strong> 两条 Pilot 都稳定完成更新，均未出现熵崩塌或数值异常，但 Reward 没有上升趋势。SFT→RL 的 Search family zero-variance 达 64.52%，Grounding Reward 为 -0.3486；这说明下一步应修任务/引用/Reward，而不是把“运行稳定”写成“能力提升”。</div>
         </article>
 
         <article class="topic a b" id="reward" data-level="a b" data-keywords="Reward hacking verifier hard gate citation evidence efficiency process outcome parser">
-          <div class="topic-head"><h3>Reward 怎样既可学习，又不鼓励走捷径？</h3><div class="badges"><span class="badge a">A · Reward v2</span><span class="badge b">B · Hacking 待受控</span></div></div>
+          <div class="topic-head"><h3>Reward 怎样既可学习，又不鼓励走捷径？</h3><div class="badges"><span class="badge a">A · Reward v2</span><span class="badge b">B · Shortcut 回归</span></div></div>
           <div class="answer-30"><p>总分拆成任务成功、证据、引用、工具质量和效率，每项单独落盘。明确的协议/环境错误使用 hard gate；空回答、缺必要引用、完全不调工具最多为 0。Function Calling 把调用正确性与最终答案按 70/30 合成，修复“调对工具但不回答也能高分”的 shortcut。</p></div>
           <pre>R = .40 task_success + .25 evidence + .15 citation
   + .15 tool_quality + .05 efficiency - violations
@@ -623,11 +637,11 @@ Function task_success = .70 call_correctness + .30 answer_quality</pre>
           </div>
           <details><summary>Outcome 与 Process Reward 如何取舍？</summary><div>当前优先可验证 outcome；证据、引用和工具质量提供轻量 process constraint。不对不可可靠验证的自然语言 CoT 强行逐步打分，避免把 judge 偏差变成训练目标。</div></details>
           <details><summary>如何识别 Reward hacking？</summary><div>检查 component domination、Reward 与 strict eval 背离、异常短答/长答、无工具高分、parser FP/FN、高分错误轨迹和 per-family 回归。自然训练未出现时，从健康 checkpoint 做短时、单变量、明确标记的 CONTROLLED_FAULT，再恢复 Reward 并在同一 suite 回归。</div></details>
-          <div class="evidence"><strong>局限：</strong> QASPER 的 token-F1/字符串匹配可能低估语义等价回答；当前没有大规模人工校准的 learned RM。<strong>代码：</strong> <code>training/rl/reward_v2.py</code>、Reward 单测与每 trial 的 <code>reward-v2.jsonl</code>。</div>
+          <div class="evidence"><strong>受控案例：</strong> 已构造“正确 Tool Call + 空 Final”回归，修复后空答案总分不得为正，并由 strict evaluator 再检查；该案例明确标记 B，不冒充自然 Pilot 事故。<a href="incidents/2026-08-27-reward-shortcut-empty-final.html">查看完整 HTML 案例</a>。<strong>局限：</strong> 当前没有大规模人工校准的 learned RM。</div>
         </article>
 
         <article class="topic a" id="evaluation" data-level="a" data-keywords="Eval32 strict success pass@4 consistent@4 bootstrap deterministic holdout">
-          <div class="topic-head"><h3>为什么平均 Reward 不能代表 Agent 变好？</h3><div class="badges"><span class="badge a">A · Base Eval32 v2</span></div></div>
+          <div class="topic-head"><h3>为什么平均 Reward 不能代表 Agent 变好？</h3><div class="badges"><span class="badge a">A · 四模型 Eval32</span></div></div>
           <div class="answer-30"><p>Reward 是训练诊断，会混合 family，也可能被权重或 shortcut 推高。StudyHub 固定 32 个开发任务、每题 4 次 rollout，报告 strict success、pass@4、consistent@4、hard-gate、工具成本和 family slice；所有候选必须使用相同任务、环境、verifier、预算与解析协议。</p></div>
           <div class="grid-3">
             <div class="panel"><h4>Strict</h4><p>单条轨迹同时满足任务、工具、证据、引用与无违规要求。</p></div>
@@ -635,18 +649,17 @@ Function task_success = .70 call_correctness + .30 answer_quality</pre>
             <div class="panel rust"><h4>Consistent@4</h4><p>四条全部严格成功，反映可靠性；缺任意 rollout 时评测器 fail closed。</p></div>
           </div>
           <table>
-            <thead><tr><th>Base-4B / Eval32 v2</th><th>结果</th><th>解释</th></tr></thead>
+            <thead><tr><th>4B / Eval32 v2</th><th>Strict</th><th>Pass@4</th><th>Consistent@4</th><th>Mean Reward</th></tr></thead>
             <tbody>
-              <tr><td>Strict rollout success</td><td>4.69%</td><td>128 条中 6 条严格成功</td></tr>
-              <tr><td>Pass@4</td><td>9.38%</td><td>32 题中 3 题至少一次成功</td></tr>
-              <tr><td>Consistent@4</td><td>3.13%</td><td>32 题中 1 题四次均成功</td></tr>
-              <tr><td>Hard gate</td><td>10.94%</td><td>协议/环境硬失败仍较多</td></tr>
-              <tr><td>Mean Reward</td><td>-0.0429</td><td>只作诊断，不作为能力结论</td></tr>
+              <tr><td>B0 Base</td><td>4.688%</td><td>9.375%</td><td>3.125%</td><td>-0.04289</td></tr>
+              <tr><td>B1 SFT</td><td>6.250%</td><td>12.500%</td><td>3.125%</td><td>-0.05199</td></tr>
+              <tr><td>B2 Direct RL</td><td>6.250%</td><td>15.625%</td><td>3.125%</td><td>-0.08457</td></tr>
+              <tr><td>B3 SFT→RL</td><td>5.469%</td><td>12.500%</td><td>3.125%</td><td>-0.07865</td></tr>
             </tbody>
           </table>
-          <details><summary>Base 的主要失败分布</summary><div>missing citation 60、invalid tool call 43、tool-call budget exhausted 11、invalid citation 4、no tool call 2。QASPER strict success 为 0，说明证据定位与引用是主要短板；这提供训练 headroom，但不保证 Pilot 一定提升。</div></details>
-          <details><summary>最终比较怎样做？</summary><div>B0/B1/B2/B3 用 per-task paired delta、改善/不变/退化数和 paired bootstrap CI。Eval32 是开发集，不是密封 final benchmark；最终 claim 还需要不参与调参的 sealed test 与 incident regression。</div></details>
-          <div class="evidence"><strong>Run：</strong> <code>direct-eval-seed-7301-20260826_150452</code> 与 <code>...153009</code>。两次聚合指标和逐 rollout 行为完全一致。</div>
+          <details><summary>2×2 配对 bootstrap 说明了什么？</summary><div>Strict、pass@4、consistent@4 和 mean Reward 的 SFT 主效应、Direct RL 主效应、RL-after-SFT 与 interaction 共 20 个区间全部包含 0。Direct RL 的 pass@4 点估计最高，但不能据此宣称显著提升。</div></details>
+          <details><summary>主要失败分布</summary><div>SFT→RL Grounding strict/pass@4 均为 0；训练 Pilot 中 Search family 的 citation component 为 -0.8513、missing citation 339 次，Function invalid tool call rate 为 53.13%。下一轮应先修 family-level 任务与 verifier。</div></details>
+          <div class="evidence"><strong>复现：</strong> SFT→RL 两次 Eval 的 32/32 task multisets 与 128/128 stable rollout fields 完全一致。<strong>边界：</strong> Eval32 是开发集，不是 sealed final benchmark；所有效应 CI 均跨 0。<a href="../StudyHub_4B_AReaL_Agentic_RL_Experiment_Report.html#eval">查看完整统计</a>。</div>
         </article>
 
         <article class="topic a" id="repro" data-level="a" data-keywords="reproducibility hash manifest seed deterministic checkpoint evidence LoRA">
@@ -657,18 +670,18 @@ Function task_success = .70 call_correctness + .30 answer_quality</pre>
             <div class="panel gold"><h4>秘密处理</h4><p>每次运行生成临时 AReaL admin key，结束后脱敏；公共 Reward 日志只保留答案长度与 SHA。</p></div>
           </div>
           <table>
-            <thead><tr><th>复现检查</th><th>Base Eval32 v2 结果</th></tr></thead>
+            <thead><tr><th>复现检查</th><th>SFT→RL Eval32 v2 结果</th></tr></thead>
             <tbody>
               <tr><td>相同 task / model / data / config / seed</td><td><span class="status-dot ok"></span>通过</td></tr>
               <tr><td>每题恰好 4 条</td><td><span class="status-dot ok"></span>32/32 groups</td></tr>
               <tr><td>LoRA 初始/最终哈希</td><td><span class="status-dot ok"></span>完全相同</td></tr>
-              <tr><td>System prompt marker</td><td><span class="status-dot ok"></span>455/455 恰好一次</td></tr>
+              <tr><td>System prompt marker</td><td><span class="status-dot ok"></span>缺失 0、重复 0</td></tr>
               <tr><td>两次行为签名</td><td><span class="status-dot ok"></span>128/128 EXACT</td></tr>
               <tr><td>Evidence bundle</td><td><span class="status-dot ok"></span>COMPLETE</td></tr>
             </tbody>
           </table>
           <details><summary>固定 seed 为什么还不够？</summary><div>并发请求调度、CUDA kernel 和 sampling backend 仍可能漂移。Dev Eval 同时开启 AReaL deterministic sampling、SGLang deterministic inference、固定 request ordering 和 <code>max_head_offpolicyness=0</code>；然后用答案 SHA、完整 Reward、工具轨迹和 token 元数据做双跑签名比较。</div></details>
-          <div class="evidence"><strong>代码：</strong> <code>capture_run_metadata.py</code>、<code>build_experiment_evidence.py</code>、<code>compare_eval_reproducibility.py</code>。第二次 Eval 峰值 66,708 MiB，证据包 <code>artifact-completeness.json=COMPLETE</code>。</div>
+          <div class="evidence"><strong>代码：</strong> <code>capture_run_metadata.py</code>、<code>build_experiment_evidence.py</code>、<code>compare_eval_reproducibility.py</code>。两次 SFT→RL Eval 的 128/128 stable fields 完全一致，证据包均为 <code>COMPLETE</code>。</div>
         </article>
 
         <article class="topic a c" id="infra" data-level="a c" data-keywords="GPU H100 memory FSDP SGLang KV cache LoRA watchdog process group">
@@ -760,14 +773,16 @@ Function task_success = .70 call_correctness + .30 answer_quality</pre>
         </article>
 
         <article class="topic a" id="incidents" data-level="a" data-keywords="incident duplicate system prompt QASPER budget contract context overflow truncation thinking bug root cause">
-          <div class="topic-head"><h3>目前有哪些真实发生、已闭环的事故？</h3><div class="badges"><span class="badge a">A · 三个自然事件</span></div></div>
-          <div class="answer-30"><p>三个案例分别覆盖输入重复、任务不可完成和动态上下文越界：Hermes 双路径注入重复 system prompt；QASPER 多标注 evidence 并集突破 6-turn 合同；多轮 Search/Read prompt 穿过 4,096，并在第一轮修复后暴露 thinking 收尾截断。每个案例都保存竞争假设、原始证据、最小修复、同协议回归和残余风险。</p></div>
+          <div class="topic-head"><h3>目前有哪些已闭环的故障案例？</h3><div class="badges"><span class="badge a">A · 四个自然事件</span><span class="badge b">B · 一个受控漏洞</span></div></div>
+          <div class="answer-30"><p>四个自然案例覆盖输入重复、任务不可完成、动态上下文越界和 checkpoint 打包不完整；另有一个明确标注 B 的 Reward shortcut 回归。每个案例都保存竞争假设、原始证据、最小修复、同协议回归和残余风险；没有发生的熵崩塌不伪造成事故。</p></div>
           <div class="incident-strip">
             <a class="incident" href="incidents/2026-08-26-duplicate-training-system-prompt.html"><small>A_REAL_REPRODUCED · RUNTIME</small><h4>Duplicate Training System Prompt</h4><p>1160/1160 重复 → 修复后 118/118 恰好一次；保留真实 Smoke 与 Gate。</p></a>
             <a class="incident" href="incidents/2026-08-26-rl-task-budget-contract.html"><small>A_REAL_REPRODUCED · DATA CONTRACT</small><h4>RL Task Budget Contract</h4><p>v1 的 35 个任务超 6 turns、15 个超工具预算 → v2 全量 2400 条审计通过。</p></a>
             <a class="incident" href="incidents/2026-08-26-agent-context-budget-overflow.html"><small>A_REAL_REPRODUCED · CONTEXT</small><h4>Agent Context Budget Overflow</h4><p>自然 Pilot 有 9 个超长请求；两轮最小修复后，5/5 强制收尾完成且 runtime error 为 0。</p></a>
+            <a class="incident" href="incidents/2026-08-26-merged-checkpoint-processor-assets.html"><small>A_REAL_REPRODUCED · CHECKPOINT</small><h4>Merged Checkpoint Processor Assets</h4><p>Eval 在 0 rollout 时因 processor 配置缺失退出；补齐保存契约后完成 128/128 精确复现。</p></a>
+            <a class="incident" href="incidents/2026-08-27-reward-shortcut-empty-final.html"><small>B_CONTROLLED_PROJECT · REWARD</small><h4>Correct Call, Empty Final</h4><p>正确工具调用但空答案的受控 shortcut；修复后 total≤0，并由 strict evaluator 双重约束。</p></a>
           </div>
-          <div class="evidence"><strong>当前自然素材：</strong> 还包括 Base Eval 中的重复工具失败、预算耗尽与缺引用，但它们暂时是失败样本，不自动升级为“事故”；需要根因、修复和回归后再登记。</div>
+          <div class="evidence"><strong>登记纪律：</strong> Base/Eval 中的缺引用、重复工具失败和预算耗尽仍只是失败样本；没有根因、修复与回归前不升级为 Incident。完整的 30/60/180 秒讲法见 <a href="answer-bank.html">HTML 回答库</a>。</div>
         </article>
 
         <article class="topic a c d" id="coverage" data-level="a c d" data-keywords="coverage gap parser parity staleness forgetting teacher judge multi-agent G01 G18">
@@ -789,9 +804,9 @@ Function task_success = .70 call_correctness + .30 answer_quality</pre>
             <div class="gap"><b>G13 · Adjacent RL</b><span>算法谱系只做理论边界，不伪装项目结果。</span><small>D</small></div>
             <div class="gap"><b>G14 · Agent failures</b><span>tool/citation 已有真实样本；Web/Memory 故障未完成。</span><small>A / pending</small></div>
             <div class="gap"><b>G15 · Multi-agent</b><span>当前为单 Agent offline RL；credit 与 online feedback 仅理论。</span><small>D</small></div>
-            <div class="gap"><b>G16 · Data sufficient</b><span>规模与 coverage 已记录；learning/saturation curve 尚未完成。</span><small>pending</small></div>
-            <div class="gap"><b>G17 · Model migration</b><span>4B 主实验进行中；9B replication 尚未产生结果。</span><small>pending</small></div>
-            <div class="gap"><b>G18 · RL readiness</b><span>Base Eval 可复现，SFT/Pilot 对照完成后才能最终判定。</span><small>A / ongoing</small></div>
+            <div class="gap"><b>G16 · Data sufficient</b><span>3k SFT 与 2.4k RL 足以完成 Pilot，但 CI 与 failure slice 显示不足以支持 broad gain。</span><small>A/C</small></div>
+            <div class="gap"><b>G17 · Model migration</b><span>4B 2×2 已完成；9B replication 因 4B 尚无可信增益而暂停。</span><small>A / bounded</small></div>
+            <div class="gap"><b>G18 · RL readiness</b><span>四模型 Eval32 已完成：链路 ready，扩大训练的能力证据不充分。</span><small>A</small></div>
           </div>
           <details><summary>S01–S14 的 52 张截图具体用于发现哪些追问？</summary><div>
             <table>
@@ -811,7 +826,8 @@ Function task_success = .70 call_correctness + .30 answer_quality</pre>
 
         <article class="topic a c d" id="questions" data-level="a c d" data-keywords="question bank interview 面试 追问">
           <div class="topic-head"><h3>高频追问速查</h3><div class="badges"><span class="badge a">按证据回答</span></div></div>
-          <div class="answer-30"><p>每题至少准备三个长度：30 秒给结论、关键决策和一项证据；60 秒补背景—动作—结果—取舍；3 分钟展开公式、竞争假设、before/after、复现路径和残余风险。</p></div>
+          <div class="answer-30"><p>每题至少准备三个长度：30 秒给结论、关键决策和一项证据；60 秒补背景→动作→结果→取舍；3 分钟展开公式、竞争假设、before/after、复现路径和残余风险。</p></div>
+          <div class="evidence"><strong>完整回答：</strong> <a href="answer-bank.html">打开 HTML 面试回答库</a>。其中包含 20 个 30/60/180 秒回答、Goal Pack 71 项逐项证据等级和 unsupported claims。</div>
           <div class="question-bank">
             <div class="question"><b>ARCH</b><br>为什么需要 Agent，而不是固定 RAG pipeline？</div>
             <div class="question"><b>ARCH</b><br>Hermes、StudyHub workflow、AReaL、SGLang 的职责边界？</div>
@@ -853,14 +869,14 @@ Function task_success = .70 call_correctness + .30 answer_quality</pre>
           <div class="claim-wall">
             <h4>Unsupported claims · 当前禁止外推</h4>
             <ul class="clean">
-              <li>不能宣称 4B SFT、Direct RL 或 SFT→RL 已提升 Eval32，直到 checkpoint 与成对评测完成。</li>
-              <li>不能用训练 Reward 上升替代 strict success、pass@4、consistent@4 或 sealed test。</li>
-              <li>不能宣称 9B 优于 4B；9B 当前只有模型、数据、脚本和配方准备。</li>
+              <li>不能宣称 4B SFT、Direct RL 或 SFT→RL 显著提升；所有 2×2 效应的配对 95% CI 均跨 0。</li>
+              <li>不能用“25 次更新稳定完成”替代 strict success、pass@4、consistent@4 或 sealed test。</li>
+              <li>不能宣称 9B 优于 4B；9B 未训练，4B 结果也尚不支持扩大成本。</li>
               <li>不能把 Frozen Search 称作 BM25/Dense/Hybrid，也不能说离线 RAG 已上线。</li>
               <li>不能说 Search-R1 已被原样复现训练；当前借鉴的是研究问题与多轮检索思想。</li>
               <li>不能把 Reward v2 称为大规模人工校准的教育 Reward Model。</li>
               <li>不能把 fixture/offline RL 外推为生产网络、数据库、权限和真实用户 online RL 安全性。</li>
-              <li>不能把受控 entropy collapse/reward hacking 描述为自然生产事故。</li>
+              <li>不能说本次发生过 entropy collapse；只能报告两条 Pilot 均未观察到。Reward shortcut 是 B 级受控回归，不是自然事故。</li>
             </ul>
           </div>
           <details><summary>怎样把限制说得专业，而不是显得“没做完”？</summary><div>先说证据支持的范围，再说明剩余变量和下一步验证。例如：“双 H100 上 4B 的 Hermes→SGLang→Frozen Env→Reward→LoRA 链路已经完成真实 Gate；这证明配方可运行，但 9B scale effect 和业务收益仍需同协议复现。”</div></details>
@@ -868,7 +884,8 @@ Function task_success = .70 call_correctness + .30 answer_quality</pre>
 
         <footer>
           <p><strong>证据来源。</strong> StudyHub 仓库代码、Git commit、Git-ignored 本地 artifacts、模型/数据 manifests，以及 <code>artifacts/interview-goal-source/</code> 中已校验的 Goal Pack。原压缩包在双 manifest 校验后删除。</p>
-          <p><strong>当前基线。</strong> Base-4B Eval32 v2 两次固定 seed 运行获得 128/128 精确行为复现；Eval32 是开发评测，不是 sealed final benchmark。后续结果必须按 B0/B1/B2/B3 同协议追加。</p>
+          <p><strong>当前结果。</strong> Base/SFT/Direct RL/SFT→RL 四组 Eval32 已完成；SFT→RL 两次固定 seed 运行获得 128/128 精确行为复现。Eval32 是开发评测，不是 sealed final benchmark；所有 factorial CI 均跨 0。</p>
+          <p><a href="answer-bank.html">HTML 回答库</a> · <a href="../StudyHub_4B_AReaL_Agentic_RL_Experiment_Report.html">4B AReaL 实验总报告</a></p>
         </footer>
       </div>
     </main>

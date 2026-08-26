@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light">
+  <title>Incident · Merged Checkpoint Processor Assets</title>
+  <style>
+    :root{--ink:#15372f;--muted:#63736c;--paper:#f3f0e6;--green:#2f7d61;--gold:#d5a72f;--rust:#b95f3d;--line:rgba(21,55,47,.18);--serif:"Iowan Old Style","Noto Serif SC",Georgia,serif;--sans:"IBM Plex Sans","Noto Sans SC",sans-serif;--mono:"IBM Plex Mono",Consolas,monospace}*{box-sizing:border-box}body{margin:0;color:var(--ink);background:repeating-linear-gradient(0deg,rgba(21,55,47,.024) 0 1px,transparent 1px 28px),var(--paper);font-family:var(--sans);line-height:1.72}a{color:inherit}code,pre{font-family:var(--mono)}code{padding:.1rem .3rem;background:rgba(47,125,97,.09);border-radius:.25rem;font-size:.86em;overflow-wrap:anywhere}.rail{height:6px;background:linear-gradient(90deg,var(--rust) 0 26%,var(--gold) 26% 52%,var(--green) 52%)}header{position:relative;padding:4.8rem max(1.2rem,calc((100vw - 1080px)/2)) 4rem;overflow:hidden;color:#eef3e9;background:radial-gradient(circle at 84% 18%,rgba(213,167,47,.24),transparent 25%),linear-gradient(145deg,#173f34,#102c26 74%)}header:after{content:"0→128";position:absolute;right:max(0rem,calc((100vw - 1080px)/2));bottom:-2rem;color:rgba(255,255,255,.04);font-family:var(--serif);font-size:clamp(8rem,18vw,15rem);font-weight:900}.back,.kicker,h1,.lead,.facts{position:relative;z-index:1}.back{display:inline-block;margin-bottom:2.5rem;color:rgba(255,255,255,.58);font-size:.72rem;text-decoration:none}.kicker{color:var(--gold);font-size:.65rem;font-weight:800;letter-spacing:.16em}h1{max-width:850px;margin:1rem 0;font-family:var(--serif);font-size:clamp(3rem,7vw,6.4rem);line-height:.94;letter-spacing:-.05em}.lead{max-width:760px;color:rgba(255,255,255,.66);font-family:var(--serif);font-size:1.15rem}.facts{display:grid;grid-template-columns:repeat(4,1fr);max-width:820px;margin-top:2.5rem;border-block:1px solid rgba(255,255,255,.17)}.fact{padding:1rem}.fact+.fact{border-left:1px solid rgba(255,255,255,.17)}.fact b{display:block;font-family:var(--serif);font-size:1.5rem}.fact span{color:rgba(255,255,255,.45);font-size:.59rem;letter-spacing:.08em}.wrap{width:min(1080px,calc(100% - 2.4rem));margin:3.5rem auto 6rem}.summary{padding:1.3rem 1.5rem;background:rgba(255,255,255,.52);border:1px solid rgba(21,55,47,.1);border-left:6px solid var(--gold);box-shadow:0 18px 45px rgba(21,55,47,.08)}h2{margin:4rem 0 1rem;padding-top:1rem;border-top:3px solid var(--ink);font-family:var(--serif);font-size:clamp(2rem,4vw,2.8rem)}h3{margin:.2rem 0;font-family:var(--serif)}p{margin:.6rem 0}.timeline{display:grid;gap:1rem}.step{display:grid;grid-template-columns:70px 1fr;gap:1rem;padding:1rem;background:rgba(255,255,255,.4);border:1px solid rgba(21,55,47,.1)}.step b{display:grid;place-items:center;width:56px;height:56px;color:white;background:var(--green);border-radius:50%;font-family:var(--mono);font-size:.7rem}.step.fail b{background:var(--rust)}table{width:100%;border-collapse:collapse;font-size:.78rem}th{padding:.75rem;color:white;background:var(--ink);text-align:left}td{padding:.75rem;border-bottom:1px solid var(--line);vertical-align:top}.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:1rem}.card{padding:1rem 1.1rem;background:rgba(255,255,255,.42);border-left:4px solid var(--green);font-size:.8rem}.answers{display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-top:3rem}.answer{padding:1.2rem;color:#eef3e9;background:var(--ink);border-top:4px solid var(--gold);font-size:.8rem}.answer b{display:block;margin-bottom:.5rem;color:var(--gold);font-family:var(--serif);font-size:1.2rem}.boundary{margin-top:1.3rem;padding:1rem 1.2rem;background:rgba(185,95,61,.08);border-left:5px solid var(--rust);font-size:.8rem}footer{margin-top:4rem;padding-top:1rem;color:var(--muted);border-top:1px solid var(--line);font-size:.68rem}@media(max-width:700px){.facts,.grid,.answers{grid-template-columns:1fr}.fact+.fact{border-left:0;border-top:1px solid rgba(255,255,255,.14)}.step{grid-template-columns:50px 1fr}.step b{width:44px;height:44px}}@media print{header{padding:2rem}.back{display:none}.wrap{width:auto;margin:1rem 2rem}}
+  </style>
+</head>
+<body>
+  <div class="rail"></div>
+  <header>
+    <a class="back" href="../index.html#incidents">← 返回面试知识档案</a>
+    <div class="kicker">A_REAL_REPRODUCED · NATURAL · CHECKPOINT RELOAD</div>
+    <h1>Merged Checkpoint<br>缺少 Processor Assets</h1>
+    <p class="lead">25-step Direct RL Pilot 已完整结束，模型 merge 也没有报错，但确定性 Eval 在第一条 rollout 前失败。根因不是权重，而是 Qwen3.5 processor 配置没有随 checkpoint 保存。</p>
+    <div class="facts"><div class="fact"><b>25 / 25</b><span>PILOT UPDATES PRESERVED</span></div><div class="fact"><b>0</b><span>FAILED-EVAL ROLLOUTS</span></div><div class="fact"><b>2</b><span>PROCESSOR ASSETS RESTORED</span></div><div class="fact"><b>128 / 128</b><span>EXACT REPLAY AFTER FIX</span></div></div>
+  </header>
+  <main class="wrap">
+    <div class="summary"><b>30 秒结论。</b> LoRA merge 只验证了 model/tokenizer 可保存，没有验证完整的 <code>AutoProcessor.from_pretrained()</code> reload 契约。Eval 以 exit 1 在 rollout 前失败，因此没有污染结果；修复 merge 脚本保存 image/video processor 配置后，同一 Direct RL checkpoint 完成 128 条确定性 Eval，并在第二次运行中 128/128 精确一致。</div>
+    <h2>时间线</h2>
+    <div class="timeline">
+      <section class="step"><b>P25</b><div><h3>Direct RL Pilot 正常完成</h3><p><code>direct-pilot-seed-7406-20260826_193153</code> 完成 25 次更新、800 rollout、200 个完整 group；final LoRA hash 已固化。</p></div></section>
+      <section class="step fail"><b>E0</b><div><h3>Eval 在模型加载阶段退出</h3><p><code>direct-pilot-7406-eval-seed-7301-20260826_223913</code> exit=1，0 rollout、0 model update。<code>AutoProcessor</code> 找不到 processor 配置。</p></div></section>
+      <section class="step"><b>FIX</b><div><h3>补齐保存契约，而非重训</h3><p>merge 脚本保存完整 processor assets，并增加 reload 回归；修复 commit 为 <code>21f102c</code>。</p></div></section>
+      <section class="step"><b>R128</b><div><h3>同一权重完成确定性复现</h3><p>修复后的 merged model 能加载为 <code>Qwen3VLProcessor</code>；两次 Eval 的 32/32 task 和 128/128 stable rollout fields 完全一致。</p></div></section>
+    </div>
+    <h2>竞争假设</h2>
+    <table><thead><tr><th>假设</th><th>检查</th><th>结论</th></tr></thead><tbody>
+      <tr><td>RL checkpoint 损坏</td><td>adapter 文件存在、大小与 SHA 正常，25 次更新证据完整</td><td>排除</td></tr>
+      <tr><td>Eval 改变了模型</td><td>失败发生在 rollout 前；没有 optimizer step</td><td>排除</td></tr>
+      <tr><td>Tokenizer 缺失</td><td>tokenizer 可加载，但 AutoProcessor 失败</td><td>排除</td></tr>
+      <tr><td>Merge 契约不完整</td><td>缺少 processor-specific config，补齐后原 checkpoint 可加载</td><td><b>确认</b></td></tr>
+    </tbody></table>
+    <h2>修复与防回归</h2>
+    <div class="grid"><div class="card"><b>保存完整 Processor</b><p>不再假设 tokenizer 文件足够；从 Base/SFT lineage 复制并由 Transformers 正式 save API 写入。</p></div><div class="card"><b>Merge 后立即 Reload</b><p>将 <code>AutoProcessor.from_pretrained()</code> 作为 checkpoint 完成条件，而不是等 Eval 才发现。</p></div><div class="card"><b>失败运行保留</b><p>exit reason、GPU peak、0 rollout 和 parent checkpoint 均保留，避免把失败重跑覆盖掉。</p></div><div class="card"><b>权重无需重训</b><p>修复只改变 packaging，不改变 LoRA 或 merged weights，保证前后评测仍对应同一策略。</p></div></div>
+    <div class="answers"><div class="answer"><b>60 秒回答</b>这次问题说明 checkpoint 可用性不等于 safetensors 存在。对 Qwen3.5 这类 processor-aware 模型，merge artifact 必须同时满足 model、tokenizer、processor 和 chat template 的 reload contract。我用 0-rollout 失败证明问题位于加载层，补齐资产后再用 128/128 精确重放证明修复没有改变策略。</div><div class="answer"><b>3 分钟追问</b>继续展开可讲 artifact completeness、checkpoint lineage、为什么失败 Eval 没有污染主结果、lr=0 eval 的 LoRA hash、volatile/stable field 区分，以及为何不通过手工伪造 config 绕过 Transformers loader。</div></div>
+    <div class="boundary"><b>边界：</b>这是 A 级自然工程事故，证明本项目的 merged checkpoint reload 与 Eval 可复现；它不证明跨 Transformers 版本或另一台机器的二进制完全一致。</div>
+    <footer>关联代码：<code>scripts/train/merge_sft_lora.py</code> · <code>tests/unit/training/test_merge_sft_lora.py</code> · <a href="../answer-bank.html">HTML 面试回答库</a></footer>
+  </main>
+</body>
+</html>

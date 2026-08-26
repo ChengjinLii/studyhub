@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light">
+  <title>Controlled Case · Empty Final Reward Shortcut</title>
+  <style>
+    :root{--ink:#15372f;--muted:#63736c;--paper:#f3f0e6;--green:#2f7d61;--gold:#d5a72f;--rust:#b95f3d;--line:rgba(21,55,47,.18);--serif:"Iowan Old Style","Noto Serif SC",Georgia,serif;--sans:"IBM Plex Sans","Noto Sans SC",sans-serif;--mono:"IBM Plex Mono",Consolas,monospace}*{box-sizing:border-box}body{margin:0;color:var(--ink);background:repeating-linear-gradient(0deg,rgba(21,55,47,.024) 0 1px,transparent 1px 28px),var(--paper);font-family:var(--sans);line-height:1.72}a{color:inherit}code,pre{font-family:var(--mono)}code{padding:.1rem .3rem;background:rgba(47,125,97,.09);border-radius:.25rem;font-size:.86em}.rail{height:6px;background:linear-gradient(90deg,var(--rust) 0 54%,var(--gold) 54% 76%,var(--green) 76%)}header{position:relative;padding:4.8rem max(1.2rem,calc((100vw - 1080px)/2)) 4rem;overflow:hidden;color:#eef3e9;background:radial-gradient(circle at 84% 18%,rgba(185,95,61,.25),transparent 26%),linear-gradient(145deg,#173f34,#102c26 74%)}header:after{content:"≤0";position:absolute;right:max(0rem,calc((100vw - 1080px)/2));bottom:-3rem;color:rgba(255,255,255,.04);font-family:var(--serif);font-size:clamp(10rem,21vw,17rem);font-weight:900}.back,.kicker,h1,.lead,.facts{position:relative;z-index:1}.back{display:inline-block;margin-bottom:2.5rem;color:rgba(255,255,255,.58);font-size:.72rem;text-decoration:none}.kicker{color:#efb093;font-size:.65rem;font-weight:800;letter-spacing:.16em}h1{max-width:850px;margin:1rem 0;font-family:var(--serif);font-size:clamp(3rem,7vw,6.4rem);line-height:.94;letter-spacing:-.05em}.lead{max-width:760px;color:rgba(255,255,255,.66);font-family:var(--serif);font-size:1.15rem}.facts{display:grid;grid-template-columns:repeat(4,1fr);max-width:850px;margin-top:2.5rem;border-block:1px solid rgba(255,255,255,.17)}.fact{padding:1rem}.fact+.fact{border-left:1px solid rgba(255,255,255,.17)}.fact b{display:block;font-family:var(--serif);font-size:1.45rem}.fact span{color:rgba(255,255,255,.45);font-size:.59rem;letter-spacing:.08em}.wrap{width:min(1080px,calc(100% - 2.4rem));margin:3.5rem auto 6rem}.notice{padding:1rem 1.2rem;color:#6d301f;background:rgba(185,95,61,.12);border:1px solid rgba(185,95,61,.25);font-weight:700}.summary{margin-top:1rem;padding:1.3rem 1.5rem;background:rgba(255,255,255,.52);border-left:6px solid var(--rust);box-shadow:0 18px 45px rgba(21,55,47,.08)}h2{margin:4rem 0 1rem;padding-top:1rem;border-top:3px solid var(--ink);font-family:var(--serif);font-size:clamp(2rem,4vw,2.8rem)}p{margin:.6rem 0}.formula{padding:1.1rem 1.3rem;color:#eef3e9;background:#123a30;border-left:5px solid var(--gold);font-family:var(--mono);font-size:.78rem;overflow:auto}.compare{display:grid;grid-template-columns:1fr 70px 1fr;gap:1rem;align-items:center}.box{padding:1.2rem;background:rgba(255,255,255,.45);border-top:5px solid var(--rust)}.box.fixed{border-color:var(--green)}.arrow{text-align:center;color:var(--gold);font-size:2rem}.box h3{margin:0 0 .5rem;font-family:var(--serif)}table{width:100%;border-collapse:collapse;font-size:.78rem}th{padding:.75rem;color:white;background:var(--ink);text-align:left}td{padding:.75rem;border-bottom:1px solid var(--line);vertical-align:top}.answers{display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-top:3rem}.answer{padding:1.2rem;color:#eef3e9;background:var(--ink);border-top:4px solid var(--gold);font-size:.8rem}.answer b{display:block;margin-bottom:.5rem;color:var(--gold);font-family:var(--serif);font-size:1.2rem}.boundary{margin-top:1.3rem;padding:1rem 1.2rem;background:rgba(213,167,47,.13);border-left:5px solid var(--gold);font-size:.8rem}footer{margin-top:4rem;padding-top:1rem;color:var(--muted);border-top:1px solid var(--line);font-size:.68rem}@media(max-width:700px){.facts,.answers{grid-template-columns:1fr}.fact+.fact{border-left:0;border-top:1px solid rgba(255,255,255,.14)}.compare{grid-template-columns:1fr}.arrow{transform:rotate(90deg)}}@media print{header{padding:2rem}.back{display:none}.wrap{width:auto;margin:1rem 2rem}}
+  </style>
+</head>
+<body>
+  <div class="rail"></div>
+  <header>
+    <a class="back" href="../index.html#incidents">← 返回面试知识档案</a>
+    <div class="kicker">B_CONTROLLED_PROJECT · REWARD REGRESSION · NOT A NATURAL INCIDENT</div>
+    <h1>Correct Tool Call,<br>Empty Final Answer</h1>
+    <p class="lead">一个函数调用可以完全正确，但模型不向用户给出最终答案。若 Reward 只看 Call，它会把“做到一半”当成高质量策略。</p>
+    <div class="facts"><div class="fact"><b>1.0</b><span>FUNCTION CALL QUALITY</span></div><div class="fact"><b>-1.0</b><span>EMPTY ANSWER QUALITY</span></div><div class="fact"><b>0.4</b><span>FIXED TASK SUCCESS</span></div><div class="fact"><b>≤ 0</b><span>FINAL TOTAL CONTRACT</span></div></div>
+  </header>
+  <main class="wrap">
+    <div class="notice">真实性声明：这是隔离单元测试中的受控漏洞样例，用于验证 Reward 可利用面；没有声称正式 Pilot 中模型曾大规模利用该 shortcut。</div>
+    <div class="summary"><b>30 秒结论。</b>旧 Function Calling 分支计算了 answer score，却没有把它用于 task success；正确 call、空 Final 仍可能获得约 0.8。修复后 function task success 使用 70% call + 30% answer，空 Final 触发违规与非正总分，并由独立 strict evaluator 再检查 nonempty final。</div>
+    <h2>漏洞结构</h2>
+    <div class="compare"><div class="box"><h3>旧行为</h3><p>Call 正确 → function score=1<br>Evidence/citation 固定为 1<br>空 Final 只做较小软扣分</p><div class="formula">R ≈ 0.4 + 0.25 + 0.15 + 0.15 − 0.15 = 0.80</div></div><div class="arrow">→</div><div class="box fixed"><h3>修复后</h3><p>Call 与 Answer 共同决定 task success<br>empty_final_answer 进入 violations<br>总分被封顶到非正</p><div class="formula">R_task = 0.70 R_call + 0.30 R_answer<br>empty final ⇒ total ≤ 0</div></div></div>
+    <h2>为什么属于 Reward hacking 风险</h2>
+    <table><thead><tr><th>设计意图</th><th>可被优化的代理目标</th><th>风险</th></tr></thead><tbody>
+      <tr><td>完成工具任务并向用户回答</td><td>只把隐藏 expected call 调对</td><td>模型学会提前停止</td></tr>
+      <tr><td>使用 Observation 形成结论</td><td>调用工具后不消费结果</td><td>离线 call metric 好看，实际无用</td></tr>
+      <tr><td>总 Reward 代表完整成功</td><td>辅助 component 累加超过失败惩罚</td><td>Reward 与 strict Eval 背离</td></tr>
+    </tbody></table>
+    <h2>修复与验证</h2>
+    <table><thead><tr><th>保护层</th><th>实现</th><th>防止什么</th></tr></thead><tbody>
+      <tr><td>Task success</td><td>70% function call + 30% answer</td><td>正确 Call 掩盖空答案</td></tr>
+      <tr><td>Violation</td><td><code>empty_final_answer</code></td><td>错误只存在于隐式分数</td></tr>
+      <tr><td>Reward cap</td><td>空答案 total≤0</td><td>辅助 component 堆出正奖励</td></tr>
+      <tr><td>独立 Eval</td><td>Strict 首先要求 nonempty final</td><td>Reward 与 evaluator 共享同一 shortcut</td></tr>
+      <tr><td>Regression</td><td><code>test_function_reward_requires_a_final_answer</code></td><td>后续改权重时漏洞回归</td></tr>
+    </tbody></table>
+    <div class="answers"><div class="answer"><b>60 秒回答</b>Reward hacking 不一定是模型输出奇怪字符，更常见的是它找到组合权重的捷径。这例中工具调用是局部正确，但用户任务没有闭环。修复不能只加一个小 penalty，而要把 Final 纳入 task success，并用 hard contract 和独立 strict evaluator 双重约束。</div><div class="answer"><b>3 分钟追问</b>继续展开可讲 component weight calibration、为何 hard gate 只用于不可接受行为、parser FP/FN、counterfactual test、Reward 上升但 holdout 下降的监控，以及为什么该案例只能标 B，不能说是自然训练事故。</div></div>
+    <div class="boundary"><b>边界：</b>本案例证明代码层 shortcut 已被封住，不证明 Reward v2 没有其他可利用面。正式训练仍需持续检查 Reward、strict success、family slice 与代表轨迹是否一致。</div>
+    <footer>关联代码：<code>training/rl/reward_v2.py</code> · <code>tests/unit/training/test_open_rl.py</code> · <a href="../answer-bank.html">HTML 面试回答库</a></footer>
+  </main>
+</body>
+</html>
