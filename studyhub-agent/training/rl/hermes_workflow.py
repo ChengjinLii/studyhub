@@ -134,6 +134,7 @@ class ContextBudgetTelemetry:
     max_sent_prompt_tokens: int = 0
     forced_final_count: int = 0
     forced_final_reasons: list[str] = field(default_factory=list)
+    finalization_thinking_disabled: bool = False
     compacted_tool_messages: int = 0
     compacted_tool_chars: int = 0
     dropped_tool_exchanges: int = 0
@@ -151,6 +152,7 @@ class ContextBudgetTelemetry:
             "forced_final": self.forced_final_count > 0,
             "forced_final_count": self.forced_final_count,
             "forced_final_reasons": list(self.forced_final_reasons),
+            "finalization_thinking_disabled": self.finalization_thinking_disabled,
             "compacted_tool_messages": self.compacted_tool_messages,
             "compacted_tool_chars": self.compacted_tool_chars,
             "dropped_tool_exchanges": self.dropped_tool_exchanges,
@@ -236,6 +238,17 @@ class ContextBudgetController:
             api_kwargs.pop("tools", None)
             api_kwargs.pop("tool_choice", None)
             api_kwargs.pop("parallel_tool_calls", None)
+            # Do not spend the final-answer reserve in an unclosed think block.
+            extra_body = api_kwargs.get("extra_body")
+            if not isinstance(extra_body, dict):
+                extra_body = {}
+                api_kwargs["extra_body"] = extra_body
+            chat_template_kwargs = extra_body.get("chat_template_kwargs")
+            if not isinstance(chat_template_kwargs, dict):
+                chat_template_kwargs = {}
+                extra_body["chat_template_kwargs"] = chat_template_kwargs
+            chat_template_kwargs["enable_thinking"] = False
+            self.telemetry.finalization_thinking_disabled = True
             messages = api_kwargs["messages"]
             _append_context_finalization_guidance(messages)
             target = (
@@ -455,7 +468,7 @@ class StudyHubHermesWorkflow:
         tokenizer_path: str = "",
         engine_max_tokens: int = 4096,
         context_finalization_ratio: float = 0.80,
-        context_safety_margin_tokens: int = 256,
+        context_safety_margin_tokens: int = 768,
         temperature: float = 1.0,
         top_p: float = 1.0,
         **_: Any,

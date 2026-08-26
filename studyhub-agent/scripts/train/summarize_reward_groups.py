@@ -55,6 +55,7 @@ def _runtime_summary(rows: list[dict[str, Any]]) -> dict[str, Any]:
     forced_final_reasons: Counter[str] = Counter()
     halts = 0
     forced_finals = compacted_rollouts = dropped_exchange_rollouts = 0
+    finalization_thinking_disabled = 0
     compacted_tool_messages = compacted_tool_chars = 0
     counter_failures = guard_failures = 0
     for row in rows:
@@ -78,6 +79,9 @@ def _runtime_summary(rows: list[dict[str, Any]]) -> dict[str, Any]:
                 if isinstance(value, (int, float)) and not isinstance(value, bool):
                     values[field].append(float(value))
             forced_finals += int(bool(context.get("forced_final")))
+            finalization_thinking_disabled += int(
+                bool(context.get("finalization_thinking_disabled"))
+            )
             forced_final_reasons.update(
                 map(str, context.get("forced_final_reasons", []))
             )
@@ -104,6 +108,9 @@ def _runtime_summary(rows: list[dict[str, Any]]) -> dict[str, Any]:
             "forced_final_rollouts": forced_finals,
             "forced_final_rate": _rate(forced_finals, len(rows)),
             "forced_final_reasons": dict(sorted(forced_final_reasons.items())),
+            "finalization_thinking_disabled_rollouts": (
+                finalization_thinking_disabled
+            ),
             "compacted_rollouts": compacted_rollouts,
             "compacted_rollout_rate": _rate(compacted_rollouts, len(rows)),
             "compacted_tool_messages": compacted_tool_messages,

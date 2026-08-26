@@ -32,6 +32,7 @@ def test_reward_summary_reports_group_variance_and_quality_rates(tmp_path) -> No
                             "max_pre_guard_prompt_tokens": 1200 + 100 * index,
                             "max_sent_prompt_tokens": 1100 + 100 * index,
                             "forced_final": index == 3,
+                            "finalization_thinking_disabled": index == 3,
                             "forced_final_reasons": (
                                 ["context_threshold"] if index == 3 else []
                             ),
@@ -98,6 +99,7 @@ def test_reward_summary_reports_group_variance_and_quality_rates(tmp_path) -> No
             "forced_final_rollouts": 1,
             "forced_final_rate": 0.25,
             "forced_final_reasons": {"context_threshold": 1},
+            "finalization_thinking_disabled_rollouts": 1,
             "compacted_rollouts": 1,
             "compacted_rollout_rate": 0.25,
             "compacted_tool_messages": 1,

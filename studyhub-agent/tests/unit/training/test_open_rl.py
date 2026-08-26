@@ -99,7 +99,7 @@ def test_grpo_config_caps_exported_interactions_at_microbatch_capacity() -> None
     assert config.rollout.agent.chat_template_type == "hf"
     assert config.rollout.agent.export_style == "individual"
     assert config.context_finalization_ratio == CONTEXT_FINALIZATION_RATIO == 0.80
-    assert config.context_safety_margin_tokens == CONTEXT_SAFETY_MARGIN_TOKENS == 256
+    assert config.context_safety_margin_tokens == CONTEXT_SAFETY_MARGIN_TOKENS == 768
 
 
 def test_eval_launcher_enforces_deterministic_non_updating_protocol() -> None:
@@ -241,10 +241,12 @@ def test_context_budget_guard_forces_a_final_turn_before_engine_limit(monkeypatc
     kwargs = agent._build_api_kwargs(messages)
 
     assert "tools" not in kwargs
+    assert kwargs["extra_body"]["chat_template_kwargs"]["enable_thinking"] is False
     assert CONTEXT_FINALIZATION_GUIDANCE in kwargs["messages"][-1]["content"]
     assert kwargs["max_tokens"] <= 4096 - fake_count(None, kwargs)
     assert controller.telemetry.forced_final_count == 1
     assert controller.telemetry.forced_final_reasons == ["context_threshold"]
+    assert controller.telemetry.finalization_thinking_disabled is True
     assert controller.telemetry.max_sent_prompt_tokens < 4096
     assert runtime_errors == []
 
