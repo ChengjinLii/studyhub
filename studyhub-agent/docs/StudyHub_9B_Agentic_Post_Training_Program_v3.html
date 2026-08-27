@@ -1,0 +1,456 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="StudyHub Agent 9B Agentic Post-Training v3：Benchmark、数据、Reward、训练与双 H100 执行方案">
+  <title>StudyHub 9B Agentic Post-Training v3</title>
+  <style>
+    :root {
+      --paper: #f3f0e7;
+      --paper-hi: #fbf9f2;
+      --ink: #14231d;
+      --muted: #65716b;
+      --line: #c9cbc1;
+      --green: #2f7d62;
+      --green-deep: #1d5643;
+      --green-pale: #dce9e1;
+      --gold: #d3a73c;
+      --gold-pale: #f1e5bd;
+      --rust: #994d39;
+      --rust-pale: #eeddd6;
+      --blue: #3f6d78;
+      --shadow: rgba(20, 35, 29, 0.11);
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      color: var(--ink);
+      background:
+        linear-gradient(rgba(47, 125, 98, 0.045) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(47, 125, 98, 0.045) 1px, transparent 1px),
+        radial-gradient(circle at 14% 8%, rgba(211, 167, 60, 0.12), transparent 28%),
+        var(--paper);
+      background-size: 32px 32px, 32px 32px, auto, auto;
+      font-family: "IBM Plex Sans", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif;
+      line-height: 1.68;
+    }
+
+    a { color: inherit; text-decoration-color: var(--green); text-underline-offset: 4px; }
+    code, .mono { font-family: "IBM Plex Mono", "Cascadia Mono", monospace; }
+    code { font-size: 0.9em; }
+    .page { width: min(1200px, calc(100% - 48px)); margin: 0 auto; padding-bottom: 82px; }
+
+    .hero {
+      min-height: 88vh;
+      display: grid;
+      grid-template-columns: minmax(0, 1.2fr) minmax(320px, 0.8fr);
+      gap: 72px;
+      align-items: center;
+      border-bottom: 1px solid var(--ink);
+      position: relative;
+    }
+    .hero::before {
+      content: "STUDYHUB / PROGRAM 03";
+      position: absolute;
+      top: 28px;
+      left: 0;
+      color: var(--green);
+      font: 700 11px/1 "IBM Plex Mono", monospace;
+      letter-spacing: 0.2em;
+    }
+    .hero h1 {
+      margin: 0 0 28px;
+      font-family: "Source Han Serif SC", "Noto Serif CJK SC", STSong, serif;
+      font-size: clamp(54px, 8vw, 112px);
+      font-weight: 600;
+      letter-spacing: -0.065em;
+      line-height: 0.88;
+    }
+    .hero h1 span { color: var(--green); }
+    .hero .lead { max-width: 760px; margin: 0; color: #394840; font-size: clamp(17px, 2vw, 23px); }
+    .status-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 30px; }
+    .pill {
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 6px 11px;
+      background: rgba(251, 249, 242, 0.62);
+      color: var(--muted);
+      font: 700 11px/1.2 "IBM Plex Mono", monospace;
+      letter-spacing: 0.04em;
+    }
+    .pill.green { border-color: var(--green); color: var(--green-deep); background: var(--green-pale); }
+    .pill.gold { border-color: var(--gold); color: #715612; background: var(--gold-pale); }
+    .pill.rust { border-color: var(--rust); color: var(--rust); background: var(--rust-pale); }
+
+    .hero-card {
+      background: var(--ink);
+      color: var(--paper-hi);
+      padding: 34px;
+      box-shadow: 18px 18px 0 rgba(47, 125, 98, 0.18);
+      position: relative;
+    }
+    .hero-card::after { content: ""; position: absolute; inset: 9px; border: 1px solid rgba(251, 249, 242, 0.18); pointer-events: none; }
+    .hero-card .eyebrow { color: var(--gold); font: 700 11px/1 "IBM Plex Mono", monospace; letter-spacing: 0.18em; }
+    .hero-card strong { display: block; margin: 18px 0 22px; font: 500 clamp(27px, 3vw, 42px)/1.12 "Source Han Serif SC", STSong, serif; }
+    .sequence { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+    .sequence li { display: grid; grid-template-columns: 22px 1fr; gap: 10px; color: #cad5cf; font-size: 14px; }
+    .sequence b { color: var(--gold); font: 700 11px/1.6 "IBM Plex Mono", monospace; }
+
+    .nav {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      display: flex;
+      gap: 4px;
+      overflow-x: auto;
+      padding: 10px 0;
+      background: rgba(243, 240, 231, 0.94);
+      border-bottom: 1px solid var(--line);
+      backdrop-filter: blur(12px);
+    }
+    .nav a { white-space: nowrap; padding: 7px 12px; text-decoration: none; color: var(--muted); font: 700 11px/1 "IBM Plex Mono", monospace; }
+    .nav a:hover { background: var(--green-pale); color: var(--green-deep); }
+
+    section { padding: 78px 0; border-bottom: 1px solid var(--line); }
+    .section-head { display: grid; grid-template-columns: 110px minmax(0, 1fr); gap: 28px; margin-bottom: 42px; }
+    .section-no { color: var(--green); font: 700 12px/1.4 "IBM Plex Mono", monospace; letter-spacing: 0.13em; }
+    h2 { margin: 0 0 10px; font: 600 clamp(31px, 4vw, 53px)/1.05 "Source Han Serif SC", "Noto Serif CJK SC", STSong, serif; letter-spacing: -0.035em; }
+    h3 { margin: 0 0 10px; font-size: 18px; line-height: 1.35; }
+    p { margin: 0; }
+    .note { max-width: 820px; color: var(--muted); }
+
+    .decision {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      border: 1px solid var(--ink);
+      background: var(--paper-hi);
+      box-shadow: 10px 10px 0 var(--green-pale);
+    }
+    .decision > div { padding: 30px; }
+    .decision > div + div { border-left: 1px solid var(--ink); }
+    .decision .old { color: var(--muted); }
+    .decision .new { background: linear-gradient(145deg, rgba(220, 233, 225, 0.7), transparent); }
+    .decision ul { margin: 16px 0 0; padding-left: 18px; }
+
+    .architecture { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+    .arch-card { min-height: 170px; padding: 22px; border-top: 5px solid var(--green); background: var(--paper-hi); box-shadow: 0 8px 24px var(--shadow); }
+    .arch-card:nth-child(2) { border-color: var(--gold); }
+    .arch-card:nth-child(3) { border-color: var(--blue); }
+    .arch-card:nth-child(4) { border-color: var(--rust); }
+    .arch-card .label { display: block; margin-bottom: 22px; color: var(--muted); font: 700 11px/1 "IBM Plex Mono", monospace; letter-spacing: 0.14em; }
+
+    .metric-strip { display: grid; grid-template-columns: repeat(5, 1fr); border: 1px solid var(--ink); background: var(--ink); gap: 1px; }
+    .metric-strip article { padding: 22px 18px; background: var(--paper-hi); }
+    .metric-strip b { display: block; color: var(--green-deep); font: 600 34px/1 "Source Han Serif SC", STSong, serif; }
+    .metric-strip span { display: block; margin-top: 8px; color: var(--muted); font-size: 12px; }
+
+    .cap-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-top: 26px; }
+    .cap { min-height: 112px; padding: 16px; border: 1px solid var(--line); background: rgba(251, 249, 242, 0.72); }
+    .cap b { display: block; margin-bottom: 11px; font-size: 14px; }
+    .cap small { color: var(--muted); }
+    .state { display: inline-block; margin-top: 12px; padding: 3px 7px; background: var(--green-pale); color: var(--green-deep); font: 700 9px/1 "IBM Plex Mono", monospace; }
+    .state.undefined { background: var(--rust-pale); color: var(--rust); }
+
+    .table-wrap { overflow-x: auto; border: 1px solid var(--line); background: var(--paper-hi); }
+    table { width: 100%; border-collapse: collapse; min-width: 720px; }
+    th, td { padding: 15px 17px; text-align: left; vertical-align: top; border-bottom: 1px solid var(--line); }
+    th { color: var(--green-deep); background: var(--green-pale); font: 700 11px/1.3 "IBM Plex Mono", monospace; letter-spacing: 0.07em; }
+    tr:last-child td { border-bottom: 0; }
+    td strong { white-space: nowrap; }
+
+    .flow { display: grid; grid-template-columns: repeat(5, 1fr); gap: 26px; margin-top: 34px; }
+    .flow article { position: relative; padding: 19px; background: var(--paper-hi); border: 1px solid var(--line); }
+    .flow article:not(:last-child)::after { content: "→"; position: absolute; right: -22px; top: 50%; color: var(--green); font-weight: 800; }
+    .flow em { display: block; margin-bottom: 12px; color: var(--gold); font: normal 700 11px/1 "IBM Plex Mono", monospace; }
+    .flow small { color: var(--muted); }
+
+    .split { display: grid; grid-template-columns: 1.08fr 0.92fr; gap: 22px; }
+    .panel { padding: 26px; background: var(--paper-hi); border: 1px solid var(--line); }
+    .panel.green { background: var(--green-pale); border-color: var(--green); }
+    .panel.gold { background: var(--gold-pale); border-color: var(--gold); }
+    .big-number { display: block; margin: 14px 0; color: var(--green-deep); font: 600 clamp(48px, 7vw, 82px)/0.95 "Source Han Serif SC", STSong, serif; letter-spacing: -0.05em; }
+    .formula { margin-top: 22px; padding: 17px; background: var(--ink); color: #dbe5df; font: 500 13px/1.75 "IBM Plex Mono", monospace; }
+
+    .reward-layers { display: grid; gap: 8px; }
+    .reward-layer { display: grid; grid-template-columns: 92px 220px 1fr; align-items: center; gap: 20px; padding: 19px 22px; border: 1px solid var(--line); background: var(--paper-hi); }
+    .reward-layer .level { color: var(--gold); font: 700 11px/1 "IBM Plex Mono", monospace; }
+    .reward-layer:nth-child(1) { border-left: 7px solid var(--rust); }
+    .reward-layer:nth-child(2) { border-left: 7px solid var(--green); }
+    .reward-layer:nth-child(3) { border-left: 7px solid var(--gold); }
+    .reward-layer:nth-child(4) { border-left: 7px solid var(--blue); }
+    .separation { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 20px; }
+    .separation article { padding: 17px; background: var(--ink); color: var(--paper-hi); }
+    .separation b { display: block; color: var(--gold); margin-bottom: 6px; }
+
+    .timeline { position: relative; margin-left: 28px; padding-left: 36px; border-left: 2px solid var(--green); }
+    .phase { position: relative; display: grid; grid-template-columns: 180px 1fr; gap: 24px; padding: 0 0 30px; }
+    .phase::before { content: ""; position: absolute; left: -44px; top: 4px; width: 14px; height: 14px; border: 3px solid var(--paper); border-radius: 50%; background: var(--green); }
+    .phase .gate { color: var(--green-deep); font: 700 12px/1.5 "IBM Plex Mono", monospace; }
+    .phase small { display: block; margin-top: 6px; color: var(--muted); }
+
+    .infra-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+    .infra { padding: 25px; border: 1px solid var(--ink); background: var(--paper-hi); }
+    .infra.primary { background: var(--green-pale); border-color: var(--green-deep); }
+    .infra.conditional { border-style: dashed; }
+    .infra .letter { display: block; color: var(--green); font: 700 44px/1 "Source Han Serif SC", STSong, serif; }
+    .infra ul { margin: 17px 0 0; padding-left: 18px; color: var(--muted); }
+
+    .research-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+    .research-card { padding: 20px; border: 1px solid var(--line); background: var(--paper-hi); }
+    .research-card .decision-tag { display: inline-block; margin-bottom: 14px; color: var(--green-deep); font: 700 10px/1 "IBM Plex Mono", monospace; }
+    .research-card.defer .decision-tag { color: var(--rust); }
+    .research-card p { color: var(--muted); font-size: 13px; }
+
+    .callout { display: grid; grid-template-columns: 190px 1fr; gap: 24px; padding: 24px; border-left: 7px solid var(--gold); background: var(--gold-pale); }
+    .callout b { font-family: "Source Han Serif SC", STSong, serif; font-size: 20px; }
+    .command { margin-top: 22px; overflow-x: auto; padding: 18px 20px; background: #101d18; color: #d9e4de; font: 500 13px/1.7 "IBM Plex Mono", monospace; }
+
+    footer { display: flex; justify-content: space-between; gap: 20px; padding-top: 34px; color: var(--muted); font-size: 12px; }
+    .reveal { animation: rise 0.62s ease both; }
+    .reveal.delay { animation-delay: 0.12s; }
+    @keyframes rise { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: none; } }
+
+    @media (max-width: 960px) {
+      .hero { grid-template-columns: 1fr; gap: 30px; padding: 110px 0 70px; }
+      .architecture, .cap-grid { grid-template-columns: repeat(2, 1fr); }
+      .metric-strip { grid-template-columns: repeat(2, 1fr); }
+      .flow { grid-template-columns: 1fr; }
+      .flow article:not(:last-child)::after { content: "↓"; right: auto; left: 50%; top: auto; bottom: -24px; }
+      .split { grid-template-columns: 1fr; }
+      .infra-grid, .research-grid { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 640px) {
+      .page { width: min(100% - 26px, 1200px); }
+      .section-head { grid-template-columns: 1fr; gap: 8px; }
+      section { padding: 56px 0; }
+      .decision { grid-template-columns: 1fr; }
+      .decision > div + div { border-left: 0; border-top: 1px solid var(--ink); }
+      .architecture, .cap-grid, .metric-strip, .separation { grid-template-columns: 1fr; }
+      .reward-layer { grid-template-columns: 1fr; gap: 7px; }
+      .phase { grid-template-columns: 1fr; gap: 6px; }
+      .callout { grid-template-columns: 1fr; }
+      #algorithms .table-wrap { overflow: visible; border: 0; background: transparent; }
+      #algorithms table, #algorithms tbody, #algorithms tr, #algorithms td { display: block; width: 100%; min-width: 0; }
+      #algorithms thead { display: none; }
+      #algorithms tr { margin-bottom: 12px; border: 1px solid var(--line); background: var(--paper-hi); }
+      #algorithms td { display: grid; grid-template-columns: 84px minmax(0, 1fr); gap: 12px; padding: 13px 14px; }
+      #algorithms td::before { content: attr(data-label); color: var(--green-deep); font: 700 9px/1.4 "IBM Plex Mono", monospace; letter-spacing: 0.06em; }
+      #algorithms td:last-child { border-bottom: 0; }
+    }
+    @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } .reveal { animation: none; } }
+    @media print { body { background: #fff; } .page { width: 100%; } .nav { display: none; } section { break-inside: avoid; } }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <header class="hero">
+      <div class="reveal">
+        <h1><span>9B</span><br>Agentic<br>Post-Training</h1>
+        <p class="lead">先用独立 Benchmark 定义能力和误差，再构建 Hermes runtime-native 数据，最后执行 9B SFT 与开放路径 GRPO。4B 只保留为历史基础设施证据。</p>
+        <div class="status-row">
+          <span class="pill green">v3 DESIGN FROZEN</span>
+          <span class="pill gold">BENCHMARK FIRST</span>
+          <span class="pill">Qwen3.5-9B</span>
+          <span class="pill">2 × H100 80GB</span>
+          <span class="pill rust">GPU TRAINING NOT STARTED</span>
+        </div>
+      </div>
+      <aside class="hero-card reveal delay">
+        <span class="eyebrow">MAINLINE / NO 4B GATE</span>
+        <strong>能力先于训练，评测独立于 Reward。</strong>
+        <ol class="sequence">
+          <li><b>01</b><span>20 项 Capability Matrix</span></li>
+          <li><b>02</b><span>Benchmark v1 + 9B Base</span></li>
+          <li><b>03</b><span>45k Runtime-native SFT</span></li>
+          <li><b>04</b><span>Reward v3 + 10k RL QA Pool</span></li>
+          <li><b>05</b><span>500-update 9B GRPO Main</span></li>
+          <li><b>06</b><span>Dev + External + Sealed</span></li>
+        </ol>
+      </aside>
+    </header>
+
+    <nav class="nav" aria-label="页面目录">
+      <a href="#decision">方案变化</a>
+      <a href="#architecture">架构边界</a>
+      <a href="#capabilities">能力矩阵</a>
+      <a href="#benchmark">Benchmark</a>
+      <a href="#data">数据</a>
+      <a href="#reward">Reward</a>
+      <a href="#training">9B 训练</a>
+      <a href="#algorithms">算法</a>
+      <a href="#infra">双卡</a>
+      <a href="#research">外部依据</a>
+      <a href="#next">执行入口</a>
+    </nav>
+
+    <section id="decision">
+      <div class="section-head"><span class="section-no">01 / DECISION</span><div><h2>停止复制 v2，重建训练问题</h2><p class="note">v2 已经证明链路能运行，也暴露了 Gold-path Reward、小 Benchmark 和短程环境的边界。v3 保留证据，不继承结论。</p></div></div>
+      <div class="decision">
+        <div class="old"><h3>历史 v2</h3><ul><li>4B 先行并成为事实上的晋级门槛</li><li>3k SFT + 2.4k RL</li><li>32 题同源 Dev</li><li><code>expected_calls</code> / gold source</li><li>全局 6-turn</li><li>静态 GPU0 update / GPU1 rollout</li></ul></div>
+        <div class="new"><h3>当前 v3</h3><ul><li>Benchmark v1 后直接 9B</li><li>90k 候选 → 45k SFT</li><li>160 Regression / 1,005 Dev / 500 Sealed</li><li>目标与终态，路径开放</li><li>3 / 6 / 10 / 20 turn 分层</li><li>双 H100 布局以 time-to-quality 实测选择</li></ul></div>
+      </div>
+    </section>
+
+    <section id="architecture">
+      <div class="section-head"><span class="section-no">02 / BOUNDARY</span><div><h2>冻结四个职责</h2><p class="note">不增加 Router、Planner、Fixed DAG 或第二套 ToolLoop。能力提升必须来自数据、环境、Reward、训练和独立评测，而不是再造编排框架。</p></div></div>
+      <div class="architecture">
+        <article class="arch-card"><span class="label">AGENT LOOP</span><h3>Hermes</h3><p>唯一自主决策与工具交互循环。保留实际 policy space。</p></article>
+        <article class="arch-card"><span class="label">OPTIMIZATION</span><h3>AReaL</h3><p>Rollout、logprob、GRPO、权重更新与发布。</p></article>
+        <article class="arch-card"><span class="label">SERVING</span><h3>SGLang</h3><p>9B 策略推理、并发 rollout 与 LoRA serving。</p></article>
+        <article class="arch-card"><span class="label">DOMAIN</span><h3>StudyHub</h3><p>RAG、Web、Memory、ACL、环境、Reward 与 Eval adapters。</p></article>
+      </div>
+    </section>
+
+    <section id="capabilities">
+      <div class="section-head"><span class="section-no">03 / CAPABILITY</span><div><h2>20 项能力是唯一范围来源</h2><p class="note">当前 v3 只有 Contract 或未定义状态。没有任何能力因“已有工具接口”自动记为 SFT、RL、Dev 或正式 Claim。</p></div></div>
+      <div class="metric-strip">
+        <article><b>20</b><span>能力条目</span></article><article><b>17</b><span>初始设计缺陷</span></article><article><b>0</b><span>v3 已支持 Claim</span></article><article><b>17</b><span>P0 能力</span></article><article><b>3</b><span>P1 能力</span></article>
+      </div>
+      <div class="cap-grid">
+        <article class="cap"><b>Direct / Abstention</b><small>知道何时不用工具、何时拒答或继续找证据。</small><span class="state">CONTRACT</span></article>
+        <article class="cap"><b>Tool Routing</b><small>在 Function、RAG、Web、Memory 中自主选择。</small><span class="state">CONTRACT</span></article>
+        <article class="cap"><b>Function Calling</b><small>合法参数、多路径与可验证终态。</small><span class="state">CONTRACT</span></article>
+        <article class="cap"><b>RAG Search / Read</b><small>冻结 Hybrid RAG、证据效用与停止。</small><span class="state">CONTRACT</span></article>
+        <article class="cap"><b>Query Rewrite</b><small>初搜失败后的改写、回溯与 evidence gain。</small><span class="state">CONTRACT</span></article>
+        <article class="cap"><b>Multi-hop</b><small>跨文档组合，不暴露 oracle evidence。</small><span class="state">CONTRACT</span></article>
+        <article class="cap"><b>Claim Citation</b><small>Claim → Citation → Passage → Support。</small><span class="state">CONTRACT</span></article>
+        <article class="cap"><b>Insufficient Evidence</b><small>校准拒答、不确定性与继续搜索。</small><span class="state">CONTRACT</span></article>
+        <article class="cap"><b>Web Search / Fetch</b><small>新鲜度、来源质量和 replay。</small><span class="state">CONTRACT</span></article>
+        <article class="cap"><b>RAG → Web</b><small>内部证据不足或过期时正确 fallback。</small><span class="state">CONTRACT</span></article>
+        <article class="cap"><b>Personal Memory</b><small>有用、过期、隐私和无关记忆的取舍。</small><span class="state">CONTRACT</span></article>
+        <article class="cap"><b>Collective Memory</b><small>群体规律、置信度、偏差和适用性。</small><span class="state">CONTRACT</span></article>
+        <article class="cap"><b>RAG + Memory</b><small>个体状态与课程证据组合。</small><span class="state">CONTRACT</span></article>
+        <article class="cap"><b>Web + Memory</b><small>当前事实与稳定偏好的冲突处理。</small><span class="state">CONTRACT</span></article>
+        <article class="cap"><b>Permission Recovery</b><small>拒绝访问后安全完成，不探测付费内容。</small><span class="state">CONTRACT</span></article>
+        <article class="cap"><b>Tool Failure Recovery</b><small>Timeout、empty、bad response 与重试。</small><span class="state">CONTRACT</span></article>
+        <article class="cap"><b>Conflict Resolution</b><small>多源冲突、证据强度和不确定性。</small><span class="state undefined">UNDEFINED</span></article>
+        <article class="cap"><b>Long Horizon</b><small>8–20+ actions 的状态保持与防循环。</small><span class="state undefined">UNDEFINED</span></article>
+        <article class="cap"><b>Deep Research</b><small>不靠固定 Graph 的多源综合。</small><span class="state">CONTRACT</span></article>
+        <article class="cap"><b>Stop / Cost</b><small>premature stop、over-search 与单位成功成本。</small><span class="state">CONTRACT</span></article>
+      </div>
+    </section>
+
+    <section id="benchmark">
+      <div class="section-head"><span class="section-no">04 / BENCHMARK</span><div><h2>训练前先冻结导航仪</h2><p class="note">Regression 只负责回归；Dev 负责模型选择和错误分析；Sealed 只负责最终 Claim。External 提供可比性，不替代产品能力。</p></div></div>
+      <div class="table-wrap"><table><thead><tr><th>层级</th><th>规模</th><th>用途</th><th>关键纪律</th></tr></thead><tbody>
+        <tr><td><strong>Regression</strong></td><td>160</td><td>Parser、tool schema、checkpoint、permission/error 回归</td><td>允许 deterministic；不支持能力 Claim</td></tr>
+        <tr><td><strong>StudyHub Dev</strong></td><td>1,005</td><td>20 项能力、难度、horizon、failure、语言切片</td><td>全量 2 rollouts；200 题 × 4 variance panel</td></tr>
+        <tr><td><strong>StudyHub Sealed</strong></td><td>500</td><td>最终产品能力确认</td><td>不参与 Reward、Prompt、threshold 或采样调参</td></tr>
+        <tr><td><strong>External</strong></td><td>官方协议</td><td>BFCL V4、tau3、DeepResearch Bench；BrowseComp 条件执行</td><td>full / subset 明确分开，不冒充官方分数</td></tr>
+      </tbody></table></div>
+      <div class="flow">
+        <article><em>G1-A</em><b>P0 覆盖</b><small>关键能力不再空白。</small></article>
+        <article><em>G1-B</em><b>独立 Grader</b><small>Reward / Dev / Sealed 代码分离。</small></article>
+        <article><em>G1-C</em><b>质量抽检</b><small>120 stratified + 30 double review。</small></article>
+        <article><em>G1-D</em><b>9B Base</b><small>全量 baseline、variance 与 MDE。</small></article>
+        <article><em>G1-E</em><b>Freeze v1</b><small>达到门槛立即开训，不等待完美。</small></article>
+      </div>
+    </section>
+
+    <section id="data">
+      <div class="section-head"><span class="section-no">05 / DATA</span><div><h2>按能力和 token 规划数据</h2><p class="note">开放数据负责规模与行为多样性，StudyHub 数据负责产品相关性。两者都必须转换为实际 Hermes tool_calls / observations / final，并通过 9B tokenizer 统计。</p></div></div>
+      <div class="split">
+        <article class="panel green"><h3>SFT</h3><span class="big-number">90k → 45k</span><p>候选轨迹筛成最终集，目标约 90M tokens。StudyHub 52%，Open 48%；runtime-native multi-turn 不低于 70%。</p><div class="formula">assistant actions + final only<br>tool observations → loss mask = 0<br>source cap ≤ 25%</div></article>
+        <article class="panel"><h3>RL Task</h3><span class="big-number">16k → 10k</span><p>全量静态 QA 后做 9B policy learnability calibration。初始主训练 4k unique，曲线健康再扩到 8k。</p><div class="formula">mixed outcome → GRPO<br>all correct → retention<br>all failed → teacher / curriculum<br>infra failure → retry / exclude</div></article>
+      </div>
+      <div class="table-wrap" style="margin-top:22px"><table><thead><tr><th>SFT 来源</th><th>最终预算</th><th>进入条件</th></tr></thead><tbody>
+        <tr><td>StudyHub RAG / Learning</td><td>9,000</td><td>Hybrid RAG snapshot、课程/错题/解释任务通过</td></tr>
+        <tr><td>StudyHub Web / Fallback</td><td>5,500</td><td>record/replay、来源质量和新鲜度标签通过</td></tr>
+        <tr><td>StudyHub Memory</td><td>5,000</td><td>个人/群体、stale/conflict/privacy 场景通过</td></tr>
+        <tr><td>StudyHub ACL / Recovery / Abstention</td><td>4,000</td><td>权限与失败 ownership 可验证</td></tr>
+        <tr><td>Hermes FC + ToolACE</td><td>12,000</td><td>License、revision、schema/runtime parity 通过</td></tr>
+        <tr><td>OpenResearcher</td><td>6,000 上限</td><td>Teacher、污染、长度、license 审计通过</td></tr>
+        <tr><td>tau / other traces</td><td>3,500</td><td>Provenance、工具身份和转换损失通过</td></tr>
+      </tbody></table></div>
+    </section>
+
+    <section id="reward">
+      <div class="section-head"><span class="section-no">06 / REWARD</span><div><h2>Reward v3 评价结果，不指定路线</h2><p class="note">公开 RL task 不再包含 expected calls、gold query、source order 或 gold trajectory。开放任务的合法动作序列可以发散。</p></div></div>
+      <div class="reward-layers">
+        <article class="reward-layer"><span class="level">LAYER 01</span><b>Hard constraints</b><span>ACL、隐私、安全、未知工具、非法状态。确定性且 fail closed。</span></article>
+        <article class="reward-layer"><span class="level">LAYER 02</span><b>Objective end state</b><span>事务状态、测试结果、明确事实、环境 postcondition。</span></article>
+        <article class="reward-layer"><span class="level">LAYER 03</span><b>Semantic rubric</b><span>正确性、覆盖、grounding、来源质量、冲突和不确定性。</span></article>
+        <article class="reward-layer"><span class="level">LAYER 04</span><b>Process diagnostics</b><span>Evidence gain、recovery、重复搜索、过早结束、成本；不匹配 teacher step。</span></article>
+      </div>
+      <div class="separation">
+        <article><b>TRAIN</b><code>training/rl/reward_v3</code></article>
+        <article><b>DEVELOPMENT</b><code>eval/development_v1</code></article>
+        <article><b>SEALED</b><code>eval/sealed_v1</code></article>
+      </div>
+      <div class="callout" style="margin-top:22px"><b>800-case calibration</b><span>正常、边界、adversarial、reward hacking 和 alternative valid path；跟踪 pairwise accuracy、Spearman/Kendall、FP/FN、family disagreement 与 Reward↔Eval 背离。</span></div>
+    </section>
+
+    <section id="training">
+      <div class="section-head"><span class="section-no">07 / TRAINING</span><div><h2>直接进入 9B 主线</h2><p class="note">Benchmark v1 和 9B Base 完成后开始 SFT。4B 不再承担 Reward、Dataset、Algorithm 或 9B 兼容性的常规预实验。</p></div></div>
+      <div class="timeline">
+        <article class="phase"><span class="gate">G0 · HISTORY</span><div><h3>冻结 v2</h3><p>保留接线、checkpoint、artifact、GPU guard 和真实 incident。</p></div></article>
+        <article class="phase"><span class="gate">G1 · BENCHMARK</span><div><h3>Capability + Benchmark v1</h3><p>完成任务、grader、质量、污染与版本卡。</p></div></article>
+        <article class="phase"><span class="gate">G2 · BASE</span><div><h3>9B Base Eval</h3><p>Dev、variance panel、BFCL、tau3、DeepResearch 与成本切片。</p></div></article>
+        <article class="phase"><span class="gate">G3–G4 · SFT</span><div><h3>45k Runtime-native SFT</h3><p>AReaL LoRA / BF16，assistant-only CE；以 token budget 和 Dev slice 选择 checkpoint。</p><small>LoRA r16/r32 与 target modules 先做 Qwen3.5 + SGLang hot-load compatibility profile，不预设答案。</small></div></article>
+        <article class="phase"><span class="gate">G5 · RL QA</span><div><h3>Reward v3 + Learnability</h3><p>800 条 Reward 校准；10k 任务按 mixed/all-correct/all-failed 分桶。</p></div></article>
+        <article class="phase"><span class="gate">G6 · INFRA</span><div><h3>Dual-H100 Layout</h3><p>A/B 同预算实测，C 仅在异步有明确信息价值时进入。</p></div></article>
+        <article class="phase"><span class="gate">G7 · GRPO</span><div><h3>9B Main RL</h3><p>G=4、500 updates、4k unique tasks；高分叉 G=8 使用独立受控阶段。</p><small>LR 2e-6 起点，范围 1e-6–5e-6；20-turn 安全上限，per-task 3/6/10/20。</small></div></article>
+        <article class="phase"><span class="gate">G8 · CONFIRM</span><div><h3>Independent Confirmation</h3><p>Dev + External 选候选，主要里程碑才运行 Sealed；Claim 回链 artifact。</p></div></article>
+      </div>
+    </section>
+
+    <section id="algorithms">
+      <div class="section-head"><span class="section-no">08 / ALGORITHM</span><div><h2>理论覆盖完整，GPU 只回答真实问题</h2><p class="note">Algorithm Decision Matrix 统一记录目标函数、advantage、critic、KL、group、长程 credit、zero variance、成本和触发条件。当前只放行 GRPO 主基线。</p></div></div>
+      <div class="table-wrap"><table><thead><tr><th>角色</th><th>方法</th><th>何时进入实验</th><th>当前结论</th></tr></thead><tbody>
+        <tr><td data-label="ROLE"><strong>Main baseline</strong></td><td data-label="METHOD">GRPO</td><td data-label="TRIGGER">Benchmark v1、9B Base、SFT、Reward v3 和 learnability QA 全部通过</td><td data-label="DECISION">G=4、500 updates；G=8 作为独立高分叉阶段</td></tr>
+        <tr><td data-label="ROLE"><strong>Estimator diagnostic</strong></td><td data-label="METHOD">REINFORCE / REINFORCE++ / RLOO</td><td data-label="TRIGGER">per-prompt 标准化或 zero-variance 被证明确实损失学习信号</td><td data-label="DECISION">同一 9B parent、同任务和同预算对照</td></tr>
+        <tr><td data-label="ROLE"><strong>Stability / credit</strong></td><td data-label="METHOD">DAPO / GSPO / PPO</td><td data-label="TRIGGER">分别对应全对全错与长度浪费、sequence ratio 异常、需要 learned value 的长程 credit</td><td data-label="DECISION">症状触发，不预先启用</td></tr>
+        <tr><td data-label="ROLE"><strong>Teacher signal</strong></td><td data-label="METHOD">OPD / KDRL</td><td data-label="TRIGGER">Teacher 在 student-visited states 上通过兼容性、增量能力和成本资格审计</td><td data-label="DECISION">需要 teacher token logprob；普通 Chat 输出不能冒充</td></tr>
+        <tr><td data-label="ROLE"><strong>Literature only</strong></td><td data-label="METHOD">Dr. GRPO / CISPO / SAPO</td><td data-label="TRIGGER">长度偏差、clipped-token 梯度丢失或 hard-clipping 不稳定出现后</td><td data-label="DECISION">未实跑；SAPO 指 Soft Adaptive Policy Optimization</td></tr>
+        <tr><td data-label="ROLE"><strong>Offline / Reward</strong></td><td data-label="METHOD">DPO / KTO / IPO · Outcome RM / Process RM</td><td data-label="TRIGGER">离线 preference baseline 或经校准的 Reward 组件</td><td data-label="DECISION">不替代 Hermes 在线 Agent RL，也不与 Sealed grader 共用实现</td></tr>
+      </tbody></table></div>
+      <div class="callout" style="margin-top:22px"><b>Algorithm Decision Matrix</b><span><a href="../configs/program-v3/algorithm-decision-matrix-v1.json">algorithm-decision-matrix-v1.json</a> 是机器可校验的选型合同。任何方法从文献状态晋级 GPU 前，必须登记症状、假设、等预算对照、停止条件和证据边界。</span></div>
+    </section>
+
+    <section id="infra">
+      <div class="section-head"><span class="section-no">09 / INFRA</span><div><h2>两张 H100 是一个资源池</h2><p class="note">选择标准不是某张卡的瞬时利用率，而是在训练正确性和稳定性约束下的 end-to-end time-to-quality。</p></div></div>
+      <div class="infra-grid">
+        <article class="infra"><span class="letter">A</span><h3>1 + 1 Sync</h3><p>一张 actor/ref，一张 SGLang。作为必须测量的真实 baseline。</p><ul><li>优点：边界简单、已有历史</li><li>风险：phase idle、显存失衡</li></ul></article>
+        <article class="infra primary"><span class="letter">B</span><h3>2-GPU Colocated</h3><p>Update 用 FSDP2，rollout 用 SGLang TP2，阶段间 memory saver / weight refresh。</p><ul><li>候选：<code>fsdp:d2</code></li><li>候选：<code>sglang:d1t2p1</code></li><li>必须先过 Qwen3.5 LoRA Gate</li></ul></article>
+        <article class="infra conditional"><span class="letter">C</span><h3>Async</h3><p>仅当 A/B 存在实质 idle，且 pinned AReaL 能可靠记录 policy age 时测试。</p><ul><li>必须报告 ratio tail / KL</li><li>吞吐提升不能掩盖 staleness</li></ul></article>
+      </div>
+      <div class="formula">Compare equal task / trajectory / token budget<br>memory · util p50/p95 · idle · tok/s · rollout/h · step time · sync · offload · KV · policy age · GPU-hour / effective trajectory</div>
+    </section>
+
+    <section id="research">
+      <div class="section-head"><span class="section-no">10 / RESEARCH</span><div><h2>外部方法只按问题采用</h2><p class="note">每项使用 Problem → Source → Mechanism → Preconditions → Evidence → Cost → StudyHub difference → Decision。没有症状，不为简历堆算法。</p></div></div>
+      <div class="research-grid">
+        <article class="research-card"><span class="decision-tag">ADAPT</span><h3><a href="https://openai.com/index/deep-research-system-card/">OpenAI Deep Research</a></h3><p>借鉴端到端浏览、引用、安全与 prompt-injection 评测，不声称复现其系统。</p></article>
+        <article class="research-card"><span class="decision-tag">ADOPT</span><h3><a href="https://gorilla.cs.berkeley.edu/leaderboard">BFCL V4</a></h3><p>官方 Function、multi-turn、Web、Memory 外部评测。</p></article>
+        <article class="research-card"><span class="decision-tag">ADAPT</span><h3><a href="https://github.com/sierra-research/tau2-bench">tau3-bench</a></h3><p>用户—工具交互与 knowledge retrieval，保留官方/适配边界。</p></article>
+        <article class="research-card"><span class="decision-tag">ADOPT</span><h3><a href="https://github.com/Ayanami0730/deep_research_bench">DeepResearch Bench</a></h3><p>100 个专家任务，补足开放报告与引用评测。</p></article>
+        <article class="research-card"><span class="decision-tag">ADAPT</span><h3><a href="https://openai.com/index/browsecomp/">BrowseComp</a></h3><p>高难 Web stress test；短答案不能替代报告质量。</p></article>
+        <article class="research-card"><span class="decision-tag">ADAPT</span><h3><a href="https://github.com/PeterGriffinJin/Search-R1">Search-R1</a></h3><p>借鉴交错检索 RL 与 BM25/Dense/Online 比较，不替换 Hermes。</p></article>
+        <article class="research-card"><span class="decision-tag">ADAPT</span><h3><a href="https://github.com/AgentR1/Agent-R1">Agent-R1</a></h3><p>借鉴 step-level 可观测性，不迁移现有 AReaL 栈。</p></article>
+        <article class="research-card defer"><span class="decision-tag">DEFER</span><h3>BrowseComp+ / GAIA / xbench</h3><p>Mandatory stack 完成后，只按剩余最大能力缺口选择一个。</p></article>
+        <article class="research-card defer"><span class="decision-tag">DEFER</span><h3>WebAgent-R1 / ReTool / WebRL</h3><p>保留工具策略和 failure curriculum 机制；不在首轮引入浏览器/VLM 栈。</p></article>
+        <article class="research-card defer"><span class="decision-tag">DEFER</span><h3><a href="https://github.com/TIGER-AI-Lab/OpenResearcher">OpenResearcher</a></h3><p>96K 候选轨迹先审 License、Teacher、长度和污染。</p></article>
+        <article class="research-card defer"><span class="decision-tag">DEFER</span><h3><a href="https://github.com/BytedTsinghua-SIA/DAPO">DAPO</a></h3><p>只有 9B learnability 显示 zero-variance 浪费后才启用。</p></article>
+        <article class="research-card defer"><span class="decision-tag">DEFER</span><h3>SkyRL / Agent Lightning</h3><p>借鉴环境和 tracing，不增加第二套 Agent 或训练框架。</p></article>
+        <article class="research-card defer"><span class="decision-tag">DEFER</span><h3>HermesBench / Other RL</h3><p>先审第三方 fixture；RLOO、REINFORCE++、GSPO、PPO/OPD 由真实症状触发。</p></article>
+      </div>
+      <div class="callout" style="margin-top:22px"><b>详细研究记录</b><span><a href="../research/primary-source-review.md">research/primary-source-review.md</a> 保存一手来源、采用条件、成本和拒绝理由；外部结果不等于 StudyHub 已复现结果。</span></div>
+    </section>
+
+    <section id="next">
+      <div class="section-head"><span class="section-no">11 / EXECUTION</span><div><h2>下一步只做 Benchmark v1</h2><p class="note">当前 9B 权重完整，双 H100 空闲，但训练未获放行。先完成 G1，再跑 G2 9B Base；SFT/GRPO 不越级启动。</p></div></div>
+      <div class="callout"><b>当前最高信息动作</b><span>构建 160 Regression、1,005 Dev、500 Sealed 的任务和独立 grader；对 P0 capability、alternative path、污染、人工抽检和统计功效完成验收。</span></div>
+      <div class="command">cd /data/chengjin/studyhub/studyhub-agent<br>.venv-train/bin/python scripts/train/validate_v3_program.py --check-local-assets</div>
+      <div class="split" style="margin-top:22px">
+        <article class="panel"><h3>机器合同</h3><p><a href="../configs/program-v3/training-program-v3.json">training-program-v3.json</a><br><a href="../configs/program-v3/capability-matrix-v1.json">capability-matrix-v1.json</a><br><a href="../configs/program-v3/algorithm-decision-matrix-v1.json">algorithm-decision-matrix-v1.json</a></p></article>
+        <article class="panel gold"><h3>缺陷台账</h3><p><a href="../design-defects/index.json">17 项初始系统性缺陷</a>。每项包含证据、竞争解释、最小证伪、修复、回归和残余风险。</p></article>
+      </div>
+    </section>
+
+    <footer><span>StudyHub Agent / 9B Agentic Post-Training v3</span><span>2026-08-27 · DESIGN FROZEN · TRAINING NOT STARTED</span></footer>
+  </main>
+</body>
+</html>

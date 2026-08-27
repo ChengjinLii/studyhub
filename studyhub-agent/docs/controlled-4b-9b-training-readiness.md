@@ -1,5 +1,9 @@
 # 4B / 9B Training Readiness
 
+> **Historical v2 document.** It preserves the original 3k SFT / 2.4k RL
+> reproduction contract. It is not the current 9B training entry point. See
+> `StudyHub_9B_Agentic_Post_Training_Program_v3.html` for the active program.
+
 ## Current state
 
 - `Qwen/Qwen3.5-4B` is fixed at revision `851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a` under `models/P1/Qwen3.5-4B`.

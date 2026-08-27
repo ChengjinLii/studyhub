@@ -1,0 +1,25 @@
+{
+  "schema_version": "studyhub.design-defect-index.v1",
+  "program_version": "studyhub-agentic-post-training.v3",
+  "created_at": "2026-08-27",
+  "status": "OPEN_BASELINE_AUDIT",
+  "cards": [
+    "01-sft-rl-action-space-parity.md",
+    "02-gold-path-reward.md",
+    "03-reward-eval-coupling.md",
+    "04-small-same-source-benchmark.md",
+    "05-missing-capability-closure.md",
+    "06-toy-retrieval-domain-gap.md",
+    "07-task-specific-tool-suffix.md",
+    "08-exact-fixture-route.md",
+    "09-zero-variance-groups.md",
+    "10-infra-error-as-policy-reward.md",
+    "11-answer-shortcuts.md",
+    "12-source-id-citation.md",
+    "13-evidence-recall-without-precision.md",
+    "14-six-turn-survivorship-bias.md",
+    "15-product-capability-mismatch.md",
+    "16-static-dual-gpu-layout.md",
+    "17-tiny-pilot-overclaim.md"
+  ]
+}

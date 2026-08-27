@@ -1,0 +1,274 @@
+{
+  "schema_version": "studyhub.training-program.v3",
+  "program_id": "studyhub-9b-agentic-post-training-v3",
+  "created_at": "2026-08-27",
+  "status": "DESIGN_FROZEN_PENDING_BENCHMARK_V1",
+  "launch_authorized": false,
+  "source_prompt": "/data/chengjin/studyhub-agentic-rl-interview-prompt-pack-v3/studyhub-agentic-rl-interview-prompt-pack-v3/prompt.md",
+  "north_star": "Demonstrate that a 9B model learns stronger autonomous behavior in the real Hermes policy space on independent evaluations at an acceptable end-to-end cost.",
+  "architecture": {
+    "hermes": "the only agent loop and tool-interaction harness",
+    "areal": "rollout, log probability, optimization and weight publication",
+    "sglang": "policy inference and rollout serving",
+    "studyhub": "tools, replayable environments, identity, ACL, RAG, Web, Memory, reward and evaluation adapters",
+    "forbidden_mainline": ["router", "planner", "fixed_dag", "second_tool_loop", "second_memory_manager", "deep_research_graph"]
+  },
+  "history": {
+    "v2_role": "INFRASTRUCTURE_AND_SHORT_HORIZON_PILOT",
+    "four_b_policy": "FROZEN_HISTORY_ONLY",
+    "retained_evidence": [
+      "Hermes-AReaL-SGLang integration",
+      "trajectory and experiment evidence bundle",
+      "checkpoint merge and reload",
+      "dataset lineage and oracle isolation",
+      "GPU guard",
+      "context and prompt incidents"
+    ],
+    "not_promoted": [
+      "configs/train/open-sft-qwen35-9b.yaml",
+      "configs/train/open-grpo-qwen35-9b.yaml",
+      "configs/eval/studyhub-dev-eval-v2.json"
+    ]
+  },
+  "model": {
+    "main_scale": "9B",
+    "base_model": "Qwen3.5-9B",
+    "local_path": "/data/chengjin/studyhub/models/P1/Qwen3.5-9B",
+    "weights_status": "LOCAL_COMPLETE",
+    "four_b_is_gate": false
+  },
+  "benchmark": {
+    "version": "studyhub-agentbench-v1",
+    "regression": {
+      "tasks": 160,
+      "purpose": "Runtime, parser, tool contract, checkpoint and deterministic error recovery regression only",
+      "deterministic": true,
+      "claim_eligible": false
+    },
+    "development": {
+      "tasks": 1005,
+      "purpose": "Training decisions, checkpoint selection and capability/horizon/failure slice analysis",
+      "code_path": "eval/development_v1",
+      "broad_rollouts_per_task": 2,
+      "variance_panel": {"tasks": 200, "rollouts_per_task": 4},
+      "human_or_strong_judge_qa": {"stratified_tasks": 120, "double_reviewed_tasks": 30}
+    },
+    "sealed": {
+      "tasks": 500,
+      "purpose": "Final product claims only; never used for prompt, reward, threshold or sampling decisions",
+      "code_path": "eval/sealed_v1",
+      "rollouts_per_task": 2,
+      "access_policy": "TASKS_AND_GRADER_HIDDEN_FROM_TRAINING_PIPELINE"
+    },
+    "external": [
+      {"name": "BFCL V4", "role": "MANDATORY", "scope": "relevant agentic, multi-turn, Web and Memory categories", "protocol": "OFFICIAL_FULL_FOR_CLAIMS"},
+      {"name": "tau3-bench", "role": "HIGH_PRIORITY", "scope": "knowledge retrieval and user-tool interaction", "protocol": "OFFICIAL_OR_EXPLICIT_ADAPTED_SUBSET"},
+      {"name": "DeepResearch Bench", "role": "MANDATORY_LONG_FORM", "scope": "open research quality and citation support", "protocol": "OFFICIAL_FULL_FOR_CLAIMS"},
+      {"name": "BrowseComp", "role": "CONDITIONAL_WEB_STRESS", "scope": "persistent difficult Web search", "protocol": "OFFICIAL_FULL_OR_EXPLICIT_SUBSET"},
+      {"name": "BrowseComp-Plus", "role": "DEFER_PENDING_GAP", "scope": "separate retriever and Agent effects", "protocol": "AUDIT_BEFORE_SELECTION"},
+      {"name": "GAIA or xbench-DeepSearch", "role": "OPTIONAL_ONE_OF", "scope": "broad assistant or deep-search confirmation", "protocol": "SELECT_ONLY_AFTER_MANDATORY_STACK"},
+      {"name": "HermesBench", "role": "AUDIT_FIRST", "scope": "third-party Hermes harness coverage", "protocol": "NO_CLAIM_BEFORE_INTEGRITY_AND_CONTAMINATION_AUDIT"}
+    ],
+    "v1_freeze_gate": [
+      "all P0 capabilities have task coverage",
+      "training reward and development evaluator do not share core grading code",
+      "open tasks accept multiple valid trajectories",
+      "task and grader quality audit is complete",
+      "version, hash and contamination records are complete",
+      "9B Base baseline and variance panel are complete",
+      "minimum detectable effect analysis is recorded"
+    ],
+    "promotion_rule": "A higher scalar training reward alone never promotes a checkpoint. Development, external and cost slices must agree."
+  },
+  "data": {
+    "sft": {
+      "candidate_trajectories": 90000,
+      "final_trajectories": 45000,
+      "target_tokens": 90000000,
+      "allowed_token_range": [60000000, 150000000],
+      "studyhub_share": 0.52,
+      "open_source_share": 0.48,
+      "runtime_native_multi_turn_min_share": 0.70,
+      "recovery_tag_share_range": [0.10, 0.20],
+      "direct_or_abstention_tag_share": 0.10,
+      "long_web_or_research_tag_share_range": [0.15, 0.25],
+      "max_single_source_share": 0.25,
+      "source_budget": [
+        {"source": "studyhub_rag_and_learning", "trajectories": 9000, "status": "TO_BUILD"},
+        {"source": "studyhub_web_and_fallback", "trajectories": 5500, "status": "TO_BUILD"},
+        {"source": "studyhub_memory_and_personalization", "trajectories": 5000, "status": "TO_BUILD"},
+        {"source": "studyhub_acl_recovery_and_abstention", "trajectories": 4000, "status": "TO_BUILD"},
+        {"source": "hermes_function_calling", "trajectories": 6500, "status": "LICENSE_AND_PARITY_AUDIT"},
+        {"source": "toolace", "trajectories": 5500, "status": "LICENSE_AND_PARITY_AUDIT"},
+        {"source": "openresearcher", "trajectories": 6000, "status": "LICENSE_TEACHER_AND_LENGTH_AUDIT"},
+        {"source": "tau_web_and_other_agent_traces", "trajectories": 3500, "status": "PROVENANCE_LICENSE_AND_PARITY_AUDIT"}
+      ],
+      "split": {"train": 0.90, "validation": 0.05, "protocol_holdout": 0.05},
+      "quality_gates": [
+        "license and revision recorded",
+        "exact, near and semantic deduplication",
+        "source and group split",
+        "SFT, RL, Dev and Sealed contamination audit",
+        "actual Hermes schema and message parity",
+        "assistant-only loss mask with observations excluded",
+        "claim-to-passage support audit",
+        "teacher trajectory success and quality audit",
+        "actual 9B tokenizer length and token accounting"
+      ]
+    },
+    "rl": {
+      "candidate_tasks": 16000,
+      "post_qa_tasks": 10000,
+      "initial_unique_tasks": 4000,
+      "expanded_unique_tasks": 8000,
+      "studyhub_share": 0.60,
+      "external_share": 0.40,
+      "family_mix": {
+        "function_calling": 0.12,
+        "rag_and_multihop": 0.18,
+        "web": 0.12,
+        "memory": 0.12,
+        "cross_tool": 0.16,
+        "recovery_and_acl": 0.12,
+        "long_horizon_and_deep_research": 0.10,
+        "direct_answer_and_abstention": 0.08
+      },
+      "public_task_fields": ["goal", "initial_state", "available_tools", "hard_constraints", "environment_id", "budget_tier"],
+      "forbidden_public_fields": ["expected_calls", "gold_query", "gold_source_order", "gold_trajectory", "supporting_facts", "oracle_answer"],
+      "learnability_calibration": {
+        "rollouts_per_task": 4,
+        "mixed_outcome_destination": "GRPO_MAIN",
+        "all_correct_destination": "RETENTION_SET",
+        "all_failed_destination": "TEACHER_REPAIR_OR_CURRICULUM",
+        "infra_failure_destination": "RETRY_OR_EXCLUDE_NOT_POLICY_REWARD"
+      }
+    }
+  },
+  "reward": {
+    "version": "reward-v3",
+    "training_code_path": "training/rl/reward_v3",
+    "development_evaluator_path": "eval/development_v1",
+    "sealed_evaluator_path": "eval/sealed_v1",
+    "layers": [
+      {"level": 1, "name": "hard_constraints", "signals": ["ACL", "privacy", "security", "unknown_tool", "forbidden_state"]},
+      {"level": 2, "name": "objective_end_state", "signals": ["transaction_state", "test_result", "verifiable_fact", "environment_postcondition"]},
+      {"level": 3, "name": "semantic_rubric", "signals": ["correctness", "coverage", "grounding", "source_quality", "conflict_handling", "uncertainty"]},
+      {"level": 4, "name": "process_diagnostics", "signals": ["evidence_gain", "recovery", "duplicate_search", "premature_final", "over_search", "cost"]}
+    ],
+    "path_agnostic": true,
+    "gold_path_equality_allowed": false,
+    "citation_contract": "claim_to_citation_to_source_passage_support",
+    "infra_failure_policy": "EXCLUDE_FROM_POLICY_REWARD_UNLESS_POLICY_CAUSED",
+    "calibration": {
+      "cases": 800,
+      "case_types": ["normal", "boundary", "adversarial", "reward_hacking", "alternative_valid_path"],
+      "metrics": ["pairwise_accuracy", "spearman", "kendall", "false_positive_rate", "false_negative_rate", "per_family_disagreement", "reward_eval_divergence"]
+    }
+  },
+  "training": {
+    "phase_order": [
+      "FREEZE_V2_HISTORY",
+      "CAPABILITY_AND_BENCHMARK_V1",
+      "NINE_B_BASE_EVAL",
+      "RUNTIME_NATIVE_SFT_DATA",
+      "NINE_B_SFT",
+      "REWARD_V3_AND_RL_LEARNABILITY",
+      "DUAL_H100_PROFILE",
+      "NINE_B_GRPO",
+      "INDEPENDENT_CONFIRMATION"
+    ],
+    "sft": {
+      "method": "AReaL SFT with LoRA and BF16",
+      "loss": "assistant_action_and_final_tokens_only_causal_cross_entropy",
+      "observation_loss": false,
+      "epoch_policy": "Start with one token-budgeted pass; continue only if independent Dev slices improve without protocol regression.",
+      "checkpoint_frequency": "every_10_percent_of_token_budget",
+      "selection_metric": "independent_development_composite_with_family_floors",
+      "lora_recipe": {"rank_candidates": [16, 32], "target_modules": "resolve by Qwen3.5 module audit and SGLang hot-load gate", "final_choice": "PROFILE_REQUIRED"}
+    },
+    "grpo": {
+      "algorithm": "GRPO",
+      "default_group_size": 4,
+      "high_branch_group_size": 8,
+      "group_size_rule": "Use separate controlled phases because the current trainer configuration has one group size per run.",
+      "initial_optimizer_updates": 500,
+      "allowed_initial_update_range": [300, 600],
+      "initial_learning_rate": 0.000002,
+      "learning_rate_search_range": [0.000001, 0.000005],
+      "clip_epsilon": 0.2,
+      "initial_kl_coefficient": 0.02,
+      "global_max_model_turns": 20,
+      "per_task_turn_tiers": [3, 6, 10, 20],
+      "main_context_tokens": 16384,
+      "long_context_followup_tokens": 32768,
+      "dynamic_sampling": "ENABLE_AFTER_LEARNABILITY_CALIBRATION_IF_ZERO_VARIANCE_WASTES_MEANINGFUL_COMPUTE",
+      "checkpoint_selection": "development_and_external_metrics_not_training_reward",
+      "expansion_gate": ["independent metrics improve", "effective group rate is healthy", "reward calibration remains stable", "infra failure is not a dominant rollout cause"],
+      "pause_gate": ["reward and development evaluation diverge", "grader reliability fails", "zero variance is extreme", "contamination is found", "entropy or policy collapses", "infra errors contaminate policy reward"]
+    },
+    "algorithm_policy": {
+      "main": "GRPO",
+      "decision_matrix": "configs/program-v3/algorithm-decision-matrix-v1.json",
+      "comparison_contract": "same 9B parent, tasks, environment, Reward v3 and independent evaluator; match tokens, updates and GPU-hours or report every budget",
+      "conditional": {
+        "RLOO_OR_REINFORCE_PLUS_PLUS": "group normalization, baseline variance or critic cost is a demonstrated bottleneck",
+        "DAPO": "all-correct/all-failed groups or overlong trajectories waste material compute",
+        "GSPO": "sequence-level ratio tails or mild off-policy instability are demonstrated",
+        "PPO": "a learned value baseline is required for long-horizon credit",
+        "OPD_OR_KDRL": "a stable high-quality teacher and retention objective exist"
+      },
+      "literature_only_until_triggered": ["DrGRPO", "CISPO", "SAPO"],
+      "offline_baseline_only": ["DPO", "KTO", "IPO"],
+      "reward_components_not_policy_optimizers": ["OUTCOME_RM", "PROCESS_RM"]
+    }
+  },
+  "infrastructure": {
+    "hardware": "2 x NVIDIA H100 PCIe 80GB",
+    "framework_lock": {
+      "areal_commit": "cbff54d645d2cd8ee1f1c358a82f3f473588433d",
+      "hermes_commit": "5c1a304ce890276a4334d8ced3f29ffeedbbbf93"
+    },
+    "layouts": [
+      {
+        "id": "A",
+        "name": "one_plus_one_sync_baseline",
+        "status": "REQUIRED_BASELINE",
+        "shape": "one GPU actor/ref update plus one GPU SGLang rollout",
+        "risk": "phase idle time and unbalanced memory/SM use"
+      },
+      {
+        "id": "B",
+        "name": "two_gpu_colocated",
+        "status": "COMPATIBILITY_GATE_REQUIRED",
+        "shape": "update with FSDP2 across two GPUs; rollout with SGLang TP2; memory saver and weight refresh between phases",
+        "candidate_backends": {"actor": "fsdp:d2", "rollout": "sglang:d1t2p1"},
+        "risk": "Qwen3.5 LoRA hot-load, offload and pinned AReaL compatibility must be measured rather than assumed"
+      },
+      {
+        "id": "C",
+        "name": "async_disaggregated",
+        "status": "CONDITIONAL",
+        "shape": "asynchronous rollout/update with bounded head offpolicyness",
+        "entry_condition": "A or B is materially idle and the pinned runtime exposes reliable policy-age, ratio-tail and KL evidence",
+        "risk": "staleness can invalidate throughput-only wins"
+      }
+    ],
+    "profile_budget": "same tasks, trajectories and token cap for every viable layout",
+    "profile_metrics": ["gpu_memory_peak_reserved", "gpu_util_p50_p95", "idle_fraction", "generated_tokens_per_second", "rollouts_per_hour", "successful_rollouts_per_hour", "optimizer_step_wall_time", "weight_publish_time", "lora_hot_load_time", "offload_onload_time", "fsdp_communication", "tp_communication", "kv_cache", "cpu_ram_and_io", "policy_age", "ratio_tail", "kl", "gpu_hours_per_1000_effective_trajectories", "time_to_quality"],
+    "selection_rule": "Choose the stable layout with the best end-to-end time-to-quality, not the highest isolated GPU utilization.",
+    "shared_server_safety": ["foreign process detection", "memory headroom gate", "process-group cleanup", "no interference with non-project jobs"]
+  },
+  "gates": [
+    {"id": "G0", "name": "v2 history frozen", "evidence": ["legacy configs listed", "4B not a gate", "lineage retained"]},
+    {"id": "G1", "name": "Benchmark v1 frozen", "evidence": ["1005 Dev and 500 Sealed manifests", "independent graders", "quality and contamination audit"]},
+    {"id": "G2", "name": "9B Base baseline", "evidence": ["Dev", "variance panel", "mandatory external", "cost slices", "MDE"]},
+    {"id": "G3", "name": "SFT data accepted", "evidence": ["45k final trajectories", "actual token count", "runtime parity", "quality and contamination cards"]},
+    {"id": "G4", "name": "9B SFT promoted", "evidence": ["loss and gradient health", "protocol stability", "Dev family floors", "checkpoint lineage"]},
+    {"id": "G5", "name": "Reward and RL tasks accepted", "evidence": ["800-case Reward calibration", "10k learnability-QA tasks", "effective-group estimate", "alternative-path acceptance"]},
+    {"id": "G6", "name": "dual-H100 layout selected", "evidence": ["A/B profiles", "C only if triggered", "before-after artifact", "time-to-quality decision"]},
+    {"id": "G7", "name": "9B GRPO main", "evidence": ["500-update initial budget", "complete groups", "entropy/KL/ratio diagnostics", "independent checkpoint evaluation"]},
+    {"id": "G8", "name": "confirmation", "evidence": ["best recipe confirmation", "external official protocol", "Sealed Final", "claim ledger"]}
+  ],
+  "artifact_contract": ["manifest", "config", "model_hash", "dataset_hash", "reward_version", "benchmark_version", "seed", "trajectory_sample", "training_metrics", "independent_eval", "gpu_profile", "failure_slices", "checkpoint_hash", "claim_ledger"],
+  "next_action": "Build and quality-audit Benchmark v1, then run the 9B Base baseline. Do not launch SFT or RL before G1 and G2."
+}

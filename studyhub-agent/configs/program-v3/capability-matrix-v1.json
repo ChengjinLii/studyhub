@@ -1,0 +1,238 @@
+{
+  "schema_version": "studyhub.capability-matrix.v1",
+  "program_version": "studyhub-agentic-post-training.v3",
+  "frozen_at": "2026-08-27",
+  "state_order": [
+    "UNDEFINED",
+    "CONTRACT_ONLY",
+    "SFT",
+    "RL",
+    "DEV",
+    "SEALED",
+    "SUPPORTED_CLAIM"
+  ],
+  "state_rule": "A capability advances only when evidence for the named stage exists. An adapter or tool schema alone is CONTRACT_ONLY.",
+  "legacy_rule": "The 4B v2 pilot is historical evidence and never advances a 9B v3 capability state.",
+  "capabilities": [
+    {
+      "id": "direct_answer_abstention",
+      "name": "Direct answer / tool abstention",
+      "priority": "P0",
+      "v3_state": "CONTRACT_ONLY",
+      "legacy_v2_evidence": "NOT_EVALUATED",
+      "training_target": "Answer directly when tools add no value; abstain or continue gathering evidence when the request is unsupported.",
+      "primary_metrics": ["task_success", "abstention_precision", "abstention_recall", "unnecessary_tool_rate"],
+      "development_tasks": 50,
+      "sealed_tasks": 25
+    },
+    {
+      "id": "tool_routing",
+      "name": "Tool routing",
+      "priority": "P0",
+      "v3_state": "CONTRACT_ONLY",
+      "legacy_v2_evidence": "NARROW_ALLOWED_TOOL_SETS",
+      "training_target": "Choose among function, RAG, Web and Memory tools without a task-specific router or tool suffix.",
+      "primary_metrics": ["goal_success", "routing_regret", "invalid_tool_rate", "cost_per_success"],
+      "development_tasks": 60,
+      "sealed_tasks": 30
+    },
+    {
+      "id": "function_calling",
+      "name": "Function calling",
+      "priority": "P0",
+      "v3_state": "CONTRACT_ONLY",
+      "legacy_v2_evidence": "4B_SFT_RL_DEV_SHORT_HORIZON",
+      "training_target": "Reach valid end states with correct schemas and arguments while accepting multiple legal call sequences.",
+      "primary_metrics": ["end_state_success", "schema_validity", "invalid_call_rate", "recovery_rate"],
+      "development_tasks": 70,
+      "sealed_tasks": 35
+    },
+    {
+      "id": "rag_search_read",
+      "name": "RAG search / read",
+      "priority": "P0",
+      "v3_state": "CONTRACT_ONLY",
+      "legacy_v2_evidence": "4B_TOY_LEXICAL_SEARCH_READ",
+      "training_target": "Search and read a frozen StudyHub Hybrid RAG snapshot, then stop when evidence is sufficient.",
+      "primary_metrics": ["answer_correctness", "retrieval_utility", "evidence_precision", "cost_per_success"],
+      "development_tasks": 70,
+      "sealed_tasks": 35
+    },
+    {
+      "id": "query_rewrite",
+      "name": "Query rewrite / backtracking",
+      "priority": "P0",
+      "v3_state": "CONTRACT_ONLY",
+      "legacy_v2_evidence": "NOT_SLICED",
+      "training_target": "Revise a failed or ambiguous query using new evidence rather than repeating the same search.",
+      "primary_metrics": ["recovery_rate", "evidence_gain", "duplicate_query_rate", "task_success"],
+      "development_tasks": 45,
+      "sealed_tasks": 20
+    },
+    {
+      "id": "multi_hop_retrieval",
+      "name": "Multi-hop retrieval",
+      "priority": "P0",
+      "v3_state": "CONTRACT_ONLY",
+      "legacy_v2_evidence": "SHORT_HORIZON_ONLY",
+      "training_target": "Combine evidence across documents and hops without exposing oracle evidence or a gold source order.",
+      "primary_metrics": ["task_success", "evidence_coverage", "unsupported_claim_rate", "tool_cost"],
+      "development_tasks": 55,
+      "sealed_tasks": 25
+    },
+    {
+      "id": "citation_claim_grounding",
+      "name": "Citation and claim grounding",
+      "priority": "P0",
+      "v3_state": "CONTRACT_ONLY",
+      "legacy_v2_evidence": "SOURCE_ID_ONLY",
+      "training_target": "Map each material claim to a supporting passage and avoid unsupported or decorative citations.",
+      "primary_metrics": ["citation_precision", "citation_recall", "claim_support", "unsupported_claim_rate"],
+      "development_tasks": 60,
+      "sealed_tasks": 30
+    },
+    {
+      "id": "insufficient_evidence",
+      "name": "Insufficient evidence",
+      "priority": "P0",
+      "v3_state": "CONTRACT_ONLY",
+      "legacy_v2_evidence": "NOT_EVALUATED",
+      "training_target": "Distinguish answerable, searchable and unanswerable requests and express calibrated uncertainty.",
+      "primary_metrics": ["no_answer_precision", "no_answer_recall", "calibration_error", "hallucination_rate"],
+      "development_tasks": 45,
+      "sealed_tasks": 25
+    },
+    {
+      "id": "web_search_fetch",
+      "name": "Web search / fetch",
+      "priority": "P0",
+      "v3_state": "CONTRACT_ONLY",
+      "legacy_v2_evidence": "ADAPTER_ONLY",
+      "training_target": "Use record/replay Web search and fetch for current information with source-quality checks.",
+      "primary_metrics": ["web_task_success", "freshness", "source_quality", "citation_support"],
+      "development_tasks": 60,
+      "sealed_tasks": 30
+    },
+    {
+      "id": "rag_to_web_fallback",
+      "name": "RAG to Web fallback",
+      "priority": "P0",
+      "v3_state": "CONTRACT_ONLY",
+      "legacy_v2_evidence": "NOT_EVALUATED",
+      "training_target": "Fall back to Web only when internal material is absent, stale or insufficient, and retain provenance boundaries.",
+      "primary_metrics": ["fallback_success", "fallback_precision", "premature_web_rate", "goal_success"],
+      "development_tasks": 45,
+      "sealed_tasks": 20
+    },
+    {
+      "id": "personal_memory",
+      "name": "Personal Memory",
+      "priority": "P0",
+      "v3_state": "CONTRACT_ONLY",
+      "legacy_v2_evidence": "ADAPTER_ONLY",
+      "training_target": "Recall useful preferences and learning state while ignoring stale, irrelevant or disallowed memories.",
+      "primary_metrics": ["memory_utility", "stale_memory_error", "privacy_violation_rate", "personalized_success"],
+      "development_tasks": 50,
+      "sealed_tasks": 25
+    },
+    {
+      "id": "collective_memory",
+      "name": "Collective Memory",
+      "priority": "P1",
+      "v3_state": "CONTRACT_ONLY",
+      "legacy_v2_evidence": "ADAPTER_ONLY",
+      "training_target": "Use aggregate learning patterns only when confidence and cohort applicability are adequate.",
+      "primary_metrics": ["collective_memory_value", "cohort_bias_error", "confidence_calibration", "goal_success"],
+      "development_tasks": 35,
+      "sealed_tasks": 15
+    },
+    {
+      "id": "rag_memory_composition",
+      "name": "RAG + Memory",
+      "priority": "P0",
+      "v3_state": "CONTRACT_ONLY",
+      "legacy_v2_evidence": "NOT_EVALUATED",
+      "training_target": "Combine course evidence with personal learning context without allowing memory to override source facts.",
+      "primary_metrics": ["personalized_task_success", "grounding", "memory_conflict_error", "cost_per_success"],
+      "development_tasks": 45,
+      "sealed_tasks": 20
+    },
+    {
+      "id": "web_memory_composition",
+      "name": "Web + Memory",
+      "priority": "P1",
+      "v3_state": "CONTRACT_ONLY",
+      "legacy_v2_evidence": "NOT_EVALUATED",
+      "training_target": "Combine current Web facts with stable preferences while detecting stale memory conflicts.",
+      "primary_metrics": ["personalized_task_success", "freshness", "stale_conflict_error", "citation_support"],
+      "development_tasks": 35,
+      "sealed_tasks": 15
+    },
+    {
+      "id": "permission_recovery",
+      "name": "Permission-aware recovery",
+      "priority": "P0",
+      "v3_state": "CONTRACT_ONLY",
+      "legacy_v2_evidence": "GUARDRAIL_CONTRACT_ONLY",
+      "training_target": "Recover safely from denied access without probing paid, private or cross-user content.",
+      "primary_metrics": ["secure_completion", "acl_violation_rate", "recovery_rate", "over_refusal_rate"],
+      "development_tasks": 45,
+      "sealed_tasks": 25
+    },
+    {
+      "id": "tool_failure_recovery",
+      "name": "Tool failure recovery",
+      "priority": "P0",
+      "v3_state": "CONTRACT_ONLY",
+      "legacy_v2_evidence": "LIMITED_FIXTURE_ERRORS",
+      "training_target": "Recover from timeout, empty result, malformed response and transient provider failure.",
+      "primary_metrics": ["recovery_rate", "goal_success", "repeat_failure_rate", "premature_stop_rate"],
+      "development_tasks": 50,
+      "sealed_tasks": 25
+    },
+    {
+      "id": "conflict_resolution",
+      "name": "Conflict resolution",
+      "priority": "P0",
+      "v3_state": "UNDEFINED",
+      "legacy_v2_evidence": "NOT_EVALUATED",
+      "training_target": "Detect source or memory conflicts, prefer stronger evidence and communicate unresolved uncertainty.",
+      "primary_metrics": ["factuality", "conflict_detection", "source_selection_quality", "uncertainty_quality"],
+      "development_tasks": 45,
+      "sealed_tasks": 25
+    },
+    {
+      "id": "long_horizon",
+      "name": "Long horizon",
+      "priority": "P0",
+      "v3_state": "UNDEFINED",
+      "legacy_v2_evidence": "GLOBAL_SIX_TURN_CAP",
+      "training_target": "Complete tasks requiring 8 to 20 or more policy actions while retaining state and avoiding loops.",
+      "primary_metrics": ["horizon_sliced_success", "state_retention", "loop_rate", "cost_per_success"],
+      "development_tasks": 50,
+      "sealed_tasks": 25
+    },
+    {
+      "id": "deep_research",
+      "name": "Deep research",
+      "priority": "P1",
+      "v3_state": "CONTRACT_ONLY",
+      "legacy_v2_evidence": "NOT_EVALUATED",
+      "training_target": "Produce a multi-source, evidence-grounded synthesis through the Hermes loop without a fixed research graph.",
+      "primary_metrics": ["rubric_coverage", "factuality", "source_quality", "citation_support", "synthesis_quality"],
+      "development_tasks": 45,
+      "sealed_tasks": 25
+    },
+    {
+      "id": "stop_cost_control",
+      "name": "Stop / cost control",
+      "priority": "P0",
+      "v3_state": "CONTRACT_ONLY",
+      "legacy_v2_evidence": "HARD_BUDGET_ONLY",
+      "training_target": "Stop after sufficient evidence, continue when useful evidence is missing, and minimize redundant actions.",
+      "primary_metrics": ["cost_per_success", "premature_stop_rate", "over_search_rate", "duplicate_action_rate"],
+      "development_tasks": 45,
+      "sealed_tasks": 25
+    }
+  ]
+}
