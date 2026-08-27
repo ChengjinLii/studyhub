@@ -1,0 +1,574 @@
+{
+  "schema_version": "studyhub.agentbench-web-source-config.v2",
+  "snapshot_policy": "official public documentation, sanitized and replayed offline",
+  "sources": [
+    {
+      "source_key": "py-json",
+      "split": "regression",
+      "url": "https://docs.python.org/3.12/library/json.html",
+      "title": "Python 3.12 json documentation",
+      "publisher": "Python Software Foundation",
+      "license_spdx": "PSF-2.0",
+      "license_url": "https://docs.python.org/3.12/license.html",
+      "document_type": "official_documentation",
+      "is_target": true,
+      "support_needles": [
+        "JSON is not a framed protocol",
+        "repeated calls to dump() using the same fp will result in an invalid JSON file"
+      ],
+      "task_contract": {
+        "language": "en",
+        "user_request": "In the frozen Python documentation snapshot, why should repeated json.dump calls not be used to serialize several objects into one file?",
+        "acceptable_answers": [
+          ["not a framed protocol", "not framed"],
+          ["invalid JSON file", "invalid JSON"]
+        ]
+      }
+    },
+    {
+      "source_key": "py-csv",
+      "split": "regression",
+      "url": "https://docs.python.org/3.12/library/csv.html",
+      "title": "Python 3.12 csv documentation",
+      "publisher": "Python Software Foundation",
+      "license_spdx": "PSF-2.0",
+      "license_url": "https://docs.python.org/3.12/license.html",
+      "document_type": "official_documentation"
+    },
+    {
+      "source_key": "py-configparser",
+      "split": "regression",
+      "url": "https://docs.python.org/3.12/library/configparser.html",
+      "title": "Python 3.12 configparser documentation",
+      "publisher": "Python Software Foundation",
+      "license_spdx": "PSF-2.0",
+      "license_url": "https://docs.python.org/3.12/license.html",
+      "document_type": "official_documentation"
+    },
+    {
+      "source_key": "py-argparse",
+      "split": "regression",
+      "url": "https://docs.python.org/3.12/library/argparse.html",
+      "title": "Python 3.12 argparse documentation",
+      "publisher": "Python Software Foundation",
+      "license_spdx": "PSF-2.0",
+      "license_url": "https://docs.python.org/3.12/license.html",
+      "document_type": "official_documentation"
+    },
+    {
+      "source_key": "py-logging",
+      "split": "regression",
+      "url": "https://docs.python.org/3.12/library/logging.html",
+      "title": "Python 3.12 logging documentation",
+      "publisher": "Python Software Foundation",
+      "license_spdx": "PSF-2.0",
+      "license_url": "https://docs.python.org/3.12/license.html",
+      "document_type": "official_documentation"
+    },
+    {
+      "source_key": "py-pickle",
+      "split": "regression",
+      "url": "https://docs.python.org/3.12/library/pickle.html",
+      "title": "Python 3.12 pickle documentation",
+      "publisher": "Python Software Foundation",
+      "license_spdx": "PSF-2.0",
+      "license_url": "https://docs.python.org/3.12/license.html",
+      "document_type": "official_documentation"
+    },
+    {
+      "source_key": "py-shelve",
+      "split": "regression",
+      "url": "https://docs.python.org/3.12/library/shelve.html",
+      "title": "Python 3.12 shelve documentation",
+      "publisher": "Python Software Foundation",
+      "license_spdx": "PSF-2.0",
+      "license_url": "https://docs.python.org/3.12/license.html",
+      "document_type": "official_documentation"
+    },
+    {
+      "source_key": "py-sqlite3",
+      "split": "regression",
+      "url": "https://docs.python.org/3.12/library/sqlite3.html",
+      "title": "Python 3.12 sqlite3 documentation",
+      "publisher": "Python Software Foundation",
+      "license_spdx": "PSF-2.0",
+      "license_url": "https://docs.python.org/3.12/license.html",
+      "document_type": "official_documentation"
+    },
+    {
+      "source_key": "py-xml",
+      "split": "regression",
+      "url": "https://docs.python.org/3.12/library/xml.html",
+      "title": "Python 3.12 XML documentation",
+      "publisher": "Python Software Foundation",
+      "license_spdx": "PSF-2.0",
+      "license_url": "https://docs.python.org/3.12/license.html",
+      "document_type": "official_documentation"
+    },
+    {
+      "source_key": "py-html",
+      "split": "regression",
+      "url": "https://docs.python.org/3.12/library/html.html",
+      "title": "Python 3.12 HTML documentation",
+      "publisher": "Python Software Foundation",
+      "license_spdx": "PSF-2.0",
+      "license_url": "https://docs.python.org/3.12/license.html",
+      "document_type": "official_documentation"
+    },
+
+    {
+      "source_key": "py-pathlib",
+      "split": "development",
+      "url": "https://docs.python.org/3.12/library/pathlib.html",
+      "title": "Python 3.12 pathlib documentation",
+      "publisher": "Python Software Foundation",
+      "license_spdx": "PSF-2.0",
+      "license_url": "https://docs.python.org/3.12/license.html",
+      "document_type": "official_documentation",
+      "is_target": true,
+      "support_needles": [
+        "pure paths, which provide purely computational operations without I/O",
+        "concrete paths, which inherit from pure paths but also provide I/O operations"
+      ],
+      "task_contract": {
+        "language": "en",
+        "user_request": "Compare pure and concrete pathlib paths using the frozen official documentation. What capability distinguishes them?",
+        "acceptable_answers": [
+          ["purely computational operations without I/O", "without I/O"],
+          ["provide I/O operations", "I/O operations"]
+        ]
+      }
+    },
+    {
+      "source_key": "py-os-path",
+      "split": "development",
+      "url": "https://docs.python.org/3.12/library/os.path.html",
+      "title": "Python 3.12 os.path documentation",
+      "publisher": "Python Software Foundation",
+      "license_spdx": "PSF-2.0",
+      "license_url": "https://docs.python.org/3.12/license.html",
+      "document_type": "official_documentation"
+    },
+    {
+      "source_key": "py-glob",
+      "split": "development",
+      "url": "https://docs.python.org/3.12/library/glob.html",
+      "title": "Python 3.12 glob documentation",
+      "publisher": "Python Software Foundation",
+      "license_spdx": "PSF-2.0",
+      "license_url": "https://docs.python.org/3.12/license.html",
+      "document_type": "official_documentation"
+    },
+    {
+      "source_key": "py-shutil",
+      "split": "development",
+      "url": "https://docs.python.org/3.12/library/shutil.html",
+      "title": "Python 3.12 shutil documentation",
+      "publisher": "Python Software Foundation",
+      "license_spdx": "PSF-2.0",
+      "license_url": "https://docs.python.org/3.12/license.html",
+      "document_type": "official_documentation"
+    },
+    {
+      "source_key": "py-io",
+      "split": "development",
+      "url": "https://docs.python.org/3.12/library/io.html",
+      "title": "Python 3.12 io documentation",
+      "publisher": "Python Software Foundation",
+      "license_spdx": "PSF-2.0",
+      "license_url": "https://docs.python.org/3.12/license.html",
+      "document_type": "official_documentation"
+    },
+    {
+      "source_key": "py-filecmp",
+      "split": "development",
+      "url": "https://docs.python.org/3.12/library/filecmp.html",
+      "title": "Python 3.12 filecmp documentation",
+      "publisher": "Python Software Foundation",
+      "license_spdx": "PSF-2.0",
+      "license_url": "https://docs.python.org/3.12/license.html",
+      "document_type": "official_documentation"
+    },
+    {
+      "source_key": "py-fnmatch",
+      "split": "development",
+      "url": "https://docs.python.org/3.12/library/fnmatch.html",
+      "title": "Python 3.12 fnmatch documentation",
+      "publisher": "Python Software Foundation",
+      "license_spdx": "PSF-2.0",
+      "license_url": "https://docs.python.org/3.12/license.html",
+      "document_type": "official_documentation"
+    },
+    {
+      "source_key": "py-linecache",
+      "split": "development",
+      "url": "https://docs.python.org/3.12/library/linecache.html",
+      "title": "Python 3.12 linecache documentation",
+      "publisher": "Python Software Foundation",
+      "license_spdx": "PSF-2.0",
+      "license_url": "https://docs.python.org/3.12/license.html",
+      "document_type": "official_documentation"
+    },
+    {
+      "source_key": "py-stat",
+      "split": "development",
+      "url": "https://docs.python.org/3.12/library/stat.html",
+      "title": "Python 3.12 stat documentation",
+      "publisher": "Python Software Foundation",
+      "license_spdx": "PSF-2.0",
+      "license_url": "https://docs.python.org/3.12/license.html",
+      "document_type": "official_documentation"
+    },
+    {
+      "source_key": "py-mimetypes",
+      "split": "development",
+      "url": "https://docs.python.org/3.12/library/mimetypes.html",
+      "title": "Python 3.12 mimetypes documentation",
+      "publisher": "Python Software Foundation",
+      "license_spdx": "PSF-2.0",
+      "license_url": "https://docs.python.org/3.12/license.html",
+      "document_type": "official_documentation"
+    },
+
+    {
+      "source_key": "py-concurrent-futures",
+      "split": "sealed_a",
+      "url": "https://docs.python.org/3.12/library/concurrent.futures.html",
+      "title": "Python 3.12 concurrent.futures documentation",
+      "publisher": "Python Software Foundation",
+      "license_spdx": "PSF-2.0",
+      "license_url": "https://docs.python.org/3.12/license.html",
+      "document_type": "official_documentation",
+      "is_target": true,
+      "support_needles": [
+        "Deadlocks can occur when the callable associated with a Future waits on the results of another Future"
+      ],
+      "task_contract": {
+        "language": "en",
+        "user_request": "What deadlock risk does the frozen concurrent.futures documentation identify for a callable associated with a Future?",
+        "acceptable_answers": [
+          ["waits on the results of another Future", "waits for another Future"]
+        ]
+      }
+    },
+    {
+      "source_key": "py-threading",
+      "split": "sealed_a",
+      "url": "https://docs.python.org/3.12/library/threading.html",
+      "title": "Python 3.12 threading documentation",
+      "publisher": "Python Software Foundation",
+      "license_spdx": "PSF-2.0",
+      "license_url": "https://docs.python.org/3.12/license.html",
+      "document_type": "official_documentation"
+    },
+    {
+      "source_key": "py-multiprocessing",
+      "split": "sealed_a",
+      "url": "https://docs.python.org/3.12/library/multiprocessing.html",
+      "title": "Python 3.12 multiprocessing documentation",
+      "publisher": "Python Software Foundation",
+      "license_spdx": "PSF-2.0",
+      "license_url": "https://docs.python.org/3.12/license.html",
+      "document_type": "official_documentation"
+    },
+    {
+      "source_key": "py-subprocess",
+      "split": "sealed_a",
+      "url": "https://docs.python.org/3.12/library/subprocess.html",
+      "title": "Python 3.12 subprocess documentation",
+      "publisher": "Python Software Foundation",
+      "license_spdx": "PSF-2.0",
+      "license_url": "https://docs.python.org/3.12/license.html",
+      "document_type": "official_documentation"
+    },
+    {
+      "source_key": "py-queue",
+      "split": "sealed_a",
+      "url": "https://docs.python.org/3.12/library/queue.html",
+      "title": "Python 3.12 queue documentation",
+      "publisher": "Python Software Foundation",
+      "license_spdx": "PSF-2.0",
+      "license_url": "https://docs.python.org/3.12/license.html",
+      "document_type": "official_documentation"
+    },
+    {
+      "source_key": "py-asyncio",
+      "split": "sealed_a",
+      "url": "https://docs.python.org/3.12/library/asyncio.html",
+      "title": "Python 3.12 asyncio documentation",
+      "publisher": "Python Software Foundation",
+      "license_spdx": "PSF-2.0",
+      "license_url": "https://docs.python.org/3.12/license.html",
+      "document_type": "official_documentation"
+    },
+    {
+      "source_key": "py-contextvars",
+      "split": "sealed_a",
+      "url": "https://docs.python.org/3.12/library/contextvars.html",
+      "title": "Python 3.12 contextvars documentation",
+      "publisher": "Python Software Foundation",
+      "license_spdx": "PSF-2.0",
+      "license_url": "https://docs.python.org/3.12/license.html",
+      "document_type": "official_documentation"
+    },
+    {
+      "source_key": "py-selectors",
+      "split": "sealed_a",
+      "url": "https://docs.python.org/3.12/library/selectors.html",
+      "title": "Python 3.12 selectors documentation",
+      "publisher": "Python Software Foundation",
+      "license_spdx": "PSF-2.0",
+      "license_url": "https://docs.python.org/3.12/license.html",
+      "document_type": "official_documentation"
+    },
+    {
+      "source_key": "py-socket",
+      "split": "sealed_a",
+      "url": "https://docs.python.org/3.12/library/socket.html",
+      "title": "Python 3.12 socket documentation",
+      "publisher": "Python Software Foundation",
+      "license_spdx": "PSF-2.0",
+      "license_url": "https://docs.python.org/3.12/license.html",
+      "document_type": "official_documentation"
+    },
+    {
+      "source_key": "py-signal",
+      "split": "sealed_a",
+      "url": "https://docs.python.org/3.12/library/signal.html",
+      "title": "Python 3.12 signal documentation",
+      "publisher": "Python Software Foundation",
+      "license_spdx": "PSF-2.0",
+      "license_url": "https://docs.python.org/3.12/license.html",
+      "document_type": "official_documentation"
+    },
+
+    {
+      "source_key": "py-tempfile",
+      "split": "calibration_challenge",
+      "url": "https://docs.python.org/3.12/library/tempfile.html",
+      "title": "Python 3.12 tempfile documentation",
+      "publisher": "Python Software Foundation",
+      "license_spdx": "PSF-2.0",
+      "license_url": "https://docs.python.org/3.12/license.html",
+      "document_type": "official_documentation",
+      "is_target": true,
+      "support_needles": [
+        "It will be destroyed as soon as it is closed",
+        "guaranteed to have a visible name in the file system"
+      ],
+      "task_contract": {
+        "language": "en",
+        "user_request": "Contrast TemporaryFile and NamedTemporaryFile using the frozen official page: what happens on close, and which one guarantees a visible filesystem name?",
+        "acceptable_answers": [
+          ["destroyed as soon as it is closed", "destroyed on close"],
+          ["NamedTemporaryFile"],
+          ["visible name in the file system", "visible filesystem name"]
+        ]
+      }
+    },
+    {
+      "source_key": "py-dataclasses",
+      "split": "calibration_challenge",
+      "url": "https://docs.python.org/3.12/library/dataclasses.html",
+      "title": "Python 3.12 dataclasses documentation",
+      "publisher": "Python Software Foundation",
+      "license_spdx": "PSF-2.0",
+      "license_url": "https://docs.python.org/3.12/license.html",
+      "document_type": "official_documentation"
+    },
+    {
+      "source_key": "py-typing",
+      "split": "calibration_challenge",
+      "url": "https://docs.python.org/3.12/library/typing.html",
+      "title": "Python 3.12 typing documentation",
+      "publisher": "Python Software Foundation",
+      "license_spdx": "PSF-2.0",
+      "license_url": "https://docs.python.org/3.12/license.html",
+      "document_type": "official_documentation"
+    },
+    {
+      "source_key": "py-collections",
+      "split": "calibration_challenge",
+      "url": "https://docs.python.org/3.12/library/collections.html",
+      "title": "Python 3.12 collections documentation",
+      "publisher": "Python Software Foundation",
+      "license_spdx": "PSF-2.0",
+      "license_url": "https://docs.python.org/3.12/license.html",
+      "document_type": "official_documentation"
+    },
+    {
+      "source_key": "py-functools",
+      "split": "calibration_challenge",
+      "url": "https://docs.python.org/3.12/library/functools.html",
+      "title": "Python 3.12 functools documentation",
+      "publisher": "Python Software Foundation",
+      "license_spdx": "PSF-2.0",
+      "license_url": "https://docs.python.org/3.12/license.html",
+      "document_type": "official_documentation"
+    },
+    {
+      "source_key": "py-itertools",
+      "split": "calibration_challenge",
+      "url": "https://docs.python.org/3.12/library/itertools.html",
+      "title": "Python 3.12 itertools documentation",
+      "publisher": "Python Software Foundation",
+      "license_spdx": "PSF-2.0",
+      "license_url": "https://docs.python.org/3.12/license.html",
+      "document_type": "official_documentation"
+    },
+    {
+      "source_key": "py-statistics",
+      "split": "calibration_challenge",
+      "url": "https://docs.python.org/3.12/library/statistics.html",
+      "title": "Python 3.12 statistics documentation",
+      "publisher": "Python Software Foundation",
+      "license_spdx": "PSF-2.0",
+      "license_url": "https://docs.python.org/3.12/license.html",
+      "document_type": "official_documentation"
+    },
+    {
+      "source_key": "py-decimal",
+      "split": "calibration_challenge",
+      "url": "https://docs.python.org/3.12/library/decimal.html",
+      "title": "Python 3.12 decimal documentation",
+      "publisher": "Python Software Foundation",
+      "license_spdx": "PSF-2.0",
+      "license_url": "https://docs.python.org/3.12/license.html",
+      "document_type": "official_documentation"
+    },
+    {
+      "source_key": "py-fractions",
+      "split": "calibration_challenge",
+      "url": "https://docs.python.org/3.12/library/fractions.html",
+      "title": "Python 3.12 fractions documentation",
+      "publisher": "Python Software Foundation",
+      "license_spdx": "PSF-2.0",
+      "license_url": "https://docs.python.org/3.12/license.html",
+      "document_type": "official_documentation"
+    },
+    {
+      "source_key": "py-random",
+      "split": "calibration_challenge",
+      "url": "https://docs.python.org/3.12/library/random.html",
+      "title": "Python 3.12 random documentation",
+      "publisher": "Python Software Foundation",
+      "license_spdx": "PSF-2.0",
+      "license_url": "https://docs.python.org/3.12/license.html",
+      "document_type": "official_documentation"
+    },
+
+    {
+      "source_key": "git-gitignore",
+      "split": "sealed_b",
+      "url": "https://raw.githubusercontent.com/git/git/f78ce2f7b6df702f93d40b85d6bda92a3f65da79/Documentation/gitignore.adoc",
+      "title": "gitignore official documentation at f78ce2f7",
+      "publisher": "Git project",
+      "license_spdx": "GPL-2.0-only",
+      "license_url": "https://github.com/git/git/blob/f78ce2f7b6df702f93d40b85d6bda92a3f65da79/COPYING",
+      "document_type": "official_pinned_repository_documentation",
+      "is_target": true,
+      "support_needles": [
+        "Files already tracked by Git are not affected",
+        "git rm --cached"
+      ],
+      "task_contract": {
+        "language": "en",
+        "user_request": "A tracked file still appears after adding it to .gitignore. According to the pinned Git documentation, why, and which index-only removal command is recommended?",
+        "acceptable_answers": [
+          ["already tracked", "tracked files are not affected"],
+          ["git rm --cached"]
+        ]
+      }
+    },
+    {
+      "source_key": "git-clone",
+      "split": "sealed_b",
+      "url": "https://raw.githubusercontent.com/git/git/f78ce2f7b6df702f93d40b85d6bda92a3f65da79/Documentation/git-clone.adoc",
+      "title": "git-clone official documentation at f78ce2f7",
+      "publisher": "Git project",
+      "license_spdx": "GPL-2.0-only",
+      "license_url": "https://github.com/git/git/blob/f78ce2f7b6df702f93d40b85d6bda92a3f65da79/COPYING",
+      "document_type": "official_pinned_repository_documentation"
+    },
+    {
+      "source_key": "git-fetch",
+      "split": "sealed_b",
+      "url": "https://raw.githubusercontent.com/git/git/f78ce2f7b6df702f93d40b85d6bda92a3f65da79/Documentation/git-fetch.adoc",
+      "title": "git-fetch official documentation at f78ce2f7",
+      "publisher": "Git project",
+      "license_spdx": "GPL-2.0-only",
+      "license_url": "https://github.com/git/git/blob/f78ce2f7b6df702f93d40b85d6bda92a3f65da79/COPYING",
+      "document_type": "official_pinned_repository_documentation"
+    },
+    {
+      "source_key": "git-merge",
+      "split": "sealed_b",
+      "url": "https://raw.githubusercontent.com/git/git/f78ce2f7b6df702f93d40b85d6bda92a3f65da79/Documentation/git-merge.adoc",
+      "title": "git-merge official documentation at f78ce2f7",
+      "publisher": "Git project",
+      "license_spdx": "GPL-2.0-only",
+      "license_url": "https://github.com/git/git/blob/f78ce2f7b6df702f93d40b85d6bda92a3f65da79/COPYING",
+      "document_type": "official_pinned_repository_documentation"
+    },
+    {
+      "source_key": "git-rebase",
+      "split": "sealed_b",
+      "url": "https://raw.githubusercontent.com/git/git/f78ce2f7b6df702f93d40b85d6bda92a3f65da79/Documentation/git-rebase.adoc",
+      "title": "git-rebase official documentation at f78ce2f7",
+      "publisher": "Git project",
+      "license_spdx": "GPL-2.0-only",
+      "license_url": "https://github.com/git/git/blob/f78ce2f7b6df702f93d40b85d6bda92a3f65da79/COPYING",
+      "document_type": "official_pinned_repository_documentation"
+    },
+    {
+      "source_key": "git-reset",
+      "split": "sealed_b",
+      "url": "https://raw.githubusercontent.com/git/git/f78ce2f7b6df702f93d40b85d6bda92a3f65da79/Documentation/git-reset.adoc",
+      "title": "git-reset official documentation at f78ce2f7",
+      "publisher": "Git project",
+      "license_spdx": "GPL-2.0-only",
+      "license_url": "https://github.com/git/git/blob/f78ce2f7b6df702f93d40b85d6bda92a3f65da79/COPYING",
+      "document_type": "official_pinned_repository_documentation"
+    },
+    {
+      "source_key": "git-revert",
+      "split": "sealed_b",
+      "url": "https://raw.githubusercontent.com/git/git/f78ce2f7b6df702f93d40b85d6bda92a3f65da79/Documentation/git-revert.adoc",
+      "title": "git-revert official documentation at f78ce2f7",
+      "publisher": "Git project",
+      "license_spdx": "GPL-2.0-only",
+      "license_url": "https://github.com/git/git/blob/f78ce2f7b6df702f93d40b85d6bda92a3f65da79/COPYING",
+      "document_type": "official_pinned_repository_documentation"
+    },
+    {
+      "source_key": "git-worktree",
+      "split": "sealed_b",
+      "url": "https://raw.githubusercontent.com/git/git/f78ce2f7b6df702f93d40b85d6bda92a3f65da79/Documentation/git-worktree.adoc",
+      "title": "git-worktree official documentation at f78ce2f7",
+      "publisher": "Git project",
+      "license_spdx": "GPL-2.0-only",
+      "license_url": "https://github.com/git/git/blob/f78ce2f7b6df702f93d40b85d6bda92a3f65da79/COPYING",
+      "document_type": "official_pinned_repository_documentation"
+    },
+    {
+      "source_key": "git-branch",
+      "split": "sealed_b",
+      "url": "https://raw.githubusercontent.com/git/git/f78ce2f7b6df702f93d40b85d6bda92a3f65da79/Documentation/git-branch.adoc",
+      "title": "git-branch official documentation at f78ce2f7",
+      "publisher": "Git project",
+      "license_spdx": "GPL-2.0-only",
+      "license_url": "https://github.com/git/git/blob/f78ce2f7b6df702f93d40b85d6bda92a3f65da79/COPYING",
+      "document_type": "official_pinned_repository_documentation"
+    },
+    {
+      "source_key": "git-commit",
+      "split": "sealed_b",
+      "url": "https://raw.githubusercontent.com/git/git/f78ce2f7b6df702f93d40b85d6bda92a3f65da79/Documentation/git-commit.adoc",
+      "title": "git-commit official documentation at f78ce2f7",
+      "publisher": "Git project",
+      "license_spdx": "GPL-2.0-only",
+      "license_url": "https://github.com/git/git/blob/f78ce2f7b6df702f93d40b85d6bda92a3f65da79/COPYING",
+      "document_type": "official_pinned_repository_documentation"
+    }
+  ]
+}

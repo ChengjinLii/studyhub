@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Benchmark v1 测量有效性审计</title>
+  <style>
+    :root { --ink:#14211b; --green:#2e6a57; --gold:#d3a73c; --paper:#f4f1e8; --line:#d6ddd7; --red:#9b3a2f; }
+    * { box-sizing:border-box; }
+    body { margin:0; color:var(--ink); background:var(--paper); font:16px/1.72 Georgia,"Noto Serif SC",serif; }
+    main { width:min(1040px,calc(100% - 40px)); margin:40px auto 72px; }
+    header { padding:44px 48px; color:#fff; background:linear-gradient(135deg,#173f34,#2e6a57); border-radius:24px; }
+    h1 { margin:8px 0 12px; font-size:clamp(32px,5vw,54px); line-height:1.12; }
+    h2 { margin:40px 0 12px; color:var(--green); font-size:25px; }
+    p,li { max-width:88ch; }
+    .tag { color:#ffe094; font:700 13px/1.2 ui-monospace,monospace; letter-spacing:.08em; }
+    code { color:#1f5948; background:#e5ece7; padding:.15em .35em; border-radius:5px; }
+    table { width:100%; border-collapse:collapse; background:#fff; }
+    th,td { padding:12px 14px; border-bottom:1px solid var(--line); text-align:left; vertical-align:top; }
+    th { color:var(--green); }
+    .blocker { color:var(--red); font-weight:700; }
+    .note { padding:18px 22px; border-left:5px solid var(--gold); background:#fff9e8; }
+    @media (max-width:720px) { header { padding:30px 24px; } table { font-size:14px; } }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <div class="tag">A_REAL_REPRODUCED · SOURCE + DATA AUDIT · 2026-08-27</div>
+    <h1>Benchmark 能跑，<br>不等于测得准。</h1>
+    <p>冻结 v1 通过了结构合同，却在正式 9B baseline 前暴露出测量有效性缺陷。</p>
+  </header>
+
+  <h2>面试问题</h2>
+  <p>为什么一个 35/35 结构检查全部通过的 Agent Benchmark，仍然不能直接用于训练前后能力结论？</p>
+
+  <h2>30 秒回答</h2>
+  <p>结构审计只能证明 schema、split、grader 和环境引用没有断裂，不能证明题目真的测到了命名能力。我复查 v1 后发现，“教师语义审查”没有调用模型或逐题人工判断，而是规则通过后自动给 5 分；Direct Answer 明示“不用工具”，Query Rewrite 没检查 query 是否变化，Permission Recovery 反而要求先撞 ACL，Deep Research 仍以关键词命中计分。因此保留 v1 的 hash 和运行证据，不篡改 lineage；新建 v2 重新设计量尺，再重跑 9B Base。</p>
+
+  <h2>可复现缺陷</h2>
+  <table>
+    <tr><th>名义能力</th><th>v1 实际判定</th><th>风险</th></tr>
+    <tr><td>Teacher semantic QA</td><td><code>review_case()</code> 做可达性规则检查；无 blocker 时固定赋 5 分。</td><td class="blocker">把 structural review 误称为 semantic review。</td></tr>
+    <tr><td>Tool abstention</td><td>用户请求直接写“Without using tools / 不用调用工具”。</td><td>测指令服从，不测自主工具相关性判断。</td></tr>
+    <tr><td>Query rewrite</td><td>第一次固定失败；后续任何成功调用都可算 recovery。</td><td>重复原 query 也可能通过。</td></tr>
+    <tr><td>Permission recovery</td><td>强制出现 permission denial。</td><td>惩罚主动规避明显私有资源的更安全策略。</td></tr>
+    <tr><td>Long horizon</td><td>由 budget tier 直接标 <code>10+</code>。</td><td>允许十步不代表成功必须依赖十步。</td></tr>
+    <tr><td>Deep research</td><td><code>rubric</code> 最终仍走 substring concept matching。</td><td>关键词罗列可能替代真实综合与论证。</td></tr>
+  </table>
+
+  <h2>上游方法如何约束修复</h2>
+  <ul>
+    <li>BFCL V4 的 relevance/irrelevance 划分用于构造不泄露策略的工具相关性任务。</li>
+    <li>tau-bench 的等价终态原则用于状态任务；不要求复刻单一 gold trajectory。</li>
+    <li>BrowseComp 的“难找、易验证”思想用于开放检索任务，但官方 evaluator 也必须审计后固定版本。</li>
+    <li>DeepResearchBench II 的原子化、可核验 rubric 用于多源综合；精确事实与开放语义维度分开评分。</li>
+  </ul>
+
+  <h2>处置</h2>
+  <p class="note"><strong>v1 保持冻结。</strong>它继续证明运行合同、Infra exclusion 和 Hermes 工具链，但不再承载正式能力结论。v2 将重建 source-group/template split，拆分 permission avoidance/recovery，检查 query change 与 evidence gain，报告 realized horizon，并加入自审/独立审查状态和 cluster-aware 统计。外部 Judge 的 401 不会被伪装成成功审查。</p>
+</main>
+</body>
+</html>

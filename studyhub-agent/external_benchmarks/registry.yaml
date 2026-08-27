@@ -1,0 +1,163 @@
+schema_version: studyhub.external-benchmark-registry.v1
+portfolio_version: studyhub-external-eval-2026.08
+generated_at: "2026-08-27"
+benchmarks:
+  bfcl:
+    display_name: BFCL V4 Agentic
+    upstream: https://github.com/ShishirPatil/gorilla.git
+    source_subdir: berkeley-function-call-leaderboard
+    revision:
+      kind: commit
+      ref: f7cf735
+      resolved_commit: f7cf7359b7ac615a0b294831c5ba2bc95ee4a000
+    license:
+      status: verified
+      spdx: Apache-2.0
+      path: LICENSE
+      scope: repository_code_and_bundled_data
+    export_allowed: true
+    evaluator:
+      version: bfcl-eval==2025.12.17
+      entrypoint: bfcl evaluate
+      module: bfcl_eval.eval_checker.eval_runner
+      preserves_official_metrics: true
+    generation:
+      entrypoint: bfcl generate
+      local_endpoint_flag: --skip-server-setup
+    expected_paths:
+      - LICENSE
+      - berkeley-function-call-leaderboard/pyproject.toml
+      - berkeley-function-call-leaderboard/bfcl_eval/__main__.py
+      - berkeley-function-call-leaderboard/bfcl_eval/eval_checker/eval_runner.py
+      - berkeley-function-call-leaderboard/bfcl_eval/data/BFCL_v4_simple_python.json
+      - berkeley-function-call-leaderboard/bfcl_eval/data/BFCL_v4_multi_turn_base.json
+      - berkeley-function-call-leaderboard/bfcl_eval/data/BFCL_v4_web_search.json
+      - berkeley-function-call-leaderboard/bfcl_eval/data/BFCL_v4_memory.json
+    core_categories:
+      - simple_python
+      - parallel
+      - multiple
+      - multi_turn
+      - web_search
+      - memory
+      - format_sensitivity
+    runtime_requirements:
+      python: ">=3.10"
+      optional_api_keys:
+        - SERPAPI_API_KEY
+
+  tau2:
+    display_name: tau2-bench v1.0.1
+    upstream: https://github.com/sierra-research/tau2-bench.git
+    source_subdir: .
+    revision:
+      kind: tag
+      ref: v1.0.1
+      resolved_commit: fc0055dc4e0a316c3f83133267fbd6faaa770992
+    license:
+      status: verified
+      spdx: MIT
+      path: LICENSE
+      scope: repository_code_and_bundled_data
+    export_allowed: true
+    evaluator:
+      version: tau2==1.0.1
+      entrypoint: tau2 run
+      module: tau2.evaluator.evaluator
+      preserves_official_metrics: true
+      scoring_note: Reference actions are not unique required actions unless ACTION is in reward_basis.
+    expected_paths:
+      - LICENSE
+      - pyproject.toml
+      - docs/evaluation.md
+      - src/tau2/evaluator/evaluator.py
+      - data/tau2/domains/airline/tasks.json
+      - data/tau2/domains/retail/tasks.json
+      - data/tau2/domains/telecom/tasks.json
+      - data/tau2/domains/banking_knowledge/tasks.json
+    core_domains:
+      - airline
+      - retail
+      - telecom
+      - banking_knowledge
+    excluded_from_core:
+      - voice
+      - multimodal
+    runtime_requirements:
+      python: ">=3.12,<3.14"
+      model_endpoint_required: true
+
+  deepresearch_bench_ii:
+    display_name: DeepResearch Bench II
+    upstream: https://github.com/SawyerCooper/DeepResearchBench2.git
+    source_subdir: .
+    revision:
+      kind: commit
+      ref: 440bdc33728438d317ca7860809942b5a1e40256
+      resolved_commit: 440bdc33728438d317ca7860809942b5a1e40256
+    license:
+      status: unconfirmed
+      spdx: NOASSERTION
+      path: null
+      scope: upstream_repository_has_no_license_file
+    export_allowed: false
+    evaluator:
+      version: upstream-440bdc3
+      entrypoint: python run_evaluation.py
+      aggregation_entrypoint: python aggregate_scores.py
+      module: run_evaluation
+      preserves_official_metrics: true
+      judge: Gemini-compatible rubric judge configured by upstream
+    expected_paths:
+      - README.md
+      - pyproject.toml
+      - run_evaluation.py
+      - aggregate_scores.py
+      - tasks_and_rubrics.jsonl
+    runtime_requirements:
+      python: ">=3.12"
+      required_api_keys:
+        - GEMINI_API_TOKEN
+      license_review_required: true
+
+  browsecomp_plus:
+    display_name: BrowseComp-Plus
+    upstream: https://github.com/texttron/BrowseComp-Plus.git
+    source_subdir: .
+    revision:
+      kind: commit
+      ref: 046949032b0328319cc9a02663a759ec601d9402
+      resolved_commit: 046949032b0328319cc9a02663a759ec601d9402
+    license:
+      status: verified
+      spdx: MIT
+      path: LICENSE
+      scope: repository_code
+    export_allowed: true
+    evaluator:
+      version: upstream-0469490
+      entrypoint: python scripts_evaluation/evaluate_run.py
+      retrieval_entrypoint: python -m pyserini.eval.trec_eval
+      module: scripts_evaluation.evaluate_run
+      preserves_official_metrics: true
+      judge: Qwen3-32B by upstream default
+    expected_paths:
+      - LICENSE
+      - pyproject.toml
+      - scripts_build_index/decrypt_dataset.py
+      - scripts_evaluation/evaluate_run.py
+      - topics-qrels/qrel_evidence.txt
+      - topics-qrels/qrel_golds.txt
+    data_assets:
+      - repository: Tevatron/browsecomp-plus
+        revision: 144cff8e35b5eaef7e526346aa60774a9deb941f
+        license: MIT
+        content: obfuscated_queries_answers_and_qrels
+      - repository: Tevatron/browsecomp-plus-corpus
+        revision: b27b02bc3e45511b8b82a13e6f90ce761df726f6
+        license: MIT
+        content: fixed_approximately_100k_document_corpus
+    runtime_requirements:
+      python: ">=3.10"
+      full_corpus_download: manual
+      gpu_for_official_judge: required

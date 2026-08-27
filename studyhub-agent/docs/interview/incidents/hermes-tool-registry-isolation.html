@@ -71,7 +71,12 @@ finally: deregister("web_search") # 又删除了内置项
   <h2>证据</h2>
   <p><code>aborted_run=qwen35-9b-base-regression-seed-20260827-20260827_185655</code><br>
      <code>trigger=Tool registration REJECTED: web_search would shadow toolset web</code></p>
-  <p class="note">该 Regression 不进入任何能力结论。只有修复后重新通过 20-task Gate，并确认日志中无 registration rejection，才允许重新启动完整 Regression。</p>
+  <p><code>fixed_gate=qwen35-9b-base-gate-seed-20260827-20260827_190907</code><br>
+     <code>git=a4c295fbd9f85669decaeb111b449815152bdd1a</code><br>
+     <code>episodes=20/20 SCORED · infra_excluded=0 · runtime_errors=0</code><br>
+     <code>prompt_audit=80/80 requests contained one system message and one Benchmark prompt</code><br>
+     <code>tool_calls=76 · registration_rejections=0</code></p>
+  <p class="note">受污染的 Regression 永不进入能力结论。修复后 Gate 已证明冻结工具覆盖、Hermes 循环、SGLang 推理和 evaluator 链路可用；其中 10% strict success 仅是 Benchmark v1 的运行诊断，不作为正式能力基线，因为后续审计发现 v1 仍有测量有效性缺陷。</p>
 </main>
 </body>
 </html>

@@ -1,0 +1,43 @@
+{
+  "schema_version": "studyhub.agentbench-self-review.v2",
+  "benchmark_version": "studyhub-agentbench-v2",
+  "reviewer_type": "codex_self_review",
+  "reviewed_at": "2026-08-27",
+  "status": "COMPLETED_PASS_WITH_LIMITATIONS",
+  "reviewed_items": 32,
+  "sampling": {
+    "capability_representatives": 30,
+    "additional_split_representatives": 2,
+    "covered_splits": [
+      "regression",
+      "development",
+      "sealed_a",
+      "sealed_b",
+      "calibration_challenge"
+    ],
+    "covered_languages": [
+      "zh",
+      "en"
+    ],
+    "covered_origins": [
+      "authentic_studyhub_preview",
+      "authentic_web_snapshot",
+      "synthetic_adversarial",
+      "synthetic_memory",
+      "synthetic_state"
+    ]
+  },
+  "primary_review_pack_sha256": "661bbb57c178790e3a6d54e2d07dbd636c634e23f5648af11b012c91f5157643",
+  "blocking_findings_resolved": [
+    "English tasks previously received Chinese split prefixes; prefixes now follow task language.",
+    "OCR passage tasks previously accepted one arbitrary companion term; graders now accept all supported non-anchor terms.",
+    "Query reformulation previously allowed a first-search target hit; the task now requires an observed alias bridge, changed query and target-recall gain."
+  ],
+  "known_limitations": [
+    "StudyHub preview OCR quality varies and some authentic tasks remain extraction-oriented.",
+    "A small number of cross-passage tasks use the same anchor in two distinct passages.",
+    "The internal research lane measures controlled multi-source synthesis, not general open-web Deep Research quality."
+  ],
+  "independent_human_review": "NOT_RUN",
+  "external_llm_judge": "NOT_RUN"
+}

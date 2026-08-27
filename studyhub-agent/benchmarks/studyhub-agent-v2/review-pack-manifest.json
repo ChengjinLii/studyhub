@@ -1,0 +1,149 @@
+{
+  "schema_version": "studyhub.agentbench-review-pack-manifest.v2",
+  "benchmark_version": "studyhub-agentbench-v2",
+  "storage": "IGNORED_LOCAL_ARTIFACT",
+  "contains_hidden_graders": true,
+  "packs": {
+    "primary-all": {
+      "count": 95,
+      "sha256": "661bbb57c178790e3a6d54e2d07dbd636c634e23f5648af11b012c91f5157643",
+      "split_counts": {
+        "calibration_challenge": 7,
+        "development": 51,
+        "regression": 12,
+        "sealed_a": 13,
+        "sealed_b": 12
+      },
+      "capability_counts": {
+        "authentic_web_research": 5,
+        "cross_chunk_synthesis": 20,
+        "direct_answer_tool_relevance": 2,
+        "factual_passage_retrieval": 34,
+        "insufficient_evidence": 1,
+        "long_horizon": 1,
+        "memory_absence": 1,
+        "memory_collective_conflict": 1,
+        "memory_collective_low_confidence": 2,
+        "memory_cross_user_privacy": 1,
+        "memory_current_conflict": 2,
+        "memory_incomplete_abstention": 1,
+        "memory_irrelevant_tool_abstention": 1,
+        "memory_rag_composition": 2,
+        "memory_scope_resolution": 1,
+        "memory_selection": 1,
+        "memory_temporal_change": 1,
+        "memory_user_correction": 1,
+        "memory_web_composition": 1,
+        "memory_web_conflict_resolution": 1,
+        "multi_source_synthesis": 1,
+        "permission_avoidance": 2,
+        "permission_recovery": 2,
+        "query_reformulation": 1,
+        "source_disambiguation_ood": 1,
+        "state_conditional_action": 1,
+        "state_function_calling": 2,
+        "state_multistep_postcondition": 1,
+        "stop_cost_control": 1,
+        "tool_failure_recovery": 3
+      },
+      "language_counts": {
+        "en": 27,
+        "zh": 68
+      },
+      "origin_counts": {
+        "authentic_studyhub_preview": 54,
+        "authentic_web_snapshot": 5,
+        "synthetic_adversarial": 15,
+        "synthetic_memory": 17,
+        "synthetic_state": 4
+      }
+    },
+    "adversarial": {
+      "count": 36,
+      "sha256": "d99264c9ecc6c1f1fa6cb13cc3f4385bcba939f63d59695beaa9cb91abab007a",
+      "split_counts": {
+        "calibration_challenge": 3,
+        "development": 24,
+        "regression": 3,
+        "sealed_a": 3,
+        "sealed_b": 3
+      },
+      "capability_counts": {
+        "direct_answer_tool_relevance": 2,
+        "insufficient_evidence": 1,
+        "long_horizon": 1,
+        "memory_absence": 1,
+        "memory_collective_conflict": 1,
+        "memory_collective_low_confidence": 2,
+        "memory_cross_user_privacy": 1,
+        "memory_current_conflict": 2,
+        "memory_incomplete_abstention": 1,
+        "memory_irrelevant_tool_abstention": 1,
+        "memory_rag_composition": 2,
+        "memory_scope_resolution": 1,
+        "memory_selection": 1,
+        "memory_temporal_change": 1,
+        "memory_user_correction": 1,
+        "memory_web_composition": 1,
+        "memory_web_conflict_resolution": 1,
+        "multi_source_synthesis": 1,
+        "permission_avoidance": 2,
+        "permission_recovery": 2,
+        "query_reformulation": 1,
+        "source_disambiguation_ood": 1,
+        "state_conditional_action": 1,
+        "state_function_calling": 2,
+        "state_multistep_postcondition": 1,
+        "stop_cost_control": 1,
+        "tool_failure_recovery": 3
+      },
+      "language_counts": {
+        "en": 2,
+        "zh": 34
+      },
+      "origin_counts": {
+        "synthetic_adversarial": 15,
+        "synthetic_memory": 17,
+        "synthetic_state": 4
+      }
+    },
+    "research-and-synthesis": {
+      "count": 32,
+      "sha256": "e1a9224c997953863ac6ad7674e5a0eb2d638e9f243e89bd0c9caac67a7a0653",
+      "split_counts": {
+        "calibration_challenge": 2,
+        "development": 15,
+        "regression": 4,
+        "sealed_a": 5,
+        "sealed_b": 6
+      },
+      "capability_counts": {
+        "authentic_web_research": 5,
+        "cross_chunk_synthesis": 20,
+        "long_horizon": 1,
+        "memory_rag_composition": 2,
+        "memory_web_composition": 1,
+        "memory_web_conflict_resolution": 1,
+        "multi_source_synthesis": 1,
+        "source_disambiguation_ood": 1
+      },
+      "language_counts": {
+        "en": 14,
+        "zh": 18
+      },
+      "origin_counts": {
+        "authentic_studyhub_preview": 20,
+        "authentic_web_snapshot": 5,
+        "synthetic_adversarial": 3,
+        "synthetic_memory": 4
+      }
+    }
+  },
+  "review_status": {
+    "self_review": "COMPLETED_PASS_WITH_LIMITATIONS",
+    "self_reviewed_items": 32,
+    "self_review_evidence": "configs/benchmark-v2-self-review.json",
+    "independent_human_review": "NOT_RUN",
+    "external_llm_judge": "NOT_RUN"
+  }
+}

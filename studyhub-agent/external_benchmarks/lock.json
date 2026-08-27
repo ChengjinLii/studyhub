@@ -1,0 +1,132 @@
+{
+  "benchmarks": {
+    "bfcl": {
+      "artifact_hashes": {
+        "LICENSE": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
+        "berkeley-function-call-leaderboard/bfcl_eval/__main__.py": "682d1e416913d602fddbce0bfb52c048bc72439dd71ea01ac3b41a6efaa9319e",
+        "berkeley-function-call-leaderboard/bfcl_eval/data/BFCL_v4_memory.json": "40fc21d4528af53c6b44204def89e81515d0101654229e2c2e82bbf5f047b14f",
+        "berkeley-function-call-leaderboard/bfcl_eval/data/BFCL_v4_multi_turn_base.json": "1a21a995d06fd6f20ba55de7bced30ef953ec35e998f502ec2ecf4d66ef1c43a",
+        "berkeley-function-call-leaderboard/bfcl_eval/data/BFCL_v4_simple_python.json": "82dd63ba502eb2520c6b5d1d9a5c4b590e03ff261565175561f6228a367d1991",
+        "berkeley-function-call-leaderboard/bfcl_eval/data/BFCL_v4_web_search.json": "6fc41d96d003dc849028966a782923560d2fc127ed2088aa967f06daaafa4268",
+        "berkeley-function-call-leaderboard/bfcl_eval/eval_checker/eval_runner.py": "b1033684908819ccb312d4d0e2c563359d69247412f00206013b2292b0e3ce81",
+        "berkeley-function-call-leaderboard/pyproject.toml": "000bbf6b0018157b1843d1db3c73ae434925343c178d0bfb9b2db5b57e1aefc6"
+      },
+      "data_assets": [],
+      "evaluator_status": "SETUP_READY",
+      "fetched_at": "2026-08-27T12:24:58+00:00",
+      "git_tree": "8c805ceaf6b5d9c576e67f9274ed386fd9998911",
+      "license": {
+        "path": "LICENSE",
+        "scope": "repository_code_and_bundled_data",
+        "spdx": "Apache-2.0",
+        "status": "verified"
+      },
+      "name": "bfcl",
+      "resolved_commit": "f7cf7359b7ac615a0b294831c5ba2bc95ee4a000",
+      "revision": "f7cf735",
+      "setup_status": "FETCHED",
+      "source_exported": true,
+      "source_path": "artifacts/external-benchmarks/sources/bfcl/f7cf7359b7ac615a0b294831c5ba2bc95ee4a000",
+      "upstream": "https://github.com/ShishirPatil/gorilla.git"
+    },
+    "browsecomp_plus": {
+      "artifact_hashes": {
+        "LICENSE": "a580afd0716e99a1c43fb297a950620a55980305aae9fcd236141101a7e21803",
+        "pyproject.toml": "742432b9b41b86daeb26a19330bb1348c604800d46f0a6f465f9b2b920782d19",
+        "scripts_build_index/decrypt_dataset.py": "d25c7565ee7c1d9c8ec37f610b1f67756db8f8924ac6b8175ffff6d261a0e32d",
+        "scripts_evaluation/evaluate_run.py": "1a21233937c377ab6323c98ff9af67742756a57fbacab4ebf9bc30852eae530a",
+        "topics-qrels/qrel_evidence.txt": "a6f594975be57339de9e4e9f67f13c044f647feda77c0b84c45a1581e3041bd1",
+        "topics-qrels/qrel_golds.txt": "b875af4a745712bee7a94f464ed989232f8c77977c31824428470e11dcb28c73"
+      },
+      "data_assets": [
+        {
+          "content": "obfuscated_queries_answers_and_qrels",
+          "license": "MIT",
+          "repository": "Tevatron/browsecomp-plus",
+          "revision": "144cff8e35b5eaef7e526346aa60774a9deb941f"
+        },
+        {
+          "content": "fixed_approximately_100k_document_corpus",
+          "license": "MIT",
+          "repository": "Tevatron/browsecomp-plus-corpus",
+          "revision": "b27b02bc3e45511b8b82a13e6f90ce761df726f6"
+        }
+      ],
+      "evaluator_status": "SETUP_READY",
+      "fetched_at": "2026-08-27T12:25:22+00:00",
+      "git_tree": "fd66afd6c66d5d092dc9547e6147d7da263e44ec",
+      "license": {
+        "path": "LICENSE",
+        "scope": "repository_code",
+        "spdx": "MIT",
+        "status": "verified"
+      },
+      "name": "browsecomp_plus",
+      "resolved_commit": "046949032b0328319cc9a02663a759ec601d9402",
+      "revision": "046949032b0328319cc9a02663a759ec601d9402",
+      "setup_status": "FETCHED",
+      "source_exported": true,
+      "source_path": "artifacts/external-benchmarks/sources/browsecomp_plus/046949032b0328319cc9a02663a759ec601d9402",
+      "upstream": "https://github.com/texttron/BrowseComp-Plus.git"
+    },
+    "deepresearch_bench_ii": {
+      "artifact_hashes": {
+        "README.md": "ccef75b3dc552c474d93ce1f1d2cf7b5cf1243c377953ceaee2f00cabbe1fa51",
+        "aggregate_scores.py": "11270962fa69c220f90e100bbcbebf5183f87d8f25c18b1c49d13363c1a542de",
+        "pyproject.toml": "8b7cbb013394d19e55a04c52e7ed6ad998441ea6fca939f2e901c8ce008379ca",
+        "run_evaluation.py": "67cf49cb68c57cec91d262f687c2dd39836f7c7621d6d86bf925aa972d7050b2",
+        "tasks_and_rubrics.jsonl": "85a416a69b7bf6b1607fc927c0459789f4f59a3f495a5e8bee7e2e5a53c7db6f"
+      },
+      "data_assets": [],
+      "evaluator_status": "LICENSE_REVIEW_REQUIRED",
+      "fetched_at": "2026-08-27T12:25:20+00:00",
+      "git_tree": "053ffb29ec1aa42a4a03a8a6699069e3d1e2672a",
+      "license": {
+        "path": null,
+        "scope": "upstream_repository_has_no_license_file",
+        "spdx": "NOASSERTION",
+        "status": "unconfirmed"
+      },
+      "name": "deepresearch_bench_ii",
+      "resolved_commit": "440bdc33728438d317ca7860809942b5a1e40256",
+      "revision": "440bdc33728438d317ca7860809942b5a1e40256",
+      "setup_status": "LICENSE_REVIEW_REQUIRED",
+      "source_exported": false,
+      "source_path": null,
+      "upstream": "https://github.com/SawyerCooper/DeepResearchBench2.git"
+    },
+    "tau2": {
+      "artifact_hashes": {
+        "LICENSE": "e67c5aa0074dfcaefd3c3a1aedb94cb539234aecd15d5a972574e3200e6252fe",
+        "data/tau2/domains/airline/tasks.json": "ccd8ba737b4cc371415af70151187788f728d6108d0916e73bb4317b40542052",
+        "data/tau2/domains/banking_knowledge/tasks.json": "213c7f3e6dc0420b1184ee271e39e38c6ece3c43edfa362db49a560828ebd543",
+        "data/tau2/domains/retail/tasks.json": "8e03ebce7901bd6218e7a7dc3105faa9324091a68058f7fe61c65262868812e8",
+        "data/tau2/domains/telecom/tasks.json": "37e562e1ae3242577407e1303b1548bc64e7ea68e37d36173e6747990ceaf8a4",
+        "docs/evaluation.md": "017e992b8e8b57c227523c63c4a2597b69a328c0108bd94b1c9028fed6a26ac4",
+        "pyproject.toml": "23d59670b4ad7bbc0f57420fd9643a8d9188c24abe4f29c9c965544d8cc4cb8d",
+        "src/tau2/evaluator/evaluator.py": "204d95a82812402f2fee989250392d3c66de702a8bcc20258c7e2a8153a1ea8d"
+      },
+      "data_assets": [],
+      "evaluator_status": "SETUP_READY",
+      "fetched_at": "2026-08-27T12:25:17+00:00",
+      "git_tree": "4837da1c2b310152f63d3d7987f4325183ca6f7c",
+      "license": {
+        "path": "LICENSE",
+        "scope": "repository_code_and_bundled_data",
+        "spdx": "MIT",
+        "status": "verified"
+      },
+      "name": "tau2",
+      "resolved_commit": "fc0055dc4e0a316c3f83133267fbd6faaa770992",
+      "revision": "v1.0.1",
+      "setup_status": "FETCHED",
+      "source_exported": true,
+      "source_path": "artifacts/external-benchmarks/sources/tau2/fc0055dc4e0a316c3f83133267fbd6faaa770992",
+      "upstream": "https://github.com/sierra-research/tau2-bench.git"
+    }
+  },
+  "generated_at": "2026-08-27T12:25:22+00:00",
+  "portfolio_version": "studyhub-external-eval-2026.08",
+  "registry_sha256": "01737e7515667d1916dea1d8b62eef37bc52c9064c602a48cb0413fc6958aa1f",
+  "schema_version": "studyhub.external-benchmark-lock.v1"
+}

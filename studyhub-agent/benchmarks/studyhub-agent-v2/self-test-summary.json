@@ -1,0 +1,69 @@
+{
+  "schema_version": "studyhub.agentbench-self-test-summary.v2",
+  "benchmark_version": "studyhub-agentbench-v2",
+  "generated_at": "2026-08-27T12:50:01+00:00",
+  "status": "PASS",
+  "oracle": {
+    "tasks": 70,
+    "scored": 70,
+    "strict_pass": 70,
+    "pass_rate": 1.0,
+    "errors": 0
+  },
+  "negative_controls": {
+    "empty_answer": {
+      "evaluated": 70,
+      "strict_pass": 0,
+      "strict_pass_rate": 0.0
+    },
+    "random_answer": {
+      "evaluated": 70,
+      "strict_pass": 0,
+      "strict_pass_rate": 0.0
+    },
+    "fixed_generic_answer": {
+      "evaluated": 70,
+      "strict_pass": 0,
+      "strict_pass_rate": 0.0
+    },
+    "tool_spam": {
+      "evaluated": 70,
+      "strict_pass": 0,
+      "strict_pass_rate": 0.0
+    },
+    "citation_decoration": {
+      "evaluated": 53,
+      "strict_pass": 0,
+      "strict_pass_rate": 0.0
+    },
+    "wrong_source": {
+      "evaluated": 53,
+      "strict_pass": 0,
+      "strict_pass_rate": 0.0
+    }
+  },
+  "metamorphic": {
+    "cases": 8,
+    "passed": 8
+  },
+  "shortcut": {
+    "checks": {
+      "task_id_answer_leakage_zero": true,
+      "content_request_answer_leakage_zero": true,
+      "public_oracle_fields_zero": true,
+      "difficulty_not_ordinal": true,
+      "largest_answer_signature_at_most_ten_percent": true,
+      "semantic_template_ids_unique": true
+    },
+    "tasks": 95,
+    "unique_answer_signatures": 70,
+    "largest_answer_signature": 6,
+    "largest_answer_signature_share": 0.06315789473684211
+  },
+  "artifact_hashes": {
+    "oracle-reachability-report.json": "a89d1ce4d2cc0a202d7e6e5c884f0ba9f0236b9b3fe56227da46637ee0ad9be3",
+    "negative-control-report.json": "91db44688e05568dc84548b03c2f849c2cc95a733a159107035887e5f17cbfb1",
+    "metamorphic-test-report.json": "4ad307d20469e9ee62077cc0ae7a7ec722c74a27be34df24f0189eec14351837",
+    "shortcut-probe-report.json": "551730e8808ad0cfdfa839c6c04ad3bcf4fc3abd46198a992752881c372387c7"
+  }
+}

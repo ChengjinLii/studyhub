@@ -1,0 +1,14 @@
+{
+  "schema_version": "studyhub.agentbench-frozen-integrity.v1",
+  "benchmark_version": "studyhub-agentbench-v1",
+  "baseline_commit": "3b0a7fb",
+  "files": {
+    "benchmarks/studyhub-agent-v1/BENCHMARK_CARD.html": "cf7153a4d7ce7e8e618e6c179cad18e612b2dc0d59ee3cfb5555c16ee65f32d5",
+    "benchmarks/studyhub-agent-v1/BENCHMARK_CARD.json": "25dd9176601d464f57a33db937539b4ac8f63322f0b341dc8eb63a399df552a2",
+    "benchmarks/studyhub-agent-v1/development/tasks.jsonl": "dc13fb67971b028d2e5c039ed1ab12d73672cafd9607ab10613b0aabe09e4dc9",
+    "benchmarks/studyhub-agent-v1/manifest.json": "89b6fe098c26ba8664d27704b28b4571d1c70de636abcfe06ecfb929594c7cb1",
+    "benchmarks/studyhub-agent-v1/quality-review-summary.json": "5c8e1d23abb697dd80547117393331c48ebcada60fdb49b21be08b6ae1c37c9d",
+    "benchmarks/studyhub-agent-v1/regression/tasks.jsonl": "8303ca9eb499ab97cb881b2543d69aed6e8dacdf5ea99b6e2f32d1a44923a3c8",
+    "benchmarks/studyhub-agent-v1/structural-audit-summary.json": "bf3a04f50c160ce7fc45154aa0d43973524e46083c40aba7685edaed55a0c67e"
+  }
+}

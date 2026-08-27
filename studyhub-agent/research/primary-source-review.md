@@ -281,3 +281,26 @@ Rule: a decision below is a design input, not evidence that StudyHub has reprodu
 ## Research triggers after launch
 
 The review must be revised when any of the following appears: Reward rises while Dev falls; more than the accepted compute budget is spent on zero-variance groups; entropy, KL or ratio tails become abnormal; external and StudyHub scores diverge; a dual-GPU layout is OOM or materially idle; Web/Memory judge disagreement exceeds its calibration bound. Each revision must record the primary source, falsifiable hypothesis, minimum experiment and decision change.
+
+## Benchmark v2 measurement-validity decisions
+
+This section records the correction made after Benchmark v1 passed structural checks but failed a source-level measurement-validity review. Benchmark v1 remains immutable evidence for runtime and Infra behavior. Formal 9B capability conclusions move to v2.
+
+| Source and pinned review revision | Mechanism reviewed | Decision for v2 |
+| --- | --- | --- |
+| BFCL V4, Gorilla `6ea57973c7a6097fd7c5915698c54c17c5b1b6c8` | Relevant prompts require an appropriate function call; irrelevant prompts test withholding calls without telling the model the policy. | **ADOPT** for direct-answer/tool-relevance scenarios. Remove “do not use tools” hints and expose the same broad tool inventory in both positive and negative cases. |
+| tau2/tau3-bench `a2c024725189473d2d7cea3a5cfdbcc67478e41f` | Evaluate equivalent end state rather than equality to one action sequence; reference actions can remain diagnostic. | **ADOPT** for state-changing tasks. **DO NOT COPY BLINDLY**: the upstream evaluation notes that permissive no-op paths can falsely pass, so StudyHub assertions remain fail-closed. |
+| OpenAI simple-evals BrowseComp `652c89d0ca9df547706735883097e9537d40dc47` | Hard-to-find but short, objectively verifiable answers separate search effort from answer verification. | **ADAPT** for Web stress and query reformulation. The pinned evaluator snapshot is audited before use; official provenance does not exempt parsing code from local tests. |
+| DeepResearchBench II `087c1b8d4a0ed46fd3dd8615a0b5e93ce3acf6f8` | Atomic content-bearing rubrics, explicit evidence and separate information/analysis/presentation dimensions, with evaluator-human calibration. | **ADAPT** for multi-source synthesis. Exact facts, ACL and citations remain deterministic; open entailment and synthesis dimensions require semantic grading and retain disagreement. |
+
+### v2 operational changes
+
+- Rename the internal retrieval claim to **deterministic lexical RAG replay** because the frozen environment is BM25, not Hybrid RAG. A real frozen BM25 + dense + fusion snapshot is a separate retrieval experiment and will not delay the post-training baseline.
+- Split direct calculation, insufficient-evidence handling and tool relevance so user text does not reveal the desired policy.
+- Require query reformulation to change the normalized query and produce evidence gain; a repeated retry is not recovery.
+- Split **permission avoidance** from **post-denial recovery** so avoiding an obvious ACL probe is rewarded rather than penalized.
+- Treat `horizon_tier` as intended budget metadata and report `realized_successful_policy_steps` separately. Long-horizon tasks must contain an observation-dependent chain whose minimum successful action count is auditable.
+- Rename the internal `deep_research` family to **multi_source_synthesis**. Broad Deep Research claims require external BrowseComp/DeepResearchBench results.
+- Report micro success, macro capability success, material-cluster bootstrap intervals and template-cluster bootstrap intervals; generated tasks are not described as IID.
+- Publish a metric-coverage matrix that distinguishes “task family present” from “metric operationalized”.
+- The v1 rule script is relabeled structural review. v2 records Codex inspection only as `self_review`; it is not human or independent-provider review. The failed Xiaomi 401 contributes no result, and independent review remains `NOT_RUN` until actually performed.

@@ -1,0 +1,358 @@
+{
+  "schema_version": "studyhub.agentbench-web-lock.v2",
+  "config_sha256": "f00a17744d4f9350133fa5c5960f521dbb8fb527f188ec67c20c3547173f4976",
+  "snapshot_sha256": "76930d74fe4934064071a343fe721e28116a3f653c5e67f35926b003d33875d3",
+  "source_count": 50,
+  "sources": {
+    "git-branch": {
+      "url": "https://raw.githubusercontent.com/git/git/f78ce2f7b6df702f93d40b85d6bda92a3f65da79/Documentation/git-branch.adoc",
+      "resolved_url": "https://raw.githubusercontent.com/git/git/f78ce2f7b6df702f93d40b85d6bda92a3f65da79/Documentation/git-branch.adoc",
+      "content_sha256": "0c4abe8a5fa262216016dab36298903e74923a4884f2891eefd3fd8ccf8e3a36",
+      "raw_sha256": "6631281ad04c4afe0c348b0138fa0176f17b40fce37ef1e62c5e9f91235610cd",
+      "license_spdx": "GPL-2.0-only"
+    },
+    "git-clone": {
+      "url": "https://raw.githubusercontent.com/git/git/f78ce2f7b6df702f93d40b85d6bda92a3f65da79/Documentation/git-clone.adoc",
+      "resolved_url": "https://raw.githubusercontent.com/git/git/f78ce2f7b6df702f93d40b85d6bda92a3f65da79/Documentation/git-clone.adoc",
+      "content_sha256": "96bf885bc8f4dd443d176f25344a45aee2ec17b150de9eef6084132a0da7457e",
+      "raw_sha256": "3116cc9ee8d1c7bbd12649e7203e813d2e4335b9bc9dd76d20ec87ce5f430123",
+      "license_spdx": "GPL-2.0-only"
+    },
+    "git-commit": {
+      "url": "https://raw.githubusercontent.com/git/git/f78ce2f7b6df702f93d40b85d6bda92a3f65da79/Documentation/git-commit.adoc",
+      "resolved_url": "https://raw.githubusercontent.com/git/git/f78ce2f7b6df702f93d40b85d6bda92a3f65da79/Documentation/git-commit.adoc",
+      "content_sha256": "06aa08d52871a393143b23c70161e024e402a7e21566e30761168b44198ba2a3",
+      "raw_sha256": "ec670cfacaf3df8745e9cfe2fa68b74247cb111e4208e1a0095036732cb5e717",
+      "license_spdx": "GPL-2.0-only"
+    },
+    "git-fetch": {
+      "url": "https://raw.githubusercontent.com/git/git/f78ce2f7b6df702f93d40b85d6bda92a3f65da79/Documentation/git-fetch.adoc",
+      "resolved_url": "https://raw.githubusercontent.com/git/git/f78ce2f7b6df702f93d40b85d6bda92a3f65da79/Documentation/git-fetch.adoc",
+      "content_sha256": "c1e1f0538b948c569f92bb00e3eb10a1320f3bd17bf4472dfd748383ea204c34",
+      "raw_sha256": "fd225a09cb7bdb687cff4ba161cb1f337f2523eac5f83db5dbbbb1ef216fa41e",
+      "license_spdx": "GPL-2.0-only"
+    },
+    "git-gitignore": {
+      "url": "https://raw.githubusercontent.com/git/git/f78ce2f7b6df702f93d40b85d6bda92a3f65da79/Documentation/gitignore.adoc",
+      "resolved_url": "https://raw.githubusercontent.com/git/git/f78ce2f7b6df702f93d40b85d6bda92a3f65da79/Documentation/gitignore.adoc",
+      "content_sha256": "b73cbdc10b2e799308bc1f89a6790224867d8e581f4056f40f57cb7f888abcbd",
+      "raw_sha256": "338221577b4f47ea61b10eb6e57e7b0aab71e3f7ff8ce8bc067676aede805e71",
+      "license_spdx": "GPL-2.0-only"
+    },
+    "git-merge": {
+      "url": "https://raw.githubusercontent.com/git/git/f78ce2f7b6df702f93d40b85d6bda92a3f65da79/Documentation/git-merge.adoc",
+      "resolved_url": "https://raw.githubusercontent.com/git/git/f78ce2f7b6df702f93d40b85d6bda92a3f65da79/Documentation/git-merge.adoc",
+      "content_sha256": "09ce3cfd9e06ea72ff5635a4af69302c3dbf026d7d0d701b912eb0902f25a417",
+      "raw_sha256": "8ef01610c3356215cd36ed18acf1fa460a7afbd8ac02b23b75d373b9765cece9",
+      "license_spdx": "GPL-2.0-only"
+    },
+    "git-rebase": {
+      "url": "https://raw.githubusercontent.com/git/git/f78ce2f7b6df702f93d40b85d6bda92a3f65da79/Documentation/git-rebase.adoc",
+      "resolved_url": "https://raw.githubusercontent.com/git/git/f78ce2f7b6df702f93d40b85d6bda92a3f65da79/Documentation/git-rebase.adoc",
+      "content_sha256": "5ca5461be73df22e8b9d3cd6bed593cbf4518cddce991304a1d23996b80982db",
+      "raw_sha256": "e71226d6094b71be9f13247fdd203d510073502539a42d2f4ba299f3bbfab17a",
+      "license_spdx": "GPL-2.0-only"
+    },
+    "git-reset": {
+      "url": "https://raw.githubusercontent.com/git/git/f78ce2f7b6df702f93d40b85d6bda92a3f65da79/Documentation/git-reset.adoc",
+      "resolved_url": "https://raw.githubusercontent.com/git/git/f78ce2f7b6df702f93d40b85d6bda92a3f65da79/Documentation/git-reset.adoc",
+      "content_sha256": "1ab096e1b81d66c89e64757341f74d3b27a075255ece9f182c0aeb7e4491c12f",
+      "raw_sha256": "da477f7cc126877972c124922a9abc6417eaf3ac03ccadaf7743e3d4e85254d2",
+      "license_spdx": "GPL-2.0-only"
+    },
+    "git-revert": {
+      "url": "https://raw.githubusercontent.com/git/git/f78ce2f7b6df702f93d40b85d6bda92a3f65da79/Documentation/git-revert.adoc",
+      "resolved_url": "https://raw.githubusercontent.com/git/git/f78ce2f7b6df702f93d40b85d6bda92a3f65da79/Documentation/git-revert.adoc",
+      "content_sha256": "09d65d67bfa9be97b76190a751fef1ee93fea607299ef4f33a26fcd2c9d9b127",
+      "raw_sha256": "63cd3400c56f2c55e61ac2d6048e72c0b700071caabe8d9b337a37d8b180b5fd",
+      "license_spdx": "GPL-2.0-only"
+    },
+    "git-worktree": {
+      "url": "https://raw.githubusercontent.com/git/git/f78ce2f7b6df702f93d40b85d6bda92a3f65da79/Documentation/git-worktree.adoc",
+      "resolved_url": "https://raw.githubusercontent.com/git/git/f78ce2f7b6df702f93d40b85d6bda92a3f65da79/Documentation/git-worktree.adoc",
+      "content_sha256": "9eac36fa280903a8536f825d838e64509492ed259bef03e505ff4b07eab74fd8",
+      "raw_sha256": "9dffe46a7cb20420ea638a59b0c8e103ea0a783c4900f68258343c05ff411c9c",
+      "license_spdx": "GPL-2.0-only"
+    },
+    "py-argparse": {
+      "url": "https://docs.python.org/3.12/library/argparse.html",
+      "resolved_url": "https://docs.python.org/3.12/library/argparse.html",
+      "content_sha256": "19329261fd8e532b1b979702bd95d38af22cc216f362cf2c8b39997b604e3767",
+      "raw_sha256": "fdcf85f281e1125bc74ebcce3cac63494e85a091f5f03de3c471496bd0132ff3",
+      "license_spdx": "PSF-2.0"
+    },
+    "py-asyncio": {
+      "url": "https://docs.python.org/3.12/library/asyncio.html",
+      "resolved_url": "https://docs.python.org/3.12/library/asyncio.html",
+      "content_sha256": "adfdd4f92ea8b53ad5cdbd355b15f51bc16e187b7829e5f653bf1d508648ea7c",
+      "raw_sha256": "c8c7df7cf8b88878068b32724509d714ad70414f2e84511ab654bbcead974a8b",
+      "license_spdx": "PSF-2.0"
+    },
+    "py-collections": {
+      "url": "https://docs.python.org/3.12/library/collections.html",
+      "resolved_url": "https://docs.python.org/3.12/library/collections.html",
+      "content_sha256": "90ac89597b5f84d54f2b765f13f648cd2f60ffd214731753a8ceb8be1419a714",
+      "raw_sha256": "afa31e7be586a448094bb87fb60a249bb9fb63a9f2bf96c079256184df37caf1",
+      "license_spdx": "PSF-2.0"
+    },
+    "py-concurrent-futures": {
+      "url": "https://docs.python.org/3.12/library/concurrent.futures.html",
+      "resolved_url": "https://docs.python.org/3.12/library/concurrent.futures.html",
+      "content_sha256": "d428592a4c0bd4ea3ce67a5652ba46d1cc6f4403ce476a78ce3b42a51be2d96f",
+      "raw_sha256": "f24c5bc221a9ae0d44ac85244cf8cf7448bc23855c4a16fb036c7bdf9fd9a266",
+      "license_spdx": "PSF-2.0"
+    },
+    "py-configparser": {
+      "url": "https://docs.python.org/3.12/library/configparser.html",
+      "resolved_url": "https://docs.python.org/3.12/library/configparser.html",
+      "content_sha256": "968f23ed66e14e9f3b9454ade66680293a7837551d545ceb50d673009c5e9c85",
+      "raw_sha256": "7e464d1e2014d0176c3cd8dc49e8b3d6eaf4daa7fd8930c8e809cbdfc9c1f9df",
+      "license_spdx": "PSF-2.0"
+    },
+    "py-contextvars": {
+      "url": "https://docs.python.org/3.12/library/contextvars.html",
+      "resolved_url": "https://docs.python.org/3.12/library/contextvars.html",
+      "content_sha256": "3d47ab284e9a988d4a4dfaad0fdb47869e81a4c2598b0d402e34a473160bb9c1",
+      "raw_sha256": "ac91ebe7aabefd12c0572c50a2ac13c10304e92f7b7c280137e881c34c8c6d1e",
+      "license_spdx": "PSF-2.0"
+    },
+    "py-csv": {
+      "url": "https://docs.python.org/3.12/library/csv.html",
+      "resolved_url": "https://docs.python.org/3.12/library/csv.html",
+      "content_sha256": "012f1e78db72875c5ed4718075163012a56403fb754155b7b123146922209980",
+      "raw_sha256": "1519fc06d1fafc575d94b95f35fbb0af031495aad4601876afd8b3f8de6be749",
+      "license_spdx": "PSF-2.0"
+    },
+    "py-dataclasses": {
+      "url": "https://docs.python.org/3.12/library/dataclasses.html",
+      "resolved_url": "https://docs.python.org/3.12/library/dataclasses.html",
+      "content_sha256": "4d6803aba8489f8331349d3ba2eb350f48dca7c4501e91c2ec29d3e6b0cf5ed7",
+      "raw_sha256": "a0f4fb90c359da948056060f1c379f320a82803572048ca0ad09ba360cc94e34",
+      "license_spdx": "PSF-2.0"
+    },
+    "py-decimal": {
+      "url": "https://docs.python.org/3.12/library/decimal.html",
+      "resolved_url": "https://docs.python.org/3.12/library/decimal.html",
+      "content_sha256": "f101b5cc0c733750a510d0aca3242c31a4deafadb3e465b65686b36e8fbe7a0a",
+      "raw_sha256": "c9b6f9eb7a94d88c0e3732c75b0daf1e0ba283deaa18cb0412e3f8434d47ef9c",
+      "license_spdx": "PSF-2.0"
+    },
+    "py-filecmp": {
+      "url": "https://docs.python.org/3.12/library/filecmp.html",
+      "resolved_url": "https://docs.python.org/3.12/library/filecmp.html",
+      "content_sha256": "23cf8672d74053d559ba34498046677bf9faf3953a31796451cc4d5e0f5b3aa2",
+      "raw_sha256": "b8e45ad251cd0865a60ad7bb41717c986f5573999fa33f656fc797d5c8710570",
+      "license_spdx": "PSF-2.0"
+    },
+    "py-fnmatch": {
+      "url": "https://docs.python.org/3.12/library/fnmatch.html",
+      "resolved_url": "https://docs.python.org/3.12/library/fnmatch.html",
+      "content_sha256": "b4358580deb570a469274220c23fa90c3f5e3d6eaa6159993fb8ff0b09345fbc",
+      "raw_sha256": "84c97c9dcbc68d03df89af06056ece25aa436e0a2984eadc63ef4130be63669d",
+      "license_spdx": "PSF-2.0"
+    },
+    "py-fractions": {
+      "url": "https://docs.python.org/3.12/library/fractions.html",
+      "resolved_url": "https://docs.python.org/3.12/library/fractions.html",
+      "content_sha256": "9c8c2607e9de4d382f764345eb34316d3375ee631264e52ec5edfe9545628a5a",
+      "raw_sha256": "1efeb12b82ae280f955e229b8604fd55efa40f4ac0eaae4cce0b2ca9a9a36d89",
+      "license_spdx": "PSF-2.0"
+    },
+    "py-functools": {
+      "url": "https://docs.python.org/3.12/library/functools.html",
+      "resolved_url": "https://docs.python.org/3.12/library/functools.html",
+      "content_sha256": "ceb6ed4cb559c8b862165459db034c848d2ed38f31b65f02ed37482926f10c97",
+      "raw_sha256": "107ba1f75d08c9c4f3c0bdb40697570133101743e080a858157db1baadd535ad",
+      "license_spdx": "PSF-2.0"
+    },
+    "py-glob": {
+      "url": "https://docs.python.org/3.12/library/glob.html",
+      "resolved_url": "https://docs.python.org/3.12/library/glob.html",
+      "content_sha256": "ba36877ba017222ad02e77848830f11c76720a0ceca9743e9acce8c0119f464a",
+      "raw_sha256": "dab39ab8de518dd2ccb03541d8fa6731a8c6310d638ade8e69f609e87fd7b591",
+      "license_spdx": "PSF-2.0"
+    },
+    "py-html": {
+      "url": "https://docs.python.org/3.12/library/html.html",
+      "resolved_url": "https://docs.python.org/3.12/library/html.html",
+      "content_sha256": "b52d14c7fc27e49e45e2cbe94ae32e0d77bf309da47763ca77e662defb7731f7",
+      "raw_sha256": "32fcb315db75e2b369d277e3bdfbed47910478be0db3c881404a5632862543db",
+      "license_spdx": "PSF-2.0"
+    },
+    "py-io": {
+      "url": "https://docs.python.org/3.12/library/io.html",
+      "resolved_url": "https://docs.python.org/3.12/library/io.html",
+      "content_sha256": "a4b224aeebfc66b372296cf507968a28faa18b2ee8fe453ccba8e0905386963b",
+      "raw_sha256": "c78957b7aaac8beb09b31d58049647e78cf26def4b8e5ce835fc3bc01690293e",
+      "license_spdx": "PSF-2.0"
+    },
+    "py-itertools": {
+      "url": "https://docs.python.org/3.12/library/itertools.html",
+      "resolved_url": "https://docs.python.org/3.12/library/itertools.html",
+      "content_sha256": "e1399f81ea9d4e4efec642cdaf64ea731780d38866c50d2f0edc3904b0838c87",
+      "raw_sha256": "97fd98c0402a7114b3de333b86b4848776c7ea93c8c1971f58a968cd92bab3b0",
+      "license_spdx": "PSF-2.0"
+    },
+    "py-json": {
+      "url": "https://docs.python.org/3.12/library/json.html",
+      "resolved_url": "https://docs.python.org/3.12/library/json.html",
+      "content_sha256": "b6caeb6f13740f15d2c51b6b757033b8c49d8eafad43ce030ae779179a93e2de",
+      "raw_sha256": "1e00972fe805a0ac2846bdfcf97b5890ef94a75441f470e52b3b52b495850b8e",
+      "license_spdx": "PSF-2.0"
+    },
+    "py-linecache": {
+      "url": "https://docs.python.org/3.12/library/linecache.html",
+      "resolved_url": "https://docs.python.org/3.12/library/linecache.html",
+      "content_sha256": "e26d18c080338b4f5fd36516319328e0085e7d0c745f67dd2ecb99f6012a21d9",
+      "raw_sha256": "817cbb79d3ab399737b48398b7e2aa8458e08bf52254b451651ae5d54b8d72bd",
+      "license_spdx": "PSF-2.0"
+    },
+    "py-logging": {
+      "url": "https://docs.python.org/3.12/library/logging.html",
+      "resolved_url": "https://docs.python.org/3.12/library/logging.html",
+      "content_sha256": "d1e88f0972252dba01a15c3d2ffdff8367a308054d2288001eb258ca363db3be",
+      "raw_sha256": "26646fa74bde33b6ca93295e2e09c4a6d00dbf8ce9ba65ced503fdae96603fa8",
+      "license_spdx": "PSF-2.0"
+    },
+    "py-mimetypes": {
+      "url": "https://docs.python.org/3.12/library/mimetypes.html",
+      "resolved_url": "https://docs.python.org/3.12/library/mimetypes.html",
+      "content_sha256": "0ea766dfbe5f4999729f8db8dfe11753000bff7fbe13f743189e573f9bf32f47",
+      "raw_sha256": "cc7e46452cbf2d86c3c6b0e10d67aef1bf45841737d6e8f4f5dc78fa74a869da",
+      "license_spdx": "PSF-2.0"
+    },
+    "py-multiprocessing": {
+      "url": "https://docs.python.org/3.12/library/multiprocessing.html",
+      "resolved_url": "https://docs.python.org/3.12/library/multiprocessing.html",
+      "content_sha256": "dff6fd5711c4d8937718acddf6f23a9ee461627dab97c13fcddf93231eb28959",
+      "raw_sha256": "8cc3755bb8fcd7c57616b9c320b6ec221b4de96e689191e87efc7ef1112a1d73",
+      "license_spdx": "PSF-2.0"
+    },
+    "py-os-path": {
+      "url": "https://docs.python.org/3.12/library/os.path.html",
+      "resolved_url": "https://docs.python.org/3.12/library/os.path.html",
+      "content_sha256": "48d71bec29f099c96c9c7c664e962d84166ddc7ae8acf3152d01b4882ae9ddcd",
+      "raw_sha256": "b470508917da0d77a709a260235128c389aca38e99a9a5cebee4beb18678ae65",
+      "license_spdx": "PSF-2.0"
+    },
+    "py-pathlib": {
+      "url": "https://docs.python.org/3.12/library/pathlib.html",
+      "resolved_url": "https://docs.python.org/3.12/library/pathlib.html",
+      "content_sha256": "7bc5d51d71b4651431cb92c40f64849b45b6f0927029d3c66cf68dfbed6f33e6",
+      "raw_sha256": "97019e60da45b995de2362d527086b3391023c262585d2b18479ccc03521c4e2",
+      "license_spdx": "PSF-2.0"
+    },
+    "py-pickle": {
+      "url": "https://docs.python.org/3.12/library/pickle.html",
+      "resolved_url": "https://docs.python.org/3.12/library/pickle.html",
+      "content_sha256": "40d01e08517fc5c34851295502c212d684bb04c7b161ef86b59934dd59623536",
+      "raw_sha256": "efebc973543a4f21df5aec46a857fccb315c3abca75e8ccc31d442a26d80e8a4",
+      "license_spdx": "PSF-2.0"
+    },
+    "py-queue": {
+      "url": "https://docs.python.org/3.12/library/queue.html",
+      "resolved_url": "https://docs.python.org/3.12/library/queue.html",
+      "content_sha256": "b081c3ec73891196d3c80cc118c7974ff817435f1f8fa002fcc7230f52e12dc7",
+      "raw_sha256": "e6e2c4ce382b3e45b9e974f6987b7728fb7bf8ae8c60f1426a9465cab2989d9f",
+      "license_spdx": "PSF-2.0"
+    },
+    "py-random": {
+      "url": "https://docs.python.org/3.12/library/random.html",
+      "resolved_url": "https://docs.python.org/3.12/library/random.html",
+      "content_sha256": "03a84b06ce510b89c62f0352e77129060bb3a23ea1d56943162dbaa6cabe9578",
+      "raw_sha256": "06da9ff830ce7ffd4de00851d484122d76a58d4421ce76373e01cba1f60b0e45",
+      "license_spdx": "PSF-2.0"
+    },
+    "py-selectors": {
+      "url": "https://docs.python.org/3.12/library/selectors.html",
+      "resolved_url": "https://docs.python.org/3.12/library/selectors.html",
+      "content_sha256": "3a173fd92449b443ab2d1f08af2bba98dfde74c4d0229238d8b2fe0417e0f86d",
+      "raw_sha256": "f2d81672ac982a142be280899b9bcdc276213dbda6659206f3c46a14cd5536ce",
+      "license_spdx": "PSF-2.0"
+    },
+    "py-shelve": {
+      "url": "https://docs.python.org/3.12/library/shelve.html",
+      "resolved_url": "https://docs.python.org/3.12/library/shelve.html",
+      "content_sha256": "8acb036d749878619205173198962b36cb1f80ebe2250e0ac50976646d8f66e3",
+      "raw_sha256": "ea2c8b9e761e4df3269f1c9d2e9ceb3714cde3405f71a607292326126af58d9b",
+      "license_spdx": "PSF-2.0"
+    },
+    "py-shutil": {
+      "url": "https://docs.python.org/3.12/library/shutil.html",
+      "resolved_url": "https://docs.python.org/3.12/library/shutil.html",
+      "content_sha256": "d0b169e77c84d06e2452abd25ed7ae80a1f71aca7af1855bb786f64f61d43f5b",
+      "raw_sha256": "506f2807a802e708e0fbe07c0a4a816bd993d119feea634bcc10ee06ff9debfe",
+      "license_spdx": "PSF-2.0"
+    },
+    "py-signal": {
+      "url": "https://docs.python.org/3.12/library/signal.html",
+      "resolved_url": "https://docs.python.org/3.12/library/signal.html",
+      "content_sha256": "3fac4889d54bb3108cb840df4ff642fa7022db838b7ca1dd0ca4e676b168edd7",
+      "raw_sha256": "6d4017744050942d43b76c703f6855814b5fd24150d10158137920b41eaa71a0",
+      "license_spdx": "PSF-2.0"
+    },
+    "py-socket": {
+      "url": "https://docs.python.org/3.12/library/socket.html",
+      "resolved_url": "https://docs.python.org/3.12/library/socket.html",
+      "content_sha256": "270bbc90fe8b196d81f41fe88c8f96798563b979a2c32267b49310dfc6857a3a",
+      "raw_sha256": "c38987b6bfc1e37648c0b3c1ef236cb76d062000fc5c3232e94ea5949c444dff",
+      "license_spdx": "PSF-2.0"
+    },
+    "py-sqlite3": {
+      "url": "https://docs.python.org/3.12/library/sqlite3.html",
+      "resolved_url": "https://docs.python.org/3.12/library/sqlite3.html",
+      "content_sha256": "fdca422dcbbc3a6acf0a113f49f9a36bf8c60df8ece8e198b77e01d60e690196",
+      "raw_sha256": "fd624d349887f5ce87fef7ad815307f9fbdfaa7460ebe4c2714212a8cf53054c",
+      "license_spdx": "PSF-2.0"
+    },
+    "py-stat": {
+      "url": "https://docs.python.org/3.12/library/stat.html",
+      "resolved_url": "https://docs.python.org/3.12/library/stat.html",
+      "content_sha256": "b8694d3adc505a1538b29fef828927b3d5808ac1cfa62876ca2f6c1ef05111f2",
+      "raw_sha256": "5398105af3baefb99989402bc9cf558a3b0b3547e2fa68792081f0f3f4e1f622",
+      "license_spdx": "PSF-2.0"
+    },
+    "py-statistics": {
+      "url": "https://docs.python.org/3.12/library/statistics.html",
+      "resolved_url": "https://docs.python.org/3.12/library/statistics.html",
+      "content_sha256": "f0f4c455ea17c3e143729e5a1994425cc1db02b9ee509a567c7c68d74f4765fa",
+      "raw_sha256": "f60ebf432bdf25af1c13902d01da2c741fa146d08d81174d8c9b4dad5a0132a9",
+      "license_spdx": "PSF-2.0"
+    },
+    "py-subprocess": {
+      "url": "https://docs.python.org/3.12/library/subprocess.html",
+      "resolved_url": "https://docs.python.org/3.12/library/subprocess.html",
+      "content_sha256": "23011fdda9ef5e3a771b6a4f04fcc55c38e6041c84cdfcb11719c5c8f0a91bdf",
+      "raw_sha256": "33778525d2019867fe224063f3e841c55c77604e8b63f71193840b721bb79b83",
+      "license_spdx": "PSF-2.0"
+    },
+    "py-tempfile": {
+      "url": "https://docs.python.org/3.12/library/tempfile.html",
+      "resolved_url": "https://docs.python.org/3.12/library/tempfile.html",
+      "content_sha256": "841e178c3ba27fd51bacc86e7faaa26744eab94951e3445ad9b60ca555a6269f",
+      "raw_sha256": "323542212dc35e7e0726eb9709d0059d2c9a1a6356b8f6ff833fc9ea862258c3",
+      "license_spdx": "PSF-2.0"
+    },
+    "py-threading": {
+      "url": "https://docs.python.org/3.12/library/threading.html",
+      "resolved_url": "https://docs.python.org/3.12/library/threading.html",
+      "content_sha256": "c5b4d32613e0bbbfae7619c00af5984a57547420656836892f02371dc2882366",
+      "raw_sha256": "5984ab9a576caa53a4b0d7773361d321f0226aec7e6c82cc212a4ec08b2c2331",
+      "license_spdx": "PSF-2.0"
+    },
+    "py-typing": {
+      "url": "https://docs.python.org/3.12/library/typing.html",
+      "resolved_url": "https://docs.python.org/3.12/library/typing.html",
+      "content_sha256": "5b9a5435f2a7c18499136ad392ce2805cbc234ad45cac8f3d7ebd5d8c62398d5",
+      "raw_sha256": "b8cb00eba2309f5f4dfaa2f9d79333e72b1310396486af7e052a0e69aa104eb6",
+      "license_spdx": "PSF-2.0"
+    },
+    "py-xml": {
+      "url": "https://docs.python.org/3.12/library/xml.html",
+      "resolved_url": "https://docs.python.org/3.12/library/xml.html",
+      "content_sha256": "645fb62af425c8ae0285d4cdd3edfda29f5c86702a77d39c4c724e90f9748759",
+      "raw_sha256": "3fb3e93571becdae11906d0af1a2d78018f601c849d644a7f00da6322520bce5",
+      "license_spdx": "PSF-2.0"
+    }
+  }
+}
