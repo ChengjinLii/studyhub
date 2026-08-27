@@ -13,6 +13,7 @@ from studyhub_agent.benchmark_v2.schema import (
     ENVIRONMENT_SCHEMA_VERSION,
     TASK_SCHEMA_VERSION,
     BenchmarkTaskV2,
+    artifact_timestamp,
 )
 from studyhub_agent.benchmark_v2.statistics import cluster_bootstrap_interval
 from studyhub_agent.benchmark_v2.web_snapshot import load_source_config, sanitize_payload
@@ -57,6 +58,11 @@ def test_public_schema_rejects_hidden_oracle_fields() -> None:
     leaked["metadata"] = {"expected_answers": ["secret"]}
     with pytest.raises(ValueError, match="oracle"):
         BenchmarkTaskV2.from_dict(leaked)
+
+
+def test_artifact_timestamp_respects_source_date_epoch(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("SOURCE_DATE_EPOCH", "0")
+    assert artifact_timestamp() == "1970-01-01T00:00:00+00:00"
 
 
 def environment_row() -> dict:

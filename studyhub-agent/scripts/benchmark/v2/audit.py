@@ -9,7 +9,6 @@ import hashlib
 import json
 import re
 from collections import Counter
-from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -18,6 +17,7 @@ from studyhub_agent.benchmark_v2.schema import (
     BENCHMARK_VERSION,
     GRADER_SCHEMA_VERSION,
     BenchmarkTaskV2,
+    artifact_timestamp,
     load_jsonl,
 )
 
@@ -250,7 +250,7 @@ def audit(args: argparse.Namespace) -> dict[str, Any]:
     report = {
         "schema_version": "studyhub.agentbench-structural-audit.v2",
         "benchmark_version": BENCHMARK_VERSION,
-        "generated_at": datetime.now(UTC).isoformat(timespec="seconds"),
+        "generated_at": artifact_timestamp(),
         "status": "PASS" if not result.failures else "FAIL",
         "summary": {
             "checks": len(result.checks),

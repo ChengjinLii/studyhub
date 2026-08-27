@@ -8,7 +8,6 @@ import hashlib
 import json
 import re
 from collections import Counter
-from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -19,7 +18,7 @@ from studyhub_agent.benchmark_v2.oracle import (
     load_hidden_records,
     oracle_state_from_assertions,
 )
-from studyhub_agent.benchmark_v2.schema import BENCHMARK_VERSION, load_jsonl
+from studyhub_agent.benchmark_v2.schema import BENCHMARK_VERSION, artifact_timestamp, load_jsonl
 
 
 def sha256(path: Path) -> str:
@@ -72,7 +71,7 @@ async def run_oracle(hidden_root: Path, splits: list[str]) -> tuple[dict[str, An
     report = {
         "schema_version": "studyhub.agentbench-oracle-report.v2",
         "benchmark_version": BENCHMARK_VERSION,
-        "generated_at": datetime.now(UTC).isoformat(timespec="seconds"),
+        "generated_at": artifact_timestamp(),
         "status": "PASS" if len(passed) / max(1, len(rows)) >= 0.99 else "FAIL",
         "summary": {
             "tasks": len(rows),
@@ -176,7 +175,7 @@ def run_negative_controls(successful: dict[str, dict[str, Any]]) -> dict[str, An
     return {
         "schema_version": "studyhub.agentbench-negative-controls.v2",
         "benchmark_version": BENCHMARK_VERSION,
-        "generated_at": datetime.now(UTC).isoformat(timespec="seconds"),
+        "generated_at": artifact_timestamp(),
         "status": "PASS" if all(row["strict_pass"] == 0 for row in summary.values()) else "FAIL",
         "summary": summary,
         "unexpected_passes": detail,
@@ -303,7 +302,7 @@ async def run_metamorphic(hidden_root: Path, successful: dict[str, dict[str, Any
     return {
         "schema_version": "studyhub.agentbench-metamorphic-report.v2",
         "benchmark_version": BENCHMARK_VERSION,
-        "generated_at": datetime.now(UTC).isoformat(timespec="seconds"),
+        "generated_at": artifact_timestamp(),
         "status": "PASS" if all(case["passed"] for case in cases) else "FAIL",
         "summary": {"cases": len(cases), "passed": sum(case["passed"] for case in cases)},
         "cases": cases,
@@ -380,7 +379,7 @@ def run_shortcut_probe(hidden_root: Path) -> dict[str, Any]:
     return {
         "schema_version": "studyhub.agentbench-shortcut-probe.v2",
         "benchmark_version": BENCHMARK_VERSION,
-        "generated_at": datetime.now(UTC).isoformat(timespec="seconds"),
+        "generated_at": artifact_timestamp(),
         "status": "PASS" if all(checks.values()) else "FAIL",
         "checks": checks,
         "statistics": {
@@ -443,7 +442,7 @@ async def async_main(args: argparse.Namespace) -> int:
     summary = {
         "schema_version": "studyhub.agentbench-self-test-summary.v2",
         "benchmark_version": BENCHMARK_VERSION,
-        "generated_at": datetime.now(UTC).isoformat(timespec="seconds"),
+        "generated_at": artifact_timestamp(),
         "status": status,
         "oracle": oracle["summary"],
         "negative_controls": negative["summary"],

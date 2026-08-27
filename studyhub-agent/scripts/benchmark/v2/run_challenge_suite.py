@@ -5,11 +5,10 @@ import argparse
 import asyncio
 import hashlib
 import json
-from datetime import UTC, datetime
 from pathlib import Path
 
 from studyhub_agent.benchmark_v2.challenge_suite import build_challenge_results, grade_challenge_results
-from studyhub_agent.benchmark_v2.schema import BENCHMARK_VERSION
+from studyhub_agent.benchmark_v2.schema import BENCHMARK_VERSION, artifact_timestamp
 
 
 def parse_args() -> argparse.Namespace:
@@ -39,7 +38,7 @@ async def async_main(args: argparse.Namespace) -> int:
         {
             "schema_version": "studyhub.agentbench-evaluator-challenge.v2",
             "benchmark_version": BENCHMARK_VERSION,
-            "generated_at": datetime.now(UTC).isoformat(timespec="seconds"),
+            "generated_at": artifact_timestamp(),
         }
     )
     args.output.parent.mkdir(parents=True, exist_ok=True)

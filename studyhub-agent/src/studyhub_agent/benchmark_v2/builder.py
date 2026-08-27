@@ -7,7 +7,6 @@ import re
 import shutil
 from collections import Counter, defaultdict
 from dataclasses import dataclass
-from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -18,6 +17,7 @@ from studyhub_agent.benchmark_v2.schema import (
     GRADER_SCHEMA_VERSION,
     TASK_SCHEMA_VERSION,
     BenchmarkTaskV2,
+    artifact_timestamp,
     load_jsonl,
     write_jsonl,
 )
@@ -2061,7 +2061,7 @@ def build_benchmark(
         "schema_version": "studyhub.agentbench-manifest.v2",
         "benchmark_version": BENCHMARK_VERSION,
         "status": "CANDIDATE_PENDING_QUALITY_AUDIT",
-        "generated_at": datetime.now(UTC).isoformat(timespec="seconds"),
+        "generated_at": artifact_timestamp(),
         "seed": seed,
         "task_schema_version": TASK_SCHEMA_VERSION,
         "environment_schema_version": ENVIRONMENT_SCHEMA_VERSION,

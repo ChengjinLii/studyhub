@@ -8,6 +8,7 @@ PYTHON_BIN="${PYTHON_BIN:-$PROJECT_ROOT/.venv/bin/python}"
 RUFF_BIN="${RUFF_BIN:-$PROJECT_ROOT/.venv/bin/ruff}"
 PYTEST_BIN="${PYTEST_BIN:-$PROJECT_ROOT/.venv/bin/pytest}"
 BUILDER_COMMIT="${BUILDER_COMMIT:-$(git rev-parse HEAD)}"
+export SOURCE_DATE_EPOCH="${SOURCE_DATE_EPOCH:-$(git show -s --format=%ct "$BUILDER_COMMIT")}"
 
 for executable in "$PYTHON_BIN" "$RUFF_BIN" "$PYTEST_BIN"; do
   if [[ ! -x "$executable" ]]; then

@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import json
+import os
 from collections.abc import Iterable
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -10,6 +12,16 @@ BENCHMARK_VERSION = "studyhub-agentbench-v2"
 TASK_SCHEMA_VERSION = "studyhub.agentbench-task.v2"
 ENVIRONMENT_SCHEMA_VERSION = "studyhub.agentbench-environment.v2"
 GRADER_SCHEMA_VERSION = "studyhub.agentbench-grader.v2"
+
+
+def artifact_timestamp() -> str:
+    """Return a reproducible UTC timestamp when SOURCE_DATE_EPOCH is set."""
+
+    source_epoch = os.environ.get("SOURCE_DATE_EPOCH")
+    if source_epoch is not None:
+        return datetime.fromtimestamp(int(source_epoch), UTC).isoformat(timespec="seconds")
+    return datetime.now(UTC).isoformat(timespec="seconds")
+
 
 SPLITS = frozenset({"regression", "development", "sealed_a", "sealed_b", "calibration_challenge"})
 DIFFICULTIES = frozenset({"UNSCORED", "easy", "medium", "hard", "extreme"})

@@ -11,11 +11,11 @@ import math
 import re
 import statistics
 from collections import Counter
-from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 from studyhub_agent.benchmark_v1.schema import load_jsonl
+from studyhub_agent.benchmark_v2.schema import artifact_timestamp
 
 _ID = re.compile(r"(?:sh:)?[a-f0-9-]{8,}|\b\d+\b", re.I)
 _DATE = re.compile(r"\b(?:19|20)\d{2}(?:[-/.年]\d{1,2})?(?:[-/.月]\d{1,2})?日?\b")
@@ -187,7 +187,7 @@ def audit(args: argparse.Namespace) -> dict[str, Any]:
     report = {
         "schema_version": "studyhub.agentbench-v1-semantic-audit.v1",
         "benchmark_version": "studyhub-agentbench-v1",
-        "generated_at": datetime.now(UTC).isoformat(timespec="seconds"),
+        "generated_at": artifact_timestamp(),
         "public_manifest_sha256": sha256(public_root / "manifest.json"),
         "splits": split_reports,
         "material_reuse": material_reuse,

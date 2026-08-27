@@ -8,7 +8,6 @@ import hashlib
 import json
 import subprocess
 import sys
-from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -17,6 +16,7 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from external_benchmarks.registry import load_registry  # noqa: E402 - standalone script bootstraps project root
+from studyhub_agent.benchmark_v2.schema import artifact_timestamp  # noqa: E402
 
 
 def sha256(path: Path) -> str:
@@ -182,7 +182,7 @@ def main() -> int:
         "checks": checks,
     }
     quality_path = public_root / "quality-gate.json"
-    generated_at = datetime.now(UTC).isoformat(timespec="seconds")
+    generated_at = artifact_timestamp()
     if quality_path.is_file():
         previous_quality = read_json(quality_path)
         previous_without_time = {key: value for key, value in previous_quality.items() if key != "generated_at"}
@@ -192,7 +192,7 @@ def main() -> int:
     quality_path.write_text(json.dumps(quality_gate, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     frozen_at = None
     if not failures:
-        frozen_at = datetime.now(UTC).isoformat(timespec="seconds")
+        frozen_at = artifact_timestamp()
         if manifest.get("status") == status and manifest.get("builder_commit") == builder_commit:
             frozen_at = str(manifest.get("frozen_at") or frozen_at)
     manifest.update(

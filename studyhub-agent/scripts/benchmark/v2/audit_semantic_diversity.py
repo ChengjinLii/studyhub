@@ -8,11 +8,10 @@ import hashlib
 import json
 import re
 from collections import Counter, defaultdict
-from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from studyhub_agent.benchmark_v2.schema import BENCHMARK_VERSION, load_jsonl
+from studyhub_agent.benchmark_v2.schema import BENCHMARK_VERSION, artifact_timestamp, load_jsonl
 
 _QUOTED = re.compile(r"[\"'“”‘’《》][^\"'“”‘’《》]{1,120}[\"'“”‘’《》]")
 _DATE = re.compile(r"\b(?:19|20)\d{2}(?:[-/.年]\d{1,2})?(?:[-/.月]\d{1,2})?日?\b")
@@ -156,7 +155,7 @@ def audit(args: argparse.Namespace) -> dict[str, Any]:
     report = {
         "schema_version": "studyhub.agentbench-semantic-diversity-audit.v2",
         "benchmark_version": BENCHMARK_VERSION,
-        "generated_at": datetime.now(UTC).isoformat(timespec="seconds"),
+        "generated_at": artifact_timestamp(),
         "status": "PASS" if all(checks.values()) else "FAIL",
         "method": {
             "normalization": "entity/date/id/slot replacement plus mixed Chinese bigram and Latin token sets",
