@@ -17,6 +17,7 @@ CAPABILITY_PATH = PROGRAM_DIR / "capability-matrix-v1.json"
 ALGORITHM_PATH = PROGRAM_DIR / "algorithm-decision-matrix-v1.json"
 SFT_DATA_CARD_PATH = PROGRAM_DIR / "runtime-sft-v3-data-card.json"
 SFT_GATE_EVIDENCE_PATH = PROJECT_ROOT / "docs" / "training" / "evidence" / "runtime-sft-v3-9b-gate-20260827.json"
+SFT_PROFILE_EVIDENCE_PATH = PROJECT_ROOT / "docs" / "training" / "evidence" / "runtime-sft-v3-9b-profile-20260828.json"
 DEFECT_INDEX_PATH = PROJECT_ROOT / "design-defects" / "index.json"
 HTML_PLAN_PATH = PROJECT_ROOT / "docs" / "StudyHub_9B_Agentic_Post_Training_Program_v3.html"
 
@@ -124,6 +125,7 @@ def validate_program(
     algorithm_path = project_root / "configs" / "program-v3" / "algorithm-decision-matrix-v1.json"
     sft_data_card_path = project_root / "configs" / "program-v3" / "runtime-sft-v3-data-card.json"
     sft_gate_evidence_path = project_root / "docs/training/evidence/runtime-sft-v3-9b-gate-20260827.json"
+    sft_profile_evidence_path = project_root / "docs/training/evidence/runtime-sft-v3-9b-profile-20260828.json"
     defect_index_path = project_root / "design-defects" / "index.json"
 
     errors: list[str] = []
@@ -132,16 +134,33 @@ def validate_program(
     algorithm_matrix = _load_json(algorithm_path)
     sft_data_card = _load_json(sft_data_card_path)
     sft_gate_evidence = _load_json(sft_gate_evidence_path)
+    sft_profile_evidence = _load_json(sft_profile_evidence_path)
     defects = _load_json(defect_index_path)
 
     if program.get("schema_version") != "studyhub.training-program.v3":
         errors.append("unexpected training-program schema version")
-    if program.get("launch_authorized") is not False:
-        errors.append("formal v3 GPU training must remain unauthorized until profiling and recipe review")
+    if program.get("launch_authorized") is not True:
+        errors.append("the reviewed formal r16 SFT launch must be explicitly authorized")
+    if program.get("launch_authorization_scope") != ["NINE_B_SFT_FORMAL_R16_ONE_PASS"]:
+        errors.append("GPU launch authorization must be limited to one formal r16 SFT pass")
     if program.get("gpu_gate_authorized") is not True:
         errors.append("the accepted SFT data must retain authorization for reproducible diagnostic GPU checks")
     if program.get("sft_profile_authorized") is not True:
         errors.append("equal-budget SFT profiling must be explicitly authorized after the Gate passes")
+    if program.get("formal_sft_authorized") is not True:
+        errors.append("formal SFT authorization is missing after the controlled profile decision")
+    prompt_contracts = (
+        ("source_prompt", "source_prompt_sha256"),
+        ("benchmark_execution_prompt", "benchmark_execution_prompt_sha256"),
+    )
+    for path_key, hash_key in prompt_contracts:
+        expected_hash = str(program.get(hash_key, ""))
+        if len(expected_hash) != 64:
+            errors.append(f"{hash_key} is not a SHA-256 digest")
+            continue
+        prompt_path = Path(str(program.get(path_key, "")))
+        if prompt_path.is_file() and _sha256(prompt_path) != expected_hash:
+            errors.append(f"{path_key} drifted from its recorded digest")
 
     architecture = program.get("architecture", {})
     if architecture.get("hermes") != "the only agent loop and tool-interaction harness":
@@ -177,9 +196,11 @@ def validate_program(
     benchmark = program.get("benchmark", {})
     benchmark_manifest_path = project_root / "benchmarks/studyhub-agent-v2/manifest.json"
     benchmark_card_path = project_root / "benchmarks/studyhub-agent-v2/BENCHMARK_CARD.json"
+    benchmark_quality_path = project_root / "benchmarks/studyhub-agent-v2/quality-gate.json"
     base_evidence_path = project_root / "docs/benchmark/evidence/qwen35-9b-base-v2-development-variance-20260827.json"
     benchmark_manifest = _load_json(benchmark_manifest_path)
     benchmark_card = _load_json(benchmark_card_path)
+    benchmark_quality = _load_json(benchmark_quality_path)
     base_evidence = _load_json(base_evidence_path)
     manifest_sha256 = _sha256(benchmark_manifest_path)
     if manifest_sha256 != BENCHMARK_V2_MANIFEST_SHA256:
@@ -196,6 +217,8 @@ def validate_program(
         errors.append("Benchmark v2 manifest is not frozen")
     if benchmark_card.get("status") != "FROZEN_FOR_BASELINE":
         errors.append("Benchmark v2 card is not frozen")
+    if benchmark_quality.get("status") != "PASS":
+        errors.append("Benchmark v2 quality gate is not passing")
     counts = benchmark_manifest.get("counts", {})
     regression_tasks = benchmark.get("regression", {}).get("tasks", 0)
     development_tasks = benchmark.get("development", {}).get("tasks", 0)
@@ -235,6 +258,15 @@ def validate_program(
     }
     if external_names != required_external:
         errors.append("external benchmark stack is incomplete")
+    if any(item.get("model_evaluation") != "NOT_RUN" for item in benchmark.get("external", [])):
+        errors.append("external model evaluation status must remain honest until official runs exist")
+    execution_contract = benchmark.get("execution_contract", {})
+    if execution_contract.get("training_examples_from_benchmark") != 0:
+        errors.append("Benchmark v2 examples must not enter SFT or RL training")
+    if execution_contract.get("sealed_use") != ("one final confirmation after all model and recipe choices are frozen"):
+        errors.append("Sealed-A/B access is not restricted to final confirmation")
+    if "never collapse" not in execution_contract.get("external_metric_policy", ""):
+        errors.append("external benchmark metrics must remain separate")
 
     data = program.get("data", {})
     sft = data.get("sft", {})
@@ -347,14 +379,93 @@ def validate_program(
         metrics.get("peak_memory_used_mib", guard_max + 1) > guard_max for metrics in per_gpu.values()
     ):
         errors.append("runtime SFT Gate GPU evidence is missing or exceeded the guard")
-    if gates.get("G4", {}).get("status") != "GATE_PASSED_PROFILE_AND_FORMAL_PENDING":
-        errors.append("G4 must distinguish a passed diagnostic Gate from formal SFT promotion")
+    if gates.get("G4", {}).get("status") != "FORMAL_AUTHORIZED_PENDING_RUN_AND_EVAL":
+        errors.append("G4 must distinguish formal authorization from a completed SFT or evaluation")
     profiles = sft_training.get("profiles", {})
-    if profiles.get("status") != "PENDING" or {item.get("id") for item in profiles.get("candidates", [])} != {
+    if profiles.get("status") != "PASSED" or {item.get("id") for item in profiles.get("candidates", [])} != {
         "profile-r16",
         "profile-r32",
     }:
-        errors.append("equal-budget r16/r32 SFT profiles are not declared")
+        errors.append("equal-budget r16/r32 SFT profiles are not recorded as passed")
+    if profiles.get("evidence_path") != "docs/training/evidence/runtime-sft-v3-9b-profile-20260828.json":
+        errors.append("runtime SFT profile evidence path is not pinned")
+    if profiles.get("selected_engineering_recipe") != "r16" or profiles.get("quality_claim") != (
+        "NOT_EVALUATED_BY_PROFILE"
+    ):
+        errors.append("runtime SFT profile selection or claim boundary is invalid")
+    if sft_training.get("lora_recipe", {}).get("final_choice") != "r16":
+        errors.append("formal SFT recipe does not match the controlled profile selection")
+    if (
+        sft_profile_evidence.get("status") != "PASSED"
+        or sft_profile_evidence.get("evidence_grade") != "A_REAL_REPRODUCED"
+    ):
+        errors.append("runtime SFT profile evidence is not a passed real comparison")
+    profile_rows = sft_profile_evidence.get("profiles", {})
+    if set(profile_rows) != {"r16", "r32"}:
+        errors.append("runtime SFT profile evidence does not contain both ranks")
+    else:
+        left, right = profile_rows["r16"], profile_rows["r32"]
+        if left.get("git", {}).get("status") or right.get("git", {}).get("status"):
+            errors.append("runtime SFT profiles were not run from clean worktrees")
+        if left.get("git", {}).get("commit") != right.get("git", {}).get("commit"):
+            errors.append("runtime SFT profiles are bound to different commits")
+        for field in ("sequences", "tokens", "assistant_loss_tokens"):
+            if left.get("optimizer", {}).get(field) != right.get("optimizer", {}).get(field):
+                errors.append(f"runtime SFT profile {field} budgets differ")
+        if left.get("data") != right.get("data") or left.get("model") != right.get("model"):
+            errors.append("runtime SFT profiles do not share model and data lineage")
+        if left.get("data", {}).get("benchmark_lock", {}).get("benchmark_manifest_sha256") != manifest_sha256:
+            errors.append("runtime SFT profiles are not bound to frozen Benchmark v2")
+        for label, row in profile_rows.items():
+            if row.get("optimizer", {}).get("updates") != 5:
+                errors.append(f"runtime SFT {label} profile did not complete five updates")
+            if row.get("lora_update", {}).get("update_observed") is not True:
+                errors.append(f"runtime SFT {label} profile does not prove a LoRA update")
+            profile_guard = row.get("gpu", {}).get("guard_max_used_mib", 0)
+            if any(
+                gpu.get("peak_memory_used_mib", profile_guard + 1) > profile_guard
+                for gpu in row.get("gpu", {}).get("per_gpu", {}).values()
+            ):
+                errors.append(f"runtime SFT {label} profile exceeded the GPU guard")
+    comparison = sft_profile_evidence.get("comparison", {})
+    if comparison.get("selected_engineering_recipe") != "r16" or comparison.get("quality_claim") != (
+        "NOT_EVALUATED_BY_PROFILE"
+    ):
+        errors.append("tracked runtime SFT profile comparison has an invalid selection")
+    formal = sft_training.get("formal", {})
+    expected_formal = {
+        "status": "AUTHORIZED_PENDING_START",
+        "authorization_scope": "ONE_R16_PASS_ONLY",
+        "training_trial": "formal-r16-seed-20260827",
+        "seed": 20260827,
+        "rank": 16,
+        "alpha": 16,
+        "train_rows": 43650,
+        "processed_rows": 43648,
+        "drop_last_rows": 2,
+        "global_batch_size": 8,
+        "expected_optimizer_updates": 5456,
+        "train_all_tokens": 55554221,
+        "train_assistant_loss_tokens": 8152342,
+        "dataset_manifest_sha256": sft_data_card.get("artifact_hashes", {}).get("token_manifest_sha256"),
+        "data_card_sha256": _sha256(sft_data_card_path),
+        "benchmark_manifest_sha256": manifest_sha256,
+        "checkpoint_every_updates": 546,
+        "recovery_every_updates": 50,
+    }
+    mismatched_formal = {
+        key: {"expected": expected, "actual": formal.get(key)}
+        for key, expected in expected_formal.items()
+        if formal.get(key) != expected
+    }
+    if mismatched_formal:
+        errors.append(f"formal SFT contract mismatch: {mismatched_formal}")
+    if formal.get("estimate_not_measurement") is not True:
+        errors.append("formal SFT duration estimate must not be represented as a measured run")
+    if "Stable training_trial" not in formal.get("recovery_contract", ""):
+        errors.append("formal SFT does not define stable-trial recovery")
+    if len(formal.get("post_training_gate", [])) != 4:
+        errors.append("formal SFT post-training evaluation gate is incomplete")
 
     rl = data.get("rl", {})
     if not 12000 <= rl.get("candidate_tasks", 0) <= 20000:
@@ -539,7 +650,9 @@ def validate_program(
             "500-update 9B GRPO Main",
             "Algorithm Decision Matrix",
             "SFT GATE PASSED",
-            "PROFILE PENDING",
+            "PROFILE PASSED",
+            "5,456 updates",
+            "55,554,221 train tokens",
         ]
         missing_html = [token for token in required_html_tokens if token not in html]
         if missing_html:
@@ -583,6 +696,15 @@ def validate_program(
         "sft_all_tokens": card_tokens,
         "sft_gate_status": sft_gate.get("status"),
         "sft_gate_trial": sft_gate.get("trial"),
+        "sft_profile_status": profiles.get("status"),
+        "sft_profile_selected_recipe": profiles.get("selected_engineering_recipe"),
+        "formal_sft": {
+            "status": formal.get("status"),
+            "training_trial": formal.get("training_trial"),
+            "expected_optimizer_updates": formal.get("expected_optimizer_updates"),
+            "train_all_tokens": formal.get("train_all_tokens"),
+            "train_assistant_loss_tokens": formal.get("train_assistant_loss_tokens"),
+        },
         "rl_post_qa_tasks": rl.get("post_qa_tasks"),
         "initial_grpo_updates": grpo.get("initial_optimizer_updates"),
         "algorithms": len(algorithms),

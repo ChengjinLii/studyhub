@@ -54,6 +54,50 @@ def sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
+def resolve_model_artifact(model: Path) -> tuple[str, dict[str, Any]]:
+    """Validate a fixed base or merged LoRA model and return its run identity."""
+    model = model.resolve()
+    download_manifest_path = model / "studyhub_download_manifest.json"
+    merged_manifest_path = model / "studyhub_merged_manifest.json"
+    if download_manifest_path.is_file() and merged_manifest_path.is_file():
+        raise RuntimeError(f"ambiguous model artifact contains two StudyHub manifests: {model}")
+    if download_manifest_path.is_file():
+        manifest = json.loads(download_manifest_path.read_text(encoding="utf-8"))
+        identity = f"{manifest['repository']}@{manifest['revision']}"
+    elif merged_manifest_path.is_file():
+        manifest = json.loads(merged_manifest_path.read_text(encoding="utf-8"))
+        adapter_sha256 = str(manifest.get("adapter_sha256", ""))
+        if len(adapter_sha256) != 64 or any(character not in "0123456789abcdef" for character in adapter_sha256):
+            raise RuntimeError(f"merged model has no valid adapter lineage: {merged_manifest_path}")
+        stage = str(manifest.get("training_stage", "post-trained"))
+        identity = f"StudyHub/Qwen3.5-9B-{stage}@{adapter_sha256[:16]}"
+        manifest = {"artifact_kind": "merged_lora", **manifest}
+    else:
+        raise RuntimeError(f"model has no StudyHub download or merged manifest: {model}")
+
+    config_path = model / "config.json"
+    if not config_path.is_file():
+        raise RuntimeError(f"model config is missing: {config_path}")
+    for shard in manifest.get("weight_shards", []):
+        path = model / str(shard["name"])
+        if not path.is_file() or path.stat().st_size != int(shard["bytes"]):
+            raise RuntimeError(f"model shard is missing or incomplete: {path}")
+    expected_config_sha256 = manifest.get("config_sha256")
+    if expected_config_sha256 and sha256(config_path) != expected_config_sha256:
+        raise RuntimeError(f"model config hash does not match its manifest: {config_path}")
+    index_path = model / "model.safetensors.index.json"
+    expected_index_sha256 = manifest.get("index_sha256")
+    if expected_index_sha256 and (not index_path.is_file() or sha256(index_path) != expected_index_sha256):
+        raise RuntimeError(f"model index hash does not match its manifest: {index_path}")
+    manifest = {
+        **manifest,
+        "resolved_path": str(model),
+        "resolved_config_sha256": sha256(config_path),
+        "run_identity": identity,
+    }
+    return identity, manifest
+
+
 def stable_rank(seed: int, value: str) -> str:
     return hashlib.sha256(f"{seed}:{value}".encode()).hexdigest()
 
@@ -488,15 +532,22 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
     manifest = json.loads((public_root / "manifest.json").read_text(encoding="utf-8"))
     if manifest.get("status") not in {"FROZEN_FOR_BASELINE", "FROZEN_TRAINING_READY"}:
         raise RuntimeError(f"Benchmark {benchmark_generation} must be frozen before the 9B Base evaluation")
+    model_identity, model_manifest = resolve_model_artifact(args.model)
+    artifact_role = (
+        "base"
+        if model_manifest.get("schema_version") == "studyhub.model-download.v1"
+        else str(model_manifest.get("training_stage", "post-trained"))
+    )
     trial = args.trial or (
-        f"qwen35-9b-base-{benchmark_generation}-{args.mode}-seed-{args.seed}-"
+        f"qwen35-9b-{artifact_role}-{benchmark_generation}-{args.mode}-seed-{args.seed}-"
         f"{datetime.now(UTC).strftime('%Y%m%d_%H%M%S')}"
     )
     output_base = args.output_root or project / f"artifacts/benchmark-{benchmark_generation}/runs"
     output_root = (output_base / trial).resolve()
     output_root.mkdir(parents=True, exist_ok=True)
     api_key = secrets.token_urlsafe(36)
-    model_overlay = project / "artifacts/areal/model-overlays/9b-base-benchmark"
+    overlay_key = hashlib.sha256(model_identity.encode()).hexdigest()[:16]
+    model_overlay = project / f"artifacts/areal/model-overlays/9b-benchmark-{overlay_key}"
     prepare_overlay(args.model.resolve(), model_overlay)
     ports = [args.port_base + index for index in range(args.workers)]
     endpoints = [f"http://127.0.0.1:{port}/v1" for port in ports]
@@ -529,7 +580,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
                 "items": shard,
                 "output": str(output_root / f"episodes-worker-{worker_id}.jsonl"),
                 "run_id": trial,
-                "model_identity": "Qwen/Qwen3.5-9B@c202236235762e1c871ad0ccb60c8ee5ba337b9a",
+                "model_identity": model_identity,
                 "benchmark_generation": benchmark_generation,
                 "benchmark_version": BENCHMARK_VERSION_V2 if benchmark_generation == "v2" else BENCHMARK_VERSION,
                 "hidden_root": str(hidden_root),
@@ -595,7 +646,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
             "started_at": started_at,
             "finished_at": datetime.now(UTC).isoformat(timespec="seconds"),
             "elapsed_seconds": round(time.monotonic() - started_monotonic, 6),
-            "model": "Qwen/Qwen3.5-9B@c202236235762e1c871ad0ccb60c8ee5ba337b9a",
+            "model": model_identity,
             "benchmark_content_sha256": benchmark_content_sha256,
             "benchmark_manifest_sha256": benchmark_manifest_sha256,
             "episodes_sha256": sha256(merged),
@@ -609,7 +660,6 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         json.dumps(summary, ensure_ascii=False, indent=2) + "\n",
         encoding="utf-8",
     )
-    model_manifest = json.loads((args.model / "studyhub_download_manifest.json").read_text(encoding="utf-8"))
     run_manifest = {
         "schema_version": f"studyhub.agentbench-run-manifest.{benchmark_generation}",
         "run_id": trial,

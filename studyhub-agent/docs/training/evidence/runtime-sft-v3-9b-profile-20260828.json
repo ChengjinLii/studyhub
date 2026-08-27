@@ -1,0 +1,313 @@
+{
+  "schema_version": "studyhub.runtime-sft-profile-evidence.v3",
+  "status": "PASSED",
+  "evidence_grade": "A_REAL_REPRODUCED",
+  "controlled_variables": [
+    "git_commit",
+    "model_weights",
+    "dataset_manifest",
+    "benchmark_lock",
+    "seed",
+    "task_order",
+    "five_optimizer_updates",
+    "actual_sequence_and_token_budget",
+    "GPU_guard"
+  ],
+  "profiles": {
+    "r16": {
+      "label": "r16",
+      "status": "PASSED",
+      "trial": "profile-r16-seed-20260827-20260828_000045",
+      "run_mode": "runtime-sft-v3-9b-profile-r16",
+      "started_at": "2026-08-28T00:00:50+08:00",
+      "finished_at": "2026-08-28T00:03:50+08:00",
+      "git": {
+        "commit": "40dd4c47d8968568413ffa39d5464cabc309ce08",
+        "branch": "main",
+        "status": "",
+        "dirty_patch_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "dirty_patch_bytes": 0,
+        "untracked_file_sha256": {}
+      },
+      "config": {
+        "sha256": "cebb2f94cfe971751394078278461715689e63ac37dd10b338f41de16ea8c879",
+        "seed": 20260827,
+        "steps": 5,
+        "rank": 16,
+        "alpha": 16,
+        "target_modules": [
+          "o_proj",
+          "gate_proj",
+          "up_proj",
+          "down_proj"
+        ]
+      },
+      "model": {
+        "config_sha256": "d0883072e01861ed0b2d47be3c16c36a8e81c224c7ffaa310c6558fb3f932b05",
+        "weight_sha256": [
+          "db6f444b43d318c92f360a13a25561a6a65b10c0631b8ed305a426dbaa6c380e",
+          "31c7d7e2dd5d207840b31cc59083c8f4c4718959149e0358c0364052bb9a0330",
+          "7ec36ba3a4176a44c3c0876ad80c56a2f70c84bf008d82e9501df642f17dadec",
+          "b62b0c4cd7e44edee103ee8f4fe225f246d5e768e07bfd5f25b63a8aa1fdd0c6"
+        ]
+      },
+      "data": {
+        "manifest_sha256": "b67e6d56e531cd75969e9baf51838fb9a73fc3535645e1514c0156fde2b9242f",
+        "data_card_sha256": "fdf58242c78fbf5e34ff785c4a8e6d155e253e7ecabd4973dc86228477997cbb",
+        "benchmark_lock": {
+          "benchmark_version": "studyhub-agentbench-v2",
+          "benchmark_revision": "2.0.0",
+          "benchmark_status": "FROZEN_FOR_BASELINE",
+          "benchmark_tasks": 98,
+          "benchmark_manifest_sha256": "da804b10f53dec585255598c3e256445b8ade3acf35fd8c766ca0ab4d759c88b",
+          "benchmark_source_inventory_sha256": "f88947a8f2faabdad3a9f5376a654323b898e1cf4d24ee2aadc6db6d74167275"
+        }
+      },
+      "optimizer": {
+        "updates": 5,
+        "loss": {
+          "count": 5,
+          "first": 0.51857,
+          "last": 0.21895,
+          "min": 0.21895,
+          "max": 0.69725,
+          "mean": 0.5024219999999999
+        },
+        "perplexity": {
+          "count": 5,
+          "first": 1.6827,
+          "last": 1.3116,
+          "min": 1.3116,
+          "max": 3.0206,
+          "mean": 1.9720600000000001
+        },
+        "gradient_norm": {
+          "count": 5,
+          "first": 0.40747,
+          "last": 0.29741,
+          "min": 0.29741,
+          "max": 0.45852,
+          "mean": 0.405014
+        },
+        "entropy": {
+          "count": 5,
+          "first": 0.27909,
+          "last": 0.099791,
+          "min": 0.099791,
+          "max": 0.36251,
+          "mean": 0.2593222
+        },
+        "sequences": 40,
+        "tokens": 48712,
+        "assistant_loss_tokens": 7018,
+        "train_step_seconds": {
+          "count": 5,
+          "first": 10.453,
+          "last": 11.226,
+          "min": 7.9941,
+          "max": 11.226,
+          "mean": 9.437520000000001
+        }
+      },
+      "lora_update": {
+        "bytes": 52459456,
+        "initial_sha256": "42e4a35fad189ac42637e1ee693e3342a4ba8145ed2919ed0ff1ac45372e4569",
+        "final_sha256": "32f3dd121fa8a9f71f550a4b5fc44d03612f79616d9e855382201c6969fbe360",
+        "update_observed": true
+      },
+      "gpu": {
+        "guard_max_used_mib": 72000,
+        "per_gpu": {
+          "0": {
+            "peak_memory_used_mib": 62469.0,
+            "mean_memory_used_mib": 30965.15625,
+            "peak_utilization_gpu_pct": 100.0,
+            "mean_utilization_gpu_pct": 24.625
+          },
+          "1": {
+            "peak_memory_used_mib": 45943.0,
+            "mean_memory_used_mib": 23747.0625,
+            "peak_utilization_gpu_pct": 100.0,
+            "mean_utilization_gpu_pct": 25.46875
+          }
+        }
+      },
+      "raw_evidence": {
+        "run_metadata": {
+          "path": "/data/chengjin/studyhub/studyhub-agent/artifacts/areal/launcher_logs/runtime-sft-v3-9b/profile-r16-seed-20260827-20260828_000045.run.json",
+          "sha256": "c23292f6d98479d43bd0080e63374d8c775236736a0689a779d5758701dc7a64"
+        },
+        "bundle_manifest": {
+          "path": "/data/chengjin/studyhub/studyhub-agent/artifacts/experiments/profile-r16-seed-20260827-20260828_000045/manifest.json",
+          "sha256": "7a840346ad9c78cc784c293bacb744a887a2ed6071762341eb7c8eda1ad79d9f"
+        },
+        "bundle_checksums": {
+          "path": "/data/chengjin/studyhub/studyhub-agent/artifacts/experiments/profile-r16-seed-20260827-20260828_000045/SHA256SUMS",
+          "sha256": "9a18b1ed19df444851813cd1690f3da47e58f3bd18e3bcf28ba1a600d676cf6e"
+        },
+        "training_log": {
+          "path": "/data/chengjin/studyhub/studyhub-agent/artifacts/areal/launcher_logs/runtime-sft-v3-9b/profile-r16-seed-20260827-20260828_000045.log",
+          "sha256": "c3ee05ad0134672dfd59075ee71b056bd3ef905081edc033b6215c6a2650458c"
+        },
+        "gpu_telemetry": {
+          "path": "/data/chengjin/studyhub/studyhub-agent/artifacts/areal/launcher_logs/runtime-sft-v3-9b/profile-r16-seed-20260827-20260828_000045.gpu.csv",
+          "sha256": "2e0065d51d267309958d509d613c440ef922f935dbd6b719d400e214f45f1178"
+        }
+      }
+    },
+    "r32": {
+      "label": "r32",
+      "status": "PASSED",
+      "trial": "profile-r32-seed-20260827-20260828_000426",
+      "run_mode": "runtime-sft-v3-9b-profile-r32",
+      "started_at": "2026-08-28T00:04:32+08:00",
+      "finished_at": "2026-08-28T00:07:26+08:00",
+      "git": {
+        "commit": "40dd4c47d8968568413ffa39d5464cabc309ce08",
+        "branch": "main",
+        "status": "",
+        "dirty_patch_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "dirty_patch_bytes": 0,
+        "untracked_file_sha256": {}
+      },
+      "config": {
+        "sha256": "cebb2f94cfe971751394078278461715689e63ac37dd10b338f41de16ea8c879",
+        "seed": 20260827,
+        "steps": 5,
+        "rank": 32,
+        "alpha": 32,
+        "target_modules": [
+          "o_proj",
+          "gate_proj",
+          "up_proj",
+          "down_proj"
+        ]
+      },
+      "model": {
+        "config_sha256": "d0883072e01861ed0b2d47be3c16c36a8e81c224c7ffaa310c6558fb3f932b05",
+        "weight_sha256": [
+          "db6f444b43d318c92f360a13a25561a6a65b10c0631b8ed305a426dbaa6c380e",
+          "31c7d7e2dd5d207840b31cc59083c8f4c4718959149e0358c0364052bb9a0330",
+          "7ec36ba3a4176a44c3c0876ad80c56a2f70c84bf008d82e9501df642f17dadec",
+          "b62b0c4cd7e44edee103ee8f4fe225f246d5e768e07bfd5f25b63a8aa1fdd0c6"
+        ]
+      },
+      "data": {
+        "manifest_sha256": "b67e6d56e531cd75969e9baf51838fb9a73fc3535645e1514c0156fde2b9242f",
+        "data_card_sha256": "fdf58242c78fbf5e34ff785c4a8e6d155e253e7ecabd4973dc86228477997cbb",
+        "benchmark_lock": {
+          "benchmark_version": "studyhub-agentbench-v2",
+          "benchmark_revision": "2.0.0",
+          "benchmark_status": "FROZEN_FOR_BASELINE",
+          "benchmark_tasks": 98,
+          "benchmark_manifest_sha256": "da804b10f53dec585255598c3e256445b8ade3acf35fd8c766ca0ab4d759c88b",
+          "benchmark_source_inventory_sha256": "f88947a8f2faabdad3a9f5376a654323b898e1cf4d24ee2aadc6db6d74167275"
+        }
+      },
+      "optimizer": {
+        "updates": 5,
+        "loss": {
+          "count": 5,
+          "first": 0.51857,
+          "last": 0.20734,
+          "min": 0.20734,
+          "max": 0.69222,
+          "mean": 0.49712199999999995
+        },
+        "perplexity": {
+          "count": 5,
+          "first": 1.6827,
+          "last": 1.2947,
+          "min": 1.2947,
+          "max": 3.0207,
+          "mean": 1.96506
+        },
+        "gradient_norm": {
+          "count": 5,
+          "first": 0.58451,
+          "last": 0.3898,
+          "min": 0.3898,
+          "max": 0.65112,
+          "mean": 0.562062
+        },
+        "entropy": {
+          "count": 5,
+          "first": 0.27909,
+          "last": 0.10066,
+          "min": 0.10066,
+          "max": 0.36242,
+          "mean": 0.259738
+        },
+        "sequences": 40,
+        "tokens": 48712,
+        "assistant_loss_tokens": 7018,
+        "train_step_seconds": {
+          "count": 5,
+          "first": 10.609,
+          "last": 10.976,
+          "min": 7.8175,
+          "max": 10.976,
+          "mean": 9.25652
+        }
+      },
+      "lora_update": {
+        "bytes": 104888320,
+        "initial_sha256": "49aa916ce99fdc233294654d1ab60bbfe7b97536a50f71831e687bc6025d78fb",
+        "final_sha256": "f02acbc3f81e7eb24f6e8d1b448877d32189e4a0ac4f505a5542e9a2429058ba",
+        "update_observed": true
+      },
+      "gpu": {
+        "guard_max_used_mib": 72000,
+        "per_gpu": {
+          "0": {
+            "peak_memory_used_mib": 62783.0,
+            "mean_memory_used_mib": 30451.516129032258,
+            "peak_utilization_gpu_pct": 100.0,
+            "mean_utilization_gpu_pct": 27.322580645161292
+          },
+          "1": {
+            "peak_memory_used_mib": 46257.0,
+            "mean_memory_used_mib": 23532.677419354837,
+            "peak_utilization_gpu_pct": 100.0,
+            "mean_utilization_gpu_pct": 19.129032258064516
+          }
+        }
+      },
+      "raw_evidence": {
+        "run_metadata": {
+          "path": "/data/chengjin/studyhub/studyhub-agent/artifacts/areal/launcher_logs/runtime-sft-v3-9b/profile-r32-seed-20260827-20260828_000426.run.json",
+          "sha256": "49382e065a1aec1bf486a623748f44de0646ca1df8d991c51205b6eba75946f8"
+        },
+        "bundle_manifest": {
+          "path": "/data/chengjin/studyhub/studyhub-agent/artifacts/experiments/profile-r32-seed-20260827-20260828_000426/manifest.json",
+          "sha256": "f6e6f8cad4ed364700bc32737c75749f64fe718ea3a1942aec6b5d9017f574c9"
+        },
+        "bundle_checksums": {
+          "path": "/data/chengjin/studyhub/studyhub-agent/artifacts/experiments/profile-r32-seed-20260827-20260828_000426/SHA256SUMS",
+          "sha256": "77c210806bb9e60b511ce59024a0299a9438fa188fa434cf81a14b33c6c835b1"
+        },
+        "training_log": {
+          "path": "/data/chengjin/studyhub/studyhub-agent/artifacts/areal/launcher_logs/runtime-sft-v3-9b/profile-r32-seed-20260827-20260828_000426.log",
+          "sha256": "56f6bcf733cebe2428abcac3d2c5f29a631fc3d60a62a4a294d5be9d8c67da2f"
+        },
+        "gpu_telemetry": {
+          "path": "/data/chengjin/studyhub/studyhub-agent/artifacts/areal/launcher_logs/runtime-sft-v3-9b/profile-r32-seed-20260827-20260828_000426.gpu.csv",
+          "sha256": "9f6cc0a2a9517a8e2dbcdf2c803a553a1388e05663e53561f7bb7a106a6dee06"
+        }
+      }
+    }
+  },
+  "comparison": {
+    "r32_minus_r16_mean_train_step_seconds": -0.18100000000000094,
+    "r32_minus_r16_peak_memory_used_mib": 314.0,
+    "selected_engineering_recipe": "r16",
+    "selection_reason": "r32 did not deliver a >=5% optimizer-step speedup within a 1 GiB peak-memory envelope; r16 is the lower-capacity engineering default.",
+    "quality_claim": "NOT_EVALUATED_BY_PROFILE"
+  },
+  "claim_boundary": "This profile compares runtime stability and resource cost over five updates. It does not measure downstream Agent capability; formal SFT still requires independent AgentBench v2 evaluation.",
+  "next_action": "Use r16 for the formal 9B SFT recipe, then evaluate checkpoints independently.",
+  "generator": {
+    "path": "/data/chengjin/studyhub/studyhub-agent/scripts/train/promote_runtime_sft_profiles.py",
+    "sha256": "59574c874e1d7b6a564b3bc71c919f8a170d98023b86f2772a51ab2f8ee75077"
+  }
+}

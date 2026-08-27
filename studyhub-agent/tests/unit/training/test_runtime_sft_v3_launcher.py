@@ -23,11 +23,20 @@ def test_runtime_sft_v3_launcher_has_explicit_safety_gates() -> None:
     assert "STUDYHUB_ALLOW_TRAINING" in launcher
     assert "STUDYHUB_ALLOW_FORMAL_SFT" in launcher
     assert "STUDYHUB_ALLOW_DIRTY_FORMAL" in launcher
+    assert "STUDYHUB_FORMAL_SFT_TRIAL" in launcher
+    assert 'TRAINING_TRIAL="formal-r16-seed-20260827"' in launcher
+    assert '"${SEED}" != "20260827"' in launcher
+    assert 'ATTEMPT_ID="${TRAINING_TRIAL}-attempt-${TIMESTAMP}"' in launcher
+    assert "FORMAL_SFT_COMPLETE.json" in launcher
+    assert "record_formal_sft_completion.py" in launcher
+    assert '--benchmark-manifest "${BENCHMARK_MANIFEST}"' in launcher
     assert "guarded_gpu_launch.py" in launcher
     assert "runtime-sft-v3-data-card.json" in launcher
     assert "STUDYHUB_TRAIN_GPUS:-0,1" in launcher
     assert "--model-hash-cache" in launcher
     assert "PYTORCH_ALLOC_CONF" in launcher
+    assert "profile-r32) PREFLIGHT_ARGS+=(--lora-rank 32 --lora-alpha 32)" in launcher
+    assert "PREFLIGHT_ARGS+=(--formal)" in launcher
 
 
 def test_runtime_sft_v3_driver_captures_initial_lora() -> None:

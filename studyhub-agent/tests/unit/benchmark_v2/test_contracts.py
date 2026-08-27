@@ -267,6 +267,48 @@ def test_v2_aggregate_reports_cluster_aware_intervals() -> None:
     assert summary["cluster_aware_strict_success"]["source_group_id"]["effective_clusters"] == 2
 
 
+def test_benchmark_runner_resolves_base_and_merged_model_lineage(tmp_path: Path) -> None:
+    from scripts.benchmark.run_9b_base_eval import resolve_model_artifact
+
+    base = tmp_path / "base"
+    base.mkdir()
+    (base / "config.json").write_text("{}", encoding="utf-8")
+    (base / "weights.safetensors").write_bytes(b"base")
+    (base / "studyhub_download_manifest.json").write_text(
+        json.dumps(
+            {
+                "schema_version": "studyhub.model-download.v1",
+                "repository": "Qwen/Qwen3.5-9B",
+                "revision": "fixed",
+                "weight_shards": [{"name": "weights.safetensors", "bytes": 4}],
+            }
+        ),
+        encoding="utf-8",
+    )
+    identity, manifest = resolve_model_artifact(base)
+    assert identity == "Qwen/Qwen3.5-9B@fixed"
+    assert manifest["run_identity"] == identity
+
+    merged = tmp_path / "merged"
+    merged.mkdir()
+    (merged / "config.json").write_text("{}", encoding="utf-8")
+    (merged / "weights.safetensors").write_bytes(b"sft")
+    (merged / "studyhub_merged_manifest.json").write_text(
+        json.dumps(
+            {
+                "schema_version": "studyhub.merged-lora-checkpoint.v1",
+                "training_stage": "sft",
+                "adapter_sha256": "a" * 64,
+                "weight_shards": [{"name": "weights.safetensors", "bytes": 3}],
+            }
+        ),
+        encoding="utf-8",
+    )
+    identity, manifest = resolve_model_artifact(merged)
+    assert identity == "StudyHub/Qwen3.5-9B-sft@aaaaaaaaaaaaaaaa"
+    assert manifest["artifact_kind"] == "merged_lora"
+
+
 def test_public_calibration_record_is_bound_and_does_not_claim_difficulty() -> None:
     manifest = PUBLIC_BENCHMARK / "manifest.json"
     manifest_row = json.loads(manifest.read_text(encoding="utf-8"))

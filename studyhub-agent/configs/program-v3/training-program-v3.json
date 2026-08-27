@@ -2,12 +2,16 @@
   "schema_version": "studyhub.training-program.v3",
   "program_id": "studyhub-9b-agentic-post-training-v3",
   "created_at": "2026-08-27",
-  "status": "BENCHMARK_V2_FROZEN_BASE_CALIBRATED_SFT_GATE_PASSED_PROFILE_PENDING",
-  "launch_authorized": false,
+  "status": "BENCHMARK_V2_FROZEN_BASE_CALIBRATED_SFT_FORMAL_AUTHORIZED",
+  "launch_authorized": true,
+  "launch_authorization_scope": ["NINE_B_SFT_FORMAL_R16_ONE_PASS"],
   "gpu_gate_authorized": true,
   "sft_profile_authorized": true,
+  "formal_sft_authorized": true,
   "source_prompt": "/data/chengjin/studyhub-agentic-rl-interview-prompt-pack-v3/studyhub-agentic-rl-interview-prompt-pack-v3/prompt.md",
+  "source_prompt_sha256": "478b7666c84fe69f3210d74b33f53094cbe699c47c02607200aa5dddb17acd3c",
   "benchmark_execution_prompt": "/data/chengjin/StudyHub_Benchmark_v2_Codex_Execution_Prompt.md",
+  "benchmark_execution_prompt_sha256": "8cfa15531690461de99cbfe6b57e7cf70bc65eadb583a9f81b9ecd67d0c102e7",
   "north_star": "Demonstrate that a 9B model learns stronger autonomous behavior in the real Hermes policy space on independent evaluations at an acceptable end-to-end cost.",
   "architecture": {
     "hermes": "the only agent loop and tool-interaction harness",
@@ -111,7 +115,16 @@
       "oracle_pass_rate": 1.0,
       "evaluator_challenge_pass": "21/21"
     },
-    "promotion_rule": "A higher scalar training reward alone never promotes a checkpoint. Development, external and cost slices must agree; Sealed remains untouched until final confirmation."
+    "promotion_rule": "A higher scalar training reward alone never promotes a checkpoint. Development, external and cost slices must agree; Sealed remains untouched until final confirmation.",
+    "execution_contract": {
+      "training_examples_from_benchmark": 0,
+      "development_use": "checkpoint comparison and failure analysis only",
+      "sealed_use": "one final confirmation after all model and recipe choices are frozen",
+      "calibration_challenge_use": "evaluator calibration only",
+      "external_metric_policy": "preserve each official metric and never collapse the portfolio into one AgentScore",
+      "independent_review_status": "NOT_RUN",
+      "claim_boundary": "Internal Development evidence can guide iteration; capability claims require separate external results and the untouched Sealed confirmation."
+    }
   },
   "data": {
     "sft": {
@@ -229,7 +242,7 @@
       "epoch_policy": "Start with one token-budgeted pass; continue only if independent Dev slices improve without protocol regression.",
       "checkpoint_frequency": "every_10_percent_of_token_budget",
       "selection_metric": "independent_development_composite_with_family_floors",
-      "lora_recipe": {"rank_candidates": [16, 32], "target_modules": ["o_proj", "gate_proj", "up_proj", "down_proj"], "final_choice": "PROFILE_REQUIRED"},
+      "lora_recipe": {"rank_candidates": [16, 32], "target_modules": ["o_proj", "gate_proj", "up_proj", "down_proj"], "final_choice": "r16"},
       "gate": {
         "status": "PASSED",
         "trial": "gate-seed-20260827-20260827_233653",
@@ -247,13 +260,48 @@
         "claim_boundary": "The Gate proves one guarded dual-H100 optimizer update, checkpoint export and evidence capture; it does not establish SFT quality or authorize formal training."
       },
       "profiles": {
-        "status": "PENDING",
+        "status": "PASSED",
+        "evidence_grade": "A_REAL_REPRODUCED",
+        "evidence_path": "docs/training/evidence/runtime-sft-v3-9b-profile-20260828.json",
         "equal_budget_steps": 5,
         "candidates": [
-          {"id": "profile-r16", "rank": 16, "alpha": 16, "status": "PENDING"},
-          {"id": "profile-r32", "rank": 32, "alpha": 32, "status": "PENDING"}
+          {"id": "profile-r16", "rank": 16, "alpha": 16, "status": "PASSED", "mean_train_step_seconds": 9.43752, "peak_memory_used_mib": 62469, "adapter_bytes": 52459456},
+          {"id": "profile-r32", "rank": 32, "alpha": 32, "status": "PASSED", "mean_train_step_seconds": 9.25652, "peak_memory_used_mib": 62783, "adapter_bytes": 104888320}
         ],
-        "selection_rule": "Compare the same seed, task order, five optimizer updates, token cap, GPU guard and evidence schema before authorizing formal SFT."
+        "actual_budget": {"sequences": 40, "tokens": 48712, "assistant_loss_tokens": 7018},
+        "selected_engineering_recipe": "r16",
+        "selection_rule": "Select r32 only if it reduces mean optimizer-step wall time by at least 5% without adding more than 1 GiB peak memory; otherwise retain the lower-capacity r16 default.",
+        "selection_reason": "r32 was 1.9% faster, below the 5% threshold, while doubling adapter bytes and adding 314 MiB peak memory.",
+        "quality_claim": "NOT_EVALUATED_BY_PROFILE"
+      },
+      "formal": {
+        "status": "AUTHORIZED_PENDING_START",
+        "authorization_scope": "ONE_R16_PASS_ONLY",
+        "training_trial": "formal-r16-seed-20260827",
+        "seed": 20260827,
+        "rank": 16,
+        "alpha": 16,
+        "train_rows": 43650,
+        "processed_rows": 43648,
+        "drop_last_rows": 2,
+        "global_batch_size": 8,
+        "expected_optimizer_updates": 5456,
+        "train_all_tokens": 55554221,
+        "train_assistant_loss_tokens": 8152342,
+        "estimated_wall_hours_from_profile": 14.3,
+        "estimate_not_measurement": true,
+        "dataset_manifest_sha256": "b67e6d56e531cd75969e9baf51838fb9a73fc3535645e1514c0156fde2b9242f",
+        "data_card_sha256": "fdf58242c78fbf5e34ff785c4a8e6d155e253e7ecabd4973dc86228477997cbb",
+        "benchmark_manifest_sha256": "da804b10f53dec585255598c3e256445b8ade3acf35fd8c766ca0ab4d759c88b",
+        "checkpoint_every_updates": 546,
+        "recovery_every_updates": 50,
+        "recovery_contract": "Stable training_trial across attempts; each attempt has separate logs and evidence; a completion marker is written only after globalstep 5455.",
+        "post_training_gate": [
+          "merge the final LoRA without replacing the base model",
+          "run AgentBench v2 Development with the same evaluator and report cluster-aware intervals",
+          "run the four external official protocols when their setup, license and API requirements permit",
+          "do not inspect Sealed-A or Sealed-B until the candidate and recipe are frozen"
+        ]
       }
     },
     "grpo": {
@@ -333,12 +381,12 @@
     {"id": "G1", "name": "Benchmark v2 frozen", "status": "PASSED", "evidence": ["98 tasks", "78 source groups", "51 Development semantic clusters", "v1 hash regression", "quality and contamination audit", "manifest da804b10f53dec585255598c3e256445b8ade3acf35fd8c766ca0ab4d759c88b"]},
     {"id": "G2", "name": "9B Base internal calibration", "status": "PASSED_WITH_EXTERNAL_PENDING", "evidence": ["51/51 Development scored with zero Infra exclusions", "35 tasks x 4 complete variance panel", "cluster-aware confidence intervals", "MDE", "external official model evaluations NOT_RUN"]},
     {"id": "G3", "name": "SFT data accepted", "status": "PASSED", "evidence": ["48.5k final trajectories", "61,725,581 actual tokens", "75.41% runtime-native", "Benchmark v2 prompt overlap 0", "2Wiki support-title overlap 0", "runtime-sft-v3-data-card.json"]},
-    {"id": "G4", "name": "9B SFT promoted", "status": "GATE_PASSED_PROFILE_AND_FORMAL_PENDING", "evidence": ["one guarded dual-H100 optimizer update", "initial and final LoRA hashes differ", "loss 0.51857", "gradient norm 0.40752", "GPU peaks below 72000 MiB guard", "docs/training/evidence/runtime-sft-v3-9b-gate-20260827.json", "formal SFT and independent Dev evaluation pending"]},
+    {"id": "G4", "name": "9B SFT promoted", "status": "FORMAL_AUTHORIZED_PENDING_RUN_AND_EVAL", "evidence": ["one guarded dual-H100 Gate optimizer update", "r16 and r32 each completed five controlled updates", "both profiles processed 40 sequences, 48712 tokens and 7018 assistant-loss tokens", "all initial and final LoRA hashes differ", "all GPU peaks below 72000 MiB guard", "r16 selected by the frozen engineering rule", "formal budget fixed at 5456 updates, 55554221 train tokens and 8152342 assistant-loss tokens", "stable formal-r16-seed-20260827 recovery lineage", "docs/training/evidence/runtime-sft-v3-9b-profile-20260828.json", "formal SFT and independent Dev evaluation pending"]},
     {"id": "G5", "name": "Reward and RL tasks accepted", "evidence": ["800-case Reward calibration", "10k learnability-QA tasks", "effective-group estimate", "alternative-path acceptance"]},
     {"id": "G6", "name": "dual-H100 layout selected", "evidence": ["A/B profiles", "C only if triggered", "before-after artifact", "time-to-quality decision"]},
     {"id": "G7", "name": "9B GRPO main", "evidence": ["500-update initial budget", "complete groups", "entropy/KL/ratio diagnostics", "independent checkpoint evaluation"]},
     {"id": "G8", "name": "confirmation", "evidence": ["best recipe confirmation", "external official protocol", "Sealed Final", "claim ledger"]}
   ],
   "artifact_contract": ["manifest", "config", "model_hash", "dataset_hash", "reward_version", "benchmark_version", "seed", "trajectory_sample", "training_metrics", "independent_eval", "gpu_profile", "failure_slices", "checkpoint_hash", "claim_ledger"],
-  "next_action": "Run equal-budget dual-H100 r16 and r32 SFT profiles, select a stable recipe, then request separate authorization for formal SFT. External official baselines remain required before final model claims."
+  "next_action": "Start or resume the single authorized formal-r16-seed-20260827 SFT attempt under the shared-server guard, then evaluate the merged checkpoint on AgentBench v2 Development and the separate official external portfolio. Sealed-A/B remain untouched until final confirmation."
 }

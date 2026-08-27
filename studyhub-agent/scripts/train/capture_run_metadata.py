@@ -199,6 +199,17 @@ def start(args: argparse.Namespace) -> None:
                 "is the final audited release decision."
             ),
         }
+    if args.benchmark_manifest:
+        benchmark_manifest = json.loads(args.benchmark_manifest.read_text(encoding="utf-8"))
+        metadata["benchmark"] = {
+            "path": str(args.benchmark_manifest.resolve()),
+            "sha256": sha256(args.benchmark_manifest),
+            "version": benchmark_manifest.get("benchmark_version"),
+            "revision": benchmark_manifest.get("benchmark_revision"),
+            "status": benchmark_manifest.get("status"),
+            "training_use": "lineage_and_post_training_evaluation_only",
+            "sealed_content_used": False,
+        }
     if args.hermes_lock:
         metadata["hermes_upstream"] = json.loads(args.hermes_lock.read_text(encoding="utf-8"))
     args.output.write_text(json.dumps(metadata, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
@@ -231,6 +242,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--config", type=Path)
     parser.add_argument("--dataset-manifest", type=Path)
     parser.add_argument("--data-card", type=Path)
+    parser.add_argument("--benchmark-manifest", type=Path)
     parser.add_argument("--model", type=Path)
     parser.add_argument("--model-hash-cache", type=Path)
     parser.add_argument("--areal-lock", type=Path)

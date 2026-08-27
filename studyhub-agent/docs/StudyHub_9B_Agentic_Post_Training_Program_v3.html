@@ -257,7 +257,8 @@
           <span class="pill">Qwen3.5-9B</span>
           <span class="pill">2 × H100 80GB</span>
           <span class="pill green">SFT GATE PASSED</span>
-          <span class="pill rust">PROFILE PENDING</span>
+          <span class="pill green">PROFILE PASSED</span>
+          <span class="pill gold">FORMAL SFT AUTHORIZED</span>
         </div>
       </div>
       <aside class="hero-card reveal delay">
@@ -336,7 +337,7 @@
     </section>
 
     <section id="benchmark">
-      <div class="section-head"><span class="section-no">04 / BENCHMARK</span><div><h2>训练前先冻结导航仪</h2><p class="note">Regression 只负责回归；Dev 负责模型选择和错误分析；Sealed 只负责最终 Claim。External 提供可比性，不替代产品能力。</p></div></div>
+      <div class="section-head"><span class="section-no">04 / BENCHMARK</span><div><h2>训练前先冻结导航仪</h2><p class="note">Regression 只负责回归；Dev 负责模型选择和错误分析；Sealed 只负责最终 Claim。External 保留各自官方指标，不合并成一个 AgentScore。</p></div></div>
       <div class="table-wrap"><table><thead><tr><th>层级</th><th>规模</th><th>用途</th><th>关键纪律</th></tr></thead><tbody>
         <tr><td><strong>Regression</strong></td><td>12</td><td>Parser、tool schema、checkpoint、permission/error 回归</td><td>允许 deterministic；不支持能力 Claim</td></tr>
         <tr><td><strong>StudyHub Dev</strong></td><td>51</td><td>公开开发集与错误切片</td><td>9B Base 51/51 已评分；0 Infra exclusion</td></tr>
@@ -346,11 +347,11 @@
         <tr><td><strong>External</strong></td><td>官方协议</td><td>BFCL V4 Agentic、tau2、DeepResearch Bench II、BrowseComp-Plus</td><td>仅 setup ready；官方模型评测仍为 NOT_RUN</td></tr>
       </tbody></table></div>
       <div class="flow">
-        <article><em>G1-A</em><b>P0 覆盖</b><small>关键能力不再空白。</small></article>
+        <article><em>G1-A</em><b>内容推理</b><small>正文 Search → Read → Synthesize → Cite。</small></article>
         <article><em>G1-B</em><b>独立 Grader</b><small>Reward / Dev / Sealed 代码分离。</small></article>
-        <article><em>G1-C</em><b>质量抽检</b><small>120 stratified + 30 double review。</small></article>
+        <article><em>G1-C</em><b>审查边界</b><small>35 项 self-review；独立人工审查 NOT_RUN。</small></article>
         <article><em>G1-D</em><b>9B Base</b><small>全量 baseline、variance 与 MDE。</small></article>
-        <article><em>G1-E</em><b>Freeze v1</b><small>达到门槛立即开训，不等待完美。</small></article>
+        <article><em>G1-E</em><b>Freeze v2</b><small>manifest 固定；训练样本使用量为 0。</small></article>
       </div>
     </section>
 
@@ -388,13 +389,13 @@
     </section>
 
     <section id="training">
-      <div class="section-head"><span class="section-no">07 / TRAINING</span><div><h2>9B 主线已通过最小更新 Gate</h2><p class="note">Benchmark v2、9B Base 内部校准、48.5k SFT 数据门和一次真实双 H100 优化器更新均已完成。该 Gate 只证明训练链路、梯度和 checkpoint 正常，不代表 SFT 效果成立。</p></div></div>
+      <div class="section-head"><span class="section-no">07 / TRAINING</span><div><h2>9B 正式 r16 SFT 已完成放行审查</h2><p class="note">Benchmark v2、9B Base 内部校准、48.5k SFT 数据门、真实双 H100 Gate 及 r16/r32 等预算 profile 均已完成。正式训练仍不能用 loss 代替 Agent 能力评测。</p></div></div>
       <div class="timeline">
         <article class="phase"><span class="gate">G0 · HISTORY</span><div><h3>冻结 v2</h3><p>保留接线、checkpoint、artifact、GPU guard 和真实 incident。</p></div></article>
         <article class="phase"><span class="gate">G1 · PASSED</span><div><h3>StudyHub AgentBench v2</h3><p>98 tasks、78 source groups、51 Dev semantic clusters；v1 保持不可变。</p></div></article>
         <article class="phase"><span class="gate">G2 · INTERNAL PASS</span><div><h3>9B Base Eval</h3><p>51-task Dev 与 35 × 4 variance 已完成；External official model eval 仍待执行。</p></div></article>
         <article class="phase"><span class="gate">G3 · PASSED</span><div><h3>48.5k Runtime-native SFT Data</h3><p>61.73M tokens、75.41% runtime-native；Benchmark prompt 与 2Wiki support-title 跨 split 重叠均为 0。</p><small>质量标签只陈述来源；没有把规则构造轨迹标成 teacher review。</small></div></article>
-        <article class="phase"><span class="gate">G4 · GATE PASSED</span><div><h3>9B SFT Profile</h3><p>真实 Gate 完成 1 update / 8 sequences / 9,934 tokens；loss 0.51857，gradient norm 0.40752，初始与最终 LoRA SHA 不同。</p><small>GPU0 / GPU1 峰值 61,748 / 45,757 MiB，均低于 72,000 MiB guard；下一步用同 seed、同顺序和同 5-step 预算比较 r16 / r32。正式 SFT 尚未晋级。</small></div></article>
+        <article class="phase"><span class="gate">G4 · FORMAL AUTHORIZED</span><div><h3>9B SFT · r16 Selected</h3><p>r16 / r32 均完成 5 updates、40 sequences、48,712 tokens 和 7,018 loss tokens；正式预算固定为 5,456 updates、55,554,221 train tokens 与 8,152,342 assistant-loss tokens。</p><small>r32 平均 step 仅快 1.9%，但 adapter 从 52.5MB 增至 104.9MB、峰值多 314 MiB，未达到预设 5% 收益门槛，因此选择 r16。该结论只用于工程配方，不是能力评测。</small></div></article>
         <article class="phase"><span class="gate">G5 · RL QA</span><div><h3>Reward v3 + Learnability</h3><p>800 条 Reward 校准；10k 任务按 mixed/all-correct/all-failed 分桶。</p></div></article>
         <article class="phase"><span class="gate">G6 · INFRA</span><div><h3>Dual-H100 Layout</h3><p>A/B 同预算实测，C 仅在异步有明确信息价值时进入。</p></div></article>
         <article class="phase"><span class="gate">G7 · GRPO</span><div><h3>9B Main RL</h3><p>G=4、500 updates、4k unique tasks；高分叉 G=8 使用独立受控阶段。</p><small>LR 2e-6 起点，范围 1e-6–5e-6；20-turn 安全上限，per-task 3/6/10/20。</small></div></article>
@@ -446,16 +447,16 @@
     </section>
 
     <section id="next">
-      <div class="section-head"><span class="section-no">11 / EXECUTION</span><div><h2>下一步比较 r16 / r32 等预算 Profile</h2><p class="note">最小 Gate 已通过，但单步结果不能选配方。两组 profile 必须共享 seed、任务顺序、5 个 optimizer updates、token cap、GPU guard 与证据 schema；比较稳定性、显存、step wall time 和有效 loss tokens。</p></div></div>
-      <div class="callout"><b>当前最高信息动作</b><span>先完成 r16 / r32 profile，再基于同预算证据选择正式 SFT 配方。不得用单步 loss 高低推断模型质量，也不得把 Gate 当成 SFT 晋级。</span></div>
-      <div class="command">cd /data/chengjin/studyhub/studyhub-agent<br>STUDYHUB_ALLOW_TRAINING=YES scripts/train/run_runtime_sft_v3.sh profile-r16 20260827<br>STUDYHUB_ALLOW_TRAINING=YES scripts/train/run_runtime_sft_v3.sh profile-r32 20260827</div>
+      <div class="section-head"><span class="section-no">11 / EXECUTION</span><div><h2>启动可恢复的正式 r16 SFT</h2><p class="note">正式训练绑定同一 48.5k 数据卡、Qwen3.5-9B revision、assistant-only loss、双 H100 guard 与冻结的 Benchmark v2 manifest；Benchmark v2 训练样本为 0，Sealed-A/B 不参与选择。</p></div></div>
+      <div class="callout"><b>当前最高信息动作</b><span><code>formal-r16-seed-20260827</code> 在中断后复用 checkpoint，每次 attempt 单独保存日志和证据；只有完成 globalstep 5455 才写完成标记。训练后先评 Dev 与独立 External，最后才运行 Sealed。</span></div>
+      <div class="command">cd /data/chengjin/studyhub/studyhub-agent<br>STUDYHUB_ALLOW_TRAINING=YES STUDYHUB_ALLOW_FORMAL_SFT=YES scripts/train/run_runtime_sft_v3.sh run 20260827</div>
       <div class="split" style="margin-top:22px">
-        <article class="panel"><h3>机器合同与证据</h3><p><a href="../configs/program-v3/training-program-v3.json">training-program-v3.json</a><br><a href="../configs/program-v3/capability-matrix-v1.json">capability-matrix-v1.json</a><br><a href="training/evidence/runtime-sft-v3-9b-gate-20260827.json">runtime-sft-v3-9b-gate-20260827.json</a></p></article>
+        <article class="panel"><h3>机器合同与证据</h3><p><a href="../configs/program-v3/training-program-v3.json">training-program-v3.json</a><br><a href="training/evidence/runtime-sft-v3-9b-gate-20260827.json">SFT Gate evidence</a><br><a href="training/evidence/runtime-sft-v3-9b-profile-20260828.json">r16 / r32 profile evidence</a></p></article>
         <article class="panel gold"><h3>缺陷台账</h3><p><a href="../design-defects/index.json">17 项初始系统性缺陷</a>。每项包含证据、竞争解释、最小证伪、修复、回归和残余风险。</p></article>
       </div>
     </section>
 
-    <footer><span>StudyHub Agent / 9B Agentic Post-Training v3</span><span>2026-08-27 · SFT GATE PASSED · PROFILE PENDING</span></footer>
+    <footer><span>StudyHub Agent / 9B Agentic Post-Training v3</span><span>2026-08-28 · SFT PROFILE PASSED · FORMAL SFT AUTHORIZED</span></footer>
   </main>
 </body>
 </html>

@@ -68,7 +68,20 @@ runtime-parity, contamination, and full loss-mask audits. A guarded one-step
 dual-H100 AReaL Gate then completed one real optimizer update: loss `0.51857`,
 gradient norm `0.40752`, and different initial/final LoRA hashes. This proves
 the training and checkpoint path, not model quality. Equal-budget r16/r32
-profiles remain pending, and formal SFT is still unauthorized.
+profiles then completed five updates each over the same 40 sequences and 48,712
+tokens. r32 was only 1.9% faster while doubling adapter bytes, so the frozen
+engineering rule selected r16. This profile does not establish model quality;
+formal SFT and independent AgentBench v2 evaluation remain pending. The one-pass
+formal contract is now fixed at 5,456 optimizer updates over 43,648 processed
+train rows, 55,554,221 train tokens, and 8,152,342 assistant-loss tokens. Its
+stable trial ID is `formal-r16-seed-20260827`; interrupted attempts reuse that
+checkpoint lineage while retaining separate logs and evidence bundles.
+
+Benchmark v2 contributes zero training examples. Development is used only for
+checkpoint comparison and failure analysis, external benchmark metrics stay
+separate, and Sealed-A/B remain untouched until the model and recipe are frozen.
+The formal launcher verifies the frozen manifest and quality gate before an
+optimizer can start.
 
 - [9B Agentic Post-Training v3 program](docs/StudyHub_9B_Agentic_Post_Training_Program_v3.html)
 - [Machine-readable training contract](configs/program-v3/training-program-v3.json)
@@ -78,6 +91,7 @@ profiles remain pending, and formal SFT is still unauthorized.
 - [9B Base v2 calibration](docs/benchmark/9B_BASE_V2_CALIBRATION.md)
 - [Runtime-native SFT v3 data card](docs/training/RUNTIME_SFT_V3_DATA_CARD.md)
 - [9B SFT Gate evidence](docs/training/evidence/runtime-sft-v3-9b-gate-20260827.json)
+- [9B SFT profile evidence](docs/training/evidence/runtime-sft-v3-9b-profile-20260828.json)
 - [Primary-source review](research/primary-source-review.md)
 - [Initial design-defect audit](design-defects/index.json)
 
@@ -87,6 +101,20 @@ Validate the program and local 9B assets without starting a trainer:
 cd /data/chengjin/studyhub/studyhub-agent
 .venv-train/bin/python scripts/train/validate_v3_program.py --check-local-assets
 ```
+
+Start or resume the single authorized formal SFT trial:
+
+```bash
+STUDYHUB_ALLOW_TRAINING=YES \
+STUDYHUB_ALLOW_FORMAL_SFT=YES \
+scripts/train/run_runtime_sft_v3.sh run 20260827
+```
+
+After merging a completed LoRA checkpoint, evaluate that model with the same
+frozen AgentBench v2 protocol by setting `STUDYHUB_EVAL_MODEL` and a lowercase
+`STUDYHUB_EVAL_MODEL_ROLE`, then invoking
+`scripts/benchmark/run_9b_model_eval_v2.sh`. The historical Base wrapper remains
+`scripts/benchmark/run_9b_base_eval_v2.sh`.
 
 ## Historical controlled 4B / 9B setup
 

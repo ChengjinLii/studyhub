@@ -7,6 +7,7 @@ RUNTIME_SHIM="${PROJECT_ROOT}/training/runtime_shims"
 CONFIG="${PROJECT_ROOT}/configs/train/runtime-sft-v3-qwen35-9b.yaml"
 DATA_MANIFEST="${PROJECT_ROOT}/datasets/processed/runtime_sft_v3_qwen35_9b/manifest.json"
 DATA_CARD="${PROJECT_ROOT}/configs/program-v3/runtime-sft-v3-data-card.json"
+BENCHMARK_MANIFEST="${PROJECT_ROOT}/benchmarks/studyhub-agent-v2/manifest.json"
 MODEL="${PROJECT_ROOT}/../models/P1/Qwen3.5-9B"
 MODE="${1:-check}"
 SEED="${2:-20260827}"
@@ -18,6 +19,10 @@ case "${MODE}" in
   check|gate|profile-r16|profile-r32|run) ;;
   *) echo "Usage: $0 [check|gate|profile-r16|profile-r32|run] [seed]" >&2; exit 2 ;;
 esac
+if [[ "${MODE}" == "run" && "${SEED}" != "20260827" ]]; then
+  echo "Formal SFT is authorized only for seed 20260827." >&2
+  exit 2
+fi
 if [[ ! -x "${VENV_DIR}/bin/areal" ]]; then
   echo "Missing pinned AReaL environment: ${VENV_DIR}" >&2
   exit 1
@@ -30,6 +35,13 @@ export PYTHONPATH="${RUNTIME_SHIM}:${PROJECT_ROOT}:${PROJECT_ROOT}/src${PYTHONPA
 unset ALL_PROXY all_proxy HTTP_PROXY http_proxy HTTPS_PROXY https_proxy
 
 PREFLIGHT_ARGS=(--config "${CONFIG}" --data-card "${DATA_CARD}")
+if [[ "${MODE}" == "run" ]]; then
+  PREFLIGHT_ARGS+=(--formal)
+fi
+case "${MODE}" in
+  profile-r16) PREFLIGHT_ARGS+=(--lora-rank 16 --lora-alpha 16) ;;
+  profile-r32) PREFLIGHT_ARGS+=(--lora-rank 32 --lora-alpha 32) ;;
+esac
 if [[ "${MODE}" != "check" ]]; then
   PREFLIGHT_ARGS+=(--gpus "${GPUS}" --min-free-mib "${MIN_FREE}")
 fi
@@ -55,15 +67,30 @@ if [[ "${MODE}" == "run" ]]; then
 fi
 
 TIMESTAMP="$(date +%Y%m%d_%H%M%S)"
-TRIAL="${MODE}-seed-${SEED}-${TIMESTAMP}"
+TRAINING_TRIAL="${MODE}-seed-${SEED}-${TIMESTAMP}"
+ATTEMPT_ID="${TRAINING_TRIAL}"
+if [[ "${MODE}" == "run" ]]; then
+  TRAINING_TRIAL="formal-r16-seed-20260827"
+  if [[ -n "${STUDYHUB_FORMAL_SFT_TRIAL:-}" && "${STUDYHUB_FORMAL_SFT_TRIAL}" != "${TRAINING_TRIAL}" ]]; then
+    echo "Formal SFT trial must remain ${TRAINING_TRIAL}." >&2
+    exit 2
+  fi
+  ATTEMPT_ID="${TRAINING_TRIAL}-attempt-${TIMESTAMP}"
+fi
 LOG_ROOT="${PROJECT_ROOT}/artifacts/areal/launcher_logs/runtime-sft-v3-9b"
-LOG_FILE="${LOG_ROOT}/${TRIAL}.log"
-GPU_CSV="${LOG_ROOT}/${TRIAL}.gpu.csv"
-RUN_METADATA="${LOG_ROOT}/${TRIAL}.run.json"
+LOG_FILE="${LOG_ROOT}/${ATTEMPT_ID}.log"
+GPU_CSV="${LOG_ROOT}/${ATTEMPT_ID}.gpu.csv"
+RUN_METADATA="${LOG_ROOT}/${ATTEMPT_ID}.run.json"
 MODEL_HASH_CACHE="${PROJECT_ROOT}/artifacts/areal/hash-cache/qwen35-9b.json"
 EXPERIMENT="studyhub-runtime-sft-v3-9b"
-CHECKPOINT_ROOT="${PROJECT_ROOT}/artifacts/areal/checkpoints/$(id -un)/${EXPERIMENT}/${TRIAL}"
-OVERRIDES=("seed=${SEED}" "trial_name=${TRIAL}")
+CHECKPOINT_ROOT="${PROJECT_ROOT}/artifacts/areal/checkpoints/$(id -un)/${EXPERIMENT}/${TRAINING_TRIAL}"
+COMPLETION_MARKER="${CHECKPOINT_ROOT}/FORMAL_SFT_COMPLETE.json"
+OVERRIDES=("seed=${SEED}" "trial_name=${TRAINING_TRIAL}")
+
+if [[ "${MODE}" == "run" && -f "${COMPLETION_MARKER}" && "${STUDYHUB_ALLOW_RERUN_COMPLETED:-}" != "YES" ]]; then
+  echo "Formal SFT trial is already complete: ${COMPLETION_MARKER}" >&2
+  exit 5
+fi
 
 case "${MODE}" in
   gate)
@@ -111,6 +138,7 @@ done
   --config "${CONFIG}" \
   --dataset-manifest "${DATA_MANIFEST}" \
   --data-card "${DATA_CARD}" \
+  --benchmark-manifest "${BENCHMARK_MANIFEST}" \
   --model "${MODEL}" \
   --model-hash-cache "${MODEL_HASH_CACHE}" \
   --areal-lock "${PROJECT_ROOT}/training/areal/upstream.lock.json" \
@@ -148,6 +176,17 @@ set -e
   --gpu-csv "${GPU_CSV}" \
   --status "${STATUS}"
 
+if [[ "${MODE}" == "run" && "${STATUS}" -eq 0 ]]; then
+  if ! "${VENV_DIR}/bin/python" "${PROJECT_ROOT}/scripts/train/record_formal_sft_completion.py" \
+    --run-metadata "${RUN_METADATA}" \
+    --checkpoint-root "${CHECKPOINT_ROOT}" \
+    --output "${COMPLETION_MARKER}" \
+    --expected-updates 5456 >/dev/null; then
+    echo "Formal SFT exited zero but did not satisfy the completion contract." >&2
+    STATUS=75
+  fi
+fi
+
 EVIDENCE_TIER="DIAGNOSTIC"
 if [[ "${MODE}" == "run" ]]; then
   EVIDENCE_TIER="CLAIM"
@@ -156,7 +195,7 @@ if ! "${VENV_DIR}/bin/python" "${PROJECT_ROOT}/scripts/train/build_experiment_ev
   --run-metadata "${RUN_METADATA}" \
   --checkpoint-root "${CHECKPOINT_ROOT}" \
   --evidence-tier "${EVIDENCE_TIER}" >/dev/null; then
-  echo "Failed to finalize evidence for ${TRIAL}." >&2
+  echo "Failed to finalize evidence for ${ATTEMPT_ID}." >&2
   [[ "${STATUS}" -ne 0 ]] || STATUS=74
 fi
 
