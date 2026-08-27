@@ -31,6 +31,7 @@ class EvaluationResult:
     def to_dict(self) -> dict[str, Any]:
         value = asdict(self)
         value["hard_gate_reasons"] = list(self.hard_gate_reasons)
+        value["diagnostic_scalar"] = self.diagnostic_scalar
         return value
 
     @property

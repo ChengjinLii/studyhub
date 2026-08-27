@@ -1,7 +1,7 @@
 {
   "schema_version": "studyhub.agentbench-semantic-diversity-audit.v2",
   "benchmark_version": "studyhub-agentbench-v2",
-  "generated_at": "2026-08-27T12:50:00+00:00",
+  "generated_at": "2026-08-27T13:08:06+00:00",
   "status": "PASS",
   "checks": {
     "exact_duplicates_zero": true,
@@ -15,5 +15,5 @@
     "largest_cluster": 1,
     "largest_cluster_share": 0.0196078431372549
   },
-  "audit_sha256": "93dfb8cd074229d1f22940f5861930f1903d7fe86fd3d229c8ff62e385bd64bf"
+  "audit_sha256": "43d35e1b6453db274ad6d29c9d57efda3c4456b5d3b1c4d235048d463d53e0ec"
 }

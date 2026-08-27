@@ -1,10 +1,10 @@
 {
   "schema_version": "studyhub.agentbench-evaluator-challenge.v2",
   "benchmark_version": "studyhub-agentbench-v2",
-  "generated_at": "2026-08-27T12:50:01+00:00",
+  "generated_at": "2026-08-27T13:08:07+00:00",
   "status": "PASS",
   "cases": 21,
   "passed": 21,
   "missing": [],
-  "artifact_sha256": "081725c3153962422e4d50b43b1d73df075ce406b895d42fae69bee309d947eb"
+  "artifact_sha256": "e82ef34e9c56efc4fb4d123234f61f264876dd51833ad13b8df0ef65c40dc97b"
 }

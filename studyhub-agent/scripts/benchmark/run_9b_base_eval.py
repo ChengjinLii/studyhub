@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run the frozen Benchmark v1 against Qwen3.5-9B without an optimizer."""
+"""Run a frozen StudyHub benchmark against Qwen3.5-9B without an optimizer."""
 
 from __future__ import annotations
 
@@ -30,6 +30,16 @@ from studyhub_agent.benchmark_v1.development_evaluator import (
 )
 from studyhub_agent.benchmark_v1.hermes_runner import BenchmarkHermesRunner
 from studyhub_agent.benchmark_v1.schema import BENCHMARK_VERSION, BenchmarkTask, load_jsonl
+from studyhub_agent.benchmark_v2.development_evaluator import (
+    evaluate_development as evaluate_development_v2,
+)
+from studyhub_agent.benchmark_v2.development_evaluator import (
+    load_development_graders as load_development_graders_v2,
+)
+from studyhub_agent.benchmark_v2.hermes_runner import BenchmarkHermesRunnerV2
+from studyhub_agent.benchmark_v2.schema import BENCHMARK_VERSION as BENCHMARK_VERSION_V2
+from studyhub_agent.benchmark_v2.schema import BenchmarkTaskV2
+from studyhub_agent.benchmark_v2.statistics import cluster_bootstrap_interval
 
 DEFAULT_SEED = 20260827
 VARIANCE_TASKS_PER_CAPABILITY = 5
@@ -62,10 +72,16 @@ def git_value(project: Path, *args: str) -> str:
     ).stdout.strip()
 
 
-def select_tasks(rows: list[dict[str, Any]], mode: str, seed: int) -> list[dict[str, Any]]:
+def select_tasks(
+    rows: list[dict[str, Any]],
+    mode: str,
+    seed: int,
+    *,
+    task_type: type[BenchmarkTask] | type[BenchmarkTaskV2] = BenchmarkTask,
+) -> list[dict[str, Any]]:
     grouped: dict[str, list[dict[str, Any]]] = defaultdict(list)
     for row in rows:
-        BenchmarkTask.from_dict(row)
+        task_type.from_dict(row)
         grouped[str(row["capability_id"])].append(row)
     if mode == "gate":
         return [
@@ -207,8 +223,14 @@ def worker_main(spec: dict[str, Any]) -> None:
     output = Path(spec["output"])
     output.parent.mkdir(parents=True, exist_ok=True)
     completed = load_completed(output)
-    graders = load_development_graders(Path(spec["grader_path"]))
-    runner = BenchmarkHermesRunner(
+    benchmark_generation = str(spec.get("benchmark_generation", "v1"))
+    grader_loader = load_development_graders_v2 if benchmark_generation == "v2" else load_development_graders
+    evaluator = evaluate_development_v2 if benchmark_generation == "v2" else evaluate_development
+    runner_type = BenchmarkHermesRunnerV2 if benchmark_generation == "v2" else BenchmarkHermesRunner
+    graders = {}
+    for path in spec["grader_paths"]:
+        graders.update(grader_loader(Path(path)))
+    runner = runner_type(
         hidden_root=spec["hidden_root"],
         hermes_checkout=spec["hermes_checkout"],
         tokenizer_path=spec["tokenizer_path"],
@@ -229,7 +251,7 @@ def worker_main(spec: dict[str, Any]) -> None:
             started = time.monotonic()
             try:
                 episode = asyncio.run(runner.run(task, sample_seed=int(item["sample_seed"])))
-                evaluation = evaluate_development(
+                evaluation = evaluator(
                     final_answer=str(episode["final_answer"]),
                     trace=dict(episode["trace"]),
                     final_state=dict(episode["final_state"]),
@@ -256,8 +278,8 @@ def worker_main(spec: dict[str, Any]) -> None:
                 status = "INFRA_EXCLUDED"
                 error = {"type": type(exc).__name__, "message": str(exc)[:1000]}
             row = {
-                "schema_version": "studyhub.agentbench-episode.v1",
-                "benchmark_version": BENCHMARK_VERSION,
+                "schema_version": f"studyhub.agentbench-episode.{benchmark_generation}",
+                "benchmark_version": spec["benchmark_version"],
                 "run_id": spec["run_id"],
                 "model": spec["model_identity"],
                 "episode_key": episode_key,
@@ -265,8 +287,12 @@ def worker_main(spec: dict[str, Any]) -> None:
                 "split": task["split"],
                 "capability_id": task["capability_id"],
                 "difficulty": task["difficulty"],
-                "horizon_tier": task["horizon_tier"],
+                "horizon_tier": task.get("horizon_tier")
+                or task.get("difficulty_features", {}).get("expected_horizon_band"),
                 "language": task["language"],
+                "source_group_id": task.get("source_group_id"),
+                "semantic_template_cluster": task.get("semantic_template_cluster"),
+                "environment_origin": task.get("environment_origin"),
                 "sample_index": item["sample_index"],
                 "sample_seed": item["sample_seed"],
                 "status": status,
@@ -297,10 +323,22 @@ def bootstrap_interval(values: list[float], seed: int, samples: int = 5000) -> l
     return [round(means[int(samples * 0.025)], 6), round(means[int(samples * 0.975)], 6)]
 
 
-def aggregate(rows: list[dict[str, Any]], *, mode: str, seed: int) -> dict[str, Any]:
+def _diagnostic_score(evaluation: dict[str, Any]) -> float:
+    if "total" in evaluation:
+        return float(evaluation["total"])
+    return float(evaluation.get("diagnostic_scalar", 0.0))
+
+
+def aggregate(
+    rows: list[dict[str, Any]],
+    *,
+    mode: str,
+    seed: int,
+    benchmark_generation: str = "v1",
+) -> dict[str, Any]:
     eligible = [row for row in rows if row["status"] == "SCORED"]
     strict = [float(bool(row["evaluation"]["strict_success"])) for row in eligible]
-    totals = [float(row["evaluation"]["total"]) for row in eligible]
+    totals = [_diagnostic_score(row["evaluation"]) for row in eligible]
     capability_rows: dict[str, list[dict[str, Any]]] = defaultdict(list)
     for row in eligible:
         capability_rows[str(row["capability_id"])].append(row)
@@ -311,13 +349,13 @@ def aggregate(rows: list[dict[str, Any]], *, mode: str, seed: int) -> dict[str, 
                 statistics.fmean(float(bool(row["evaluation"]["strict_success"])) for row in values),
                 6,
             ),
-            "mean_score": round(statistics.fmean(float(row["evaluation"]["total"]) for row in values), 6),
+            "mean_score": round(statistics.fmean(_diagnostic_score(row["evaluation"]) for row in values), 6),
         }
         for capability, values in sorted(capability_rows.items())
     }
     summary: dict[str, Any] = {
-        "schema_version": "studyhub.agentbench-run-summary.v1",
-        "benchmark_version": BENCHMARK_VERSION,
+        "schema_version": f"studyhub.agentbench-run-summary.{benchmark_generation}",
+        "benchmark_version": BENCHMARK_VERSION_V2 if benchmark_generation == "v2" else BENCHMARK_VERSION,
         "mode": mode,
         "episodes_expected": len(rows),
         "episodes_scored": len(eligible),
@@ -360,8 +398,7 @@ def aggregate(rows: list[dict[str, Any]], *, mode: str, seed: int) -> dict[str, 
             "tasks_incomplete": expected_task_count - len(complete),
             "pass_at_4": round(
                 statistics.fmean(
-                    any(bool(row["evaluation"]["strict_success"]) for row in values)
-                    for values in complete.values()
+                    any(bool(row["evaluation"]["strict_success"]) for row in values) for values in complete.values()
                 ),
                 6,
             )
@@ -369,8 +406,7 @@ def aggregate(rows: list[dict[str, Any]], *, mode: str, seed: int) -> dict[str, 
             else 0.0,
             "consistent_at_4": round(
                 statistics.fmean(
-                    all(bool(row["evaluation"]["strict_success"]) for row in values)
-                    for values in complete.values()
+                    all(bool(row["evaluation"]["strict_success"]) for row in values) for values in complete.values()
                 ),
                 6,
             )
@@ -386,6 +422,38 @@ def aggregate(rows: list[dict[str, Any]], *, mode: str, seed: int) -> dict[str, 
             if complete
             else 0.0,
         }
+    if benchmark_generation == "v2" and eligible:
+        metric_rows = [
+            {
+                **row,
+                "strict_value": float(bool(row["evaluation"]["strict_success"])),
+            }
+            for row in eligible
+        ]
+        summary["cluster_aware_strict_success"] = {
+            "source_group_id": cluster_bootstrap_interval(
+                metric_rows,
+                value=lambda row: float(row["strict_value"]),
+                cluster=lambda row: str(row["source_group_id"]),
+                seed=seed,
+            ),
+            "semantic_template_cluster": cluster_bootstrap_interval(
+                metric_rows,
+                value=lambda row: float(row["strict_value"]),
+                cluster=lambda row: str(row["semantic_template_cluster"]),
+                seed=seed + 1,
+            ),
+            "environment_origin": cluster_bootstrap_interval(
+                metric_rows,
+                value=lambda row: float(row["strict_value"]),
+                cluster=lambda row: str(row["environment_origin"]),
+                seed=seed + 2,
+            ),
+        }
+        summary["macro_capability_strict_success"] = round(
+            statistics.fmean(row["strict_success_rate"] for row in capabilities.values()),
+            6,
+        )
     n = len({str(row["task_id"]) for row in eligible})
     p = summary["strict_success_rate"]
     summary["approx_independent_mde_80_power_pp"] = round(
@@ -399,17 +467,33 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
     from scripts.train.prepare_sglang_model_overlay import prepare_overlay
 
     project = args.project.resolve()
-    public_root = args.public_root.resolve()
-    hidden_root = args.hidden_root.resolve()
-    split = "regression" if args.mode in {"gate", "regression"} else "development"
-    tasks = load_jsonl(public_root / split / "tasks.jsonl")
-    selected = select_tasks(tasks, args.mode, args.seed)
+    benchmark_generation = args.benchmark_version
+    public_root = (args.public_root or project / f"benchmarks/studyhub-agent-{benchmark_generation}").resolve()
+    hidden_root = (
+        args.hidden_root
+        or project / f"artifacts/benchmark-{benchmark_generation}/studyhub-agent-{benchmark_generation}"
+    ).resolve()
+    task_type = BenchmarkTaskV2 if benchmark_generation == "v2" else BenchmarkTask
+    if benchmark_generation == "v2" and args.mode == "gate":
+        tasks = [
+            row
+            for split_name in ("regression", "development", "calibration_challenge")
+            for row in load_jsonl(public_root / split_name / "tasks.jsonl")
+        ]
+    else:
+        split = "regression" if args.mode in {"gate", "regression"} else "development"
+        tasks = load_jsonl(public_root / split / "tasks.jsonl")
+    selected = select_tasks(tasks, args.mode, args.seed, task_type=task_type)
     items = build_work_items(selected, args.mode, args.seed)
     manifest = json.loads((public_root / "manifest.json").read_text(encoding="utf-8"))
     if manifest.get("status") not in {"FROZEN_FOR_BASELINE", "FROZEN_TRAINING_READY"}:
-        raise RuntimeError("Benchmark v1 must be frozen before the 9B Base evaluation")
-    trial = args.trial or f"qwen35-9b-base-{args.mode}-seed-{args.seed}-{datetime.now(UTC).strftime('%Y%m%d_%H%M%S')}"
-    output_root = (args.output_root / trial).resolve()
+        raise RuntimeError(f"Benchmark {benchmark_generation} must be frozen before the 9B Base evaluation")
+    trial = args.trial or (
+        f"qwen35-9b-base-{benchmark_generation}-{args.mode}-seed-{args.seed}-"
+        f"{datetime.now(UTC).strftime('%Y%m%d_%H%M%S')}"
+    )
+    output_base = args.output_root or project / f"artifacts/benchmark-{benchmark_generation}/runs"
+    output_root = (output_base / trial).resolve()
     output_root.mkdir(parents=True, exist_ok=True)
     api_key = secrets.token_urlsafe(36)
     model_overlay = project / "artifacts/areal/model-overlays/9b-base-benchmark"
@@ -446,8 +530,13 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
                 "output": str(output_root / f"episodes-worker-{worker_id}.jsonl"),
                 "run_id": trial,
                 "model_identity": "Qwen/Qwen3.5-9B@c202236235762e1c871ad0ccb60c8ee5ba337b9a",
+                "benchmark_generation": benchmark_generation,
+                "benchmark_version": BENCHMARK_VERSION_V2 if benchmark_generation == "v2" else BENCHMARK_VERSION,
                 "hidden_root": str(hidden_root),
-                "grader_path": str(hidden_root / f"graders/{split}.jsonl"),
+                "grader_paths": [
+                    str(hidden_root / f"graders/{split_name}.jsonl")
+                    for split_name in sorted({str(item["task"]["split"]) for item in shard})
+                ],
                 "hermes_checkout": str(args.hermes_checkout.resolve()),
                 "tokenizer_path": str(args.model.resolve()),
                 "base_url": endpoints[worker_id],
@@ -486,15 +575,20 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
     if set(by_key) != expected_keys:
         missing = len(expected_keys - set(by_key))
         extra = len(set(by_key) - expected_keys)
-        raise RuntimeError(
-            f"episode completeness mismatch: missing={missing} extra={extra}"
-        )
+        raise RuntimeError(f"episode completeness mismatch: missing={missing} extra={extra}")
     merged = output_root / "episodes.jsonl"
     merged.write_text(
         "".join(json.dumps(by_key[key], ensure_ascii=False, sort_keys=True) + "\n" for key in sorted(by_key)),
         encoding="utf-8",
     )
-    summary = aggregate(list(by_key.values()), mode=args.mode, seed=args.seed)
+    summary = aggregate(
+        list(by_key.values()),
+        mode=args.mode,
+        seed=args.seed,
+        benchmark_generation=benchmark_generation,
+    )
+    benchmark_manifest_sha256 = sha256(public_root / "manifest.json")
+    benchmark_content_sha256 = str(manifest.get("content_sha256") or benchmark_manifest_sha256)
     summary.update(
         {
             "run_id": trial,
@@ -502,8 +596,8 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
             "finished_at": datetime.now(UTC).isoformat(timespec="seconds"),
             "elapsed_seconds": round(time.monotonic() - started_monotonic, 6),
             "model": "Qwen/Qwen3.5-9B@c202236235762e1c871ad0ccb60c8ee5ba337b9a",
-            "benchmark_content_sha256": manifest["content_sha256"],
-            "benchmark_manifest_sha256": sha256(public_root / "manifest.json"),
+            "benchmark_content_sha256": benchmark_content_sha256,
+            "benchmark_manifest_sha256": benchmark_manifest_sha256,
             "episodes_sha256": sha256(merged),
             "seed": args.seed,
             "temperature": args.temperature,
@@ -517,16 +611,16 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
     )
     model_manifest = json.loads((args.model / "studyhub_download_manifest.json").read_text(encoding="utf-8"))
     run_manifest = {
-        "schema_version": "studyhub.agentbench-run-manifest.v1",
+        "schema_version": f"studyhub.agentbench-run-manifest.{benchmark_generation}",
         "run_id": trial,
         "git": {
             "commit": git_value(project, "rev-parse", "HEAD"),
             "dirty": bool(git_value(project, "status", "--porcelain")),
         },
         "benchmark": {
-            "version": BENCHMARK_VERSION,
-            "content_sha256": manifest["content_sha256"],
-            "manifest_sha256": sha256(public_root / "manifest.json"),
+            "version": BENCHMARK_VERSION_V2 if benchmark_generation == "v2" else BENCHMARK_VERSION,
+            "content_sha256": benchmark_content_sha256,
+            "manifest_sha256": benchmark_manifest_sha256,
         },
         "model": model_manifest,
         "runtime": {
@@ -560,16 +654,13 @@ def parse_args() -> argparse.Namespace:
     project = Path(__file__).resolve().parents[2]
     parser = argparse.ArgumentParser()
     parser.add_argument("mode", choices=("gate", "regression", "development", "variance"))
+    parser.add_argument("--benchmark-version", choices=("v1", "v2"), default="v1")
     parser.add_argument("--project", type=Path, default=project)
-    parser.add_argument("--public-root", type=Path, default=project / "benchmarks/studyhub-agent-v1")
-    parser.add_argument(
-        "--hidden-root",
-        type=Path,
-        default=project / "artifacts/benchmark-v1/studyhub-agent-v1",
-    )
+    parser.add_argument("--public-root", type=Path)
+    parser.add_argument("--hidden-root", type=Path)
     parser.add_argument("--model", type=Path, default=project.parent / "models/P1/Qwen3.5-9B")
     parser.add_argument("--hermes-checkout", type=Path, default=project / ".vendor/hermes-agent")
-    parser.add_argument("--output-root", type=Path, default=project / "artifacts/benchmark-v1/runs")
+    parser.add_argument("--output-root", type=Path)
     parser.add_argument("--trial")
     parser.add_argument("--seed", type=int, default=DEFAULT_SEED)
     parser.add_argument("--temperature", type=float, default=0.0)

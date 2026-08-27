@@ -4,7 +4,7 @@
   "reviewer_type": "codex_self_review",
   "reviewed_at": "2026-08-27",
   "status": "COMPLETED_PASS_WITH_LIMITATIONS",
-  "reviewed_items": 32,
+  "reviewed_items": 35,
   "sampling": {
     "capability_representatives": 30,
     "additional_split_representatives": 2,
@@ -27,11 +27,13 @@
       "synthetic_state"
     ]
   },
-  "primary_review_pack_sha256": "661bbb57c178790e3a6d54e2d07dbd636c634e23f5648af11b012c91f5157643",
+  "primary_review_pack_sha256": "42edba9d015cbe882d27ab5794d7e0657aefc2fe0728f8272c6b8e200a181ef4",
   "blocking_findings_resolved": [
     "English tasks previously received Chinese split prefixes; prefixes now follow task language.",
     "OCR passage tasks previously accepted one arbitrary companion term; graders now accept all supported non-anchor terms.",
-    "Query reformulation previously allowed a first-search target hit; the task now requires an observed alias bridge, changed query and target-recall gain."
+    "Query reformulation previously allowed a first-search target hit; the task now requires an observed alias bridge, changed query and target-recall gain.",
+    "A memory-Web conflict fixture used a Git-specific prompt with a Python-document gold target; the prompt, hidden answer and frozen official source are now derived from one task contract.",
+    "The public calibration lane now contains representatives for all 30 capability families, so the 9B smoke does not need Sealed-B tasks or graders."
   ],
   "known_limitations": [
     "StudyHub preview OCR quality varies and some authentic tasks remain extraction-oriented.",

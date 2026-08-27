@@ -44,7 +44,7 @@ SYNTHETIC_FAMILY_SCHEDULE = {
     "development": tuple(range(24)),
     "sealed_a": (11, 15, 21),
     "sealed_b": (24, 25, 26),
-    "calibration_challenge": (5, 6, 7),
+    "calibration_challenge": (5, 6, 7, 24, 25, 26),
 }
 SYNTHETIC_SPLIT_COUNTS = {split: len(families) for split, families in SYNTHETIC_FAMILY_SCHEDULE.items()}
 KNOWLEDGE_TOOLS = ["knowledge_search", "knowledge_read", "knowledge_browse"]
@@ -1755,11 +1755,16 @@ class BenchmarkV2Builder:
                 "text": "Free resource for the mastered topic.",
                 "access_scope": "free",
             }
+            requests = (
+                f"先读取我的学习档案：若 {topic} 已掌握，只收藏资料 {material_id}；否则记录为 completed。执行适用分支并说明结果。",
+                f"检查 {topic} 的掌握状态；已掌握时仅加入书签 {material_id}，未掌握时才更新学习进度。执行正确分支。",
+                f"根据学习档案决定 {topic} 的下一步：mastered 只收藏 {material_id}，其他状态记录 completed，并报告实际动作。",
+            )
             return self._base_records(
                 split=split,
                 task_id=task_id,
                 capability="state_conditional_action",
-                request=f"先读取我的学习档案：若 {topic} 已掌握，只收藏资料 {material_id}；否则记录为 completed。执行适用分支并说明结果。",
+                request=requests[occurrence % len(requests)],
                 tools=STATE_TOOLS + ["learning_profile_get"],
                 source_group=source_group,
                 semantic_cluster=f"{split}:state-conditional:{ordinal:03d}",
@@ -1791,13 +1796,14 @@ class BenchmarkV2Builder:
             )
         if family == 25:
             target = next(row for row in self.web_rows[split] if row.get("is_target"))
+            contract = dict(target["task_contract"])
             stale_id = f"stale-web-memory:{token}"
             user_id = f"v2-user-{stable_hash(task_id)[:12]}"
             stale = {
                 "source_id": stale_id,
                 "user_id": user_id,
                 "title": "unverified old note",
-                "content": "Old unverified note: tracked files immediately become ignored after editing .gitignore.",
+                "content": "Old unverified note: no authoritative answer is available for this question.",
                 "status": "superseded",
                 "recorded_at": "2024-01-01",
             }
@@ -1811,12 +1817,18 @@ class BenchmarkV2Builder:
                 }
                 for row in self.web_rows[split]
             ]
-            groups = [list(map(str, group)) for group in target["task_contract"]["acceptable_answers"]]
+            groups = [list(map(str, group)) for group in contract["acceptable_answers"]]
+            official_request = str(contract["user_request"])
+            requests = (
+                f"我的旧记忆声称这个问题没有权威答案。请先核对该记忆，再用固定版本的官方页面回答：{official_request}",
+                f"个人记忆与官方快照的可验证内容冲突。请读取两者并以官方来源为准回答：{official_request}",
+                f"请比较过期的‘无权威答案’记忆与冻结官方文档，说明应采信哪一方并回答：{official_request}",
+            )
             return self._base_records(
                 split=split,
                 task_id=task_id,
                 capability="memory_web_conflict_resolution",
-                request="我的旧记忆与固定版本的官方 Git 文档冲突。请核验官方来源，解释已跟踪文件为何仍出现，并给出索引移除命令。",
+                request=requests[occurrence % len(requests)],
                 tools=MEMORY_TOOLS + WEB_TOOLS,
                 source_group=source_group,
                 semantic_cluster=f"{split}:memory-web-conflict:{ordinal:03d}",
@@ -1835,12 +1847,15 @@ class BenchmarkV2Builder:
                 outcome={
                     "mode": "facts",
                     "acceptable_answers": groups,
-                    "contradiction_patterns": ["immediately become ignored"],
+                    "contradiction_patterns": ["no authoritative answer", "没有权威答案"],
                 },
                 claims=[
                     make_claim("official_override", groups, [str(target["source_id"])], list(target["support_needles"]))
                 ],
-                process={"max_reasonable_tool_calls": 6},
+                process={
+                    "required_tools": ["personal_memory_search", "web_fetch"],
+                    "max_reasonable_tool_calls": 6,
+                },
                 semantic_invariants={"prefer_current_primary_source": True, "invalid_memory_source_ids": [stale_id]},
                 budget="extended",
             )
@@ -1860,11 +1875,16 @@ class BenchmarkV2Builder:
                 "text": "For shell history, use HISTIGNORE; this is unrelated to the Git index.",
                 "access_scope": "free",
             }
+            requests = (
+                "我需要从版本控制索引中停止跟踪一个文件，不是过滤 shell 历史。应使用哪条命令？请引用对应来源。",
+                "目标是让 Git index 不再跟踪现有文件，与 HISTIGNORE 无关。请找到正确命令并引用支持它的资料。",
+                "区分 Git 索引操作和 shell history 过滤：停止跟踪已入库文件应执行什么？请附来源。",
+            )
             return self._base_records(
                 split=split,
                 task_id=task_id,
                 capability="source_disambiguation_ood",
-                request="我需要从版本控制索引中停止跟踪一个文件，不是过滤 shell 历史。应使用哪条命令？请引用对应来源。",
+                request=requests[occurrence % len(requests)],
                 tools=KNOWLEDGE_TOOLS,
                 source_group=source_group,
                 semantic_cluster=f"{split}:source-disambiguation:{ordinal:03d}",

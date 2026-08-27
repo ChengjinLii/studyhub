@@ -2,7 +2,7 @@
   "schema_version": "studyhub.agentbench-manifest.v2",
   "benchmark_version": "studyhub-agentbench-v2",
   "status": "CANDIDATE_PENDING_QUALITY_AUDIT",
-  "generated_at": "2026-08-27T12:50:00+00:00",
+  "generated_at": "2026-08-27T12:56:06+00:00",
   "seed": 20260827,
   "task_schema_version": "studyhub.agentbench-task.v2",
   "environment_schema_version": "studyhub.agentbench-environment.v2",
@@ -13,7 +13,7 @@
     "development": 51,
     "sealed_a": 13,
     "sealed_b": 12,
-    "calibration_challenge": 7
+    "calibration_challenge": 10
   },
   "capability_counts": {
     "regression": {
@@ -75,19 +75,22 @@
       "permission_avoidance": 1,
       "permission_recovery": 1,
       "tool_failure_recovery": 1,
+      "state_conditional_action": 1,
+      "memory_web_conflict_resolution": 1,
+      "source_disambiguation_ood": 1,
       "authentic_web_research": 1
     }
   },
-  "source_groups": 75,
+  "source_groups": 78,
   "environment_origins": {
     "authentic_studyhub_preview": 54,
-    "synthetic_adversarial": 15,
-    "synthetic_state": 4,
+    "synthetic_adversarial": 16,
+    "synthetic_state": 5,
     "authentic_web_snapshot": 5,
-    "synthetic_memory": 17
+    "synthetic_memory": 18
   },
   "languages": {
-    "zh": 68,
+    "zh": 71,
     "en": 27
   },
   "source_hashes": {
@@ -120,7 +123,7 @@
     }
   },
   "public_files": {
-    "calibration_challenge/tasks.jsonl": "c3909862468932e268e3e7b1b0cc49cf4ee9c56db3e2da70c51d0681d8f3ce09",
+    "calibration_challenge/tasks.jsonl": "c1d780b61a8a6ce61b078b571b9c6af014d0e550922f6e8c92413c6bd62e1497",
     "development/tasks.jsonl": "a8741266d375842ae25c7dfd201e6dbdbe0e083fce518b9bb351be37f4797c85",
     "regression/tasks.jsonl": "05ab3f8385acd0c4cafc3be5058adbe8b02a7b95ea247928147712785b846f64"
   },
@@ -130,19 +133,19 @@
     "corpora/regression.jsonl": "62fbfe149acee8ebecce91ae07dad205b4202abf5c99c350f042cda75566f517",
     "corpora/sealed_a.jsonl": "41b14056c57cf6457898b1a1c067460483c7e32a1ac21a750c31ce7fbd72cba8",
     "corpora/sealed_b.jsonl": "cc16b07bb941f81eb7ad07289f031590a89d61bf73158aeb5e99749b2c243fbe",
-    "environments/calibration_challenge.jsonl": "4f296fa34b726e500c41d51d14e8a286692d98325cdef0863c711e8f920cdd57",
+    "environments/calibration_challenge.jsonl": "c7cbd43d458a2bd0358d1121f751b6b9720cb534243885be7450f59c39eb92c2",
     "environments/development.jsonl": "bb1a2000e0f215a46c85dd4cb325ea6015415a71f2306c6b57c89f256d90aad2",
     "environments/regression.jsonl": "9121f8cb0cff5bc163f816db5b45e69168a553f75b7720605998f9107a59f3fa",
     "environments/sealed_a.jsonl": "6a3331d311df5652696295216ee425917d2044c135af26ba948c139b31e79974",
-    "environments/sealed_b.jsonl": "e26558e86909805885b8ebd8baa4b1a5a71052365d440cf31b8f51142045d4fc",
-    "graders/calibration_challenge.jsonl": "565edd9a7c2aa7761dac0f7439025d0af06960633b642f2af49997e9c370bf9a",
+    "environments/sealed_b.jsonl": "d0e0ec91b74ed5d4e5349dfd9488d7ce76f78e4d046098658b1939784122016c",
+    "graders/calibration_challenge.jsonl": "f41763fcf4f476191d83dfd205393b2894cb8db2bfa4907806fa1c7fc951d3dd",
     "graders/development.jsonl": "62dcb8af1fdcd19ad6d01905263d1c552ef59880bc50535c8a0d52f858e42670",
     "graders/regression.jsonl": "fd2320783e5e604ae765522bb763dbdb359b502cf9b6a882e1333d1be5c954be",
     "graders/sealed_a.jsonl": "b08eddf23008f8c347fa07bede456155e40896f05e60fb4435b66e75730fc728",
-    "graders/sealed_b.jsonl": "e9d9844b0ba4e0284d315b3a9d403458f391680c22dda290add8e8aad3ee16ee",
+    "graders/sealed_b.jsonl": "b67c088c3beb5a9b3c38e18075fabd5beb49ed7fc26df6f42b43734fb4e1b4e0",
     "source-inventory.jsonl": "f88947a8f2faabdad3a9f5376a654323b898e1cf4d24ee2aadc6db6d74167275",
     "tasks/sealed_a.jsonl": "1509cfe51f821906043c48072d1e25adab6a6246697f75107536672e51abe4ce",
-    "tasks/sealed_b.jsonl": "c17660e3794c95e433752dbe39b6c2c57a946abf55f0038ce142d072c4ee448d"
+    "tasks/sealed_b.jsonl": "04f15e726f9b6e3d0fed40922840d567b87ea2fc7ff5a6d5676ec432051b79fd"
   },
   "separation": {
     "source_group_overlap": 0,

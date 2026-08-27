@@ -52,11 +52,7 @@ def _install_request_audit(agent: Any) -> None:
     def audited_build(*args: Any, **kwargs: Any) -> dict[str, Any]:
         api_kwargs = original_build(*args, **kwargs)
         messages = list(api_kwargs.get("messages") or [])
-        system_contents = [
-            str(message.get("content", ""))
-            for message in messages
-            if message.get("role") == "system"
-        ]
+        system_contents = [str(message.get("content", "")) for message in messages if message.get("role") == "system"]
         joined = "\n\n".join(system_contents)
         records.append(
             {
@@ -91,6 +87,8 @@ class BenchmarkHermesRunner:
         max_completion_tokens: int = 1536,
         context_finalization_ratio: float = 0.80,
         context_safety_margin_tokens: int = 768,
+        task_type: type[BenchmarkTask] = BenchmarkTask,
+        environment_type: type[ReplayableAgentEnvironment] = ReplayableAgentEnvironment,
     ) -> None:
         self.hidden_root = Path(hidden_root).resolve()
         self.hermes_checkout = Path(hermes_checkout).resolve()
@@ -103,6 +101,8 @@ class BenchmarkHermesRunner:
         self.max_completion_tokens = max_completion_tokens
         self.context_finalization_ratio = context_finalization_ratio
         self.context_safety_margin_tokens = context_safety_margin_tokens
+        self.task_type = task_type
+        self.environment_type = environment_type
         self._tokenizer: Any | None = None
 
     def _load_runtime(self):
@@ -140,8 +140,8 @@ class BenchmarkHermesRunner:
             _training_runtime_metadata,
         )
 
-        task = BenchmarkTask.from_dict(task_row)
-        environment = ReplayableAgentEnvironment.from_root(self.hidden_root, task.split, task.task_id)
+        task = self.task_type.from_dict(task_row)
+        environment = self.environment_type.from_root(self.hidden_root, task.split, task.task_id)
         AIAgent, registry = self._load_runtime()
         toolset = f"studyhub-benchmark-{task.task_id}-{uuid.uuid4().hex[:10]}"
         overlay = HermesRegistryOverlay(registry)

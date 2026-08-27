@@ -5,10 +5,10 @@
   "contains_hidden_graders": true,
   "packs": {
     "primary-all": {
-      "count": 95,
-      "sha256": "661bbb57c178790e3a6d54e2d07dbd636c634e23f5648af11b012c91f5157643",
+      "count": 98,
+      "sha256": "42edba9d015cbe882d27ab5794d7e0657aefc2fe0728f8272c6b8e200a181ef4",
       "split_counts": {
-        "calibration_challenge": 7,
+        "calibration_challenge": 10,
         "development": 51,
         "regression": 12,
         "sealed_a": 13,
@@ -34,13 +34,13 @@
         "memory_temporal_change": 1,
         "memory_user_correction": 1,
         "memory_web_composition": 1,
-        "memory_web_conflict_resolution": 1,
+        "memory_web_conflict_resolution": 2,
         "multi_source_synthesis": 1,
         "permission_avoidance": 2,
         "permission_recovery": 2,
         "query_reformulation": 1,
-        "source_disambiguation_ood": 1,
-        "state_conditional_action": 1,
+        "source_disambiguation_ood": 2,
+        "state_conditional_action": 2,
         "state_function_calling": 2,
         "state_multistep_postcondition": 1,
         "stop_cost_control": 1,
@@ -48,21 +48,21 @@
       },
       "language_counts": {
         "en": 27,
-        "zh": 68
+        "zh": 71
       },
       "origin_counts": {
         "authentic_studyhub_preview": 54,
         "authentic_web_snapshot": 5,
-        "synthetic_adversarial": 15,
-        "synthetic_memory": 17,
-        "synthetic_state": 4
+        "synthetic_adversarial": 16,
+        "synthetic_memory": 18,
+        "synthetic_state": 5
       }
     },
     "adversarial": {
-      "count": 36,
-      "sha256": "d99264c9ecc6c1f1fa6cb13cc3f4385bcba939f63d59695beaa9cb91abab007a",
+      "count": 39,
+      "sha256": "e5e77eb244ee26d635c7901f66364bfe224a48bd503e7d755df432ea9c3800b8",
       "split_counts": {
-        "calibration_challenge": 3,
+        "calibration_challenge": 6,
         "development": 24,
         "regression": 3,
         "sealed_a": 3,
@@ -85,13 +85,13 @@
         "memory_temporal_change": 1,
         "memory_user_correction": 1,
         "memory_web_composition": 1,
-        "memory_web_conflict_resolution": 1,
+        "memory_web_conflict_resolution": 2,
         "multi_source_synthesis": 1,
         "permission_avoidance": 2,
         "permission_recovery": 2,
         "query_reformulation": 1,
-        "source_disambiguation_ood": 1,
-        "state_conditional_action": 1,
+        "source_disambiguation_ood": 2,
+        "state_conditional_action": 2,
         "state_function_calling": 2,
         "state_multistep_postcondition": 1,
         "stop_cost_control": 1,
@@ -99,19 +99,19 @@
       },
       "language_counts": {
         "en": 2,
-        "zh": 34
+        "zh": 37
       },
       "origin_counts": {
-        "synthetic_adversarial": 15,
-        "synthetic_memory": 17,
-        "synthetic_state": 4
+        "synthetic_adversarial": 16,
+        "synthetic_memory": 18,
+        "synthetic_state": 5
       }
     },
     "research-and-synthesis": {
-      "count": 32,
-      "sha256": "e1a9224c997953863ac6ad7674e5a0eb2d638e9f243e89bd0c9caac67a7a0653",
+      "count": 34,
+      "sha256": "9c45275c895451d3eb7cbe7759ca99696bcab81c4b29f009b1f486ab60f4843c",
       "split_counts": {
-        "calibration_challenge": 2,
+        "calibration_challenge": 4,
         "development": 15,
         "regression": 4,
         "sealed_a": 5,
@@ -123,25 +123,25 @@
         "long_horizon": 1,
         "memory_rag_composition": 2,
         "memory_web_composition": 1,
-        "memory_web_conflict_resolution": 1,
+        "memory_web_conflict_resolution": 2,
         "multi_source_synthesis": 1,
-        "source_disambiguation_ood": 1
+        "source_disambiguation_ood": 2
       },
       "language_counts": {
         "en": 14,
-        "zh": 18
+        "zh": 20
       },
       "origin_counts": {
         "authentic_studyhub_preview": 20,
         "authentic_web_snapshot": 5,
-        "synthetic_adversarial": 3,
-        "synthetic_memory": 4
+        "synthetic_adversarial": 4,
+        "synthetic_memory": 5
       }
     }
   },
   "review_status": {
     "self_review": "COMPLETED_PASS_WITH_LIMITATIONS",
-    "self_reviewed_items": 32,
+    "self_reviewed_items": 35,
     "self_review_evidence": "configs/benchmark-v2-self-review.json",
     "independent_human_review": "NOT_RUN",
     "external_llm_judge": "NOT_RUN"

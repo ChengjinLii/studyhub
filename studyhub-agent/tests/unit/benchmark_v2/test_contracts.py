@@ -6,8 +6,10 @@ from pathlib import Path
 
 import pytest
 
+from scripts.benchmark.run_9b_base_eval import aggregate, select_tasks
 from studyhub_agent.benchmark_v2.development_evaluator import evaluate_development
 from studyhub_agent.benchmark_v2.environment import ReplayableAgentEnvironmentV2
+from studyhub_agent.benchmark_v2.hermes_runner import BenchmarkHermesRunnerV2
 from studyhub_agent.benchmark_v2.schema import (
     BENCHMARK_VERSION,
     ENVIRONMENT_SCHEMA_VERSION,
@@ -17,6 +19,9 @@ from studyhub_agent.benchmark_v2.schema import (
 )
 from studyhub_agent.benchmark_v2.statistics import cluster_bootstrap_interval
 from studyhub_agent.benchmark_v2.web_snapshot import load_source_config, sanitize_payload
+
+PROJECT = Path(__file__).resolve().parents[3]
+PUBLIC_BENCHMARK = PROJECT / "benchmarks/studyhub-agent-v2"
 
 
 def task_row() -> dict:
@@ -201,3 +206,60 @@ def test_web_snapshot_sanitizes_html_and_rejects_unapproved_host(tmp_path: Path)
     )
     with pytest.raises(ValueError, match="allowlist"):
         load_source_config(config)
+
+
+def test_public_calibration_gate_covers_every_capability_without_sealed_tasks() -> None:
+    rows = []
+    for split in ("regression", "development", "calibration_challenge"):
+        rows.extend(
+            json.loads(line)
+            for line in (PUBLIC_BENCHMARK / split / "tasks.jsonl").read_text(encoding="utf-8").splitlines()
+        )
+
+    gate = select_tasks(rows, "gate", 20260827, task_type=BenchmarkTaskV2)
+
+    assert len(gate) == 30
+    assert len({row["capability_id"] for row in gate}) == 30
+    assert {row["split"] for row in gate} <= {"regression", "development", "calibration_challenge"}
+
+
+def test_v2_hermes_runner_only_adapts_task_and_environment_types(tmp_path: Path) -> None:
+    runner = BenchmarkHermesRunnerV2(
+        hidden_root=tmp_path,
+        hermes_checkout=tmp_path / "hermes",
+        tokenizer_path=tmp_path / "tokenizer",
+        base_url="http://127.0.0.1:30120/v1",
+        api_key="ephemeral",
+        model="default",
+    )
+
+    assert runner.task_type is BenchmarkTaskV2
+    assert runner.environment_type is ReplayableAgentEnvironmentV2
+
+
+def test_v2_aggregate_reports_cluster_aware_intervals() -> None:
+    rows = [
+        {
+            "episode_key": f"task-{index}:0",
+            "task_id": f"task-{index}",
+            "capability_id": "factual_passage_retrieval" if index < 2 else "web_freshness_verification",
+            "source_group_id": f"source-{index // 2}",
+            "semantic_template_cluster": f"template-{index}",
+            "environment_origin": "authentic_studyhub_preview" if index < 2 else "authentic_web_snapshot",
+            "status": "SCORED",
+            "evaluation": {
+                "strict_success": index % 2 == 0,
+                "diagnostic_scalar": 0.8 if index % 2 == 0 else 0.2,
+            },
+            "trace": {"tool_calls": []},
+            "runtime": {"elapsed_seconds": 1.0},
+        }
+        for index in range(4)
+    ]
+
+    summary = aggregate(rows, mode="development", seed=20260827, benchmark_generation="v2")
+
+    assert summary["benchmark_version"] == BENCHMARK_VERSION
+    assert summary["mean_score"] == 0.5
+    assert summary["macro_capability_strict_success"] == 0.5
+    assert summary["cluster_aware_strict_success"]["source_group_id"]["effective_clusters"] == 2

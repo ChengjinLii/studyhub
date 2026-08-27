@@ -1,43 +1,43 @@
 {
   "schema_version": "studyhub.agentbench-self-test-summary.v2",
   "benchmark_version": "studyhub-agentbench-v2",
-  "generated_at": "2026-08-27T12:50:01+00:00",
+  "generated_at": "2026-08-27T13:08:06+00:00",
   "status": "PASS",
   "oracle": {
-    "tasks": 70,
-    "scored": 70,
-    "strict_pass": 70,
+    "tasks": 73,
+    "scored": 73,
+    "strict_pass": 73,
     "pass_rate": 1.0,
     "errors": 0
   },
   "negative_controls": {
     "empty_answer": {
-      "evaluated": 70,
+      "evaluated": 73,
       "strict_pass": 0,
       "strict_pass_rate": 0.0
     },
     "random_answer": {
-      "evaluated": 70,
+      "evaluated": 73,
       "strict_pass": 0,
       "strict_pass_rate": 0.0
     },
     "fixed_generic_answer": {
-      "evaluated": 70,
+      "evaluated": 73,
       "strict_pass": 0,
       "strict_pass_rate": 0.0
     },
     "tool_spam": {
-      "evaluated": 70,
+      "evaluated": 73,
       "strict_pass": 0,
       "strict_pass_rate": 0.0
     },
     "citation_decoration": {
-      "evaluated": 53,
+      "evaluated": 55,
       "strict_pass": 0,
       "strict_pass_rate": 0.0
     },
     "wrong_source": {
-      "evaluated": 53,
+      "evaluated": 55,
       "strict_pass": 0,
       "strict_pass_rate": 0.0
     }
@@ -55,15 +55,15 @@
       "largest_answer_signature_at_most_ten_percent": true,
       "semantic_template_ids_unique": true
     },
-    "tasks": 95,
-    "unique_answer_signatures": 70,
+    "tasks": 98,
+    "unique_answer_signatures": 71,
     "largest_answer_signature": 6,
-    "largest_answer_signature_share": 0.06315789473684211
+    "largest_answer_signature_share": 0.061224489795918366
   },
   "artifact_hashes": {
-    "oracle-reachability-report.json": "a89d1ce4d2cc0a202d7e6e5c884f0ba9f0236b9b3fe56227da46637ee0ad9be3",
-    "negative-control-report.json": "91db44688e05568dc84548b03c2f849c2cc95a733a159107035887e5f17cbfb1",
-    "metamorphic-test-report.json": "4ad307d20469e9ee62077cc0ae7a7ec722c74a27be34df24f0189eec14351837",
-    "shortcut-probe-report.json": "551730e8808ad0cfdfa839c6c04ad3bcf4fc3abd46198a992752881c372387c7"
+    "oracle-reachability-report.json": "7ec1cc88c4eb734e8a5c80dcbee64ef093d287aeb8c374b1d09bdcef05ddacca",
+    "negative-control-report.json": "1037a13ca7f30b9fe3c2233c9637d8a52420c93198e05c19535ab68196b82adf",
+    "metamorphic-test-report.json": "0b6bf47062e5cbb30d73233b939258297e17e6f8962c81af92d6e4a5949f5193",
+    "shortcut-probe-report.json": "81a70bc6780b03687346331f98bb056c65da7079ae739879a7817a9a33f0aaa8"
   }
 }
