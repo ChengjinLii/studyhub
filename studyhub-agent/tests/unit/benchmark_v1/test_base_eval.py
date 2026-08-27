@@ -1,0 +1,79 @@
+from __future__ import annotations
+
+from pathlib import Path
+from types import SimpleNamespace
+
+from scripts.benchmark.run_9b_base_eval import aggregate, build_work_items, select_tasks
+from studyhub_agent.benchmark_v1.hermes_runner import BENCHMARK_SYSTEM_PROMPT, _install_benchmark_prompt
+from studyhub_agent.benchmark_v1.schema import load_jsonl
+
+PROJECT = Path(__file__).resolve().parents[3]
+BENCHMARK = PROJECT / "benchmarks/studyhub-agent-v1"
+
+
+def test_base_eval_modes_have_frozen_expected_counts() -> None:
+    regression = load_jsonl(BENCHMARK / "regression/tasks.jsonl")
+    development = load_jsonl(BENCHMARK / "development/tasks.jsonl")
+
+    gate = select_tasks(regression, "gate", 20260827)
+    variance = select_tasks(development, "variance", 20260827)
+
+    assert len(gate) == 20
+    assert len({row["capability_id"] for row in gate}) == 20
+    assert len(select_tasks(regression, "regression", 20260827)) == 160
+    assert len(select_tasks(development, "development", 20260827)) == 1005
+    assert len(variance) == 100
+    assert len(build_work_items(variance, "variance", 20260827)) == 400
+
+
+def test_variance_summary_excludes_infra_and_reports_incomplete_group() -> None:
+    rows = []
+    for index in range(4):
+        rows.append(_episode("task-complete", index, strict=index == 0))
+    rows.extend(
+        [
+            _episode("task-incomplete", 0, strict=True),
+            _episode("task-incomplete", 1, strict=False),
+            _episode("task-incomplete", 2, strict=False, status="INFRA_EXCLUDED"),
+            _episode("task-incomplete", 3, strict=False, status="INFRA_EXCLUDED"),
+        ]
+    )
+
+    summary = aggregate(rows, mode="variance", seed=20260827)
+
+    assert summary["infra_excluded"] == 2
+    assert summary["variance_panel"] == {
+        "tasks_expected": 2,
+        "tasks_complete": 1,
+        "tasks_incomplete": 1,
+        "pass_at_4": 1.0,
+        "consistent_at_4": 0.0,
+        "mixed_outcome_rate": 1.0,
+    }
+
+
+def test_benchmark_prompt_is_installed_once() -> None:
+    agent = SimpleNamespace(
+        _cached_system_prompt="old",
+        _cached_system_prompt_static="old",
+        ephemeral_system_prompt="old",
+    )
+
+    _install_benchmark_prompt(agent, ["只读", "不得泄露"])
+    prompt = agent._build_system_prompt(BENCHMARK_SYSTEM_PROMPT)
+
+    assert prompt.count(BENCHMARK_SYSTEM_PROMPT) == 1
+    assert "只读" in prompt
+    assert agent.ephemeral_system_prompt is None
+
+
+def _episode(task_id: str, sample_index: int, *, strict: bool, status: str = "SCORED") -> dict:
+    return {
+        "episode_key": f"{task_id}:{sample_index}",
+        "task_id": task_id,
+        "capability_id": "rag_search_read",
+        "status": status,
+        "evaluation": {"strict_success": strict, "total": float(strict)},
+        "trace": {"tool_calls": []},
+        "runtime": {"elapsed_seconds": 1.0},
+    }
