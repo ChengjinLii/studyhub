@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Hermes 工具注册表隔离故障</title>
+  <style>
+    :root { --ink:#14211b; --green:#2e6a57; --gold:#d3a73c; --paper:#f4f1e8; --line:#d6ddd7; }
+    * { box-sizing:border-box; }
+    body { margin:0; color:var(--ink); background:var(--paper); font:16px/1.72 Georgia,"Noto Serif SC",serif; }
+    main { width:min(980px,calc(100% - 40px)); margin:40px auto 72px; }
+    header { padding:44px 48px; color:#fff; background:linear-gradient(135deg,#173f34,#2e6a57); border-radius:24px; }
+    h1 { margin:8px 0 12px; font-size:clamp(32px,5vw,54px); line-height:1.12; }
+    h2 { margin:40px 0 12px; color:var(--green); font-size:25px; }
+    p,li { max-width:80ch; }
+    .tag { color:#ffe094; font:700 13px/1.2 ui-monospace,monospace; letter-spacing:.08em; }
+    code { color:#1f5948; background:#e5ece7; padding:.15em .35em; border-radius:5px; }
+    pre { overflow:auto; padding:22px; color:#eaf3ed; background:#12231c; border-radius:16px; }
+    table { width:100%; border-collapse:collapse; background:#fff; }
+    th,td { padding:12px 14px; border-bottom:1px solid var(--line); text-align:left; vertical-align:top; }
+    th { color:var(--green); }
+    .note { padding:18px 22px; border-left:5px solid var(--gold); background:#fff9e8; }
+    @media (max-width:720px) { header { padding:30px 24px; } }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <div class="tag">A_REAL_REPRODUCED · 2026-08-27</div>
+    <h1>Hermes 工具注册表隔离故障</h1>
+    <p>完整 Regression 启动后发现冻结 Benchmark 工具与 Hermes 内置工具同名，立即停止受污染运行。</p>
+  </header>
+
+  <h2>面试问题</h2>
+  <p>如何保证 Agent 评测和 RL rollout 使用的是冻结工具，而不是宿主 Agent 的同名生产工具？</p>
+
+  <h2>30 秒回答</h2>
+  <p>Hermes 在进程级 registry 中已注册 <code>web_search</code>。旧适配器用新的 task toolset 注册同名工具时被拒绝，但随后只检查“这个名字是否存在”，因此误把内置项当作注册成功；清理阶段还会把内置项删除，使同一 worker 的后续任务随执行顺序变化。我在 160-task Regression 的首批日志看到明确 collision 后立即停止。修复使用 Hermes 自带的 snapshot/restore：显式覆盖、校验 active entry 与 handler 身份、episode 结束后按对象身份恢复旧项，并将同一逻辑用于 Benchmark、AReaL RL 和 Hermes bridge。</p>
+
+  <h2>故障机制</h2>
+  <pre><code>Hermes built-in: web_search / toolset=web
+        ↓
+Benchmark register: web_search / task-local toolset
+        ↓
+registration rejected
+        ↓
+get_entry("web_search") != None   # 误判成功
+        ↓
+finally: deregister("web_search") # 又删除了内置项
+        ↓
+任务行为依赖 worker 内的历史顺序</code></pre>
+
+  <h2>为什么必须中止</h2>
+  <table>
+    <tr><th>风险</th><th>影响</th></tr>
+    <tr><td>环境污染</td><td>冻结 replay task 可能调用 Hermes 内置 Web 工具，Observation 不再可复现。</td></tr>
+    <tr><td>安全边界失效</td><td>只允许 fixture 的离线评测可能意外触达外部工具实现。</td></tr>
+    <tr><td>顺序依赖</td><td>第一个冲突任务与后续任务看到的 registry 状态不同。</td></tr>
+    <tr><td>RL 污染</td><td>同一缺陷存在于 AReaL Hermes workflow，会破坏 rollout、Reward 与 logprob 对齐。</td></tr>
+  </table>
+
+  <h2>最小修复与验证</h2>
+  <ol>
+    <li>调用 <code>snapshot_registration(name)</code> 保存原对象。</li>
+    <li>用 <code>override=True</code> 安装 task-local handler。</li>
+    <li>同时验证 local slot、active entry、toolset 和 handler identity。</li>
+    <li>结束时调用 <code>restore_registration(name, current, previous)</code>，不再盲目 deregister。</li>
+    <li>集成测试故意以 frozen <code>web_search</code> 覆盖内置项，完成 tool loop 后确认原 <code>toolset=web</code> 恢复。</li>
+  </ol>
+
+  <h2>证据</h2>
+  <p><code>aborted_run=qwen35-9b-base-regression-seed-20260827-20260827_185655</code><br>
+     <code>trigger=Tool registration REJECTED: web_search would shadow toolset web</code></p>
+  <p class="note">该 Regression 不进入任何能力结论。只有修复后重新通过 20-task Gate，并确认日志中无 registration rejection，才允许重新启动完整 Regression。</p>
+</main>
+</body>
+</html>

@@ -10,6 +10,7 @@ from studyhub_agent.benchmark_v1.hermes_runner import (
     _install_request_audit,
 )
 from studyhub_agent.benchmark_v1.schema import load_jsonl
+from studyhub_agent.integrations.hermes_registry import HermesRegistryOverlay
 
 PROJECT = Path(__file__).resolve().parents[3]
 BENCHMARK = PROJECT / "benchmarks/studyhub-agent-v1"
@@ -96,6 +97,53 @@ def test_request_audit_records_prompt_cardinality_without_prompt_text() -> None:
         }
     ]
     assert "question" not in str(agent._studyhub_request_audit)
+
+
+def test_benchmark_tool_override_restores_builtin_registration() -> None:
+    class Entry:
+        def __init__(self, toolset, handler):
+            self.toolset = toolset
+            self.handler = handler
+
+    class Registry:
+        def __init__(self):
+            self.entry = Entry("web", object())
+            self.override_flags = []
+
+        def snapshot_registration(self, _name):
+            return self.entry
+
+        def register(self, **kwargs):
+            self.override_flags.append(kwargs["override"])
+            self.entry = Entry(kwargs["toolset"], kwargs["handler"])
+
+        def get_entry(self, _name):
+            return self.entry
+
+        def restore_registration(self, _name, current, previous):
+            if self.entry is not current:
+                return False
+            self.entry = previous
+            return True
+
+    registry = Registry()
+    builtin = registry.entry
+
+    async def handler(_arguments):
+        return "{}"
+
+    overlay = HermesRegistryOverlay(registry)
+    overlay.install(
+        name="web_search",
+        toolset="benchmark-task",
+        schema={"description": "Frozen web search"},
+        handler=handler,
+    )
+
+    assert registry.override_flags == [True]
+    assert registry.entry.handler is handler
+    overlay.restore()
+    assert registry.entry is builtin
 
 
 def test_base_server_exposes_hermes_minimum_context(monkeypatch, tmp_path: Path) -> None:

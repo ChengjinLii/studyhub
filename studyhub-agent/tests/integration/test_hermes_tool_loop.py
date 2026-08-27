@@ -205,7 +205,7 @@ def test_training_workflow_runs_real_hermes_against_frozen_tool(monkeypatch, tmp
     for name in ("environments", "fixtures", "verifiers"):
         (environment_root / name).mkdir(parents=True)
     tool_schema = {
-        "name": "fixture_training_lookup",
+        "name": "web_search",
         "description": "Look up one deterministic fixture value.",
         "capability": "function_call",
         "parameters": {
@@ -277,3 +277,6 @@ def test_training_workflow_runs_real_hermes_against_frozen_tool(monkeypatch, tmp
     assert recorded["reward"]["task_success"] == 1.0
     assert recorded["reward"]["answer_quality"] == 1.0
     assert recorded["reward"]["function_call_quality"] == 1.0
+    from tools.registry import registry as hermes_registry
+
+    assert hermes_registry.get_entry("web_search").toolset == "web"

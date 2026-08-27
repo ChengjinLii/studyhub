@@ -13,6 +13,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from studyhub_agent.integrations.hermes_registry import HermesRegistryOverlay
 from training.rl.frozen_environment import FrozenTaskEnvironment
 from training.rl.reward_v2 import RewardV2Result, evaluate_reward_v2
 
@@ -572,7 +573,7 @@ class StudyHubHermesWorkflow:
 
         AIAgent, registry = self._load_hermes()
         toolset = f"studyhub-rl-{task_id}"
-        installed = []
+        overlay = HermesRegistryOverlay(registry)
         hermes_runtime: dict[str, Any] = {}
         for schema in environment.tool_schemas:
             name = schema["name"]
@@ -584,18 +585,16 @@ class StudyHubHermesWorkflow:
                     arguments = {}
                 return await environment.execute(_name, arguments)
 
-            registry.register(
-                name=name,
-                toolset=toolset,
-                schema=schema,
-                handler=handler,
-                is_async=True,
-                description=schema["description"],
-                max_result_size_chars=12_000,
-            )
-            if registry.get_entry(name) is None:
-                raise RuntimeError(f"Hermes rejected isolated tool registration: {name}")
-            installed.append(name)
+            try:
+                overlay.install(
+                    name=name,
+                    toolset=toolset,
+                    schema=schema,
+                    handler=handler,
+                )
+            except BaseException:
+                overlay.restore()
+                raise
 
         try:
             agent = AIAgent(
@@ -626,7 +625,7 @@ class StudyHubHermesWorkflow:
             agent._environment_probe = False
             agent._disable_streaming = True
             _install_training_system_prompt(agent)
-            _enable_training_tool_guardrails(agent, installed)
+            _enable_training_tool_guardrails(agent, overlay.names)
             ContextBudgetController(
                 tokenizer=self._load_tokenizer(),
                 engine_max_tokens=self.engine_max_tokens,
@@ -637,8 +636,7 @@ class StudyHubHermesWorkflow:
             final_answer = str(await asyncio.to_thread(agent.chat, str(data["user_request"])))
             hermes_runtime = _training_runtime_metadata(agent)
         finally:
-            for name in installed:
-                registry.deregister(name)
+            overlay.restore()
 
         if _CONTEXT_LIMIT_PATTERN in final_answer:
             environment.record_runtime_error("context_budget_provider_rejection")
