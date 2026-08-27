@@ -173,7 +173,7 @@ def launch_server(
         "--dtype",
         "bfloat16",
         "--context-length",
-        "32768",
+        "65536",
         "--mem-fraction-static",
         "0.70",
         "--max-running-requests",
@@ -577,7 +577,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--workers", type=int, default=2, choices=(1, 2))
     parser.add_argument("--gpus", type=int, nargs="+", default=[0, 1])
     parser.add_argument("--port-base", type=int, default=30120)
-    parser.add_argument("--server-timeout", type=float, default=600.0)
+    parser.add_argument("--server-timeout", type=float, default=1200.0)
     args = parser.parse_args()
     if len(args.gpus) != args.workers:
         parser.error("--gpus must provide exactly one GPU per worker")

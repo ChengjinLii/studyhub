@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from types import SimpleNamespace
 
-from scripts.benchmark.run_9b_base_eval import aggregate, build_work_items, select_tasks
+from scripts.benchmark.run_9b_base_eval import aggregate, build_work_items, launch_server, select_tasks
 from studyhub_agent.benchmark_v1.hermes_runner import BENCHMARK_SYSTEM_PROMPT, _install_benchmark_prompt
 from studyhub_agent.benchmark_v1.schema import load_jsonl
 
@@ -65,6 +65,34 @@ def test_benchmark_prompt_is_installed_once() -> None:
     assert prompt.count(BENCHMARK_SYSTEM_PROMPT) == 1
     assert "只读" in prompt
     assert agent.ephemeral_system_prompt is None
+
+
+def test_base_server_exposes_hermes_minimum_context(monkeypatch, tmp_path: Path) -> None:
+    captured = {}
+
+    class Process:
+        pass
+
+    def fake_popen(command, **kwargs):
+        captured["command"] = command
+        captured["kwargs"] = kwargs
+        return Process()
+
+    monkeypatch.setattr("scripts.benchmark.run_9b_base_eval.subprocess.Popen", fake_popen)
+    process, stream = launch_server(
+        python="python",
+        model=tmp_path / "model",
+        gpu=0,
+        port=30120,
+        api_key="ephemeral",
+        log_path=tmp_path / "server.log",
+        project=PROJECT,
+    )
+    stream.close()
+
+    context_index = captured["command"].index("--context-length")
+    assert captured["command"][context_index + 1] == "65536"
+    assert isinstance(process, Process)
 
 
 def _episode(task_id: str, sample_index: int, *, strict: bool, status: str = "SCORED") -> dict:

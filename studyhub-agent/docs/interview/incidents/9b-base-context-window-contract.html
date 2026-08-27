@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>9B Base Gate：Hermes 上下文合同不一致</title>
+  <style>
+    :root { --ink:#14211b; --muted:#607168; --green:#2e6a57; --gold:#d3a73c; --paper:#f4f1e8; --line:#d7ddd7; }
+    * { box-sizing:border-box; }
+    body { margin:0; color:var(--ink); background:var(--paper); font:16px/1.72 Georgia,"Noto Serif SC",serif; }
+    main { width:min(980px,calc(100% - 40px)); margin:40px auto 72px; }
+    header { padding:44px 48px; color:#fff; background:linear-gradient(130deg,#173f34,#2e6a57); border-radius:24px; }
+    h1 { margin:8px 0 12px; font-size:clamp(32px,5vw,54px); line-height:1.12; }
+    h2 { margin:42px 0 12px; color:var(--green); font-size:25px; }
+    p,li { max-width:78ch; }
+    .tag { color:#ffe094; font:700 13px/1.2 ui-monospace,monospace; letter-spacing:.08em; }
+    .facts { display:grid; grid-template-columns:repeat(3,1fr); gap:14px; margin:22px 0; }
+    .fact { padding:18px; background:#fff; border:1px solid var(--line); border-radius:14px; }
+    .fact strong { display:block; color:var(--green); font-size:24px; }
+    code { color:#1f5948; background:#e5ece7; padding:.15em .35em; border-radius:5px; }
+    pre { overflow:auto; padding:22px; color:#eaf3ed; background:#12231c; border-radius:16px; }
+    table { width:100%; border-collapse:collapse; background:#fff; }
+    th,td { padding:12px 14px; border-bottom:1px solid var(--line); text-align:left; vertical-align:top; }
+    th { color:var(--green); }
+    .note { padding:18px 22px; border-left:5px solid var(--gold); background:#fff9e8; }
+    @media (max-width:720px) { header { padding:30px 24px; } .facts { grid-template-columns:1fr; } }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <div class="tag">A_REAL_REPRODUCED · 2026-08-27</div>
+    <h1>9B Base Gate：Hermes 上下文合同不一致</h1>
+    <p>一次真实的双 H100 基线 Gate。基础设施失败被独立评测器排除，没有污染模型能力分数。</p>
+  </header>
+
+  <section class="facts">
+    <div class="fact"><strong>20 / 20</strong>正确标记为 Infra excluded</div>
+    <div class="fact"><strong>0</strong>进入模型能力计分的 episode</div>
+    <div class="fact"><strong>57.8 GiB</strong>单卡峰值显存</div>
+  </section>
+
+  <h2>面试问题</h2>
+  <p>讲一个 Agent 基线评测中，模型服务正常但所有任务都没有真正 rollout 的故障。你如何区分 Infra failure 与 policy failure？</p>
+
+  <h2>30 秒回答</h2>
+  <p>双 H100 上两个 Qwen3.5-9B SGLang 副本都成功加载，但 Hermes 初始化前检查到服务只报告 32,768 token，而 Hermes 的固定最低合同是 64,000 token，因此 20 个能力样本全部在模型调用前失败。评测器将带 runtime error 的 episode 全部标为 <code>INFRA_EXCLUDED</code>，没有把它们算成模型失败。原模型支持 262,144 token，所以修复是把 SGLang 服务窗口提高到 65,536，并加回归测试，而不是绕过 Hermes 检查。</p>
+
+  <h2>证据链</h2>
+  <table>
+    <tr><th>阶段</th><th>观察</th><th>结论</th></tr>
+    <tr><td>模型预检</td><td>模型 revision 与四个 shard 大小均通过</td><td>不是权重缺失</td></tr>
+    <tr><td>SGLang</td><td>两个服务均返回 HTTP 200；单副本加载约 516 秒</td><td>服务与 GPU 路径可用</td></tr>
+    <tr><td>Hermes</td><td>初始化抛出 minimum 64,000 context 错误</td><td>运行时合同不一致</td></tr>
+    <tr><td>Evaluator</td><td>20/20 为 Infra excluded，0 条计分</td><td>评测没有把 Infra 当 policy</td></tr>
+  </table>
+  <p><code>run_id=qwen35-9b-base-gate-seed-20260827-20260827_183011</code><br>
+     <code>git=1b120e917f9d27171ef0ea9b9d69381e5791c9e0</code><br>
+     <code>benchmark=d6212fd0b2ff8f6a79ee611c04d8593f7fa682f89fc298ae018f6dbfd1171bc5</code></p>
+
+  <h2>最小修复</h2>
+  <pre><code>SGLang reported context: 32768
+Hermes minimum context:   64000
+Qwen3.5-9B capability:   262144
+
+Fix: --context-length 65536
+Regression: launcher contract test + rerun same 20-task Gate</code></pre>
+
+  <h2>为什么不修改 Hermes</h2>
+  <p>Hermes 的 64K 下限是 policy harness 的公开运行合同，工具 schema 与系统前缀需要稳定的上下文预算。模型本身支持更长窗口且显存仍有余量，因此修改服务配置是更小、更符合上游语义的修复；跳过检查会制造一个不可比较的自定义 Hermes 分支。</p>
+
+  <h2>残余风险</h2>
+  <p class="note">本次只证明了故障隔离与服务配置问题。修复后的 Gate 仍需验证真实 tool call、Observation 回注、唯一 system prompt、完整 20 类能力覆盖及零 Infra exclusion，才能进入 Regression 和 Development。</p>
+</main>
+</body>
+</html>

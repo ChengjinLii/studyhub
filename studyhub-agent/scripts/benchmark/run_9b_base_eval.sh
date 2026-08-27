@@ -63,6 +63,7 @@ export STUDYHUB_DISABLE_DEEP_GEMM_WITHOUT_NVCC=1
 export STUDYHUB_SGLANG_TORCH_FALLBACKS_WITHOUT_NVCC=1
 export PYTHONPATH="${PROJECT_ROOT}/training/runtime_shims:${PROJECT_ROOT}:${PROJECT_ROOT}/src"
 
+set +e
 "${VENV}/bin/python" "${PROJECT_ROOT}/scripts/train/guarded_gpu_launch.py" \
   --gpus "${GPUS}" \
   --min-free-mib "${STUDYHUB_MIN_GPU_FREE_MIB:-76000}" \
@@ -75,12 +76,18 @@ export PYTHONPATH="${PROJECT_ROOT}/training/runtime_shims:${PROJECT_ROOT}:${PROJ
     --seed "${SEED}" \
     --workers 2 \
     --gpus "${GPU_ARRAY[0]}" "${GPU_ARRAY[1]}"
+RUN_STATUS=$?
+set -e
 
-"${VENV}/bin/python" "${PROJECT_ROOT}/scripts/benchmark/attach_run_evidence.py" \
-  --manifest "${PROJECT_ROOT}/artifacts/benchmark-v1/runs/${TRIAL}/run-manifest.json" \
-  --gpu-telemetry "${GPU_CSV}" \
-  --launcher-log "${LOG_FILE}"
+RUN_MANIFEST="${PROJECT_ROOT}/artifacts/benchmark-v1/runs/${TRIAL}/run-manifest.json"
+if [[ -f "${RUN_MANIFEST}" && -s "${GPU_CSV}" && -s "${LOG_FILE}" ]]; then
+  "${VENV}/bin/python" "${PROJECT_ROOT}/scripts/benchmark/attach_run_evidence.py" \
+    --manifest "${RUN_MANIFEST}" \
+    --gpu-telemetry "${GPU_CSV}" \
+    --launcher-log "${LOG_FILE}"
+fi
 
 printf 'Run: %s\n' "${TRIAL}"
 printf 'Summary: %s\n' "${PROJECT_ROOT}/artifacts/benchmark-v1/runs/${TRIAL}/summary.json"
 printf 'GPU telemetry: %s\n' "${GPU_CSV}"
+exit "${RUN_STATUS}"
