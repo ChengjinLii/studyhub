@@ -143,6 +143,13 @@ def accepted_record(
     provider = run.get("provider", {})
     interface = str(provider.get("interface", "unknown"))
     tier = "teacher_repaired_complete" if run.get("collection_mode") == "dagger_repair" else "teacher_verified_complete"
+    messages = run["messages"]
+    runtime_native = bool(
+        any(message.get("role") == "assistant" and message.get("tool_calls") for message in messages)
+        and any(message.get("role") == "tool" for message in messages)
+        and messages[-1].get("role") == "assistant"
+        and str(messages[-1].get("content", "")).strip()
+    )
     record: dict[str, Any] = {
         "schema_version": "studyhub.runtime-sft-trajectory.v3",
         "id": f"teacher-v1:{run['run_id']}",
@@ -154,9 +161,9 @@ def accepted_record(
         "capability_tags": [task["family"], "teacher_policy", "hermes_runtime"],
         "quality_tier": tier,
         "trajectory_status": "complete",
-        "runtime_native": True,
+        "runtime_native": runtime_native,
         "tools": run["tools"],
-        "messages": run["messages"],
+        "messages": messages,
         "teacher": {
             "interface": interface,
             "model": provider.get("model"),

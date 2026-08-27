@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pytest
 
+from scripts.data.build_runtime_sft_v3_1 import _select_teacher_rows
 from scripts.data.verify_teacher_trajectories import accepted_record, verify_run
 from scripts.data.select_runtime_sft_v3 import public_benchmark_prompt_hashes
 from training.teacher.hermes_controller import collect_trajectory
@@ -203,6 +204,42 @@ def test_actual_hermes_registry_executes_teacher_action_and_verifier_accepts(tmp
     record = accepted_record(run, task, verifier, diagnostics)
     assert record["quality_tier"] == "teacher_verified_complete"
     assert record["runtime_native"] is True
+
+
+def test_accepted_direct_teacher_trajectory_is_not_falsely_runtime_native() -> None:
+    run = {
+        "run_id": "direct-run",
+        "candidate_index": 0,
+        "collection_mode": "teacher_rollout",
+        "provider": {"interface": "fixture", "model": "fixture-teacher"},
+        "collector_git_commit": "fixture-commit",
+        "raw_run_path": "raw_runs/direct-run.json",
+        "controller": {"hermes_commit": "fixture-hermes"},
+        "tools": [],
+        "messages": [
+            {"role": "system", "content": "Answer directly when no tool is needed."},
+            {"role": "user", "content": "What is two plus two?"},
+            {"role": "assistant", "content": "Four."},
+        ],
+    }
+    task = {
+        "family": "direct_abstention",
+        "metadata": {"source_group_id": "direct-fixture"},
+    }
+
+    record = accepted_record(run, task, {}, {})
+
+    assert record["quality_tier"] == "teacher_verified_complete"
+    assert record["runtime_native"] is False
+    selected, drops = _select_teacher_rows(
+        [record],
+        base_content=set(),
+        base_near=set(),
+        public_benchmark_hashes=set(),
+        max_rows_per_group=4,
+    )
+    assert [row["id"] for row in selected] == ["teacher-v1:direct-run"]
+    assert drops == {}
 
 
 def test_provider_failure_is_rejected_with_specific_taxonomy() -> None:

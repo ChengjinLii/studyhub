@@ -92,8 +92,12 @@ def _select_teacher_rows(
         if row.get("quality_tier") not in {"teacher_verified_complete", "teacher_repaired_complete"}:
             drops["not_teacher_verified"] += 1
             continue
-        if row.get("trajectory_status") != "complete" or not row.get("runtime_native"):
-            drops["not_complete_runtime_native"] += 1
+        if row.get("trajectory_status") != "complete":
+            drops["not_complete"] += 1
+            continue
+        is_verified_direct = row.get("task_family") == "direct_abstention"
+        if not row.get("runtime_native") and not is_verified_direct:
+            drops["not_runtime_native"] += 1
             continue
         if candidate_prompt_hash(row) in public_benchmark_hashes:
             drops["public_benchmark_prompt_overlap"] += 1

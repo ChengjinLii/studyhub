@@ -1,8 +1,8 @@
 # Runtime-SFT-v3.1 Teacher Candidate Audit
 
 Status: `PASS_CANDIDATE_ONLY_INSUFFICIENT_TEACHER`
-Candidate SHA-256: `e4485fdb50488599b7eaf95165d047e67cd90c146a302ffb2e4919bf6b89dcc7`
-Teacher rows: `0`
+Candidate SHA-256: `50c08ddee475d0d577f3aead69f3b9a030697327a80e04d2b4195b5d98e0c205`
+Teacher rows: `2`
 Sealed task files read: `false`
 
 This is a candidate derived from immutable runtime-SFT-v3.0. It is not a formal release and is not used by the overnight v3.0 baseline.
@@ -33,8 +33,9 @@ This is a candidate derived from immutable runtime-SFT-v3.0. It is not a formal 
 | studyhub_memory_replay | 4,286 | 8.84% | 4,286 | 0 | 100.00% | 101 | 54/71 | 1 | 100.00% |
 | studyhub_metadata_replay | 6,000 | 12.37% | 6,000 | 0 | 100.00% | 99 | 118/138 | 1 | 100.00% |
 | studyhub_qasper_replay | 3,589 | 7.40% | 3,589 | 0 | 100.00% | 1,168 | 5/12 | 4 | 56.23% |
-| studyhub_state_tools | 4,286 | 8.84% | 4,286 | 0 | 100.00% | 101 | 57/71 | 1 | 100.00% |
-| studyhub_web_fallback | 4,286 | 8.84% | 4,286 | 0 | 100.00% | 101 | 56/62 | 1 | 100.00% |
+| studyhub_state_tools | 4,285 | 8.84% | 4,285 | 0 | 100.00% | 101 | 57/71 | 1 | 100.00% |
+| studyhub_teacher_v1 | 2 | 0.00% | 2 | 0 | 0.00% | 1 | 2/2 | 1 | 100.00% |
+| studyhub_web_fallback | 4,285 | 8.84% | 4,285 | 0 | 100.00% | 101 | 56/62 | 1 | 100.00% |
 | toolace | 2,667 | 5.50% | 647 | 2,020 | 24.26% | 2,667 | 1/1 | 2,640 | 0.07% |
 
 ## Interpretation

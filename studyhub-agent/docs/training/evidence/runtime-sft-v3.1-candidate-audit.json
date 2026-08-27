@@ -3,13 +3,13 @@
   "status": "PASS_CANDIDATE_ONLY_INSUFFICIENT_TEACHER",
   "formal_release": false,
   "candidate_manifest_status": "CANDIDATE_INSUFFICIENT_TEACHER_VOLUME",
-  "candidate_sha256": "e4485fdb50488599b7eaf95165d047e67cd90c146a302ffb2e4919bf6b89dcc7",
-  "candidate_manifest_sha256": "0b7ad035e2a7786422dd0b77dd0c2bee6a863349768349ff3829d275f221af1b",
+  "candidate_sha256": "50c08ddee475d0d577f3aead69f3b9a030697327a80e04d2b4195b5d98e0c205",
+  "candidate_manifest_sha256": "cf86f8ca7bede4f91b3c025ae594e2ac3b3f7388687af1e08f31788913d7affc",
   "base_sha256": "a115d220841a0e56c8893a01e486c8399c24cb591143f221c78a926deee42783",
   "rows": 48500,
   "action_only_rows": 2425,
   "action_only_share": 0.05,
-  "teacher_rows": 0,
+  "teacher_rows": 2,
   "teacher_minimum_useful_target_met": false,
   "split_group_overlap": {
     "train_validation": 0,
@@ -147,8 +147,8 @@
       "share": 0.088371,
       "split": {
         "protocol_holdout": 242,
-        "train": 3798,
-        "validation": 246
+        "train": 3797,
+        "validation": 247
       },
       "quality_tiers": {
         "deterministic_fixture_complete": 4286
@@ -180,9 +180,9 @@
       "rows": 4286,
       "share": 0.088371,
       "split": {
-        "protocol_holdout": 242,
+        "protocol_holdout": 243,
         "train": 3797,
-        "validation": 247
+        "validation": 246
       },
       "quality_tiers": {
         "deterministic_fixture_complete": 4286
@@ -279,18 +279,18 @@
       }
     },
     "studyhub_state_tools": {
-      "rows": 4286,
-      "share": 0.088371,
+      "rows": 4285,
+      "share": 0.088351,
       "split": {
         "protocol_holdout": 192,
-        "train": 3897,
+        "train": 3896,
         "validation": 197
       },
       "quality_tiers": {
-        "deterministic_fixture_complete": 4286
+        "deterministic_fixture_complete": 4285
       },
       "trajectory_status": {
-        "complete": 4286
+        "complete": 4285
       },
       "runtime_native_share": 1.0,
       "unique_groups": 101,
@@ -300,31 +300,63 @@
         "max": 71
       },
       "semantic_template_clusters": 40,
-      "largest_semantic_template_share": 0.028231,
+      "largest_semantic_template_share": 0.028238,
       "tool_sequence_signatures": 1,
       "largest_tool_sequence_share": 1.0,
       "final_answer_signatures": 1225,
-      "largest_final_answer_share": 0.002566,
+      "largest_final_answer_share": 0.002567,
       "language": {
-        "zh": 4286
+        "zh": 4285
       },
       "observation_origin": {
-        "deterministic_fixture": 4286
+        "deterministic_fixture": 4285
+      }
+    },
+    "studyhub_teacher_v1": {
+      "rows": 2,
+      "share": 4.1e-05,
+      "split": {
+        "train": 2
+      },
+      "quality_tiers": {
+        "teacher_verified_complete": 2
+      },
+      "trajectory_status": {
+        "complete": 2
+      },
+      "runtime_native_share": 0.0,
+      "unique_groups": 1,
+      "rows_per_group": {
+        "p50": 2,
+        "p90": 2,
+        "max": 2
+      },
+      "semantic_template_clusters": 1,
+      "largest_semantic_template_share": 1.0,
+      "tool_sequence_signatures": 1,
+      "largest_tool_sequence_share": 1.0,
+      "final_answer_signatures": 2,
+      "largest_final_answer_share": 0.5,
+      "language": {
+        "zh": 2
+      },
+      "observation_origin": {
+        "teacher_in_real_environment": 2
       }
     },
     "studyhub_web_fallback": {
-      "rows": 4286,
-      "share": 0.088371,
+      "rows": 4285,
+      "share": 0.088351,
       "split": {
-        "protocol_holdout": 193,
+        "protocol_holdout": 192,
         "train": 3884,
         "validation": 209
       },
       "quality_tiers": {
-        "deterministic_fixture_complete": 4286
+        "deterministic_fixture_complete": 4285
       },
       "trajectory_status": {
-        "complete": 4286
+        "complete": 4285
       },
       "runtime_native_share": 1.0,
       "unique_groups": 101,
@@ -334,16 +366,16 @@
         "max": 62
       },
       "semantic_template_clusters": 4,
-      "largest_semantic_template_share": 0.254783,
+      "largest_semantic_template_share": 0.254842,
       "tool_sequence_signatures": 1,
       "largest_tool_sequence_share": 1.0,
       "final_answer_signatures": 404,
-      "largest_final_answer_share": 0.004666,
+      "largest_final_answer_share": 0.004667,
       "language": {
-        "zh": 4286
+        "zh": 4285
       },
       "observation_origin": {
-        "deterministic_fixture": 4286
+        "deterministic_fixture": 4285
       }
     },
     "toolace": {
