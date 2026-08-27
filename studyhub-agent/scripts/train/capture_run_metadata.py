@@ -8,6 +8,7 @@ import csv
 import hashlib
 import importlib.metadata
 import json
+import os
 import platform
 import subprocess
 import sys
@@ -42,6 +43,53 @@ def sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
+def file_identity(path: Path) -> dict[str, int]:
+    stat = path.stat()
+    return {
+        "bytes": stat.st_size,
+        "device": stat.st_dev,
+        "inode": stat.st_ino,
+        "mtime_ns": stat.st_mtime_ns,
+        "ctime_ns": stat.st_ctime_ns,
+    }
+
+
+def load_hash_cache(path: Path | None) -> dict[str, Any]:
+    if path is None or not path.is_file():
+        return {"schema_version": "studyhub.local-file-hash-cache.v1", "files": {}}
+    value = json.loads(path.read_text(encoding="utf-8"))
+    if value.get("schema_version") != "studyhub.local-file-hash-cache.v1":
+        raise RuntimeError(f"unsupported model hash cache: {path}")
+    if not isinstance(value.get("files"), dict):
+        raise RuntimeError(f"invalid model hash cache: {path}")
+    return value
+
+
+def cached_sha256(path: Path, cache: dict[str, Any]) -> tuple[str, str]:
+    resolved = str(path.resolve())
+    identity = file_identity(path)
+    cached = cache["files"].get(resolved)
+    if (
+        isinstance(cached, dict)
+        and cached.get("identity") == identity
+        and isinstance(cached.get("sha256"), str)
+        and len(cached["sha256"]) == 64
+    ):
+        return cached["sha256"], "verified_stat_cache"
+    digest = sha256(path)
+    cache["files"][resolved] = {"identity": identity, "sha256": digest}
+    return digest, "computed"
+
+
+def save_hash_cache(path: Path | None, cache: dict[str, Any]) -> None:
+    if path is None:
+        return
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_suffix(path.suffix + ".partial")
+    temporary.write_text(json.dumps(cache, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    os.replace(temporary, path)
+
+
 def package_versions() -> dict[str, str]:
     names = ["areal", "torch", "transformers", "datasets", "peft", "tokenizers", "pyarrow"]
     versions = {name: importlib.metadata.version(name) for name in names}
@@ -65,10 +113,23 @@ def start(args: argparse.Namespace) -> None:
     repository = project.parent
     model = args.model.resolve()
     weight_files = sorted(model.glob("*.safetensors"))
+    hash_cache = load_hash_cache(args.model_hash_cache)
+    weight_records = []
+    cache_sources: dict[str, int] = {"computed": 0, "verified_stat_cache": 0}
+    for path in weight_files:
+        digest, source = cached_sha256(path, hash_cache)
+        cache_sources[source] += 1
+        weight_records.append(
+            {
+                "name": path.name,
+                "bytes": path.stat().st_size,
+                "sha256": digest,
+                "hash_source": source,
+            }
+        )
+    save_hash_cache(args.model_hash_cache, hash_cache)
     dirty_patch = command_bytes("git", "-C", str(repository), "diff", "--binary", "HEAD")
-    untracked = command(
-        "git", "-C", str(repository), "ls-files", "--others", "--exclude-standard"
-    ).splitlines()
+    untracked = command("git", "-C", str(repository), "ls-files", "--others", "--exclude-standard").splitlines()
     untracked_hashes = {}
     for relative in untracked:
         path = repository / relative
@@ -97,9 +158,12 @@ def start(args: argparse.Namespace) -> None:
         "model": {
             "path": str(model),
             "config_sha256": sha256(model / "config.json"),
-            "weight_files": [
-                {"name": path.name, "bytes": path.stat().st_size, "sha256": sha256(path)} for path in weight_files
-            ],
+            "weight_files": weight_records,
+            "hash_cache": {
+                "path": str(args.model_hash_cache.resolve()) if args.model_hash_cache else None,
+                "sources": cache_sources,
+                "validation": "device+inode+bytes+mtime_ns+ctime_ns",
+            },
         },
         "software": package_versions(),
         "areal_upstream": json.loads(args.areal_lock.read_text(encoding="utf-8")),
@@ -118,10 +182,25 @@ def start(args: argparse.Namespace) -> None:
         "log_file": str(args.log_file.resolve()),
         "gpu_csv": str(args.gpu_csv.resolve()),
     }
+    if args.data_card:
+        data_card = json.loads(args.data_card.read_text(encoding="utf-8"))
+        metadata["data_card"] = {
+            "path": str(args.data_card.resolve()),
+            "sha256": sha256(args.data_card),
+            "content": data_card,
+        }
+        metadata["dataset_release"] = {
+            "dataset_id": data_card.get("dataset_id"),
+            "release_status": data_card.get("status"),
+            "final_audit_status": data_card.get("audit", {}).get("status"),
+            "tokenization_stage_status": metadata["dataset_manifest"].get("status"),
+            "note": (
+                "The tokenization manifest is an immutable stage record; the data card "
+                "is the final audited release decision."
+            ),
+        }
     if args.hermes_lock:
-        metadata["hermes_upstream"] = json.loads(
-            args.hermes_lock.read_text(encoding="utf-8")
-        )
+        metadata["hermes_upstream"] = json.loads(args.hermes_lock.read_text(encoding="utf-8"))
     args.output.write_text(json.dumps(metadata, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 
@@ -151,7 +230,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--run-mode")
     parser.add_argument("--config", type=Path)
     parser.add_argument("--dataset-manifest", type=Path)
+    parser.add_argument("--data-card", type=Path)
     parser.add_argument("--model", type=Path)
+    parser.add_argument("--model-hash-cache", type=Path)
     parser.add_argument("--areal-lock", type=Path)
     parser.add_argument("--hermes-lock", type=Path)
     parser.add_argument("--gpu", default="0")

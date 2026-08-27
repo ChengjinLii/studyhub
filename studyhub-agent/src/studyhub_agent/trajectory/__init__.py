@@ -10,3 +10,8 @@ __all__ = [
     "TrajectoryRecorder",
     "read_trajectory",
 ]
+from studyhub_agent.trajectory.runtime_sft import (
+    SCHEMA_VERSION as RUNTIME_SFT_SCHEMA_VERSION,
+)
+
+__all__ = ["RUNTIME_SFT_SCHEMA_VERSION"]

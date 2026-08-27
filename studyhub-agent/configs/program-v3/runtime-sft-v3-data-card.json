@@ -1,0 +1,105 @@
+{
+  "schema_version": "studyhub.runtime-sft-data-card.v3",
+  "dataset_id": "studyhub-runtime-sft-v3-qwen35-9b",
+  "status": "ACCEPTED_FOR_SFT_GATE",
+  "accepted_at": "2026-08-27",
+  "transform_version": "runtime-native-sft-v3.0",
+  "rows": {
+    "candidate": 105690,
+    "selected": 48500,
+    "train": 43650,
+    "validation": 2425,
+    "protocol_holdout": 2425
+  },
+  "source_counts": {
+    "toolace": 6400,
+    "hermes_function_calling": 2600,
+    "coig_exam": 4500,
+    "studyhub_2wiki_replay": 12000,
+    "studyhub_qasper_replay": 3000,
+    "studyhub_metadata_replay": 6000,
+    "studyhub_memory_replay": 4000,
+    "studyhub_acl_recovery": 4000,
+    "studyhub_web_fallback": 3000,
+    "studyhub_state_tools": 3000
+  },
+  "quality_tiers": {
+    "expert_complete": 6695,
+    "expert_action_synthetic_observation": 647,
+    "expert_action_only": 6158,
+    "oracle_derived_expert_complete": 15000,
+    "deterministic_fixture_complete": 20000
+  },
+  "runtime": {
+    "runtime_native_rows": 36574,
+    "runtime_native_share": 0.754103,
+    "complete_rows": 42342,
+    "action_only_rows": 6158,
+    "max_source_share": 0.247423,
+    "semantic_template_clusters": 33952,
+    "largest_semantic_template_cluster_share": 0.016082
+  },
+  "tokenization": {
+    "model": "Qwen/Qwen3.5-9B",
+    "local_revision": "c202236235762e1c871ad0ccb60c8ee5ba337b9a",
+    "chat_template": "official local Qwen3.5-9B chat template",
+    "max_length": 8192,
+    "all_tokens": 61725581,
+    "assistant_loss_tokens": 9062215,
+    "assistant_token_fraction": 0.146815,
+    "token_length": {
+      "min": 52,
+      "p50": 1153,
+      "p90": 2053,
+      "p95": 2234,
+      "p99": 3341,
+      "max": 4446
+    },
+    "loss_contract": "assistant actions and final answers only; system, user and tool observations have loss mask 0"
+  },
+  "isolation": {
+    "group_overlap": {
+      "train_validation": 0,
+      "train_protocol_holdout": 0,
+      "validation_protocol_holdout": 0
+    },
+    "benchmark_version": "studyhub-agentbench-v2",
+    "benchmark_revision": "2.0.0",
+    "benchmark_tasks_excluded": 98,
+    "benchmark_material_ids_excluded": 34,
+    "benchmark_prompt_overlap": 0,
+    "benchmark_manifest_sha256": "da804b10f53dec585255598c3e256445b8ade3acf35fd8c766ca0ab4d759c88b",
+    "benchmark_source_inventory_sha256": "f88947a8f2faabdad3a9f5376a654323b898e1cf4d24ee2aadc6db6d74167275",
+    "2wiki_unique_support_titles": 24652,
+    "2wiki_cross_split_support_titles": 0,
+    "2wiki_max_rows_per_document_component": 1
+  },
+  "source_revisions": {
+    "toolace": "6bda777c88d21e5a204703c1ee45597a8fa4f734",
+    "hermes_function_calling": "dae3e1d28cfbcf4b915c04ea1e072030529b4bda",
+    "2wiki": "612bc5039a457880d9e7d84c3b0a4cf154b70e4f",
+    "qasper": "v0.3",
+    "coig_exam": "9f25758ec94f82762fb9c09a5c60e908cfb83632",
+    "studyhub_materials_sha256": "126f4a683de911498b28c43ccbfe35be14159e0e8f1174ed8db5b68bba7f5971"
+  },
+  "artifact_hashes": {
+    "candidate_jsonl_sha256": "c1c9e963df53994853b31c426c16b760039f675dbbb328ef5878e8fda3c1aa27",
+    "candidate_manifest_sha256": "79a80a6e6fa7a1460206072f93beb880758f80f139a950444fdbb1761fa0df15",
+    "selected_jsonl_sha256": "a115d220841a0e56c8893a01e486c8399c24cb591143f221c78a926deee42783",
+    "selected_manifest_sha256": "98d60c673572cd079e5f5599b53e08988aa73dfb5f5c74bc3009cc6327657b77",
+    "token_manifest_sha256": "b67e6d56e531cd75969e9baf51838fb9a73fc3535645e1514c0156fde2b9242f",
+    "hf_dataset_tree_sha256": "3dc3bf7e5c2cc759c6b690c7fcd99f36fc411cedcbffe0e88db9e2d941d8134d",
+    "final_audit_sha256": "f82c05ddd1579bad55de913d215bfa23dad87e311ad87b707c2d4ce42dcb4995"
+  },
+  "audit": {
+    "status": "PASS",
+    "rows_scanned": 48500,
+    "failures": 0
+  },
+  "limitations": [
+    "2Wiki and QASPER search/read traces are oracle-derived expert demonstrations; they do not prove autonomous search policy quality.",
+    "ToolACE action-only rows supervise tool selection and arguments but do not supervise a final answer.",
+    "StudyHub replay rows are deterministic fixtures, not human or external-LLM semantic reviews.",
+    "The protocol holdout is reserved for SFT checkpoint selection diagnostics and is not a substitute for AgentBench v2 or official external evaluation."
+  ]
+}

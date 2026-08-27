@@ -2,9 +2,12 @@
   "schema_version": "studyhub.training-program.v3",
   "program_id": "studyhub-9b-agentic-post-training-v3",
   "created_at": "2026-08-27",
-  "status": "DESIGN_FROZEN_PENDING_BENCHMARK_V1",
+  "status": "BENCHMARK_V2_FROZEN_BASE_CALIBRATED_SFT_GATE_PASSED_PROFILE_PENDING",
   "launch_authorized": false,
+  "gpu_gate_authorized": true,
+  "sft_profile_authorized": true,
   "source_prompt": "/data/chengjin/studyhub-agentic-rl-interview-prompt-pack-v3/studyhub-agentic-rl-interview-prompt-pack-v3/prompt.md",
+  "benchmark_execution_prompt": "/data/chengjin/StudyHub_Benchmark_v2_Codex_Execution_Prompt.md",
   "north_star": "Demonstrate that a 9B model learns stronger autonomous behavior in the real Hermes policy space on independent evaluations at an acceptable end-to-end cost.",
   "architecture": {
     "hermes": "the only agent loop and tool-interaction harness",
@@ -38,71 +41,113 @@
     "four_b_is_gate": false
   },
   "benchmark": {
-    "version": "studyhub-agentbench-v1",
+    "version": "studyhub-agentbench-v2",
+    "revision": "2.0.0",
+    "status": "FROZEN_FOR_BASELINE",
+    "builder_commit": "61ca5f77cfa827c35580c108596a185ba369d253",
+    "manifest_sha256": "da804b10f53dec585255598c3e256445b8ade3acf35fd8c766ca0ab4d759c88b",
+    "historical_v1": {
+      "status": "IMMUTABLE_HISTORICAL_BASELINE",
+      "integrity_config": "configs/benchmark-v1-frozen-hashes.json",
+      "training_or_model_selection_use": false
+    },
     "regression": {
-      "tasks": 160,
-      "purpose": "Runtime, parser, tool contract, checkpoint and deterministic error recovery regression only",
+      "tasks": 12,
+      "purpose": "CI and runtime regression only",
       "deterministic": true,
       "claim_eligible": false
     },
     "development": {
-      "tasks": 1005,
-      "purpose": "Training decisions, checkpoint selection and capability/horizon/failure slice analysis",
-      "code_path": "eval/development_v1",
-      "broad_rollouts_per_task": 2,
-      "variance_panel": {"tasks": 200, "rollouts_per_task": 4},
-      "human_or_strong_judge_qa": {"stratified_tasks": 120, "double_reviewed_tasks": 30}
+      "tasks": 51,
+      "purpose": "Training decisions, checkpoint selection and capability/failure slices",
+      "code_path": "studyhub_agent/benchmark_v2/development_evaluator.py",
+      "base_run_id": "qwen35-9b-base-v2-development-seed-20260827-20260827_212818",
+      "base_episodes_scored": 51,
+      "base_infra_excluded": 0,
+      "base_strict_success_rate": 0.117647,
+      "base_mean_diagnostic_score": 0.283758,
+      "base_approx_mde_80_power_pp": 17.865
     },
-    "sealed": {
-      "tasks": 500,
-      "purpose": "Final product claims only; never used for prompt, reward, threshold or sampling decisions",
-      "code_path": "eval/sealed_v1",
-      "rollouts_per_task": 2,
-      "access_policy": "TASKS_AND_GRADER_HIDDEN_FROM_TRAINING_PIPELINE"
+    "variance_panel": {
+      "tasks": 35,
+      "rollouts_per_task": 4,
+      "episodes_scored": 140,
+      "infra_excluded": 0,
+      "pass_at_4": 0.2,
+      "consistent_at_4": 0.057143,
+      "mixed_outcome_rate": 0.142857,
+      "evidence_status": "COMPLETED_DIRTY_WORKTREE_DISCLOSED"
+    },
+    "sealed_a": {
+      "tasks": 13,
+      "purpose": "Hidden in-family confirmation",
+      "code_path": "studyhub_agent/benchmark_v2/sealed_evaluator.py",
+      "access_policy": "TASKS_ENVIRONMENTS_AND_GRADERS_HIDDEN_FROM_TRAINING_PIPELINE"
+    },
+    "sealed_b": {
+      "tasks": 12,
+      "purpose": "Hidden OOD source and generator confirmation",
+      "code_path": "studyhub_agent/benchmark_v2/sealed_evaluator.py",
+      "access_policy": "TASKS_ENVIRONMENTS_AND_GRADERS_HIDDEN_FROM_TRAINING_PIPELINE"
+    },
+    "calibration_challenge": {
+      "tasks": 10,
+      "purpose": "Evaluator shortcut and adversarial calibration"
     },
     "external": [
-      {"name": "BFCL V4", "role": "MANDATORY", "scope": "relevant agentic, multi-turn, Web and Memory categories", "protocol": "OFFICIAL_FULL_FOR_CLAIMS"},
-      {"name": "tau3-bench", "role": "HIGH_PRIORITY", "scope": "knowledge retrieval and user-tool interaction", "protocol": "OFFICIAL_OR_EXPLICIT_ADAPTED_SUBSET"},
-      {"name": "DeepResearch Bench", "role": "MANDATORY_LONG_FORM", "scope": "open research quality and citation support", "protocol": "OFFICIAL_FULL_FOR_CLAIMS"},
-      {"name": "BrowseComp", "role": "CONDITIONAL_WEB_STRESS", "scope": "persistent difficult Web search", "protocol": "OFFICIAL_FULL_OR_EXPLICIT_SUBSET"},
-      {"name": "BrowseComp-Plus", "role": "DEFER_PENDING_GAP", "scope": "separate retriever and Agent effects", "protocol": "AUDIT_BEFORE_SELECTION"},
-      {"name": "GAIA or xbench-DeepSearch", "role": "OPTIONAL_ONE_OF", "scope": "broad assistant or deep-search confirmation", "protocol": "SELECT_ONLY_AFTER_MANDATORY_STACK"},
-      {"name": "HermesBench", "role": "AUDIT_FIRST", "scope": "third-party Hermes harness coverage", "protocol": "NO_CLAIM_BEFORE_INTEGRITY_AND_CONTAMINATION_AUDIT"}
+      {"name": "BFCL V4 Agentic", "revision": "f7cf7359b7ac615a0b294831c5ba2bc95ee4a000", "setup_status": "SETUP_READY", "model_evaluation": "NOT_RUN"},
+      {"name": "tau2-bench", "revision": "fc0055dc4e0a316c3f83133267fbd6faaa770992", "setup_status": "SETUP_READY", "model_evaluation": "NOT_RUN"},
+      {"name": "DeepResearch Bench II", "revision": "440bdc33728438d317ca7860809942b5a1e40256", "setup_status": "LICENSE_REVIEW_REQUIRED", "model_evaluation": "NOT_RUN"},
+      {"name": "BrowseComp-Plus", "revision": "046949032b0328319cc9a02663a759ec601d9402", "setup_status": "SETUP_READY", "model_evaluation": "NOT_RUN"}
     ],
-    "v1_freeze_gate": [
-      "all P0 capabilities have task coverage",
-      "training reward and development evaluator do not share core grading code",
-      "open tasks accept multiple valid trajectories",
-      "task and grader quality audit is complete",
-      "version, hash and contamination records are complete",
-      "9B Base baseline and variance panel are complete",
-      "minimum detectable effect analysis is recorded"
-    ],
-    "promotion_rule": "A higher scalar training reward alone never promotes a checkpoint. Development, external and cost slices must agree."
+    "quality_gate": {
+      "engineering_status": "PASSED",
+      "independent_human_review": "NOT_RUN",
+      "external_llm_judge": "NOT_RUN",
+      "tasks": 98,
+      "source_groups": 78,
+      "development_semantic_clusters": 51,
+      "largest_development_cluster_share": 0.0196078431372549,
+      "oracle_pass_rate": 1.0,
+      "evaluator_challenge_pass": "21/21"
+    },
+    "promotion_rule": "A higher scalar training reward alone never promotes a checkpoint. Development, external and cost slices must agree; Sealed remains untouched until final confirmation."
   },
   "data": {
     "sft": {
-      "candidate_trajectories": 90000,
-      "final_trajectories": 45000,
+      "candidate_trajectories": 105690,
+      "final_trajectories": 48500,
       "target_tokens": 90000000,
       "allowed_token_range": [60000000, 150000000],
-      "studyhub_share": 0.52,
-      "open_source_share": 0.48,
+      "studyhub_share": 0.412371,
+      "open_source_share": 0.587629,
       "runtime_native_multi_turn_min_share": 0.70,
       "recovery_tag_share_range": [0.10, 0.20],
       "direct_or_abstention_tag_share": 0.10,
       "long_web_or_research_tag_share_range": [0.15, 0.25],
       "max_single_source_share": 0.25,
       "source_budget": [
-        {"source": "studyhub_rag_and_learning", "trajectories": 9000, "status": "TO_BUILD"},
-        {"source": "studyhub_web_and_fallback", "trajectories": 5500, "status": "TO_BUILD"},
-        {"source": "studyhub_memory_and_personalization", "trajectories": 5000, "status": "TO_BUILD"},
-        {"source": "studyhub_acl_recovery_and_abstention", "trajectories": 4000, "status": "TO_BUILD"},
-        {"source": "hermes_function_calling", "trajectories": 6500, "status": "LICENSE_AND_PARITY_AUDIT"},
-        {"source": "toolace", "trajectories": 5500, "status": "LICENSE_AND_PARITY_AUDIT"},
-        {"source": "openresearcher", "trajectories": 6000, "status": "LICENSE_TEACHER_AND_LENGTH_AUDIT"},
-        {"source": "tau_web_and_other_agent_traces", "trajectories": 3500, "status": "PROVENANCE_LICENSE_AND_PARITY_AUDIT"}
+        {"source": "toolace", "trajectories": 6400, "status": "PARSER_AND_RUNTIME_PARITY_PASSED"},
+        {"source": "hermes_function_calling", "trajectories": 2600, "status": "RUNTIME_PARITY_PASSED"},
+        {"source": "coig_exam", "trajectories": 4500, "status": "DIRECT_TUTORING_SMOKE_PASSED"},
+        {"source": "studyhub_2wiki_replay", "trajectories": 12000, "status": "DOCUMENT_COMPONENT_ISOLATION_PASSED"},
+        {"source": "studyhub_qasper_replay", "trajectories": 3000, "status": "FROZEN_SEARCH_READ_REPLAY_SMOKE_PASSED"},
+        {"source": "studyhub_metadata_replay", "trajectories": 6000, "status": "BENCHMARK_DISJOINT_SMOKE_PASSED"},
+        {"source": "studyhub_memory_replay", "trajectories": 4000, "status": "BENCHMARK_DISJOINT_SMOKE_PASSED"},
+        {"source": "studyhub_acl_recovery", "trajectories": 4000, "status": "BENCHMARK_DISJOINT_SMOKE_PASSED"},
+        {"source": "studyhub_web_fallback", "trajectories": 3000, "status": "BENCHMARK_DISJOINT_SMOKE_PASSED"},
+        {"source": "studyhub_state_tools", "trajectories": 3000, "status": "BENCHMARK_DISJOINT_SMOKE_PASSED"}
       ],
+      "benchmark_isolation": {
+        "benchmark_version": "studyhub-agentbench-v2",
+        "benchmark_revision": "2.0.0",
+        "manifest_sha256": "da804b10f53dec585255598c3e256445b8ade3acf35fd8c766ca0ab4d759c88b",
+        "excluded_tasks": 98,
+        "excluded_material_ids": 34,
+        "public_and_hidden_prompt_hash_required": true,
+        "source_inventory_hash_required": true,
+        "sealed_content_visible_to_training": false
+      },
       "split": {"train": 0.90, "validation": 0.05, "protocol_holdout": 0.05},
       "quality_gates": [
         "license and revision recorded",
@@ -147,8 +192,8 @@
   "reward": {
     "version": "reward-v3",
     "training_code_path": "training/rl/reward_v3",
-    "development_evaluator_path": "eval/development_v1",
-    "sealed_evaluator_path": "eval/sealed_v1",
+    "development_evaluator_path": "studyhub_agent/benchmark_v2/development_evaluator.py",
+    "sealed_evaluator_path": "studyhub_agent/benchmark_v2/sealed_evaluator.py",
     "layers": [
       {"level": 1, "name": "hard_constraints", "signals": ["ACL", "privacy", "security", "unknown_tool", "forbidden_state"]},
       {"level": 2, "name": "objective_end_state", "signals": ["transaction_state", "test_result", "verifiable_fact", "environment_postcondition"]},
@@ -168,7 +213,7 @@
   "training": {
     "phase_order": [
       "FREEZE_V2_HISTORY",
-      "CAPABILITY_AND_BENCHMARK_V1",
+      "CAPABILITY_AND_BENCHMARK_V2",
       "NINE_B_BASE_EVAL",
       "RUNTIME_NATIVE_SFT_DATA",
       "NINE_B_SFT",
@@ -184,7 +229,32 @@
       "epoch_policy": "Start with one token-budgeted pass; continue only if independent Dev slices improve without protocol regression.",
       "checkpoint_frequency": "every_10_percent_of_token_budget",
       "selection_metric": "independent_development_composite_with_family_floors",
-      "lora_recipe": {"rank_candidates": [16, 32], "target_modules": "resolve by Qwen3.5 module audit and SGLang hot-load gate", "final_choice": "PROFILE_REQUIRED"}
+      "lora_recipe": {"rank_candidates": [16, 32], "target_modules": ["o_proj", "gate_proj", "up_proj", "down_proj"], "final_choice": "PROFILE_REQUIRED"},
+      "gate": {
+        "status": "PASSED",
+        "trial": "gate-seed-20260827-20260827_233653",
+        "evidence_grade": "A_REAL_REPRODUCED",
+        "evidence_path": "docs/training/evidence/runtime-sft-v3-9b-gate-20260827.json",
+        "backend": "fsdp:d2p1t1",
+        "optimizer_updates": 1,
+        "sequences": 8,
+        "tokens": 9934,
+        "assistant_loss_tokens": 1402,
+        "loss": 0.51857,
+        "gradient_norm": 0.40752,
+        "lora_update_observed": true,
+        "gpu_peak_memory_used_mib": {"0": 61748, "1": 45757},
+        "claim_boundary": "The Gate proves one guarded dual-H100 optimizer update, checkpoint export and evidence capture; it does not establish SFT quality or authorize formal training."
+      },
+      "profiles": {
+        "status": "PENDING",
+        "equal_budget_steps": 5,
+        "candidates": [
+          {"id": "profile-r16", "rank": 16, "alpha": 16, "status": "PENDING"},
+          {"id": "profile-r32", "rank": 32, "alpha": 32, "status": "PENDING"}
+        ],
+        "selection_rule": "Compare the same seed, task order, five optimizer updates, token cap, GPU guard and evidence schema before authorizing formal SFT."
+      }
     },
     "grpo": {
       "algorithm": "GRPO",
@@ -260,15 +330,15 @@
   },
   "gates": [
     {"id": "G0", "name": "v2 history frozen", "evidence": ["legacy configs listed", "4B not a gate", "lineage retained"]},
-    {"id": "G1", "name": "Benchmark v1 frozen", "evidence": ["1005 Dev and 500 Sealed manifests", "independent graders", "quality and contamination audit"]},
-    {"id": "G2", "name": "9B Base baseline", "evidence": ["Dev", "variance panel", "mandatory external", "cost slices", "MDE"]},
-    {"id": "G3", "name": "SFT data accepted", "evidence": ["45k final trajectories", "actual token count", "runtime parity", "quality and contamination cards"]},
-    {"id": "G4", "name": "9B SFT promoted", "evidence": ["loss and gradient health", "protocol stability", "Dev family floors", "checkpoint lineage"]},
+    {"id": "G1", "name": "Benchmark v2 frozen", "status": "PASSED", "evidence": ["98 tasks", "78 source groups", "51 Development semantic clusters", "v1 hash regression", "quality and contamination audit", "manifest da804b10f53dec585255598c3e256445b8ade3acf35fd8c766ca0ab4d759c88b"]},
+    {"id": "G2", "name": "9B Base internal calibration", "status": "PASSED_WITH_EXTERNAL_PENDING", "evidence": ["51/51 Development scored with zero Infra exclusions", "35 tasks x 4 complete variance panel", "cluster-aware confidence intervals", "MDE", "external official model evaluations NOT_RUN"]},
+    {"id": "G3", "name": "SFT data accepted", "status": "PASSED", "evidence": ["48.5k final trajectories", "61,725,581 actual tokens", "75.41% runtime-native", "Benchmark v2 prompt overlap 0", "2Wiki support-title overlap 0", "runtime-sft-v3-data-card.json"]},
+    {"id": "G4", "name": "9B SFT promoted", "status": "GATE_PASSED_PROFILE_AND_FORMAL_PENDING", "evidence": ["one guarded dual-H100 optimizer update", "initial and final LoRA hashes differ", "loss 0.51857", "gradient norm 0.40752", "GPU peaks below 72000 MiB guard", "docs/training/evidence/runtime-sft-v3-9b-gate-20260827.json", "formal SFT and independent Dev evaluation pending"]},
     {"id": "G5", "name": "Reward and RL tasks accepted", "evidence": ["800-case Reward calibration", "10k learnability-QA tasks", "effective-group estimate", "alternative-path acceptance"]},
     {"id": "G6", "name": "dual-H100 layout selected", "evidence": ["A/B profiles", "C only if triggered", "before-after artifact", "time-to-quality decision"]},
     {"id": "G7", "name": "9B GRPO main", "evidence": ["500-update initial budget", "complete groups", "entropy/KL/ratio diagnostics", "independent checkpoint evaluation"]},
     {"id": "G8", "name": "confirmation", "evidence": ["best recipe confirmation", "external official protocol", "Sealed Final", "claim ledger"]}
   ],
   "artifact_contract": ["manifest", "config", "model_hash", "dataset_hash", "reward_version", "benchmark_version", "seed", "trajectory_sample", "training_metrics", "independent_eval", "gpu_profile", "failure_slices", "checkpoint_hash", "claim_ledger"],
-  "next_action": "Build and quality-audit Benchmark v1, then run the 9B Base baseline. Do not launch SFT or RL before G1 and G2."
+  "next_action": "Run equal-budget dual-H100 r16 and r32 SFT profiles, select a stable recipe, then request separate authorization for formal SFT. External official baselines remain required before final model claims."
 }

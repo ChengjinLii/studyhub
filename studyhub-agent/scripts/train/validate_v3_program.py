@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import math
 from pathlib import Path
@@ -14,6 +15,8 @@ PROGRAM_DIR = PROJECT_ROOT / "configs" / "program-v3"
 PROGRAM_PATH = PROGRAM_DIR / "training-program-v3.json"
 CAPABILITY_PATH = PROGRAM_DIR / "capability-matrix-v1.json"
 ALGORITHM_PATH = PROGRAM_DIR / "algorithm-decision-matrix-v1.json"
+SFT_DATA_CARD_PATH = PROGRAM_DIR / "runtime-sft-v3-data-card.json"
+SFT_GATE_EVIDENCE_PATH = PROJECT_ROOT / "docs" / "training" / "evidence" / "runtime-sft-v3-9b-gate-20260827.json"
 DEFECT_INDEX_PATH = PROJECT_ROOT / "design-defects" / "index.json"
 HTML_PLAN_PATH = PROJECT_ROOT / "docs" / "StudyHub_9B_Agentic_Post_Training_Program_v3.html"
 
@@ -80,7 +83,7 @@ VALID_ALGORITHM_STATUSES = {
 
 EXPECTED_PHASE_ORDER = [
     "FREEZE_V2_HISTORY",
-    "CAPABILITY_AND_BENCHMARK_V1",
+    "CAPABILITY_AND_BENCHMARK_V2",
     "NINE_B_BASE_EVAL",
     "RUNTIME_NATIVE_SFT_DATA",
     "NINE_B_SFT",
@@ -90,6 +93,8 @@ EXPECTED_PHASE_ORDER = [
     "INDEPENDENT_CONFIRMATION",
 ]
 
+BENCHMARK_V2_MANIFEST_SHA256 = "da804b10f53dec585255598c3e256445b8ade3acf35fd8c766ca0ab4d759c88b"
+
 
 def _load_json(path: Path) -> dict[str, Any]:
     with path.open(encoding="utf-8") as handle:
@@ -97,6 +102,14 @@ def _load_json(path: Path) -> dict[str, Any]:
     if not isinstance(value, dict):
         raise ValueError(f"{path} must contain a JSON object")
     return value
+
+
+def _sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        for block in iter(lambda: stream.read(4 * 1024 * 1024), b""):
+            digest.update(block)
+    return digest.hexdigest()
 
 
 def _close(left: float, right: float) -> bool:
@@ -109,18 +122,26 @@ def validate_program(
     program_path = project_root / "configs" / "program-v3" / "training-program-v3.json"
     capability_path = project_root / "configs" / "program-v3" / "capability-matrix-v1.json"
     algorithm_path = project_root / "configs" / "program-v3" / "algorithm-decision-matrix-v1.json"
+    sft_data_card_path = project_root / "configs" / "program-v3" / "runtime-sft-v3-data-card.json"
+    sft_gate_evidence_path = project_root / "docs/training/evidence/runtime-sft-v3-9b-gate-20260827.json"
     defect_index_path = project_root / "design-defects" / "index.json"
 
     errors: list[str] = []
     program = _load_json(program_path)
     matrix = _load_json(capability_path)
     algorithm_matrix = _load_json(algorithm_path)
+    sft_data_card = _load_json(sft_data_card_path)
+    sft_gate_evidence = _load_json(sft_gate_evidence_path)
     defects = _load_json(defect_index_path)
 
     if program.get("schema_version") != "studyhub.training-program.v3":
         errors.append("unexpected training-program schema version")
     if program.get("launch_authorized") is not False:
-        errors.append("v3 launch must remain unauthorized until Benchmark and Base gates pass")
+        errors.append("formal v3 GPU training must remain unauthorized until profiling and recipe review")
+    if program.get("gpu_gate_authorized") is not True:
+        errors.append("the accepted SFT data must retain authorization for reproducible diagnostic GPU checks")
+    if program.get("sft_profile_authorized") is not True:
+        errors.append("equal-budget SFT profiling must be explicitly authorized after the Gate passes")
 
     architecture = program.get("architecture", {})
     if architecture.get("hermes") != "the only agent loop and tool-interaction harness":
@@ -149,35 +170,70 @@ def validate_program(
     if invalid_states:
         errors.append(f"invalid capability states: {invalid_states}")
     if any(item.get("development_tasks", 0) <= 0 or item.get("sealed_tasks", 0) <= 0 for item in capabilities):
-        errors.append("every capability must have positive Dev and Sealed coverage")
+        errors.append("every capability must retain a positive future scale-up budget")
+    if matrix.get("coverage_budget_status") != "SUPERSEDED_BY_STUDYHUB_AGENTBENCH_V2_MANIFEST":
+        errors.append("legacy capability task budgets must not override frozen Benchmark v2 counts")
 
     benchmark = program.get("benchmark", {})
+    benchmark_manifest_path = project_root / "benchmarks/studyhub-agent-v2/manifest.json"
+    benchmark_card_path = project_root / "benchmarks/studyhub-agent-v2/BENCHMARK_CARD.json"
+    base_evidence_path = project_root / "docs/benchmark/evidence/qwen35-9b-base-v2-development-variance-20260827.json"
+    benchmark_manifest = _load_json(benchmark_manifest_path)
+    benchmark_card = _load_json(benchmark_card_path)
+    base_evidence = _load_json(base_evidence_path)
+    manifest_sha256 = _sha256(benchmark_manifest_path)
+    if manifest_sha256 != BENCHMARK_V2_MANIFEST_SHA256:
+        errors.append(f"Benchmark v2 manifest hash drifted: {manifest_sha256}")
+    if benchmark.get("version") != "studyhub-agentbench-v2":
+        errors.append("v3 must use StudyHub AgentBench v2")
+    if benchmark.get("revision") != benchmark_manifest.get("benchmark_revision"):
+        errors.append("training program benchmark revision does not match the frozen manifest")
+    if benchmark.get("status") != "FROZEN_FOR_BASELINE":
+        errors.append("training program benchmark must remain frozen")
+    if benchmark.get("manifest_sha256") != manifest_sha256:
+        errors.append("training program is not bound to the frozen Benchmark v2 manifest")
+    if benchmark_manifest.get("status") != "FROZEN_FOR_BASELINE":
+        errors.append("Benchmark v2 manifest is not frozen")
+    if benchmark_card.get("status") != "FROZEN_FOR_BASELINE":
+        errors.append("Benchmark v2 card is not frozen")
+    counts = benchmark_manifest.get("counts", {})
     regression_tasks = benchmark.get("regression", {}).get("tasks", 0)
     development_tasks = benchmark.get("development", {}).get("tasks", 0)
-    sealed_tasks = benchmark.get("sealed", {}).get("tasks", 0)
-    matrix_development = sum(item.get("development_tasks", 0) for item in capabilities)
-    matrix_sealed = sum(item.get("sealed_tasks", 0) for item in capabilities)
-    if not 100 <= regression_tasks <= 200:
-        errors.append("Regression must contain 100-200 tasks")
-    if not 800 <= development_tasks <= 1200:
-        errors.append("Development must contain 800-1200 tasks")
-    if not 400 <= sealed_tasks <= 600:
-        errors.append("Sealed must contain 400-600 tasks")
-    if development_tasks != matrix_development:
-        errors.append(f"Development task budget mismatch: program={development_tasks}, matrix={matrix_development}")
-    if sealed_tasks != matrix_sealed:
-        errors.append(f"Sealed task budget mismatch: program={sealed_tasks}, matrix={matrix_sealed}")
+    sealed_a_tasks = benchmark.get("sealed_a", {}).get("tasks", 0)
+    sealed_b_tasks = benchmark.get("sealed_b", {}).get("tasks", 0)
+    sealed_tasks = sealed_a_tasks + sealed_b_tasks
+    calibration_tasks = benchmark.get("calibration_challenge", {}).get("tasks", 0)
+    expected_counts = {
+        "regression": regression_tasks,
+        "development": development_tasks,
+        "sealed_a": sealed_a_tasks,
+        "sealed_b": sealed_b_tasks,
+        "calibration_challenge": calibration_tasks,
+    }
+    if counts != expected_counts:
+        errors.append(f"Benchmark v2 split counts mismatch: program={expected_counts}, manifest={counts}")
+    if sum(expected_counts.values()) != benchmark_card.get("tasks"):
+        errors.append("Benchmark v2 total does not match the committed card")
+    if base_evidence.get("benchmark_manifest_sha256") != manifest_sha256:
+        errors.append("9B Base evidence is not bound to the current Benchmark v2 manifest")
+    development_evidence = base_evidence.get("development", {})
+    variance_evidence = base_evidence.get("variance", {})
+    if development_evidence.get("episodes_scored") != development_tasks:
+        errors.append("9B Base Development evidence is incomplete")
+    if development_evidence.get("infra_excluded") != 0:
+        errors.append("9B Base Development contains infrastructure exclusions")
+    if variance_evidence.get("tasks_complete") != benchmark.get("variance_panel", {}).get("tasks"):
+        errors.append("9B Base variance task evidence is incomplete")
+    if variance_evidence.get("episodes_scored") != 140:
+        errors.append("9B Base variance rollout evidence is incomplete")
     external_names = {item.get("name") for item in benchmark.get("external", [])}
     required_external = {
-        "BFCL V4",
-        "tau3-bench",
-        "DeepResearch Bench",
-        "BrowseComp",
+        "BFCL V4 Agentic",
+        "tau2-bench",
+        "DeepResearch Bench II",
         "BrowseComp-Plus",
-        "GAIA or xbench-DeepSearch",
-        "HermesBench",
     }
-    if not required_external.issubset(external_names):
+    if external_names != required_external:
         errors.append("external benchmark stack is incomplete")
 
     data = program.get("data", {})
@@ -203,6 +259,102 @@ def validate_program(
     ]
     if oversized_sources:
         errors.append(f"SFT sources exceed the 25% cap: {oversized_sources}")
+    benchmark_isolation = sft.get("benchmark_isolation", {})
+    if benchmark_isolation.get("manifest_sha256") != manifest_sha256:
+        errors.append("SFT data contract is not bound to frozen Benchmark v2")
+    if benchmark_isolation.get("excluded_tasks") != sum(counts.values()):
+        errors.append("SFT data contract does not exclude every Benchmark v2 task")
+    if benchmark_isolation.get("public_and_hidden_prompt_hash_required") is not True:
+        errors.append("SFT contamination audit must cover public and hidden benchmark prompts")
+    if benchmark_isolation.get("sealed_content_visible_to_training") is not False:
+        errors.append("Sealed benchmark content must remain unavailable to the training pipeline")
+
+    if sft_data_card.get("status") != "ACCEPTED_FOR_SFT_GATE":
+        errors.append("runtime SFT v3 data card is not accepted for the SFT Gate")
+    card_rows = sft_data_card.get("rows", {})
+    if card_rows.get("candidate") != sft.get("candidate_trajectories"):
+        errors.append("runtime SFT candidate count differs from the training contract")
+    if card_rows.get("selected") != sft.get("final_trajectories"):
+        errors.append("runtime SFT selected count differs from the training contract")
+    if sum(card_rows.get(split, 0) for split in ("train", "validation", "protocol_holdout")) != card_rows.get(
+        "selected"
+    ):
+        errors.append("runtime SFT split counts do not sum to the selected total")
+    card_source_counts = sft_data_card.get("source_counts", {})
+    contract_source_counts = {item.get("source"): item.get("trajectories") for item in source_budget}
+    if card_source_counts != contract_source_counts:
+        errors.append("runtime SFT source counts differ from the training contract")
+    card_runtime = sft_data_card.get("runtime", {})
+    if card_runtime.get("runtime_native_share", 0) < sft.get("runtime_native_multi_turn_min_share", 0):
+        errors.append("accepted runtime SFT data is below the runtime-native share contract")
+    if card_runtime.get("max_source_share", 1) > sft.get("max_single_source_share", 0):
+        errors.append("accepted runtime SFT data exceeds the single-source cap")
+    card_tokens = sft_data_card.get("tokenization", {}).get("all_tokens", 0)
+    if not token_min <= card_tokens <= token_max:
+        errors.append("accepted runtime SFT token count is outside the contract")
+    card_isolation = sft_data_card.get("isolation", {})
+    if card_isolation.get("benchmark_manifest_sha256") != manifest_sha256:
+        errors.append("runtime SFT data card is not bound to frozen Benchmark v2")
+    if card_isolation.get("benchmark_prompt_overlap") != 0:
+        errors.append("runtime SFT data overlaps frozen Benchmark v2 prompts")
+    if card_isolation.get("2wiki_cross_split_support_titles") != 0:
+        errors.append("runtime SFT data has cross-split 2Wiki support-title leakage")
+    if card_isolation.get("2wiki_max_rows_per_document_component") != 1:
+        errors.append("runtime SFT 2Wiki document-component concentration exceeds one row")
+    quality_tiers = sft_data_card.get("quality_tiers", {})
+    if "teacher_verified" in quality_tiers:
+        errors.append("runtime SFT data must not claim unperformed teacher verification")
+    if sum(quality_tiers.values()) != card_rows.get("selected"):
+        errors.append("runtime SFT quality-tier counts do not cover every selected row")
+    if sft_data_card.get("audit", {}).get("status") != "PASS" or sft_data_card.get("audit", {}).get("failures") != 0:
+        errors.append("runtime SFT final audit has not passed")
+    gates = {item.get("id"): item for item in program.get("gates", [])}
+    if gates.get("G3", {}).get("status") != "PASSED":
+        errors.append("G3 must be passed after accepting the runtime SFT data card")
+
+    sft_training = program.get("training", {}).get("sft", {})
+    sft_gate = sft_training.get("gate", {})
+    if sft_gate.get("status") != "PASSED":
+        errors.append("the runtime SFT Gate must be recorded as passed")
+    if sft_gate.get("evidence_path") != "docs/training/evidence/runtime-sft-v3-9b-gate-20260827.json":
+        errors.append("the runtime SFT Gate evidence path is not pinned")
+    if sft_gate.get("trial") != sft_gate_evidence.get("trial"):
+        errors.append("the training program and Gate evidence reference different trials")
+    if sft_gate_evidence.get("status") != "PASSED" or sft_gate_evidence.get("evidence_grade") != "A_REAL_REPRODUCED":
+        errors.append("runtime SFT Gate evidence is not a passed real run")
+    gate_benchmark = sft_gate_evidence.get("benchmark_lock", {})
+    if gate_benchmark.get("benchmark_manifest_sha256") != manifest_sha256:
+        errors.append("runtime SFT Gate is not bound to frozen Benchmark v2")
+    gate_dataset = sft_gate_evidence.get("dataset_release", {})
+    if (
+        gate_dataset.get("release_status") != "ACCEPTED_FOR_SFT_GATE"
+        or gate_dataset.get("final_audit_status") != "PASS"
+    ):
+        errors.append("runtime SFT Gate did not use the accepted audited dataset release")
+    gate_recipe = sft_gate_evidence.get("recipe", {})
+    if gate_recipe.get("backend") != "fsdp:d2p1t1" or gate_recipe.get("gpus") != 2:
+        errors.append("runtime SFT Gate did not execute the required dual-GPU FSDP recipe")
+    gate_lora = sft_gate_evidence.get("lora_update", {})
+    if gate_lora.get("update_observed") is not True or gate_lora.get("initial_sha256") == gate_lora.get("final_sha256"):
+        errors.append("runtime SFT Gate does not prove a LoRA parameter update")
+    gate_step = sft_gate_evidence.get("optimizer_step", {})
+    if gate_step.get("sequences") != 8 or gate_step.get("assistant_loss_tokens", 0) <= 0:
+        errors.append("runtime SFT Gate optimizer-step evidence is incomplete")
+    gate_gpu = sft_gate_evidence.get("gpu", {})
+    guard_max = gate_gpu.get("guard_max_used_mib", 0)
+    per_gpu = gate_gpu.get("per_gpu", {})
+    if set(per_gpu) != {"0", "1"} or any(
+        metrics.get("peak_memory_used_mib", guard_max + 1) > guard_max for metrics in per_gpu.values()
+    ):
+        errors.append("runtime SFT Gate GPU evidence is missing or exceeded the guard")
+    if gates.get("G4", {}).get("status") != "GATE_PASSED_PROFILE_AND_FORMAL_PENDING":
+        errors.append("G4 must distinguish a passed diagnostic Gate from formal SFT promotion")
+    profiles = sft_training.get("profiles", {})
+    if profiles.get("status") != "PENDING" or {item.get("id") for item in profiles.get("candidates", [])} != {
+        "profile-r16",
+        "profile-r32",
+    }:
+        errors.append("equal-budget r16/r32 SFT profiles are not declared")
 
     rl = data.get("rl", {})
     if not 12000 <= rl.get("candidate_tasks", 0) <= 20000:
@@ -259,9 +411,7 @@ def validate_program(
         missing = sorted(EXPECTED_ALGORITHMS - algorithm_ids)
         extra = sorted(algorithm_ids - EXPECTED_ALGORITHMS)
         errors.append(f"algorithm set mismatch; missing={missing}, extra={extra}")
-    invalid_algorithm_statuses = sorted(
-        {item.get("status") for item in algorithms} - VALID_ALGORITHM_STATUSES
-    )
+    invalid_algorithm_statuses = sorted({item.get("status") for item in algorithms} - VALID_ALGORITHM_STATUSES)
     if invalid_algorithm_statuses:
         errors.append(f"invalid algorithm statuses: {invalid_algorithm_statuses}")
     algorithm_by_id = {item.get("id"): item for item in algorithms}
@@ -377,14 +527,19 @@ def validate_program(
         html = html_path.read_text(encoding="utf-8")
         required_html_tokens = [
             "9B Agentic Post-Training",
-            "160 Regression",
-            "1,005 Dev",
-            "500 Sealed",
-            "45k Runtime-native SFT",
+            "BENCHMARK v2 FROZEN",
+            "12 Regression",
+            "51 Dev",
+            "13 Sealed-A",
+            "12 Sealed-B",
+            "35 × 4",
+            "105,690 候选",
+            "48.5k Runtime-native SFT",
             "10k RL QA Pool",
             "500-update 9B GRPO Main",
             "Algorithm Decision Matrix",
-            "GPU TRAINING NOT STARTED",
+            "SFT GATE PASSED",
+            "PROFILE PENDING",
         ]
         missing_html = [token for token in required_html_tokens if token not in html]
         if missing_html:
@@ -396,15 +551,38 @@ def validate_program(
             errors.append(f"9B model directory is missing: {model_path}")
         elif len(list(model_path.glob("model.safetensors-*-of-*.safetensors"))) != 4:
             errors.append("9B model does not have the expected four safetensor shards")
+        artifact_paths = {
+            "candidate_jsonl_sha256": project_root / "datasets/interim/runtime_sft_v3/candidates.jsonl",
+            "candidate_manifest_sha256": project_root / "datasets/interim/runtime_sft_v3/candidates.manifest.json",
+            "selected_jsonl_sha256": project_root / "datasets/interim/runtime_sft_v3/selected.jsonl",
+            "selected_manifest_sha256": project_root / "datasets/interim/runtime_sft_v3/selected.manifest.json",
+            "token_manifest_sha256": project_root / "datasets/processed/runtime_sft_v3_qwen35_9b/manifest.json",
+            "final_audit_sha256": project_root / "datasets/processed/runtime_sft_v3_qwen35_9b/audit.json",
+        }
+        expected_artifact_hashes = sft_data_card.get("artifact_hashes", {})
+        for name, path in artifact_paths.items():
+            if not path.is_file():
+                errors.append(f"runtime SFT artifact is missing: {path}")
+            elif _sha256(path) != expected_artifact_hashes.get(name):
+                errors.append(f"runtime SFT artifact hash mismatch: {name}")
 
     summary = {
         "program_id": program.get("program_id"),
         "status": program.get("status"),
         "capabilities": len(capabilities),
+        "benchmark_version": benchmark.get("version"),
+        "benchmark_manifest_sha256": manifest_sha256,
         "regression_tasks": regression_tasks,
         "development_tasks": development_tasks,
         "sealed_tasks": sealed_tasks,
+        "calibration_challenge_tasks": calibration_tasks,
+        "base_development_scored": development_evidence.get("episodes_scored"),
+        "base_variance_scored": variance_evidence.get("episodes_scored"),
         "sft_final_trajectories": sft.get("final_trajectories"),
+        "sft_data_status": sft_data_card.get("status"),
+        "sft_all_tokens": card_tokens,
+        "sft_gate_status": sft_gate.get("status"),
+        "sft_gate_trial": sft_gate.get("trial"),
         "rl_post_qa_tasks": rl.get("post_qa_tasks"),
         "initial_grpo_updates": grpo.get("initial_optimizer_updates"),
         "algorithms": len(algorithms),

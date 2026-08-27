@@ -13,6 +13,8 @@
   ],
   "state_rule": "A capability advances only when evidence for the named stage exists. An adapter or tool schema alone is CONTRACT_ONLY.",
   "legacy_rule": "The 4B v2 pilot is historical evidence and never advances a 9B v3 capability state.",
+  "coverage_budget_status": "SUPERSEDED_BY_STUDYHUB_AGENTBENCH_V2_MANIFEST",
+  "coverage_budget_note": "The per-capability development_tasks and sealed_tasks fields are retained as the original scale-up proposal, not as claims about frozen Benchmark v2 composition. Actual v2 counts and source/template isolation are authoritative in benchmarks/studyhub-agent-v2/manifest.json.",
   "capabilities": [
     {
       "id": "direct_answer_abstention",

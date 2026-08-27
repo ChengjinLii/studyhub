@@ -27,6 +27,23 @@ if manifest.get("status") == "FROZEN_FOR_BASELINE":
 PY
 )"
 fi
+# An interrupted rebuild leaves the worktree manifest in candidate state. Recover
+# the last frozen builder from Git instead of silently rebinding the benchmark to HEAD.
+if [[ -z "${BUILDER_COMMIT:-}" ]]; then
+  REPO_ROOT="$(git rev-parse --show-toplevel)"
+  MANIFEST_REL="$(realpath --relative-to="$REPO_ROOT" "$PROJECT_ROOT/benchmarks/studyhub-agent-v2/manifest.json")"
+  BUILDER_COMMIT="$(git show "HEAD:${MANIFEST_REL}" 2>/dev/null | "$PYTHON_BIN" -c '
+import json
+import sys
+
+try:
+    manifest = json.load(sys.stdin)
+except (json.JSONDecodeError, OSError):
+    manifest = {}
+if manifest.get("status") == "FROZEN_FOR_BASELINE":
+    print(manifest.get("builder_commit", ""))
+' || true)"
+fi
 BUILDER_COMMIT="${BUILDER_COMMIT:-$(git rev-parse HEAD)}"
 if ! git cat-file -e "${BUILDER_COMMIT}^{commit}"; then
   printf 'invalid builder commit: %s\n' "$BUILDER_COMMIT" >&2
@@ -84,7 +101,12 @@ fi
 "$PYTHON_BIN" scripts/benchmark/v2/generate_review_packs.py
 "$PYTHON_BIN" scripts/benchmark/external/validate_registry.py
 "$PYTHON_BIN" scripts/benchmark/external/smoke.py
-"$PYTEST_BIN" tests/unit/benchmark_v1 tests/unit/benchmark_v2 tests/unit/external_benchmarks
+calibration_contract_test="tests/unit/benchmark_v2/test_contracts.py::test_development_and_variance_evidence_is_bound_and_complete"
+"$PYTEST_BIN" \
+  tests/unit/benchmark_v1 \
+  tests/unit/benchmark_v2 \
+  tests/unit/external_benchmarks \
+  --deselect "$calibration_contract_test"
 "$RUFF_BIN" check src/studyhub_agent/benchmark_v2 scripts/benchmark/v2 scripts/benchmark/external external_benchmarks tests/unit/benchmark_v2 tests/unit/external_benchmarks
 "$RUFF_BIN" format --check src/studyhub_agent/benchmark_v2 scripts/benchmark/v2 scripts/benchmark/external external_benchmarks tests/unit/benchmark_v2 tests/unit/external_benchmarks
 "$PYTHON_BIN" scripts/benchmark/secret_scan.py
@@ -92,5 +114,6 @@ fi
 "$PYTHON_BIN" scripts/benchmark/v2/generate_docs.py
 "$PYTHON_BIN" scripts/benchmark/v2/validate_manifest.py --require-frozen
 "$PYTHON_BIN" scripts/benchmark/v2/validate_calibration.py
+"$PYTEST_BIN" "$calibration_contract_test"
 
 printf 'StudyHub AgentBench v2 quality gate passed for builder commit %s\n' "$BUILDER_COMMIT"

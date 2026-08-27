@@ -15,12 +15,21 @@ def test_committed_v3_program_is_internally_consistent() -> None:
     assert errors == []
     assert summary == {
         "program_id": "studyhub-9b-agentic-post-training-v3",
-        "status": "DESIGN_FROZEN_PENDING_BENCHMARK_V1",
+        "status": "BENCHMARK_V2_FROZEN_BASE_CALIBRATED_SFT_GATE_PASSED_PROFILE_PENDING",
         "capabilities": len(EXPECTED_CAPABILITIES),
-        "regression_tasks": 160,
-        "development_tasks": 1005,
-        "sealed_tasks": 500,
-        "sft_final_trajectories": 45000,
+        "benchmark_version": "studyhub-agentbench-v2",
+        "benchmark_manifest_sha256": "da804b10f53dec585255598c3e256445b8ade3acf35fd8c766ca0ab4d759c88b",
+        "regression_tasks": 12,
+        "development_tasks": 51,
+        "sealed_tasks": 25,
+        "calibration_challenge_tasks": 10,
+        "base_development_scored": 51,
+        "base_variance_scored": 140,
+        "sft_final_trajectories": 48500,
+        "sft_data_status": "ACCEPTED_FOR_SFT_GATE",
+        "sft_all_tokens": 61725581,
+        "sft_gate_status": "PASSED",
+        "sft_gate_trial": "gate-seed-20260827-20260827_233653",
         "rl_post_qa_tasks": 10000,
         "initial_grpo_updates": 500,
         "algorithms": len(EXPECTED_ALGORITHMS),
@@ -41,5 +50,8 @@ def test_v3_plan_has_human_and_machine_readable_entry_points() -> None:
     assert (PROJECT / "configs/program-v3/training-program-v3.json").is_file()
     assert (PROJECT / "configs/program-v3/capability-matrix-v1.json").is_file()
     assert (PROJECT / "configs/program-v3/algorithm-decision-matrix-v1.json").is_file()
+    assert (PROJECT / "configs/program-v3/runtime-sft-v3-data-card.json").is_file()
+    assert (PROJECT / "docs/training/RUNTIME_SFT_V3_DATA_CARD.md").is_file()
+    assert (PROJECT / "docs/training/evidence/runtime-sft-v3-9b-gate-20260827.json").is_file()
     assert (PROJECT / "research/primary-source-review.md").is_file()
     assert (PROJECT / "design-defects/index.json").is_file()

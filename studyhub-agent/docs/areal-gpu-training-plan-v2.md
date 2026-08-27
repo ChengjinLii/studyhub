@@ -1,7 +1,7 @@
 # StudyHub Agent V2 GPU 训练方案（评审版）
 
 > **历史 v2 方案。** 本文保留用于版本追溯，不再作为当前训练入口。现行方案见
-> `StudyHub_9B_Agentic_Post_Training_Program_v3.html`，其主线为 Benchmark v1
+> `StudyHub_9B_Agentic_Post_Training_Program_v3.html`，其主线为 Benchmark v2
 > → 9B Base → runtime-native 9B SFT → path-agnostic 9B GRPO。
 
 ## 1. 方案基线

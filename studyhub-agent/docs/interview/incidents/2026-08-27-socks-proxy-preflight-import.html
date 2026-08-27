@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>Incident · SOCKS Proxy Preflight Import</title>
+  <style>
+    :root {
+      --ink: #173a31;
+      --muted: #5d6d67;
+      --paper: #f4f0e5;
+      --paper-2: #e8e0cc;
+      --green: #2f7d61;
+      --gold: #d3a62f;
+      --rust: #b85f3e;
+      --line: rgba(23, 58, 49, .18);
+      --serif: "Iowan Old Style", "Noto Serif SC", Georgia, serif;
+      --sans: "IBM Plex Sans", "Noto Sans SC", sans-serif;
+      --mono: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      color: var(--ink);
+      background:
+        repeating-linear-gradient(0deg, rgba(23,58,49,.025) 0 1px, transparent 1px 28px),
+        var(--paper);
+      font-family: var(--sans);
+      line-height: 1.72;
+    }
+    a { color: inherit; }
+    code, pre { font-family: var(--mono); }
+    code { padding: .1rem .32rem; background: rgba(47,125,97,.09); border-radius: .25rem; overflow-wrap: anywhere; }
+    pre {
+      padding: 1.15rem 1.25rem;
+      overflow: auto;
+      color: #edf4ef;
+      background: #102c25;
+      border-left: 5px solid var(--gold);
+      font-size: .8rem;
+      line-height: 1.58;
+    }
+    .rail { height: 6px; background: linear-gradient(90deg, var(--rust) 0 28%, var(--gold) 28% 52%, var(--green) 52%); }
+    header {
+      position: relative;
+      overflow: hidden;
+      padding: 4.6rem max(1.2rem, calc((100vw - 1120px) / 2)) 3.8rem;
+      color: #eef3e9;
+      background:
+        radial-gradient(circle at 84% 15%, rgba(211,166,47,.25), transparent 24%),
+        linear-gradient(145deg, #184236, #102c25 74%);
+    }
+    header::after {
+      content: "7892";
+      position: absolute;
+      right: max(1rem, calc((100vw - 1120px) / 2));
+      bottom: -4rem;
+      color: rgba(255,255,255,.04);
+      font: 800 clamp(9rem, 22vw, 18rem)/1 var(--serif);
+      letter-spacing: -.08em;
+    }
+    .back, .kicker, h1, .lead, .facts { position: relative; z-index: 1; }
+    .back { display: inline-block; margin-bottom: 2.8rem; color: rgba(238,243,233,.62); font-size: .75rem; text-decoration: none; }
+    .kicker { color: var(--gold); font-size: .69rem; font-weight: 800; letter-spacing: .16em; }
+    h1 { max-width: 900px; margin: 1rem 0 1.2rem; font: 700 clamp(3rem, 7vw, 6.3rem)/.94 var(--serif); letter-spacing: -.05em; }
+    .lead { max-width: 820px; margin: 0; color: rgba(238,243,233,.7); font: 1.18rem/1.65 var(--serif); }
+    .facts { display: grid; grid-template-columns: repeat(5, 1fr); margin-top: 3rem; border-block: 1px solid rgba(255,255,255,.17); }
+    .fact { padding: 1rem .9rem 1rem 0; }
+    .fact + .fact { padding-left: .9rem; border-left: 1px solid rgba(255,255,255,.17); }
+    .fact strong { display: block; font: 700 1.35rem/1.1 var(--serif); }
+    .fact span { color: rgba(238,243,233,.5); font-size: .62rem; letter-spacing: .07em; }
+    .wrap { width: min(1120px, calc(100% - 2.4rem)); margin: 3.7rem auto 5rem; }
+    .summary { padding: 1.4rem 1.55rem; background: rgba(255,255,255,.55); border: 1px solid var(--line); border-left: 5px solid var(--gold); box-shadow: 0 20px 45px rgba(23,58,49,.09); }
+    h2 { margin: 4.2rem 0 1.2rem; padding-top: .9rem; border-top: 3px solid var(--ink); font: 700 clamp(1.9rem, 4vw, 2.75rem)/1.1 var(--serif); }
+    h3 { margin: 0 0 .4rem; font: 700 1.2rem/1.25 var(--serif); }
+    .timeline, .hypotheses, .grid, .answers { display: grid; gap: 1rem; }
+    .timeline { grid-template-columns: repeat(4, 1fr); }
+    .step, .hypothesis, .card { padding: 1.1rem; background: rgba(255,255,255,.42); border: 1px solid rgba(23,58,49,.1); }
+    .step { border-top: 4px solid var(--green); }
+    .step.bad { border-color: var(--rust); }
+    .step small, .hypothesis small { color: var(--rust); font: .67rem var(--mono); }
+    .hypotheses { grid-template-columns: repeat(4, 1fr); }
+    .hypothesis { border-left: 4px solid var(--rust); font-size: .82rem; }
+    .hypothesis.root { border-color: var(--green); }
+    .grid { grid-template-columns: 1fr 1fr; }
+    .card { border-top: 4px solid var(--gold); }
+    table { width: 100%; border-collapse: collapse; font-size: .8rem; }
+    th { padding: .8rem; color: #eef3e9; background: var(--ink); text-align: left; }
+    td { padding: .8rem; border-bottom: 1px solid var(--line); vertical-align: top; }
+    .yes { color: var(--green); font-weight: 800; }
+    .no { color: var(--rust); font-weight: 800; }
+    .answers { grid-template-columns: .72fr 1.28fr; margin-top: 4rem; }
+    .answer { padding: 1.35rem; color: #edf4ef; background: var(--ink); border-top: 4px solid var(--gold); font-size: .84rem; }
+    .answer b { display: block; margin-bottom: .65rem; color: var(--gold); letter-spacing: .1em; }
+    footer { margin-top: 4rem; padding-top: 1rem; color: var(--muted); border-top: 1px solid var(--line); font-size: .72rem; }
+    @media (max-width: 820px) {
+      .facts, .timeline, .hypotheses, .grid, .answers { grid-template-columns: 1fr; }
+      .fact + .fact { padding-left: 0; border-left: 0; border-top: 1px solid rgba(255,255,255,.17); }
+    }
+  </style>
+</head>
+<body>
+  <div class="rail"></div>
+  <header>
+    <a class="back" href="../index.html">← 返回面试知识档案</a>
+    <div class="kicker">A_REAL_REPRODUCED · INFRA / PREFLIGHT · 2026-08-27</div>
+    <h1>SOCKS Proxy<br>Preflight Import</h1>
+    <p class="lead">9B SFT 预检在加载本地 AReaL 配置链时失败。问题与模型、GPU 和训练数据无关，而是离线 Python 导入继承了服务器 SOCKS 代理，触发了 HTTPX 的可选依赖检查。</p>
+    <div class="facts">
+      <div class="fact"><strong>1 → 0</strong><span>IMPORT EXIT</span></div>
+      <div class="fact"><strong>7892</strong><span>ONLY PROXY PORT</span></div>
+      <div class="fact"><strong>0 GPU</strong><span>REPRO COST</span></div>
+      <div class="fact"><strong>1 UPDATE</strong><span>FULL GATE AFTER FIX</span></div>
+      <div class="fact"><strong>A</strong><span>EVIDENCE GRADE</span></div>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <div class="summary"><strong>30 秒结论：</strong>服务器环境同时设置了 HTTP 代理和 <code>ALL_PROXY=socks5://127.0.0.1:7892</code>。AReaL 的日志依赖链加载 Trackio/Gradio 时，Gradio 在 import 阶段创建 HTTPX Client；HTTPX 发现 SOCKS 代理后要求未安装的 <code>socksio</code>，预检因此在 GPU 启动前退出。由于该预检只读取本地模型、数据和配置，最小修复是在导入 AReaL 前清除六个代理变量，而不是修改上游或安装无关依赖。</div>
+
+    <h2>发生了什么</h2>
+    <div class="timeline">
+      <article class="step"><small>01 / LOCAL PREFLIGHT</small><h3>加载 AReaL 配置</h3><p>尚未启动 CUDA、模型或 optimizer。</p></article>
+      <article class="step bad"><small>02 / IMPORT CHAIN</small><h3>Trackio → Gradio</h3><p><code>gradio.processing_utils</code> 在 import 时创建 HTTPX Client。</p></article>
+      <article class="step bad"><small>03 / ENVIRONMENT</small><h3>HTTPX 读取 SOCKS</h3><p><code>ALL_PROXY</code> 指向本机 7892，但环境没有 <code>socksio</code>。</p></article>
+      <article class="step"><small>04 / FAIL CLOSED</small><h3>训练未启动</h3><p>错误被留在 preflight 阶段，没有占用共享 GPU。</p></article>
+    </div>
+    <pre>trackio
+  → gradio
+    → gradio.processing_utils
+      → httpx.Client(...)
+        → HTTPTransport(proxy="socks5://127.0.0.1:7892")
+          → ImportError: Using SOCKS proxy, but the 'socksio' package is not installed.</pre>
+
+    <h2>竞争假设</h2>
+    <div class="hypotheses">
+      <article class="hypothesis"><small>排除</small><h3>AReaL 安装损坏</h3><p>清除代理后，同一解释器、同一 site-packages 可以正常 import。</p></article>
+      <article class="hypothesis"><small>部分事实，不是根因</small><h3>缺少 socksio</h3><p>确实未安装，但本地预检本不应建立 SOCKS transport；补包会掩盖边界错误。</p></article>
+      <article class="hypothesis root"><small>根因</small><h3>代理泄漏到离线阶段</h3><p>进程继承 <code>ALL_PROXY</code>，让一个不需要网络的 import 进入可选 SOCKS 路径。</p></article>
+      <article class="hypothesis"><small>排除</small><h3>GPU / FSDP 配置</h3><p>最小复现只执行 <code>import trackio</code>，不触发 CUDA。</p></article>
+    </div>
+
+    <h2>最小修复</h2>
+    <div class="grid">
+      <article class="card"><h3>预检内清理</h3><p><code>preflight_runtime_sft_v3.py</code> 在任何 AReaL import 前移除 <code>ALL_PROXY</code>、<code>HTTP_PROXY</code>、<code>HTTPS_PROXY</code> 及其小写变量。</p></article>
+      <article class="card"><h3>启动器双保险</h3><p><code>run_runtime_sft_v3.sh</code> 在调用预检和 trainer 前执行相同清理。没有修改 AReaL、Trackio、Gradio 或 HTTPX。</p></article>
+      <article class="card"><h3>为什么不装 socksio</h3><p>安装可选依赖会让 import 通过，但离线训练仍会无意继承网络代理。正确修复是明确阶段边界。</p></article>
+      <article class="card"><h3>为什么不全局删代理</h3><p>只对当前本地训练子进程清理。需要联网下载或 Web rollout 的流程必须单独、显式配置 <code>127.0.0.1:7892</code>。</p></article>
+    </div>
+
+    <h2>同协议回归</h2>
+    <table>
+      <thead><tr><th>条件</th><th>命令边界</th><th>结果</th><th>SHA256</th></tr></thead>
+      <tbody>
+        <tr><td>保留服务器代理</td><td>同一 venv，仅 <code>import trackio</code></td><td class="no">exit 1 / socksio ImportError</td><td><code>99eedf02f413c08b189927ba447d2354ea811c4393206ea6ffce52266a2f2a12</code></td></tr>
+        <tr><td>清除六个代理变量</td><td>同一 venv，仅 <code>import trackio</code></td><td class="yes">exit 0 / IMPORT_OK</td><td><code>182210181d1cc69014904c7de328d3ef941c366c24c9e594b5a4a9d4f25a6c5d</code></td></tr>
+        <tr><td>完整 9B SFT Gate</td><td>双 H100、AReaL FSDP、1 optimizer update</td><td class="yes">exit 0 / LoRA hash changed</td><td><a href="../../training/evidence/runtime-sft-v3-9b-gate-20260827.json">提交的 Gate 证据</a></td></tr>
+      </tbody>
+    </table>
+    <p>受控复现原始日志保存在忽略目录 <code>artifacts/experiments/preflight-proxy-import-20260827/</code>。可提交证据只记录结论、哈希和代码边界，不提交本机运行产物。</p>
+
+    <h2>残余风险</h2>
+    <div class="grid">
+      <article class="card"><h3>联网任务需要另一份合同</h3><p>Web Search 或依赖下载不能继承本地训练的“清代理”假设，应显式声明网络阶段、代理端口和失败策略。</p></article>
+      <article class="card"><h3>依赖链可能变化</h3><p>Trackio/Gradio 后续版本可能改变 import 副作用。Preflight 回归应继续验证：本地检查不建立网络 transport，也不启动 GPU。</p></article>
+    </div>
+
+    <div class="answers">
+      <article class="answer"><b>60 秒回答</b>9B SFT Gate 前，AReaL 配置预检在 Python import 阶段报 SOCKS 依赖错误。我先做最小复现，发现同一 venv 下保留代理时 <code>import trackio</code> 退出 1，清除代理后退出 0，因此排除了模型、GPU 和 AReaL 安装损坏。根因是离线预检继承了 <code>ALL_PROXY=socks5://127.0.0.1:7892</code>，Gradio import 时创建 HTTPX Client，触发了未安装的 socksio。修复是在 AReaL import 前局部清除代理变量，并在 launcher 做双保险，不修改上游也不安装掩盖问题的依赖。之后完整双 H100 Gate 完成一次优化器更新，初始和最终 LoRA hash 不同。</article>
+      <article class="answer"><b>3 分钟追问</b>这个案例的关键不是“缺包就装包”，而是先判断阶段语义。预检只读取本地配置、模型和数据，不应该因为 shell 的网络代理进入 HTTPX SOCKS 分支。我比较了四个假设：AReaL 损坏、socksio 缺失、代理泄漏、GPU 配置错误。无 GPU 的同解释器 A/B import 把根因缩到代理继承；socksio 缺失只是触发条件。最小修复只影响训练子进程，保留其他联网任务使用 7892 的能力。回归分两层：第一层是 import 前后 exit 1→0，并保存日志 hash；第二层是真实 9B Gate，验证 preflight、FSDP、assistant-only loss、checkpoint 导出和 LoRA 更新。边界是该 Gate 仍不证明模型质量，且未来联网 rollout 要有独立代理合同。</article>
+    </div>
+
+    <footer>StudyHub Agent · Evidence Engineering · 原始复现 2026-08-27 · 分类 A_REAL_REPRODUCED</footer>
+  </main>
+</body>
+</html>

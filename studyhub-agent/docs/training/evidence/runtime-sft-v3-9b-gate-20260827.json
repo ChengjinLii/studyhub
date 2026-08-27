@@ -1,0 +1,136 @@
+{
+  "schema_version": "studyhub.runtime-sft-gate-evidence.v3",
+  "status": "PASSED",
+  "evidence_grade": "A_REAL_REPRODUCED",
+  "trial": "gate-seed-20260827-20260827_233653",
+  "run_mode": "runtime-sft-v3-9b-gate",
+  "started_at": "2026-08-27T23:37:20+08:00",
+  "finished_at": "2026-08-27T23:39:33+08:00",
+  "git": {
+    "commit": "4b66674fbdc968f4d814b129b2afcf1ea3897406",
+    "branch": "main",
+    "status": "M studyhub-agent/README.md\n M studyhub-agent/configs/program-v3/algorithm-decision-matrix-v1.json\n M studyhub-agent/configs/program-v3/capability-matrix-v1.json\n M studyhub-agent/configs/program-v3/training-program-v3.json\n M studyhub-agent/docs/StudyHub_9B_Agentic_Post_Training_Program_v3.html\n M studyhub-agent/docs/areal-gpu-training-plan-v2.md\n M studyhub-agent/docs/benchmark/9B_BASE_V2_CALIBRATION.md\n M studyhub-agent/scripts/benchmark/v2/validate_calibration.py\n M studyhub-agent/scripts/train/build_experiment_evidence.py\n M studyhub-agent/scripts/train/capture_run_metadata.py\n M studyhub-agent/scripts/train/validate_v3_program.py\n M studyhub-agent/src/studyhub_agent/trajectory/__init__.py\n M studyhub-agent/tests/unit/benchmark_v2/test_contracts.py\n M studyhub-agent/tests/unit/training/test_experiment_evidence.py\n M studyhub-agent/tests/unit/training/test_v3_program.py\n M studyhub-agent/training/sft/open_bootstrap_driver.py\n?? studyhub-agent/configs/program-v3/runtime-sft-v3-data-card.json\n?? studyhub-agent/configs/train/runtime-sft-v3-qwen35-9b.yaml\n?? studyhub-agent/docs/benchmark/evidence/qwen35-9b-base-v2-development-variance-20260827.json\n?? studyhub-agent/docs/training/\n?? studyhub-agent/scripts/data/audit_runtime_sft_v3.py\n?? studyhub-agent/scripts/data/build_runtime_sft_v3.py\n?? studyhub-agent/scripts/data/select_runtime_sft_v3.py\n?? studyhub-agent/scripts/data/tokenize_runtime_sft_v3.py\n?? studyhub-agent/scripts/train/preflight_runtime_sft_v3.py\n?? studyhub-agent/scripts/train/run_runtime_sft_v3.sh\n?? studyhub-agent/src/studyhub_agent/trajectory/runtime_sft.py\n?? studyhub-agent/tests/unit/training/test_capture_run_metadata.py\n?? studyhub-agent/tests/unit/training/test_runtime_sft_v3_data.py\n?? studyhub-agent/tests/unit/training/test_runtime_sft_v3_launcher.py",
+    "dirty_patch_sha256": "71a46558fd799ecc163eef055ec351625be351856809e7b9e52e16efa9b54082",
+    "dirty_patch_bytes": 89442,
+    "untracked_file_sha256": {
+      "studyhub-agent/configs/program-v3/runtime-sft-v3-data-card.json": "fdf58242c78fbf5e34ff785c4a8e6d155e253e7ecabd4973dc86228477997cbb",
+      "studyhub-agent/configs/train/runtime-sft-v3-qwen35-9b.yaml": "cebb2f94cfe971751394078278461715689e63ac37dd10b338f41de16ea8c879",
+      "studyhub-agent/docs/benchmark/evidence/qwen35-9b-base-v2-development-variance-20260827.json": "6b880a5d63cf7e78bd82612bc8f5dd72a4da53dce8bf523a4b722e7fb22ef580",
+      "studyhub-agent/docs/training/RUNTIME_SFT_V3_DATA_CARD.md": "3a06715a466136a0e0503f4359ed7a578334e4b2df5779cdeab15dcea685dd92",
+      "studyhub-agent/scripts/data/audit_runtime_sft_v3.py": "caa3448dece3eac212576732e09dc9150dd5bb5a43963d8b8285948d364989b5",
+      "studyhub-agent/scripts/data/build_runtime_sft_v3.py": "6cc6980678212414ef0056035fcceeefd2f3a07c98f88f79589e1ab2f092d26d",
+      "studyhub-agent/scripts/data/select_runtime_sft_v3.py": "0d354f867c7e9725679921e27789c2aa4d1a3447a50f4f17abf334ce666d4afb",
+      "studyhub-agent/scripts/data/tokenize_runtime_sft_v3.py": "c86e1007c5d9d5ca91e0be91601ee4b81e23aa82ebaca27bc546e711c3f12844",
+      "studyhub-agent/scripts/train/preflight_runtime_sft_v3.py": "1dbeb3840a99f828b52c2829ea9d1a880230861ac371c63b82697dca32244b6e",
+      "studyhub-agent/scripts/train/run_runtime_sft_v3.sh": "2cdcc3d413aab435abd994e1961a7204859fd668c3aa281d84ebbf9926ad3560",
+      "studyhub-agent/src/studyhub_agent/trajectory/runtime_sft.py": "8f99ff36d778b92e32afb5bb183221f86fe132dcedbf20eeaab72c49efbb46e3",
+      "studyhub-agent/tests/unit/training/test_capture_run_metadata.py": "b85f22f4cd39c9adf4b8bdac7cc60c6e236925edad255ae3682768ff33b34037",
+      "studyhub-agent/tests/unit/training/test_runtime_sft_v3_data.py": "758d45661eb04e2f5bc37a561843f0ca8e0abb85b74c37c139060f62439801d3",
+      "studyhub-agent/tests/unit/training/test_runtime_sft_v3_launcher.py": "3a6500d9b85419dbc342da2984fb3d6e96139ba76980343f320fba3a03066e42"
+    }
+  },
+  "model": {
+    "path": "/data/chengjin/studyhub/models/P1/Qwen3.5-9B",
+    "revision": "c202236235762e1c871ad0ccb60c8ee5ba337b9a",
+    "weight_sha256": [
+      "db6f444b43d318c92f360a13a25561a6a65b10c0631b8ed305a426dbaa6c380e",
+      "31c7d7e2dd5d207840b31cc59083c8f4c4718959149e0358c0364052bb9a0330",
+      "7ec36ba3a4176a44c3c0876ad80c56a2f70c84bf008d82e9501df642f17dadec",
+      "b62b0c4cd7e44edee103ee8f4fe225f246d5e768e07bfd5f25b63a8aa1fdd0c6"
+    ]
+  },
+  "dataset_release": {
+    "dataset_id": "studyhub-runtime-sft-v3-qwen35-9b",
+    "release_status": "ACCEPTED_FOR_SFT_GATE",
+    "final_audit_status": "PASS",
+    "tokenization_stage_status": "TOKENIZED_PENDING_FINAL_AUDIT",
+    "note": "The tokenization manifest is an immutable stage record; the data card is the final audited release decision."
+  },
+  "benchmark_lock": {
+    "benchmark_version": "studyhub-agentbench-v2",
+    "benchmark_revision": "2.0.0",
+    "benchmark_status": "FROZEN_FOR_BASELINE",
+    "benchmark_tasks": 98,
+    "benchmark_manifest_sha256": "da804b10f53dec585255598c3e256445b8ade3acf35fd8c766ca0ab4d759c88b",
+    "benchmark_source_inventory_sha256": "f88947a8f2faabdad3a9f5376a654323b898e1cf4d24ee2aadc6db6d74167275"
+  },
+  "recipe": {
+    "backend": "fsdp:d2p1t1",
+    "gpus": 2,
+    "dtype": "bfloat16",
+    "lora_rank": 16,
+    "lora_alpha": 16,
+    "target_modules": [
+      "o_proj",
+      "gate_proj",
+      "up_proj",
+      "down_proj"
+    ],
+    "global_batch_size": 8,
+    "steps": 1,
+    "learning_rate": 2e-05,
+    "loss_contract": "assistant actions and final answers only; system, user and tool observations have loss mask 0"
+  },
+  "optimizer_step": {
+    "loss": 0.51857,
+    "perplexity": 1.6827,
+    "gradient_norm": 0.40752,
+    "entropy": 0.27909,
+    "sequences": 8,
+    "tokens": 9934,
+    "assistant_loss_tokens": 1402,
+    "train_step_seconds": 11.142,
+    "checkpoint_save_seconds": 10.949
+  },
+  "lora_update": {
+    "initial_sha256": "42e4a35fad189ac42637e1ee693e3342a4ba8145ed2919ed0ff1ac45372e4569",
+    "final_sha256": "f4ba36ee7524495d6a4184d3872026aba2769bd07a15ec47e90d70b4e59e7872",
+    "bytes": 52459456,
+    "update_observed": true
+  },
+  "gpu": {
+    "guard_max_used_mib": 72000,
+    "per_gpu": {
+      "0": {
+        "peak_memory_used_mib": 61748.0,
+        "mean_memory_used_mib": 22479.869565217392,
+        "peak_utilization_gpu_pct": 100.0,
+        "mean_utilization_gpu_pct": 9.347826086956522
+      },
+      "1": {
+        "peak_memory_used_mib": 45757.0,
+        "mean_memory_used_mib": 17688.217391304348,
+        "peak_utilization_gpu_pct": 100.0,
+        "mean_utilization_gpu_pct": 9.695652173913043
+      }
+    }
+  },
+  "raw_evidence": {
+    "run_metadata": {
+      "path": "/data/chengjin/studyhub/studyhub-agent/artifacts/areal/launcher_logs/runtime-sft-v3-9b/gate-seed-20260827-20260827_233653.run.json",
+      "sha256": "689266d9351c2630a661719730e915250db340c151923c06ec75100279ecf3ba"
+    },
+    "bundle_manifest": {
+      "path": "/data/chengjin/studyhub/studyhub-agent/artifacts/experiments/gate-seed-20260827-20260827_233653/manifest.json",
+      "sha256": "01f359525a1b78683c5cf648a9730e7104f257aa0e1adb1e664136890388ed08"
+    },
+    "bundle_checksums": {
+      "path": "/data/chengjin/studyhub/studyhub-agent/artifacts/experiments/gate-seed-20260827-20260827_233653/SHA256SUMS",
+      "sha256": "61e8f3f291f2a959b4067271157c8e625dac3371b9119fb6a4e622f544c0a6be"
+    },
+    "training_log": {
+      "path": "/data/chengjin/studyhub/studyhub-agent/artifacts/areal/launcher_logs/runtime-sft-v3-9b/gate-seed-20260827-20260827_233653.log",
+      "sha256": "a2de9a4c7f4b167485c5db3f90f7112652d06a8c9f0f94189010d80a7161a556"
+    },
+    "gpu_telemetry": {
+      "path": "/data/chengjin/studyhub/studyhub-agent/artifacts/areal/launcher_logs/runtime-sft-v3-9b/gate-seed-20260827-20260827_233653.gpu.csv",
+      "sha256": "0040c305571a9c3b6dde41af4b287acfca72abaac688f2002f4e009bf45da8bc"
+    }
+  },
+  "claim_boundary": "This Gate proves one guarded dual-H100 AReaL SFT optimizer update, checkpoint export, and evidence capture. It does not establish SFT quality, generalization, or promotion to RL.",
+  "next_action": "Run equal-budget r16 and r32 profiles before selecting the formal SFT recipe.",
+  "generator": {
+    "path": "/data/chengjin/studyhub/studyhub-agent/scripts/train/promote_runtime_sft_gate.py",
+    "sha256": "6a9671511f5da52b0cb42db3a17c765e3994a9b731309d0da614ca25567366ba"
+  }
+}

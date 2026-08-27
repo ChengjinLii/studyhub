@@ -1,0 +1,129 @@
+{
+  "schema_version": "studyhub.agentbench-calibration-record.v2",
+  "calibration_version": "qwen35-9b-base-development-variance-20260827.1",
+  "benchmark_version": "studyhub-agentbench-v2",
+  "benchmark_revision": "2.0.0",
+  "benchmark_manifest_sha256": "da804b10f53dec585255598c3e256445b8ade3acf35fd8c766ca0ab4d759c88b",
+  "builder_commit": "61ca5f77cfa827c35580c108596a185ba369d253",
+  "model": {
+    "repository": "Qwen/Qwen3.5-9B",
+    "revision": "c202236235762e1c871ad0ccb60c8ee5ba337b9a"
+  },
+  "runtime": {
+    "hermes_commit": "5c1a304ce890276a4334d8ced3f29ffeedbbbf93",
+    "areal_commit": "cbff54d645d2cd8ee1f1c358a82f3f473588433d",
+    "sglang": "0.5.10.post1",
+    "optimizer_steps": 0,
+    "workers": 2,
+    "gpus": [0, 1]
+  },
+  "development": {
+    "run_id": "qwen35-9b-base-v2-development-seed-20260827-20260827_212818",
+    "run_commit": "4b66674fbdc968f4d814b129b2afcf1ea3897406",
+    "working_tree_dirty": false,
+    "status": "COMPLETED",
+    "seed": 20260827,
+    "temperature": 0.0,
+    "episodes_expected": 51,
+    "episodes_scored": 51,
+    "infra_excluded": 0,
+    "strict_success_rate": 0.117647,
+    "strict_success_ci95": [0.039216, 0.215686],
+    "mean_diagnostic_score": 0.283758,
+    "mean_score_ci95": [0.196078, 0.375915],
+    "macro_capability_strict_success": 0.118056,
+    "approx_independent_mde_80_power_pp": 17.865,
+    "mean_tool_calls": 2.882353,
+    "mean_latency_seconds": 9.034495,
+    "p95_latency_seconds": 18.788395,
+    "elapsed_seconds": 284.239271,
+    "request_audit": {
+      "api_requests": 206,
+      "exactly_one_system_message": 206,
+      "exactly_one_benchmark_prompt": 206,
+      "violations": 0
+    },
+    "hard_gate_counts": {
+      "invalid_citation": 11,
+      "policy:source_not_discovered": 3
+    },
+    "token_usage": {
+      "total_tokens": 364480,
+      "completion_tokens": 34079
+    },
+    "gpu_peak_used_mib": {
+      "0": 59603.0,
+      "1": 59476.0
+    },
+    "artifact_hashes": {
+      "episodes_jsonl": "1ec9c8fcb326302f3bc6604400c4418b6d2f1911d05273e55f1e52d2551401f6",
+      "summary_json": "bad0b7a47a4ce3a85a744be4f8ed8c965b17771daa7ed116a12fd4691df27e14",
+      "gpu_telemetry_csv": "d32591bfb7217c3969c241fe0125a301ad894c39facdb04192e72b44382cab72",
+      "launcher_log": "0a48b5365afbbe0192e69ef4d5038b420c60446bf2f42ff7e7749f1ac96eb142"
+    }
+  },
+  "variance": {
+    "run_id": "qwen35-9b-base-v2-variance-seed-20260827-20260827_213336",
+    "run_commit": "4b66674fbdc968f4d814b129b2afcf1ea3897406",
+    "working_tree_dirty": true,
+    "dirty_scope": "Uncommitted runtime-SFT data scripts; benchmark, evaluator, runner, model, and frozen manifest remained at the recorded commit and hashes.",
+    "status": "COMPLETED_WITH_DIRTY_WORKTREE_DISCLOSED",
+    "seed": 20260827,
+    "temperature": 0.7,
+    "tasks_expected": 35,
+    "tasks_complete": 35,
+    "rollouts_per_task": 4,
+    "episodes_expected": 140,
+    "episodes_scored": 140,
+    "infra_excluded": 0,
+    "strict_success_rate": 0.121429,
+    "strict_success_ci95": [0.071429, 0.178571],
+    "mean_diagnostic_score": 0.257127,
+    "mean_score_ci95": [0.200107, 0.31429],
+    "pass_at_4": 0.2,
+    "consistent_at_4": 0.057143,
+    "mixed_outcome_rate": 0.142857,
+    "macro_capability_strict_success": 0.127778,
+    "approx_independent_mde_80_power_pp": 21.862,
+    "mean_tool_calls": 3.235714,
+    "mean_latency_seconds": 9.391977,
+    "p95_latency_seconds": 19.754009,
+    "elapsed_seconds": 716.985721,
+    "request_audit": {
+      "api_requests": 609,
+      "exactly_one_system_message": 609,
+      "exactly_one_benchmark_prompt": 609,
+      "violations": 0
+    },
+    "hard_gate_counts": {
+      "invalid_citation": 53,
+      "policy:invalid_arguments": 1,
+      "policy:source_not_discovered": 11,
+      "policy:tool_call_budget_exhausted": 4
+    },
+    "token_usage": {
+      "total_tokens": 1116003,
+      "completion_tokens": 102665
+    },
+    "gpu_peak_used_mib": {
+      "0": 59893.0,
+      "1": 60574.0
+    },
+    "artifact_hashes": {
+      "episodes_jsonl": "6a64c0753729be611e9df4249b00928843c553f1d3c92d675270ef9dde85634d",
+      "summary_json": "2e7f6e183333d922fcc772e59578cf865941e933cc6c47da6008d811258bd7b1",
+      "gpu_telemetry_csv": "8b88c51ab9a7c2b13f5804d270cb37156cb3cc324eac222fd9caf57e8439f936",
+      "launcher_log": "28af31904cf7078214bed7cbe563cdd6e3b3770a11d819b523a8a4fd795a4994"
+    }
+  },
+  "sealed_tasks_or_graders_used": false,
+  "external_model_evaluations": "NOT_RUN",
+  "difficulty_annotation": {
+    "status": "NOT_APPLIED",
+    "reason": "The benchmark remains immutable after freeze. Calibration results are stored as separate metadata and do not rewrite task content or grader semantics."
+  },
+  "interpretation": {
+    "allowed": "Use the Development and variance results as the internal Qwen3.5-9B Base reference for later paired checkpoint comparisons.",
+    "not_allowed": "Do not report these runs as Sealed performance, external validity, independent expert review, or an official external benchmark score."
+  }
+}

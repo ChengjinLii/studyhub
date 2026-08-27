@@ -60,7 +60,31 @@ def test_eval_lora_immutability_compares_initial_and_latest_step() -> None:
     result = summarize_lora_immutability(checkpoints, required=True)
 
     assert result["unchanged"] is True
+    assert result["update_observed"] is False
+    assert result["comparison_status"] == "unchanged"
     assert result["status"] == "passed"
+
+
+def test_training_lora_comparison_records_an_observed_update() -> None:
+    checkpoints = [
+        {
+            "relative_path": "actor/initial_lora/adapter_model.safetensors",
+            "sha256": "before",
+            "global_step": None,
+        },
+        {
+            "relative_path": "default/epoch0epochstep0globalstep0/adapter_model.safetensors",
+            "sha256": "after",
+            "global_step": 0,
+        },
+    ]
+
+    result = summarize_lora_immutability(checkpoints, required=False)
+
+    assert result["unchanged"] is False
+    assert result["update_observed"] is True
+    assert result["comparison_status"] == "updated"
+    assert result["status"] == "diagnostic"
 
 
 def test_rollout_index_preserves_policy_version_and_task_lineage(tmp_path) -> None:
@@ -87,10 +111,7 @@ def test_rollout_index_preserves_policy_version_and_task_lineage(tmp_path) -> No
         "tail_version": 3,
         "version_rle": [[3, 3096]],
         "reward": 0.5,
-        "prompt": (
-            f"<|im_start|>system\n{SYSTEM_PROMPT_MARKER}<|im_end|>"
-            f"<|im_start|>user\n{request}<|im_end|>"
-        ),
+        "prompt": (f"<|im_start|>system\n{SYSTEM_PROMPT_MARKER}<|im_end|><|im_start|>user\n{request}<|im_end|>"),
         "completion": "answer",
     }
     (version_root / "7.jsonl").write_text(json.dumps(interaction) + "\n")
@@ -144,8 +165,7 @@ def test_rollout_index_accepts_a_single_task_jsonl(tmp_path) -> None:
                 "version_rle": [[1, 32]],
                 "reward": 0.75,
                 "prompt": (
-                    f"<|im_start|>system\n{SYSTEM_PROMPT_MARKER}<|im_end|>"
-                    f"<|im_start|>user\n{request}<|im_end|>"
+                    f"<|im_start|>system\n{SYSTEM_PROMPT_MARKER}<|im_end|><|im_start|>user\n{request}<|im_end|>"
                 ),
                 "completion": "answer",
             }

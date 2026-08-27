@@ -251,11 +251,13 @@
         <h1><span>9B</span><br>Agentic<br>Post-Training</h1>
         <p class="lead">先用独立 Benchmark 定义能力和误差，再构建 Hermes runtime-native 数据，最后执行 9B SFT 与开放路径 GRPO。4B 只保留为历史基础设施证据。</p>
         <div class="status-row">
-          <span class="pill green">v3 DESIGN FROZEN</span>
-          <span class="pill gold">BENCHMARK FIRST</span>
+          <span class="pill green">BENCHMARK v2 FROZEN</span>
+          <span class="pill gold">9B BASE CALIBRATED</span>
+          <span class="pill green">SFT DATA ACCEPTED</span>
           <span class="pill">Qwen3.5-9B</span>
           <span class="pill">2 × H100 80GB</span>
-          <span class="pill rust">GPU TRAINING NOT STARTED</span>
+          <span class="pill green">SFT GATE PASSED</span>
+          <span class="pill rust">PROFILE PENDING</span>
         </div>
       </div>
       <aside class="hero-card reveal delay">
@@ -263,8 +265,8 @@
         <strong>能力先于训练，评测独立于 Reward。</strong>
         <ol class="sequence">
           <li><b>01</b><span>20 项 Capability Matrix</span></li>
-          <li><b>02</b><span>Benchmark v1 + 9B Base</span></li>
-          <li><b>03</b><span>45k Runtime-native SFT</span></li>
+          <li><b>02</b><span>Benchmark v2 + 9B Base</span></li>
+          <li><b>03</b><span>48.5k Runtime-native SFT</span></li>
           <li><b>04</b><span>Reward v3 + 10k RL QA Pool</span></li>
           <li><b>05</b><span>500-update 9B GRPO Main</span></li>
           <li><b>06</b><span>Dev + External + Sealed</span></li>
@@ -290,7 +292,7 @@
       <div class="section-head"><span class="section-no">01 / DECISION</span><div><h2>停止复制 v2，重建训练问题</h2><p class="note">v2 已经证明链路能运行，也暴露了 Gold-path Reward、小 Benchmark 和短程环境的边界。v3 保留证据，不继承结论。</p></div></div>
       <div class="decision">
         <div class="old"><h3>历史 v2</h3><ul><li>4B 先行并成为事实上的晋级门槛</li><li>3k SFT + 2.4k RL</li><li>32 题同源 Dev</li><li><code>expected_calls</code> / gold source</li><li>全局 6-turn</li><li>静态 GPU0 update / GPU1 rollout</li></ul></div>
-        <div class="new"><h3>当前 v3</h3><ul><li>Benchmark v1 后直接 9B</li><li>90k 候选 → 45k SFT</li><li>160 Regression / 1,005 Dev / 500 Sealed</li><li>目标与终态，路径开放</li><li>3 / 6 / 10 / 20 turn 分层</li><li>双 H100 布局以 time-to-quality 实测选择</li></ul></div>
+        <div class="new"><h3>当前 v3</h3><ul><li>冻结 Benchmark v2 后直接 9B</li><li>105,690 候选 → 48.5k SFT</li><li>12 Regression / 51 Dev / 13 Sealed-A / 12 Sealed-B / 10 Challenge</li><li>目标与终态，路径开放</li><li>3 / 6 / 10 / 20 turn 分层</li><li>双 H100 布局以 time-to-quality 实测选择</li></ul></div>
       </div>
     </section>
 
@@ -336,10 +338,12 @@
     <section id="benchmark">
       <div class="section-head"><span class="section-no">04 / BENCHMARK</span><div><h2>训练前先冻结导航仪</h2><p class="note">Regression 只负责回归；Dev 负责模型选择和错误分析；Sealed 只负责最终 Claim。External 提供可比性，不替代产品能力。</p></div></div>
       <div class="table-wrap"><table><thead><tr><th>层级</th><th>规模</th><th>用途</th><th>关键纪律</th></tr></thead><tbody>
-        <tr><td><strong>Regression</strong></td><td>160</td><td>Parser、tool schema、checkpoint、permission/error 回归</td><td>允许 deterministic；不支持能力 Claim</td></tr>
-        <tr><td><strong>StudyHub Dev</strong></td><td>1,005</td><td>20 项能力、难度、horizon、failure、语言切片</td><td>全量 2 rollouts；200 题 × 4 variance panel</td></tr>
-        <tr><td><strong>StudyHub Sealed</strong></td><td>500</td><td>最终产品能力确认</td><td>不参与 Reward、Prompt、threshold 或采样调参</td></tr>
-        <tr><td><strong>External</strong></td><td>官方协议</td><td>BFCL V4、tau3、DeepResearch Bench；BrowseComp 条件执行</td><td>full / subset 明确分开，不冒充官方分数</td></tr>
+        <tr><td><strong>Regression</strong></td><td>12</td><td>Parser、tool schema、checkpoint、permission/error 回归</td><td>允许 deterministic；不支持能力 Claim</td></tr>
+        <tr><td><strong>StudyHub Dev</strong></td><td>51</td><td>公开开发集与错误切片</td><td>9B Base 51/51 已评分；0 Infra exclusion</td></tr>
+        <tr><td><strong>Variance Panel</strong></td><td>35 × 4</td><td>同任务随机 rollout 稳定性与可学习性</td><td>35/35 完整；pass@4 20.00%；mixed 14.29%</td></tr>
+        <tr><td><strong>Sealed-A / B</strong></td><td>13 / 12</td><td>in-family 与 OOD 最终确认</td><td>任务、环境和 grader 不进入训练管线</td></tr>
+        <tr><td><strong>Calibration Challenge</strong></td><td>10</td><td>Evaluator shortcut 与 adversarial calibration</td><td>不用于优化训练 Reward</td></tr>
+        <tr><td><strong>External</strong></td><td>官方协议</td><td>BFCL V4 Agentic、tau2、DeepResearch Bench II、BrowseComp-Plus</td><td>仅 setup ready；官方模型评测仍为 NOT_RUN</td></tr>
       </tbody></table></div>
       <div class="flow">
         <article><em>G1-A</em><b>P0 覆盖</b><small>关键能力不再空白。</small></article>
@@ -353,17 +357,17 @@
     <section id="data">
       <div class="section-head"><span class="section-no">05 / DATA</span><div><h2>按能力和 token 规划数据</h2><p class="note">开放数据负责规模与行为多样性，StudyHub 数据负责产品相关性。两者都必须转换为实际 Hermes tool_calls / observations / final，并通过 9B tokenizer 统计。</p></div></div>
       <div class="split">
-        <article class="panel green"><h3>SFT</h3><span class="big-number">90k → 45k</span><p>候选轨迹筛成最终集，目标约 90M tokens。StudyHub 52%，Open 48%；runtime-native multi-turn 不低于 70%。</p><div class="formula">assistant actions + final only<br>tool observations → loss mask = 0<br>source cap ≤ 25%</div></article>
+        <article class="panel green"><h3>SFT</h3><span class="big-number">105,690 → 48.5k</span><p>最终集包含 61,725,581 tokens，StudyHub custom 41.24%，Open 58.76%；2Wiki 按支持页面连通分量隔离且每组最多一条，runtime-native multi-turn 为 75.41%。</p><div class="formula">assistant actions + final only<br>tool observations → loss mask = 0<br>source cap = 24.74%</div></article>
         <article class="panel"><h3>RL Task</h3><span class="big-number">16k → 10k</span><p>全量静态 QA 后做 9B policy learnability calibration。初始主训练 4k unique，曲线健康再扩到 8k。</p><div class="formula">mixed outcome → GRPO<br>all correct → retention<br>all failed → teacher / curriculum<br>infra failure → retry / exclude</div></article>
       </div>
       <div class="table-wrap" style="margin-top:22px"><table><thead><tr><th>SFT 来源</th><th>最终预算</th><th>进入条件</th></tr></thead><tbody>
-        <tr><td>StudyHub RAG / Learning</td><td>9,000</td><td>Hybrid RAG snapshot、课程/错题/解释任务通过</td></tr>
-        <tr><td>StudyHub Web / Fallback</td><td>5,500</td><td>record/replay、来源质量和新鲜度标签通过</td></tr>
-        <tr><td>StudyHub Memory</td><td>5,000</td><td>个人/群体、stale/conflict/privacy 场景通过</td></tr>
-        <tr><td>StudyHub ACL / Recovery / Abstention</td><td>4,000</td><td>权限与失败 ownership 可验证</td></tr>
-        <tr><td>Hermes FC + ToolACE</td><td>12,000</td><td>License、revision、schema/runtime parity 通过</td></tr>
-        <tr><td>OpenResearcher</td><td>6,000 上限</td><td>Teacher、污染、长度、license 审计通过</td></tr>
-        <tr><td>tau / other traces</td><td>3,500</td><td>Provenance、工具身份和转换损失通过</td></tr>
+        <tr><td>ToolACE + Hermes FC</td><td>9,000</td><td>License、revision、schema/runtime parity 通过</td></tr>
+        <tr><td>COIG Exam</td><td>4,500</td><td>中文讲解与直接回答轨迹通过</td></tr>
+        <tr><td>2Wiki + QASPER replay</td><td>15,000</td><td>文档组隔离、Search→Read、citation 与 evidence 通过</td></tr>
+        <tr><td>StudyHub Metadata</td><td>6,000</td><td>排除 Benchmark v2 的 34 个 material，公开元数据可追溯</td></tr>
+        <tr><td>StudyHub Memory</td><td>4,000</td><td>个人学习偏好和可见群体信号边界通过</td></tr>
+        <tr><td>StudyHub ACL / Recovery</td><td>4,000</td><td>受限资料拒绝与公开替代路径通过</td></tr>
+        <tr><td>StudyHub Web / State</td><td>6,000</td><td>record/replay、新鲜度和 read-after-write 状态通过</td></tr>
       </tbody></table></div>
     </section>
 
@@ -384,12 +388,13 @@
     </section>
 
     <section id="training">
-      <div class="section-head"><span class="section-no">07 / TRAINING</span><div><h2>直接进入 9B 主线</h2><p class="note">Benchmark v1 和 9B Base 完成后开始 SFT。4B 不再承担 Reward、Dataset、Algorithm 或 9B 兼容性的常规预实验。</p></div></div>
+      <div class="section-head"><span class="section-no">07 / TRAINING</span><div><h2>9B 主线已通过最小更新 Gate</h2><p class="note">Benchmark v2、9B Base 内部校准、48.5k SFT 数据门和一次真实双 H100 优化器更新均已完成。该 Gate 只证明训练链路、梯度和 checkpoint 正常，不代表 SFT 效果成立。</p></div></div>
       <div class="timeline">
         <article class="phase"><span class="gate">G0 · HISTORY</span><div><h3>冻结 v2</h3><p>保留接线、checkpoint、artifact、GPU guard 和真实 incident。</p></div></article>
-        <article class="phase"><span class="gate">G1 · BENCHMARK</span><div><h3>Capability + Benchmark v1</h3><p>完成任务、grader、质量、污染与版本卡。</p></div></article>
-        <article class="phase"><span class="gate">G2 · BASE</span><div><h3>9B Base Eval</h3><p>Dev、variance panel、BFCL、tau3、DeepResearch 与成本切片。</p></div></article>
-        <article class="phase"><span class="gate">G3–G4 · SFT</span><div><h3>45k Runtime-native SFT</h3><p>AReaL LoRA / BF16，assistant-only CE；以 token budget 和 Dev slice 选择 checkpoint。</p><small>LoRA r16/r32 与 target modules 先做 Qwen3.5 + SGLang hot-load compatibility profile，不预设答案。</small></div></article>
+        <article class="phase"><span class="gate">G1 · PASSED</span><div><h3>StudyHub AgentBench v2</h3><p>98 tasks、78 source groups、51 Dev semantic clusters；v1 保持不可变。</p></div></article>
+        <article class="phase"><span class="gate">G2 · INTERNAL PASS</span><div><h3>9B Base Eval</h3><p>51-task Dev 与 35 × 4 variance 已完成；External official model eval 仍待执行。</p></div></article>
+        <article class="phase"><span class="gate">G3 · PASSED</span><div><h3>48.5k Runtime-native SFT Data</h3><p>61.73M tokens、75.41% runtime-native；Benchmark prompt 与 2Wiki support-title 跨 split 重叠均为 0。</p><small>质量标签只陈述来源；没有把规则构造轨迹标成 teacher review。</small></div></article>
+        <article class="phase"><span class="gate">G4 · GATE PASSED</span><div><h3>9B SFT Profile</h3><p>真实 Gate 完成 1 update / 8 sequences / 9,934 tokens；loss 0.51857，gradient norm 0.40752，初始与最终 LoRA SHA 不同。</p><small>GPU0 / GPU1 峰值 61,748 / 45,757 MiB，均低于 72,000 MiB guard；下一步用同 seed、同顺序和同 5-step 预算比较 r16 / r32。正式 SFT 尚未晋级。</small></div></article>
         <article class="phase"><span class="gate">G5 · RL QA</span><div><h3>Reward v3 + Learnability</h3><p>800 条 Reward 校准；10k 任务按 mixed/all-correct/all-failed 分桶。</p></div></article>
         <article class="phase"><span class="gate">G6 · INFRA</span><div><h3>Dual-H100 Layout</h3><p>A/B 同预算实测，C 仅在异步有明确信息价值时进入。</p></div></article>
         <article class="phase"><span class="gate">G7 · GRPO</span><div><h3>9B Main RL</h3><p>G=4、500 updates、4k unique tasks；高分叉 G=8 使用独立受控阶段。</p><small>LR 2e-6 起点，范围 1e-6–5e-6；20-turn 安全上限，per-task 3/6/10/20。</small></div></article>
@@ -400,7 +405,7 @@
     <section id="algorithms">
       <div class="section-head"><span class="section-no">08 / ALGORITHM</span><div><h2>理论覆盖完整，GPU 只回答真实问题</h2><p class="note">Algorithm Decision Matrix 统一记录目标函数、advantage、critic、KL、group、长程 credit、zero variance、成本和触发条件。当前只放行 GRPO 主基线。</p></div></div>
       <div class="table-wrap"><table><thead><tr><th>角色</th><th>方法</th><th>何时进入实验</th><th>当前结论</th></tr></thead><tbody>
-        <tr><td data-label="ROLE"><strong>Main baseline</strong></td><td data-label="METHOD">GRPO</td><td data-label="TRIGGER">Benchmark v1、9B Base、SFT、Reward v3 和 learnability QA 全部通过</td><td data-label="DECISION">G=4、500 updates；G=8 作为独立高分叉阶段</td></tr>
+        <tr><td data-label="ROLE"><strong>Main baseline</strong></td><td data-label="METHOD">GRPO</td><td data-label="TRIGGER">Benchmark v2、9B Base、SFT、Reward v3 和 learnability QA 全部通过</td><td data-label="DECISION">G=4、500 updates；G=8 作为独立高分叉阶段</td></tr>
         <tr><td data-label="ROLE"><strong>Estimator diagnostic</strong></td><td data-label="METHOD">REINFORCE / REINFORCE++ / RLOO</td><td data-label="TRIGGER">per-prompt 标准化或 zero-variance 被证明确实损失学习信号</td><td data-label="DECISION">同一 9B parent、同任务和同预算对照</td></tr>
         <tr><td data-label="ROLE"><strong>Stability / credit</strong></td><td data-label="METHOD">DAPO / GSPO / PPO</td><td data-label="TRIGGER">分别对应全对全错与长度浪费、sequence ratio 异常、需要 learned value 的长程 credit</td><td data-label="DECISION">症状触发，不预先启用</td></tr>
         <tr><td data-label="ROLE"><strong>Teacher signal</strong></td><td data-label="METHOD">OPD / KDRL</td><td data-label="TRIGGER">Teacher 在 student-visited states 上通过兼容性、增量能力和成本资格审计</td><td data-label="DECISION">需要 teacher token logprob；普通 Chat 输出不能冒充</td></tr>
@@ -414,7 +419,7 @@
       <div class="section-head"><span class="section-no">09 / INFRA</span><div><h2>两张 H100 是一个资源池</h2><p class="note">选择标准不是某张卡的瞬时利用率，而是在训练正确性和稳定性约束下的 end-to-end time-to-quality。</p></div></div>
       <div class="infra-grid">
         <article class="infra"><span class="letter">A</span><h3>1 + 1 Sync</h3><p>一张 actor/ref，一张 SGLang。作为必须测量的真实 baseline。</p><ul><li>优点：边界简单、已有历史</li><li>风险：phase idle、显存失衡</li></ul></article>
-        <article class="infra primary"><span class="letter">B</span><h3>2-GPU Colocated</h3><p>Update 用 FSDP2，rollout 用 SGLang TP2，阶段间 memory saver / weight refresh。</p><ul><li>候选：<code>fsdp:d2</code></li><li>候选：<code>sglang:d1t2p1</code></li><li>必须先过 Qwen3.5 LoRA Gate</li></ul></article>
+        <article class="infra primary"><span class="letter">B</span><h3>2-GPU Colocated</h3><p>Update 用 FSDP2，rollout 用 SGLang TP2，阶段间 memory saver / weight refresh。</p><ul><li>候选：<code>fsdp:d2</code></li><li>候选：<code>sglang:d1t2p1</code></li><li>Qwen3.5 LoRA 最小更新 Gate 已通过；完整 profile 待执行</li></ul></article>
         <article class="infra conditional"><span class="letter">C</span><h3>Async</h3><p>仅当 A/B 存在实质 idle，且 pinned AReaL 能可靠记录 policy age 时测试。</p><ul><li>必须报告 ratio tail / KL</li><li>吞吐提升不能掩盖 staleness</li></ul></article>
       </div>
       <div class="formula">Compare equal task / trajectory / token budget<br>memory · util p50/p95 · idle · tok/s · rollout/h · step time · sync · offload · KV · policy age · GPU-hour / effective trajectory</div>
@@ -441,16 +446,16 @@
     </section>
 
     <section id="next">
-      <div class="section-head"><span class="section-no">11 / EXECUTION</span><div><h2>下一步只做 Benchmark v1</h2><p class="note">当前 9B 权重完整，双 H100 空闲，但训练未获放行。先完成 G1，再跑 G2 9B Base；SFT/GRPO 不越级启动。</p></div></div>
-      <div class="callout"><b>当前最高信息动作</b><span>构建 160 Regression、1,005 Dev、500 Sealed 的任务和独立 grader；对 P0 capability、alternative path、污染、人工抽检和统计功效完成验收。</span></div>
-      <div class="command">cd /data/chengjin/studyhub/studyhub-agent<br>.venv-train/bin/python scripts/train/validate_v3_program.py --check-local-assets</div>
+      <div class="section-head"><span class="section-no">11 / EXECUTION</span><div><h2>下一步比较 r16 / r32 等预算 Profile</h2><p class="note">最小 Gate 已通过，但单步结果不能选配方。两组 profile 必须共享 seed、任务顺序、5 个 optimizer updates、token cap、GPU guard 与证据 schema；比较稳定性、显存、step wall time 和有效 loss tokens。</p></div></div>
+      <div class="callout"><b>当前最高信息动作</b><span>先完成 r16 / r32 profile，再基于同预算证据选择正式 SFT 配方。不得用单步 loss 高低推断模型质量，也不得把 Gate 当成 SFT 晋级。</span></div>
+      <div class="command">cd /data/chengjin/studyhub/studyhub-agent<br>STUDYHUB_ALLOW_TRAINING=YES scripts/train/run_runtime_sft_v3.sh profile-r16 20260827<br>STUDYHUB_ALLOW_TRAINING=YES scripts/train/run_runtime_sft_v3.sh profile-r32 20260827</div>
       <div class="split" style="margin-top:22px">
-        <article class="panel"><h3>机器合同</h3><p><a href="../configs/program-v3/training-program-v3.json">training-program-v3.json</a><br><a href="../configs/program-v3/capability-matrix-v1.json">capability-matrix-v1.json</a><br><a href="../configs/program-v3/algorithm-decision-matrix-v1.json">algorithm-decision-matrix-v1.json</a></p></article>
+        <article class="panel"><h3>机器合同与证据</h3><p><a href="../configs/program-v3/training-program-v3.json">training-program-v3.json</a><br><a href="../configs/program-v3/capability-matrix-v1.json">capability-matrix-v1.json</a><br><a href="training/evidence/runtime-sft-v3-9b-gate-20260827.json">runtime-sft-v3-9b-gate-20260827.json</a></p></article>
         <article class="panel gold"><h3>缺陷台账</h3><p><a href="../design-defects/index.json">17 项初始系统性缺陷</a>。每项包含证据、竞争解释、最小证伪、修复、回归和残余风险。</p></article>
       </div>
     </section>
 
-    <footer><span>StudyHub Agent / 9B Agentic Post-Training v3</span><span>2026-08-27 · DESIGN FROZEN · TRAINING NOT STARTED</span></footer>
+    <footer><span>StudyHub Agent / 9B Agentic Post-Training v3</span><span>2026-08-27 · SFT GATE PASSED · PROFILE PENDING</span></footer>
   </main>
 </body>
 </html>

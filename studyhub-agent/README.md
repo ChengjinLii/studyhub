@@ -54,15 +54,30 @@ main model. The 4B matrix, 3k SFT set, 2.4k RL set, Reward v2, and Eval32 are
 frozen as historical infrastructure evidence; they do not gate the 9B
 program.
 
-Current v3 targets are 160 Regression tasks, 1,005 StudyHub Development tasks,
-500 Sealed tasks, 45k runtime-native SFT trajectories, and a 10k post-QA RL
-task pool. Training remains disabled until Benchmark v1 is frozen and the 9B
-Base baseline is complete.
+StudyHub AgentBench v2 is now frozen at revision `2.0.0`: 98 tasks, 78 source
+groups, 51 Development tasks, 13 Sealed-A tasks, 12 Sealed-B tasks, and 10
+Calibration-Challenge tasks. Qwen3.5-9B Base completed the 51-task Development
+run and a complete 35-task, four-rollout variance panel with zero infrastructure
+exclusions. Official external model evaluations remain pending and are reported
+separately.
+
+The current data target is a 105,690-trajectory candidate pool followed by
+48,500 Benchmark-v2-disjoint runtime-native SFT trajectories and a 10k post-QA
+RL task pool. The runtime-native SFT release passed its manifest, tokenizer,
+runtime-parity, contamination, and full loss-mask audits. A guarded one-step
+dual-H100 AReaL Gate then completed one real optimizer update: loss `0.51857`,
+gradient norm `0.40752`, and different initial/final LoRA hashes. This proves
+the training and checkpoint path, not model quality. Equal-budget r16/r32
+profiles remain pending, and formal SFT is still unauthorized.
 
 - [9B Agentic Post-Training v3 program](docs/StudyHub_9B_Agentic_Post_Training_Program_v3.html)
 - [Machine-readable training contract](configs/program-v3/training-program-v3.json)
 - [Capability matrix](configs/program-v3/capability-matrix-v1.json)
 - [Algorithm decision matrix](configs/program-v3/algorithm-decision-matrix-v1.json)
+- [Benchmark v2 data card](benchmarks/studyhub-agent-v2/DATA_CARD.md)
+- [9B Base v2 calibration](docs/benchmark/9B_BASE_V2_CALIBRATION.md)
+- [Runtime-native SFT v3 data card](docs/training/RUNTIME_SFT_V3_DATA_CARD.md)
+- [9B SFT Gate evidence](docs/training/evidence/runtime-sft-v3-9b-gate-20260827.json)
 - [Primary-source review](research/primary-source-review.md)
 - [Initial design-defect audit](design-defects/index.json)
 

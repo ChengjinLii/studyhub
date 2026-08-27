@@ -8,6 +8,7 @@ from pathlib import Path
 import pytest
 
 from scripts.benchmark.run_9b_base_eval import aggregate, select_tasks
+from scripts.benchmark.v2.validate_calibration import validate as validate_calibration
 from studyhub_agent.benchmark_v2.development_evaluator import evaluate_development
 from studyhub_agent.benchmark_v2.environment import ReplayableAgentEnvironmentV2
 from studyhub_agent.benchmark_v2.hermes_runner import BenchmarkHermesRunnerV2
@@ -282,3 +283,30 @@ def test_public_calibration_record_is_bound_and_does_not_claim_difficulty() -> N
     assert record["sealed_tasks_or_graders_used"] is False
     assert record["request_audit"]["violations"] == 0
     assert record["difficulty_annotation"]["status"] == "NOT_APPLIED_INSUFFICIENT_SAMPLE"
+
+
+def test_development_and_variance_evidence_is_bound_and_complete() -> None:
+    manifest_path = PUBLIC_BENCHMARK / "manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    record = json.loads(
+        (PROJECT / "docs/benchmark/evidence/qwen35-9b-base-v2-development-variance-20260827.json").read_text(
+            encoding="utf-8"
+        )
+    )
+
+    assert validate_calibration(record, manifest, manifest_path) == []
+    assert record["development"]["episodes_scored"] == 51
+    assert record["variance"]["tasks_complete"] == 35
+    assert record["variance"]["episodes_scored"] == 140
+    assert record["sealed_tasks_or_graders_used"] is False
+
+
+def test_full_quality_gate_validates_frozen_evidence_after_finalize() -> None:
+    script = (PROJECT / "scripts/benchmark/run_full_quality_gate.sh").read_text(encoding="utf-8")
+
+    finalize = script.index('scripts/benchmark/v2/finalize.py --builder-commit "$BUILDER_COMMIT"')
+    frozen_contract = script.rindex('"$PYTEST_BIN" "$calibration_contract_test"')
+
+    assert '--deselect "$calibration_contract_test"' in script
+    assert finalize < frozen_contract
+    assert 'git show "HEAD:${MANIFEST_REL}"' in script

@@ -49,7 +49,7 @@
       "long_horizon_credit": "Trajectory reward is broadcast to generated action tokens; this is not true temporal credit assignment.",
       "zero_variance_behavior": "An all-equal group has zero relative advantage and contributes no outcome learning signal.",
       "compute_memory": "MEDIUM: no critic, but multiple rollouts per prompt dominate inference cost.",
-      "studyhub_trigger": "Default after Benchmark v1, 9B Base, runtime-native SFT, Reward v3 calibration and RL learnability QA pass.",
+      "studyhub_trigger": "Default after frozen Benchmark v2, 9B Base calibration, runtime-native SFT, Reward v3 calibration and RL learnability QA pass.",
       "studyhub_decision": "Use G=4 for the first 500-update main run; use G=8 only in a separate high-branch experiment.",
       "sources": [
         "https://arxiv.org/abs/2402.03300",

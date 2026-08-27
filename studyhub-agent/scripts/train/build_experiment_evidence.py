@@ -26,9 +26,7 @@ USER_MESSAGE = re.compile(
     r"<\|im_start\|>user\n(.*?)<\|im_end\|>",
     re.DOTALL,
 )
-SYSTEM_PROMPT_MARKER = (
-    "You are StudyHub Agent in an isolated training environment."
-)
+SYSTEM_PROMPT_MARKER = "You are StudyHub Agent in an isolated training environment."
 GLOBAL_STEP = re.compile(r"globalstep(\d+)")
 
 
@@ -97,9 +95,7 @@ def summarize_gpu_csv(path: Path) -> dict[str, Any]:
         return {"samples": 0}
     with path.open(encoding="utf-8") as stream:
         rows = list(csv.DictReader(stream))
-    by_gpu: dict[str, dict[str, list[float]]] = defaultdict(
-        lambda: {"memory_used_mib": [], "utilization_gpu_pct": []}
-    )
+    by_gpu: dict[str, dict[str, list[float]]] = defaultdict(lambda: {"memory_used_mib": [], "utilization_gpu_pct": []})
     for row in rows:
         gpu = str(row.get("gpu_index", row.get("index", "unknown")))
         for key in ("memory_used_mib", "utilization_gpu_pct"):
@@ -112,17 +108,11 @@ def summarize_gpu_csv(path: Path) -> dict[str, Any]:
             gpu: {
                 "peak_memory_used_mib": max(values["memory_used_mib"], default=None),
                 "mean_memory_used_mib": (
-                    statistics.fmean(values["memory_used_mib"])
-                    if values["memory_used_mib"]
-                    else None
+                    statistics.fmean(values["memory_used_mib"]) if values["memory_used_mib"] else None
                 ),
-                "peak_utilization_gpu_pct": max(
-                    values["utilization_gpu_pct"], default=None
-                ),
+                "peak_utilization_gpu_pct": max(values["utilization_gpu_pct"], default=None),
                 "mean_utilization_gpu_pct": (
-                    statistics.fmean(values["utilization_gpu_pct"])
-                    if values["utilization_gpu_pct"]
-                    else None
+                    statistics.fmean(values["utilization_gpu_pct"]) if values["utilization_gpu_pct"] else None
                 ),
             }
             for gpu, values in sorted(by_gpu.items())
@@ -148,33 +138,32 @@ def checkpoint_index(root: Path | None) -> list[dict[str, Any]]:
     return indexed
 
 
-def summarize_lora_immutability(
-    checkpoints: list[dict[str, Any]], *, required: bool
-) -> dict[str, Any]:
+def summarize_lora_immutability(checkpoints: list[dict[str, Any]], *, required: bool) -> dict[str, Any]:
     initial = next(
-        (
-            row
-            for row in checkpoints
-            if row["relative_path"] == "actor/initial_lora/adapter_model.safetensors"
-        ),
+        (row for row in checkpoints if row["relative_path"] == "actor/initial_lora/adapter_model.safetensors"),
         None,
     )
     trained = [row for row in checkpoints if row.get("global_step") is not None]
     final = max(trained, key=lambda row: int(row["global_step"])) if trained else None
     unchanged = bool(initial and final and initial["sha256"] == final["sha256"])
+    update_observed = bool(initial and final and initial["sha256"] != final["sha256"])
     return {
         "schema_version": "studyhub.lora-immutability.v1",
         "required": required,
         "initial": initial,
         "final": final,
         "unchanged": unchanged,
-        "status": (
-            "passed"
-            if required and unchanged
-            else "failed"
-            if required
-            else "diagnostic"
+        "update_observed": update_observed,
+        "comparison_status": (
+            "unchanged"
+            if unchanged
+            else "updated"
+            if update_observed
+            else "initial_missing"
+            if initial is None
+            else "final_missing"
         ),
+        "status": ("passed" if required and unchanged else "failed" if required else "diagnostic"),
     }
 
 
@@ -280,27 +269,21 @@ def index_rollout_interactions(
             reward = float(row.get("reward", 0.0))
             rewards.append(reward)
             versions[str(tail_version)] += 1
-            system_prompt_count = str(row.get("prompt", "")).count(
-                SYSTEM_PROMPT_MARKER
-            )
+            system_prompt_count = str(row.get("prompt", "")).count(SYSTEM_PROMPT_MARKER)
             if system_prompt_count == 0:
                 missing_system_prompt_records += 1
             elif system_prompt_count > 1:
                 duplicated_system_prompt_records += 1
             record_rows.append(
                 {
-                    "record_id": hashlib.sha256(
-                        f"{trial}:{relative}:{line_number}".encode()
-                    ).hexdigest()[:24],
+                    "record_id": hashlib.sha256(f"{trial}:{relative}:{line_number}".encode()).hexdigest()[:24],
                     "trial": trial,
                     "source_file": relative,
                     "line_number": line_number,
                     "internal_task_id": row.get("task_id"),
                     "task_id": task.get("task_id") if task else None,
                     "task_family": task.get("family") if task else None,
-                    "source_dataset": (
-                        task.get("metadata", {}).get("source_dataset") if task else None
-                    ),
+                    "source_dataset": (task.get("metadata", {}).get("source_dataset") if task else None),
                     "split": task.get("metadata", {}).get("split") if task else None,
                     "run_seed": run_seed,
                     "environment_seed": task.get("environment_seed") if task else None,
@@ -316,12 +299,8 @@ def index_rollout_interactions(
                     "at_sequence_limit": sequence_length >= max_sequence_tokens,
                     "system_prompt_marker_count": system_prompt_count,
                     "reward": reward,
-                    "prompt_sha256": hashlib.sha256(
-                        str(row.get("prompt", "")).encode()
-                    ).hexdigest(),
-                    "completion_sha256": hashlib.sha256(
-                        str(row.get("completion", "")).encode()
-                    ).hexdigest(),
+                    "prompt_sha256": hashlib.sha256(str(row.get("prompt", "")).encode()).hexdigest(),
+                    "completion_sha256": hashlib.sha256(str(row.get("completion", "")).encode()).hexdigest(),
                 }
             )
 
@@ -341,9 +320,7 @@ def index_rollout_interactions(
             "missing_records": missing_system_prompt_records,
             "duplicated_records": duplicated_system_prompt_records,
             "all_records_exactly_once": (
-                bool(record_rows)
-                and missing_system_prompt_records == 0
-                and duplicated_system_prompt_records == 0
+                bool(record_rows) and missing_system_prompt_records == 0 and duplicated_system_prompt_records == 0
             ),
         },
         "trajectory_reuse_count": 1,
@@ -354,9 +331,7 @@ def index_rollout_interactions(
             "p95": _percentile(sequence_lengths, 0.95),
             "max": max(sequence_lengths, default=None),
             "at_limit": truncated_records,
-            "at_limit_rate": (
-                truncated_records / len(sequence_lengths) if sequence_lengths else None
-            ),
+            "at_limit_rate": (truncated_records / len(sequence_lengths) if sequence_lengths else None),
             "limit": max_sequence_tokens,
         },
         "prompt_tokens": {
@@ -397,9 +372,7 @@ def build_bundle(args: argparse.Namespace) -> dict[str, Any]:
     log_path = Path(metadata["log_file"])
     gpu_path = Path(metadata["gpu_csv"])
     metric_series = (
-        parse_metric_series(log_path.read_text(encoding="utf-8", errors="replace"))
-        if log_path.is_file()
-        else {}
+        parse_metric_series(log_path.read_text(encoding="utf-8", errors="replace")) if log_path.is_file() else {}
     )
     trainer_metrics = {
         "schema_version": "studyhub.trainer-metrics.v1",
@@ -413,21 +386,13 @@ def build_bundle(args: argparse.Namespace) -> dict[str, Any]:
     reward_summary = None
     reward_log = None
     if args.reward_root:
-        reward_log = (
-            args.reward_root / "reward-v2.jsonl"
-            if args.reward_root.is_dir()
-            else args.reward_root
-        ).resolve()
+        reward_log = (args.reward_root / "reward-v2.jsonl" if args.reward_root.is_dir() else args.reward_root).resolve()
         if reward_log.is_file() and reward_log.stat().st_size:
-            reward_summary = summarize_rewards(
-                reward_log, expected_group_size=args.expected_group_size
-            )
+            reward_summary = summarize_rewards(reward_log, expected_group_size=args.expected_group_size)
             _write_json(output / "metrics" / "reward-groups.json", reward_summary)
 
     checkpoints = checkpoint_index(args.checkpoint_root)
-    lora_immutability = summarize_lora_immutability(
-        checkpoints, required=args.require_unchanged_lora
-    )
+    lora_immutability = summarize_lora_immutability(checkpoints, required=args.require_unchanged_lora)
     _write_json(output / "metrics" / "lora-immutability.json", lora_immutability)
     checkpoint_path = output / "checkpoints" / "checkpoint-index.jsonl"
     checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
@@ -440,9 +405,7 @@ def build_bundle(args: argparse.Namespace) -> dict[str, Any]:
         args.trajectory_root,
         task_root=args.task_root,
         trial=trial,
-        run_seed=metadata.get("run_metadata", {}).get("seed")
-        if "run_metadata" in metadata
-        else None,
+        run_seed=metadata.get("run_metadata", {}).get("seed") if "run_metadata" in metadata else None,
         max_sequence_tokens=args.max_sequence_tokens,
     )
     # Run metadata stores the seed in the config overrides rather than a
@@ -478,9 +441,7 @@ def build_bundle(args: argparse.Namespace) -> dict[str, Any]:
         "reward_log": reward_log is None or reward_log.is_file(),
         "reward_summary": reward_log is None or reward_summary is not None,
         "checkpoint_index": bool(checkpoints),
-        "lora_unchanged": (
-            not args.require_unchanged_lora or lora_immutability["unchanged"]
-        ),
+        "lora_unchanged": (not args.require_unchanged_lora or lora_immutability["unchanged"]),
         "trajectory_index": args.trajectory_root is None or bool(trajectory_records),
         "trajectory_task_mapping": (
             args.trajectory_root is None
@@ -497,6 +458,17 @@ def build_bundle(args: argparse.Namespace) -> dict[str, Any]:
         "trial": trial,
         "generated_at": _now(),
         "checks": required,
+        "not_applicable": [
+            name
+            for name, applicable in {
+                "reward_log": args.reward_root is not None,
+                "reward_summary": args.reward_root is not None,
+                "trajectory_index": args.trajectory_root is not None,
+                "trajectory_task_mapping": args.trajectory_root is not None,
+                "lora_unchanged": args.require_unchanged_lora,
+            }.items()
+            if not applicable
+        ],
         "status": "COMPLETE" if all(required.values()) else "PARTIAL_EVIDENCE",
         "missing": [name for name, present in required.items() if not present],
     }
@@ -517,28 +489,16 @@ def build_bundle(args: argparse.Namespace) -> dict[str, Any]:
             "training_log": str(log_path.resolve()),
             "gpu_csv": str(gpu_path.resolve()),
             "reward_log": str(reward_log) if reward_log else None,
-            "checkpoint_root": (
-                str(args.checkpoint_root.resolve()) if args.checkpoint_root else None
-            ),
+            "checkpoint_root": (str(args.checkpoint_root.resolve()) if args.checkpoint_root else None),
             "trainer_metrics": "metrics/trainer.json",
             "system_metrics": "metrics/system.json",
-            "reward_summary": (
-                "metrics/reward-groups.json" if reward_summary is not None else None
-            ),
+            "reward_summary": ("metrics/reward-groups.json" if reward_summary is not None else None),
             "checkpoint_index": "checkpoints/checkpoint-index.jsonl",
             "lora_immutability": "metrics/lora-immutability.json",
-            "trajectory_root": (
-                str(args.trajectory_root.resolve()) if args.trajectory_root else None
-            ),
-            "trajectory_files": (
-                "trajectories/trajectory-files.jsonl" if args.trajectory_root else None
-            ),
-            "trajectory_records": (
-                "trajectories/trajectory-records.jsonl" if args.trajectory_root else None
-            ),
-            "trajectory_summary": (
-                "metrics/rollout-interactions.json" if trajectory_summary else None
-            ),
+            "trajectory_root": (str(args.trajectory_root.resolve()) if args.trajectory_root else None),
+            "trajectory_files": ("trajectories/trajectory-files.jsonl" if args.trajectory_root else None),
+            "trajectory_records": ("trajectories/trajectory-records.jsonl" if args.trajectory_root else None),
+            "trajectory_summary": ("metrics/rollout-interactions.json" if trajectory_summary else None),
         },
         "lora_immutability": lora_immutability,
         "completeness": completeness,

@@ -772,14 +772,16 @@ Function task_success = .70 call_correctness + .30 answer_quality</pre>
           <div class="evidence"><strong>归因纪律：</strong> 固定模型只换数据；固定数据只换 Reward；固定前两者只换 optimizer；重放同一 trajectory 只换环境/评估器。负结果也保留，不挑最好曲线。</div>
         </article>
 
-        <article class="topic a" id="incidents" data-level="a" data-keywords="incident duplicate system prompt QASPER budget contract context overflow truncation thinking bug root cause">
-          <div class="topic-head"><h3>目前有哪些已闭环的故障案例？</h3><div class="badges"><span class="badge a">A · 四个自然事件</span><span class="badge b">B · 一个受控漏洞</span></div></div>
-          <div class="answer-30"><p>四个自然案例覆盖输入重复、任务不可完成、动态上下文越界和 checkpoint 打包不完整；另有一个明确标注 B 的 Reward shortcut 回归。每个案例都保存竞争假设、原始证据、最小修复、同协议回归和残余风险；没有发生的熵崩塌不伪造成事故。</p></div>
+        <article class="topic a" id="incidents" data-level="a" data-keywords="incident duplicate system prompt QASPER budget contract context overflow truncation proxy socksio preflight thinking bug root cause">
+          <div class="topic-head"><h3>目前有哪些已闭环的故障案例？</h3><div class="badges"><span class="badge a">A · 六个自然事件</span><span class="badge b">B · 一个受控漏洞</span></div></div>
+          <div class="answer-30"><p>六个自然案例覆盖输入重复、任务不可完成、动态上下文越界、checkpoint 打包、离线代理泄漏和 Benchmark 冻结状态机；另有一个明确标注 B 的 Reward shortcut 回归。每个案例都保存竞争假设、原始证据、最小修复、同协议回归和残余风险；没有发生的熵崩塌不伪造成事故。</p></div>
           <div class="incident-strip">
             <a class="incident" href="incidents/2026-08-26-duplicate-training-system-prompt.html"><small>A_REAL_REPRODUCED · RUNTIME</small><h4>Duplicate Training System Prompt</h4><p>1160/1160 重复 → 修复后 118/118 恰好一次；保留真实 Smoke 与 Gate。</p></a>
             <a class="incident" href="incidents/2026-08-26-rl-task-budget-contract.html"><small>A_REAL_REPRODUCED · DATA CONTRACT</small><h4>RL Task Budget Contract</h4><p>v1 的 35 个任务超 6 turns、15 个超工具预算 → v2 全量 2400 条审计通过。</p></a>
             <a class="incident" href="incidents/2026-08-26-agent-context-budget-overflow.html"><small>A_REAL_REPRODUCED · CONTEXT</small><h4>Agent Context Budget Overflow</h4><p>自然 Pilot 有 9 个超长请求；两轮最小修复后，5/5 强制收尾完成且 runtime error 为 0。</p></a>
             <a class="incident" href="incidents/2026-08-26-merged-checkpoint-processor-assets.html"><small>A_REAL_REPRODUCED · CHECKPOINT</small><h4>Merged Checkpoint Processor Assets</h4><p>Eval 在 0 rollout 时因 processor 配置缺失退出；补齐保存契约后完成 128/128 精确复现。</p></a>
+            <a class="incident" href="incidents/2026-08-27-socks-proxy-preflight-import.html"><small>A_REAL_REPRODUCED · PREFLIGHT</small><h4>SOCKS Proxy Import Leak</h4><p>离线 import 因继承 SOCKS 代理触发 socksio 错误；局部清代理后完成真实双 H100 SFT Gate。</p></a>
+            <a class="incident" href="incidents/2026-08-27-benchmark-freeze-contract-ordering.html"><small>A_REAL_REPRODUCED · BENCHMARK</small><h4>Freeze Contract Ordering</h4><p>冻结绑定测试被提前到 finalize 之前；修复阶段顺序与中断恢复后，原 manifest hash 精确恢复。</p></a>
             <a class="incident" href="incidents/2026-08-27-reward-shortcut-empty-final.html"><small>B_CONTROLLED_PROJECT · REWARD</small><h4>Correct Call, Empty Final</h4><p>正确工具调用但空答案的受控 shortcut；修复后 total≤0，并由 strict evaluator 双重约束。</p></a>
           </div>
           <div class="evidence"><strong>登记纪律：</strong> Base/Eval 中的缺引用、重复工具失败和预算耗尽仍只是失败样本；没有根因、修复与回归前不升级为 Incident。完整的 30/60/180 秒讲法见 <a href="answer-bank.html">HTML 回答库</a>。</div>
