@@ -23,7 +23,7 @@ dev = [
 packages = ["src/studyhub_agent"]
 
 [tool.pytest.ini_options]
-addopts = "-q"
+addopts = "-q --import-mode=importlib"
 testpaths = ["tests"]
 pythonpath = [".", "src", "ai_platform/rag_experiments/src"]
 

@@ -1,0 +1,54 @@
+{
+  "schema_version": "studyhub.agentbench-card.v1",
+  "version": "studyhub-agentbench-v1",
+  "status": "FROZEN_FOR_BASELINE",
+  "frozen_at": "2026-08-27T10:16:24+00:00",
+  "build_base_commit": "74ed7c2b2d69766f6214a569436ddcb23055cf2c",
+  "license": {
+    "code_and_public_task_metadata": "MIT",
+    "hidden_source_material": "local evaluation only; governed by StudyHub source terms"
+  },
+  "purpose": "Internal product-aligned benchmark for autonomous StudyHub Agent behavior under replayable tools.",
+  "task_counts": {
+    "regression": 160,
+    "development": 1005,
+    "sealed": 500
+  },
+  "capability_count": 20,
+  "environment": "replayable StudyHub RAG, Web, Memory, ACL, failure, and state-transition sandbox",
+  "grader": {
+    "development": "independent claim/state/process evaluator",
+    "sealed": "separate sealed evaluator implementation",
+    "training_reward": "not used by this benchmark"
+  },
+  "quality": {
+    "structural_checks": "35/35 PASS",
+    "teacher_primary": 120,
+    "teacher_adversarial": 30,
+    "teacher_verdicts": {
+      "PASS": 108,
+      "MINOR": 12
+    },
+    "external_judge": "UNAVAILABLE",
+    "material_partition_overlap": 0,
+    "public_oracle_fields": 0
+  },
+  "baseline_models": {
+    "qwen3_5_9b": "PENDING"
+  },
+  "variance_mde": "PENDING_BASELINE_ROLLOUTS",
+  "cost": "PENDING_BASELINE_PROFILE",
+  "known_limits": [
+    "long-horizon and deep-research tasks use deterministic replay rather than the live Web",
+    "the adversarial pass uses the same teacher session and is not an independent provider",
+    "external benchmark results remain pending"
+  ],
+  "change_log": [
+    "v1 candidate: 20-capability, three-split benchmark generated",
+    "semantic QA: fixed random material/course and weak-topic mismatches",
+    "grader hardening: observable tool-family and recovery contracts added",
+    "v1 frozen for the 9B Base baseline; no post-freeze task edits are allowed"
+  ],
+  "claim_boundary": "Supports internal comparative evaluation only; no external leaderboard or production claim.",
+  "content_sha256": "d6212fd0b2ff8f6a79ee611c04d8593f7fa682f89fc298ae018f6dbfd1171bc5"
+}

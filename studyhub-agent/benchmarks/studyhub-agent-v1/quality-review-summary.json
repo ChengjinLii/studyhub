@@ -1,0 +1,45 @@
+{
+  "schema_version": "studyhub.agentbench-teacher-review.v1",
+  "benchmark_version": "studyhub-agentbench-v1",
+  "status": "PASS",
+  "generated_at": "2026-08-27T10:16:24+00:00",
+  "reviewer": {
+    "type": "openai-codex-teacher-session",
+    "method": "stratified semantic review plus same-teacher adversarial pass",
+    "independent_provider": false
+  },
+  "sample": {
+    "primary": 120,
+    "double_reviewed": 30,
+    "capabilities": 20,
+    "primary_verdicts": {
+      "PASS": 108,
+      "MINOR": 12
+    },
+    "adversarial_verdicts": {
+      "PASS": 26,
+      "MINOR": 4
+    },
+    "sample_ids_sha256": "9ca0a828fa506f859e35cd85b875fd30b2ebbf407faad91c06a79738bee8444b"
+  },
+  "repairs_before_final_review": [
+    "replaced random material pairing with course-related pairing",
+    "aligned memory weak topics with the actual course",
+    "removed low-quality sample titles and redacted contact identifiers",
+    "prevented same-title materials from forming a two-source task",
+    "required observable tool use, composite tool-family coverage, and recovery events"
+  ],
+  "external_judge": {
+    "status": "UNAVAILABLE",
+    "reason": "configured Xiaomi OpenAI-compatible credential returned HTTP 401 invalid_key",
+    "claim": "No Xiaomi review result is included or implied."
+  },
+  "known_limits": [
+    "long-horizon and deep-research tasks use deterministic replay rather than the live Web",
+    "the adversarial pass uses the same teacher session and is not an independent provider",
+    "external benchmark results remain pending"
+  ],
+  "hidden_review_rows": "artifacts/benchmark-v1/studyhub-agent-v1/quality/teacher-reviews.jsonl",
+  "hidden_review_sha256": "ebbff2a1dbf4971fcefbaa9a9900c2fef2365930294387057e7f129ad6e682dd",
+  "blocking_failures": 0
+}

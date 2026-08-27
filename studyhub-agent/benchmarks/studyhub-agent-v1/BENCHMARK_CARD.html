@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>StudyHub Agent Benchmark v1 Card</title>
+<style>
+:root{--ink:#17211d;--muted:#65726b;--paper:#f4f2e9;--green:#2e6a57;--gold:#d3a73c;--line:#cbd2ca}
+*{box-sizing:border-box} body{margin:0;background:var(--paper);color:var(--ink);font-family:"Noto Sans SC","Source Han Sans SC",sans-serif}
+main{max-width:1080px;margin:auto;padding:64px 36px 80px} h1{font:700 clamp(36px,6vw,70px)/1.03 Georgia,serif;margin:0 0 18px}
+.eyebrow{color:var(--green);font-weight:800;letter-spacing:.14em;text-transform:uppercase} .status{display:inline-block;padding:8px 13px;border:1px solid var(--green);border-radius:999px;color:var(--green);font-weight:800}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin:38px 0} .metric,.panel{border-top:3px solid var(--gold);background:#fff9;padding:22px}
+.metric b{display:block;font:700 42px/1 Georgia,serif;margin-bottom:8px} .metric span,p,li{color:var(--muted);line-height:1.65}
+.panels{display:grid;grid-template-columns:1fr 1fr;gap:18px} h2{font-size:20px;margin:0 0 12px} code{font-family:"IBM Plex Mono",monospace;color:var(--green);word-break:break-all}
+@media(max-width:720px){main{padding:38px 20px}.grid,.panels{grid-template-columns:1fr}}
+</style>
+</head>
+<body><main>
+<div class="eyebrow">Benchmark Card / studyhub-agentbench-v1</div>
+<h1>先固定尺子，<br>再训练模型。</h1>
+<p><span class="status">FROZEN_FOR_BASELINE</span></p>
+<p>Internal product-aligned benchmark for autonomous StudyHub Agent behavior under replayable tools.</p>
+<section class="grid">
+<div class="metric"><b>160</b><span>Regression</span></div>
+<div class="metric"><b>1005</b><span>Development</span></div>
+<div class="metric"><b>500</b><span>Sealed Final</span></div>
+</section>
+<section class="panels">
+<article class="panel"><h2>质量门禁</h2><p>结构审计 <strong>35/35 PASS</strong>；教师主审 <strong>120</strong> 条；对抗复核 <strong>30</strong> 条；阻塞缺陷为 0。</p></article>
+<article class="panel"><h2>隔离</h2><p>Training Reward、Development evaluator、Sealed evaluator 独立实现。Sealed tasks、环境、grader 和资料语料只保存在 Git ignored artifact。</p></article>
+<article class="panel"><h2>已知限制</h2><ul><li>long-horizon and deep-research tasks use deterministic replay rather than the live Web</li><li>the adversarial pass uses the same teacher session and is not an independent provider</li><li>external benchmark results remain pending</li></ul></article>
+<article class="panel"><h2>变更记录</h2><ul><li>v1 candidate: 20-capability, three-split benchmark generated</li><li>semantic QA: fixed random material/course and weak-topic mismatches</li><li>grader hardening: observable tool-family and recovery contracts added</li><li>v1 frozen for the 9B Base baseline; no post-freeze task edits are allowed</li></ul></article>
+</section>
+<p>内容指纹：<code>d6212fd0b2ff8f6a79ee611c04d8593f7fa682f89fc298ae018f6dbfd1171bc5</code></p>
+<p>基线状态：PENDING。当前卡片不包含任何模型能力提升结论。</p>
+</main></body></html>
