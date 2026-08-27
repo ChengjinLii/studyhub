@@ -4,7 +4,11 @@ from pathlib import Path
 from types import SimpleNamespace
 
 from scripts.benchmark.run_9b_base_eval import aggregate, build_work_items, launch_server, select_tasks
-from studyhub_agent.benchmark_v1.hermes_runner import BENCHMARK_SYSTEM_PROMPT, _install_benchmark_prompt
+from studyhub_agent.benchmark_v1.hermes_runner import (
+    BENCHMARK_SYSTEM_PROMPT,
+    _install_benchmark_prompt,
+    _install_request_audit,
+)
 from studyhub_agent.benchmark_v1.schema import load_jsonl
 
 PROJECT = Path(__file__).resolve().parents[3]
@@ -65,6 +69,33 @@ def test_benchmark_prompt_is_installed_once() -> None:
     assert prompt.count(BENCHMARK_SYSTEM_PROMPT) == 1
     assert "只读" in prompt
     assert agent.ephemeral_system_prompt is None
+
+
+def test_request_audit_records_prompt_cardinality_without_prompt_text() -> None:
+    agent = SimpleNamespace(
+        _build_api_kwargs=lambda: {
+            "messages": [
+                {"role": "system", "content": BENCHMARK_SYSTEM_PROMPT},
+                {"role": "user", "content": "question"},
+            ],
+            "tools": [{"type": "function"}],
+        }
+    )
+
+    _install_request_audit(agent)
+    agent._build_api_kwargs()
+
+    assert agent._studyhub_request_audit == [
+        {
+            "request_index": 0,
+            "message_count": 2,
+            "system_message_count": 1,
+            "benchmark_prompt_occurrences": 1,
+            "system_prompt_sha256": "3d7a9af088c60d1ee8bd68bb6860c806ece7493e341261a952dc2f023001b099",
+            "tool_schema_count": 1,
+        }
+    ]
+    assert "question" not in str(agent._studyhub_request_audit)
 
 
 def test_base_server_exposes_hermes_minimum_context(monkeypatch, tmp_path: Path) -> None:

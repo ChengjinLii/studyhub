@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import json
 import sys
 import time
@@ -39,6 +40,37 @@ def _install_benchmark_prompt(agent: Any, constraints: list[str]) -> None:
     agent._cached_system_prompt = None
     agent._cached_system_prompt_static = None
     agent.ephemeral_system_prompt = None
+
+
+def _install_request_audit(agent: Any) -> None:
+    """Record prompt cardinality and hashes without retaining prompt text."""
+
+    original_build = agent._build_api_kwargs
+    records: list[dict[str, Any]] = []
+
+    def audited_build(*args: Any, **kwargs: Any) -> dict[str, Any]:
+        api_kwargs = original_build(*args, **kwargs)
+        messages = list(api_kwargs.get("messages") or [])
+        system_contents = [
+            str(message.get("content", ""))
+            for message in messages
+            if message.get("role") == "system"
+        ]
+        joined = "\n\n".join(system_contents)
+        records.append(
+            {
+                "request_index": len(records),
+                "message_count": len(messages),
+                "system_message_count": len(system_contents),
+                "benchmark_prompt_occurrences": joined.count(BENCHMARK_SYSTEM_PROMPT),
+                "system_prompt_sha256": hashlib.sha256(joined.encode()).hexdigest(),
+                "tool_schema_count": len(api_kwargs.get("tools") or []),
+            }
+        )
+        return api_kwargs
+
+    agent._build_api_kwargs = audited_build
+    agent._studyhub_request_audit = records
 
 
 class BenchmarkHermesRunner:
@@ -183,6 +215,7 @@ class BenchmarkHermesRunner:
                 ),
                 runtime_error_callback=environment.record_runtime_error,
             ).install(agent)
+            _install_request_audit(agent)
             result = await asyncio.to_thread(
                 agent.run_conversation,
                 task.user_request,
@@ -207,5 +240,6 @@ class BenchmarkHermesRunner:
                 **(_training_runtime_metadata(agent) if agent is not None else {}),
                 "elapsed_seconds": round(time.monotonic() - started, 6),
                 "sample_seed": sample_seed,
+                "request_audit": list(getattr(agent, "_studyhub_request_audit", [])) if agent is not None else [],
             },
         }
