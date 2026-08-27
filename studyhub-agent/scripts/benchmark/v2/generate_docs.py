@@ -212,6 +212,10 @@ bash scripts/benchmark/run_full_quality_gate.sh
 ```
 
 The command fetches or validates the licensed Web/external snapshots, rebuilds v2, runs structural and semantic audits, Oracle/negative/metamorphic/challenge tests, validates v1 integrity, scans commit candidates for secrets, freezes the manifest, and verifies all recorded hashes. Without the authorized OCR snapshot, the command exits with an explicit prerequisite error rather than substituting synthetic content.
+
+## Base Calibration
+
+The first post-freeze Qwen3.5-9B Base Gate is recorded in [9B_BASE_V2_CALIBRATION.md](9B_BASE_V2_CALIBRATION.md). It covers one public task per capability and validates the complete runtime, but it is not a full Development or Sealed benchmark result and does not assign empirical difficulty labels.
 """,
         encoding="utf-8",
     )

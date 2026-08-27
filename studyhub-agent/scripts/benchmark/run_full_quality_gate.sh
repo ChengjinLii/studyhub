@@ -7,8 +7,6 @@ cd "$PROJECT_ROOT"
 PYTHON_BIN="${PYTHON_BIN:-$PROJECT_ROOT/.venv/bin/python}"
 RUFF_BIN="${RUFF_BIN:-$PROJECT_ROOT/.venv/bin/ruff}"
 PYTEST_BIN="${PYTEST_BIN:-$PROJECT_ROOT/.venv/bin/pytest}"
-BUILDER_COMMIT="${BUILDER_COMMIT:-$(git rev-parse HEAD)}"
-export SOURCE_DATE_EPOCH="${SOURCE_DATE_EPOCH:-$(git show -s --format=%ct "$BUILDER_COMMIT")}"
 
 for executable in "$PYTHON_BIN" "$RUFF_BIN" "$PYTEST_BIN"; do
   if [[ ! -x "$executable" ]]; then
@@ -16,6 +14,25 @@ for executable in "$PYTHON_BIN" "$RUFF_BIN" "$PYTEST_BIN"; do
     exit 2
   fi
 done
+
+if [[ -z "${BUILDER_COMMIT:-}" && -f "benchmarks/studyhub-agent-v2/manifest.json" ]]; then
+  BUILDER_COMMIT="$("$PYTHON_BIN" - "benchmarks/studyhub-agent-v2/manifest.json" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+manifest = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+if manifest.get("status") == "FROZEN_FOR_BASELINE":
+    print(manifest.get("builder_commit", ""))
+PY
+)"
+fi
+BUILDER_COMMIT="${BUILDER_COMMIT:-$(git rev-parse HEAD)}"
+if ! git cat-file -e "${BUILDER_COMMIT}^{commit}"; then
+  printf 'invalid builder commit: %s\n' "$BUILDER_COMMIT" >&2
+  exit 2
+fi
+export SOURCE_DATE_EPOCH="${SOURCE_DATE_EPOCH:-$(git show -s --format=%ct "$BUILDER_COMMIT")}"
 
 required_inputs=(
   "ai_platform/rag_experiments/artifacts/corpus/chunks.jsonl"
@@ -74,5 +91,6 @@ fi
 "$PYTHON_BIN" scripts/benchmark/v2/finalize.py --builder-commit "$BUILDER_COMMIT"
 "$PYTHON_BIN" scripts/benchmark/v2/generate_docs.py
 "$PYTHON_BIN" scripts/benchmark/v2/validate_manifest.py --require-frozen
+"$PYTHON_BIN" scripts/benchmark/v2/validate_calibration.py
 
 printf 'StudyHub AgentBench v2 quality gate passed for builder commit %s\n' "$BUILDER_COMMIT"

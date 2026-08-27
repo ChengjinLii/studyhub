@@ -1,0 +1,106 @@
+{
+  "schema_version": "studyhub.agentbench-calibration-record.v2",
+  "calibration_version": "qwen35-9b-base-gate-20260827.1",
+  "benchmark_version": "studyhub-agentbench-v2",
+  "benchmark_revision": "2.0.0",
+  "benchmark_manifest_sha256": "da804b10f53dec585255598c3e256445b8ade3acf35fd8c766ca0ab4d759c88b",
+  "builder_commit": "61ca5f77cfa827c35580c108596a185ba369d253",
+  "run_commit": "c0eb9c8da6e6dbd4cfe6fbae530fb115fb724710",
+  "run_id": "qwen35-9b-base-v2-gate-seed-20260827-20260827_211021",
+  "status": "COMPLETED",
+  "scope": "STRATIFIED_PUBLIC_GATE_SMOKE",
+  "sealed_tasks_or_graders_used": false,
+  "model": {
+    "repository": "Qwen/Qwen3.5-9B",
+    "revision": "c202236235762e1c871ad0ccb60c8ee5ba337b9a"
+  },
+  "runtime": {
+    "hermes_commit": "5c1a304ce890276a4334d8ced3f29ffeedbbbf93",
+    "areal_commit": "cbff54d645d2cd8ee1f1c358a82f3f473588433d",
+    "sglang": "0.5.10.post1",
+    "optimizer_steps": 0,
+    "workers": 2,
+    "gpus": [
+      0,
+      1
+    ],
+    "temperature": 0.0,
+    "seed": 20260827,
+    "elapsed_seconds": 178.267364,
+    "peak_used_mib_by_gpu": {
+      "0": 59291.0,
+      "1": 59240.0
+    }
+  },
+  "coverage": {
+    "episodes_expected": 30,
+    "episodes_scored": 30,
+    "infra_excluded": 0,
+    "capability_families": 30,
+    "source_groups": 30,
+    "semantic_template_clusters": 30,
+    "split_counts": {
+      "regression": 1,
+      "development": 24,
+      "calibration_challenge": 5
+    },
+    "origin_counts": {
+      "authentic_studyhub_preview": 2,
+      "authentic_web_snapshot": 1,
+      "synthetic_adversarial": 10,
+      "synthetic_memory": 14,
+      "synthetic_state": 3
+    },
+    "language_counts": {
+      "zh": 27,
+      "en": 3
+    }
+  },
+  "results": {
+    "strict_success": 5,
+    "strict_success_rate": 0.166667,
+    "strict_success_ci95": [
+      0.033333,
+      0.3
+    ],
+    "mean_diagnostic_score": 0.308222,
+    "mean_diagnostic_score_ci95": [
+      0.181389,
+      0.447778
+    ],
+    "mean_tool_calls": 3.0,
+    "mean_latency_seconds": 7.917418,
+    "p95_latency_seconds": 18.094877,
+    "successful_capabilities": [
+      "direct_answer_tool_relevance",
+      "factual_passage_retrieval",
+      "memory_irrelevant_tool_abstention",
+      "state_function_calling",
+      "state_multistep_postcondition"
+    ],
+    "hard_gate_counts": {
+      "invalid_citation": 8,
+      "policy:source_not_discovered": 3
+    }
+  },
+  "request_audit": {
+    "api_requests": 126,
+    "exactly_one_system_message": 126,
+    "exactly_one_benchmark_prompt": 126,
+    "violations": 0
+  },
+  "artifact_hashes": {
+    "episodes_jsonl": "f3660f18b3e67e3d5625716c604a824faef635843b01eddeb011d3f89bb54334",
+    "summary_json": "a42ef8221cfdde1cb3098e38b043b54756989c31a312bf7d6609ee14ecdcdc4a",
+    "gpu_telemetry_csv": "fcf3154364f60f4714a6d753c0de171b2863134b809394c8893e8592668eef47",
+    "launcher_log": "3e14895488baf03f420307ce65200d5a91fc0fa34f00fcd6cf3618a13fcded64"
+  },
+  "difficulty_annotation": {
+    "status": "NOT_APPLIED_INSUFFICIENT_SAMPLE",
+    "reason": "This gate contains one task per capability and is an infrastructure and learnability smoke, not a stable empirical-difficulty estimate. All benchmark tasks remain UNSCORED."
+  },
+  "interpretation": {
+    "allowed": "The frozen v2 runtime is healthy and the Base model produces scoreable trajectories across all 30 capability families.",
+    "not_allowed": "The 30-episode gate must not be treated as a full benchmark score, a sealed-set result, or sufficient evidence for empirical difficulty labels."
+  }
+}

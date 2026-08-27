@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import json
 from pathlib import Path
 
@@ -263,3 +264,21 @@ def test_v2_aggregate_reports_cluster_aware_intervals() -> None:
     assert summary["mean_score"] == 0.5
     assert summary["macro_capability_strict_success"] == 0.5
     assert summary["cluster_aware_strict_success"]["source_group_id"]["effective_clusters"] == 2
+
+
+def test_public_calibration_record_is_bound_and_does_not_claim_difficulty() -> None:
+    manifest = PUBLIC_BENCHMARK / "manifest.json"
+    manifest_row = json.loads(manifest.read_text(encoding="utf-8"))
+    record = json.loads(
+        (PROJECT / "docs/benchmark/evidence/qwen35-9b-base-gate-20260827.json").read_text(encoding="utf-8")
+    )
+
+    if manifest_row["status"] == "FROZEN_FOR_BASELINE":
+        assert record["benchmark_manifest_sha256"] == hashlib.sha256(manifest.read_bytes()).hexdigest()
+        assert record["builder_commit"] == manifest_row["builder_commit"]
+    assert record["coverage"]["episodes_scored"] == 30
+    assert record["coverage"]["capability_families"] == 30
+    assert record["coverage"]["infra_excluded"] == 0
+    assert record["sealed_tasks_or_graders_used"] is False
+    assert record["request_audit"]["violations"] == 0
+    assert record["difficulty_annotation"]["status"] == "NOT_APPLIED_INSUFFICIENT_SAMPLE"
