@@ -15,7 +15,7 @@ def test_committed_v3_program_is_internally_consistent() -> None:
     assert errors == []
     assert summary == {
         "program_id": "studyhub-9b-agentic-post-training-v3",
-        "status": "BENCHMARK_V2_FROZEN_BASE_CALIBRATED_SFT_FORMAL_AUTHORIZED",
+        "status": "BENCHMARK_V2_FROZEN_BASE_CALIBRATED_OVERNIGHT_SFT_AUTHORIZED",
         "capabilities": len(EXPECTED_CAPABILITIES),
         "benchmark_version": "studyhub-agentbench-v2",
         "benchmark_manifest_sha256": "da804b10f53dec585255598c3e256445b8ade3acf35fd8c766ca0ab4d759c88b",
@@ -33,17 +33,25 @@ def test_committed_v3_program_is_internally_consistent() -> None:
         "sft_profile_status": "PASSED",
         "sft_profile_selected_recipe": "r16",
         "formal_sft": {
-            "status": "AUTHORIZED_PENDING_START",
+            "status": "INTERRUPTED_SCOPE_CORRECTION",
             "training_trial": "formal-r16-seed-20260827",
             "expected_optimizer_updates": 5456,
             "train_all_tokens": 55554221,
             "train_assistant_loss_tokens": 8152342,
         },
+        "overnight_sft": {
+            "status": "AUTHORIZED_PENDING_RUN",
+            "training_trial": "overnight-r16-v30-seed-20260827",
+            "maximum_optimizer_updates": 2100,
+            "maximum_wall_time_seconds": 22500,
+            "no_rl": True,
+            "no_sealed": True,
+        },
         "rl_post_qa_tasks": 10000,
         "initial_grpo_updates": 500,
         "algorithms": len(EXPECTED_ALGORITHMS),
         "design_defects": 17,
-        "launch_authorized": True,
+        "launch_authorized": False,
     }
 
 
@@ -51,7 +59,7 @@ def test_v3_program_keeps_local_model_check_optional_for_ci() -> None:
     errors, summary = validate_program(PROJECT, check_local_assets=False)
 
     assert errors == []
-    assert summary["launch_authorized"] is True
+    assert summary["launch_authorized"] is False
 
 
 def test_v3_plan_has_human_and_machine_readable_entry_points() -> None:

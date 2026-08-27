@@ -8,8 +8,13 @@ import hashlib
 import json
 import os
 import subprocess
+import sys
 from pathlib import Path
 from typing import Any
+
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
 
 from scripts.train.validate_v3_program import validate_program
 
@@ -36,6 +41,10 @@ def _load(path: Path) -> dict[str, Any]:
     if not isinstance(value, dict):
         raise RuntimeError(f"expected JSON object: {path}")
     return value
+
+
+def _resolve_cli_path(path: Path) -> Path:
+    return path.expanduser().resolve()
 
 
 def _gpu_state(gpus: str) -> dict[str, Any]:
@@ -79,7 +88,7 @@ def _gpu_state(gpus: str) -> dict[str, Any]:
 
 
 def parse_args() -> argparse.Namespace:
-    project = Path(__file__).resolve().parents[2]
+    project = PROJECT_ROOT
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--config",
@@ -96,12 +105,21 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--lora-rank", type=int)
     parser.add_argument("--lora-alpha", type=int)
     parser.add_argument("--formal", action="store_true")
+    parser.add_argument("--overnight", action="store_true")
+    parser.add_argument(
+        "--authorization",
+        type=Path,
+        default=project / "configs/program-v3/overnight-sft-baseline-authorization.json",
+    )
     return parser.parse_args()
 
 
 def main() -> int:
     args = parse_args()
-    project = Path(__file__).resolve().parents[2]
+    if args.formal and args.overnight:
+        raise RuntimeError("--formal and --overnight are mutually exclusive")
+    project = PROJECT_ROOT
+    authorization_path = _resolve_cli_path(args.authorization)
     errors, program_summary = validate_program(project, check_local_assets=True)
     if errors:
         raise RuntimeError("v3 program validation failed: " + "; ".join(errors))
@@ -158,6 +176,50 @@ def main() -> int:
         if formal.get("expected_optimizer_updates") != len(dataset["train"]) // config.train_dataset.batch_size:
             raise RuntimeError("formal SFT optimizer budget does not match the accepted train split")
 
+    overnight_authorization: dict[str, Any] | None = None
+    if args.overnight:
+        overnight_authorization = _load(authorization_path)
+        program = _load(project / "configs/program-v3/training-program-v3.json")
+        if program.get("launch_authorized") is not False or program.get("formal_sft_authorized") is not False:
+            raise RuntimeError("global/formal launch authorization must remain disabled")
+        if program.get("overnight_sft_baseline_authorized") is not True:
+            raise RuntimeError("overnight SFT baseline is not authorized")
+        if program.get("overnight_sft_authorization") != str(authorization_path.relative_to(project)):
+            raise RuntimeError("program points to a different overnight authorization")
+        if program.get("overnight_sft_authorization_sha256") != _sha256(authorization_path):
+            raise RuntimeError("overnight authorization hash drift")
+        if overnight_authorization.get("status") != "AUTHORIZED_PENDING_RUN":
+            raise RuntimeError("overnight authorization is not pending")
+        scope = overnight_authorization.get("scope", {})
+        required_false = ("no_rl", "no_sealed", "no_benchmark_modification", "no_general_hermes_refactor")
+        if any(scope.get(name) is not True for name in required_false):
+            raise RuntimeError("overnight forbidden-scope contract is incomplete")
+        lineage = overnight_authorization.get("lineage", {})
+        expected_hashes = {
+            "dataset_manifest_sha256": _sha256(project / "datasets/processed/runtime_sft_v3_qwen35_9b/manifest.json"),
+            "selected_jsonl_sha256": _sha256(project / "datasets/interim/runtime_sft_v3/selected.jsonl"),
+            "selected_manifest_sha256": _sha256(project / "datasets/interim/runtime_sft_v3/selected.manifest.json"),
+            "data_card_sha256": _sha256(args.data_card),
+            "benchmark_manifest_sha256": benchmark_manifest_sha256,
+            "model_config_sha256": _sha256(Path(config.actor.path) / "config.json"),
+            "model_index_sha256": _sha256(Path(config.actor.path) / "model.safetensors.index.json"),
+        }
+        drift = {key: {"authorized": lineage.get(key), "actual": value} for key, value in expected_hashes.items() if lineage.get(key) != value}
+        if drift:
+            raise RuntimeError(f"overnight lineage drift: {drift}")
+        budget = overnight_authorization.get("budget", {})
+        if not 0 < int(budget.get("maximum_optimizer_updates", 0)) <= len(dataset["train"]) // config.train_dataset.batch_size:
+            raise RuntimeError("overnight optimizer budget is not a bounded single pass")
+        if not 0 < int(budget.get("maximum_wall_time_seconds", 0)) <= 22500:
+            raise RuntimeError("overnight wall-time budget exceeds 6.25 hours")
+        if int(budget.get("checkpoint_every_updates", 0)) != int(budget.get("recovery_every_updates", -1)):
+            raise RuntimeError("overnight save and recovery cadence must match")
+        if int(budget.get("checkpoint_every_updates", 0)) * 10 != int(budget["planned_optimizer_updates"]):
+            raise RuntimeError("overnight checkpoints must divide the planned budget into ten slices")
+        recipe = overnight_authorization.get("recipe", {})
+        if effective_lora_rank != recipe.get("lora_rank") or effective_lora_alpha != recipe.get("lora_alpha"):
+            raise RuntimeError("overnight SFT must use the authorized LoRA recipe")
+
     model_path = Path(config.actor.path)
     weight_index = _load(model_path / "model.safetensors.index.json")
     weight_names = tuple(weight_index.get("weight_map", {}))
@@ -207,9 +269,17 @@ def main() -> int:
             "max_tokens_per_microbatch": config.actor.mb_spec.max_tokens_per_mb,
             "global_batch_size": config.train_dataset.batch_size,
             "formal": args.formal,
+            "overnight": args.overnight,
         },
         "gpu_state": gpu_state,
     }
+    if overnight_authorization is not None:
+        result["overnight_authorization"] = {
+            "authorization_id": overnight_authorization["authorization_id"],
+            "sha256": _sha256(authorization_path),
+            "budget": overnight_authorization["budget"],
+            "scope": overnight_authorization["scope"],
+        }
     print(json.dumps(result, ensure_ascii=False, indent=2))
     return 0
 

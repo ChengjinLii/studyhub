@@ -1,0 +1,542 @@
+{
+  "schema_version": "studyhub.runtime-sft-v3-source-audit.v1",
+  "status": "PASS",
+  "dataset_release": "runtime-SFT-v3.0",
+  "immutable_selected_sha256": "a115d220841a0e56c8893a01e486c8399c24cb591143f221c78a926deee42783",
+  "token_manifest_sha256": "b67e6d56e531cd75969e9baf51838fb9a73fc3535645e1514c0156fde2b9242f",
+  "benchmark_manifest_sha256": "da804b10f53dec585255598c3e256445b8ade3acf35fd8c766ca0ab4d759c88b",
+  "benchmark_tasks_checked": 73,
+  "benchmark_splits_checked": [
+    "regression",
+    "development",
+    "calibration_challenge"
+  ],
+  "sealed_task_files_read": false,
+  "sealed_overlap_recheck": "INHERITED_FROM_FROZEN_V3_SOURCE_LOCK_NOT_RECOMPUTED",
+  "benchmark_prompt_overlap": 0,
+  "rows": 48500,
+  "total_tokens": 61725581,
+  "assistant_loss_tokens": 9062215,
+  "assistant_fraction": 0.146815,
+  "action_only": {
+    "total": 6158,
+    "by_source": {
+      "hermes_function_calling": 405,
+      "toolace": 5753
+    }
+  },
+  "deterministic_fixture": {
+    "total": 20000,
+    "by_source": {
+      "studyhub_acl_recovery": 4000,
+      "studyhub_memory_replay": 4000,
+      "studyhub_metadata_replay": 6000,
+      "studyhub_state_tools": 3000,
+      "studyhub_web_fallback": 3000
+    }
+  },
+  "teacher_verified_rows": 0,
+  "custom_source_group_max": {
+    "studyhub_acl_recovery": 13,
+    "studyhub_memory_replay": 70,
+    "studyhub_metadata_replay": 138,
+    "studyhub_state_tools": 50,
+    "studyhub_web_fallback": 49
+  },
+  "sources": {
+    "coig_exam": {
+      "rows": 4500,
+      "row_share": 0.092784,
+      "complete_rows": 4500,
+      "action_only_rows": 0,
+      "runtime_native_rows": 0,
+      "runtime_native_share": 0.0,
+      "quality_tiers": {
+        "expert_complete": 4500
+      },
+      "quality_classes": {
+        "expert_recorded": 4500
+      },
+      "observation_origin": {
+        "no_tool_observation": 4500
+      },
+      "total_tokens": 1564599,
+      "assistant_loss_tokens": 337898,
+      "assistant_fraction": 0.215965,
+      "split": {
+        "protocol_holdout": 225,
+        "train": 4050,
+        "validation": 225
+      },
+      "unique_groups": 4500,
+      "rows_per_group": {
+        "p50": 1,
+        "p90": 1,
+        "max": 1
+      },
+      "template_clusters": 4470,
+      "largest_template_cluster_share": 0.000667,
+      "tool_sequence_signatures": 1,
+      "largest_tool_sequence_share": 1.0,
+      "final_answer_signatures": 3050,
+      "largest_final_answer_share": 0.083111,
+      "capability_tags": {
+        "chinese_tutoring": 4500,
+        "direct_answer": 4500,
+        "tool_abstention": 4500
+      },
+      "language": {
+        "en": 21,
+        "zh": 4479
+      },
+      "citation_rows": 0,
+      "citation_rate": 0.0
+    },
+    "hermes_function_calling": {
+      "rows": 2600,
+      "row_share": 0.053608,
+      "complete_rows": 2195,
+      "action_only_rows": 405,
+      "runtime_native_rows": 927,
+      "runtime_native_share": 0.356538,
+      "quality_tiers": {
+        "expert_action_only": 405,
+        "expert_complete": 2195
+      },
+      "quality_classes": {
+        "action_only": 405,
+        "expert_recorded": 2195
+      },
+      "observation_origin": {
+        "no_complete_observation_and_final": 405,
+        "no_tool_observation": 1268,
+        "open_dataset_recorded_or_converted": 927
+      },
+      "total_tokens": 3595505,
+      "assistant_loss_tokens": 697352,
+      "assistant_fraction": 0.193951,
+      "split": {
+        "protocol_holdout": 130,
+        "train": 2340,
+        "validation": 130
+      },
+      "unique_groups": 2600,
+      "rows_per_group": {
+        "p50": 1,
+        "p90": 1,
+        "max": 1
+      },
+      "template_clusters": 2322,
+      "largest_template_cluster_share": 0.003462,
+      "tool_sequence_signatures": 990,
+      "largest_tool_sequence_share": 0.613077,
+      "final_answer_signatures": 2126,
+      "largest_final_answer_share": 0.001538,
+      "capability_tags": {
+        "direct_answer": 1268,
+        "function_calling": 1332,
+        "structured_output": 1268,
+        "tool_protocol": 1332
+      },
+      "language": {
+        "en": 2597,
+        "zh": 3
+      },
+      "citation_rows": 0,
+      "citation_rate": 0.0
+    },
+    "studyhub_2wiki_replay": {
+      "rows": 12000,
+      "row_share": 0.247423,
+      "complete_rows": 12000,
+      "action_only_rows": 0,
+      "runtime_native_rows": 12000,
+      "runtime_native_share": 1.0,
+      "quality_tiers": {
+        "oracle_derived_expert_complete": 12000
+      },
+      "quality_classes": {
+        "oracle": 12000
+      },
+      "observation_origin": {
+        "oracle_derived_replay": 12000
+      },
+      "total_tokens": 24260902,
+      "assistant_loss_tokens": 2902971,
+      "assistant_fraction": 0.119656,
+      "split": {
+        "protocol_holdout": 600,
+        "train": 10800,
+        "validation": 600
+      },
+      "unique_groups": 12000,
+      "rows_per_group": {
+        "p50": 1,
+        "p90": 1,
+        "max": 1
+      },
+      "template_clusters": 11999,
+      "largest_template_cluster_share": 0.000167,
+      "tool_sequence_signatures": 2,
+      "largest_tool_sequence_share": 0.972833,
+      "final_answer_signatures": 12000,
+      "largest_final_answer_share": 8.3e-05,
+      "capability_tags": {
+        "citation": 12000,
+        "long_horizon": 326,
+        "multi_hop": 12000,
+        "rag": 12000,
+        "short_horizon": 11674
+      },
+      "language": {
+        "en": 12000
+      },
+      "citation_rows": 12000,
+      "citation_rate": 1.0
+    },
+    "studyhub_acl_recovery": {
+      "rows": 4000,
+      "row_share": 0.082474,
+      "complete_rows": 4000,
+      "action_only_rows": 0,
+      "runtime_native_rows": 4000,
+      "runtime_native_share": 1.0,
+      "quality_tiers": {
+        "deterministic_fixture_complete": 4000
+      },
+      "quality_classes": {
+        "fixture": 4000
+      },
+      "observation_origin": {
+        "deterministic_fixture": 4000
+      },
+      "total_tokens": 3905071,
+      "assistant_loss_tokens": 690700,
+      "assistant_fraction": 0.176873,
+      "split": {
+        "protocol_holdout": 200,
+        "train": 3600,
+        "validation": 200
+      },
+      "unique_groups": 1905,
+      "rows_per_group": {
+        "p50": 2,
+        "p90": 4,
+        "max": 13
+      },
+      "template_clusters": 2559,
+      "largest_template_cluster_share": 0.01925,
+      "tool_sequence_signatures": 1,
+      "largest_tool_sequence_share": 1.0,
+      "final_answer_signatures": 982,
+      "largest_final_answer_share": 0.00325,
+      "capability_tags": {
+        "acl": 4000,
+        "citation": 4000,
+        "rag": 4000,
+        "recovery": 4000
+      },
+      "language": {
+        "zh": 4000
+      },
+      "citation_rows": 4000,
+      "citation_rate": 1.0
+    },
+    "studyhub_memory_replay": {
+      "rows": 4000,
+      "row_share": 0.082474,
+      "complete_rows": 4000,
+      "action_only_rows": 0,
+      "runtime_native_rows": 4000,
+      "runtime_native_share": 1.0,
+      "quality_tiers": {
+        "deterministic_fixture_complete": 4000
+      },
+      "quality_classes": {
+        "fixture": 4000
+      },
+      "observation_origin": {
+        "deterministic_fixture": 4000
+      },
+      "total_tokens": 4932665,
+      "assistant_loss_tokens": 762337,
+      "assistant_fraction": 0.154549,
+      "split": {
+        "protocol_holdout": 200,
+        "train": 3600,
+        "validation": 200
+      },
+      "unique_groups": 101,
+      "rows_per_group": {
+        "p50": 41,
+        "p90": 52,
+        "max": 70
+      },
+      "template_clusters": 10,
+      "largest_template_cluster_share": 0.104,
+      "tool_sequence_signatures": 1,
+      "largest_tool_sequence_share": 1.0,
+      "final_answer_signatures": 404,
+      "largest_final_answer_share": 0.00525,
+      "capability_tags": {
+        "citation": 4000,
+        "memory": 4000,
+        "personalization": 4000,
+        "rag": 4000
+      },
+      "language": {
+        "zh": 4000
+      },
+      "citation_rows": 4000,
+      "citation_rate": 1.0
+    },
+    "studyhub_metadata_replay": {
+      "rows": 6000,
+      "row_share": 0.123711,
+      "complete_rows": 6000,
+      "action_only_rows": 0,
+      "runtime_native_rows": 6000,
+      "runtime_native_share": 1.0,
+      "quality_tiers": {
+        "deterministic_fixture_complete": 6000
+      },
+      "quality_classes": {
+        "fixture": 6000
+      },
+      "observation_origin": {
+        "deterministic_fixture": 6000
+      },
+      "total_tokens": 6311557,
+      "assistant_loss_tokens": 823135,
+      "assistant_fraction": 0.130417,
+      "split": {
+        "protocol_holdout": 300,
+        "train": 5400,
+        "validation": 300
+      },
+      "unique_groups": 99,
+      "rows_per_group": {
+        "p50": 56,
+        "p90": 118,
+        "max": 138
+      },
+      "template_clusters": 3167,
+      "largest_template_cluster_share": 0.041833,
+      "tool_sequence_signatures": 1,
+      "largest_tool_sequence_share": 1.0,
+      "final_answer_signatures": 570,
+      "largest_final_answer_share": 0.004667,
+      "capability_tags": {
+        "citation": 6000,
+        "rag": 6000,
+        "recommendation": 6000
+      },
+      "language": {
+        "zh": 6000
+      },
+      "citation_rows": 6000,
+      "citation_rate": 1.0
+    },
+    "studyhub_qasper_replay": {
+      "rows": 3000,
+      "row_share": 0.061856,
+      "complete_rows": 3000,
+      "action_only_rows": 0,
+      "runtime_native_rows": 3000,
+      "runtime_native_share": 1.0,
+      "quality_tiers": {
+        "oracle_derived_expert_complete": 3000
+      },
+      "quality_classes": {
+        "oracle": 3000
+      },
+      "observation_origin": {
+        "oracle_derived_replay": 3000
+      },
+      "total_tokens": 3435234,
+      "assistant_loss_tokens": 486445,
+      "assistant_fraction": 0.141605,
+      "split": {
+        "protocol_holdout": 150,
+        "train": 2700,
+        "validation": 150
+      },
+      "unique_groups": 1117,
+      "rows_per_group": {
+        "p50": 2,
+        "p90": 5,
+        "max": 11
+      },
+      "template_clusters": 2999,
+      "largest_template_cluster_share": 0.000667,
+      "tool_sequence_signatures": 4,
+      "largest_tool_sequence_share": 0.565667,
+      "final_answer_signatures": 2605,
+      "largest_final_answer_share": 0.101333,
+      "capability_tags": {
+        "abstention": 400,
+        "citation": 3000,
+        "paper_qa": 3000,
+        "rag": 3000,
+        "research": 2600
+      },
+      "language": {
+        "en": 3000
+      },
+      "citation_rows": 2600,
+      "citation_rate": 0.866667
+    },
+    "studyhub_state_tools": {
+      "rows": 3000,
+      "row_share": 0.061856,
+      "complete_rows": 3000,
+      "action_only_rows": 0,
+      "runtime_native_rows": 3000,
+      "runtime_native_share": 1.0,
+      "quality_tiers": {
+        "deterministic_fixture_complete": 3000
+      },
+      "quality_classes": {
+        "fixture": 3000
+      },
+      "observation_origin": {
+        "deterministic_fixture": 3000
+      },
+      "total_tokens": 4287551,
+      "assistant_loss_tokens": 735022,
+      "assistant_fraction": 0.171432,
+      "split": {
+        "protocol_holdout": 150,
+        "train": 2700,
+        "validation": 150
+      },
+      "unique_groups": 101,
+      "rows_per_group": {
+        "p50": 31,
+        "p90": 40,
+        "max": 50
+      },
+      "template_clusters": 40,
+      "largest_template_cluster_share": 0.029667,
+      "tool_sequence_signatures": 1,
+      "largest_tool_sequence_share": 1.0,
+      "final_answer_signatures": 1147,
+      "largest_final_answer_share": 0.003,
+      "capability_tags": {
+        "function_calling": 3000,
+        "long_horizon": 3000,
+        "rag": 3000,
+        "state": 3000
+      },
+      "language": {
+        "zh": 3000
+      },
+      "citation_rows": 3000,
+      "citation_rate": 1.0
+    },
+    "studyhub_web_fallback": {
+      "rows": 3000,
+      "row_share": 0.061856,
+      "complete_rows": 3000,
+      "action_only_rows": 0,
+      "runtime_native_rows": 3000,
+      "runtime_native_share": 1.0,
+      "quality_tiers": {
+        "deterministic_fixture_complete": 3000
+      },
+      "quality_classes": {
+        "fixture": 3000
+      },
+      "observation_origin": {
+        "deterministic_fixture": 3000
+      },
+      "total_tokens": 3294585,
+      "assistant_loss_tokens": 664303,
+      "assistant_fraction": 0.201635,
+      "split": {
+        "protocol_holdout": 150,
+        "train": 2700,
+        "validation": 150
+      },
+      "unique_groups": 101,
+      "rows_per_group": {
+        "p50": 31,
+        "p90": 40,
+        "max": 49
+      },
+      "template_clusters": 4,
+      "largest_template_cluster_share": 0.26,
+      "tool_sequence_signatures": 1,
+      "largest_tool_sequence_share": 1.0,
+      "final_answer_signatures": 404,
+      "largest_final_answer_share": 0.005333,
+      "capability_tags": {
+        "citation": 3000,
+        "long_horizon": 3000,
+        "recovery": 3000,
+        "web": 3000
+      },
+      "language": {
+        "zh": 3000
+      },
+      "citation_rows": 3000,
+      "citation_rate": 1.0
+    },
+    "toolace": {
+      "rows": 6400,
+      "row_share": 0.131959,
+      "complete_rows": 647,
+      "action_only_rows": 5753,
+      "runtime_native_rows": 647,
+      "runtime_native_share": 0.101094,
+      "quality_tiers": {
+        "expert_action_only": 5753,
+        "expert_action_synthetic_observation": 647
+      },
+      "quality_classes": {
+        "action_only": 5753,
+        "synthetic_observation": 647
+      },
+      "observation_origin": {
+        "no_complete_observation_and_final": 5753,
+        "synthetic_observation": 647
+      },
+      "total_tokens": 6137912,
+      "assistant_loss_tokens": 962052,
+      "assistant_fraction": 0.156739,
+      "split": {
+        "protocol_holdout": 320,
+        "train": 5760,
+        "validation": 320
+      },
+      "unique_groups": 6400,
+      "rows_per_group": {
+        "p50": 1,
+        "p90": 1,
+        "max": 1
+      },
+      "template_clusters": 6382,
+      "largest_template_cluster_share": 0.000313,
+      "tool_sequence_signatures": 6256,
+      "largest_tool_sequence_share": 0.000469,
+      "final_answer_signatures": 750,
+      "largest_final_answer_share": 0.000156,
+      "capability_tags": {
+        "function_calling": 6400,
+        "tool_protocol": 6400
+      },
+      "language": {
+        "en": 6398,
+        "zh": 2
+      },
+      "citation_rows": 0,
+      "citation_rate": 0.0
+    }
+  },
+  "failures": [],
+  "interpretation": {
+    "runtime_native_is_teacher": false,
+    "template_cluster_is_semantic_embedding_cluster": false,
+    "quality_labels_describe_provenance": true
+  }
+}

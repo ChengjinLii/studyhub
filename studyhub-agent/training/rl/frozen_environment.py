@@ -50,6 +50,9 @@ class FrozenTaskEnvironment:
             (row["name"], canonical_arguments(row["arguments"])): row.get("result")
             for row in self.fixture.get("routes", [])
         }
+        self._routes_by_name: dict[str, list[dict[str, Any]]] = {}
+        for row in self.fixture.get("routes", []):
+            self._routes_by_name.setdefault(str(row["name"]), []).append(row)
 
     @classmethod
     def from_root(
@@ -93,6 +96,8 @@ class FrozenTaskEnvironment:
             return self._search(arguments)
         if capability == "knowledge_read":
             return self._read(arguments)
+        if capability == "replay_search":
+            return self._replay_search(name, arguments)
         if capability == "function_call":
             return self._fixture_call(name, arguments, tool)
         self._record_error("unsupported_capability")
@@ -140,6 +145,9 @@ class FrozenTaskEnvironment:
 
     def _read(self, arguments: dict[str, Any]) -> str:
         source_id = str(arguments.get("source_id", "")).strip()
+        route_key = ("knowledge_read", canonical_arguments(arguments))
+        if route_key in self._routes:
+            return json.dumps(self._routes[route_key], ensure_ascii=False, sort_keys=True)
         document = self._documents.get(source_id)
         if document is None:
             self._record_error("source_not_found")
@@ -172,6 +180,30 @@ class FrozenTaskEnvironment:
             )
         route = self._routes[route_key]
         return self._result(ok=True, tool=name, content=route, fixture_match=True)
+
+    def _replay_search(self, name: str, arguments: dict[str, Any]) -> str:
+        query = str(arguments.get("query", "")).strip()
+        if not query:
+            self._record_error("query_required")
+            return self._result(error="query_required", tool=name)
+        routes = self._routes_by_name.get(name, [])
+        if not routes:
+            self._record_error("replay_search_route_missing")
+            return self._result(error="replay_search_route_missing", tool=name)
+        query_terms = _terms(query)
+        scored = []
+        for ordinal, route in enumerate(routes):
+            searchable = f"{canonical_arguments(route.get('arguments', {}))} {canonical_arguments(route.get('result', {}))}"
+            searchable_terms = _terms(searchable)
+            score = sum(searchable_terms.count(term) for term in query_terms)
+            scored.append((score, -ordinal, route))
+        _score, _ordinal, selected = max(scored, key=lambda item: (item[0], item[1]))
+        result = selected.get("result")
+        if isinstance(result, dict):
+            result = dict(result)
+            if "query" in result:
+                result["query"] = query
+        return json.dumps(result, ensure_ascii=False, sort_keys=True)
 
     def _record_error(self, code: str) -> None:
         self.trace.invalid_tool_calls += 1

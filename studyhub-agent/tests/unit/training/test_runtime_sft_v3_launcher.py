@@ -1,8 +1,31 @@
+import subprocess
+import sys
 from pathlib import Path
 
 import yaml
 
+from scripts.train.preflight_runtime_sft_v3 import _resolve_cli_path
+
 PROJECT = Path(__file__).resolve().parents[3]
+
+
+def test_runtime_sft_v3_preflight_is_directly_executable(tmp_path: Path) -> None:
+    result = subprocess.run(
+        [sys.executable, str(PROJECT / "scripts/train/preflight_runtime_sft_v3.py"), "--help"],
+        cwd=tmp_path,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert "--overnight" in result.stdout
+
+
+def test_runtime_sft_v3_preflight_resolves_relative_authorization(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.chdir(tmp_path)
+
+    assert _resolve_cli_path(Path("configs/authorization.json")) == tmp_path / "configs/authorization.json"
 
 
 def test_runtime_sft_v3_config_is_bound_to_dual_gpu_dataset() -> None:
@@ -45,6 +68,19 @@ def test_runtime_sft_v3_driver_captures_initial_lora() -> None:
     assert "SaveLoadMeta" in driver
     assert "_save_initial_lora_weights(trainer, config)" in driver
     assert 'name="actor"' in driver
+
+
+def test_overnight_launcher_is_bounded_and_separately_authorized() -> None:
+    launcher = (PROJECT / "scripts/train/run_overnight_sft_baseline.sh").read_text(encoding="utf-8")
+
+    assert "STUDYHUB_ALLOW_OVERNIGHT_SFT" in launcher
+    assert "overnight-sft-baseline-authorization.json" in launcher
+    assert "--max-wall-seconds" in launcher
+    assert "OVERNIGHT_SFT_BASELINE_COMPLETE.json" in launcher
+    assert "record_overnight_sft_completion.py" in launcher
+    assert "--overnight" in launcher
+    assert "run_controlled_grpo.sh" not in launcher
+    assert "sealed" not in launcher.casefold()
 
 
 def test_runtime_sft_gate_has_a_tracked_promotion_tool() -> None:

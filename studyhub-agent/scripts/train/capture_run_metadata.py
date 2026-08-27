@@ -210,6 +210,16 @@ def start(args: argparse.Namespace) -> None:
             "training_use": "lineage_and_post_training_evaluation_only",
             "sealed_content_used": False,
         }
+    if args.authorization:
+        authorization = json.loads(args.authorization.read_text(encoding="utf-8"))
+        metadata["run_authorization"] = {
+            "path": str(args.authorization.resolve()),
+            "sha256": sha256(args.authorization),
+            "authorization_id": authorization.get("authorization_id"),
+            "status": authorization.get("status"),
+            "scope": authorization.get("scope"),
+            "budget": authorization.get("budget"),
+        }
     if args.hermes_lock:
         metadata["hermes_upstream"] = json.loads(args.hermes_lock.read_text(encoding="utf-8"))
     args.output.write_text(json.dumps(metadata, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
@@ -243,6 +253,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--dataset-manifest", type=Path)
     parser.add_argument("--data-card", type=Path)
     parser.add_argument("--benchmark-manifest", type=Path)
+    parser.add_argument("--authorization", type=Path)
     parser.add_argument("--model", type=Path)
     parser.add_argument("--model-hash-cache", type=Path)
     parser.add_argument("--areal-lock", type=Path)

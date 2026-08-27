@@ -2,12 +2,15 @@
   "schema_version": "studyhub.training-program.v3",
   "program_id": "studyhub-9b-agentic-post-training-v3",
   "created_at": "2026-08-27",
-  "status": "BENCHMARK_V2_FROZEN_BASE_CALIBRATED_SFT_FORMAL_AUTHORIZED",
-  "launch_authorized": true,
-  "launch_authorization_scope": ["NINE_B_SFT_FORMAL_R16_ONE_PASS"],
+  "status": "BENCHMARK_V2_FROZEN_BASE_CALIBRATED_OVERNIGHT_SFT_AUTHORIZED",
+  "launch_authorized": false,
+  "launch_authorization_scope": [],
   "gpu_gate_authorized": true,
   "sft_profile_authorized": true,
-  "formal_sft_authorized": true,
+  "formal_sft_authorized": false,
+  "overnight_sft_baseline_authorized": true,
+  "overnight_sft_authorization": "configs/program-v3/overnight-sft-baseline-authorization.json",
+  "overnight_sft_authorization_sha256": "1990e62fa5939324f0f67aa166fe4f730daaf08898bea9b7fc09c0cb05e93e8b",
   "source_prompt": "/data/chengjin/studyhub-agentic-rl-interview-prompt-pack-v3/studyhub-agentic-rl-interview-prompt-pack-v3/prompt.md",
   "source_prompt_sha256": "478b7666c84fe69f3210d74b33f53094cbe699c47c02607200aa5dddb17acd3c",
   "benchmark_execution_prompt": "/data/chengjin/StudyHub_Benchmark_v2_Codex_Execution_Prompt.md",
@@ -275,7 +278,7 @@
         "quality_claim": "NOT_EVALUATED_BY_PROFILE"
       },
       "formal": {
-        "status": "AUTHORIZED_PENDING_START",
+        "status": "INTERRUPTED_SCOPE_CORRECTION",
         "authorization_scope": "ONE_R16_PASS_ONLY",
         "training_trial": "formal-r16-seed-20260827",
         "seed": 20260827,
@@ -296,12 +299,36 @@
         "checkpoint_every_updates": 546,
         "recovery_every_updates": 50,
         "recovery_contract": "Stable training_trial across attempts; each attempt has separate logs and evidence; a completion marker is written only after globalstep 5455.",
+        "interrupted_attempt": {
+          "trial": "formal-r16-seed-20260827",
+          "attempt": "formal-r16-seed-20260827-attempt-20260828_003412",
+          "exit_status": 130,
+          "last_completed_update": 104,
+          "recoverable_updates": 100,
+          "reason": "ONE_PASS_ESTIMATE_14.3H_EXCEEDED_OVERNIGHT_6.25H_TRAINING_BUDGET",
+          "claim": "INTERRUPTED_DIAGNOSTIC_ONLY"
+        },
         "post_training_gate": [
           "merge the final LoRA without replacing the base model",
           "run AgentBench v2 Development with the same evaluator and report cluster-aware intervals",
           "run the four external official protocols when their setup, license and API requirements permit",
           "do not inspect Sealed-A or Sealed-B until the candidate and recipe are frozen"
         ]
+      },
+      "overnight": {
+        "status": "AUTHORIZED_PENDING_RUN",
+        "authorization": "configs/program-v3/overnight-sft-baseline-authorization.json",
+        "training_trial": "overnight-r16-v30-seed-20260827",
+        "seed": 20260827,
+        "rank": 16,
+        "alpha": 16,
+        "maximum_optimizer_updates": 2100,
+        "maximum_wall_time_seconds": 22500,
+        "checkpoint_every_updates": 210,
+        "recovery_every_updates": 210,
+        "no_rl": true,
+        "no_sealed": true,
+        "quality_claim": "PENDING_INDEPENDENT_DEVELOPMENT_EVALUATION"
       }
     },
     "grpo": {

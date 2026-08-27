@@ -11,6 +11,10 @@ from studyhub_agent.benchmark_v1.tool_contracts import tool_schemas
 
 SCHEMA_VERSION = "studyhub.runtime-sft-trajectory.v3"
 QUALITY_TIERS = {
+    "teacher_verified_complete",
+    "teacher_repaired_complete",
+    "expert_recorded_complete",
+    "oracle_verified_complete",
     "expert_action_synthetic_observation",
     "expert_action_only",
     "expert_complete",

@@ -1,0 +1,389 @@
+{
+  "schema_version": "studyhub.runtime-sft-v3.1-candidate-audit.v1",
+  "status": "PASS_CANDIDATE_ONLY_INSUFFICIENT_TEACHER",
+  "formal_release": false,
+  "candidate_manifest_status": "CANDIDATE_INSUFFICIENT_TEACHER_VOLUME",
+  "candidate_sha256": "e4485fdb50488599b7eaf95165d047e67cd90c146a302ffb2e4919bf6b89dcc7",
+  "candidate_manifest_sha256": "0b7ad035e2a7786422dd0b77dd0c2bee6a863349768349ff3829d275f221af1b",
+  "base_sha256": "a115d220841a0e56c8893a01e486c8399c24cb591143f221c78a926deee42783",
+  "rows": 48500,
+  "action_only_rows": 2425,
+  "action_only_share": 0.05,
+  "teacher_rows": 0,
+  "teacher_minimum_useful_target_met": false,
+  "split_group_overlap": {
+    "train_validation": 0,
+    "train_protocol_holdout": 0,
+    "validation_protocol_holdout": 0
+  },
+  "public_benchmark_tasks_checked": 73,
+  "public_benchmark_prompt_overlap": 0,
+  "sealed_task_files_read": false,
+  "sealed_overlap_recheck": "INHERITED_FROM_FROZEN_V3_SOURCE_LOCK_NOT_RECOMPUTED",
+  "tokenization_status": "NOT_RUN_CANDIDATE_ONLY",
+  "constraints": {
+    "candidate_hash_matches_manifest": true,
+    "base_hash_is_frozen_v3": true,
+    "rows_45k_to_50k": true,
+    "action_only_at_most_5_percent": true,
+    "single_source_at_most_25_percent": true,
+    "custom_source_at_most_15_percent": true,
+    "group_split_overlap_zero": true,
+    "public_benchmark_prompt_overlap_zero": true,
+    "runtime_contract_valid": true,
+    "sealed_task_files_read_false": true
+  },
+  "sources": {
+    "coig_exam": {
+      "rows": 4500,
+      "share": 0.092784,
+      "split": {
+        "protocol_holdout": 225,
+        "train": 4050,
+        "validation": 225
+      },
+      "quality_tiers": {
+        "expert_complete": 4500
+      },
+      "trajectory_status": {
+        "complete": 4500
+      },
+      "runtime_native_share": 0.0,
+      "unique_groups": 4500,
+      "rows_per_group": {
+        "p50": 1,
+        "p90": 1,
+        "max": 1
+      },
+      "semantic_template_clusters": 4470,
+      "largest_semantic_template_share": 0.000667,
+      "tool_sequence_signatures": 1,
+      "largest_tool_sequence_share": 1.0,
+      "final_answer_signatures": 3050,
+      "largest_final_answer_share": 0.083111,
+      "language": {
+        "en": 21,
+        "zh": 4479
+      },
+      "observation_origin": {
+        "no_tool_observation": 4500
+      }
+    },
+    "hermes_function_calling": {
+      "rows": 2600,
+      "share": 0.053608,
+      "split": {
+        "protocol_holdout": 130,
+        "train": 2340,
+        "validation": 130
+      },
+      "quality_tiers": {
+        "expert_action_only": 405,
+        "expert_complete": 2195
+      },
+      "trajectory_status": {
+        "action_only": 405,
+        "complete": 2195
+      },
+      "runtime_native_share": 0.356538,
+      "unique_groups": 2600,
+      "rows_per_group": {
+        "p50": 1,
+        "p90": 1,
+        "max": 1
+      },
+      "semantic_template_clusters": 2322,
+      "largest_semantic_template_share": 0.003462,
+      "tool_sequence_signatures": 990,
+      "largest_tool_sequence_share": 0.613077,
+      "final_answer_signatures": 2127,
+      "largest_final_answer_share": 0.030385,
+      "language": {
+        "en": 2597,
+        "zh": 3
+      },
+      "observation_origin": {
+        "no_complete_observation_and_final": 405,
+        "no_tool_observation": 1268,
+        "open_dataset_recorded_or_converted": 927
+      }
+    },
+    "studyhub_2wiki_replay": {
+      "rows": 12000,
+      "share": 0.247423,
+      "split": {
+        "protocol_holdout": 600,
+        "train": 10800,
+        "validation": 600
+      },
+      "quality_tiers": {
+        "oracle_derived_expert_complete": 12000
+      },
+      "trajectory_status": {
+        "complete": 12000
+      },
+      "runtime_native_share": 1.0,
+      "unique_groups": 12000,
+      "rows_per_group": {
+        "p50": 1,
+        "p90": 1,
+        "max": 1
+      },
+      "semantic_template_clusters": 11999,
+      "largest_semantic_template_share": 0.000167,
+      "tool_sequence_signatures": 2,
+      "largest_tool_sequence_share": 0.972833,
+      "final_answer_signatures": 12000,
+      "largest_final_answer_share": 8.3e-05,
+      "language": {
+        "en": 12000
+      },
+      "observation_origin": {
+        "oracle_derived_replay": 12000
+      }
+    },
+    "studyhub_acl_recovery": {
+      "rows": 4286,
+      "share": 0.088371,
+      "split": {
+        "protocol_holdout": 242,
+        "train": 3798,
+        "validation": 246
+      },
+      "quality_tiers": {
+        "deterministic_fixture_complete": 4286
+      },
+      "trajectory_status": {
+        "complete": 4286
+      },
+      "runtime_native_share": 1.0,
+      "unique_groups": 1946,
+      "rows_per_group": {
+        "p50": 2,
+        "p90": 4,
+        "max": 14
+      },
+      "semantic_template_clusters": 2703,
+      "largest_semantic_template_share": 0.019132,
+      "tool_sequence_signatures": 1,
+      "largest_tool_sequence_share": 1.0,
+      "final_answer_signatures": 995,
+      "largest_final_answer_share": 0.003266,
+      "language": {
+        "zh": 4286
+      },
+      "observation_origin": {
+        "deterministic_fixture": 4286
+      }
+    },
+    "studyhub_memory_replay": {
+      "rows": 4286,
+      "share": 0.088371,
+      "split": {
+        "protocol_holdout": 242,
+        "train": 3797,
+        "validation": 247
+      },
+      "quality_tiers": {
+        "deterministic_fixture_complete": 4286
+      },
+      "trajectory_status": {
+        "complete": 4286
+      },
+      "runtime_native_share": 1.0,
+      "unique_groups": 101,
+      "rows_per_group": {
+        "p50": 43,
+        "p90": 54,
+        "max": 71
+      },
+      "semantic_template_clusters": 10,
+      "largest_semantic_template_share": 0.10266,
+      "tool_sequence_signatures": 1,
+      "largest_tool_sequence_share": 1.0,
+      "final_answer_signatures": 404,
+      "largest_final_answer_share": 0.005133,
+      "language": {
+        "zh": 4286
+      },
+      "observation_origin": {
+        "deterministic_fixture": 4286
+      }
+    },
+    "studyhub_metadata_replay": {
+      "rows": 6000,
+      "share": 0.123711,
+      "split": {
+        "protocol_holdout": 300,
+        "train": 5400,
+        "validation": 300
+      },
+      "quality_tiers": {
+        "deterministic_fixture_complete": 6000
+      },
+      "trajectory_status": {
+        "complete": 6000
+      },
+      "runtime_native_share": 1.0,
+      "unique_groups": 99,
+      "rows_per_group": {
+        "p50": 56,
+        "p90": 118,
+        "max": 138
+      },
+      "semantic_template_clusters": 3167,
+      "largest_semantic_template_share": 0.041833,
+      "tool_sequence_signatures": 1,
+      "largest_tool_sequence_share": 1.0,
+      "final_answer_signatures": 570,
+      "largest_final_answer_share": 0.004667,
+      "language": {
+        "zh": 6000
+      },
+      "observation_origin": {
+        "deterministic_fixture": 6000
+      }
+    },
+    "studyhub_qasper_replay": {
+      "rows": 3589,
+      "share": 0.074,
+      "split": {
+        "protocol_holdout": 163,
+        "train": 3273,
+        "validation": 153
+      },
+      "quality_tiers": {
+        "oracle_derived_expert_complete": 3589
+      },
+      "trajectory_status": {
+        "complete": 3589
+      },
+      "runtime_native_share": 1.0,
+      "unique_groups": 1168,
+      "rows_per_group": {
+        "p50": 3,
+        "p90": 5,
+        "max": 12
+      },
+      "semantic_template_clusters": 3588,
+      "largest_semantic_template_share": 0.000557,
+      "tool_sequence_signatures": 4,
+      "largest_tool_sequence_share": 0.562274,
+      "final_answer_signatures": 3123,
+      "largest_final_answer_share": 0.101142,
+      "language": {
+        "en": 3589
+      },
+      "observation_origin": {
+        "oracle_derived_replay": 3589
+      }
+    },
+    "studyhub_state_tools": {
+      "rows": 4286,
+      "share": 0.088371,
+      "split": {
+        "protocol_holdout": 192,
+        "train": 3897,
+        "validation": 197
+      },
+      "quality_tiers": {
+        "deterministic_fixture_complete": 4286
+      },
+      "trajectory_status": {
+        "complete": 4286
+      },
+      "runtime_native_share": 1.0,
+      "unique_groups": 101,
+      "rows_per_group": {
+        "p50": 46,
+        "p90": 57,
+        "max": 71
+      },
+      "semantic_template_clusters": 40,
+      "largest_semantic_template_share": 0.028231,
+      "tool_sequence_signatures": 1,
+      "largest_tool_sequence_share": 1.0,
+      "final_answer_signatures": 1225,
+      "largest_final_answer_share": 0.002566,
+      "language": {
+        "zh": 4286
+      },
+      "observation_origin": {
+        "deterministic_fixture": 4286
+      }
+    },
+    "studyhub_web_fallback": {
+      "rows": 4286,
+      "share": 0.088371,
+      "split": {
+        "protocol_holdout": 193,
+        "train": 3884,
+        "validation": 209
+      },
+      "quality_tiers": {
+        "deterministic_fixture_complete": 4286
+      },
+      "trajectory_status": {
+        "complete": 4286
+      },
+      "runtime_native_share": 1.0,
+      "unique_groups": 101,
+      "rows_per_group": {
+        "p50": 46,
+        "p90": 56,
+        "max": 62
+      },
+      "semantic_template_clusters": 4,
+      "largest_semantic_template_share": 0.254783,
+      "tool_sequence_signatures": 1,
+      "largest_tool_sequence_share": 1.0,
+      "final_answer_signatures": 404,
+      "largest_final_answer_share": 0.004666,
+      "language": {
+        "zh": 4286
+      },
+      "observation_origin": {
+        "deterministic_fixture": 4286
+      }
+    },
+    "toolace": {
+      "rows": 2667,
+      "share": 0.05499,
+      "split": {
+        "protocol_holdout": 138,
+        "train": 2411,
+        "validation": 118
+      },
+      "quality_tiers": {
+        "expert_action_only": 2020,
+        "expert_action_synthetic_observation": 647
+      },
+      "trajectory_status": {
+        "action_only": 2020,
+        "complete": 647
+      },
+      "runtime_native_share": 0.242595,
+      "unique_groups": 2667,
+      "rows_per_group": {
+        "p50": 1,
+        "p90": 1,
+        "max": 1
+      },
+      "semantic_template_clusters": 2661,
+      "largest_semantic_template_share": 0.00075,
+      "tool_sequence_signatures": 2640,
+      "largest_tool_sequence_share": 0.00075,
+      "final_answer_signatures": 681,
+      "largest_final_answer_share": 0.745032,
+      "language": {
+        "en": 2666,
+        "zh": 1
+      },
+      "observation_origin": {
+        "no_complete_observation_and_final": 2020,
+        "synthetic_observation": 647
+      }
+    }
+  },
+  "failures": []
+}

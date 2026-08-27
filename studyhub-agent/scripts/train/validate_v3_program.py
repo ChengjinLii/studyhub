@@ -139,16 +139,31 @@ def validate_program(
 
     if program.get("schema_version") != "studyhub.training-program.v3":
         errors.append("unexpected training-program schema version")
-    if program.get("launch_authorized") is not True:
-        errors.append("the reviewed formal r16 SFT launch must be explicitly authorized")
-    if program.get("launch_authorization_scope") != ["NINE_B_SFT_FORMAL_R16_ONE_PASS"]:
-        errors.append("GPU launch authorization must be limited to one formal r16 SFT pass")
+    if program.get("launch_authorized") is not False:
+        errors.append("global GPU launch authorization must remain disabled")
+    if program.get("launch_authorization_scope") != []:
+        errors.append("global GPU launch scope must remain empty")
     if program.get("gpu_gate_authorized") is not True:
         errors.append("the accepted SFT data must retain authorization for reproducible diagnostic GPU checks")
     if program.get("sft_profile_authorized") is not True:
         errors.append("equal-budget SFT profiling must be explicitly authorized after the Gate passes")
-    if program.get("formal_sft_authorized") is not True:
-        errors.append("formal SFT authorization is missing after the controlled profile decision")
+    if program.get("formal_sft_authorized") is not False:
+        errors.append("the superseded one-pass formal SFT must remain unauthorized")
+    if program.get("overnight_sft_baseline_authorized") is not True:
+        errors.append("the bounded overnight SFT baseline is not authorized")
+    overnight_path = project_root / str(program.get("overnight_sft_authorization", ""))
+    if not overnight_path.is_file():
+        errors.append("overnight SFT authorization file is missing")
+        overnight_authorization = {}
+    else:
+        overnight_authorization = _load_json(overnight_path)
+        if program.get("overnight_sft_authorization_sha256") != _sha256(overnight_path):
+            errors.append("overnight SFT authorization hash drifted")
+        if overnight_authorization.get("status") != "AUTHORIZED_PENDING_RUN":
+            errors.append("overnight SFT authorization is not pending")
+        scope = overnight_authorization.get("scope", {})
+        if not all(scope.get(name) is True for name in ("no_rl", "no_sealed", "no_benchmark_modification")):
+            errors.append("overnight SFT forbidden-scope contract is incomplete")
     prompt_contracts = (
         ("source_prompt", "source_prompt_sha256"),
         ("benchmark_execution_prompt", "benchmark_execution_prompt_sha256"),
@@ -434,7 +449,7 @@ def validate_program(
         errors.append("tracked runtime SFT profile comparison has an invalid selection")
     formal = sft_training.get("formal", {})
     expected_formal = {
-        "status": "AUTHORIZED_PENDING_START",
+        "status": "INTERRUPTED_SCOPE_CORRECTION",
         "authorization_scope": "ONE_R16_PASS_ONLY",
         "training_trial": "formal-r16-seed-20260827",
         "seed": 20260827,
@@ -466,6 +481,36 @@ def validate_program(
         errors.append("formal SFT does not define stable-trial recovery")
     if len(formal.get("post_training_gate", [])) != 4:
         errors.append("formal SFT post-training evaluation gate is incomplete")
+    interrupted = formal.get("interrupted_attempt", {})
+    if interrupted.get("exit_status") != 130 or interrupted.get("recoverable_updates") != 100:
+        errors.append("scope-corrected formal SFT interruption evidence is incomplete")
+    overnight = sft_training.get("overnight", {})
+    overnight_budget = overnight_authorization.get("budget", {})
+    expected_overnight = {
+        "status": "AUTHORIZED_PENDING_RUN",
+        "authorization": program.get("overnight_sft_authorization"),
+        "training_trial": "overnight-r16-v30-seed-20260827",
+        "seed": 20260827,
+        "rank": 16,
+        "alpha": 16,
+        "maximum_optimizer_updates": overnight_budget.get("maximum_optimizer_updates"),
+        "maximum_wall_time_seconds": overnight_budget.get("maximum_wall_time_seconds"),
+        "checkpoint_every_updates": overnight_budget.get("checkpoint_every_updates"),
+        "recovery_every_updates": overnight_budget.get("recovery_every_updates"),
+        "no_rl": True,
+        "no_sealed": True,
+    }
+    mismatched_overnight = {
+        key: {"expected": expected, "actual": overnight.get(key)}
+        for key, expected in expected_overnight.items()
+        if overnight.get(key) != expected
+    }
+    if mismatched_overnight:
+        errors.append(f"overnight SFT contract mismatch: {mismatched_overnight}")
+    if int(overnight_budget.get("maximum_wall_time_seconds", 0)) > 22500:
+        errors.append("overnight SFT exceeds the 6.25-hour training wall budget")
+    if int(overnight_budget.get("maximum_optimizer_updates", 0)) >= formal.get("expected_optimizer_updates", 0):
+        errors.append("overnight SFT is not bounded below one full data pass")
 
     rl = data.get("rl", {})
     if not 12000 <= rl.get("candidate_tasks", 0) <= 20000:
@@ -704,6 +749,14 @@ def validate_program(
             "expected_optimizer_updates": formal.get("expected_optimizer_updates"),
             "train_all_tokens": formal.get("train_all_tokens"),
             "train_assistant_loss_tokens": formal.get("train_assistant_loss_tokens"),
+        },
+        "overnight_sft": {
+            "status": overnight.get("status"),
+            "training_trial": overnight.get("training_trial"),
+            "maximum_optimizer_updates": overnight.get("maximum_optimizer_updates"),
+            "maximum_wall_time_seconds": overnight.get("maximum_wall_time_seconds"),
+            "no_rl": overnight.get("no_rl"),
+            "no_sealed": overnight.get("no_sealed"),
         },
         "rl_post_qa_tasks": rl.get("post_qa_tasks"),
         "initial_grpo_updates": grpo.get("initial_optimizer_updates"),

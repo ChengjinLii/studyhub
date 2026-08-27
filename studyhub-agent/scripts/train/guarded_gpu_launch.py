@@ -14,6 +14,10 @@ from datetime import datetime
 from pathlib import Path
 
 
+class WallTimeExceeded(RuntimeError):
+    """Raised when the explicitly authorized launcher wall time expires."""
+
+
 def nvidia_query(gpus: str, query: str) -> list[list[str]]:
     output = subprocess.run(
         [
@@ -92,6 +96,22 @@ def terminate_group(process: subprocess.Popen[str]) -> None:
             pass
 
 
+def interrupt_group(process: subprocess.Popen[str], grace_seconds: int) -> None:
+    """Give the child a chance to leave a consistent recovery checkpoint."""
+    pgid = process.pid
+    if not process_group_exists(pgid):
+        return
+    try:
+        os.killpg(pgid, signal.SIGINT)
+    except ProcessLookupError:
+        return
+    deadline = time.monotonic() + grace_seconds
+    while process_group_exists(pgid) and time.monotonic() < deadline:
+        time.sleep(0.2)
+    if process_group_exists(pgid):
+        terminate_group(process)
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--gpus", required=True)
@@ -99,6 +119,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--max-used-mib", type=int, required=True)
     parser.add_argument("--log", type=Path, required=True)
     parser.add_argument("--gpu-csv", type=Path, required=True)
+    parser.add_argument("--max-wall-seconds", type=int)
+    parser.add_argument("--interrupt-grace-seconds", type=int, default=120)
     parser.add_argument("command", nargs=argparse.REMAINDER)
     return parser.parse_args()
 
@@ -110,6 +132,10 @@ def main() -> int:
         raise ValueError("--gpus must contain unique comma-separated GPU indices")
     if not args.command:
         raise ValueError("missing command")
+    if args.max_wall_seconds is not None and args.max_wall_seconds < 1:
+        raise ValueError("--max-wall-seconds must be positive")
+    if args.interrupt_grace_seconds < 1:
+        raise ValueError("--interrupt-grace-seconds must be positive")
     command = args.command[1:] if args.command[0] == "--" else args.command
 
     initial = nvidia_query(",".join(gpus), "index,memory.free")
@@ -147,9 +173,12 @@ def main() -> int:
             text=True,
             start_new_session=True,
         )
+        started = time.monotonic()
         print(f"Training PID {process.pid}; log {args.log}", flush=True)
         try:
             while process.poll() is None:
+                if args.max_wall_seconds is not None and time.monotonic() - started >= args.max_wall_seconds:
+                    raise WallTimeExceeded(f"authorized wall time reached: {args.max_wall_seconds}s")
                 samples = nvidia_query(
                     ",".join(gpus),
                     "index,memory.used,memory.free,utilization.gpu,power.draw",
@@ -167,8 +196,15 @@ def main() -> int:
                 time.sleep(5)
         except (KeyboardInterrupt, RuntimeError) as exc:
             print(f"GPU guard stopped only process group {process.pid}: {exc}", file=sys.stderr)
-            terminate_group(process)
-            return 130 if isinstance(exc, KeyboardInterrupt) else 70
+            if isinstance(exc, (KeyboardInterrupt, WallTimeExceeded)):
+                interrupt_group(process, args.interrupt_grace_seconds)
+            else:
+                terminate_group(process)
+            if isinstance(exc, KeyboardInterrupt):
+                return 130
+            if isinstance(exc, WallTimeExceeded):
+                return 124
+            return 70
         status = process.wait()
         terminate_group(process)
         return status

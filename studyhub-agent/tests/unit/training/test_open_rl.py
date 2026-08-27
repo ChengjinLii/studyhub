@@ -543,6 +543,76 @@ def test_fixture_environment_rejects_unmatched_arguments() -> None:
     assert runtime.trace.error_codes == ["fixture_route_not_found"]
 
 
+def test_replay_search_accepts_rewritten_query_without_changing_frozen_results() -> None:
+    environment = {
+        "tools": [
+            {
+                "name": "web_search",
+                "description": "Search a frozen Web snapshot.",
+                "capability": "replay_search",
+                "parameters": {
+                    "type": "object",
+                    "properties": {"query": {"type": "string"}},
+                    "required": ["query"],
+                },
+            }
+        ],
+        "documents": [],
+    }
+    fixture = {
+        "routes": [
+            {
+                "name": "web_search",
+                "arguments": {"query": "通信原理 公开资料"},
+                "result": {
+                    "query": "通信原理 公开资料",
+                    "results": [{"source_id": "web:1", "url": "https://example.edu/1"}],
+                },
+            }
+        ]
+    }
+    runtime = FrozenTaskEnvironment(environment, fixture, max_tool_calls=2)
+
+    result = json.loads(asyncio.run(runtime.execute("web_search", {"query": "通信原理 期末资料"})))
+
+    assert result["query"] == "通信原理 期末资料"
+    assert result["results"] == [{"source_id": "web:1", "url": "https://example.edu/1"}]
+    assert runtime.trace.invalid_tool_calls == 0
+
+
+def test_knowledge_read_preserves_exact_permission_denial_fixture() -> None:
+    environment = {
+        "tools": [
+            {
+                "name": "knowledge_read",
+                "description": "Read one source.",
+                "capability": "knowledge_read",
+                "parameters": {
+                    "type": "object",
+                    "properties": {"source_id": {"type": "string"}},
+                    "required": ["source_id"],
+                },
+            }
+        ],
+        "documents": [],
+    }
+    fixture = {
+        "routes": [
+            {
+                "name": "knowledge_read",
+                "arguments": {"source_id": "private:42"},
+                "result": {"error": "permission_denied", "source_id": "private:42"},
+            }
+        ]
+    }
+    runtime = FrozenTaskEnvironment(environment, fixture, max_tool_calls=2)
+
+    result = json.loads(asyncio.run(runtime.execute("knowledge_read", {"source_id": "private:42"})))
+
+    assert result == {"error": "permission_denied", "source_id": "private:42"}
+    assert runtime.trace.invalid_tool_calls == 0
+
+
 def test_grounded_reward_uses_hidden_evidence_and_valid_citation() -> None:
     source_id = "src-0123456789ab"
     environment = {

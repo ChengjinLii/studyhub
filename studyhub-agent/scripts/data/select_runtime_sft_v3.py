@@ -155,6 +155,34 @@ def benchmark_prompt_hashes(project: Path, manifest: dict[str, Any]) -> tuple[se
     return hashes, count
 
 
+def public_benchmark_prompt_hashes(project: Path, manifest: dict[str, Any]) -> tuple[set[str], int]:
+    """Hash only public Benchmark v2 prompts without opening sealed task files."""
+    hashes: set[str] = set()
+    count = 0
+    for relative in sorted(manifest["public_files"]):
+        if not relative.endswith("tasks.jsonl"):
+            continue
+        path = project / "benchmarks/studyhub-agent-v2" / relative
+        for line in path.read_text(encoding="utf-8").splitlines():
+            if not line.strip():
+                continue
+            row = json.loads(line)
+            prompt = next(
+                (str(row.get(key, "")) for key in ("request", "user_request", "prompt", "goal") if row.get(key)),
+                "",
+            )
+            if prompt:
+                count += 1
+                hashes.add(hashlib.sha256(normalized_text(prompt).encode()).hexdigest())
+    expected = sum(
+        int(manifest["counts"][split])
+        for split in ("regression", "development", "calibration_challenge")
+    )
+    if count != expected or len(hashes) != expected:
+        raise RuntimeError(f"public benchmark prompt inventory mismatch: rows={count}, unique={len(hashes)}, expected={expected}")
+    return hashes, count
+
+
 def candidate_prompt_hash(row: dict[str, Any]) -> str:
     prompt = next(
         (str(message.get("content", "")) for message in row["messages"] if message.get("role") == "user"),
