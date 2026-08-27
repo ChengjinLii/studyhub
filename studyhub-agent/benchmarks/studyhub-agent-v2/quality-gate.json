@@ -1,0 +1,241 @@
+{
+  "schema_version": "studyhub.agentbench-quality-gate.v2",
+  "benchmark_version": "studyhub-agentbench-v2",
+  "benchmark_revision": "2.0.0",
+  "builder_commit": "61ca5f77cfa827c35580c108596a185ba369d253",
+  "status": "PASS",
+  "summary": {
+    "checks": 14,
+    "passed": 14,
+    "failed": 0
+  },
+  "checks": [
+    {
+      "name": "structural_audit",
+      "passed": true,
+      "detail": {
+        "checks": 18,
+        "passed": 18,
+        "failed": 0
+      }
+    },
+    {
+      "name": "semantic_diversity",
+      "passed": true,
+      "detail": {
+        "exact_duplicates_zero": true,
+        "cross_split_normalized_duplicates_zero": true,
+        "cross_split_declared_clusters_zero": true,
+        "largest_semantic_cluster_at_most_two_percent_dev": true
+      }
+    },
+    {
+      "name": "development_largest_cluster_at_most_two_percent",
+      "passed": true,
+      "detail": 0.0196078431372549
+    },
+    {
+      "name": "oracle_reachability_at_least_99_percent",
+      "passed": true,
+      "detail": {
+        "tasks": 73,
+        "scored": 73,
+        "strict_pass": 73,
+        "pass_rate": 1.0,
+        "errors": 0
+      }
+    },
+    {
+      "name": "negative_controls_reject_shortcuts",
+      "passed": true,
+      "detail": {
+        "empty_answer": {
+          "evaluated": 73,
+          "strict_pass": 0,
+          "strict_pass_rate": 0.0
+        },
+        "random_answer": {
+          "evaluated": 73,
+          "strict_pass": 0,
+          "strict_pass_rate": 0.0
+        },
+        "fixed_generic_answer": {
+          "evaluated": 73,
+          "strict_pass": 0,
+          "strict_pass_rate": 0.0
+        },
+        "tool_spam": {
+          "evaluated": 73,
+          "strict_pass": 0,
+          "strict_pass_rate": 0.0
+        },
+        "citation_decoration": {
+          "evaluated": 55,
+          "strict_pass": 0,
+          "strict_pass_rate": 0.0
+        },
+        "wrong_source": {
+          "evaluated": 55,
+          "strict_pass": 0,
+          "strict_pass_rate": 0.0
+        }
+      }
+    },
+    {
+      "name": "metamorphic_tests",
+      "passed": true,
+      "detail": {
+        "cases": 8,
+        "passed": 8
+      }
+    },
+    {
+      "name": "shortcut_probes",
+      "passed": true,
+      "detail": {
+        "task_id_answer_leakage_zero": true,
+        "content_request_answer_leakage_zero": true,
+        "public_oracle_fields_zero": true,
+        "difficulty_not_ordinal": true,
+        "largest_answer_signature_at_most_ten_percent": true,
+        "semantic_template_ids_unique": true
+      }
+    },
+    {
+      "name": "evaluator_challenge_suite",
+      "passed": true,
+      "detail": {
+        "cases": 21,
+        "passed": 21
+      }
+    },
+    {
+      "name": "authentic_task_ratio_at_least_60_percent",
+      "passed": true,
+      "detail": 0.6020408163265306
+    },
+    {
+      "name": "benchmark_v1_frozen_integrity",
+      "passed": true,
+      "detail": {}
+    },
+    {
+      "name": "external_registry_revisions_pinned",
+      "passed": true,
+      "detail": {}
+    },
+    {
+      "name": "external_adapter_smoke",
+      "passed": true,
+      "detail": {
+        "bfcl": {
+          "model_score_generated": false,
+          "official_import": "NOT_RUN_DEPENDENCIES_NOT_INSTALLED",
+          "official_invocation": {
+            "evaluate": [
+              "bfcl",
+              "evaluate",
+              "--model",
+              "studyhub-qwen",
+              "--test-category",
+              "simple_python",
+              "--result-dir",
+              "result/studyhub-smoke",
+              "--partial-eval"
+            ],
+            "generate": [
+              "bfcl",
+              "generate",
+              "--model",
+              "studyhub-qwen",
+              "--test-category",
+              "simple_python",
+              "--result-dir",
+              "result/studyhub-smoke",
+              "--skip-server-setup"
+            ]
+          },
+          "status": "SETUP_READY",
+          "task_discovery": {
+            "sample_records": 400,
+            "v4_category_files": 20
+          }
+        },
+        "browsecomp_plus": {
+          "dataset_download": "NOT_RUN_LARGE_MANUAL_ARTIFACT",
+          "model_score_generated": false,
+          "official_evaluation": "SKIPPED_NO_GPU",
+          "official_invocation": [
+            "uv",
+            "run",
+            "python",
+            "scripts_evaluation/evaluate_run.py",
+            "--input_dir",
+            "runs/studyhub-smoke"
+          ],
+          "status": "SETUP_READY",
+          "task_discovery": {
+            "bundled_qrel_rows": {
+              "qrel_evidence.txt": 5064,
+              "qrel_golds.txt": 2407
+            }
+          }
+        },
+        "deepresearch_bench_ii": {
+          "model_score_generated": false,
+          "official_evaluation": "NOT_RUN",
+          "source_exported": false,
+          "status": "LICENSE_REVIEW_REQUIRED"
+        },
+        "tau2": {
+          "model_score_generated": false,
+          "official_import": "NOT_RUN_DEPENDENCIES_NOT_INSTALLED",
+          "official_invocation": [
+            "uv",
+            "run",
+            "tau2",
+            "run",
+            "--domain",
+            "airline",
+            "--agent-llm",
+            "studyhub-qwen",
+            "--user-llm",
+            "studyhub-user-simulator",
+            "--task-split-name",
+            "base",
+            "--task-ids",
+            "0"
+          ],
+          "official_semantics": "DB/COMMUNICATE outcome; reference actions are diagnostic unless ACTION gates reward",
+          "status": "SETUP_READY",
+          "task_discovery": {
+            "domains": {
+              "airline": 50,
+              "banking_knowledge": 97,
+              "retail": 114,
+              "telecom": 2285
+            },
+            "total": 2546
+          }
+        }
+      }
+    },
+    {
+      "name": "self_review_recorded_honestly",
+      "passed": true,
+      "detail": {
+        "self_review": "COMPLETED_PASS_WITH_LIMITATIONS",
+        "self_reviewed_items": 35,
+        "self_review_evidence": "configs/benchmark-v2-self-review.json",
+        "independent_human_review": "NOT_RUN",
+        "external_llm_judge": "NOT_RUN"
+      }
+    },
+    {
+      "name": "manifest_asset_hashes",
+      "passed": true,
+      "detail": []
+    }
+  ],
+  "generated_at": "2026-08-27T13:08:43+00:00"
+}

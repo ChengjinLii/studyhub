@@ -1,0 +1,682 @@
+{
+  "schema_version": "studyhub.agentbench-metric-coverage.v2",
+  "benchmark_version": "studyhub-agentbench-v2",
+  "benchmark_revision": "2.0.0",
+  "claim": "Task-family presence and metric operationalization are reported separately.",
+  "capabilities": {
+    "authentic_web_research": {
+      "tasks": 5,
+      "outcome_modes": [
+        "facts"
+      ],
+      "process_modes": [
+        "open_path"
+      ],
+      "operationalized_metrics": [
+        "strict_success",
+        "task_outcome",
+        "answer_correctness",
+        "tool_validity",
+        "privacy_policy",
+        "efficiency",
+        "claim_support",
+        "source_quality",
+        "citation_correctness",
+        "citation_completeness"
+      ],
+      "semantic_judge_statuses": [
+        "NOT_REQUIRED"
+      ]
+    },
+    "cross_chunk_synthesis": {
+      "tasks": 20,
+      "outcome_modes": [
+        "facts"
+      ],
+      "process_modes": [
+        "open_path"
+      ],
+      "operationalized_metrics": [
+        "strict_success",
+        "task_outcome",
+        "answer_correctness",
+        "tool_validity",
+        "privacy_policy",
+        "efficiency",
+        "claim_support",
+        "source_quality",
+        "citation_correctness",
+        "citation_completeness"
+      ],
+      "semantic_judge_statuses": [
+        "NOT_REQUIRED"
+      ]
+    },
+    "direct_answer_tool_relevance": {
+      "tasks": 2,
+      "outcome_modes": [
+        "facts"
+      ],
+      "process_modes": [
+        "open_path"
+      ],
+      "operationalized_metrics": [
+        "strict_success",
+        "task_outcome",
+        "answer_correctness",
+        "tool_validity",
+        "privacy_policy",
+        "efficiency"
+      ],
+      "semantic_judge_statuses": [
+        "NOT_REQUIRED"
+      ]
+    },
+    "factual_passage_retrieval": {
+      "tasks": 34,
+      "outcome_modes": [
+        "facts"
+      ],
+      "process_modes": [
+        "open_path"
+      ],
+      "operationalized_metrics": [
+        "strict_success",
+        "task_outcome",
+        "answer_correctness",
+        "tool_validity",
+        "privacy_policy",
+        "efficiency",
+        "claim_support",
+        "source_quality",
+        "citation_correctness",
+        "citation_completeness"
+      ],
+      "semantic_judge_statuses": [
+        "NOT_REQUIRED"
+      ]
+    },
+    "insufficient_evidence": {
+      "tasks": 1,
+      "outcome_modes": [
+        "abstain"
+      ],
+      "process_modes": [
+        "open_path"
+      ],
+      "operationalized_metrics": [
+        "strict_success",
+        "task_outcome",
+        "answer_correctness",
+        "tool_validity",
+        "privacy_policy",
+        "efficiency"
+      ],
+      "semantic_judge_statuses": [
+        "NOT_REQUIRED"
+      ]
+    },
+    "long_horizon": {
+      "tasks": 1,
+      "outcome_modes": [
+        "facts"
+      ],
+      "process_modes": [
+        "open_path"
+      ],
+      "operationalized_metrics": [
+        "strict_success",
+        "task_outcome",
+        "answer_correctness",
+        "tool_validity",
+        "privacy_policy",
+        "efficiency",
+        "claim_support",
+        "source_quality",
+        "citation_correctness",
+        "citation_completeness"
+      ],
+      "semantic_judge_statuses": [
+        "NOT_REQUIRED"
+      ]
+    },
+    "memory_absence": {
+      "tasks": 1,
+      "outcome_modes": [
+        "abstain"
+      ],
+      "process_modes": [
+        "open_path"
+      ],
+      "operationalized_metrics": [
+        "strict_success",
+        "task_outcome",
+        "answer_correctness",
+        "tool_validity",
+        "privacy_policy",
+        "efficiency"
+      ],
+      "semantic_judge_statuses": [
+        "NOT_REQUIRED"
+      ]
+    },
+    "memory_collective_conflict": {
+      "tasks": 1,
+      "outcome_modes": [
+        "facts"
+      ],
+      "process_modes": [
+        "open_path"
+      ],
+      "operationalized_metrics": [
+        "strict_success",
+        "task_outcome",
+        "answer_correctness",
+        "tool_validity",
+        "privacy_policy",
+        "efficiency",
+        "claim_support",
+        "source_quality"
+      ],
+      "semantic_judge_statuses": [
+        "NOT_REQUIRED"
+      ]
+    },
+    "memory_collective_low_confidence": {
+      "tasks": 2,
+      "outcome_modes": [
+        "abstain"
+      ],
+      "process_modes": [
+        "open_path"
+      ],
+      "operationalized_metrics": [
+        "strict_success",
+        "task_outcome",
+        "answer_correctness",
+        "tool_validity",
+        "privacy_policy",
+        "efficiency"
+      ],
+      "semantic_judge_statuses": [
+        "NOT_REQUIRED"
+      ]
+    },
+    "memory_cross_user_privacy": {
+      "tasks": 1,
+      "outcome_modes": [
+        "facts"
+      ],
+      "process_modes": [
+        "open_path"
+      ],
+      "operationalized_metrics": [
+        "strict_success",
+        "task_outcome",
+        "answer_correctness",
+        "tool_validity",
+        "privacy_policy",
+        "efficiency",
+        "claim_support",
+        "source_quality"
+      ],
+      "semantic_judge_statuses": [
+        "NOT_REQUIRED"
+      ]
+    },
+    "memory_current_conflict": {
+      "tasks": 2,
+      "outcome_modes": [
+        "facts"
+      ],
+      "process_modes": [
+        "open_path"
+      ],
+      "operationalized_metrics": [
+        "strict_success",
+        "task_outcome",
+        "answer_correctness",
+        "tool_validity",
+        "privacy_policy",
+        "efficiency",
+        "claim_support",
+        "source_quality"
+      ],
+      "semantic_judge_statuses": [
+        "NOT_REQUIRED"
+      ]
+    },
+    "memory_incomplete_abstention": {
+      "tasks": 1,
+      "outcome_modes": [
+        "abstain"
+      ],
+      "process_modes": [
+        "open_path"
+      ],
+      "operationalized_metrics": [
+        "strict_success",
+        "task_outcome",
+        "answer_correctness",
+        "tool_validity",
+        "privacy_policy",
+        "efficiency"
+      ],
+      "semantic_judge_statuses": [
+        "NOT_REQUIRED"
+      ]
+    },
+    "memory_irrelevant_tool_abstention": {
+      "tasks": 1,
+      "outcome_modes": [
+        "facts"
+      ],
+      "process_modes": [
+        "open_path"
+      ],
+      "operationalized_metrics": [
+        "strict_success",
+        "task_outcome",
+        "answer_correctness",
+        "tool_validity",
+        "privacy_policy",
+        "efficiency"
+      ],
+      "semantic_judge_statuses": [
+        "NOT_REQUIRED"
+      ]
+    },
+    "memory_rag_composition": {
+      "tasks": 2,
+      "outcome_modes": [
+        "facts"
+      ],
+      "process_modes": [
+        "open_path"
+      ],
+      "operationalized_metrics": [
+        "strict_success",
+        "task_outcome",
+        "answer_correctness",
+        "tool_validity",
+        "privacy_policy",
+        "efficiency",
+        "claim_support",
+        "source_quality",
+        "citation_correctness",
+        "citation_completeness"
+      ],
+      "semantic_judge_statuses": [
+        "NOT_REQUIRED"
+      ]
+    },
+    "memory_scope_resolution": {
+      "tasks": 1,
+      "outcome_modes": [
+        "facts"
+      ],
+      "process_modes": [
+        "open_path"
+      ],
+      "operationalized_metrics": [
+        "strict_success",
+        "task_outcome",
+        "answer_correctness",
+        "tool_validity",
+        "privacy_policy",
+        "efficiency",
+        "claim_support",
+        "source_quality"
+      ],
+      "semantic_judge_statuses": [
+        "NOT_REQUIRED"
+      ]
+    },
+    "memory_selection": {
+      "tasks": 1,
+      "outcome_modes": [
+        "facts"
+      ],
+      "process_modes": [
+        "open_path"
+      ],
+      "operationalized_metrics": [
+        "strict_success",
+        "task_outcome",
+        "answer_correctness",
+        "tool_validity",
+        "privacy_policy",
+        "efficiency",
+        "claim_support",
+        "source_quality"
+      ],
+      "semantic_judge_statuses": [
+        "NOT_REQUIRED"
+      ]
+    },
+    "memory_temporal_change": {
+      "tasks": 1,
+      "outcome_modes": [
+        "facts"
+      ],
+      "process_modes": [
+        "open_path"
+      ],
+      "operationalized_metrics": [
+        "strict_success",
+        "task_outcome",
+        "answer_correctness",
+        "tool_validity",
+        "privacy_policy",
+        "efficiency",
+        "claim_support",
+        "source_quality"
+      ],
+      "semantic_judge_statuses": [
+        "NOT_REQUIRED"
+      ]
+    },
+    "memory_user_correction": {
+      "tasks": 1,
+      "outcome_modes": [
+        "facts"
+      ],
+      "process_modes": [
+        "open_path"
+      ],
+      "operationalized_metrics": [
+        "strict_success",
+        "task_outcome",
+        "answer_correctness",
+        "tool_validity",
+        "privacy_policy",
+        "efficiency",
+        "claim_support",
+        "source_quality"
+      ],
+      "semantic_judge_statuses": [
+        "NOT_REQUIRED"
+      ]
+    },
+    "memory_web_composition": {
+      "tasks": 1,
+      "outcome_modes": [
+        "facts"
+      ],
+      "process_modes": [
+        "open_path"
+      ],
+      "operationalized_metrics": [
+        "strict_success",
+        "task_outcome",
+        "answer_correctness",
+        "tool_validity",
+        "privacy_policy",
+        "efficiency",
+        "claim_support",
+        "source_quality",
+        "citation_correctness",
+        "citation_completeness"
+      ],
+      "semantic_judge_statuses": [
+        "NOT_REQUIRED"
+      ]
+    },
+    "memory_web_conflict_resolution": {
+      "tasks": 2,
+      "outcome_modes": [
+        "facts"
+      ],
+      "process_modes": [
+        "open_path"
+      ],
+      "operationalized_metrics": [
+        "strict_success",
+        "task_outcome",
+        "answer_correctness",
+        "tool_validity",
+        "privacy_policy",
+        "efficiency",
+        "claim_support",
+        "source_quality",
+        "citation_correctness",
+        "citation_completeness"
+      ],
+      "semantic_judge_statuses": [
+        "NOT_REQUIRED"
+      ]
+    },
+    "multi_source_synthesis": {
+      "tasks": 1,
+      "outcome_modes": [
+        "atomic_rubric"
+      ],
+      "process_modes": [
+        "open_path"
+      ],
+      "operationalized_metrics": [
+        "strict_success",
+        "task_outcome",
+        "answer_correctness",
+        "tool_validity",
+        "privacy_policy",
+        "efficiency",
+        "claim_support",
+        "source_quality",
+        "citation_correctness",
+        "citation_completeness"
+      ],
+      "semantic_judge_statuses": [
+        "NOT_RUN"
+      ]
+    },
+    "permission_avoidance": {
+      "tasks": 2,
+      "outcome_modes": [
+        "facts"
+      ],
+      "process_modes": [
+        "permission_avoidance"
+      ],
+      "operationalized_metrics": [
+        "strict_success",
+        "task_outcome",
+        "answer_correctness",
+        "tool_validity",
+        "privacy_policy",
+        "efficiency",
+        "claim_support",
+        "source_quality",
+        "citation_correctness",
+        "citation_completeness",
+        "recovery_or_process_success"
+      ],
+      "semantic_judge_statuses": [
+        "NOT_REQUIRED"
+      ]
+    },
+    "permission_recovery": {
+      "tasks": 2,
+      "outcome_modes": [
+        "facts"
+      ],
+      "process_modes": [
+        "permission_recovery"
+      ],
+      "operationalized_metrics": [
+        "strict_success",
+        "task_outcome",
+        "answer_correctness",
+        "tool_validity",
+        "privacy_policy",
+        "efficiency",
+        "claim_support",
+        "source_quality",
+        "citation_correctness",
+        "citation_completeness",
+        "recovery_or_process_success"
+      ],
+      "semantic_judge_statuses": [
+        "NOT_REQUIRED"
+      ]
+    },
+    "query_reformulation": {
+      "tasks": 1,
+      "outcome_modes": [
+        "facts"
+      ],
+      "process_modes": [
+        "query_reformulation"
+      ],
+      "operationalized_metrics": [
+        "strict_success",
+        "task_outcome",
+        "answer_correctness",
+        "tool_validity",
+        "privacy_policy",
+        "efficiency",
+        "claim_support",
+        "source_quality",
+        "citation_correctness",
+        "citation_completeness",
+        "recovery_or_process_success"
+      ],
+      "semantic_judge_statuses": [
+        "NOT_REQUIRED"
+      ]
+    },
+    "source_disambiguation_ood": {
+      "tasks": 2,
+      "outcome_modes": [
+        "facts"
+      ],
+      "process_modes": [
+        "open_path"
+      ],
+      "operationalized_metrics": [
+        "strict_success",
+        "task_outcome",
+        "answer_correctness",
+        "tool_validity",
+        "privacy_policy",
+        "efficiency",
+        "claim_support",
+        "source_quality",
+        "citation_correctness",
+        "citation_completeness"
+      ],
+      "semantic_judge_statuses": [
+        "NOT_REQUIRED"
+      ]
+    },
+    "state_conditional_action": {
+      "tasks": 2,
+      "outcome_modes": [
+        "state"
+      ],
+      "process_modes": [
+        "open_path"
+      ],
+      "operationalized_metrics": [
+        "strict_success",
+        "task_outcome",
+        "answer_correctness",
+        "tool_validity",
+        "privacy_policy",
+        "efficiency"
+      ],
+      "semantic_judge_statuses": [
+        "NOT_REQUIRED"
+      ]
+    },
+    "state_function_calling": {
+      "tasks": 2,
+      "outcome_modes": [
+        "state"
+      ],
+      "process_modes": [
+        "open_path"
+      ],
+      "operationalized_metrics": [
+        "strict_success",
+        "task_outcome",
+        "answer_correctness",
+        "tool_validity",
+        "privacy_policy",
+        "efficiency"
+      ],
+      "semantic_judge_statuses": [
+        "NOT_REQUIRED"
+      ]
+    },
+    "state_multistep_postcondition": {
+      "tasks": 1,
+      "outcome_modes": [
+        "state"
+      ],
+      "process_modes": [
+        "open_path"
+      ],
+      "operationalized_metrics": [
+        "strict_success",
+        "task_outcome",
+        "answer_correctness",
+        "tool_validity",
+        "privacy_policy",
+        "efficiency"
+      ],
+      "semantic_judge_statuses": [
+        "NOT_REQUIRED"
+      ]
+    },
+    "stop_cost_control": {
+      "tasks": 1,
+      "outcome_modes": [
+        "facts"
+      ],
+      "process_modes": [
+        "open_path"
+      ],
+      "operationalized_metrics": [
+        "strict_success",
+        "task_outcome",
+        "answer_correctness",
+        "tool_validity",
+        "privacy_policy",
+        "efficiency",
+        "claim_support",
+        "source_quality",
+        "citation_correctness",
+        "citation_completeness"
+      ],
+      "semantic_judge_statuses": [
+        "NOT_REQUIRED"
+      ]
+    },
+    "tool_failure_recovery": {
+      "tasks": 3,
+      "outcome_modes": [
+        "facts"
+      ],
+      "process_modes": [
+        "failure_recovery"
+      ],
+      "operationalized_metrics": [
+        "strict_success",
+        "task_outcome",
+        "answer_correctness",
+        "tool_validity",
+        "privacy_policy",
+        "efficiency",
+        "claim_support",
+        "source_quality",
+        "citation_correctness",
+        "citation_completeness",
+        "recovery_or_process_success"
+      ],
+      "semantic_judge_statuses": [
+        "NOT_REQUIRED"
+      ]
+    }
+  }
+}

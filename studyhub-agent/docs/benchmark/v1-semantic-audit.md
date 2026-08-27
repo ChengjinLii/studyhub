@@ -1,6 +1,6 @@
 # StudyHub AgentBench v1 Semantic Audit
 
-Generated: `2026-08-27T12:50:00+00:00`
+Generated: `2026-08-27T13:08:43+00:00`
 Frozen manifest: `89b6fe098c26ba8664d27704b28b4571d1c70de636abcfe06ecfb929594c7cb1`
 
 This audit does not modify Benchmark v1. It quantifies why the frozen benchmark remains useful for runtime lineage but is not reused as the formal v2 capability ruler.

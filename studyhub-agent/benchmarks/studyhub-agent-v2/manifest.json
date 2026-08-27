@@ -1,8 +1,8 @@
 {
   "schema_version": "studyhub.agentbench-manifest.v2",
   "benchmark_version": "studyhub-agentbench-v2",
-  "status": "CANDIDATE_PENDING_QUALITY_AUDIT",
-  "generated_at": "2026-08-27T12:56:06+00:00",
+  "status": "FROZEN_FOR_BASELINE",
+  "generated_at": "2026-08-27T13:08:43+00:00",
   "seed": 20260827,
   "task_schema_version": "studyhub.agentbench-task.v2",
   "environment_schema_version": "studyhub.agentbench-environment.v2",
@@ -153,8 +153,43 @@
     "evaluator_imports_training_reward": false
   },
   "review": {
-    "self_review": "NOT_RUN",
+    "self_review": "COMPLETED_PASS_WITH_LIMITATIONS",
+    "self_reviewed_items": 35,
+    "self_review_evidence": "configs/benchmark-v2-self-review.json",
     "independent_human_review": "NOT_RUN",
     "external_llm_judge": "NOT_RUN"
+  },
+  "benchmark_revision": "2.0.0",
+  "frozen_at": "2026-08-27T13:08:43+00:00",
+  "builder_commit": "61ca5f77cfa827c35580c108596a185ba369d253",
+  "builder_source_sha256": "40b7b99aafd023375cdb674f22f865cd5fd51f2a46dcf5ec7b3b1fb98b5e2794",
+  "quality_artifacts": {
+    "quality_gate": "2caf1f31a6e0a7c631528491d73384d2b2dc016257b96250fd89a8c195b7b19f",
+    "structural_audit_summary": "2aa2ae6f9827b6c4bbfb2ce159d34e86e67116a4b2d5460f82abe3a97f8e6b3a",
+    "semantic_audit_summary": "d5c6d1389c8de885af0930d7d3893044af0c486a7d566cc2c53172134a506345",
+    "self_test_summary": "86532f56adcade76439a1637bb180a9914597fbab9aef442d68cd730d876723e",
+    "evaluator_challenge_summary": "267d14373e48968ca241e10a9e4c33c4e33a0db7ad5547e0ba65584e9219a2c2",
+    "review_pack_manifest": "59f82ed049f4967d08d9ac57cae926c236d2eee80830fef6586c850db02f7dd2",
+    "self_review": "915ca63a77635508f327b020d6a7d5717f889810e56c793101874f30ce89efdd",
+    "external_portfolio_lock": "7a845f7a9a108d6d8097eb9f4bb4b1946291ddc3a85a2b5cb8423083f2c4cf01",
+    "external_smoke": "d27fab529329740a613f839bd56dbde0545749e0612f6562093d93beb218be63"
+  },
+  "external_portfolio": {
+    "bfcl": {
+      "resolved_commit": "f7cf7359b7ac615a0b294831c5ba2bc95ee4a000",
+      "setup_status": "SETUP_READY"
+    },
+    "browsecomp_plus": {
+      "resolved_commit": "046949032b0328319cc9a02663a759ec601d9402",
+      "setup_status": "SETUP_READY"
+    },
+    "deepresearch_bench_ii": {
+      "resolved_commit": "440bdc33728438d317ca7860809942b5a1e40256",
+      "setup_status": "LICENSE_REVIEW_REQUIRED"
+    },
+    "tau2": {
+      "resolved_commit": "fc0055dc4e0a316c3f83133267fbd6faaa770992",
+      "setup_status": "SETUP_READY"
+    }
   }
 }

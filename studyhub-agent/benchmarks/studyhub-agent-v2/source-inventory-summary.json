@@ -1,0 +1,19 @@
+{
+  "schema_version": "studyhub.agentbench-source-inventory-summary.v2",
+  "records": 84,
+  "document_types": {
+    "preview_ocr": 34,
+    "official_pinned_repository_documentation": 10,
+    "official_documentation": 40
+  },
+  "access_scopes": {
+    "free": 34,
+    "public_open_documentation": 50
+  },
+  "provenance": {
+    "StudyHub OSS backup": 34,
+    "frozen official web snapshot": 50
+  },
+  "content_hashes_present": true,
+  "paid_private_sources": 0
+}

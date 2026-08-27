@@ -1,12 +1,12 @@
 {
   "schema_version": "studyhub.agentbench-structural-audit.v2",
   "benchmark_version": "studyhub-agentbench-v2",
-  "generated_at": "2026-08-27T13:08:06+00:00",
+  "generated_at": "2026-08-27T13:08:43+00:00",
   "status": "PASS",
   "summary": {
     "checks": 18,
     "passed": 18,
     "failed": 0
   },
-  "audit_sha256": "43c510330196689e8c41e9cb83c9c0fdffb715724ba77c398748f8c6d70ef5cd"
+  "audit_sha256": "2aa7cade9489c777a1e77bce155ac3d546e187f1965a6ba7b40db5f2a238dc1e"
 }

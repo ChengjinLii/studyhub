@@ -1,7 +1,7 @@
 {
   "schema_version": "studyhub.agentbench-self-test-summary.v2",
   "benchmark_version": "studyhub-agentbench-v2",
-  "generated_at": "2026-08-27T13:08:06+00:00",
+  "generated_at": "2026-08-27T13:08:43+00:00",
   "status": "PASS",
   "oracle": {
     "tasks": 73,
@@ -61,9 +61,9 @@
     "largest_answer_signature_share": 0.061224489795918366
   },
   "artifact_hashes": {
-    "oracle-reachability-report.json": "7ec1cc88c4eb734e8a5c80dcbee64ef093d287aeb8c374b1d09bdcef05ddacca",
-    "negative-control-report.json": "1037a13ca7f30b9fe3c2233c9637d8a52420c93198e05c19535ab68196b82adf",
-    "metamorphic-test-report.json": "0b6bf47062e5cbb30d73233b939258297e17e6f8962c81af92d6e4a5949f5193",
-    "shortcut-probe-report.json": "81a70bc6780b03687346331f98bb056c65da7079ae739879a7817a9a33f0aaa8"
+    "oracle-reachability-report.json": "41549da6423a75ea1f911ca0dd44efce1f0df421a16bd63e465de8a3af9da4ec",
+    "negative-control-report.json": "79f416d88c8e526a98063eb57e63c9b65d7e0eb15dd98c3fcf687195bd100124",
+    "metamorphic-test-report.json": "e3f70a793562afb47578203363dbf07654507d4099c3e9f1296ca88c2de37f9b",
+    "shortcut-probe-report.json": "f09701e85e10b793d72a0d5005f86296a9e9d0159de16067557598ccf0aee126"
   }
 }
