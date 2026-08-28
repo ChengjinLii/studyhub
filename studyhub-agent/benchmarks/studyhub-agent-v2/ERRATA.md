@@ -41,6 +41,15 @@ following separate claims:
   artifacts, and the access policy. It is not based on directly comparing all
   98 prompt texts inside the training audit.
 
+On 2026-08-29, the legacy manifest validator performed one local integrity
+pass over 18 hidden files because hidden validation was its default. It hashed
+files and checked hidden-manifest binding; it did not parse task/grader
+semantics, export content, run a model, or feed any result into training,
+Teacher generation, checkpoint selection, or evaluation. This process
+deviation is recorded in `HIDDEN_ACCESS_LEDGER.json`. The validator now
+defaults to public-only validation; hidden integrity checks require both an
+explicit flag and `STUDYHUB_ALLOW_SEALED_VALIDATION=YES`.
+
 These statements must remain separate in future reports.
 
 ## Development exposure
@@ -50,9 +59,10 @@ Open-Only-v1 diagnostic run. It is an iteration set, not an untouched final
 test. New uses must be appended to `DEVELOPMENT_EXPOSURE_LEDGER.json` before a
 result is used for model selection.
 
-Sealed-A and Sealed-B remain unused. They may be opened once only after the
-dataset, recipe, checkpoint, promotion rule, internal variance, and official
-external results are frozen.
+Sealed-A and Sealed-B remain unused for model execution, scoring, training,
+Teacher generation, and model selection. They may be opened for final model
+evaluation once only after the dataset, recipe, checkpoint, promotion rule,
+internal variance, and official external results are frozen.
 
 ## Allowed claim
 

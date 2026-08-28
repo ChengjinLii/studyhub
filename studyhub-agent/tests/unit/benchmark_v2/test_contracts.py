@@ -4,8 +4,11 @@ import asyncio
 import hashlib
 import json
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
+
+from scripts.benchmark.v2.validate_manifest import validate as validate_manifest
 
 from scripts.benchmark.run_9b_base_eval import aggregate, select_tasks
 from scripts.benchmark.v2.validate_calibration import validate as validate_calibration
@@ -372,15 +375,55 @@ def test_errata_keeps_public_overlap_and_sealed_isolation_claims_separate() -> N
 
 
 def test_development_exposure_ledger_never_claims_sealed_usage() -> None:
-    ledger = json.loads(
-        (PUBLIC_BENCHMARK / "DEVELOPMENT_EXPOSURE_LEDGER.json").read_text(
-            encoding="utf-8"
-        )
-    )
+    ledger = json.loads((PUBLIC_BENCHMARK / "DEVELOPMENT_EXPOSURE_LEDGER.json").read_text(encoding="utf-8"))
 
-    assert ledger["benchmark_manifest_sha256"] == hashlib.sha256(
-        (PUBLIC_BENCHMARK / "manifest.json").read_bytes()
-    ).hexdigest()
+    assert (
+        ledger["benchmark_manifest_sha256"]
+        == hashlib.sha256((PUBLIC_BENCHMARK / "manifest.json").read_bytes()).hexdigest()
+    )
     assert ledger["policy"]["development_is_untouched_final_test"] is False
     assert ledger["policy"]["sealed_used"] is False
     assert all("sealed" not in row["mode"] for row in ledger["entries"])
+
+
+def test_manifest_validation_defaults_to_public_only(tmp_path: Path) -> None:
+    args = SimpleNamespace(
+        project=PROJECT,
+        public_root=PUBLIC_BENCHMARK,
+        hidden_root=tmp_path / "must-not-be-read",
+        require_frozen=True,
+        include_hidden=False,
+    )
+
+    result = validate_manifest(args)
+
+    assert result["status"] == "PASS"
+    assert result["hidden_assets_checked"] == 0
+
+
+def test_hidden_manifest_validation_requires_explicit_environment_authorization(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.delenv("STUDYHUB_ALLOW_SEALED_VALIDATION", raising=False)
+    args = SimpleNamespace(
+        project=PROJECT,
+        public_root=PUBLIC_BENCHMARK,
+        hidden_root=tmp_path / "must-not-be-read",
+        require_frozen=True,
+        include_hidden=True,
+    )
+
+    result = validate_manifest(args)
+
+    assert result["status"] == "FAIL"
+    assert result["hidden_assets_checked"] == 0
+    assert "STUDYHUB_ALLOW_SEALED_VALIDATION=YES" in result["failures"][0]
+
+
+def test_hidden_access_ledger_discloses_integrity_check_without_model_use() -> None:
+    ledger = json.loads((PUBLIC_BENCHMARK / "HIDDEN_ACCESS_LEDGER.json").read_text(encoding="utf-8"))
+
+    assert ledger["current_policy"]["default_validation"] == "PUBLIC_ONLY"
+    assert ledger["current_policy"]["final_sealed_model_evaluation"] == "NOT_RUN"
+    assert all(row["model_executed"] is False for row in ledger["entries"])
+    assert all(row["used_for_model_selection"] is False for row in ledger["entries"])

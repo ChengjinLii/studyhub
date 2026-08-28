@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import subprocess
 from pathlib import Path
 from typing import Any
@@ -29,7 +30,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--public-root", type=Path, default=project / "benchmarks/studyhub-agent-v2")
     parser.add_argument("--hidden-root", type=Path, default=project / "artifacts/benchmark-v2/studyhub-agent-v2")
     parser.add_argument("--require-frozen", action="store_true")
-    parser.add_argument("--public-only", action="store_true")
+    parser.add_argument(
+        "--include-hidden",
+        action="store_true",
+        help=("Validate ignored hidden assets. Requires STUDYHUB_ALLOW_SEALED_VALIDATION=YES."),
+    )
     return parser.parse_args()
 
 
@@ -40,6 +45,18 @@ def validate(args: argparse.Namespace) -> dict[str, Any]:
     manifest_path = public / "manifest.json"
     manifest = read_json(manifest_path)
     failures: list[str] = []
+    include_hidden = bool(args.include_hidden)
+
+    if include_hidden and os.environ.get("STUDYHUB_ALLOW_SEALED_VALIDATION") != "YES":
+        return {
+            "schema_version": "studyhub.agentbench-manifest-validation.v2",
+            "status": "FAIL",
+            "benchmark_status": manifest.get("status"),
+            "public_assets": 0,
+            "hidden_assets_checked": 0,
+            "quality_artifacts": 0,
+            "failures": ["hidden validation requires STUDYHUB_ALLOW_SEALED_VALIDATION=YES"],
+        }
 
     if args.require_frozen and manifest.get("status") != "FROZEN_FOR_BASELINE":
         failures.append(f"benchmark status is {manifest.get('status')!r}, not FROZEN_FOR_BASELINE")
@@ -51,7 +68,7 @@ def validate(args: argparse.Namespace) -> dict[str, Any]:
         elif sha256(path) != expected:
             failures.append(f"public asset hash mismatch: {relative}")
 
-    if not args.public_only:
+    if include_hidden:
         for relative, expected in manifest.get("hidden_files", {}).items():
             path = hidden / relative
             if not path.is_file():
@@ -101,7 +118,7 @@ def validate(args: argparse.Namespace) -> dict[str, Any]:
         if args.require_frozen and quality.get("status") != "PASS":
             failures.append("frozen manifest points to a failing quality gate")
 
-    if not args.public_only:
+    if include_hidden:
         hidden_manifest_path = hidden / "manifest.json"
         if not hidden_manifest_path.is_file():
             failures.append("missing hidden manifest")
@@ -115,7 +132,7 @@ def validate(args: argparse.Namespace) -> dict[str, Any]:
         "status": "PASS" if not failures else "FAIL",
         "benchmark_status": manifest.get("status"),
         "public_assets": len(manifest.get("public_files", {})),
-        "hidden_assets_checked": 0 if args.public_only else len(manifest.get("hidden_files", {})),
+        "hidden_assets_checked": (len(manifest.get("hidden_files", {})) if include_hidden else 0),
         "quality_artifacts": len(manifest.get("quality_artifacts", {})),
         "failures": failures,
     }

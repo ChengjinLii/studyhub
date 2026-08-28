@@ -112,7 +112,7 @@ calibration_contract_test="tests/unit/benchmark_v2/test_contracts.py::test_devel
 "$PYTHON_BIN" scripts/benchmark/secret_scan.py
 "$PYTHON_BIN" scripts/benchmark/v2/finalize.py --builder-commit "$BUILDER_COMMIT"
 "$PYTHON_BIN" scripts/benchmark/v2/generate_docs.py
-"$PYTHON_BIN" scripts/benchmark/v2/validate_manifest.py --require-frozen
+"$PYTHON_BIN" scripts/benchmark/v2/validate_manifest.py --require-frozen --include-hidden
 "$PYTHON_BIN" scripts/benchmark/v2/validate_calibration.py
 "$PYTEST_BIN" "$calibration_contract_test"
 

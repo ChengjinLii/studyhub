@@ -1,0 +1,28 @@
+{
+  "schema_version": "studyhub.agentbench-hidden-access-ledger.v1",
+  "benchmark_manifest_sha256": "da804b10f53dec585255598c3e256445b8ade3acf35fd8c766ca0ab4d759c88b",
+  "entries": [
+    {
+      "date": "2026-08-29",
+      "operation": "legacy_manifest_integrity_validation",
+      "trigger": "validate_manifest_default_included_hidden_assets",
+      "hidden_files_hashed": 18,
+      "hidden_manifest_binding_checked": true,
+      "task_or_grader_semantics_parsed": false,
+      "content_exported": false,
+      "model_executed": false,
+      "used_for_training": false,
+      "used_for_teacher_generation": false,
+      "used_for_model_selection": false,
+      "used_for_evaluation": false,
+      "classification": "PROCESS_DEVIATION_NO_MODEL_CONTAMINATION",
+      "remediation": "Default validation is public-only. Hidden integrity validation now requires --include-hidden and STUDYHUB_ALLOW_SEALED_VALIDATION=YES."
+    }
+  ],
+  "current_policy": {
+    "default_validation": "PUBLIC_ONLY",
+    "hidden_validation_flag": "--include-hidden",
+    "hidden_validation_environment": "STUDYHUB_ALLOW_SEALED_VALIDATION=YES",
+    "final_sealed_model_evaluation": "NOT_RUN"
+  }
+}
