@@ -1,0 +1,425 @@
+{
+  "schema_version": "studyhub.sft-recovery-gate.v1",
+  "created_at": "2026-08-28T22:58:49+08:00",
+  "status": "FAIL",
+  "claim": "The tested interrupted SFT path is not equivalent to the uninterrupted reference.",
+  "scope": {
+    "model_quality": "NOT_EVALUATED",
+    "rl_started": false,
+    "sealed_used": false,
+    "expected_updates_per_path": 4
+  },
+  "equivalence_contract": {
+    "path": "/data/chengjin/studyhub/studyhub-agent/configs/program-v3/sft-recovery-numerical-equivalence-v1.json",
+    "sha256": "f63a154b2b2dd9e72878f7049daf4ff89bdbb0f3a1b7e988075d62fb87680239",
+    "payload": {
+      "schema_version": "studyhub.sft-recovery-equivalence-contract.v1",
+      "status": "PRE_REGISTERED_BEFORE_CONFIRMATION_RUN",
+      "created_at": "2026-08-28T22:45:00+08:00",
+      "scope": {
+        "backend": "AReaL FSDP2",
+        "dtype": "bfloat16",
+        "model": "Qwen3.5-9B LoRA r16 alpha16",
+        "updates_per_path": 4,
+        "shared_prefix_global_step": 1,
+        "model_quality": "NOT_EVALUATED"
+      },
+      "rationale": {
+        "bitwise_identity": "Reported but not required because the controlled production recipe does not enable PyTorch deterministic algorithms and CUDA SDPA backward may be nondeterministic across process restarts.",
+        "official_reference": "https://docs.pytorch.org/docs/stable/notes/randomness.html",
+        "control_constraint": "Deterministic kernels are not enabled only for this Gate because the Mixed-v3.0 control was trained with the production recipe; changing kernels would introduce a second experimental variable.",
+        "confirmation_rule": "Only a fresh Gate started after this contract is committed may satisfy it. Earlier observations remain FAIL under their original exact-tensor contract."
+      },
+      "calibration_disclosure": [
+        "docs/training/evidence/open-only-sft-v1-1-recovery-gate-20260828_220507.json",
+        "docs/training/evidence/open-only-sft-v1-1-recovery-gate-20260828_223122.json"
+      ],
+      "adapter_thresholds": {
+        "max_absolute_difference": 1e-05,
+        "max_relative_l2_to_reference": 5e-06,
+        "max_relative_l2_to_reference_update": 0.05,
+        "min_update_cosine_similarity": 0.999,
+        "min_update_norm_ratio": 0.995,
+        "max_update_norm_ratio": 1.005
+      },
+      "continuation_thresholds": {
+        "exact_series": [
+          "sft/n_tokens",
+          "sft/n_valid_tokens",
+          "sft/prompt_tokens",
+          "sft/n_seqs",
+          "sft/num_micro_batches",
+          "sft/update_successful"
+        ],
+        "max_first_step_loss_absolute_difference": 0.0005,
+        "max_tail_loss_relative_difference": 0.01,
+        "max_tail_grad_norm_relative_difference": 0.02,
+        "max_tail_entropy_absolute_difference": 0.005
+      },
+      "hard_failures": [
+        "shared prefix missing or not atomically branched",
+        "LR schedule mismatch",
+        "sample-shape series mismatch",
+        "missing or unexpected LoRA tensor",
+        "non-finite metric",
+        "any numerical threshold exceeded"
+      ]
+    }
+  },
+  "continuous_lr": {
+    "schema_version": "studyhub.sft-lr-schedule-audit.v1",
+    "status": "PASS",
+    "contract": {
+      "base_lr": 2e-05,
+      "scheduler": "cosine",
+      "scheduler_total_steps": 5456,
+      "warmup_fraction": 0.03,
+      "warmup_steps": 163,
+      "expected_updates": 4,
+      "expected_start_step": 0,
+      "rel_tolerance": 0.0001,
+      "abs_tolerance": 5e-10
+    },
+    "segments": [
+      {
+        "metrics": "/data/chengjin/studyhub/studyhub-agent/artifacts/experiments/open-only-sft-v1-1-recovery-gate-20260828_224842-continuous-attempt-full/metrics/trainer.json",
+        "start_global_step": 0,
+        "count": 4,
+        "first_actual_lr": 0.0,
+        "last_actual_lr": 3.681e-07,
+        "first_expected_lr": 0.0,
+        "last_expected_lr": 3.680981595092025e-07,
+        "mismatch_count": 0,
+        "first_mismatches": [],
+        "max_absolute_error": 1.8404907975224414e-12,
+        "max_relative_error": 4.9999999999359656e-06
+      }
+    ],
+    "coverage": {
+      "observed_updates": 4,
+      "first_global_step": 0,
+      "last_global_step": 3
+    },
+    "mismatch_count": 0,
+    "failures": []
+  },
+  "recovered_lr": {
+    "schema_version": "studyhub.sft-lr-schedule-audit.v1",
+    "status": "PASS",
+    "contract": {
+      "base_lr": 2e-05,
+      "scheduler": "cosine",
+      "scheduler_total_steps": 5456,
+      "warmup_fraction": 0.03,
+      "warmup_steps": 163,
+      "expected_updates": 4,
+      "expected_start_step": 0,
+      "rel_tolerance": 0.0001,
+      "abs_tolerance": 5e-10
+    },
+    "segments": [
+      {
+        "metrics": "/data/chengjin/studyhub/studyhub-agent/artifacts/experiments/open-only-sft-v1-1-recovery-gate-20260828_224842-continuous-attempt-full/metrics/trainer.json",
+        "start_global_step": 0,
+        "count": 2,
+        "first_actual_lr": 0.0,
+        "last_actual_lr": 1.227e-07,
+        "first_expected_lr": 0.0,
+        "last_expected_lr": 1.226993865030675e-07,
+        "mismatch_count": 0,
+        "first_mismatches": [],
+        "max_absolute_error": 6.134969324986572e-13,
+        "max_relative_error": 4.999999999864055e-06
+      },
+      {
+        "metrics": "/data/chengjin/studyhub/studyhub-agent/artifacts/experiments/open-only-sft-v1-1-recovery-gate-20260828_224842-recovered-attempt-after-recovery/metrics/trainer.json",
+        "start_global_step": 2,
+        "count": 2,
+        "first_actual_lr": 2.454e-07,
+        "last_actual_lr": 3.681e-07,
+        "first_expected_lr": 2.45398773006135e-07,
+        "last_expected_lr": 3.680981595092025e-07,
+        "mismatch_count": 0,
+        "first_mismatches": [],
+        "max_absolute_error": 1.8404907975224414e-12,
+        "max_relative_error": 4.9999999999359656e-06
+      }
+    ],
+    "coverage": {
+      "observed_updates": 4,
+      "first_global_step": 0,
+      "last_global_step": 3
+    },
+    "mismatch_count": 0,
+    "failures": []
+  },
+  "shared_prefix": {
+    "status": "PASS",
+    "path": "/data/chengjin/studyhub/studyhub-agent/artifacts/areal/launcher_logs/open-only-sft-v1-1-recovery-gate-20260828_224842/shared-prefix-snapshot.json",
+    "snapshot": {
+      "schema_version": "studyhub.sft-shared-prefix.v1",
+      "created_at": "2026-08-28T22:52:12+08:00",
+      "status": "PASS",
+      "method": "atomic_directory_rename_same_filesystem",
+      "source_root": "/data/chengjin/studyhub/studyhub-agent/artifacts/areal/checkpoints/chengjin/studyhub-open-only-sft-v1-1-recovery-gate-20260828_224842/open-only-sft-v1-1-recovery-gate-20260828_224842-continuous",
+      "target_root": "/data/chengjin/studyhub/studyhub-agent/artifacts/areal/checkpoints/chengjin/studyhub-open-only-sft-v1-1-recovery-gate-20260828_224842/open-only-sft-v1-1-recovery-gate-20260828_224842-recovered",
+      "step_info": {
+        "epoch": 0,
+        "epoch_step": 1,
+        "global_step": 1,
+        "steps_per_epoch": 2100
+      },
+      "checkpoint": {
+        "file_count": 3,
+        "total_bytes": 37959718135,
+        "metadata_sha256": "af1f060b4b3ca10fdfcc4bba75684296a681dd0a1c2be2a2b99ea83a0a83504a",
+        "relative_files": [
+          ".metadata",
+          "__0_0.distcp",
+          "__1_0.distcp"
+        ]
+      },
+      "recover_info_files": {
+        "checkpoint_info.json": "b23d2d8c7ade4901d78ac917322e154bec1eb5698ad95d7aae44f5a7a8e70587",
+        "dataloader_info.pkl": "3f9817d018790ec12dfede8a6aed5afa982ed0b54dbe33f713f5c46be4a43915",
+        "evaluator_info.json": "de6b15b648c56e94201705ce9b304b0e54353208881600777d1dd59e0302d504",
+        "saver_info.json": "01dd96e1d2eeebf3073ac3b0e76e0b8f66d7aa53f63b41cf92162e03e1e76ac9",
+        "stats_logger_info.json": "1caf522c9ce5de1f770b2ac1a359603c251402fba2724df05c7720d96142b98e",
+        "step_info.json": "c5538966d4cbfebb3aa6e28a6fea33d223570cfa3b3d34d06aaf61388fab9a22"
+      }
+    },
+    "failures": []
+  },
+  "continuation_metrics": {
+    "status": "PASS",
+    "continuous_metrics": "/data/chengjin/studyhub/studyhub-agent/artifacts/experiments/open-only-sft-v1-1-recovery-gate-20260828_224842-continuous-attempt-full/metrics/trainer.json",
+    "recovered_metrics": "/data/chengjin/studyhub/studyhub-agent/artifacts/experiments/open-only-sft-v1-1-recovery-gate-20260828_224842-recovered-attempt-after-recovery/metrics/trainer.json",
+    "tail_start": 2,
+    "tail_count": 2,
+    "exact_series": {
+      "sft/n_tokens": {
+        "reference": [
+          7403.0,
+          8593.0
+        ],
+        "recovered": [
+          7403.0,
+          8593.0
+        ],
+        "equal": true
+      },
+      "sft/n_valid_tokens": {
+        "reference": [
+          1298.0,
+          1336.0
+        ],
+        "recovered": [
+          1298.0,
+          1336.0
+        ],
+        "equal": true
+      },
+      "sft/prompt_tokens": {
+        "reference": [
+          6105.0,
+          7257.0
+        ],
+        "recovered": [
+          6105.0,
+          7257.0
+        ],
+        "equal": true
+      },
+      "sft/n_seqs": {
+        "reference": [
+          8.0,
+          8.0
+        ],
+        "recovered": [
+          8.0,
+          8.0
+        ],
+        "equal": true
+      },
+      "sft/num_micro_batches": {
+        "reference": [
+          1.0,
+          1.0
+        ],
+        "recovered": [
+          1.0,
+          1.0
+        ],
+        "equal": true
+      },
+      "sft/update_successful": {
+        "reference": [
+          1.0,
+          1.0
+        ],
+        "recovered": [
+          1.0,
+          1.0
+        ],
+        "equal": true
+      }
+    },
+    "diagnostics": {
+      "first_step_loss_absolute_difference": 0.0,
+      "max_tail_loss_relative_difference": 8.178754866358244e-05,
+      "max_tail_grad_norm_relative_difference": 0.00346730823662616,
+      "max_tail_entropy_absolute_difference": 0.0011300000000000199
+    },
+    "contract_thresholds": {
+      "exact_series": [
+        "sft/n_tokens",
+        "sft/n_valid_tokens",
+        "sft/prompt_tokens",
+        "sft/n_seqs",
+        "sft/num_micro_batches",
+        "sft/update_successful"
+      ],
+      "max_first_step_loss_absolute_difference": 0.0005,
+      "max_tail_loss_relative_difference": 0.01,
+      "max_tail_grad_norm_relative_difference": 0.02,
+      "max_tail_entropy_absolute_difference": 0.005
+    },
+    "failures": []
+  },
+  "adapter_comparison": {
+    "status": "FAIL",
+    "equivalence_mode": "bounded_numeric",
+    "bitwise_equal": false,
+    "contract_thresholds": {
+      "max_absolute_difference": 1e-05,
+      "max_relative_l2_to_reference": 5e-06,
+      "max_relative_l2_to_reference_update": 0.05,
+      "min_update_cosine_similarity": 0.999,
+      "min_update_norm_ratio": 0.995,
+      "max_update_norm_ratio": 1.005
+    },
+    "reference": {
+      "path": "/data/chengjin/studyhub/studyhub-agent/artifacts/areal/checkpoints/chengjin/studyhub-open-only-sft-v1-1-recovery-gate-20260828_224842/open-only-sft-v1-1-recovery-gate-20260828_224842-continuous/default/epoch0epochstep3globalstep3/adapter_model.safetensors",
+      "sha256": "a4baf7abf9e07b0f93b0c643e448d599ebaf42742f6e048d467d0e00f6538086"
+    },
+    "recovered": {
+      "path": "/data/chengjin/studyhub/studyhub-agent/artifacts/areal/checkpoints/chengjin/studyhub-open-only-sft-v1-1-recovery-gate-20260828_224842/open-only-sft-v1-1-recovery-gate-20260828_224842-recovered/default/epoch0epochstep3globalstep3/adapter_model.safetensors",
+      "sha256": "f386bb7e1cfc88c3450cfe513c959de3b227e45c9e1359c8e2728706e05cc9d1"
+    },
+    "tensor_key_count": 208,
+    "exact_tensor_count": 91,
+    "element_count": 26214400,
+    "exact_element_count": 15477511,
+    "exact_element_fraction": 0.5904201889038085,
+    "file_sha256_equal": false,
+    "max_absolute_difference": 3.0517578125e-05,
+    "l2_difference": 4.698045896844306e-05,
+    "relative_l2_to_reference": 1.9949411876285575e-06,
+    "relative_l2_to_reference_update": 0.0272802617946567,
+    "reference_update_l2": 0.00172214106015819,
+    "recovered_update_l2": 0.001722445579406005,
+    "update_cosine_similarity": 0.9996279864472487,
+    "update_norm_ratio": 1.0001768259609274,
+    "first_tensor_differences": [
+      {
+        "name": "base_model.model.model.language_model.layers.0.mlp.down_proj.lora_B.weight",
+        "shape": [
+          4096,
+          16
+        ],
+        "dtype": "torch.bfloat16",
+        "max_absolute_difference": 1.648440957069397e-07
+      },
+      {
+        "name": "base_model.model.model.language_model.layers.0.mlp.gate_proj.lora_B.weight",
+        "shape": [
+          12288,
+          16
+        ],
+        "dtype": "torch.bfloat16",
+        "max_absolute_difference": 2.322776708751917e-07
+      },
+      {
+        "name": "base_model.model.model.language_model.layers.0.mlp.up_proj.lora_B.weight",
+        "shape": [
+          12288,
+          16
+        ],
+        "dtype": "torch.bfloat16",
+        "max_absolute_difference": 3.157183527946472e-07
+      },
+      {
+        "name": "base_model.model.model.language_model.layers.1.mlp.down_proj.lora_B.weight",
+        "shape": [
+          4096,
+          16
+        ],
+        "dtype": "torch.bfloat16",
+        "max_absolute_difference": 1.9941944628953934e-07
+      },
+      {
+        "name": "base_model.model.model.language_model.layers.1.mlp.gate_proj.lora_B.weight",
+        "shape": [
+          12288,
+          16
+        ],
+        "dtype": "torch.bfloat16",
+        "max_absolute_difference": 2.3469328880310059e-07
+      },
+      {
+        "name": "base_model.model.model.language_model.layers.1.mlp.up_proj.lora_B.weight",
+        "shape": [
+          12288,
+          16
+        ],
+        "dtype": "torch.bfloat16",
+        "max_absolute_difference": 3.259629011154175e-07
+      },
+      {
+        "name": "base_model.model.model.language_model.layers.10.mlp.down_proj.lora_B.weight",
+        "shape": [
+          4096,
+          16
+        ],
+        "dtype": "torch.bfloat16",
+        "max_absolute_difference": 1.1897645890712738e-07
+      },
+      {
+        "name": "base_model.model.model.language_model.layers.10.mlp.gate_proj.lora_B.weight",
+        "shape": [
+          12288,
+          16
+        ],
+        "dtype": "torch.bfloat16",
+        "max_absolute_difference": 1.6082776710391045e-07
+      },
+      {
+        "name": "base_model.model.model.language_model.layers.10.mlp.up_proj.lora_B.weight",
+        "shape": [
+          12288,
+          16
+        ],
+        "dtype": "torch.bfloat16",
+        "max_absolute_difference": 1.30385160446167e-07
+      },
+      {
+        "name": "base_model.model.model.language_model.layers.11.mlp.down_proj.lora_B.weight",
+        "shape": [
+          4096,
+          16
+        ],
+        "dtype": "torch.bfloat16",
+        "max_absolute_difference": 1.1920928955078125e-07
+      }
+    ],
+    "missing_tensors": [],
+    "unexpected_tensors": [],
+    "initial_missing_tensors": [],
+    "failures": [
+      "max_absolute_difference_exceeded"
+    ]
+  },
+  "failures": [
+    "recovered_adapter_differs_from_continuous"
+  ]
+}
