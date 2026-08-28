@@ -3,7 +3,7 @@
   "created_at": "2026-08-28T23:58:00+08:00",
   "status": "READY_BUT_NOT_RUN",
   "decision": "BLOCKED_MISSING_EXPLICIT_GPU_AUTHORIZATION",
-  "prepared_from_commit": "6877a25",
+  "prepared_from_commit": "420bb46",
   "run_commit_requirement": "CLEAN_HEAD_AT_LAUNCH",
   "next_gate": {
     "profile": "cadence-210",
@@ -22,9 +22,9 @@
   },
   "input_hashes": {
     "launcher": "00cc3374ab178bb74c6b29fabe7b5a2aed252b6cade4225676ee2f58b68fae95",
-    "snapshot": "273bff97a06768023834acf97af7040a98b45d13473419c37a56ea50156d2f83",
-    "verifier": "03b51cd63832db4592eac69767431722dbbe15f09294fdb84b9520fb572cf575",
-    "recovery_state_bridge": "93069f557dcbba7c46c357258e41f40f00be9fa406f38a61a9b1e258776fd4e3",
+    "snapshot": "06e82ca70ac5eb77daf2f32f0dd5b43fd148476168e9d858ac82b7cea94fd0ef",
+    "verifier": "cede392ec4391cb57b4cd0fdc3f204dc92ceadad518065bfbbf9283ae6aa006b",
+    "recovery_state_bridge": "92ecaf92cc07b01ab8e965dae0a8b3fdc7c37502596a991f5fb6e9b4b4bbf651",
     "scheduler_bridge": "44ede5a3d80e37f9e8dacbdc0b315ee543b3e364a0ca6e5d82743a42aa15733d",
     "config": "c0ed9c52aadf30ed6b6f9996ee4b4f90752040f9b03f7d1c9f6c7471481b7f35",
     "program": "f45fdcebdbfeeb50d09d409d001226ae0861bd0449affe7171979aa9305f4ee5",
