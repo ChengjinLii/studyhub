@@ -1,0 +1,65 @@
+{
+  "schema_version": "studyhub.open-only-sft-promotion-decision.v1",
+  "created_at": "2026-08-28T23:54:33+08:00",
+  "candidate": "open-only-sft-v1.1",
+  "decision": "BLOCKED_RECOVERY_CONTRACT",
+  "requirements": {
+    "training_control": {
+      "status": "PASS",
+      "required": true
+    },
+    "recovery_contract": {
+      "status": "NOT_PASS",
+      "required": true,
+      "r4": null
+    },
+    "candidate_training": {
+      "status": "NOT_RUN",
+      "required": true
+    },
+    "internal_development": {
+      "status": "INCOMPLETE",
+      "required": true
+    },
+    "internal_direction_and_tradeoffs": {
+      "status": "NOT_PASS",
+      "required": true
+    },
+    "internal_variance": {
+      "status": "INCOMPLETE",
+      "required": true
+    },
+    "variance_direction": {
+      "status": "NOT_PASS",
+      "required": true
+    },
+    "external_bfcl_tau2": {
+      "status": "NOT_RUN",
+      "required": true
+    },
+    "external_direction": {
+      "status": "NOT_PASS",
+      "required": true
+    },
+    "sealed_unused": {
+      "status": "PASS",
+      "required": true
+    }
+  },
+  "claim_boundary": "No overall Agentic improvement or final confirmation claim is permitted until controlled training, paired Development, variance, and official BFCL/tau2 evidence all pass. Sealed remains unused.",
+  "evidence": {
+    "control": {
+      "path": "/data/chengjin/studyhub/studyhub-agent/docs/training/evidence/open-only-sft-v1-1-control-diff.json",
+      "sha256": "222c158e7408f1a0f023aef6f725497371f063e31dc83caa9fbb6ff64aacc012"
+    },
+    "portfolio": {
+      "path": "/data/chengjin/studyhub/studyhub-agent/docs/training/evidence/open-only-sft-v1-1-benchmark-portfolio.json",
+      "sha256": "3ea94cd619a8cc793cd4940796fc47cd65782d9b497db08397da746e677624e5"
+    }
+  },
+  "scope": {
+    "rl_started": false,
+    "sealed_used": false,
+    "benchmark_modified": false
+  }
+}

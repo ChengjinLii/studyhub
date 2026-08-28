@@ -1,0 +1,340 @@
+{
+  "schema_version": "studyhub.open-only-sft-benchmark-portfolio.v1",
+  "created_at": "2026-08-28T23:54:29+08:00",
+  "status": "READY_BUT_NOT_RUN",
+  "candidate": "open-only-sft-v1.1",
+  "benchmark": {
+    "version": "studyhub-agentbench-v2",
+    "revision": "2.0.0",
+    "manifest_sha256": "da804b10f53dec585255598c3e256445b8ade3acf35fd8c766ca0ab4d759c88b",
+    "development_mde_80_power_pp": 17.865,
+    "sealed_used": false
+  },
+  "training": {
+    "base": {
+      "status": "FROZEN_UNTRAINED_REFERENCE"
+    },
+    "mixed_v3_0": {
+      "status": "COMPLETE_NEGATIVE_DIRECTIONAL_BASELINE"
+    },
+    "open_only_v1_1": {
+      "status": "NOT_RUN",
+      "reason": "BLOCKED_RECOVERY_CONTRACT"
+    }
+  },
+  "internal": {
+    "development": {
+      "base": {
+        "status": "COMPLETED",
+        "reason": null,
+        "metrics": {
+          "episodes_scored": 51,
+          "infra_excluded": 0,
+          "strict_success_rate": 0.117647,
+          "mean_diagnostic_score": 0.283758,
+          "mean_tool_calls": 2.882353,
+          "mean_latency_seconds": 9.034495,
+          "run_id": "qwen35-9b-base-v2-development-seed-20260827-20260827_212818",
+          "episodes_sha256": "1ec9c8fcb326302f3bc6604400c4418b6d2f1911d05273e55f1e52d2551401f6"
+        },
+        "evidence": {
+          "path": "docs/benchmark/evidence/qwen35-9b-base-v2-development-variance-20260827.json",
+          "sha256": "6b880a5d63cf7e78bd82612bc8f5dd72a4da53dce8bf523a4b722e7fb22ef580"
+        }
+      },
+      "mixed_v3_0": {
+        "status": "COMPLETED",
+        "reason": null,
+        "metrics": {
+          "episodes_scored": 51,
+          "infra_excluded": 0,
+          "strict_success_rate": 0.078431,
+          "mean_diagnostic_score": 0.249346,
+          "mean_tool_calls": 2.27451,
+          "run_id": "qwen35-9b-overnight-sft-v2-development-seed-20260827-20260828_074542",
+          "episodes_sha256": "6b61f7c7c4cde1e9e2f295e498e654cb311b053655171093e2ead6594ba447a6"
+        },
+        "evidence": {
+          "path": "docs/training/evidence/overnight-sft-teacher-20260828.json",
+          "sha256": "542e2176ab4e471827176143c0b8f76583b76be67d379e041585595074901783"
+        }
+      },
+      "open_only_v1_1": {
+        "status": "NOT_RUN",
+        "reason": "FORMAL_TRAINING_NOT_RUN",
+        "metrics": null,
+        "evidence": null
+      }
+    },
+    "variance": {
+      "base": {
+        "status": "COMPLETED",
+        "reason": null,
+        "metrics": {
+          "episodes_scored": 140,
+          "infra_excluded": 0,
+          "strict_success_rate": 0.121429,
+          "pass_at_4": 0.2,
+          "consistent_at_4": 0.057143,
+          "mixed_outcome_rate": 0.142857,
+          "run_id": "qwen35-9b-base-v2-variance-seed-20260827-20260827_213336",
+          "episodes_sha256": "6a64c0753729be611e9df4249b00928843c553f1d3c92d675270ef9dde85634d"
+        },
+        "evidence": {
+          "path": "docs/benchmark/evidence/qwen35-9b-base-v2-development-variance-20260827.json",
+          "sha256": "6b880a5d63cf7e78bd82612bc8f5dd72a4da53dce8bf523a4b722e7fb22ef580"
+        }
+      },
+      "mixed_v3_0": {
+        "status": "NOT_RUN",
+        "reason": "MIXED_VARIANCE_NOT_RUN",
+        "metrics": null,
+        "evidence": null
+      },
+      "open_only_v1_1": {
+        "status": "NOT_RUN",
+        "reason": "CANDIDATE_VARIANCE_NOT_RUN",
+        "metrics": null,
+        "evidence": null
+      }
+    }
+  },
+  "external": {
+    "bfcl": {
+      "pinned_commit": "f7cf7359b7ac615a0b294831c5ba2bc95ee4a000",
+      "setup_status": "SETUP_READY",
+      "license": {
+        "path": "LICENSE",
+        "scope": "repository_code_and_bundled_data",
+        "spdx": "Apache-2.0",
+        "status": "verified"
+      },
+      "official_metric_semantics_preserved": true,
+      "official_invocation": {
+        "evaluate": [
+          "bfcl",
+          "evaluate",
+          "--model",
+          "studyhub-qwen",
+          "--test-category",
+          "simple_python",
+          "--result-dir",
+          "result/studyhub-smoke",
+          "--partial-eval"
+        ],
+        "generate": [
+          "bfcl",
+          "generate",
+          "--model",
+          "studyhub-qwen",
+          "--test-category",
+          "simple_python",
+          "--result-dir",
+          "result/studyhub-smoke",
+          "--skip-server-setup"
+        ]
+      },
+      "model_results": {
+        "base": {
+          "status": "NOT_RUN",
+          "raw_metric_name": null,
+          "raw_metric_value": null
+        },
+        "mixed_v3_0": {
+          "status": "NOT_RUN",
+          "raw_metric_name": null,
+          "raw_metric_value": null
+        },
+        "open_only_v1_1": {
+          "status": "NOT_RUN",
+          "raw_metric_name": null,
+          "raw_metric_value": null
+        }
+      }
+    },
+    "browsecomp_plus": {
+      "pinned_commit": "046949032b0328319cc9a02663a759ec601d9402",
+      "setup_status": "SETUP_READY",
+      "license": {
+        "path": "LICENSE",
+        "scope": "repository_code",
+        "spdx": "MIT",
+        "status": "verified"
+      },
+      "official_metric_semantics_preserved": true,
+      "official_invocation": [
+        "uv",
+        "run",
+        "python",
+        "scripts_evaluation/evaluate_run.py",
+        "--input_dir",
+        "runs/studyhub-smoke"
+      ],
+      "model_results": {
+        "base": {
+          "status": "NOT_RUN",
+          "raw_metric_name": null,
+          "raw_metric_value": null
+        },
+        "mixed_v3_0": {
+          "status": "NOT_RUN",
+          "raw_metric_name": null,
+          "raw_metric_value": null
+        },
+        "open_only_v1_1": {
+          "status": "NOT_RUN",
+          "raw_metric_name": null,
+          "raw_metric_value": null
+        }
+      }
+    },
+    "deepresearch_bench_ii": {
+      "pinned_commit": "440bdc33728438d317ca7860809942b5a1e40256",
+      "setup_status": "LICENSE_REVIEW_REQUIRED",
+      "license": {
+        "path": null,
+        "scope": "upstream_repository_has_no_license_file",
+        "spdx": "NOASSERTION",
+        "status": "unconfirmed"
+      },
+      "official_metric_semantics_preserved": "NOT_APPLICABLE_LICENSE_BLOCKED",
+      "official_invocation": null,
+      "model_results": {
+        "base": {
+          "status": "LICENSE_REVIEW_REQUIRED",
+          "raw_metric_name": null,
+          "raw_metric_value": null
+        },
+        "mixed_v3_0": {
+          "status": "LICENSE_REVIEW_REQUIRED",
+          "raw_metric_name": null,
+          "raw_metric_value": null
+        },
+        "open_only_v1_1": {
+          "status": "LICENSE_REVIEW_REQUIRED",
+          "raw_metric_name": null,
+          "raw_metric_value": null
+        }
+      }
+    },
+    "tau2": {
+      "pinned_commit": "fc0055dc4e0a316c3f83133267fbd6faaa770992",
+      "setup_status": "SETUP_READY",
+      "license": {
+        "path": "LICENSE",
+        "scope": "repository_code_and_bundled_data",
+        "spdx": "MIT",
+        "status": "verified"
+      },
+      "official_metric_semantics_preserved": true,
+      "official_invocation": [
+        "uv",
+        "run",
+        "tau2",
+        "run",
+        "--domain",
+        "airline",
+        "--agent-llm",
+        "studyhub-qwen",
+        "--user-llm",
+        "studyhub-user-simulator",
+        "--task-split-name",
+        "base",
+        "--task-ids",
+        "0"
+      ],
+      "model_results": {
+        "base": {
+          "status": "NOT_RUN",
+          "raw_metric_name": null,
+          "raw_metric_value": null
+        },
+        "mixed_v3_0": {
+          "status": "NOT_RUN",
+          "raw_metric_name": null,
+          "raw_metric_value": null
+        },
+        "open_only_v1_1": {
+          "status": "NOT_RUN",
+          "raw_metric_name": null,
+          "raw_metric_value": null
+        }
+      }
+    }
+  },
+  "supported_suites": [
+    "internal-development",
+    "internal-variance",
+    "bfcl",
+    "tau2",
+    "browsecomp-plus",
+    "portfolio"
+  ],
+  "result_policy": {
+    "aggregate_agent_score": "PROHIBITED",
+    "official_external_metrics": "PRESERVE_UNMODIFIED",
+    "external_not_run_blocks_promotion": true,
+    "single_rollout_direction_is_not_promotion_evidence": true,
+    "policy": {
+      "path": "configs/program-v3/open-only-sft-v1.1-promotion-policy.json",
+      "sha256": "ffc7b20ce02056fa4438d333c078880f1ea7a2c766167e1fad475ad47381e9f5"
+    }
+  },
+  "promotion_signals": {
+    "internal_paired_direction": {
+      "status": "NOT_RUN",
+      "evidence": null
+    },
+    "capability_tradeoffs": {
+      "status": "NOT_RUN",
+      "evidence": null
+    },
+    "cost_latency": {
+      "status": "NOT_RUN",
+      "evidence": null
+    },
+    "variance_direction": {
+      "status": "NOT_RUN",
+      "evidence": null
+    },
+    "external_direction": {
+      "status": "NOT_RUN",
+      "evidence": null
+    }
+  },
+  "scope": {
+    "rl_started": false,
+    "sealed_used": false,
+    "benchmark_modified": false
+  },
+  "inputs": {
+    "benchmark": {
+      "path": "benchmarks/studyhub-agent-v2/manifest.json",
+      "sha256": "da804b10f53dec585255598c3e256445b8ade3acf35fd8c766ca0ab4d759c88b"
+    },
+    "base": {
+      "path": "docs/benchmark/evidence/qwen35-9b-base-v2-development-variance-20260827.json",
+      "sha256": "6b880a5d63cf7e78bd82612bc8f5dd72a4da53dce8bf523a4b722e7fb22ef580"
+    },
+    "mixed": {
+      "path": "docs/training/evidence/overnight-sft-teacher-20260828.json",
+      "sha256": "542e2176ab4e471827176143c0b8f76583b76be67d379e041585595074901783"
+    },
+    "control": {
+      "path": "docs/training/evidence/open-only-sft-v1-1-control-diff.json",
+      "sha256": "222c158e7408f1a0f023aef6f725497371f063e31dc83caa9fbb6ff64aacc012"
+    },
+    "external_lock": {
+      "path": "external_benchmarks/lock.json",
+      "sha256": "7a845f7a9a108d6d8097eb9f4bb4b1946291ddc3a85a2b5cb8423083f2c4cf01"
+    },
+    "external_smoke": {
+      "path": "external_benchmarks/smoke-status.json",
+      "sha256": "d27fab529329740a613f839bd56dbde0545749e0612f6562093d93beb218be63"
+    },
+    "promotion_policy": {
+      "path": "configs/program-v3/open-only-sft-v1.1-promotion-policy.json",
+      "sha256": "ffc7b20ce02056fa4438d333c078880f1ea7a2c766167e1fad475ad47381e9f5"
+    }
+  }
+}
