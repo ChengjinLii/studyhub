@@ -126,6 +126,8 @@ def test_corrected_launcher_fails_closed_on_scheduler_and_recovery() -> None:
     assert "STUDYHUB_AREAL_SCHEDULER_BRIDGE=1" in launcher
     assert "STUDYHUB_AREAL_SCHEDULER_TOTAL_STEPS" in launcher
     assert "STUDYHUB_AREAL_RECOVER_SCHEDULER_STEP" in launcher
+    assert '"${VENV_DIR}/bin/python" -S - "${RECOVER_STEP_INFO}"' in launcher
+    assert '[[ ! "${ATTEMPT_START_STEP}" =~ ^[0-9]+$ ]]' in launcher
     assert "collect_lr_audit_segments.py" in launcher
     assert "audit_sft_lr_schedule.py" in launcher
     assert '--lr-audit "${LR_AUDIT}"' in launcher
@@ -145,4 +147,6 @@ def test_recovery_gate_compares_continuous_and_resumed_lora() -> None:
     assert "--continuous-adapter" in launcher
     assert "--recovered-adapter" in launcher
     assert "EXPECTED_UPDATES=4" in launcher
+    assert '"${VENV_DIR}/bin/python" -S - "${RECOVER_STEP_INFO}"' in launcher
+    assert '[[ ! "${recover_step}" =~ ^[0-9]+$ ]]' in launcher
     assert "GRPO" not in launcher

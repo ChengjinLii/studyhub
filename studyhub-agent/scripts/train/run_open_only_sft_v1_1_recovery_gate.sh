@@ -87,6 +87,10 @@ run_attempt() {
   )
   local metadata_args=()
 
+  if [[ ! "${recover_step}" =~ ^[0-9]+$ ]]; then
+    echo "Recovery Gate start step is not a non-negative integer: ${recover_step}" >&2
+    return 64
+  fi
   if [[ "${recover_step}" -gt 0 ]]; then
     export STUDYHUB_AREAL_RECOVER_SCHEDULER_STEP="${recover_step}"
   else
@@ -154,7 +158,7 @@ run_attempt "${CONTINUOUS_TRIAL}" "${CONTINUOUS_ATTEMPT}" 4 0
 run_attempt "${RECOVERED_TRIAL}" "${RECOVERED_FIRST_ATTEMPT}" 2 0
 
 RECOVER_STEP_INFO="${PROJECT_ROOT}/artifacts/areal/checkpoints/$(id -un)/${EXPERIMENT}/${RECOVERED_TRIAL}/recover_info/step_info.json"
-RECOVER_START="$("${VENV_DIR}/bin/python" - "${RECOVER_STEP_INFO}" <<'PY'
+RECOVER_START="$("${VENV_DIR}/bin/python" -S - "${RECOVER_STEP_INFO}" <<'PY'
 import json, pathlib, sys
 path=pathlib.Path(sys.argv[1])
 value=json.loads(path.read_text())
@@ -163,6 +167,10 @@ if int(value["global_step"]) != 1:
 print(int(value["global_step"])+1)
 PY
 )"
+if [[ ! "${RECOVER_START}" =~ ^[0-9]+$ ]]; then
+  echo "Recovery Gate extracted an invalid start step: ${RECOVER_START}" >&2
+  exit 64
+fi
 run_attempt "${RECOVERED_TRIAL}" "${RECOVERED_SECOND_ATTEMPT}" 4 "${RECOVER_START}"
 
 CONTINUOUS_ROOT="${PROJECT_ROOT}/artifacts/areal/checkpoints/$(id -un)/${EXPERIMENT}/${CONTINUOUS_TRIAL}"

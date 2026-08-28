@@ -34,7 +34,7 @@ if [[ ! -x "${VENV_DIR}/bin/areal" ]]; then
   exit 1
 fi
 
-readarray -t CONTRACT < <("${VENV_DIR}/bin/python" - "${AUTHORIZATION}" <<'PY'
+readarray -t CONTRACT < <("${VENV_DIR}/bin/python" -S - "${AUTHORIZATION}" <<'PY'
 import json, sys
 d=json.load(open(sys.argv[1]))
 b=d["budget"]
@@ -68,7 +68,7 @@ if [[ -f "${COMPLETION_MARKER}" ]]; then
   exit 5
 fi
 
-ATTEMPT_START_STEP="$("${VENV_DIR}/bin/python" - "${RECOVER_STEP_INFO}" "${PLANNED_UPDATES}" <<'PY'
+ATTEMPT_START_STEP="$("${VENV_DIR}/bin/python" -S - "${RECOVER_STEP_INFO}" "${PLANNED_UPDATES}" <<'PY'
 import json, pathlib, sys
 path=pathlib.Path(sys.argv[1])
 planned=int(sys.argv[2])
@@ -84,6 +84,10 @@ else:
     print(start)
 PY
 )"
+if [[ ! "${ATTEMPT_START_STEP}" =~ ^[0-9]+$ ]]; then
+  echo "Recovery start step is not a non-negative integer: ${ATTEMPT_START_STEP}" >&2
+  exit 64
+fi
 
 export PATH="${VENV_DIR}/bin:${PATH}"
 unset PYTHONHOME ALL_PROXY all_proxy HTTP_PROXY http_proxy HTTPS_PROXY https_proxy
