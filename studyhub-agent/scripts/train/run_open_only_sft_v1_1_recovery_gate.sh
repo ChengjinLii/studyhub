@@ -20,7 +20,31 @@ MAX_USED="${STUDYHUB_MAX_GPU_USED_MIB:-72000}"
 SCHEDULER_TOTAL_STEPS=5456
 BASE_LR=2e-5
 WARMUP_FRACTION=0.03
-EXPECTED_UPDATES=4
+PROFILE="${STUDYHUB_RECOVERY_GATE_PROFILE:-early-warmup}"
+case "${PROFILE}" in
+  early-warmup)
+    PREFIX_GLOBAL_STEP=1
+    EXPECTED_UPDATES=4
+    GATE_SCOPE="EARLY_WARMUP_MECHANICS_ONLY"
+    ;;
+  post-warmup)
+    PREFIX_GLOBAL_STEP=164
+    EXPECTED_UPDATES=167
+    GATE_SCOPE="POST_WARMUP_CONFIRMATION"
+    ;;
+  cadence-210)
+    PREFIX_GLOBAL_STEP=209
+    EXPECTED_UPDATES=212
+    GATE_SCOPE="RECOVERY_CADENCE_CONFIRMATION"
+    ;;
+  *)
+    echo "Unknown recovery Gate profile: ${PROFILE}" >&2
+    exit 2
+    ;;
+esac
+RECOVERY_FREQUENCY=$((PREFIX_GLOBAL_STEP + 1))
+TAIL_START=$((PREFIX_GLOBAL_STEP + 1))
+TAIL_COUNT=$((EXPECTED_UPDATES - TAIL_START))
 
 if [[ "${STUDYHUB_ALLOW_TRAINING:-}" != "YES" || "${STUDYHUB_ALLOW_SFT_RECOVERY_GATE:-}" != "YES" ]]; then
   echo "Set STUDYHUB_ALLOW_TRAINING=YES and STUDYHUB_ALLOW_SFT_RECOVERY_GATE=YES." >&2
@@ -54,7 +78,7 @@ export PYTORCH_ALLOC_CONF=expandable_segments:True
   --min-free-mib "${MIN_FREE}" >/dev/null
 
 TIMESTAMP="$(date +%Y%m%d_%H%M%S)"
-GATE_ID="open-only-sft-v1-1-recovery-gate-${TIMESTAMP}"
+GATE_ID="open-only-sft-v1-1-recovery-gate-${PROFILE}-${TIMESTAMP}"
 EXPERIMENT="studyhub-${GATE_ID}"
 LOG_ROOT="${PROJECT_ROOT}/artifacts/areal/launcher_logs/${GATE_ID}"
 CONTINUOUS_TRIAL="${GATE_ID}-continuous"
@@ -64,7 +88,6 @@ RECOVERED_SECOND_ATTEMPT="${RECOVERED_TRIAL}-attempt-after-recovery"
 CONTINUOUS_ROOT="${PROJECT_ROOT}/artifacts/areal/checkpoints/$(id -un)/${EXPERIMENT}/${CONTINUOUS_TRIAL}"
 RECOVERED_ROOT="${PROJECT_ROOT}/artifacts/areal/checkpoints/$(id -un)/${EXPERIMENT}/${RECOVERED_TRIAL}"
 SHARED_PREFIX_REPORT="${LOG_ROOT}/shared-prefix-snapshot.json"
-SHARED_PREFIX_LOG="${LOG_ROOT}/shared-prefix-snapshot.log"
 mkdir -p "${LOG_ROOT}"
 
 run_attempt() {
@@ -72,6 +95,7 @@ run_attempt() {
   local attempt="$2"
   local total_steps="$3"
   local recover_step="$4"
+  local snapshot_mode="$5"
   local log_file="${LOG_ROOT}/${attempt}.log"
   local gpu_csv="${LOG_ROOT}/${attempt}.gpu.csv"
   local run_metadata="${LOG_ROOT}/${attempt}.run.json"
@@ -81,10 +105,10 @@ run_attempt() {
     "trial_name=${trial}"
     "seed=${SEED}"
     "total_train_steps=${total_steps}"
-    "saver.freq_steps=2"
+    "saver.freq_steps=${EXPECTED_UPDATES}"
     "saver.freq_secs=null"
     "recover.mode=auto"
-    "recover.freq_steps=2"
+    "recover.freq_steps=${RECOVERY_FREQUENCY}"
     "recover.freq_secs=null"
     "evaluator.freq_steps=null"
     "evaluator.freq_secs=null"
@@ -107,7 +131,21 @@ run_attempt() {
     --override "studyhub_attempt_start_step=${recover_step}"
     --override "studyhub_scheduler_total_steps=${SCHEDULER_TOTAL_STEPS}"
     --override "studyhub_gate_id=${GATE_ID}"
+    --override "studyhub_gate_scope=${GATE_SCOPE}"
   )
+
+  export STUDYHUB_AREAL_RECOVERY_STATE_BRIDGE=1
+  export STUDYHUB_RECOVERY_AUDIT_ROOT="${LOG_ROOT}/${attempt}.recovery-audit"
+  export STUDYHUB_RECOVERY_AUDIT_START_STEP="${recover_step}"
+  if [[ "${snapshot_mode}" == "snapshot" ]]; then
+    export STUDYHUB_RECOVERY_SNAPSHOT_STEP="${PREFIX_GLOBAL_STEP}"
+    export STUDYHUB_RECOVERY_SNAPSHOT_TARGET="${RECOVERED_ROOT}"
+    export STUDYHUB_RECOVERY_SNAPSHOT_REPORT="${SHARED_PREFIX_REPORT}"
+  else
+    unset STUDYHUB_RECOVERY_SNAPSHOT_STEP || true
+    unset STUDYHUB_RECOVERY_SNAPSHOT_TARGET || true
+    unset STUDYHUB_RECOVERY_SNAPSHOT_REPORT || true
+  fi
 
   "${VENV_DIR}/bin/python" "${PROJECT_ROOT}/scripts/train/capture_run_metadata.py" start \
     --output "${run_metadata}" \
@@ -158,38 +196,25 @@ run_attempt() {
   fi
 }
 
-SNAPSHOT_PID=""
-cleanup_snapshot_process() {
-  if [[ -n "${SNAPSHOT_PID}" ]] && kill -0 "${SNAPSHOT_PID}" 2>/dev/null; then
-    kill "${SNAPSHOT_PID}" 2>/dev/null || true
-    wait "${SNAPSHOT_PID}" 2>/dev/null || true
-  fi
-}
-trap cleanup_snapshot_process EXIT INT TERM
-
-"${VENV_DIR}/bin/python" "${PROJECT_ROOT}/scripts/train/snapshot_sft_recovery_prefix.py" \
-  --source-root "${CONTINUOUS_ROOT}" \
-  --target-root "${RECOVERED_ROOT}" \
-  --output "${SHARED_PREFIX_REPORT}" \
-  --expected-global-step 1 \
-  >"${SHARED_PREFIX_LOG}" 2>&1 &
-SNAPSHOT_PID=$!
-run_attempt "${CONTINUOUS_TRIAL}" "${CONTINUOUS_ATTEMPT}" 4 0
-if ! wait "${SNAPSHOT_PID}"; then
-  SNAPSHOT_PID=""
-  cat "${SHARED_PREFIX_LOG}" >&2
+run_attempt \
+  "${CONTINUOUS_TRIAL}" \
+  "${CONTINUOUS_ATTEMPT}" \
+  "${EXPECTED_UPDATES}" \
+  0 \
+  snapshot
+if [[ ! -f "${SHARED_PREFIX_REPORT}" ]]; then
+  echo "The synchronous non-destructive snapshot did not produce a report." >&2
   exit 65
 fi
-SNAPSHOT_PID=""
-trap - EXIT INT TERM
 
 RECOVER_STEP_INFO="${PROJECT_ROOT}/artifacts/areal/checkpoints/$(id -un)/${EXPERIMENT}/${RECOVERED_TRIAL}/recover_info/step_info.json"
-RECOVER_START="$("${VENV_DIR}/bin/python" -S - "${RECOVER_STEP_INFO}" <<'PY'
+RECOVER_START="$("${VENV_DIR}/bin/python" -S - "${RECOVER_STEP_INFO}" "${PREFIX_GLOBAL_STEP}" <<'PY'
 import json, pathlib, sys
 path=pathlib.Path(sys.argv[1])
 value=json.loads(path.read_text())
-if int(value["global_step"]) != 1:
-    raise SystemExit(f"expected a recovery checkpoint at global step 1, got {value}")
+expected=int(sys.argv[2])
+if int(value["global_step"]) != expected:
+    raise SystemExit(f"expected a recovery checkpoint at global step {expected}, got {value}")
 print(int(value["global_step"])+1)
 PY
 )"
@@ -197,25 +222,41 @@ if [[ ! "${RECOVER_START}" =~ ^[0-9]+$ ]]; then
   echo "Recovery Gate extracted an invalid start step: ${RECOVER_START}" >&2
   exit 64
 fi
-run_attempt "${RECOVERED_TRIAL}" "${RECOVERED_SECOND_ATTEMPT}" 4 "${RECOVER_START}"
+run_attempt \
+  "${RECOVERED_TRIAL}" \
+  "${RECOVERED_SECOND_ATTEMPT}" \
+  "${EXPECTED_UPDATES}" \
+  "${RECOVER_START}" \
+  no-snapshot
 
 CONTINUOUS_METRICS="${PROJECT_ROOT}/artifacts/experiments/${CONTINUOUS_ATTEMPT}/metrics/trainer.json"
 RECOVERED_SECOND_METRICS="${PROJECT_ROOT}/artifacts/experiments/${RECOVERED_SECOND_ATTEMPT}/metrics/trainer.json"
-CONTINUOUS_ADAPTER="${CONTINUOUS_ROOT}/default/epoch0epochstep3globalstep3/adapter_model.safetensors"
-RECOVERED_ADAPTER="${RECOVERED_ROOT}/default/epoch0epochstep3globalstep3/adapter_model.safetensors"
+FINAL_GLOBAL_STEP=$((EXPECTED_UPDATES - 1))
+CONTINUOUS_ADAPTER="${CONTINUOUS_ROOT}/default/epoch0epochstep${FINAL_GLOBAL_STEP}globalstep${FINAL_GLOBAL_STEP}/adapter_model.safetensors"
+RECOVERED_ADAPTER="${RECOVERED_ROOT}/default/epoch0epochstep${FINAL_GLOBAL_STEP}globalstep${FINAL_GLOBAL_STEP}/adapter_model.safetensors"
 INITIAL_ADAPTER="${CONTINUOUS_ROOT}/actor/initial_lora/adapter_model.safetensors"
 GATE_REPORT="${PROJECT_ROOT}/docs/training/evidence/${GATE_ID}.json"
+CONTINUOUS_AUDIT_ROOT="${LOG_ROOT}/${CONTINUOUS_ATTEMPT}.recovery-audit"
+RECOVERED_AUDIT_ROOT="${LOG_ROOT}/${RECOVERED_SECOND_ATTEMPT}.recovery-audit"
+CONTINUOUS_RUN_METADATA="${LOG_ROOT}/${CONTINUOUS_ATTEMPT}.run.json"
+RECOVERED_RUN_METADATA="${LOG_ROOT}/${RECOVERED_SECOND_ATTEMPT}.run.json"
 
 "${VENV_DIR}/bin/python" "${PROJECT_ROOT}/scripts/train/verify_sft_recovery_gate.py" \
-  --continuous-segment "${CONTINUOUS_METRICS},0,4" \
-  --recovered-segment "${CONTINUOUS_METRICS},0,2" \
-  --recovered-segment "${RECOVERED_SECOND_METRICS},2,2" \
+  --continuous-segment "${CONTINUOUS_METRICS},0,${EXPECTED_UPDATES}" \
+  --recovered-segment "${CONTINUOUS_METRICS},0,${RECOVER_START}" \
+  --recovered-segment "${RECOVERED_SECOND_METRICS},${RECOVER_START},${TAIL_COUNT}" \
   --shared-prefix-report "${SHARED_PREFIX_REPORT}" \
   --equivalence-contract "${EQUIVALENCE_CONTRACT}" \
   --continuous-tail-metrics "${CONTINUOUS_METRICS}" \
   --recovered-tail-metrics "${RECOVERED_SECOND_METRICS}" \
-  --tail-start 2 \
-  --tail-count 2 \
+  --continuous-audit-root "${CONTINUOUS_AUDIT_ROOT}" \
+  --recovered-audit-root "${RECOVERED_AUDIT_ROOT}" \
+  --continuous-run-metadata "${CONTINUOUS_RUN_METADATA}" \
+  --recovered-run-metadata "${RECOVERED_RUN_METADATA}" \
+  --boundary-scope "${GATE_SCOPE}" \
+  --expected-prefix-global-step "${PREFIX_GLOBAL_STEP}" \
+  --tail-start "${TAIL_START}" \
+  --tail-count "${TAIL_COUNT}" \
   --continuous-adapter "${CONTINUOUS_ADAPTER}" \
   --recovered-adapter "${RECOVERED_ADAPTER}" \
   --initial-adapter "${INITIAL_ADAPTER}" \

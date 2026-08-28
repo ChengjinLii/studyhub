@@ -155,3 +155,49 @@ def test_areal_scheduler_bridge_requires_an_explicit_horizon() -> None:
     assert result.returncode != 0
     assert "StudyHub AReaL scheduler bridge failed" in result.stderr
     assert "missing required scheduler bridge variable" in result.stderr
+
+
+def test_areal_recovery_bridge_installs_state_and_batch_hooks(tmp_path: Path) -> None:
+    env = dict(os.environ)
+    env["PYTHONPATH"] = os.pathsep.join(
+        [str(ROOT / "training/runtime_shims"), str(ROOT)]
+    )
+    env["STUDYHUB_AREAL_RECOVERY_STATE_BRIDGE"] = "1"
+    env["STUDYHUB_RECOVERY_AUDIT_ROOT"] = str(tmp_path / "audit")
+    env["STUDYHUB_RECOVERY_AUDIT_START_STEP"] = "0"
+    for name in (
+        "ALL_PROXY",
+        "all_proxy",
+        "HTTP_PROXY",
+        "http_proxy",
+        "HTTPS_PROXY",
+        "https_proxy",
+    ):
+        env.pop(name, None)
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            (
+                "import json; "
+                "from areal.trainer.sft_trainer import SFTTrainer; "
+                "from areal.utils.recover import RecoverHandler; "
+                "print(json.dumps({"
+                "'dump': bool(getattr(RecoverHandler.dump, "
+                "'_studyhub_recovery_state_v1', False)), "
+                "'load': bool(getattr(RecoverHandler.load, "
+                "'_studyhub_recovery_state_v1', False)), "
+                "'batch': bool(getattr(SFTTrainer._load_bcast_from, "
+                "'_studyhub_batch_fingerprint_v1', False))}, sort_keys=True))"
+            ),
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+        env=env,
+    )
+
+    assert result.stdout.strip().splitlines()[-1] == (
+        '{"batch": true, "dump": true, "load": true}'
+    )

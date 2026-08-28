@@ -23,6 +23,17 @@ if os.environ.get("STUDYHUB_AREAL_SCHEDULER_BRIDGE") == "1":
         os._exit(78)
 
 
+if os.environ.get("STUDYHUB_AREAL_RECOVERY_STATE_BRIDGE") == "1":
+    try:
+        from areal_recovery_state_bridge import install_areal_recovery_state_bridge
+
+        install_areal_recovery_state_bridge()
+    except Exception as exc:
+        sys.stderr.write(f"StudyHub AReaL recovery state bridge failed: {exc}\n")
+        sys.stderr.flush()
+        os._exit(79)
+
+
 if os.environ.get("STUDYHUB_DISABLE_DEEP_GEMM_WITHOUT_NVCC") == "1" and shutil.which("nvcc") is None:
     # SGLang treats DeepGEMM as optional, but the bundled module eagerly
     # asserts when only the CUDA runtime (not the compiler toolkit) exists.

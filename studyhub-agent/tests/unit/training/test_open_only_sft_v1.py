@@ -126,6 +126,8 @@ def test_corrected_launcher_fails_closed_on_scheduler_and_recovery() -> None:
     assert "STUDYHUB_AREAL_SCHEDULER_BRIDGE=1" in launcher
     assert "STUDYHUB_AREAL_SCHEDULER_TOTAL_STEPS" in launcher
     assert "STUDYHUB_AREAL_RECOVER_SCHEDULER_STEP" in launcher
+    assert "STUDYHUB_AREAL_RECOVERY_STATE_BRIDGE=1" in launcher
+    assert "STUDYHUB_RECOVERY_AUDIT_ROOT" in launcher
     assert '"${VENV_DIR}/bin/python" -S - "${RECOVER_STEP_INFO}"' in launcher
     assert '[[ ! "${ATTEMPT_START_STEP}" =~ ^[0-9]+$ ]]' in launcher
     assert "collect_lr_audit_segments.py" in launcher
@@ -141,9 +143,13 @@ def test_recovery_gate_compares_continuous_and_resumed_lora() -> None:
     ).read_text(encoding="utf-8")
 
     assert "STUDYHUB_ALLOW_SFT_RECOVERY_GATE" in launcher
-    assert 'run_attempt "${CONTINUOUS_TRIAL}"' in launcher
-    assert 'run_attempt "${RECOVERED_TRIAL}"' in launcher
-    assert "snapshot_sft_recovery_prefix.py" in launcher
+    assert '"${CONTINUOUS_TRIAL}"' in launcher
+    assert '"${RECOVERED_TRIAL}"' in launcher
+    assert "STUDYHUB_AREAL_RECOVERY_STATE_BRIDGE=1" in launcher
+    assert "STUDYHUB_RECOVERY_SNAPSHOT_TARGET" in launcher
+    assert "STUDYHUB_RECOVERY_AUDIT_ROOT" in launcher
+    assert "post-warmup" in launcher
+    assert "cadence-210" in launcher
     assert '--shared-prefix-report "${SHARED_PREFIX_REPORT}"' in launcher
     assert '--equivalence-contract "${EQUIVALENCE_CONTRACT}"' in launcher
     assert '--initial-adapter "${INITIAL_ADAPTER}"' in launcher

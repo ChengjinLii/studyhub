@@ -1,6 +1,6 @@
 {
   "schema_version": "studyhub.sft-recovery-equivalence-contract.v1",
-  "status": "PRE_REGISTERED_BEFORE_CONFIRMATION_RUN",
+  "status": "CALIBRATED_ON_DISCLOSED_RUNS_AND_FROZEN_BEFORE_HOLDOUT_CONFIRMATION",
   "created_at": "2026-08-28T22:45:00+08:00",
   "scope": {
     "backend": "AReaL FSDP2",
@@ -20,6 +20,12 @@
     "docs/training/evidence/open-only-sft-v1-1-recovery-gate-20260828_220507.json",
     "docs/training/evidence/open-only-sft-v1-1-recovery-gate-20260828_223122.json"
   ],
+  "confirmation": {
+    "first_confirmation_evidence": "docs/training/evidence/open-only-sft-v1-1-recovery-gate-20260828_224842.json",
+    "first_confirmation_status": "FAIL",
+    "eligible_for_promotion": false,
+    "rule": "Do not widen this contract after its failed confirmation. A future bounded-numeric contract requires an independent nondeterminism baseline and a new frozen holdout."
+  },
   "adapter_thresholds": {
     "max_absolute_difference": 0.00001,
     "max_relative_l2_to_reference": 0.000005,
