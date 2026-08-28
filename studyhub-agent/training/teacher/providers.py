@@ -476,6 +476,8 @@ class LocalOpenAIProvider:
     interface: str = "local-best-of-n"
     strict_json_schema: bool = True
     require_api_key: bool = False
+    max_completion_tokens: int = 1024
+    chat_template_kwargs: dict[str, Any] | None = None
 
     def availability(self) -> dict[str, Any]:
         configured = bool(self.base_url and self.model)
@@ -508,6 +510,7 @@ class LocalOpenAIProvider:
             "model": self.model,
             "messages": [{"role": "user", "content": prompt}],
             "temperature": 0.7,
+            "max_completion_tokens": self.max_completion_tokens,
             "response_format": (
                 {
                     "type": "json_schema",
@@ -517,6 +520,8 @@ class LocalOpenAIProvider:
                 else {"type": "json_object"}
             ),
         }
+        if self.chat_template_kwargs is not None:
+            body["chat_template_kwargs"] = self.chat_template_kwargs
         headers = {}
         api_key = os.getenv(self.api_key_env)
         if api_key:
@@ -562,6 +567,7 @@ def build_provider(
             model=model or os.getenv("STUDYHUB_LOCAL_TEACHER_MODEL", ""),
             base_url=os.getenv("STUDYHUB_LOCAL_TEACHER_BASE_URL", ""),
             timeout_seconds=timeout_seconds,
+            chat_template_kwargs={"enable_thinking": False},
         )
     if teacher == "authorized-openai-compatible":
         return LocalOpenAIProvider(

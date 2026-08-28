@@ -7,6 +7,7 @@ from pathlib import Path
 
 import pytest
 
+import training.teacher.providers as teacher_providers
 from scripts.data.build_runtime_sft_v3_1 import _apply_teacher_self_review, _select_teacher_rows
 from scripts.data.select_runtime_sft_v3 import public_benchmark_prompt_hashes
 from scripts.data.verify_teacher_trajectories import accepted_record, verify_run
@@ -14,6 +15,7 @@ from training.rl.frozen_environment import FrozenTaskEnvironment
 from training.teacher.hermes_controller import collect_trajectory
 from training.teacher.providers import (
     CodexSparkProvider,
+    LocalOpenAIProvider,
     ResponsesAPIProvider,
     _codex_event_audit,
     _parse_action,
@@ -236,6 +238,43 @@ def test_teacher_provider_availability_never_confuses_cli_with_responses_key(
     assert CodexSparkProvider(command="missing-studyhub-codex").availability()["available"] is False
     compatible = build_provider("authorized-openai-compatible", model="fixture")
     assert compatible.availability()["available"] is False
+
+
+def test_local_teacher_bounds_action_tokens_and_disables_thinking(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured: dict = {}
+
+    def fake_post(_url, body, _headers, _timeout):
+        captured.update(body)
+        return {
+            "model": "default",
+            "choices": [
+                {
+                    "message": {
+                        "content": json.dumps({"type": "final", "name": "", "arguments": "{}", "content": "done"})
+                    }
+                }
+            ],
+        }
+
+    monkeypatch.setattr(teacher_providers, "_post_json", fake_post)
+    provider = LocalOpenAIProvider(
+        model="default",
+        base_url="http://127.0.0.1:30000/v1",
+        chat_template_kwargs={"enable_thinking": False},
+    )
+
+    action, _event = provider.choose_action(
+        {"max_steps": 2, "max_tool_calls": 1, "completion_contract": {}},
+        [],
+        [{"role": "user", "content": "answer"}],
+        0,
+    )
+
+    assert action["type"] == "final"
+    assert captured["max_completion_tokens"] == 1024
+    assert captured["chat_template_kwargs"] == {"enable_thinking": False}
 
 
 def test_public_benchmark_hash_inventory_never_requires_sealed_task_files(tmp_path: Path) -> None:
