@@ -314,6 +314,7 @@ def test_teacher_provider_availability_never_confuses_cli_with_responses_key(
 
     assert ResponsesAPIProvider().availability()["available"] is False
     assert CodexSparkProvider(command="missing-studyhub-codex").availability()["available"] is False
+    assert build_provider("local-best-of-n", model="fixture").native_tool_calling is True
     compatible = build_provider("authorized-openai-compatible", model="fixture")
     assert compatible.availability()["available"] is False
 
@@ -327,13 +328,7 @@ def test_local_teacher_bounds_action_tokens_and_disables_thinking(
         captured.update(body)
         return {
             "model": "default",
-            "choices": [
-                {
-                    "message": {
-                        "content": json.dumps({"type": "final", "name": "", "arguments": "{}", "content": "done"})
-                    }
-                }
-            ],
+            "choices": [{"message": {"content": "done"}}],
         }
 
     monkeypatch.setattr(teacher_providers, "_post_json", fake_post)
@@ -341,6 +336,7 @@ def test_local_teacher_bounds_action_tokens_and_disables_thinking(
         model="default",
         base_url="http://127.0.0.1:30000/v1",
         chat_template_kwargs={"enable_thinking": False},
+        native_tool_calling=True,
     )
 
     action, _event = provider.choose_action(
@@ -351,11 +347,83 @@ def test_local_teacher_bounds_action_tokens_and_disables_thinking(
     )
 
     assert action["type"] == "final"
+    assert action["content"] == "done"
     assert captured["max_completion_tokens"] == 1024
     assert captured["chat_template_kwargs"] == {"enable_thinking": False}
-    assert captured["response_format"]["json_schema"]["schema"]["properties"]["arguments"] == {"type": "object"}
-    prompt = json.loads(captured["messages"][0]["content"])
-    assert prompt["action_contract"]["tool_call"]["arguments"] == {"tool_parameter": "value"}
+    assert "response_format" not in captured
+    assert "tools" not in captured
+    assert captured["messages"][0]["role"] == "system"
+    assert "native function interface" in captured["messages"][0]["content"]
+
+
+def test_local_teacher_exposes_studyhub_tools_through_native_channel(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured: dict = {}
+
+    def fake_post(_url, body, _headers, _timeout):
+        captured.update(body)
+        return {
+            "model": "default",
+            "choices": [
+                {
+                    "finish_reason": "tool_calls",
+                    "message": {
+                        "content": None,
+                        "tool_calls": [
+                            {
+                                "function": {
+                                    "name": "knowledge_search",
+                                    "arguments": '{"query":"通信原理","limit":3}',
+                                }
+                            }
+                        ],
+                    },
+                }
+            ],
+        }
+
+    monkeypatch.setattr(teacher_providers, "_post_json", fake_post)
+    provider = LocalOpenAIProvider(
+        model="default",
+        base_url="http://127.0.0.1:30000/v1",
+        chat_template_kwargs={"enable_thinking": False},
+        native_tool_calling=True,
+    )
+    tools = [
+        {
+            "type": "function",
+            "function": {
+                "name": "knowledge_search",
+                "description": "Search public StudyHub sources.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {"query": {"type": "string"}},
+                    "required": ["query"],
+                },
+            },
+        }
+    ]
+
+    action, event = provider.choose_action(
+        {"max_steps": 3, "max_tool_calls": 2, "completion_contract": {}},
+        tools,
+        [{"role": "system", "content": "StudyHub teacher."}, {"role": "user", "content": "检索通信原理"}],
+        0,
+    )
+
+    assert action == {
+        "type": "tool_call",
+        "name": "knowledge_search",
+        "arguments": {"query": "通信原理", "limit": 3},
+        "content": "",
+    }
+    assert captured["tools"] == tools
+    assert captured["tool_choice"] == "auto"
+    assert captured["parallel_tool_calls"] is False
+    assert "response_format" not in captured
+    assert event["response_mode"] == "native_tool_calls"
+    assert event["native_studyhub_tool_names"] == ["knowledge_search"]
 
 
 def test_public_benchmark_hash_inventory_never_requires_sealed_task_files(tmp_path: Path) -> None:
@@ -531,6 +599,85 @@ def test_controller_rejects_premature_final_and_records_repair(tmp_path: Path) -
         for message in run["messages"]
     )
     assert all(message.get("content") != "Recorded." for message in run["messages"])
+
+
+def test_controller_repairs_public_tool_schema_failure_without_training_bad_action(tmp_path: Path) -> None:
+    checkout = ROOT / ".vendor/hermes-agent"
+    if not checkout.is_dir():
+        pytest.skip("pinned Hermes checkout is not installed")
+    lock = json.loads((ROOT / "integrations/hermes/upstream.lock.json").read_text(encoding="utf-8"))
+    task_id = "teacher-schema-repair-fixture"
+    root = _teacher_root(tmp_path, task_id)
+    fixture_path = root / "fixtures" / f"{task_id}.json"
+    fixture = json.loads(fixture_path.read_text(encoding="utf-8"))
+    fixture["routes"][0]["result"] = {
+        "ok": True,
+        "value": "42",
+        "postcondition": "answer_recorded",
+    }
+    fixture_path.write_text(json.dumps(fixture), encoding="utf-8")
+    task = {
+        "schema_version": "studyhub.teacher-task.v2.1",
+        "task_id": task_id,
+        "family": "state_function",
+        "user_request": "Record the answer before reporting completion.",
+        "allowed_tools": ["teacher_fixture_lookup"],
+        "completion_contract": {
+            "minimum_grounded_citations": 0,
+            "minimum_successful_state_changes": 1,
+        },
+        "max_steps": 4,
+        "max_tool_calls": 2,
+        "metadata": {"source_group_id": "schema-repair-fixture"},
+    }
+
+    def choose_action(_task, _tools, _messages, turn):
+        actions = [
+            {
+                "type": "tool_call",
+                "name": "teacher_fixture_lookup",
+                "arguments": {"answer": "42"},
+                "content": "",
+            },
+            {
+                "type": "tool_call",
+                "name": "teacher_fixture_lookup",
+                "arguments": {"key": "answer"},
+                "content": "",
+            },
+            {"type": "final", "name": "", "arguments": {}, "content": "The answer 42 is recorded."},
+        ]
+        return actions[turn], {"interface": "fixture", "model": "fixture-teacher"}
+
+    run = collect_trajectory(
+        task=task,
+        root=root,
+        hermes_checkout=checkout,
+        hermes_commit=lock["commit"],
+        choose_action=choose_action,
+    )
+
+    assert run["status"] == "COMPLETED"
+    assert run["controller"]["controller_errors"] == []
+    assert run["controller"]["tool_calls"] == 1
+    assert len(run["controller"]["schema_validation_failures"]) == 1
+    correction = run["controller"]["policy_corrections"][0]
+    assert correction["reason"] == "tool_schema_validation_failed"
+    assert correction["tool_name"] == "teacher_fixture_lookup"
+    assert correction["argument_keys"] == ["answer"]
+    validators = {row["validator"] for row in correction["validation_errors"]}
+    assert validators == {"additionalProperties", "required"}
+    assistant_calls = [
+        call
+        for message in run["messages"]
+        if message.get("role") == "assistant"
+        for call in message.get("tool_calls", [])
+    ]
+    assert [call["function"]["arguments"] for call in assistant_calls] == [{"key": "answer"}]
+    assert any(
+        message.get("role") == "user" and "Tool action not accepted" in message.get("content", "")
+        for message in run["messages"]
+    )
 
 
 def test_policy_corrected_teacher_trajectory_uses_repaired_quality_tier() -> None:

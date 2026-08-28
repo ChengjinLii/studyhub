@@ -51,6 +51,13 @@ read/fetch observation. Do not finish while a public completion constraint is vi
 If a tool returns an error, correct the next visible action instead of claiming success. Do not
 reveal chain-of-thought."""
 
+NATIVE_PROVIDER_SYSTEM = """Choose exactly one visible StudyHub action for this turn. If a tool
+is needed, call exactly one supplied tool through the native function interface. Otherwise return
+only the supported final answer. Use no shell, filesystem, network, browser, credential, hidden
+grader, or private source. Read or fetch a discovered source before citing it, and cite only as
+[source_id]. Do not finish while a public completion constraint remains unmet. Correct visible
+tool errors on the next turn. Do not reveal chain-of-thought."""
+
 _SECRET_PATTERNS = (
     re.compile(r"\bsk-[A-Za-z0-9_-]{12,}\b"),
     re.compile(r"\btp-[A-Za-z0-9_-]{12,}\b"),
@@ -219,6 +226,27 @@ def _action_prompt(
     return json.dumps(payload, ensure_ascii=False, sort_keys=True)
 
 
+def _native_action_messages(
+    task: dict[str, Any],
+    messages: list[dict[str, Any]],
+    turn: int,
+) -> list[dict[str, Any]]:
+    public_context = json.dumps(
+        {
+            "instruction": NATIVE_PROVIDER_SYSTEM,
+            "public_completion_contract": task.get("completion_contract", {}),
+            "visible_runtime_state": _visible_runtime_state(task, messages, turn),
+        },
+        ensure_ascii=False,
+        sort_keys=True,
+    )
+    copied = [dict(message) for message in messages]
+    if copied and copied[0].get("role") == "system":
+        copied[0]["content"] = f"{copied[0].get('content', '')}\n\n{public_context}"
+        return copied
+    return [{"role": "system", "content": public_context}, *copied]
+
+
 def _parse_action(value: str) -> dict[str, Any]:
     text = value.strip()
     if text.startswith("```"):
@@ -305,6 +333,48 @@ def _chat_action_output(payload: dict[str, Any]) -> tuple[str, str]:
     reasoning = message.get("reasoning_content") if isinstance(message, dict) else None
     if isinstance(reasoning, str) and reasoning.lstrip().startswith("{") and reasoning.rstrip().endswith("}"):
         return reasoning, "reasoning_json"
+    return "", "empty"
+
+
+def _chat_native_action_output(payload: dict[str, Any]) -> tuple[str, str]:
+    choice = payload.get("choices", [{}])[0]
+    message = choice.get("message", {}) if isinstance(choice, dict) else {}
+    tool_calls = message.get("tool_calls", []) if isinstance(message, dict) else []
+    if isinstance(tool_calls, list) and tool_calls:
+        if len(tool_calls) != 1 or not isinstance(tool_calls[0], dict):
+            raise TeacherProviderError(
+                "provider_parallel_tool_calls",
+                {"tool_call_count": len(tool_calls)},
+            )
+        function = tool_calls[0].get("function", {})
+        if not isinstance(function, dict) or not function.get("name"):
+            raise TeacherProviderError("provider_tool_call_missing_name", {})
+        return (
+            json.dumps(
+                {
+                    "type": "tool_call",
+                    "name": str(function["name"]),
+                    "arguments": function.get("arguments", {}),
+                    "content": "",
+                },
+                ensure_ascii=False,
+            ),
+            "native_tool_calls",
+        )
+    content = message.get("content") if isinstance(message, dict) else None
+    if isinstance(content, str) and content.strip():
+        return (
+            json.dumps(
+                {
+                    "type": "final",
+                    "name": "",
+                    "arguments": {},
+                    "content": content.strip(),
+                },
+                ensure_ascii=False,
+            ),
+            "native_content",
+        )
     return "", "empty"
 
 
@@ -577,6 +647,7 @@ class LocalOpenAIProvider:
     require_api_key: bool = False
     max_completion_tokens: int = 1024
     chat_template_kwargs: dict[str, Any] | None = None
+    native_tool_calling: bool = False
 
     def availability(self) -> dict[str, Any]:
         configured = bool(self.base_url and self.model)
@@ -604,25 +675,48 @@ class LocalOpenAIProvider:
     ) -> tuple[dict[str, Any], dict[str, Any]]:
         if not self.base_url or not self.model:
             raise TeacherProviderError("local_teacher_not_configured", self.availability())
-        prompt = _action_prompt(task, tools, messages, turn, arguments_as_object=True)
-        body = {
-            "model": self.model,
-            "messages": [{"role": "user", "content": prompt}],
-            "temperature": 0.7,
-            "max_completion_tokens": self.max_completion_tokens,
-            "response_format": (
-                {
-                    "type": "json_schema",
-                    "json_schema": {
-                        "name": "studyhub_teacher_action",
-                        "strict": True,
-                        "schema": LOCAL_ACTION_SCHEMA,
-                    },
-                }
-                if self.strict_json_schema
-                else {"type": "json_object"}
-            ),
-        }
+        if self.native_tool_calling:
+            api_messages = _native_action_messages(task, messages, turn)
+            body = {
+                "model": self.model,
+                "messages": api_messages,
+                "temperature": 0.7,
+                "max_completion_tokens": self.max_completion_tokens,
+            }
+            if tools:
+                body.update(
+                    {
+                        "tools": tools,
+                        "tool_choice": "auto",
+                        "parallel_tool_calls": False,
+                    }
+                )
+            prompt_fingerprint = json.dumps(
+                {"messages": api_messages, "tools": tools},
+                ensure_ascii=False,
+                sort_keys=True,
+            )
+        else:
+            prompt = _action_prompt(task, tools, messages, turn, arguments_as_object=True)
+            body = {
+                "model": self.model,
+                "messages": [{"role": "user", "content": prompt}],
+                "temperature": 0.7,
+                "max_completion_tokens": self.max_completion_tokens,
+                "response_format": (
+                    {
+                        "type": "json_schema",
+                        "json_schema": {
+                            "name": "studyhub_teacher_action",
+                            "strict": True,
+                            "schema": LOCAL_ACTION_SCHEMA,
+                        },
+                    }
+                    if self.strict_json_schema
+                    else {"type": "json_object"}
+                ),
+            }
+            prompt_fingerprint = prompt
         if self.chat_template_kwargs is not None:
             body["chat_template_kwargs"] = self.chat_template_kwargs
         headers = {}
@@ -636,19 +730,27 @@ class LocalOpenAIProvider:
             headers,
             self.timeout_seconds,
         )
-        output, response_mode = _chat_action_output(payload)
+        output, response_mode = (
+            _chat_native_action_output(payload) if self.native_tool_calling else _chat_action_output(payload)
+        )
         choice = payload.get("choices", [{}])[0]
         event = {
             "interface": self.interface,
             "model": payload.get("model", self.model),
             "response_id": payload.get("id"),
             "duration_seconds": round(time.monotonic() - started, 3),
-            "prompt_sha256": _sha256_text(prompt),
+            "prompt_sha256": _sha256_text(prompt_fingerprint),
             "output_sha256": _sha256_text(output),
             "usage": payload.get("usage", {}),
             "finish_reason": choice.get("finish_reason") if isinstance(choice, dict) else None,
             "response_mode": response_mode,
             "provider_tools": [],
+            "native_studyhub_tool_names": (
+                sorted(str(tool.get("function", {}).get("name", "")) for tool in tools)
+                if self.native_tool_calling
+                else []
+            ),
+            "native_tool_calling": self.native_tool_calling,
             "hidden_oracle_available": False,
         }
         return _parse_action_with_event(output, event)
@@ -674,6 +776,7 @@ def build_provider(
             base_url=os.getenv("STUDYHUB_LOCAL_TEACHER_BASE_URL", ""),
             timeout_seconds=timeout_seconds,
             chat_template_kwargs={"enable_thinking": False},
+            native_tool_calling=True,
         )
     if teacher == "authorized-openai-compatible":
         return LocalOpenAIProvider(

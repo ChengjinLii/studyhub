@@ -69,6 +69,30 @@ def _validate_action(action: dict[str, Any]) -> list[str]:
     return failures
 
 
+def _schema_validation_diagnostics(
+    schema: dict[str, Any],
+    arguments: dict[str, Any],
+    errors: list[Any],
+) -> list[dict[str, Any]]:
+    properties = set(schema.get("properties", {}))
+    result: list[dict[str, Any]] = []
+    for error in errors:
+        diagnostic: dict[str, Any] = {
+            "validator": str(error.validator),
+            "instance_path": [str(part) for part in error.absolute_path],
+            "schema_path": [str(part) for part in error.absolute_schema_path],
+            "instance_type": type(error.instance).__name__,
+        }
+        if error.validator == "required" and isinstance(error.instance, dict):
+            diagnostic["missing_required"] = sorted(set(error.validator_value) - set(error.instance))
+        elif error.validator == "additionalProperties" and isinstance(error.instance, dict):
+            diagnostic["unexpected_keys"] = sorted(set(error.instance) - properties)
+        elif error.validator == "type":
+            diagnostic["expected_type"] = error.validator_value
+        result.append(diagnostic)
+    return result
+
+
 def collect_trajectory(
     *,
     task: dict[str, Any],
@@ -91,6 +115,7 @@ def collect_trajectory(
     provider_events: list[dict[str, Any]] = []
     controller_errors: list[str] = []
     policy_corrections: list[dict[str, Any]] = []
+    schema_validation_failures: list[dict[str, Any]] = []
     final_answer = ""
 
     for schema in environment.tool_schemas:
@@ -152,8 +177,39 @@ def collect_trajectory(
                 key=lambda error: list(error.path),
             )
             if validation_errors:
-                controller_errors.append("schema_validation_failed")
-                break
+                diagnostics = _schema_validation_diagnostics(schema["parameters"], arguments, validation_errors)
+                runtime_state = _visible_runtime_state(task, messages, turn + 1)
+                failure = {
+                    "turn": turn,
+                    "tool_name": name,
+                    "argument_keys": sorted(arguments),
+                    "validation_errors": diagnostics,
+                }
+                schema_validation_failures.append(failure)
+                policy_corrections.append(
+                    {
+                        **failure,
+                        "reason": "tool_schema_validation_failed",
+                        "remaining_model_steps": runtime_state["remaining_model_steps"],
+                        "remaining_tool_calls": runtime_state["remaining_tool_calls"],
+                    }
+                )
+                if not runtime_state["remaining_model_steps"] or not runtime_state["remaining_tool_calls"]:
+                    controller_errors.append("tool_schema_validation_failed_without_recovery_budget")
+                    break
+                messages.append(
+                    {
+                        "role": "user",
+                        "content": (
+                            "<runtime_feedback>Tool action not accepted by the public schema for "
+                            f"{name}. Safe diagnostics: "
+                            f"{json.dumps(diagnostics, ensure_ascii=False, sort_keys=True)}. "
+                            "Re-read the visible tool schema and retry with one allowed action; do not claim "
+                            "the rejected action succeeded.</runtime_feedback>"
+                        ),
+                    }
+                )
+                continue
             call_key = f"{task_id}:{turn}:{name}:{json.dumps(arguments, sort_keys=True)}"
             call_id = f"call_{hashlib.sha256(call_key.encode()).hexdigest()[:20]}"
             messages.append(
@@ -205,6 +261,7 @@ def collect_trajectory(
             "runtime_errors": list(environment.trace.runtime_errors),
             "controller_errors": controller_errors,
             "policy_corrections": policy_corrections,
+            "schema_validation_failures": schema_validation_failures,
             "read_source_ids": sorted(environment.trace.read_source_ids),
             "search_result_ids": sorted(environment.trace.search_result_ids),
         },
