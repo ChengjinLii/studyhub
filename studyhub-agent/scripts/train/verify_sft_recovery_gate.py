@@ -465,6 +465,28 @@ def verify_state_continuity(
     }
 
 
+def summarize_restart_dcp_load(state_continuity: dict[str, Any]) -> dict[str, Any]:
+    rank_checks = state_continuity.get("rank_checks", [])
+    passed_ranks = [
+        int(row["rank"])
+        for row in rank_checks
+        if row.get("model_optimizer_and_dataloader_load") is True
+    ]
+    expected_ranks = [int(row["rank"]) for row in rank_checks]
+    failures = []
+    if not expected_ranks:
+        failures.append("restart_load_has_no_rank_evidence")
+    if passed_ranks != expected_ranks:
+        failures.append("restart_model_optimizer_dataloader_load_incomplete")
+    return {
+        "status": "PASS" if not failures else "FAIL",
+        "kind": "AREAL_DCP_MODEL_OPTIMIZER_AND_DATALOADER_RESTART_LOAD",
+        "expected_ranks": expected_ranks,
+        "passed_ranks": passed_ranks,
+        "failures": failures,
+    }
+
+
 def load_shared_prefix_report(
     path: Path,
     *,
@@ -652,6 +674,7 @@ def main() -> int:
         args.initial_adapter,
         contract,
     )
+    restart_dcp_load = summarize_restart_dcp_load(state_continuity)
     failures = []
     if continuous_lr["status"] != "PASS":
         failures.append("continuous_lr_contract_failed")
@@ -661,6 +684,8 @@ def main() -> int:
         failures.append("shared_prefix_contract_failed")
     if run_provenance["status"] != "PASS":
         failures.append("run_provenance_contract_failed")
+    if restart_dcp_load["status"] != "PASS":
+        failures.append("restart_dcp_load_smoke_failed")
     if state_continuity["status"] != "PASS":
         failures.append("state_continuity_contract_failed")
     if batch_fingerprints["status"] != "PASS":
@@ -704,10 +729,17 @@ def main() -> int:
         **shared_prefix,
         "status": (
             "PASS"
-            if shared_prefix["status"] == run_provenance["status"] == "PASS"
+            if shared_prefix["status"]
+            == run_provenance["status"]
+            == restart_dcp_load["status"]
+            == "PASS"
             else "FAIL"
         ),
         "run_provenance": run_provenance,
+        "metadata_parse": shared_prefix.get("snapshot", {}).get(
+            "dcp_metadata_load"
+        ),
+        "actual_restart_load": restart_dcp_load,
     }
     r3 = {
         "status": (

@@ -11,6 +11,7 @@ from scripts.train.verify_sft_recovery_gate import (
     compare_batch_fingerprints,
     compare_run_provenance,
     load_shared_prefix_report,
+    summarize_restart_dcp_load,
     verify_state_continuity,
 )
 
@@ -215,6 +216,21 @@ def test_state_continuity_requires_rng_dataloader_and_engine_load(tmp_path: Path
     )
 
     assert result["status"] == "PASS"
+
+
+def test_r2_restart_load_requires_every_rank() -> None:
+    result = summarize_restart_dcp_load(
+        {
+            "rank_checks": [
+                {"rank": 0, "model_optimizer_and_dataloader_load": True},
+                {"rank": 1, "model_optimizer_and_dataloader_load": False},
+            ]
+        }
+    )
+
+    assert result["status"] == "FAIL"
+    assert result["passed_ranks"] == [0]
+    assert "restart_model_optimizer_dataloader_load_incomplete" in result["failures"]
 
 
 def test_run_provenance_fails_closed_on_dataset_drift(tmp_path: Path) -> None:
