@@ -25,7 +25,7 @@ from scripts.data.select_runtime_sft_v3 import (  # noqa: E402
 )
 from studyhub_agent.trajectory.runtime_sft import canonical_json, stable_hash  # noqa: E402
 
-SCHEMA_VERSION = "studyhub.teacher-task.v2"
+SCHEMA_VERSION = "studyhub.teacher-task.v2.1"
 DEFAULT_TOTAL = 2_400
 FAMILY_PLAN = {
     "rag_query_rewrite_citation": ("studyhub_metadata_replay", 0.25),
@@ -180,6 +180,13 @@ def _required_observation_markers(calls: list[tuple[str, dict[str, Any], Any]]) 
     return sorted(markers)
 
 
+def _required_state_postconditions(calls: list[tuple[str, dict[str, Any], Any]]) -> list[str]:
+    markers: set[str] = set()
+    for _name, _arguments, observation in calls:
+        markers.update(_nested_values(observation, "postcondition"))
+    return sorted(markers)
+
+
 def _hidden_required_tools(family: str, expected_tools: list[str]) -> list[str]:
     if family == "memory_personalization_privacy":
         return sorted({name for name in expected_tools if "memory" in name})
@@ -263,7 +270,7 @@ def _round_robin(
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--input", type=Path, default=PROJECT_ROOT / "datasets/interim/runtime_sft_v3/selected.jsonl")
-    parser.add_argument("--output", type=Path, default=PROJECT_ROOT / "datasets/interim/studyhub_teacher_v2")
+    parser.add_argument("--output", type=Path, default=PROJECT_ROOT / "datasets/interim/studyhub_teacher_v2_1")
     parser.add_argument("--max-tasks", type=int, default=DEFAULT_TOTAL)
     parser.add_argument("--max-rows-per-source-group", type=int, default=12)
     parser.add_argument("--overwrite", action="store_true")
@@ -306,9 +313,10 @@ def main() -> int:
             max_rows_per_group=args.max_rows_per_source_group,
         ):
             used_rows.add(str(row["id"]))
-            task_id = f"teacher-v2-{stable_hash(str(row['id']), salt='studyhub-teacher-v2')[:20]}"
+            task_id = f"teacher-v2-1-{stable_hash(str(row['id']), salt='studyhub-teacher-v2.1')[:20]}"
             environment, fixture, expected_tools = _environment(row)
             calls = _call_observations(row)
+            required_state_postconditions = _required_state_postconditions(calls)
             evidence_sources = sorted(
                 set(_evidence_sources(calls))
                 | {document["source_id"] for document in environment["documents"] if document["text"].strip()}
@@ -334,6 +342,7 @@ def main() -> int:
                     ),
                     "citation_format": "[source_id]",
                     "search_result_requires_read_or_fetch_before_citation": True,
+                    "minimum_successful_state_changes": len(required_state_postconditions),
                     "state_changes_require_successful_observation": family
                     in {"cross_tool_composition", "state_function"},
                 },
@@ -347,11 +356,11 @@ def main() -> int:
                     "benchmark_overlap": False,
                     "environment_id": task_id,
                     "verifier_id": task_id,
-                    "teacher_dataset": "studyhub_teacher_v2",
+                    "teacher_dataset": "studyhub_teacher_v2_1",
                 },
             }
             verifier = {
-                "schema_version": "studyhub.teacher-verifier.v2",
+                "schema_version": "studyhub.teacher-verifier.v2.1",
                 "task_id": task_id,
                 "family": family,
                 "reference_final": reference,
@@ -379,7 +388,7 @@ def main() -> int:
 
     write_jsonl(args.output / "task_specs.jsonl", tasks)
     manifest = {
-        "schema_version": "studyhub.teacher-task-manifest.v2",
+        "schema_version": "studyhub.teacher-task-manifest.v2.1",
         "status": "READY_FOR_TEACHER_SMOKE",
         "tasks": len(tasks),
         "requested_tasks": args.max_tasks,

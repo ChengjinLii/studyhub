@@ -4,13 +4,15 @@ import hashlib
 import json
 import subprocess
 import sys
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 from jsonschema import Draft202012Validator
 
 from studyhub_agent.integrations.hermes_registry import HermesRegistryOverlay
 from training.rl.frozen_environment import FrozenTaskEnvironment
+from training.teacher.providers import _visible_runtime_state
 
 ActionChooser = Callable[
     [dict[str, Any], list[dict[str, Any]], list[dict[str, Any]], int],
@@ -88,6 +90,7 @@ def collect_trajectory(
     ]
     provider_events: list[dict[str, Any]] = []
     controller_errors: list[str] = []
+    policy_corrections: list[dict[str, Any]] = []
     final_answer = ""
 
     for schema in environment.tool_schemas:
@@ -107,6 +110,33 @@ def collect_trajectory(
                 controller_errors.extend(failures)
                 break
             if action["type"] == "final":
+                runtime_state = _visible_runtime_state(task, messages, turn + 1)
+                if not runtime_state["final_ready"]:
+                    correction = {
+                        "turn": turn,
+                        "reason": "premature_final",
+                        "grounded_citation_deficit": runtime_state["grounded_citation_deficit"],
+                        "successful_state_change_deficit": runtime_state["successful_state_change_deficit"],
+                        "remaining_model_steps": runtime_state["remaining_model_steps"],
+                        "remaining_tool_calls": runtime_state["remaining_tool_calls"],
+                    }
+                    policy_corrections.append(correction)
+                    if not runtime_state["remaining_model_steps"] or not runtime_state["remaining_tool_calls"]:
+                        controller_errors.append("premature_final_without_recovery_budget")
+                        break
+                    messages.append(
+                        {
+                            "role": "user",
+                            "content": (
+                                "<runtime_feedback>Final action not accepted: public completion constraints "
+                                f"remain unmet (grounded_citation_deficit="
+                                f"{runtime_state['grounded_citation_deficit']}, successful_state_change_deficit="
+                                f"{runtime_state['successful_state_change_deficit']}). Continue with one allowed "
+                                "tool action using only visible observations.</runtime_feedback>"
+                            ),
+                        }
+                    )
+                    continue
                 final_answer = str(action["content"]).strip()
                 messages.append({"role": "assistant", "content": final_answer})
                 break
@@ -155,7 +185,7 @@ def collect_trajectory(
 
     path_signature = "→".join(row["name"] for row in environment.trace.tool_calls) or "DIRECT"
     return {
-        "schema_version": "studyhub.teacher-raw-run.v1",
+        "schema_version": "studyhub.teacher-raw-run.v2",
         "task_id": task_id,
         "task_spec_sha256": hashlib.sha256(json.dumps(task, ensure_ascii=False, sort_keys=True).encode()).hexdigest(),
         "source": dict(task.get("metadata", {})),
@@ -174,6 +204,7 @@ def collect_trajectory(
             "environment_errors": list(environment.trace.error_codes),
             "runtime_errors": list(environment.trace.runtime_errors),
             "controller_errors": controller_errors,
+            "policy_corrections": policy_corrections,
             "read_source_ids": sorted(environment.trace.read_source_ids),
             "search_result_ids": sorted(environment.trace.search_result_ids),
         },

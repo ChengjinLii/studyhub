@@ -101,6 +101,20 @@ def _source_ids(value: Any) -> set[str]:
     return result
 
 
+def _nested_strings(value: Any, key: str) -> set[str]:
+    result: set[str] = set()
+    if isinstance(value, dict):
+        item = value.get(key)
+        if isinstance(item, str) and item:
+            result.add(item)
+        for child in value.values():
+            result.update(_nested_strings(child, key))
+    elif isinstance(value, list):
+        for child in value:
+            result.update(_nested_strings(child, key))
+    return result
+
+
 def _visible_runtime_state(
     task: dict[str, Any],
     messages: list[dict[str, Any]],
@@ -109,6 +123,7 @@ def _visible_runtime_state(
     completed_tools: list[str] = []
     discovered: set[str] = set()
     grounded: set[str] = set()
+    state_postconditions: set[str] = set()
     tool_calls = 0
     last_tool_error: str | None = None
     for message in messages:
@@ -129,22 +144,30 @@ def _visible_runtime_state(
         if name.endswith("_read") or name.endswith("_fetch") or name == "knowledge_read":
             grounded.update(ids)
         if isinstance(payload, dict):
-            error = payload.get("error")
-            if isinstance(error, str) and error:
-                last_tool_error = error
+            errors = _nested_strings(payload, "error")
+            if payload.get("ok") is True and not errors:
+                state_postconditions.update(_nested_strings(payload, "postcondition"))
+            if errors:
+                last_tool_error = sorted(errors)[-1]
 
     contract = task.get("completion_contract", {})
     minimum_citations = int(contract.get("minimum_grounded_citations", 0))
+    minimum_state_changes = int(contract.get("minimum_successful_state_changes", 0))
     return {
         "completed_tool_calls": completed_tools,
         "discovered_source_ids": sorted(discovered),
         "grounded_source_ids": sorted(grounded),
         "minimum_grounded_citations": minimum_citations,
         "grounded_citation_deficit": max(0, minimum_citations - len(grounded)),
+        "successful_state_postconditions": sorted(state_postconditions),
+        "minimum_successful_state_changes": minimum_state_changes,
+        "successful_state_change_deficit": max(0, minimum_state_changes - len(state_postconditions)),
         "remaining_model_steps": max(0, int(task.get("max_steps", 0)) - turn),
         "remaining_tool_calls": max(0, int(task.get("max_tool_calls", 0)) - tool_calls),
         "last_tool_error": last_tool_error,
         "final_evidence_ready": len(grounded) >= minimum_citations,
+        "final_state_ready": len(state_postconditions) >= minimum_state_changes,
+        "final_ready": len(grounded) >= minimum_citations and len(state_postconditions) >= minimum_state_changes,
     }
 
 

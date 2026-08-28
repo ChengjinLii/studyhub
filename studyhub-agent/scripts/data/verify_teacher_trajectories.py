@@ -188,7 +188,10 @@ def accepted_record(
 ) -> dict[str, Any]:
     provider = run.get("provider", {})
     interface = str(provider.get("interface", "unknown"))
-    tier = "teacher_repaired_complete" if run.get("collection_mode") == "dagger_repair" else "teacher_verified_complete"
+    repaired = bool(
+        run.get("collection_mode") == "dagger_repair" or run.get("controller", {}).get("policy_corrections")
+    )
+    tier = "teacher_repaired_complete" if repaired else "teacher_verified_complete"
     messages = run["messages"]
     runtime_native = bool(
         any(message.get("role") == "assistant" and message.get("tool_calls") for message in messages)
@@ -223,6 +226,7 @@ def accepted_record(
             "path_signature": run.get("path_signature"),
             "controller": "pinned_hermes_registry_dispatch",
             "hermes_commit": run.get("controller", {}).get("hermes_commit"),
+            "policy_corrections": len(run.get("controller", {}).get("policy_corrections", [])),
         },
         "verification": diagnostics,
         "provenance": {
@@ -384,7 +388,7 @@ def verify_root(root: Path) -> dict[str, Any]:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--root", type=Path, default=PROJECT_ROOT / "datasets/interim/studyhub_teacher_v2")
+    parser.add_argument("--root", type=Path, default=PROJECT_ROOT / "datasets/interim/studyhub_teacher_v2_1")
     return parser.parse_args()
 
 

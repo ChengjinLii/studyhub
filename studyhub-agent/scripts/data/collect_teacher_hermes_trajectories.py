@@ -136,7 +136,9 @@ def _collect_job(job: dict[str, Any]) -> dict[str, Any]:
         {
             "run_id": job["run_id"],
             "candidate_index": job["candidate_index"],
-            "collection_mode": "teacher_rollout",
+            "collection_mode": (
+                "dagger_repair" if run.get("controller", {}).get("policy_corrections") else "teacher_rollout"
+            ),
             "provider": {
                 "interface": provider.interface,
                 "model": provider.model,
@@ -357,7 +359,7 @@ def _collect_parallel(
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--root", type=Path, default=PROJECT_ROOT / "datasets/interim/studyhub_teacher_v2")
+    parser.add_argument("--root", type=Path, default=PROJECT_ROOT / "datasets/interim/studyhub_teacher_v2_1")
     parser.add_argument("--teacher", choices=TEACHERS, default="codex-spark")
     parser.add_argument("--teacher-model")
     parser.add_argument("--max-accepted", type=int, default=500)

@@ -102,7 +102,10 @@ def test_visible_runtime_state_separates_discovery_from_grounded_evidence() -> N
     task = {
         "max_steps": 6,
         "max_tool_calls": 5,
-        "completion_contract": {"minimum_grounded_citations": 1},
+        "completion_contract": {
+            "minimum_grounded_citations": 1,
+            "minimum_successful_state_changes": 1,
+        },
     }
     messages = [
         {
@@ -123,6 +126,20 @@ def test_visible_runtime_state_separates_discovery_from_grounded_evidence() -> N
             "name": "web_fetch",
             "content": json.dumps({"content": {"source_id": "web:one", "text": "evidence"}}),
         },
+        {
+            "role": "assistant",
+            "tool_calls": [{"function": {"name": "study_plan_update", "arguments": {}}}],
+        },
+        {
+            "role": "tool",
+            "name": "study_plan_update",
+            "content": json.dumps(
+                {
+                    "ok": True,
+                    "content": {"ok": True, "postcondition": "study_plan_updated"},
+                }
+            ),
+        },
     ]
 
     state = _visible_runtime_state(task, messages, turn=2)
@@ -130,8 +147,12 @@ def test_visible_runtime_state_separates_discovery_from_grounded_evidence() -> N
     assert state["discovered_source_ids"] == ["web:one"]
     assert state["grounded_source_ids"] == ["web:one"]
     assert state["grounded_citation_deficit"] == 0
-    assert state["remaining_tool_calls"] == 3
+    assert state["remaining_tool_calls"] == 2
     assert state["final_evidence_ready"] is True
+    assert state["successful_state_postconditions"] == ["study_plan_updated"]
+    assert state["successful_state_change_deficit"] == 0
+    assert state["final_state_ready"] is True
+    assert state["final_ready"] is True
 
 
 def test_fixture_route_accepts_declared_equivalent_state_text() -> None:
@@ -380,6 +401,106 @@ def test_actual_hermes_registry_executes_teacher_action_and_verifier_accepts(tmp
     record = accepted_record(run, task, verifier, diagnostics)
     assert record["quality_tier"] == "teacher_verified_complete"
     assert record["runtime_native"] is True
+
+
+def test_controller_rejects_premature_final_and_records_repair(tmp_path: Path) -> None:
+    checkout = ROOT / ".vendor/hermes-agent"
+    if not checkout.is_dir():
+        pytest.skip("pinned Hermes checkout is not installed")
+    lock = json.loads((ROOT / "integrations/hermes/upstream.lock.json").read_text(encoding="utf-8"))
+    task_id = "teacher-repair-fixture"
+    root = _teacher_root(tmp_path, task_id)
+    fixture_path = root / "fixtures" / f"{task_id}.json"
+    fixture = json.loads(fixture_path.read_text(encoding="utf-8"))
+    fixture["routes"][0]["result"] = {
+        "ok": True,
+        "value": "42",
+        "postcondition": "answer_recorded",
+    }
+    fixture_path.write_text(json.dumps(fixture), encoding="utf-8")
+    task = {
+        "schema_version": "studyhub.teacher-task.v2.1",
+        "task_id": task_id,
+        "family": "state_function",
+        "user_request": "Record the answer before reporting completion.",
+        "allowed_tools": ["teacher_fixture_lookup"],
+        "completion_contract": {
+            "minimum_grounded_citations": 0,
+            "minimum_successful_state_changes": 1,
+        },
+        "max_steps": 3,
+        "max_tool_calls": 2,
+        "metadata": {"source_group_id": "repair-fixture"},
+    }
+
+    def choose_action(_task, _tools, _messages, turn):
+        actions = [
+            {"type": "final", "name": "", "arguments": {}, "content": "Recorded."},
+            {
+                "type": "tool_call",
+                "name": "teacher_fixture_lookup",
+                "arguments": {"key": "answer"},
+                "content": "",
+            },
+            {"type": "final", "name": "", "arguments": {}, "content": "The answer 42 is recorded."},
+        ]
+        return actions[turn], {"interface": "fixture", "model": "fixture-teacher"}
+
+    run = collect_trajectory(
+        task=task,
+        root=root,
+        hermes_checkout=checkout,
+        hermes_commit=lock["commit"],
+        choose_action=choose_action,
+    )
+
+    assert run["status"] == "COMPLETED"
+    assert run["final_answer"] == "The answer 42 is recorded."
+    assert run["controller"]["policy_corrections"] == [
+        {
+            "turn": 0,
+            "reason": "premature_final",
+            "grounded_citation_deficit": 0,
+            "successful_state_change_deficit": 1,
+            "remaining_model_steps": 2,
+            "remaining_tool_calls": 2,
+        }
+    ]
+    assert any(
+        message.get("role") == "user" and "runtime_feedback" in message.get("content", "")
+        for message in run["messages"]
+    )
+    assert all(message.get("content") != "Recorded." for message in run["messages"])
+
+
+def test_policy_corrected_teacher_trajectory_uses_repaired_quality_tier() -> None:
+    run = {
+        "run_id": "repaired-run",
+        "candidate_index": 0,
+        "collection_mode": "teacher_rollout",
+        "provider": {"interface": "fixture", "model": "fixture-teacher"},
+        "collector_git_commit": "fixture-commit",
+        "raw_run_path": "raw_runs/repaired-run.json",
+        "controller": {
+            "hermes_commit": "fixture-hermes",
+            "policy_corrections": [{"reason": "premature_final"}],
+        },
+        "tools": [],
+        "messages": [
+            {"role": "system", "content": "Answer safely."},
+            {"role": "user", "content": "Answer."},
+            {"role": "assistant", "content": "Supported answer."},
+        ],
+    }
+    task = {
+        "family": "direct_abstention",
+        "metadata": {"source_group_id": "repaired-fixture", "teacher_dataset": "studyhub_teacher_v2_1"},
+    }
+
+    record = accepted_record(run, task, {}, {})
+
+    assert record["quality_tier"] == "teacher_repaired_complete"
+    assert record["teacher"]["policy_corrections"] == 1
 
 
 def test_accepted_direct_teacher_trajectory_is_not_falsely_runtime_native() -> None:
