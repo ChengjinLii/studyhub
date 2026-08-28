@@ -6,7 +6,6 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-
 SEARCH_SNIPPET_CHARS = 200
 
 
@@ -16,6 +15,20 @@ def canonical_arguments(value: dict[str, Any]) -> str:
 
 def _terms(value: str) -> list[str]:
     return re.findall(r"[A-Za-z0-9]+|[\u3400-\u9fff]", value.casefold())
+
+
+def _nested_source_ids(value: Any) -> set[str]:
+    result: set[str] = set()
+    if isinstance(value, dict):
+        source_id = value.get("source_id")
+        if isinstance(source_id, str) and source_id:
+            result.add(source_id)
+        for child in value.values():
+            result.update(_nested_source_ids(child))
+    elif isinstance(value, list):
+        for child in value:
+            result.update(_nested_source_ids(child))
+    return result
 
 
 @dataclass(slots=True)
@@ -98,8 +111,13 @@ class FrozenTaskEnvironment:
             return self._read(arguments)
         if capability == "replay_search":
             return self._replay_search(name, arguments)
-        if capability == "function_call":
-            return self._fixture_call(name, arguments, tool)
+        if capability in {"function_call", "evidence_fetch"}:
+            return self._fixture_call(
+                name,
+                arguments,
+                tool,
+                records_evidence=capability == "evidence_fetch",
+            )
         self._record_error("unsupported_capability")
         return self._result(error="unsupported_capability", tool=name)
 
@@ -163,14 +181,52 @@ class FrozenTaskEnvironment:
             citation=f"[{source_id}]",
         )
 
-    def _fixture_call(self, name: str, arguments: dict[str, Any], tool: dict[str, Any]) -> str:
+    @staticmethod
+    def _route_matches(arguments: dict[str, Any], route: dict[str, Any]) -> bool:
+        match = route.get("argument_match")
+        if not isinstance(match, dict) or match.get("mode") != "exact_except":
+            return False
+        expected = route.get("arguments", {})
+        flexible = set(match.get("flexible_fields", []))
+        if not isinstance(expected, dict) or not flexible <= expected.keys():
+            return False
+        for key, value in expected.items():
+            if key in flexible:
+                if key not in arguments or not isinstance(arguments[key], type(value)):
+                    return False
+                if isinstance(arguments[key], str) and not arguments[key].strip():
+                    return False
+                continue
+            if arguments.get(key) != value:
+                return False
+        return set(arguments) == set(expected)
+
+    def _fixture_call(
+        self,
+        name: str,
+        arguments: dict[str, Any],
+        tool: dict[str, Any],
+        *,
+        records_evidence: bool = False,
+    ) -> str:
         required = set(tool.get("parameters", {}).get("required", []))
         missing = sorted(required - arguments.keys())
         if missing:
             self._record_error("missing_required_arguments")
             return self._result(error="missing_required_arguments", missing=missing)
         route_key = (name, canonical_arguments(arguments))
-        if route_key not in self._routes:
+        route = self._routes.get(route_key)
+        if route is None:
+            route_row = next(
+                (
+                    candidate
+                    for candidate in self._routes_by_name.get(name, [])
+                    if self._route_matches(arguments, candidate)
+                ),
+                None,
+            )
+            route = route_row.get("result") if route_row is not None else None
+        if route is None:
             self._record_error("fixture_route_not_found")
             return self._result(
                 ok=False,
@@ -178,7 +234,8 @@ class FrozenTaskEnvironment:
                 tool=name,
                 fixture_match=False,
             )
-        route = self._routes[route_key]
+        if records_evidence:
+            self.trace.read_source_ids.update(_nested_source_ids(route))
         return self._result(ok=True, tool=name, content=route, fixture_match=True)
 
     def _replay_search(self, name: str, arguments: dict[str, Any]) -> str:
@@ -193,7 +250,9 @@ class FrozenTaskEnvironment:
         query_terms = _terms(query)
         scored = []
         for ordinal, route in enumerate(routes):
-            searchable = f"{canonical_arguments(route.get('arguments', {}))} {canonical_arguments(route.get('result', {}))}"
+            searchable = (
+                f"{canonical_arguments(route.get('arguments', {}))} {canonical_arguments(route.get('result', {}))}"
+            )
             searchable_terms = _terms(searchable)
             score = sum(searchable_terms.count(term) for term in query_terms)
             scored.append((score, -ordinal, route))

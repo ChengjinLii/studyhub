@@ -9,18 +9,23 @@ import json
 import shutil
 import sys
 from collections import Counter, defaultdict, deque
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 for entry in (PROJECT_ROOT, PROJECT_ROOT / "src"):
     if str(entry) not in sys.path:
         sys.path.insert(0, str(entry))
 
-from scripts.data.select_runtime_sft_v3 import candidate_prompt_hash, public_benchmark_prompt_hashes, sha256
-from studyhub_agent.trajectory.runtime_sft import canonical_json, stable_hash
+from scripts.data.select_runtime_sft_v3 import (  # noqa: E402
+    candidate_prompt_hash,
+    public_benchmark_prompt_hashes,
+    sha256,
+)
+from studyhub_agent.trajectory.runtime_sft import canonical_json, stable_hash  # noqa: E402
 
-SCHEMA_VERSION = "studyhub.teacher-task.v1"
+SCHEMA_VERSION = "studyhub.teacher-task.v2"
 DEFAULT_TOTAL = 2_400
 FAMILY_PLAN = {
     "rag_query_rewrite_citation": ("studyhub_metadata_replay", 0.25),
@@ -151,6 +156,38 @@ def _evidence_sources(calls: list[tuple[str, dict[str, Any], Any]]) -> list[str]
     return sorted(values)
 
 
+def _nested_values(value: Any, key: str) -> set[str]:
+    result: set[str] = set()
+    if isinstance(value, dict):
+        item = value.get(key)
+        if isinstance(item, str) and item:
+            result.add(item)
+        for child in value.values():
+            result.update(_nested_values(child, key))
+    elif isinstance(value, list):
+        for child in value:
+            result.update(_nested_values(child, key))
+    return result
+
+
+def _required_observation_markers(calls: list[tuple[str, dict[str, Any], Any]]) -> list[str]:
+    markers: set[str] = set()
+    for _name, _arguments, observation in calls:
+        markers.update(_nested_values(observation, "postcondition"))
+        errors = _nested_values(observation, "error")
+        if "permission_denied" in errors:
+            markers.add("permission_denied")
+    return sorted(markers)
+
+
+def _hidden_required_tools(family: str, expected_tools: list[str]) -> list[str]:
+    if family == "memory_personalization_privacy":
+        return sorted({name for name in expected_tools if "memory" in name})
+    if family in {"cross_tool_composition", "state_function"}:
+        return sorted({name for name in expected_tools if name in {"material_bookmark_add", "study_plan_update"}})
+    return []
+
+
 def _environment(row: dict[str, Any]) -> tuple[dict[str, Any], dict[str, Any], list[str]]:
     tools = _tools(row)
     calls = _call_observations(row)
@@ -164,6 +201,8 @@ def _environment(row: dict[str, Any]) -> tuple[dict[str, Any], dict[str, Any], l
             tool["capability"] = "knowledge_read"
         elif tool["name"].endswith("_search"):
             tool["capability"] = "replay_search"
+        elif tool["name"].endswith("_fetch"):
+            tool["capability"] = "evidence_fetch"
     routes = []
     expected_tools = []
     for name, arguments, observation in calls:
@@ -178,7 +217,13 @@ def _environment(row: dict[str, Any]) -> tuple[dict[str, Any], dict[str, Any], l
             continue
         if tool["capability"] != "function_call" and tool["capability"] != "replay_search":
             continue
-        routes.append({"name": name, "arguments": arguments, "result": observation})
+        route = {"name": name, "arguments": arguments, "result": observation}
+        if name == "study_plan_update":
+            route["argument_match"] = {
+                "mode": "exact_except",
+                "flexible_fields": ["topic"],
+            }
+        routes.append(route)
     # A read document must be discoverable by search; the environment enforces this.
     if documents and any(tool.get("capability") == "knowledge_read" for tool in tools):
         for source_id in document_ids:
@@ -187,17 +232,27 @@ def _environment(row: dict[str, Any]) -> tuple[dict[str, Any], dict[str, Any], l
     return {"tools": tools, "documents": documents}, {"routes": routes}, expected_tools
 
 
-def _round_robin(rows: list[dict[str, Any]], limit: int) -> list[dict[str, Any]]:
+def _round_robin(
+    rows: list[dict[str, Any]],
+    limit: int,
+    *,
+    existing_group_counts: Counter[str] | None = None,
+    max_rows_per_group: int | None = None,
+) -> list[dict[str, Any]]:
     groups: dict[str, deque[dict[str, Any]]] = defaultdict(deque)
     for row in sorted(rows, key=lambda item: stable_hash(str(item["id"]), salt="teacher-task-order")):
         groups[str(row["group_id"])].append(row)
     order = sorted(groups, key=lambda key: stable_hash(key, salt="teacher-group-order"))
+    counts = Counter(existing_group_counts or {})
     selected = []
     while order and len(selected) < limit:
         next_order = []
         for group in order:
+            if max_rows_per_group is not None and counts[group] >= max_rows_per_group:
+                continue
             selected.append(groups[group].popleft())
-            if groups[group]:
+            counts[group] += 1
+            if groups[group] and (max_rows_per_group is None or counts[group] < max_rows_per_group):
                 next_order.append(group)
             if len(selected) == limit:
                 break
@@ -208,8 +263,9 @@ def _round_robin(rows: list[dict[str, Any]], limit: int) -> list[dict[str, Any]]
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--input", type=Path, default=PROJECT_ROOT / "datasets/interim/runtime_sft_v3/selected.jsonl")
-    parser.add_argument("--output", type=Path, default=PROJECT_ROOT / "datasets/interim/studyhub_teacher_v1")
+    parser.add_argument("--output", type=Path, default=PROJECT_ROOT / "datasets/interim/studyhub_teacher_v2")
     parser.add_argument("--max-tasks", type=int, default=DEFAULT_TOTAL)
+    parser.add_argument("--max-rows-per-source-group", type=int, default=12)
     parser.add_argument("--overwrite", action="store_true")
     return parser.parse_args()
 
@@ -218,6 +274,8 @@ def main() -> int:
     args = parse_args()
     if not 1 <= args.max_tasks <= 4_000:
         raise ValueError("--max-tasks must be in [1, 4000]")
+    if not 1 <= args.max_rows_per_source_group <= 32:
+        raise ValueError("--max-rows-per-source-group must be in [1, 32]")
     if args.output.exists():
         if not args.overwrite:
             raise FileExistsError(f"output exists; pass --overwrite: {args.output}")
@@ -241,12 +299,18 @@ def main() -> int:
     used_rows: set[str] = set()
     for family, (source, _share) in FAMILY_PLAN.items():
         candidates = [row for row in pools[source] if str(row["id"]) not in used_rows]
-        for row in _round_robin(candidates, allocations[family]):
+        for row in _round_robin(
+            candidates,
+            allocations[family],
+            existing_group_counts=source_groups,
+            max_rows_per_group=args.max_rows_per_source_group,
+        ):
             used_rows.add(str(row["id"]))
-            task_id = f"teacher-{stable_hash(str(row['id']), salt='studyhub-teacher-v1')[:20]}"
+            task_id = f"teacher-v2-{stable_hash(str(row['id']), salt='studyhub-teacher-v2')[:20]}"
             environment, fixture, expected_tools = _environment(row)
+            calls = _call_observations(row)
             evidence_sources = sorted(
-                set(_evidence_sources(_call_observations(row)))
+                set(_evidence_sources(calls))
                 | {document["source_id"] for document in environment["documents"] if document["text"].strip()}
             )
             request = _user_request(row)
@@ -262,14 +326,16 @@ def main() -> int:
                 "user_request": request,
                 "allowed_tools": [tool["name"] for tool in environment["tools"]],
                 "completion_contract": {
-                    "required_tool_names": sorted(set(expected_tools)),
                     "minimum_grounded_citations": (
                         min(2, len(evidence_sources))
-                        if evidence_sources and any(token in request.casefold() for token in ("比较", "核对两", "compare"))
+                        if evidence_sources
+                        and any(token in request.casefold() for token in ("比较", "核对两", "compare"))
                         else int(bool(evidence_sources))
                     ),
                     "citation_format": "[source_id]",
                     "search_result_requires_read_or_fetch_before_citation": True,
+                    "state_changes_require_successful_observation": family
+                    in {"cross_tool_composition", "state_function"},
                 },
                 "max_steps": max_steps,
                 "max_tool_calls": max_tool_calls,
@@ -281,10 +347,11 @@ def main() -> int:
                     "benchmark_overlap": False,
                     "environment_id": task_id,
                     "verifier_id": task_id,
+                    "teacher_dataset": "studyhub_teacher_v2",
                 },
             }
             verifier = {
-                "schema_version": "studyhub.teacher-verifier.v1",
+                "schema_version": "studyhub.teacher-verifier.v2",
                 "task_id": task_id,
                 "family": family,
                 "reference_final": reference,
@@ -297,7 +364,8 @@ def main() -> int:
                     else int(bool(evidence_sources))
                 ),
                 "expected_tool_names": expected_tools,
-                "required_tool_names": sorted(set(expected_tools)),
+                "required_tool_names": _hidden_required_tools(family, expected_tools),
+                "required_observation_markers": _required_observation_markers(calls),
                 "minimum_tool_calls": 0 if not expected_tools else 1,
                 "source_group_id": row["group_id"],
                 "benchmark_prompt_overlap": False,
@@ -311,7 +379,7 @@ def main() -> int:
 
     write_jsonl(args.output / "task_specs.jsonl", tasks)
     manifest = {
-        "schema_version": "studyhub.teacher-task-manifest.v1",
+        "schema_version": "studyhub.teacher-task-manifest.v2",
         "status": "READY_FOR_TEACHER_SMOKE",
         "tasks": len(tasks),
         "requested_tasks": args.max_tasks,
@@ -321,6 +389,7 @@ def main() -> int:
             "max": max(source_groups.values(), default=0),
             "groups_over_10": sum(value > 10 for value in source_groups.values()),
         },
+        "max_rows_per_source_group_contract": args.max_rows_per_source_group,
         "source_selected_sha256": sha256(args.input),
         "benchmark_manifest_sha256": sha256(benchmark_path),
         "benchmark_tasks_checked": benchmark_tasks,
@@ -329,6 +398,7 @@ def main() -> int:
         "sealed_overlap_recheck": "INHERITED_FROM_FROZEN_V3_SOURCE_LOCK_NOT_RECOMPUTED",
         "benchmark_prompt_overlap": 0,
         "public_task_has_verifier": False,
+        "public_task_exposes_gold_tool_path": False,
         "task_specs_sha256": sha256(args.output / "task_specs.jsonl"),
         "hidden_roots": ["environments", "fixtures", "verifiers"],
         "teacher_sandbox_mounts_hidden_roots": False,

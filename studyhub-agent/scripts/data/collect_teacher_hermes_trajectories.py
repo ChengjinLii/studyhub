@@ -9,18 +9,19 @@ import json
 import subprocess
 import sys
 import time
+from collections.abc import Iterable
 from concurrent.futures import FIRST_COMPLETED, ProcessPoolExecutor, wait
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 for entry in (PROJECT_ROOT, PROJECT_ROOT / "src"):
     if str(entry) not in sys.path:
         sys.path.insert(0, str(entry))
 
-from scripts.data.verify_teacher_trajectories import verify_root, verify_run
-from training.teacher.hermes_controller import collect_trajectory
-from training.teacher.providers import TeacherProviderError, build_provider
+from scripts.data.verify_teacher_trajectories import verify_root, verify_run  # noqa: E402
+from training.teacher.hermes_controller import collect_trajectory  # noqa: E402
+from training.teacher.providers import TeacherProviderError, build_provider  # noqa: E402
 
 TEACHERS = ("codex-spark", "responses-api", "authorized-openai-compatible", "local-best-of-n")
 
@@ -61,7 +62,13 @@ def _load_tasks(root: Path) -> list[dict[str, Any]]:
     )
 
 
-def _run_id(task: dict[str, Any], teacher: str, model: str, candidate_index: int) -> str:
+def _run_id(
+    task: dict[str, Any],
+    teacher: str,
+    model: str,
+    candidate_index: int,
+    collector_git_commit: str,
+) -> str:
     digest = hashlib.sha256(
         json.dumps(
             {
@@ -69,6 +76,7 @@ def _run_id(task: dict[str, Any], teacher: str, model: str, candidate_index: int
                 "teacher": teacher,
                 "model": model,
                 "candidate_index": candidate_index,
+                "collector_git_commit": collector_git_commit,
                 "task": task,
             },
             ensure_ascii=False,
@@ -159,7 +167,7 @@ def _jobs(
     result = []
     for task in tasks:
         for candidate_index in range(candidates_per_task):
-            run_id = _run_id(task, teacher, model, candidate_index)
+            run_id = _run_id(task, teacher, model, candidate_index, collector_git_commit)
             result.append(
                 {
                     "root": str(root),
@@ -191,6 +199,39 @@ def _existing_result(root: Path, job: dict[str, Any]) -> dict[str, Any] | None:
 def _write_run(root: Path, result: dict[str, Any]) -> None:
     run = result["run"]
     _write_json(root / "raw_runs" / f"{run['run_id']}.json", run)
+
+
+def _terminal_provider_stop(result: dict[str, Any]) -> str | None:
+    failures = set(result.get("failures", []))
+    if "provider:codex_usage_limit" in failures:
+        return "PROVIDER_USAGE_LIMIT"
+    if "provider:codex_rate_limit" in failures:
+        return "PROVIDER_RATE_LIMIT"
+    return None
+
+
+def _stratified_tasks(tasks: list[dict[str, Any]], limit: int) -> list[dict[str, Any]]:
+    by_family: dict[str, list[dict[str, Any]]] = {}
+    for task in tasks:
+        by_family.setdefault(str(task.get("family", "unknown")), []).append(task)
+    selected: list[dict[str, Any]] = []
+    offsets = {family: 0 for family in by_family}
+    families = sorted(by_family)
+    while families and len(selected) < limit:
+        next_families = []
+        for family in families:
+            offset = offsets[family]
+            rows = by_family[family]
+            if offset >= len(rows):
+                continue
+            selected.append(rows[offset])
+            offsets[family] += 1
+            if offsets[family] < len(rows):
+                next_families.append(family)
+            if len(selected) == limit:
+                break
+        families = next_families
+    return selected
 
 
 def _progress_manifest(
@@ -229,8 +270,9 @@ def _collect_sequential(
     max_accepted: int,
     deadline: float,
     resume: bool,
-) -> tuple[int, int, int]:
+) -> tuple[int, int, int, str | None]:
     completed = accepted = rejected = 0
+    stop_reason: str | None = None
     for job in jobs:
         if accepted >= max_accepted or time.monotonic() >= deadline:
             break
@@ -249,7 +291,10 @@ def _collect_sequential(
             accepted += 1
         else:
             rejected += 1
-    return completed, accepted, rejected
+        stop_reason = _terminal_provider_stop(result)
+        if stop_reason:
+            break
+    return completed, accepted, rejected, stop_reason
 
 
 def _collect_parallel(
@@ -260,8 +305,9 @@ def _collect_parallel(
     deadline: float,
     resume: bool,
     concurrency: int,
-) -> tuple[int, int, int]:
+) -> tuple[int, int, int, str | None]:
     completed = accepted = rejected = 0
+    stop_reason: str | None = None
     remaining_jobs = iter(jobs)
     pending: dict[Any, dict[str, Any]] = {}
     with ProcessPoolExecutor(max_workers=concurrency) as executor:
@@ -299,14 +345,19 @@ def _collect_parallel(
                     accepted += 1
                 else:
                     rejected += 1
+                stop_reason = _terminal_provider_stop(result)
+                if stop_reason:
+                    break
+            if stop_reason:
+                break
         for future in pending:
             future.cancel()
-    return completed, accepted, rejected
+    return completed, accepted, rejected, stop_reason
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--root", type=Path, default=PROJECT_ROOT / "datasets/interim/studyhub_teacher_v1")
+    parser.add_argument("--root", type=Path, default=PROJECT_ROOT / "datasets/interim/studyhub_teacher_v2")
     parser.add_argument("--teacher", choices=TEACHERS, default="codex-spark")
     parser.add_argument("--teacher-model")
     parser.add_argument("--max-accepted", type=int, default=500)
@@ -358,7 +409,7 @@ def main() -> int:
     if args.max_tasks is not None:
         if args.max_tasks < 1:
             raise ValueError("--max-tasks must be positive")
-        tasks = tasks[: args.max_tasks]
+        tasks = _stratified_tasks(tasks, args.max_tasks)
     commit = _git_head()
     jobs = _jobs(
         tasks,
@@ -384,7 +435,7 @@ def main() -> int:
     )
     deadline = started + args.max_wall_time
     if args.concurrency == 1:
-        completed, accepted, rejected = _collect_sequential(
+        completed, accepted, rejected, stop_reason = _collect_sequential(
             jobs,
             root=args.root,
             max_accepted=args.max_accepted,
@@ -392,7 +443,7 @@ def main() -> int:
             resume=args.resume,
         )
     else:
-        completed, accepted, rejected = _collect_parallel(
+        completed, accepted, rejected, stop_reason = _collect_parallel(
             jobs,
             root=args.root,
             max_accepted=args.max_accepted,
@@ -400,7 +451,7 @@ def main() -> int:
             resume=args.resume,
             concurrency=args.concurrency,
         )
-    status = "TARGET_REACHED" if accepted >= args.max_accepted else "WALL_TIME_OR_TASKS_EXHAUSTED"
+    status = "TARGET_REACHED" if accepted >= args.max_accepted else stop_reason or "WALL_TIME_OR_TASKS_EXHAUSTED"
     _progress_manifest(
         root=args.root,
         teacher=args.teacher,

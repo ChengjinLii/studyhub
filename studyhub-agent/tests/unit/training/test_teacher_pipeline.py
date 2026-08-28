@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import json
 from pathlib import Path
@@ -7,14 +8,16 @@ from pathlib import Path
 import pytest
 
 from scripts.data.build_runtime_sft_v3_1 import _apply_teacher_self_review, _select_teacher_rows
-from scripts.data.verify_teacher_trajectories import accepted_record, verify_run
 from scripts.data.select_runtime_sft_v3 import public_benchmark_prompt_hashes
+from scripts.data.verify_teacher_trajectories import accepted_record, verify_run
+from training.rl.frozen_environment import FrozenTaskEnvironment
 from training.teacher.hermes_controller import collect_trajectory
 from training.teacher.providers import (
     CodexSparkProvider,
     ResponsesAPIProvider,
     _codex_event_audit,
     _parse_action,
+    _visible_runtime_state,
     build_provider,
 )
 
@@ -66,8 +69,10 @@ def test_codex_event_audit_rejects_any_codex_tool_event() -> None:
             json.dumps({"type": "turn.completed", "usage": {"input_tokens": 10, "output_tokens": 4}}),
         ]
     )
-    unsafe = safe + "\n" + json.dumps(
-        {"type": "item.completed", "item": {"type": "command_execution", "command": "cat secret"}}
+    unsafe = (
+        safe
+        + "\n"
+        + json.dumps({"type": "item.completed", "item": {"type": "command_execution", "command": "cat secret"}})
     )
 
     assert _codex_event_audit(safe)["zero_codex_tool_events"] is True
@@ -89,6 +94,137 @@ def test_provider_action_decodes_strict_schema_argument_string() -> None:
     )
 
     assert action["arguments"] == {"query": "通信原理", "limit": 3}
+
+
+def test_visible_runtime_state_separates_discovery_from_grounded_evidence() -> None:
+    task = {
+        "max_steps": 6,
+        "max_tool_calls": 5,
+        "completion_contract": {"minimum_grounded_citations": 1},
+    }
+    messages = [
+        {
+            "role": "assistant",
+            "tool_calls": [{"function": {"name": "web_search", "arguments": {}}}],
+        },
+        {
+            "role": "tool",
+            "name": "web_search",
+            "content": json.dumps({"results": [{"source_id": "web:one", "url": "https://one"}]}),
+        },
+        {
+            "role": "assistant",
+            "tool_calls": [{"function": {"name": "web_fetch", "arguments": {}}}],
+        },
+        {
+            "role": "tool",
+            "name": "web_fetch",
+            "content": json.dumps({"content": {"source_id": "web:one", "text": "evidence"}}),
+        },
+    ]
+
+    state = _visible_runtime_state(task, messages, turn=2)
+
+    assert state["discovered_source_ids"] == ["web:one"]
+    assert state["grounded_source_ids"] == ["web:one"]
+    assert state["grounded_citation_deficit"] == 0
+    assert state["remaining_tool_calls"] == 3
+    assert state["final_evidence_ready"] is True
+
+
+def test_fixture_route_accepts_declared_equivalent_state_text() -> None:
+    environment = FrozenTaskEnvironment(
+        {
+            "tools": [
+                {
+                    "name": "study_plan_update",
+                    "description": "Update a plan.",
+                    "capability": "function_call",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "topic": {"type": "string"},
+                            "weekly_minutes": {"type": "integer"},
+                            "resource_ids": {"type": "array", "items": {"type": "integer"}},
+                        },
+                        "required": ["topic", "weekly_minutes", "resource_ids"],
+                    },
+                }
+            ],
+            "documents": [],
+        },
+        {
+            "routes": [
+                {
+                    "name": "study_plan_update",
+                    "arguments": {"topic": "reference wording", "weekly_minutes": 90, "resource_ids": [1, 2]},
+                    "argument_match": {"mode": "exact_except", "flexible_fields": ["topic"]},
+                    "result": {"ok": True, "postcondition": "study_plan_updated"},
+                }
+            ]
+        },
+    )
+
+    result = json.loads(
+        asyncio.run(
+            environment.execute(
+                "study_plan_update",
+                {"topic": "equivalent teacher wording", "weekly_minutes": 90, "resource_ids": [1, 2]},
+            )
+        )
+    )
+
+    assert result["ok"] is True
+    assert result["fixture_match"] is True
+    assert environment.trace.invalid_tool_calls == 0
+
+
+def test_nested_fetch_observation_is_valid_grounded_citation() -> None:
+    task = {
+        "family": "web_fallback_conflict",
+        "max_tool_calls": 3,
+        "metadata": {"source_group_id": "web:one", "teacher_dataset": "studyhub_teacher_v2"},
+    }
+    run = {
+        "status": "COMPLETED",
+        "controller": {
+            "hermes_registry_dispatch": True,
+            "controller_errors": [],
+            "environment_errors": [],
+            "runtime_errors": [],
+            "invalid_tool_calls": 0,
+            "tool_calls": 1,
+            "read_source_ids": [],
+        },
+        "provider_events": [],
+        "messages": [
+            {
+                "role": "assistant",
+                "tool_calls": [{"function": {"name": "web_fetch", "arguments": {"url": "https://one"}}}],
+            },
+            {
+                "role": "tool",
+                "name": "web_fetch",
+                "content": json.dumps({"ok": True, "content": {"source_id": "web:one", "text": "supported fact"}}),
+            },
+            {"role": "assistant", "content": "supported fact [web:one]"},
+        ],
+        "final_answer": "supported fact [web:one]",
+    }
+    verifier = {
+        "reference_final": "supported fact [web:one]",
+        "allowed_citations": ["web:one"],
+        "minimum_citations": 1,
+        "expected_tool_names": ["web_fetch"],
+        "required_tool_names": [],
+        "minimum_tool_calls": 1,
+        "benchmark_prompt_overlap": False,
+    }
+
+    failures, diagnostics = verify_run(run, task, verifier)
+
+    assert failures == []
+    assert diagnostics["grounded_citations"] == ["web:one"]
 
 
 def test_teacher_provider_availability_never_confuses_cli_with_responses_key(

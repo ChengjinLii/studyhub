@@ -15,7 +15,7 @@ def test_committed_v3_program_is_internally_consistent() -> None:
     assert errors == []
     assert summary == {
         "program_id": "studyhub-9b-agentic-post-training-v3",
-        "status": "BENCHMARK_V2_FROZEN_BASE_CALIBRATED_OVERNIGHT_SFT_AUTHORIZED",
+        "status": "BENCHMARK_V2_FROZEN_OVERNIGHT_SFT_COMPLETE_TEACHER_V2_PREFLIGHT",
         "capabilities": len(EXPECTED_CAPABILITIES),
         "benchmark_version": "studyhub-agentbench-v2",
         "benchmark_manifest_sha256": "da804b10f53dec585255598c3e256445b8ade3acf35fd8c766ca0ab4d759c88b",
@@ -40,7 +40,7 @@ def test_committed_v3_program_is_internally_consistent() -> None:
             "train_assistant_loss_tokens": 8152342,
         },
         "overnight_sft": {
-            "status": "AUTHORIZED_PENDING_RUN",
+            "status": "COMPLETE_NEGATIVE_DEVELOPMENT_DIRECTION",
             "training_trial": "overnight-r16-v30-seed-20260827",
             "maximum_optimizer_updates": 2100,
             "maximum_wall_time_seconds": 22500,

@@ -14,7 +14,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Protocol
 
-
 ACTION_SCHEMA: dict[str, Any] = {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
     "type": "object",
@@ -33,8 +32,11 @@ Return exactly one JSON action matching the supplied schema. Do not use a shell,
 network, browser, or any tool of your own. The only permitted actions are one listed StudyHub
 tool call or a final answer. Base the action only on the public task and visible message history.
 For evidence tasks, a search result only discovers a source: read or fetch every source before
-citing it. Write final citations exactly as [source_id], using only source IDs returned by a
-successful read/fetch observation. Do not reveal chain-of-thought."""
+citing it. Never invent a source ID or infer a fetch URL that was not returned by an observation.
+Write final citations exactly as [source_id], using only source IDs returned by a successful
+read/fetch observation. Do not finish while a public completion constraint is visibly unmet.
+If a tool returns an error, correct the next visible action instead of claiming success. Do not
+reveal chain-of-thought."""
 
 _SECRET_PATTERNS = (
     re.compile(r"\bsk-[A-Za-z0-9_-]{12,}\b"),
@@ -76,6 +78,76 @@ def _redact(value: str, *, limit: int = 800) -> str:
     return result[:limit]
 
 
+def _json_payload(value: Any) -> Any:
+    if not isinstance(value, str):
+        return value
+    try:
+        return json.loads(value)
+    except json.JSONDecodeError:
+        return value
+
+
+def _source_ids(value: Any) -> set[str]:
+    result: set[str] = set()
+    if isinstance(value, dict):
+        source_id = value.get("source_id")
+        if isinstance(source_id, str) and source_id:
+            result.add(source_id)
+        for child in value.values():
+            result.update(_source_ids(child))
+    elif isinstance(value, list):
+        for child in value:
+            result.update(_source_ids(child))
+    return result
+
+
+def _visible_runtime_state(
+    task: dict[str, Any],
+    messages: list[dict[str, Any]],
+    turn: int,
+) -> dict[str, Any]:
+    completed_tools: list[str] = []
+    discovered: set[str] = set()
+    grounded: set[str] = set()
+    tool_calls = 0
+    last_tool_error: str | None = None
+    for message in messages:
+        if message.get("role") == "assistant":
+            for call in message.get("tool_calls", []):
+                name = str(call.get("function", {}).get("name", ""))
+                if name:
+                    completed_tools.append(name)
+                    tool_calls += 1
+            continue
+        if message.get("role") != "tool":
+            continue
+        name = str(message.get("name", ""))
+        payload = _json_payload(message.get("content", ""))
+        ids = _source_ids(payload)
+        if name.endswith("_search") or name == "knowledge_search":
+            discovered.update(ids)
+        if name.endswith("_read") or name.endswith("_fetch") or name == "knowledge_read":
+            grounded.update(ids)
+        if isinstance(payload, dict):
+            error = payload.get("error")
+            if isinstance(error, str) and error:
+                last_tool_error = error
+
+    contract = task.get("completion_contract", {})
+    minimum_citations = int(contract.get("minimum_grounded_citations", 0))
+    return {
+        "completed_tool_calls": completed_tools,
+        "discovered_source_ids": sorted(discovered),
+        "grounded_source_ids": sorted(grounded),
+        "minimum_grounded_citations": minimum_citations,
+        "grounded_citation_deficit": max(0, minimum_citations - len(grounded)),
+        "remaining_model_steps": max(0, int(task.get("max_steps", 0)) - turn),
+        "remaining_tool_calls": max(0, int(task.get("max_tool_calls", 0)) - tool_calls),
+        "last_tool_error": last_tool_error,
+        "final_evidence_ready": len(grounded) >= minimum_citations,
+    }
+
+
 def _action_prompt(
     task: dict[str, Any],
     tools: list[dict[str, Any]],
@@ -88,6 +160,7 @@ def _action_prompt(
         "public_task": task,
         "studyhub_tools": tools,
         "visible_messages": messages,
+        "visible_runtime_state": _visible_runtime_state(task, messages, turn),
         "action_contract": {
             "tool_call": {
                 "type": "tool_call",
@@ -276,7 +349,14 @@ class CodexSparkProvider:
                 "usage": audit["usage"],
             }
             if process.returncode != 0:
-                raise TeacherProviderError("codex_exec_failed", event)
+                error_text = " ".join(audit.get("errors", [])).casefold()
+                if "usage limit" in error_text:
+                    code = "codex_usage_limit"
+                elif "rate limit" in error_text or "too many requests" in error_text:
+                    code = "codex_rate_limit"
+                else:
+                    code = "codex_exec_failed"
+                raise TeacherProviderError(code, event)
             if not audit["zero_codex_tool_events"]:
                 raise TeacherProviderError("codex_isolation_tool_event", event)
             if not output_path.is_file():

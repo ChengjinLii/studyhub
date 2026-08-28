@@ -2,15 +2,17 @@
   "schema_version": "studyhub.training-program.v3",
   "program_id": "studyhub-9b-agentic-post-training-v3",
   "created_at": "2026-08-27",
-  "status": "BENCHMARK_V2_FROZEN_BASE_CALIBRATED_OVERNIGHT_SFT_AUTHORIZED",
+  "status": "BENCHMARK_V2_FROZEN_OVERNIGHT_SFT_COMPLETE_TEACHER_V2_PREFLIGHT",
   "launch_authorized": false,
   "launch_authorization_scope": [],
   "gpu_gate_authorized": true,
   "sft_profile_authorized": true,
   "formal_sft_authorized": false,
-  "overnight_sft_baseline_authorized": true,
+  "overnight_sft_baseline_authorized": false,
   "overnight_sft_authorization": "configs/program-v3/overnight-sft-baseline-authorization.json",
   "overnight_sft_authorization_sha256": "1990e62fa5939324f0f67aa166fe4f730daaf08898bea9b7fc09c0cb05e93e8b",
+  "overnight_sft_consumption": "configs/program-v3/overnight-sft-baseline-consumption.json",
+  "overnight_sft_consumption_sha256": "77a9963e368ab95e4c798c2e3eebe595d62c43c297c5852df57a04966df4b979",
   "source_prompt": "/data/chengjin/studyhub-agentic-rl-interview-prompt-pack-v3/studyhub-agentic-rl-interview-prompt-pack-v3/prompt.md",
   "source_prompt_sha256": "478b7666c84fe69f3210d74b33f53094cbe699c47c02607200aa5dddb17acd3c",
   "benchmark_execution_prompt": "/data/chengjin/StudyHub_Benchmark_v2_Codex_Execution_Prompt.md",
@@ -316,7 +318,7 @@
         ]
       },
       "overnight": {
-        "status": "AUTHORIZED_PENDING_RUN",
+        "status": "COMPLETE_NEGATIVE_DEVELOPMENT_DIRECTION",
         "authorization": "configs/program-v3/overnight-sft-baseline-authorization.json",
         "training_trial": "overnight-r16-v30-seed-20260827",
         "seed": 20260827,
@@ -328,7 +330,13 @@
         "recovery_every_updates": 210,
         "no_rl": true,
         "no_sealed": true,
-        "quality_claim": "PENDING_INDEPENDENT_DEVELOPMENT_EVALUATION"
+        "optimizer_updates": 2100,
+        "total_tokens": 21318410,
+        "assistant_loss_tokens": 3138019,
+        "development_strict_base": 0.117647,
+        "development_strict_sft": 0.078431,
+        "development_delta": -0.039216,
+        "quality_claim": "NO_RELIABLE_IMPROVEMENT_DETECTED_DIRECTION_NEGATIVE"
       }
     },
     "grpo": {

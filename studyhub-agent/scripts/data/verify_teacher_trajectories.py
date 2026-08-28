@@ -8,16 +8,20 @@ import json
 import re
 import sys
 from collections import Counter, defaultdict
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 for entry in (PROJECT_ROOT, PROJECT_ROOT / "src"):
     if str(entry) not in sys.path:
         sys.path.insert(0, str(entry))
 
-from scripts.data.select_runtime_sft_v3 import sha256
-from studyhub_agent.trajectory.runtime_sft import trajectory_fingerprint, validate_runtime_trajectory
+from scripts.data.select_runtime_sft_v3 import sha256  # noqa: E402
+from studyhub_agent.trajectory.runtime_sft import (  # noqa: E402
+    trajectory_fingerprint,
+    validate_runtime_trajectory,
+)
 
 CITATION = re.compile(r"\[([^][\s]+:[^][\s]+)]")
 
@@ -32,10 +36,30 @@ def semantic_overlap(reference: str, candidate: str) -> float:
     return len(expected & actual) / max(len(expected), 1)
 
 
+def _nested_strings(value: Any, key: str) -> set[str]:
+    result: set[str] = set()
+    if isinstance(value, dict):
+        item = value.get(key)
+        if isinstance(item, str) and item:
+            result.add(item)
+        for child in value.values():
+            result.update(_nested_strings(child, key))
+    elif isinstance(value, list):
+        for child in value:
+            result.update(_nested_strings(child, key))
+    return result
+
+
+def _evidence_tool(name: str) -> bool:
+    return name == "knowledge_read" or name.endswith("_read") or name.endswith("_fetch")
+
+
 def observed_citations(run: dict[str, Any]) -> set[str]:
     values: set[str] = set()
     for message in run.get("messages", []):
         if message.get("role") != "tool":
+            continue
+        if not _evidence_tool(str(message.get("name", ""))):
             continue
         content = str(message.get("content", ""))
         values.update(CITATION.findall(content))
@@ -43,13 +67,24 @@ def observed_citations(run: dict[str, Any]) -> set[str]:
             payload = json.loads(content)
         except json.JSONDecodeError:
             continue
-        if isinstance(payload, dict):
-            for key in ("source_id", "citation"):
-                value = str(payload.get(key, ""))
-                values.update(CITATION.findall(value))
-                if key == "source_id" and value:
-                    values.add(value)
+        values.update(_nested_strings(payload, "source_id"))
+        for citation in _nested_strings(payload, "citation"):
+            values.update(CITATION.findall(citation))
     return values
+
+
+def observed_markers(run: dict[str, Any]) -> set[str]:
+    result: set[str] = set()
+    for message in run.get("messages", []):
+        if message.get("role") != "tool":
+            continue
+        try:
+            payload = json.loads(str(message.get("content", "")))
+        except json.JSONDecodeError:
+            continue
+        result.update(_nested_strings(payload, "postcondition"))
+        result.update(_nested_strings(payload, "error"))
+    return result
 
 
 def verify_run(run: dict[str, Any], task: dict[str, Any], verifier: dict[str, Any]) -> tuple[list[str], dict[str, Any]]:
@@ -92,6 +127,10 @@ def verify_run(run: dict[str, Any], task: dict[str, Any], verifier: dict[str, An
         failures.append("required_tool_family_missing")
     if not required_tools.issubset(actual_tools):
         failures.append("required_tool_sequence_missing")
+    required_markers = set(verifier.get("required_observation_markers", []))
+    actual_markers = observed_markers(run)
+    if not required_markers.issubset(actual_markers):
+        failures.append("required_observation_marker_missing")
 
     answer_citations = set(CITATION.findall(final))
     observed = observed_citations(run) | set(controller.get("read_source_ids", []))
@@ -122,6 +161,11 @@ def verify_run(run: dict[str, Any], task: dict[str, Any], verifier: dict[str, An
         "actual_tools": sorted(actual_tools),
         "expected_tool_names": sorted(expected_tools),
         "required_tool_names": sorted(required_tools),
+        "actual_tool_sequence": [
+            str(call.get("function", {}).get("name", ""))
+            for message in run.get("messages", [])
+            for call in message.get("tool_calls", [])
+        ],
         "answer_citations": sorted(answer_citations),
         "observed_citations": sorted(observed),
         "invalid_citations": invalid_citations,
@@ -130,6 +174,8 @@ def verify_run(run: dict[str, Any], task: dict[str, Any], verifier: dict[str, An
         "grounded_citations": sorted(grounded_citations),
         "minimum_citations": minimum_citations,
         "provider_errors": provider_errors,
+        "required_observation_markers": sorted(required_markers),
+        "observed_markers": sorted(actual_markers),
     }
     return sorted(set(failures)), diagnostics
 
@@ -150,10 +196,16 @@ def accepted_record(
         and messages[-1].get("role") == "assistant"
         and str(messages[-1].get("content", "")).strip()
     )
+    teacher_dataset = str(task.get("metadata", {}).get("teacher_dataset", "studyhub_teacher_v1"))
+    record_id = (
+        f"teacher-v1:{run['run_id']}"
+        if teacher_dataset == "studyhub_teacher_v1"
+        else f"{teacher_dataset}:{run['run_id']}"
+    )
     record: dict[str, Any] = {
         "schema_version": "studyhub.runtime-sft-trajectory.v3",
-        "id": f"teacher-v1:{run['run_id']}",
-        "source_dataset": "studyhub_teacher_v1",
+        "id": record_id,
+        "source_dataset": teacher_dataset,
         "source_id": run["run_id"],
         "group_id": task["metadata"]["source_group_id"],
         "split": "train",
@@ -176,7 +228,7 @@ def accepted_record(
         "provenance": {
             "revision": run.get("collector_git_commit", "unknown"),
             "license": "StudyHub-internal-derived",
-            "source_url": "local://studyhub_teacher_v1",
+            "source_url": f"local://{teacher_dataset}",
             "raw_files": [run.get("raw_run_path", "raw_runs")],
         },
     }
@@ -214,6 +266,7 @@ def verify_root(root: Path) -> dict[str, Any]:
     providers: Counter[str] = Counter()
     capabilities: Counter[str] = Counter()
     source_groups: Counter[str] = Counter()
+    task_schema_versions: Counter[str] = Counter()
     provider_errors: Counter[str] = Counter()
     turn_counts: list[int] = []
     tool_call_counts: list[int] = []
@@ -223,6 +276,8 @@ def verify_root(root: Path) -> dict[str, Any]:
         run = json.loads(path.read_text(encoding="utf-8"))
         task_id = str(run.get("task_id", ""))
         task = tasks.get(task_id)
+        if task is not None:
+            task_schema_versions[str(task.get("schema_version", "unknown"))] += 1
         verifier_path = root / "verifiers" / f"{task_id}.json"
         if task is None or not verifier_path.is_file():
             failures, diagnostics = ["task_or_verifier_missing"], {}
@@ -282,7 +337,9 @@ def verify_root(root: Path) -> dict[str, Any]:
         "acceptance_rate": round(len(accepted) / max(len(accepted) + len(rejected), 1), 6),
         "providers": dict(sorted(providers.items())),
         "provider_errors": dict(provider_errors.most_common()),
-        "rate_limit_failures": sum("rate" in key.casefold() for key in provider_errors.elements()),
+        "rate_limit_failures": sum(
+            "rate" in key.casefold() or "usage_limit" in key.casefold() for key in provider_errors.elements()
+        ),
         "capability_distribution": dict(sorted(capabilities.items())),
         "unique_source_groups": len(source_groups),
         "largest_source_group_share": round(max(source_groups.values(), default=0) / max(len(accepted), 1), 6),
@@ -294,16 +351,40 @@ def verify_root(root: Path) -> dict[str, Any]:
         "token_usage": dict(sorted(usage_totals.items())),
         "estimated_cost": "NOT_AVAILABLE_UNLESS_PROVIDER_REPORTS_COST",
         "failure_taxonomy": dict(failure_taxonomy.most_common()),
+        "task_schema_versions": dict(sorted(task_schema_versions.items())),
         "accepted_sha256": sha256(root / "accepted.jsonl"),
         "rejected_sha256": sha256(root / "rejected.jsonl"),
     }
     (root / "audit.json").write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    (root / "manifest.json").write_text(
+        json.dumps(
+            {
+                **manifest,
+                "task_specs_sha256": sha256(root / "task_specs.jsonl"),
+                "task_manifest_sha256": (
+                    sha256(root / "task-specs.manifest.json") if (root / "task-specs.manifest.json").is_file() else None
+                ),
+            },
+            ensure_ascii=False,
+            indent=2,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    (root / "capability_distribution.json").write_text(
+        json.dumps(dict(sorted(capabilities.items())), ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    (root / "failure_taxonomy.json").write_text(
+        json.dumps(dict(failure_taxonomy.most_common()), ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
     return manifest
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--root", type=Path, default=PROJECT_ROOT / "datasets/interim/studyhub_teacher_v1")
+    parser.add_argument("--root", type=Path, default=PROJECT_ROOT / "datasets/interim/studyhub_teacher_v2")
     return parser.parse_args()
 
 

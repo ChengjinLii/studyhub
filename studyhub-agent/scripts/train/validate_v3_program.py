@@ -149,8 +149,8 @@ def validate_program(
         errors.append("equal-budget SFT profiling must be explicitly authorized after the Gate passes")
     if program.get("formal_sft_authorized") is not False:
         errors.append("the superseded one-pass formal SFT must remain unauthorized")
-    if program.get("overnight_sft_baseline_authorized") is not True:
-        errors.append("the bounded overnight SFT baseline is not authorized")
+    if program.get("overnight_sft_baseline_authorized") is not False:
+        errors.append("the consumed overnight SFT baseline must not remain authorized")
     overnight_path = project_root / str(program.get("overnight_sft_authorization", ""))
     if not overnight_path.is_file():
         errors.append("overnight SFT authorization file is missing")
@@ -160,10 +160,29 @@ def validate_program(
         if program.get("overnight_sft_authorization_sha256") != _sha256(overnight_path):
             errors.append("overnight SFT authorization hash drifted")
         if overnight_authorization.get("status") != "AUTHORIZED_PENDING_RUN":
-            errors.append("overnight SFT authorization is not pending")
+            errors.append("historical overnight SFT authorization record drifted")
         scope = overnight_authorization.get("scope", {})
         if not all(scope.get(name) is True for name in ("no_rl", "no_sealed", "no_benchmark_modification")):
             errors.append("overnight SFT forbidden-scope contract is incomplete")
+    consumption_path = project_root / str(program.get("overnight_sft_consumption", ""))
+    if not consumption_path.is_file():
+        errors.append("overnight SFT consumption record is missing")
+        overnight_consumption = {}
+    else:
+        overnight_consumption = _load_json(consumption_path)
+        if program.get("overnight_sft_consumption_sha256") != _sha256(consumption_path):
+            errors.append("overnight SFT consumption hash drifted")
+        if overnight_consumption.get("status") != "CONSUMED_COMPLETE":
+            errors.append("overnight SFT consumption record is not complete")
+        if overnight_consumption.get("authorization_sha256") != program.get("overnight_sft_authorization_sha256"):
+            errors.append("overnight SFT consumption references a different authorization")
+        if overnight_consumption.get("scope", {}).get("repeat_authorized") is not False:
+            errors.append("overnight SFT consumption must forbid a repeated run")
+        evidence_path = project_root / str(overnight_consumption.get("tracked_evidence", ""))
+        if not evidence_path.is_file():
+            errors.append("overnight SFT tracked completion evidence is missing")
+        elif overnight_consumption.get("tracked_evidence_sha256") != _sha256(evidence_path):
+            errors.append("overnight SFT tracked completion evidence drifted")
     prompt_contracts = (
         ("source_prompt", "source_prompt_sha256"),
         ("benchmark_execution_prompt", "benchmark_execution_prompt_sha256"),
@@ -487,7 +506,7 @@ def validate_program(
     overnight = sft_training.get("overnight", {})
     overnight_budget = overnight_authorization.get("budget", {})
     expected_overnight = {
-        "status": "AUTHORIZED_PENDING_RUN",
+        "status": "COMPLETE_NEGATIVE_DEVELOPMENT_DIRECTION",
         "authorization": program.get("overnight_sft_authorization"),
         "training_trial": "overnight-r16-v30-seed-20260827",
         "seed": 20260827,
@@ -499,6 +518,13 @@ def validate_program(
         "recovery_every_updates": overnight_budget.get("recovery_every_updates"),
         "no_rl": True,
         "no_sealed": True,
+        "optimizer_updates": 2100,
+        "total_tokens": 21318410,
+        "assistant_loss_tokens": 3138019,
+        "development_strict_base": 0.117647,
+        "development_strict_sft": 0.078431,
+        "development_delta": -0.039216,
+        "quality_claim": "NO_RELIABLE_IMPROVEMENT_DETECTED_DIRECTION_NEGATIVE",
     }
     mismatched_overnight = {
         key: {"expected": expected, "actual": overnight.get(key)}

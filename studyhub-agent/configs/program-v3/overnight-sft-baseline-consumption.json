@@ -1,0 +1,30 @@
+{
+  "schema_version": "studyhub.overnight-sft-consumption.v1",
+  "status": "CONSUMED_COMPLETE",
+  "authorization_id": "runtime-sft-v3-9b-r16-overnight-20260828",
+  "authorization_path": "configs/program-v3/overnight-sft-baseline-authorization.json",
+  "authorization_sha256": "1990e62fa5939324f0f67aa166fe4f730daaf08898bea9b7fc09c0cb05e93e8b",
+  "training_trial": "overnight-r16-v30-seed-20260827",
+  "completed_attempt": "overnight-r16-v30-seed-20260827-attempt-20260828_020420",
+  "training_commit": "9cc7b0421f50a9ffd4c2ecb363cff56c5c77eaf0",
+  "completion_marker": "artifacts/areal/checkpoints/chengjin/studyhub-runtime-sft-v3-9b/overnight-r16-v30-seed-20260827/OVERNIGHT_SFT_BASELINE_COMPLETE.json",
+  "completion_marker_sha256": "4a9b4712b0453281dcf29905aca3b26701751cb6ba83003c60948d3017110a88",
+  "tracked_evidence": "docs/training/evidence/overnight-sft-teacher-20260828.json",
+  "tracked_evidence_sha256": "542e2176ab4e471827176143c0b8f76583b76be67d379e041585595074901783",
+  "result": {
+    "optimizer_updates": 2100,
+    "total_tokens": 21318410,
+    "assistant_loss_tokens": 3138019,
+    "lora_update_observed": true,
+    "development_strict_base": 0.117647,
+    "development_strict_sft": 0.078431,
+    "development_delta": -0.039216,
+    "claim": "NO_RELIABLE_IMPROVEMENT_DETECTED_DIRECTION_NEGATIVE"
+  },
+  "scope": {
+    "rl_started": false,
+    "sealed_used": false,
+    "benchmark_modified": false,
+    "repeat_authorized": false
+  }
+}

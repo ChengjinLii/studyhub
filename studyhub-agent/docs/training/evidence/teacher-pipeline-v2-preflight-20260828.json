@@ -1,0 +1,52 @@
+{
+  "schema_version": "studyhub.teacher-pipeline-preflight.v2",
+  "date": "2026-08-28",
+  "status": "READY_FOR_COMMITTED_TEACHER_SMOKE",
+  "scope": {
+    "rl_run": false,
+    "benchmark_modified": false,
+    "sealed_used": false,
+    "runtime_sft_v3_modified": false,
+    "hermes_upstream_modified": false
+  },
+  "v1_measurement_findings": [
+    "public_gold_tool_set_exposed",
+    "nested_fetch_evidence_not_counted",
+    "state_free_text_route_overconstrained",
+    "provider_usage_limit_not_fail_fast"
+  ],
+  "task_inventory": {
+    "schema_version": "studyhub.teacher-task-manifest.v2",
+    "requested": 1200,
+    "built": 1152,
+    "families": {
+      "cross_tool_composition": 180,
+      "direct_abstention": 60,
+      "memory_personalization_privacy": 240,
+      "rag_query_rewrite_citation": 300,
+      "recovery_acl": 120,
+      "state_function": 72,
+      "web_fallback_conflict": 180
+    },
+    "unique_source_groups": 261,
+    "max_rows_per_source_group": 12,
+    "public_gold_key_leaks": 0,
+    "benchmark_prompt_overlap": 0,
+    "sealed_task_files_read": false
+  },
+  "hashes": {
+    "runtime_sft_v3_selected_sha256": "a115d220841a0e56c8893a01e486c8399c24cb591143f221c78a926deee42783",
+    "benchmark_v2_manifest_sha256": "da804b10f53dec585255598c3e256445b8ade3acf35fd8c766ca0ab4d759c88b",
+    "teacher_v2_task_specs_sha256": "9f0a8b0855138fc36d8dd9195815082c19d25190b6e3cd00f23dabef686765ca",
+    "teacher_v2_task_manifest_sha256": "173de7c1f57bfd35c04bbc08f9636f5060726499be0b9128a9da00111ef1bae6",
+    "teacher_v2_sandbox_manifest_sha256": "72eaf6109f82e74208b9ed1d882b2620c1b0f160d2af76aeb44adea13c093b10"
+  },
+  "verification": {
+    "ruff": "PASS",
+    "targeted_unit_tests": {
+      "status": "PASS",
+      "count": 37
+    },
+    "teacher_smoke": "NOT_RUN_PENDING_CLEAN_COMMIT"
+  }
+}
