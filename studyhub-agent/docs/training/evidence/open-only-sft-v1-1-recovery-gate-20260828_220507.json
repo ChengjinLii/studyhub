@@ -1,0 +1,214 @@
+{
+  "schema_version": "studyhub.sft-recovery-gate.v1",
+  "created_at": "2026-08-28T22:18:33+08:00",
+  "status": "FAIL",
+  "claim": "The tested interrupted SFT path is not equivalent to the uninterrupted reference.",
+  "scope": {
+    "model_quality": "NOT_EVALUATED",
+    "rl_started": false,
+    "sealed_used": false,
+    "expected_updates_per_path": 4
+  },
+  "continuous_lr": {
+    "schema_version": "studyhub.sft-lr-schedule-audit.v1",
+    "status": "PASS",
+    "contract": {
+      "base_lr": 2e-05,
+      "scheduler": "cosine",
+      "scheduler_total_steps": 5456,
+      "warmup_fraction": 0.03,
+      "warmup_steps": 163,
+      "expected_updates": 4,
+      "expected_start_step": 0,
+      "rel_tolerance": 0.0001,
+      "abs_tolerance": 5e-10
+    },
+    "segments": [
+      {
+        "metrics": "/data/chengjin/studyhub/studyhub-agent/artifacts/experiments/open-only-sft-v1-1-recovery-gate-20260828_220507-continuous-attempt-full/metrics/trainer.json",
+        "start_global_step": 0,
+        "count": 4,
+        "first_actual_lr": 0.0,
+        "last_actual_lr": 3.681e-07,
+        "first_expected_lr": 0.0,
+        "last_expected_lr": 3.680981595092025e-07,
+        "mismatch_count": 0,
+        "first_mismatches": [],
+        "max_absolute_error": 1.8404907975224414e-12,
+        "max_relative_error": 4.9999999999359656e-06
+      }
+    ],
+    "coverage": {
+      "observed_updates": 4,
+      "first_global_step": 0,
+      "last_global_step": 3
+    },
+    "mismatch_count": 0,
+    "failures": []
+  },
+  "recovered_lr": {
+    "schema_version": "studyhub.sft-lr-schedule-audit.v1",
+    "status": "PASS",
+    "contract": {
+      "base_lr": 2e-05,
+      "scheduler": "cosine",
+      "scheduler_total_steps": 5456,
+      "warmup_fraction": 0.03,
+      "warmup_steps": 163,
+      "expected_updates": 4,
+      "expected_start_step": 0,
+      "rel_tolerance": 0.0001,
+      "abs_tolerance": 5e-10
+    },
+    "segments": [
+      {
+        "metrics": "/data/chengjin/studyhub/studyhub-agent/artifacts/experiments/open-only-sft-v1-1-recovery-gate-20260828_220507-recovered-attempt-before-interrupt/metrics/trainer.json",
+        "start_global_step": 0,
+        "count": 2,
+        "first_actual_lr": 0.0,
+        "last_actual_lr": 1.227e-07,
+        "first_expected_lr": 0.0,
+        "last_expected_lr": 1.226993865030675e-07,
+        "mismatch_count": 0,
+        "first_mismatches": [],
+        "max_absolute_error": 6.134969324986572e-13,
+        "max_relative_error": 4.999999999864055e-06
+      },
+      {
+        "metrics": "/data/chengjin/studyhub/studyhub-agent/artifacts/experiments/open-only-sft-v1-1-recovery-gate-20260828_220507-recovered-attempt-after-recovery/metrics/trainer.json",
+        "start_global_step": 2,
+        "count": 2,
+        "first_actual_lr": 2.454e-07,
+        "last_actual_lr": 3.681e-07,
+        "first_expected_lr": 2.45398773006135e-07,
+        "last_expected_lr": 3.680981595092025e-07,
+        "mismatch_count": 0,
+        "first_mismatches": [],
+        "max_absolute_error": 1.8404907975224414e-12,
+        "max_relative_error": 4.9999999999359656e-06
+      }
+    ],
+    "coverage": {
+      "observed_updates": 4,
+      "first_global_step": 0,
+      "last_global_step": 3
+    },
+    "mismatch_count": 0,
+    "failures": []
+  },
+  "adapter_comparison": {
+    "status": "FAIL",
+    "reference": {
+      "path": "/data/chengjin/studyhub/studyhub-agent/artifacts/areal/checkpoints/chengjin/studyhub-open-only-sft-v1-1-recovery-gate-20260828_220507/open-only-sft-v1-1-recovery-gate-20260828_220507-continuous/default/epoch0epochstep3globalstep3/adapter_model.safetensors",
+      "sha256": "1d021d161bd302511af5d0b251357a7788d929806011e395c5ef3a31d3bb19b5"
+    },
+    "recovered": {
+      "path": "/data/chengjin/studyhub/studyhub-agent/artifacts/areal/checkpoints/chengjin/studyhub-open-only-sft-v1-1-recovery-gate-20260828_220507/open-only-sft-v1-1-recovery-gate-20260828_220507-recovered/default/epoch0epochstep3globalstep3/adapter_model.safetensors",
+      "sha256": "d05d4e1fb7dd95850dff2e88a1085b7b8c8c2f534d6a70f69206230f6dabd57b"
+    },
+    "tensor_key_count": 208,
+    "exact_tensor_count": 89,
+    "file_sha256_equal": false,
+    "max_absolute_difference": 7.62939453125e-06,
+    "first_tensor_differences": [
+      {
+        "name": "base_model.model.model.language_model.layers.0.mlp.down_proj.lora_B.weight",
+        "shape": [
+          4096,
+          16
+        ],
+        "dtype": "torch.bfloat16",
+        "max_absolute_difference": 2.3777829483151436e-07
+      },
+      {
+        "name": "base_model.model.model.language_model.layers.0.mlp.gate_proj.lora_B.weight",
+        "shape": [
+          12288,
+          16
+        ],
+        "dtype": "torch.bfloat16",
+        "max_absolute_difference": 3.734603524208069e-07
+      },
+      {
+        "name": "base_model.model.model.language_model.layers.0.mlp.up_proj.lora_B.weight",
+        "shape": [
+          12288,
+          16
+        ],
+        "dtype": "torch.bfloat16",
+        "max_absolute_difference": 2.952292561531067e-07
+      },
+      {
+        "name": "base_model.model.model.language_model.layers.1.mlp.down_proj.lora_B.weight",
+        "shape": [
+          4096,
+          16
+        ],
+        "dtype": "torch.bfloat16",
+        "max_absolute_difference": 2.691522240638733e-07
+      },
+      {
+        "name": "base_model.model.model.language_model.layers.1.mlp.gate_proj.lora_B.weight",
+        "shape": [
+          12288,
+          16
+        ],
+        "dtype": "torch.bfloat16",
+        "max_absolute_difference": 3.026798367500305e-07
+      },
+      {
+        "name": "base_model.model.model.language_model.layers.1.mlp.up_proj.lora_B.weight",
+        "shape": [
+          12288,
+          16
+        ],
+        "dtype": "torch.bfloat16",
+        "max_absolute_difference": 3.3993273973464966e-07
+      },
+      {
+        "name": "base_model.model.model.language_model.layers.10.mlp.down_proj.lora_A.weight",
+        "shape": [
+          16,
+          12288
+        ],
+        "dtype": "torch.bfloat16",
+        "max_absolute_difference": 7.450580596923828e-09
+      },
+      {
+        "name": "base_model.model.model.language_model.layers.10.mlp.down_proj.lora_B.weight",
+        "shape": [
+          4096,
+          16
+        ],
+        "dtype": "torch.bfloat16",
+        "max_absolute_difference": 1.8303398974239826e-07
+      },
+      {
+        "name": "base_model.model.model.language_model.layers.10.mlp.gate_proj.lora_B.weight",
+        "shape": [
+          12288,
+          16
+        ],
+        "dtype": "torch.bfloat16",
+        "max_absolute_difference": 2.169981598854065e-07
+      },
+      {
+        "name": "base_model.model.model.language_model.layers.10.mlp.up_proj.lora_B.weight",
+        "shape": [
+          12288,
+          16
+        ],
+        "dtype": "torch.bfloat16",
+        "max_absolute_difference": 1.6123522073030472e-07
+      }
+    ],
+    "missing_tensors": [],
+    "unexpected_tensors": [],
+    "failures": [
+      "nonidentical_tensors:119"
+    ]
+  },
+  "failures": [
+    "recovered_adapter_differs_from_continuous"
+  ]
+}
