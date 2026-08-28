@@ -1,0 +1,72 @@
+{
+  "schema_version": "studyhub.agentbench-development-exposure-ledger.v1",
+  "benchmark_version": "studyhub-agentbench-v2",
+  "benchmark_revision": "2.0.0",
+  "benchmark_manifest_sha256": "da804b10f53dec585255598c3e256445b8ade3acf35fd8c766ca0ab4d759c88b",
+  "status": "ACTIVE_ITERATION_LEDGER",
+  "policy": {
+    "append_before_model_selection": true,
+    "development_is_untouched_final_test": false,
+    "sealed_used": false,
+    "sealed_entries_allowed_before_final_freeze": false
+  },
+  "entries": [
+    {
+      "run_id": "qwen35-9b-base-v2-gate-seed-20260827-20260827_211021",
+      "date": "2026-08-27",
+      "model_role": "base",
+      "mode": "gate",
+      "episodes_scored": 30,
+      "use": "runtime calibration",
+      "summary_sha256": "a42ef8221cfdde1cb3098e38b043b54756989c31a312bf7d6609ee14ecdcdc4a"
+    },
+    {
+      "run_id": "qwen35-9b-base-v2-development-seed-20260827-20260827_212818",
+      "date": "2026-08-27",
+      "model_role": "base",
+      "mode": "development",
+      "episodes_scored": 51,
+      "use": "frozen internal reference",
+      "summary_sha256": "bad0b7a47a4ce3a85a744be4f8ed8c965b17771daa7ed116a12fd4691df27e14"
+    },
+    {
+      "run_id": "qwen35-9b-base-v2-variance-seed-20260827-20260827_213336",
+      "date": "2026-08-27",
+      "model_role": "base",
+      "mode": "variance",
+      "tasks": 35,
+      "rollouts_per_task": 4,
+      "episodes_scored": 140,
+      "use": "frozen stochastic reference",
+      "summary_sha256": "2e7f6e183333d922fcc772e59578cf865941e933cc6c47da6008d811258bd7b1"
+    },
+    {
+      "run_id": "qwen35-9b-overnight-sft-v2-development-seed-20260827-20260828_074542",
+      "date": "2026-08-28",
+      "model_role": "mixed_v3_0",
+      "mode": "development",
+      "episodes_scored": 51,
+      "use": "negative directional SFT baseline",
+      "summary_sha256": "42688c2f1ccc2f51ea9efdb501ef7195e19a6fe875a1e1a381fa70de0f814e4b"
+    },
+    {
+      "run_id": "qwen35-9b-sft-v2-development-seed-20260827-20260828_124721",
+      "date": "2026-08-28",
+      "model_role": "open_only_v1_diagnostic",
+      "mode": "development",
+      "episodes_scored": 51,
+      "use": "diagnostic only; scheduler control failed",
+      "summary_sha256": "e7d9bc4822c9fd3d7da9e9f54f0df1995c5d5d2cb020bfdb17cd87b5adb669e5"
+    },
+    {
+      "run_id": "qwen35-9b-sft-v2-variance-seed-20260827-20260828_125928",
+      "date": "2026-08-28",
+      "model_role": "open_only_v1_diagnostic",
+      "mode": "variance",
+      "status": "INCOMPLETE_NO_SUMMARY",
+      "partial_episode_rows": 124,
+      "use": "not valid model evidence"
+    }
+  ],
+  "current_interpretation": "Development is exposed iteration data. Only paired directional use is allowed; Sealed remains untouched."
+}

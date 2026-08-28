@@ -352,3 +352,35 @@ def test_full_quality_gate_validates_frozen_evidence_after_finalize() -> None:
     assert '--deselect "$calibration_contract_test"' in script
     assert finalize < frozen_contract
     assert 'git show "HEAD:${MANIFEST_REL}"' in script
+
+
+def test_errata_keeps_public_overlap_and_sealed_isolation_claims_separate() -> None:
+    manifest_path = PUBLIC_BENCHMARK / "manifest.json"
+    public_rows = sum(
+        len((PUBLIC_BENCHMARK / split / "tasks.jsonl").read_text(encoding="utf-8").splitlines())
+        for split in ("regression", "development", "calibration_challenge")
+    )
+    errata = (PUBLIC_BENCHMARK / "ERRATA.md").read_text(encoding="utf-8")
+
+    assert hashlib.sha256(manifest_path.read_bytes()).hexdigest() == (
+        "da804b10f53dec585255598c3e256445b8ade3acf35fd8c766ca0ab4d759c88b"
+    )
+    assert public_rows == 73
+    assert "Public prompt exact/hash overlap: `0 / 73`" in errata
+    assert "Sealed task and grader content was not read" in errata
+    assert "lexical/Jaccard" in errata
+
+
+def test_development_exposure_ledger_never_claims_sealed_usage() -> None:
+    ledger = json.loads(
+        (PUBLIC_BENCHMARK / "DEVELOPMENT_EXPOSURE_LEDGER.json").read_text(
+            encoding="utf-8"
+        )
+    )
+
+    assert ledger["benchmark_manifest_sha256"] == hashlib.sha256(
+        (PUBLIC_BENCHMARK / "manifest.json").read_bytes()
+    ).hexdigest()
+    assert ledger["policy"]["development_is_untouched_final_test"] is False
+    assert ledger["policy"]["sealed_used"] is False
+    assert all("sealed" not in row["mode"] for row in ledger["entries"])

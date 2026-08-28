@@ -1,0 +1,52 @@
+{
+  "schema_version": "studyhub.sft-recovery-ready-not-run.v1",
+  "created_at": "2026-08-28T23:58:00+08:00",
+  "status": "READY_BUT_NOT_RUN",
+  "decision": "BLOCKED_MISSING_EXPLICIT_GPU_AUTHORIZATION",
+  "prepared_from_commit": "6877a25",
+  "run_commit_requirement": "CLEAN_HEAD_AT_LAUNCH",
+  "next_gate": {
+    "profile": "cadence-210",
+    "boundary": "RECOVERY_CADENCE_CONFIRMATION",
+    "prefix_global_step": 209,
+    "expected_updates_continuous": 212,
+    "command": "STUDYHUB_ALLOW_TRAINING=YES STUDYHUB_ALLOW_SFT_RECOVERY_GATE=YES STUDYHUB_RECOVERY_GATE_PROFILE=cadence-210 bash studyhub-agent/scripts/train/run_open_only_sft_v1_1_recovery_gate.sh"
+  },
+  "authorization": {
+    "required_environment": [
+      "STUDYHUB_ALLOW_TRAINING=YES",
+      "STUDYHUB_ALLOW_SFT_RECOVERY_GATE=YES"
+    ],
+    "observed_environment": "NOT_PRESENT",
+    "gpu_job_started": false
+  },
+  "input_hashes": {
+    "launcher": "00cc3374ab178bb74c6b29fabe7b5a2aed252b6cade4225676ee2f58b68fae95",
+    "snapshot": "273bff97a06768023834acf97af7040a98b45d13473419c37a56ea50156d2f83",
+    "verifier": "03b51cd63832db4592eac69767431722dbbe15f09294fdb84b9520fb572cf575",
+    "recovery_state_bridge": "93069f557dcbba7c46c357258e41f40f00be9fa406f38a61a9b1e258776fd4e3",
+    "scheduler_bridge": "44ede5a3d80e37f9e8dacbdc0b315ee543b3e364a0ca6e5d82743a42aa15733d",
+    "config": "c0ed9c52aadf30ed6b6f9996ee4b4f90752040f9b03f7d1c9f6c7471481b7f35",
+    "program": "f45fdcebdbfeeb50d09d409d001226ae0861bd0449affe7171979aa9305f4ee5",
+    "authorization": "0f6304ae7b16658a30a4e58aaaacb1c9a738db4cf32e7d19d90c9c44fa645dfe",
+    "equivalence_contract": "55f2c1e34d8e3e29143c14306c7a0bb7d724baefb127723fb7496bbb13c2fd6c",
+    "dataset_manifest": "2fbb455ff3c647d253fa4f15011534cd02f423a2728095b493d09a0eb76ae8c2",
+    "benchmark_manifest": "da804b10f53dec585255598c3e256445b8ade3acf35fd8c766ca0ab4d759c88b",
+    "model_revision": "c202236235762e1c871ad0ccb60c8ee5ba337b9a",
+    "model_weight_set": "2625abd17ad8ddd33485b3b2a91ef3892830b98749b843e37b20576e404fe69c"
+  },
+  "required_result": {
+    "R1": "PASS",
+    "R2": "PASS_WITH_NON_DESTRUCTIVE_HASHED_SNAPSHOT_AND_ACTUAL_RESTART_LOAD",
+    "R3": "PASS_WITH_EXACT_BATCH_AND_STATE_CONTINUITY",
+    "R4": ["BITWISE_RESUME_PASS", "BOUNDED_NUMERIC_RESUME_PASS"],
+    "formal_training_eligible": true
+  },
+  "scope": {
+    "model_quality": "NOT_EVALUATED",
+    "rl_started": false,
+    "sealed_used": false,
+    "benchmark_modified": false,
+    "formal_sft_started": false
+  }
+}
