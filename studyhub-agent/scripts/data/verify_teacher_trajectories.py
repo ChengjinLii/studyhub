@@ -272,12 +272,21 @@ def verify_root(root: Path) -> dict[str, Any]:
     source_groups: Counter[str] = Counter()
     task_schema_versions: Counter[str] = Counter()
     provider_errors: Counter[str] = Counter()
+    quality_tiers: Counter[str] = Counter()
+    collection_modes: Counter[str] = Counter()
+    policy_correction_events = 0
+    runs_with_policy_corrections = 0
     turn_counts: list[int] = []
     tool_call_counts: list[int] = []
     latencies: list[float] = []
     usage_totals: defaultdict[str, int] = defaultdict(int)
     for path in sorted((root / "raw_runs").glob("*.json")):
         run = json.loads(path.read_text(encoding="utf-8"))
+        collection_modes[str(run.get("collection_mode", "unknown"))] += 1
+        corrections = run.get("controller", {}).get("policy_corrections", [])
+        if isinstance(corrections, list) and corrections:
+            runs_with_policy_corrections += 1
+            policy_correction_events += len(corrections)
         task_id = str(run.get("task_id", ""))
         task = tasks.get(task_id)
         if task is not None:
@@ -296,9 +305,16 @@ def verify_root(root: Path) -> dict[str, Any]:
             usage = event.get("usage", {})
             if not isinstance(usage, dict):
                 continue
-            for key in ("input_tokens", "output_tokens", "total_tokens"):
+            aliases = {
+                "input_tokens": ("input_tokens", "prompt_tokens"),
+                "output_tokens": ("output_tokens", "completion_tokens"),
+                "total_tokens": ("total_tokens",),
+                "reasoning_tokens": ("reasoning_tokens",),
+            }
+            for key, candidates in aliases.items():
                 try:
-                    usage_totals[key] += int(usage.get(key, 0))
+                    value = next((usage[candidate] for candidate in candidates if usage.get(candidate) is not None), 0)
+                    usage_totals[key] += int(value)
                 except (TypeError, ValueError):
                     continue
         turn_counts.append(sum(message.get("role") == "assistant" for message in run.get("messages", [])))
@@ -321,6 +337,7 @@ def verify_root(root: Path) -> dict[str, Any]:
         verifier = json.loads(verifier_path.read_text(encoding="utf-8"))
         record = accepted_record(run, task, verifier, diagnostics)
         accepted.append(record)
+        quality_tiers[str(record.get("quality_tier", "unknown"))] += 1
         path_signatures[str(run.get("path_signature", ""))] += 1
         providers[str(run.get("provider", {}).get("interface", "unknown"))] += 1
         capabilities[str(task.get("family", "unknown"))] += 1
@@ -341,6 +358,10 @@ def verify_root(root: Path) -> dict[str, Any]:
         "acceptance_rate": round(len(accepted) / max(len(accepted) + len(rejected), 1), 6),
         "providers": dict(sorted(providers.items())),
         "provider_errors": dict(provider_errors.most_common()),
+        "quality_tiers": dict(sorted(quality_tiers.items())),
+        "collection_modes": dict(sorted(collection_modes.items())),
+        "runs_with_policy_corrections": runs_with_policy_corrections,
+        "policy_correction_events": policy_correction_events,
         "rate_limit_failures": sum(
             "rate" in key.casefold() or "usage_limit" in key.casefold() for key in provider_errors.elements()
         ),

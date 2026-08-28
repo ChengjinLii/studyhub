@@ -207,13 +207,24 @@ def _parse_action(value: str) -> dict[str, Any]:
     except json.JSONDecodeError as exc:
         raise TeacherProviderError(
             "provider_output_not_json",
-            {"error": "provider_output_not_json", "output_sha256": _sha256_text(value)},
+            {
+                "error": "provider_output_not_json",
+                "output_sha256": _sha256_text(value),
+                "output_excerpt": _redact(value),
+            },
         ) from exc
     if not isinstance(action, dict):
         raise TeacherProviderError(
             "provider_output_not_object",
-            {"error": "provider_output_not_object", "output_sha256": _sha256_text(value)},
+            {
+                "error": "provider_output_not_object",
+                "output_sha256": _sha256_text(value),
+                "output_excerpt": _redact(value),
+            },
         )
+    if action.get("type") == "final":
+        action["arguments"] = {}
+        return action
     arguments = action.get("arguments")
     if isinstance(arguments, str):
         try:
@@ -221,15 +232,58 @@ def _parse_action(value: str) -> dict[str, Any]:
         except json.JSONDecodeError as exc:
             raise TeacherProviderError(
                 "provider_arguments_not_json",
-                {"error": "provider_arguments_not_json", "output_sha256": _sha256_text(value)},
+                {
+                    "error": "provider_arguments_not_json",
+                    "output_sha256": _sha256_text(value),
+                    "output_excerpt": _redact(value),
+                },
             ) from exc
     if not isinstance(arguments, dict):
         raise TeacherProviderError(
             "provider_arguments_not_object",
-            {"error": "provider_arguments_not_object", "output_sha256": _sha256_text(value)},
+            {
+                "error": "provider_arguments_not_object",
+                "output_sha256": _sha256_text(value),
+                "output_excerpt": _redact(value),
+            },
         )
     action["arguments"] = arguments
     return action
+
+
+def _parse_action_with_event(value: str, event: dict[str, Any]) -> tuple[dict[str, Any], dict[str, Any]]:
+    try:
+        return _parse_action(value), event
+    except TeacherProviderError as exc:
+        raise TeacherProviderError(exc.code, {**event, **exc.event}) from exc
+
+
+def _chat_action_output(payload: dict[str, Any]) -> tuple[str, str]:
+    choice = payload.get("choices", [{}])[0]
+    message = choice.get("message", {}) if isinstance(choice, dict) else {}
+    content = message.get("content") if isinstance(message, dict) else None
+    if isinstance(content, str) and content.strip():
+        return content, "content"
+    tool_calls = message.get("tool_calls", []) if isinstance(message, dict) else []
+    if isinstance(tool_calls, list) and len(tool_calls) == 1 and isinstance(tool_calls[0], dict):
+        function = tool_calls[0].get("function", {})
+        if isinstance(function, dict) and function.get("name"):
+            return (
+                json.dumps(
+                    {
+                        "type": "tool_call",
+                        "name": str(function["name"]),
+                        "arguments": function.get("arguments", "{}"),
+                        "content": "",
+                    },
+                    ensure_ascii=False,
+                ),
+                "tool_calls",
+            )
+    reasoning = message.get("reasoning_content") if isinstance(message, dict) else None
+    if isinstance(reasoning, str) and reasoning.lstrip().startswith("{") and reasoning.rstrip().endswith("}"):
+        return reasoning, "reasoning_json"
+    return "", "empty"
 
 
 def _codex_event_audit(stdout: str) -> dict[str, Any]:
@@ -386,7 +440,7 @@ class CodexSparkProvider:
                 raise TeacherProviderError("codex_output_missing", event)
             output = output_path.read_text(encoding="utf-8")
             event["output_sha256"] = _sha256_text(output)
-            return _parse_action(output), event
+            return _parse_action_with_event(output, event)
 
 
 def _response_output_text(payload: dict[str, Any]) -> str:
@@ -487,7 +541,7 @@ class ResponsesAPIProvider:
         }
         if payload.get("status") not in {None, "completed"}:
             raise TeacherProviderError("responses_api_incomplete", event)
-        return _parse_action(output), event
+        return _parse_action_with_event(output, event)
 
 
 @dataclass(slots=True)
@@ -556,7 +610,8 @@ class LocalOpenAIProvider:
             headers,
             self.timeout_seconds,
         )
-        output = str(payload.get("choices", [{}])[0].get("message", {}).get("content", ""))
+        output, response_mode = _chat_action_output(payload)
+        choice = payload.get("choices", [{}])[0]
         event = {
             "interface": self.interface,
             "model": payload.get("model", self.model),
@@ -565,10 +620,12 @@ class LocalOpenAIProvider:
             "prompt_sha256": _sha256_text(prompt),
             "output_sha256": _sha256_text(output),
             "usage": payload.get("usage", {}),
+            "finish_reason": choice.get("finish_reason") if isinstance(choice, dict) else None,
+            "response_mode": response_mode,
             "provider_tools": [],
             "hidden_oracle_available": False,
         }
-        return _parse_action(output), event
+        return _parse_action_with_event(output, event)
 
 
 def build_provider(

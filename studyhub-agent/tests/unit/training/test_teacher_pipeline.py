@@ -17,6 +17,7 @@ from training.teacher.providers import (
     CodexSparkProvider,
     LocalOpenAIProvider,
     ResponsesAPIProvider,
+    _chat_action_output,
     _codex_event_audit,
     _parse_action,
     _visible_runtime_state,
@@ -96,6 +97,62 @@ def test_provider_action_decodes_strict_schema_argument_string() -> None:
     )
 
     assert action["arguments"] == {"query": "通信原理", "limit": 3}
+
+
+def test_provider_final_ignores_nonsemantic_arguments_field() -> None:
+    action = _parse_action(
+        json.dumps(
+            {
+                "type": "final",
+                "name": "",
+                "arguments": "",
+                "content": "Supported final answer.",
+            }
+        )
+    )
+
+    assert action["arguments"] == {}
+
+
+def test_chat_action_output_recovers_structured_compatibility_fields() -> None:
+    tool_output, tool_mode = _chat_action_output(
+        {
+            "choices": [
+                {
+                    "message": {
+                        "content": None,
+                        "tool_calls": [
+                            {
+                                "function": {
+                                    "name": "knowledge_search",
+                                    "arguments": '{"query":"通信原理"}',
+                                }
+                            }
+                        ],
+                    }
+                }
+            ]
+        }
+    )
+    reasoning_output, reasoning_mode = _chat_action_output(
+        {
+            "choices": [
+                {
+                    "message": {
+                        "content": "",
+                        "reasoning_content": json.dumps(
+                            {"type": "final", "name": "", "arguments": "{}", "content": "done"}
+                        ),
+                    }
+                }
+            ]
+        }
+    )
+
+    assert json.loads(tool_output)["name"] == "knowledge_search"
+    assert tool_mode == "tool_calls"
+    assert json.loads(reasoning_output)["type"] == "final"
+    assert reasoning_mode == "reasoning_json"
 
 
 def test_visible_runtime_state_separates_discovery_from_grounded_evidence() -> None:
