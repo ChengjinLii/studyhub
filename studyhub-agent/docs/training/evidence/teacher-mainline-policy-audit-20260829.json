@@ -1,0 +1,60 @@
+{
+  "schema_version": "studyhub.teacher-mainline-policy-audit.v1",
+  "created_at": "2026-08-29T00:06:07+08:00",
+  "status": "PASS",
+  "decision": "LEGACY_REVERSE_REPLAY_FROZEN_NOT_MAINLINE",
+  "checks": {
+    "policy_freezes_legacy_reverse_replay": true,
+    "active_program_forbids_teacher_prefix": true,
+    "active_dataset_has_no_teacher_source": true,
+    "authorization_targets_open_only_dataset": true,
+    "legacy_authorization_consumed_and_not_repeatable": true,
+    "teacher_candidate_not_formal": true,
+    "teacher_candidate_below_reentry_minimum": true,
+    "sealed_unused": true
+  },
+  "failures": [],
+  "observed": {
+    "active_training_sources": [
+      "coig_exam",
+      "hermes_function_calling",
+      "studyhub_2wiki_replay",
+      "studyhub_qasper_replay",
+      "toolace"
+    ],
+    "teacher_sources_in_active_dataset": [],
+    "teacher_candidate_rows": 1,
+    "teacher_candidate_status": "PASS_CANDIDATE_ONLY_INSUFFICIENT_TEACHER"
+  },
+  "inputs": {
+    "policy": {
+      "path": "configs/program-v3/teacher-mainline-policy-v1.json",
+      "sha256": "3cf609bde254fac6d16074a56b53da6311b5d762d5e204a94efb99df4e111f4d"
+    },
+    "program": {
+      "path": "configs/program-v3/open-only-sft-v1.1-lrmatched.json",
+      "sha256": "f45fdcebdbfeeb50d09d409d001226ae0861bd0449affe7171979aa9305f4ee5"
+    },
+    "authorization": {
+      "path": "configs/program-v3/open-only-sft-v1.1-lrmatched-authorization.json",
+      "sha256": "0f6304ae7b16658a30a4e58aaaacb1c9a738db4cf32e7d19d90c9c44fa645dfe"
+    },
+    "data_card": {
+      "path": "configs/program-v3/open-only-sft-v1-data-card.json",
+      "sha256": "2bb5358f81609245d481191f1eed6b3d3c3cc9ad79525846f771ab6b6cad878c"
+    },
+    "legacy_consumption": {
+      "path": "configs/program-v3/overnight-sft-baseline-consumption.json",
+      "sha256": "77a9963e368ab95e4c798c2e3eebe595d62c43c297c5852df57a04966df4b979"
+    },
+    "teacher_candidate": {
+      "path": "docs/training/evidence/runtime-sft-v3.1-candidate-audit.json",
+      "sha256": "7275a1171ffcf89946887ab08fc46a2b6868f84b2d6829feb6254d104ff0ec94"
+    }
+  },
+  "scope": {
+    "rl_started": false,
+    "sealed_used": false,
+    "teacher_collection_started": false
+  }
+}

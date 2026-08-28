@@ -1,0 +1,37 @@
+{
+  "schema_version": "studyhub.teacher-mainline-policy.v1",
+  "status": "LEGACY_REVERSE_REPLAY_FROZEN_NOT_MAINLINE",
+  "active_sft_control": {
+    "experiment_id": "open-only-sft-v1.1-lrmatched",
+    "dataset_id": "open-only-sft-v1-qwen35-9b",
+    "teacher_source_prefix_allowed": false
+  },
+  "legacy_teacher_line": {
+    "artifacts_preserved": true,
+    "collection_may_continue": false,
+    "formal_training_eligible": false,
+    "reason": "The reverse-replay task/environment construction inherits path assumptions from old SFT trajectories and is not an independent teacher-policy source."
+  },
+  "candidate_only": {
+    "audit": "docs/training/evidence/runtime-sft-v3.1-candidate-audit.json",
+    "minimum_teacher_verified_rows": 500,
+    "requires_independent_semantic_review": true,
+    "requires_independent_task_and_environment_design": true
+  },
+  "reentry_contract": [
+    "independent_training_tasks_and_environments",
+    "pre_generation_executability_audit",
+    "fixed_tool_provider_contract",
+    "multiple_legal_policy_paths",
+    "path_agnostic_end_state_grounding_acl_verifier",
+    "complete_failure_retry_provider_diagnostics",
+    "source_license_revision_provenance",
+    "independent_semantic_review_sample",
+    "small_policy_quality_probe_before_sft"
+  ],
+  "scope": {
+    "rl_started": false,
+    "sealed_used": false,
+    "benchmark_training_rows": 0
+  }
+}
