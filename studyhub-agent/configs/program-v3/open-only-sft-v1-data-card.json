@@ -1,0 +1,119 @@
+{
+  "schema_version": "studyhub.open-only-sft-data-card.v1",
+  "dataset_id": "open-only-sft-v1-qwen35-9b",
+  "status": "ACCEPTED_FOR_CONTROLLED_SFT",
+  "rows": {
+    "candidate": 22342,
+    "selected": 19023,
+    "train": 16800,
+    "validation": 1121,
+    "protocol_holdout": 1102
+  },
+  "selection": {
+    "target_train_assistant_loss_tokens": 3138019,
+    "actual_train_assistant_loss_tokens": 3138019,
+    "delta_fraction": 0.0,
+    "planned_optimizer_updates": 2100,
+    "train_source_assistant_loss_shares": {
+      "coig_exam": 0.096786,
+      "hermes_function_calling": 0.111535,
+      "studyhub_2wiki_replay": 0.600873,
+      "studyhub_qasper_replay": 0.139818,
+      "toolace": 0.050988
+    }
+  },
+  "tokenization": {
+    "schema_version": "studyhub.open-only-sft-tokenized-manifest.v1",
+    "status": "TOKENIZED_AND_AUDITED",
+    "model_tokenizer": "/data/chengjin/studyhub/models/P1/Qwen3.5-9B",
+    "tokenizer_revision": "c202236235762e1c871ad0ccb60c8ee5ba337b9a",
+    "max_length": 8192,
+    "split_counts": {
+      "train": 16800,
+      "validation": 1121,
+      "protocol_holdout": 1102
+    },
+    "source_split_counts": {
+      "coig_exam": {
+        "protocol_holdout": 225,
+        "train": 4050,
+        "validation": 225
+      },
+      "hermes_function_calling": {
+        "protocol_holdout": 96,
+        "train": 1600,
+        "validation": 119
+      },
+      "studyhub_2wiki_replay": {
+        "protocol_holdout": 600,
+        "train": 8050,
+        "validation": 600
+      },
+      "studyhub_qasper_replay": {
+        "protocol_holdout": 150,
+        "train": 2700,
+        "validation": 150
+      },
+      "toolace": {
+        "protocol_holdout": 31,
+        "train": 400,
+        "validation": 27
+      }
+    },
+    "token_length": {
+      "min": 52,
+      "p50": 1656,
+      "p90": 2145,
+      "p95": 2273,
+      "p99": 2539,
+      "max": 4446
+    },
+    "all_tokens": 25623302,
+    "assistant_loss_tokens": 3605045,
+    "train_assistant_loss_tokens": 3138019,
+    "assistant_token_fraction": 0.140694,
+    "selected_sha256": "ce33c796c1f8532173404864e02d5c876599b87e6f83bb36847f95c0b7e5f368",
+    "selected_manifest_sha256": "a0f4e794cfa598c6bddbe225fec4aaa95384d59c2f37cc24bc3b8ec569b67d04",
+    "benchmark_lock": {
+      "version": "studyhub-agentbench-v2",
+      "revision": "2.0.0",
+      "status": "FROZEN_FOR_BASELINE",
+      "manifest_sha256": "da804b10f53dec585255598c3e256445b8ade3acf35fd8c766ca0ab4d759c88b",
+      "training_rows_used": 0,
+      "sealed_used": false
+    },
+    "hf_dataset_tree_sha256": "e12d8e6b8a9402af409d7ff6b833a363ceee97f8144e660c9092fad28af0fac4"
+  },
+  "isolation": {
+    "studyhub_custom_rows": 0,
+    "action_only_rows": 0,
+    "benchmark_prompt_overlap": 0,
+    "sealed_exposure": false,
+    "exact_duplicates": 0,
+    "near_duplicates": 0,
+    "group_overlap": {
+      "train_validation": 0,
+      "train_protocol_holdout": 0,
+      "validation_protocol_holdout": 0
+    },
+    "benchmark_manifest_sha256": "da804b10f53dec585255598c3e256445b8ade3acf35fd8c766ca0ab4d759c88b"
+  },
+  "lineage": {
+    "program_sha256": "ff582c4040d3e9bbeee38976c20bf8c8ff90bf06e5655f1997be87a44aed5a0d",
+    "candidate_sha256": "415bc209e54a54b3cccd41db7a64b2c72801f38335930f0e13a4ba1104bb18db",
+    "candidate_manifest_sha256": "e89e47a0a8ea8b5481f1036e17ad065dd83ce7a0ea659a443d269fd3c046374a",
+    "selected_sha256": "ce33c796c1f8532173404864e02d5c876599b87e6f83bb36847f95c0b7e5f368",
+    "selected_manifest_sha256": "a0f4e794cfa598c6bddbe225fec4aaa95384d59c2f37cc24bc3b8ec569b67d04",
+    "token_manifest_sha256": "2fbb455ff3c647d253fa4f15011534cd02f423a2728095b493d09a0eb76ae8c2",
+    "hf_dataset_tree_sha256": "e12d8e6b8a9402af409d7ff6b833a363ceee97f8144e660c9092fad28af0fac4"
+  },
+  "audit": {
+    "status": "PASS",
+    "failures": 0
+  },
+  "limitations": [
+    "2Wiki and QASPER rows are open-source-derived oracle/replay trajectories, not autonomous teacher policies.",
+    "COIG and QASPER complete-row capacity is insufficient for their requested assistant-token share ranges; the residual is assigned to 2Wiki.",
+    "This dataset is designed for a controlled directional comparison, not a claim of general agent improvement."
+  ]
+}

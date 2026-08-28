@@ -1,0 +1,71 @@
+{
+  "schema_version": "studyhub.controlled-sft-authorization.v1",
+  "authorization_id": "open-only-sft-v1-qwen35-9b-seed-20260827",
+  "status": "AUTHORIZED_PENDING_RUN",
+  "source_prompt": "StudyHub 9B pure open-source SFT controlled experiment, user prompt dated 2026-08-28",
+  "scope": {
+    "training_runs": 1,
+    "model": "Qwen/Qwen3.5-9B",
+    "dataset": "open-only-sft-v1-qwen35-9b",
+    "method": "AReaL SFT BF16 FSDP2 LoRA",
+    "development_evaluation": true,
+    "no_rl": true,
+    "no_sealed": true,
+    "no_benchmark_modification": true,
+    "only_training_data_changes": true
+  },
+  "lineage": {
+    "git_commit_required": "SET_AT_LAUNCH_FROM_CLEAN_WORKTREE",
+    "seed": 20260827,
+    "program_sha256": "ff582c4040d3e9bbeee38976c20bf8c8ff90bf06e5655f1997be87a44aed5a0d",
+    "dataset_manifest_sha256": "2fbb455ff3c647d253fa4f15011534cd02f423a2728095b493d09a0eb76ae8c2",
+    "selected_jsonl_sha256": "ce33c796c1f8532173404864e02d5c876599b87e6f83bb36847f95c0b7e5f368",
+    "selected_manifest_sha256": "a0f4e794cfa598c6bddbe225fec4aaa95384d59c2f37cc24bc3b8ec569b67d04",
+    "data_card_sha256": "2bb5358f81609245d481191f1eed6b3d3c3cc9ad79525846f771ab6b6cad878c",
+    "benchmark_manifest_sha256": "da804b10f53dec585255598c3e256445b8ade3acf35fd8c766ca0ab4d759c88b",
+    "model_revision": "c202236235762e1c871ad0ccb60c8ee5ba337b9a",
+    "model_config_sha256": "d0883072e01861ed0b2d47be3c16c36a8e81c224c7ffaa310c6558fb3f932b05",
+    "model_index_sha256": "26d3539b516be613f39563617cb9d33b3f83d401298125be392c80cefb8f7fe5",
+    "model_weight_set_sha256": "2625abd17ad8ddd33485b3b2a91ef3892830b98749b843e37b20576e404fe69c"
+  },
+  "budget": {
+    "global_batch_size": 8,
+    "planned_optimizer_updates": 2100,
+    "maximum_optimizer_updates": 2100,
+    "planned_sequences": 16800,
+    "projected_total_tokens": 22333694,
+    "projected_assistant_loss_tokens": 3138019,
+    "assistant_loss_token_tolerance_fraction": 0.01,
+    "maximum_data_passes": 1.0,
+    "maximum_wall_time_seconds": 22500,
+    "evaluation_reserve_seconds": 2700,
+    "checkpoint_every_updates": 210,
+    "recovery_every_updates": 210
+  },
+  "recipe": {
+    "backend": "fsdp:d2p1t1",
+    "dtype": "bfloat16",
+    "lora_rank": 16,
+    "lora_alpha": 16,
+    "target_modules": ["o_proj", "gate_proj", "up_proj", "down_proj"],
+    "loss": "assistant_action_and_final_tokens_only_causal_cross_entropy",
+    "observations_masked": true,
+    "optimizer": "adam",
+    "learning_rate": 0.00002,
+    "weight_decay": 0.05,
+    "beta1": 0.9,
+    "beta2": 0.95,
+    "eps": 0.00001,
+    "scheduler": "cosine",
+    "warmup_fraction": 0.03,
+    "gradient_clip": 1.0
+  },
+  "completion_contract": {
+    "marker": "OPEN_ONLY_SFT_V1_COMPLETE.json",
+    "expected_final_global_step": 2099,
+    "require_lora_update": true,
+    "require_zero_exit": true,
+    "require_frozen_benchmark_hash": true,
+    "require_sealed_used_false": true
+  }
+}
