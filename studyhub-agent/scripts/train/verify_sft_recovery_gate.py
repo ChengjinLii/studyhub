@@ -92,6 +92,26 @@ def compare_adapters(reference: Path, recovered: Path) -> dict[str, Any]:
     }
 
 
+def load_shared_prefix_report(path: Path) -> dict[str, Any]:
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    failures: list[str] = []
+    if payload.get("schema_version") != "studyhub.sft-shared-prefix.v1":
+        failures.append("unexpected_shared_prefix_schema")
+    if payload.get("status") != "PASS":
+        failures.append("shared_prefix_snapshot_failed")
+    step_info = payload.get("step_info")
+    if not isinstance(step_info, dict) or int(step_info.get("global_step", -1)) != 1:
+        failures.append("shared_prefix_not_at_global_step_1")
+    if payload.get("method") != "atomic_directory_rename_same_filesystem":
+        failures.append("shared_prefix_not_atomically_branched")
+    return {
+        "status": "PASS" if not failures else "FAIL",
+        "path": str(path.resolve()),
+        "snapshot": payload,
+        "failures": failures,
+    }
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -108,6 +128,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--continuous-adapter", type=Path, required=True)
     parser.add_argument("--recovered-adapter", type=Path, required=True)
+    parser.add_argument("--shared-prefix-report", type=Path, required=True)
     parser.add_argument("--base-lr", type=float, required=True)
     parser.add_argument("--scheduler-total-steps", type=int, required=True)
     parser.add_argument("--warmup-fraction", type=float, required=True)
@@ -132,12 +153,15 @@ def main() -> int:
         warmup_fraction=args.warmup_fraction,
         expected_updates=args.expected_updates,
     )
+    shared_prefix = load_shared_prefix_report(args.shared_prefix_report)
     adapter = compare_adapters(args.continuous_adapter, args.recovered_adapter)
     failures = []
     if continuous_lr["status"] != "PASS":
         failures.append("continuous_lr_contract_failed")
     if recovered_lr["status"] != "PASS":
         failures.append("recovered_lr_contract_failed")
+    if shared_prefix["status"] != "PASS":
+        failures.append("shared_prefix_contract_failed")
     if adapter["status"] != "PASS":
         failures.append("recovered_adapter_differs_from_continuous")
 
@@ -160,6 +184,7 @@ def main() -> int:
         },
         "continuous_lr": continuous_lr,
         "recovered_lr": recovered_lr,
+        "shared_prefix": shared_prefix,
         "adapter_comparison": adapter,
         "failures": failures,
     }

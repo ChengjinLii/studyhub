@@ -59,8 +59,11 @@ LOG_ROOT="${PROJECT_ROOT}/artifacts/areal/launcher_logs/${GATE_ID}"
 CONTINUOUS_TRIAL="${GATE_ID}-continuous"
 RECOVERED_TRIAL="${GATE_ID}-recovered"
 CONTINUOUS_ATTEMPT="${CONTINUOUS_TRIAL}-attempt-full"
-RECOVERED_FIRST_ATTEMPT="${RECOVERED_TRIAL}-attempt-before-interrupt"
 RECOVERED_SECOND_ATTEMPT="${RECOVERED_TRIAL}-attempt-after-recovery"
+CONTINUOUS_ROOT="${PROJECT_ROOT}/artifacts/areal/checkpoints/$(id -un)/${EXPERIMENT}/${CONTINUOUS_TRIAL}"
+RECOVERED_ROOT="${PROJECT_ROOT}/artifacts/areal/checkpoints/$(id -un)/${EXPERIMENT}/${RECOVERED_TRIAL}"
+SHARED_PREFIX_REPORT="${LOG_ROOT}/shared-prefix-snapshot.json"
+SHARED_PREFIX_LOG="${LOG_ROOT}/shared-prefix-snapshot.log"
 mkdir -p "${LOG_ROOT}"
 
 run_attempt() {
@@ -154,8 +157,30 @@ run_attempt() {
   fi
 }
 
+SNAPSHOT_PID=""
+cleanup_snapshot_process() {
+  if [[ -n "${SNAPSHOT_PID}" ]] && kill -0 "${SNAPSHOT_PID}" 2>/dev/null; then
+    kill "${SNAPSHOT_PID}" 2>/dev/null || true
+    wait "${SNAPSHOT_PID}" 2>/dev/null || true
+  fi
+}
+trap cleanup_snapshot_process EXIT INT TERM
+
+"${VENV_DIR}/bin/python" "${PROJECT_ROOT}/scripts/train/snapshot_sft_recovery_prefix.py" \
+  --source-root "${CONTINUOUS_ROOT}" \
+  --target-root "${RECOVERED_ROOT}" \
+  --output "${SHARED_PREFIX_REPORT}" \
+  --expected-global-step 1 \
+  >"${SHARED_PREFIX_LOG}" 2>&1 &
+SNAPSHOT_PID=$!
 run_attempt "${CONTINUOUS_TRIAL}" "${CONTINUOUS_ATTEMPT}" 4 0
-run_attempt "${RECOVERED_TRIAL}" "${RECOVERED_FIRST_ATTEMPT}" 2 0
+if ! wait "${SNAPSHOT_PID}"; then
+  SNAPSHOT_PID=""
+  cat "${SHARED_PREFIX_LOG}" >&2
+  exit 65
+fi
+SNAPSHOT_PID=""
+trap - EXIT INT TERM
 
 RECOVER_STEP_INFO="${PROJECT_ROOT}/artifacts/areal/checkpoints/$(id -un)/${EXPERIMENT}/${RECOVERED_TRIAL}/recover_info/step_info.json"
 RECOVER_START="$("${VENV_DIR}/bin/python" -S - "${RECOVER_STEP_INFO}" <<'PY'
@@ -173,10 +198,7 @@ if [[ ! "${RECOVER_START}" =~ ^[0-9]+$ ]]; then
 fi
 run_attempt "${RECOVERED_TRIAL}" "${RECOVERED_SECOND_ATTEMPT}" 4 "${RECOVER_START}"
 
-CONTINUOUS_ROOT="${PROJECT_ROOT}/artifacts/areal/checkpoints/$(id -un)/${EXPERIMENT}/${CONTINUOUS_TRIAL}"
-RECOVERED_ROOT="${PROJECT_ROOT}/artifacts/areal/checkpoints/$(id -un)/${EXPERIMENT}/${RECOVERED_TRIAL}"
 CONTINUOUS_METRICS="${PROJECT_ROOT}/artifacts/experiments/${CONTINUOUS_ATTEMPT}/metrics/trainer.json"
-RECOVERED_FIRST_METRICS="${PROJECT_ROOT}/artifacts/experiments/${RECOVERED_FIRST_ATTEMPT}/metrics/trainer.json"
 RECOVERED_SECOND_METRICS="${PROJECT_ROOT}/artifacts/experiments/${RECOVERED_SECOND_ATTEMPT}/metrics/trainer.json"
 CONTINUOUS_ADAPTER="${CONTINUOUS_ROOT}/default/epoch0epochstep3globalstep3/adapter_model.safetensors"
 RECOVERED_ADAPTER="${RECOVERED_ROOT}/default/epoch0epochstep3globalstep3/adapter_model.safetensors"
@@ -184,8 +206,9 @@ GATE_REPORT="${PROJECT_ROOT}/docs/training/evidence/${GATE_ID}.json"
 
 "${VENV_DIR}/bin/python" "${PROJECT_ROOT}/scripts/train/verify_sft_recovery_gate.py" \
   --continuous-segment "${CONTINUOUS_METRICS},0,4" \
-  --recovered-segment "${RECOVERED_FIRST_METRICS},0,2" \
+  --recovered-segment "${CONTINUOUS_METRICS},0,2" \
   --recovered-segment "${RECOVERED_SECOND_METRICS},2,2" \
+  --shared-prefix-report "${SHARED_PREFIX_REPORT}" \
   --continuous-adapter "${CONTINUOUS_ADAPTER}" \
   --recovered-adapter "${RECOVERED_ADAPTER}" \
   --base-lr "${BASE_LR}" \
