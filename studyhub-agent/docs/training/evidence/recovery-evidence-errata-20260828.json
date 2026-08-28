@@ -1,0 +1,32 @@
+{
+  "schema_version": "studyhub.recovery-evidence-errata.v1",
+  "created_at": "2026-08-28T23:09:32+08:00",
+  "policy": "Original evidence files and their FAIL status remain immutable. This file only narrows their causal interpretation.",
+  "entries": [
+    {
+      "evidence": "open-only-sft-v1-1-recovery-gate-20260828_220507.json",
+      "original_status": "FAIL",
+      "corrected_interpretation": "INDEPENDENT_PREFIX_REPRODUCIBILITY_FAIL",
+      "claim_boundary": "The run mixed independent-prefix nondeterminism with restart effects and cannot establish recovery causality."
+    },
+    {
+      "evidence": "open-only-sft-v1-1-recovery-gate-20260828_223122.json",
+      "original_status": "FAIL",
+      "corrected_interpretation": "SHARED_PREFIX_EXACT_EQUIVALENCE_FAIL",
+      "claim_boundary": "The shared-prefix design removed the main independent-prefix confounder, but destructive rename and missing source-side hashes leave snapshot provenance incomplete."
+    },
+    {
+      "evidence": "open-only-sft-v1-1-recovery-gate-20260828_224842.json",
+      "original_status": "FAIL",
+      "corrected_interpretation": "CALIBRATED_CONTRACT_CONFIRMATION_FAIL",
+      "contract_status": "CALIBRATED_ON_DISCLOSED_RUNS_AND_FROZEN_BEFORE_ONE_CONFIRMATION",
+      "claim_boundary": "The run failed its frozen absolute threshold. Exact batch identity, full state continuity, a nondeterminism baseline, and a post-warmup boundary were not established."
+    }
+  ],
+  "prohibited_reinterpretations": [
+    "Do not relabel any of the three runs as PASS.",
+    "Do not tune a replacement threshold on these same observations and count them as confirmation.",
+    "Do not claim checkpoint recovery is broken solely from the independent-prefix run.",
+    "Do not claim production-cadence recovery from a four-update warmup Gate."
+  ]
+}

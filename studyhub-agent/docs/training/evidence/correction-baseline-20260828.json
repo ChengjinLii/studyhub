@@ -1,0 +1,125 @@
+{
+  "schema_version": "studyhub.training-correction-baseline.v1",
+  "created_at": "2026-08-28T23:09:32+08:00",
+  "audit_start": {
+    "head": "f7391734732cd2a348c81544daf97e50e1cbbc89",
+    "branch": "main",
+    "worktree": "CLEAN",
+    "remote": "origin",
+    "gpu_authorization_environment": "NOT_PRESENT"
+  },
+  "reviewed_commits": [
+    "17b4bc6ecda67bf80d365f2b3c6987ceb7714685",
+    "1eefb5ca3a850d94f5d99659de25f1ceecf16dc5",
+    "853fd42d6ed90f80ee586970414f001cf254e94e",
+    "cf610d853276560c230c78af16248538d1fb64de",
+    "b20f200a36e916d0b1c955b553023f6a2d171f1c",
+    "765f0cbdc740e4ca987bc37d0d005e5fb2981da4",
+    "20f033c91c2d8597a3605554bd491e17a54234e5",
+    "f7391734732cd2a348c81544daf97e50e1cbbc89"
+  ],
+  "locks": {
+    "benchmark_v2": {
+      "path": "benchmarks/studyhub-agent-v2/manifest.json",
+      "sha256": "da804b10f53dec585255598c3e256445b8ade3acf35fd8c766ca0ab4d759c88b",
+      "status": "FROZEN_FOR_BASELINE",
+      "sealed": "NOT_USED"
+    },
+    "open_only_dataset": {
+      "path": "datasets/processed/open_only_sft_v1_qwen35_9b/manifest.json",
+      "sha256": "2fbb455ff3c647d253fa4f15011534cd02f423a2728095b493d09a0eb76ae8c2",
+      "selected_jsonl_sha256": "ce33c796c1f8532173404864e02d5c876599b87e6f83bb36847f95c0b7e5f368",
+      "train_rows": 16800,
+      "assistant_loss_tokens": 3138019
+    },
+    "mixed_dataset": {
+      "path": "datasets/processed/runtime_sft_v3_qwen35_9b/manifest.json",
+      "sha256": "b67e6d56e531cd75969e9baf51838fb9a73fc3535645e1514c0156fde2b9242f"
+    },
+    "model": {
+      "name": "Qwen/Qwen3.5-9B",
+      "revision": "c202236235762e1c871ad0ccb60c8ee5ba337b9a"
+    },
+    "areal": "cbff54d645d2cd8ee1f1c358a82f3f473588433d"
+  },
+  "verified_history": {
+    "mixed_v3_0": {
+      "status": "COMPLETE_NEGATIVE_DIRECTIONAL_BASELINE",
+      "optimizer_updates": 2100,
+      "total_tokens": 21318410,
+      "assistant_loss_tokens": 3138019,
+      "development_strict": "4/51",
+      "evidence": "docs/training/evidence/overnight-sft-teacher-20260828.json",
+      "evidence_sha256": "542e2176ab4e471827176143c0b8f76583b76be67d379e041585595074901783"
+    },
+    "open_only_v1": {
+      "status": "DIAGNOSTIC_ONLY",
+      "formal_conclusion": "CONTROL_CONTRACT_FAILED_LR_SCHEDULE",
+      "diagnostic_development_strict": "11/51",
+      "reason": "The scheduler horizon and resumed LambdaLR trajectory did not match Mixed-v3.0.",
+      "lr_audit": "docs/training/evidence/open-only-sft-v1-lr-control-audit-20260828.json",
+      "lr_audit_sha256": "f16ca78d8b0125d8c20bc121fae32c528cafef0c738f8fe127e7fec7946d83f1"
+    },
+    "open_only_v1_1": {
+      "formal_training": "NOT_RUN",
+      "scheduler_horizon": 5456,
+      "warmup_steps": 163,
+      "stop_updates": 2100,
+      "recovery_status": "BLOCKED_RECOVERY_CONTRACT",
+      "control_status": "BLOCKED_CONTROL_DRIFT"
+    }
+  },
+  "recovery_evidence": [
+    {
+      "path": "docs/training/evidence/open-only-sft-v1-1-recovery-gate-20260828_220507.json",
+      "sha256": "ce43e8104e280e1f0c7e341b2a50aedc245baa4e6442df3e05436ec0dafb97ec",
+      "status": "FAIL",
+      "classification": [
+        "INDEPENDENT_PREFIX_REPRODUCIBILITY_FAIL",
+        "RECOVERY_CAUSALITY_NOT_ISOLATED"
+      ]
+    },
+    {
+      "path": "docs/training/evidence/open-only-sft-v1-1-recovery-gate-20260828_223122.json",
+      "sha256": "66fa00bb0183b42ed784f367100feabc2d31d16233d940e9fe0a7c371f07508b",
+      "status": "FAIL",
+      "classification": [
+        "SHARED_PREFIX_EXACT_EQUIVALENCE_FAIL",
+        "SNAPSHOT_PROVENANCE_INCOMPLETE"
+      ]
+    },
+    {
+      "path": "docs/training/evidence/open-only-sft-v1-1-recovery-gate-20260828_224842.json",
+      "sha256": "430a870dff44ddb3d1813436cbaeb276eae8fda24ab2da5c0b2552be43f69189",
+      "status": "FAIL",
+      "classification": [
+        "CALIBRATED_CONTRACT_CONFIRMATION_FAIL",
+        "BATCH_IDENTITY_NOT_VERIFIED",
+        "EARLY_WARMUP_ONLY"
+      ]
+    }
+  ],
+  "benchmark_evidence": {
+    "development": "AVAILABLE_INTERNAL_DIRECTIONAL_ONLY",
+    "variance": "BASE_ONLY_CANDIDATE_NOT_RUN",
+    "bfcl": "SETUP_READY_MODEL_SCORE_NOT_RUN",
+    "tau2": "SETUP_READY_MODEL_SCORE_NOT_RUN",
+    "browsecomp_plus": "SETUP_READY_MODEL_SCORE_NOT_RUN",
+    "deepresearch_bench_ii": "LICENSE_REVIEW_REQUIRED",
+    "sealed": "NOT_USED"
+  },
+  "other_programs": {
+    "legacy_teacher_reverse_replay": "FROZEN_NOT_MAINLINE",
+    "reward_v3": "PROGRAMMATIC_CONTRACT_CALIBRATION_ONLY",
+    "main_grpo": "NOT_RUN"
+  },
+  "known_blockers": [
+    "R2 checkpoint snapshot integrity and non-destructive provenance are not closed.",
+    "R3 exact batch fingerprints and full RNG/dataloader/optimizer state continuity are not closed.",
+    "R4 has neither bitwise pass nor a valid post-contract holdout bounded-numeric pass.",
+    "All recovery Gates so far are four-update early-warmup mechanics tests.",
+    "Open-Only v1.1 saver/recovery/evaluator cadence differs from Mixed-v3.0, so only-data-changes is not yet true.",
+    "Candidate variance and external model scores are not available."
+  ],
+  "current_decision": "BLOCKED_RECOVERY_CONTRACT"
+}
