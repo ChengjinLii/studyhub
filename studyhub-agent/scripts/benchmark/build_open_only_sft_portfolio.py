@@ -97,9 +97,7 @@ def optional_summary(
         raise RuntimeError(f"expected {mode} summary, got {summary.get('mode')}: {path}")
     if int(summary.get("infra_excluded", -1)) != 0:
         raise RuntimeError(f"portfolio refuses a summary with Infra exclusions: {path}")
-    metrics = (
-        development_metrics(summary) if mode == "development" else variance_metrics(summary)
-    )
+    metrics = development_metrics(summary) if mode == "development" else variance_metrics(summary)
     return completed_result(metrics, evidence_ref(project, path))
 
 
@@ -109,17 +107,19 @@ def external_entry(
     smoke_row: dict[str, Any],
 ) -> dict[str, Any]:
     setup = smoke_row["status"]
-    model_status = (
-        "LICENSE_REVIEW_REQUIRED"
-        if setup == "LICENSE_REVIEW_REQUIRED"
-        else "NOT_RUN"
-    )
+    model_status = "LICENSE_REVIEW_REQUIRED" if setup == "LICENSE_REVIEW_REQUIRED" else "NOT_RUN"
     entry = {
         "pinned_commit": lock_row["resolved_commit"],
         "setup_status": setup,
+        "execution_readiness": {
+            "source_and_command_discovery": setup,
+            "official_dependency_import": smoke_row.get("official_import", "NOT_APPLICABLE_OR_NOT_RUN"),
+            "formal_model_orchestration": "NOT_IMPLEMENTED_OR_NOT_VERIFIED",
+            "official_model_evaluation": "NOT_RUN",
+        },
         "license": lock_row["license"],
         "official_metric_semantics_preserved": True,
-        "official_invocation": smoke_row.get("official_invocation"),
+        "official_command_reference": smoke_row.get("official_invocation"),
         "model_results": {
             role: {
                 "status": model_status,
@@ -131,6 +131,12 @@ def external_entry(
     }
     if name == "deepresearch_bench_ii":
         entry["official_metric_semantics_preserved"] = "NOT_APPLICABLE_LICENSE_BLOCKED"
+        entry["execution_readiness"] = {
+            "source_and_command_discovery": "LICENSE_REVIEW_REQUIRED",
+            "official_dependency_import": "NOT_RUN",
+            "formal_model_orchestration": "BLOCKED_LICENSE_REVIEW",
+            "official_model_evaluation": "NOT_RUN",
+        }
     return entry
 
 
@@ -143,20 +149,10 @@ def build_portfolio(
     promotion_signals: Path | None = None,
 ) -> dict[str, Any]:
     benchmark_path = project / "benchmarks/studyhub-agent-v2/manifest.json"
-    base_evidence_path = (
-        project
-        / "docs/benchmark/evidence/qwen35-9b-base-v2-development-variance-20260827.json"
-    )
-    mixed_evidence_path = (
-        project / "docs/training/evidence/overnight-sft-teacher-20260828.json"
-    )
-    control_path = (
-        project / "docs/training/evidence/open-only-sft-v1-1-control-diff.json"
-    )
-    promotion_policy_path = (
-        project
-        / "configs/program-v3/open-only-sft-v1.1-promotion-policy.json"
-    )
+    base_evidence_path = project / "docs/benchmark/evidence/qwen35-9b-base-v2-development-variance-20260827.json"
+    mixed_evidence_path = project / "docs/training/evidence/overnight-sft-teacher-20260828.json"
+    control_path = project / "docs/training/evidence/open-only-sft-v1-1-control-diff.json"
+    promotion_policy_path = project / "configs/program-v3/open-only-sft-v1.1-promotion-policy.json"
     external_lock_path = project / "external_benchmarks/lock.json"
     external_smoke_path = project / "external_benchmarks/smoke-status.json"
 
@@ -171,14 +167,10 @@ def build_portfolio(
     expected_hashes = {
         base["benchmark_manifest_sha256"],
         mixed["lineage"]["benchmark_manifest_sha256"],
-        control["model_affecting_controls"]["benchmark_manifest_sha256"][
-            "open_only_v1_1"
-        ],
+        control["model_affecting_controls"]["benchmark_manifest_sha256"]["open_only_v1_1"],
     }
     if expected_hashes != {benchmark_hash}:
-        raise RuntimeError(
-            f"Benchmark hash drift in portfolio inputs: {sorted(expected_hashes)}"
-        )
+        raise RuntimeError(f"Benchmark hash drift in portfolio inputs: {sorted(expected_hashes)}")
     if benchmark.get("status") != "FROZEN_FOR_BASELINE":
         raise RuntimeError("AgentBench v2 is not frozen")
     if promotion_policy.get("benchmark_manifest_sha256") != benchmark_hash:
@@ -193,15 +185,11 @@ def build_portfolio(
             "episodes_scored": base["development"]["episodes_scored"],
             "infra_excluded": base["development"]["infra_excluded"],
             "strict_success_rate": base["development"]["strict_success_rate"],
-            "mean_diagnostic_score": base["development"][
-                "mean_diagnostic_score"
-            ],
+            "mean_diagnostic_score": base["development"]["mean_diagnostic_score"],
             "mean_tool_calls": base["development"]["mean_tool_calls"],
             "mean_latency_seconds": base["development"]["mean_latency_seconds"],
             "run_id": base["development"]["run_id"],
-            "episodes_sha256": base["development"]["artifact_hashes"][
-                "episodes_jsonl"
-            ],
+            "episodes_sha256": base["development"]["artifact_hashes"]["episodes_jsonl"],
         },
         "evidence": evidence_ref(project, base_evidence_path),
     }
@@ -211,19 +199,11 @@ def build_portfolio(
         "metrics": {
             "episodes_scored": mixed["development_comparison"]["paired_tasks"],
             "infra_excluded": mixed["development_comparison"]["infra_excluded"],
-            "strict_success_rate": mixed["development_comparison"]["sft"][
-                "strict_success"
-            ],
-            "mean_diagnostic_score": mixed["development_comparison"]["sft"][
-                "mean_diagnostic"
-            ],
-            "mean_tool_calls": mixed["development_comparison"]["sft"][
-                "mean_tool_calls"
-            ],
+            "strict_success_rate": mixed["development_comparison"]["sft"]["strict_success"],
+            "mean_diagnostic_score": mixed["development_comparison"]["sft"]["mean_diagnostic"],
+            "mean_tool_calls": mixed["development_comparison"]["sft"]["mean_tool_calls"],
             "run_id": mixed["development_comparison"]["sft_run_id"],
-            "episodes_sha256": mixed["development_comparison"][
-                "sft_episodes_sha256"
-            ],
+            "episodes_sha256": mixed["development_comparison"]["sft_episodes_sha256"],
         },
         "evidence": evidence_ref(project, mixed_evidence_path),
     }
@@ -238,9 +218,7 @@ def build_portfolio(
             "consistent_at_4": base["variance"]["consistent_at_4"],
             "mixed_outcome_rate": base["variance"]["mixed_outcome_rate"],
             "run_id": base["variance"]["run_id"],
-            "episodes_sha256": base["variance"]["artifact_hashes"][
-                "episodes_jsonl"
-            ],
+            "episodes_sha256": base["variance"]["artifact_hashes"]["episodes_jsonl"],
         },
         "evidence": evidence_ref(project, base_evidence_path),
     }
@@ -319,14 +297,20 @@ def build_portfolio(
             },
         },
         "external": external,
-        "supported_suites": [
+        "portfolio_entries": [
             "internal-development",
             "internal-variance",
             "bfcl",
             "tau2",
             "browsecomp-plus",
-            "portfolio",
         ],
+        "execution_readiness": {
+            "internal_model_runner": "AVAILABLE",
+            "portfolio_assembler": "AVAILABLE",
+            "external_source_and_command_smoke": "PASS",
+            "external_formal_model_orchestrator": "NOT_IMPLEMENTED_OR_NOT_VERIFIED",
+            "external_model_scores": "NOT_RUN",
+        },
         "result_policy": {
             "aggregate_agent_score": "PROHIBITED",
             "official_external_metrics": "PRESERVE_UNMODIFIED",
@@ -367,18 +351,10 @@ def main() -> int:
     args = parse_args()
     payload = build_portfolio(
         args.project_root.resolve(),
-        candidate_development=(
-            args.candidate_development.resolve()
-            if args.candidate_development
-            else None
-        ),
+        candidate_development=(args.candidate_development.resolve() if args.candidate_development else None),
         mixed_variance=args.mixed_variance.resolve() if args.mixed_variance else None,
-        candidate_variance=(
-            args.candidate_variance.resolve() if args.candidate_variance else None
-        ),
-        promotion_signals=(
-            args.promotion_signals.resolve() if args.promotion_signals else None
-        ),
+        candidate_variance=(args.candidate_variance.resolve() if args.candidate_variance else None),
+        promotion_signals=(args.promotion_signals.resolve() if args.promotion_signals else None),
     )
     args.output.parent.mkdir(parents=True, exist_ok=True)
     temporary = args.output.with_suffix(args.output.suffix + ".partial")

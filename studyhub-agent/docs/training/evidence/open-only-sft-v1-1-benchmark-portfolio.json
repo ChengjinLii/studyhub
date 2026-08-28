@@ -1,6 +1,6 @@
 {
   "schema_version": "studyhub.open-only-sft-benchmark-portfolio.v1",
-  "created_at": "2026-08-28T23:54:29+08:00",
+  "created_at": "2026-08-29T00:02:52+08:00",
   "status": "READY_BUT_NOT_RUN",
   "candidate": "open-only-sft-v1.1",
   "benchmark": {
@@ -103,6 +103,12 @@
     "bfcl": {
       "pinned_commit": "f7cf7359b7ac615a0b294831c5ba2bc95ee4a000",
       "setup_status": "SETUP_READY",
+      "execution_readiness": {
+        "source_and_command_discovery": "SETUP_READY",
+        "official_dependency_import": "NOT_RUN_DEPENDENCIES_NOT_INSTALLED",
+        "formal_model_orchestration": "NOT_IMPLEMENTED_OR_NOT_VERIFIED",
+        "official_model_evaluation": "NOT_RUN"
+      },
       "license": {
         "path": "LICENSE",
         "scope": "repository_code_and_bundled_data",
@@ -110,7 +116,7 @@
         "status": "verified"
       },
       "official_metric_semantics_preserved": true,
-      "official_invocation": {
+      "official_command_reference": {
         "evaluate": [
           "bfcl",
           "evaluate",
@@ -155,6 +161,12 @@
     "browsecomp_plus": {
       "pinned_commit": "046949032b0328319cc9a02663a759ec601d9402",
       "setup_status": "SETUP_READY",
+      "execution_readiness": {
+        "source_and_command_discovery": "SETUP_READY",
+        "official_dependency_import": "NOT_APPLICABLE_OR_NOT_RUN",
+        "formal_model_orchestration": "NOT_IMPLEMENTED_OR_NOT_VERIFIED",
+        "official_model_evaluation": "NOT_RUN"
+      },
       "license": {
         "path": "LICENSE",
         "scope": "repository_code",
@@ -162,7 +174,7 @@
         "status": "verified"
       },
       "official_metric_semantics_preserved": true,
-      "official_invocation": [
+      "official_command_reference": [
         "uv",
         "run",
         "python",
@@ -191,6 +203,12 @@
     "deepresearch_bench_ii": {
       "pinned_commit": "440bdc33728438d317ca7860809942b5a1e40256",
       "setup_status": "LICENSE_REVIEW_REQUIRED",
+      "execution_readiness": {
+        "source_and_command_discovery": "LICENSE_REVIEW_REQUIRED",
+        "official_dependency_import": "NOT_RUN",
+        "formal_model_orchestration": "BLOCKED_LICENSE_REVIEW",
+        "official_model_evaluation": "NOT_RUN"
+      },
       "license": {
         "path": null,
         "scope": "upstream_repository_has_no_license_file",
@@ -198,7 +216,7 @@
         "status": "unconfirmed"
       },
       "official_metric_semantics_preserved": "NOT_APPLICABLE_LICENSE_BLOCKED",
-      "official_invocation": null,
+      "official_command_reference": null,
       "model_results": {
         "base": {
           "status": "LICENSE_REVIEW_REQUIRED",
@@ -220,6 +238,12 @@
     "tau2": {
       "pinned_commit": "fc0055dc4e0a316c3f83133267fbd6faaa770992",
       "setup_status": "SETUP_READY",
+      "execution_readiness": {
+        "source_and_command_discovery": "SETUP_READY",
+        "official_dependency_import": "NOT_RUN_DEPENDENCIES_NOT_INSTALLED",
+        "formal_model_orchestration": "NOT_IMPLEMENTED_OR_NOT_VERIFIED",
+        "official_model_evaluation": "NOT_RUN"
+      },
       "license": {
         "path": "LICENSE",
         "scope": "repository_code_and_bundled_data",
@@ -227,7 +251,7 @@
         "status": "verified"
       },
       "official_metric_semantics_preserved": true,
-      "official_invocation": [
+      "official_command_reference": [
         "uv",
         "run",
         "tau2",
@@ -262,14 +286,20 @@
       }
     }
   },
-  "supported_suites": [
+  "portfolio_entries": [
     "internal-development",
     "internal-variance",
     "bfcl",
     "tau2",
-    "browsecomp-plus",
-    "portfolio"
+    "browsecomp-plus"
   ],
+  "execution_readiness": {
+    "internal_model_runner": "AVAILABLE",
+    "portfolio_assembler": "AVAILABLE",
+    "external_source_and_command_smoke": "PASS",
+    "external_formal_model_orchestrator": "NOT_IMPLEMENTED_OR_NOT_VERIFIED",
+    "external_model_scores": "NOT_RUN"
+  },
   "result_policy": {
     "aggregate_agent_score": "PROHIBITED",
     "official_external_metrics": "PRESERVE_UNMODIFIED",

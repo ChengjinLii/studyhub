@@ -16,8 +16,10 @@ def test_current_portfolio_is_ready_but_has_no_candidate_or_external_scores() ->
     assert result["internal"]["development"]["mixed_v3_0"]["status"] == "COMPLETED"
     assert result["internal"]["development"]["open_only_v1_1"]["status"] == "NOT_RUN"
     assert all(
-        row["model_results"]["open_only_v1_1"]["status"]
-        in {"NOT_RUN", "LICENSE_REVIEW_REQUIRED"}
+        row["model_results"]["open_only_v1_1"]["status"] in {"NOT_RUN", "LICENSE_REVIEW_REQUIRED"}
         for row in result["external"].values()
     )
+    assert "supported_suites" not in result
+    assert result["execution_readiness"]["external_formal_model_orchestrator"] == "NOT_IMPLEMENTED_OR_NOT_VERIFIED"
+    assert all("official_command_reference" in row for row in result["external"].values())
     assert result["result_policy"]["aggregate_agent_score"] == "PROHIBITED"
