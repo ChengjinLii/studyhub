@@ -1,0 +1,155 @@
+{
+  "schema_version": "studyhub.sft-benchmark-alignment-audit.v1",
+  "created_at": "2026-08-29T00:04:44+08:00",
+  "status": "PASS_WITH_ALIGNMENT_BIAS_DISCLOSED",
+  "scope": {
+    "training_dataset": "open-only-sft-v1-qwen35-9b",
+    "training_measure": "train_assistant_loss_token_share",
+    "benchmark_split": "PUBLIC_DEVELOPMENT_ONLY",
+    "sealed_accessed": false,
+    "mapping_semantics": "COARSE_EXPOSURE_PROXY_NOT_SEMANTIC_CAPABILITY_EQUIVALENCE"
+  },
+  "training_sources": [
+    {
+      "source": "coig_exam",
+      "assistant_loss_share": 0.096786,
+      "coarse_support_lane": "direct_tutoring",
+      "development_lane_share": 0.039216,
+      "mapping_semantics": "COARSE_EXPOSURE_PROXY_NOT_CAPABILITY_EQUIVALENCE"
+    },
+    {
+      "source": "hermes_function_calling",
+      "assistant_loss_share": 0.111535,
+      "coarse_support_lane": "function_state",
+      "development_lane_share": 0.039216,
+      "mapping_semantics": "COARSE_EXPOSURE_PROXY_NOT_CAPABILITY_EQUIVALENCE"
+    },
+    {
+      "source": "studyhub_2wiki_replay",
+      "assistant_loss_share": 0.600873,
+      "coarse_support_lane": "rag_evidence",
+      "development_lane_share": 0.568627,
+      "mapping_semantics": "COARSE_EXPOSURE_PROXY_NOT_CAPABILITY_EQUIVALENCE"
+    },
+    {
+      "source": "studyhub_qasper_replay",
+      "assistant_loss_share": 0.139818,
+      "coarse_support_lane": "rag_evidence",
+      "development_lane_share": 0.568627,
+      "mapping_semantics": "COARSE_EXPOSURE_PROXY_NOT_CAPABILITY_EQUIVALENCE"
+    },
+    {
+      "source": "toolace",
+      "assistant_loss_share": 0.050988,
+      "coarse_support_lane": "function_state",
+      "development_lane_share": 0.039216,
+      "mapping_semantics": "COARSE_EXPOSURE_PROXY_NOT_CAPABILITY_EQUIVALENCE"
+    }
+  ],
+  "development_capability_counts": {
+    "authentic_web_research": 1,
+    "cross_chunk_synthesis": 10,
+    "direct_answer_tool_relevance": 1,
+    "factual_passage_retrieval": 16,
+    "insufficient_evidence": 1,
+    "long_horizon": 1,
+    "memory_absence": 1,
+    "memory_collective_conflict": 1,
+    "memory_collective_low_confidence": 1,
+    "memory_cross_user_privacy": 1,
+    "memory_current_conflict": 1,
+    "memory_incomplete_abstention": 1,
+    "memory_irrelevant_tool_abstention": 1,
+    "memory_rag_composition": 1,
+    "memory_scope_resolution": 1,
+    "memory_selection": 1,
+    "memory_temporal_change": 1,
+    "memory_user_correction": 1,
+    "memory_web_composition": 1,
+    "multi_source_synthesis": 1,
+    "permission_avoidance": 1,
+    "permission_recovery": 1,
+    "query_reformulation": 1,
+    "state_function_calling": 1,
+    "state_multistep_postcondition": 1,
+    "stop_cost_control": 1,
+    "tool_failure_recovery": 1
+  },
+  "lane_matrix": [
+    {
+      "lane": "direct_tutoring",
+      "training_assistant_loss_share": 0.096786,
+      "development_task_count": 2,
+      "development_task_share": 0.039216,
+      "share_delta_percentage_points": 5.757
+    },
+    {
+      "lane": "function_state",
+      "training_assistant_loss_share": 0.162523,
+      "development_task_count": 2,
+      "development_task_share": 0.039216,
+      "share_delta_percentage_points": 12.331
+    },
+    {
+      "lane": "long_horizon",
+      "training_assistant_loss_share": 0.0,
+      "development_task_count": 1,
+      "development_task_share": 0.019608,
+      "share_delta_percentage_points": -1.961
+    },
+    {
+      "lane": "memory",
+      "training_assistant_loss_share": 0.0,
+      "development_task_count": 13,
+      "development_task_share": 0.254902,
+      "share_delta_percentage_points": -25.49
+    },
+    {
+      "lane": "rag_evidence",
+      "training_assistant_loss_share": 0.740691,
+      "development_task_count": 29,
+      "development_task_share": 0.568627,
+      "share_delta_percentage_points": 17.206
+    },
+    {
+      "lane": "recovery_acl",
+      "training_assistant_loss_share": 0.0,
+      "development_task_count": 3,
+      "development_task_share": 0.058824,
+      "share_delta_percentage_points": -5.882
+    },
+    {
+      "lane": "web_research",
+      "training_assistant_loss_share": 0.0,
+      "development_task_count": 1,
+      "development_task_share": 0.019608,
+      "share_delta_percentage_points": -1.961
+    }
+  ],
+  "findings": {
+    "rag_training_share": 0.740691,
+    "rag_development_share": 0.568627,
+    "uncovered_development_lanes": [
+      "long_horizon",
+      "memory",
+      "recovery_acl",
+      "web_research"
+    ],
+    "claim_boundary": "A positive internal RAG direction cannot be generalized to Web, Memory, Recovery/ACL, or long-horizon Agent capability without direct and external evidence."
+  },
+  "inputs": {
+    "data_card": {
+      "path": "configs/program-v3/open-only-sft-v1-data-card.json",
+      "sha256": "2bb5358f81609245d481191f1eed6b3d3c3cc9ad79525846f771ab6b6cad878c"
+    },
+    "benchmark_manifest": {
+      "path": "benchmarks/studyhub-agent-v2/manifest.json",
+      "sha256": "da804b10f53dec585255598c3e256445b8ade3acf35fd8c766ca0ab4d759c88b"
+    },
+    "public_development": {
+      "path": "benchmarks/studyhub-agent-v2/development/tasks.jsonl",
+      "sha256": "a8741266d375842ae25c7dfd201e6dbdbe0e083fce518b9bb351be37f4797c85",
+      "rows": 51
+    }
+  }
+}
