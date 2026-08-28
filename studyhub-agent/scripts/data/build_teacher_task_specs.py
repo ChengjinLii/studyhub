@@ -25,7 +25,10 @@ from scripts.data.select_runtime_sft_v3 import (  # noqa: E402
 )
 from studyhub_agent.trajectory.runtime_sft import canonical_json, stable_hash  # noqa: E402
 
-SCHEMA_VERSION = "studyhub.teacher-task.v2.1"
+SCHEMA_VERSION = "studyhub.teacher-task.v2.2"
+VERIFIER_SCHEMA_VERSION = "studyhub.teacher-verifier.v2.2"
+MANIFEST_SCHEMA_VERSION = "studyhub.teacher-task-manifest.v2.2"
+TEACHER_DATASET = "studyhub_teacher_v2_2"
 DEFAULT_TOTAL = 2_400
 FAMILY_PLAN = {
     "rag_query_rewrite_citation": ("studyhub_metadata_replay", 0.25),
@@ -135,6 +138,9 @@ def _documents(calls: list[tuple[str, dict[str, Any], Any]]) -> list[dict[str, s
             if not source_id:
                 continue
             text = str(item.get("text") or item.get("snippet") or "")
+            # Error observations are fixture routes, not readable corpus documents.
+            if not text.strip():
+                continue
             existing = documents.get(source_id)
             if existing is None or len(text) > len(existing["text"]):
                 documents[source_id] = {
@@ -222,7 +228,7 @@ def _environment(row: dict[str, Any]) -> tuple[dict[str, Any], dict[str, Any], l
             if source_id not in document_ids:
                 routes.append({"name": name, "arguments": arguments, "result": observation})
             continue
-        if tool["capability"] != "function_call" and tool["capability"] != "replay_search":
+        if tool["capability"] not in {"function_call", "replay_search", "evidence_fetch"}:
             continue
         route = {"name": name, "arguments": arguments, "result": observation}
         if name == "study_plan_update":
@@ -270,7 +276,7 @@ def _round_robin(
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--input", type=Path, default=PROJECT_ROOT / "datasets/interim/runtime_sft_v3/selected.jsonl")
-    parser.add_argument("--output", type=Path, default=PROJECT_ROOT / "datasets/interim/studyhub_teacher_v2_1")
+    parser.add_argument("--output", type=Path, default=PROJECT_ROOT / f"datasets/interim/{TEACHER_DATASET}")
     parser.add_argument("--max-tasks", type=int, default=DEFAULT_TOTAL)
     parser.add_argument("--max-rows-per-source-group", type=int, default=12)
     parser.add_argument("--overwrite", action="store_true")
@@ -313,7 +319,7 @@ def main() -> int:
             max_rows_per_group=args.max_rows_per_source_group,
         ):
             used_rows.add(str(row["id"]))
-            task_id = f"teacher-v2-1-{stable_hash(str(row['id']), salt='studyhub-teacher-v2.1')[:20]}"
+            task_id = f"teacher-v2-2-{stable_hash(str(row['id']), salt='studyhub-teacher-v2.2')[:20]}"
             environment, fixture, expected_tools = _environment(row)
             calls = _call_observations(row)
             required_state_postconditions = _required_state_postconditions(calls)
@@ -356,11 +362,11 @@ def main() -> int:
                     "benchmark_overlap": False,
                     "environment_id": task_id,
                     "verifier_id": task_id,
-                    "teacher_dataset": "studyhub_teacher_v2_1",
+                    "teacher_dataset": TEACHER_DATASET,
                 },
             }
             verifier = {
-                "schema_version": "studyhub.teacher-verifier.v2.1",
+                "schema_version": VERIFIER_SCHEMA_VERSION,
                 "task_id": task_id,
                 "family": family,
                 "reference_final": reference,
@@ -388,7 +394,7 @@ def main() -> int:
 
     write_jsonl(args.output / "task_specs.jsonl", tasks)
     manifest = {
-        "schema_version": "studyhub.teacher-task-manifest.v2.1",
+        "schema_version": MANIFEST_SCHEMA_VERSION,
         "status": "READY_FOR_TEACHER_SMOKE",
         "tasks": len(tasks),
         "requested_tasks": args.max_tasks,

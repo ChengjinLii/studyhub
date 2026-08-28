@@ -16,7 +16,7 @@ for entry in (PROJECT_ROOT, PROJECT_ROOT / "src"):
     if str(entry) not in sys.path:
         sys.path.insert(0, str(entry))
 
-from scripts.data.select_runtime_sft_v3 import (
+from scripts.data.select_runtime_sft_v3 import (  # noqa: E402
     candidate_prompt_hash,
     near_signature,
     public_benchmark_prompt_hashes,
@@ -24,7 +24,7 @@ from scripts.data.select_runtime_sft_v3 import (
     sha256,
     split_for,
 )
-from studyhub_agent.trajectory.runtime_sft import stable_hash, validate_runtime_trajectory
+from studyhub_agent.trajectory.runtime_sft import stable_hash, validate_runtime_trajectory  # noqa: E402
 
 CUSTOM_SOURCES = {
     "studyhub_metadata_replay",
@@ -33,6 +33,8 @@ CUSTOM_SOURCES = {
     "studyhub_web_fallback",
     "studyhub_state_tools",
     "studyhub_teacher_v1",
+    "studyhub_teacher_v2_1",
+    "studyhub_teacher_v2_2",
 }
 COMPLETE_QUALITY_ORDER = {
     "teacher_verified_complete": 0,
@@ -211,10 +213,7 @@ def _candidate_pool(
             prepared["split"] = split
             prepared["semantic_template_cluster"] = semantic_template(prepared)
             rows[key].append(prepared)
-    return {
-        key: deque(sorted(values, key=_quality_rank))
-        for key, values in rows.items()
-    }, drops
+    return {key: deque(sorted(values, key=_quality_rank)) for key, values in rows.items()}, drops
 
 
 def _fill_complete_replacements(
@@ -291,7 +290,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--teacher",
         type=Path,
-        default=PROJECT_ROOT / "datasets/interim/studyhub_teacher_v1/accepted.jsonl",
+        default=PROJECT_ROOT / "datasets/interim/studyhub_teacher_v2_2/accepted.jsonl",
     )
     parser.add_argument(
         "--output",

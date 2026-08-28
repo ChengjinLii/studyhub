@@ -9,6 +9,7 @@ import pytest
 
 import training.teacher.providers as teacher_providers
 from scripts.data.build_runtime_sft_v3_1 import _apply_teacher_self_review, _select_teacher_rows
+from scripts.data.build_teacher_task_specs import _environment
 from scripts.data.select_runtime_sft_v3 import public_benchmark_prompt_hashes
 from scripts.data.verify_teacher_trajectories import accepted_record, verify_run
 from training.rl.frozen_environment import FrozenTaskEnvironment
@@ -25,6 +26,46 @@ from training.teacher.providers import (
 )
 
 ROOT = Path(__file__).resolve().parents[3]
+
+
+def _builder_row(
+    tools: list[dict],
+    calls: list[tuple[str, str, dict, dict]],
+) -> dict:
+    messages = []
+    for call_id, name, arguments, observation in calls:
+        messages.extend(
+            [
+                {
+                    "role": "assistant",
+                    "tool_calls": [
+                        {
+                            "id": call_id,
+                            "function": {"name": name, "arguments": arguments},
+                        }
+                    ],
+                },
+                {
+                    "role": "tool",
+                    "tool_call_id": call_id,
+                    "content": json.dumps(observation),
+                },
+            ]
+        )
+    return {
+        "tools": [
+            {
+                "type": "function",
+                "function": {
+                    "name": name,
+                    "description": name,
+                    "parameters": parameters,
+                },
+            }
+            for name, parameters in tools
+        ],
+        "messages": messages,
+    }
 
 
 def _teacher_root(tmp_path: Path, task_id: str) -> Path:
@@ -210,6 +251,99 @@ def test_visible_runtime_state_separates_discovery_from_grounded_evidence() -> N
     assert state["successful_state_change_deficit"] == 0
     assert state["final_state_ready"] is True
     assert state["final_ready"] is True
+
+
+def test_teacher_builder_preserves_permission_denial_as_executable_route() -> None:
+    source_id = "paid-source:203"
+    row = _builder_row(
+        [
+            (
+                "knowledge_read",
+                {
+                    "type": "object",
+                    "additionalProperties": False,
+                    "properties": {"source_id": {"type": "string"}},
+                    "required": ["source_id"],
+                },
+            )
+        ],
+        [
+            (
+                "read-private",
+                "knowledge_read",
+                {"source_id": source_id},
+                {"ok": False, "error": "permission_denied", "source_id": source_id},
+            )
+        ],
+    )
+
+    environment, fixture, expected_tools = _environment(row)
+
+    assert environment["documents"] == []
+    assert fixture["routes"] == [
+        {
+            "name": "knowledge_read",
+            "arguments": {"source_id": source_id},
+            "result": {"ok": False, "error": "permission_denied", "source_id": source_id},
+        }
+    ]
+    assert expected_tools == ["knowledge_read"]
+    runtime = FrozenTaskEnvironment(environment, fixture)
+    result = json.loads(asyncio.run(runtime.execute("knowledge_read", {"source_id": source_id})))
+    assert result["error"] == "permission_denied"
+    assert runtime.trace.invalid_tool_calls == 0
+
+
+def test_teacher_builder_preserves_web_fetch_route_and_records_evidence() -> None:
+    url = "https://example.edu/current"
+    source_id = "web:official-current"
+    row = _builder_row(
+        [
+            (
+                "web_search",
+                {
+                    "type": "object",
+                    "additionalProperties": False,
+                    "properties": {"query": {"type": "string"}},
+                    "required": ["query"],
+                },
+            ),
+            (
+                "web_fetch",
+                {
+                    "type": "object",
+                    "additionalProperties": False,
+                    "properties": {"url": {"type": "string"}},
+                    "required": ["url"],
+                },
+            ),
+        ],
+        [
+            (
+                "search-web",
+                "web_search",
+                {"query": "current policy"},
+                {"results": [{"url": url, "title": "Official result"}]},
+            ),
+            (
+                "fetch-web",
+                "web_fetch",
+                {"url": url},
+                {"content": {"source_id": source_id, "text": "Current official evidence."}},
+            ),
+        ],
+    )
+
+    environment, fixture, expected_tools = _environment(row)
+
+    assert [route["name"] for route in fixture["routes"]] == ["web_search", "web_fetch"]
+    assert expected_tools == ["web_search", "web_fetch"]
+    runtime = FrozenTaskEnvironment(environment, fixture)
+    search = json.loads(asyncio.run(runtime.execute("web_search", {"query": "current policy"})))
+    fetch = json.loads(asyncio.run(runtime.execute("web_fetch", {"url": url})))
+    assert search["results"] == [{"url": url, "title": "Official result"}]
+    assert fetch["fixture_match"] is True
+    assert runtime.trace.read_source_ids == {source_id}
 
 
 def test_fixture_route_accepts_declared_equivalent_state_text() -> None:
