@@ -312,13 +312,14 @@ def _collect_parallel(
     stop_reason: str | None = None
     remaining_jobs = iter(jobs)
     pending: dict[Any, dict[str, Any]] = {}
+    exhausted = False
     with ProcessPoolExecutor(max_workers=concurrency) as executor:
         while time.monotonic() < deadline and accepted < max_accepted:
-            slots = min(concurrency - len(pending), max_accepted - accepted - len(pending))
-            for _ in range(max(0, slots)):
+            while not exhausted and len(pending) < concurrency and accepted + len(pending) < max_accepted:
                 try:
                     job = next(remaining_jobs)
                 except StopIteration:
+                    exhausted = True
                     break
                 existing = _existing_result(root, job)
                 if existing is not None:
@@ -329,12 +330,19 @@ def _collect_parallel(
                         accepted += 1
                     else:
                         rejected += 1
+                    stop_reason = _terminal_provider_stop(existing)
+                    if stop_reason:
+                        break
                     continue
                 remaining = max(1, int(deadline - time.monotonic()))
                 prepared = {**job, "request_timeout": min(int(job["request_timeout"]), remaining)}
                 pending[executor.submit(_collect_job, prepared)] = prepared
-            if not pending:
+            if stop_reason or accepted >= max_accepted:
                 break
+            if not pending:
+                if exhausted:
+                    break
+                continue
             done, _ = wait(pending, timeout=max(0.1, deadline - time.monotonic()), return_when=FIRST_COMPLETED)
             if not done:
                 break

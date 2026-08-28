@@ -3,10 +3,12 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import json
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import pytest
 
+import scripts.data.collect_teacher_hermes_trajectories as teacher_collector
 import training.teacher.providers as teacher_providers
 from scripts.data.build_runtime_sft_v3_1 import _apply_teacher_self_review, _select_teacher_rows
 from scripts.data.build_teacher_task_specs import _environment, _source_group_ids
@@ -26,6 +28,41 @@ from training.teacher.providers import (
 )
 
 ROOT = Path(__file__).resolve().parents[3]
+
+
+def test_parallel_teacher_resume_skips_existing_batch_and_runs_next_job(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    jobs = [
+        {"run_id": "existing-one", "request_timeout": 30},
+        {"run_id": "existing-two", "request_timeout": 30},
+        {"run_id": "new-three", "request_timeout": 30},
+    ]
+
+    def existing_result(_root: Path, job: dict) -> dict | None:
+        if job["run_id"].startswith("existing"):
+            return {"run": {"run_id": job["run_id"]}, "accepted": True, "failures": []}
+        return None
+
+    def collect_job(job: dict) -> dict:
+        return {"run": {"run_id": job["run_id"]}, "accepted": True, "failures": []}
+
+    monkeypatch.setattr(teacher_collector, "ProcessPoolExecutor", ThreadPoolExecutor)
+    monkeypatch.setattr(teacher_collector, "_existing_result", existing_result)
+    monkeypatch.setattr(teacher_collector, "_collect_job", collect_job)
+    monkeypatch.setattr(teacher_collector, "_write_run", lambda _root, _result: None)
+
+    result = teacher_collector._collect_parallel(
+        jobs,
+        root=tmp_path,
+        max_accepted=3,
+        deadline=teacher_collector.time.monotonic() + 10,
+        resume=True,
+        concurrency=2,
+    )
+
+    assert result == (3, 3, 0, None)
 
 
 def _builder_row(
