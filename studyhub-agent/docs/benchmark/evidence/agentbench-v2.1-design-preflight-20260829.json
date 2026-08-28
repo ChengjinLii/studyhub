@@ -1,0 +1,44 @@
+{
+  "schema_version": "studyhub.agentbench-v2.1-design-preflight.v1",
+  "created_at": "2026-08-29T00:08:06+08:00",
+  "status": "PASS",
+  "design_status": "DESIGN_READY_DATA_NOT_BUILT",
+  "checks": {
+    "independent_successor": true,
+    "development_target_in_range": true,
+    "sealed_a_target_in_range": true,
+    "sealed_b_target_in_range": true,
+    "capability_counts_match_development_target": true,
+    "all_capabilities_have_multiple_source_groups": true,
+    "public_builder_excludes_sealed": true,
+    "sealed_generation_not_run": true,
+    "independent_semantic_review_required": true,
+    "frozen_v2_status_unchanged": true
+  },
+  "failures": [],
+  "pipeline_stages": {
+    "design_and_public_builder": "READY",
+    "independent_source_acquisition": "NOT_RUN",
+    "public_candidate_generation": "NOT_RUN",
+    "independent_semantic_review": "NOT_RUN",
+    "challenge_and_shortcut_tests": "NOT_RUN",
+    "benchmark_freeze": "NOT_RUN",
+    "sealed_generation": "NOT_RUN_PROHIBITED_BEFORE_FINAL_FREEZE",
+    "model_evaluation": "NOT_RUN"
+  },
+  "scope": {
+    "sealed_accessed": false,
+    "v2_modified": false,
+    "model_claim_allowed": false
+  },
+  "inputs": {
+    "plan": {
+      "path": "benchmarks/studyhub-agent-v2.1-design/plan.json",
+      "sha256": "684ca7776e7ef717cf49348055f166048cda77c646bc23ffb53b7fda0f37f959"
+    },
+    "frozen_v2_manifest": {
+      "path": "benchmarks/studyhub-agent-v2/manifest.json",
+      "sha256": "da804b10f53dec585255598c3e256445b8ade3acf35fd8c766ca0ab4d759c88b"
+    }
+  }
+}

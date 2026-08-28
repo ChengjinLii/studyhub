@@ -1,0 +1,59 @@
+{
+  "schema_version": "studyhub.agentbench-v2.1-design.v1",
+  "benchmark_id": "studyhub-agentbench-v2.1-expanded",
+  "status": "DESIGN_READY_DATA_NOT_BUILT",
+  "relationship_to_v2": "INDEPENDENT_SUCCESSOR_DO_NOT_MUTATE_V2",
+  "targets": {
+    "development": 360,
+    "sealed_a": 120,
+    "sealed_b": 120,
+    "calibration": 60
+  },
+  "development_capability_plan": [
+    {"lane": "rag_evidence", "tasks": 50, "minimum_source_groups": 18},
+    {"lane": "web_research", "tasks": 45, "minimum_source_groups": 18},
+    {"lane": "memory", "tasks": 45, "minimum_source_groups": 18},
+    {"lane": "recovery_acl", "tasks": 35, "minimum_source_groups": 14},
+    {"lane": "tool_routing_invalid_args", "tasks": 35, "minimum_source_groups": 14},
+    {"lane": "stateful_function", "tasks": 35, "minimum_source_groups": 14},
+    {"lane": "cross_tool_composition", "tasks": 35, "minimum_source_groups": 14},
+    {"lane": "long_horizon", "tasks": 25, "minimum_source_groups": 12},
+    {"lane": "multi_source_quality_conflict", "tasks": 30, "minimum_source_groups": 12},
+    {"lane": "stop_cost_direct_abstention", "tasks": 25, "minimum_source_groups": 12}
+  ],
+  "isolation_contract": {
+    "training_public_prompt_overlap": 0,
+    "training_source_group_overlap": 0,
+    "training_material_overlap": 0,
+    "training_generator_lineage_overlap": 0,
+    "development_sealed_source_group_overlap": 0,
+    "development_sealed_template_lineage_overlap": 0,
+    "sealed_access_before_final_freeze": false
+  },
+  "quality_contract": {
+    "exact_dedup": true,
+    "near_dedup": true,
+    "semantic_dedup": true,
+    "source_cluster_bootstrap": true,
+    "template_cluster_bootstrap": true,
+    "effective_sample_size_report": true,
+    "source_concentration_report": true,
+    "deterministic_grader_for_hard_facts_state_acl": true,
+    "independent_semantic_review_for_open_tasks": true,
+    "negative_controls": true,
+    "metamorphic_tests": true,
+    "shortcut_probes": true,
+    "development_exposure_ledger": true
+  },
+  "generation_contract": {
+    "public_splits_allowed": ["development", "calibration"],
+    "sealed_generation_location": "SEPARATE_HIDDEN_WORKSPACE_AFTER_FINAL_FREEZE",
+    "sealed_generation_current_status": "NOT_RUN",
+    "source_license_must_be_verified": true,
+    "source_independence_review_must_pass": true,
+    "maximum_rows_per_source_group": 4,
+    "maximum_largest_source_group_share": 0.04,
+    "template_slot_expansion_only": false
+  },
+  "claim_boundary": "A design and public build pipeline do not constitute a validated benchmark. No v2.1 model claim is allowed before source acquisition, independent review, challenge tests, freeze, and official evaluation evidence."
+}
