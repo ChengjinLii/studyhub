@@ -353,6 +353,9 @@ def test_local_teacher_bounds_action_tokens_and_disables_thinking(
     assert action["type"] == "final"
     assert captured["max_completion_tokens"] == 1024
     assert captured["chat_template_kwargs"] == {"enable_thinking": False}
+    assert captured["response_format"]["json_schema"]["schema"]["properties"]["arguments"] == {"type": "object"}
+    prompt = json.loads(captured["messages"][0]["content"])
+    assert prompt["action_contract"]["tool_call"]["arguments"] == {"tool_parameter": "value"}
 
 
 def test_public_benchmark_hash_inventory_never_requires_sealed_task_files(tmp_path: Path) -> None:

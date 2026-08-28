@@ -27,6 +27,19 @@ ACTION_SCHEMA: dict[str, Any] = {
     "required": ["type", "name", "arguments", "content"],
 }
 
+LOCAL_ACTION_SCHEMA: dict[str, Any] = {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "additionalProperties": False,
+    "properties": {
+        "type": {"type": "string", "enum": ["tool_call", "final"]},
+        "name": {"type": "string"},
+        "arguments": {"type": "object"},
+        "content": {"type": "string"},
+    },
+    "required": ["type", "name", "arguments", "content"],
+}
+
 PROVIDER_SYSTEM = """You are the policy teacher for one isolated StudyHub Agent turn.
 Return exactly one JSON action matching the supplied schema. Do not use a shell, filesystem,
 network, browser, or any tool of your own. The only permitted actions are one listed StudyHub
@@ -176,6 +189,8 @@ def _action_prompt(
     tools: list[dict[str, Any]],
     messages: list[dict[str, Any]],
     turn: int,
+    *,
+    arguments_as_object: bool = False,
 ) -> str:
     payload = {
         "instruction": PROVIDER_SYSTEM,
@@ -188,10 +203,17 @@ def _action_prompt(
             "tool_call": {
                 "type": "tool_call",
                 "name": "tool name",
-                "arguments": "JSON object encoded as a string",
+                "arguments": (
+                    {"tool_parameter": "value"} if arguments_as_object else "JSON object encoded as a string"
+                ),
                 "content": "",
             },
-            "final": {"type": "final", "name": "", "arguments": "{}", "content": "supported answer"},
+            "final": {
+                "type": "final",
+                "name": "",
+                "arguments": {} if arguments_as_object else "{}",
+                "content": "supported answer",
+            },
         },
     }
     return json.dumps(payload, ensure_ascii=False, sort_keys=True)
@@ -582,7 +604,7 @@ class LocalOpenAIProvider:
     ) -> tuple[dict[str, Any], dict[str, Any]]:
         if not self.base_url or not self.model:
             raise TeacherProviderError("local_teacher_not_configured", self.availability())
-        prompt = _action_prompt(task, tools, messages, turn)
+        prompt = _action_prompt(task, tools, messages, turn, arguments_as_object=True)
         body = {
             "model": self.model,
             "messages": [{"role": "user", "content": prompt}],
@@ -591,7 +613,11 @@ class LocalOpenAIProvider:
             "response_format": (
                 {
                     "type": "json_schema",
-                    "json_schema": {"name": "studyhub_teacher_action", "strict": True, "schema": ACTION_SCHEMA},
+                    "json_schema": {
+                        "name": "studyhub_teacher_action",
+                        "strict": True,
+                        "schema": LOCAL_ACTION_SCHEMA,
+                    },
                 }
                 if self.strict_json_schema
                 else {"type": "json_object"}
