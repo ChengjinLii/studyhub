@@ -13,10 +13,9 @@ def sha256(path: Path) -> str:
 
 def test_recovery_ready_evidence_is_bound_to_current_inputs() -> None:
     evidence = json.loads(
-        (
-            PROJECT_ROOT
-            / "docs/training/evidence/open-only-sft-v1-1-recovery-ready-not-run-20260828.json"
-        ).read_text(encoding="utf-8")
+        (PROJECT_ROOT / "docs/training/evidence/open-only-sft-v1-1-recovery-ready-not-run-20260828.json").read_text(
+            encoding="utf-8"
+        )
     )
     paths = {
         "launcher": "scripts/train/run_open_only_sft_v1_1_recovery_gate.sh",
@@ -26,15 +25,9 @@ def test_recovery_ready_evidence_is_bound_to_current_inputs() -> None:
         "scheduler_bridge": "training/runtime_shims/areal_scheduler_bridge.py",
         "config": "configs/train/open-only-sft-v1.1-qwen35-9b.yaml",
         "program": "configs/program-v3/open-only-sft-v1.1-lrmatched.json",
-        "authorization": (
-            "configs/program-v3/open-only-sft-v1.1-lrmatched-authorization.json"
-        ),
-        "equivalence_contract": (
-            "configs/program-v3/sft-recovery-numerical-equivalence-v1.json"
-        ),
-        "dataset_manifest": (
-            "datasets/processed/open_only_sft_v1_qwen35_9b/manifest.json"
-        ),
+        "authorization": ("configs/program-v3/open-only-sft-v1.1-lrmatched-authorization.json"),
+        "equivalence_contract": ("configs/program-v3/sft-recovery-numerical-equivalence-v1.json"),
+        "dataset_manifest": ("datasets/processed/open_only_sft_v1_qwen35_9b/manifest.json"),
         "benchmark_manifest": "benchmarks/studyhub-agent-v2/manifest.json",
     }
 
