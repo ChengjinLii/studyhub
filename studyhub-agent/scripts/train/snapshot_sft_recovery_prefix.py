@@ -97,11 +97,7 @@ def _validate_source(source_root: Path, expected_global_step: int) -> dict[str, 
     files = _files(checkpoint) + _files(recover_info)
     if any(path.is_symlink() for path in files):
         raise RuntimeError("checkpoint snapshot refuses symbolic links")
-    transient = [
-        str(path)
-        for path in files
-        if any(path.name.endswith(marker) for marker in TRANSIENT_MARKERS)
-    ]
+    transient = [str(path) for path in files if any(path.name.endswith(marker) for marker in TRANSIENT_MARKERS)]
     if transient:
         raise RuntimeError(f"transient checkpoint files are still present: {transient}")
     missing = sorted(REQUIRED_RECOVER_INFO - {path.name for path in _files(recover_info)})
@@ -110,10 +106,7 @@ def _validate_source(source_root: Path, expected_global_step: int) -> dict[str, 
 
     step_info = json.loads((recover_info / "step_info.json").read_text(encoding="utf-8"))
     if int(step_info.get("global_step", -1)) != expected_global_step:
-        raise RuntimeError(
-            "unexpected prefix global step: "
-            f"{step_info.get('global_step')} != {expected_global_step}"
-        )
+        raise RuntimeError(f"unexpected prefix global step: {step_info.get('global_step')} != {expected_global_step}")
     return step_info
 
 

@@ -159,9 +159,7 @@ def test_areal_scheduler_bridge_requires_an_explicit_horizon() -> None:
 
 def test_areal_recovery_bridge_installs_state_and_batch_hooks(tmp_path: Path) -> None:
     env = dict(os.environ)
-    env["PYTHONPATH"] = os.pathsep.join(
-        [str(ROOT / "training/runtime_shims"), str(ROOT)]
-    )
+    env["PYTHONPATH"] = os.pathsep.join([str(ROOT / "training/runtime_shims"), str(ROOT)])
     env["STUDYHUB_AREAL_RECOVERY_STATE_BRIDGE"] = "1"
     env["STUDYHUB_RECOVERY_AUDIT_ROOT"] = str(tmp_path / "audit")
     env["STUDYHUB_RECOVERY_AUDIT_START_STEP"] = "0"
@@ -198,6 +196,4 @@ def test_areal_recovery_bridge_installs_state_and_batch_hooks(tmp_path: Path) ->
         env=env,
     )
 
-    assert result.stdout.strip().splitlines()[-1] == (
-        '{"batch": true, "dump": true, "load": true}'
-    )
+    assert result.stdout.strip().splitlines()[-1] == ('{"batch": true, "dump": true, "load": true}')

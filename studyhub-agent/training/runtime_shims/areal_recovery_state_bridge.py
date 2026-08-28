@@ -92,12 +92,10 @@ def fingerprint_batch(batch: Any) -> dict[str, Any]:
         "sample_count": len(samples),
         "sample_sha256": [fingerprint(sample) for sample in samples],
         "input_ids_sha256": [
-            fingerprint(sample.get("input_ids")) if isinstance(sample, dict) else None
-            for sample in samples
+            fingerprint(sample.get("input_ids")) if isinstance(sample, dict) else None for sample in samples
         ],
         "loss_mask_sha256": [
-            fingerprint(sample.get("loss_mask")) if isinstance(sample, dict) else None
-            for sample in samples
+            fingerprint(sample.get("loss_mask")) if isinstance(sample, dict) else None for sample in samples
         ],
     }
 
@@ -209,8 +207,7 @@ def _restore_rng_state(recover_info: Path, rank: int, world_size: int) -> dict[s
         states = payload["torch_cuda"]
         if len(states) != torch.cuda.device_count():
             raise RuntimeError(
-                "CUDA RNG state device count mismatch: "
-                f"saved={len(states)}, current={torch.cuda.device_count()}"
+                f"CUDA RNG state device count mismatch: saved={len(states)}, current={torch.cuda.device_count()}"
             )
         torch.cuda.set_rng_state_all(states)
     return {"path": path.name, "sha256": _sha256(path)}
@@ -325,10 +322,7 @@ def install_areal_recovery_state_bridge() -> None:
             try:
                 _restore_rng_state(recover_info, rank, world_size)
             except Exception as exc:
-                audit_restore_error = (
-                    f"rank {rank} post-audit RNG restore failed: "
-                    f"{type(exc).__name__}: {exc}"
-                )
+                audit_restore_error = f"rank {rank} post-audit RNG restore failed: {type(exc).__name__}: {exc}"
             _raise_rank_errors(audit_restore_error)
             _append_event(
                 audit_root / "state",
@@ -373,9 +367,7 @@ def install_areal_recovery_state_bridge() -> None:
             try:
                 rng_file = _restore_rng_state(recover_info, rank, world_size)
             except Exception as exc:
-                restore_error = (
-                    f"rank {rank} RNG restore failed: {type(exc).__name__}: {exc}"
-                )
+                restore_error = f"rank {rank} RNG restore failed: {type(exc).__name__}: {exc}"
             _raise_rank_errors(restore_error)
             _append_event(
                 audit_root / "state",

@@ -8,10 +8,9 @@ from types import SimpleNamespace
 
 import pytest
 
-from scripts.benchmark.v2.validate_manifest import validate as validate_manifest
-
 from scripts.benchmark.run_9b_base_eval import aggregate, select_tasks
 from scripts.benchmark.v2.validate_calibration import validate as validate_calibration
+from scripts.benchmark.v2.validate_manifest import validate as validate_manifest
 from studyhub_agent.benchmark_v2.development_evaluator import evaluate_development
 from studyhub_agent.benchmark_v2.environment import ReplayableAgentEnvironmentV2
 from studyhub_agent.benchmark_v2.hermes_runner import BenchmarkHermesRunnerV2

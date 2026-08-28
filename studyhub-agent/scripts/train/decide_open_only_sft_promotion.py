@@ -25,55 +25,30 @@ def load_json(path: Path) -> dict[str, Any]:
 
 
 def completed(portfolio: dict[str, Any], section: str, role: str) -> bool:
-    return (
-        portfolio.get("internal", {})
-        .get(section, {})
-        .get(role, {})
-        .get("status")
-        == "COMPLETED"
-    )
+    return portfolio.get("internal", {}).get(section, {}).get(role, {}).get("status") == "COMPLETED"
 
 
 def external_complete(portfolio: dict[str, Any], benchmark: str) -> bool:
     results = portfolio.get("external", {}).get(benchmark, {}).get("model_results", {})
-    return all(
-        results.get(role, {}).get("status") == "COMPLETED"
-        for role in ("base", "mixed_v3_0", "open_only_v1_1")
-    )
+    return all(results.get(role, {}).get("status") == "COMPLETED" for role in ("base", "mixed_v3_0", "open_only_v1_1"))
 
 
 def decide(control: dict[str, Any], portfolio: dict[str, Any]) -> dict[str, Any]:
-    hard_controls_pass = (
-        not control.get("hard_control_failures")
-        and not control.get("provenance_failures")
-    )
+    hard_controls_pass = not control.get("hard_control_failures") and not control.get("provenance_failures")
     recovery = control.get("runtime_correction_diff", {}).get("recovery_contract", {})
     recovery_pass = (
         recovery.get("eligible") is True
-        and control.get("runtime_correction_diff", {}).get("status")
-        == "SEMANTIC_EQUIVALENCE_CONFIRMED_BY_R1_R4"
+        and control.get("runtime_correction_diff", {}).get("status") == "SEMANTIC_EQUIVALENCE_CONFIRMED_BY_R1_R4"
     )
     sealed_unused = (
-        portfolio.get("scope", {}).get("sealed_used") is False
-        and control.get("scope", {}).get("sealed_used") is False
+        portfolio.get("scope", {}).get("sealed_used") is False and control.get("scope", {}).get("sealed_used") is False
     )
-    candidate_training_complete = (
-        portfolio.get("training", {})
-        .get("open_only_v1_1", {})
-        .get("status")
-        == "COMPLETE"
-    )
+    candidate_training_complete = portfolio.get("training", {}).get("open_only_v1_1", {}).get("status") == "COMPLETE"
     development_complete = all(
-        completed(portfolio, "development", role)
-        for role in ("base", "mixed_v3_0", "open_only_v1_1")
+        completed(portfolio, "development", role) for role in ("base", "mixed_v3_0", "open_only_v1_1")
     )
-    variance_complete = all(
-        completed(portfolio, "variance", role)
-        for role in ("base", "mixed_v3_0", "open_only_v1_1")
-    )
-    external_required_complete = all(
-        external_complete(portfolio, benchmark) for benchmark in ("bfcl", "tau2")
-    )
+    variance_complete = all(completed(portfolio, "variance", role) for role in ("base", "mixed_v3_0", "open_only_v1_1"))
+    external_required_complete = all(external_complete(portfolio, benchmark) for benchmark in ("bfcl", "tau2"))
     signals = portfolio.get("promotion_signals", {})
     internal_direction_pass = all(
         signals.get(name, {}).get("status") == "PASS"
@@ -83,12 +58,8 @@ def decide(control: dict[str, Any], portfolio: dict[str, Any]) -> dict[str, Any]
             "cost_latency",
         )
     )
-    variance_direction_pass = (
-        signals.get("variance_direction", {}).get("status") == "PASS"
-    )
-    external_direction_pass = (
-        signals.get("external_direction", {}).get("status") == "PASS"
-    )
+    variance_direction_pass = signals.get("variance_direction", {}).get("status") == "PASS"
+    external_direction_pass = signals.get("external_direction", {}).get("status") == "PASS"
 
     if not sealed_unused or not hard_controls_pass:
         decision = "BLOCKED_CONTROL_DRIFT"
@@ -168,18 +139,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--control",
         type=Path,
-        default=(
-            PROJECT_ROOT
-            / "docs/training/evidence/open-only-sft-v1-1-control-diff.json"
-        ),
+        default=(PROJECT_ROOT / "docs/training/evidence/open-only-sft-v1-1-control-diff.json"),
     )
     parser.add_argument(
         "--portfolio",
         type=Path,
-        default=(
-            PROJECT_ROOT
-            / "docs/training/evidence/open-only-sft-v1-1-benchmark-portfolio.json"
-        ),
+        default=(PROJECT_ROOT / "docs/training/evidence/open-only-sft-v1-1-benchmark-portfolio.json"),
     )
     parser.add_argument("--output", type=Path, required=True)
     return parser.parse_args()

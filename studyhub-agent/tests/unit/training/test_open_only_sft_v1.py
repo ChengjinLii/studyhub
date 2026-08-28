@@ -33,9 +33,7 @@ def test_token_selector_preserves_count_and_hits_feasible_target() -> None:
 
 
 def test_program_changes_only_training_data() -> None:
-    program = json.loads(
-        (PROJECT_ROOT / "configs/program-v3/open-only-sft-v1.json").read_text(encoding="utf-8")
-    )
+    program = json.loads((PROJECT_ROOT / "configs/program-v3/open-only-sft-v1.json").read_text(encoding="utf-8"))
     selection = program["selection"]
 
     assert program["scope"]["only_training_data_changes"] is True
@@ -54,9 +52,7 @@ def test_open_only_recipe_matches_mixed_control() -> None:
     open_only = yaml.safe_load(
         (PROJECT_ROOT / "configs/train/open-only-sft-v1-qwen35-9b.yaml").read_text(encoding="utf-8")
     )
-    mixed = yaml.safe_load(
-        (PROJECT_ROOT / "configs/train/runtime-sft-v3-qwen35-9b.yaml").read_text(encoding="utf-8")
-    )
+    mixed = yaml.safe_load((PROJECT_ROOT / "configs/train/runtime-sft-v3-qwen35-9b.yaml").read_text(encoding="utf-8"))
 
     assert open_only["seed"] == mixed["seed"] == 20260827
     assert open_only["cluster"]["n_gpus_per_node"] == mixed["cluster"]["n_gpus_per_node"] == 2
@@ -83,14 +79,10 @@ def test_launcher_requires_explicit_open_only_authorization() -> None:
 
 def test_corrected_open_only_config_preserves_the_sft_schema() -> None:
     original = yaml.safe_load(
-        (PROJECT_ROOT / "configs/train/open-only-sft-v1-qwen35-9b.yaml").read_text(
-            encoding="utf-8"
-        )
+        (PROJECT_ROOT / "configs/train/open-only-sft-v1-qwen35-9b.yaml").read_text(encoding="utf-8")
     )
     corrected = yaml.safe_load(
-        (PROJECT_ROOT / "configs/train/open-only-sft-v1.1-qwen35-9b.yaml").read_text(
-            encoding="utf-8"
-        )
+        (PROJECT_ROOT / "configs/train/open-only-sft-v1.1-qwen35-9b.yaml").read_text(encoding="utf-8")
     )
 
     assert set(corrected) == set(original)
@@ -104,23 +96,18 @@ def test_corrected_open_only_config_preserves_the_sft_schema() -> None:
 def test_corrected_authorization_locks_the_real_config_hash() -> None:
     config = PROJECT_ROOT / "configs/train/open-only-sft-v1.1-qwen35-9b.yaml"
     authorization = json.loads(
-        (
-            PROJECT_ROOT
-            / "configs/program-v3/open-only-sft-v1.1-lrmatched-authorization.json"
-        ).read_text(encoding="utf-8")
+        (PROJECT_ROOT / "configs/program-v3/open-only-sft-v1.1-lrmatched-authorization.json").read_text(
+            encoding="utf-8"
+        )
     )
 
-    assert authorization["lineage"]["config_sha256"] == hashlib.sha256(
-        config.read_bytes()
-    ).hexdigest()
+    assert authorization["lineage"]["config_sha256"] == hashlib.sha256(config.read_bytes()).hexdigest()
     assert authorization["recipe"]["scheduler_total_steps"] == 5_456
     assert authorization["completion_contract"]["require_lr_schedule_audit"] is True
 
 
 def test_corrected_launcher_fails_closed_on_scheduler_and_recovery() -> None:
-    launcher = (PROJECT_ROOT / "scripts/train/run_open_only_sft_v1_1.sh").read_text(
-        encoding="utf-8"
-    )
+    launcher = (PROJECT_ROOT / "scripts/train/run_open_only_sft_v1_1.sh").read_text(encoding="utf-8")
 
     assert "STUDYHUB_ALLOW_OPEN_ONLY_SFT_V1_1" in launcher
     assert "STUDYHUB_AREAL_SCHEDULER_BRIDGE=1" in launcher
@@ -138,9 +125,7 @@ def test_corrected_launcher_fails_closed_on_scheduler_and_recovery() -> None:
 
 
 def test_recovery_gate_compares_continuous_and_resumed_lora() -> None:
-    launcher = (
-        PROJECT_ROOT / "scripts/train/run_open_only_sft_v1_1_recovery_gate.sh"
-    ).read_text(encoding="utf-8")
+    launcher = (PROJECT_ROOT / "scripts/train/run_open_only_sft_v1_1_recovery_gate.sh").read_text(encoding="utf-8")
 
     assert "STUDYHUB_ALLOW_SFT_RECOVERY_GATE" in launcher
     assert '"${CONTINUOUS_TRIAL}"' in launcher

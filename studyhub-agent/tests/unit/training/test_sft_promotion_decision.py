@@ -8,11 +8,7 @@ def _control(*, recovery: bool = True) -> dict:
         "hard_control_failures": [],
         "provenance_failures": [],
         "runtime_correction_diff": {
-            "status": (
-                "SEMANTIC_EQUIVALENCE_CONFIRMED_BY_R1_R4"
-                if recovery
-                else "REQUIRES_R1_R4_CONFIRMATION"
-            ),
+            "status": ("SEMANTIC_EQUIVALENCE_CONFIRMED_BY_R1_R4" if recovery else "REQUIRES_R1_R4_CONFIRMATION"),
             "recovery_contract": {
                 "eligible": recovery,
                 "r4_status": "BITWISE_RESUME_PASS" if recovery else None,
@@ -40,10 +36,7 @@ def _portfolio(*, external: str = "COMPLETED") -> dict:
         },
         "external": {
             benchmark: {
-                "model_results": {
-                    role: {"status": external}
-                    for role in ("base", "mixed_v3_0", "open_only_v1_1")
-                }
+                "model_results": {role: {"status": external} for role in ("base", "mixed_v3_0", "open_only_v1_1")}
             }
             for benchmark in ("bfcl", "tau2")
         },

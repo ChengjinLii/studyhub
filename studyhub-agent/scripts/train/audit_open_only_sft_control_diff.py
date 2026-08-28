@@ -205,37 +205,16 @@ def build_audit(
 ) -> dict[str, Any]:
     repo = project_root.parent
     mixed_config_relative = "studyhub-agent/configs/train/runtime-sft-v3-qwen35-9b.yaml"
-    candidate_config_path = (
-        project_root / "configs/train/open-only-sft-v1.1-qwen35-9b.yaml"
-    )
-    mixed_authorization_path = (
-        project_root / "configs/program-v3/overnight-sft-baseline-authorization.json"
-    )
-    candidate_authorization_path = (
-        project_root
-        / "configs/program-v3/open-only-sft-v1.1-lrmatched-authorization.json"
-    )
-    candidate_program_path = (
-        project_root / "configs/program-v3/open-only-sft-v1.1-lrmatched.json"
-    )
-    candidate_data_card_path = (
-        project_root / "configs/program-v3/open-only-sft-v1-data-card.json"
-    )
-    candidate_selected_path = (
-        project_root / "datasets/interim/open_only_sft_v1/selected.jsonl"
-    )
-    candidate_selected_manifest_path = (
-        project_root / "datasets/interim/open_only_sft_v1/selected.manifest.json"
-    )
-    mixed_consumption_path = (
-        project_root / "configs/program-v3/overnight-sft-baseline-consumption.json"
-    )
-    mixed_manifest_path = (
-        project_root / "datasets/processed/runtime_sft_v3_qwen35_9b/manifest.json"
-    )
-    candidate_manifest_path = (
-        project_root / "datasets/processed/open_only_sft_v1_qwen35_9b/manifest.json"
-    )
+    candidate_config_path = project_root / "configs/train/open-only-sft-v1.1-qwen35-9b.yaml"
+    mixed_authorization_path = project_root / "configs/program-v3/overnight-sft-baseline-authorization.json"
+    candidate_authorization_path = project_root / "configs/program-v3/open-only-sft-v1.1-lrmatched-authorization.json"
+    candidate_program_path = project_root / "configs/program-v3/open-only-sft-v1.1-lrmatched.json"
+    candidate_data_card_path = project_root / "configs/program-v3/open-only-sft-v1-data-card.json"
+    candidate_selected_path = project_root / "datasets/interim/open_only_sft_v1/selected.jsonl"
+    candidate_selected_manifest_path = project_root / "datasets/interim/open_only_sft_v1/selected.manifest.json"
+    mixed_consumption_path = project_root / "configs/program-v3/overnight-sft-baseline-consumption.json"
+    mixed_manifest_path = project_root / "datasets/processed/runtime_sft_v3_qwen35_9b/manifest.json"
+    candidate_manifest_path = project_root / "datasets/processed/open_only_sft_v1_qwen35_9b/manifest.json"
     benchmark_path = project_root / "benchmarks/studyhub-agent-v2/manifest.json"
     areal_lock_path = project_root / "training/areal/upstream.lock.json"
     hermes_lock_path = project_root / "integrations/hermes/upstream.lock.json"
@@ -535,68 +514,48 @@ def build_audit(
         for path in runtime_files
     }
     runtime_changed = [
-        path
-        for path, values in runtime_diff.items()
-        if values["mixed_blob_sha256"] != values["candidate_blob_sha256"]
+        path for path, values in runtime_diff.items() if values["mixed_blob_sha256"] != values["candidate_blob_sha256"]
     ]
     provenance_checks = {
-        "mixed_training_commit_matches_frozen_reference": (
-            mixed_training_commit == MIXED_TRAINING_COMMIT
-        ),
-        "mixed_consumption_commit_matches_run": (
-            mixed_consumption["training_commit"] == mixed_training_commit
-        ),
+        "mixed_training_commit_matches_frozen_reference": (mixed_training_commit == MIXED_TRAINING_COMMIT),
+        "mixed_consumption_commit_matches_run": (mixed_consumption["training_commit"] == mixed_training_commit),
         "mixed_config_git_blob_matches_run": (
-            git_blob_sha256(repo, mixed_training_commit, mixed_config_relative)
-            == mixed_run["config"]["sha256"]
+            git_blob_sha256(repo, mixed_training_commit, mixed_config_relative) == mixed_run["config"]["sha256"]
         ),
         "mixed_authorization_matches_run": (
-            sha256(mixed_authorization_path)
-            == mixed_run["run_authorization"]["sha256"]
+            sha256(mixed_authorization_path) == mixed_run["run_authorization"]["sha256"]
         ),
-        "mixed_dataset_manifest_matches_run": (
-            sha256(mixed_manifest_path) == mixed_run["dataset_manifest_sha256"]
-        ),
+        "mixed_dataset_manifest_matches_run": (sha256(mixed_manifest_path) == mixed_run["dataset_manifest_sha256"]),
         "candidate_program_matches_authorization": (
-            sha256(candidate_program_path)
-            == candidate_authorization["lineage"]["program_sha256"]
+            sha256(candidate_program_path) == candidate_authorization["lineage"]["program_sha256"]
         ),
         "candidate_config_matches_authorization": (
-            sha256(candidate_config_path)
-            == candidate_authorization["lineage"]["config_sha256"]
+            sha256(candidate_config_path) == candidate_authorization["lineage"]["config_sha256"]
         ),
         "candidate_dataset_matches_authorization": (
-            sha256(candidate_manifest_path)
-            == candidate_authorization["lineage"]["dataset_manifest_sha256"]
+            sha256(candidate_manifest_path) == candidate_authorization["lineage"]["dataset_manifest_sha256"]
         ),
         "candidate_selected_matches_authorization": (
-            sha256(candidate_selected_path)
-            == candidate_authorization["lineage"]["selected_jsonl_sha256"]
+            sha256(candidate_selected_path) == candidate_authorization["lineage"]["selected_jsonl_sha256"]
         ),
         "candidate_selected_manifest_matches_authorization": (
-            sha256(candidate_selected_manifest_path)
-            == candidate_authorization["lineage"]["selected_manifest_sha256"]
+            sha256(candidate_selected_manifest_path) == candidate_authorization["lineage"]["selected_manifest_sha256"]
         ),
         "candidate_data_card_matches_authorization": (
-            sha256(candidate_data_card_path)
-            == candidate_authorization["lineage"]["data_card_sha256"]
+            sha256(candidate_data_card_path) == candidate_authorization["lineage"]["data_card_sha256"]
         ),
         "benchmark_matches_authorization": (
-            sha256(benchmark_path)
-            == candidate_authorization["lineage"]["benchmark_manifest_sha256"]
+            sha256(benchmark_path) == candidate_authorization["lineage"]["benchmark_manifest_sha256"]
         ),
     }
-    provenance_failures = [
-        name for name, passed in provenance_checks.items() if not passed
-    ]
+    provenance_failures = [name for name, passed in provenance_checks.items() if not passed]
     hard_failures = [name for name, row in controls.items() if row["status"] == "FAIL"]
     recovery_contract = recovery_contract_status(recovery_evidence_path)
     worktree = git_output(repo, "status", "--short")
     status, decision, blockers = classify_audit(
         hard_failures=hard_failures,
         provenance_failures=provenance_failures,
-        runtime_requires_confirmation=bool(runtime_changed)
-        and not recovery_contract["eligible"],
+        runtime_requires_confirmation=bool(runtime_changed) and not recovery_contract["eligible"],
         worktree_dirty=bool(worktree),
     )
 

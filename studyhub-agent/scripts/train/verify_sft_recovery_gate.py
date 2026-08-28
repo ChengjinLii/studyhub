@@ -46,9 +46,11 @@ def compare_adapters(
     failures: list[str] = []
     tensor_rows: list[dict[str, Any]] = []
     thresholds = contract["adapter_thresholds"]
-    with safe_open(reference, framework="pt", device="cpu") as left, safe_open(
-        recovered, framework="pt", device="cpu"
-    ) as right, safe_open(initial, framework="pt", device="cpu") as origin:
+    with (
+        safe_open(reference, framework="pt", device="cpu") as left,
+        safe_open(recovered, framework="pt", device="cpu") as right,
+        safe_open(initial, framework="pt", device="cpu") as origin,
+    ):
         left_keys = set(left.keys())
         right_keys = set(right.keys())
         origin_keys = set(origin.keys())
@@ -130,16 +132,12 @@ def compare_adapters(
         failures.append("max_absolute_difference_exceeded")
     if relative_l2 > float(thresholds["max_relative_l2_to_reference"]):
         failures.append("relative_l2_to_reference_exceeded")
-    if relative_update_l2 > float(
-        thresholds["max_relative_l2_to_reference_update"]
-    ):
+    if relative_update_l2 > float(thresholds["max_relative_l2_to_reference_update"]):
         failures.append("relative_l2_to_reference_update_exceeded")
     if update_cosine < float(thresholds["min_update_cosine_similarity"]):
         failures.append("update_cosine_similarity_below_minimum")
     if not (
-        float(thresholds["min_update_norm_ratio"])
-        <= update_norm_ratio
-        <= float(thresholds["max_update_norm_ratio"])
+        float(thresholds["min_update_norm_ratio"]) <= update_norm_ratio <= float(thresholds["max_update_norm_ratio"])
     ):
         failures.append("update_norm_ratio_out_of_bounds")
     return {
@@ -217,31 +215,19 @@ def compare_continuation_metrics(
     entropy_left, entropy_right = paired_differences("sft/entropy/avg")
     first_loss_difference = abs(loss_left[0] - loss_right[0])
     max_loss_relative_difference = max(
-        abs(a - b) / max(abs(a), 1e-12)
-        for a, b in zip(loss_left, loss_right, strict=True)
+        abs(a - b) / max(abs(a), 1e-12) for a, b in zip(loss_left, loss_right, strict=True)
     )
     max_grad_relative_difference = max(
-        abs(a - b) / max(abs(a), 1e-12)
-        for a, b in zip(grad_left, grad_right, strict=True)
+        abs(a - b) / max(abs(a), 1e-12) for a, b in zip(grad_left, grad_right, strict=True)
     )
-    max_entropy_absolute_difference = max(
-        abs(a - b) for a, b in zip(entropy_left, entropy_right, strict=True)
-    )
-    if first_loss_difference > float(
-        thresholds["max_first_step_loss_absolute_difference"]
-    ):
+    max_entropy_absolute_difference = max(abs(a - b) for a, b in zip(entropy_left, entropy_right, strict=True))
+    if first_loss_difference > float(thresholds["max_first_step_loss_absolute_difference"]):
         failures.append("first_recovered_loss_difference_exceeded")
-    if max_loss_relative_difference > float(
-        thresholds["max_tail_loss_relative_difference"]
-    ):
+    if max_loss_relative_difference > float(thresholds["max_tail_loss_relative_difference"]):
         failures.append("tail_loss_relative_difference_exceeded")
-    if max_grad_relative_difference > float(
-        thresholds["max_tail_grad_norm_relative_difference"]
-    ):
+    if max_grad_relative_difference > float(thresholds["max_tail_grad_norm_relative_difference"]):
         failures.append("tail_grad_norm_relative_difference_exceeded")
-    if max_entropy_absolute_difference > float(
-        thresholds["max_tail_entropy_absolute_difference"]
-    ):
+    if max_entropy_absolute_difference > float(thresholds["max_tail_entropy_absolute_difference"]):
         failures.append("tail_entropy_absolute_difference_exceeded")
     return {
         "status": "PASS" if not failures else "FAIL",
@@ -267,11 +253,7 @@ def _load_audit_lane(root: Path, lane: str) -> dict[int, list[dict[str, Any]]]:
         raise RuntimeError(f"missing recovery audit lane: {directory}")
     by_rank: dict[int, list[dict[str, Any]]] = {}
     for path in sorted(directory.glob("rank-*.jsonl")):
-        rows = [
-            json.loads(line)
-            for line in path.read_text(encoding="utf-8").splitlines()
-            if line.strip()
-        ]
+        rows = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
         if not rows:
             raise RuntimeError(f"empty recovery audit file: {path}")
         rank = int(rows[0]["rank"])
@@ -298,13 +280,9 @@ def compare_batch_fingerprints(
     if set(left) != set(right):
         failures.append("batch_audit_rank_set_mismatch")
     declared_world_sizes = {
-        int(row.get("world_size", -1))
-        for rows in [*left.values(), *right.values()]
-        for row in rows
+        int(row.get("world_size", -1)) for rows in [*left.values(), *right.values()] for row in rows
     }
-    if len(declared_world_sizes) != 1 or set(left) != set(
-        range(next(iter(declared_world_sizes), -1))
-    ):
+    if len(declared_world_sizes) != 1 or set(left) != set(range(next(iter(declared_world_sizes), -1))):
         failures.append("batch_audit_world_size_mismatch")
     expected_steps = list(range(start, start + count))
     comparisons = []
@@ -361,17 +339,12 @@ def verify_state_continuity(
     recovered = _load_audit_lane(recovered_root, "state")
     failures: list[str] = []
     inventory = {
-        row["path"]: row
-        for row in shared_prefix.get("snapshot", {})
-        .get("target_inventory", {})
-        .get("files", [])
+        row["path"]: row for row in shared_prefix.get("snapshot", {}).get("target_inventory", {}).get("files", [])
     }
     rank_set = set(continuous) & set(recovered)
     if set(continuous) != set(recovered):
         failures.append("state_audit_rank_set_mismatch")
-    snapshot_world_size = int(
-        shared_prefix.get("snapshot", {}).get("runtime", {}).get("world_size", -1)
-    )
+    snapshot_world_size = int(shared_prefix.get("snapshot", {}).get("runtime", {}).get("world_size", -1))
     if rank_set != set(range(snapshot_world_size)):
         failures.append("state_audit_world_size_mismatch")
     rows = []
@@ -379,8 +352,7 @@ def verify_state_continuity(
         saved = [
             row
             for row in continuous[rank]
-            if row.get("event") == "state_saved"
-            and int(row.get("global_step", -1)) == expected_prefix_global_step
+            if row.get("event") == "state_saved" and int(row.get("global_step", -1)) == expected_prefix_global_step
         ]
         restored = [row for row in recovered[rank] if row.get("event") == "state_restored"]
         if len(saved) != 1:
@@ -398,19 +370,15 @@ def verify_state_continuity(
             and snapshot_rng == saved_row.get("rng_file", {}).get("sha256")
             and snapshot_rng == restored_row.get("rng_file", {}).get("sha256")
         )
-        dataloader_hash = inventory.get("recover_info/dataloader_info.pkl", {}).get(
-            "sha256"
-        )
+        dataloader_hash = inventory.get("recover_info/dataloader_info.pkl", {}).get("sha256")
         dataloader_equal = (
             dataloader_hash
             and dataloader_hash == saved_row.get("dataloader_state_sha256")
             and dataloader_hash == restored_row.get("dataloader_state_sha256")
         )
         next_step_equal = (
-            int(restored_row.get("saved_global_step", -1))
-            == expected_prefix_global_step
-            and int(restored_row.get("next_global_step", -1))
-            == expected_prefix_global_step + 1
+            int(restored_row.get("saved_global_step", -1)) == expected_prefix_global_step
+            and int(restored_row.get("next_global_step", -1)) == expected_prefix_global_step + 1
         )
         world_size_equal = (
             int(saved_row.get("world_size", -1)) == snapshot_world_size
@@ -420,12 +388,8 @@ def verify_state_continuity(
             restored_row.get("dcp_model_optimizer_load") == "PASS"
             and restored_row.get("dataloader_load_state_dict") == "PASS"
         )
-        engine_versions_equal = (
-            saved_row.get("engine_versions") == restored_row.get("engine_versions")
-            and all(
-                int(value) == expected_prefix_global_step + 1
-                for value in saved_row.get("engine_versions", {}).values()
-            )
+        engine_versions_equal = saved_row.get("engine_versions") == restored_row.get("engine_versions") and all(
+            int(value) == expected_prefix_global_step + 1 for value in saved_row.get("engine_versions", {}).values()
         )
         audit_rng_restored = saved_row.get("post_audit_rng_restored") is True
         rows.append(
@@ -467,11 +431,7 @@ def verify_state_continuity(
 
 def summarize_restart_dcp_load(state_continuity: dict[str, Any]) -> dict[str, Any]:
     rank_checks = state_continuity.get("rank_checks", [])
-    passed_ranks = [
-        int(row["rank"])
-        for row in rank_checks
-        if row.get("model_optimizer_and_dataloader_load") is True
-    ]
+    passed_ranks = [int(row["rank"]) for row in rank_checks if row.get("model_optimizer_and_dataloader_load") is True]
     expected_ranks = [int(row["rank"]) for row in rank_checks]
     failures = []
     if not expected_ranks:
@@ -499,10 +459,7 @@ def load_shared_prefix_report(
     if payload.get("status") != "PASS":
         failures.append("shared_prefix_snapshot_failed")
     step_info = payload.get("step_info")
-    if (
-        not isinstance(step_info, dict)
-        or int(step_info.get("global_step", -1)) != expected_global_step
-    ):
+    if not isinstance(step_info, dict) or int(step_info.get("global_step", -1)) != expected_global_step:
         failures.append("shared_prefix_global_step_mismatch")
     if payload.get("method") != "paused_non_destructive_copy_atomic_publish":
         failures.append("shared_prefix_not_non_destructive")
@@ -540,8 +497,7 @@ def compare_run_provenance(reference_path: Path, recovered_path: Path) -> dict[s
             "benchmark_manifest_sha256": payload.get("benchmark", {}).get("sha256"),
             "model_config_sha256": payload.get("model", {}).get("config_sha256"),
             "model_weights": [
-                (row.get("name"), row.get("sha256"))
-                for row in payload.get("model", {}).get("weight_files", [])
+                (row.get("name"), row.get("sha256")) for row in payload.get("model", {}).get("weight_files", [])
             ],
             "areal_commit": payload.get("areal_upstream", {}).get("commit"),
             "hermes_commit": payload.get("hermes_upstream", {}).get("commit"),
@@ -692,9 +648,7 @@ def main() -> int:
         failures.append("batch_fingerprint_contract_failed")
     if continuation["status"] != "PASS":
         failures.append("continuation_metrics_contract_failed")
-    bounded_contract_eligible = bool(
-        contract.get("confirmation", {}).get("eligible_for_promotion", True)
-    )
+    bounded_contract_eligible = bool(contract.get("confirmation", {}).get("eligible_for_promotion", True))
     if adapter["bitwise_equal"]:
         r4_status = "BITWISE_RESUME_PASS"
     elif adapter["status"] == "PASS" and bounded_contract_eligible:
@@ -705,11 +659,7 @@ def main() -> int:
         failures.append("recovered_adapter_differs_from_continuous")
 
     r1 = {
-        "status": (
-            "PASS"
-            if continuous_lr["status"] == recovered_lr["status"] == "PASS"
-            else "FAIL"
-        ),
+        "status": ("PASS" if continuous_lr["status"] == recovered_lr["status"] == "PASS" else "FAIL"),
         "continuous": continuous_lr,
         "recovered": recovered_lr,
         "recovered_segment_provenance": [
@@ -729,25 +679,17 @@ def main() -> int:
         **shared_prefix,
         "status": (
             "PASS"
-            if shared_prefix["status"]
-            == run_provenance["status"]
-            == restart_dcp_load["status"]
-            == "PASS"
+            if shared_prefix["status"] == run_provenance["status"] == restart_dcp_load["status"] == "PASS"
             else "FAIL"
         ),
         "run_provenance": run_provenance,
-        "metadata_parse": shared_prefix.get("snapshot", {}).get(
-            "dcp_metadata_load"
-        ),
+        "metadata_parse": shared_prefix.get("snapshot", {}).get("dcp_metadata_load"),
         "actual_restart_load": restart_dcp_load,
     }
     r3 = {
         "status": (
             "PASS"
-            if state_continuity["status"]
-            == batch_fingerprints["status"]
-            == continuation["status"]
-            == "PASS"
+            if state_continuity["status"] == batch_fingerprints["status"] == continuation["status"] == "PASS"
             else "FAIL"
         ),
         "state_continuity": state_continuity,
@@ -778,8 +720,7 @@ def main() -> int:
             "sealed_used": False,
             "expected_updates_per_path": args.expected_updates,
             "boundary": args.boundary_scope,
-            "formal_training_eligible": not failures
-            and args.boundary_scope != "EARLY_WARMUP_MECHANICS_ONLY",
+            "formal_training_eligible": not failures and args.boundary_scope != "EARLY_WARMUP_MECHANICS_ONLY",
         },
         "equivalence_contract": {
             "path": str(args.equivalence_contract.resolve()),
