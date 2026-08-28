@@ -145,6 +145,8 @@ def test_recovery_gate_compares_continuous_and_resumed_lora() -> None:
     assert 'run_attempt "${RECOVERED_TRIAL}"' in launcher
     assert "snapshot_sft_recovery_prefix.py" in launcher
     assert '--shared-prefix-report "${SHARED_PREFIX_REPORT}"' in launcher
+    assert '--equivalence-contract "${EQUIVALENCE_CONTRACT}"' in launcher
+    assert '--initial-adapter "${INITIAL_ADAPTER}"' in launcher
     assert "RECOVERED_FIRST_ATTEMPT" not in launcher
     assert "verify_sft_recovery_gate.py" in launcher
     assert "--continuous-adapter" in launcher

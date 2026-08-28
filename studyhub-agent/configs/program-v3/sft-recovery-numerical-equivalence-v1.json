@@ -1,0 +1,53 @@
+{
+  "schema_version": "studyhub.sft-recovery-equivalence-contract.v1",
+  "status": "PRE_REGISTERED_BEFORE_CONFIRMATION_RUN",
+  "created_at": "2026-08-28T22:45:00+08:00",
+  "scope": {
+    "backend": "AReaL FSDP2",
+    "dtype": "bfloat16",
+    "model": "Qwen3.5-9B LoRA r16 alpha16",
+    "updates_per_path": 4,
+    "shared_prefix_global_step": 1,
+    "model_quality": "NOT_EVALUATED"
+  },
+  "rationale": {
+    "bitwise_identity": "Reported but not required because the controlled production recipe does not enable PyTorch deterministic algorithms and CUDA SDPA backward may be nondeterministic across process restarts.",
+    "official_reference": "https://docs.pytorch.org/docs/stable/notes/randomness.html",
+    "control_constraint": "Deterministic kernels are not enabled only for this Gate because the Mixed-v3.0 control was trained with the production recipe; changing kernels would introduce a second experimental variable.",
+    "confirmation_rule": "Only a fresh Gate started after this contract is committed may satisfy it. Earlier observations remain FAIL under their original exact-tensor contract."
+  },
+  "calibration_disclosure": [
+    "docs/training/evidence/open-only-sft-v1-1-recovery-gate-20260828_220507.json",
+    "docs/training/evidence/open-only-sft-v1-1-recovery-gate-20260828_223122.json"
+  ],
+  "adapter_thresholds": {
+    "max_absolute_difference": 0.00001,
+    "max_relative_l2_to_reference": 0.000005,
+    "max_relative_l2_to_reference_update": 0.05,
+    "min_update_cosine_similarity": 0.999,
+    "min_update_norm_ratio": 0.995,
+    "max_update_norm_ratio": 1.005
+  },
+  "continuation_thresholds": {
+    "exact_series": [
+      "sft/n_tokens",
+      "sft/n_valid_tokens",
+      "sft/prompt_tokens",
+      "sft/n_seqs",
+      "sft/num_micro_batches",
+      "sft/update_successful"
+    ],
+    "max_first_step_loss_absolute_difference": 0.0005,
+    "max_tail_loss_relative_difference": 0.01,
+    "max_tail_grad_norm_relative_difference": 0.02,
+    "max_tail_entropy_absolute_difference": 0.005
+  },
+  "hard_failures": [
+    "shared prefix missing or not atomically branched",
+    "LR schedule mismatch",
+    "sample-shape series mismatch",
+    "missing or unexpected LoRA tensor",
+    "non-finite metric",
+    "any numerical threshold exceeded"
+  ]
+}

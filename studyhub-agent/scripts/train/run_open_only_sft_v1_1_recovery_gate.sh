@@ -7,6 +7,7 @@ RUNTIME_SHIM="${PROJECT_ROOT}/training/runtime_shims"
 CONFIG="${PROJECT_ROOT}/configs/train/open-only-sft-v1.1-qwen35-9b.yaml"
 PROGRAM="${PROJECT_ROOT}/configs/program-v3/open-only-sft-v1.1-lrmatched.json"
 AUTHORIZATION="${PROJECT_ROOT}/configs/program-v3/open-only-sft-v1.1-lrmatched-authorization.json"
+EQUIVALENCE_CONTRACT="${PROJECT_ROOT}/configs/program-v3/sft-recovery-numerical-equivalence-v1.json"
 DATA_MANIFEST="${PROJECT_ROOT}/datasets/processed/open_only_sft_v1_qwen35_9b/manifest.json"
 DATA_CARD="${PROJECT_ROOT}/configs/program-v3/open-only-sft-v1-data-card.json"
 BENCHMARK_MANIFEST="${PROJECT_ROOT}/benchmarks/studyhub-agent-v2/manifest.json"
@@ -202,6 +203,7 @@ CONTINUOUS_METRICS="${PROJECT_ROOT}/artifacts/experiments/${CONTINUOUS_ATTEMPT}/
 RECOVERED_SECOND_METRICS="${PROJECT_ROOT}/artifacts/experiments/${RECOVERED_SECOND_ATTEMPT}/metrics/trainer.json"
 CONTINUOUS_ADAPTER="${CONTINUOUS_ROOT}/default/epoch0epochstep3globalstep3/adapter_model.safetensors"
 RECOVERED_ADAPTER="${RECOVERED_ROOT}/default/epoch0epochstep3globalstep3/adapter_model.safetensors"
+INITIAL_ADAPTER="${CONTINUOUS_ROOT}/actor/initial_lora/adapter_model.safetensors"
 GATE_REPORT="${PROJECT_ROOT}/docs/training/evidence/${GATE_ID}.json"
 
 "${VENV_DIR}/bin/python" "${PROJECT_ROOT}/scripts/train/verify_sft_recovery_gate.py" \
@@ -209,8 +211,14 @@ GATE_REPORT="${PROJECT_ROOT}/docs/training/evidence/${GATE_ID}.json"
   --recovered-segment "${CONTINUOUS_METRICS},0,2" \
   --recovered-segment "${RECOVERED_SECOND_METRICS},2,2" \
   --shared-prefix-report "${SHARED_PREFIX_REPORT}" \
+  --equivalence-contract "${EQUIVALENCE_CONTRACT}" \
+  --continuous-tail-metrics "${CONTINUOUS_METRICS}" \
+  --recovered-tail-metrics "${RECOVERED_SECOND_METRICS}" \
+  --tail-start 2 \
+  --tail-count 2 \
   --continuous-adapter "${CONTINUOUS_ADAPTER}" \
   --recovered-adapter "${RECOVERED_ADAPTER}" \
+  --initial-adapter "${INITIAL_ADAPTER}" \
   --base-lr "${BASE_LR}" \
   --scheduler-total-steps "${SCHEDULER_TOTAL_STEPS}" \
   --warmup-fraction "${WARMUP_FRACTION}" \
