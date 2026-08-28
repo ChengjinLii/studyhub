@@ -1,0 +1,344 @@
+{
+  "schema_version": "studyhub.agent-rl-v3-readiness-evidence.v1",
+  "status": "STATIC_DATA_AND_CONTROLLED_REWARD_CALIBRATION_PASSED",
+  "scope": {
+    "gpu_training_started": false,
+    "grpo_started": false,
+    "policy_learnability": "NOT_RUN",
+    "sealed_used": false,
+    "benchmark_modified": false,
+    "production_services_used": false
+  },
+  "dataset": {
+    "revision": "agent-rl-v3-post-qa.1",
+    "status": "STATIC_QA_PASSED_LEARNABILITY_NOT_RUN",
+    "candidate_tasks": 16000,
+    "post_qa_tasks": 10000,
+    "split_counts": {
+      "train": 8000,
+      "validation": 1000,
+      "protocol_holdout": 1000
+    },
+    "family_counts": {
+      "cross_tool": 1600,
+      "direct_answer_and_abstention": 800,
+      "function_calling": 1200,
+      "long_horizon_and_deep_research": 1000,
+      "memory": 1200,
+      "rag_and_multihop": 1800,
+      "recovery_and_acl": 1200,
+      "web": 1200
+    },
+    "origin_counts": {
+      "custom": 6000,
+      "external": 4000
+    },
+    "source_counts": {
+      "2wiki": 1719,
+      "coig_exam": 550,
+      "hermes_function_calling": 469,
+      "qasper": 31,
+      "studyhub_rlv3_cross": 700,
+      "studyhub_rlv3_direct": 250,
+      "studyhub_rlv3_long": 500,
+      "studyhub_rlv3_memory": 1200,
+      "studyhub_rlv3_rag": 550,
+      "studyhub_rlv3_recovery": 1200,
+      "studyhub_rlv3_state": 400,
+      "studyhub_rlv3_web": 1200,
+      "toolace": 1231
+    },
+    "budget_tier_counts": {
+      "direct": 800,
+      "extended": 3698,
+      "research": 1000,
+      "short": 4502
+    },
+    "environment_kind_counts": {
+      "fixture": 2500,
+      "replay": 7500
+    },
+    "tool_signatures": {
+      "unique": 1707,
+      "top_counts": {
+        "knowledge_read+knowledge_search": 3500,
+        "personal_memory_search": 1200,
+        "web_fetch+web_search": 1200,
+        "NO_TOOLS": 800,
+        "knowledge_read+knowledge_search+personal_memory_search+study_plan_update": 700,
+        "knowledge_read+knowledge_search+personal_memory_search+web_fetch+web_search": 500,
+        "learning_progress_record+material_bookmark_add": 400,
+        "about_channel_b01a543cd1+commentthreads_b01a543cd1+get_crime_outcomes_b01a543cd1+get_jiosaavn_data_b01a543cd1+get_monthly_volume_by_gallery_b01a543cd1+getcommunitiesbytopic_b01a543cd1": 1,
+        "absolute_price_oscillator_apo_1f1a2bafcc+earnings_articles_1f1a2bafcc+get_equities_list_1f1a2bafcc+historical_stock_prices_1f1a2bafcc": 1,
+        "accept_confirmation_dialog_12ba0b9108+find_and_click_delete_12ba0b9108": 1,
+        "account_verification_6b3049c7d3+company_income_statement_6b3049c7d3+earning_call_transcript_analysis_api_6b3049c7d3+futures_ohlcv_data_api_6b3049c7d3+get_balance_6b3049c7d3": 1,
+        "account_verification_fe9c2e8992+get_asset_allocation_fe9c2e8992+get_earning_summaries_by_symbol_fe9c2e8992+market_small_cap_gainers_fe9c2e8992": 1,
+        "acousticpressuresimulator_simulatepressurewav_c6d1f430ce": 1,
+        "activate_cash_boost_fff15be06f+deactivate_cash_boost_fff15be06f+get_boost_details_fff15be06f+list_available_boosts_fff15be06f": 1,
+        "activate_security_cameras_e439f6e84a+activate_voice_command_e439f6e84a+set_thermostat_e439f6e84a": 1,
+        "active_stocks_by_price_with_respect_to_countr_84bed74665+get_customer_details_84bed74665+get_fixed_income_exposure_analysis_84bed74665+get_us_card_spending_data_84bed74665+min_84bed74665": 1,
+        "activity_insights_753e5b0796+get_challenge_videos_753e5b0796+web_signature_generation_api_753e5b0796": 1,
+        "adaptive_learning_get_student_performance_074bd7789f+adaptive_learning_update_learning_path_074bd7789f": 1,
+        "add_05f29f211b+divide_05f29f211b+multiply_05f29f211b+subtract_05f29f211b": 1,
+        "add_asset_80b83d1cc3+create_ticket_80b83d1cc3+submit_change_request_80b83d1cc3": 1
+      },
+      "full_counts_location": "ignored dataset manifest"
+    },
+    "unique_source_groups": 10000,
+    "source_group_split_overlap": {
+      "train_validation": 0,
+      "train_holdout": 0,
+      "validation_holdout": 0
+    },
+    "exact_goal_duplicates": 0,
+    "selected_alternative_witnesses": 1850,
+    "custom_data_character": "deterministic_training_simulator_not_production_traffic",
+    "hf_transport": {
+      "status": "PASS",
+      "split_counts": {
+        "train": 8000,
+        "validation": 1000
+      },
+      "rows_validated": 9000,
+      "protocol_holdout_exposed": false,
+      "hidden_fields_found": 0
+    },
+    "manifest_sha256": "caabf7dd8d8b76a588f8e91c48138049a7407b4e321821990101417bf029a5cc",
+    "candidate_manifest_sha256": "88f8d1d1640bc57d0be672c3c14c7c1f908208768bb312deaf047bd794e30801",
+    "runtime_sft_selected_sha256": "a115d220841a0e56c8893a01e486c8399c24cb591143f221c78a926deee42783"
+  },
+  "solvability": {
+    "candidate_canonical_pass": 15378,
+    "candidate_canonical_fail": 622,
+    "alternative_applicable": 2960,
+    "alternative_pass": 2940,
+    "alternative_fail": 20,
+    "sampled_failure_reason_counts": {
+      "invalid_citation": 110,
+      "policy:source_not_discovered": 94,
+      "qa_exception:ValueError": 6
+    },
+    "failure_reason_scope": "first_100_canonical_failures_only"
+  },
+  "reward_calibration": {
+    "status": "PASS",
+    "scope": "controlled_programmatic_calibration_not_human_or_teacher_review",
+    "suite": {
+      "cases": 800,
+      "case_type_counts": {
+        "adversarial": 160,
+        "alternative_valid_path": 160,
+        "boundary": 160,
+        "normal": 160,
+        "reward_hacking": 160
+      },
+      "family_counts": {
+        "cross_tool": 145,
+        "direct_answer_and_abstention": 80,
+        "function_calling": 120,
+        "long_horizon_and_deep_research": 80,
+        "memory": 80,
+        "rag_and_multihop": 135,
+        "recovery_and_acl": 80,
+        "web": 80
+      },
+      "unique_tasks": 297,
+      "source_split": "protocol_holdout",
+      "controlled_programmatic_labels": true,
+      "human_review": false,
+      "teacher_semantic_review": false
+    },
+    "metrics": {
+      "cases": 800,
+      "scored": 800,
+      "label_accuracy": 1.0,
+      "false_positives": 0,
+      "false_positive_rate": 0.0,
+      "false_negatives": 0,
+      "false_negative_rate": 0.0,
+      "pairwise_accuracy": 0.966667,
+      "pairwise_comparisons": 960,
+      "paired_margins": {
+        "normal_vs_boundary": {
+          "strict_win_rate": 1.0,
+          "non_inversion_rate": 1.0,
+          "minimum": 0.25,
+          "p05": 0.333333,
+          "mean": 0.68125
+        },
+        "normal_vs_reward_hacking": {
+          "strict_win_rate": 1.0,
+          "non_inversion_rate": 1.0,
+          "minimum": 0.525,
+          "p05": 0.55,
+          "mean": 0.814984
+        },
+        "normal_vs_adversarial": {
+          "strict_win_rate": 1.0,
+          "non_inversion_rate": 1.0,
+          "minimum": 1.975,
+          "p05": 2.0,
+          "mean": 1.999141
+        },
+        "boundary_vs_reward_hacking": {
+          "strict_win_rate": 0.8,
+          "non_inversion_rate": 1.0,
+          "minimum": 0.0,
+          "p05": 0.0,
+          "mean": 0.133734
+        },
+        "boundary_vs_adversarial": {
+          "strict_win_rate": 1.0,
+          "non_inversion_rate": 1.0,
+          "minimum": 1.0,
+          "p05": 1.0,
+          "mean": 1.317891
+        },
+        "reward_hacking_vs_adversarial": {
+          "strict_win_rate": 1.0,
+          "non_inversion_rate": 1.0,
+          "minimum": 0.45,
+          "p05": 0.45,
+          "mean": 1.184156
+        }
+      },
+      "spearman": 0.939281,
+      "kendall_tau_b": 0.864047,
+      "adversarial_hard_gate_rate": 1.0,
+      "alternative_strict_pass_rate": 1.0,
+      "alternative_mean_abs_reward_delta": 0.0,
+      "alternative_p95_abs_reward_delta": 0.0,
+      "positive_reward_but_expected_reject": 179,
+      "by_case_type": {
+        "adversarial": {
+          "count": 160,
+          "strict_accept_rate": 0.0,
+          "mean_reward": -1.0,
+          "hard_gate_rate": 1.0
+        },
+        "alternative_valid_path": {
+          "count": 160,
+          "strict_accept_rate": 1.0,
+          "mean_reward": 1.0,
+          "hard_gate_rate": 0.0
+        },
+        "boundary": {
+          "count": 160,
+          "strict_accept_rate": 0.0,
+          "mean_reward": 0.317891,
+          "hard_gate_rate": 0.0
+        },
+        "normal": {
+          "count": 160,
+          "strict_accept_rate": 1.0,
+          "mean_reward": 0.999141,
+          "hard_gate_rate": 0.0
+        },
+        "reward_hacking": {
+          "count": 160,
+          "strict_accept_rate": 0.0,
+          "mean_reward": 0.184156,
+          "hard_gate_rate": 0.0
+        }
+      },
+      "by_family": {
+        "cross_tool": {
+          "count": 145,
+          "label_accuracy": 1.0,
+          "false_positives": 0,
+          "false_negatives": 0
+        },
+        "direct_answer_and_abstention": {
+          "count": 80,
+          "label_accuracy": 1.0,
+          "false_positives": 0,
+          "false_negatives": 0
+        },
+        "function_calling": {
+          "count": 120,
+          "label_accuracy": 1.0,
+          "false_positives": 0,
+          "false_negatives": 0
+        },
+        "long_horizon_and_deep_research": {
+          "count": 80,
+          "label_accuracy": 1.0,
+          "false_positives": 0,
+          "false_negatives": 0
+        },
+        "memory": {
+          "count": 80,
+          "label_accuracy": 1.0,
+          "false_positives": 0,
+          "false_negatives": 0
+        },
+        "rag_and_multihop": {
+          "count": 135,
+          "label_accuracy": 1.0,
+          "false_positives": 0,
+          "false_negatives": 0
+        },
+        "recovery_and_acl": {
+          "count": 80,
+          "label_accuracy": 1.0,
+          "false_positives": 0,
+          "false_negatives": 0
+        },
+        "web": {
+          "count": 80,
+          "label_accuracy": 1.0,
+          "false_positives": 0,
+          "false_negatives": 0
+        }
+      },
+      "hard_gate_reason_counts": {
+        "invalid_citation:calibration-fabricated-source": 89,
+        "policy:unknown_tool": 71
+      }
+    },
+    "gates": {
+      "all_cases_scored": true,
+      "label_accuracy_gte_0_98": true,
+      "false_positive_rate_lte_0_01": true,
+      "false_negative_rate_lte_0_01": true,
+      "pairwise_accuracy_gte_0_95": true,
+      "spearman_gte_0_85": true,
+      "kendall_gte_0_75": true,
+      "adversarial_hard_gate_gte_0_99": true,
+      "alternative_strict_pass_gte_0_99": true,
+      "alternative_p95_delta_lte_0_05": true,
+      "normal_beats_reward_hacking": true,
+      "normal_reward_hacking_p05_margin_gte_0_20": true,
+      "no_pairwise_reward_inversions": true
+    },
+    "report_sha256": "1c0507b80ce649fce3029ebbb8e73489f8363270415aec122e72e5a9dffd843f",
+    "cases_sha256": "e2aa8e0a388d955ae5c990bad158d5477b5d32c9ff3fd46a379c4ed60a08e0b6"
+  },
+  "benchmark_lock": {
+    "version": "studyhub-agentbench-v2",
+    "revision": "2.0.0",
+    "manifest_sha256": "da804b10f53dec585255598c3e256445b8ade3acf35fd8c766ca0ab4d759c88b",
+    "sealed_task_files_read": false,
+    "overlap_method": "external-source exclusion plus disjoint rlv3 training namespace"
+  },
+  "implementation_sha256": {
+    "training/rl/dataset_v3.py": "1dd469ceb89e9c6890cc98bceae5be3fd77e159ef0f3fee3bdaa3b4179f96255",
+    "training/rl/environment_v3.py": "fddef9274aed288da04888333ec297c9ab1d59c0198083f930121b0f56ddd8d6",
+    "training/rl/hermes_workflow_v3.py": "98fbb3ce137dfcf515bfd9ee860655c6fdaf9a8d6691ddd2040b89fb0c1ad035",
+    "training/rl/reward_v3.py": "1eaee0e2aa4bc814a864f8a38d3573552525f9a58bcd6c92000cae2e6f6a71d3",
+    "training/rl/task_factory_v3.py": "78aca9ddbc450b15ea1ba984e9172f86cba84f0660cf4371c27311457038bdf5",
+    "scripts/data/build_agent_rl_v3.py": "2834c529c192d1a1e1552f6ab87dcbf877d8efb560af04c369a91a78d6fdc38c",
+    "scripts/data/verify_agent_rl_v3.py": "08b25ed66d53d76afaf8faa7055cb5b9e6f29d1547fcb5a8e0d9a4902b63a42a",
+    "scripts/data/build_reward_v3_calibration.py": "e3e5db33ac1984148d3d8a5ec19a403fa21946ba5b463004f075eb83f5431204",
+    "scripts/data/calibrate_reward_v3.py": "16bcfbe42045df6a2c55992b5a9d9b7499cafe9cc76edb5c2097ff624c558cce"
+  },
+  "limitations": [
+    "Reward calibration uses controlled programmatic labels, not human or independent teacher semantic review.",
+    "Policy learnability rollouts have not run; the 10k set is not yet partitioned by current 9B policy outcome variance.",
+    "The 6000 custom rows are deterministic training simulations, not production traffic or real user trajectories.",
+    "179 expected-reject cases receive positive partial credit, but none passes strict success or outranks its paired normal trajectory.",
+    "QASPER contributes only 44 candidate rows after runtime-SFT source-group isolation; 2Wiki fills the remaining external long-context quota.",
+    "No GRPO, GPU profile, or checkpoint comparison is authorized by this evidence."
+  ],
+  "next_gate": "SEPARATE_POLICY_LEARNABILITY_EVAL_REQUIRES_EXPLICIT_GPU_AUTHORIZATION"
+}
