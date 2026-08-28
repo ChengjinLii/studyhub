@@ -1,0 +1,614 @@
+{
+  "schema_version": "studyhub.open-only-sft-control-diff.v1",
+  "created_at": "2026-08-28T23:45:09+08:00",
+  "status": "BLOCKED",
+  "decision": "BLOCKED_RECOVERY_CONTRACT",
+  "head": "c21b7ed027e3516c6746d5602421937b172bea11",
+  "mixed_reference": {
+    "training_commit": "9cc7b0421f50a9ffd4c2ecb363cff56c5c77eaf0",
+    "run_metadata": "/data/chengjin/studyhub/studyhub-agent/artifacts/areal/launcher_logs/runtime-sft-v3-9b/overnight-r16-v30-seed-20260827-attempt-20260828_020420.run.json",
+    "run_metadata_sha256": "f46e56ea6dc5681e08bb341842496a331fe8d8e018489a9aab541fe4e9e18aa0"
+  },
+  "candidate": {
+    "authorization": "configs/program-v3/open-only-sft-v1.1-lrmatched-authorization.json",
+    "authorization_sha256": "0f6304ae7b16658a30a4e58aaaacb1c9a738db4cf32e7d19d90c9c44fa645dfe",
+    "formal_run": "NOT_RUN"
+  },
+  "model_affecting_controls": {
+    "base_model_path": {
+      "mixed": "/data/chengjin/studyhub/models/P1/Qwen3.5-9B",
+      "open_only_v1_1": "/data/chengjin/studyhub/models/P1/Qwen3.5-9B",
+      "equal": true,
+      "required_equal": true,
+      "status": "PASS"
+    },
+    "model_revision": {
+      "mixed": "c202236235762e1c871ad0ccb60c8ee5ba337b9a",
+      "open_only_v1_1": "c202236235762e1c871ad0ccb60c8ee5ba337b9a",
+      "equal": true,
+      "required_equal": true,
+      "status": "PASS"
+    },
+    "model_config_sha256": {
+      "mixed": "d0883072e01861ed0b2d47be3c16c36a8e81c224c7ffaa310c6558fb3f932b05",
+      "open_only_v1_1": "d0883072e01861ed0b2d47be3c16c36a8e81c224c7ffaa310c6558fb3f932b05",
+      "equal": true,
+      "required_equal": true,
+      "status": "PASS"
+    },
+    "model_index_sha256": {
+      "mixed": "26d3539b516be613f39563617cb9d33b3f83d401298125be392c80cefb8f7fe5",
+      "open_only_v1_1": "26d3539b516be613f39563617cb9d33b3f83d401298125be392c80cefb8f7fe5",
+      "equal": true,
+      "required_equal": true,
+      "status": "PASS"
+    },
+    "model_weight_set_sha256": {
+      "mixed": "2625abd17ad8ddd33485b3b2a91ef3892830b98749b843e37b20576e404fe69c",
+      "open_only_v1_1": "2625abd17ad8ddd33485b3b2a91ef3892830b98749b843e37b20576e404fe69c",
+      "equal": true,
+      "required_equal": true,
+      "status": "PASS"
+    },
+    "tokenizer_revision": {
+      "mixed": "c202236235762e1c871ad0ccb60c8ee5ba337b9a",
+      "open_only_v1_1": "c202236235762e1c871ad0ccb60c8ee5ba337b9a",
+      "equal": true,
+      "required_equal": true,
+      "status": "PASS"
+    },
+    "tokenizer_config_sha256": {
+      "mixed": "316230d6a809701f4db5ea8f8fc862bc3a6f3229c937c174e674ff3ca0a64ac8",
+      "open_only_v1_1": "316230d6a809701f4db5ea8f8fc862bc3a6f3229c937c174e674ff3ca0a64ac8",
+      "equal": true,
+      "required_equal": true,
+      "status": "PASS"
+    },
+    "chat_template_sha256": {
+      "mixed": "12de9034d5269e8b1fe6012b3538374fcb3941bf93c95fc81b0cf5acf3f08ce4",
+      "open_only_v1_1": "12de9034d5269e8b1fe6012b3538374fcb3941bf93c95fc81b0cf5acf3f08ce4",
+      "equal": true,
+      "required_equal": true,
+      "status": "PASS"
+    },
+    "areal_commit": {
+      "mixed": "cbff54d645d2cd8ee1f1c358a82f3f473588433d",
+      "open_only_v1_1": "cbff54d645d2cd8ee1f1c358a82f3f473588433d",
+      "equal": true,
+      "required_equal": true,
+      "status": "PASS"
+    },
+    "hermes_commit": {
+      "mixed": "5c1a304ce890276a4334d8ced3f29ffeedbbbf93",
+      "open_only_v1_1": "5c1a304ce890276a4334d8ced3f29ffeedbbbf93",
+      "equal": true,
+      "required_equal": true,
+      "status": "PASS"
+    },
+    "seed": {
+      "mixed": 20260827,
+      "open_only_v1_1": 20260827,
+      "equal": true,
+      "required_equal": true,
+      "status": "PASS"
+    },
+    "fsdp_backend": {
+      "mixed": "fsdp:d2p1t1",
+      "open_only_v1_1": "fsdp:d2p1t1",
+      "equal": true,
+      "required_equal": true,
+      "status": "PASS"
+    },
+    "dtype": {
+      "mixed": "bfloat16",
+      "open_only_v1_1": "bfloat16",
+      "equal": true,
+      "required_equal": true,
+      "status": "PASS"
+    },
+    "attention_implementation": {
+      "mixed": "sdpa",
+      "open_only_v1_1": "sdpa",
+      "equal": true,
+      "required_equal": true,
+      "status": "PASS"
+    },
+    "dropout_disabled": {
+      "mixed": true,
+      "open_only_v1_1": true,
+      "equal": true,
+      "required_equal": true,
+      "status": "PASS"
+    },
+    "gradient_checkpointing": {
+      "mixed": true,
+      "open_only_v1_1": true,
+      "equal": true,
+      "required_equal": true,
+      "status": "PASS"
+    },
+    "lora_rank": {
+      "mixed": 16,
+      "open_only_v1_1": 16,
+      "equal": true,
+      "required_equal": true,
+      "status": "PASS"
+    },
+    "lora_alpha": {
+      "mixed": 16,
+      "open_only_v1_1": 16,
+      "equal": true,
+      "required_equal": true,
+      "status": "PASS"
+    },
+    "lora_target_modules": {
+      "mixed": [
+        "o_proj",
+        "gate_proj",
+        "up_proj",
+        "down_proj"
+      ],
+      "open_only_v1_1": [
+        "o_proj",
+        "gate_proj",
+        "up_proj",
+        "down_proj"
+      ],
+      "equal": true,
+      "required_equal": true,
+      "status": "PASS"
+    },
+    "optimizer": {
+      "mixed": "adam",
+      "open_only_v1_1": "adam",
+      "equal": true,
+      "required_equal": true,
+      "status": "PASS"
+    },
+    "learning_rate": {
+      "mixed": 2e-05,
+      "open_only_v1_1": 2e-05,
+      "equal": true,
+      "required_equal": true,
+      "status": "PASS"
+    },
+    "weight_decay": {
+      "mixed": 0.05,
+      "open_only_v1_1": 0.05,
+      "equal": true,
+      "required_equal": true,
+      "status": "PASS"
+    },
+    "beta1": {
+      "mixed": 0.9,
+      "open_only_v1_1": 0.9,
+      "equal": true,
+      "required_equal": true,
+      "status": "PASS"
+    },
+    "beta2": {
+      "mixed": 0.95,
+      "open_only_v1_1": 0.95,
+      "equal": true,
+      "required_equal": true,
+      "status": "PASS"
+    },
+    "optimizer_epsilon": {
+      "mixed": 1e-05,
+      "open_only_v1_1": 1e-05,
+      "equal": true,
+      "required_equal": true,
+      "status": "PASS"
+    },
+    "scheduler_type": {
+      "mixed": "cosine",
+      "open_only_v1_1": "cosine",
+      "equal": true,
+      "required_equal": true,
+      "status": "PASS"
+    },
+    "warmup_fraction": {
+      "mixed": 0.03,
+      "open_only_v1_1": 0.03,
+      "equal": true,
+      "required_equal": true,
+      "status": "PASS"
+    },
+    "gradient_clip": {
+      "mixed": 1.0,
+      "open_only_v1_1": 1.0,
+      "equal": true,
+      "required_equal": true,
+      "status": "PASS"
+    },
+    "microbatch_token_cap": {
+      "mixed": 8192,
+      "open_only_v1_1": 8192,
+      "equal": true,
+      "required_equal": true,
+      "status": "PASS"
+    },
+    "global_batch_size": {
+      "mixed": 8,
+      "open_only_v1_1": 8,
+      "equal": true,
+      "required_equal": true,
+      "status": "PASS"
+    },
+    "shuffle": {
+      "mixed": true,
+      "open_only_v1_1": true,
+      "equal": true,
+      "required_equal": true,
+      "status": "PASS"
+    },
+    "drop_last": {
+      "mixed": true,
+      "open_only_v1_1": true,
+      "equal": true,
+      "required_equal": true,
+      "status": "PASS"
+    },
+    "pin_memory": {
+      "mixed": true,
+      "open_only_v1_1": true,
+      "equal": true,
+      "required_equal": true,
+      "status": "PASS"
+    },
+    "dataloader_workers": {
+      "mixed": 2,
+      "open_only_v1_1": 2,
+      "equal": true,
+      "required_equal": true,
+      "status": "PASS"
+    },
+    "dataset_type": {
+      "mixed": "sft",
+      "open_only_v1_1": "sft",
+      "equal": true,
+      "required_equal": true,
+      "status": "PASS"
+    },
+    "nodes": {
+      "mixed": 1,
+      "open_only_v1_1": 1,
+      "equal": true,
+      "required_equal": true,
+      "status": "PASS"
+    },
+    "gpus_per_node": {
+      "mixed": 2,
+      "open_only_v1_1": 2,
+      "equal": true,
+      "required_equal": true,
+      "status": "PASS"
+    },
+    "scheduler_backend": {
+      "mixed": "local",
+      "open_only_v1_1": "local",
+      "equal": true,
+      "required_equal": true,
+      "status": "PASS"
+    },
+    "offload_enabled": {
+      "mixed": false,
+      "open_only_v1_1": false,
+      "equal": true,
+      "required_equal": true,
+      "status": "PASS"
+    },
+    "init_from_scratch": {
+      "mixed": false,
+      "open_only_v1_1": false,
+      "equal": true,
+      "required_equal": true,
+      "status": "PASS"
+    },
+    "lora_enabled": {
+      "mixed": true,
+      "open_only_v1_1": true,
+      "equal": true,
+      "required_equal": true,
+      "status": "PASS"
+    },
+    "peft_type": {
+      "mixed": "lora",
+      "open_only_v1_1": "lora",
+      "equal": true,
+      "required_equal": true,
+      "status": "PASS"
+    },
+    "worker_runtime_environment": {
+      "mixed": [
+        {
+          "task_type": "worker",
+          "port_count": 2,
+          "gpu": 1,
+          "cpu": 8,
+          "mem": 64,
+          "cmd": "python3 -m areal.infra.rpc.rpc_server",
+          "env_vars": {
+            "WANDB_MODE": "disabled",
+            "HF_HUB_OFFLINE": "1",
+            "TRANSFORMERS_OFFLINE": "1",
+            "NCCL_DEBUG": "WARN",
+            "TORCH_NCCL_ASYNC_ERROR_HANDLING": "1"
+          }
+        }
+      ],
+      "open_only_v1_1": [
+        {
+          "task_type": "worker",
+          "port_count": 2,
+          "gpu": 1,
+          "cpu": 8,
+          "mem": 64,
+          "cmd": "python3 -m areal.infra.rpc.rpc_server",
+          "env_vars": {
+            "WANDB_MODE": "disabled",
+            "HF_HUB_OFFLINE": "1",
+            "TRANSFORMERS_OFFLINE": "1",
+            "NCCL_DEBUG": "WARN",
+            "TORCH_NCCL_ASYNC_ERROR_HANDLING": "1"
+          }
+        }
+      ],
+      "equal": true,
+      "required_equal": true,
+      "status": "PASS"
+    },
+    "optimizer_updates": {
+      "mixed": 2100,
+      "open_only_v1_1": 2100,
+      "equal": true,
+      "required_equal": true,
+      "status": "PASS"
+    },
+    "training_sequences": {
+      "mixed": 16800,
+      "open_only_v1_1": 16800,
+      "equal": true,
+      "required_equal": true,
+      "status": "PASS"
+    },
+    "assistant_loss_tokens": {
+      "mixed": 3138019,
+      "open_only_v1_1": 3138019,
+      "equal": true,
+      "required_equal": true,
+      "status": "PASS"
+    },
+    "scheduler_horizon": {
+      "mixed": 5456,
+      "open_only_v1_1": 5456,
+      "equal": true,
+      "required_equal": true,
+      "status": "PASS"
+    },
+    "warmup_steps": {
+      "mixed": 163,
+      "open_only_v1_1": 163,
+      "equal": true,
+      "required_equal": true,
+      "status": "PASS"
+    },
+    "max_length": {
+      "mixed": 8192,
+      "open_only_v1_1": 8192,
+      "equal": true,
+      "required_equal": true,
+      "status": "PASS"
+    },
+    "loss_objective": {
+      "mixed": "assistant_action_and_final_tokens_only_causal_cross_entropy",
+      "open_only_v1_1": "assistant_action_and_final_tokens_only_causal_cross_entropy",
+      "equal": true,
+      "required_equal": true,
+      "status": "PASS"
+    },
+    "observations_masked": {
+      "mixed": true,
+      "open_only_v1_1": true,
+      "equal": true,
+      "required_equal": true,
+      "status": "PASS"
+    },
+    "saver.freq_steps": {
+      "mixed": 210,
+      "open_only_v1_1": 210,
+      "equal": true,
+      "required_equal": true,
+      "status": "PASS"
+    },
+    "saver.freq_secs": {
+      "mixed": null,
+      "open_only_v1_1": null,
+      "equal": true,
+      "required_equal": true,
+      "status": "PASS"
+    },
+    "recover.freq_steps": {
+      "mixed": 210,
+      "open_only_v1_1": 210,
+      "equal": true,
+      "required_equal": true,
+      "status": "PASS"
+    },
+    "recover.freq_secs": {
+      "mixed": null,
+      "open_only_v1_1": null,
+      "equal": true,
+      "required_equal": true,
+      "status": "PASS"
+    },
+    "evaluator.freq_steps": {
+      "mixed": null,
+      "open_only_v1_1": null,
+      "equal": true,
+      "required_equal": true,
+      "status": "PASS"
+    },
+    "evaluator.freq_secs": {
+      "mixed": null,
+      "open_only_v1_1": null,
+      "equal": true,
+      "required_equal": true,
+      "status": "PASS"
+    },
+    "benchmark_manifest_sha256": {
+      "mixed": "da804b10f53dec585255598c3e256445b8ade3acf35fd8c766ca0ab4d759c88b",
+      "open_only_v1_1": "da804b10f53dec585255598c3e256445b8ade3acf35fd8c766ca0ab4d759c88b",
+      "equal": true,
+      "required_equal": true,
+      "status": "PASS"
+    },
+    "sealed_used": {
+      "mixed": false,
+      "open_only_v1_1": false,
+      "equal": true,
+      "required_equal": true,
+      "status": "PASS"
+    },
+    "rl_started": {
+      "mixed": false,
+      "open_only_v1_1": false,
+      "equal": true,
+      "required_equal": true,
+      "status": "PASS"
+    },
+    "benchmark_modified": {
+      "mixed": false,
+      "open_only_v1_1": false,
+      "equal": true,
+      "required_equal": true,
+      "status": "PASS"
+    },
+    "gradient_accumulation_contract": {
+      "mixed": {
+        "mode": "dynamic_microbatch_at_optimizer_boundary",
+        "global_batch_size": 8,
+        "max_tokens_per_microbatch": 8192
+      },
+      "open_only_v1_1": {
+        "mode": "dynamic_microbatch_at_optimizer_boundary",
+        "global_batch_size": 8,
+        "max_tokens_per_microbatch": 8192
+      },
+      "equal": true,
+      "required_equal": true,
+      "status": "PASS"
+    },
+    "decoding_settings": {
+      "mixed": "NOT_APPLICABLE_SUPERVISED_FINETUNING",
+      "open_only_v1_1": "NOT_APPLICABLE_SUPERVISED_FINETUNING",
+      "equal": true,
+      "required_equal": true,
+      "status": "PASS"
+    }
+  },
+  "hard_control_failures": [],
+  "provenance_checks": {
+    "mixed_training_commit_matches_frozen_reference": true,
+    "mixed_consumption_commit_matches_run": true,
+    "mixed_config_git_blob_matches_run": true,
+    "mixed_authorization_matches_run": true,
+    "mixed_dataset_manifest_matches_run": true,
+    "candidate_program_matches_authorization": true,
+    "candidate_config_matches_authorization": true,
+    "candidate_dataset_matches_authorization": true,
+    "candidate_selected_matches_authorization": true,
+    "candidate_selected_manifest_matches_authorization": true,
+    "candidate_data_card_matches_authorization": true,
+    "benchmark_matches_authorization": true
+  },
+  "provenance_failures": [],
+  "data_condition_differences": {
+    "total_context_tokens": {
+      "mixed": 21318410,
+      "open_only_v1_1": 22333694,
+      "equal": false,
+      "required_equal": false,
+      "status": "PASS",
+      "note": "Disclosed data-condition difference; assistant-loss exposure is exactly matched."
+    },
+    "dataset_manifest_sha256": {
+      "mixed": "b67e6d56e531cd75969e9baf51838fb9a73fc3535645e1514c0156fde2b9242f",
+      "open_only_v1_1": "2fbb455ff3c647d253fa4f15011534cd02f423a2728095b493d09a0eb76ae8c2",
+      "equal": false,
+      "required_equal": false,
+      "status": "PASS",
+      "note": "The controlled variable is the training dataset composition."
+    },
+    "natural_train_rows": {
+      "mixed": 43650,
+      "open_only_v1_1": 16800,
+      "equal": false,
+      "required_equal": false,
+      "status": "PASS",
+      "note": "Both runs stop after 16,800 sequences; natural dataset lengths differ."
+    }
+  },
+  "runtime_correction_diff": {
+    "status": "REQUIRES_R1_R4_CONFIRMATION",
+    "files": {
+      "studyhub-agent/training/runtime_shims/areal_metadata_bridge.py": {
+        "mixed_blob_sha256": "10d849e551ed65a7c7d2c97bce5ee471ac25746b11cceea25d16784d539c7427",
+        "candidate_blob_sha256": "10d849e551ed65a7c7d2c97bce5ee471ac25746b11cceea25d16784d539c7427"
+      },
+      "studyhub-agent/training/runtime_shims/areal_scheduler_bridge.py": {
+        "mixed_blob_sha256": null,
+        "candidate_blob_sha256": "44ede5a3d80e37f9e8dacbdc0b315ee543b3e364a0ca6e5d82743a42aa15733d"
+      },
+      "studyhub-agent/training/runtime_shims/areal_recovery_state_bridge.py": {
+        "mixed_blob_sha256": null,
+        "candidate_blob_sha256": "93069f557dcbba7c46c357258e41f40f00be9fa406f38a61a9b1e258776fd4e3"
+      },
+      "studyhub-agent/training/runtime_shims/sitecustomize.py": {
+        "mixed_blob_sha256": "8295d5f71caa13f4d495f95c5a2f7d4375b780d2ddd2575d3ae3dba147499043",
+        "candidate_blob_sha256": "3e99a012591796cc02fbe845b98e8e54b9c921881d8cae2e880d04b1d26748de"
+      },
+      "studyhub-agent/training/sft/open_bootstrap_driver.py": {
+        "mixed_blob_sha256": "adc6c058ef03070dc5405470f34f04c1a626f57ca6724156a8f82313b344dc67",
+        "candidate_blob_sha256": "adc6c058ef03070dc5405470f34f04c1a626f57ca6724156a8f82313b344dc67"
+      }
+    },
+    "changed_files": [
+      "studyhub-agent/training/runtime_shims/areal_scheduler_bridge.py",
+      "studyhub-agent/training/runtime_shims/areal_recovery_state_bridge.py",
+      "studyhub-agent/training/runtime_shims/sitecustomize.py"
+    ],
+    "recovery_contract": {
+      "status": "NOT_PROVIDED",
+      "eligible": false,
+      "path": null,
+      "sha256": null,
+      "failures": [
+        "recovery_evidence_not_provided"
+      ]
+    },
+    "claim_boundary": "The candidate adds scheduler and recovery-provenance shims. They are not treated as training-data effects until R1-R4 passes."
+  },
+  "static_default_note": {
+    "mixed_yaml": {
+      "saver.freq_steps": 546,
+      "recover.freq_steps": 50,
+      "evaluator.freq_steps": 546
+    },
+    "candidate_yaml": {
+      "saver.freq_steps": 210,
+      "recover.freq_steps": 210,
+      "evaluator.freq_steps": null
+    },
+    "interpretation": "Static defaults differ, but the Mixed formal launcher overrode them to 210/210/disabled; candidate planned runtime overrides match."
+  },
+  "worktree": "CLEAN",
+  "blockers": [
+    "RUNTIME_CORRECTIONS_REQUIRE_R1_R4_CONFIRMATION"
+  ],
+  "scope": {
+    "rl_started": false,
+    "sealed_used": false,
+    "benchmark_modified": false
+  }
+}

@@ -66,7 +66,9 @@
       "warmup_steps": 163,
       "stop_updates": 2100,
       "recovery_status": "BLOCKED_RECOVERY_CONTRACT",
-      "control_status": "BLOCKED_CONTROL_DRIFT"
+      "control_status": "HARD_CONTROLS_PASS_RUNTIME_RECOVERY_PENDING",
+      "control_evidence": "docs/training/evidence/open-only-sft-v1-1-control-diff.json",
+      "control_evidence_sha256": "222c158e7408f1a0f023aef6f725497371f063e31dc83caa9fbb6ff64aacc012"
     }
   },
   "recovery_evidence": [
@@ -118,7 +120,8 @@
     "R3 exact batch fingerprints and full RNG/dataloader/optimizer state continuity are not closed.",
     "R4 has neither bitwise pass nor a valid post-contract holdout bounded-numeric pass.",
     "All recovery Gates so far are four-update early-warmup mechanics tests.",
-    "Open-Only v1.1 saver/recovery/evaluator cadence differs from Mixed-v3.0, so only-data-changes is not yet true.",
+    "Static YAML cadence defaults differ, but the Mixed formal launcher overrode them to saver=210, recover=210 and evaluator disabled; Open-Only v1.1 planned runtime overrides match exactly.",
+    "Candidate scheduler/recovery instrumentation differs from the Mixed runtime and remains blocked until a formal R1-R4 confirmation proves semantic equivalence.",
     "Candidate variance and external model scores are not available."
   ],
   "current_decision": "BLOCKED_RECOVERY_CONTRACT"
