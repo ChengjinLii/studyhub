@@ -1,0 +1,530 @@
+{
+  "schema_version": "studyhub.open-only-development-comparison.v1",
+  "status": "FAIL",
+  "conclusion": "CONTROL_CONTRACT_FAILED_LR_SCHEDULE",
+  "diagnostic_conclusion": "OPEN_ONLY_DIRECTION_POSITIVE",
+  "claim": "DIRECTIONAL_PAIRED_EVIDENCE_ONLY",
+  "benchmark_manifest_sha256": "da804b10f53dec585255598c3e256445b8ade3acf35fd8c766ca0ab4d759c88b",
+  "sealed_used": false,
+  "runs": {
+    "base": {
+      "run_id": "qwen35-9b-base-v2-development-seed-20260827-20260827_212818",
+      "model": "Qwen/Qwen3.5-9B@c202236235762e1c871ad0ccb60c8ee5ba337b9a",
+      "tasks": 51,
+      "strict_count": 6,
+      "strict_success_rate": 0.117647,
+      "mean_diagnostic_score": 0.283758,
+      "mean_tool_calls": 2.882353,
+      "mean_latency_seconds": 9.034495,
+      "infra_excluded": 0,
+      "episodes_sha256": "1ec9c8fcb326302f3bc6604400c4418b6d2f1911d05273e55f1e52d2551401f6",
+      "failures": {
+        "invalid_citation": 11,
+        "source_not_discovered": 3,
+        "invalid_arguments": 0,
+        "tool_budget_exhausted": 0,
+        "empty_final": 0,
+        "premature_final": 2
+      },
+      "behavior": {
+        "zero_tool_final_count": 2,
+        "zero_tool_final_rate": 0.039216,
+        "one_tool_final_count": 8,
+        "one_tool_final_rate": 0.156863,
+        "premature_final_count": 2,
+        "premature_final_rate": 0.039216,
+        "successful_evidence_gain_steps": 101,
+        "successful_evidence_gain_steps_per_task": 1.980392,
+        "successful_policy_steps": 142,
+        "successful_policy_steps_per_task": 2.784314,
+        "search_tasks": 36,
+        "search_to_read_converted_tasks": 31,
+        "search_to_read_conversion_rate": 0.861111,
+        "tool_name_counts": {
+          "collective_memory_search": 8,
+          "knowledge_browse": 2,
+          "knowledge_read": 55,
+          "knowledge_search": 46,
+          "learning_profile_get": 6,
+          "learning_progress_record": 1,
+          "material_bookmark_add": 1,
+          "personal_memory_search": 18,
+          "study_plan_update": 2,
+          "web_search": 8
+        }
+      },
+      "capability_slices": {
+        "factual_retrieval": {
+          "tasks": 16,
+          "strict_count": 3,
+          "strict_rate": 0.1875,
+          "mean_diagnostic": 0.3125
+        },
+        "multi_hop": {
+          "tasks": 11,
+          "strict_count": 0,
+          "strict_rate": 0.0,
+          "mean_diagnostic": 0.217424
+        },
+        "citation_grounding": {
+          "tasks": 27,
+          "strict_count": 3,
+          "strict_rate": 0.111111,
+          "mean_diagnostic": 0.273765
+        },
+        "web": {
+          "tasks": 2,
+          "strict_count": 0,
+          "strict_rate": 0.0,
+          "mean_diagnostic": 0.065
+        },
+        "memory": {
+          "tasks": 13,
+          "strict_count": 1,
+          "strict_rate": 0.076923,
+          "mean_diagnostic": 0.25
+        },
+        "state_function": {
+          "tasks": 2,
+          "strict_count": 1,
+          "strict_rate": 0.5,
+          "mean_diagnostic": 0.5
+        },
+        "recovery": {
+          "tasks": 4,
+          "strict_count": 0,
+          "strict_rate": 0.0,
+          "mean_diagnostic": 0.425
+        },
+        "direct_answer_abstention": {
+          "tasks": 4,
+          "strict_count": 2,
+          "strict_rate": 0.5,
+          "mean_diagnostic": 0.625
+        },
+        "stop_cost_control": {
+          "tasks": 1,
+          "strict_count": 0,
+          "strict_rate": 0.0,
+          "mean_diagnostic": 0.0
+        }
+      }
+    },
+    "mixed_v3": {
+      "run_id": "qwen35-9b-overnight-sft-v2-development-seed-20260827-20260828_074542",
+      "model": "StudyHub/Qwen3.5-9B-sft@f216c5552b6ad886",
+      "tasks": 51,
+      "strict_count": 4,
+      "strict_success_rate": 0.078431,
+      "mean_diagnostic_score": 0.249346,
+      "mean_tool_calls": 2.27451,
+      "mean_latency_seconds": 8.027991,
+      "infra_excluded": 0,
+      "episodes_sha256": "6b61f7c7c4cde1e9e2f295e498e654cb311b053655171093e2ead6594ba447a6",
+      "failures": {
+        "invalid_citation": 7,
+        "source_not_discovered": 2,
+        "invalid_arguments": 0,
+        "tool_budget_exhausted": 0,
+        "empty_final": 0,
+        "premature_final": 1
+      },
+      "behavior": {
+        "zero_tool_final_count": 2,
+        "zero_tool_final_rate": 0.039216,
+        "one_tool_final_count": 10,
+        "one_tool_final_rate": 0.196078,
+        "premature_final_count": 1,
+        "premature_final_rate": 0.019608,
+        "successful_evidence_gain_steps": 93,
+        "successful_evidence_gain_steps_per_task": 1.823529,
+        "successful_policy_steps": 112,
+        "successful_policy_steps_per_task": 2.196078,
+        "search_tasks": 35,
+        "search_to_read_converted_tasks": 32,
+        "search_to_read_conversion_rate": 0.914286,
+        "tool_name_counts": {
+          "collective_memory_search": 4,
+          "knowledge_browse": 3,
+          "knowledge_read": 49,
+          "knowledge_search": 42,
+          "learning_profile_get": 5,
+          "learning_progress_record": 1,
+          "material_bookmark_add": 1,
+          "personal_memory_search": 7,
+          "study_plan_update": 2,
+          "web_search": 2
+        }
+      },
+      "capability_slices": {
+        "factual_retrieval": {
+          "tasks": 16,
+          "strict_count": 1,
+          "strict_rate": 0.0625,
+          "mean_diagnostic": 0.20625
+        },
+        "multi_hop": {
+          "tasks": 11,
+          "strict_count": 0,
+          "strict_rate": 0.0,
+          "mean_diagnostic": 0.226515
+        },
+        "citation_grounding": {
+          "tasks": 27,
+          "strict_count": 1,
+          "strict_rate": 0.037037,
+          "mean_diagnostic": 0.214506
+        },
+        "web": {
+          "tasks": 2,
+          "strict_count": 0,
+          "strict_rate": 0.0,
+          "mean_diagnostic": 0.15
+        },
+        "memory": {
+          "tasks": 13,
+          "strict_count": 1,
+          "strict_rate": 0.076923,
+          "mean_diagnostic": 0.244231
+        },
+        "state_function": {
+          "tasks": 2,
+          "strict_count": 0,
+          "strict_rate": 0.0,
+          "mean_diagnostic": 0.0
+        },
+        "recovery": {
+          "tasks": 4,
+          "strict_count": 0,
+          "strict_rate": 0.0,
+          "mean_diagnostic": 0.4
+        },
+        "direct_answer_abstention": {
+          "tasks": 4,
+          "strict_count": 2,
+          "strict_rate": 0.5,
+          "mean_diagnostic": 0.625
+        },
+        "stop_cost_control": {
+          "tasks": 1,
+          "strict_count": 1,
+          "strict_rate": 1.0,
+          "mean_diagnostic": 1.0
+        }
+      }
+    },
+    "open_only": {
+      "run_id": "qwen35-9b-sft-v2-development-seed-20260827-20260828_124721",
+      "model": "StudyHub/Qwen3.5-9B-sft@c07040903935888d",
+      "tasks": 51,
+      "strict_count": 11,
+      "strict_success_rate": 0.215686,
+      "mean_diagnostic_score": 0.388725,
+      "mean_tool_calls": 2.529412,
+      "mean_latency_seconds": 8.398131,
+      "infra_excluded": 0,
+      "episodes_sha256": "b700c939a5408e44e5e6af1aef5d719f0fb7a691fd84094f6f8a55db790eee3a",
+      "failures": {
+        "invalid_citation": 6,
+        "source_not_discovered": 2,
+        "invalid_arguments": 0,
+        "tool_budget_exhausted": 0,
+        "empty_final": 0,
+        "premature_final": 1
+      },
+      "behavior": {
+        "zero_tool_final_count": 2,
+        "zero_tool_final_rate": 0.039216,
+        "one_tool_final_count": 11,
+        "one_tool_final_rate": 0.215686,
+        "premature_final_count": 1,
+        "premature_final_rate": 0.019608,
+        "successful_evidence_gain_steps": 98,
+        "successful_evidence_gain_steps_per_task": 1.921569,
+        "successful_policy_steps": 125,
+        "successful_policy_steps_per_task": 2.45098,
+        "search_tasks": 35,
+        "search_to_read_converted_tasks": 31,
+        "search_to_read_conversion_rate": 0.885714,
+        "tool_name_counts": {
+          "collective_memory_search": 5,
+          "knowledge_browse": 4,
+          "knowledge_read": 52,
+          "knowledge_search": 44,
+          "learning_profile_get": 6,
+          "learning_progress_record": 1,
+          "material_bookmark_add": 1,
+          "personal_memory_search": 11,
+          "study_plan_update": 2,
+          "web_search": 3
+        }
+      },
+      "capability_slices": {
+        "factual_retrieval": {
+          "tasks": 16,
+          "strict_count": 6,
+          "strict_rate": 0.375,
+          "mean_diagnostic": 0.440625
+        },
+        "multi_hop": {
+          "tasks": 11,
+          "strict_count": 0,
+          "strict_rate": 0.0,
+          "mean_diagnostic": 0.297727
+        },
+        "citation_grounding": {
+          "tasks": 27,
+          "strict_count": 6,
+          "strict_rate": 0.222222,
+          "mean_diagnostic": 0.382407
+        },
+        "web": {
+          "tasks": 2,
+          "strict_count": 0,
+          "strict_rate": 0.0,
+          "mean_diagnostic": 0.15
+        },
+        "memory": {
+          "tasks": 13,
+          "strict_count": 1,
+          "strict_rate": 0.076923,
+          "mean_diagnostic": 0.288462
+        },
+        "state_function": {
+          "tasks": 2,
+          "strict_count": 2,
+          "strict_rate": 1.0,
+          "mean_diagnostic": 1.0
+        },
+        "recovery": {
+          "tasks": 4,
+          "strict_count": 0,
+          "strict_rate": 0.0,
+          "mean_diagnostic": 0.4
+        },
+        "direct_answer_abstention": {
+          "tasks": 4,
+          "strict_count": 3,
+          "strict_rate": 0.75,
+          "mean_diagnostic": 0.875
+        },
+        "stop_cost_control": {
+          "tasks": 1,
+          "strict_count": 0,
+          "strict_rate": 0.0,
+          "mean_diagnostic": 0.0
+        }
+      }
+    }
+  },
+  "pairwise": {
+    "mixed_vs_base": {
+      "wins": 2,
+      "losses": 4,
+      "ties": 45,
+      "strict_delta": {
+        "point": -0.039216,
+        "ci95": [
+          -0.137255,
+          0.058824
+        ],
+        "bootstrap_samples": 10000,
+        "seed": 20260827
+      },
+      "diagnostic_delta": {
+        "point": -0.034412,
+        "ci95": [
+          -0.132353,
+          0.057843
+        ],
+        "bootstrap_samples": 10000,
+        "seed": 20260828
+      },
+      "mean_tool_calls_delta": -0.607843
+    },
+    "open_vs_base": {
+      "wins": 7,
+      "losses": 2,
+      "ties": 42,
+      "strict_delta": {
+        "point": 0.098039,
+        "ci95": [
+          0.0,
+          0.215686
+        ],
+        "bootstrap_samples": 10000,
+        "seed": 20260837
+      },
+      "diagnostic_delta": {
+        "point": 0.104967,
+        "ci95": [
+          -0.002059,
+          0.215196
+        ],
+        "bootstrap_samples": 10000,
+        "seed": 20260838
+      },
+      "mean_tool_calls_delta": -0.352941
+    },
+    "open_vs_mixed": {
+      "wins": 8,
+      "losses": 1,
+      "ties": 42,
+      "strict_delta": {
+        "point": 0.137255,
+        "ci95": [
+          0.039216,
+          0.254902
+        ],
+        "bootstrap_samples": 10000,
+        "seed": 20260847
+      },
+      "diagnostic_delta": {
+        "point": 0.139379,
+        "ci95": [
+          0.033007,
+          0.250817
+        ],
+        "bootstrap_samples": 10000,
+        "seed": 20260848
+      },
+      "mean_tool_calls_delta": 0.254902
+    }
+  },
+  "directional_gates": {
+    "status": "FAIL",
+    "diagnostic_status": "PASS",
+    "checks": {
+      "open_strict_gte_base": true,
+      "open_strict_gt_mixed": true,
+      "paired_wins_gt_losses_vs_mixed": true,
+      "mean_diagnostic_gt_mixed": true,
+      "factual_retrieval_not_below_base_by_more_than_one": true,
+      "invalid_citation_not_more_than_base_plus_one": true,
+      "tool_calls_no_unrewarded_drop_gt_15pct": true
+    },
+    "open_vs_base_tool_call_change_fraction": -0.122449
+  },
+  "training_control_contract": {
+    "schema_version": "studyhub.sft-lr-schedule-audit.v1",
+    "status": "FAIL",
+    "contract": {
+      "base_lr": 2e-05,
+      "scheduler": "cosine",
+      "scheduler_total_steps": 5456,
+      "warmup_fraction": 0.03,
+      "warmup_steps": 163,
+      "expected_updates": 2100,
+      "rel_tolerance": 0.0001,
+      "abs_tolerance": 5e-10
+    },
+    "segments": [
+      {
+        "metrics": "artifacts/experiments/open-only-sft-v1-r16-seed-20260827-attempt-20260828_134809/metrics/trainer.json",
+        "start_global_step": 0,
+        "count": 1890,
+        "first_actual_lr": 0.0,
+        "last_actual_lr": 5.2483e-07,
+        "first_expected_lr": 0.0,
+        "last_expected_lr": 1.5195729254325735e-05,
+        "mismatch_count": 1889,
+        "first_mismatches": [
+          {
+            "global_step": 1,
+            "actual": 3.1746e-07,
+            "expected": 1.226993865030675e-07,
+            "absolute_error": 1.9476061349693248e-07
+          },
+          {
+            "global_step": 2,
+            "actual": 6.3492e-07,
+            "expected": 2.45398773006135e-07,
+            "absolute_error": 3.8952122699386495e-07
+          },
+          {
+            "global_step": 3,
+            "actual": 9.5238e-07,
+            "expected": 3.680981595092025e-07,
+            "absolute_error": 5.842818404907974e-07
+          },
+          {
+            "global_step": 4,
+            "actual": 1.2698e-06,
+            "expected": 4.9079754601227e-07,
+            "absolute_error": 7.790024539877299e-07
+          },
+          {
+            "global_step": 5,
+            "actual": 1.5873e-06,
+            "expected": 6.134969325153375e-07,
+            "absolute_error": 9.738030674846626e-07
+          }
+        ],
+        "max_absolute_error": 1.4671304266381112e-05,
+        "max_relative_error": 1.5873986111111107
+      },
+      {
+        "metrics": "artifacts/experiments/open-only-sft-v1-r16-seed-20260827-attempt-20260828_200708/metrics/trainer.json",
+        "start_global_step": 1890,
+        "count": 210,
+        "first_actual_lr": 0.0,
+        "last_actual_lr": 1.9748e-05,
+        "first_expected_lr": 1.519065700221957e-05,
+        "last_expected_lr": 1.4093196093239832e-05,
+        "mismatch_count": 210,
+        "first_mismatches": [
+          {
+            "global_step": 1890,
+            "actual": 0.0,
+            "expected": 1.519065700221957e-05,
+            "absolute_error": 1.519065700221957e-05
+          },
+          {
+            "global_step": 1891,
+            "actual": 3.1746e-07,
+            "expected": 1.5185582921515254e-05,
+            "absolute_error": 1.4868122921515254e-05
+          },
+          {
+            "global_step": 1892,
+            "actual": 6.3492e-07,
+            "expected": 1.5180507014000318e-05,
+            "absolute_error": 1.4545587014000319e-05
+          },
+          {
+            "global_step": 1893,
+            "actual": 9.5238e-07,
+            "expected": 1.5175429281462934e-05,
+            "absolute_error": 1.4223049281462934e-05
+          },
+          {
+            "global_step": 1894,
+            "actual": 1.2698e-06,
+            "expected": 1.5170349725691917e-05,
+            "absolute_error": 1.3900549725691918e-05
+          }
+        ],
+        "max_absolute_error": 1.519065700221957e-05,
+        "max_relative_error": 1.0
+      }
+    ],
+    "coverage": {
+      "observed_updates": 2100,
+      "first_global_step": 0,
+      "last_global_step": 2099
+    },
+    "mismatch_count": 2099,
+    "failures": [
+      "lr_schedule_mismatches:2099"
+    ]
+  },
+  "limitations": [
+    "The 51-task Development split supports directional paired evidence, not a small-effect significance claim.",
+    "Capability slices with one or a few tasks are descriptive only.",
+    "No Sealed-A/B or external benchmark result is used.",
+    "Successful evidence gain is a deterministic trace diagnostic, not a learned reward."
+  ],
+  "failures": [
+    "training_control_contract:FAIL"
+  ]
+}

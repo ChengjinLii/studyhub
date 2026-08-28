@@ -1,0 +1,76 @@
+{
+  "schema_version": "studyhub.open-only-sft-program.v1.1",
+  "experiment_id": "open-only-sft-v1.1-lrmatched",
+  "status": "AUTHORIZED_PENDING_RUN",
+  "question": "Does removing StudyHub deterministic constructed SFT data recover or improve Qwen3.5-9B agent behavior when the actual Mixed-v3.0 LR trajectory is held fixed?",
+  "seed": 20260827,
+  "supersedes_for_formal_control": "open-only-sft-v1",
+  "correction": {
+    "reason": "v1 used a 2100-step scheduler horizon and restarted LambdaLR after recovery; Mixed-v3.0 used a 5456-step scheduler horizon.",
+    "reuse_v1_checkpoint": false,
+    "reuse_v1_evaluation_as_formal_result": false,
+    "preserve_v1_as_diagnostic_evidence": true
+  },
+  "allowed_sources": [
+    "toolace",
+    "hermes_function_calling",
+    "coig_exam",
+    "studyhub_2wiki_replay",
+    "studyhub_qasper_replay"
+  ],
+  "forbidden_source_prefixes": [
+    "studyhub_metadata_replay",
+    "studyhub_memory_replay",
+    "studyhub_acl_recovery",
+    "studyhub_web_fallback",
+    "studyhub_state_tools",
+    "studyhub_teacher_"
+  ],
+  "dataset_lock": {
+    "dataset_id": "open-only-sft-v1-qwen35-9b",
+    "selected_jsonl_sha256": "ce33c796c1f8532173404864e02d5c876599b87e6f83bb36847f95c0b7e5f368",
+    "selected_manifest_sha256": "a0f4e794cfa598c6bddbe225fec4aaa95384d59c2f37cc24bc3b8ec569b67d04",
+    "tokenized_manifest_sha256": "2fbb455ff3c647d253fa4f15011534cd02f423a2728095b493d09a0eb76ae8c2",
+    "train_rows": 16800,
+    "train_assistant_loss_tokens": 3138019
+  },
+  "benchmark_lock": {
+    "version": "studyhub-agentbench-v2",
+    "revision": "2.0.0",
+    "status": "FROZEN_FOR_BASELINE",
+    "manifest_sha256": "da804b10f53dec585255598c3e256445b8ade3acf35fd8c766ca0ab4d759c88b",
+    "training_rows_used": 0,
+    "sealed_used": false
+  },
+  "recipe": {
+    "model": "Qwen/Qwen3.5-9B",
+    "model_revision": "c202236235762e1c871ad0ccb60c8ee5ba337b9a",
+    "backend": "fsdp:d2p1t1",
+    "dtype": "bfloat16",
+    "lora_rank": 16,
+    "lora_alpha": 16,
+    "target_modules": ["o_proj", "gate_proj", "up_proj", "down_proj"],
+    "optimizer": "adam",
+    "learning_rate": 0.00002,
+    "weight_decay": 0.05,
+    "beta1": 0.9,
+    "beta2": 0.95,
+    "eps": 0.00001,
+    "scheduler": "cosine",
+    "scheduler_total_steps": 5456,
+    "scheduler_reference": "Mixed-v3.0 actual FinetuneSpec: floor(43650 / 8) = 5456",
+    "warmup_fraction": 0.03,
+    "warmup_steps": 163,
+    "gradient_clip": 1.0,
+    "global_batch_size": 8,
+    "planned_optimizer_updates": 2100
+  },
+  "scope": {
+    "no_rl": true,
+    "no_sealed": true,
+    "no_benchmark_modification": true,
+    "no_external_test_training_data": true,
+    "only_training_data_changes": true,
+    "require_scheduler_recovery_continuity": true
+  }
+}

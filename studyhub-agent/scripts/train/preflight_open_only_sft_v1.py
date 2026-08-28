@@ -115,6 +115,7 @@ def main() -> int:
     for name in PROXY_VARIABLES:
         os.environ.pop(name, None)
 
+    from areal.api import FinetuneSpec
     from areal.api.cli_args import SFTConfig, load_expr_config
 
     from datasets import load_from_disk
@@ -155,6 +156,8 @@ def main() -> int:
         "model_config_sha256": sha256(Path(config.actor.path) / "config.json"),
         "model_index_sha256": sha256(Path(config.actor.path) / "model.safetensors.index.json"),
     }
+    if "config_sha256" in lineage:
+        actual_hashes["config_sha256"] = sha256(args.config)
     drift = {
         key: {"authorized": lineage.get(key), "actual": value}
         for key, value in actual_hashes.items()
@@ -198,6 +201,7 @@ def main() -> int:
         raise RuntimeError(f"selected source coverage drift: {dict(source_counts)}")
 
     dataset = load_from_disk(Path(config.train_dataset.path))
+    mixed_dataset = load_from_disk(Path(mixed.train_dataset.path))
     expected_splits = {key: int(value) for key, value in card["rows"].items() if key in dataset}
     actual_splits = {split: len(dataset[split]) for split in expected_splits}
     if actual_splits != expected_splits:
@@ -211,6 +215,35 @@ def main() -> int:
         raise RuntimeError("controlled assistant-loss token budget drift")
     if selected_manifest["actual_assistant_loss_tokens"] != int(budget["projected_assistant_loss_tokens"]):
         raise RuntimeError("selected and tokenized assistant budgets differ")
+
+    scheduler_total_steps = authorization.get("recipe", {}).get(
+        "scheduler_total_steps"
+    )
+    if scheduler_total_steps is not None:
+        scheduler_total_steps = int(scheduler_total_steps)
+        mixed_scheduler_total_steps = (
+            len(mixed_dataset["train"]) // mixed.train_dataset.batch_size
+        )
+        if scheduler_total_steps != mixed_scheduler_total_steps:
+            raise RuntimeError(
+                "scheduler horizon does not match the Mixed control: "
+                f"authorized={scheduler_total_steps}, mixed={mixed_scheduler_total_steps}"
+            )
+        if int(program.get("recipe", {}).get("scheduler_total_steps", -1)) != scheduler_total_steps:
+            raise RuntimeError("program and authorization scheduler horizons differ")
+        if os.environ.get("STUDYHUB_AREAL_SCHEDULER_BRIDGE") != "1":
+            raise RuntimeError("the controlled scheduler bridge is not enabled")
+        if int(os.environ.get("STUDYHUB_AREAL_SCHEDULER_TOTAL_STEPS", -1)) != scheduler_total_steps:
+            raise RuntimeError("runtime scheduler horizon differs from authorization")
+        finetune_spec = FinetuneSpec(
+            total_train_epochs=config.total_train_epochs,
+            dataset_size=len(dataset["train"]),
+            train_batch_size=config.train_dataset.batch_size,
+        )
+        if finetune_spec.total_train_steps != scheduler_total_steps:
+            raise RuntimeError(
+                "scheduler bridge did not override FinetuneSpec.total_train_steps"
+            )
 
     recipe_pairs = {
         "seed": (config.seed, mixed.seed),
@@ -279,6 +312,11 @@ def main() -> int:
             "lora_alpha": config.actor.lora_alpha,
             "target_modules": list(config.actor.target_modules),
             "global_batch_size": config.train_dataset.batch_size,
+            "scheduler_total_steps": scheduler_total_steps,
+            "natural_open_only_steps": len(dataset["train"])
+            // config.train_dataset.batch_size,
+            "mixed_reference_steps": len(mixed_dataset["train"])
+            // mixed.train_dataset.batch_size,
         },
         "gpu_state": state,
         "lineage": actual_hashes,

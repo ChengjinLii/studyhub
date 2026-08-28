@@ -1,3 +1,4 @@
+import hashlib
 import json
 from pathlib import Path
 
@@ -77,4 +78,71 @@ def test_launcher_requires_explicit_open_only_authorization() -> None:
     assert "STUDYHUB_ALLOW_OPEN_ONLY_SFT" in launcher
     assert "preflight_open_only_sft_v1.py" in launcher
     assert "training.sft.open_bootstrap_driver:main" in launcher
+    assert "GRPO" not in launcher
+
+
+def test_corrected_open_only_config_preserves_the_sft_schema() -> None:
+    original = yaml.safe_load(
+        (PROJECT_ROOT / "configs/train/open-only-sft-v1-qwen35-9b.yaml").read_text(
+            encoding="utf-8"
+        )
+    )
+    corrected = yaml.safe_load(
+        (PROJECT_ROOT / "configs/train/open-only-sft-v1.1-qwen35-9b.yaml").read_text(
+            encoding="utf-8"
+        )
+    )
+
+    assert set(corrected) == set(original)
+    assert corrected["actor"] == original["actor"]
+    assert corrected["train_dataset"] == original["train_dataset"]
+    assert corrected["valid_dataset"] == original["valid_dataset"]
+    assert corrected["experiment_name"] != original["experiment_name"]
+    assert corrected["cluster"]["name_resolve"] != original["cluster"]["name_resolve"]
+
+
+def test_corrected_authorization_locks_the_real_config_hash() -> None:
+    config = PROJECT_ROOT / "configs/train/open-only-sft-v1.1-qwen35-9b.yaml"
+    authorization = json.loads(
+        (
+            PROJECT_ROOT
+            / "configs/program-v3/open-only-sft-v1.1-lrmatched-authorization.json"
+        ).read_text(encoding="utf-8")
+    )
+
+    assert authorization["lineage"]["config_sha256"] == hashlib.sha256(
+        config.read_bytes()
+    ).hexdigest()
+    assert authorization["recipe"]["scheduler_total_steps"] == 5_456
+    assert authorization["completion_contract"]["require_lr_schedule_audit"] is True
+
+
+def test_corrected_launcher_fails_closed_on_scheduler_and_recovery() -> None:
+    launcher = (PROJECT_ROOT / "scripts/train/run_open_only_sft_v1_1.sh").read_text(
+        encoding="utf-8"
+    )
+
+    assert "STUDYHUB_ALLOW_OPEN_ONLY_SFT_V1_1" in launcher
+    assert "STUDYHUB_AREAL_SCHEDULER_BRIDGE=1" in launcher
+    assert "STUDYHUB_AREAL_SCHEDULER_TOTAL_STEPS" in launcher
+    assert "STUDYHUB_AREAL_RECOVER_SCHEDULER_STEP" in launcher
+    assert "collect_lr_audit_segments.py" in launcher
+    assert "audit_sft_lr_schedule.py" in launcher
+    assert '--lr-audit "${LR_AUDIT}"' in launcher
+    assert "OPEN_ONLY_SFT_V1_1_COMPLETE.json" in launcher
+    assert "run_controlled_grpo.sh" not in launcher
+
+
+def test_recovery_gate_compares_continuous_and_resumed_lora() -> None:
+    launcher = (
+        PROJECT_ROOT / "scripts/train/run_open_only_sft_v1_1_recovery_gate.sh"
+    ).read_text(encoding="utf-8")
+
+    assert "STUDYHUB_ALLOW_SFT_RECOVERY_GATE" in launcher
+    assert 'run_attempt "${CONTINUOUS_TRIAL}"' in launcher
+    assert 'run_attempt "${RECOVERED_TRIAL}"' in launcher
+    assert "verify_sft_recovery_gate.py" in launcher
+    assert "--continuous-adapter" in launcher
+    assert "--recovered-adapter" in launcher
+    assert "EXPECTED_UPDATES=4" in launcher
     assert "GRPO" not in launcher
