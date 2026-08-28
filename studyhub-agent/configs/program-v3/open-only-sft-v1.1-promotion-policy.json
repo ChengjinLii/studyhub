@@ -1,0 +1,42 @@
+{
+  "schema_version": "studyhub.open-only-sft-promotion-policy.v1",
+  "status": "FROZEN_BEFORE_FORMAL_V1_1_RUN",
+  "candidate": "open-only-sft-v1.1",
+  "benchmark_manifest_sha256": "da804b10f53dec585255598c3e256445b8ade3acf35fd8c766ca0ab4d759c88b",
+  "required_contracts": {
+    "training_control": "PASS",
+    "recovery": ["BITWISE_RESUME_PASS", "BOUNDED_NUMERIC_RESUME_PASS"],
+    "sealed_used": false,
+    "rl_started": false
+  },
+  "development": {
+    "strict_candidate_gte_base": true,
+    "strict_candidate_gt_mixed": true,
+    "paired_wins_gt_losses_vs_mixed": true,
+    "mean_diagnostic_gt_mixed": true,
+    "factual_retrieval_max_task_drop_vs_base": 1,
+    "invalid_citation_max_increase_vs_base": 1,
+    "key_non_rag_slice_total_max_task_drop_vs_base": 1
+  },
+  "cost": {
+    "mean_tool_calls_min_ratio_vs_base": 0.85,
+    "mean_tool_calls_min_ratio_waived_if_strict_improves": true,
+    "mean_tool_calls_max_ratio_vs_base": 1.25,
+    "mean_latency_max_ratio_vs_base": 1.25
+  },
+  "variance": {
+    "strict_rollout_candidate_gte_base": true,
+    "pass_at_4_candidate_gte_base": true,
+    "consistent_at_4_candidate_gte_base": true,
+    "mixed_outcome_max_increase": 0.1
+  },
+  "external": {
+    "required": ["bfcl", "tau2"],
+    "official_metrics_only": true,
+    "candidate_must_not_be_below_base": true,
+    "candidate_must_not_be_below_mixed": true,
+    "aggregate_agent_score": "PROHIBITED",
+    "not_run_decision": "BLOCKED_PENDING_EXTERNAL_EVIDENCE"
+  },
+  "claim_boundary": "Passing this policy makes the candidate eligible for final recipe freeze. It is not a Sealed result and does not establish broad Agentic improvement by itself."
+}
