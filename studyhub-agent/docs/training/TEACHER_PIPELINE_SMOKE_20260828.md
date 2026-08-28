@@ -8,7 +8,7 @@ This smoke validated the provider-to-controller boundary only. It did not use Be
 
 | Provider | Result | Evidence |
 | --- | --- | --- |
-| GPT-5.3-Codex-Spark CLI | Available, then rate-limited | Structured action output worked; accepted Codex turns had zero shell/file tool events. The account reported a usage limit until 06:34 CST. |
+| GPT-5.3-Codex-Spark CLI | Available after 06:34 CST | The bounded recovery smoke completed 20 rollouts over 10 public training tasks. Two direct-answer rollouts passed the objective verifier; one was later excluded by Codex self-review. |
 | OpenAI Responses API | `NOT_AVAILABLE` | `OPENAI_API_KEY` was not configured. |
 | Authorized Xiaomi OpenAI-compatible endpoint | `FAILED_AUTH` | Six bounded smoke requests returned HTTP 401 `Invalid API Key`; no retry loop was started. |
 | Local Qwen3.5-9B best-of-N | `NOT_RUN` | The two H100s were reserved for the bounded v3.0 SFT baseline. |
@@ -26,6 +26,15 @@ The corrected environment keeps local and Web evidence separate, allows determin
 
 ## Outcome
 
-Accepted teacher trajectories: `0`.
+Raw runs: `26` (`20` Spark plus `6` failed authorized-endpoint probes).
 
-The corrected task/environment version was not expanded after Spark hit its usage limit. Existing failed raw runs and rejection taxonomies are retained under ignored interim probe directories. No failed trajectory enters SFT. `runtime-SFT-v3.1-teacher-candidate` therefore remains candidate-only and must not be described as a formal v3.1 release.
+Objective verifier results:
+
+- accepted: `2`;
+- rejected: `24`;
+- overall objective acceptance rate: `7.69%`;
+- Spark objective acceptance rate: `10%`.
+
+Codex self-review covered all available rows, not the requested 50/50 minimum because only 2 accepted and 24 rejected rows existed. One objective-accepted direct answer was excluded for a factual mismatch that lexical overlap had missed. One direct answer remained approved. All 24 objective rejections were upheld.
+
+The smoke was not expanded because tool-using trajectories had low verifier pass rates. Main failures were missing grounded citations, incomplete Search/Read/Fetch sequences, provider execution failures, and invalid state-tool calls. Existing raw runs and rejection taxonomies remain in the ignored interim directory. No failed or self-review-excluded trajectory enters the v3.1 candidate. `runtime-SFT-v3.1-teacher-candidate` remains candidate-only and must not be described as a formal v3.1 release.

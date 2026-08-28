@@ -1,0 +1,168 @@
+{
+  "schema_version": "studyhub.overnight-sft-teacher-evidence.v1",
+  "status": "COMPLETE_WITH_NEGATIVE_DEVELOPMENT_DIRECTION_AND_INSUFFICIENT_TEACHER_VOLUME",
+  "date": "2026-08-28",
+  "repository": {
+    "branch": "main",
+    "training_commit": "9cc7b0421f50a9ffd4c2ecb363cff56c5c77eaf0",
+    "teacher_fix_commit": "7df8a07b44d3c0314edd4136caf959113ba43bee",
+    "training_worktree_dirty": false
+  },
+  "scope": {
+    "rl_started": false,
+    "reward_v3_used": false,
+    "benchmark_modified": false,
+    "sealed_used": false,
+    "development_used": true,
+    "external_benchmark_run": false
+  },
+  "lineage": {
+    "model": "Qwen/Qwen3.5-9B",
+    "model_revision": "c202236235762e1c871ad0ccb60c8ee5ba337b9a",
+    "dataset": "studyhub-runtime-sft-v3-qwen35-9b",
+    "dataset_selected_sha256": "a115d220841a0e56c8893a01e486c8399c24cb591143f221c78a926deee42783",
+    "benchmark": "StudyHub AgentBench v2.0.0",
+    "benchmark_manifest_sha256": "da804b10f53dec585255598c3e256445b8ade3acf35fd8c766ca0ab4d759c88b",
+    "areal_commit": "cbff54d645d2cd8ee1f1c358a82f3f473588433d",
+    "hermes_commit": "5c1a304ce890276a4334d8ced3f29ffeedbbbf93"
+  },
+  "engineering_profile": {
+    "quality_claim": "NOT_EVALUATED",
+    "selected_recipe": "r16_alpha16",
+    "r16": {
+      "status": "PASS",
+      "updates": 5,
+      "mean_step_seconds": 9.43752,
+      "total_tokens_per_second": 1032.305097,
+      "assistant_loss_tokens_per_second": 148.725513,
+      "gpu_peak_mib": [62469, 45943]
+    },
+    "r32": {
+      "status": "PASS",
+      "updates": 5,
+      "mean_step_seconds": 9.25652,
+      "total_tokens_per_second": 1052.490569,
+      "assistant_loss_tokens_per_second": 151.633659,
+      "gpu_peak_mib": [62783, 46257]
+    },
+    "selection_reason": "Both profiles were stable; r16 was retained as the pre-authorized lower-capacity engineering baseline. Five-step loss was not used as a quality comparison."
+  },
+  "sft_run": {
+    "run_id": "overnight-r16-v30-seed-20260827-attempt-20260828_020420",
+    "status": "COMPLETE",
+    "exit_status": 0,
+    "run_metadata_sha256": "f46e56ea6dc5681e08bb341842496a331fe8d8e018489a9aab541fe4e9e18aa0",
+    "started_at": "2026-08-28T02:04:26+08:00",
+    "finished_at": "2026-08-28T07:39:28+08:00",
+    "trainer_elapsed_seconds": 19995.15,
+    "optimizer_updates": 2100,
+    "sequences": 16800,
+    "total_tokens": 21318410,
+    "assistant_loss_tokens": 3138019,
+    "assistant_token_fraction": 0.147198,
+    "total_tokens_per_train_second": 1117.237076,
+    "assistant_tokens_per_train_second": 164.454627,
+    "dual_gpu_hours_per_million_assistant_tokens": 3.378169,
+    "checkpoints": 10,
+    "loss": {
+      "first": 0.51857,
+      "last": 0.21011,
+      "mean": 0.124107,
+      "min": 0.00022404,
+      "max": 1.257
+    },
+    "gradient_norm": {
+      "first": 0.4073,
+      "last": 0.37416,
+      "mean": 0.256012,
+      "min": 0.013426,
+      "max": 1.5729
+    },
+    "gpu_peak_mib": {
+      "0": 62693,
+      "1": 46171
+    },
+    "initial_lora_sha256": "42e4a35fad189ac42637e1ee693e3342a4ba8145ed2919ed0ff1ac45372e4569",
+    "final_lora_sha256": "f216c5552b6ad886fe860f5fcb419205144624f7069bc5e2f4f3595d28c943a3",
+    "lora_update_observed": true,
+    "artifact_completeness": "COMPLETE"
+  },
+  "development_comparison": {
+    "claim": "DIRECTIONAL_PAIRED_EVIDENCE_ONLY",
+    "base_run_id": "qwen35-9b-base-v2-development-seed-20260827-20260827_212818",
+    "sft_run_id": "qwen35-9b-overnight-sft-v2-development-seed-20260827-20260828_074542",
+    "base_episodes_sha256": "1ec9c8fcb326302f3bc6604400c4418b6d2f1911d05273e55f1e52d2551401f6",
+    "sft_episodes_sha256": "6b61f7c7c4cde1e9e2f295e498e654cb311b053655171093e2ead6594ba447a6",
+    "paired_tasks": 51,
+    "infra_excluded": 0,
+    "base": {
+      "strict_success": 0.117647,
+      "strict_success_count": 6,
+      "mean_diagnostic": 0.283758,
+      "mean_tool_calls": 2.882353
+    },
+    "sft": {
+      "strict_success": 0.078431,
+      "strict_success_count": 4,
+      "mean_diagnostic": 0.249346,
+      "mean_tool_calls": 2.27451
+    },
+    "paired_wins": 2,
+    "paired_losses": 4,
+    "paired_ties": 45,
+    "strict_delta": -0.039216,
+    "strict_delta_ci95": [-0.137255, 0.058824],
+    "diagnostic_delta": -0.034412,
+    "diagnostic_delta_ci95": [-0.132353, 0.057843],
+    "tool_validity_delta": 0.014379,
+    "mean_tool_calls_delta": -0.607843,
+    "approx_mde_80_power_percentage_points": 17.865,
+    "conclusion": "NO_RELIABLE_IMPROVEMENT_DETECTED_DIRECTION_NEGATIVE"
+  },
+  "teacher_data": {
+    "spark_available_after": "2026-08-28T06:34:00+08:00",
+    "spark_tasks": 10,
+    "spark_rollouts": 20,
+    "all_raw_runs": 26,
+    "objective_accepted": 2,
+    "objective_rejected": 24,
+    "objective_acceptance_rate": 0.076923,
+    "accepted_jsonl_sha256": "b1ed6540481c1ce90043b8b22e301d7d3f62598741cc4bc0ae80d503d5763d39",
+    "rejected_jsonl_sha256": "7bb3f80baf135a05ceb82e789955847c40c4cb7f58a1783977337ff46546fbe3",
+    "self_review_accepted_reviewed": 2,
+    "self_review_rejected_reviewed": 24,
+    "self_review_approved": 1,
+    "self_review_status": "ALL_AVAILABLE_REVIEWED_BELOW_REQUESTED_SAMPLE_MINIMUM",
+    "self_review_sha256": "c933ca33859a5242057a5c67445dbbdad21abbf674dac57d45ce8a91ade9920b",
+    "provider_errors": {
+      "teacher_http_error": 6,
+      "codex_exec_failed": 6,
+      "codex_isolation_tool_event": 1
+    },
+    "input_tokens_reported": 394706,
+    "output_tokens_reported": 102465,
+    "cost": "NOT_AVAILABLE_UNLESS_PROVIDER_REPORTS_COST",
+    "minimum_useful_target_met": false
+  },
+  "v3_1_candidate": {
+    "status": "PASS_CANDIDATE_ONLY_INSUFFICIENT_TEACHER",
+    "formal_release": false,
+    "rows": 48500,
+    "candidate_sha256": "e97058c1f26a403855ca0eccf388d472e9dbe507eb34b5ba444f1333cc804d81",
+    "teacher_selected": 1,
+    "action_only_rows": 2425,
+    "action_only_share": 0.05,
+    "group_split_overlap": 0,
+    "public_benchmark_prompt_overlap": 0,
+    "sealed_task_files_read": false
+  },
+  "not_run": [
+    "GRPO_OR_OTHER_RL",
+    "REWARD_V3_MAIN_TRAINING",
+    "SEALED_A",
+    "SEALED_B",
+    "EXTERNAL_BENCHMARK_MODEL_EVALUATION",
+    "LOCAL_BEST_OF_N_TEACHER",
+    "DEVELOPMENT_VARIANCE_RERUN"
+  ]
+}

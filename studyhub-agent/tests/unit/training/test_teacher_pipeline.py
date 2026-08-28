@@ -1,11 +1,12 @@
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 
 import pytest
 
-from scripts.data.build_runtime_sft_v3_1 import _select_teacher_rows
+from scripts.data.build_runtime_sft_v3_1 import _apply_teacher_self_review, _select_teacher_rows
 from scripts.data.verify_teacher_trajectories import accepted_record, verify_run
 from scripts.data.select_runtime_sft_v3 import public_benchmark_prompt_hashes
 from training.teacher.hermes_controller import collect_trajectory
@@ -240,6 +241,42 @@ def test_accepted_direct_teacher_trajectory_is_not_falsely_runtime_native() -> N
     )
     assert [row["id"] for row in selected] == ["teacher-v1:direct-run"]
     assert drops == {}
+
+
+def test_teacher_self_review_is_hash_bound_and_fail_closed(tmp_path: Path) -> None:
+    accepted_path = tmp_path / "accepted.jsonl"
+    accepted_path.write_text(
+        json.dumps({"source_id": "include"}) + "\n" + json.dumps({"source_id": "exclude"}) + "\n",
+        encoding="utf-8",
+    )
+    accepted_sha = hashlib.sha256(accepted_path.read_bytes()).hexdigest()
+    review_path = tmp_path / "self-review.json"
+    review_path.write_text(
+        json.dumps(
+            {
+                "status": "SELF_REVIEW",
+                "population": {"accepted_jsonl_sha256": accepted_sha},
+                "included_run_ids": ["include"],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    selected, review = _apply_teacher_self_review(
+        [{"source_id": "include"}, {"source_id": "exclude"}],
+        accepted_path=accepted_path,
+        review_path=review_path,
+    )
+
+    assert selected == [{"source_id": "include"}]
+    assert review["status"] == "SELF_REVIEW"
+    accepted_path.write_text("{}\n", encoding="utf-8")
+    with pytest.raises(RuntimeError, match="different accepted dataset"):
+        _apply_teacher_self_review(
+            [{"source_id": "include"}],
+            accepted_path=accepted_path,
+            review_path=review_path,
+        )
 
 
 def test_provider_failure_is_rejected_with_specific_taxonomy() -> None:

@@ -1,0 +1,56 @@
+{
+  "schema_version": "studyhub.teacher-self-review.v1",
+  "review_type": "codex_self_review",
+  "status": "ALL_AVAILABLE_REVIEWED_BELOW_REQUESTED_SAMPLE_MINIMUM",
+  "reviewed_at": "2026-08-28",
+  "benchmark_content_used": false,
+  "sealed_content_used": false,
+  "population": {
+    "raw_runs": 26,
+    "objective_accepted": 2,
+    "objective_rejected": 24,
+    "accepted_jsonl_sha256": "b1ed6540481c1ce90043b8b22e301d7d3f62598741cc4bc0ae80d503d5763d39",
+    "rejected_jsonl_sha256": "7bb3f80baf135a05ceb82e789955847c40c4cb7f58a1783977337ff46546fbe3"
+  },
+  "requested_sample_minimum": {
+    "accepted": 50,
+    "rejected": 50
+  },
+  "actual_review": {
+    "accepted": 2,
+    "rejected": 24,
+    "sampling": "ALL_AVAILABLE"
+  },
+  "accepted_decisions": [
+    {
+      "run_id": "teacher-3dbfcead15957b911412-codex-spark-00-d224128af642a858",
+      "verdict": "EXCLUDE",
+      "reason": "FACTUAL_MISMATCH_WITH_TRAINING_REFERENCE",
+      "note": "The answer says glucose/total sugar reaches its minimum, while the training reference and vinegar-fermentation endpoint require ethanol. Lexical overlap produced a false objective pass."
+    },
+    {
+      "run_id": "teacher-3dbfcead15957b911412-codex-spark-01-86e6f176f9dc7997",
+      "verdict": "INCLUDE",
+      "reason": "ANSWER_ALIGNS_WITH_TRAINING_REFERENCE",
+      "note": "The answer uses ethanol as the endpoint and supplies two valid strain-selection properties without unnecessary tools."
+    }
+  ],
+  "rejected_review": {
+    "verdict": "ALL_REJECTIONS_UPHELD",
+    "reviewed": 24,
+    "basis": [
+      "provider or controller failure with no complete answer",
+      "required Search/Read/Fetch sequence missing",
+      "citation was not grounded in an observed Read/Fetch result",
+      "invalid state-tool call or environment postcondition failure"
+    ]
+  },
+  "included_run_ids": [
+    "teacher-3dbfcead15957b911412-codex-spark-01-86e6f176f9dc7997"
+  ],
+  "limitations": [
+    "Only two objective-accepted and twenty-four objective-rejected rows existed, so the requested 50/50 sample could not be reached.",
+    "This is Codex self-review, not human review.",
+    "No Benchmark v2 task, grader, oracle, Sealed-A, or Sealed-B content was used."
+  ]
+}

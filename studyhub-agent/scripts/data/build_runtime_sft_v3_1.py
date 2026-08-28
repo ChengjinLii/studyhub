@@ -64,6 +64,26 @@ def _write_jsonl(path: Path, rows: list[dict[str, Any]]) -> None:
             stream.write(json.dumps(row, ensure_ascii=False, sort_keys=True) + "\n")
 
 
+def _apply_teacher_self_review(
+    accepted: list[dict[str, Any]],
+    *,
+    accepted_path: Path,
+    review_path: Path,
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    if not review_path.is_file():
+        raise FileNotFoundError(f"teacher self-review is missing: {review_path}")
+    review = json.loads(review_path.read_text(encoding="utf-8"))
+    expected_sha = review.get("population", {}).get("accepted_jsonl_sha256")
+    actual_sha = sha256(accepted_path)
+    if expected_sha != actual_sha:
+        raise RuntimeError("teacher self-review is bound to a different accepted dataset")
+    approved = {str(run_id) for run_id in review.get("included_run_ids", [])}
+    available = {str(row.get("source_id")) for row in accepted}
+    if not approved <= available:
+        raise RuntimeError(f"teacher self-review references missing runs: {sorted(approved - available)}")
+    return [row for row in accepted if str(row.get("source_id")) in approved], review
+
+
 def _quality_rank(row: dict[str, Any]) -> tuple[int, str]:
     return (
         COMPLETE_QUALITY_ORDER.get(str(row.get("quality_tier")), 99),
@@ -278,6 +298,11 @@ def parse_args() -> argparse.Namespace:
         type=Path,
         default=PROJECT_ROOT / "datasets/interim/runtime_sft_v3_1/selected.jsonl",
     )
+    parser.add_argument(
+        "--teacher-self-review",
+        type=Path,
+        default=PROJECT_ROOT / "docs/training/evidence/runtime-sft-v3.1-teacher-self-review.json",
+    )
     parser.add_argument("--teacher-group-cap", type=int, default=4)
     return parser.parse_args()
 
@@ -296,7 +321,12 @@ def main() -> int:
     benchmark = json.loads(benchmark_path.read_text(encoding="utf-8"))
     public_hashes, public_tasks = public_benchmark_prompt_hashes(PROJECT_ROOT, benchmark)
     base = _read_jsonl(args.base)
-    accepted = _read_jsonl(args.teacher)
+    objective_accepted = _read_jsonl(args.teacher)
+    accepted, teacher_review = _apply_teacher_self_review(
+        objective_accepted,
+        accepted_path=args.teacher,
+        review_path=args.teacher_self_review,
+    )
     base_content = {str(row["content_sha256"]) for row in base}
     base_near = {(str(row["source_dataset"]), near_signature(row)) for row in base}
     teacher, teacher_drops = _select_teacher_rows(
@@ -397,7 +427,10 @@ def main() -> int:
         "base_sha256": sha256(args.base),
         "candidate_rows": len(result),
         "candidate_sha256": sha256(args.output),
-        "teacher_raw_accepted": len(accepted),
+        "teacher_raw_accepted": len(objective_accepted),
+        "teacher_self_review_approved": len(accepted),
+        "teacher_self_review_status": teacher_review["status"],
+        "teacher_self_review_sha256": sha256(args.teacher_self_review),
         "teacher_selected": len(teacher),
         "teacher_minimum_useful_target_met": enough_teacher,
         "teacher_group_cap": args.teacher_group_cap,
