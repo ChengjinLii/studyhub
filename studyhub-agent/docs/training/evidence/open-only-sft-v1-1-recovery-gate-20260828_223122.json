@@ -1,0 +1,251 @@
+{
+  "schema_version": "studyhub.sft-recovery-gate.v1",
+  "created_at": "2026-08-28T22:40:53+08:00",
+  "status": "FAIL",
+  "claim": "The tested interrupted SFT path is not equivalent to the uninterrupted reference.",
+  "scope": {
+    "model_quality": "NOT_EVALUATED",
+    "rl_started": false,
+    "sealed_used": false,
+    "expected_updates_per_path": 4
+  },
+  "continuous_lr": {
+    "schema_version": "studyhub.sft-lr-schedule-audit.v1",
+    "status": "PASS",
+    "contract": {
+      "base_lr": 2e-05,
+      "scheduler": "cosine",
+      "scheduler_total_steps": 5456,
+      "warmup_fraction": 0.03,
+      "warmup_steps": 163,
+      "expected_updates": 4,
+      "expected_start_step": 0,
+      "rel_tolerance": 0.0001,
+      "abs_tolerance": 5e-10
+    },
+    "segments": [
+      {
+        "metrics": "/data/chengjin/studyhub/studyhub-agent/artifacts/experiments/open-only-sft-v1-1-recovery-gate-20260828_223122-continuous-attempt-full/metrics/trainer.json",
+        "start_global_step": 0,
+        "count": 4,
+        "first_actual_lr": 0.0,
+        "last_actual_lr": 3.681e-07,
+        "first_expected_lr": 0.0,
+        "last_expected_lr": 3.680981595092025e-07,
+        "mismatch_count": 0,
+        "first_mismatches": [],
+        "max_absolute_error": 1.8404907975224414e-12,
+        "max_relative_error": 4.9999999999359656e-06
+      }
+    ],
+    "coverage": {
+      "observed_updates": 4,
+      "first_global_step": 0,
+      "last_global_step": 3
+    },
+    "mismatch_count": 0,
+    "failures": []
+  },
+  "recovered_lr": {
+    "schema_version": "studyhub.sft-lr-schedule-audit.v1",
+    "status": "PASS",
+    "contract": {
+      "base_lr": 2e-05,
+      "scheduler": "cosine",
+      "scheduler_total_steps": 5456,
+      "warmup_fraction": 0.03,
+      "warmup_steps": 163,
+      "expected_updates": 4,
+      "expected_start_step": 0,
+      "rel_tolerance": 0.0001,
+      "abs_tolerance": 5e-10
+    },
+    "segments": [
+      {
+        "metrics": "/data/chengjin/studyhub/studyhub-agent/artifacts/experiments/open-only-sft-v1-1-recovery-gate-20260828_223122-continuous-attempt-full/metrics/trainer.json",
+        "start_global_step": 0,
+        "count": 2,
+        "first_actual_lr": 0.0,
+        "last_actual_lr": 1.227e-07,
+        "first_expected_lr": 0.0,
+        "last_expected_lr": 1.226993865030675e-07,
+        "mismatch_count": 0,
+        "first_mismatches": [],
+        "max_absolute_error": 6.134969324986572e-13,
+        "max_relative_error": 4.999999999864055e-06
+      },
+      {
+        "metrics": "/data/chengjin/studyhub/studyhub-agent/artifacts/experiments/open-only-sft-v1-1-recovery-gate-20260828_223122-recovered-attempt-after-recovery/metrics/trainer.json",
+        "start_global_step": 2,
+        "count": 2,
+        "first_actual_lr": 2.454e-07,
+        "last_actual_lr": 3.681e-07,
+        "first_expected_lr": 2.45398773006135e-07,
+        "last_expected_lr": 3.680981595092025e-07,
+        "mismatch_count": 0,
+        "first_mismatches": [],
+        "max_absolute_error": 1.8404907975224414e-12,
+        "max_relative_error": 4.9999999999359656e-06
+      }
+    ],
+    "coverage": {
+      "observed_updates": 4,
+      "first_global_step": 0,
+      "last_global_step": 3
+    },
+    "mismatch_count": 0,
+    "failures": []
+  },
+  "shared_prefix": {
+    "status": "PASS",
+    "path": "/data/chengjin/studyhub/studyhub-agent/artifacts/areal/launcher_logs/open-only-sft-v1-1-recovery-gate-20260828_223122/shared-prefix-snapshot.json",
+    "snapshot": {
+      "schema_version": "studyhub.sft-shared-prefix.v1",
+      "created_at": "2026-08-28T22:34:41+08:00",
+      "status": "PASS",
+      "method": "atomic_directory_rename_same_filesystem",
+      "source_root": "/data/chengjin/studyhub/studyhub-agent/artifacts/areal/checkpoints/chengjin/studyhub-open-only-sft-v1-1-recovery-gate-20260828_223122/open-only-sft-v1-1-recovery-gate-20260828_223122-continuous",
+      "target_root": "/data/chengjin/studyhub/studyhub-agent/artifacts/areal/checkpoints/chengjin/studyhub-open-only-sft-v1-1-recovery-gate-20260828_223122/open-only-sft-v1-1-recovery-gate-20260828_223122-recovered",
+      "step_info": {
+        "epoch": 0,
+        "epoch_step": 1,
+        "global_step": 1,
+        "steps_per_epoch": 2100
+      },
+      "checkpoint": {
+        "file_count": 3,
+        "total_bytes": 37959718135,
+        "metadata_sha256": "099ccc2216dd8996d4d0affa131717244fa0cf931b027170b5d70af2cd31f3a0",
+        "relative_files": [
+          ".metadata",
+          "__0_0.distcp",
+          "__1_0.distcp"
+        ]
+      },
+      "recover_info_files": {
+        "checkpoint_info.json": "87b26956bbda98d489761c3dc05dedf7ddd437b1a128338761e6362e326302c4",
+        "dataloader_info.pkl": "3f9817d018790ec12dfede8a6aed5afa982ed0b54dbe33f713f5c46be4a43915",
+        "evaluator_info.json": "715dcff044c6291d3a89d0c05c6a85fa90b738b4ba83db181cf52d3b0cd037bb",
+        "saver_info.json": "cd5c5c4eb497def19f5a9c40c1476e0d5b608c6dfd25bbeef2b8bc5a732cf86f",
+        "stats_logger_info.json": "1caf522c9ce5de1f770b2ac1a359603c251402fba2724df05c7720d96142b98e",
+        "step_info.json": "c5538966d4cbfebb3aa6e28a6fea33d223570cfa3b3d34d06aaf61388fab9a22"
+      }
+    },
+    "failures": []
+  },
+  "adapter_comparison": {
+    "status": "FAIL",
+    "reference": {
+      "path": "/data/chengjin/studyhub/studyhub-agent/artifacts/areal/checkpoints/chengjin/studyhub-open-only-sft-v1-1-recovery-gate-20260828_223122/open-only-sft-v1-1-recovery-gate-20260828_223122-continuous/default/epoch0epochstep3globalstep3/adapter_model.safetensors",
+      "sha256": "d490bd4b0d5e672640ebd2bf1b23290332da380f608cabf9709e7c7a301f10d1"
+    },
+    "recovered": {
+      "path": "/data/chengjin/studyhub/studyhub-agent/artifacts/areal/checkpoints/chengjin/studyhub-open-only-sft-v1-1-recovery-gate-20260828_223122/open-only-sft-v1-1-recovery-gate-20260828_223122-recovered/default/epoch0epochstep3globalstep3/adapter_model.safetensors",
+      "sha256": "af24c4ccc8d2ec3778e0d12eb23bf989d6ed282f8fc9615d042ae4aae4e841c4"
+    },
+    "tensor_key_count": 208,
+    "exact_tensor_count": 89,
+    "file_sha256_equal": false,
+    "max_absolute_difference": 7.62939453125e-06,
+    "first_tensor_differences": [
+      {
+        "name": "base_model.model.model.language_model.layers.0.mlp.down_proj.lora_B.weight",
+        "shape": [
+          4096,
+          16
+        ],
+        "dtype": "torch.bfloat16",
+        "max_absolute_difference": 3.0314549803733826e-07
+      },
+      {
+        "name": "base_model.model.model.language_model.layers.0.mlp.gate_proj.lora_A.weight",
+        "shape": [
+          16,
+          4096
+        ],
+        "dtype": "torch.bfloat16",
+        "max_absolute_difference": 9.5367431640625e-07
+      },
+      {
+        "name": "base_model.model.model.language_model.layers.0.mlp.gate_proj.lora_B.weight",
+        "shape": [
+          12288,
+          16
+        ],
+        "dtype": "torch.bfloat16",
+        "max_absolute_difference": 3.2782554626464844e-07
+      },
+      {
+        "name": "base_model.model.model.language_model.layers.0.mlp.up_proj.lora_B.weight",
+        "shape": [
+          12288,
+          16
+        ],
+        "dtype": "torch.bfloat16",
+        "max_absolute_difference": 3.343448042869568e-07
+      },
+      {
+        "name": "base_model.model.model.language_model.layers.1.mlp.down_proj.lora_B.weight",
+        "shape": [
+          4096,
+          16
+        ],
+        "dtype": "torch.bfloat16",
+        "max_absolute_difference": 3.03611159324646e-07
+      },
+      {
+        "name": "base_model.model.model.language_model.layers.1.mlp.gate_proj.lora_B.weight",
+        "shape": [
+          12288,
+          16
+        ],
+        "dtype": "torch.bfloat16",
+        "max_absolute_difference": 4.200264811515808e-07
+      },
+      {
+        "name": "base_model.model.model.language_model.layers.1.mlp.up_proj.lora_B.weight",
+        "shape": [
+          12288,
+          16
+        ],
+        "dtype": "torch.bfloat16",
+        "max_absolute_difference": 4.0652230381965637e-07
+      },
+      {
+        "name": "base_model.model.model.language_model.layers.10.mlp.down_proj.lora_B.weight",
+        "shape": [
+          4096,
+          16
+        ],
+        "dtype": "torch.bfloat16",
+        "max_absolute_difference": 1.809094101190567e-07
+      },
+      {
+        "name": "base_model.model.model.language_model.layers.10.mlp.gate_proj.lora_B.weight",
+        "shape": [
+          12288,
+          16
+        ],
+        "dtype": "torch.bfloat16",
+        "max_absolute_difference": 3.132154233753681e-07
+      },
+      {
+        "name": "base_model.model.model.language_model.layers.10.mlp.up_proj.lora_B.weight",
+        "shape": [
+          12288,
+          16
+        ],
+        "dtype": "torch.bfloat16",
+        "max_absolute_difference": 2.7474015951156616e-07
+      }
+    ],
+    "missing_tensors": [],
+    "unexpected_tensors": [],
+    "failures": [
+      "nonidentical_tensors:119"
+    ]
+  },
+  "failures": [
+    "recovered_adapter_differs_from_continuous"
+  ]
+}
