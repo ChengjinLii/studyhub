@@ -102,6 +102,7 @@ def audit_root(root: Path) -> dict[str, Any]:
     manifest = read_json(manifest_path)
     errors: list[dict[str, Any]] = []
     families: Counter[str] = Counter()
+    source_groups: Counter[str] = Counter()
     tool_routes: Counter[str] = Counter()
     schemas: Counter[str] = Counter()
     task_ids: set[str] = set()
@@ -135,6 +136,10 @@ def audit_root(root: Path) -> dict[str, Any]:
         metadata = task.get("metadata", {})
         if metadata.get("benchmark_overlap") is not False:
             _record(errors, task_id, "task_benchmark_overlap")
+        task_source_groups = set(map(str, metadata.get("source_group_ids", [])))
+        if not task_source_groups or str(metadata.get("source_group_id", "")) not in task_source_groups:
+            _record(errors, task_id, "source_group_provenance_invalid")
+        source_groups.update(task_source_groups)
 
         paths = {
             "environment": root / "environments" / f"{task_id}.json",
@@ -211,13 +216,37 @@ def audit_root(root: Path) -> dict[str, Any]:
         family = str(task.get("family", ""))
         if family == "recovery_acl" and "permission_denied" not in reachable_markers:
             _record(errors, task_id, "acl_permission_route_missing")
-        if family == "web_fallback_conflict" and "web_fetch" in expected_tools and not routes_by_name["web_fetch"]:
-            _record(errors, task_id, "web_fetch_route_missing")
+        if family == "web_fallback_conflict":
+            search_urls = {
+                str(result.get("url", ""))
+                for route in routes
+                if route.get("name") == "web_search" and isinstance(route.get("result"), dict)
+                for result in route["result"].get("results", [])
+                if isinstance(result, dict) and result.get("url")
+            }
+            fetch_urls = {
+                str(route.get("arguments", {}).get("url", "")) for route in routes if route.get("name") == "web_fetch"
+            }
+            missing_fetch_urls = sorted(search_urls - fetch_urls)
+            if missing_fetch_urls:
+                _record(errors, task_id, "web_search_results_not_fetchable", urls=missing_fetch_urls)
+            if "web_fetch" in expected_tools and not routes_by_name["web_fetch"]:
+                _record(errors, task_id, "web_fetch_route_missing")
 
     if len(tasks) != manifest.get("tasks"):
         _record(errors, "<manifest>", "task_count_mismatch", observed=len(tasks), expected=manifest.get("tasks"))
     if dict(sorted(families.items())) != manifest.get("family_counts"):
         _record(errors, "<manifest>", "family_count_mismatch")
+    maximum_group_rows = max(source_groups.values(), default=0)
+    group_cap = int(manifest.get("max_rows_per_source_group_contract", 0))
+    if maximum_group_rows > group_cap:
+        _record(
+            errors,
+            "<manifest>",
+            "source_group_cap_exceeded",
+            observed=maximum_group_rows,
+            maximum=group_cap,
+        )
 
     report = {
         "schema_version": "studyhub.teacher-task-contract-audit.v1",
@@ -226,6 +255,11 @@ def audit_root(root: Path) -> dict[str, Any]:
         "tasks": len(tasks),
         "unique_task_ids": len(task_ids),
         "families": dict(sorted(families.items())),
+        "unique_source_groups": len(source_groups),
+        "rows_per_source_group": {
+            "max": maximum_group_rows,
+            "groups_over_10": sum(value > 10 for value in source_groups.values()),
+        },
         "task_schemas": dict(sorted(schemas.items())),
         "documents": total_documents,
         "fixture_routes": total_routes,
@@ -244,7 +278,7 @@ def audit_root(root: Path) -> dict[str, Any]:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--root", type=Path, default=PROJECT_ROOT / "datasets/interim/studyhub_teacher_v2_2")
+    parser.add_argument("--root", type=Path, default=PROJECT_ROOT / "datasets/interim/studyhub_teacher_v2_3")
     return parser.parse_args()
 
 

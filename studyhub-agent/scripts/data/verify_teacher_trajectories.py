@@ -211,6 +211,9 @@ def accepted_record(
         "source_dataset": teacher_dataset,
         "source_id": run["run_id"],
         "group_id": task["metadata"]["source_group_id"],
+        "source_group_ids": sorted(
+            set(map(str, task["metadata"].get("source_group_ids", [task["metadata"]["source_group_id"]])))
+        ),
         "split": "train",
         "task_family": task["family"],
         "capability_tags": [task["family"], "teacher_policy", "hermes_runtime"],
@@ -341,7 +344,17 @@ def verify_root(root: Path) -> dict[str, Any]:
         path_signatures[str(run.get("path_signature", ""))] += 1
         providers[str(run.get("provider", {}).get("interface", "unknown"))] += 1
         capabilities[str(task.get("family", "unknown"))] += 1
-        source_groups[str(task.get("metadata", {}).get("source_group_id", "unknown"))] += 1
+        source_groups.update(
+            set(
+                map(
+                    str,
+                    task.get("metadata", {}).get(
+                        "source_group_ids",
+                        [task.get("metadata", {}).get("source_group_id", "unknown")],
+                    ),
+                )
+            )
+        )
 
     write_jsonl(root / "accepted.jsonl", accepted)
     write_jsonl(root / "rejected.jsonl", rejected)
@@ -409,7 +422,7 @@ def verify_root(root: Path) -> dict[str, Any]:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--root", type=Path, default=PROJECT_ROOT / "datasets/interim/studyhub_teacher_v2_2")
+    parser.add_argument("--root", type=Path, default=PROJECT_ROOT / "datasets/interim/studyhub_teacher_v2_3")
     return parser.parse_args()
 
 

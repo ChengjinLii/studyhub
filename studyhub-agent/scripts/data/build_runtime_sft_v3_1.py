@@ -35,6 +35,7 @@ CUSTOM_SOURCES = {
     "studyhub_teacher_v1",
     "studyhub_teacher_v2_1",
     "studyhub_teacher_v2_2",
+    "studyhub_teacher_v2_3",
 }
 COMPLETE_QUALITY_ORDER = {
     "teacher_verified_complete": 0,
@@ -124,8 +125,8 @@ def _select_teacher_rows(
         if candidate_prompt_hash(row) in public_benchmark_hashes:
             drops["public_benchmark_prompt_overlap"] += 1
             continue
-        group = str(row["group_id"])
-        if groups[group] >= max_rows_per_group:
+        row_groups = set(map(str, row.get("source_group_ids", [row["group_id"]])))
+        if any(groups[group] >= max_rows_per_group for group in row_groups):
             drops["teacher_group_cap"] += 1
             continue
         content = str(row["content_sha256"])
@@ -140,7 +141,7 @@ def _select_teacher_rows(
         prepared["split"] = "train"
         prepared["semantic_template_cluster"] = semantic_template(prepared)
         selected.append(prepared)
-        groups[group] += 1
+        groups.update(row_groups)
         contents.add(content)
         near.add(signature)
     return selected, drops
@@ -290,7 +291,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--teacher",
         type=Path,
-        default=PROJECT_ROOT / "datasets/interim/studyhub_teacher_v2_2/accepted.jsonl",
+        default=PROJECT_ROOT / "datasets/interim/studyhub_teacher_v2_3/accepted.jsonl",
     )
     parser.add_argument(
         "--output",

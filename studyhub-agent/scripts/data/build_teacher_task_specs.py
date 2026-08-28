@@ -9,7 +9,7 @@ import json
 import shutil
 import sys
 from collections import Counter, defaultdict, deque
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from pathlib import Path
 from typing import Any
 
@@ -25,10 +25,10 @@ from scripts.data.select_runtime_sft_v3 import (  # noqa: E402
 )
 from studyhub_agent.trajectory.runtime_sft import canonical_json, stable_hash  # noqa: E402
 
-SCHEMA_VERSION = "studyhub.teacher-task.v2.2"
-VERIFIER_SCHEMA_VERSION = "studyhub.teacher-verifier.v2.2"
-MANIFEST_SCHEMA_VERSION = "studyhub.teacher-task-manifest.v2.2"
-TEACHER_DATASET = "studyhub_teacher_v2_2"
+SCHEMA_VERSION = "studyhub.teacher-task.v2.3"
+VERIFIER_SCHEMA_VERSION = "studyhub.teacher-verifier.v2.3"
+MANIFEST_SCHEMA_VERSION = "studyhub.teacher-task-manifest.v2.3"
+TEACHER_DATASET = "studyhub_teacher_v2_3"
 DEFAULT_TOTAL = 2_400
 FAMILY_PLAN = {
     "rag_query_rewrite_citation": ("studyhub_metadata_replay", 0.25),
@@ -151,15 +151,84 @@ def _documents(calls: list[tuple[str, dict[str, Any], Any]]) -> list[dict[str, s
     return sorted(documents.values(), key=lambda item: item["source_id"])
 
 
+def _evidence_source_ids(value: Any) -> set[str]:
+    result: set[str] = set()
+    if isinstance(value, dict):
+        source_id = value.get("source_id")
+        text = value.get("text")
+        if isinstance(source_id, str) and source_id and isinstance(text, str) and text.strip():
+            result.add(source_id)
+        for child in value.values():
+            result.update(_evidence_source_ids(child))
+    elif isinstance(value, list):
+        for child in value:
+            result.update(_evidence_source_ids(child))
+    return result
+
+
 def _evidence_sources(calls: list[tuple[str, dict[str, Any], Any]]) -> list[str]:
     values: set[str] = set()
     for _name, _arguments, observation in calls:
-        if not isinstance(observation, dict):
-            continue
-        source_id = str(observation.get("source_id", ""))
-        if source_id and str(observation.get("text", "")).strip():
-            values.add(source_id)
+        values.update(_evidence_source_ids(observation))
     return sorted(values)
+
+
+def _normalize_source_group(source_id: str) -> str | None:
+    if source_id.startswith("studyhub-material:"):
+        return source_id
+    if source_id.startswith(("web-material:", "paid-source:")):
+        return f"studyhub-material:{source_id.split(':', 1)[1]}"
+    if source_id.startswith("memory:"):
+        return f"studyhub-memory:{source_id.split(':', 1)[1]}"
+    return None
+
+
+def _build_web_fetch_library(rows: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
+    library: dict[str, dict[str, Any]] = {}
+    for row in sorted(rows, key=lambda item: stable_hash(str(item["id"]), salt="teacher-fetch-library")):
+        for name, arguments, observation in _call_observations(row):
+            if name != "web_fetch" or not isinstance(observation, dict):
+                continue
+            url = str(arguments.get("url", "")).strip()
+            if not url or not _evidence_source_ids(observation):
+                continue
+            candidate = {
+                "result": observation,
+                "source_group_id": str(row["group_id"]),
+                "source_row_id": str(row["id"]),
+            }
+            existing = library.get(url)
+            if existing is not None and (
+                canonical_json(existing["result"]) != canonical_json(candidate["result"])
+                or existing["source_group_id"] != candidate["source_group_id"]
+            ):
+                raise RuntimeError(f"conflicting frozen web fetch payload: {url}")
+            library[url] = candidate
+    return library
+
+
+def _source_group_ids(
+    row: dict[str, Any],
+    web_fetch_library: dict[str, dict[str, Any]],
+) -> list[str]:
+    groups = {str(row["group_id"])}
+    for name, arguments, observation in _call_observations(row):
+        for source_id in _nested_values(observation, "source_id"):
+            normalized = _normalize_source_group(source_id)
+            if normalized:
+                groups.add(normalized)
+        if name == "material_bookmark_add" and arguments.get("material_id") is not None:
+            groups.add(f"studyhub-material:{arguments['material_id']}")
+        if name == "study_plan_update":
+            groups.update(f"studyhub-material:{value}" for value in arguments.get("resource_ids", []))
+        if name == "web_search" and isinstance(observation, dict):
+            for result in observation.get("results", []):
+                if not isinstance(result, dict):
+                    continue
+                route = web_fetch_library.get(str(result.get("url", "")))
+                if route is not None:
+                    groups.add(str(route["source_group_id"]))
+    return sorted(groups)
 
 
 def _nested_values(value: Any, key: str) -> set[str]:
@@ -201,7 +270,11 @@ def _hidden_required_tools(family: str, expected_tools: list[str]) -> list[str]:
     return []
 
 
-def _environment(row: dict[str, Any]) -> tuple[dict[str, Any], dict[str, Any], list[str]]:
+def _environment(
+    row: dict[str, Any],
+    *,
+    web_fetch_library: dict[str, dict[str, Any]] | None = None,
+) -> tuple[dict[str, Any], dict[str, Any], list[str]]:
     tools = _tools(row)
     calls = _call_observations(row)
     documents = _documents(calls)
@@ -237,6 +310,34 @@ def _environment(row: dict[str, Any]) -> tuple[dict[str, Any], dict[str, Any], l
                 "flexible_fields": ["topic"],
             }
         routes.append(route)
+    fetch_library = web_fetch_library or {}
+    existing_fetch_urls = {
+        str(route.get("arguments", {}).get("url", "")) for route in routes if route.get("name") == "web_fetch"
+    }
+    if "web_fetch" in tool_by_name:
+        for name, _arguments, observation in calls:
+            if name != "web_search" or not isinstance(observation, dict):
+                continue
+            for result in observation.get("results", []):
+                if not isinstance(result, dict):
+                    continue
+                url = str(result.get("url", "")).strip()
+                supplement = fetch_library.get(url)
+                if not url or url in existing_fetch_urls or supplement is None:
+                    continue
+                routes.append(
+                    {
+                        "name": "web_fetch",
+                        "arguments": {"url": url},
+                        "result": supplement["result"],
+                        "provenance": {
+                            "origin": "frozen_train_fetch_library",
+                            "source_group_id": supplement["source_group_id"],
+                            "source_row_id": supplement["source_row_id"],
+                        },
+                    }
+                )
+                existing_fetch_urls.add(url)
     # A read document must be discoverable by search; the environment enforces this.
     if documents and any(tool.get("capability") == "knowledge_read" for tool in tools):
         for source_id in document_ids:
@@ -245,32 +346,59 @@ def _environment(row: dict[str, Any]) -> tuple[dict[str, Any], dict[str, Any], l
     return {"tools": tools, "documents": documents}, {"routes": routes}, expected_tools
 
 
-def _round_robin(
-    rows: list[dict[str, Any]],
-    limit: int,
-    *,
-    existing_group_counts: Counter[str] | None = None,
-    max_rows_per_group: int | None = None,
-) -> list[dict[str, Any]]:
+def _round_robin_order(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     groups: dict[str, deque[dict[str, Any]]] = defaultdict(deque)
     for row in sorted(rows, key=lambda item: stable_hash(str(item["id"]), salt="teacher-task-order")):
         groups[str(row["group_id"])].append(row)
     order = sorted(groups, key=lambda key: stable_hash(key, salt="teacher-group-order"))
-    counts = Counter(existing_group_counts or {})
-    selected = []
-    while order and len(selected) < limit:
+    result = []
+    while order:
         next_order = []
         for group in order:
-            if max_rows_per_group is not None and counts[group] >= max_rows_per_group:
-                continue
-            selected.append(groups[group].popleft())
-            counts[group] += 1
-            if groups[group] and (max_rows_per_group is None or counts[group] < max_rows_per_group):
+            result.append(groups[group].popleft())
+            if groups[group]:
                 next_order.append(group)
-            if len(selected) == limit:
-                break
         order = next_order
-    return selected
+    return result
+
+
+def _select_family_balanced_rows(
+    pools: dict[str, list[dict[str, Any]]],
+    allocations: dict[str, int],
+    *,
+    source_group_ids_for_row: Callable[[dict[str, Any]], list[str]],
+    max_rows_per_group: int,
+) -> tuple[list[tuple[str, dict[str, Any]]], Counter[str]]:
+    queues = {family: deque(_round_robin_order(pools[source])) for family, (source, _share) in FAMILY_PLAN.items()}
+    selected: list[tuple[str, dict[str, Any]]] = []
+    selected_by_family: Counter[str] = Counter()
+    source_groups: Counter[str] = Counter()
+    used_rows: set[str] = set()
+    while True:
+        made_progress = False
+        has_unfilled_family = False
+        for family in FAMILY_PLAN:
+            if selected_by_family[family] >= allocations[family]:
+                continue
+            has_unfilled_family = True
+            queue = queues[family]
+            while queue:
+                row = queue.popleft()
+                row_id = str(row["id"])
+                if row_id in used_rows:
+                    continue
+                row_groups = set(map(str, source_group_ids_for_row(row))) or {str(row["group_id"])}
+                if any(source_groups[group] >= max_rows_per_group for group in row_groups):
+                    continue
+                selected.append((family, row))
+                selected_by_family[family] += 1
+                source_groups.update(row_groups)
+                used_rows.add(row_id)
+                made_progress = True
+                break
+        if not has_unfilled_family or not made_progress:
+            break
+    return selected, source_groups
 
 
 def parse_args() -> argparse.Namespace:
@@ -278,7 +406,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--input", type=Path, default=PROJECT_ROOT / "datasets/interim/runtime_sft_v3/selected.jsonl")
     parser.add_argument("--output", type=Path, default=PROJECT_ROOT / f"datasets/interim/{TEACHER_DATASET}")
     parser.add_argument("--max-tasks", type=int, default=DEFAULT_TOTAL)
-    parser.add_argument("--max-rows-per-source-group", type=int, default=12)
+    parser.add_argument("--max-rows-per-source-group", type=int, default=24)
     parser.add_argument("--overwrite", action="store_true")
     return parser.parse_args()
 
@@ -297,100 +425,106 @@ def main() -> int:
     benchmark = json.loads(benchmark_path.read_text(encoding="utf-8"))
     benchmark_hashes, benchmark_tasks = public_benchmark_prompt_hashes(PROJECT_ROOT, benchmark)
     pools: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    training_rows = []
     with args.input.open(encoding="utf-8") as stream:
         for line in stream:
             row = json.loads(line)
             if row.get("split") != "train" or candidate_prompt_hash(row) in benchmark_hashes:
                 continue
+            training_rows.append(row)
             pools[str(row["source_dataset"])].append(row)
+    web_fetch_library = _build_web_fetch_library(training_rows)
 
     allocations = {family: round(args.max_tasks * share) for family, (_source, share) in FAMILY_PLAN.items()}
     allocations[next(iter(allocations))] += args.max_tasks - sum(allocations.values())
     tasks = []
-    source_groups: Counter[str] = Counter()
     family_counts: Counter[str] = Counter()
-    used_rows: set[str] = set()
-    for family, (source, _share) in FAMILY_PLAN.items():
-        candidates = [row for row in pools[source] if str(row["id"]) not in used_rows]
-        for row in _round_robin(
-            candidates,
-            allocations[family],
-            existing_group_counts=source_groups,
-            max_rows_per_group=args.max_rows_per_source_group,
-        ):
-            used_rows.add(str(row["id"]))
-            task_id = f"teacher-v2-2-{stable_hash(str(row['id']), salt='studyhub-teacher-v2.2')[:20]}"
-            environment, fixture, expected_tools = _environment(row)
-            calls = _call_observations(row)
-            required_state_postconditions = _required_state_postconditions(calls)
-            evidence_sources = sorted(
-                set(_evidence_sources(calls))
-                | {document["source_id"] for document in environment["documents"] if document["text"].strip()}
+    supplemental_web_routes = 0
+    selected_rows, source_groups = _select_family_balanced_rows(
+        pools,
+        allocations,
+        source_group_ids_for_row=lambda item: _source_group_ids(item, web_fetch_library),
+        max_rows_per_group=args.max_rows_per_source_group,
+    )
+    for family, row in selected_rows:
+        source = FAMILY_PLAN[family][0]
+        task_id = f"teacher-v2-3-{stable_hash(str(row['id']), salt='studyhub-teacher-v2.3')[:20]}"
+        environment, fixture, expected_tools = _environment(row, web_fetch_library=web_fetch_library)
+        supplemental_web_routes += sum(
+            route.get("provenance", {}).get("origin") == "frozen_train_fetch_library" for route in fixture["routes"]
+        )
+        calls = _call_observations(row)
+        task_source_groups = _source_group_ids(row, web_fetch_library)
+        required_state_postconditions = _required_state_postconditions(calls)
+        evidence_sources = sorted(
+            set(_evidence_sources(calls))
+            | {document["source_id"] for document in environment["documents"] if document["text"].strip()}
+            | {source_id for route in fixture["routes"] for source_id in _evidence_source_ids(route.get("result"))}
+        )
+        request = _user_request(row)
+        reference = _final_answer(row)
+        if not request or not reference:
+            continue
+        minimum_citations = (
+            min(2, len(evidence_sources))
+            if evidence_sources
+            and (
+                family == "web_fallback_conflict"
+                or any(token in request.casefold() for token in ("比较", "核对两", "compare"))
             )
-            request = _user_request(row)
-            reference = _final_answer(row)
-            if not request or not reference:
-                continue
-            max_tool_calls = max(1, min(12, len(expected_tools) + 3))
-            max_steps = max(2, min(14, len(expected_tools) + 4))
-            public = {
-                "schema_version": SCHEMA_VERSION,
-                "task_id": task_id,
-                "family": family,
-                "user_request": request,
-                "allowed_tools": [tool["name"] for tool in environment["tools"]],
-                "completion_contract": {
-                    "minimum_grounded_citations": (
-                        min(2, len(evidence_sources))
-                        if evidence_sources
-                        and any(token in request.casefold() for token in ("比较", "核对两", "compare"))
-                        else int(bool(evidence_sources))
-                    ),
-                    "citation_format": "[source_id]",
-                    "search_result_requires_read_or_fetch_before_citation": True,
-                    "minimum_successful_state_changes": len(required_state_postconditions),
-                    "state_changes_require_successful_observation": family
-                    in {"cross_tool_composition", "state_function"},
-                },
-                "max_steps": max_steps,
-                "max_tool_calls": max_tool_calls,
-                "metadata": {
-                    "source_dataset": source,
-                    "source_row_id": row["id"],
-                    "source_group_id": row["group_id"],
-                    "split": "train",
-                    "benchmark_overlap": False,
-                    "environment_id": task_id,
-                    "verifier_id": task_id,
-                    "teacher_dataset": TEACHER_DATASET,
-                },
-            }
-            verifier = {
-                "schema_version": VERIFIER_SCHEMA_VERSION,
-                "task_id": task_id,
-                "family": family,
-                "reference_final": reference,
-                "reference_final_sha256": hashlib.sha256(reference.encode()).hexdigest(),
-                "reference_citations": _citations(reference),
-                "allowed_citations": evidence_sources,
-                "minimum_citations": (
-                    min(2, len(evidence_sources))
-                    if evidence_sources and any(token in request.casefold() for token in ("比较", "核对两", "compare"))
-                    else int(bool(evidence_sources))
-                ),
-                "expected_tool_names": expected_tools,
-                "required_tool_names": _hidden_required_tools(family, expected_tools),
-                "required_observation_markers": _required_observation_markers(calls),
-                "minimum_tool_calls": 0 if not expected_tools else 1,
+            else int(bool(evidence_sources))
+        )
+        max_tool_calls = max(1, min(12, len(expected_tools) + 3))
+        max_steps = max(2, min(14, len(expected_tools) + 4))
+        public = {
+            "schema_version": SCHEMA_VERSION,
+            "task_id": task_id,
+            "family": family,
+            "user_request": request,
+            "allowed_tools": [tool["name"] for tool in environment["tools"]],
+            "completion_contract": {
+                "minimum_grounded_citations": minimum_citations,
+                "citation_format": "[source_id]",
+                "search_result_requires_read_or_fetch_before_citation": True,
+                "minimum_successful_state_changes": len(required_state_postconditions),
+                "state_changes_require_successful_observation": family in {"cross_tool_composition", "state_function"},
+            },
+            "max_steps": max_steps,
+            "max_tool_calls": max_tool_calls,
+            "metadata": {
+                "source_dataset": source,
+                "source_row_id": row["id"],
                 "source_group_id": row["group_id"],
-                "benchmark_prompt_overlap": False,
-            }
-            write_json(args.output / "environments" / f"{task_id}.json", environment)
-            write_json(args.output / "fixtures" / f"{task_id}.json", fixture)
-            write_json(args.output / "verifiers" / f"{task_id}.json", verifier)
-            tasks.append(public)
-            source_groups[str(row["group_id"])] += 1
-            family_counts[family] += 1
+                "source_group_ids": task_source_groups,
+                "split": "train",
+                "benchmark_overlap": False,
+                "environment_id": task_id,
+                "verifier_id": task_id,
+                "teacher_dataset": TEACHER_DATASET,
+            },
+        }
+        verifier = {
+            "schema_version": VERIFIER_SCHEMA_VERSION,
+            "task_id": task_id,
+            "family": family,
+            "reference_final": reference,
+            "reference_final_sha256": hashlib.sha256(reference.encode()).hexdigest(),
+            "reference_citations": _citations(reference),
+            "allowed_citations": evidence_sources,
+            "minimum_citations": minimum_citations,
+            "expected_tool_names": expected_tools,
+            "required_tool_names": _hidden_required_tools(family, expected_tools),
+            "required_observation_markers": _required_observation_markers(calls),
+            "minimum_tool_calls": 0 if not expected_tools else 1,
+            "source_group_id": row["group_id"],
+            "source_group_ids": task_source_groups,
+            "benchmark_prompt_overlap": False,
+        }
+        write_json(args.output / "environments" / f"{task_id}.json", environment)
+        write_json(args.output / "fixtures" / f"{task_id}.json", fixture)
+        write_json(args.output / "verifiers" / f"{task_id}.json", verifier)
+        tasks.append(public)
+        family_counts[family] += 1
 
     write_jsonl(args.output / "task_specs.jsonl", tasks)
     manifest = {
@@ -405,6 +539,13 @@ def main() -> int:
             "groups_over_10": sum(value > 10 for value in source_groups.values()),
         },
         "max_rows_per_source_group_contract": args.max_rows_per_source_group,
+        "source_group_cap_scope": "candidate_task_specs_full_provenance",
+        "downstream_v3_1_default_teacher_group_cap": 4,
+        "web_fetch_library": {
+            "scope": "runtime_sft_v3_train_only",
+            "urls": len(web_fetch_library),
+            "supplemental_routes": supplemental_web_routes,
+        },
         "source_selected_sha256": sha256(args.input),
         "benchmark_manifest_sha256": sha256(benchmark_path),
         "benchmark_tasks_checked": benchmark_tasks,

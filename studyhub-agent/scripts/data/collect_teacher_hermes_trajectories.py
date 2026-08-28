@@ -359,7 +359,7 @@ def _collect_parallel(
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--root", type=Path, default=PROJECT_ROOT / "datasets/interim/studyhub_teacher_v2_2")
+    parser.add_argument("--root", type=Path, default=PROJECT_ROOT / "datasets/interim/studyhub_teacher_v2_3")
     parser.add_argument("--teacher", choices=TEACHERS, default="codex-spark")
     parser.add_argument("--teacher-model")
     parser.add_argument("--max-accepted", type=int, default=500)

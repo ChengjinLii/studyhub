@@ -9,7 +9,7 @@ import pytest
 
 import training.teacher.providers as teacher_providers
 from scripts.data.build_runtime_sft_v3_1 import _apply_teacher_self_review, _select_teacher_rows
-from scripts.data.build_teacher_task_specs import _environment
+from scripts.data.build_teacher_task_specs import _environment, _source_group_ids
 from scripts.data.select_runtime_sft_v3 import public_benchmark_prompt_hashes
 from scripts.data.verify_teacher_trajectories import accepted_record, verify_run
 from training.rl.frozen_environment import FrozenTaskEnvironment
@@ -344,6 +344,71 @@ def test_teacher_builder_preserves_web_fetch_route_and_records_evidence() -> Non
     assert search["results"] == [{"url": url, "title": "Official result"}]
     assert fetch["fixture_match"] is True
     assert runtime.trace.read_source_ids == {source_id}
+
+
+def test_teacher_builder_supplements_every_frozen_web_result_from_train_library() -> None:
+    first_url = "https://example.edu/first"
+    second_url = "https://example.edu/second"
+    row = _builder_row(
+        [
+            (
+                "web_search",
+                {
+                    "type": "object",
+                    "additionalProperties": False,
+                    "properties": {"query": {"type": "string"}},
+                    "required": ["query"],
+                },
+            ),
+            (
+                "web_fetch",
+                {
+                    "type": "object",
+                    "additionalProperties": False,
+                    "properties": {"url": {"type": "string"}},
+                    "required": ["url"],
+                },
+            ),
+        ],
+        [
+            (
+                "search-web",
+                "web_search",
+                {"query": "compare sources"},
+                {
+                    "results": [
+                        {"url": first_url, "source_id": "web-material:1"},
+                        {"url": second_url, "source_id": "web-material:2"},
+                    ]
+                },
+            ),
+            (
+                "fetch-first",
+                "web_fetch",
+                {"url": first_url},
+                {"source_id": "web-material:1", "text": "First evidence."},
+            ),
+        ],
+    )
+    row.update({"id": "web-row", "group_id": "studyhub-material:1"})
+    library = {
+        second_url: {
+            "result": {"source_id": "web-material:2", "text": "Second evidence."},
+            "source_group_id": "studyhub-material:2",
+            "source_row_id": "web-row-two",
+        }
+    }
+
+    environment, fixture, _expected_tools = _environment(row, web_fetch_library=library)
+
+    fetch_routes = [route for route in fixture["routes"] if route["name"] == "web_fetch"]
+    assert [route["arguments"]["url"] for route in fetch_routes] == [first_url, second_url]
+    assert fetch_routes[1]["provenance"]["origin"] == "frozen_train_fetch_library"
+    assert _source_group_ids(row, library) == ["studyhub-material:1", "studyhub-material:2"]
+    runtime = FrozenTaskEnvironment(environment, fixture)
+    result = json.loads(asyncio.run(runtime.execute("web_fetch", {"url": second_url})))
+    assert result["fixture_match"] is True
+    assert runtime.trace.read_source_ids == {"web-material:2"}
 
 
 def test_fixture_route_accepts_declared_equivalent_state_text() -> None:
@@ -862,13 +927,17 @@ def test_accepted_direct_teacher_trajectory_is_not_falsely_runtime_native() -> N
     }
     task = {
         "family": "direct_abstention",
-        "metadata": {"source_group_id": "direct-fixture"},
+        "metadata": {
+            "source_group_id": "direct-fixture",
+            "source_group_ids": ["direct-fixture", "shared-secondary-fixture"],
+        },
     }
 
     record = accepted_record(run, task, {}, {})
 
     assert record["quality_tier"] == "teacher_verified_complete"
     assert record["runtime_native"] is False
+    assert record["source_group_ids"] == ["direct-fixture", "shared-secondary-fixture"]
     selected, drops = _select_teacher_rows(
         [record],
         base_content=set(),
@@ -878,6 +947,47 @@ def test_accepted_direct_teacher_trajectory_is_not_falsely_runtime_native() -> N
     )
     assert [row["id"] for row in selected] == ["teacher-v1:direct-run"]
     assert drops == {}
+
+
+def test_teacher_selection_caps_secondary_source_groups() -> None:
+    def direct_record(run_id: str, group_id: str, question: str, answer: str) -> dict:
+        run = {
+            "run_id": run_id,
+            "candidate_index": 0,
+            "collection_mode": "teacher_rollout",
+            "provider": {"interface": "fixture", "model": "fixture-teacher"},
+            "collector_git_commit": "fixture-commit",
+            "raw_run_path": f"raw_runs/{run_id}.json",
+            "controller": {"hermes_commit": "fixture-hermes"},
+            "tools": [],
+            "messages": [
+                {"role": "system", "content": "Answer directly."},
+                {"role": "user", "content": question},
+                {"role": "assistant", "content": answer},
+            ],
+        }
+        task = {
+            "family": "direct_abstention",
+            "metadata": {
+                "source_group_id": group_id,
+                "source_group_ids": [group_id, "shared-secondary"],
+            },
+        }
+        return accepted_record(run, task, {}, {})
+
+    selected, drops = _select_teacher_rows(
+        [
+            direct_record("direct-one", "primary-one", "What is one plus one?", "Two."),
+            direct_record("direct-two", "primary-two", "What is two plus two?", "Four."),
+        ],
+        base_content=set(),
+        base_near=set(),
+        public_benchmark_hashes=set(),
+        max_rows_per_group=1,
+    )
+
+    assert len(selected) == 1
+    assert drops == {"teacher_group_cap": 1}
 
 
 def test_teacher_self_review_is_hash_bound_and_fail_closed(tmp_path: Path) -> None:
