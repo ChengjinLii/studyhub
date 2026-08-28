@@ -1,6 +1,6 @@
 # StudyHub 9B Agentic Training Correction Status
 
-Generated on 2026-08-29 (Asia/Shanghai) from implementation HEAD `ebf72fe` on `main`. The status document itself is committed after that implementation HEAD; the final delivery message records the resulting repository HEAD.
+Generated on 2026-08-29 (Asia/Shanghai) from implementation HEAD `9b65cd1` on `main`. The status document itself is committed after that implementation HEAD; the final delivery message records the resulting repository HEAD.
 
 ## Decision
 
@@ -49,7 +49,7 @@ Formal Open-Only v1.1 training is `NOT_RUN`. Open-Only v1 remains `DIAGNOSTIC_ON
 
 | Command | Result |
 |---|---:|
-| `.venv-train/bin/pytest -q tests/unit/training` | 181/181 passed; deprecation warnings only |
+| `.venv-train/bin/pytest -q tests/unit/training` | 182/182 passed; deprecation warnings only |
 | `.venv/bin/pytest -q tests/unit/benchmark_v2 tests/unit/external_benchmarks` | 28/28 passed |
 | `.venv/bin/python scripts/benchmark/v2/validate_manifest.py --require-frozen` | PASS; 3 public assets, 0 hidden assets checked, 9 quality artifacts |
 | Focused Ruff checks for newly changed Python files | PASS |
@@ -130,7 +130,7 @@ Not supported:
 |---|---|
 | `benchmarks/studyhub-agent-v2/manifest.json` | `da804b10f53dec585255598c3e256445b8ade3acf35fd8c766ca0ab4d759c88b` |
 | `docs/training/evidence/open-only-sft-v1-1-control-diff.json` | `222c158e7408f1a0f023aef6f725497371f063e31dc83caa9fbb6ff64aacc012` |
-| `docs/training/evidence/open-only-sft-v1-1-recovery-ready-not-run-20260828.json` | `3e01cb0c33c196450fe21b09a384c535ae03f815c89099798b5ee9de93b145ef` |
+| `docs/training/evidence/open-only-sft-v1-1-recovery-ready-not-run-20260828.json` | `705ac05bdcfc54ce3258e6b50d0c321c2d92c7e28a27e7eb254951af19330a63` |
 | `docs/training/evidence/open-only-sft-v1-1-benchmark-portfolio.json` | `f8bfe4217d85f490a01bd677afe616f2c30af8699dd5953d6aafca5b6c47b47c` |
 | `docs/training/evidence/open-only-sft-v1-1-promotion-decision.json` | `20ef207f27b54c8be9ccb2f971fa3513b58984c924f5585f1332a9c1397782b8` |
 | `docs/training/evidence/open-only-sft-v1-1-data-benchmark-alignment.json` | `a6292ca159479d408122f18307060f6f5b71597318a5c101d45b4f7640a4e971` |
