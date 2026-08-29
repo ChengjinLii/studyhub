@@ -8,7 +8,7 @@ Generated on 2026-08-29 (Asia/Shanghai) from implementation HEAD `9b65cd1` on `m
 BLOCKED_RECOVERY_CONTRACT
 ```
 
-Open-Only v1.1 formal SFT has not started. The only next GPU action is the `cadence-210` recovery confirmation. It requires explicit training and recovery-gate environment authorization, which was not present during this correction run.
+Open-Only v1.1 formal SFT has not started. The only next GPU action is the `cadence-210` recovery confirmation. Explicit training and recovery-gate authorization was received on 2026-08-29; execution remains pending until its recorded run begins.
 
 ## Commits reviewed
 
@@ -130,7 +130,7 @@ Not supported:
 |---|---|
 | `benchmarks/studyhub-agent-v2/manifest.json` | `da804b10f53dec585255598c3e256445b8ade3acf35fd8c766ca0ab4d759c88b` |
 | `docs/training/evidence/open-only-sft-v1-1-control-diff.json` | `222c158e7408f1a0f023aef6f725497371f063e31dc83caa9fbb6ff64aacc012` |
-| `docs/training/evidence/open-only-sft-v1-1-recovery-ready-not-run-20260828.json` | `705ac05bdcfc54ce3258e6b50d0c321c2d92c7e28a27e7eb254951af19330a63` |
+| `docs/training/evidence/open-only-sft-v1-1-recovery-ready-not-run-20260828.json` | `65620b2bde59159251a471e501540f65e5e7e93499ba93c2ac988dd9eb9604bf` |
 | `docs/training/evidence/open-only-sft-v1-1-benchmark-portfolio.json` | `f8bfe4217d85f490a01bd677afe616f2c30af8699dd5953d6aafca5b6c47b47c` |
 | `docs/training/evidence/open-only-sft-v1-1-promotion-decision.json` | `20ef207f27b54c8be9ccb2f971fa3513b58984c924f5585f1332a9c1397782b8` |
 | `docs/training/evidence/open-only-sft-v1-1-data-benchmark-alignment.json` | `a6292ca159479d408122f18307060f6f5b71597318a5c101d45b4f7640a4e971` |

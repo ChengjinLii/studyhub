@@ -1,15 +1,15 @@
 {
   "schema_version": "studyhub.sft-recovery-ready-not-run.v1",
-  "created_at": "2026-08-28T23:58:00+08:00",
+  "created_at": "2026-08-29T15:13:49+08:00",
   "status": "READY_BUT_NOT_RUN",
-  "decision": "BLOCKED_MISSING_EXPLICIT_GPU_AUTHORIZATION",
-  "prepared_from_commit": "420bb46",
+  "decision": "AUTHORIZED_PENDING_CADENCE_210_GATE",
+  "prepared_from_commit": "289eb6842e6040b1eb59658193173b42500bb0f3",
   "run_commit_requirement": "CLEAN_HEAD_AT_LAUNCH",
   "next_gate": {
     "profile": "cadence-210",
     "boundary": "RECOVERY_CADENCE_CONFIRMATION",
     "prefix_global_step": 209,
-    "expected_updates_continuous": 212,
+    "expected_updates_continuous": 220,
     "command": "STUDYHUB_ALLOW_TRAINING=YES STUDYHUB_ALLOW_SFT_RECOVERY_GATE=YES STUDYHUB_RECOVERY_GATE_PROFILE=cadence-210 bash studyhub-agent/scripts/train/run_open_only_sft_v1_1_recovery_gate.sh"
   },
   "authorization": {
@@ -17,11 +17,11 @@
       "STUDYHUB_ALLOW_TRAINING=YES",
       "STUDYHUB_ALLOW_SFT_RECOVERY_GATE=YES"
     ],
-    "observed_environment": "NOT_PRESENT",
+    "observed_environment": "EXPLICIT_USER_AUTHORIZATION_RECEIVED_2026-08-29",
     "gpu_job_started": false
   },
   "input_hashes": {
-    "launcher": "00cc3374ab178bb74c6b29fabe7b5a2aed252b6cade4225676ee2f58b68fae95",
+    "launcher": "7fac91bc5ceb3ae8b80d3e9e35efe035fe49c75f1ac1861904217c43e4f733db",
     "snapshot": "06e82ca70ac5eb77daf2f32f0dd5b43fd148476168e9d858ac82b7cea94fd0ef",
     "verifier": "cede392ec4391cb57b4cd0fdc3f204dc92ceadad518065bfbbf9283ae6aa006b",
     "recovery_state_bridge": "92ecaf92cc07b01ab8e965dae0a8b3fdc7c37502596a991f5fb6e9b4b4bbf651",

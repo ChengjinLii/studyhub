@@ -135,6 +135,7 @@ def test_recovery_gate_compares_continuous_and_resumed_lora() -> None:
     assert "STUDYHUB_RECOVERY_AUDIT_ROOT" in launcher
     assert "post-warmup" in launcher
     assert "cadence-210" in launcher
+    assert 'PREFIX_GLOBAL_STEP=209\n    EXPECTED_UPDATES=220' in launcher
     assert '--shared-prefix-report "${SHARED_PREFIX_REPORT}"' in launcher
     assert '--equivalence-contract "${EQUIVALENCE_CONTRACT}"' in launcher
     assert '--initial-adapter "${INITIAL_ADAPTER}"' in launcher
