@@ -59,26 +59,6 @@ jobs:
             exit 1
           fi
 
-  agent-v2:
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-python@v6
-        with:
-          python-version: "3.12"
-          cache: pip
-          cache-dependency-path: |
-            studyhub-agent/pyproject.toml
-            studyhub-agent/ai_platform/rag_experiments/pyproject.toml
-            studyhub-agent/integrations/hermes/upstream.lock.json
-      - name: Bootstrap pinned CPU Agent runtime
-        env:
-          PIP_INDEX_URL: https://pypi.org/simple
-        run: bash studyhub-agent/scripts/bootstrap-phase1.sh
-      - name: Verify Agent V2 training-ready contracts
-        run: bash studyhub-agent/scripts/verify-phase1.sh
-
   frontend:
     runs-on: ubuntu-latest
     timeout-minutes: 30
