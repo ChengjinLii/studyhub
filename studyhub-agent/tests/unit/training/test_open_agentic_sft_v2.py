@@ -98,6 +98,10 @@ def test_launcher_has_bounded_smoke_and_formal_modes() -> None:
     assert "preflight_open_agentic_sft_v2.py" in launcher
     assert "STUDYHUB_TORCH_DETERMINISTIC_TRAINING=1" in launcher
     assert "STUDYHUB_AREAL_SCHEDULER_TOTAL_STEPS" in launcher
+    assert launcher.index("preflight_open_agentic_sft_v2.py") < launcher.index(
+        "export STUDYHUB_AREAL_RECOVERY_STATE_BRIDGE=1"
+    )
+    assert launcher.index('RECOVERY_AUDIT_ROOT="') < launcher.index("export STUDYHUB_AREAL_RECOVERY_STATE_BRIDGE=1")
     assert "record_open_agentic_sft_completion.py" in launcher
     assert "training.sft.open_bootstrap_driver:main" in launcher
     assert "GRPO" not in launcher
