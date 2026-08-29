@@ -25,7 +25,7 @@ def collect(
     attempt_prefix: str,
     expected_updates: int,
 ) -> list[tuple[Path, int, int]]:
-    attempts: list[tuple[int, Path, str]] = []
+    attempts: list[tuple[int, Path, str, int]] = []
     for metadata_path in sorted(log_root.glob(f"{attempt_prefix}-attempt-*.run.json")):
         metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
         overrides = _override_map(metadata)
@@ -35,29 +35,37 @@ def collect(
         attempt_id = metadata_path.name.removesuffix(".run.json")
         metrics = evidence_root / attempt_id / "metrics" / "trainer.json"
         if metrics.is_file():
-            attempts.append((start, metrics, attempt_id))
+            payload = json.loads(metrics.read_text(encoding="utf-8"))
+            observed = len(payload.get("series", {}).get("sft/lr", []))
+            attempts.append((start, metrics, attempt_id, observed))
     if not attempts:
         raise RuntimeError(f"no LR metric attempts found for {attempt_prefix}")
 
-    attempts.sort(key=lambda value: value[0])
-    starts = [start for start, _, _ in attempts]
-    if len(starts) != len(set(starts)):
-        raise RuntimeError(f"duplicate attempt start steps: {starts}")
+    by_start: dict[int, list[tuple[Path, str, int]]] = {}
+    for start, metrics, attempt_id, observed in attempts:
+        by_start.setdefault(start, []).append((metrics, attempt_id, observed))
+    starts = sorted(by_start)
     if starts[0] != 0:
         raise RuntimeError(f"first attempt does not start at zero: {starts[0]}")
 
     segments: list[tuple[Path, int, int]] = []
-    for index, (start, metrics, attempt_id) in enumerate(attempts):
+    for index, start in enumerate(starts):
         end = starts[index + 1] if index + 1 < len(starts) else expected_updates
         count = end - start
         if count <= 0:
-            raise RuntimeError(f"invalid durable segment for {attempt_id}: {start}..{end}")
-        payload = json.loads(metrics.read_text(encoding="utf-8"))
-        observed = len(payload.get("series", {}).get("sft/lr", []))
-        if observed < count:
+            raise RuntimeError(f"invalid durable segment: {start}..{end}")
+        eligible = [candidate for candidate in by_start[start] if candidate[2] >= count]
+        if not eligible:
+            observed = max(candidate[2] for candidate in by_start[start])
             raise RuntimeError(
-                f"attempt {attempt_id} has {observed} LR points but {count} are required"
+                f"attempt at step {start} has {observed} LR points but {count} are required"
             )
+        if len(eligible) != 1:
+            attempt_ids = sorted(candidate[1] for candidate in eligible)
+            raise RuntimeError(
+                f"ambiguous durable attempts at step {start}: {attempt_ids}"
+            )
+        metrics, _, _ = eligible[0]
         segments.append((metrics, start, count))
     return segments
 

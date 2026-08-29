@@ -83,3 +83,42 @@ def test_collect_segments_fails_when_durable_metrics_are_missing(tmp_path: Path)
 
     with pytest.raises(RuntimeError, match="2 LR points but 4 are required"):
         collect(logs, evidence, attempt_prefix="trial", expected_updates=4)
+
+
+def test_collect_segments_ignores_incomplete_attempts_at_same_recovery_step(
+    tmp_path: Path,
+) -> None:
+    logs = tmp_path / "logs"
+    evidence = tmp_path / "evidence"
+    logs.mkdir()
+    prefix = "resumed-trial"
+    _attempt(logs, evidence, prefix=prefix, suffix="001", start=0, observed=8)
+    _attempt(logs, evidence, prefix=prefix, suffix="002", start=6, observed=0)
+    _attempt(logs, evidence, prefix=prefix, suffix="003", start=6, observed=2)
+    _attempt(logs, evidence, prefix=prefix, suffix="004", start=6, observed=4)
+
+    segments = collect(
+        logs,
+        evidence,
+        attempt_prefix=prefix,
+        expected_updates=10,
+    )
+
+    assert [(path.parts[-3], start, count) for path, start, count in segments] == [
+        (f"{prefix}-attempt-001", 0, 6),
+        (f"{prefix}-attempt-004", 6, 4),
+    ]
+
+
+def test_collect_segments_fails_closed_for_multiple_complete_attempts(
+    tmp_path: Path,
+) -> None:
+    logs = tmp_path / "logs"
+    evidence = tmp_path / "evidence"
+    logs.mkdir()
+    prefix = "ambiguous-trial"
+    _attempt(logs, evidence, prefix=prefix, suffix="001", start=0, observed=4)
+    _attempt(logs, evidence, prefix=prefix, suffix="002", start=0, observed=4)
+
+    with pytest.raises(RuntimeError, match="ambiguous durable attempts at step 0"):
+        collect(logs, evidence, attempt_prefix=prefix, expected_updates=4)
