@@ -131,6 +131,11 @@ def test_recovery_gate_compares_continuous_and_resumed_lora() -> None:
     assert '"${CONTINUOUS_TRIAL}"' in launcher
     assert '"${RECOVERED_TRIAL}"' in launcher
     assert "STUDYHUB_AREAL_RECOVERY_STATE_BRIDGE=1" in launcher
+    assert "STUDYHUB_TORCH_DETERMINISTIC_TRAINING=1" in launcher
+    assert "CUBLAS_WORKSPACE_CONFIG=:4096:8" in launcher
+    assert "NCCL_ALGO=Ring" in launcher
+    assert "TORCH_COMPILE_DETERMINISTIC=1" in launcher
+    assert 'studyhub_torch_determinism=strict' in launcher
     assert "STUDYHUB_RECOVERY_SNAPSHOT_TARGET" in launcher
     assert "STUDYHUB_RECOVERY_AUDIT_ROOT" in launcher
     assert "post-warmup" in launcher

@@ -6,6 +6,17 @@ import os
 import shutil
 import sys
 
+if os.environ.get("STUDYHUB_TORCH_DETERMINISTIC_TRAINING") == "1":
+    try:
+        from torch_determinism_bridge import install_torch_determinism_bridge
+
+        install_torch_determinism_bridge()
+    except Exception as exc:
+        sys.stderr.write(f"StudyHub strict training determinism failed: {exc}\n")
+        sys.stderr.flush()
+        os._exit(77)
+
+
 if os.environ.get("STUDYHUB_AREAL_CHAT_TEMPLATE_METADATA_BRIDGE") == "1":
     from areal_metadata_bridge import install_areal_metadata_bridge
 

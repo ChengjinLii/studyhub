@@ -64,6 +64,10 @@ unset PYTHONHOME ALL_PROXY all_proxy HTTP_PROXY http_proxy HTTPS_PROXY https_pro
 export STUDYHUB_AREAL_CHAT_TEMPLATE_METADATA_BRIDGE=1
 export STUDYHUB_AREAL_SCHEDULER_BRIDGE=1
 export STUDYHUB_AREAL_SCHEDULER_TOTAL_STEPS="${SCHEDULER_TOTAL_STEPS}"
+export STUDYHUB_TORCH_DETERMINISTIC_TRAINING=1
+export CUBLAS_WORKSPACE_CONFIG=:4096:8
+export NCCL_ALGO=Ring
+export TORCH_COMPILE_DETERMINISTIC=1
 export PYTHONPATH="${RUNTIME_SHIM}:${PROJECT_ROOT}:${PROJECT_ROOT}/src${PYTHONPATH:+:${PYTHONPATH}}"
 export CUDA_VISIBLE_DEVICES="${GPUS}"
 export WANDB_MODE=disabled HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 TOKENIZERS_PARALLELISM=false
@@ -132,6 +136,7 @@ run_attempt() {
     --override "studyhub_scheduler_total_steps=${SCHEDULER_TOTAL_STEPS}"
     --override "studyhub_gate_id=${GATE_ID}"
     --override "studyhub_gate_scope=${GATE_SCOPE}"
+    --override "studyhub_torch_determinism=strict"
   )
 
   export STUDYHUB_AREAL_RECOVERY_STATE_BRIDGE=1

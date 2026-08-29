@@ -1,0 +1,57 @@
+{
+  "schema_version": "studyhub.open-agentic-source-registry.v2",
+  "dataset_id": "open-agentic-sft-v2-qwen35-9b",
+  "sources": {
+    "hermes_function_calling_v1": {
+      "status": "ENABLED",
+      "url": "https://huggingface.co/datasets/NousResearch/hermes-function-calling-v1",
+      "revision": "dae3e1d26f495a56f2570944488be3cf3916c2f9",
+      "license": "Apache-2.0",
+      "files": {
+        "func-calling.json": "769478035a886678d525d057ea66e3fd1e247f43e35c8d6d7cc866e080b6742b",
+        "func-calling-singleturn.json": "fb2df9fe3f295dfd65b223c2dbf04d6b90006357d737f8f8927749f0bea09527",
+        "glaive-function-calling-5k.json": "b98eb3f160359f27ad15018e974ce6db444f566eb5be4aa9e4aa690b34d50832",
+        "json-mode-agentic.json": "7343a1ce0b3c1e894978fc15bb79c695a925f835c91a81786bf59e7379eb5da2",
+        "json-mode-singleturn.json": "c07b20b7e88afc9cde0cf8c92e50ad150861ba2e35f4c82eb85999aba7182f4a"
+      }
+    },
+    "toolbench": {
+      "status": "ENABLED_FILTERED",
+      "url": "https://github.com/OpenBMB/ToolBench",
+      "revision": "google-drive-data.zip:df035ef91551d5cdc9e66d782dc12c821c81e830da2e7d05f633c7b26ae06016",
+      "license": "Apache-2.0",
+      "files": {
+        "data.zip": "df035ef91551d5cdc9e66d782dc12c821c81e830da2e7d05f633c7b26ae06016"
+      }
+    },
+    "agent_flan": {
+      "status": "ENABLED_SELECTED",
+      "url": "https://huggingface.co/datasets/internlm/Agent-FLAN",
+      "revision": "8b25999e795a58b264fcb51e8746edb2faee9161",
+      "license": "Apache-2.0",
+      "files": {
+        "data/agent_instruct_react.jsonl": "fb0b710ab45159ea68555385ed0d5d538ab82673b68fcc7142905deb3f7669de",
+        "data/agent_instruct_tflan.jsonl": "82894560bec58a71cd7ccf342a236b6d1600ceb1246b5830d2dfecafe9349e2c",
+        "data/toolbench_instruct_j1s1_3k.jsonl": "3ceea471090600004844ba84c6ebf660a5e5dbdbe6de70d37862307323b4ab85",
+        "data/toolbench_negative.jsonl": "03355a7fd18ccd0cc88a2c9eb6f047c734c66084efff5bf3e1463e3cb3d1e6a8",
+        "data/toolbench_react_10p.jsonl": "25a13e3baec935a3a8dbe82a9acabd38c544e9abf70bb7b5972bb4048d6d06c0",
+        "data/toolbench_tflan_60p_r10r5u7.jsonl": "99f9995a4f0e95e2c5d32c8a521dad634c4ac72a4ef45a945d0f7e3454b2ff7d",
+        "data/toolbench_tflan_cot_30p.jsonl": "20063a8e94f56483b5bdc64a2d3fe8a585e74e5d916338ae312067c4fb9bddcc"
+      },
+      "selected_files": [
+        "data/toolbench_react_10p.jsonl",
+        "data/toolbench_negative.jsonl"
+      ]
+    },
+    "xlam_function_calling_60k": {
+      "status": "SKIPPED_GATED_ACCESS",
+      "url": "https://huggingface.co/datasets/Salesforce/xlam-function-calling-60k",
+      "license": "CC-BY-4.0"
+    },
+    "apigen_mt_5k": {
+      "status": "DISABLED_LICENSE_AND_TAU_INDEPENDENCE",
+      "url": "https://huggingface.co/datasets/Salesforce/APIGen-MT-5k",
+      "license": "CC-BY-NC-4.0"
+    }
+  }
+}

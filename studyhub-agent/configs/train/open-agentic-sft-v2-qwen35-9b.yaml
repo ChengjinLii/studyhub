@@ -1,0 +1,118 @@
+experiment_name: studyhub-open-agentic-sft-v2-9b
+trial_name: r16-seed-20260827
+
+seed: 20260827
+enable_offload: false
+total_train_epochs: 1
+total_train_steps: null
+tokenizer_path: ${actor.path}
+
+cluster:
+  n_nodes: 1
+  n_gpus_per_node: 2
+  fileroot: /data/chengjin/studyhub/studyhub-agent/artifacts/areal
+  name_resolve:
+    type: nfs
+    nfs_record_root: /data/chengjin/studyhub/studyhub-agent/artifacts/areal/name_resolve/open-agentic-sft-v2
+
+scheduler:
+  type: local
+
+actor:
+  backend: fsdp:d2p1t1
+  experiment_name: ${experiment_name}
+  trial_name: ${trial_name}
+  path: /data/chengjin/studyhub/models/P1/Qwen3.5-9B
+  attn_impl: sdpa
+  init_from_scratch: false
+  disable_dropout: true
+  gradient_checkpointing: true
+  dtype: bfloat16
+  use_lora: true
+  peft_type: lora
+  lora_rank: 16
+  lora_alpha: 16
+  target_modules: [o_proj, gate_proj, up_proj, down_proj]
+  mb_spec:
+    max_tokens_per_mb: 8192
+  optimizer:
+    type: adam
+    lr: 2.0e-5
+    weight_decay: 0.05
+    beta1: 0.9
+    beta2: 0.95
+    eps: 1.0e-5
+    lr_scheduler_type: cosine
+    warmup_steps_proportion: 0.03
+    gradient_clipping: 1.0
+  scheduling_spec:
+    - task_type: worker
+      port_count: 2
+      gpu: 1
+      cpu: 8
+      mem: 64
+      cmd: python3 -m areal.infra.rpc.rpc_server
+      env_vars:
+        WANDB_MODE: disabled
+        HF_HUB_OFFLINE: "1"
+        TRANSFORMERS_OFFLINE: "1"
+        NCCL_DEBUG: WARN
+        TORCH_NCCL_ASYNC_ERROR_HANDLING: "1"
+
+train_dataset:
+  batch_size: 8
+  shuffle: true
+  drop_last: true
+  pin_memory: true
+  num_workers: 2
+  path: /data/chengjin/studyhub/studyhub-agent/datasets/processed/open_agentic_sft_v2_qwen35_9b/hf_dataset
+  type: sft
+
+valid_dataset:
+  batch_size: 8
+  shuffle: false
+  drop_last: false
+  pin_memory: true
+  num_workers: 2
+  path: /data/chengjin/studyhub/studyhub-agent/datasets/processed/open_agentic_sft_v2_qwen35_9b/hf_dataset
+  type: sft
+
+saver:
+  experiment_name: ${experiment_name}
+  trial_name: ${trial_name}
+  fileroot: ${cluster.fileroot}
+  freq_epochs: null
+  freq_steps: 210
+  freq_secs: null
+
+recover:
+  mode: auto
+  experiment_name: ${experiment_name}
+  trial_name: ${trial_name}
+  fileroot: ${cluster.fileroot}
+  freq_epochs: null
+  freq_steps: 210
+  freq_secs: null
+
+evaluator:
+  experiment_name: ${experiment_name}
+  trial_name: ${trial_name}
+  fileroot: ${cluster.fileroot}
+  freq_epochs: null
+  freq_steps: null
+  freq_secs: null
+
+stats_logger:
+  experiment_name: ${experiment_name}
+  trial_name: ${trial_name}
+  fileroot: ${cluster.fileroot}
+  wandb:
+    mode: disabled
+
+perf_tracer:
+  enabled: false
+  experiment_name: ${experiment_name}
+  trial_name: ${trial_name}
+  fileroot: ${cluster.fileroot}
+  save_interval: 10
+  profile_steps: null

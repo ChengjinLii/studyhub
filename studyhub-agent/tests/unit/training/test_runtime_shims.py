@@ -197,3 +197,56 @@ def test_areal_recovery_bridge_installs_state_and_batch_hooks(tmp_path: Path) ->
     )
 
     assert result.stdout.strip().splitlines()[-1] == ('{"batch": true, "dump": true, "load": true}')
+
+
+def test_strict_training_determinism_is_fail_closed() -> None:
+    env = dict(os.environ)
+    env["PYTHONPATH"] = str(ROOT / "training/runtime_shims")
+    env["STUDYHUB_TORCH_DETERMINISTIC_TRAINING"] = "1"
+    env["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"
+    env["NCCL_ALGO"] = "Ring"
+    env["TORCH_COMPILE_DETERMINISTIC"] = "1"
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            (
+                "import json, torch; "
+                "print(json.dumps({'enabled': torch.are_deterministic_algorithms_enabled(), "
+                "'warn_only': torch.is_deterministic_algorithms_warn_only_enabled(), "
+                "'cudnn_benchmark': torch.backends.cudnn.benchmark, "
+                "'cudnn_deterministic': torch.backends.cudnn.deterministic}, sort_keys=True))"
+            ),
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+        env=env,
+    )
+
+    assert result.stdout.strip() == (
+        '{"cudnn_benchmark": false, "cudnn_deterministic": true, '
+        '"enabled": true, "warn_only": false}'
+    )
+
+
+def test_strict_training_determinism_rejects_missing_startup_environment() -> None:
+    env = dict(os.environ)
+    env["PYTHONPATH"] = str(ROOT / "training/runtime_shims")
+    env["STUDYHUB_TORCH_DETERMINISTIC_TRAINING"] = "1"
+    env.pop("CUBLAS_WORKSPACE_CONFIG", None)
+    env["NCCL_ALGO"] = "Ring"
+    env["TORCH_COMPILE_DETERMINISTIC"] = "1"
+
+    result = subprocess.run(
+        [sys.executable, "-c", "print('must-not-run')"],
+        check=False,
+        capture_output=True,
+        text=True,
+        env=env,
+    )
+
+    assert result.returncode == 77
+    assert "StudyHub strict training determinism failed" in result.stderr
+    assert "CUBLAS_WORKSPACE_CONFIG" in result.stderr

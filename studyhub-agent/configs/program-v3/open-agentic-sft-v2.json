@@ -1,0 +1,99 @@
+{
+  "schema_version": "studyhub.open-agentic-sft-program.v2",
+  "program_id": "open-agentic-sft-v2-qwen35-9b",
+  "status": "DATA_BUILD_AUTHORIZED_RECOVERY_GATE_PENDING",
+  "scientific_question": "Under the frozen 9B LoRA recipe and assistant-loss-token budget, does Hermes-centered open agentic supervision improve real Hermes agent task completion over Base and Mixed-v3.0?",
+  "seed": 20260827,
+  "model": {
+    "id": "Qwen/Qwen3.5-9B",
+    "revision": "c202236235762e1c871ad0ccb60c8ee5ba337b9a",
+    "manifest_sha256": "b00bde79c4272817442b1aa1c6a8acbbf8c465bc1117421dfd45d8681f00582a"
+  },
+  "benchmark_lock": {
+    "benchmark_version": "studyhub-agentbench-v2",
+    "benchmark_revision": "2.0.0",
+    "status": "FROZEN_FOR_BASELINE",
+    "manifest_sha256": "da804b10f53dec585255598c3e256445b8ade3acf35fd8c766ca0ab4d759c88b",
+    "sealed_access": false
+  },
+  "selection": {
+    "target_train_rows": 16800,
+    "target_assistant_loss_tokens": 3138019,
+    "assistant_loss_token_tolerance_fraction": 0.01,
+    "target_total_tokens": 21318410,
+    "total_token_tolerance_fraction": 0.10,
+    "split": {
+      "train": 0.90,
+      "validation": 0.05,
+      "protocol_holdout": 0.05
+    },
+    "source_family_assistant_token_bounds": {
+      "hermes": [0.35, 0.45],
+      "toolbench": [0.15, 0.25],
+      "agent_flan": [0.10, 0.18],
+      "rag_replay": [0.10, 0.15],
+      "coig": [0.03, 0.07],
+      "toolace": [0.00, 0.05]
+    },
+    "source_family_target_shares": {
+      "hermes": 0.40,
+      "toolbench": 0.22,
+      "agent_flan": 0.15,
+      "rag_replay": 0.14,
+      "coig": 0.05,
+      "toolace": 0.04
+    },
+    "behavior_minimum_shares": {
+      "observation_conditioned": 0.60,
+      "multi_turn": 0.50,
+      "multi_tool": 0.25,
+      "recovery_negative": 0.10
+    },
+    "behavior_maximum_shares": {
+      "planning_only": 0.08,
+      "oracle_replay": 0.20
+    },
+    "largest_abstract_tool_path_share_max": 0.25,
+    "max_rows_per_conversation_group": 36,
+    "action_only_rows": 0,
+    "two_wiki_assistant_token_share_max": 0.12
+  },
+  "recipe": {
+    "optimizer_updates": 2100,
+    "global_batch_size": 8,
+    "precision": "bf16",
+    "backend": "AReaL-FSDP2",
+    "lora": {
+      "rank": 16,
+      "alpha": 16,
+      "target_modules": ["o_proj", "gate_proj", "up_proj", "down_proj"]
+    },
+    "optimizer": {
+      "name": "Adam",
+      "lr": 0.00002,
+      "weight_decay": 0.05,
+      "beta1": 0.9,
+      "beta2": 0.95,
+      "eps": 0.00001,
+      "gradient_clip": 1.0
+    },
+    "scheduler": {
+      "name": "cosine",
+      "total_steps": 5456,
+      "warmup_steps": 163
+    }
+  },
+  "recovery_gate": {
+    "required_profile": "cadence-210",
+    "continuous_updates": 220,
+    "checkpoint_update": 210,
+    "numerical_contract_sha256": "55f2c1e34d8e3e29143c14306c7a0bb7d724baefb127723fb7496bbb13c2fd6c",
+    "formal_training_allowed_only_after_pass": true
+  },
+  "disabled_sources": {
+    "xlam_function_calling_60k": "SKIPPED_GATED_ACCESS",
+    "apigen_mt_5k": "DISABLED_LICENSE_AND_TAU_INDEPENDENCE",
+    "legacy_teacher_reverse_replay": "DISABLED",
+    "studyhub_deterministic_fixture": "DISABLED_MAINLINE"
+  }
+}
