@@ -103,5 +103,7 @@ def test_launcher_has_bounded_smoke_and_formal_modes() -> None:
     )
     assert launcher.index('RECOVERY_AUDIT_ROOT="') < launcher.index("export STUDYHUB_AREAL_RECOVERY_STATE_BRIDGE=1")
     assert "record_open_agentic_sft_completion.py" in launcher
+    assert '--output "${LR_SEGMENT_INDEX}" >/dev/null' in launcher
+    assert '"${VENV_DIR}/bin/python" -S - "${LR_SEGMENT_INDEX}"' in launcher
     assert "training.sft.open_bootstrap_driver:main" in launcher
     assert "GRPO" not in launcher

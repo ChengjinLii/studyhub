@@ -1,0 +1,61 @@
+{
+  "schema_version": "studyhub.open-agentic-sft-smoke-evidence.v1",
+  "status": "SMOKE_PASS",
+  "run": {
+    "attempt_id": "open-agentic-sft-v2-smoke-r16-seed-20260827-attempt-20260829_183124",
+    "git_commit": "048b4fa654768c6e13f2b8b6a8a2551f77a86c7c",
+    "started_at": "2026-08-29T18:31:35+08:00",
+    "finished_at": "2026-08-29T18:39:33+08:00",
+    "exit_status": 0,
+    "run_metadata_sha256": "0aadad35d23a8070df37325e776dffb3bbf3259a04a0a34fb5b6e848c9fff502"
+  },
+  "contract": {
+    "optimizer_updates": 24,
+    "global_batch_size": 8,
+    "sequences": 192,
+    "scheduler": "cosine",
+    "scheduler_total_steps": 5456,
+    "warmup_steps": 163,
+    "base_learning_rate": 0.00002,
+    "checkpoint_cadence_updates": 16,
+    "sealed_used": false,
+    "rl_started": false
+  },
+  "observed": {
+    "successful_updates": 24,
+    "total_tokens": 195946,
+    "assistant_loss_tokens": 33193,
+    "loss_first": 0.61287,
+    "loss_last": 0.47479,
+    "loss_mean": 0.440745,
+    "gradient_norm_min": 0.22315,
+    "gradient_norm_max": 0.63877,
+    "gradient_norm_mean": 0.4068070833333333,
+    "learning_rate_last": 0.0000028221,
+    "mean_train_step_seconds": 10.1715,
+    "p95_train_step_seconds": 11.879,
+    "peak_gpu_memory_used_mib": 62533,
+    "peak_gpu_utilization_pct": 100
+  },
+  "checks": {
+    "dataset_and_authorization_preflight": "PASS",
+    "loss_and_gradient_finite": "PASS",
+    "all_updates_successful": "PASS",
+    "lr_exact_coverage": "PASS",
+    "lr_observed_updates": 24,
+    "lr_mismatch_count": 0,
+    "initial_lora_sha256": "42e4a35fad189ac42637e1ee693e3342a4ba8145ed2919ed0ff1ac45372e4569",
+    "checkpoint_lora_sha256": "b3e517ee82f24cfe03e5580477c9afc37fc78e4f5d2e95323f366fd32f82036e",
+    "lora_update_observed": true,
+    "recovery_checkpoint_state_files": 2,
+    "recovery_checkpoint_state_bytes": 37958611369,
+    "lr_schedule_audit_sha256": "49ac077fd4f990095769218c78b6d7e0e487716a385419b8c08cc58c02caf660"
+  },
+  "postprocessing": {
+    "training_completed_before_postprocessing_fix": true,
+    "root_cause": "AReaL startup diagnostics contaminated a stdout-based LR segment transport, and the generic completion recorder expected a final adapter outside the authorized 16-update smoke checkpoint cadence.",
+    "resolution": "Read LR segments from the durable JSON index and validate smoke completion from full 24-update metrics plus the complete cadence-16 recovery checkpoint.",
+    "training_rerun": false
+  },
+  "quality_claim": "NOT_EVALUATED_SMOKE_ONLY"
+}

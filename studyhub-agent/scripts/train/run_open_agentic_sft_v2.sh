@@ -214,8 +214,28 @@ if [[ "${STATUS}" -eq 0 ]]; then
     --evidence-root "${PROJECT_ROOT}/artifacts/experiments" \
     --attempt-prefix "${TRAINING_TRIAL}" \
     --expected-updates "${PLANNED_UPDATES}" \
-    --output "${LR_SEGMENT_INDEX}" >"${SEGMENT_TEXT}"; then
+    --output "${LR_SEGMENT_INDEX}" >/dev/null; then
     echo "Failed to collect a complete Open-Agentic LR segment index." >&2
+    STATUS=76
+  fi
+fi
+
+if [[ "${STATUS}" -eq 0 ]]; then
+  # Read the durable JSON index with site initialization disabled. AReaL may
+  # emit startup diagnostics on stdout, so stdout is not a machine interface.
+  if ! "${VENV_DIR}/bin/python" -S - "${LR_SEGMENT_INDEX}" >"${SEGMENT_TEXT}" <<'PY'
+import json
+import pathlib
+import sys
+
+payload = json.loads(pathlib.Path(sys.argv[1]).read_text(encoding="utf-8"))
+if payload.get("status") != "PASS":
+    raise SystemExit("LR segment index did not pass")
+for segment in payload.get("segments", []):
+    print(f"{segment['metrics']},{segment['start_global_step']},{segment['count']}")
+PY
+  then
+    echo "Failed to render clean Open-Agentic LR audit segments." >&2
     STATUS=76
   fi
 fi

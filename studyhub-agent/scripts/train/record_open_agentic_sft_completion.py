@@ -6,9 +6,16 @@ from __future__ import annotations
 import argparse
 import json
 import os
+from datetime import datetime
 from pathlib import Path
 
-from scripts.train.record_formal_sft_completion import build_marker, load_json, sha256
+from scripts.train.record_formal_sft_completion import (
+    build_marker,
+    final_adapter,
+    load_json,
+    override_value,
+    sha256,
+)
 from scripts.train.record_open_only_sft_completion import validate_lr_audit
 
 
@@ -33,12 +40,54 @@ def main() -> int:
     if args.expected_updates != int(authorization["budget"][budget_key]):
         raise RuntimeError("completion update count differs from authorization")
 
-    marker = build_marker(args)
     metadata = load_json(args.run_metadata)
     if metadata.get("run_authorization", {}).get("sha256") != sha256(args.authorization):
         raise RuntimeError("run metadata is not bound to the Open-Agentic authorization")
     lr_audit = load_json(args.lr_audit)
     validate_lr_audit(lr_audit, authorization, expected_updates=args.expected_updates)
+
+    if args.mode == "formal":
+        marker = build_marker(args)
+    else:
+        if metadata.get("exit_status") != 0:
+            raise RuntimeError("Open-Agentic smoke attempt did not exit successfully")
+        training_trial = override_value(metadata, "trial_name")
+        if not training_trial:
+            raise RuntimeError("training trial is absent from run metadata overrides")
+        checkpoint_step, adapter = final_adapter(args.checkpoint_root)
+        checkpoint_cadence = int(authorization["budget"]["smoke_checkpoint_every_updates"])
+        if checkpoint_step + 1 < checkpoint_cadence or checkpoint_step >= args.expected_updates:
+            raise RuntimeError(
+                "smoke adapter checkpoint does not satisfy its authorized checkpoint cadence"
+            )
+        benchmark = metadata.get("benchmark", {})
+        if benchmark.get("status") != "FROZEN_FOR_BASELINE" or benchmark.get("sealed_content_used") is not False:
+            raise RuntimeError("Open-Agentic smoke metadata is not bound to the frozen public Benchmark v2 contract")
+        coverage = lr_audit.get("coverage", {})
+        if coverage.get("last_global_step") != args.expected_updates - 1:
+            raise RuntimeError("smoke LR evidence does not cover its final optimizer update")
+        marker = {
+            "schema_version": "studyhub.open-agentic-sft-smoke-completion.v1",
+            "status": "SMOKE_PASS",
+            "completed_at": datetime.now().astimezone().isoformat(timespec="seconds"),
+            "training_trial": training_trial,
+            "completed_attempt": args.run_metadata.stem.removesuffix(".run"),
+            "expected_optimizer_updates": args.expected_updates,
+            "final_global_step": coverage["last_global_step"],
+            "last_saved_adapter_global_step": checkpoint_step,
+            "run_metadata": {
+                "path": str(args.run_metadata.resolve()),
+                "sha256": sha256(args.run_metadata),
+            },
+            "checkpoint": {
+                "path": str(adapter.resolve()),
+                "bytes": adapter.stat().st_size,
+                "sha256": sha256(adapter),
+            },
+            "dataset_manifest_sha256": metadata.get("dataset_manifest_sha256"),
+            "benchmark_manifest_sha256": benchmark.get("sha256"),
+            "git_commit": metadata.get("git", {}).get("commit"),
+        }
 
     initial = args.checkpoint_root / "actor/initial_lora/adapter_model.safetensors"
     if not initial.is_file():
@@ -61,7 +110,7 @@ def main() -> int:
 
     marker.update(
         {
-            "schema_version": "studyhub.open-agentic-sft-completion.v2",
+            "schema_version": "studyhub.open-agentic-sft-completion.v3",
             "status": "SMOKE_PASS" if args.mode == "smoke" else "COMPLETE",
             "mode": args.mode,
             "authorization_id": authorization["authorization_id"],
