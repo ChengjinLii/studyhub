@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from typing import Any
 
-
 BUDGET_CONTRACT_SCHEMA = "studyhub.rl-budget-contract.v1"
 RUNTIME_MAX_MODEL_TURNS = 6
 CONTROLLED_TASK_MAX_TOOL_CALLS = 6

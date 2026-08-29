@@ -8,8 +8,8 @@ from pathlib import Path
 from types import ModuleType, SimpleNamespace
 
 import yaml
+
 from scripts.data.build_open_rl_tasks import parse_toolace_trajectory
-from training.rl.frozen_environment import SEARCH_SNIPPET_CHARS, FrozenTaskEnvironment
 from training.rl.config import (
     AGENT_ENGINE_MAX_TOKENS,
     AGENT_MAX_TURNS,
@@ -17,6 +17,7 @@ from training.rl.config import (
     CONTEXT_SAFETY_MARGIN_TOKENS,
     StudyHubAgentGRPOConfig,
 )
+from training.rl.frozen_environment import SEARCH_SNIPPET_CHARS, FrozenTaskEnvironment
 from training.rl.hermes_workflow import (
     CONTEXT_FINALIZATION_GUIDANCE,
     SYSTEM_PROMPT,

@@ -6,7 +6,6 @@ from areal.api.cli_args import AgentConfig, GRPOConfig, InferenceEngineConfig, S
 
 from training.rl.budget_contract import RUNTIME_MAX_MODEL_TURNS
 
-
 AGENT_ENGINE_MAX_TOKENS = 4096
 AGENT_MAX_TURNS = RUNTIME_MAX_MODEL_TURNS
 CONTEXT_FINALIZATION_RATIO = 0.80

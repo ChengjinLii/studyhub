@@ -6,7 +6,6 @@ import functools
 from collections.abc import Mapping
 from typing import Any
 
-
 METADATA_KEY = "studyhub_chat_template"
 DISABLE_THINKING_VALUE = "disable_thinking_v1"
 PATCH_MARKER = "_studyhub_metadata_bridge_v1"
