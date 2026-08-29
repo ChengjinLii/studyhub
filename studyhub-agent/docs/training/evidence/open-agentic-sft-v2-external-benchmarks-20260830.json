@@ -1,0 +1,171 @@
+{
+  "schema_version": "studyhub.open-agentic-external-evaluation.v1",
+  "status": "COMPLETE_SUBSET_DIAGNOSTIC_ONLY",
+  "created_at": "2026-08-30T03:55:37+08:00",
+  "scope": {
+    "checkpoint": "Open-Agentic SFT v2 Qwen3.5-9B",
+    "test_only": true,
+    "used_for_training": false,
+    "used_for_data_selection": false,
+    "used_for_hyperparameter_tuning": false,
+    "sealed_used": false,
+    "rl_started": false,
+    "full_leaderboard_run": false
+  },
+  "models": {
+    "base": {
+      "id": "Qwen/Qwen3.5-9B",
+      "revision": "c202236235762e1c871ad0ccb60c8ee5ba337b9a",
+      "manifest_sha256": "b00bde79c4272817442b1aa1c6a8acbbf8c465bc1117421dfd45d8681f00582a"
+    },
+    "sft": {
+      "base_revision": "c202236235762e1c871ad0ccb60c8ee5ba337b9a",
+      "adapter_sha256": "909d0e2a415da04ef8c3035bb04bccab84bb044fc5c2ca3bbe58cd489e4bfede",
+      "merged_manifest_sha256": "48ab9ab9bd5327ceeceb1acc53e5cc240c5575a8c6fbd0027838873d0250730a",
+      "training_dataset_manifest_sha256": "04612c22c4134a0b9cfaf97cafea85985c33c1eb2b99302514a0fffd8b35e906"
+    }
+  },
+  "internal_reference": {
+    "benchmark": "StudyHub AgentBench v2 Development",
+    "benchmark_manifest_sha256": "da804b10f53dec585255598c3e256445b8ade3acf35fd8c766ca0ab4d759c88b",
+    "tasks": 51,
+    "temperature": 0.0,
+    "infra_excluded": 0,
+    "base": {
+      "strict": {"correct": 6, "total": 51, "rate": 0.117647},
+      "mean_diagnostic": 0.283758,
+      "mean_tool_calls": 2.882353,
+      "summary_sha256": "bad0b7a47a4ce3a85a744be4f8ed8c965b17771daa7ed116a12fd4691df27e14"
+    },
+    "mixed_v3_0": {
+      "strict": {"correct": 4, "total": 51, "rate": 0.078431},
+      "mean_diagnostic": 0.249346,
+      "mean_tool_calls": 2.27451,
+      "summary_sha256": "42688c2f1ccc2f51ea9efdb501ef7195e19a6fe875a1e1a381fa70de0f814e4b"
+    },
+    "open_agentic_v2": {
+      "strict": {"correct": 5, "total": 51, "rate": 0.098039},
+      "mean_diagnostic": 0.294346,
+      "mean_tool_calls": 2.823529,
+      "summary_sha256": "e7fd113fe465d075d70695bd5e5aa089998df7731a89956797ea29ffe684a0fc"
+    },
+    "paired_open_agentic_vs_base": {"wins": 2, "losses": 3, "ties": 46},
+    "paired_open_agentic_vs_mixed": {"wins": 3, "losses": 2, "ties": 46},
+    "claim": "OPEN_AGENTIC_BETTER_THAN_MIXED_BUT_BELOW_BASE"
+  },
+  "bfcl_v4": {
+    "upstream": {
+      "repository": "https://github.com/ShishirPatil/gorilla.git",
+      "commit": "f7cf7359b7ac615a0b294831c5ba2bc95ee4a000",
+      "tree": "8c805ceaf6b5d9c576e67f9274ed386fd9998911",
+      "license": "Apache-2.0"
+    },
+    "official_evaluator": true,
+    "official_test_data": true,
+    "evaluator_modified": false,
+    "adapter": {
+      "purpose": "Register the local Qwen3.5 checkpoint with the pinned BFCL CLI.",
+      "handler": "bfcl_eval.model_handler.local_inference.qwen_fc.QwenFCHandler",
+      "entrypoint_sha256": "a4f05e14c9ebbb44a8601c0688ba1c74740fbee8ad5d23fe7359a7aaea9fc650",
+      "limitation": "The pinned BFCL revision has no native Qwen3.5 registry entry; the closest official Qwen function-calling handler was used."
+    },
+    "subset": {
+      "selection": "10 deterministic official test IDs from each of seven categories, selected by SHA-256 ordering with seed 20260830",
+      "categories": 7,
+      "tasks_per_category": 10,
+      "total_tasks": 70,
+      "id_file_sha256": "e696fc5259dff9c2ca6a7e82c70a735233217f815c014a90cfaaa824c8824db4",
+      "canonical_selection_sha256": "87c8e0059b5f36d5a60620e7d30bf3779f708a8aef6bcfa9e4e923f96c9a94ad"
+    },
+    "results": {
+      "simple_python": {"sft": [8, 10], "base": [9, 10], "paired": [0, 1, 9]},
+      "parallel": {"sft": [10, 10], "base": [10, 10], "paired": [0, 0, 10]},
+      "multiple": {"sft": [9, 10], "base": [8, 10], "paired": [1, 0, 9]},
+      "irrelevance": {"sft": [7, 10], "base": [10, 10], "paired": [0, 3, 7]},
+      "multi_turn_base": {"sft": [6, 10], "base": [4, 10], "paired": [2, 0, 8]},
+      "multi_turn_miss_func": {"sft": [2, 10], "base": [4, 10], "paired": [0, 2, 8]},
+      "multi_turn_miss_param": {"sft": [5, 10], "base": [5, 10], "paired": [2, 2, 6]},
+      "selected_subset_micro": {
+        "sft": {"correct": 47, "total": 70, "rate": 0.671429},
+        "base": {"correct": 50, "total": 70, "rate": 0.714286},
+        "paired": {"wins": 5, "losses": 8, "ties": 57},
+        "exact_mcnemar_two_sided_p": 0.581055
+      }
+    },
+    "artifacts": {
+      "sft_non_live_csv_sha256": "2a13b0220370e348a4dd3b19c734d7caa6d131ea4fb8d68c42b351fc6065e48e",
+      "base_non_live_csv_sha256": "14609f13d9d80798f41fde3a9d1384e010ada7964c397f9fee7b3966d6b6fc82",
+      "sft_multi_turn_csv_sha256": "cfeedfe57640c6f63fa9546b9b4d59001e9937baa9deb21574fc8632219c5faa",
+      "base_multi_turn_csv_sha256": "3f1ab3f69c8dff713a4ac7eca118a11b18e5b75294d9feca0e3a423776a0cff4",
+      "raw_artifacts_tracked": false
+    },
+    "claim_boundary": "This is a deterministic 70-task official-test subset, not a complete BFCL V4 leaderboard submission. Per-category exact counts are authoritative for this run; BFCL aggregate leaderboard weights are not reported for the partial category set."
+  },
+  "tau2": {
+    "upstream": {
+      "repository": "https://github.com/sierra-research/tau2-bench.git",
+      "commit": "fc0055dc4e0a316c3f83133267fbd6faaa770992",
+      "tree": "4837da1c2b310152f63d3d7987f4325183ca6f7c",
+      "license": "MIT"
+    },
+    "official_evaluator": true,
+    "official_environment": true,
+    "evaluator_modified": false,
+    "configuration": {
+      "domains": ["airline", "retail", "telecom"],
+      "task_split": "base",
+      "tasks_per_domain": 5,
+      "trials_per_task": 1,
+      "seed": 20260830,
+      "temperature": 0.0,
+      "max_steps": 50,
+      "communication_protocol_enforced": true,
+      "agent_thinking_disabled": true,
+      "user_thinking_disabled": true,
+      "user_simulator": "local Qwen3.5-9B Base on a separate GPU"
+    },
+    "task_ids": {
+      "airline": ["0", "1", "2", "3", "4"],
+      "retail": ["0", "1", "2", "3", "4"],
+      "telecom": [
+        "[mobile_data_issue]airplane_mode_on|data_mode_off[PERSONA:None]",
+        "[mobile_data_issue]airplane_mode_on|user_abroad_roaming_enabled_off[PERSONA:None]",
+        "[mobile_data_issue]airplane_mode_on|bad_network_preference[PERSONA:Hard]",
+        "[mobile_data_issue]bad_network_preference|user_abroad_roaming_enabled_off[PERSONA:Hard]",
+        "[mobile_data_issue]data_saver_mode_on|user_abroad_roaming_enabled_off[PERSONA:Easy]"
+      ]
+    },
+    "results": {
+      "sft": {
+        "airline": {"reward_sum": 3.0, "tasks": 5, "terminations": {"user_stop": 3, "agent_error": 2}},
+        "retail": {"reward_sum": 0.0, "tasks": 5, "terminations": {"user_stop": 2, "agent_error": 3}},
+        "telecom": {"reward_sum": 0.0, "tasks": 5, "terminations": {"agent_error": 1, "user_error": 2, "max_steps": 2}},
+        "aggregate": {"reward_sum": 3.0, "tasks": 15, "mean_reward": 0.2}
+      },
+      "base": {
+        "airline": {"reward_sum": 0.0, "tasks": 5, "terminations": {"agent_error": 5}},
+        "retail": {"reward_sum": 0.0, "tasks": 5, "terminations": {"agent_error": 5}},
+        "telecom": {"reward_sum": 0.0, "tasks": 5, "terminations": {"agent_error": 5}},
+        "aggregate": {"reward_sum": 0.0, "tasks": 15, "mean_reward": 0.0}
+      },
+      "paired": {"sft_wins": 3, "sft_losses": 0, "ties": 12}
+    },
+    "artifacts": {
+      "sft_airline_sha256": "36b7c9d3cd63db9da9b6ca30b24123f8ed8aeaa817ee729da2b275c3f973f54e",
+      "sft_retail_sha256": "784c45bc5df18c5682086b022f5fa58eae7af53159c32ecf995fd6197642af61",
+      "sft_telecom_sha256": "cc99e7cc6b8c352ff1d2e7da31c2f09710648df5fd30095b9b56b666cc5df48b",
+      "base_airline_sha256": "f90803765be625d54ad5cea30734a15320cbac75d42eb29cd39227eb5a010fe2",
+      "base_retail_sha256": "8bd7acaca6419e5a3448bc89a2a63780f6f68a7b061770ae6c0ba2e602b6c69f",
+      "base_telecom_sha256": "30bcfb788364496be7928ddb3a420da6a1550fc2f47a42d4144c0d6753939eb5",
+      "raw_artifacts_tracked": false
+    },
+    "claim_boundary": "The official tau2 environment and DB/COMMUNICATE reward were used, but the 15-task subset and local 9B user simulator are not leaderboard-comparable. Agent protocol errors and user-simulator errors are reported separately; the 3/15 versus 0/15 result is directional only."
+  },
+  "decision": {
+    "classification": "NO_BROAD_AGENT_IMPROVEMENT_DEMONSTRATED",
+    "summary": "Open-Agentic v2 recovers part of the Mixed-v3.0 regression and improves selected multi-tool/multi-turn slices, but remains below Base on internal strict success and BFCL selected-subset micro accuracy. The tau2 gain is too small and simulator-dependent for a promotion claim.",
+    "variance_run": "NOT_RUN_INTERNAL_DIRECTIONAL_GATE_FAILED",
+    "sealed_evaluation": "NOT_RUN",
+    "rl": "NOT_STARTED"
+  }
+}

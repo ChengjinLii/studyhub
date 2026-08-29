@@ -1,0 +1,258 @@
+{
+  "schema_version": "studyhub.base-sft-development-comparison.v1",
+  "status": "PASS",
+  "claim": "DIRECTIONAL_PAIRED_EVIDENCE_ONLY",
+  "benchmark_manifest_sha256": "da804b10f53dec585255598c3e256445b8ade3acf35fd8c766ca0ab4d759c88b",
+  "sealed_used": false,
+  "paired_tasks": 51,
+  "base": {
+    "run_id": "qwen35-9b-base-v2-development-seed-20260827-20260827_212818",
+    "model": "Qwen/Qwen3.5-9B@c202236235762e1c871ad0ccb60c8ee5ba337b9a",
+    "strict_success_rate": 0.117647,
+    "mean_diagnostic_score": 0.283758,
+    "mean_tool_calls": 2.882353,
+    "mean_latency_seconds": 9.034495,
+    "episodes_sha256": "1ec9c8fcb326302f3bc6604400c4418b6d2f1911d05273e55f1e52d2551401f6",
+    "failures": {
+      "invalid_citation": 11,
+      "policy:source_not_discovered": 6,
+      "environment:provider_timeout": 1
+    }
+  },
+  "sft": {
+    "run_id": "qwen35-9b-open-agentic-v2-sft-v2-development-seed-20260827-20260830_030805",
+    "model": "StudyHub/Qwen3.5-9B-sft@909d0e2a415da04e",
+    "strict_success_rate": 0.098039,
+    "mean_diagnostic_score": 0.294346,
+    "mean_tool_calls": 2.823529,
+    "mean_latency_seconds": 8.485872,
+    "episodes_sha256": "ce969bfbc6da7053fcfd3599c7debf5b2b406df409869ee50fd11c467d859055",
+    "failures": {
+      "invalid_citation": 7,
+      "policy:source_not_discovered": 2,
+      "environment:provider_timeout": 1
+    }
+  },
+  "paired_strict": {
+    "wins": 2,
+    "losses": 3,
+    "ties": 46,
+    "delta": {
+      "point": -0.019608,
+      "ci95": [
+        -0.098039,
+        0.058824
+      ],
+      "bootstrap_samples": 10000,
+      "seed": 20260827
+    }
+  },
+  "paired_diagnostic_delta": {
+    "point": 0.010588,
+    "ci95": [
+      -0.078529,
+      0.097745
+    ],
+    "bootstrap_samples": 10000,
+    "seed": 20260828
+  },
+  "mean_tool_validity_delta": 0.029412,
+  "mean_tool_calls_delta": -0.058824,
+  "capabilities": {
+    "authentic_web_research": {
+      "tasks": 1,
+      "base_strict": 0.0,
+      "sft_strict": 0.0,
+      "base_diagnostic": 0.13,
+      "sft_diagnostic": 0.15
+    },
+    "cross_chunk_synthesis": {
+      "tasks": 10,
+      "base_strict": 0.0,
+      "sft_strict": 0.0,
+      "base_diagnostic": 0.1725,
+      "sft_diagnostic": 0.135
+    },
+    "direct_answer_tool_relevance": {
+      "tasks": 1,
+      "base_strict": 1.0,
+      "sft_strict": 1.0,
+      "base_diagnostic": 1.0,
+      "sft_diagnostic": 1.0
+    },
+    "factual_passage_retrieval": {
+      "tasks": 16,
+      "base_strict": 0.1875,
+      "sft_strict": 0.125,
+      "base_diagnostic": 0.3125,
+      "sft_diagnostic": 0.28125
+    },
+    "insufficient_evidence": {
+      "tasks": 1,
+      "base_strict": 0.0,
+      "sft_strict": 0.0,
+      "base_diagnostic": 0.0,
+      "sft_diagnostic": 0.5
+    },
+    "long_horizon": {
+      "tasks": 1,
+      "base_strict": 0.0,
+      "sft_strict": 0.0,
+      "base_diagnostic": 0.0,
+      "sft_diagnostic": 0.995
+    },
+    "memory_absence": {
+      "tasks": 1,
+      "base_strict": 0.0,
+      "sft_strict": 0.0,
+      "base_diagnostic": 0.5,
+      "sft_diagnostic": 0.5
+    },
+    "memory_collective_conflict": {
+      "tasks": 1,
+      "base_strict": 0.0,
+      "sft_strict": 0.0,
+      "base_diagnostic": 0.1,
+      "sft_diagnostic": 0.125
+    },
+    "memory_collective_low_confidence": {
+      "tasks": 1,
+      "base_strict": 0.0,
+      "sft_strict": 0.0,
+      "base_diagnostic": 0.5,
+      "sft_diagnostic": 0.475
+    },
+    "memory_cross_user_privacy": {
+      "tasks": 1,
+      "base_strict": 0.0,
+      "sft_strict": 0.0,
+      "base_diagnostic": 0.15,
+      "sft_diagnostic": 0.15
+    },
+    "memory_current_conflict": {
+      "tasks": 1,
+      "base_strict": 0.0,
+      "sft_strict": 0.0,
+      "base_diagnostic": 0.1,
+      "sft_diagnostic": 0.125
+    },
+    "memory_incomplete_abstention": {
+      "tasks": 1,
+      "base_strict": 0.0,
+      "sft_strict": 0.0,
+      "base_diagnostic": 0.5,
+      "sft_diagnostic": 0.5
+    },
+    "memory_irrelevant_tool_abstention": {
+      "tasks": 1,
+      "base_strict": 1.0,
+      "sft_strict": 1.0,
+      "base_diagnostic": 1.0,
+      "sft_diagnostic": 1.0
+    },
+    "memory_rag_composition": {
+      "tasks": 1,
+      "base_strict": 0.0,
+      "sft_strict": 0.0,
+      "base_diagnostic": 0.0,
+      "sft_diagnostic": 0.15
+    },
+    "memory_scope_resolution": {
+      "tasks": 1,
+      "base_strict": 0.0,
+      "sft_strict": 0.0,
+      "base_diagnostic": 0.125,
+      "sft_diagnostic": 0.125
+    },
+    "memory_selection": {
+      "tasks": 1,
+      "base_strict": 0.0,
+      "sft_strict": 0.0,
+      "base_diagnostic": 0.0,
+      "sft_diagnostic": 0.15
+    },
+    "memory_temporal_change": {
+      "tasks": 1,
+      "base_strict": 0.0,
+      "sft_strict": 0.0,
+      "base_diagnostic": 0.15,
+      "sft_diagnostic": 0.15
+    },
+    "memory_user_correction": {
+      "tasks": 1,
+      "base_strict": 0.0,
+      "sft_strict": 0.0,
+      "base_diagnostic": 0.125,
+      "sft_diagnostic": 0.15
+    },
+    "memory_web_composition": {
+      "tasks": 1,
+      "base_strict": 0.0,
+      "sft_strict": 0.0,
+      "base_diagnostic": 0.0,
+      "sft_diagnostic": 0.15
+    },
+    "multi_source_synthesis": {
+      "tasks": 1,
+      "base_strict": 0.0,
+      "sft_strict": 0.0,
+      "base_diagnostic": 0.666667,
+      "sft_diagnostic": 0.316666
+    },
+    "permission_avoidance": {
+      "tasks": 1,
+      "base_strict": 0.0,
+      "sft_strict": 0.0,
+      "base_diagnostic": 0.0,
+      "sft_diagnostic": 0.15
+    },
+    "permission_recovery": {
+      "tasks": 1,
+      "base_strict": 0.0,
+      "sft_strict": 0.0,
+      "base_diagnostic": 0.65,
+      "sft_diagnostic": 0.65
+    },
+    "query_reformulation": {
+      "tasks": 1,
+      "base_strict": 0.0,
+      "sft_strict": 0.0,
+      "base_diagnostic": 0.4,
+      "sft_diagnostic": 0.0
+    },
+    "state_function_calling": {
+      "tasks": 1,
+      "base_strict": 0.0,
+      "sft_strict": 0.0,
+      "base_diagnostic": 0.0,
+      "sft_diagnostic": 0.0
+    },
+    "state_multistep_postcondition": {
+      "tasks": 1,
+      "base_strict": 1.0,
+      "sft_strict": 1.0,
+      "base_diagnostic": 1.0,
+      "sft_diagnostic": 1.0
+    },
+    "stop_cost_control": {
+      "tasks": 1,
+      "base_strict": 0.0,
+      "sft_strict": 0.0,
+      "base_diagnostic": 0.0,
+      "sft_diagnostic": 0.0
+    },
+    "tool_failure_recovery": {
+      "tasks": 1,
+      "base_strict": 0.0,
+      "sft_strict": 0.0,
+      "base_diagnostic": 0.65,
+      "sft_diagnostic": 0.65
+    }
+  },
+  "approx_independent_mde_80_power_pp": 17.865,
+  "limitations": [
+    "51 Development tasks provide directional paired evidence, not a small-effect significance claim.",
+    "No Sealed-A/B or external benchmark result is used in this comparison."
+  ],
+  "failures": []
+}
