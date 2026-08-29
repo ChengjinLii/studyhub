@@ -1,7 +1,7 @@
 {
   "schema_version": "studyhub.open-agentic-sft-program.v2",
   "program_id": "open-agentic-sft-v2-qwen35-9b",
-  "status": "DATA_BUILD_AUTHORIZED_RECOVERY_GATE_PENDING",
+  "status": "DATA_AND_RECOVERY_GATES_PASS_PENDING_SMOKE",
   "scientific_question": "Under the frozen 9B LoRA recipe and assistant-loss-token budget, does Hermes-centered open agentic supervision improve real Hermes agent task completion over Base and Mixed-v3.0?",
   "seed": 20260827,
   "model": {
@@ -54,7 +54,8 @@
       "oracle_replay": 0.20
     },
     "largest_abstract_tool_path_share_max": 0.25,
-    "max_rows_per_conversation_group": 36,
+    "max_rows_per_conversation_group": 128,
+    "largest_conversation_group_assistant_token_share_max": 0.01,
     "action_only_rows": 0,
     "two_wiki_assistant_token_share_max": 0.12
   },

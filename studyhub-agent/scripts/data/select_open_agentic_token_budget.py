@@ -175,6 +175,7 @@ def solve_train(rows: list[InventoryRow], program: dict[str, Any]) -> tuple[list
     path_maximum = float(selection["largest_abstract_tool_path_share_max"])
     two_wiki_maximum = float(selection["two_wiki_assistant_token_share_max"])
     max_rows_per_group = int(selection["max_rows_per_conversation_group"])
+    max_group_assistant_share = float(selection["largest_conversation_group_assistant_token_share_max"])
 
     if target_rows > len(rows):
         raise RuntimeError(f"insufficient train candidates: {len(rows)} < {target_rows}")
@@ -278,8 +279,7 @@ def solve_train(rows: list[InventoryRow], program: dict[str, Any]) -> tuple[list
         )
     add_constraint(
         {
-            index: row.assistant_tokens
-            * ((1.0 if row.source == "studyhub_2wiki_replay" else 0.0) - two_wiki_maximum)
+            index: row.assistant_tokens * ((1.0 if row.source == "studyhub_2wiki_replay" else 0.0) - two_wiki_maximum)
             for index, row in enumerate(rows)
         },
         -np.inf,
@@ -292,6 +292,18 @@ def solve_train(rows: list[InventoryRow], program: dict[str, Any]) -> tuple[list
     for indices in grouped.values():
         if len(indices) > max_rows_per_group:
             add_constraint({index: 1.0 for index in indices}, 0.0, float(max_rows_per_group))
+        minimum_allowed_group_tokens = max_group_assistant_share * target_assistant * (1.0 - assistant_tolerance)
+        if sum(rows[index].assistant_tokens for index in indices) <= minimum_allowed_group_tokens:
+            continue
+        group_indices = set(indices)
+        add_constraint(
+            {
+                index: row.assistant_tokens * ((1.0 if index in group_indices else 0.0) - max_group_assistant_share)
+                for index, row in enumerate(rows)
+            },
+            -np.inf,
+            0.0,
+        )
 
     for family_index, family in enumerate(families):
         positive = base_variables + 2 * family_index
@@ -314,31 +326,118 @@ def solve_train(rows: list[InventoryRow], program: dict[str, Any]) -> tuple[list
     variable_upper = np.concatenate(
         [np.ones(base_variables, dtype=np.float64), np.full(2 * len(families), np.inf, dtype=np.float64)]
     )
-    integrality = np.concatenate(
-        [np.ones(base_variables, dtype=np.int8), np.zeros(2 * len(families), dtype=np.int8)]
-    )
-    result = milp(
+    integrality = np.concatenate([np.ones(base_variables, dtype=np.int8), np.zeros(2 * len(families), dtype=np.int8)])
+    constraint_lower = np.asarray(lower)
+    constraint_upper = np.asarray(upper)
+    bounds = Bounds(variable_lower, variable_upper)
+    constraints = LinearConstraint(matrix, constraint_lower, constraint_upper)
+
+    # The full 34k-variable MIP spends most of its time proving optimality. Its LP
+    # extreme point has only a small fractional boundary, so keep the integral
+    # interior fixed and solve a deterministic family-stratified repair MIP.
+    relaxation = milp(
         c=objective,
-        integrality=integrality,
-        bounds=Bounds(variable_lower, variable_upper),
-        constraints=LinearConstraint(matrix, np.asarray(lower), np.asarray(upper)),
-        options={"time_limit": 600.0, "mip_rel_gap": 0.001, "presolve": True},
+        integrality=np.zeros(variable_count, dtype=np.int8),
+        bounds=bounds,
+        constraints=constraints,
+        options={"presolve": True},
     )
-    if result.x is None or result.status not in {0, 1}:
-        raise RuntimeError(f"constrained allocator failed: status={result.status}, message={result.message}")
-    selected = [row for index, row in enumerate(rows) if result.x[index] > 0.5]
+    if relaxation.x is None or relaxation.status != 0:
+        raise RuntimeError(
+            f"constrained allocator relaxation failed: status={relaxation.status}, message={relaxation.message}"
+        )
+
+    tolerance = 1.0e-7
+    relaxed_base = relaxation.x[:base_variables]
+    fractional = {index for index, value in enumerate(relaxed_base) if tolerance < value < 1.0 - tolerance}
+    slack_indices = list(range(base_variables, variable_count))
+    result = None
+    solution = None
+    repair_variable_count = 0
+    boundary_per_family = 0
+    for boundary_per_family in (400, 800):
+        free_base = set(fractional)
+        for family in families:
+            selected_boundary = sorted(
+                (
+                    index
+                    for index, row in enumerate(rows)
+                    if row.source_family == family and relaxed_base[index] >= 1.0 - tolerance
+                ),
+                key=lambda index: (objective[index], rows[index].stable_order),
+                reverse=True,
+            )
+            unselected_boundary = sorted(
+                (
+                    index
+                    for index, row in enumerate(rows)
+                    if row.source_family == family and relaxed_base[index] <= tolerance
+                ),
+                key=lambda index: (objective[index], rows[index].stable_order),
+            )
+            free_base.update(selected_boundary[:boundary_per_family])
+            free_base.update(unselected_boundary[:boundary_per_family])
+
+        free_base_indices = np.asarray(sorted(free_base), dtype=np.int64)
+        free_base_set = set(map(int, free_base_indices))
+        fixed_indices = np.asarray(
+            [index for index in range(base_variables) if index not in free_base_set],
+            dtype=np.int64,
+        )
+        fixed_values = (relaxed_base[fixed_indices] >= 1.0 - tolerance).astype(np.float64)
+        fixed_contribution = np.asarray(matrix[:, fixed_indices] @ fixed_values).ravel()
+        repair_indices = np.asarray([*free_base_indices, *slack_indices], dtype=np.int64)
+        repair_variable_count = len(free_base_indices)
+        result = milp(
+            c=objective[repair_indices],
+            integrality=integrality[repair_indices],
+            bounds=Bounds(variable_lower[repair_indices], variable_upper[repair_indices]),
+            constraints=LinearConstraint(
+                matrix[:, repair_indices],
+                constraint_lower - fixed_contribution,
+                constraint_upper - fixed_contribution,
+            ),
+            options={"time_limit": 180.0, "mip_rel_gap": 0.05, "presolve": True},
+        )
+        if result.x is None or result.status not in {0, 1}:
+            continue
+        candidate_solution = np.zeros(variable_count, dtype=np.float64)
+        candidate_solution[fixed_indices] = fixed_values
+        candidate_solution[repair_indices] = result.x
+        constraint_values = np.asarray(matrix @ candidate_solution).ravel()
+        lower_valid = np.logical_or(
+            ~np.isfinite(constraint_lower),
+            constraint_values >= constraint_lower - 1.0e-5,
+        )
+        upper_valid = np.logical_or(
+            ~np.isfinite(constraint_upper),
+            constraint_values <= constraint_upper + 1.0e-5,
+        )
+        if np.all(lower_valid) and np.all(upper_valid):
+            solution = candidate_solution
+            break
+
+    if result is None or solution is None:
+        status = None if result is None else result.status
+        message = None if result is None else result.message
+        raise RuntimeError(f"constrained allocator repair failed: status={status}, message={message}")
+    selected = [row for index, row in enumerate(rows) if solution[index] > 0.5]
     if len(selected) != target_rows:
         raise RuntimeError(f"allocator returned {len(selected)} rows instead of {target_rows}")
     selected.sort(key=lambda row: row.stable_order)
     diagnostics = {
-        "solver": "scipy.optimize.milp/HiGHS",
+        "solver": "scipy.optimize.milp/HiGHS LP-guided integer repair",
         "status": int(result.status),
         "message": str(result.message),
-        "objective": float(result.fun),
+        "objective": float(objective @ solution),
         "mip_gap": None if getattr(result, "mip_gap", None) is None else float(result.mip_gap),
         "node_count": None if getattr(result, "mip_node_count", None) is None else int(result.mip_node_count),
         "constraints": len(lower),
         "binary_variables": base_variables,
+        "relaxation_status": int(relaxation.status),
+        "relaxation_fractional_variables": len(fractional),
+        "repair_binary_variables": repair_variable_count,
+        "repair_boundary_per_family": boundary_per_family,
     }
     return selected, diagnostics
 
@@ -459,6 +558,16 @@ def parse_args() -> argparse.Namespace:
         type=Path,
         default=PROJECT_ROOT / "datasets/interim/open_agentic_sft_v2/token-inventory.jsonl",
     )
+    parser.add_argument(
+        "--semantic-blocklist",
+        type=Path,
+        default=PROJECT_ROOT / "datasets/interim/open_agentic_sft_v2/semantic-blocklist.jsonl",
+    )
+    parser.add_argument(
+        "--semantic-evidence",
+        type=Path,
+        default=PROJECT_ROOT / "docs/training/evidence/open-agentic-sft-v2-candidate-semantic-dedup.json",
+    )
     parser.add_argument("--max-length", type=int, default=8192)
     parser.add_argument("--overwrite", action="store_true")
     return parser.parse_args()
@@ -499,6 +608,26 @@ def main() -> int:
         )
     else:
         inventory, excluded = cached
+    semantic_evidence = load_json(args.semantic_evidence)
+    if semantic_evidence.get("status") not in {"PASS", "PASS_WITH_SEMANTIC_BLOCKLIST"}:
+        raise RuntimeError("candidate semantic dedup audit is not accepted")
+    if semantic_evidence.get("lineage", {}).get("input_sha256") != sha256(args.candidate):
+        raise RuntimeError("candidate semantic dedup evidence is bound to another candidate set")
+    blocklist_contract = semantic_evidence.get("blocklist")
+    if not isinstance(blocklist_contract, dict):
+        raise RuntimeError("candidate semantic dedup evidence has no blocklist contract")
+    if blocklist_contract.get("sha256") != sha256(args.semantic_blocklist) or int(
+        blocklist_contract.get("rows", -1)
+    ) != sum(1 for _line in args.semantic_blocklist.open(encoding="utf-8")):
+        raise RuntimeError("semantic blocklist lineage drift")
+    blocked_ids = {
+        str(json.loads(line)["blocked_id"])
+        for line in args.semantic_blocklist.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    }
+    inventory_before_semantic_dedup = len(inventory)
+    inventory = [row for row in inventory if row.record_id not in blocked_ids]
+    excluded["semantic_blocklist"] += inventory_before_semantic_dedup - len(inventory)
     by_split: dict[str, list[InventoryRow]] = defaultdict(list)
     for row in inventory:
         by_split[row.split].append(row)
@@ -512,9 +641,7 @@ def main() -> int:
         "validation": selected_validation,
         "protocol_holdout": selected_protocol,
     }
-    selected_ids = {
-        split: {row.record_id for row in rows} for split, rows in selected_by_split.items()
-    }
+    selected_ids = {split: {row.record_id for row in rows} for split, rows in selected_by_split.items()}
     selected_inventory = {row.record_id: row for rows in selected_by_split.values() for row in rows}
 
     if args.output.exists() or args.processed_output.exists():
@@ -533,8 +660,7 @@ def main() -> int:
         split: {"input_ids": [], "loss_mask": []} for split in selected_by_split
     }
     metadata_streams = {
-        split: (metadata_root / f"{split}.jsonl").open("w", encoding="utf-8")
-        for split in selected_by_split
+        split: (metadata_root / f"{split}.jsonl").open("w", encoding="utf-8") for split in selected_by_split
     }
     selected_temporary = args.output.with_suffix(args.output.suffix + ".partial")
     with selected_temporary.open("w", encoding="utf-8") as selected_output:
@@ -563,9 +689,9 @@ def main() -> int:
             for metadata_stream in metadata_streams.values():
                 metadata_stream.close()
     os.replace(selected_temporary, args.output)
-    DatasetDict(
-        {split: Dataset.from_dict(values) for split, values in tensors.items()}
-    ).save_to_disk(staging / "hf_dataset")
+    DatasetDict({split: Dataset.from_dict(values) for split, values in tensors.items()}).save_to_disk(
+        staging / "hf_dataset"
+    )
 
     summaries = {split: summarize(rows) for split, rows in selected_by_split.items()}
     manifest = {
@@ -582,6 +708,8 @@ def main() -> int:
             "program_sha256": sha256(args.program),
             "candidate_sha256": sha256(args.candidate),
             "candidate_manifest_sha256": sha256(candidate_manifest_path),
+            "semantic_evidence_sha256": sha256(args.semantic_evidence),
+            "semantic_blocklist_sha256": sha256(args.semantic_blocklist),
             "selected_sha256": sha256(args.output),
         },
     }

@@ -62,11 +62,7 @@ def percentile(values: list[int], fraction: float) -> int:
 
 def user_text(row: dict[str, Any]) -> str:
     return next(
-        (
-            str(message.get("content", ""))
-            for message in row.get("messages", [])
-            if message.get("role") == "user"
-        ),
+        (str(message.get("content", "")) for message in row.get("messages", []) if message.get("role") == "user"),
         "",
     )
 
@@ -150,6 +146,11 @@ def parse_args() -> argparse.Namespace:
         type=Path,
         default=PROJECT_ROOT / "docs/training/OPEN_AGENTIC_SFT_V2_DATA_CARD.md",
     )
+    parser.add_argument(
+        "--semantic-evidence",
+        type=Path,
+        default=PROJECT_ROOT / "docs/training/evidence/open-agentic-sft-v2-semantic-dedup.json",
+    )
     parser.add_argument("--skip-mask-recompute", action="store_true")
     return parser.parse_args()
 
@@ -165,10 +166,17 @@ def main() -> int:
     selected_manifest = load_json(selected_manifest_path)
     token_manifest_path = args.processed / "manifest.json"
     token_manifest = load_json(token_manifest_path)
+    semantic_evidence = load_json(args.semantic_evidence)
     if selected_manifest["output_sha256"] != sha256(args.selected):
         raise RuntimeError("selected dataset hash drift")
     if selected_manifest["tokenized_manifest_sha256"] != sha256(token_manifest_path):
         raise RuntimeError("tokenized manifest hash drift")
+    if (
+        semantic_evidence.get("status") != "PASS"
+        or semantic_evidence.get("lineage", {}).get("input_sha256") != sha256(args.selected)
+        or int(semantic_evidence.get("hard_cross_group_pairs", -1)) != 0
+    ):
+        raise RuntimeError("selected semantic dedup evidence is not passing or has drifted")
 
     benchmark_path = PROJECT_ROOT / "benchmarks/studyhub-agent-v2/manifest.json"
     benchmark = load_json(benchmark_path)
@@ -219,9 +227,7 @@ def main() -> int:
     overlap = {
         "train_validation": len(groups_by_split["train"] & groups_by_split["validation"]),
         "train_protocol_holdout": len(groups_by_split["train"] & groups_by_split["protocol_holdout"]),
-        "validation_protocol_holdout": len(
-            groups_by_split["validation"] & groups_by_split["protocol_holdout"]
-        ),
+        "validation_protocol_holdout": len(groups_by_split["validation"] & groups_by_split["protocol_holdout"]),
     }
     if any(overlap.values()):
         failures.append({"failure": f"split_group_overlap:{overlap}"})
@@ -259,11 +265,13 @@ def main() -> int:
     exact_tokens = Counter()
     quality_rows = Counter()
     train_group_rows = Counter()
+    train_group_tokens = Counter()
     replay_tokens = 0
     two_wiki_tokens = 0
     for row in train_rows:
         tokens = int(row["tokenization"]["assistant_loss_tokens"])
         train_group_rows[str(row["group_id"])] += 1
+        train_group_tokens[str(row["group_id"])] += tokens
         family_tokens[str(row["source_family"])] += tokens
         abstract_tokens[str(row["abstract_tool_path"])] += tokens
         exact_tokens[str(row["tool_path_signature"])] += tokens
@@ -280,8 +288,7 @@ def main() -> int:
         "train_rows": len(train_rows) == int(selection["target_train_rows"]),
         "assistant_token_budget": abs(train_assistant - int(selection["target_assistant_loss_tokens"]))
         <= round(
-            int(selection["target_assistant_loss_tokens"])
-            * float(selection["assistant_loss_token_tolerance_fraction"])
+            int(selection["target_assistant_loss_tokens"]) * float(selection["assistant_loss_token_tolerance_fraction"])
         ),
         "total_token_budget": abs(train_total - int(selection["target_total_tokens"]))
         <= round(int(selection["target_total_tokens"]) * float(selection["total_token_tolerance_fraction"])),
@@ -296,6 +303,9 @@ def main() -> int:
         "two_wiki_at_most_12pct": two_wiki_tokens / train_assistant <= 0.12,
         "conversation_group_cap": max(train_group_rows.values(), default=0)
         <= int(selection["max_rows_per_conversation_group"]),
+        "conversation_group_assistant_share_cap": max(train_group_tokens.values(), default=0) / train_assistant
+        <= float(selection["largest_conversation_group_assistant_token_share_max"]),
+        "semantic_cross_group_duplicates_zero": semantic_evidence["hard_cross_group_pairs"] == 0,
     }
     for family, (minimum, maximum) in selection["source_family_assistant_token_bounds"].items():
         share = family_tokens[family] / train_assistant
@@ -339,6 +349,18 @@ def main() -> int:
             key: round(value / train_assistant, 8) for key, value in sorted(abstract_tokens.items())
         },
         "largest_exact_path_assistant_share": round(max(exact_tokens.values()) / train_assistant, 8),
+        "conversation_groups": {
+            "unique": len(train_group_rows),
+            "rows_per_group": {
+                "p50": percentile(list(train_group_rows.values()), 0.50),
+                "p90": percentile(list(train_group_rows.values()), 0.90),
+                "max": max(train_group_rows.values()),
+            },
+            "largest_assistant_token_share": round(
+                max(train_group_tokens.values(), default=0) / train_assistant,
+                8,
+            ),
+        },
         "source_audit": source_audit(rows),
         "isolation": {
             "public_benchmark_rows_hashed": benchmark_rows,
@@ -348,6 +370,7 @@ def main() -> int:
             "split_group_overlap": overlap,
             "exact_duplicates": 0,
             "near_lexical_duplicates": 0,
+            "semantic_cross_group_duplicates": 0,
         },
         "loss_mask": {
             "rows_recomputed": mask_rows_verified,
@@ -361,11 +384,9 @@ def main() -> int:
             "selected_manifest_sha256": sha256(selected_manifest_path),
             "tokenized_manifest_sha256": sha256(token_manifest_path),
             "benchmark_manifest_sha256": sha256(benchmark_path),
+            "semantic_evidence_sha256": sha256(args.semantic_evidence),
         },
-        "dedup_limit": (
-            "Embedding-neighbor audit is recorded separately; this gate covers exact, normalized user/final, "
-            "semantic-template caps, source IDs, and benchmark prompt hashes."
-        ),
+        "semantic_dedup": semantic_evidence["contract"],
     }
     write_json(args.evidence, audit)
     write_data_card(args.data_card, audit)
@@ -403,14 +424,72 @@ def write_data_card(path: Path, audit: dict[str, Any]) -> None:
         "| Family | Assistant-loss token share |",
         "|---|---:|",
     ]
-    lines.extend(
-        f"| {family} | {share:.2%} |"
-        for family, share in audit["source_family_assistant_shares"].items()
-    )
+    lines.extend(f"| {family} | {share:.2%} |" for family, share in audit["source_family_assistant_shares"].items())
     lines.extend(["", "## Behavior Mix", "", "| Behavior | Assistant-loss token share |", "|---|---:|"])
+    lines.extend(f"| {behavior} | {share:.2%} |" for behavior, share in audit["behavior_assistant_shares"].items())
+    lines.extend(["", "## Quality Tiers", "", "| Tier | Rows |", "|---|---:|"])
+    lines.extend(f"| {tier} | {rows:,} |" for tier, rows in audit["quality_tier_rows"].items())
     lines.extend(
-        f"| {behavior} | {share:.2%} |"
-        for behavior, share in audit["behavior_assistant_shares"].items()
+        [
+            "",
+            "## Tool Paths",
+            "",
+            "| Abstract path | Assistant-loss token share |",
+            "|---|---:|",
+        ]
+    )
+    lines.extend(
+        f"| {tool_path} | {share:.2%} |" for tool_path, share in audit["abstract_path_assistant_shares"].items()
+    )
+    groups = audit["conversation_groups"]
+    lines.extend(
+        [
+            "",
+            "## Group Concentration",
+            "",
+            f"- Unique train conversation groups: {groups['unique']:,}",
+            f"- Rows/group p50, p90, max: {groups['rows_per_group']['p50']}, "
+            f"{groups['rows_per_group']['p90']}, {groups['rows_per_group']['max']}",
+            f"- Largest group assistant-token share: {groups['largest_assistant_token_share']:.2%}",
+            f"- Largest exact tool-path assistant-token share: {audit['largest_exact_path_assistant_share']:.2%}",
+            "",
+            "## Source Detail",
+            "",
+            "The table below covers all three splits.",
+            "",
+            "| Source | Family | Rows | Assistant tokens | Groups | Group p90/max | Calls p50/p90 | "
+            "Observation origin | License | Revision |",
+            "|---|---|---:|---:|---:|---:|---:|---|---|---|",
+        ]
+    )
+    language = Counter()
+    for source, detail in audit["source_audit"].items():
+        language.update(detail["language"])
+        lines.append(
+            f"| {source} | {detail['source_family']} | {detail['rows']:,} | "
+            f"{detail['assistant_loss_tokens']:,} | {detail['unique_groups']:,} | "
+            f"{detail['rows_per_group']['p90']}/{detail['rows_per_group']['max']} | "
+            f"{detail['tool_calls_per_trajectory']['p50']}/"
+            f"{detail['tool_calls_per_trajectory']['p90']} | "
+            f"{', '.join(detail['observation_origin'])} | {', '.join(detail['licenses'])} | "
+            f"{', '.join(detail['revisions'])} |"
+        )
+    lines.extend(
+        [
+            "",
+            "## Language",
+            "",
+            "| Language | Rows |",
+            "|---|---:|",
+            *[f"| {key} | {value:,} |" for key, value in sorted(language.items())],
+            "",
+            "## Semantic Deduplication",
+            "",
+            f"- Embedding contract: {audit['semantic_dedup']['embedding']}",
+            f"- Neighbor count: {audit['semantic_dedup']['neighbors']}",
+            f"- Hard cross-group threshold: {audit['semantic_dedup']['hard_cross_group_threshold']}",
+            "- Hard cross-group pairs in the selected dataset: 0",
+        ]
     )
     lines.extend(
         [

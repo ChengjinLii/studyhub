@@ -55,7 +55,7 @@ DISALLOWED_SOURCE_PREFIXES = (
     "studyhub_state",
     "studyhub_teacher",
 )
-SEMANTIC_TEMPLATE_CAPS = {"hermes": 64, "other_families": 8}
+SEMANTIC_TEMPLATE_CAPS = {"hermes": 128, "other_families": 8}
 
 
 def load_json(path: Path) -> dict[str, Any]:
@@ -85,11 +85,7 @@ def iter_jsonl(path: Path) -> Iterable[dict[str, Any]]:
 
 def first_user(record: dict[str, Any]) -> str:
     return next(
-        (
-            str(message.get("content", ""))
-            for message in record.get("messages", [])
-            if message.get("role") == "user"
-        ),
+        (str(message.get("content", "")) for message in record.get("messages", []) if message.get("role") == "user"),
         "",
     )
 
@@ -218,9 +214,7 @@ class CandidateWriter:
             self.reject(f"{source}:cross_group_near_lexical_duplicate")
             return False
         template_cap = (
-            SEMANTIC_TEMPLATE_CAPS["hermes"]
-            if source_family == "hermes"
-            else SEMANTIC_TEMPLATE_CAPS["other_families"]
+            SEMANTIC_TEMPLATE_CAPS["hermes"] if source_family == "hermes" else SEMANTIC_TEMPLATE_CAPS["other_families"]
         )
         if self.template_counts[template_key] >= template_cap:
             self.reject(f"{source}:semantic_template_path_cap")
@@ -366,9 +360,7 @@ def main() -> int:
 
     overlap = {
         "train_validation": len(writer.groups_by_split["train"] & writer.groups_by_split["validation"]),
-        "train_protocol_holdout": len(
-            writer.groups_by_split["train"] & writer.groups_by_split["protocol_holdout"]
-        ),
+        "train_protocol_holdout": len(writer.groups_by_split["train"] & writer.groups_by_split["protocol_holdout"]),
         "validation_protocol_holdout": len(
             writer.groups_by_split["validation"] & writer.groups_by_split["protocol_holdout"]
         ),

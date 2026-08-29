@@ -1,0 +1,621 @@
+{
+  "schema_version": "studyhub.open-agentic-data-audit.v2",
+  "status": "PASS",
+  "dataset_id": "open-agentic-sft-v2-qwen35-9b",
+  "rows": {
+    "total": 18666,
+    "train": 16800,
+    "validation": 933,
+    "protocol_holdout": 933
+  },
+  "tokens": {
+    "train_total": 19188650,
+    "train_assistant_loss": 3107404,
+    "target_assistant_loss": 3138019,
+    "assistant_delta": -30615,
+    "target_total": 21318410,
+    "total_delta": -2129760
+  },
+  "source_family_assistant_shares": {
+    "agent_flan": 0.11982317,
+    "coig": 0.06391992,
+    "hermes": 0.37608853,
+    "rag_replay": 0.14994252,
+    "toolace": 0.04026834,
+    "toolbench": 0.24995752
+  },
+  "behavior_assistant_shares": {
+    "direct_abstention": 0.15138778,
+    "multi_tool": 0.60989623,
+    "multi_turn": 0.62915121,
+    "observation_conditioned": 0.84861222,
+    "oracle_replay": 0.14994252,
+    "planning_only": 0.07998606,
+    "recovery_negative": 0.22965504,
+    "stateful_function": 0.08318487
+  },
+  "quality_tier_rows": {
+    "A": 10099,
+    "B": 3233,
+    "C": 3468
+  },
+  "abstract_path_assistant_shares": {
+    "direct -> final": 0.07140172,
+    "failure -> retry -> final": 0.22217324,
+    "planning/direct -> final": 0.07998606,
+    "search -> read -> final": 0.14267472,
+    "single-tool -> final": 0.12811273,
+    "single-tool-repeat -> final": 0.10565926,
+    "toolA -> toolB -> final": 0.24999228
+  },
+  "largest_exact_path_assistant_share": 0.15138778,
+  "conversation_groups": {
+    "unique": 12697,
+    "rows_per_group": {
+      "p50": 1,
+      "p90": 1,
+      "max": 127
+    },
+    "largest_assistant_token_share": 0.00707311
+  },
+  "source_audit": {
+    "agent_flan_toolbench_negative": {
+      "source_family": "agent_flan",
+      "rows": 299,
+      "total_tokens": 68890,
+      "assistant_loss_tokens": 25251,
+      "assistant_fraction": 0.36654086,
+      "unique_groups": 299,
+      "rows_per_group": {
+        "p50": 1,
+        "p90": 1,
+        "max": 1
+      },
+      "quality_tiers": {
+        "C": 299
+      },
+      "behavior_tags": {
+        "direct_abstention": 299,
+        "recovery_negative": 299
+      },
+      "tool_path_signatures": 1,
+      "largest_exact_tool_path_row_share": 1.0,
+      "abstract_tool_paths": {
+        "direct -> final": 299
+      },
+      "tool_calls_per_trajectory": {
+        "p50": 0,
+        "p90": 0,
+        "max": 0
+      },
+      "language": {
+        "en": 299
+      },
+      "licenses": [
+        "Apache-2.0"
+      ],
+      "revisions": [
+        "8b25999e795a58b264fcb51e8746edb2faee9161"
+      ],
+      "observation_origin": {
+        "open_dataset": 299
+      }
+    },
+    "agent_flan_toolbench_react": {
+      "source_family": "agent_flan",
+      "rows": 1413,
+      "total_tokens": 2303720,
+      "assistant_loss_tokens": 386306,
+      "assistant_fraction": 0.16768791,
+      "unique_groups": 1413,
+      "rows_per_group": {
+        "p50": 1,
+        "p90": 1,
+        "max": 1
+      },
+      "quality_tiers": {
+        "A": 1413
+      },
+      "behavior_tags": {
+        "multi_tool": 1373,
+        "multi_turn": 1413,
+        "observation_conditioned": 1413,
+        "recovery_negative": 890,
+        "stateful_function": 85
+      },
+      "tool_path_signatures": 1326,
+      "largest_exact_tool_path_row_share": 0.00283086,
+      "abstract_tool_paths": {
+        "failure -> retry -> final": 890,
+        "single-tool-repeat -> final": 15,
+        "toolA -> toolB -> final": 508
+      },
+      "tool_calls_per_trajectory": {
+        "p50": 3,
+        "p90": 4,
+        "max": 5
+      },
+      "language": {
+        "en": 1411,
+        "zh": 2
+      },
+      "licenses": [
+        "Apache-2.0"
+      ],
+      "revisions": [
+        "8b25999e795a58b264fcb51e8746edb2faee9161"
+      ],
+      "observation_origin": {
+        "open_dataset": 1413
+      }
+    },
+    "coig_exam": {
+      "source_family": "coig",
+      "rows": 1256,
+      "total_tokens": 546872,
+      "assistant_loss_tokens": 209175,
+      "assistant_fraction": 0.38249353,
+      "unique_groups": 1256,
+      "rows_per_group": {
+        "p50": 1,
+        "p90": 1,
+        "max": 1
+      },
+      "quality_tiers": {
+        "C": 1256
+      },
+      "behavior_tags": {
+        "direct_abstention": 1256
+      },
+      "tool_path_signatures": 1,
+      "largest_exact_tool_path_row_share": 1.0,
+      "abstract_tool_paths": {
+        "direct -> final": 1256
+      },
+      "tool_calls_per_trajectory": {
+        "p50": 0,
+        "p90": 0,
+        "max": 0
+      },
+      "language": {
+        "en": 1,
+        "zh": 1255
+      },
+      "licenses": [
+        "Apache-2.0 (dataset-level; mixed-source notice retained)"
+      ],
+      "revisions": [
+        "9f25758ec94f82762fb9c09a5c60e908cfb83632"
+      ],
+      "observation_origin": {
+        "open_dataset": 1256
+      }
+    },
+    "hermes_func_calling": {
+      "source_family": "hermes",
+      "rows": 927,
+      "total_tokens": 1553247,
+      "assistant_loss_tokens": 458649,
+      "assistant_fraction": 0.29528401,
+      "unique_groups": 927,
+      "rows_per_group": {
+        "p50": 1,
+        "p90": 1,
+        "max": 1
+      },
+      "quality_tiers": {
+        "B": 927
+      },
+      "behavior_tags": {
+        "multi_tool": 544,
+        "observation_conditioned": 927,
+        "stateful_function": 256
+      },
+      "tool_path_signatures": 912,
+      "largest_exact_tool_path_row_share": 0.00323625,
+      "abstract_tool_paths": {
+        "search -> read -> final": 1,
+        "single-tool -> final": 382,
+        "toolA -> toolB -> final": 544
+      },
+      "tool_calls_per_trajectory": {
+        "p50": 2,
+        "p90": 3,
+        "max": 11
+      },
+      "language": {
+        "en": 927
+      },
+      "licenses": [
+        "Apache-2.0"
+      ],
+      "revisions": [
+        "dae3e1d26f495a56f2570944488be3cf3916c2f9"
+      ],
+      "observation_origin": {
+        "open_dataset": 927
+      }
+    },
+    "hermes_glaive_function_calling_5k": {
+      "source_family": "hermes",
+      "rows": 3764,
+      "total_tokens": 2937194,
+      "assistant_loss_tokens": 539246,
+      "assistant_fraction": 0.18359223,
+      "unique_groups": 1148,
+      "rows_per_group": {
+        "p50": 1,
+        "p90": 5,
+        "max": 127
+      },
+      "quality_tiers": {
+        "A": 2011,
+        "B": 1753
+      },
+      "behavior_tags": {
+        "multi_turn": 2011,
+        "observation_conditioned": 3764,
+        "stateful_function": 520
+      },
+      "tool_path_signatures": 369,
+      "largest_exact_tool_path_row_share": 0.075983,
+      "abstract_tool_paths": {
+        "single-tool -> final": 1753,
+        "single-tool-repeat -> final": 2011
+      },
+      "tool_calls_per_trajectory": {
+        "p50": 2,
+        "p90": 2,
+        "max": 3
+      },
+      "language": {
+        "en": 3764
+      },
+      "licenses": [
+        "Apache-2.0"
+      ],
+      "revisions": [
+        "dae3e1d26f495a56f2570944488be3cf3916c2f9"
+      ],
+      "observation_origin": {
+        "open_dataset": 3764
+      }
+    },
+    "hermes_json_mode_agentic": {
+      "source_family": "hermes",
+      "rows": 1123,
+      "total_tokens": 750068,
+      "assistant_loss_tokens": 186762,
+      "assistant_fraction": 0.24899342,
+      "unique_groups": 1123,
+      "rows_per_group": {
+        "p50": 1,
+        "p90": 1,
+        "max": 1
+      },
+      "quality_tiers": {
+        "C": 1123
+      },
+      "behavior_tags": {
+        "direct_abstention": 1123,
+        "planning_only": 1123
+      },
+      "tool_path_signatures": 1,
+      "largest_exact_tool_path_row_share": 1.0,
+      "abstract_tool_paths": {
+        "planning/direct -> final": 1123
+      },
+      "tool_calls_per_trajectory": {
+        "p50": 0,
+        "p90": 0,
+        "max": 0
+      },
+      "language": {
+        "en": 1120,
+        "zh": 3
+      },
+      "licenses": [
+        "Apache-2.0"
+      ],
+      "revisions": [
+        "dae3e1d26f495a56f2570944488be3cf3916c2f9"
+      ],
+      "observation_origin": {
+        "open_dataset": 1123
+      }
+    },
+    "hermes_json_mode_singleturn": {
+      "source_family": "hermes",
+      "rows": 1207,
+      "total_tokens": 495543,
+      "assistant_loss_tokens": 93125,
+      "assistant_fraction": 0.18792516,
+      "unique_groups": 1207,
+      "rows_per_group": {
+        "p50": 1,
+        "p90": 1,
+        "max": 1
+      },
+      "quality_tiers": {
+        "C": 1207
+      },
+      "behavior_tags": {
+        "direct_abstention": 1207,
+        "planning_only": 1207
+      },
+      "tool_path_signatures": 1,
+      "largest_exact_tool_path_row_share": 1.0,
+      "abstract_tool_paths": {
+        "planning/direct -> final": 1207
+      },
+      "tool_calls_per_trajectory": {
+        "p50": 0,
+        "p90": 0,
+        "max": 0
+      },
+      "language": {
+        "en": 1207
+      },
+      "licenses": [
+        "Apache-2.0"
+      ],
+      "revisions": [
+        "dae3e1d26f495a56f2570944488be3cf3916c2f9"
+      ],
+      "observation_origin": {
+        "open_dataset": 1207
+      }
+    },
+    "studyhub_2wiki_replay": {
+      "source_family": "rag_replay",
+      "rows": 441,
+      "total_tokens": 1088609,
+      "assistant_loss_tokens": 133111,
+      "assistant_fraction": 0.12227623,
+      "unique_groups": 441,
+      "rows_per_group": {
+        "p50": 1,
+        "p90": 1,
+        "max": 1
+      },
+      "quality_tiers": {
+        "A": 441
+      },
+      "behavior_tags": {
+        "multi_tool": 441,
+        "multi_turn": 441,
+        "observation_conditioned": 441,
+        "oracle_replay": 441
+      },
+      "tool_path_signatures": 2,
+      "largest_exact_tool_path_row_share": 0.69614512,
+      "abstract_tool_paths": {
+        "search -> read -> final": 441
+      },
+      "tool_calls_per_trajectory": {
+        "p50": 4,
+        "p90": 8,
+        "max": 8
+      },
+      "language": {
+        "en": 441
+      },
+      "licenses": [
+        "Apache-2.0"
+      ],
+      "revisions": [
+        "612bc5039a457880d9e7d84c3b0a4cf154b70e4f"
+      ],
+      "observation_origin": {
+        "frozen_open_corpus_replay": 441
+      }
+    },
+    "studyhub_qasper_replay": {
+      "source_family": "rag_replay",
+      "rows": 2670,
+      "total_tokens": 3043113,
+      "assistant_loss_tokens": 422915,
+      "assistant_fraction": 0.13897446,
+      "unique_groups": 1057,
+      "rows_per_group": {
+        "p50": 2,
+        "p90": 5,
+        "max": 11
+      },
+      "quality_tiers": {
+        "A": 2295,
+        "B": 375
+      },
+      "behavior_tags": {
+        "multi_tool": 2295,
+        "multi_turn": 2295,
+        "observation_conditioned": 2670,
+        "oracle_replay": 2670
+      },
+      "tool_path_signatures": 4,
+      "largest_exact_tool_path_row_share": 0.55430712,
+      "abstract_tool_paths": {
+        "search -> read -> final": 2295,
+        "single-tool -> final": 375
+      },
+      "tool_calls_per_trajectory": {
+        "p50": 2,
+        "p90": 4,
+        "max": 4
+      },
+      "language": {
+        "en": 2670
+      },
+      "licenses": [
+        "CC-BY-4.0"
+      ],
+      "revisions": [
+        "v0.3"
+      ],
+      "observation_origin": {
+        "frozen_open_corpus_replay": 2670
+      }
+    },
+    "toolace": {
+      "source_family": "toolace",
+      "rows": 462,
+      "total_tokens": 626550,
+      "assistant_loss_tokens": 145882,
+      "assistant_fraction": 0.23283377,
+      "unique_groups": 462,
+      "rows_per_group": {
+        "p50": 1,
+        "p90": 1,
+        "max": 1
+      },
+      "quality_tiers": {
+        "B": 462
+      },
+      "behavior_tags": {
+        "multi_tool": 340,
+        "multi_turn": 341,
+        "observation_conditioned": 462,
+        "recovery_negative": 3,
+        "stateful_function": 64
+      },
+      "tool_path_signatures": 458,
+      "largest_exact_tool_path_row_share": 0.004329,
+      "abstract_tool_paths": {
+        "failure -> retry -> final": 3,
+        "search -> read -> final": 1,
+        "single-tool -> final": 120,
+        "single-tool-repeat -> final": 2,
+        "toolA -> toolB -> final": 336
+      },
+      "tool_calls_per_trajectory": {
+        "p50": 2,
+        "p90": 2,
+        "max": 5
+      },
+      "language": {
+        "en": 461,
+        "zh": 1
+      },
+      "licenses": [
+        "Apache-2.0"
+      ],
+      "revisions": [
+        "6bda777c88d21e5a204703c1ee45597a8fa4f734"
+      ],
+      "observation_origin": {
+        "open_dataset": 462
+      }
+    },
+    "toolbench_toolllama_g123_dfs_train": {
+      "source_family": "toolbench",
+      "rows": 5104,
+      "total_tokens": 8216066,
+      "assistant_loss_tokens": 895553,
+      "assistant_fraction": 0.10900022,
+      "unique_groups": 5076,
+      "rows_per_group": {
+        "p50": 1,
+        "p90": 1,
+        "max": 2
+      },
+      "quality_tiers": {
+        "A": 5104
+      },
+      "behavior_tags": {
+        "multi_tool": 4983,
+        "multi_turn": 5104,
+        "observation_conditioned": 5104,
+        "recovery_negative": 2535,
+        "stateful_function": 360
+      },
+      "tool_path_signatures": 3461,
+      "largest_exact_tool_path_row_share": 0.00568182,
+      "abstract_tool_paths": {
+        "failure -> retry -> final": 2535,
+        "single-tool-repeat -> final": 75,
+        "toolA -> toolB -> final": 2494
+      },
+      "tool_calls_per_trajectory": {
+        "p50": 2,
+        "p90": 4,
+        "max": 5
+      },
+      "language": {
+        "en": 5104
+      },
+      "licenses": [
+        "Apache-2.0"
+      ],
+      "revisions": [
+        "google-drive-data.zip:df035ef91551d5cdc9e66d782dc12c821c81e830da2e7d05f633c7b26ae06016"
+      ],
+      "observation_origin": {
+        "open_dataset": 5104
+      }
+    }
+  },
+  "isolation": {
+    "public_benchmark_rows_hashed": 73,
+    "public_benchmark_overlap": 0,
+    "sealed_content_read": false,
+    "studyhub_custom_rows": 0,
+    "split_group_overlap": {
+      "train_validation": 0,
+      "train_protocol_holdout": 0,
+      "validation_protocol_holdout": 0
+    },
+    "exact_duplicates": 0,
+    "near_lexical_duplicates": 0,
+    "semantic_cross_group_duplicates": 0
+  },
+  "loss_mask": {
+    "rows_recomputed": 18666,
+    "system_user_tool_tokens_masked": true,
+    "assistant_tool_call_continuation_final_trained": true
+  },
+  "gates": {
+    "train_rows": true,
+    "assistant_token_budget": true,
+    "total_token_budget": true,
+    "action_only_zero": true,
+    "tier_d_zero": true,
+    "benchmark_overlap_zero": true,
+    "split_overlap_zero": true,
+    "studyhub_custom_zero": true,
+    "largest_abstract_path_below_25pct": true,
+    "largest_exact_path_below_25pct": true,
+    "oracle_replay_at_most_20pct": true,
+    "two_wiki_at_most_12pct": true,
+    "conversation_group_cap": true,
+    "conversation_group_assistant_share_cap": true,
+    "semantic_cross_group_duplicates_zero": true,
+    "family_hermes_share": true,
+    "family_toolbench_share": true,
+    "family_agent_flan_share": true,
+    "family_rag_replay_share": true,
+    "family_coig_share": true,
+    "family_toolace_share": true,
+    "behavior_observation_conditioned_minimum": true,
+    "behavior_multi_turn_minimum": true,
+    "behavior_multi_tool_minimum": true,
+    "behavior_recovery_negative_minimum": true,
+    "behavior_planning_only_maximum": true,
+    "behavior_oracle_replay_maximum": true
+  },
+  "lineage": {
+    "program_sha256": "3974e619582da512a6a1ff9a55b8063c6b5ba1303ca09e399d114dd7c6d15bcb",
+    "selected_sha256": "c4b92df2c3c35eb73d1454c2d03f7d53f15b67d13927373fadb32f33b219c3d7",
+    "selected_manifest_sha256": "257bfd9df5f894f9867be37bef13963aa2a93bbb27da10c50b024d60d5f7461d",
+    "tokenized_manifest_sha256": "04612c22c4134a0b9cfaf97cafea85985c33c1eb2b99302514a0fffd8b35e906",
+    "benchmark_manifest_sha256": "da804b10f53dec585255598c3e256445b8ade3acf35fd8c766ca0ab4d759c88b",
+    "semantic_evidence_sha256": "9010320dc90e9c676e335156a566ef980247c58c4ce38aaa711d0feb3f61e326"
+  },
+  "semantic_dedup": {
+    "embedding": "BAAI/bge-m3 CLS normalized cosine",
+    "max_length": 256,
+    "neighbors": 192,
+    "review_threshold": 0.985,
+    "hard_cross_group_threshold": 0.995,
+    "same_group_pairs_are_reported_not_failed": true
+  }
+}
