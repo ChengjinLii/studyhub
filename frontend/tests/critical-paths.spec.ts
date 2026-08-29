@@ -277,6 +277,77 @@ test('material list restores its session view and scroll position after detail n
   expect(await page.evaluate(() => window.scrollY)).toBeGreaterThanOrEqual(450);
 });
 
+test('desktop material cards keep long titles and prices inside their bounds', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.addInitScript(() => {
+    const materials = [
+      {
+        id: 8101,
+        title: '线性代数2020期末卷UESTC1001_1_Linear_Algebra_and_Space_Analytic_Extended_Edition',
+        free: true,
+        price: 0,
+      },
+      {
+        id: 8102,
+        title: '毛概期末复习考试重点手写笔记与历年真题解析完整版',
+        free: false,
+        price: 3,
+      },
+    ].map((material) => ({
+      ...material,
+      school: '电子科技大学',
+      uploaderNickname: '测试用户',
+      gradeValue: '大二',
+      courseCategory: 'GENERAL',
+      tags: ['期末真题'],
+      likeCount: 0,
+      commentCount: 0,
+      downloadCount: 8,
+      ratingAvg: 0,
+    }));
+    window.sessionStorage.setItem('studyhub:materials-list:v1', JSON.stringify({
+      version: 1,
+      savedAt: Date.now(),
+      pendingRestore: true,
+      filters: {
+        keyword: '', school: '', college: '', major: '', tag: '', gradeValue: '',
+        courseCategory: '', price: '', sort: 'latest', page: '1', size: '24',
+      },
+      materials,
+      meta: { page: 1, size: 24, total: 2 },
+      availableTags: ['期末真题'],
+      mobileView: 'compact',
+      scrollY: 0,
+    }));
+  });
+
+  await page.goto('/materials');
+  const cards = page.locator('.material-card');
+  await expect(cards).toHaveCount(2);
+
+  for (let index = 0; index < 2; index += 1) {
+    const card = cards.nth(index);
+    const header = card.locator('.material-card__header');
+    const title = header.locator('h3');
+    const price = header.locator('.price-tag');
+    await expect(title).toBeVisible();
+    await expect(price).toBeVisible();
+
+    const bounds = await Promise.all([card.boundingBox(), title.boundingBox(), price.boundingBox()]);
+    const [cardBox, titleBox, priceBox] = bounds;
+    expect(cardBox).not.toBeNull();
+    expect(titleBox).not.toBeNull();
+    expect(priceBox).not.toBeNull();
+    expect((titleBox?.x ?? 0) + (titleBox?.width ?? 0)).toBeLessThanOrEqual(
+      (cardBox?.x ?? 0) + (cardBox?.width ?? 0) + 0.5
+    );
+    expect((priceBox?.x ?? 0) + (priceBox?.width ?? 0)).toBeLessThanOrEqual(
+      (cardBox?.x ?? 0) + (cardBox?.width ?? 0) + 0.5
+    );
+    expect(await header.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
+  }
+});
+
 test('mobile Bot moves away while a text field is focused and returns after blur', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.addInitScript(() => window.localStorage.removeItem('floating-sidebar-pos'));

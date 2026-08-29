@@ -5969,6 +5969,8 @@ g.studyhub-popup-poster__hotspot:hover > text {
 
 .material-card {
   list-style: none;
+  min-width: 0;
+  max-width: 100%;
   border: 1px solid #e2e8f0;
   border-radius: 14px;
   padding: 24px;
@@ -6188,6 +6190,8 @@ g.studyhub-popup-poster__hotspot:hover > text {
 
 .material-card__header {
   display: flex;
+  min-width: 0;
+  max-width: 100%;
   justify-content: space-between;
   gap: 16px;
   align-items: flex-start;
@@ -6201,11 +6205,16 @@ g.studyhub-popup-poster__hotspot:hover > text {
 }
 
 .material-card__header h3 {
+  max-width: 100%;
   margin: 0 0 4px 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .material-title-row {
   display: inline-flex;
+  min-width: 0;
+  max-width: 100%;
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
@@ -6231,6 +6240,8 @@ g.studyhub-popup-poster__hotspot:hover > text {
 
 .material-card__header > div {
   flex: 1;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .material-card__header .price-tag {
