@@ -1,0 +1,61 @@
+{
+  "schema_version": "studyhub.qwen35-4b-m0-agentbench-v2-baseline.v1",
+  "status": "COMPLETE",
+  "claim": "RAW_BASE_AGENT_PROTOCOL_BASELINE",
+  "run_commit": "9be0f3f62be0f7573d1d14c549be2efe12224290",
+  "model": {
+    "repository": "Qwen/Qwen3.5-4B-Base",
+    "revision": "1001bb4d826a52d1f399e183466143f4da7b741b",
+    "role": "M0",
+    "optimizer_steps": 0
+  },
+  "protocol": {
+    "benchmark": "StudyHub AgentBench v2",
+    "benchmark_manifest_sha256": "da804b10f53dec585255598c3e256445b8ade3acf35fd8c766ca0ab4d759c88b",
+    "seed": 20260827,
+    "temperature": 0.0,
+    "enable_thinking": false,
+    "canonical_tokenizer_parity": "PASS",
+    "sealed_used": false
+  },
+  "gate": {
+    "run_id": "qwen35-4b-base-m0-base-v2-gate-seed-20260827-20260830_155611",
+    "episodes_scored": 30,
+    "infra_excluded": 0,
+    "strict_success": 2,
+    "strict_success_rate": 0.066667,
+    "mean_diagnostic": 0.102333,
+    "mean_tool_calls": 4.833333,
+    "episodes_sha256": "b9533b203368cf59b792b3a178cd1a2e90ce4e927415380384534bee9873a776",
+    "summary_sha256": "f96f51f7f06dcb97855aab4bf98dd90caf6d36b8195fd0e55ddd04ba165a6156",
+    "run_manifest_sha256": "0a512b4f7c380565c56eaa6834e6595d42547efc769736c831020b3cebd579a0"
+  },
+  "development": {
+    "run_id": "qwen35-4b-base-m0-base-v2-development-seed-20260827-20260830_155919",
+    "episodes_scored": 51,
+    "infra_excluded": 0,
+    "strict_success": 0,
+    "strict_success_rate": 0.0,
+    "mean_diagnostic": 0.038193,
+    "mean_tool_calls": 5.0,
+    "mean_latency_seconds": 3.56584,
+    "empty_final": 0,
+    "request_count": 304,
+    "prompt_cardinality_violations": 0,
+    "thinking_contract_violations": 0,
+    "failures": {
+      "invalid_citation": 15,
+      "tool_call_budget_exhausted": 28,
+      "source_not_discovered": 4
+    },
+    "episodes_sha256": "9b9b438cbe7c47de299a7caaf97212638b5d6a68a8035c29c37a3de1913275ae",
+    "summary_sha256": "47ee15cb3647718d76993a285791e1714a6703cd0d9c5682f66722289c374035",
+    "run_manifest_sha256": "92059ad3bbda0bd0302b10acf106ac80769f28557e7be12f922f7d5ae2be14b6"
+  },
+  "interpretation": {
+    "agent_chain_proven": true,
+    "instruction_or_tool_policy_aligned": false,
+    "primary_observed_failure": "repeated tool use until budget exhaustion",
+    "quality_claim": "NOT_TRAINED_NOT_A_POSTTRAINING_RESULT"
+  }
+}
