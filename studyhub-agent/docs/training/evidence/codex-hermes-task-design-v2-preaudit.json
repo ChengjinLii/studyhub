@@ -1,0 +1,81 @@
+{
+  "schema_version": "studyhub.codex-hermes-task-design-preaudit.v2",
+  "status": "PASS_READY_FOR_COLLECTION",
+  "task_design_revision": "semantic-diversity-v2",
+  "seed": 20260827,
+  "ordinal_offset": 2000,
+  "tasks": 1500,
+  "family_counts": {
+    "cross_tool_composition": 225,
+    "direct_abstention": 75,
+    "memory_personalization_privacy": 300,
+    "rag_query_rewrite_citation": 300,
+    "recovery_acl_provider_error": 225,
+    "stateful_function": 150,
+    "web_source_conflict_freshness": 225
+  },
+  "construction_audit": {
+    "environment_executable": 1500,
+    "environment_executable_rate": 1.0,
+    "path_agnostic_verifier": 1500,
+    "source_groups": 1500,
+    "exact_public_benchmark_overlap": 0,
+    "maximum_public_benchmark_prompt_jaccard": 0.111111,
+    "sealed_or_fresh_external_holdouts_opened": false,
+    "legacy_reverse_replay_used": false
+  },
+  "digit_normalized_prompt_shapes": {
+    "cross_tool_composition": {
+      "unique_ratio": 1.0,
+      "largest_shape_share": 0.004444
+    },
+    "direct_abstention": {
+      "unique_ratio": 1.0,
+      "largest_shape_share": 0.013333
+    },
+    "memory_personalization_privacy": {
+      "unique_ratio": 1.0,
+      "largest_shape_share": 0.003333
+    },
+    "rag_query_rewrite_citation": {
+      "unique_ratio": 1.0,
+      "largest_shape_share": 0.003333
+    },
+    "recovery_acl_provider_error": {
+      "unique_ratio": 1.0,
+      "largest_shape_share": 0.004444
+    },
+    "stateful_function": {
+      "unique_ratio": 0.846667,
+      "largest_shape_share": 0.02
+    },
+    "web_source_conflict_freshness": {
+      "unique_ratio": 0.906667,
+      "largest_shape_share": 0.017778
+    }
+  },
+  "semantic_audit": {
+    "status": "PASS_WITH_SEMANTIC_BLOCKLIST",
+    "embedding": "BAAI/bge-m3 CLS normalized cosine",
+    "review_threshold": 0.985,
+    "hard_cross_group_threshold": 0.995,
+    "hard_cross_group_pairs": 13,
+    "semantic_components": 9,
+    "blocked_rows": 11,
+    "blocked_fraction": 0.007333,
+    "model_config_sha256": "26159e7ad065073448460117eb24b7a4572f6f4e78eadff65dc0a11c052449fa",
+    "model_weights_sha256": "b5e0ce3470abf5ef3831aa1bd5553b486803e83251590ab7ff35a117cf6aad38",
+    "blocklist_sha256": "823bde0eaad8e4f451e58481e9b98497121580afa7abc5b20b26479b19443034"
+  },
+  "lineage": {
+    "task_specs_sha256": "4d38af3c08caa4fe92f173d2397a8f7a5bf2ea130cacbc14ac7027d92854ffaa",
+    "source_provenance_sha256": "54dd8ce0016833c9423a2bdbe8c9ce17e104a81ee41fb78f4fb6fb835ef18c8d",
+    "semantic_input_sha256": "1e856e35c20f191ff0abef739e1000c44c967894e07b4791dc3583db68f2f760",
+    "raw_task_and_semantic_artifacts_tracked": false
+  },
+  "claim_boundary": [
+    "This pre-audit evaluates task construction and prompt diversity, not teacher trajectory quality.",
+    "The 11 blocked tasks remain subject to downstream trajectory-level semantic deduplication.",
+    "No model training or OPD optimizer update is represented by this evidence."
+  ]
+}
