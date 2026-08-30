@@ -221,6 +221,28 @@ def test_codex_event_audit_rejects_any_codex_tool_event() -> None:
     assert audit["forbidden_item_types"] == ["command_execution"]
 
 
+def test_codex_event_audit_records_error_item_without_misclassifying_it_as_a_tool() -> None:
+    output = "\n".join(
+        [
+            json.dumps({"type": "thread.started"}),
+            json.dumps(
+                {
+                    "type": "item.completed",
+                    "item": {"type": "error", "message": "non-fatal provider diagnostic"},
+                }
+            ),
+            json.dumps({"type": "item.completed", "item": {"type": "agent_message"}}),
+            json.dumps({"type": "turn.completed", "usage": {"input_tokens": 10, "output_tokens": 4}}),
+        ]
+    )
+
+    audit = _codex_event_audit(output)
+
+    assert audit["zero_codex_tool_events"] is True
+    assert audit["forbidden_item_types"] == []
+    assert audit["item_errors"]
+
+
 def test_codex_provider_disables_hosted_search_and_codex_planning(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
@@ -1025,7 +1047,7 @@ def test_controller_allows_only_one_schema_retry(tmp_path: Path) -> None:
     task_id = "teacher-schema-retry-limit"
     root = _teacher_root(tmp_path, task_id)
     task = {
-        "schema_version": "studyhub.spark-hermes-task.v1",
+        "schema_version": "studyhub.codex-hermes-task.v1",
         "task_id": task_id,
         "family": "stateful_function",
         "user_request": "Use the fixture once.",

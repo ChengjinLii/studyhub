@@ -416,6 +416,7 @@ def _codex_event_audit(stdout: str) -> dict[str, Any]:
     malformed = 0
     usage: dict[str, Any] = {}
     errors: list[str] = []
+    item_errors: list[str] = []
     for line in stdout.splitlines():
         if not line.strip():
             continue
@@ -433,7 +434,10 @@ def _codex_event_audit(stdout: str) -> dict[str, Any]:
         if isinstance(item, dict):
             item_type = str(item.get("type", "unknown"))
             item_types[item_type] = item_types.get(item_type, 0) + 1
-            if item_type not in {"reasoning", "agent_message"}:
+            if item_type == "error":
+                detail = item.get("message") or item.get("error") or item
+                item_errors.append(_redact(json.dumps(detail, ensure_ascii=False, sort_keys=True), limit=500))
+            elif item_type not in {"reasoning", "agent_message"}:
                 forbidden_items.append(item_type)
         if event_type == "turn.completed" and isinstance(event.get("usage"), dict):
             usage = dict(event["usage"])
@@ -445,6 +449,7 @@ def _codex_event_audit(stdout: str) -> dict[str, Any]:
         "zero_codex_tool_events": not forbidden_items,
         "usage": usage,
         "errors": errors,
+        "item_errors": item_errors,
     }
 
 

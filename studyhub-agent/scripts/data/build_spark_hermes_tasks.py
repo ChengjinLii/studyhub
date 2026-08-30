@@ -114,7 +114,7 @@ def _write_jsonl(path: Path, rows: list[dict[str, Any]]) -> None:
 
 def _stable_id(family: str, ordinal: int, seed: int) -> str:
     digest = hashlib.sha256(f"{DATASET_ID}:{seed}:{family}:{ordinal}".encode()).hexdigest()[:18]
-    return f"spark-train-{digest}"
+    return f"codex-train-{digest}"
 
 
 def _allocate(total: int) -> dict[str, int]:
@@ -186,7 +186,7 @@ def _base_task(
     max_tool_calls: int = 8,
 ) -> dict[str, Any]:
     return {
-        "schema_version": "studyhub.spark-hermes-task.v1",
+        "schema_version": "studyhub.codex-hermes-task.v1",
         "task_id": task_id,
         "family": family,
         "user_request": user_request,
@@ -228,7 +228,7 @@ def _base_verifier(
     require_no_tools: bool = False,
 ) -> dict[str, Any]:
     return {
-        "schema_version": "studyhub.spark-hermes-verifier.v1",
+        "schema_version": "studyhub.codex-hermes-verifier.v1",
         "verifier_mode": "path_agnostic_v2",
         "task_id": task_id,
         "family": family,
@@ -275,7 +275,7 @@ def _rag(ordinal: int, seed: int) -> Scenario:
                 "text": f"该资料讨论 {TOPICS[other]}，建议活动为 {ACTIVITIES[other]}。",
             }
         )
-    source_group = f"spark-rag:{ordinal:04d}"
+    source_group = f"codex-rag:{ordinal:04d}"
     request = f"请在 StudyHub 训练资料中找到《{title}》，说明首个复习动作和每周分钟数，并引用读到的资料。"
     final = f"《{title}》建议{activity}，每周安排 {minutes} 分钟。[{source_id}]"
     return Scenario(
@@ -350,7 +350,7 @@ def _web(ordinal: int, seed: int) -> Scenario:
         "published_at": "2025-08-20",
         "text": "旧安排为 2025-09-01，地点 B101；页面标注已过期。",
     }
-    source_group = f"spark-web:{ordinal:04d}"
+    source_group = f"codex-web:{ordinal:04d}"
     request = f"请查证 {course} 当前有效的答疑日期和地点。优先使用最新的官方来源并附引用。"
     final = f"{course} 当前答疑日期是 {date}，地点 {room}。[{official_source}]"
     fixtures = {
@@ -412,7 +412,7 @@ def _memory(ordinal: int, seed: int) -> Scenario:
         ],
         "cross_user_records": [],
     }
-    source_group = f"spark-memory:{ordinal:04d}"
+    source_group = f"codex-memory:{ordinal:04d}"
     request = (
         f"请根据我当前而不是过期的学习偏好，从《{target_title}》和《{other_title}》中推荐一本。"
         "先核对个人记忆和资料内容，并引用推荐资料。"
@@ -484,7 +484,7 @@ def _cross_tool(ordinal: int, seed: int) -> Scenario:
     material_id = 720_000 + ordinal
     source_id = f"training-cross:{ordinal:04d}:material"
     title = f"{course} {topic} 分步训练"
-    source_group = f"spark-cross:{ordinal:04d}"
+    source_group = f"codex-cross:{ordinal:04d}"
     request = (
         f"找到《{title}》并核对内容，然后收藏它；再为“{topic}”建立每周 {minutes} 分钟的学习计划。"
         "完成后引用资料并简要确认两项状态。"
@@ -560,7 +560,7 @@ def _recovery(ordinal: int, seed: int) -> Scenario:
     material_id = 740_000 + ordinal
     source_id = f"training-recovery:{ordinal:04d}:public"
     title = f"{course} 公开替代资料 {ordinal + 1:03d}"
-    source_group = f"spark-recovery:{ordinal:04d}"
+    source_group = f"codex-recovery:{ordinal:04d}"
     documents = [
         {
             "source_id": source_id,
@@ -657,7 +657,7 @@ def _stateful(ordinal: int, seed: int) -> Scenario:
     topic = TOPICS[ordinal % len(TOPICS)]
     minutes = 120 + 15 * (ordinal % 5)
     score = 55 + ordinal % 35
-    source_group = f"spark-state:{ordinal:04d}"
+    source_group = f"codex-state:{ordinal:04d}"
     plan_marker = f"state-plan:{ordinal:04d}:updated"
     progress_marker = f"state-progress:{ordinal:04d}:recorded"
     request = (
@@ -722,7 +722,7 @@ def _direct(ordinal: int, seed: int) -> Scenario:
     sessions = 3 + ordinal % 4
     minutes = 25 + 5 * (ordinal % 5)
     total = sessions * minutes
-    source_group = f"spark-direct:{ordinal:04d}"
+    source_group = f"codex-direct:{ordinal:04d}"
     request = f"我每周复习 {sessions} 次，每次 {minutes} 分钟。一周总共复习多少分钟？"
     final = f"一周总复习时间是 {sessions} × {minutes} = {total} 分钟。"
     return Scenario(
