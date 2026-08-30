@@ -92,8 +92,8 @@ def parse_args() -> argparse.Namespace:
 def main() -> int:
     args = parse_args()
     from areal.api.cli_args import load_expr_config
-    from datasets import load_from_disk
 
+    from datasets import load_from_disk
     from training.opd.config import StudyHubOPDConfig
 
     authorization = load_json(args.authorization)
@@ -126,7 +126,6 @@ def main() -> int:
         f"rollout.consumer_batch_size={args.batch_size}",
     ]
     config, _ = load_expr_config(overrides, StudyHubOPDConfig)
-    root = Path(config.cluster.fileroot).resolve().parents[1]
     pool = Path(config.environment_root).resolve()
     paths = {
         "program_sha256": args.program,

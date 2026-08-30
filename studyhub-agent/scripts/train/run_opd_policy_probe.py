@@ -8,7 +8,6 @@ import asyncio
 import hashlib
 import json
 import multiprocessing as mp
-import os
 import secrets
 import signal
 import subprocess

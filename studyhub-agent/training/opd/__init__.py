@@ -7,7 +7,6 @@ from training.opd.areal_runtime import (
     install_areal_opd_bridge,
     install_opd_controller_hooks,
 )
-
 from training.opd.token_reward_parity import (
     TokenRewardReference,
     analytic_gradient_at_anchor,

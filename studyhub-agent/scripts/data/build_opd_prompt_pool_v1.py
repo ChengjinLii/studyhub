@@ -12,8 +12,9 @@ import re
 import shutil
 import sys
 from collections import Counter, defaultdict
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 for entry in (PROJECT_ROOT, PROJECT_ROOT / "src"):
