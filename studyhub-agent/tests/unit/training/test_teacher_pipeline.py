@@ -90,8 +90,11 @@ def test_teacher_task_ordinal_offsets_create_disjoint_source_groups(
     ]
     first_groups = {row["metadata"]["source_group_id"] for row in first_rows}
     second_groups = {row["metadata"]["source_group_id"] for row in second_rows}
+    first_requests = {row["user_request"] for row in first_rows}
+    second_requests = {row["user_request"] for row in second_rows}
 
     assert first_groups.isdisjoint(second_groups)
+    assert first_requests.isdisjoint(second_requests)
     assert manifest["ordinal_offset"] == 1000
 
 

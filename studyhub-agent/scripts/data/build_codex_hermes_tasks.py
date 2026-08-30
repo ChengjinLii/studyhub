@@ -326,6 +326,7 @@ def _web(ordinal: int, seed: int) -> Scenario:
     course = COURSES[ordinal % len(COURSES)]
     date = f"2026-{(ordinal % 9) + 1:02d}-{(ordinal % 24) + 1:02d}"
     room = f"A{200 + ordinal % 70}"
+    notice_id = f"WEB-{ordinal:04d}"
     official_url = f"https://official.example.edu/training/{ordinal:04d}"
     stale_url = f"https://archive.example.org/training/{ordinal:04d}"
     official_source = f"training-web:{ordinal:04d}:official"
@@ -352,7 +353,10 @@ def _web(ordinal: int, seed: int) -> Scenario:
         "citation": f"[{official_source}]",
         "title": f"{course} 教务处最新通知",
         "published_at": "2026-08-20",
-        "text": f"{course} 答疑安排确认于 {date}，地点为 {room}。这是当前有效通知。",
+        "text": (
+            f"通知 {notice_id}：{course} 答疑安排确认于 {date}，地点为 {room}。"
+            "这是当前有效通知。"
+        ),
     }
     stale_page = {
         "source_id": stale_source,
@@ -363,7 +367,8 @@ def _web(ordinal: int, seed: int) -> Scenario:
     }
     source_group = f"codex-web:{ordinal:04d}"
     request = (
-        f"请查证 {course} 当前有效的答疑日期和地点。优先使用最新的官方来源并附引用。"
+        f"请查证 {course} 教务通知 {notice_id} 当前有效的答疑日期和地点。"
+        "优先使用最新的官方来源并附引用。"
     )
     final = f"{course} 当前答疑日期是 {date}，地点 {room}。[{official_source}]"
     fixtures = {
@@ -417,8 +422,8 @@ def _memory(ordinal: int, seed: int) -> Scenario:
     other_id = target_id + 1
     target_source = f"training-memory:{ordinal:04d}:target"
     other_source = f"training-memory:{ordinal:04d}:other"
-    target_title = f"{course} {current} 实践册"
-    other_title = f"{course} {stale} 速览"
+    target_title = f"{course} {current} 实践册 {ordinal + 1:04d}"
+    other_title = f"{course} {stale} 速览 {ordinal + 1:04d}"
     memory_result = {
         "ok": True,
         "memories": [
@@ -517,7 +522,7 @@ def _cross_tool(ordinal: int, seed: int) -> Scenario:
     minutes = 90 + 15 * (ordinal % 5)
     material_id = 720_000 + ordinal
     source_id = f"training-cross:{ordinal:04d}:material"
-    title = f"{course} {topic} 分步训练"
+    title = f"{course} {topic} 分步训练 {ordinal + 1:04d}"
     source_group = f"codex-cross:{ordinal:04d}"
     request = (
         f"找到《{title}》并核对内容，然后收藏它；再为“{topic}”建立每周 {minutes} 分钟的学习计划。"
@@ -633,7 +638,7 @@ def _recovery(ordinal: int, seed: int) -> Scenario:
         status_marker = "provider_temporarily_unavailable"
         request = (
             f"先确认外部目录服务是否可用；若当前不可用，请在 StudyHub 公开资料中找到 {course} 的替代资料，"
-            "说明主题并引用。"
+            f"优先核对《{title}》，说明主题并引用。"
         )
         tools = ["learning_profile_get", "knowledge_search", "knowledge_read"]
         fixture = {
@@ -721,15 +726,17 @@ def _stateful(ordinal: int, seed: int) -> Scenario:
     topic = TOPICS[ordinal % len(TOPICS)]
     minutes = 120 + 15 * (ordinal % 5)
     score = 55 + ordinal % 35
+    resource_id = 760_000 + ordinal
     source_group = f"codex-state:{ordinal:04d}"
     plan_marker = f"state-plan:{ordinal:04d}:updated"
     progress_marker = f"state-progress:{ordinal:04d}:recorded"
     request = (
         f"读取我的当前学习档案，然后为 {course} 的“{topic}”建立每周 {minutes} 分钟计划，"
-        f"并把该主题记录为 review、分数 {score}。完成后确认结果。"
+        f"关联资料编号 {resource_id}，并把该主题记录为 review、分数 {score}。完成后确认结果。"
     )
     final = (
-        f"已为“{topic}”建立每周 {minutes} 分钟计划，并记录 review 状态和分数 {score}。"
+        f"已为“{topic}”建立每周 {minutes} 分钟计划并关联资料 {resource_id}，"
+        f"同时记录 review 状态和分数 {score}。"
     )
     routes = [
         _route(
@@ -743,8 +750,16 @@ def _stateful(ordinal: int, seed: int) -> Scenario:
         ),
         _route(
             "study_plan_update",
-            {"topic": topic, "weekly_minutes": minutes, "resource_ids": []},
-            {"postcondition": plan_marker, "weekly_minutes": minutes},
+            {
+                "topic": topic,
+                "weekly_minutes": minutes,
+                "resource_ids": [resource_id],
+            },
+            {
+                "postcondition": plan_marker,
+                "weekly_minutes": minutes,
+                "resource_ids": [resource_id],
+            },
             flexible_fields=["topic"],
         ),
         _route(
@@ -773,7 +788,13 @@ def _stateful(ordinal: int, seed: int) -> Scenario:
             family=family,
             source_group_id=source_group,
             reference_final=final,
-            concept_groups=[[topic], [str(minutes)], ["review", "复习"], [str(score)]],
+            concept_groups=[
+                [topic],
+                [str(minutes)],
+                [str(resource_id)],
+                ["review", "复习"],
+                [str(score)],
+            ],
             markers=[plan_marker, progress_marker],
             tool_groups=[
                 ["learning_profile_get"],
@@ -785,7 +806,11 @@ def _stateful(ordinal: int, seed: int) -> Scenario:
             ("learning_profile_get", {}),
             (
                 "study_plan_update",
-                {"topic": topic, "weekly_minutes": minutes, "resource_ids": []},
+                {
+                    "topic": topic,
+                    "weekly_minutes": minutes,
+                    "resource_ids": [resource_id],
+                },
             ),
             (
                 "learning_progress_record",
@@ -799,12 +824,16 @@ def _stateful(ordinal: int, seed: int) -> Scenario:
 def _direct(ordinal: int, seed: int) -> Scenario:
     family = "direct_abstention"
     task_id = _stable_id(family, ordinal, seed)
-    sessions = 3 + ordinal % 4
-    minutes = 25 + 5 * (ordinal % 5)
-    total = sessions * minutes
+    sessions = 2 + ordinal % 11
+    minutes = 20 + 5 * ((ordinal // 11) % 31)
+    weeks = 1 + (ordinal // 341) % 20
+    total = sessions * minutes * weeks
     source_group = f"codex-direct:{ordinal:04d}"
-    request = f"我每周复习 {sessions} 次，每次 {minutes} 分钟。一周总共复习多少分钟？"
-    final = f"一周总复习时间是 {sessions} × {minutes} = {total} 分钟。"
+    request = (
+        f"未来 {weeks} 周，我每周复习 {sessions} 次，每次 {minutes} 分钟。"
+        "这段时间总共复习多少分钟？"
+    )
+    final = f"总复习时间是 {weeks} × {sessions} × {minutes} = {total} 分钟。"
     return Scenario(
         task=_base_task(
             task_id=task_id,
