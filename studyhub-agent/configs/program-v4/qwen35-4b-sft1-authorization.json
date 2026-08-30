@@ -1,0 +1,83 @@
+{
+  "schema_version": "studyhub.qwen35-4b-sft1-authorization.v1",
+  "authorization_id": "qwen35-4b-base-open-agentic-sft1-r32-seed-20260827",
+  "status": "AUTHORIZED_PENDING_SMOKE_AND_FORMAL_RUN",
+  "scope": {
+    "model": "Qwen/Qwen3.5-4B-Base",
+    "method": "AReaL SFT BF16 FSDP2 LoRA",
+    "smoke_runs": 1,
+    "formal_training_runs": 1,
+    "no_main_grpo": true,
+    "no_opd_in_sft1": true,
+    "no_sealed": true,
+    "no_benchmark_modification": true,
+    "legacy_teacher_reverse_replay_disabled": true
+  },
+  "lineage": {
+    "program_sha256": "d2d726954117778522faff6241e413429c9038cd2ca9d51e451f9018ff09f4b9",
+    "config_sha256": "29a69a5ba628fe74785fb7c234985071d0d6efdff706d43d110030f9219b2770",
+    "dataset_manifest_sha256": "04612c22c4134a0b9cfaf97cafea85985c33c1eb2b99302514a0fffd8b35e906",
+    "selected_jsonl_sha256": "c4b92df2c3c35eb73d1454c2d03f7d53f15b67d13927373fadb32f33b219c3d7",
+    "selected_manifest_sha256": "257bfd9df5f894f9867be37bef13963aa2a93bbb27da10c50b024d60d5f7461d",
+    "data_audit_sha256": "7a33437bd3435d5e343fd88db9387a04f76006997e78876096350d1af7642bb8",
+    "semantic_audit_sha256": "9010320dc90e9c676e335156a566ef980247c58c4ce38aaa711d0feb3f61e326",
+    "benchmark_manifest_sha256": "da804b10f53dec585255598c3e256445b8ade3acf35fd8c766ca0ab4d759c88b",
+    "model_lock_sha256": "1e879f9197b6313b231c36f8137242d581f29f3de12963666757e748ebbe3967",
+    "tokenizer_overlay_sha256": "bfbf6ff4aa328bde682c1a0751113bc3b3e963b228863cbb443a4c229ea0307a",
+    "tokenizer_parity_sha256": "53749c20f3b7658cb3cbe27e0bc27d3b4e5db4556e1a4e0c32d5d93d6ffe8ec6",
+    "thinking_contract_sha256": "0b1af943d6166aa5e802d26f95082a79f7753058328ef627bd3843bee3908069",
+    "bfcl_holdout_sha256": "63ecacd12ddee45fba06894f99b7b8e866cf1862163b1c661640ee16feade4cc",
+    "tau2_holdout_sha256": "844e0076f026742a411835c8f3b65cedc3bff23a3d9c3d4bcc700f78590d179b",
+    "recovery_gate_sha256": "a6ab7f8a5cd103f08fe4384d410be2714ffbcbfb9bc37ef3247ee468c479d921",
+    "model_revision": "1001bb4d826a52d1f399e183466143f4da7b741b",
+    "model_weight_set_sha256": "4b114d4cd1f3311ec6b25709416053a5009b9aa6b582dbd496beaef17c930b26",
+    "canonical_tokenizer_overlay": "/data/chengjin/studyhub/studyhub-agent/artifacts/areal/model-overlays/qwen35-4b-base-canonical-tokenizer",
+    "run_commit_required": "SET_AT_LAUNCH_FROM_CLEAN_WORKTREE"
+  },
+  "budget": {
+    "global_batch_size": 8,
+    "smoke_optimizer_updates": 24,
+    "smoke_checkpoint_every_updates": 16,
+    "smoke_maximum_wall_time_seconds": 3600,
+    "planned_optimizer_updates": 2100,
+    "planned_sequences": 16800,
+    "actual_total_tokens": 19188650,
+    "actual_assistant_loss_tokens": 3107404,
+    "checkpoint_every_updates": 210,
+    "maximum_wall_time_seconds": 28800
+  },
+  "recipe": {
+    "backend": "fsdp:d2p1t1",
+    "dtype": "bfloat16",
+    "lora_rank": 32,
+    "lora_alpha": 32,
+    "target_modules": [
+      "o_proj",
+      "gate_proj",
+      "up_proj",
+      "down_proj"
+    ],
+    "learning_rate": 2e-05,
+    "weight_decay": 0.05,
+    "beta1": 0.9,
+    "beta2": 0.95,
+    "eps": 1e-05,
+    "scheduler": "cosine",
+    "scheduler_total_steps": 2100,
+    "warmup_fraction": 0.03,
+    "warmup_steps": 63,
+    "gradient_clip": 1.0,
+    "seed": 20260827,
+    "enable_thinking": false
+  },
+  "completion_contract": {
+    "smoke_marker": "QWEN35_4B_SFT1_SMOKE_PASS.json",
+    "formal_marker": "QWEN35_4B_SFT1_COMPLETE.json",
+    "require_lora_update": true,
+    "require_complete_recovery_checkpoint": true,
+    "require_exact_lr_schedule_audit": true,
+    "expected_scheduler_total_steps": 2100,
+    "expected_warmup_steps": 63,
+    "require_sealed_used_false": true
+  }
+}

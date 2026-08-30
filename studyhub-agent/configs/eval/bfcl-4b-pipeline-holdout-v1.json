@@ -1,0 +1,104 @@
+{
+  "schema_version": "studyhub.bfcl-4b-pipeline-holdout.v1",
+  "status": "LOCKED_UNEXPOSED",
+  "seed": 20260901,
+  "selection": "sha256_order_after_excluding_20260830_replication_ids",
+  "tasks_per_category": 10,
+  "task_ids": {
+    "simple_python": [
+      "simple_python_182",
+      "simple_python_390",
+      "simple_python_187",
+      "simple_python_301",
+      "simple_python_376",
+      "simple_python_395",
+      "simple_python_183",
+      "simple_python_71",
+      "simple_python_327",
+      "simple_python_304"
+    ],
+    "parallel": [
+      "parallel_68",
+      "parallel_101",
+      "parallel_115",
+      "parallel_195",
+      "parallel_113",
+      "parallel_94",
+      "parallel_110",
+      "parallel_142",
+      "parallel_196",
+      "parallel_29"
+    ],
+    "multiple": [
+      "multiple_87",
+      "multiple_178",
+      "multiple_24",
+      "multiple_36",
+      "multiple_137",
+      "multiple_82",
+      "multiple_94",
+      "multiple_185",
+      "multiple_155",
+      "multiple_84"
+    ],
+    "irrelevance": [
+      "irrelevance_93",
+      "irrelevance_194",
+      "irrelevance_195",
+      "irrelevance_190",
+      "irrelevance_10",
+      "irrelevance_227",
+      "irrelevance_98",
+      "irrelevance_139",
+      "irrelevance_213",
+      "irrelevance_60"
+    ],
+    "multi_turn_base": [
+      "multi_turn_base_181",
+      "multi_turn_base_155",
+      "multi_turn_base_125",
+      "multi_turn_base_23",
+      "multi_turn_base_75",
+      "multi_turn_base_137",
+      "multi_turn_base_73",
+      "multi_turn_base_161",
+      "multi_turn_base_116",
+      "multi_turn_base_81"
+    ],
+    "multi_turn_miss_func": [
+      "multi_turn_miss_func_118",
+      "multi_turn_miss_func_39",
+      "multi_turn_miss_func_139",
+      "multi_turn_miss_func_142",
+      "multi_turn_miss_func_75",
+      "multi_turn_miss_func_125",
+      "multi_turn_miss_func_165",
+      "multi_turn_miss_func_140",
+      "multi_turn_miss_func_143",
+      "multi_turn_miss_func_126"
+    ],
+    "multi_turn_miss_param": [
+      "multi_turn_miss_param_35",
+      "multi_turn_miss_param_186",
+      "multi_turn_miss_param_176",
+      "multi_turn_miss_param_11",
+      "multi_turn_miss_param_19",
+      "multi_turn_miss_param_133",
+      "multi_turn_miss_param_152",
+      "multi_turn_miss_param_71",
+      "multi_turn_miss_param_117",
+      "multi_turn_miss_param_130"
+    ]
+  },
+  "source_file_sha256": {
+    "simple_python": "82dd63ba502eb2520c6b5d1d9a5c4b590e03ff261565175561f6228a367d1991",
+    "parallel": "19f51a82eff42e5d62541aa500115a056eb78f437c2ba1f10415fd7c8e5dda84",
+    "multiple": "aef168155ebd74b7ac2401198b201343bc7d16d7a3d7e0d4e6d8ee82c6969b2a",
+    "irrelevance": "2b6ed4c2e992cdcf5f1678a701851f944bef7550ee026ed1ddb89efed5be01a6",
+    "multi_turn_base": "1a21a995d06fd6f20ba55de7bced30ef953ec35e998f502ec2ecf4d66ef1c43a",
+    "multi_turn_miss_func": "87d28ce10e37d864b72de85d5732eef2a867b241d6c1c99b4ae682c9e3ea921c",
+    "multi_turn_miss_param": "f0c66dda3795f5f53e3e1c0cc8ba0246b6761c8f58bdba8317203bf451ab8838"
+  },
+  "training_access": false,
+  "opened_for_model_selection": false
+}

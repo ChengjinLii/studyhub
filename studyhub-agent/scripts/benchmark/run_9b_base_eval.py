@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run a frozen StudyHub benchmark against Qwen3.5-9B without an optimizer."""
+"""Run a frozen StudyHub benchmark against a fixed Qwen3.5 artifact."""
 
 from __future__ import annotations
 
@@ -70,7 +70,8 @@ def resolve_model_artifact(model: Path) -> tuple[str, dict[str, Any]]:
         if len(adapter_sha256) != 64 or any(character not in "0123456789abcdef" for character in adapter_sha256):
             raise RuntimeError(f"merged model has no valid adapter lineage: {merged_manifest_path}")
         stage = str(manifest.get("training_stage", "post-trained"))
-        identity = f"StudyHub/Qwen3.5-9B-{stage}@{adapter_sha256[:16]}"
+        base_name = Path(str(manifest.get("base", "Qwen3.5"))).name
+        identity = f"StudyHub/{base_name}-{stage}@{adapter_sha256[:16]}"
         manifest = {"artifact_kind": "merged_lora", **manifest}
     else:
         raise RuntimeError(f"model has no StudyHub download or merged manifest: {model}")
@@ -531,7 +532,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
     items = build_work_items(selected, args.mode, args.seed)
     manifest = json.loads((public_root / "manifest.json").read_text(encoding="utf-8"))
     if manifest.get("status") not in {"FROZEN_FOR_BASELINE", "FROZEN_TRAINING_READY"}:
-        raise RuntimeError(f"Benchmark {benchmark_generation} must be frozen before the 9B Base evaluation")
+        raise RuntimeError(f"Benchmark {benchmark_generation} must be frozen before evaluation")
     model_identity, model_manifest = resolve_model_artifact(args.model)
     artifact_role = (
         "base"
@@ -539,7 +540,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         else str(model_manifest.get("training_stage", "post-trained"))
     )
     trial = args.trial or (
-        f"qwen35-9b-{artifact_role}-{benchmark_generation}-{args.mode}-seed-{args.seed}-"
+        f"qwen35-{artifact_role}-{benchmark_generation}-{args.mode}-seed-{args.seed}-"
         f"{datetime.now(UTC).strftime('%Y%m%d_%H%M%S')}"
     )
     output_base = args.output_root or project / f"artifacts/benchmark-{benchmark_generation}/runs"
@@ -547,7 +548,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
     output_root.mkdir(parents=True, exist_ok=True)
     api_key = secrets.token_urlsafe(36)
     overlay_key = hashlib.sha256(model_identity.encode()).hexdigest()[:16]
-    model_overlay = project / f"artifacts/areal/model-overlays/9b-benchmark-{overlay_key}"
+    model_overlay = project / f"artifacts/areal/model-overlays/benchmark-{overlay_key}"
     prepare_overlay(args.model.resolve(), model_overlay)
     ports = [args.port_base + index for index in range(args.workers)]
     endpoints = [f"http://127.0.0.1:{port}/v1" for port in ports]

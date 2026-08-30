@@ -1,0 +1,50 @@
+{
+  "schema_version": "studyhub.qwen35-canonical-tokenizer-overlay.v1",
+  "status": "LOCKED",
+  "student_weights": {
+    "path": "/data/chengjin/studyhub/models/P1/Qwen3.5-4B-Base",
+    "repository": "Qwen/Qwen3.5-4B-Base",
+    "revision": "1001bb4d826a52d1f399e183466143f4da7b741b",
+    "config_sha256": "ddc63e1c717afa86c865bb5e01313d89d72bb53b97ad4a8a03ba8510c0621670",
+    "weight_shards": [
+      {
+        "name": "model.safetensors-00001-of-00002.safetensors",
+        "bytes": 5329398712,
+        "sha256": "df547074dce70532a0493e5433152bd17a65efb89088cfabc2e7e2371a93d712"
+      },
+      {
+        "name": "model.safetensors-00002-of-00002.safetensors",
+        "bytes": 3990429344,
+        "sha256": "590fbaac095dd31db886c322d9d2f7df47777966391acf306ddddc3e4e3a15ef"
+      }
+    ]
+  },
+  "canonical_tokenizer": {
+    "path": "/data/chengjin/studyhub/models/P1/Qwen3.5-9B",
+    "assets": {
+      "tokenizer.json": {
+        "bytes": 12807982,
+        "sha256": "5f9e4d4901a92b997e463c1f46055088b6cca5ca61a6522d1b9f64c4bb81cb42"
+      },
+      "tokenizer_config.json": {
+        "bytes": 16710,
+        "sha256": "316230d6a809701f4db5ea8f8fc862bc3a6f3229c937c174e674ff3ca0a64ac8"
+      },
+      "chat_template.jinja": {
+        "bytes": 7756,
+        "sha256": "a4aee8afcf2e0711942cf848899be66016f8d14a889ff9ede07bca099c28f715"
+      },
+      "vocab.json": {
+        "bytes": 6722759,
+        "sha256": "ce99b4cb2983d118806ce0a8b777a35b093e2000a503ebde25853284c9dfa003"
+      },
+      "merges.txt": {
+        "bytes": 3353259,
+        "sha256": "a9d356d7bdf1ef4949e3e748e95b8e10ad9d4e2e838eddc38a0a7b6b94d1db8d"
+      }
+    }
+  },
+  "overlay": "/data/chengjin/studyhub/studyhub-agent/artifacts/areal/model-overlays/qwen35-4b-base-canonical-tokenizer",
+  "weight_files_are_symlinks": true,
+  "tokenizer_files_are_symlinks": true
+}

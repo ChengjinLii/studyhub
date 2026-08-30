@@ -307,7 +307,7 @@ def test_benchmark_runner_resolves_base_and_merged_model_lineage(tmp_path: Path)
         encoding="utf-8",
     )
     identity, manifest = resolve_model_artifact(merged)
-    assert identity == "StudyHub/Qwen3.5-9B-sft@aaaaaaaaaaaaaaaa"
+    assert identity == "StudyHub/Qwen3.5-sft@aaaaaaaaaaaaaaaa"
     assert manifest["artifact_kind"] == "merged_lora"
 
 

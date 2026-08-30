@@ -1,0 +1,114 @@
+{
+  "schema_version": "studyhub.qwen35-opd-tokenizer-parity.v1",
+  "status": "PASS",
+  "student": "/data/chengjin/studyhub/studyhub-agent/artifacts/areal/model-overlays/qwen35-4b-base-canonical-tokenizer",
+  "teacher": "/data/chengjin/studyhub/models/P1/Qwen3.5-9B",
+  "sample_source": "/data/chengjin/studyhub/studyhub-agent/datasets/interim/open_agentic_sft_v2/selected.jsonl",
+  "sample_size": 1000,
+  "vocab": {
+    "student_size": 248077,
+    "teacher_size": 248077,
+    "exact": true,
+    "added_vocab_exact": true
+  },
+  "special_tokens": {
+    "</tool_call>": {
+      "student": 248059,
+      "teacher": 248059
+    },
+    "<tool_call>": {
+      "student": 248058,
+      "teacher": 248058
+    },
+    "<|audio_end|>": {
+      "student": 248071,
+      "teacher": 248071
+    },
+    "<|audio_pad|>": {
+      "student": 248076,
+      "teacher": 248076
+    },
+    "<|audio_start|>": {
+      "student": 248070,
+      "teacher": 248070
+    },
+    "<|endoftext|>": {
+      "student": 248044,
+      "teacher": 248044
+    },
+    "<|im_end|>": {
+      "student": 248046,
+      "teacher": 248046
+    },
+    "<|im_start|>": {
+      "student": 248045,
+      "teacher": 248045
+    },
+    "<|image_pad|>": {
+      "student": 248056,
+      "teacher": 248056
+    },
+    "<|video_pad|>": {
+      "student": 248057,
+      "teacher": 248057
+    },
+    "<|vision_end|>": {
+      "student": 248054,
+      "teacher": 248054
+    },
+    "<|vision_start|>": {
+      "student": 248053,
+      "teacher": 248053
+    }
+  },
+  "special_token_ids_exact": true,
+  "token_roles": {
+    "bos": {
+      "student_token": null,
+      "student_id": null,
+      "teacher_token": null,
+      "teacher_id": null
+    },
+    "eos": {
+      "student_token": "<|im_end|>",
+      "student_id": 248046,
+      "teacher_token": "<|im_end|>",
+      "teacher_id": 248046
+    },
+    "pad": {
+      "student_token": "<|endoftext|>",
+      "student_id": 248044,
+      "teacher_token": "<|endoftext|>",
+      "teacher_id": 248044
+    },
+    "unk": {
+      "student_token": null,
+      "student_id": null,
+      "teacher_token": null,
+      "teacher_id": null
+    }
+  },
+  "token_roles_exact": true,
+  "tokenizer_file_hashes": {
+    "tokenizer.json": {
+      "student": "5f9e4d4901a92b997e463c1f46055088b6cca5ca61a6522d1b9f64c4bb81cb42",
+      "teacher": "5f9e4d4901a92b997e463c1f46055088b6cca5ca61a6522d1b9f64c4bb81cb42"
+    },
+    "tokenizer_config.json": {
+      "student": "316230d6a809701f4db5ea8f8fc862bc3a6f3229c937c174e674ff3ca0a64ac8",
+      "teacher": "316230d6a809701f4db5ea8f8fc862bc3a6f3229c937c174e674ff3ca0a64ac8"
+    },
+    "chat_template.jinja": {
+      "student": "a4aee8afcf2e0711942cf848899be66016f8d14a889ff9ede07bca099c28f715",
+      "teacher": "a4aee8afcf2e0711942cf848899be66016f8d14a889ff9ede07bca099c28f715"
+    }
+  },
+  "tokenizer_files_exact": true,
+  "message_parity": {
+    "token_ids_exact": true,
+    "assistant_loss_mask_exact": true,
+    "tool_observations_masked": true,
+    "mismatches": []
+  },
+  "canonical_opd_allowed": true
+}

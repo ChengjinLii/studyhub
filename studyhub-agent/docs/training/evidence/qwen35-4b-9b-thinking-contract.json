@@ -1,0 +1,17 @@
+{
+  "schema_version": "studyhub.qwen35-4b-9b-thinking-contract.v1",
+  "status": "LOCKED",
+  "student": "Qwen/Qwen3.5-4B-Base",
+  "teacher": "Qwen/Qwen3.5-9B",
+  "student_tokenizer_overlay": "artifacts/areal/model-overlays/qwen35-4b-base-canonical-tokenizer",
+  "enable_thinking": false,
+  "applies_to": [
+    "SFT1_tokenization",
+    "SFT2_tokenization",
+    "student_Hermes_rollout",
+    "teacher_prefix_scoring",
+    "evaluation_rollout"
+  ],
+  "chain_of_thought_collected": false,
+  "mismatch_policy": "BLOCK_OPD"
+}

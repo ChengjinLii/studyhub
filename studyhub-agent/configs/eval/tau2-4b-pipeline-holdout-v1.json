@@ -1,0 +1,37 @@
+{
+  "schema_version": "studyhub.tau2-4b-pipeline-holdout.v1",
+  "status": "LOCKED_UNEXPOSED",
+  "seed": 20260901,
+  "selection": "sha256_order_after_excluding_20260830_replication_ids",
+  "tasks_per_domain": 5,
+  "task_ids": {
+    "airline": [
+      "23",
+      "32",
+      "6",
+      "47",
+      "46"
+    ],
+    "retail": [
+      "79",
+      "110",
+      "55",
+      "39",
+      "109"
+    ],
+    "telecom": [
+      "[mms_issue]airplane_mode_on|bad_network_preference|bad_wifi_calling|break_app_sms_permission|data_mode_off|data_usage_exceeded|user_abroad_roaming_disabled_on[PERSONA:Hard]",
+      "[mobile_data_issue]airplane_mode_on|bad_network_preference|data_mode_off|data_usage_exceeded|user_abroad_roaming_disabled_off[PERSONA:Easy]",
+      "[mms_issue]bad_network_preference|bad_wifi_calling|break_apn_mms_setting|break_app_storage_permission|data_usage_exceeded|unseat_sim_card|user_abroad_roaming_enabled_off[PERSONA:Easy]",
+      "[mms_issue]airplane_mode_on|bad_wifi_calling|break_app_sms_permission|unseat_sim_card|user_abroad_roaming_enabled_off[PERSONA:None]",
+      "[mms_issue]bad_network_preference|break_app_both_permissions|unseat_sim_card[PERSONA:Easy]"
+    ]
+  },
+  "source_file_sha256": {
+    "airline": "ccd8ba737b4cc371415af70151187788f728d6108d0916e73bb4317b40542052",
+    "retail": "8e03ebce7901bd6218e7a7dc3105faa9324091a68058f7fe61c65262868812e8",
+    "telecom": "37e562e1ae3242577407e1303b1548bc64e7ea68e37d36173e6747990ceaf8a4"
+  },
+  "training_access": false,
+  "opened_for_model_selection": false
+}

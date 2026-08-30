@@ -62,6 +62,9 @@ def _install_request_audit(agent: Any) -> None:
                 "benchmark_prompt_occurrences": joined.count(BENCHMARK_SYSTEM_PROMPT),
                 "system_prompt_sha256": hashlib.sha256(joined.encode()).hexdigest(),
                 "tool_schema_count": len(api_kwargs.get("tools") or []),
+                "chat_template_enable_thinking": (
+                    ((api_kwargs.get("extra_body") or {}).get("chat_template_kwargs") or {}).get("enable_thinking")
+                ),
             }
         )
         return api_kwargs
@@ -188,6 +191,9 @@ class BenchmarkHermesRunner:
                     "temperature": self.temperature,
                     "top_p": self.top_p,
                     "seed": sample_seed,
+                    "extra_body": {
+                        "chat_template_kwargs": {"enable_thinking": False},
+                    },
                 },
                 platform="batch",
                 skip_context_files=True,

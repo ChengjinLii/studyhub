@@ -1,0 +1,10 @@
+{
+  "schema_version": "studyhub.tau2-4b-pipeline-holdout-lock-evidence.v1",
+  "status": "PASS",
+  "config": "/data/chengjin/studyhub/studyhub-agent/configs/eval/tau2-4b-pipeline-holdout-v1.json",
+  "config_sha256": "844e0076f026742a411835c8f3b65cedc3bff23a3d9c3d4bcc700f78590d179b",
+  "selected_id_set_sha256": "a75f514451f226aa58e38c3f1f19505a1a0c5e2a1bbaa4b504a6d197424a5d67",
+  "previous_ids_excluded": true,
+  "task_content_copied": false,
+  "training_access": false
+}

@@ -9,14 +9,17 @@ TARGET="${1:-all}"
 
 declare -Ar REPOSITORIES=(
   [4b]="Qwen/Qwen3.5-4B"
+  [4b-base]="Qwen/Qwen3.5-4B-Base"
   [9b]="Qwen/Qwen3.5-9B"
 )
 declare -Ar REVISIONS=(
   [4b]="851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a"
+  [4b-base]="1001bb4d826a52d1f399e183466143f4da7b741b"
   [9b]="c202236235762e1c871ad0ccb60c8ee5ba337b9a"
 )
 declare -Ar DIRECTORIES=(
   [4b]="Qwen3.5-4B"
+  [4b-base]="Qwen3.5-4B-Base"
   [9b]="Qwen3.5-9B"
 )
 
@@ -24,8 +27,8 @@ if [[ "${PROXY_URL}" != "http://127.0.0.1:7892" ]]; then
   echo "Only http://127.0.0.1:7892 is allowed for this download." >&2
   exit 2
 fi
-if [[ "${TARGET}" != "4b" && "${TARGET}" != "9b" && "${TARGET}" != "all" && "${TARGET}" != "verify" ]]; then
-  echo "Usage: $0 [4b|9b|all|verify]" >&2
+if [[ "${TARGET}" != "4b" && "${TARGET}" != "4b-base" && "${TARGET}" != "9b" && "${TARGET}" != "all" && "${TARGET}" != "verify" ]]; then
+  echo "Usage: $0 [4b|4b-base|9b|all|verify]" >&2
   exit 2
 fi
 if ! command -v hf >/dev/null 2>&1; then
@@ -104,13 +107,15 @@ download_model() {
 }
 
 case "${TARGET}" in
-  4b|9b) download_model "${TARGET}" ;;
+  4b|4b-base|9b) download_model "${TARGET}" ;;
   all)
     download_model 4b
+    download_model 4b-base
     download_model 9b
     ;;
   verify)
     verify_model 4b
+    verify_model 4b-base
     verify_model 9b
     ;;
 esac

@@ -1,0 +1,60 @@
+{
+  "schema_version": "studyhub.qwen35-4b-agent-posttraining.v1",
+  "program_id": "qwen35-4b-base-sft-spark-opd-v1",
+  "status": "PHASE_A_LOCKED_PENDING_M0_AND_SFT1",
+  "seed": 20260827,
+  "roles": {
+    "T9": {
+      "model": "Qwen/Qwen3.5-9B",
+      "revision": "c202236235762e1c871ad0ccb60c8ee5ba337b9a",
+      "role": "frozen_opd_teacher"
+    },
+    "M0": {
+      "model": "Qwen/Qwen3.5-4B-Base",
+      "revision": "1001bb4d826a52d1f399e183466143f4da7b741b",
+      "role": "raw_pretrained_student"
+    },
+    "M1": {"role": "M0_plus_open_agentic_v2_sft1"},
+    "M2": {"role": "M1_plus_verified_spark_hermes_sft2"},
+    "M3": {"role": "M2_plus_on_policy_distillation"},
+    "R4": {
+      "model": "Qwen/Qwen3.5-4B",
+      "revision": "851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a",
+      "role": "official_posttrained_reference"
+    }
+  },
+  "contracts": {
+    "thinking_mode": "disabled",
+    "canonical_opd_requires_exact_tokenizer": true,
+    "canonical_tokenizer_overlay": "artifacts/areal/model-overlays/qwen35-4b-base-canonical-tokenizer",
+    "sealed_used": false,
+    "main_grpo_allowed": false,
+    "legacy_teacher_reverse_replay_allowed": false,
+    "benchmark_modification_allowed": false
+  },
+  "phases": {
+    "A": "model_tokenizer_thinking_and_holdout_locks",
+    "B": "M0_baseline_and_open_agentic_sft1",
+    "C": "codex_spark_drives_real_hermes_environment",
+    "D": "verified_spark_trajectory_sft2_with_retention",
+    "E": "opd_compatibility_and_teacher_novelty",
+    "F": "bounded_opd_pilot",
+    "G": "bounded_opd_main",
+    "H": "frozen_internal_and_external_evaluation"
+  },
+  "data": {
+    "sft1_dataset": "open-agentic-sft-v2-qwen35-9b",
+    "sft1_selected_rows": 18666,
+    "sft1_train_rows": 16800,
+    "sft1_train_assistant_loss_tokens": 3107404,
+    "sft2_teacher_share": 0.35,
+    "sft2_retention_share": 0.65
+  },
+  "prohibited_training_sources": [
+    "AgentBench_v2_all_splits",
+    "BFCL_holdout",
+    "tau2_holdout",
+    "sealed_data",
+    "legacy_teacher_reverse_replay"
+  ]
+}

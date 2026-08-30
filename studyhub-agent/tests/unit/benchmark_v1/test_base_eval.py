@@ -80,6 +80,7 @@ def test_request_audit_records_prompt_cardinality_without_prompt_text() -> None:
                 {"role": "user", "content": "question"},
             ],
             "tools": [{"type": "function"}],
+            "extra_body": {"chat_template_kwargs": {"enable_thinking": False}},
         }
     )
 
@@ -94,6 +95,7 @@ def test_request_audit_records_prompt_cardinality_without_prompt_text() -> None:
             "benchmark_prompt_occurrences": 1,
             "system_prompt_sha256": "3d7a9af088c60d1ee8bd68bb6860c806ece7493e341261a952dc2f023001b099",
             "tool_schema_count": 1,
+            "chat_template_enable_thinking": False,
         }
     ]
     assert "question" not in str(agent._studyhub_request_audit)

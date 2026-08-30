@@ -8,6 +8,7 @@ SEED="${2:-20260827}"
 GPUS="${STUDYHUB_EVAL_GPUS:-0,1}"
 MODEL="${STUDYHUB_EVAL_MODEL:-${PROJECT_ROOT}/../models/P1/Qwen3.5-9B}"
 MODEL_ROLE="${STUDYHUB_EVAL_MODEL_ROLE:-base}"
+MODEL_RUN_PREFIX="${STUDYHUB_EVAL_MODEL_RUN_PREFIX:-qwen35-9b}"
 
 case "${MODE}" in
   gate|regression|development|variance) ;;
@@ -15,6 +16,10 @@ case "${MODE}" in
 esac
 if [[ ! "${MODEL_ROLE}" =~ ^[a-z0-9][a-z0-9-]*$ ]]; then
   echo "STUDYHUB_EVAL_MODEL_ROLE must contain only lowercase letters, digits and hyphens." >&2
+  exit 2
+fi
+if [[ ! "${MODEL_RUN_PREFIX}" =~ ^[a-z0-9][a-z0-9-]*$ ]]; then
+  echo "STUDYHUB_EVAL_MODEL_RUN_PREFIX must contain only lowercase letters, digits and hyphens." >&2
   exit 2
 fi
 if [[ "${STUDYHUB_ALLOW_EVALUATION:-}" != "YES" ]]; then
@@ -65,7 +70,7 @@ print(
 PY
 
 TIMESTAMP="$(date +%Y%m%d_%H%M%S)"
-TRIAL="qwen35-9b-${MODEL_ROLE}-v2-${MODE}-seed-${SEED}-${TIMESTAMP}"
+TRIAL="${MODEL_RUN_PREFIX}-${MODEL_ROLE}-v2-${MODE}-seed-${SEED}-${TIMESTAMP}"
 LAUNCH_ROOT="${PROJECT_ROOT}/artifacts/benchmark-v2/launcher"
 LOG_FILE="${LAUNCH_ROOT}/${TRIAL}.log"
 GPU_CSV="${LAUNCH_ROOT}/${TRIAL}.gpu.csv"

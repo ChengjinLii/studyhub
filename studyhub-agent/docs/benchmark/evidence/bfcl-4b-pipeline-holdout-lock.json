@@ -1,0 +1,10 @@
+{
+  "schema_version": "studyhub.bfcl-4b-pipeline-holdout-lock-evidence.v1",
+  "status": "PASS",
+  "config": "/data/chengjin/studyhub/studyhub-agent/configs/eval/bfcl-4b-pipeline-holdout-v1.json",
+  "config_sha256": "63ecacd12ddee45fba06894f99b7b8e866cf1862163b1c661640ee16feade4cc",
+  "selected_id_set_sha256": "19421a3fd2f792c0b12a391704c8db917b88be7a0968d90e1a41842fcaab3d52",
+  "previous_ids_excluded": true,
+  "task_content_copied": false,
+  "training_access": false
+}
