@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import json
+import subprocess
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
@@ -213,6 +214,52 @@ def test_codex_event_audit_rejects_any_codex_tool_event() -> None:
     audit = _codex_event_audit(unsafe)
     assert audit["zero_codex_tool_events"] is False
     assert audit["forbidden_item_types"] == ["command_execution"]
+
+
+def test_codex_provider_disables_hosted_search_and_codex_planning(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    captured: dict[str, object] = {}
+
+    def fake_run(command, **kwargs):
+        captured["command"] = command
+        captured["prompt"] = kwargs.get("input")
+        output_path = Path(command[command.index("--output-last-message") + 1])
+        output_path.write_text(
+            json.dumps({"type": "final", "name": "", "arguments": "{}", "content": "done"}),
+            encoding="utf-8",
+        )
+        stdout = "\n".join(
+            [
+                json.dumps({"type": "thread.started"}),
+                json.dumps({"type": "item.completed", "item": {"type": "agent_message"}}),
+                json.dumps({"type": "turn.completed", "usage": {"input_tokens": 1, "output_tokens": 1}}),
+            ]
+        )
+        return subprocess.CompletedProcess(command, 0, stdout=stdout, stderr="")
+
+    monkeypatch.setattr(teacher_providers.subprocess, "run", fake_run)
+    provider = CodexSparkProvider(command="codex")
+
+    action, event = provider.choose_action(
+        {"max_steps": 1, "max_tool_calls": 0, "completion_contract": {}},
+        [],
+        [{"role": "user", "content": "answer directly"}],
+        0,
+    )
+
+    command = captured["command"]
+    assert isinstance(command, list)
+    assert 'web_search="disabled"' in command
+    developer_override = next(
+        value for value in command if isinstance(value, str) and value.startswith("developer_instructions=")
+    )
+    assert "Do not invoke or emit any Codex tool" in developer_override
+    assert "todo list" in developer_override
+    assert action["type"] == "final"
+    assert action["content"] == "done"
+    assert event["event_audit"]["zero_codex_tool_events"] is True
 
 
 def test_provider_action_decodes_strict_schema_argument_string() -> None:

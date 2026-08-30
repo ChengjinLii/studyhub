@@ -42,7 +42,7 @@ LOCAL_ACTION_SCHEMA: dict[str, Any] = {
 
 PROVIDER_SYSTEM = """You are the policy teacher for one isolated StudyHub Agent turn.
 Return exactly one JSON action matching the supplied schema. Do not use a shell, filesystem,
-network, browser, or any tool of your own. The only permitted actions are one listed StudyHub
+network, browser, plan, todo list, or any tool of your own. The only permitted actions are one listed StudyHub
 tool call or a final answer. Base the action only on the public task and visible message history.
 For evidence tasks, a search result only discovers a source: read or fetch every source before
 citing it. Never invent a source ID or infer a fetch URL that was not returned by an observation.
@@ -50,6 +50,12 @@ Write final citations exactly as [source_id], using only source IDs returned by 
 read/fetch observation. Do not finish while a public completion constraint is visibly unmet.
 If a tool returns an error, correct the next visible action instead of claiming success. Do not
 reveal chain-of-thought."""
+
+CODEX_PROVIDER_DEVELOPER_INSTRUCTIONS = """This is a constrained policy inference call, not a
+coding task. Do not invoke or emit any Codex tool, web search, plan, todo list, shell command,
+file operation, browser action, or MCP call. Return exactly one JSON object matching the supplied
+output schema. The JSON must describe either one allowed StudyHub tool action or the final answer.
+Do not reveal chain-of-thought."""
 
 NATIVE_PROVIDER_SYSTEM = """Choose exactly one visible StudyHub action for this turn. If a tool
 is needed, call exactly one supplied tool through the native function interface. Otherwise return
@@ -493,6 +499,10 @@ class CodexSparkProvider:
                 "--skip-git-repo-check",
                 "--sandbox",
                 "read-only",
+                "--config",
+                'web_search="disabled"',
+                "--config",
+                f"developer_instructions={json.dumps(CODEX_PROVIDER_DEVELOPER_INSTRUCTIONS)}",
             ]
             for feature in CODEX_DISABLED_FEATURES:
                 command.extend(["--disable", feature])
