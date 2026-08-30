@@ -1,0 +1,39 @@
+{
+  "schema_version": "studyhub.sft1-protocol-holdout-contract.v1",
+  "contract_id": "qwen35-4b-sft1-protocol-holdout-v1",
+  "status": "FROZEN_BEFORE_M1_COMPLETION",
+  "split": "protocol_holdout",
+  "expected_rows": 933,
+  "expected_assistant_turn_items": 3022,
+  "expected_kinds": {
+    "tool_call": 1851,
+    "continuation": 238,
+    "final": 933
+  },
+  "expected_observation_conditioned_items": 1851,
+  "dataset": {
+    "selected_relative_path": "datasets/interim/open_agentic_sft_v2/selected.jsonl",
+    "selected_sha256": "c4b92df2c3c35eb73d1454c2d03f7d53f15b67d13927373fadb32f33b219c3d7",
+    "tokenized_manifest_relative_path": "datasets/processed/open_agentic_sft_v2_qwen35_9b/manifest.json",
+    "tokenized_manifest_sha256": "04612c22c4134a0b9cfaf97cafea85985c33c1eb2b99302514a0fffd8b35e906",
+    "data_audit_relative_path": "docs/training/evidence/open-agentic-sft-v2-data-audit.json",
+    "data_audit_sha256": "7a33437bd3435d5e343fd88db9387a04f76006997e78876096350d1af7642bb8"
+  },
+  "evaluation": {
+    "mode": "teacher_forced_each_assistant_turn",
+    "temperature": 0.0,
+    "top_p": 1.0,
+    "enable_thinking": false,
+    "max_completion_tokens": 1024,
+    "tool_call_parser": "qwen3_coder",
+    "reasoning_parser": "qwen3",
+    "reasoning_tool_markup_is_protocol_failure": true,
+    "same_turn_text_and_tool_is_protocol_failure": true
+  },
+  "thresholds": {
+    "tool_call_parse_minimum": 0.9,
+    "final_nonempty_minimum": 0.95,
+    "observation_mask_audit_required": true
+  },
+  "claim_boundary": "TEACHER_FORCED_PROTOCOL_VALIDITY_ONLY_NOT_AGENT_CAPABILITY"
+}

@@ -1,8 +1,14 @@
+import hashlib
+import json
 from pathlib import Path
 
 import pytest
 
-from scripts.train.merge_sft_lora import PROCESSOR_CONFIG_FILES, save_model_io_assets
+from scripts.train.merge_sft_lora import (
+    PROCESSOR_CONFIG_FILES,
+    completion_lineage,
+    save_model_io_assets,
+)
 
 
 class _SavedAsset:
@@ -61,3 +67,63 @@ def test_save_model_io_assets_rejects_incomplete_processor(tmp_path: Path) -> No
             tokenizer_class=_Tokenizer,
             processor_class=_IncompleteProcessor,
         )
+
+
+def test_completion_lineage_requires_and_hashes_formal_checkpoint(tmp_path: Path) -> None:
+    adapter = tmp_path / "checkpoint/adapter_model.safetensors"
+    adapter.parent.mkdir()
+    adapter.write_bytes(b"adapter")
+    marker = tmp_path / "complete.json"
+    marker.write_text(
+        json.dumps(
+            {
+                "status": "COMPLETE",
+                "mode": "formal",
+                "training_trial": "sft1",
+                "expected_optimizer_updates": 2100,
+                "final_global_step": 2099,
+                "checkpoint": {
+                    "path": str(adapter),
+                    "sha256": hashlib.sha256(b"adapter").hexdigest(),
+                },
+                "dataset_manifest_sha256": "d" * 64,
+                "benchmark_manifest_sha256": "b" * 64,
+                "git_commit": "c" * 40,
+                "sealed_used": False,
+                "rl_started": False,
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    lineage = completion_lineage(marker)
+
+    assert lineage["final_global_step"] == 2099
+    assert lineage["checkpoint_sha256"] == hashlib.sha256(b"adapter").hexdigest()
+    assert lineage["completion_marker_sha256"] == hashlib.sha256(marker.read_bytes()).hexdigest()
+
+
+def test_completion_lineage_rejects_nonformal_or_drifted_checkpoint(tmp_path: Path) -> None:
+    adapter = tmp_path / "adapter_model.safetensors"
+    adapter.write_bytes(b"drifted")
+    marker = tmp_path / "complete.json"
+    marker.write_text(
+        json.dumps(
+            {
+                "status": "COMPLETE",
+                "mode": "smoke",
+                "checkpoint": {"path": str(adapter), "sha256": "0" * 64},
+            }
+        ),
+        encoding="utf-8",
+    )
+    with pytest.raises(RuntimeError, match="completed formal"):
+        completion_lineage(marker)
+
+    value = json.loads(marker.read_text(encoding="utf-8"))
+    value["mode"] = "formal"
+    value["sealed_used"] = False
+    value["rl_started"] = False
+    marker.write_text(json.dumps(value), encoding="utf-8")
+    with pytest.raises(RuntimeError, match="hash drift"):
+        completion_lineage(marker)

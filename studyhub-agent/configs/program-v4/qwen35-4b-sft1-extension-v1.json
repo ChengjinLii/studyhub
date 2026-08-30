@@ -1,0 +1,75 @@
+{
+  "schema_version": "studyhub.qwen35-4b-sft1-extension-contract.v1",
+  "contract_id": "qwen35-4b-sft1-extension-v1",
+  "status": "FROZEN_BEFORE_M1_PROTOCOL_RESULT",
+  "purpose": "One bounded protocol-repair extension allowed by the 4B post-training program.",
+  "decision_source": {
+    "contract_relative_path": "configs/eval/qwen35-4b-sft1-protocol-holdout-v1.json",
+    "contract_sha256": "90e4a2bcdcb4bc9c1e7c8c3916225e86a9aa4e4d045b0bbea306443787a477c8",
+    "allowed_metrics": [
+      "tool_call_parse_rate",
+      "final_nonempty_rate",
+      "observation_mask_audit"
+    ],
+    "prohibited_decision_inputs": [
+      "AgentBench",
+      "BFCL",
+      "tau2",
+      "fresh_holdout",
+      "sealed"
+    ]
+  },
+  "trigger": {
+    "protocol_evaluation_status_required": "COMPLETE",
+    "observation_mask_audit_required": "PASS",
+    "run_only_if_any": {
+      "tool_call_parse_rate_below": 0.9,
+      "final_nonempty_rate_below": 0.95
+    },
+    "skip_if_protocol_gate_passes": true,
+    "infra_failure_is_not_a_training_trigger": true
+  },
+  "lineage": {
+    "initial_stage": "M1",
+    "initial_model": "exact completed M1 checkpoint",
+    "dataset": "open-agentic-sft-v2-qwen35-9b",
+    "selected_sha256": "c4b92df2c3c35eb73d1454c2d03f7d53f15b67d13927373fadb32f33b219c3d7",
+    "same_selected_rows_required": true,
+    "same_tokenization_required": true,
+    "sealed_used": false,
+    "main_grpo_started": false
+  },
+  "training": {
+    "maximum_additional_optimizer_updates": 1050,
+    "learning_rate": 1e-5,
+    "global_batch_size": 8,
+    "seed": 20260827,
+    "optimizer": "adam",
+    "weight_decay": 0.05,
+    "beta1": 0.9,
+    "beta2": 0.95,
+    "eps": 1e-5,
+    "gradient_clip": 1.0,
+    "scheduler": "cosine",
+    "warmup_fraction": 0.03,
+    "lora": {
+      "rank": 32,
+      "alpha": 32,
+      "dropout": 0.0,
+      "target_modules": [
+        "o_proj",
+        "gate_proj",
+        "up_proj",
+        "down_proj"
+      ]
+    }
+  },
+  "execution": {
+    "authorization_required": true,
+    "implementation_deferred_until_triggered": true,
+    "original_M1_artifacts_immutable": true,
+    "rerun_protocol_holdout_after_extension": true,
+    "maximum_extension_runs": 1
+  },
+  "claim_boundary": "PRE_REGISTERED_PROTOCOL_REPAIR_ONLY_NOT_CAPABILITY_TUNING"
+}

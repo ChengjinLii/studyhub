@@ -1,0 +1,30 @@
+{
+  "schema_version": "studyhub.bfcl-replication-preflight-evidence.v1",
+  "status": "PASS_BFCL_REPLICATION_PREFLIGHT",
+  "recorded_at": "2026-08-30T19:14:06+08:00",
+  "git_commit": "8853ed0858d8496880579ca9a545fe882f08d524",
+  "contract": {
+    "sha256": "36a6de579a8dc7c4ca43bac5f19f8571c67c2b713c69ee9242572710c1687a4a",
+    "selection_canonical_sha256": "87c8e0059b5f36d5a60620e7d30bf3779f708a8aef6bcfa9e4e923f96c9a94ad",
+    "expected_cases": 70,
+    "fresh_holdout_used": false,
+    "training_or_tuning_input": false
+  },
+  "model": {
+    "identity": "Qwen/Qwen3.5-4B@851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a",
+    "path": "/data/chengjin/studyhub/models/P1/Qwen3.5-4B"
+  },
+  "bfcl": {
+    "resolved_commit": "f7cf7359b7ac615a0b294831c5ba2bc95ee4a000",
+    "git_tree": "8c805ceaf6b5d9c576e67f9274ed386fd9998911",
+    "official_evaluator": true,
+    "cli_import": "PASS",
+    "python": "/data/chengjin/studyhub/studyhub-agent/artifacts/external-benchmarks/sources/bfcl/f7cf7359b7ac615a0b294831c5ba2bc95ee4a000/berkeley-function-call-leaderboard/.venv/bin/python"
+  },
+  "runtime": {
+    "server_python": "/data/chengjin/studyhub/studyhub-agent/.venv-train/bin/python",
+    "student_thinking": false,
+    "gpu_started": false,
+    "model_score_status": "NOT_RUN"
+  }
+}

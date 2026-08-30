@@ -1,0 +1,85 @@
+{
+  "schema_version": "studyhub.tau2-replication-contract.v1",
+  "status": "FROZEN_BEFORE_M1_COMPLETION",
+  "purpose": "Replicate the previously used public tau2 15-task panel after M1 without reading the fresh pipeline holdout.",
+  "benchmark": {
+    "name": "tau2 v1.0.1",
+    "upstream": "https://github.com/sierra-research/tau2-bench.git",
+    "resolved_commit": "fc0055dc4e0a316c3f83133267fbd6faaa770992",
+    "git_tree": "4837da1c2b310152f63d3d7987f4325183ca6f7c",
+    "official_evaluator": true,
+    "official_environment": true,
+    "task_split": "base"
+  },
+  "selection": {
+    "name": "tau2-public-15-replication-v1",
+    "canonical_sha256": "9bdee4f79786d5dff665b11376cad33a0cd23367ca3a7bc099b942a37bcd90eb",
+    "expected_tasks": 15,
+    "tasks": {
+      "airline": [
+        "0",
+        "1",
+        "2",
+        "3",
+        "4"
+      ],
+      "retail": [
+        "0",
+        "1",
+        "2",
+        "3",
+        "4"
+      ],
+      "telecom": [
+        "[mobile_data_issue]airplane_mode_on|data_mode_off[PERSONA:None]",
+        "[mobile_data_issue]airplane_mode_on|user_abroad_roaming_enabled_off[PERSONA:None]",
+        "[mobile_data_issue]airplane_mode_on|bad_network_preference[PERSONA:Hard]",
+        "[mobile_data_issue]bad_network_preference|user_abroad_roaming_enabled_off[PERSONA:Hard]",
+        "[mobile_data_issue]data_saver_mode_on|user_abroad_roaming_enabled_off[PERSONA:Easy]"
+      ]
+    },
+    "source_file_sha256": {
+      "airline": "ccd8ba737b4cc371415af70151187788f728d6108d0916e73bb4317b40542052",
+      "retail": "8e03ebce7901bd6218e7a7dc3105faa9324091a68058f7fe61c65262868812e8",
+      "telecom": "37e562e1ae3242577407e1303b1548bc64e7ea68e37d36173e6747990ceaf8a4"
+    }
+  },
+  "protocol": {
+    "seed": 20260830,
+    "num_trials": 1,
+    "max_steps": 50,
+    "max_errors": 5,
+    "max_concurrency": 1,
+    "max_retries": 3,
+    "retry_delay_seconds": 1.0,
+    "simulation_timeout_seconds": 1200,
+    "enforce_communication_protocol": true,
+    "agent": {
+      "temperature": 0.0,
+      "max_tokens": 4096,
+      "enable_thinking": false
+    },
+    "user": {
+      "model": "Qwen/Qwen3.5-9B",
+      "revision": "c202236235762e1c871ad0ccb60c8ee5ba337b9a",
+      "path": "/data/chengjin/studyhub/models/P1/Qwen3.5-9B",
+      "temperature": 0.0,
+      "max_tokens": 1024,
+      "enable_thinking": false
+    }
+  },
+  "servers": {
+    "context_length": 65536,
+    "max_running_requests": 4,
+    "mem_fraction_static": 0.7,
+    "tool_call_parser": "qwen3_coder",
+    "reasoning_parser": "qwen3"
+  },
+  "claim_boundary": {
+    "official_full_leaderboard_score": false,
+    "public_partial_replication_only": true,
+    "local_user_simulator": true,
+    "fresh_holdout_used": false,
+    "training_or_tuning_input": false
+  }
+}
