@@ -1,0 +1,264 @@
+{
+  "schema_version": "studyhub.opd-token-reward-parity.v1",
+  "status": "PASS_THUNLP_TOKEN_REWARD_DIRECT_MATH",
+  "contract": {
+    "adv_estimator": "token_reward_direct",
+    "top_k": 3,
+    "top_k_strategy": "only_stu",
+    "reward_weight_mode": "student_p",
+    "loss_aggregation": "sum-k-then-token-mean",
+    "advantages_detached": true,
+    "scope": "synthetic mathematical parity; runtime/backend parity remains separate"
+  },
+  "checks": {
+    "anchor_loss_matches_detached_reference": true,
+    "masked_position_zero": true,
+    "finite_difference_gradient_matches": true,
+    "gradient_descent_direction_decreases_surrogate": true,
+    "official_teacher_topk_forward_kl_is_not_silently_equivalent": true
+  },
+  "metrics": {
+    "reference_token_mean_loss": 0.4205124847200241,
+    "anchor_surrogate_loss": 0.4205124847200241,
+    "gradient_max_abs_error": 3.5183952973305566e-11,
+    "gradient_step_loss": 0.41355550746552167,
+    "official_teacher_topk_forward_kl_fixture_loss": 0.4022869893060942
+  },
+  "reference": {
+    "top_k_ids": [
+      [
+        [
+          0,
+          1,
+          2
+        ],
+        [
+          1,
+          2,
+          0
+        ],
+        [
+          2,
+          0,
+          1
+        ]
+      ]
+    ],
+    "student_top_k_log_probs": [
+      [
+        [
+          -0.4519143959375933,
+          -1.4519143959375933,
+          -2.4519143959375933
+        ],
+        [
+          -0.4519143959375933,
+          -1.4519143959375933,
+          -2.4519143959375933
+        ],
+        [
+          -0.4519143959375933,
+          -1.4519143959375933,
+          -2.4519143959375933
+        ]
+      ]
+    ],
+    "teacher_on_student_log_probs": [
+      [
+        [
+          -1.4519143959375933,
+          -0.4519143959375933,
+          -2.4519143959375933
+        ],
+        [
+          -1.4519143959375933,
+          -0.4519143959375933,
+          -2.4519143959375933
+        ],
+        [
+          -1.4519143959375933,
+          -0.4519143959375933,
+          -2.4519143959375933
+        ]
+      ]
+    ],
+    "student_conditional_weights": [
+      [
+        [
+          0.6652409557748218,
+          0.24472847105479764,
+          0.09003057317038046
+        ],
+        [
+          0.6652409557748218,
+          0.24472847105479764,
+          0.09003057317038046
+        ],
+        [
+          0.6652409557748218,
+          0.24472847105479764,
+          0.09003057317038046
+        ]
+      ]
+    ],
+    "raw_token_rewards": [
+      [
+        [
+          -0.6652409557748218,
+          0.24472847105479764,
+          0.0
+        ],
+        [
+          -0.6652409557748218,
+          0.24472847105479764,
+          0.0
+        ],
+        [
+          -0.6652409557748218,
+          0.24472847105479764,
+          0.0
+        ]
+      ]
+    ],
+    "advantages": [
+      [
+        [
+          -0.6652409557748218,
+          0.24472847105479764,
+          0.0
+        ],
+        [
+          -0.6652409557748218,
+          0.24472847105479764,
+          0.0
+        ],
+        [
+          -0.0,
+          0.0,
+          0.0
+        ]
+      ]
+    ],
+    "response_mask": [
+      [
+        1,
+        1,
+        0
+      ]
+    ],
+    "token_losses": [
+      [
+        0.4205124847200241,
+        0.4205124847200241,
+        -0.0
+      ]
+    ],
+    "token_mean_loss": 0.4205124847200241,
+    "student_temperature": 1.0,
+    "teacher_temperature": 1.0
+  },
+  "analytic_gradient": [
+    [
+      [
+        0.19881158725653011,
+        -0.17158977543645787,
+        -0.01810906411310718,
+        -0.0066619523860676905,
+        -0.0024507953208973386
+      ],
+      [
+        -0.01810906411310718,
+        0.19881158725653011,
+        -0.17158977543645787,
+        -0.0066619523860676905,
+        -0.0024507953208973386
+      ],
+      [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ]
+    ]
+  ],
+  "finite_difference_gradient": [
+    [
+      [
+        0.19881158724865955,
+        -0.17158977541620324,
+        -0.018109064137128428,
+        -0.0066619523508837375,
+        -0.0024507953444441455
+      ],
+      [
+        -0.018109064137128428,
+        0.19881158724865955,
+        -0.17158977541620324,
+        -0.0066619523508837375,
+        -0.0024507953444441455
+      ],
+      [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ]
+    ]
+  ],
+  "official_verl_native_equivalence": {
+    "sampled_token_k1": false,
+    "teacher_top_k_forward_kl": false
+  },
+  "generated_at": "2026-08-30T09:55:31.136096+00:00",
+  "upstream_lock_sha256": "508f17387a9a05ebe88fc76d47837a1a997a7f144b4ad581234f89c2fbc1d436",
+  "upstream_checkouts": {
+    "thunlp_opd": {
+      "commit": "ac26e38d6f1572eb027597b48a9f4e01f6915ef8",
+      "expected_commit": "ac26e38d6f1572eb027597b48a9f4e01f6915ef8",
+      "commit_matches": true,
+      "critical_sources": {
+        "verl/verl/workers/actor/dp_actor.py": {
+          "expected_sha256": "ae706f1d20d3677bcd952fad8fb054180159747b4f2e61cab002f1328fd18d6f",
+          "actual_sha256": "ae706f1d20d3677bcd952fad8fb054180159747b4f2e61cab002f1328fd18d6f"
+        },
+        "verl/verl/trainer/ppo/core_algos.py": {
+          "expected_sha256": "d7a2796319d9de5e0672138ae131e458b82ae0e54e9e121e44d415ece9a24bc3",
+          "actual_sha256": "d7a2796319d9de5e0672138ae131e458b82ae0e54e9e121e44d415ece9a24bc3"
+        },
+        "verl/verl/workers/fsdp_workers.py": {
+          "expected_sha256": "3b9d038741571d9ed14fd752a6619855df491b6ea7f93dc4e0c4294f353bf10d",
+          "actual_sha256": "3b9d038741571d9ed14fd752a6619855df491b6ea7f93dc4e0c4294f353bf10d"
+        }
+      },
+      "critical_sources_match": true
+    },
+    "official_verl": {
+      "commit": "ea53291385ce764019a2b40733605f21d8317583",
+      "expected_commit": "ea53291385ce764019a2b40733605f21d8317583",
+      "commit_matches": true,
+      "critical_sources": {
+        "verl/trainer/config/distillation/distillation.yaml": {
+          "expected_sha256": "706b380d3cc9a0baa961a935d073ec3c93d0176158d75dae700ac7e3af4cdf1b",
+          "actual_sha256": "706b380d3cc9a0baa961a935d073ec3c93d0176158d75dae700ac7e3af4cdf1b"
+        },
+        "verl/trainer/distillation/fsdp/losses.py": {
+          "expected_sha256": "75fb7ac8b8072dbc84ffddc9cf1cdeaec645010b2de3fdedc39fb791d6c170f3",
+          "actual_sha256": "75fb7ac8b8072dbc84ffddc9cf1cdeaec645010b2de3fdedc39fb791d6c170f3"
+        },
+        "verl/trainer/distillation/losses.py": {
+          "expected_sha256": "8fc5835f410228c110f492a10dddfe6ce3274efd22f439dfaf8c88c5d5a6d843",
+          "actual_sha256": "8fc5835f410228c110f492a10dddfe6ce3274efd22f439dfaf8c88c5d5a6d843"
+        },
+        "verl/experimental/teacher_loop/teacher_manager.py": {
+          "expected_sha256": "0a820c59cbeafacec61fc2f0da4e2810a39cc5f25a9f6d07aa9bad9618efde26",
+          "actual_sha256": "0a820c59cbeafacec61fc2f0da4e2810a39cc5f25a9f6d07aa9bad9618efde26"
+        }
+      },
+      "critical_sources_match": true
+    }
+  },
+  "runtime_backend_parity": "NOT_RUN",
+  "opd_training_authorized_by_this_gate": false
+}
