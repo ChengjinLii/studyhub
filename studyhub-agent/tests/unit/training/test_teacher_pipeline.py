@@ -84,6 +84,40 @@ def test_parallel_teacher_resume_skips_existing_batch_and_runs_next_job(
     assert result == (3, 3, 0, None)
 
 
+def test_sequential_teacher_resume_archives_and_retries_usage_limit(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    job = {"run_id": "retry-one", "request_timeout": 30}
+    raw_path = tmp_path / "raw_runs" / "retry-one.json"
+    raw_path.parent.mkdir(parents=True)
+    raw_path.write_text(json.dumps({"run_id": "retry-one", "status": "FAILED"}), encoding="utf-8")
+    limited = {
+        "run": {"run_id": "retry-one"},
+        "accepted": False,
+        "failures": ["provider:codex_usage_limit"],
+    }
+    retried = {"run": {"run_id": "retry-one"}, "accepted": True, "failures": []}
+
+    monkeypatch.setattr(teacher_collector, "_existing_result", lambda _root, _job: limited)
+    monkeypatch.setattr(teacher_collector, "_collect_job", lambda _job: retried)
+    monkeypatch.setattr(teacher_collector, "_write_run", lambda _root, _result: None)
+
+    result = teacher_collector._collect_sequential(
+        [job],
+        root=tmp_path,
+        max_accepted=1,
+        deadline=teacher_collector.time.monotonic() + 10,
+        resume=True,
+    )
+
+    assert result == (1, 1, 0, None)
+    assert not raw_path.exists()
+    attempts = list((tmp_path / "provider_attempts").glob("retry-one-*.json"))
+    assert len(attempts) == 1
+    assert json.loads(attempts[0].read_text())["status"] == "FAILED"
+
+
 def _builder_row(
     tools: list[dict],
     calls: list[tuple[str, str, dict, dict]],

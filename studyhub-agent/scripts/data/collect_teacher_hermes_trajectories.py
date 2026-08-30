@@ -203,6 +203,20 @@ def _write_run(root: Path, result: dict[str, Any]) -> None:
     _write_json(root / "raw_runs" / f"{run['run_id']}.json", run)
 
 
+def _archive_retryable_provider_failure(root: Path, job: dict[str, Any]) -> None:
+    """Preserve a transient provider failure before retrying the same run ID."""
+    path = root / "raw_runs" / f"{job['run_id']}.json"
+    payload = path.read_bytes()
+    digest = hashlib.sha256(payload).hexdigest()[:16]
+    archive = root / "provider_attempts" / f"{job['run_id']}-{digest}.json"
+    archive.parent.mkdir(parents=True, exist_ok=True)
+    if archive.exists() and archive.read_bytes() != payload:
+        raise RuntimeError(f"provider attempt hash collision: {archive}")
+    if not archive.exists():
+        archive.write_bytes(payload)
+    path.unlink()
+
+
 def _terminal_provider_stop(result: dict[str, Any]) -> str | None:
     failures = set(result.get("failures", []))
     if "provider:codex_usage_limit" in failures:
@@ -282,12 +296,16 @@ def _collect_sequential(
         if existing is not None:
             if not resume:
                 raise FileExistsError(f"raw run exists; use --resume: {job['run_id']}")
-            result = existing
-        else:
+            if _terminal_provider_stop(existing):
+                _archive_retryable_provider_failure(root, job)
+                existing = None
+        if existing is None:
             remaining = max(1, int(deadline - time.monotonic()))
             job = {**job, "request_timeout": min(int(job["request_timeout"]), remaining)}
             result = _collect_job(job)
             _write_run(root, result)
+        else:
+            result = existing
         completed += 1
         if result["accepted"]:
             accepted += 1
@@ -325,6 +343,10 @@ def _collect_parallel(
                 if existing is not None:
                     if not resume:
                         raise FileExistsError(f"raw run exists; use --resume: {job['run_id']}")
+                    if _terminal_provider_stop(existing):
+                        _archive_retryable_provider_failure(root, job)
+                        existing = None
+                if existing is not None:
                     completed += 1
                     if existing["accepted"]:
                         accepted += 1
