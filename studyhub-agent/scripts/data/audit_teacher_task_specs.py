@@ -100,6 +100,20 @@ def audit_root(root: Path) -> dict[str, Any]:
     manifest_path = root / "task-specs.manifest.json"
     tasks = read_jsonl(tasks_path)
     manifest = read_json(manifest_path)
+    manifest_schema = str(manifest.get("schema_version", ""))
+    benchmark_prompt_overlap = manifest.get(
+        "benchmark_prompt_overlap",
+        manifest.get("exact_public_benchmark_overlap"),
+    )
+    sealed_task_files_read = manifest.get(
+        "sealed_task_files_read",
+        manifest.get("sealed_or_fresh_external_holdouts_opened"),
+    )
+    public_task_has_verifier = manifest.get("public_task_has_verifier")
+    if public_task_has_verifier is None and manifest_schema == "studyhub.codex-hermes-training-tasks.v2":
+        public_task_has_verifier = any(
+            bool(FORBIDDEN_PUBLIC_FIELDS & task.keys()) for task in tasks
+        )
     errors: list[dict[str, Any]] = []
     families: Counter[str] = Counter()
     source_groups: Counter[str] = Counter()
@@ -112,11 +126,11 @@ def audit_root(root: Path) -> dict[str, Any]:
 
     if sha256(tasks_path) != manifest.get("task_specs_sha256"):
         _record(errors, "<manifest>", "task_specs_hash_mismatch")
-    if manifest.get("benchmark_prompt_overlap") != 0:
+    if benchmark_prompt_overlap != 0:
         _record(errors, "<manifest>", "benchmark_prompt_overlap")
-    if manifest.get("sealed_task_files_read") is not False:
+    if sealed_task_files_read is not False:
         _record(errors, "<manifest>", "sealed_files_not_proven_unread")
-    if manifest.get("public_task_has_verifier") is not False:
+    if public_task_has_verifier is not False:
         _record(errors, "<manifest>", "public_verifier_exposure")
 
     for task in tasks:
@@ -238,7 +252,10 @@ def audit_root(root: Path) -> dict[str, Any]:
     if dict(sorted(families.items())) != manifest.get("family_counts"):
         _record(errors, "<manifest>", "family_count_mismatch")
     maximum_group_rows = max(source_groups.values(), default=0)
-    group_cap = int(manifest.get("max_rows_per_source_group_contract", 0))
+    group_cap_value = manifest.get("max_rows_per_source_group_contract")
+    if group_cap_value is None and manifest_schema == "studyhub.codex-hermes-training-tasks.v2":
+        group_cap_value = 1
+    group_cap = int(group_cap_value or 0)
     if maximum_group_rows > group_cap:
         _record(
             errors,
@@ -265,8 +282,8 @@ def audit_root(root: Path) -> dict[str, Any]:
         "fixture_routes": total_routes,
         "executable_routes": executable_routes,
         "tool_routes": dict(sorted(tool_routes.items())),
-        "benchmark_prompt_overlap": manifest.get("benchmark_prompt_overlap"),
-        "sealed_task_files_read": manifest.get("sealed_task_files_read"),
+        "benchmark_prompt_overlap": benchmark_prompt_overlap,
+        "sealed_task_files_read": sealed_task_files_read,
         "task_specs_sha256": sha256(tasks_path),
         "errors": errors,
         "error_count": len(errors),

@@ -11,6 +11,7 @@ import pytest
 
 import scripts.data.collect_teacher_hermes_trajectories as teacher_collector
 import training.teacher.providers as teacher_providers
+from scripts.data.audit_teacher_task_specs import audit_root as audit_teacher_task_root
 from scripts.data.build_codex_hermes_tasks import (
     BUILDERS as CODEX_TASK_BUILDERS,
 )
@@ -67,6 +68,18 @@ def test_independent_spark_task_builder_emits_executable_path_agnostic_tasks(
     for task in tasks:
         verifier = json.loads((root / "verifiers" / f"{task['task_id']}.json").read_text())
         assert verifier["verifier_mode"] == "path_agnostic_v2"
+
+
+def test_teacher_task_contract_audit_accepts_v2_manifest(tmp_path: Path) -> None:
+    root = tmp_path / "teacher-v2"
+    build_codex_hermes_tasks(root, total_tasks=14, seed=20260827, force=False)
+
+    report = audit_teacher_task_root(root)
+
+    assert report["status"] == "PASS"
+    assert report["benchmark_prompt_overlap"] == 0
+    assert report["sealed_task_files_read"] is False
+    assert report["rows_per_source_group"]["max"] == 1
 
 
 def test_teacher_task_ordinal_offsets_create_disjoint_source_groups(
