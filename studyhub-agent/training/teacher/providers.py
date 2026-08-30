@@ -64,6 +64,31 @@ _SECRET_PATTERNS = (
     re.compile(r"(?i)bearer\s+[A-Za-z0-9._~-]{12,}"),
 )
 
+CODEX_DISABLED_FEATURES = (
+    "apps",
+    "browser_use",
+    "browser_use_external",
+    "browser_use_full_cdp_access",
+    "code_mode_host",
+    "computer_use",
+    "enable_mcp_apps",
+    "goals",
+    "image_generation",
+    "multi_agent",
+    "multi_agent_v2",
+    "plugin_sharing",
+    "plugins",
+    "recommended_plugins",
+    "remote_plugin",
+    "shell_tool",
+    "skill_mcp_dependency_install",
+    "skill_search",
+    "tool_call_mcp_elicitation",
+    "tool_suggest",
+    "unified_exec",
+    "view_image",
+)
+
 
 class TeacherProviderError(RuntimeError):
     def __init__(self, code: str, event: dict[str, Any]) -> None:
@@ -468,21 +493,23 @@ class CodexSparkProvider:
                 "--skip-git-repo-check",
                 "--sandbox",
                 "read-only",
-                "--disable",
-                "shell_tool",
-                "--disable",
-                "unified_exec",
-                "--model",
-                self.model,
-                "--cd",
-                str(root),
-                "--output-schema",
-                str(schema_path),
-                "--output-last-message",
-                str(output_path),
-                "--json",
-                "-",
             ]
+            for feature in CODEX_DISABLED_FEATURES:
+                command.extend(["--disable", feature])
+            command.extend(
+                [
+                    "--model",
+                    self.model,
+                    "--cd",
+                    str(root),
+                    "--output-schema",
+                    str(schema_path),
+                    "--output-last-message",
+                    str(output_path),
+                    "--json",
+                    "-",
+                ]
+            )
             try:
                 process = subprocess.run(
                     command,
@@ -516,7 +543,7 @@ class CodexSparkProvider:
                 "sandbox": "read-only",
                 "public_files": ["action-schema.json"],
                 "public_task_transport": "stdin_only",
-                "codex_shell_features_disabled": ["shell_tool", "unified_exec"],
+                "codex_features_disabled": list(CODEX_DISABLED_FEATURES),
                 "hidden_oracle_mounted": False,
                 "event_audit": audit,
                 "usage": audit["usage"],
