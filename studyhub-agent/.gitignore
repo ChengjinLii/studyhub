@@ -1,5 +1,5 @@
 .venv/
-.vendor/
+.vendor
 artifacts/
 ai_platform/data/*.local.json
 ai_platform/logs/
