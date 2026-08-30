@@ -1,0 +1,42 @@
+{
+  "schema_version": "studyhub.qwen35-4b-sft2-data-contract.v1",
+  "program_id": "qwen35-4b-sft2-spark-retention-v1",
+  "status": "DATA_GATE_PREPARED_TRAINING_NOT_AUTHORIZED",
+  "seed": 20260827,
+  "teacher_gate": {
+    "source_dataset": "spark_hermes_teacher_v1",
+    "minimum_selected_rows": 500,
+    "minimum_assistant_loss_tokens": 250000,
+    "allowed_quality_tiers": [
+      "teacher_verified_complete",
+      "teacher_repaired_complete"
+    ],
+    "maximum_rows_per_source_group": 2,
+    "maximum_rows_per_source_group_and_path": 1,
+    "replay_only_tools": ["web_fetch"],
+    "required_teacher_controller": "pinned_hermes_registry_dispatch",
+    "required_hermes_commit": "5c1a304ce890276a4334d8ced3f29ffeedbbbf93"
+  },
+  "mix": {
+    "spark_assistant_token_target_share": 0.35,
+    "retention_assistant_token_target_share": 0.65,
+    "spark_assistant_token_share_bounds": [0.30, 0.40]
+  },
+  "training": {
+    "student_input": "M1",
+    "primary_updates": 800,
+    "allowed_update_range": [600, 900],
+    "global_batch_size": 8,
+    "learning_rate": 0.00001,
+    "lora_rank": 32,
+    "lora_alpha": 32,
+    "enable_thinking": false
+  },
+  "prohibited_sources": [
+    "AgentBench_v2_all_splits",
+    "BFCL_holdout",
+    "tau2_holdout",
+    "sealed_data",
+    "legacy_teacher_reverse_replay"
+  ]
+}
