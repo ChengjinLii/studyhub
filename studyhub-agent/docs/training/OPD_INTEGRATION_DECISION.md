@@ -58,7 +58,8 @@ student top-k IDs
 
 The independent implementation in `training/opd/token_reward_parity.py` is the mathematical oracle. It checks top-k
 selection, student weighting, masking, K aggregation, token-mean loss, and gradient direction using finite differences.
-It deliberately has no torch or verl dependency.
+It deliberately has no torch or verl dependency. `training/opd/verl_compat.py` is a separate Torch candidate kernel;
+the compatibility spike requires its tensors, scalar loss, and backward gradient to match that oracle.
 
 Passing this mathematical gate does **not** authorize OPD training. Before a GPU pilot, the actual verl compatibility
 extension must reproduce the same fixed tensors and gradients, and the following independent gates must also pass:

@@ -2,6 +2,8 @@ import json
 import math
 from pathlib import Path
 
+import pytest
+
 from training.opd.token_reward_parity import (
     analytic_gradient_at_anchor,
     build_thunlp_token_reward_reference,
@@ -84,3 +86,14 @@ def test_upstream_lock_prevents_native_verl_losses_being_mislabeled() -> None:
     assert lock["compatibility"]["official_sampled_token_k1_equivalent"] is False
     assert lock["compatibility"]["official_teacher_top_k_forward_kl_equivalent"] is False
     assert lock["compatibility"]["runtime_backend_parity"] == "NOT_RUN"
+
+
+def test_torch_candidate_matches_independent_oracle() -> None:
+    pytest.importorskip("torch")
+    from training.opd.verl_compat import run_torch_candidate_parity_gate
+
+    result = run_torch_candidate_parity_gate()
+
+    assert result["status"] == "PASS_TORCH_COMPATIBILITY_KERNEL"
+    assert all(result["checks"].values())
+    assert result["metrics"]["gradient_max_abs_error"] <= 2e-12
