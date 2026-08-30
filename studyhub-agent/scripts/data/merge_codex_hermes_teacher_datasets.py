@@ -7,9 +7,15 @@ import argparse
 import hashlib
 import json
 import os
+import sys
 from collections import Counter
 from pathlib import Path
 from typing import Any
+
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(PROJECT_ROOT / "src"))
+
+from studyhub_agent.trajectory.runtime_sft import trajectory_fingerprint  # noqa: E402
 
 
 def sha256(path: Path) -> str:
@@ -42,9 +48,7 @@ def read_jsonl(path: Path) -> list[dict[str, Any]]:
 
 def stable_row_sha256(row: dict[str, Any]) -> str:
     return hashlib.sha256(
-        json.dumps(
-            row, ensure_ascii=False, sort_keys=True, separators=(",", ":")
-        ).encode()
+        json.dumps(row, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode()
     ).hexdigest()
 
 
@@ -54,6 +58,7 @@ def merge_batches(roots: list[Path]) -> tuple[list[dict[str, Any]], dict[str, An
     rows_by_content: dict[str, tuple[str, dict[str, Any]]] = {}
     run_ids: dict[str, str] = {}
     duplicate_content = 0
+    duplicate_metadata_variants = 0
     inputs = []
     family_counts: Counter[str] = Counter()
     quality_counts: Counter[str] = Counter()
@@ -85,10 +90,7 @@ def merge_batches(roots: list[Path]) -> tuple[list[dict[str, Any]], dict[str, An
             if row.get("source_dataset") != "codex_hermes_teacher_v1":
                 raise RuntimeError("unexpected teacher source_dataset")
             teacher = row.get("teacher", {})
-            if (
-                teacher.get("interface") != "codex-cli"
-                or teacher.get("model") != "gpt-5.6-sol"
-            ):
+            if teacher.get("interface") != "codex-cli" or teacher.get("model") != "gpt-5.6-sol":
                 raise RuntimeError("non-Codex teacher identity in verified batch")
             if row.get("quality_tier") not in {
                 "teacher_verified_complete",
@@ -104,25 +106,24 @@ def merge_batches(roots: list[Path]) -> tuple[list[dict[str, Any]], dict[str, An
                 raise RuntimeError(f"run ID collision with different content: {run_id}")
             content = str(row.get("content_sha256", ""))
             if len(content) != 64:
-                raise RuntimeError(
-                    "verified teacher row has no valid content fingerprint"
-                )
+                raise RuntimeError("verified teacher row has no valid content fingerprint")
+            if trajectory_fingerprint(row) != content:
+                raise RuntimeError(f"verified teacher row has a stale content fingerprint: {run_id}")
             previous = rows_by_content.get(content)
             if previous is not None:
-                if previous[0] != row_sha:
-                    raise RuntimeError(
-                        "content fingerprint collision with different serialized row"
-                    )
                 duplicate_content += 1
+                duplicate_metadata_variants += int(previous[0] != row_sha)
+                # The fingerprint covers normalized tools and messages, while run IDs,
+                # source groups, and provenance intentionally remain outside it. Keep
+                # one deterministic representative without treating metadata-only
+                # differences as a cryptographic collision.
+                if row_sha < previous[0]:
+                    rows_by_content[content] = (row_sha, row)
                 continue
             rows_by_content[content] = (row_sha, row)
 
     merged = [entry[1] for entry in rows_by_content.values()]
-    merged.sort(
-        key=lambda row: hashlib.sha256(
-            f"20260827:{row['content_sha256']}".encode()
-        ).hexdigest()
-    )
+    merged.sort(key=lambda row: hashlib.sha256(f"20260827:{row['content_sha256']}".encode()).hexdigest())
     for row in merged:
         family_counts[str(row.get("task_family", "unknown"))] += 1
         quality_counts[str(row.get("quality_tier", "unknown"))] += 1
@@ -137,6 +138,7 @@ def merge_batches(roots: list[Path]) -> tuple[list[dict[str, Any]], dict[str, An
         "input_rows": sum(item["accepted_rows"] for item in inputs),
         "merged_rows": len(merged),
         "exact_content_duplicates_removed": duplicate_content,
+        "duplicate_content_metadata_variants": duplicate_metadata_variants,
         "unique_run_ids": len(run_ids),
         "unique_source_groups": len(source_groups),
         "largest_source_group_rows": max(source_groups.values(), default=0),
@@ -174,9 +176,7 @@ def main() -> int:
     manifest = output / "manifest.json"
     manifest.parent.mkdir(parents=True, exist_ok=True)
     temporary = manifest.with_suffix(".json.partial")
-    temporary.write_text(
-        json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
-    )
+    temporary.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     os.replace(temporary, manifest)
     print(json.dumps(report, ensure_ascii=False, indent=2))
     return 0
