@@ -10,7 +10,6 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-
 PROCESSOR_CONFIG_FILES = (
     "preprocessor_config.json",
     "video_preprocessor_config.json",
@@ -23,6 +22,30 @@ def sha256(path: Path) -> str:
         for block in iter(lambda: stream.read(4 * 1024 * 1024), b""):
             digest.update(block)
     return digest.hexdigest()
+
+
+def completion_lineage(path: Path) -> dict[str, Any]:
+    value = json.loads(path.read_text(encoding="utf-8"))
+    if value.get("status") != "COMPLETE" or value.get("mode") != "formal":
+        raise RuntimeError("training lineage is not a completed formal run")
+    if value.get("sealed_used") is not False or value.get("rl_started") is not False:
+        raise RuntimeError("training lineage does not prove SFT-only sealed isolation")
+    checkpoint = value.get("checkpoint", {})
+    checkpoint_path = Path(str(checkpoint.get("path", "")))
+    if not checkpoint_path.is_file() or sha256(checkpoint_path) != checkpoint.get("sha256"):
+        raise RuntimeError("training lineage checkpoint is missing or has hash drift")
+    return {
+        "completion_marker_sha256": sha256(path),
+        "training_trial": value.get("training_trial"),
+        "expected_optimizer_updates": value.get("expected_optimizer_updates"),
+        "final_global_step": value.get("final_global_step"),
+        "checkpoint_sha256": checkpoint.get("sha256"),
+        "dataset_manifest_sha256": value.get("dataset_manifest_sha256"),
+        "benchmark_manifest_sha256": value.get("benchmark_manifest_sha256"),
+        "training_git_commit": value.get("git_commit"),
+        "sealed_used": value.get("sealed_used"),
+        "rl_started": value.get("rl_started"),
+    }
 
 
 def save_model_io_assets(
@@ -66,7 +89,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--adapter", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--max-shard-size", default="4GB")
-    parser.add_argument("--stage", choices=("sft", "grpo"), default="sft")
+    parser.add_argument("--stage", choices=("sft", "sft1", "sft2", "grpo", "opd"), default="sft")
+    parser.add_argument("--completion-lineage", type=Path)
     return parser.parse_args()
 
 
@@ -120,6 +144,8 @@ def main() -> int:
         "weight_shards": [{"name": path.name, "bytes": path.stat().st_size} for path in shards],
         "model_io_assets": model_io_assets,
     }
+    if args.completion_lineage is not None:
+        manifest["training_lineage"] = completion_lineage(args.completion_lineage.resolve())
     (args.output / "studyhub_merged_manifest.json").write_text(
         json.dumps(manifest, ensure_ascii=False, indent=2) + "\n",
         encoding="utf-8",
