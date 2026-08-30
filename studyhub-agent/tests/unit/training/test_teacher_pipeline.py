@@ -69,6 +69,32 @@ def test_independent_spark_task_builder_emits_executable_path_agnostic_tasks(
         assert verifier["verifier_mode"] == "path_agnostic_v2"
 
 
+def test_teacher_task_ordinal_offsets_create_disjoint_source_groups(
+    tmp_path: Path,
+) -> None:
+    first = tmp_path / "first"
+    second = tmp_path / "second"
+    build_codex_hermes_tasks(
+        first, total_tasks=14, seed=20260827, force=False, ordinal_offset=0
+    )
+    manifest = build_codex_hermes_tasks(
+        second, total_tasks=14, seed=20260828, force=False, ordinal_offset=1000
+    )
+    first_rows = [
+        json.loads(line)
+        for line in (first / "task_specs.jsonl").read_text().splitlines()
+    ]
+    second_rows = [
+        json.loads(line)
+        for line in (second / "task_specs.jsonl").read_text().splitlines()
+    ]
+    first_groups = {row["metadata"]["source_group_id"] for row in first_rows}
+    second_groups = {row["metadata"]["source_group_id"] for row in second_rows}
+
+    assert first_groups.isdisjoint(second_groups)
+    assert manifest["ordinal_offset"] == 1000
+
+
 def test_parallel_teacher_resume_skips_existing_batch_and_runs_next_job(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,

@@ -925,9 +925,18 @@ def _jaccard(left: str, right: str) -> float:
     return len(a & b) / max(len(a | b), 1)
 
 
-def build(root: Path, *, total_tasks: int, seed: int, force: bool) -> dict[str, Any]:
+def build(
+    root: Path,
+    *,
+    total_tasks: int,
+    seed: int,
+    force: bool,
+    ordinal_offset: int = 0,
+) -> dict[str, Any]:
     if total_tasks < len(FAMILY_WEIGHTS):
         raise ValueError(f"--total-tasks must be at least {len(FAMILY_WEIGHTS)}")
+    if ordinal_offset < 0:
+        raise ValueError("--ordinal-offset must be nonnegative")
     if root.exists() and any((root / "raw_runs").glob("*.json")):
         raise RuntimeError(
             "refusing to rebuild a root that already contains raw teacher runs"
@@ -944,7 +953,10 @@ def build(root: Path, *, total_tasks: int, seed: int, force: bool) -> dict[str, 
     counts = _allocate(total_tasks)
     scenarios: list[Scenario] = []
     for family, count in counts.items():
-        scenarios.extend(BUILDERS[family](ordinal, seed) for ordinal in range(count))
+        scenarios.extend(
+            BUILDERS[family](ordinal, seed)
+            for ordinal in range(ordinal_offset, ordinal_offset + count)
+        )
     if len({row.task["task_id"] for row in scenarios}) != total_tasks:
         raise RuntimeError("task IDs are not unique")
 
@@ -1020,6 +1032,11 @@ def build(root: Path, *, total_tasks: int, seed: int, force: bool) -> dict[str, 
         ),
         "dataset_id": DATASET_ID,
         "seed": seed,
+        "ordinal_offset": ordinal_offset,
+        "ordinal_range_by_family": {
+            family: [ordinal_offset, ordinal_offset + count - 1]
+            for family, count in counts.items()
+        },
         "tasks": total_tasks,
         "family_counts": counts,
         "environment_executable": total_tasks,
@@ -1047,6 +1064,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--total-tasks", type=int, default=50)
     parser.add_argument("--seed", type=int, default=DEFAULT_SEED)
+    parser.add_argument("--ordinal-offset", type=int, default=0)
     parser.add_argument("--force", action="store_true")
     return parser.parse_args()
 
@@ -1060,6 +1078,7 @@ def main() -> int:
                 total_tasks=args.total_tasks,
                 seed=args.seed,
                 force=args.force,
+                ordinal_offset=args.ordinal_offset,
             ),
             indent=2,
         )
