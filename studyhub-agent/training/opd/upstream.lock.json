@@ -1,0 +1,41 @@
+{
+  "schema_version": "studyhub.opd-upstream-lock.v1",
+  "status": "LOCKED_FOR_COMPATIBILITY_SPIKE",
+  "primary_recipe": {
+    "name": "THUNLP token_reward_direct",
+    "adv_estimator": "token_reward_direct",
+    "log_prob_top_k": 16,
+    "top_k_strategy": "only_stu",
+    "reward_weight_mode": "student_p",
+    "loss_aggregation": "sum-k-then-token-mean",
+    "standard_reference_kl": false
+  },
+  "thunlp_opd": {
+    "repository": "https://github.com/thunlp/OPD.git",
+    "commit": "ac26e38d6f1572eb027597b48a9f4e01f6915ef8",
+    "license": "Apache-2.0",
+    "critical_sources": {
+      "verl/verl/workers/actor/dp_actor.py": "ae706f1d20d3677bcd952fad8fb054180159747b4f2e61cab002f1328fd18d6f",
+      "verl/verl/trainer/ppo/core_algos.py": "d7a2796319d9de5e0672138ae131e458b82ae0e54e9e121e44d415ece9a24bc3",
+      "verl/verl/workers/fsdp_workers.py": "3b9d038741571d9ed14fd752a6619855df491b6ea7f93dc4e0c4294f353bf10d"
+    }
+  },
+  "official_verl": {
+    "repository": "https://github.com/volcengine/verl.git",
+    "commit": "ea53291385ce764019a2b40733605f21d8317583",
+    "license": "Apache-2.0",
+    "critical_sources": {
+      "verl/trainer/config/distillation/distillation.yaml": "706b380d3cc9a0baa961a935d073ec3c93d0176158d75dae700ac7e3af4cdf1b",
+      "verl/trainer/distillation/fsdp/losses.py": "75fb7ac8b8072dbc84ffddc9cf1cdeaec645010b2de3fdedc39fb791d6c170f3",
+      "verl/trainer/distillation/losses.py": "8fc5835f410228c110f492a10dddfe6ce3274efd22f439dfaf8c88c5d5a6d843",
+      "verl/experimental/teacher_loop/teacher_manager.py": "0a820c59cbeafacec61fc2f0da4e2810a39cc5f25a9f6d07aa9bad9618efde26"
+    }
+  },
+  "compatibility": {
+    "official_sampled_token_k1_equivalent": false,
+    "official_teacher_top_k_forward_kl_equivalent": false,
+    "required_runtime_extension": "teacher-on-student-top-k scoring plus detached 3D token reward policy surrogate",
+    "mathematical_parity_gate": "training/opd/token_reward_parity.py",
+    "runtime_backend_parity": "NOT_RUN"
+  }
+}
