@@ -49,7 +49,8 @@ def _checkout_audit(checkout: Path, expected: dict[str, Any]) -> dict[str, Any]:
         "commit_matches": commit == expected["commit"],
         "critical_sources": sources,
         "critical_sources_match": all(
-            item["actual_sha256"] == item["expected_sha256"] for item in sources.values()
+            item["actual_sha256"] == item["expected_sha256"]
+            for item in sources.values()
         ),
     }
 
@@ -59,6 +60,7 @@ def main() -> int:
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--thunlp-checkout", type=Path)
     parser.add_argument("--verl-checkout", type=Path)
+    parser.add_argument("--areal-checkout", type=Path)
     args = parser.parse_args()
 
     lock_path = PROJECT_ROOT / "training/opd/upstream.lock.json"
@@ -67,12 +69,21 @@ def main() -> int:
     torch_candidate = run_torch_candidate_parity_gate()
     upstream: dict[str, Any] = {}
     if args.thunlp_checkout:
-        upstream["thunlp_opd"] = _checkout_audit(args.thunlp_checkout, lock["thunlp_opd"])
+        upstream["thunlp_opd"] = _checkout_audit(
+            args.thunlp_checkout, lock["thunlp_opd"]
+        )
     if args.verl_checkout:
-        upstream["official_verl"] = _checkout_audit(args.verl_checkout, lock["official_verl"])
+        upstream["official_verl"] = _checkout_audit(
+            args.verl_checkout, lock["official_verl"]
+        )
+    if args.areal_checkout:
+        upstream["areal_runtime"] = _checkout_audit(
+            args.areal_checkout, lock["areal_runtime"]
+        )
 
     upstream_pass = all(
-        audit["commit_matches"] and audit["critical_sources_match"] for audit in upstream.values()
+        audit["commit_matches"] and audit["critical_sources_match"]
+        for audit in upstream.values()
     )
     status = "PASS_OPD_COMPATIBILITY_SPIKE"
     if (
@@ -92,7 +103,9 @@ def main() -> int:
         "opd_training_authorized_by_this_gate": False,
     }
     args.output.parent.mkdir(parents=True, exist_ok=True)
-    args.output.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    args.output.write_text(
+        json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+    )
     print(json.dumps(report, ensure_ascii=False, indent=2))
     return 0 if status == "PASS_OPD_COMPATIBILITY_SPIKE" else 2
 

@@ -31,6 +31,16 @@
       "verl/experimental/teacher_loop/teacher_manager.py": "0a820c59cbeafacec61fc2f0da4e2810a39cc5f25a9f6d07aa9bad9618efde26"
     }
   },
+  "areal_runtime": {
+    "repository": "https://github.com/areal-project/AReaL.git",
+    "commit": "cbff54d645d2cd8ee1f1c358a82f3f473588433d",
+    "license": "Apache-2.0",
+    "critical_sources": {
+      "areal/engine/fsdp_engine.py": "021e89ba0f2cacceaf6a70e066cf78fe94f2a98a92879c60c8f6d5b48ace2f38",
+      "areal/trainer/rl_trainer.py": "6723092872f27eb24b23f2e7cde0c4521e6403863b1f208111492dbc796c8486",
+      "areal/trainer/ppo/actor.py": "eb16cd0cefdf1a03fef6be50ae6aebcbf01bc4d84b335753d2f14c914f161712"
+    }
+  },
   "compatibility": {
     "official_sampled_token_k1_equivalent": false,
     "official_teacher_top_k_forward_kl_equivalent": false,

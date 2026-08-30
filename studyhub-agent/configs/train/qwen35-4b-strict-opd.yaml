@@ -1,0 +1,265 @@
+experiment_name: studyhub-qwen35-4b-strict-opd
+trial_name: pilot-seed-20260827
+
+seed: 20260827
+enable_offload: true
+total_train_epochs: 1
+total_train_steps: null
+tokenizer_path: ${actor.path}
+workflow: training.rl.hermes_workflow.StudyHubHermesWorkflow
+eval_workflow: ${workflow}
+max_turns: 6
+context_finalization_ratio: 0.80
+context_safety_margin_tokens: 768
+environment_root: /data/chengjin/studyhub/studyhub-agent/datasets/processed/opd_prompt_pool_v1/environments
+verifier_root: /data/chengjin/studyhub/studyhub-agent/datasets/processed/opd_prompt_pool_v1/verifiers
+hermes_checkout: /data/chengjin/studyhub/studyhub-agent/.vendor/hermes-agent
+reward_artifact_root: /data/chengjin/studyhub/studyhub-agent/artifacts/areal/strict-opd/rewards
+
+opd_top_k: 16
+opd_student_temperature: 0.7
+opd_teacher_temperature: 1.0
+opd_eps_clip: 0.2
+opd_clip_ratio_c: 3.0
+opd_algorithm: token_reward_direct
+opd_top_k_strategy: only_stu
+opd_reward_weight_mode: student_p
+opd_loss_aggregation: sum-k-then-token-mean
+
+cluster:
+  n_nodes: 1
+  n_gpus_per_node: 2
+  fileroot: /data/chengjin/studyhub/studyhub-agent/artifacts/areal
+  name_resolve:
+    type: nfs
+    nfs_record_root: /data/chengjin/studyhub/studyhub-agent/artifacts/areal/name_resolve/qwen35-4b-strict-opd
+
+scheduler:
+  type: local
+
+rollout:
+  backend: sglang:d1
+  experiment_name: ${experiment_name}
+  trial_name: ${trial_name}
+  max_concurrent_rollouts: 4
+  queue_size: null
+  consumer_batch_size: ${train_dataset.batch_size}
+  max_head_offpolicyness: 0
+  deterministic_sampling: false
+  enable_rollout_tracing: false
+  scheduling_strategy:
+    type: colocation
+    target: actor
+  scheduling_spec: ${actor.scheduling_spec}
+  use_lora: true
+  fileroot: ${cluster.fileroot}
+  tokenizer_path: ${tokenizer_path}
+  dump_to_file: true
+  agent:
+    mode: subproc
+    admin_api_key: ${oc.env:STUDYHUB_AREAL_ADMIN_API_KEY}
+    subproc_max_workers: 2
+    engine_max_tokens: 16384
+    tool_call_parser: qwen3_coder
+    reasoning_parser: qwen3
+    chat_template_type: hf
+    export_style: individual
+    turn_discount: 1.0
+
+gconfig:
+  n_samples: 2
+  drop_incomplete_group: true
+  min_new_tokens: 0
+  max_new_tokens: 4096
+  max_tokens: 16384
+  greedy: false
+  temperature: 0.7
+  top_p: 1.0
+  lora_name: studyhub-opd-4b
+
+eval_gconfig:
+  n_samples: 1
+  drop_incomplete_group: true
+  min_new_tokens: 0
+  max_new_tokens: 4096
+  max_tokens: 16384
+  greedy: true
+  temperature: 0.0
+  top_p: 1.0
+  lora_name: studyhub-opd-4b
+
+actor:
+  backend: fsdp:d1
+  experiment_name: ${experiment_name}
+  trial_name: ${trial_name}
+  path: /data/chengjin/studyhub/studyhub-agent/artifacts/areal/model-overlays/qwen35-4b-base-canonical-tokenizer
+  attn_impl: sdpa
+  init_from_scratch: false
+  disable_dropout: true
+  gradient_checkpointing: true
+  dtype: bfloat16
+  mb_spec:
+    max_tokens_per_mb: 16384
+  optimizer:
+    type: adam
+    lr: 1.0e-6
+    weight_decay: 0.0
+    beta1: 0.9
+    beta2: 0.95
+    eps: 1.0e-5
+    lr_scheduler_type: constant
+    gradient_clipping: 1.0
+  eps_clip: ${opd_eps_clip}
+  c_clip: ${opd_clip_ratio_c}
+  temperature: ${opd_student_temperature}
+  reward_scaling: 1.0
+  reward_bias: 0.0
+  kl_ctl: 0.0
+  mask_no_eos_with_zero: true
+  ppo_n_minibatches: 1
+  recompute_logprob: false
+  use_decoupled_loss: false
+  reward_norm: null
+  adv_norm: null
+  max_new_tokens: ${gconfig.max_new_tokens}
+  weight_update_mode: disk
+  use_lora: true
+  peft_type: lora
+  lora_rank: 32
+  lora_alpha: 32
+  target_modules: [o_proj, gate_proj, up_proj, down_proj]
+  scheduling_spec:
+    - task_type: worker
+      port_count: 2
+      gpu: 1
+      cpu: 8
+      mem: 64
+      cmd: python3 -m areal.infra.rpc.rpc_server
+      env_vars:
+        WANDB_MODE: disabled
+        HF_HUB_OFFLINE: "1"
+        TRANSFORMERS_OFFLINE: "1"
+        STUDYHUB_AREAL_OPD_BRIDGE: "1"
+
+teacher:
+  engine_type: train
+  offload: false
+  path: /data/chengjin/studyhub/models/P1/Qwen3.5-9B
+  train:
+    backend: fsdp:d1
+    experiment_name: ${experiment_name}
+    trial_name: ${trial_name}
+    path: ${teacher.path}
+    attn_impl: sdpa
+    init_from_scratch: false
+    disable_dropout: true
+    gradient_checkpointing: false
+    dtype: bfloat16
+    temperature: ${opd_teacher_temperature}
+    mb_spec:
+      max_tokens_per_mb: 16384
+    optimizer: null
+    use_lora: false
+    scheduling_spec:
+      - task_type: worker
+        port_count: 2
+        gpu: 1
+        cpu: 8
+        mem: 64
+        cmd: python3 -m areal.infra.rpc.rpc_server
+        env_vars:
+          WANDB_MODE: disabled
+          HF_HUB_OFFLINE: "1"
+          TRANSFORMERS_OFFLINE: "1"
+          STUDYHUB_AREAL_OPD_BRIDGE: "1"
+  rl_loss_weight: 0.0
+  distill_loss_weight: 1.0
+
+ref: null
+critic: null
+
+sglang:
+  model_path: ${actor.path}
+  random_seed: ${seed}
+  skip_tokenizer_init: true
+  dtype: ${actor.dtype}
+  disable_overlap_schedule: true
+  enable_deterministic_inference: false
+  sampling_backend: pytorch
+  max_running_requests: 4
+  context_length: 16384
+  mem_fraction_static: 0.45
+  enable_lora: true
+  max_lora_rank: 32
+  max_loaded_loras: 1
+  max_loras_per_batch: 1
+
+vllm:
+  model: ${actor.path}
+  seed: ${seed}
+  skip_tokenizer_init: false
+  dtype: ${actor.dtype}
+  max_model_len: 16384
+  gpu_memory_utilization: 0.45
+  enable_lora: true
+  max_lora_rank: 32
+
+train_dataset:
+  batch_size: 2
+  shuffle: true
+  drop_last: true
+  pin_memory: true
+  num_workers: 2
+  path: /data/chengjin/studyhub/studyhub-agent/datasets/processed/opd_prompt_pool_v1/hf_dataset
+  type: rl
+  max_length: 16384
+
+valid_dataset:
+  batch_size: 2
+  shuffle: false
+  drop_last: false
+  pin_memory: true
+  num_workers: 2
+  path: /data/chengjin/studyhub/studyhub-agent/datasets/processed/opd_prompt_pool_v1/hf_dataset
+  type: rl
+  max_length: 16384
+
+saver:
+  experiment_name: ${experiment_name}
+  trial_name: ${trial_name}
+  fileroot: ${cluster.fileroot}
+  freq_epochs: null
+  freq_steps: 50
+  freq_secs: null
+
+recover:
+  mode: auto
+  experiment_name: ${experiment_name}
+  trial_name: ${trial_name}
+  fileroot: ${cluster.fileroot}
+  freq_epochs: null
+  freq_steps: 50
+  freq_secs: null
+
+evaluator:
+  experiment_name: ${experiment_name}
+  trial_name: ${trial_name}
+  fileroot: ${cluster.fileroot}
+  freq_epochs: null
+  freq_steps: null
+  freq_secs: null
+
+stats_logger:
+  experiment_name: ${experiment_name}
+  trial_name: ${trial_name}
+  fileroot: ${cluster.fileroot}
+  wandb:
+    mode: disabled
+
+perf_tracer:
+  experiment_name: ${experiment_name}
+  trial_name: ${trial_name}
+  fileroot: ${cluster.fileroot}
+  enabled: false
+  session_tracer:
+    enabled: false

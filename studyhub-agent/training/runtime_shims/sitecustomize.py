@@ -45,6 +45,17 @@ if os.environ.get("STUDYHUB_AREAL_RECOVERY_STATE_BRIDGE") == "1":
         os._exit(79)
 
 
+if os.environ.get("STUDYHUB_AREAL_OPD_BRIDGE") == "1":
+    try:
+        from training.opd.areal_runtime import install_areal_opd_bridge
+
+        install_areal_opd_bridge()
+    except Exception as exc:
+        sys.stderr.write(f"StudyHub strict OPD runtime bridge failed: {exc}\n")
+        sys.stderr.flush()
+        os._exit(80)
+
+
 if os.environ.get("STUDYHUB_DISABLE_DEEP_GEMM_WITHOUT_NVCC") == "1" and shutil.which("nvcc") is None:
     # SGLang treats DeepGEMM as optional, but the bundled module eagerly
     # asserts when only the CUDA runtime (not the compiler toolkit) exists.
