@@ -98,6 +98,36 @@ def test_teacher_task_ordinal_offsets_create_disjoint_source_groups(
     assert manifest["ordinal_offset"] == 1000
 
 
+def test_teacher_web_fixture_accepts_batched_extract_with_optional_limit(
+    tmp_path: Path,
+) -> None:
+    root = tmp_path / "web-fixture"
+    build_codex_hermes_tasks(root, total_tasks=14, seed=20260827, force=False)
+    tasks = [
+        json.loads(line)
+        for line in (root / "task_specs.jsonl").read_text().splitlines()
+    ]
+    task = next(
+        row for row in tasks if row["family"] == "web_source_conflict_freshness"
+    )
+    environment = FrozenTaskEnvironment.from_root(root, task["task_id"])
+    search = json.loads(
+        asyncio.run(environment.execute("web_search", {"query": "最新官方通知"}))
+    )
+    urls = [row["url"] for row in search["results"]]
+    extract = json.loads(
+        asyncio.run(
+            environment.execute(
+                "web_extract", {"urls": urls, "char_limit": 4000}
+            )
+        )
+    )
+
+    assert extract["ok"] is True
+    assert len(extract["content"]["pages"]) == 2
+    assert environment.trace.invalid_tool_calls == 0
+
+
 def test_parallel_teacher_resume_skips_existing_batch_and_runs_next_job(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,

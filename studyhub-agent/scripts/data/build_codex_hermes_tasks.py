@@ -325,6 +325,7 @@ def _web(ordinal: int, seed: int) -> Scenario:
     task_id = _stable_id(family, ordinal, seed)
     course = COURSES[ordinal % len(COURSES)]
     date = f"2026-{(ordinal % 9) + 1:02d}-{(ordinal % 24) + 1:02d}"
+    date_zh = f"2026年{(ordinal % 9) + 1}月{(ordinal % 24) + 1}日"
     room = f"A{200 + ordinal % 70}"
     notice_id = f"WEB-{ordinal:04d}"
     official_url = f"https://official.example.edu/training/{ordinal:04d}"
@@ -377,7 +378,33 @@ def _web(ordinal: int, seed: int) -> Scenario:
                 "web_search", {"query": f"{course} 答疑", "limit": 5}, search_result
             ),
             _route("web_extract", {"urls": [official_url]}, official_page),
+            _route(
+                "web_extract",
+                {"urls": [official_url], "char_limit": 2000},
+                official_page,
+                flexible_fields=["char_limit"],
+            ),
             _route("web_extract", {"urls": [stale_url]}, stale_page),
+            _route(
+                "web_extract",
+                {"urls": [stale_url], "char_limit": 2000},
+                stale_page,
+                flexible_fields=["char_limit"],
+            ),
+            _route(
+                "web_extract",
+                {"urls": [official_url, stale_url]},
+                {"pages": [official_page, stale_page]},
+            ),
+            _route(
+                "web_extract",
+                {
+                    "urls": [official_url, stale_url],
+                    "char_limit": 2000,
+                },
+                {"pages": [official_page, stale_page]},
+                flexible_fields=["char_limit"],
+            ),
         ]
     }
     return Scenario(
@@ -398,7 +425,7 @@ def _web(ordinal: int, seed: int) -> Scenario:
             family=family,
             source_group_id=source_group,
             reference_final=final,
-            concept_groups=[[date], [room]],
+            concept_groups=[[date, date_zh], [room]],
             allowed_citations=[official_source],
             minimum_citations=1,
             tool_groups=[["web_search"], ["web_extract"]],
