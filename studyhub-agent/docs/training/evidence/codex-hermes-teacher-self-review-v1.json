@@ -1,0 +1,73 @@
+{
+  "schema_version": "studyhub.codex-hermes-teacher-self-review-evidence.v1",
+  "status": "COMPLETE",
+  "review_type": "codex_self_review",
+  "independent_human_review": false,
+  "review_model": "gpt-5.6-sol",
+  "review_interface": "codex-cli",
+  "seed": 20260827,
+  "sample": {
+    "accepted": 50,
+    "rejected": 50,
+    "total": 100,
+    "sample_sha256": "d3dc21c358adaef358071af956898056c85da191a3a51a4b0a4975b9a9f73862"
+  },
+  "input_batches": [
+    {
+      "batch": "codex_hermes_teacher_v1_full",
+      "manifest_sha256": "de5ef566d2c5916a10775b6055e5ce82dc4e57c447ce3fd1125534b8462108aa",
+      "accepted_sha256": "381a586768fa034ec4c8b5d4f3214b353270c530a6fa4eaa0aec2a3617e6cd82",
+      "rejected_sha256": "55bf19aa800ed48e278ab4864a0888772d00e230836db3823ad5002b61bf3427"
+    },
+    {
+      "batch": "codex_hermes_teacher_v1_full_d",
+      "manifest_sha256": "4f818643eec3f9ceeee16d94c669706e0f26b5a24275d66b54e6f42c50783518",
+      "accepted_sha256": "90dc3ceeb8f79174602bff24449b19ebd3271d63ae5c11da0812fb6b09657685",
+      "rejected_sha256": "8d17f81c29cec9e60036e2c22638eb2931ce29b94337a064e6bd9f8c2cbe97d3"
+    }
+  ],
+  "verdicts": {
+    "UPHOLD_ACCEPT": 50,
+    "FLAG_FALSE_POSITIVE": 0,
+    "UPHOLD_REJECT": 13,
+    "FLAG_FALSE_NEGATIVE": 37,
+    "INDETERMINATE": 0,
+    "PROVIDER_ERROR": 0
+  },
+  "accepted_family_sample": {
+    "cross_tool_composition": 8,
+    "direct_abstention": 7,
+    "memory_personalization_privacy": 7,
+    "rag_query_rewrite_citation": 7,
+    "recovery_acl_provider_error": 7,
+    "stateful_function": 7,
+    "web_source_conflict_freshness": 7
+  },
+  "false_negative_diagnostics": {
+    "required_answer_concept_missing": 20,
+    "environment_errors": 18,
+    "invalid_tool_calls": 18,
+    "forbidden_answer_content": 1,
+    "interpretation": [
+      "The semantic review found lexical or formatting equivalence that the deterministic concept matcher did not recognize.",
+      "Some trajectories recovered from an intermediate invalid call and completed the public contract, while the deterministic verifier remained fail-closed.",
+      "Diagnostic counts can overlap because one rejected trajectory may carry multiple failure codes."
+    ]
+  },
+  "training_decision": {
+    "accepted_false_positives_removed": 0,
+    "rejected_rows_promoted": 0,
+    "merged_teacher_pool_unchanged": true,
+    "reason": "No reviewed accepted trajectory was flagged. Self-review false negatives remain rejected until an independently versioned verifier-policy change and full re-audit are completed."
+  },
+  "raw_artifacts": {
+    "tracked": false,
+    "git_ignored": true,
+    "manifest_sha256": "44ca266e9b0a2eb0d524271d2630a243d5d4f3035bebba37b065d2bda93506f9"
+  },
+  "claim_boundary": [
+    "This is Codex self-review, not human review.",
+    "The result supports precision of the sampled accepted pool; it does not estimate quality of every accepted row.",
+    "Flagged false negatives diagnose verifier conservatism and are not additional SFT examples."
+  ]
+}
