@@ -9,7 +9,7 @@ from studyhub_agent.trajectory.runtime_sft import trajectory_fingerprint
 def _contract(*, minimum_rows: int = 1, minimum_tokens: int = 1) -> dict:
     return {
         "teacher_gate": {
-            "source_dataset": "spark_hermes_teacher_v1",
+            "source_dataset": "codex_hermes_teacher_v1",
             "minimum_selected_rows": minimum_rows,
             "minimum_assistant_loss_tokens": minimum_tokens,
             "allowed_quality_tiers": ["teacher_verified_complete"],
@@ -17,6 +17,8 @@ def _contract(*, minimum_rows: int = 1, minimum_tokens: int = 1) -> dict:
             "maximum_rows_per_source_group_and_path": 1,
             "replay_only_tools": ["web_fetch"],
             "required_teacher_controller": "pinned_hermes_registry_dispatch",
+            "required_teacher_interface": "codex-cli",
+            "required_teacher_model": "gpt-5.6-sol",
             "required_hermes_commit": "hermes-pin",
         }
     }
@@ -27,7 +29,7 @@ def _record(record_id: str, *, group: str = "group-1", tool: str = "knowledge_se
     row = {
         "schema_version": "studyhub.runtime-sft-trajectory.v3",
         "id": record_id,
-        "source_dataset": "spark_hermes_teacher_v1",
+        "source_dataset": "codex_hermes_teacher_v1",
         "source_id": record_id,
         "group_id": group,
         "source_group_ids": [group],
@@ -66,6 +68,8 @@ def _record(record_id: str, *, group: str = "group-1", tool: str = "knowledge_se
         ],
         "teacher": {
             "controller": "pinned_hermes_registry_dispatch",
+            "interface": "codex-cli",
+            "model": "gpt-5.6-sol",
             "hermes_commit": "hermes-pin",
             "path_signature": tool,
         },
@@ -139,3 +143,24 @@ def test_sft2_gate_rejects_prompt_overlap_and_fingerprint_drift() -> None:
     assert selected == []
     assert drops["public_benchmark_prompt_overlap"] == 1
     assert drops["content_sha256"] == 1
+
+
+def test_sft2_gate_rejects_non_codex_teacher_identity() -> None:
+    spark = _record("row-spark")
+    spark["teacher"] = {
+        **spark["teacher"],
+        "interface": "codex-spark-cli",
+        "model": "gpt-5.3-codex-spark",
+    }
+    spark["content_sha256"] = trajectory_fingerprint(spark)
+
+    selected, drops, _checked = select_eligible(
+        [spark],
+        contract=_contract(),
+        benchmark_prompt_hashes=set(),
+        count_tokens=lambda _row: (100, 25),
+    )
+
+    assert selected == []
+    assert drops["teacher_interface"] == 1
+    assert drops["teacher_model"] == 1

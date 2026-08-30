@@ -28,8 +28,8 @@ from scripts.data.verify_teacher_trajectories import verify_run  # noqa: E402
 from studyhub_agent.benchmark_v1.tool_contracts import tool_schemas  # noqa: E402
 from training.rl.frozen_environment import FrozenTaskEnvironment  # noqa: E402
 
-SCHEMA_VERSION = "studyhub.spark-hermes-training-tasks.v1"
-DATASET_ID = "spark_hermes_teacher_v1"
+SCHEMA_VERSION = "studyhub.codex-hermes-training-tasks.v1"
+DATASET_ID = "codex_hermes_teacher_v1"
 DEFAULT_SEED = 20260827
 FAMILY_WEIGHTS = {
     "rag_query_rewrite_citation": 0.20,
@@ -44,7 +44,7 @@ CAPABILITIES = {
     "knowledge_search": "knowledge_search",
     "knowledge_read": "knowledge_read",
     "web_search": "replay_search",
-    "web_fetch": "evidence_fetch",
+    "web_extract": "evidence_fetch",
     "personal_memory_search": "replay_search",
     "collective_memory_search": "replay_search",
     "learning_profile_get": "function_call",
@@ -129,7 +129,31 @@ def _allocate(total: int) -> dict[str, int]:
 
 def _tools(names: list[str]) -> list[dict[str, Any]]:
     result = []
-    for row in tool_schemas(names):
+    frozen_names = [name for name in names if name != "web_extract"]
+    rows = tool_schemas(frozen_names)
+    if "web_extract" in names:
+        rows.append(
+            {
+                "name": "web_extract",
+                "description": "Extract clean content from up to five public URLs using the Hermes Web contract.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "urls": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "minItems": 1,
+                            "maxItems": 5,
+                        },
+                        "char_limit": {"type": "integer", "minimum": 2000},
+                    },
+                    "required": ["urls"],
+                },
+            }
+        )
+    by_name = {row["name"]: row for row in rows}
+    for name in names:
+        row = by_name[name]
         copied = deepcopy(row)
         copied["capability"] = CAPABILITIES[copied["name"]]
         result.append(copied)
@@ -332,8 +356,8 @@ def _web(ordinal: int, seed: int) -> Scenario:
     fixtures = {
         "routes": [
             _route("web_search", {"query": f"{course} 答疑", "limit": 5}, search_result),
-            _route("web_fetch", {"url": official_url}, official_page),
-            _route("web_fetch", {"url": stale_url}, stale_page),
+            _route("web_extract", {"urls": [official_url]}, official_page),
+            _route("web_extract", {"urls": [stale_url]}, stale_page),
         ]
     }
     return Scenario(
@@ -341,13 +365,13 @@ def _web(ordinal: int, seed: int) -> Scenario:
             task_id=task_id,
             family=family,
             user_request=request,
-            allowed_tools=["web_search", "web_fetch"],
+            allowed_tools=["web_search", "web_extract"],
             source_group_id=source_group,
             minimum_citations=1,
             max_steps=6,
             max_tool_calls=5,
         ),
-        environment={"tools": _tools(["web_search", "web_fetch"]), "documents": []},
+        environment={"tools": _tools(["web_search", "web_extract"]), "documents": []},
         fixture=fixtures,
         verifier=_base_verifier(
             task_id=task_id,
@@ -357,12 +381,12 @@ def _web(ordinal: int, seed: int) -> Scenario:
             concept_groups=[[date], [room]],
             allowed_citations=[official_source],
             minimum_citations=1,
-            tool_groups=[["web_search"], ["web_fetch"]],
+            tool_groups=[["web_search"], ["web_extract"]],
             forbidden_terms=["2025-09-01", "B101"],
         ),
         audit_actions=[
             ("web_search", {"query": f"{course} 最新答疑", "limit": 5}),
-            ("web_fetch", {"url": official_url}),
+            ("web_extract", {"urls": [official_url]}),
         ],
         audit_final=final,
     )
@@ -853,7 +877,7 @@ def build(root: Path, *, total_tasks: int, seed: int, force: bool) -> dict[str, 
 
     _write_jsonl(root / "task_specs.jsonl", tasks)
     provenance = {
-        "schema_version": "studyhub.spark-hermes-source-provenance.v1",
+        "schema_version": "studyhub.codex-hermes-source-provenance.v1",
         "dataset_id": DATASET_ID,
         "source": "independent deterministic training simulator",
         "license": "StudyHub-generated-training-simulator-v1",
@@ -867,7 +891,7 @@ def build(root: Path, *, total_tasks: int, seed: int, force: bool) -> dict[str, 
     _write_json(root / "source_provenance.json", provenance)
     manifest = {
         "schema_version": SCHEMA_VERSION,
-        "status": "PASS_READY_FOR_SPARK_PILOT" if total_tasks == 50 else "PASS_READY_FOR_COLLECTION",
+        "status": "PASS_READY_FOR_CODEX_PILOT" if total_tasks == 50 else "PASS_READY_FOR_COLLECTION",
         "dataset_id": DATASET_ID,
         "seed": seed,
         "tasks": total_tasks,
@@ -893,7 +917,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--root",
         type=Path,
-        default=PROJECT_ROOT / "datasets/interim/spark_hermes_teacher_v1",
+        default=PROJECT_ROOT / "datasets/interim/codex_hermes_teacher_v1",
     )
     parser.add_argument("--total-tasks", type=int, default=50)
     parser.add_argument("--seed", type=int, default=DEFAULT_SEED)

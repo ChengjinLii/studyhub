@@ -118,6 +118,10 @@ def _row_failures(
     teacher = record.get("teacher", {})
     if teacher.get("controller") != gate["required_teacher_controller"]:
         failures.append("teacher_controller")
+    if teacher.get("interface") != gate["required_teacher_interface"]:
+        failures.append("teacher_interface")
+    if teacher.get("model") != gate["required_teacher_model"]:
+        failures.append("teacher_model")
     if teacher.get("hermes_commit") != gate["required_hermes_commit"]:
         failures.append("hermes_commit")
     replay_tools = _tool_names(record) & set(gate["replay_only_tools"])
@@ -241,7 +245,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--accepted",
         type=Path,
-        default=PROJECT_ROOT / "datasets/interim/spark_hermes_teacher_v1/accepted.jsonl",
+        default=PROJECT_ROOT / "datasets/interim/codex_hermes_teacher_v1/accepted.jsonl",
     )
     parser.add_argument(
         "--program",

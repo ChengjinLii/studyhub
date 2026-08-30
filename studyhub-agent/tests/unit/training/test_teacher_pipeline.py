@@ -19,6 +19,7 @@ from scripts.data.verify_teacher_trajectories import accepted_record, verify_run
 from training.rl.frozen_environment import FrozenTaskEnvironment
 from training.teacher.hermes_controller import collect_trajectory
 from training.teacher.providers import (
+    CodexCLIProvider,
     CodexSparkProvider,
     LocalOpenAIProvider,
     ResponsesAPIProvider,
@@ -45,6 +46,10 @@ def test_independent_spark_task_builder_emits_executable_path_agnostic_tasks(tmp
     assert len(tasks) == 14
     assert len({task["metadata"]["source_group_id"] for task in tasks}) == 14
     assert all("verifier" not in task for task in tasks)
+    web_tasks = [task for task in tasks if task["family"] == "web_source_conflict_freshness"]
+    assert web_tasks
+    assert web_tasks[0]["allowed_tools"] == ["web_search", "web_extract"]
+    assert all("web_fetch" not in task["allowed_tools"] for task in tasks)
     for task in tasks:
         verifier = json.loads((root / "verifiers" / f"{task['task_id']}.json").read_text())
         assert verifier["verifier_mode"] == "path_agnostic_v2"
@@ -649,7 +654,11 @@ def test_teacher_provider_availability_never_confuses_cli_with_responses_key(
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
 
     assert ResponsesAPIProvider().availability()["available"] is False
+    assert CodexCLIProvider(command="missing-studyhub-codex").availability()["available"] is False
     assert CodexSparkProvider(command="missing-studyhub-codex").availability()["available"] is False
+    codex = build_provider("codex-cli")
+    assert codex.interface == "codex-cli"
+    assert codex.model == "gpt-5.6-sol"
     assert build_provider("local-best-of-n", model="fixture").native_tool_calling is True
     compatible = build_provider("authorized-openai-compatible", model="fixture")
     assert compatible.availability()["available"] is False

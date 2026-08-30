@@ -56,7 +56,7 @@ def _nested_strings(value: Any, key: str) -> set[str]:
 
 
 def _evidence_tool(name: str) -> bool:
-    return name == "knowledge_read" or name.endswith("_read") or name.endswith("_fetch")
+    return name == "knowledge_read" or name == "web_extract" or name.endswith("_read") or name.endswith("_fetch")
 
 
 def observed_citations(run: dict[str, Any]) -> set[str]:
@@ -459,7 +459,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--root",
         type=Path,
-        default=PROJECT_ROOT / "datasets/interim/spark_hermes_teacher_v1",
+        default=PROJECT_ROOT / "datasets/interim/codex_hermes_teacher_v1",
     )
     return parser.parse_args()
 

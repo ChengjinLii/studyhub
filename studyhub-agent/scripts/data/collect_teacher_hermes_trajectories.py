@@ -23,7 +23,13 @@ from scripts.data.verify_teacher_trajectories import verify_root, verify_run  # 
 from training.teacher.hermes_controller import collect_trajectory  # noqa: E402
 from training.teacher.providers import TeacherProviderError, build_provider  # noqa: E402
 
-TEACHERS = ("codex-spark", "responses-api", "authorized-openai-compatible", "local-best-of-n")
+TEACHERS = (
+    "codex-cli",
+    "codex-spark",
+    "responses-api",
+    "authorized-openai-compatible",
+    "local-best-of-n",
+)
 
 
 def _read_json(path: Path) -> dict[str, Any]:
@@ -392,9 +398,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--root",
         type=Path,
-        default=PROJECT_ROOT / "datasets/interim/spark_hermes_teacher_v1",
+        default=PROJECT_ROOT / "datasets/interim/codex_hermes_teacher_v1",
     )
-    parser.add_argument("--teacher", choices=TEACHERS, default="codex-spark")
+    parser.add_argument("--teacher", choices=TEACHERS, default="codex-cli")
     parser.add_argument("--teacher-model")
     parser.add_argument("--max-accepted", type=int, default=500)
     parser.add_argument("--max-wall-time", type=int, default=8 * 60 * 60)

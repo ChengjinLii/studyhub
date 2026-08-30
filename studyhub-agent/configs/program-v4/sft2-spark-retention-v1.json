@@ -1,7 +1,7 @@
 {
   "schema_version": "studyhub.qwen35-4b-sft2-data-contract.v1",
-  "program_id": "qwen35-4b-sft2-spark-retention-v1",
-  "dataset_id": "qwen35-4b-sft2-spark-retention-v1",
+  "program_id": "qwen35-4b-sft2-codex-retention-v1",
+  "dataset_id": "qwen35-4b-sft2-codex-retention-v1",
   "status": "DATA_GATE_PREPARED_TRAINING_NOT_AUTHORIZED",
   "seed": 20260827,
   "model": {
@@ -17,7 +17,7 @@
     "sealed_access": false
   },
   "teacher_gate": {
-    "source_dataset": "spark_hermes_teacher_v1",
+    "source_dataset": "codex_hermes_teacher_v1",
     "minimum_selected_rows": 500,
     "minimum_assistant_loss_tokens": 250000,
     "allowed_quality_tiers": [
@@ -28,12 +28,14 @@
     "maximum_rows_per_source_group_and_path": 1,
     "replay_only_tools": ["web_fetch"],
     "required_teacher_controller": "pinned_hermes_registry_dispatch",
+    "required_teacher_interface": "codex-cli",
+    "required_teacher_model": "gpt-5.6-sol",
     "required_hermes_commit": "5c1a304ce890276a4334d8ced3f29ffeedbbbf93"
   },
   "mix": {
-    "spark_assistant_token_target_share": 0.35,
+    "teacher_assistant_token_target_share": 0.35,
     "retention_assistant_token_target_share": 0.65,
-    "spark_assistant_token_share_bounds": [0.30, 0.40]
+    "teacher_assistant_token_share_bounds": [0.30, 0.40]
   },
   "selection": {
     "target_train_rows": 6400,
@@ -47,7 +49,7 @@
       "protocol_holdout": 0.05
     },
     "source_family_assistant_token_bounds": {
-      "spark_teacher": [0.30, 0.40],
+      "codex_teacher": [0.30, 0.40],
       "hermes": [0.19, 0.30],
       "toolbench": [0.11, 0.21],
       "agent_flan": [0.04, 0.12],
@@ -56,7 +58,7 @@
       "toolace": [0.00, 0.05]
     },
     "source_family_target_shares": {
-      "spark_teacher": 0.35,
+      "codex_teacher": 0.35,
       "hermes": 0.244,
       "toolbench": 0.162,
       "agent_flan": 0.078,
@@ -122,8 +124,8 @@
     "legacy_teacher_reverse_replay"
   ],
   "data_card": {
-    "title": "Qwen3.5 4B SFT-2 Spark + Retention Data Card",
-    "purpose": "Second-stage 4B Agent SFT using verifier-accepted Spark-driven Hermes trajectories with stratified Open-Agentic v2 retention.",
+    "title": "Qwen3.5 4B SFT-2 Codex + Retention Data Card",
+    "purpose": "Second-stage 4B Agent SFT using verifier-accepted Codex-driven Hermes trajectories with stratified Open-Agentic v2 retention.",
     "exclusions": "Replay-only Web aliases, duplicate teacher paths, legacy reverse replay, deterministic StudyHub fixtures, and evaluation tasks are excluded."
   }
 }

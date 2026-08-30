@@ -33,7 +33,7 @@ def _row(record_id: str, *, source: str, group: str, split: str = "train") -> di
 
 
 def test_candidate_builder_prioritizes_teacher_and_preserves_retention_splits() -> None:
-    teacher_row = _row("teacher", source="spark_hermes_teacher_v1", group="teacher-group")
+    teacher_row = _row("teacher", source="codex_hermes_teacher_v1", group="teacher-group")
     teacher = [
         EligibleTrajectory(
             record=teacher_row,
@@ -54,7 +54,7 @@ def test_candidate_builder_prioritizes_teacher_and_preserves_retention_splits() 
     )
 
     assert drops == {}
-    assert [row["source_family"] for row in candidates] == ["spark_teacher", "hermes"]
+    assert [row["source_family"] for row in candidates] == ["codex_teacher", "hermes"]
     assert candidates[0]["behavior_tags"] == ["direct_abstention"]
     assert candidates[0]["tool_call_count"] == 0
     assert candidates[0]["tool_turn_count"] == 0
@@ -62,7 +62,7 @@ def test_candidate_builder_prioritizes_teacher_and_preserves_retention_splits() 
 
 
 def test_candidate_builder_drops_cross_source_near_duplicate_and_prohibited_source() -> None:
-    teacher_row = _row("teacher", source="spark_hermes_teacher_v1", group="teacher-group")
+    teacher_row = _row("teacher", source="codex_hermes_teacher_v1", group="teacher-group")
     teacher = [
         EligibleTrajectory(
             record=teacher_row,

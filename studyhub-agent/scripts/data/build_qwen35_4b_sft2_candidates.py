@@ -115,8 +115,8 @@ def _prepare_teacher(row: EligibleTrajectory) -> dict[str, Any]:
     prepared.update(
         {
             "split": "train",
-            "source_family": "spark_teacher",
-            "environment_origin": "spark_hermes_actual_observation",
+            "source_family": "codex_teacher",
+            "environment_origin": "codex_hermes_actual_observation",
             "behavior_tags": _behavior_tags(prepared),
             "abstract_tool_path": _abstract_path(prepared),
             "tool_path_signature": row.path_signature,
@@ -201,7 +201,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--teacher",
         type=Path,
-        default=PROJECT_ROOT / "datasets/interim/spark_hermes_teacher_v1/accepted.jsonl",
+        default=PROJECT_ROOT / "datasets/interim/codex_hermes_teacher_v1/accepted.jsonl",
     )
     parser.add_argument(
         "--retention",
@@ -285,8 +285,8 @@ def main() -> int:
         "status": "CANDIDATE_BUILD_PASS",
         "rows": len(candidates),
         "source_family_rows": dict(sorted(counts.items())),
-        "teacher_rows": counts["spark_teacher"],
-        "retention_rows": len(candidates) - counts["spark_teacher"],
+        "teacher_rows": counts["codex_teacher"],
+        "retention_rows": len(candidates) - counts["codex_teacher"],
         "drops": dict(candidate_drops.most_common()),
         "lineage": {
             "output_sha256": sha256(args.output),

@@ -192,7 +192,7 @@ def _visible_runtime_state(
         ids = _source_ids(payload)
         if name.endswith("_search") or name == "knowledge_search":
             discovered.update(ids)
-        if name.endswith("_read") or name.endswith("_fetch") or name == "knowledge_read":
+        if name.endswith("_read") or name.endswith("_fetch") or name == "web_extract":
             grounded.update(ids)
         if isinstance(payload, dict):
             errors = _nested_strings(payload, "error")
@@ -449,11 +449,11 @@ def _codex_event_audit(stdout: str) -> dict[str, Any]:
 
 
 @dataclass(slots=True)
-class CodexSparkProvider:
-    model: str = "gpt-5.3-codex-spark"
+class CodexCLIProvider:
+    model: str = "gpt-5.6-sol"
     timeout_seconds: int = 300
     command: str = "codex"
-    interface: str = "codex-spark-cli"
+    interface: str = "codex-cli"
 
     def availability(self) -> dict[str, Any]:
         executable = shutil.which(self.command)
@@ -574,6 +574,14 @@ class CodexSparkProvider:
             output = output_path.read_text(encoding="utf-8")
             event["output_sha256"] = _sha256_text(output)
             return _parse_action_with_event(output, event)
+
+
+@dataclass(slots=True)
+class CodexSparkProvider(CodexCLIProvider):
+    """Backward-compatible provider for historical Spark collection evidence."""
+
+    model: str = "gpt-5.3-codex-spark"
+    interface: str = "codex-spark-cli"
 
 
 def _response_output_text(payload: dict[str, Any]) -> str:
@@ -803,6 +811,11 @@ def build_provider(
     model: str | None = None,
     timeout_seconds: int = 300,
 ) -> ActionProvider:
+    if teacher == "codex-cli":
+        return CodexCLIProvider(
+            model=model or os.getenv("STUDYHUB_CODEX_TEACHER_MODEL", "gpt-5.6-sol"),
+            timeout_seconds=timeout_seconds,
+        )
     if teacher == "codex-spark":
         return CodexSparkProvider(model=model or "gpt-5.3-codex-spark", timeout_seconds=timeout_seconds)
     if teacher == "responses-api":
