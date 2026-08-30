@@ -157,9 +157,8 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> int:
     args = parse_args()
-    from transformers import AutoTokenizer
-
     from datasets import load_from_disk
+    from transformers import AutoTokenizer
 
     program = load_json(args.program)
     selected_manifest_path = args.selected.with_suffix(".manifest.json")
@@ -323,7 +322,7 @@ def main() -> int:
     audit = {
         "schema_version": "studyhub.open-agentic-data-audit.v2",
         "status": "PASS",
-        "dataset_id": "open-agentic-sft-v2-qwen35-9b",
+        "dataset_id": program.get("dataset_id", "open-agentic-sft-v2-qwen35-9b"),
         "rows": {
             "total": len(rows),
             "train": len(train_rows),
@@ -389,7 +388,7 @@ def main() -> int:
         "semantic_dedup": semantic_evidence["contract"],
     }
     write_json(args.evidence, audit)
-    write_data_card(args.data_card, audit)
+    write_data_card(args.data_card, audit, program=program)
     print(json.dumps(audit, ensure_ascii=False, indent=2))
     return 0
 
@@ -398,14 +397,28 @@ def sha256_text(value: str) -> str:
     return hashlib.sha256(value.encode()).hexdigest()
 
 
-def write_data_card(path: Path, audit: dict[str, Any]) -> None:
+def write_data_card(path: Path, audit: dict[str, Any], *, program: dict[str, Any]) -> None:
+    data_card = program.get("data_card", {})
+    title = str(data_card.get("title", "Open-Agentic SFT v2 Data Card"))
+    purpose = str(
+        data_card.get(
+            "purpose",
+            "Hermes-centered open-source supervision for the controlled Qwen3.5-9B SFT comparison.",
+        )
+    )
+    exclusions = str(
+        data_card.get(
+            "exclusions",
+            "StudyHub deterministic fixtures, teacher reverse replay, and evaluation tasks are excluded.",
+        )
+    )
     lines = [
-        "# Open-Agentic SFT v2 Data Card",
+        f"# {title}",
         "",
         "## Purpose",
         "",
-        "Hermes-centered open-source supervision for the controlled Qwen3.5-9B SFT comparison.",
-        "StudyHub deterministic fixtures, teacher reverse replay, and evaluation tasks are excluded.",
+        purpose,
+        exclusions,
         "",
         "## Scale",
         "",

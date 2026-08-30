@@ -111,6 +111,7 @@ def _abstract_path(record: dict[str, Any]) -> str:
 
 def _prepare_teacher(row: EligibleTrajectory) -> dict[str, Any]:
     prepared = dict(row.record)
+    calls = _tool_sequence(prepared)
     prepared.update(
         {
             "split": "train",
@@ -119,6 +120,12 @@ def _prepare_teacher(row: EligibleTrajectory) -> dict[str, Any]:
             "behavior_tags": _behavior_tags(prepared),
             "abstract_tool_path": _abstract_path(prepared),
             "tool_path_signature": row.path_signature,
+            "tool_call_count": len(calls),
+            "tool_turn_count": sum(
+                bool(message.get("tool_calls"))
+                for message in prepared.get("messages", [])
+                if isinstance(message, dict) and message.get("role") == "assistant"
+            ),
             "policy_quality_tier": "A",
         }
     )

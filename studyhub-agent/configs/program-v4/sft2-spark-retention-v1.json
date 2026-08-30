@@ -1,6 +1,7 @@
 {
   "schema_version": "studyhub.qwen35-4b-sft2-data-contract.v1",
   "program_id": "qwen35-4b-sft2-spark-retention-v1",
+  "dataset_id": "qwen35-4b-sft2-spark-retention-v1",
   "status": "DATA_GATE_PREPARED_TRAINING_NOT_AUTHORIZED",
   "seed": 20260827,
   "model": {
@@ -119,5 +120,10 @@
     "tau2_holdout",
     "sealed_data",
     "legacy_teacher_reverse_replay"
-  ]
+  ],
+  "data_card": {
+    "title": "Qwen3.5 4B SFT-2 Spark + Retention Data Card",
+    "purpose": "Second-stage 4B Agent SFT using verifier-accepted Spark-driven Hermes trajectories with stratified Open-Agentic v2 retention.",
+    "exclusions": "Replay-only Web aliases, duplicate teacher paths, legacy reverse replay, deterministic StudyHub fixtures, and evaluation tasks are excluded."
+  }
 }

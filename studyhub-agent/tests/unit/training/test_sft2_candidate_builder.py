@@ -56,6 +56,8 @@ def test_candidate_builder_prioritizes_teacher_and_preserves_retention_splits() 
     assert drops == {}
     assert [row["source_family"] for row in candidates] == ["spark_teacher", "hermes"]
     assert candidates[0]["behavior_tags"] == ["direct_abstention"]
+    assert candidates[0]["tool_call_count"] == 0
+    assert candidates[0]["tool_turn_count"] == 0
     assert candidates[1]["split"] == "validation"
 
 
