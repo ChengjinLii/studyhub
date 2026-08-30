@@ -116,6 +116,7 @@ def collect_trajectory(
     controller_errors: list[str] = []
     policy_corrections: list[dict[str, Any]] = []
     schema_validation_failures: list[dict[str, Any]] = []
+    schema_retry_used = False
     final_answer = ""
 
     for schema in environment.tool_schemas:
@@ -137,31 +138,8 @@ def collect_trajectory(
             if action["type"] == "final":
                 runtime_state = _visible_runtime_state(task, messages, turn + 1)
                 if not runtime_state["final_ready"]:
-                    correction = {
-                        "turn": turn,
-                        "reason": "premature_final",
-                        "grounded_citation_deficit": runtime_state["grounded_citation_deficit"],
-                        "successful_state_change_deficit": runtime_state["successful_state_change_deficit"],
-                        "remaining_model_steps": runtime_state["remaining_model_steps"],
-                        "remaining_tool_calls": runtime_state["remaining_tool_calls"],
-                    }
-                    policy_corrections.append(correction)
-                    if not runtime_state["remaining_model_steps"] or not runtime_state["remaining_tool_calls"]:
-                        controller_errors.append("premature_final_without_recovery_budget")
-                        break
-                    messages.append(
-                        {
-                            "role": "user",
-                            "content": (
-                                "<runtime_feedback>Final action not accepted: public completion constraints "
-                                f"remain unmet (grounded_citation_deficit="
-                                f"{runtime_state['grounded_citation_deficit']}, successful_state_change_deficit="
-                                f"{runtime_state['successful_state_change_deficit']}). Continue with one allowed "
-                                "tool action using only visible observations.</runtime_feedback>"
-                            ),
-                        }
-                    )
-                    continue
+                    controller_errors.append("premature_final")
+                    break
                 final_answer = str(action["content"]).strip()
                 messages.append({"role": "assistant", "content": final_answer})
                 break
@@ -186,6 +164,10 @@ def collect_trajectory(
                     "validation_errors": diagnostics,
                 }
                 schema_validation_failures.append(failure)
+                if schema_retry_used:
+                    controller_errors.append("second_tool_schema_validation_failure")
+                    break
+                schema_retry_used = True
                 policy_corrections.append(
                     {
                         **failure,
@@ -262,6 +244,7 @@ def collect_trajectory(
             "controller_errors": controller_errors,
             "policy_corrections": policy_corrections,
             "schema_validation_failures": schema_validation_failures,
+            "schema_retry_used": schema_retry_used,
             "read_source_ids": sorted(environment.trace.read_source_ids),
             "search_result_ids": sorted(environment.trace.search_result_ids),
         },

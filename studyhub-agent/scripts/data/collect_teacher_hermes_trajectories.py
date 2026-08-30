@@ -137,7 +137,7 @@ def _collect_job(job: dict[str, Any]) -> dict[str, Any]:
             "run_id": job["run_id"],
             "candidate_index": job["candidate_index"],
             "collection_mode": (
-                "dagger_repair" if run.get("controller", {}).get("policy_corrections") else "teacher_rollout"
+                "provider_format_retry" if run.get("controller", {}).get("schema_retry_used") else "teacher_rollout"
             ),
             "provider": {
                 "interface": provider.interface,
@@ -367,13 +367,17 @@ def _collect_parallel(
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--root", type=Path, default=PROJECT_ROOT / "datasets/interim/studyhub_teacher_v2_3")
+    parser.add_argument(
+        "--root",
+        type=Path,
+        default=PROJECT_ROOT / "datasets/interim/spark_hermes_teacher_v1",
+    )
     parser.add_argument("--teacher", choices=TEACHERS, default="codex-spark")
     parser.add_argument("--teacher-model")
     parser.add_argument("--max-accepted", type=int, default=500)
-    parser.add_argument("--max-wall-time", type=int, default=6 * 60 * 60)
+    parser.add_argument("--max-wall-time", type=int, default=8 * 60 * 60)
     parser.add_argument("--concurrency", type=int, default=1)
-    parser.add_argument("--candidates-per-task", type=int, default=2)
+    parser.add_argument("--candidates-per-task", type=int, default=1)
     parser.add_argument("--max-tasks", type=int)
     parser.add_argument("--request-timeout", type=int, default=300)
     parser.add_argument("--resume", action="store_true")
@@ -388,12 +392,12 @@ def main() -> int:
         return 0
     if not 1 <= args.max_accepted <= 4_000:
         raise ValueError("--max-accepted must be in [1, 4000]")
-    if not 1 <= args.max_wall_time <= 6 * 60 * 60:
-        raise ValueError("--max-wall-time must be in [1, 21600]")
+    if not 1 <= args.max_wall_time <= 8 * 60 * 60:
+        raise ValueError("--max-wall-time must be in [1, 28800]")
     if not 1 <= args.concurrency <= 16:
         raise ValueError("--concurrency must be in [1, 16]")
-    if not 2 <= args.candidates_per_task <= 4:
-        raise ValueError("--candidates-per-task must be in [2, 4]")
+    if not 1 <= args.candidates_per_task <= 2:
+        raise ValueError("--candidates-per-task must be in [1, 2]")
     if not (args.root / "task_specs.jsonl").is_file():
         raise FileNotFoundError("teacher task specs are missing")
 

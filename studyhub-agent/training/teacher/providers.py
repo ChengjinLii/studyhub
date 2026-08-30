@@ -440,7 +440,7 @@ class CodexSparkProvider:
             "reason": "probe_required" if version.returncode == 0 else "codex_version_failed",
             "model": self.model,
             "cli_version": _redact(version.stdout.strip()),
-            "isolation_policy": "temporary_public_dir_and_reject_any_codex_tool_event",
+            "isolation_policy": "stdin_task_temp_dir_shell_disabled_and_reject_any_codex_tool_event",
         }
 
     def choose_action(
@@ -456,9 +456,7 @@ class CodexSparkProvider:
             root = Path(directory)
             schema_path = root / "action-schema.json"
             output_path = root / "action.json"
-            public_path = root / "public-task.json"
             schema_path.write_text(json.dumps(ACTION_SCHEMA, sort_keys=True), encoding="utf-8")
-            public_path.write_text(json.dumps(task, ensure_ascii=False, sort_keys=True), encoding="utf-8")
             command = [
                 self.command,
                 "--ask-for-approval",
@@ -470,6 +468,10 @@ class CodexSparkProvider:
                 "--skip-git-repo-check",
                 "--sandbox",
                 "read-only",
+                "--disable",
+                "shell_tool",
+                "--disable",
+                "unified_exec",
                 "--model",
                 self.model,
                 "--cd",
@@ -512,7 +514,9 @@ class CodexSparkProvider:
                 "stderr_sha256": _sha256_text(process.stderr),
                 "stderr_excerpt": _redact(process.stderr),
                 "sandbox": "read-only",
-                "public_files": ["action-schema.json", "public-task.json"],
+                "public_files": ["action-schema.json"],
+                "public_task_transport": "stdin_only",
+                "codex_shell_features_disabled": ["shell_tool", "unified_exec"],
                 "hidden_oracle_mounted": False,
                 "event_audit": audit,
                 "usage": audit["usage"],

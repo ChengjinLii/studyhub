@@ -11,6 +11,7 @@ import pytest
 import scripts.data.collect_teacher_hermes_trajectories as teacher_collector
 import training.teacher.providers as teacher_providers
 from scripts.data.build_runtime_sft_v3_1 import _apply_teacher_self_review, _select_teacher_rows
+from scripts.data.build_spark_hermes_tasks import build as build_spark_hermes_tasks
 from scripts.data.build_teacher_task_specs import _environment, _source_group_ids
 from scripts.data.select_runtime_sft_v3 import public_benchmark_prompt_hashes
 from scripts.data.verify_teacher_trajectories import accepted_record, verify_run
@@ -28,6 +29,24 @@ from training.teacher.providers import (
 )
 
 ROOT = Path(__file__).resolve().parents[3]
+
+
+def test_independent_spark_task_builder_emits_executable_path_agnostic_tasks(tmp_path: Path) -> None:
+    root = tmp_path / "spark-tasks"
+
+    manifest = build_spark_hermes_tasks(root, total_tasks=14, seed=20260827, force=False)
+
+    assert manifest["environment_executable_rate"] == 1.0
+    assert manifest["exact_public_benchmark_overlap"] == 0
+    assert manifest["legacy_reverse_replay_used"] is False
+    assert manifest["sealed_or_fresh_external_holdouts_opened"] is False
+    tasks = [json.loads(line) for line in (root / "task_specs.jsonl").read_text().splitlines()]
+    assert len(tasks) == 14
+    assert len({task["metadata"]["source_group_id"] for task in tasks}) == 14
+    assert all("verifier" not in task for task in tasks)
+    for task in tasks:
+        verifier = json.loads((root / "verifiers" / f"{task['task_id']}.json").read_text())
+        assert verifier["verifier_mode"] == "path_agnostic_v2"
 
 
 def test_parallel_teacher_resume_skips_existing_batch_and_runs_next_job(
@@ -767,7 +786,7 @@ def test_actual_hermes_registry_executes_teacher_action_and_verifier_accepts(tmp
     assert record["runtime_native"] is True
 
 
-def test_controller_rejects_premature_final_and_records_repair(tmp_path: Path) -> None:
+def test_controller_rejects_premature_final_without_policy_hint(tmp_path: Path) -> None:
     checkout = ROOT / ".vendor/hermes-agent"
     if not checkout.is_dir():
         pytest.skip("pinned Hermes checkout is not installed")
@@ -818,19 +837,11 @@ def test_controller_rejects_premature_final_and_records_repair(tmp_path: Path) -
         choose_action=choose_action,
     )
 
-    assert run["status"] == "COMPLETED"
-    assert run["final_answer"] == "The answer 42 is recorded."
-    assert run["controller"]["policy_corrections"] == [
-        {
-            "turn": 0,
-            "reason": "premature_final",
-            "grounded_citation_deficit": 0,
-            "successful_state_change_deficit": 1,
-            "remaining_model_steps": 2,
-            "remaining_tool_calls": 2,
-        }
-    ]
-    assert any(
+    assert run["status"] == "FAILED"
+    assert run["final_answer"] == ""
+    assert run["controller"]["controller_errors"] == ["premature_final"]
+    assert run["controller"]["policy_corrections"] == []
+    assert not any(
         message.get("role") == "user" and "runtime_feedback" in message.get("content", "")
         for message in run["messages"]
     )
@@ -914,6 +925,51 @@ def test_controller_repairs_public_tool_schema_failure_without_training_bad_acti
         message.get("role") == "user" and "Tool action not accepted" in message.get("content", "")
         for message in run["messages"]
     )
+
+
+def test_controller_allows_only_one_schema_retry(tmp_path: Path) -> None:
+    checkout = ROOT / ".vendor/hermes-agent"
+    if not checkout.is_dir():
+        pytest.skip("pinned Hermes checkout is not installed")
+    lock = json.loads((ROOT / "integrations/hermes/upstream.lock.json").read_text(encoding="utf-8"))
+    task_id = "teacher-schema-retry-limit"
+    root = _teacher_root(tmp_path, task_id)
+    task = {
+        "schema_version": "studyhub.spark-hermes-task.v1",
+        "task_id": task_id,
+        "family": "stateful_function",
+        "user_request": "Use the fixture once.",
+        "allowed_tools": ["teacher_fixture_lookup"],
+        "completion_contract": {},
+        "max_steps": 4,
+        "max_tool_calls": 2,
+        "metadata": {"source_group_id": "schema-retry-limit"},
+    }
+
+    def choose_action(_task, _tools, _messages, _turn):
+        return (
+            {
+                "type": "tool_call",
+                "name": "teacher_fixture_lookup",
+                "arguments": {"wrong": "value"},
+                "content": "",
+            },
+            {"interface": "fixture", "model": "fixture-teacher"},
+        )
+
+    run = collect_trajectory(
+        task=task,
+        root=root,
+        hermes_checkout=checkout,
+        hermes_commit=lock["commit"],
+        choose_action=choose_action,
+    )
+
+    assert run["status"] == "FAILED"
+    assert run["controller"]["schema_retry_used"] is True
+    assert run["controller"]["controller_errors"] == ["second_tool_schema_validation_failure"]
+    assert len(run["controller"]["policy_corrections"]) == 1
+    assert len(run["controller"]["schema_validation_failures"]) == 2
 
 
 def test_policy_corrected_teacher_trajectory_uses_repaired_quality_tier() -> None:

@@ -17,7 +17,7 @@ for entry in (PROJECT_ROOT, PROJECT_ROOT / "src"):
     if str(entry) not in sys.path:
         sys.path.insert(0, str(entry))
 
-from scripts.data.select_runtime_sft_v3 import sha256  # noqa: E402
+from scripts.data.select_runtime_sft_v3 import normalized_text, sha256  # noqa: E402
 from studyhub_agent.trajectory.runtime_sft import (  # noqa: E402
     trajectory_fingerprint,
     validate_runtime_trajectory,
@@ -34,6 +34,11 @@ def semantic_overlap(reference: str, candidate: str) -> float:
     expected = terms(reference)
     actual = terms(candidate)
     return len(expected & actual) / max(len(expected), 1)
+
+
+def _contains_any(value: str, candidates: list[Any]) -> bool:
+    normalized = normalized_text(value)
+    return any(normalized_text(str(candidate)) in normalized for candidate in candidates if str(candidate).strip())
 
 
 def _nested_strings(value: Any, key: str) -> set[str]:
@@ -123,10 +128,21 @@ def verify_run(run: dict[str, Any], task: dict[str, Any], verifier: dict[str, An
         for message in run.get("messages", [])
         for call in message.get("tool_calls", [])
     }
-    if int(verifier.get("minimum_tool_calls", 0)) and not (expected_tools & actual_tools):
-        failures.append("required_tool_family_missing")
-    if not required_tools.issubset(actual_tools):
-        failures.append("required_tool_sequence_missing")
+    path_agnostic = verifier.get("verifier_mode") == "path_agnostic_v2"
+    if path_agnostic:
+        required_any_groups = [list(map(str, group)) for group in verifier.get("required_any_tool_groups", [])]
+        missing_tool_groups = [group for group in required_any_groups if not (set(group) & actual_tools)]
+        if missing_tool_groups:
+            failures.append("required_tool_capability_missing")
+        if verifier.get("require_no_tools") and actual_tools:
+            failures.append("unnecessary_tool_use")
+    else:
+        required_any_groups = []
+        missing_tool_groups = []
+        if int(verifier.get("minimum_tool_calls", 0)) and not (expected_tools & actual_tools):
+            failures.append("required_tool_family_missing")
+        if not required_tools.issubset(actual_tools):
+            failures.append("required_tool_sequence_missing")
     required_markers = set(verifier.get("required_observation_markers", []))
     actual_markers = observed_markers(run)
     if not required_markers.issubset(actual_markers):
@@ -150,7 +166,19 @@ def verify_run(run: dict[str, Any], task: dict[str, Any], verifier: dict[str, An
         failures.append("required_citation_missing")
     overlap = semantic_overlap(str(verifier.get("reference_final", "")), final)
     minimum_overlap = 0.20 if task.get("family") == "direct_abstention" else 0.25
-    if overlap < minimum_overlap:
+    concept_groups = [list(group) for group in verifier.get("required_answer_concept_groups", [])]
+    missing_concept_groups = [group for group in concept_groups if not _contains_any(final, group)]
+    forbidden_terms = [str(value) for value in verifier.get("forbidden_answer_terms", [])]
+    present_forbidden_terms = [value for value in forbidden_terms if _contains_any(final, [value])]
+    if path_agnostic:
+        if missing_concept_groups:
+            failures.append("required_answer_concept_missing")
+        if present_forbidden_terms:
+            failures.append("forbidden_answer_content")
+        corrections = controller.get("policy_corrections", [])
+        if corrections and not verifier.get("allow_schema_retry", False):
+            failures.append("provider_format_retried")
+    elif overlap < minimum_overlap:
         failures.append("insufficient_answer_support_overlap")
     if verifier.get("benchmark_prompt_overlap") is not False:
         failures.append("verifier_benchmark_overlap")
@@ -161,6 +189,8 @@ def verify_run(run: dict[str, Any], task: dict[str, Any], verifier: dict[str, An
         "actual_tools": sorted(actual_tools),
         "expected_tool_names": sorted(expected_tools),
         "required_tool_names": sorted(required_tools),
+        "required_any_tool_groups": required_any_groups,
+        "missing_tool_groups": missing_tool_groups,
         "actual_tool_sequence": [
             str(call.get("function", {}).get("name", ""))
             for message in run.get("messages", [])
@@ -176,6 +206,10 @@ def verify_run(run: dict[str, Any], task: dict[str, Any], verifier: dict[str, An
         "provider_errors": provider_errors,
         "required_observation_markers": sorted(required_markers),
         "observed_markers": sorted(actual_markers),
+        "required_answer_concept_groups": concept_groups,
+        "missing_answer_concept_groups": missing_concept_groups,
+        "present_forbidden_terms": present_forbidden_terms,
+        "verifier_mode": verifier.get("verifier_mode", "legacy_path_contract"),
     }
     return sorted(set(failures)), diagnostics
 
@@ -234,8 +268,8 @@ def accepted_record(
         "verification": diagnostics,
         "provenance": {
             "revision": run.get("collector_git_commit", "unknown"),
-            "license": "StudyHub-internal-derived",
-            "source_url": f"local://{teacher_dataset}",
+            "license": task.get("metadata", {}).get("source_license", "StudyHub-internal-derived"),
+            "source_url": task.get("metadata", {}).get("source_url", f"local://{teacher_dataset}"),
             "raw_files": [run.get("raw_run_path", "raw_runs")],
         },
     }
@@ -422,7 +456,11 @@ def verify_root(root: Path) -> dict[str, Any]:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--root", type=Path, default=PROJECT_ROOT / "datasets/interim/studyhub_teacher_v2_3")
+    parser.add_argument(
+        "--root",
+        type=Path,
+        default=PROJECT_ROOT / "datasets/interim/spark_hermes_teacher_v1",
+    )
     return parser.parse_args()
 
 
