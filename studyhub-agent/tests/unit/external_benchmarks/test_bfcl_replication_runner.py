@@ -5,6 +5,7 @@ from pathlib import Path
 
 from external_benchmarks.adapters.bfcl_prompt import disable_thinking_generation_prefix
 from scripts.benchmark.external.run_bfcl_replication import (
+    absolute_executable,
     bfcl_commands,
     collect_score_summary,
     temporary_test_ids,
@@ -78,6 +79,17 @@ def test_official_commands_use_run_ids_and_partial_eval(tmp_path: Path) -> None:
 def test_bfcl_qwen_adapter_disables_thinking_at_generation_boundary() -> None:
     prompt = disable_thinking_generation_prefix("prefix<|im_start|>assistant\n")
     assert prompt.endswith("<|im_start|>assistant\n<think>\n\n</think>\n\n")
+
+
+def test_venv_executable_path_is_not_symlink_resolved(tmp_path: Path) -> None:
+    target = tmp_path / "python-real"
+    target.write_text("binary")
+    venv = tmp_path / ".venv/bin"
+    venv.mkdir(parents=True)
+    link = venv / "python"
+    link.symlink_to(target)
+    assert absolute_executable(link) == link
+    assert absolute_executable(link) != target
 
 
 def test_score_summary_preserves_official_category_counts(tmp_path: Path) -> None:

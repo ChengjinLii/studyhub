@@ -43,6 +43,12 @@ def canonical_sha256(value: Any) -> str:
     return hashlib.sha256(payload.encode()).hexdigest()
 
 
+def absolute_executable(path: Path) -> Path:
+    """Keep a venv interpreter path intact instead of resolving its symlink."""
+
+    return Path(os.path.abspath(path.expanduser()))
+
+
 def read_json(path: Path) -> dict[str, Any]:
     value = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(value, dict):
@@ -389,8 +395,9 @@ def main() -> int:
     cases = validate_replication_contract(contract, source_root)
     model_identity, model_manifest = resolve_model_artifact(args.model.resolve())
     bfcl_root = source_root / "berkeley-function-call-leaderboard"
-    bfcl_python = (args.bfcl_python or (bfcl_root / ".venv/bin/python")).resolve()
-    for executable in (args.server_python.resolve(), bfcl_python):
+    bfcl_python = absolute_executable(args.bfcl_python or (bfcl_root / ".venv/bin/python"))
+    server_python = absolute_executable(args.server_python)
+    for executable in (server_python, bfcl_python):
         if not executable.is_file():
             raise RuntimeError(f"required Python environment is missing: {executable}")
     registry_name = str(args.registry_name)
@@ -438,7 +445,7 @@ def main() -> int:
                     "model": model_identity,
                     "model_manifest": model_manifest,
                     "bfcl_python": str(bfcl_python),
-                    "server_python": str(args.server_python.resolve()),
+                    "server_python": str(server_python),
                     "fresh_holdout_used": False,
                 },
                 ensure_ascii=False,
@@ -482,7 +489,7 @@ def main() -> int:
         "source_lock": read_json(source_root / ".studyhub-external-lock.json"),
         "model": model_identity,
         "model_manifest": model_manifest,
-        "server_python": str(args.server_python.resolve()),
+        "server_python": str(server_python),
         "bfcl_python": str(bfcl_python),
         "gpu": args.gpu,
         "port": args.port,
@@ -511,7 +518,7 @@ def main() -> int:
     started = time.monotonic()
     try:
         server, server_stream = launch_server(
-            python=args.server_python.resolve(),
+            python=server_python,
             model=args.model.resolve(),
             gpu=args.gpu,
             port=args.port,
