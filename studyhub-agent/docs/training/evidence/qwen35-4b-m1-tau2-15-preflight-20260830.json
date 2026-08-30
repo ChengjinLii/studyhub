@@ -1,0 +1,40 @@
+{
+  "schema_version": "studyhub.tau2-replication-preflight-evidence.v1",
+  "status": "PASS_TAU2_REPLICATION_PREFLIGHT",
+  "recorded_at": "2026-08-30T19:22:51+08:00",
+  "git_commit": "d2cd1d58beff363e74cc722d13548184036049bc",
+  "contract": {
+    "sha256": "c072d696487274e7f9b74aaa2763d12603c652f3d96dab66cf556cd01991f275",
+    "selection_canonical_sha256": "9bdee4f79786d5dff665b11376cad33a0cd23367ca3a7bc099b942a37bcd90eb",
+    "expected_tasks": 15,
+    "fresh_holdout_used": false,
+    "training_or_tuning_input": false
+  },
+  "model_preflight": {
+    "identity": "Qwen/Qwen3.5-4B-Base@1001bb4d826a52d1f399e183466143f4da7b741b",
+    "path": "/data/chengjin/studyhub/models/P1/Qwen3.5-4B-Base",
+    "config_sha256": "ddc63e1c717afa86c865bb5e01313d89d72bb53b97ad4a8a03ba8510c0621670"
+  },
+  "user_simulator": {
+    "identity": "Qwen/Qwen3.5-9B@c202236235762e1c871ad0ccb60c8ee5ba337b9a",
+    "path": "/data/chengjin/studyhub/models/P1/Qwen3.5-9B",
+    "config_sha256": "d0883072e01861ed0b2d47be3c16c36a8e81c224c7ffaa310c6558fb3f932b05",
+    "thinking": false
+  },
+  "tau2": {
+    "resolved_commit": "fc0055dc4e0a316c3f83133267fbd6faaa770992",
+    "git_tree": "4837da1c2b310152f63d3d7987f4325183ca6f7c",
+    "official_evaluator": true,
+    "official_environment": true,
+    "cli_import": "PASS",
+    "proxy_isolation": "PASS",
+    "python": "/data/chengjin/studyhub/studyhub-agent/artifacts/external-benchmarks/venvs/tau2/bin/python"
+  },
+  "runtime": {
+    "server_python": "/data/chengjin/studyhub/studyhub-agent/.venv-train/bin/python",
+    "student_thinking": false,
+    "communication_protocol_enforced": true,
+    "gpu_started": false,
+    "model_score_status": "NOT_RUN"
+  }
+}
