@@ -1,0 +1,121 @@
+{
+  "schema_version": "studyhub.bfcl-replication-contract.v1",
+  "status": "FROZEN_BEFORE_M1_COMPLETION",
+  "purpose": "Replicate the previously used public BFCL V4 70-case panel after M1 without reading the fresh pipeline holdout.",
+  "benchmark": {
+    "name": "BFCL V4",
+    "upstream": "https://github.com/ShishirPatil/gorilla.git",
+    "resolved_commit": "f7cf7359b7ac615a0b294831c5ba2bc95ee4a000",
+    "git_tree": "8c805ceaf6b5d9c576e67f9274ed386fd9998911",
+    "official_evaluator": true,
+    "partial_evaluation": true
+  },
+  "selection": {
+    "name": "bfcl-paired-70-replication-v1",
+    "canonical_sha256": "87c8e0059b5f36d5a60620e7d30bf3779f708a8aef6bcfa9e4e923f96c9a94ad",
+    "reference_file_sha256": "e696fc5259dff9c2ca6a7e82c70a735233217f815c014a90cfaaa824c8824db4",
+    "expected_cases": 70,
+    "cases": {
+      "simple_python": [
+        "simple_python_40",
+        "simple_python_132",
+        "simple_python_77",
+        "simple_python_81",
+        "simple_python_116",
+        "simple_python_231",
+        "simple_python_129",
+        "simple_python_305",
+        "simple_python_370",
+        "simple_python_20"
+      ],
+      "parallel": [
+        "parallel_119",
+        "parallel_25",
+        "parallel_41",
+        "parallel_167",
+        "parallel_59",
+        "parallel_76",
+        "parallel_150",
+        "parallel_96",
+        "parallel_116",
+        "parallel_34"
+      ],
+      "multiple": [
+        "multiple_95",
+        "multiple_149",
+        "multiple_60",
+        "multiple_167",
+        "multiple_99",
+        "multiple_196",
+        "multiple_181",
+        "multiple_107",
+        "multiple_124",
+        "multiple_179"
+      ],
+      "irrelevance": [
+        "irrelevance_96",
+        "irrelevance_147",
+        "irrelevance_130",
+        "irrelevance_26",
+        "irrelevance_219",
+        "irrelevance_13",
+        "irrelevance_70",
+        "irrelevance_210",
+        "irrelevance_76",
+        "irrelevance_114"
+      ],
+      "multi_turn_base": [
+        "multi_turn_base_98",
+        "multi_turn_base_176",
+        "multi_turn_base_72",
+        "multi_turn_base_12",
+        "multi_turn_base_136",
+        "multi_turn_base_195",
+        "multi_turn_base_193",
+        "multi_turn_base_178",
+        "multi_turn_base_25",
+        "multi_turn_base_122"
+      ],
+      "multi_turn_miss_func": [
+        "multi_turn_miss_func_148",
+        "multi_turn_miss_func_199",
+        "multi_turn_miss_func_69",
+        "multi_turn_miss_func_16",
+        "multi_turn_miss_func_12",
+        "multi_turn_miss_func_86",
+        "multi_turn_miss_func_187",
+        "multi_turn_miss_func_182",
+        "multi_turn_miss_func_198",
+        "multi_turn_miss_func_22"
+      ],
+      "multi_turn_miss_param": [
+        "multi_turn_miss_param_66",
+        "multi_turn_miss_param_157",
+        "multi_turn_miss_param_119",
+        "multi_turn_miss_param_162",
+        "multi_turn_miss_param_96",
+        "multi_turn_miss_param_101",
+        "multi_turn_miss_param_191",
+        "multi_turn_miss_param_52",
+        "multi_turn_miss_param_163",
+        "multi_turn_miss_param_113"
+      ]
+    }
+  },
+  "generation": {
+    "temperature": 0.001,
+    "num_threads": 4,
+    "context_length": 65536,
+    "max_running_requests": 8,
+    "mem_fraction_static": 0.7,
+    "tool_call_parser": "qwen3_coder",
+    "reasoning_parser": "qwen3",
+    "enable_thinking": false
+  },
+  "claim_boundary": {
+    "official_full_leaderboard_score": false,
+    "public_partial_replication_only": true,
+    "fresh_holdout_used": false,
+    "training_or_tuning_input": false
+  }
+}
