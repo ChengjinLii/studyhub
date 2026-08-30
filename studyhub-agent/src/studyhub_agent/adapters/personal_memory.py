@@ -1,9 +1,8 @@
 from __future__ import annotations
 
-import json
 import threading
 import uuid
-from dataclasses import asdict, dataclass, field
+from dataclasses import dataclass, field
 from time import time
 from typing import Protocol
 
@@ -77,66 +76,3 @@ class InMemoryPersonalMemoryProvider:
     def reset_namespace(self, namespace: str) -> int:
         with self._lock:
             return len(self._records.pop(namespace, {}))
-
-
-class HermesPersonalMemoryBridge:
-    """Duck-typed adapter for Hermes' upstream MemoryProvider lifecycle."""
-
-    name = "studyhub-personal"
-
-    def __init__(self, provider: PersonalMemoryProvider, namespace: str) -> None:
-        self.provider = provider
-        self.namespace = namespace
-        self.session_id = ""
-
-    def is_available(self) -> bool:
-        return True
-
-    def initialize(self, session_id: str, **kwargs: object) -> None:
-        self.session_id = session_id
-
-    def prefetch(self, query: str, *, session_id: str = "") -> str:
-        records = self.provider.search(self.namespace, query, limit=5)
-        return "\n".join(f"- {record.content}" for record in records)
-
-    def sync_turn(
-        self,
-        user_content: str,
-        assistant_content: str,
-        *,
-        session_id: str = "",
-        messages: list[dict[str, object]] | None = None,
-    ) -> None:
-        del user_content, assistant_content, session_id, messages
-
-    def on_session_end(self, messages: list[dict[str, object]]) -> None:
-        del messages
-
-    def get_tool_schemas(self) -> list[dict[str, object]]:
-        return [
-            {
-                "name": "personal_memory_search",
-                "description": "Search only the active StudyHub user's isolated memory namespace.",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "query": {"type": "string", "minLength": 1, "maxLength": 500},
-                        "limit": {"type": "integer", "minimum": 1, "maximum": 20, "default": 5},
-                    },
-                    "required": ["query"],
-                    "additionalProperties": False,
-                },
-            }
-        ]
-
-    def handle_tool_call(self, tool_name: str, args: dict[str, object], **kwargs: object) -> str:
-        del kwargs
-        if tool_name != "personal_memory_search":
-            raise KeyError(tool_name)
-        query = str(args.get("query", "")).strip()
-        limit = int(args.get("limit", 5))
-        records = self.provider.search(self.namespace, query, limit=limit)
-        return json.dumps({"memories": [asdict(record) for record in records]}, ensure_ascii=False)
-
-    def shutdown(self) -> None:
-        return None

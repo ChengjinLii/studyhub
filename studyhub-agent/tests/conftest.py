@@ -5,13 +5,13 @@ import pytest
 from studyhub_agent.adapters.collective_memory import FixtureCollectiveMemoryReader
 from studyhub_agent.adapters.personal_memory import InMemoryPersonalMemoryProvider
 from studyhub_agent.adapters.rag import RagExperimentKnowledgeRetriever
-from studyhub_agent.adapters.web import (
+from studyhub_agent.guardrails.permissions import PermissionContext
+from studyhub_agent.guardrails.web_security import WebSecurityPolicy
+from studyhub_agent.replay.web_providers import (
     FixtureWebFetchProvider,
     FixtureWebSearchProvider,
     GuardedWebProviders,
 )
-from studyhub_agent.guardrails.permissions import PermissionContext
-from studyhub_agent.guardrails.web_security import WebSecurityPolicy
 from studyhub_agent.runtime.identity import AgentIdentity
 
 ROOT = Path(__file__).resolve().parents[1]

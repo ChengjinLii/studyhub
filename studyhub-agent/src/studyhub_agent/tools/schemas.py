@@ -5,6 +5,22 @@ from typing import Any
 
 TOOL_SCHEMA_VERSION = "v1"
 
+# Hermes owns general web execution and the external-memory lifecycle. StudyHub
+# only owns capabilities whose semantics depend on its materials, ACLs, or
+# aggregate learning data. The replay names remain in schema v1 solely so
+# frozen historical fixtures can still be reproduced.
+STUDYHUB_DOMAIN_TOOL_NAMES = frozenset(
+    {
+        "knowledge_search",
+        "knowledge_read",
+        "knowledge_browse",
+        "collective_memory_search",
+    }
+)
+HERMES_NATIVE_TOOL_NAMES = frozenset({"web_search", "web_extract"})
+HERMES_MEMORY_TOOL_NAMES = frozenset({"personal_memory_search"})
+REPLAY_COMPAT_TOOL_NAMES = frozenset({"web_search", "web_fetch", "personal_memory_search"})
+
 
 @dataclass(frozen=True, slots=True)
 class ToolDefinition:
@@ -101,3 +117,6 @@ def tool_definitions() -> tuple[ToolDefinition, ...]:
 
 
 TOOL_DEFINITIONS = {definition.name: definition for definition in tool_definitions()}
+STUDYHUB_DOMAIN_TOOL_DEFINITIONS = {
+    name: TOOL_DEFINITIONS[name] for name in STUDYHUB_DOMAIN_TOOL_NAMES
+}

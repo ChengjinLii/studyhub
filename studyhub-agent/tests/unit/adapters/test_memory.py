@@ -3,7 +3,10 @@ import json
 import pytest
 
 from studyhub_agent.adapters.collective_memory import FixtureCollectiveMemoryReader
-from studyhub_agent.adapters.personal_memory import HermesPersonalMemoryBridge
+from studyhub_agent.guardrails.budget import BudgetState
+from studyhub_agent.integrations.hermes_memory import HermesPersonalMemoryBridge
+from studyhub_agent.runtime.session import TaskSpec
+from studyhub_agent.tools.registry import ToolExecutionContext
 
 
 def test_personal_memory_crud_is_namespace_isolated(personal_memory) -> None:
@@ -17,9 +20,27 @@ def test_personal_memory_crud_is_namespace_isolated(personal_memory) -> None:
     assert personal_memory.reset_namespace("prod:user-a") == 1
 
 
-def test_hermes_memory_bridge_matches_upstream_lifecycle(personal_memory) -> None:
-    personal_memory.add("eval:case-a:7", "每天复习两小时")
-    bridge = HermesPersonalMemoryBridge(personal_memory, "eval:case-a:7")
+def test_hermes_memory_bridge_matches_upstream_lifecycle(personal_memory, identity, permissions) -> None:
+    namespace = identity.personal_memory_namespace(case_id="case-a", seed=7)
+    personal_memory.add(namespace, "每天复习两小时")
+    task = TaskSpec(
+        task_id="case-a",
+        family="memory",
+        difficulty="easy",
+        user_request="按我的偏好规划复习",
+        environment_seed=7,
+        allowed_tools=["personal_memory_search"],
+        max_steps=3,
+        max_tool_calls=2,
+    )
+    context = ToolExecutionContext(
+        identity=identity,
+        task=task,
+        permissions=permissions,
+        budget=BudgetState(max_steps=task.max_steps, max_tool_calls=task.max_tool_calls),
+        memory_namespace=namespace,
+    )
+    bridge = HermesPersonalMemoryBridge(personal_memory, context)
     bridge.initialize("session-1", platform="test")
 
     assert bridge.is_available() is True
@@ -27,7 +48,9 @@ def test_hermes_memory_bridge_matches_upstream_lifecycle(personal_memory) -> Non
     schema = bridge.get_tool_schemas()[0]
     assert schema["name"] == "personal_memory_search"
     payload = json.loads(bridge.handle_tool_call("personal_memory_search", {"query": "复习", "limit": 2}))
-    assert payload["memories"][0]["namespace"] == "eval:case-a:7"
+    assert payload["memories"][0]["content"] == "每天复习两小时"
+    assert "namespace" not in payload["memories"][0]
+    assert context.budget.tool_calls == 1
     bridge.sync_turn("question", "answer")
     bridge.on_session_end([])
     bridge.shutdown()

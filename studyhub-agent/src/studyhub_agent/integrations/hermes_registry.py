@@ -25,7 +25,12 @@ class HermesRegistryOverlay:
         toolset: str,
         schema: dict[str, Any],
         handler: Any,
+        check_fn: Any = None,
+        requires_env: list[str] | None = None,
+        is_async: bool = True,
+        emoji: str = "",
         max_result_size_chars: int = 12_000,
+        dynamic_schema_overrides: Any = None,
     ) -> None:
         previous = self.registry.snapshot_registration(name)
         self.registry.register(
@@ -33,9 +38,13 @@ class HermesRegistryOverlay:
             toolset=toolset,
             schema=schema,
             handler=handler,
-            is_async=True,
+            check_fn=check_fn,
+            requires_env=requires_env,
+            is_async=is_async,
             description=str(schema["description"]),
+            emoji=emoji,
             max_result_size_chars=max_result_size_chars,
+            dynamic_schema_overrides=dynamic_schema_overrides,
             override=True,
         )
         current = self.registry.snapshot_registration(name)

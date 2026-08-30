@@ -24,6 +24,12 @@ The checkout is stored under the ignored `.vendor/` directory. No legacy
 StudyHub router, memory implementation, patch, or skin is carried into V2. See
 `integrations/hermes/README.md` for the integration boundary.
 
+Production tool ownership is intentionally narrow. Hermes provides native Web
+search/extraction and the personal-memory provider lifecycle; StudyHub adds
+material RAG, collective learning memory, ACL/privacy, and task budgets. The
+old `web_fetch` fixture and parallel Web/memory handlers are replay-only. See
+[`docs/architecture/HERMES_TOOL_BOUNDARY.md`](docs/architecture/HERMES_TOOL_BOUNDARY.md).
+
 ## Phase 1 CPU setup
 
 The training-ready contract can be installed and verified without CUDA or model weights:

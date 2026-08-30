@@ -2,6 +2,11 @@
 
 Version: `agent-v2-training-ready-v1`
 
+Historical note: this report describes the frozen schema-v1 fixture surface.
+The production runtime now delegates Web and personal-memory lifecycle to
+Hermes while retaining schema-v1 under `studyhub_agent.replay`. See
+`docs/architecture/HERMES_TOOL_BOUNDARY.md`.
+
 Phase 1 freezes the runtime and training-data contracts required before moving work to a GPU host. It was verified on CPU in a single process. No model checkpoint was downloaded, no CUDA stack was installed, no trainer was started, and no production database was accessed or changed.
 
 ## Runtime Boundary

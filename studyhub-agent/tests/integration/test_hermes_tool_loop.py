@@ -3,6 +3,8 @@ from __future__ import annotations
 import asyncio
 import json
 import subprocess
+from collections.abc import Iterator
+from contextlib import contextmanager
 from pathlib import Path
 
 import pytest
@@ -10,13 +12,12 @@ import pytest
 from studyhub_agent.adapters.collective_memory import FixtureCollectiveMemoryReader
 from studyhub_agent.adapters.personal_memory import InMemoryPersonalMemoryProvider
 from studyhub_agent.adapters.rag import RagExperimentKnowledgeRetriever
-from studyhub_agent.adapters.web import FixtureWebFetchProvider, FixtureWebSearchProvider, GuardedWebProviders
 from studyhub_agent.guardrails.budget import BudgetState
 from studyhub_agent.guardrails.permissions import PermissionContext
-from studyhub_agent.guardrails.web_security import WebSecurityPolicy
-from studyhub_agent.integrations import HermesToolBridge
+from studyhub_agent.integrations import HermesRuntimeTools
+from studyhub_agent.integrations.hermes_registry import HermesRegistryOverlay
 from studyhub_agent.runtime import AgentIdentity, TaskSpec
-from studyhub_agent.tools.factory import ToolServices, build_tool_registry
+from studyhub_agent.tools.factory import DomainToolServices, build_domain_tool_registry
 from studyhub_agent.tools.registry import ToolExecutionContext
 from tests.fakes.openai_server import ScriptedOpenAIServer, ToolTurn
 from training.rl.hermes_workflow import StudyHubHermesWorkflow
@@ -42,13 +43,12 @@ def _prepare_hermes_test_runtime(monkeypatch) -> None:
         monkeypatch.delenv(key, raising=False)
 
 
-def _resolver(hostname: str) -> list[str]:
-    if hostname in {"docs.example.edu", "standards.example.org"}:
-        return ["93.184.216.34"]
-    return ["127.0.0.1"]
-
-
-def _context(case_id: str, allowed_tools: list[str], services: ToolServices) -> tuple[ToolExecutionContext, object]:
+def _context(
+    case_id: str,
+    allowed_tools: list[str],
+    services: DomainToolServices,
+    personal_memory: InMemoryPersonalMemoryProvider,
+) -> tuple[ToolExecutionContext, object]:
     identity = AgentIdentity.from_raw_user_id(
         "fixture-user",
         session_id=f"session-{case_id}",
@@ -66,7 +66,7 @@ def _context(case_id: str, allowed_tools: list[str], services: ToolServices) -> 
         max_tool_calls=max(1, len(allowed_tools) + 1),
     )
     namespace = identity.personal_memory_namespace(case_id=case_id, seed=task.environment_seed)
-    services.personal_memory.add(namespace, "用户偏好按题型刷真题。", {"kind": "study_preference"})
+    personal_memory.add(namespace, "用户偏好按题型刷真题。", {"kind": "study_preference"})
     context = ToolExecutionContext(
         identity=identity,
         task=task,
@@ -74,21 +74,66 @@ def _context(case_id: str, allowed_tools: list[str], services: ToolServices) -> 
         budget=BudgetState(max_steps=task.max_steps, max_tool_calls=task.max_tool_calls),
         memory_namespace=namespace,
     )
-    return context, build_tool_registry(services)
+    return context, build_domain_tool_registry(services)
 
 
-def _services() -> ToolServices:
-    return ToolServices(
+def _services() -> tuple[DomainToolServices, InMemoryPersonalMemoryProvider]:
+    return DomainToolServices(
         knowledge=RagExperimentKnowledgeRetriever.from_jsonl(ROOT / "fixtures/rag/chunks.jsonl"),
-        web=GuardedWebProviders(
-            search_provider=FixtureWebSearchProvider.from_json(ROOT / "fixtures/web/search.json"),
-            fetch_provider=FixtureWebFetchProvider.from_json(ROOT / "fixtures/web/pages.json"),
-            policy=WebSecurityPolicy(max_redirects=2, max_response_bytes=10_000),
-            resolver=_resolver,
-        ),
-        personal_memory=InMemoryPersonalMemoryProvider(),
         collective_memory=FixtureCollectiveMemoryReader.from_json(ROOT / "fixtures/memory/collective.json"),
-    )
+    ), InMemoryPersonalMemoryProvider()
+
+
+@contextmanager
+def _fixture_native_web() -> Iterator[None]:
+    """Replace only the network handlers while retaining Hermes-native schemas."""
+    from tools.registry import registry as hermes_registry
+
+    overlay = HermesRegistryOverlay(hermes_registry)
+    try:
+        for name in ("web_search", "web_extract"):
+            entry = hermes_registry.get_entry(name)
+            assert entry is not None
+
+            async def handler(arguments, _name=name, **_kwargs):
+                if _name == "web_search":
+                    return json.dumps(
+                        {
+                            "success": True,
+                            "data": {
+                                "web": [
+                                    {
+                                        "title": "Fixture result",
+                                        "url": "https://docs.example.edu/review",
+                                        "description": str(arguments["query"]),
+                                    }
+                                ]
+                            },
+                        }
+                    )
+                return json.dumps(
+                    {
+                        "results": [
+                            {
+                                "url": str(arguments["urls"][0]),
+                                "title": "Fixture page",
+                                "content": "Public fixture content",
+                                "error": None,
+                            }
+                        ]
+                    }
+                )
+
+            overlay.install(
+                name=name,
+                toolset=entry.toolset,
+                schema=dict(entry.schema),
+                handler=handler,
+                max_result_size_chars=entry.max_result_size_chars or 100_000,
+            )
+        yield
+    finally:
+        overlay.restore()
 
 
 def _decode_tool_payload(content: str) -> dict:
@@ -113,7 +158,7 @@ def test_hermes_checkout_matches_clean_unpatched_upstream() -> None:
     assert "patches/" not in setup
 
 
-def test_real_hermes_runs_all_fixture_tool_combinations(monkeypatch, tmp_path) -> None:
+def test_real_hermes_composes_native_and_domain_tools_without_duplicates(monkeypatch, tmp_path) -> None:
     _prepare_hermes_test_runtime(monkeypatch)
     monkeypatch.setenv("HERMES_HOME", str(tmp_path / "hermes-home"))
     monkeypatch.setenv("NO_PROXY", "127.0.0.1,localhost")
@@ -128,7 +173,10 @@ def test_real_hermes_runs_all_fixture_tool_combinations(monkeypatch, tmp_path) -
 
     scenarios = {
         "rag": [ToolTurn("knowledge_search", {"query": "通信原理 真题", "limit": 3})],
-        "web": [ToolTurn("web_search", {"query": "通信原理 复习", "limit": 3})],
+        "web": [
+            ToolTurn("web_search", {"query": "通信原理 复习", "limit": 3}),
+            ToolTurn("web_extract", {"urls": ["https://docs.example.edu/review"]}),
+        ],
         "memory": [ToolTurn("personal_memory_search", {"query": "刷题 偏好", "limit": 3})],
         "rag_memory": [
             ToolTurn("knowledge_search", {"query": "通信原理 真题", "limit": 3}),
@@ -138,45 +186,61 @@ def test_real_hermes_runs_all_fixture_tool_combinations(monkeypatch, tmp_path) -
             ToolTurn("knowledge_search", {"query": "通信原理 真题", "limit": 3}),
             ToolTurn("web_search", {"query": "通信原理 复习", "limit": 3}),
             ToolTurn("personal_memory_search", {"query": "刷题 偏好", "limit": 3}),
+            ToolTurn("collective_memory_search", {"query": "两周 冲刺", "course": "通信原理", "limit": 2}),
         ],
     }
 
-    for scenario, turns in scenarios.items():
-        services = _services()
-        allowed = list(dict.fromkeys(turn.name for turn in turns))
-        context, registry = _context(f"hermes-{scenario}", allowed, services)
-        with ScriptedOpenAIServer(turns, f"fixture-final:{scenario}") as server:
-            with HermesToolBridge(registry, context):
-                agent = AIAgent(
-                    base_url=server.base_url,
-                    api_key="fixture-key",
-                    provider="custom",
-                    api_mode="chat_completions",
-                    model="fake-studyhub",
-                    max_iterations=8,
-                    enabled_toolsets=["studyhub"],
-                    quiet_mode=True,
-                    ephemeral_system_prompt="Use the available StudyHub tools, then answer.",
-                    session_id=f"fixture-{scenario}",
-                    skip_context_files=True,
-                    load_soul_identity=False,
-                    skip_memory=True,
-                    skip_background_review=True,
-                    checkpoints_enabled=False,
-                )
-                agent._disable_streaming = True
-                answer = agent.chat("Run the scripted fixture scenario.")
+    with _fixture_native_web():
+        for scenario, turns in scenarios.items():
+            services, personal_memory = _services()
+            allowed = list(dict.fromkeys(turn.name for turn in turns))
+            context, registry = _context(f"hermes-{scenario}", allowed, services, personal_memory)
+            runtime_tools = HermesRuntimeTools(registry, context, personal_memory=personal_memory)
+            with ScriptedOpenAIServer(turns, f"fixture-final:{scenario}") as server:
+                with runtime_tools:
+                    agent = AIAgent(
+                        base_url=server.base_url,
+                        api_key="fixture-key",
+                        provider="custom",
+                        api_mode="chat_completions",
+                        model="fake-studyhub",
+                        max_iterations=8,
+                        enabled_toolsets=runtime_tools.enabled_toolsets,
+                        quiet_mode=True,
+                        ephemeral_system_prompt="Use the available tools, then answer.",
+                        session_id=f"fixture-{scenario}",
+                        skip_context_files=True,
+                        load_soul_identity=False,
+                        skip_memory=True,
+                        skip_background_review=True,
+                        checkpoints_enabled=False,
+                    )
+                    runtime_tools.bind_agent(agent)
+                    assert agent.valid_tool_names == set(allowed)
+                    agent._disable_streaming = True
+                    answer = agent.chat("Run the scripted fixture scenario.")
+                    agent.shutdown_memory_provider()
 
-        assert answer == f"fixture-final:{scenario}"
-        assert len(server.requests) == len(turns) + 1
-        assert len(server.tool_result_messages) >= len(turns)
-        assert all(message.get("content") for message in server.tool_result_messages)
-        tool_payloads = [_decode_tool_payload(message["content"]) for message in server.tool_result_messages]
-        assert all("error" not in payload for payload in tool_payloads)
+            assert answer == f"fixture-final:{scenario}"
+            assert len(server.requests) == len(turns) + 1
+            assert len(server.tool_result_messages) >= len(turns)
+            assert all(message.get("content") for message in server.tool_result_messages)
+            tool_payloads = [_decode_tool_payload(message["content"]) for message in server.tool_result_messages]
+            assert all("error" not in payload for payload in tool_payloads)
+            assert context.budget.tool_calls == len(turns)
 
     from tools.registry import registry as hermes_registry
 
     assert hermes_registry.get_entry("web_search").toolset == "web"
+    assert hermes_registry.get_entry("web_extract").toolset == "web"
+
+
+def test_production_runtime_rejects_replay_only_web_fetch() -> None:
+    services, personal_memory = _services()
+    context, registry = _context("legacy-web", ["web_fetch"], services, personal_memory)
+
+    with pytest.raises(ValueError, match="replay-only"):
+        HermesRuntimeTools(registry, context, personal_memory=personal_memory)
 
 
 def test_training_workflow_runs_real_hermes_against_frozen_tool(monkeypatch, tmp_path) -> None:
