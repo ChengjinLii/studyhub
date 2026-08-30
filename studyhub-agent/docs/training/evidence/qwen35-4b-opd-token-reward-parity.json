@@ -1,6 +1,6 @@
 {
   "schema_version": "studyhub.opd-token-reward-parity.v1",
-  "status": "PASS_THUNLP_TOKEN_REWARD_DIRECT_MATH",
+  "status": "PASS_OPD_COMPATIBILITY_SPIKE",
   "contract": {
     "adv_estimator": "token_reward_direct",
     "top_k": 3,
@@ -211,7 +211,7 @@
     "sampled_token_k1": false,
     "teacher_top_k_forward_kl": false
   },
-  "generated_at": "2026-08-30T09:55:31.136096+00:00",
+  "generated_at": "2026-08-30T09:59:39.584235+00:00",
   "upstream_lock_sha256": "508f17387a9a05ebe88fc76d47837a1a997a7f144b4ad581234f89c2fbc1d436",
   "upstream_checkouts": {
     "thunlp_opd": {
@@ -258,6 +258,26 @@
       },
       "critical_sources_match": true
     }
+  },
+  "torch_candidate": {
+    "status": "PASS_TORCH_COMPATIBILITY_KERNEL",
+    "checks": {
+      "top_k_ids": true,
+      "student_top_k_log_probs": true,
+      "teacher_on_student_log_probs": true,
+      "student_conditional_weights": true,
+      "raw_token_rewards": true,
+      "advantages_and_mask": true,
+      "loss_aggregation": true,
+      "gradient": true,
+      "teacher_detached": true
+    },
+    "metrics": {
+      "loss": 0.42051248472002417,
+      "reference_loss": 0.4205124847200241,
+      "gradient_max_abs_error": 2.7755575615628914e-17
+    },
+    "boundary": "kernel parity only; official verl teacher scorer and distributed runtime remain NOT_RUN"
   },
   "runtime_backend_parity": "NOT_RUN",
   "opd_training_authorized_by_this_gate": false

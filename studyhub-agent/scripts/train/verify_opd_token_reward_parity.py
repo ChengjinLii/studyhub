@@ -17,6 +17,7 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from training.opd.token_reward_parity import run_synthetic_parity_gate  # noqa: E402
+from training.opd.verl_compat import run_torch_candidate_parity_gate  # noqa: E402
 
 
 def _sha256(path: Path) -> str:
@@ -63,6 +64,7 @@ def main() -> int:
     lock_path = PROJECT_ROOT / "training/opd/upstream.lock.json"
     lock = json.loads(lock_path.read_text(encoding="utf-8"))
     parity = run_synthetic_parity_gate()
+    torch_candidate = run_torch_candidate_parity_gate()
     upstream: dict[str, Any] = {}
     if args.thunlp_checkout:
         upstream["thunlp_opd"] = _checkout_audit(args.thunlp_checkout, lock["thunlp_opd"])
@@ -72,24 +74,27 @@ def main() -> int:
     upstream_pass = all(
         audit["commit_matches"] and audit["critical_sources_match"] for audit in upstream.values()
     )
-    status = (
-        "PASS_THUNLP_TOKEN_REWARD_DIRECT_MATH"
-        if parity["status"] == "PASS_THUNLP_TOKEN_REWARD_DIRECT_MATH" and upstream_pass
-        else "FAIL"
-    )
+    status = "PASS_OPD_COMPATIBILITY_SPIKE"
+    if (
+        parity["status"] != "PASS_THUNLP_TOKEN_REWARD_DIRECT_MATH"
+        or torch_candidate["status"] != "PASS_TORCH_COMPATIBILITY_KERNEL"
+        or not upstream_pass
+    ):
+        status = "FAIL"
     report = {
         **parity,
         "status": status,
         "generated_at": datetime.now(UTC).isoformat(),
         "upstream_lock_sha256": _sha256(lock_path),
         "upstream_checkouts": upstream,
+        "torch_candidate": torch_candidate,
         "runtime_backend_parity": "NOT_RUN",
         "opd_training_authorized_by_this_gate": False,
     }
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     print(json.dumps(report, ensure_ascii=False, indent=2))
-    return 0 if status == "PASS_THUNLP_TOKEN_REWARD_DIRECT_MATH" else 2
+    return 0 if status == "PASS_OPD_COMPATIBILITY_SPIKE" else 2
 
 
 if __name__ == "__main__":
