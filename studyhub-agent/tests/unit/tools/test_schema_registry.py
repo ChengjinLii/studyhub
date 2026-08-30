@@ -4,9 +4,10 @@ import pytest
 
 from studyhub_agent.adapters.personal_memory import PersonalMemoryProvider
 from studyhub_agent.guardrails.budget import BudgetState
-from studyhub_agent.tools.factory import ToolServices, build_tool_registry
+from studyhub_agent.replay import ReplayToolServices, build_replay_tool_registry
+from studyhub_agent.tools.factory import DomainToolServices, build_domain_tool_registry
 from studyhub_agent.tools.registry import ToolExecutionContext, ToolValidationError, validate_arguments
-from studyhub_agent.tools.schemas import TOOL_DEFINITIONS, TOOL_SCHEMA_VERSION
+from studyhub_agent.tools.schemas import STUDYHUB_DOMAIN_TOOL_NAMES, TOOL_DEFINITIONS, TOOL_SCHEMA_VERSION
 
 EXPECTED_TOOLS = {
     "knowledge_search",
@@ -39,8 +40,8 @@ def test_registry_dispatches_fixture_capabilities_without_acl_leak(
 ) -> None:
     namespace = identity.personal_memory_namespace(case_id="case-a", seed=9)
     personal_memory.add(namespace, "用户偏好按题型刷通信原理真题")
-    registry = build_tool_registry(
-        ToolServices(
+    registry = build_replay_tool_registry(
+        ReplayToolServices(
             knowledge=knowledge,
             web=web,
             personal_memory=personal_memory,
@@ -77,3 +78,13 @@ def test_registry_dispatches_fixture_capabilities_without_acl_leak(
     assert memory_result["memories"][0]["content"].startswith("用户偏好")
     assert "namespace" not in memory_result["memories"][0]
     assert context.budget.tool_calls == 3
+
+
+def test_production_registry_contains_only_studyhub_domain_tools(knowledge, collective_memory) -> None:
+    registry = build_domain_tool_registry(
+        DomainToolServices(knowledge=knowledge, collective_memory=collective_memory)
+    )
+
+    assert registry.names == STUDYHUB_DOMAIN_TOOL_NAMES
+    assert "web_search" not in registry.names
+    assert "personal_memory_search" not in registry.names

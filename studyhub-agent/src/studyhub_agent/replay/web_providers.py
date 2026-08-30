@@ -78,6 +78,8 @@ class FixtureWebFetchProvider:
 
 
 class GuardedWebProviders:
+    """Historical deterministic provider surface used only by replay tests."""
+
     def __init__(
         self,
         *,
