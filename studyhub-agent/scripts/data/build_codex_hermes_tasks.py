@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build independent training tasks for Codex-Spark driven Hermes rollouts."""
+"""Build independent training tasks for Codex-driven Hermes rollouts."""
 
 from __future__ import annotations
 
@@ -102,7 +102,10 @@ class Scenario:
 
 def _write_json(path: Path, value: Any) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(value, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    path.write_text(
+        json.dumps(value, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
 
 
 def _write_jsonl(path: Path, rows: list[dict[str, Any]]) -> None:
@@ -113,7 +116,9 @@ def _write_jsonl(path: Path, rows: list[dict[str, Any]]) -> None:
 
 
 def _stable_id(family: str, ordinal: int, seed: int) -> str:
-    digest = hashlib.sha256(f"{DATASET_ID}:{seed}:{family}:{ordinal}".encode()).hexdigest()[:18]
+    digest = hashlib.sha256(
+        f"{DATASET_ID}:{seed}:{family}:{ordinal}".encode()
+    ).hexdigest()[:18]
     return f"codex-train-{digest}"
 
 
@@ -169,7 +174,10 @@ def _route(
 ) -> dict[str, Any]:
     row: dict[str, Any] = {"name": name, "arguments": arguments, "result": result}
     if flexible_fields:
-        row["argument_match"] = {"mode": "exact_except", "flexible_fields": flexible_fields}
+        row["argument_match"] = {
+            "mode": "exact_except",
+            "flexible_fields": flexible_fields,
+        }
     return row
 
 
@@ -289,7 +297,10 @@ def _rag(ordinal: int, seed: int) -> Scenario:
             max_steps=6,
             max_tool_calls=5,
         ),
-        environment={"tools": _tools(["knowledge_search", "knowledge_read"]), "documents": documents},
+        environment={
+            "tools": _tools(["knowledge_search", "knowledge_read"]),
+            "documents": documents,
+        },
         fixture={"routes": []},
         verifier=_base_verifier(
             task_id=task_id,
@@ -351,11 +362,15 @@ def _web(ordinal: int, seed: int) -> Scenario:
         "text": "旧安排为 2025-09-01，地点 B101；页面标注已过期。",
     }
     source_group = f"codex-web:{ordinal:04d}"
-    request = f"请查证 {course} 当前有效的答疑日期和地点。优先使用最新的官方来源并附引用。"
+    request = (
+        f"请查证 {course} 当前有效的答疑日期和地点。优先使用最新的官方来源并附引用。"
+    )
     final = f"{course} 当前答疑日期是 {date}，地点 {room}。[{official_source}]"
     fixtures = {
         "routes": [
-            _route("web_search", {"query": f"{course} 答疑", "limit": 5}, search_result),
+            _route(
+                "web_search", {"query": f"{course} 答疑", "limit": 5}, search_result
+            ),
             _route("web_extract", {"urls": [official_url]}, official_page),
             _route("web_extract", {"urls": [stale_url]}, stale_page),
         ]
@@ -407,8 +422,17 @@ def _memory(ordinal: int, seed: int) -> Scenario:
     memory_result = {
         "ok": True,
         "memories": [
-            {"scope": "current_user", "preference": current, "updated_at": "2026-08-20"},
-            {"scope": "current_user", "preference": stale, "updated_at": "2025-03-01", "stale": True},
+            {
+                "scope": "current_user",
+                "preference": current,
+                "updated_at": "2026-08-20",
+            },
+            {
+                "scope": "current_user",
+                "preference": stale,
+                "updated_at": "2025-03-01",
+                "stale": True,
+            },
         ],
         "cross_user_records": [],
     }
@@ -423,14 +447,20 @@ def _memory(ordinal: int, seed: int) -> Scenario:
             task_id=task_id,
             family=family,
             user_request=request,
-            allowed_tools=["personal_memory_search", "knowledge_search", "knowledge_read"],
+            allowed_tools=[
+                "personal_memory_search",
+                "knowledge_search",
+                "knowledge_read",
+            ],
             source_group_id=source_group,
             minimum_citations=1,
             max_steps=8,
             max_tool_calls=6,
         ),
         environment={
-            "tools": _tools(["personal_memory_search", "knowledge_search", "knowledge_read"]),
+            "tools": _tools(
+                ["personal_memory_search", "knowledge_search", "knowledge_read"]
+            ),
             "documents": [
                 {
                     "source_id": target_source,
@@ -463,7 +493,11 @@ def _memory(ordinal: int, seed: int) -> Scenario:
             concept_groups=[[current], [target_title]],
             allowed_citations=[target_source],
             minimum_citations=1,
-            tool_groups=[["personal_memory_search"], ["knowledge_search"], ["knowledge_read"]],
+            tool_groups=[
+                ["personal_memory_search"],
+                ["knowledge_search"],
+                ["knowledge_read"],
+            ],
             forbidden_terms=["cross_user", "其他用户"],
         ),
         audit_actions=[
@@ -489,14 +523,20 @@ def _cross_tool(ordinal: int, seed: int) -> Scenario:
         f"找到《{title}》并核对内容，然后收藏它；再为“{topic}”建立每周 {minutes} 分钟的学习计划。"
         "完成后引用资料并简要确认两项状态。"
     )
-    final = f"已收藏《{title}》，并建立每周 {minutes} 分钟的“{topic}”计划。[{source_id}]"
+    final = (
+        f"已收藏《{title}》，并建立每周 {minutes} 分钟的“{topic}”计划。[{source_id}]"
+    )
     plan_postcondition = f"plan:{ordinal:04d}:updated"
     bookmark_postcondition = f"bookmark:{material_id}:added"
     routes = [
         _route(
             "study_plan_update",
             {"topic": topic, "weekly_minutes": minutes, "resource_ids": [material_id]},
-            {"postcondition": plan_postcondition, "weekly_minutes": minutes, "resource_ids": [material_id]},
+            {
+                "postcondition": plan_postcondition,
+                "weekly_minutes": minutes,
+                "resource_ids": [material_id],
+            },
             flexible_fields=["topic"],
         ),
         _route(
@@ -510,7 +550,12 @@ def _cross_tool(ordinal: int, seed: int) -> Scenario:
             task_id=task_id,
             family=family,
             user_request=request,
-            allowed_tools=["knowledge_search", "knowledge_read", "study_plan_update", "material_bookmark_add"],
+            allowed_tools=[
+                "knowledge_search",
+                "knowledge_read",
+                "study_plan_update",
+                "material_bookmark_add",
+            ],
             source_group_id=source_group,
             minimum_citations=1,
             minimum_state_changes=2,
@@ -518,7 +563,14 @@ def _cross_tool(ordinal: int, seed: int) -> Scenario:
             max_tool_calls=7,
         ),
         environment={
-            "tools": _tools(["knowledge_search", "knowledge_read", "study_plan_update", "material_bookmark_add"]),
+            "tools": _tools(
+                [
+                    "knowledge_search",
+                    "knowledge_read",
+                    "study_plan_update",
+                    "material_bookmark_add",
+                ]
+            ),
             "documents": [
                 {
                     "source_id": source_id,
@@ -538,7 +590,11 @@ def _cross_tool(ordinal: int, seed: int) -> Scenario:
             allowed_citations=[source_id],
             minimum_citations=1,
             markers=[plan_postcondition, bookmark_postcondition],
-            tool_groups=[["knowledge_read"], ["study_plan_update"], ["material_bookmark_add"]],
+            tool_groups=[
+                ["knowledge_read"],
+                ["study_plan_update"],
+                ["material_bookmark_add"],
+            ],
         ),
         audit_actions=[
             ("knowledge_search", {"query": title, "limit": 5}),
@@ -546,7 +602,11 @@ def _cross_tool(ordinal: int, seed: int) -> Scenario:
             ("material_bookmark_add", {"material_id": material_id}),
             (
                 "study_plan_update",
-                {"topic": topic, "weekly_minutes": minutes, "resource_ids": [material_id]},
+                {
+                    "topic": topic,
+                    "weekly_minutes": minutes,
+                    "resource_ids": [material_id],
+                },
             ),
         ],
         audit_final=final,
@@ -581,7 +641,11 @@ def _recovery(ordinal: int, seed: int) -> Scenario:
                 _route(
                     "learning_profile_get",
                     {},
-                    {"service": "external_catalog", "status": "unavailable", "error": status_marker},
+                    {
+                        "service": "external_catalog",
+                        "status": "unavailable",
+                        "error": status_marker,
+                    },
                 )
             ]
         }
@@ -596,16 +660,18 @@ def _recovery(ordinal: int, seed: int) -> Scenario:
     else:
         private_source = f"training-private:{ordinal:04d}"
         private_marker = f"PRIVATE-PAYLOAD-{ordinal:04d}"
-        request = (
-            f"检查我保存的来源 {private_source} 是否可读；如果权限不足，不要猜内容，改用《{title}》并引用公开资料。"
-        )
+        request = f"检查我保存的来源 {private_source} 是否可读；如果权限不足，不要猜内容，改用《{title}》并引用公开资料。"
         tools = ["knowledge_search", "knowledge_read"]
         fixture = {
             "routes": [
                 _route(
                     "knowledge_read",
                     {"source_id": private_source},
-                    {"ok": False, "error": "permission_denied", "source_id": private_source},
+                    {
+                        "ok": False,
+                        "error": "permission_denied",
+                        "source_id": private_source,
+                    },
                 )
             ]
         }
@@ -617,9 +683,7 @@ def _recovery(ordinal: int, seed: int) -> Scenario:
         ]
         tool_groups = [["knowledge_read"], ["knowledge_search"]]
         forbidden = [private_marker]
-    final = (
-        f"外部来源当前不可用或无权读取；安全替代是《{title}》，主题为 {TOPICS[ordinal % len(TOPICS)]}。[{source_id}]"
-    )
+    final = f"外部来源当前不可用或无权读取；安全替代是《{title}》，主题为 {TOPICS[ordinal % len(TOPICS)]}。[{source_id}]"
     return Scenario(
         task=_base_task(
             task_id=task_id,
@@ -664,12 +728,18 @@ def _stateful(ordinal: int, seed: int) -> Scenario:
         f"读取我的当前学习档案，然后为 {course} 的“{topic}”建立每周 {minutes} 分钟计划，"
         f"并把该主题记录为 review、分数 {score}。完成后确认结果。"
     )
-    final = f"已为“{topic}”建立每周 {minutes} 分钟计划，并记录 review 状态和分数 {score}。"
+    final = (
+        f"已为“{topic}”建立每周 {minutes} 分钟计划，并记录 review 状态和分数 {score}。"
+    )
     routes = [
         _route(
             "learning_profile_get",
             {},
-            {"profile_scope": "current_user", "course": course, "postcondition": "profile_loaded"},
+            {
+                "profile_scope": "current_user",
+                "course": course,
+                "postcondition": "profile_loaded",
+            },
         ),
         _route(
             "study_plan_update",
@@ -705,12 +775,22 @@ def _stateful(ordinal: int, seed: int) -> Scenario:
             reference_final=final,
             concept_groups=[[topic], [str(minutes)], ["review", "复习"], [str(score)]],
             markers=[plan_marker, progress_marker],
-            tool_groups=[["learning_profile_get"], ["study_plan_update"], ["learning_progress_record"]],
+            tool_groups=[
+                ["learning_profile_get"],
+                ["study_plan_update"],
+                ["learning_progress_record"],
+            ],
         ),
         audit_actions=[
             ("learning_profile_get", {}),
-            ("study_plan_update", {"topic": topic, "weekly_minutes": minutes, "resource_ids": []}),
-            ("learning_progress_record", {"topic": topic, "status": "review", "score": score}),
+            (
+                "study_plan_update",
+                {"topic": topic, "weekly_minutes": minutes, "resource_ids": []},
+            ),
+            (
+                "learning_progress_record",
+                {"topic": topic, "status": "review", "score": score},
+            ),
         ],
         audit_final=final,
     )
@@ -761,9 +841,13 @@ BUILDERS = {
 }
 
 
-async def _audit_scenario(root: Path, scenario: Scenario) -> tuple[list[str], dict[str, Any]]:
+async def _audit_scenario(
+    root: Path, scenario: Scenario
+) -> tuple[list[str], dict[str, Any]]:
     task = scenario.task
-    environment = FrozenTaskEnvironment.from_root(root, task["task_id"], max_tool_calls=task["max_tool_calls"])
+    environment = FrozenTaskEnvironment.from_root(
+        root, task["task_id"], max_tool_calls=task["max_tool_calls"]
+    )
     messages: list[dict[str, Any]] = [
         {"role": "system", "content": "training environment executability audit"},
         {"role": "user", "content": task["user_request"]},
@@ -774,11 +858,24 @@ async def _audit_scenario(root: Path, scenario: Scenario) -> tuple[list[str], di
             {
                 "role": "assistant",
                 "content": "",
-                "tool_calls": [{"id": call_id, "type": "function", "function": {"name": name, "arguments": arguments}}],
+                "tool_calls": [
+                    {
+                        "id": call_id,
+                        "type": "function",
+                        "function": {"name": name, "arguments": arguments},
+                    }
+                ],
             }
         )
         observation = await environment.execute(name, arguments)
-        messages.append({"role": "tool", "name": name, "tool_call_id": call_id, "content": observation})
+        messages.append(
+            {
+                "role": "tool",
+                "name": name,
+                "tool_call_id": call_id,
+                "content": observation,
+            }
+        )
     messages.append({"role": "assistant", "content": scenario.audit_final})
     run = {
         "status": "COMPLETED",
@@ -800,7 +897,11 @@ async def _audit_scenario(root: Path, scenario: Scenario) -> tuple[list[str], di
 
 
 def _public_benchmark_prompts() -> list[str]:
-    manifest = json.loads((PROJECT_ROOT / "benchmarks/studyhub-agent-v2/manifest.json").read_text(encoding="utf-8"))
+    manifest = json.loads(
+        (PROJECT_ROOT / "benchmarks/studyhub-agent-v2/manifest.json").read_text(
+            encoding="utf-8"
+        )
+    )
     prompts: list[str] = []
     for relative in sorted(manifest["public_files"]):
         if not relative.endswith("tasks.jsonl"):
@@ -828,9 +929,13 @@ def build(root: Path, *, total_tasks: int, seed: int, force: bool) -> dict[str, 
     if total_tasks < len(FAMILY_WEIGHTS):
         raise ValueError(f"--total-tasks must be at least {len(FAMILY_WEIGHTS)}")
     if root.exists() and any((root / "raw_runs").glob("*.json")):
-        raise RuntimeError("refusing to rebuild a root that already contains raw teacher runs")
+        raise RuntimeError(
+            "refusing to rebuild a root that already contains raw teacher runs"
+        )
     if root.exists() and not force:
-        raise FileExistsError(f"output root exists; pass --force after checking it: {root}")
+        raise FileExistsError(
+            f"output root exists; pass --force after checking it: {root}"
+        )
     if root.exists():
         shutil.rmtree(root)
     for name in ("environments", "fixtures", "verifiers", "raw_runs"):
@@ -856,24 +961,41 @@ def build(root: Path, *, total_tasks: int, seed: int, force: bool) -> dict[str, 
         if failures:
             audit_failures[scenario.task["task_id"]] = failures
     if audit_failures:
-        raise RuntimeError(f"training environment/verifier executability failed: {audit_failures}")
+        raise RuntimeError(
+            f"training environment/verifier executability failed: {audit_failures}"
+        )
 
-    tasks = sorted((scenario.task for scenario in scenarios), key=lambda row: row["task_id"])
-    benchmark_manifest = json.loads(
-        (PROJECT_ROOT / "benchmarks/studyhub-agent-v2/manifest.json").read_text(encoding="utf-8")
+    tasks = sorted(
+        (scenario.task for scenario in scenarios), key=lambda row: row["task_id"]
     )
-    benchmark_hashes, benchmark_rows = public_benchmark_prompt_hashes(PROJECT_ROOT, benchmark_manifest)
-    prompt_hashes = [hashlib.sha256(normalized_text(row["user_request"]).encode()).hexdigest() for row in tasks]
+    benchmark_manifest = json.loads(
+        (PROJECT_ROOT / "benchmarks/studyhub-agent-v2/manifest.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    benchmark_hashes, benchmark_rows = public_benchmark_prompt_hashes(
+        PROJECT_ROOT, benchmark_manifest
+    )
+    prompt_hashes = [
+        hashlib.sha256(normalized_text(row["user_request"]).encode()).hexdigest()
+        for row in tasks
+    ]
     exact_overlap = sum(value in benchmark_hashes for value in prompt_hashes)
     public_prompts = _public_benchmark_prompts()
     maximum_near_overlap = max(
-        (_jaccard(task["user_request"], benchmark) for task in tasks for benchmark in public_prompts),
+        (
+            _jaccard(task["user_request"], benchmark)
+            for task in tasks
+            for benchmark in public_prompts
+        ),
         default=0.0,
     )
     if exact_overlap:
         raise RuntimeError(f"public benchmark prompt overlap detected: {exact_overlap}")
     if maximum_near_overlap >= 0.80:
-        raise RuntimeError(f"near benchmark prompt overlap is too high: {maximum_near_overlap:.6f}")
+        raise RuntimeError(
+            f"near benchmark prompt overlap is too high: {maximum_near_overlap:.6f}"
+        )
 
     _write_jsonl(root / "task_specs.jsonl", tasks)
     provenance = {
@@ -891,7 +1013,11 @@ def build(root: Path, *, total_tasks: int, seed: int, force: bool) -> dict[str, 
     _write_json(root / "source_provenance.json", provenance)
     manifest = {
         "schema_version": SCHEMA_VERSION,
-        "status": "PASS_READY_FOR_CODEX_PILOT" if total_tasks == 50 else "PASS_READY_FOR_COLLECTION",
+        "status": (
+            "PASS_READY_FOR_CODEX_PILOT"
+            if total_tasks == 50
+            else "PASS_READY_FOR_COLLECTION"
+        ),
         "dataset_id": DATASET_ID,
         "seed": seed,
         "tasks": total_tasks,
@@ -927,7 +1053,17 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> int:
     args = parse_args()
-    print(json.dumps(build(args.root, total_tasks=args.total_tasks, seed=args.seed, force=args.force), indent=2))
+    print(
+        json.dumps(
+            build(
+                args.root,
+                total_tasks=args.total_tasks,
+                seed=args.seed,
+                force=args.force,
+            ),
+            indent=2,
+        )
+    )
     return 0
 
 

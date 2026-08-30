@@ -11,8 +11,11 @@ import pytest
 
 import scripts.data.collect_teacher_hermes_trajectories as teacher_collector
 import training.teacher.providers as teacher_providers
-from scripts.data.build_runtime_sft_v3_1 import _apply_teacher_self_review, _select_teacher_rows
-from scripts.data.build_spark_hermes_tasks import build as build_spark_hermes_tasks
+from scripts.data.build_runtime_sft_v3_1 import (
+    _apply_teacher_self_review,
+    _select_teacher_rows,
+)
+from scripts.data.build_codex_hermes_tasks import build as build_codex_hermes_tasks
 from scripts.data.build_teacher_task_specs import _environment, _source_group_ids
 from scripts.data.select_runtime_sft_v3 import public_benchmark_prompt_hashes
 from scripts.data.verify_teacher_trajectories import accepted_record, verify_run
@@ -33,25 +36,36 @@ from training.teacher.providers import (
 ROOT = Path(__file__).resolve().parents[3]
 
 
-def test_independent_spark_task_builder_emits_executable_path_agnostic_tasks(tmp_path: Path) -> None:
+def test_independent_spark_task_builder_emits_executable_path_agnostic_tasks(
+    tmp_path: Path,
+) -> None:
     root = tmp_path / "spark-tasks"
 
-    manifest = build_spark_hermes_tasks(root, total_tasks=14, seed=20260827, force=False)
+    manifest = build_codex_hermes_tasks(
+        root, total_tasks=14, seed=20260827, force=False
+    )
 
     assert manifest["environment_executable_rate"] == 1.0
     assert manifest["exact_public_benchmark_overlap"] == 0
     assert manifest["legacy_reverse_replay_used"] is False
     assert manifest["sealed_or_fresh_external_holdouts_opened"] is False
-    tasks = [json.loads(line) for line in (root / "task_specs.jsonl").read_text().splitlines()]
+    tasks = [
+        json.loads(line)
+        for line in (root / "task_specs.jsonl").read_text().splitlines()
+    ]
     assert len(tasks) == 14
     assert len({task["metadata"]["source_group_id"] for task in tasks}) == 14
     assert all("verifier" not in task for task in tasks)
-    web_tasks = [task for task in tasks if task["family"] == "web_source_conflict_freshness"]
+    web_tasks = [
+        task for task in tasks if task["family"] == "web_source_conflict_freshness"
+    ]
     assert web_tasks
     assert web_tasks[0]["allowed_tools"] == ["web_search", "web_extract"]
     assert all("web_fetch" not in task["allowed_tools"] for task in tasks)
     for task in tasks:
-        verifier = json.loads((root / "verifiers" / f"{task['task_id']}.json").read_text())
+        verifier = json.loads(
+            (root / "verifiers" / f"{task['task_id']}.json").read_text()
+        )
         assert verifier["verifier_mode"] == "path_agnostic_v2"
 
 
@@ -97,7 +111,9 @@ def test_sequential_teacher_resume_archives_and_retries_usage_limit(
     job = {"run_id": "retry-one", "request_timeout": 30}
     raw_path = tmp_path / "raw_runs" / "retry-one.json"
     raw_path.parent.mkdir(parents=True)
-    raw_path.write_text(json.dumps({"run_id": "retry-one", "status": "FAILED"}), encoding="utf-8")
+    raw_path.write_text(
+        json.dumps({"run_id": "retry-one", "status": "FAILED"}), encoding="utf-8"
+    )
     limited = {
         "run": {"run_id": "retry-one"},
         "accepted": False,
@@ -105,7 +121,9 @@ def test_sequential_teacher_resume_archives_and_retries_usage_limit(
     }
     retried = {"run": {"run_id": "retry-one"}, "accepted": True, "failures": []}
 
-    monkeypatch.setattr(teacher_collector, "_existing_result", lambda _root, _job: limited)
+    monkeypatch.setattr(
+        teacher_collector, "_existing_result", lambda _root, _job: limited
+    )
     monkeypatch.setattr(teacher_collector, "_collect_job", lambda _job: retried)
     monkeypatch.setattr(teacher_collector, "_write_run", lambda _root, _result: None)
 
@@ -206,13 +224,23 @@ def test_codex_event_audit_rejects_any_codex_tool_event() -> None:
             json.dumps({"type": "thread.started"}),
             json.dumps({"type": "item.completed", "item": {"type": "reasoning"}}),
             json.dumps({"type": "item.completed", "item": {"type": "agent_message"}}),
-            json.dumps({"type": "turn.completed", "usage": {"input_tokens": 10, "output_tokens": 4}}),
+            json.dumps(
+                {
+                    "type": "turn.completed",
+                    "usage": {"input_tokens": 10, "output_tokens": 4},
+                }
+            ),
         ]
     )
     unsafe = (
         safe
         + "\n"
-        + json.dumps({"type": "item.completed", "item": {"type": "command_execution", "command": "cat secret"}})
+        + json.dumps(
+            {
+                "type": "item.completed",
+                "item": {"type": "command_execution", "command": "cat secret"},
+            }
+        )
     )
 
     assert _codex_event_audit(safe)["zero_codex_tool_events"] is True
@@ -221,18 +249,28 @@ def test_codex_event_audit_rejects_any_codex_tool_event() -> None:
     assert audit["forbidden_item_types"] == ["command_execution"]
 
 
-def test_codex_event_audit_records_error_item_without_misclassifying_it_as_a_tool() -> None:
+def test_codex_event_audit_records_error_item_without_misclassifying_it_as_a_tool() -> (
+    None
+):
     output = "\n".join(
         [
             json.dumps({"type": "thread.started"}),
             json.dumps(
                 {
                     "type": "item.completed",
-                    "item": {"type": "error", "message": "non-fatal provider diagnostic"},
+                    "item": {
+                        "type": "error",
+                        "message": "non-fatal provider diagnostic",
+                    },
                 }
             ),
             json.dumps({"type": "item.completed", "item": {"type": "agent_message"}}),
-            json.dumps({"type": "turn.completed", "usage": {"input_tokens": 10, "output_tokens": 4}}),
+            json.dumps(
+                {
+                    "type": "turn.completed",
+                    "usage": {"input_tokens": 10, "output_tokens": 4},
+                }
+            ),
         ]
     )
 
@@ -254,14 +292,23 @@ def test_codex_provider_disables_hosted_search_and_codex_planning(
         captured["prompt"] = kwargs.get("input")
         output_path = Path(command[command.index("--output-last-message") + 1])
         output_path.write_text(
-            json.dumps({"type": "final", "name": "", "arguments": "{}", "content": "done"}),
+            json.dumps(
+                {"type": "final", "name": "", "arguments": "{}", "content": "done"}
+            ),
             encoding="utf-8",
         )
         stdout = "\n".join(
             [
                 json.dumps({"type": "thread.started"}),
-                json.dumps({"type": "item.completed", "item": {"type": "agent_message"}}),
-                json.dumps({"type": "turn.completed", "usage": {"input_tokens": 1, "output_tokens": 1}}),
+                json.dumps(
+                    {"type": "item.completed", "item": {"type": "agent_message"}}
+                ),
+                json.dumps(
+                    {
+                        "type": "turn.completed",
+                        "usage": {"input_tokens": 1, "output_tokens": 1},
+                    }
+                ),
             ]
         )
         return subprocess.CompletedProcess(command, 0, stdout=stdout, stderr="")
@@ -280,7 +327,9 @@ def test_codex_provider_disables_hosted_search_and_codex_planning(
     assert isinstance(command, list)
     assert 'web_search="disabled"' in command
     developer_override = next(
-        value for value in command if isinstance(value, str) and value.startswith("developer_instructions=")
+        value
+        for value in command
+        if isinstance(value, str) and value.startswith("developer_instructions=")
     )
     assert "Do not invoke or emit any Codex tool" in developer_override
     assert "todo list" in developer_override
@@ -346,7 +395,12 @@ def test_chat_action_output_recovers_structured_compatibility_fields() -> None:
                     "message": {
                         "content": "",
                         "reasoning_content": json.dumps(
-                            {"type": "final", "name": "", "arguments": "{}", "content": "done"}
+                            {
+                                "type": "final",
+                                "name": "",
+                                "arguments": "{}",
+                                "content": "done",
+                            }
                         ),
                     }
                 }
@@ -377,7 +431,9 @@ def test_visible_runtime_state_separates_discovery_from_grounded_evidence() -> N
         {
             "role": "tool",
             "name": "web_search",
-            "content": json.dumps({"results": [{"source_id": "web:one", "url": "https://one"}]}),
+            "content": json.dumps(
+                {"results": [{"source_id": "web:one", "url": "https://one"}]}
+            ),
         },
         {
             "role": "assistant",
@@ -386,11 +442,15 @@ def test_visible_runtime_state_separates_discovery_from_grounded_evidence() -> N
         {
             "role": "tool",
             "name": "web_fetch",
-            "content": json.dumps({"content": {"source_id": "web:one", "text": "evidence"}}),
+            "content": json.dumps(
+                {"content": {"source_id": "web:one", "text": "evidence"}}
+            ),
         },
         {
             "role": "assistant",
-            "tool_calls": [{"function": {"name": "study_plan_update", "arguments": {}}}],
+            "tool_calls": [
+                {"function": {"name": "study_plan_update", "arguments": {}}}
+            ],
         },
         {
             "role": "tool",
@@ -448,12 +508,18 @@ def test_teacher_builder_preserves_permission_denial_as_executable_route() -> No
         {
             "name": "knowledge_read",
             "arguments": {"source_id": source_id},
-            "result": {"ok": False, "error": "permission_denied", "source_id": source_id},
+            "result": {
+                "ok": False,
+                "error": "permission_denied",
+                "source_id": source_id,
+            },
         }
     ]
     assert expected_tools == ["knowledge_read"]
     runtime = FrozenTaskEnvironment(environment, fixture)
-    result = json.loads(asyncio.run(runtime.execute("knowledge_read", {"source_id": source_id})))
+    result = json.loads(
+        asyncio.run(runtime.execute("knowledge_read", {"source_id": source_id}))
+    )
     assert result["error"] == "permission_denied"
     assert runtime.trace.invalid_tool_calls == 0
 
@@ -493,7 +559,12 @@ def test_teacher_builder_preserves_web_fetch_route_and_records_evidence() -> Non
                 "fetch-web",
                 "web_fetch",
                 {"url": url},
-                {"content": {"source_id": source_id, "text": "Current official evidence."}},
+                {
+                    "content": {
+                        "source_id": source_id,
+                        "text": "Current official evidence.",
+                    }
+                },
             ),
         ],
     )
@@ -503,14 +574,18 @@ def test_teacher_builder_preserves_web_fetch_route_and_records_evidence() -> Non
     assert [route["name"] for route in fixture["routes"]] == ["web_search", "web_fetch"]
     assert expected_tools == ["web_search", "web_fetch"]
     runtime = FrozenTaskEnvironment(environment, fixture)
-    search = json.loads(asyncio.run(runtime.execute("web_search", {"query": "current policy"})))
+    search = json.loads(
+        asyncio.run(runtime.execute("web_search", {"query": "current policy"}))
+    )
     fetch = json.loads(asyncio.run(runtime.execute("web_fetch", {"url": url})))
     assert search["results"] == [{"url": url, "title": "Official result"}]
     assert fetch["fixture_match"] is True
     assert runtime.trace.read_source_ids == {source_id}
 
 
-def test_teacher_builder_supplements_every_frozen_web_result_from_train_library() -> None:
+def test_teacher_builder_supplements_every_frozen_web_result_from_train_library() -> (
+    None
+):
     first_url = "https://example.edu/first"
     second_url = "https://example.edu/second"
     row = _builder_row(
@@ -565,10 +640,18 @@ def test_teacher_builder_supplements_every_frozen_web_result_from_train_library(
 
     environment, fixture, _expected_tools = _environment(row, web_fetch_library=library)
 
-    fetch_routes = [route for route in fixture["routes"] if route["name"] == "web_fetch"]
-    assert [route["arguments"]["url"] for route in fetch_routes] == [first_url, second_url]
+    fetch_routes = [
+        route for route in fixture["routes"] if route["name"] == "web_fetch"
+    ]
+    assert [route["arguments"]["url"] for route in fetch_routes] == [
+        first_url,
+        second_url,
+    ]
     assert fetch_routes[1]["provenance"]["origin"] == "frozen_train_fetch_library"
-    assert _source_group_ids(row, library) == ["studyhub-material:1", "studyhub-material:2"]
+    assert _source_group_ids(row, library) == [
+        "studyhub-material:1",
+        "studyhub-material:2",
+    ]
     runtime = FrozenTaskEnvironment(environment, fixture)
     result = json.loads(asyncio.run(runtime.execute("web_fetch", {"url": second_url})))
     assert result["fixture_match"] is True
@@ -588,7 +671,10 @@ def test_fixture_route_accepts_declared_equivalent_state_text() -> None:
                         "properties": {
                             "topic": {"type": "string"},
                             "weekly_minutes": {"type": "integer"},
-                            "resource_ids": {"type": "array", "items": {"type": "integer"}},
+                            "resource_ids": {
+                                "type": "array",
+                                "items": {"type": "integer"},
+                            },
                         },
                         "required": ["topic", "weekly_minutes", "resource_ids"],
                     },
@@ -600,8 +686,15 @@ def test_fixture_route_accepts_declared_equivalent_state_text() -> None:
             "routes": [
                 {
                     "name": "study_plan_update",
-                    "arguments": {"topic": "reference wording", "weekly_minutes": 90, "resource_ids": [1, 2]},
-                    "argument_match": {"mode": "exact_except", "flexible_fields": ["topic"]},
+                    "arguments": {
+                        "topic": "reference wording",
+                        "weekly_minutes": 90,
+                        "resource_ids": [1, 2],
+                    },
+                    "argument_match": {
+                        "mode": "exact_except",
+                        "flexible_fields": ["topic"],
+                    },
                     "result": {"ok": True, "postcondition": "study_plan_updated"},
                 }
             ]
@@ -612,7 +705,11 @@ def test_fixture_route_accepts_declared_equivalent_state_text() -> None:
         asyncio.run(
             environment.execute(
                 "study_plan_update",
-                {"topic": "equivalent teacher wording", "weekly_minutes": 90, "resource_ids": [1, 2]},
+                {
+                    "topic": "equivalent teacher wording",
+                    "weekly_minutes": 90,
+                    "resource_ids": [1, 2],
+                },
             )
         )
     )
@@ -626,7 +723,10 @@ def test_nested_fetch_observation_is_valid_grounded_citation() -> None:
     task = {
         "family": "web_fallback_conflict",
         "max_tool_calls": 3,
-        "metadata": {"source_group_id": "web:one", "teacher_dataset": "studyhub_teacher_v2"},
+        "metadata": {
+            "source_group_id": "web:one",
+            "teacher_dataset": "studyhub_teacher_v2",
+        },
     }
     run = {
         "status": "COMPLETED",
@@ -643,12 +743,24 @@ def test_nested_fetch_observation_is_valid_grounded_citation() -> None:
         "messages": [
             {
                 "role": "assistant",
-                "tool_calls": [{"function": {"name": "web_fetch", "arguments": {"url": "https://one"}}}],
+                "tool_calls": [
+                    {
+                        "function": {
+                            "name": "web_fetch",
+                            "arguments": {"url": "https://one"},
+                        }
+                    }
+                ],
             },
             {
                 "role": "tool",
                 "name": "web_fetch",
-                "content": json.dumps({"ok": True, "content": {"source_id": "web:one", "text": "supported fact"}}),
+                "content": json.dumps(
+                    {
+                        "ok": True,
+                        "content": {"source_id": "web:one", "text": "supported fact"},
+                    }
+                ),
             },
             {"role": "assistant", "content": "supported fact [web:one]"},
         ],
@@ -676,12 +788,20 @@ def test_teacher_provider_availability_never_confuses_cli_with_responses_key(
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
 
     assert ResponsesAPIProvider().availability()["available"] is False
-    assert CodexCLIProvider(command="missing-studyhub-codex").availability()["available"] is False
-    assert CodexSparkProvider(command="missing-studyhub-codex").availability()["available"] is False
+    assert (
+        CodexCLIProvider(command="missing-studyhub-codex").availability()["available"]
+        is False
+    )
+    assert (
+        CodexSparkProvider(command="missing-studyhub-codex").availability()["available"]
+        is False
+    )
     codex = build_provider("codex-cli")
     assert codex.interface == "codex-cli"
     assert codex.model == "gpt-5.6-sol"
-    assert build_provider("local-best-of-n", model="fixture").native_tool_calling is True
+    assert (
+        build_provider("local-best-of-n", model="fixture").native_tool_calling is True
+    )
     compatible = build_provider("authorized-openai-compatible", model="fixture")
     assert compatible.availability()["available"] is False
 
@@ -775,7 +895,10 @@ def test_local_teacher_exposes_studyhub_tools_through_native_channel(
     action, event = provider.choose_action(
         {"max_steps": 3, "max_tool_calls": 2, "completion_contract": {}},
         tools,
-        [{"role": "system", "content": "StudyHub teacher."}, {"role": "user", "content": "检索通信原理"}],
+        [
+            {"role": "system", "content": "StudyHub teacher."},
+            {"role": "user", "content": "检索通信原理"},
+        ],
         0,
     )
 
@@ -793,11 +916,14 @@ def test_local_teacher_exposes_studyhub_tools_through_native_channel(
     assert event["native_studyhub_tool_names"] == ["knowledge_search"]
 
 
-def test_public_benchmark_hash_inventory_never_requires_sealed_task_files(tmp_path: Path) -> None:
+def test_public_benchmark_hash_inventory_never_requires_sealed_task_files(
+    tmp_path: Path,
+) -> None:
     benchmark = tmp_path / "benchmarks/studyhub-agent-v2/development"
     benchmark.mkdir(parents=True)
     (benchmark / "tasks.jsonl").write_text(
-        json.dumps({"task_id": "dev-1", "user_request": "public development task"}) + "\n",
+        json.dumps({"task_id": "dev-1", "user_request": "public development task"})
+        + "\n",
         encoding="utf-8",
     )
     manifest = {
@@ -821,11 +947,15 @@ def test_public_benchmark_hash_inventory_never_requires_sealed_task_files(tmp_pa
     assert len(hashes) == 1
 
 
-def test_actual_hermes_registry_executes_teacher_action_and_verifier_accepts(tmp_path: Path) -> None:
+def test_actual_hermes_registry_executes_teacher_action_and_verifier_accepts(
+    tmp_path: Path,
+) -> None:
     checkout = ROOT / ".vendor/hermes-agent"
     if not checkout.is_dir():
         pytest.skip("pinned Hermes checkout is not installed")
-    lock = json.loads((ROOT / "integrations/hermes/upstream.lock.json").read_text(encoding="utf-8"))
+    lock = json.loads(
+        (ROOT / "integrations/hermes/upstream.lock.json").read_text(encoding="utf-8")
+    )
     task_id = "teacher-fixture"
     root = _teacher_root(tmp_path, task_id)
     task = {
@@ -859,7 +989,12 @@ def test_actual_hermes_registry_executes_teacher_action_and_verifier_accepts(tmp
                 {"interface": "fixture", "model": "fixture-teacher"},
             )
         return (
-            {"type": "final", "name": "", "arguments": {}, "content": "The observed answer is 42."},
+            {
+                "type": "final",
+                "name": "",
+                "arguments": {},
+                "content": "The observed answer is 42.",
+            },
             {"interface": "fixture", "model": "fixture-teacher"},
         )
 
@@ -902,7 +1037,9 @@ def test_controller_rejects_premature_final_without_policy_hint(tmp_path: Path) 
     checkout = ROOT / ".vendor/hermes-agent"
     if not checkout.is_dir():
         pytest.skip("pinned Hermes checkout is not installed")
-    lock = json.loads((ROOT / "integrations/hermes/upstream.lock.json").read_text(encoding="utf-8"))
+    lock = json.loads(
+        (ROOT / "integrations/hermes/upstream.lock.json").read_text(encoding="utf-8")
+    )
     task_id = "teacher-repair-fixture"
     root = _teacher_root(tmp_path, task_id)
     fixture_path = root / "fixtures" / f"{task_id}.json"
@@ -937,7 +1074,12 @@ def test_controller_rejects_premature_final_without_policy_hint(tmp_path: Path) 
                 "arguments": {"key": "answer"},
                 "content": "",
             },
-            {"type": "final", "name": "", "arguments": {}, "content": "The answer 42 is recorded."},
+            {
+                "type": "final",
+                "name": "",
+                "arguments": {},
+                "content": "The answer 42 is recorded.",
+            },
         ]
         return actions[turn], {"interface": "fixture", "model": "fixture-teacher"}
 
@@ -954,17 +1096,22 @@ def test_controller_rejects_premature_final_without_policy_hint(tmp_path: Path) 
     assert run["controller"]["controller_errors"] == ["premature_final"]
     assert run["controller"]["policy_corrections"] == []
     assert not any(
-        message.get("role") == "user" and "runtime_feedback" in message.get("content", "")
+        message.get("role") == "user"
+        and "runtime_feedback" in message.get("content", "")
         for message in run["messages"]
     )
     assert all(message.get("content") != "Recorded." for message in run["messages"])
 
 
-def test_controller_repairs_public_tool_schema_failure_without_training_bad_action(tmp_path: Path) -> None:
+def test_controller_repairs_public_tool_schema_failure_without_training_bad_action(
+    tmp_path: Path,
+) -> None:
     checkout = ROOT / ".vendor/hermes-agent"
     if not checkout.is_dir():
         pytest.skip("pinned Hermes checkout is not installed")
-    lock = json.loads((ROOT / "integrations/hermes/upstream.lock.json").read_text(encoding="utf-8"))
+    lock = json.loads(
+        (ROOT / "integrations/hermes/upstream.lock.json").read_text(encoding="utf-8")
+    )
     task_id = "teacher-schema-repair-fixture"
     root = _teacher_root(tmp_path, task_id)
     fixture_path = root / "fixtures" / f"{task_id}.json"
@@ -1004,7 +1151,12 @@ def test_controller_repairs_public_tool_schema_failure_without_training_bad_acti
                 "arguments": {"key": "answer"},
                 "content": "",
             },
-            {"type": "final", "name": "", "arguments": {}, "content": "The answer 42 is recorded."},
+            {
+                "type": "final",
+                "name": "",
+                "arguments": {},
+                "content": "The answer 42 is recorded.",
+            },
         ]
         return actions[turn], {"interface": "fixture", "model": "fixture-teacher"}
 
@@ -1032,9 +1184,12 @@ def test_controller_repairs_public_tool_schema_failure_without_training_bad_acti
         if message.get("role") == "assistant"
         for call in message.get("tool_calls", [])
     ]
-    assert [call["function"]["arguments"] for call in assistant_calls] == [{"key": "answer"}]
+    assert [call["function"]["arguments"] for call in assistant_calls] == [
+        {"key": "answer"}
+    ]
     assert any(
-        message.get("role") == "user" and "Tool action not accepted" in message.get("content", "")
+        message.get("role") == "user"
+        and "Tool action not accepted" in message.get("content", "")
         for message in run["messages"]
     )
 
@@ -1043,7 +1198,9 @@ def test_controller_allows_only_one_schema_retry(tmp_path: Path) -> None:
     checkout = ROOT / ".vendor/hermes-agent"
     if not checkout.is_dir():
         pytest.skip("pinned Hermes checkout is not installed")
-    lock = json.loads((ROOT / "integrations/hermes/upstream.lock.json").read_text(encoding="utf-8"))
+    lock = json.loads(
+        (ROOT / "integrations/hermes/upstream.lock.json").read_text(encoding="utf-8")
+    )
     task_id = "teacher-schema-retry-limit"
     root = _teacher_root(tmp_path, task_id)
     task = {
@@ -1079,7 +1236,9 @@ def test_controller_allows_only_one_schema_retry(tmp_path: Path) -> None:
 
     assert run["status"] == "FAILED"
     assert run["controller"]["schema_retry_used"] is True
-    assert run["controller"]["controller_errors"] == ["second_tool_schema_validation_failure"]
+    assert run["controller"]["controller_errors"] == [
+        "second_tool_schema_validation_failure"
+    ]
     assert len(run["controller"]["policy_corrections"]) == 1
     assert len(run["controller"]["schema_validation_failures"]) == 2
 
@@ -1105,7 +1264,10 @@ def test_policy_corrected_teacher_trajectory_uses_repaired_quality_tier() -> Non
     }
     task = {
         "family": "direct_abstention",
-        "metadata": {"source_group_id": "repaired-fixture", "teacher_dataset": "studyhub_teacher_v2_1"},
+        "metadata": {
+            "source_group_id": "repaired-fixture",
+            "teacher_dataset": "studyhub_teacher_v2_1",
+        },
     }
 
     record = accepted_record(run, task, {}, {})
@@ -1183,7 +1345,9 @@ def test_teacher_selection_caps_secondary_source_groups() -> None:
     selected, drops = _select_teacher_rows(
         [
             direct_record("direct-one", "primary-one", "What is one plus one?", "Two."),
-            direct_record("direct-two", "primary-two", "What is two plus two?", "Four."),
+            direct_record(
+                "direct-two", "primary-two", "What is two plus two?", "Four."
+            ),
         ],
         base_content=set(),
         base_near=set(),
@@ -1198,7 +1362,10 @@ def test_teacher_selection_caps_secondary_source_groups() -> None:
 def test_teacher_self_review_is_hash_bound_and_fail_closed(tmp_path: Path) -> None:
     accepted_path = tmp_path / "accepted.jsonl"
     accepted_path.write_text(
-        json.dumps({"source_id": "include"}) + "\n" + json.dumps({"source_id": "exclude"}) + "\n",
+        json.dumps({"source_id": "include"})
+        + "\n"
+        + json.dumps({"source_id": "exclude"})
+        + "\n",
         encoding="utf-8",
     )
     accepted_sha = hashlib.sha256(accepted_path.read_bytes()).hexdigest()

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from scripts.data.audit_spark_hermes_sft2_inputs import EligibleTrajectory
+from scripts.data.audit_codex_hermes_sft2_inputs import EligibleTrajectory
 from scripts.data.build_qwen35_4b_sft2_candidates import build_candidate_pool
 from studyhub_agent.trajectory.runtime_sft import trajectory_fingerprint
 
@@ -26,14 +26,20 @@ def _row(record_id: str, *, source: str, group: str, split: str = "train") -> di
             {"role": "user", "content": f"request {record_id}"},
             {"role": "assistant", "content": f"answer {record_id}"},
         ],
-        "provenance": {"revision": "test", "license": "test", "source_url": "local://test"},
+        "provenance": {
+            "revision": "test",
+            "license": "test",
+            "source_url": "local://test",
+        },
     }
     row["content_sha256"] = trajectory_fingerprint(row)
     return row
 
 
 def test_candidate_builder_prioritizes_teacher_and_preserves_retention_splits() -> None:
-    teacher_row = _row("teacher", source="codex_hermes_teacher_v1", group="teacher-group")
+    teacher_row = _row(
+        "teacher", source="codex_hermes_teacher_v1", group="teacher-group"
+    )
     teacher = [
         EligibleTrajectory(
             record=teacher_row,
@@ -44,7 +50,14 @@ def test_candidate_builder_prioritizes_teacher_and_preserves_retention_splits() 
             stable_order="0",
         )
     ]
-    retention = [_row("retention", source="hermes_func_calling", group="retention-group", split="validation")]
+    retention = [
+        _row(
+            "retention",
+            source="hermes_func_calling",
+            group="retention-group",
+            split="validation",
+        )
+    ]
 
     candidates, drops = build_candidate_pool(
         teacher,
@@ -61,8 +74,12 @@ def test_candidate_builder_prioritizes_teacher_and_preserves_retention_splits() 
     assert candidates[1]["split"] == "validation"
 
 
-def test_candidate_builder_drops_cross_source_near_duplicate_and_prohibited_source() -> None:
-    teacher_row = _row("teacher", source="codex_hermes_teacher_v1", group="teacher-group")
+def test_candidate_builder_drops_cross_source_near_duplicate_and_prohibited_source() -> (
+    None
+):
+    teacher_row = _row(
+        "teacher", source="codex_hermes_teacher_v1", group="teacher-group"
+    )
     teacher = [
         EligibleTrajectory(
             record=teacher_row,
@@ -73,7 +90,9 @@ def test_candidate_builder_drops_cross_source_near_duplicate_and_prohibited_sour
             stable_order="0",
         )
     ]
-    duplicate = _row("retention-duplicate", source="hermes_func_calling", group="other-group")
+    duplicate = _row(
+        "retention-duplicate", source="hermes_func_calling", group="other-group"
+    )
     duplicate["messages"][0]["content"] = "different system contract"
     duplicate["messages"][1]["content"] = teacher_row["messages"][1]["content"]
     duplicate["messages"][2]["content"] = teacher_row["messages"][2]["content"]

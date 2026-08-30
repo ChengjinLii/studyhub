@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Fail-closed audit for Spark-Hermes trajectories entering 4B SFT-2."""
+"""Fail-closed audit for Codex-driven Hermes trajectories entering 4B SFT-2."""
 
 from __future__ import annotations
 
@@ -51,13 +51,19 @@ def _read_json(path: Path) -> dict[str, Any]:
 
 
 def _read_jsonl(path: Path) -> list[dict[str, Any]]:
-    return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
+    return [
+        json.loads(line)
+        for line in path.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
 
 
 def _write_json(path: Path, value: Any) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_suffix(path.suffix + ".partial")
-    temporary.write_text(json.dumps(value, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    temporary.write_text(
+        json.dumps(value, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+    )
     temporary.replace(path)
 
 
@@ -169,7 +175,9 @@ def select_eligible(
                 assistant_tokens=assistant_tokens,
                 group_id=group_id,
                 path_signature=path,
-                stable_order=stable_hash(str(record["id"]), salt="spark-hermes-sft2-gate-v1"),
+                stable_order=stable_hash(
+                    str(record["id"]), salt="codex-hermes-sft2-gate-v1"
+                ),
             )
         )
 
@@ -209,7 +217,9 @@ def summarize(
     assistant_tokens = sum(row.assistant_tokens for row in selected)
     total_tokens = sum(row.total_tokens for row in selected)
     path_counts = Counter(row.path_signature for row in selected)
-    family_counts = Counter(str(row.record.get("task_family", "unknown")) for row in selected)
+    family_counts = Counter(
+        str(row.record.get("task_family", "unknown")) for row in selected
+    )
     tool_counts: Counter[str] = Counter()
     for row in selected:
         tool_counts.update(_tool_names(row.record))
@@ -219,8 +229,10 @@ def summarize(
     if assistant_tokens < int(gate["minimum_assistant_loss_tokens"]):
         failures.append("minimum_assistant_loss_tokens")
     return {
-        "schema_version": "studyhub.spark-hermes-sft2-input-audit.v1",
-        "status": "PASS" if not failures else "BLOCKED_INSUFFICIENT_VERIFIED_TEACHER_DATA",
+        "schema_version": "studyhub.codex-hermes-sft2-input-audit.v1",
+        "status": (
+            "PASS" if not failures else "BLOCKED_INSUFFICIENT_VERIFIED_TEACHER_DATA"
+        ),
         "checked_rows": checked,
         "selected_rows": len(selected),
         "dropped_rows": checked - len(selected),
@@ -229,7 +241,9 @@ def summarize(
         "assistant_fraction": round(assistant_tokens / max(total_tokens, 1), 8),
         "unique_source_groups": len({row.group_id for row in selected}),
         "unique_path_signatures": len(path_counts),
-        "largest_path_share": round(max(path_counts.values(), default=0) / max(len(selected), 1), 8),
+        "largest_path_share": round(
+            max(path_counts.values(), default=0) / max(len(selected), 1), 8
+        ),
         "family_counts": dict(sorted(family_counts.items())),
         "tool_counts": dict(sorted(tool_counts.items())),
         "drop_reasons": dict(drops.most_common()),
@@ -245,12 +259,13 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--accepted",
         type=Path,
-        default=PROJECT_ROOT / "datasets/interim/codex_hermes_teacher_v1/accepted.jsonl",
+        default=PROJECT_ROOT
+        / "datasets/interim/codex_hermes_teacher_v1/accepted.jsonl",
     )
     parser.add_argument(
         "--program",
         type=Path,
-        default=PROJECT_ROOT / "configs/program-v4/sft2-spark-retention-v1.json",
+        default=PROJECT_ROOT / "configs/program-v4/sft2-codex-retention-v1.json",
     )
     parser.add_argument(
         "--model",
@@ -268,7 +283,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--output",
         type=Path,
-        default=PROJECT_ROOT / "docs/training/evidence/spark-hermes-sft2-input-audit.json",
+        default=PROJECT_ROOT
+        / "docs/training/evidence/codex-hermes-sft2-input-audit.json",
     )
     return parser.parse_args()
 
@@ -279,11 +295,17 @@ def main() -> int:
     args = parse_args()
     contract = _read_json(args.program)
     benchmark_manifest = _read_json(args.benchmark_manifest)
-    benchmark_hashes, _public_tasks = public_benchmark_prompt_hashes(PROJECT_ROOT, benchmark_manifest)
-    tokenizer = AutoTokenizer.from_pretrained(args.model, local_files_only=True, trust_remote_code=True)
+    benchmark_hashes, _public_tasks = public_benchmark_prompt_hashes(
+        PROJECT_ROOT, benchmark_manifest
+    )
+    tokenizer = AutoTokenizer.from_pretrained(
+        args.model, local_files_only=True, trust_remote_code=True
+    )
 
     def count_tokens(record: dict[str, Any]) -> tuple[int, int]:
-        input_ids, loss_mask, _rendered = assistant_loss_mask(tokenizer, record["messages"], record["tools"])
+        input_ids, loss_mask, _rendered = assistant_loss_mask(
+            tokenizer, record["messages"], record["tools"]
+        )
         return len(input_ids), int(sum(loss_mask))
 
     selected, drops, checked = select_eligible(

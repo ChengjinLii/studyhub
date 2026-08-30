@@ -545,6 +545,17 @@ def _load_existing_adapter(self: Any) -> None:
             f"expected={sorted(expected_targets)}, actual={sorted(actual_targets)}"
         )
 
+    # Nonzero ranks hold meta tensors here. AReaL later broadcasts rank 0's
+    # full PEFT state as part of its native FSDP2 initialization.
+    if int(getattr(self, "rank", 0)) != 0:
+        self._studyhub_opd_adapter = {
+            "path": str(path),
+            "adapter_sha256": _sha256(weights_path),
+            "loaded_by_rank0_broadcast": True,
+            "target_modules": sorted(actual_targets),
+        }
+        return
+
     from peft import set_peft_model_state_dict
     from safetensors.torch import load_file
 
@@ -573,6 +584,7 @@ def _load_existing_adapter(self: Any) -> None:
         "lora_tensors": loaded,
         "lora_nonzero_values": nonzero,
         "missing_key_count": len(missing),
+        "loaded_by_rank0_broadcast": False,
         "target_modules": sorted(actual_targets),
     }
 

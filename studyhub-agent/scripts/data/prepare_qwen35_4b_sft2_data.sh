@@ -8,7 +8,7 @@ SEMANTIC_MODEL="${STUDYHUB_SFT2_SEMANTIC_MODEL:-/data/chengjin/studyhub/models/P
 SEMANTIC_DEVICE="${STUDYHUB_SFT2_SEMANTIC_DEVICE:-cuda:0}"
 TEACHER_DATA="${STUDYHUB_SFT2_TEACHER_DATA:-${PROJECT_ROOT}/datasets/interim/codex_hermes_teacher_v1/accepted.jsonl}"
 RETENTION_DATA="${STUDYHUB_SFT2_RETENTION_DATA:-${PROJECT_ROOT}/datasets/interim/open_agentic_sft_v2/selected.jsonl}"
-PROGRAM="${PROJECT_ROOT}/configs/program-v4/sft2-spark-retention-v1.json"
+PROGRAM="${PROJECT_ROOT}/configs/program-v4/sft2-codex-retention-v1.json"
 INTERIM="${PROJECT_ROOT}/datasets/interim/qwen35_4b_sft2_codex_retention_v1"
 PROCESSED="${PROJECT_ROOT}/datasets/processed/qwen35_4b_sft2_codex_retention_v1"
 EVIDENCE="${PROJECT_ROOT}/docs/training/evidence"
@@ -28,7 +28,7 @@ export TRANSFORMERS_OFFLINE=1
   --program "${PROGRAM}" \
   --model "${TOKENIZER_MODEL}" \
   --output "${CANDIDATES}" \
-  --teacher-audit-output "${EVIDENCE}/spark-hermes-sft2-input-audit.json"
+  --teacher-audit-output "${EVIDENCE}/codex-hermes-sft2-input-audit.json"
 
 "${PYTHON_BIN}" "${PROJECT_ROOT}/scripts/data/audit_open_agentic_semantic_dedup.py" \
   --input "${CANDIDATES}" \

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build the Spark-teacher plus Open-Agentic retention candidate pool for SFT-2."""
+"""Build the Codex-teacher plus Open-Agentic retention candidate pool for SFT-2."""
 
 from __future__ import annotations
 
@@ -16,7 +16,7 @@ for entry in (PROJECT_ROOT, PROJECT_ROOT / "src"):
     if str(entry) not in sys.path:
         sys.path.insert(0, str(entry))
 
-from scripts.data.audit_spark_hermes_sft2_inputs import (  # noqa: E402
+from scripts.data.audit_codex_hermes_sft2_inputs import (  # noqa: E402
     EligibleTrajectory,
     select_eligible,
     summarize,
@@ -28,7 +28,9 @@ from scripts.data.select_runtime_sft_v3 import (  # noqa: E402
     sha256,
 )
 from scripts.data.tokenize_runtime_sft_v3 import assistant_loss_mask  # noqa: E402
-from studyhub_agent.trajectory.runtime_sft import validate_runtime_trajectory  # noqa: E402
+from studyhub_agent.trajectory.runtime_sft import (
+    validate_runtime_trajectory,
+)  # noqa: E402
 
 STATE_TOOLS = {
     "learning_profile_get",
@@ -46,13 +48,19 @@ def _read_json(path: Path) -> dict[str, Any]:
 
 
 def _read_jsonl(path: Path) -> list[dict[str, Any]]:
-    return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
+    return [
+        json.loads(line)
+        for line in path.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
 
 
 def _write_json(path: Path, value: Any) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_suffix(path.suffix + ".partial")
-    temporary.write_text(json.dumps(value, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    temporary.write_text(
+        json.dumps(value, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+    )
     os.replace(temporary, path)
 
 
@@ -179,7 +187,9 @@ def build_candidate_pool(
         if signature in near:
             drops["deterministic_near_duplicate"] += 1
             return
-        if any(group in group_splits and group_splits[group] != split for group in groups):
+        if any(
+            group in group_splits and group_splits[group] != split for group in groups
+        ):
             drops["group_split_conflict"] += 1
             return
         candidates.append(row)
@@ -201,7 +211,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--teacher",
         type=Path,
-        default=PROJECT_ROOT / "datasets/interim/codex_hermes_teacher_v1/accepted.jsonl",
+        default=PROJECT_ROOT
+        / "datasets/interim/codex_hermes_teacher_v1/accepted.jsonl",
     )
     parser.add_argument(
         "--retention",
@@ -211,7 +222,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--program",
         type=Path,
-        default=PROJECT_ROOT / "configs/program-v4/sft2-spark-retention-v1.json",
+        default=PROJECT_ROOT / "configs/program-v4/sft2-codex-retention-v1.json",
     )
     parser.add_argument(
         "--model",
@@ -229,12 +240,14 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--output",
         type=Path,
-        default=PROJECT_ROOT / "datasets/interim/qwen35_4b_sft2_spark_retention_v1/candidates.jsonl",
+        default=PROJECT_ROOT
+        / "datasets/interim/qwen35_4b_sft2_codex_retention_v1/candidates.jsonl",
     )
     parser.add_argument(
         "--teacher-audit-output",
         type=Path,
-        default=PROJECT_ROOT / "docs/training/evidence/spark-hermes-sft2-input-audit.json",
+        default=PROJECT_ROOT
+        / "docs/training/evidence/codex-hermes-sft2-input-audit.json",
     )
     return parser.parse_args()
 
@@ -247,11 +260,17 @@ def main() -> int:
     benchmark = _read_json(args.benchmark_manifest)
     if program["benchmark_lock"]["manifest_sha256"] != sha256(args.benchmark_manifest):
         raise RuntimeError("Benchmark v2 manifest drift")
-    public_hashes, _public_count = public_benchmark_prompt_hashes(PROJECT_ROOT, benchmark)
-    tokenizer = AutoTokenizer.from_pretrained(args.model, local_files_only=True, trust_remote_code=True)
+    public_hashes, _public_count = public_benchmark_prompt_hashes(
+        PROJECT_ROOT, benchmark
+    )
+    tokenizer = AutoTokenizer.from_pretrained(
+        args.model, local_files_only=True, trust_remote_code=True
+    )
 
     def count_tokens(record: dict[str, Any]) -> tuple[int, int]:
-        input_ids, loss_mask, _rendered = assistant_loss_mask(tokenizer, record["messages"], record["tools"])
+        input_ids, loss_mask, _rendered = assistant_loss_mask(
+            tokenizer, record["messages"], record["tools"]
+        )
         return len(input_ids), int(sum(loss_mask))
 
     eligible, teacher_drops, checked = select_eligible(
@@ -260,7 +279,9 @@ def main() -> int:
         benchmark_prompt_hashes=public_hashes,
         count_tokens=count_tokens,
     )
-    teacher_audit = summarize(eligible, checked=checked, drops=teacher_drops, contract=program)
+    teacher_audit = summarize(
+        eligible, checked=checked, drops=teacher_drops, contract=program
+    )
     teacher_audit["lineage"] = {
         "accepted_sha256": sha256(args.teacher),
         "program_sha256": sha256(args.program),

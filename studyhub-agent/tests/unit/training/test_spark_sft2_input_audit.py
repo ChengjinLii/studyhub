@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from copy import deepcopy
 
-from scripts.data.audit_spark_hermes_sft2_inputs import select_eligible, summarize
+from scripts.data.audit_codex_hermes_sft2_inputs import select_eligible, summarize
 from studyhub_agent.trajectory.runtime_sft import trajectory_fingerprint
 
 
@@ -24,7 +24,9 @@ def _contract(*, minimum_rows: int = 1, minimum_tokens: int = 1) -> dict:
     }
 
 
-def _record(record_id: str, *, group: str = "group-1", tool: str = "knowledge_search") -> dict:
+def _record(
+    record_id: str, *, group: str = "group-1", tool: str = "knowledge_search"
+) -> dict:
     call_id = f"call-{record_id}"
     row = {
         "schema_version": "studyhub.runtime-sft-trajectory.v3",
@@ -45,7 +47,11 @@ def _record(record_id: str, *, group: str = "group-1", tool: str = "knowledge_se
                 "function": {
                     "name": tool,
                     "description": "test",
-                    "parameters": {"type": "object", "properties": {}, "additionalProperties": False},
+                    "parameters": {
+                        "type": "object",
+                        "properties": {},
+                        "additionalProperties": False,
+                    },
                 },
             }
         ],
@@ -82,7 +88,11 @@ def _record(record_id: str, *, group: str = "group-1", tool: str = "knowledge_se
             "provider_errors": [],
             "present_forbidden_terms": [],
         },
-        "provenance": {"revision": "test", "license": "test", "source_url": "local://test"},
+        "provenance": {
+            "revision": "test",
+            "license": "test",
+            "source_url": "local://test",
+        },
     }
     row["content_sha256"] = trajectory_fingerprint(row)
     return row
@@ -109,7 +119,10 @@ def test_sft2_gate_rejects_replay_tool_and_same_group_path_duplicate() -> None:
 def test_sft2_gate_retains_distinct_paths_and_reports_thresholds() -> None:
     first = _record("row-1")
     second = _record("row-2")
-    second["teacher"] = {**second["teacher"], "path_signature": "knowledge_search->knowledge_read"}
+    second["teacher"] = {
+        **second["teacher"],
+        "path_signature": "knowledge_search->knowledge_read",
+    }
     second["content_sha256"] = trajectory_fingerprint(second)
     contract = _contract(minimum_rows=2, minimum_tokens=50)
 
@@ -134,9 +147,11 @@ def test_sft2_gate_rejects_prompt_overlap_and_fingerprint_drift() -> None:
     selected, drops, _checked = select_eligible(
         [overlap, drift],
         contract=_contract(),
-        benchmark_prompt_hashes={__import__(
-            "scripts.data.select_runtime_sft_v3", fromlist=["candidate_prompt_hash"]
-        ).candidate_prompt_hash(overlap)},
+        benchmark_prompt_hashes={
+            __import__(
+                "scripts.data.select_runtime_sft_v3", fromlist=["candidate_prompt_hash"]
+            ).candidate_prompt_hash(overlap)
+        },
         count_tokens=lambda _row: (100, 25),
     )
 
@@ -146,16 +161,16 @@ def test_sft2_gate_rejects_prompt_overlap_and_fingerprint_drift() -> None:
 
 
 def test_sft2_gate_rejects_non_codex_teacher_identity() -> None:
-    spark = _record("row-spark")
-    spark["teacher"] = {
-        **spark["teacher"],
+    legacy_spark = _record("row-spark")
+    legacy_spark["teacher"] = {
+        **legacy_spark["teacher"],
         "interface": "codex-spark-cli",
         "model": "gpt-5.3-codex-spark",
     }
-    spark["content_sha256"] = trajectory_fingerprint(spark)
+    legacy_spark["content_sha256"] = trajectory_fingerprint(legacy_spark)
 
     selected, drops, _checked = select_eligible(
-        [spark],
+        [legacy_spark],
         contract=_contract(),
         benchmark_prompt_hashes=set(),
         count_tokens=lambda _row: (100, 25),

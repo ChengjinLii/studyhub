@@ -6,13 +6,13 @@ enable_offload: true
 total_train_epochs: 1
 total_train_steps: null
 tokenizer_path: ${actor.path}
-workflow: training.rl.hermes_workflow.StudyHubHermesWorkflow
+workflow: training.rl.hermes_workflow_v3.StudyHubHermesWorkflowV3
 eval_workflow: ${workflow}
 max_turns: 6
 context_finalization_ratio: 0.80
 context_safety_margin_tokens: 768
-environment_root: /data/chengjin/studyhub/studyhub-agent/datasets/processed/opd_prompt_pool_v1/environments
-verifier_root: /data/chengjin/studyhub/studyhub-agent/datasets/processed/opd_prompt_pool_v1/verifiers
+environment_root: /data/chengjin/studyhub/studyhub-agent/datasets/processed/opd_prompt_pool_v1
+verifier_root: ${environment_root}/verifiers
 hermes_checkout: /data/chengjin/studyhub/studyhub-agent/.vendor/hermes-agent
 reward_artifact_root: /data/chengjin/studyhub/studyhub-agent/artifacts/areal/strict-opd/rewards
 

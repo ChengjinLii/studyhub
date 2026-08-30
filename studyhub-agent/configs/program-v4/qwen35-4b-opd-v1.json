@@ -1,0 +1,79 @@
+{
+  "schema_version": "studyhub.qwen35-4b-opd-program.v1",
+  "program_id": "qwen35-4b-m2-to-opd-v1",
+  "status": "PREPARED_NOT_AUTHORIZED",
+  "seed": 20260827,
+  "student": {
+    "model": "Qwen/Qwen3.5-4B-Base",
+    "input_stage": "M2",
+    "lora_rank": 32,
+    "lora_alpha": 32,
+    "target_modules": ["o_proj", "gate_proj", "up_proj", "down_proj"]
+  },
+  "teacher": {
+    "model": "Qwen/Qwen3.5-9B",
+    "role": "frozen_post_trained_token_scorer",
+    "may_execute_tools": false,
+    "may_read_hidden_verifier": false
+  },
+  "prompt_pool": {
+    "source_dataset": "agent-rl-v3-post-qa.1",
+    "source_split": "train",
+    "candidate_rows": [4000, 8000],
+    "selected_rows": [1500, 3000],
+    "novelty_probe_rows": 500,
+    "maximum_model_turns": 6,
+    "prohibited_families": ["long_horizon_and_deep_research"],
+    "prohibited_budget_tiers": ["research"],
+    "prohibited_tools": ["web_fetch"],
+    "prohibited_splits": ["validation", "protocol_holdout", "sealed"],
+    "selection_priority": [
+      "teacher_pass_student_fail",
+      "teacher_diagnostic_advantage",
+      "teacher_valid_tool_path"
+    ]
+  },
+  "novelty_gate": {
+    "teacher_success_must_exceed_student": true,
+    "minimum_teacher_only_successes": 20,
+    "same_tasks": true,
+    "same_hermes_environment": true,
+    "same_generation_contract": true
+  },
+  "algorithm": {
+    "upstream": "thunlp/OPD",
+    "algorithm": "token_reward_direct",
+    "top_k": 16,
+    "top_k_strategy": "only_stu",
+    "reward_weight": "student_p",
+    "loss_aggregation": "sum-k-then-token-mean",
+    "student_temperature": 0.7,
+    "teacher_temperature": 1.0,
+    "reference_kl": 0.0,
+    "responses_per_prompt": 2
+  },
+  "training": {
+    "lr_pilots": [1e-6, 3e-6],
+    "lr_pilot_updates": 16,
+    "pilot_updates": 64,
+    "formal_updates": 300,
+    "formal_batch_size": 8,
+    "checkpoint_every_updates": 50,
+    "minimum_unique_formal_prompts": 1500,
+    "maximum_context_tokens": 16384,
+    "maximum_assistant_tokens": 4096,
+    "maximum_turns": 6
+  },
+  "hard_stops": [
+    "teacher_novelty_gate_failed",
+    "tokenizer_or_vocabulary_mismatch",
+    "thinking_contract_mismatch",
+    "prompt_pool_contamination",
+    "invalid_or_missing_m2_adapter",
+    "opd_parity_failed",
+    "nan_or_inf",
+    "lora_not_updated",
+    "foreign_gpu_pid",
+    "checkpoint_corruption"
+  ]
+}

@@ -45,6 +45,17 @@ if os.environ.get("STUDYHUB_AREAL_RECOVERY_STATE_BRIDGE") == "1":
         os._exit(79)
 
 
+if os.environ.get("STUDYHUB_AREAL_INITIAL_ADAPTER_BRIDGE") == "1":
+    try:
+        from training.initial_adapter import install_areal_initial_adapter_bridge
+
+        install_areal_initial_adapter_bridge()
+    except Exception as exc:
+        sys.stderr.write(f"StudyHub initial LoRA adapter bridge failed: {exc}\n")
+        sys.stderr.flush()
+        os._exit(81)
+
+
 if os.environ.get("STUDYHUB_AREAL_OPD_BRIDGE") == "1":
     try:
         from training.opd.areal_runtime import install_areal_opd_bridge
@@ -56,13 +67,19 @@ if os.environ.get("STUDYHUB_AREAL_OPD_BRIDGE") == "1":
         os._exit(80)
 
 
-if os.environ.get("STUDYHUB_DISABLE_DEEP_GEMM_WITHOUT_NVCC") == "1" and shutil.which("nvcc") is None:
+if (
+    os.environ.get("STUDYHUB_DISABLE_DEEP_GEMM_WITHOUT_NVCC") == "1"
+    and shutil.which("nvcc") is None
+):
     # SGLang treats DeepGEMM as optional, but the bundled module eagerly
     # asserts when only the CUDA runtime (not the compiler toolkit) exists.
     sys.modules["deep_gemm"] = None
 
 
-if os.environ.get("STUDYHUB_SGLANG_TORCH_FALLBACKS_WITHOUT_NVCC") == "1" and shutil.which("nvcc") is None:
+if (
+    os.environ.get("STUDYHUB_SGLANG_TORCH_FALLBACKS_WITHOUT_NVCC") == "1"
+    and shutil.which("nvcc") is None
+):
     import torch
     from sglang.jit_kernel import clamp_position as _clamp_position_module
 
