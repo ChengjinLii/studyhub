@@ -2,6 +2,9 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -11,6 +14,21 @@ SPEC = importlib.util.spec_from_file_location("qwen35_4b_m1_evaluation_suite", S
 assert SPEC and SPEC.loader
 MODULE = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(MODULE)
+
+
+def test_direct_script_execution_bootstraps_project_imports(tmp_path: Path) -> None:
+    command = [
+        sys.executable,
+        "-c",
+        (
+            "import runpy; "
+            f"runpy.run_path({str(SCRIPT)!r}); "
+            "import scripts.benchmark.run_9b_base_eval"
+        ),
+    ]
+    environment = os.environ.copy()
+    environment["PYTHONPATH"] = ""
+    subprocess.run(command, cwd=tmp_path, env=environment, check=True)
 
 
 def test_stage_order_is_preregistered() -> None:
