@@ -2,7 +2,8 @@
 set -euo pipefail
 
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-VENV_DIR="${PROJECT_ROOT}/.venv-train"
+ARTIFACT_ROOT="${STUDYHUB_SFT2_ARTIFACT_ROOT:-${PROJECT_ROOT}}"
+VENV_DIR="${STUDYHUB_TRAIN_VENV:-${PROJECT_ROOT}/.venv-train}"
 RUNTIME_SHIM="${PROJECT_ROOT}/training/runtime_shims"
 DATASET_ID="${STUDYHUB_SFT2_DATASET_ID:-qwen35_4b_sft2_codex_retention_v1}"
 EVIDENCE_PREFIX="${STUDYHUB_SFT2_EVIDENCE_PREFIX:-qwen35-4b-sft2}"
@@ -10,11 +11,11 @@ RUN_SLUG="${STUDYHUB_SFT2_RUN_SLUG:-qwen35-4b-sft2}"
 CONFIG="${STUDYHUB_SFT2_CONFIG:-${PROJECT_ROOT}/configs/train/qwen35-4b-codex-sft2.yaml}"
 PROGRAM="${STUDYHUB_SFT2_PROGRAM:-${PROJECT_ROOT}/configs/program-v4/sft2-codex-retention-v1.json}"
 AUTHORIZATION="${STUDYHUB_SFT2_AUTHORIZATION:-${PROJECT_ROOT}/configs/program-v4/qwen35-4b-sft2-authorization.json}"
-DATA_MANIFEST="${PROJECT_ROOT}/datasets/processed/${DATASET_ID}/manifest.json"
-DATA_AUDIT="${PROJECT_ROOT}/docs/training/evidence/${EVIDENCE_PREFIX}-data-audit.json"
+DATA_MANIFEST="${ARTIFACT_ROOT}/datasets/processed/${DATASET_ID}/manifest.json"
+DATA_AUDIT="${ARTIFACT_ROOT}/docs/training/evidence/${EVIDENCE_PREFIX}-data-audit.json"
 BENCHMARK_MANIFEST="${PROJECT_ROOT}/benchmarks/studyhub-agent-v2/manifest.json"
-MODEL="${PROJECT_ROOT}/artifacts/areal/model-overlays/qwen35-4b-base-canonical-tokenizer"
-MODEL_HASH_CACHE="${PROJECT_ROOT}/artifacts/areal/hash-cache/qwen35-4b-base.json"
+MODEL="${ARTIFACT_ROOT}/artifacts/areal/model-overlays/qwen35-4b-base-canonical-tokenizer"
+MODEL_HASH_CACHE="${ARTIFACT_ROOT}/artifacts/areal/hash-cache/qwen35-4b-base.json"
 MODE="${1:-smoke}"
 SEED="${2:-20260827}"
 GPUS="${STUDYHUB_TRAIN_GPUS:-0,1}"
@@ -72,14 +73,14 @@ WARMUP_FRACTION="${CONTRACT[5]}"
 
 TRAINING_TRIAL="${RUN_SLUG}-${MODE}-r32-seed-20260827"
 EXPERIMENT="${STUDYHUB_SFT2_EXPERIMENT:-studyhub-qwen35-4b-codex-sft2}"
-LOG_ROOT="${PROJECT_ROOT}/artifacts/areal/launcher_logs/${RUN_SLUG}"
-CHECKPOINT_ROOT="${PROJECT_ROOT}/artifacts/areal/checkpoints/$(id -un)/${EXPERIMENT}/${TRAINING_TRIAL}"
+LOG_ROOT="${ARTIFACT_ROOT}/artifacts/areal/launcher_logs/${RUN_SLUG}"
+CHECKPOINT_ROOT="${ARTIFACT_ROOT}/artifacts/areal/checkpoints/$(id -un)/${EXPERIMENT}/${TRAINING_TRIAL}"
 if [[ "${MODE}" == "smoke" ]]; then
   COMPLETION_MARKER="${CHECKPOINT_ROOT}/QWEN35_4B_SFT2_SMOKE_PASS.json"
 else
   COMPLETION_MARKER="${CHECKPOINT_ROOT}/QWEN35_4B_SFT2_COMPLETE.json"
 fi
-SMOKE_MARKER="${PROJECT_ROOT}/artifacts/areal/checkpoints/$(id -un)/${EXPERIMENT}/${RUN_SLUG}-smoke-r32-seed-20260827/QWEN35_4B_SFT2_SMOKE_PASS.json"
+SMOKE_MARKER="${ARTIFACT_ROOT}/artifacts/areal/checkpoints/$(id -un)/${EXPERIMENT}/${RUN_SLUG}-smoke-r32-seed-20260827/QWEN35_4B_SFT2_SMOKE_PASS.json"
 RECOVER_STEP_INFO="${CHECKPOINT_ROOT}/recover_info/step_info.json"
 
 if [[ -f "${COMPLETION_MARKER}" ]]; then
@@ -224,7 +225,7 @@ fi
 if [[ "${STATUS}" -eq 0 ]]; then
   "${VENV_DIR}/bin/python" "${PROJECT_ROOT}/scripts/train/collect_lr_audit_segments.py" \
     --log-root "${LOG_ROOT}" \
-    --evidence-root "${PROJECT_ROOT}/artifacts/experiments" \
+    --evidence-root "${ARTIFACT_ROOT}/artifacts/experiments" \
     --attempt-prefix "${TRAINING_TRIAL}" \
     --expected-updates "${PLANNED_UPDATES}" \
     --output "${LR_SEGMENT_INDEX}" >/dev/null || STATUS=76
