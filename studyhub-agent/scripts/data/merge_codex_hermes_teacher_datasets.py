@@ -158,11 +158,14 @@ def merge_batches(
         ] += 1
         for group in set(map(str, row.get("source_group_ids", []))):
             source_groups[group] += 1
+    single_identity = None
+    if len(teacher_identities) == 1:
+        single_identity = next(iter(teacher_identities)).split("|", maxsplit=2)
     report = {
         "schema_version": "studyhub.codex-hermes-teacher-merge.v1",
         "status": "PASS",
-        "teacher_interface": "codex-cli" if len(teacher_identities) == 1 else "mixed",
-        "teacher_model": "gpt-5.6-sol" if len(teacher_identities) == 1 else "mixed",
+        "teacher_interface": single_identity[1] if single_identity else "mixed",
+        "teacher_model": single_identity[2] if single_identity else "mixed",
         "teacher_identities": dict(sorted(teacher_identities.items())),
         "inputs": inputs,
         "input_rows": sum(item["accepted_rows"] for item in inputs),
