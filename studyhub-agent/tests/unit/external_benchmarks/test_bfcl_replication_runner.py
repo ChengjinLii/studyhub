@@ -101,6 +101,13 @@ def test_local_bfcl_environment_drops_proxy_variables(monkeypatch) -> None:
     assert all(key not in environment for key in PROXY_ENVIRONMENT_KEYS)
 
 
+def test_server_and_official_cli_share_local_environment() -> None:
+    source = (
+        PROJECT / "scripts/benchmark/external/run_bfcl_replication.py"
+    ).read_text(encoding="utf-8")
+    assert source.count("environment = local_bfcl_environment()") == 2
+
+
 def test_score_summary_preserves_official_category_counts(tmp_path: Path) -> None:
     score = tmp_path / "score/model/non_live"
     score.mkdir(parents=True)

@@ -421,7 +421,7 @@ def main() -> int:
     display_name = str(args.display_name)
     if not registry_name.startswith("StudyHub/") or not display_name.startswith("StudyHub "):
         raise ValueError("BFCL model labels must remain in the StudyHub namespace")
-    environment = os.environ.copy()
+    environment = local_bfcl_environment()
     environment.update(
         {
             "PYTHONPATH": str(bfcl_root),
