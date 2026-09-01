@@ -512,11 +512,12 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
     from scripts.train.prepare_sglang_model_overlay import prepare_overlay
 
     project = args.project.resolve()
+    artifact_root = args.artifact_root.resolve()
     benchmark_generation = args.benchmark_version
     public_root = (args.public_root or project / f"benchmarks/studyhub-agent-{benchmark_generation}").resolve()
     hidden_root = (
         args.hidden_root
-        or project / f"artifacts/benchmark-{benchmark_generation}/studyhub-agent-{benchmark_generation}"
+        or artifact_root / f"artifacts/benchmark-{benchmark_generation}/studyhub-agent-{benchmark_generation}"
     ).resolve()
     task_type = BenchmarkTaskV2 if benchmark_generation == "v2" else BenchmarkTask
     if benchmark_generation == "v2" and args.mode == "gate":
@@ -543,12 +544,12 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         f"qwen35-{artifact_role}-{benchmark_generation}-{args.mode}-seed-{args.seed}-"
         f"{datetime.now(UTC).strftime('%Y%m%d_%H%M%S')}"
     )
-    output_base = args.output_root or project / f"artifacts/benchmark-{benchmark_generation}/runs"
+    output_base = args.output_root or artifact_root / f"artifacts/benchmark-{benchmark_generation}/runs"
     output_root = (output_base / trial).resolve()
     output_root.mkdir(parents=True, exist_ok=True)
     api_key = secrets.token_urlsafe(36)
     overlay_key = hashlib.sha256(model_identity.encode()).hexdigest()[:16]
-    model_overlay = project / f"artifacts/areal/model-overlays/benchmark-{overlay_key}"
+    model_overlay = artifact_root / f"artifacts/areal/model-overlays/benchmark-{overlay_key}"
     prepare_overlay(args.model.resolve(), model_overlay)
     ports = [args.port_base + index for index in range(args.workers)]
     endpoints = [f"http://127.0.0.1:{port}/v1" for port in ports]
@@ -707,6 +708,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("mode", choices=("gate", "regression", "development", "variance"))
     parser.add_argument("--benchmark-version", choices=("v1", "v2"), default="v1")
     parser.add_argument("--project", type=Path, default=project)
+    parser.add_argument("--artifact-root", type=Path, default=project)
     parser.add_argument("--public-root", type=Path)
     parser.add_argument("--hidden-root", type=Path)
     parser.add_argument("--model", type=Path, default=project.parent / "models/P1/Qwen3.5-9B")

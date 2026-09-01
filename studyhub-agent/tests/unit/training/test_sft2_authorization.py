@@ -108,11 +108,16 @@ def test_m2_merge_and_eval_use_canonical_artifact_root() -> None:
     merger = (PROJECT_ROOT / "scripts/train/merge_qwen35_4b_sft2_compact.sh").read_text()
     eval_4b = (PROJECT_ROOT / "scripts/benchmark/run_qwen35_4b_model_eval_v2.sh").read_text()
     eval_shared = (PROJECT_ROOT / "scripts/benchmark/run_9b_model_eval_v2.sh").read_text()
+    eval_runner = (PROJECT_ROOT / "scripts/benchmark/run_9b_base_eval.py").read_text()
 
     assert "qwen35-4b-sft2-compact-v1" in merger
     assert "expected_optimizer_updates\") != 300" in merger
     assert 'STUDYHUB_EVAL_ARTIFACT_ROOT:-${PROJECT_ROOT}' in eval_4b
     assert 'exec bash "${PROJECT_ROOT}/scripts/benchmark/run_9b_model_eval_v2.sh"' in eval_4b
     assert 'ARTIFACT_ROOT="${STUDYHUB_EVAL_ARTIFACT_ROOT:-${PROJECT_ROOT}}"' in eval_shared
+    assert '--artifact-root "${ARTIFACT_ROOT}"' in eval_shared
     assert '--output-root "${ARTIFACT_ROOT}/artifacts/benchmark-v2/runs"' in eval_shared
     assert '${ARTIFACT_ROOT}/artifacts/benchmark-v2/runs' in eval_shared
+    assert 'artifact_root = args.artifact_root.resolve()' in eval_runner
+    assert 'artifact_root / f"artifacts/benchmark-{benchmark_generation}' in eval_runner
+    assert 'model_overlay = artifact_root /' in eval_runner

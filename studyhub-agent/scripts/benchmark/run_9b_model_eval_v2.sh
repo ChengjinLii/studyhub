@@ -87,6 +87,7 @@ set +e
   -- "${VENV}/bin/python" "${PROJECT_ROOT}/scripts/benchmark/run_9b_base_eval.py" \
     "${MODE}" \
     --benchmark-version v2 \
+    --artifact-root "${ARTIFACT_ROOT}" \
     --model "${MODEL}" \
     --trial "${TRIAL}" \
     --output-root "${ARTIFACT_ROOT}/artifacts/benchmark-v2/runs" \
