@@ -129,5 +129,7 @@ def test_m2_merge_and_eval_use_canonical_artifact_root() -> None:
     assert 'model_overlay = artifact_root /' in eval_runner
     assert 'parser.add_argument("--artifact-root"' in protocol_runner
     assert 'dataset_path = artifact_root / contract["dataset"]' in protocol_runner
+    assert 'server_python = args.python or str(artifact_root / ".venv-train/bin/python")' in protocol_runner
     assert 'ARTIFACT_ROOT="${STUDYHUB_EVAL_ARTIFACT_ROOT:-${PROJECT_ROOT}}"' in protocol_launcher
     assert '--artifact-root "${ARTIFACT_ROOT}"' in protocol_launcher
+    assert '--python "${VENV_DIR}/bin/python"' in protocol_launcher

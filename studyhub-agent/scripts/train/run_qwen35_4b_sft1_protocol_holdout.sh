@@ -46,6 +46,7 @@ mkdir -p "${LOG_ROOT}"
   --gpu-csv "${GPU_CSV}" \
   -- "${VENV_DIR}/bin/python" "${PROJECT_ROOT}/scripts/train/evaluate_qwen35_4b_protocol_holdout.py" \
     --artifact-root "${ARTIFACT_ROOT}" \
+    --python "${VENV_DIR}/bin/python" \
     --model "${MODEL}" \
     --output-root "${OUTPUT_ROOT}" \
     --gpus "${GPUS}" \

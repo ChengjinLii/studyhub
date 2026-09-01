@@ -279,7 +279,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--run-id")
     parser.add_argument("--gpus", default="0,1")
     parser.add_argument("--ports", default="30310,30311")
-    parser.add_argument("--python", default=str(project / ".venv-train/bin/python"))
+    parser.add_argument("--python")
     parser.add_argument("--seed", type=int, default=DEFAULT_SEED)
     parser.add_argument("--max-rows", type=int, default=0)
     parser.add_argument("--server-timeout", type=int, default=1200)
@@ -291,6 +291,7 @@ def main() -> int:
     args = parse_args()
     project = PROJECT_ROOT
     artifact_root = args.artifact_root.resolve()
+    server_python = args.python or str(artifact_root / ".venv-train/bin/python")
     contract, data_audit = validate_contract(artifact_root, args.config.resolve())
     dataset_path = artifact_root / contract["dataset"]["selected_relative_path"]
     selected_rows = select_protocol_rows(read_jsonl(dataset_path), max_rows=args.max_rows, seed=args.seed)
@@ -350,7 +351,7 @@ def main() -> int:
         for worker_id, (gpu, port) in enumerate(zip(gpus, ports, strict=True)):
             base_url = f"http://127.0.0.1:{port}/v1"
             process, stream = launch_server(
-                python=args.python,
+                python=server_python,
                 model=args.model.resolve(),
                 gpu=gpu,
                 port=port,
