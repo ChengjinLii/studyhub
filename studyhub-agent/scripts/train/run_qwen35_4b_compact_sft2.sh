@@ -12,4 +12,4 @@ export STUDYHUB_SFT2_PROGRAM="${PROJECT_ROOT}/configs/program-v4/sft2-compact-mi
 export STUDYHUB_SFT2_AUTHORIZATION="${PROJECT_ROOT}/configs/program-v4/qwen35-4b-sft2-compact-v1-authorization.json"
 export STUDYHUB_SFT2_EXPERIMENT=studyhub-qwen35-4b-compact-sft2
 
-exec "${PROJECT_ROOT}/scripts/train/run_qwen35_4b_sft2.sh" "$@"
+exec bash "${PROJECT_ROOT}/scripts/train/run_qwen35_4b_sft2.sh" "$@"
