@@ -157,7 +157,24 @@
       "stage_marker_written": false,
       "runtime_progress": "Four real Hermes trajectories and attempt-isolated Reward v3 rows completed. The 4B actor anchor passed with 4,096-token microbatches and was restored to every trajectory; the frozen 9B teacher then began its first two microbatches before the sparse payload shape failure. Peak actor-anchor memory remained below the 79 GiB guard and no OOM occurred.",
       "remediation": "Encode each of the 16 top-k wings as a standard [batch, sequence] token field before the pinned AReaL splitter, then reassemble [tokens, k] inside the teacher and actor callbacks. This reuses upstream forward indices, packing, and padding without changing AReaL source or OPD math."
+    },
+    {
+      "attempt_id": "qwen35-4b-opd-lr1e6-seed-20260827-attempt-20260901_222155",
+      "status": "INFRA_FAILED_NO_UPDATE",
+      "failure_stage": "First 4B OPD backward after successful student anchor and frozen-teacher scoring",
+      "root_cause": "The 4B actor was onloaded beside the paused 16k SGLang allocation at approximately 70.02 GiB. A 4,096-token update forward raised device use to approximately 77.44 GiB, leaving insufficient physical memory for the first gradient-checkpointed backward CUDA segment.",
+      "native_error": "torch_memory_saver.cpp CUresult error: 2 (out of memory) in cu_mem_create",
+      "launcher_log_sha256": "45cc03ee8f4eb132ff2cca383a81b0c3a27b547a3ec7275dbd5b0be27325e81d",
+      "gpu_telemetry_sha256": "73bc7ef74bf501bfcfe2f29d3d48786a45f11835e9f671a461575085feef981f",
+      "sglang_overlay_audit_sha256": "b1f9fb0a1166ad1c370571d9303837d8058f2243a667fe323822def96ed51528",
+      "reward_v3_sha256": "3c7c243a66959d6a829cb58d101cd4fead6a397e3a0b02c17d0aa7e66a180ace",
+      "reward_v3_rows": 4,
+      "initial_lora_sha256": "4b7ee7462d82cd17a7c55fdb27335eee70b4df7a08f282697efafc577c173e6e",
+      "optimizer_updates": 0,
+      "stage_marker_written": false,
+      "runtime_progress": "The sparse-wing bridge passed: four real Hermes trajectories completed, the 4B student anchor was restored, and the frozen 9B teacher scored all selected tokens. AReaL then entered the first actor OPD update before backward memory allocation failed.",
+      "remediation": "Reduce only actor max_tokens_per_mb from 4,096 to 2,048 so forward/backward activations fit beside the frozen colocated allocation. Keep global batch, learning rate, data, OPD objective, LoRA, top-k, and teacher microbatch unchanged."
     }
   ],
-  "claim_boundary": "Attempts 20260901_214833, 20260901_220024, and 20260901_220910 each produced four real Hermes trajectories and four Reward v3 rows. Attempt 20260901_220910 additionally completed the 4B student anchor. No recorded attempt produced an optimizer update, passing LR marker, or OPD model result."
+  "claim_boundary": "Attempts 20260901_214833, 20260901_220024, 20260901_220910, and 20260901_222155 each produced four real Hermes trajectories and four Reward v3 rows. Attempt 20260901_220910 completed the 4B student anchor; attempt 20260901_222155 additionally completed frozen 9B teacher scoring and entered actor backward. No recorded attempt produced an optimizer update, passing LR marker, or OPD model result."
 }

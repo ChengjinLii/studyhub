@@ -255,7 +255,7 @@ def test_opd_config_is_fail_closed(monkeypatch: pytest.MonkeyPatch) -> None:
 
     assert config.opd_top_k == 16
     assert config.opd_top_k_strategy == "only_stu"
-    assert config.actor.mb_spec.max_tokens_per_mb == 4096
+    assert config.actor.mb_spec.max_tokens_per_mb == 2048
     assert config.teacher.train.mb_spec.max_tokens_per_mb == 8192
     assert config.actor.kl_ctl == 0
     assert config.ref is None
