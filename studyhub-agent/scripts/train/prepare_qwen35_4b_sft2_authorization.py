@@ -37,6 +37,70 @@ def write_json(path: Path, value: Any) -> None:
     temporary.replace(path)
 
 
+def build_training_contract(
+    program: dict[str, Any], *, selected_rows: int, train: dict[str, Any]
+) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
+    training = program["training"]
+    frozen = program["recipe"]
+    optimizer = frozen["optimizer"]
+    scheduler = frozen["scheduler"]
+    updates = int(training["primary_updates"])
+    batch_size = int(training["global_batch_size"])
+    smoke_updates = int(training.get("smoke_updates", 24))
+    warmup_fraction = float(scheduler["warmup_fraction"])
+    checkpoint_every = int(training.get("checkpoint_every_updates", 100))
+    smoke_checkpoint_every = int(
+        training.get("smoke_checkpoint_every_updates", min(16, smoke_updates))
+    )
+    budget = {
+        "global_batch_size": batch_size,
+        "smoke_optimizer_updates": smoke_updates,
+        "smoke_checkpoint_every_updates": smoke_checkpoint_every,
+        "smoke_maximum_wall_time_seconds": int(
+            training.get("smoke_maximum_wall_time_seconds", 3600)
+        ),
+        "planned_optimizer_updates": updates,
+        "planned_sequences": selected_rows,
+        "actual_total_tokens": int(train["total_tokens"]),
+        "actual_assistant_loss_tokens": int(train["assistant_loss_tokens"]),
+        "checkpoint_every_updates": checkpoint_every,
+        "maximum_wall_time_seconds": int(
+            training.get("maximum_wall_time_seconds", 18000)
+        ),
+    }
+    recipe = {
+        "backend": frozen.get("backend", "fsdp:d2p1t1"),
+        "dtype": frozen.get("precision", "bf16").replace("bf16", "bfloat16"),
+        "lora_rank": int(frozen["lora"]["rank"]),
+        "lora_alpha": int(frozen["lora"]["alpha"]),
+        "target_modules": list(frozen["lora"]["target_modules"]),
+        "learning_rate": float(optimizer["lr"]),
+        "weight_decay": float(optimizer["weight_decay"]),
+        "beta1": float(optimizer["beta1"]),
+        "beta2": float(optimizer["beta2"]),
+        "eps": float(optimizer["eps"]),
+        "scheduler": str(scheduler["name"]),
+        "scheduler_total_steps": updates,
+        "warmup_fraction": warmup_fraction,
+        "warmup_steps": int(updates * warmup_fraction),
+        "gradient_clip": float(optimizer["gradient_clip"]),
+        "seed": int(program["seed"]),
+        "enable_thinking": bool(training["enable_thinking"]),
+    }
+    completion = {
+        "smoke_marker": "QWEN35_4B_SFT2_SMOKE_PASS.json",
+        "formal_marker": "QWEN35_4B_SFT2_COMPLETE.json",
+        "require_exact_m1_initialization": True,
+        "require_lora_update": True,
+        "require_complete_recovery_checkpoint": True,
+        "require_exact_lr_schedule_audit": True,
+        "expected_scheduler_total_steps": updates,
+        "expected_warmup_steps": recipe["warmup_steps"],
+        "require_sealed_used_false": True,
+    }
+    return budget, recipe, completion
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--artifact-root", type=Path, default=CANONICAL_ROOT)
@@ -142,6 +206,9 @@ def main() -> int:
 
     model_lock = load_json(paths["model_lock_sha256"])
     overlay = load_json(paths["tokenizer_overlay_sha256"])
+    budget, recipe, completion = build_training_contract(
+        program, selected_rows=selected_rows, train=train
+    )
     teacher_gate = program["teacher_gate"]
     teacher_identities = teacher_gate.get("allowed_teacher_identities")
     if not teacher_identities:
@@ -154,7 +221,9 @@ def main() -> int:
         ]
     value = {
         "schema_version": "studyhub.qwen35-4b-sft2-authorization.v1",
-        "authorization_id": f"{program['program_id']}-r32-seed-20260827",
+        "authorization_id": (
+            f"{program['program_id']}-r{recipe['lora_rank']}-seed-{recipe['seed']}"
+        ),
         "status": "AUTHORIZED_PENDING_SMOKE_AND_FORMAL_RUN",
         "scope": {
             "model": "Qwen/Qwen3.5-4B-Base",
@@ -184,48 +253,9 @@ def main() -> int:
             "m1_adapter_sha256": sha256(m1_adapter),
             "run_commit_required": "SET_AT_LAUNCH_FROM_CLEAN_WORKTREE",
         },
-        "budget": {
-            "global_batch_size": 8,
-            "smoke_optimizer_updates": 24,
-            "smoke_checkpoint_every_updates": 16,
-            "smoke_maximum_wall_time_seconds": 3600,
-            "planned_optimizer_updates": 800,
-            "planned_sequences": selected_rows,
-            "actual_total_tokens": int(train["total_tokens"]),
-            "actual_assistant_loss_tokens": int(train["assistant_loss_tokens"]),
-            "checkpoint_every_updates": 100,
-            "maximum_wall_time_seconds": 18000,
-        },
-        "recipe": {
-            "backend": "fsdp:d2p1t1",
-            "dtype": "bfloat16",
-            "lora_rank": 32,
-            "lora_alpha": 32,
-            "target_modules": ["o_proj", "gate_proj", "up_proj", "down_proj"],
-            "learning_rate": 1.0e-5,
-            "weight_decay": 0.05,
-            "beta1": 0.9,
-            "beta2": 0.95,
-            "eps": 1.0e-5,
-            "scheduler": "cosine",
-            "scheduler_total_steps": 800,
-            "warmup_fraction": 0.03,
-            "warmup_steps": 24,
-            "gradient_clip": 1.0,
-            "seed": 20260827,
-            "enable_thinking": False,
-        },
-        "completion_contract": {
-            "smoke_marker": "QWEN35_4B_SFT2_SMOKE_PASS.json",
-            "formal_marker": "QWEN35_4B_SFT2_COMPLETE.json",
-            "require_exact_m1_initialization": True,
-            "require_lora_update": True,
-            "require_complete_recovery_checkpoint": True,
-            "require_exact_lr_schedule_audit": True,
-            "expected_scheduler_total_steps": 800,
-            "expected_warmup_steps": 24,
-            "require_sealed_used_false": True,
-        },
+        "budget": budget,
+        "recipe": recipe,
+        "completion_contract": completion,
     }
     write_json(args.output, value)
     print(json.dumps(value, ensure_ascii=False, indent=2))

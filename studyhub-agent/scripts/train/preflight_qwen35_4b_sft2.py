@@ -268,7 +268,9 @@ def main() -> int:
         train_batch_size=config.train_dataset.batch_size,
     )
     if spec.total_train_steps != scheduler_total_steps:
-        raise RuntimeError("SFT-2 dataset does not produce exactly 800 updates")
+        raise RuntimeError(
+            "SFT-2 dataset update count differs from the authorization contract"
+        )
 
     if args.mode == "formal":
         if args.smoke_marker is None or not args.smoke_marker.is_file():
