@@ -2,7 +2,8 @@
 set -euo pipefail
 
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-VENV="${PROJECT_ROOT}/.venv-train"
+ARTIFACT_ROOT="${STUDYHUB_EVAL_ARTIFACT_ROOT:-${PROJECT_ROOT}}"
+VENV="${STUDYHUB_TRAIN_VENV:-${ARTIFACT_ROOT}/.venv-train}"
 MODE="${1:-gate}"
 SEED="${2:-20260827}"
 GPUS="${STUDYHUB_EVAL_GPUS:-0,1}"
@@ -71,7 +72,7 @@ PY
 
 TIMESTAMP="$(date +%Y%m%d_%H%M%S)"
 TRIAL="${MODEL_RUN_PREFIX}-${MODEL_ROLE}-v2-${MODE}-seed-${SEED}-${TIMESTAMP}"
-LAUNCH_ROOT="${PROJECT_ROOT}/artifacts/benchmark-v2/launcher"
+LAUNCH_ROOT="${ARTIFACT_ROOT}/artifacts/benchmark-v2/launcher"
 LOG_FILE="${LAUNCH_ROOT}/${TRIAL}.log"
 GPU_CSV="${LAUNCH_ROOT}/${TRIAL}.gpu.csv"
 mkdir -p "${LAUNCH_ROOT}"
@@ -88,13 +89,14 @@ set +e
     --benchmark-version v2 \
     --model "${MODEL}" \
     --trial "${TRIAL}" \
+    --output-root "${ARTIFACT_ROOT}/artifacts/benchmark-v2/runs" \
     --seed "${SEED}" \
     --workers 2 \
     --gpus "${GPU_ARRAY[0]}" "${GPU_ARRAY[1]}"
 RUN_STATUS=$?
 set -e
 
-RUN_MANIFEST="${PROJECT_ROOT}/artifacts/benchmark-v2/runs/${TRIAL}/run-manifest.json"
+RUN_MANIFEST="${ARTIFACT_ROOT}/artifacts/benchmark-v2/runs/${TRIAL}/run-manifest.json"
 if [[ -f "${RUN_MANIFEST}" && -s "${GPU_CSV}" && -s "${LOG_FILE}" ]]; then
   "${VENV}/bin/python" "${PROJECT_ROOT}/scripts/benchmark/attach_run_evidence.py" \
     --manifest "${RUN_MANIFEST}" \
@@ -104,6 +106,6 @@ fi
 
 printf 'Run: %s\n' "${TRIAL}"
 printf 'Model: %s\n' "${MODEL}"
-printf 'Summary: %s\n' "${PROJECT_ROOT}/artifacts/benchmark-v2/runs/${TRIAL}/summary.json"
+printf 'Summary: %s\n' "${ARTIFACT_ROOT}/artifacts/benchmark-v2/runs/${TRIAL}/summary.json"
 printf 'GPU telemetry: %s\n' "${GPU_CSV}"
 exit "${RUN_STATUS}"

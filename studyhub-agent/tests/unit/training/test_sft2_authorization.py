@@ -102,3 +102,17 @@ def test_sft2_formal_completion_requires_recovery_inventory() -> None:
     assert 'if args.mode == "smoke":\n        metadata_files' not in recorder
     assert '"metadata_sha256": sha256(metadata_files[0])' in recorder
     assert 'raise RuntimeError("SFT-2 has no complete recovery checkpoint")' in recorder
+
+
+def test_m2_merge_and_eval_use_canonical_artifact_root() -> None:
+    merger = (PROJECT_ROOT / "scripts/train/merge_qwen35_4b_sft2_compact.sh").read_text()
+    eval_4b = (PROJECT_ROOT / "scripts/benchmark/run_qwen35_4b_model_eval_v2.sh").read_text()
+    eval_shared = (PROJECT_ROOT / "scripts/benchmark/run_9b_model_eval_v2.sh").read_text()
+
+    assert "qwen35-4b-sft2-compact-v1" in merger
+    assert "expected_optimizer_updates\") != 300" in merger
+    assert 'STUDYHUB_EVAL_ARTIFACT_ROOT:-${PROJECT_ROOT}' in eval_4b
+    assert 'exec bash "${PROJECT_ROOT}/scripts/benchmark/run_9b_model_eval_v2.sh"' in eval_4b
+    assert 'ARTIFACT_ROOT="${STUDYHUB_EVAL_ARTIFACT_ROOT:-${PROJECT_ROOT}}"' in eval_shared
+    assert '--output-root "${ARTIFACT_ROOT}/artifacts/benchmark-v2/runs"' in eval_shared
+    assert '${ARTIFACT_ROOT}/artifacts/benchmark-v2/runs' in eval_shared
