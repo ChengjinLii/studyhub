@@ -2,15 +2,35 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
 
 SCRIPT = Path(__file__).resolve().parents[3] / "scripts/train/run_qwen35_4b_m1_evaluation_suite.py"
+PROTOCOL_SCRIPT = Path(__file__).resolve().parents[3] / "scripts/train/evaluate_qwen35_4b_protocol_holdout.py"
 SPEC = importlib.util.spec_from_file_location("qwen35_4b_m1_evaluation_suite", SCRIPT)
 assert SPEC and SPEC.loader
 MODULE = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(MODULE)
+
+
+@pytest.mark.parametrize("script", (SCRIPT, PROTOCOL_SCRIPT))
+def test_direct_script_execution_bootstraps_project_imports(tmp_path: Path, script: Path) -> None:
+    command = [
+        sys.executable,
+        "-c",
+        (
+            "import runpy; "
+            f"runpy.run_path({str(script)!r}); "
+            "import scripts.benchmark.run_9b_base_eval"
+        ),
+    ]
+    environment = os.environ.copy()
+    environment["PYTHONPATH"] = ""
+    subprocess.run(command, cwd=tmp_path, env=environment, check=True)
 
 
 def test_stage_order_is_preregistered() -> None:

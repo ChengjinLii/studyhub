@@ -10,6 +10,7 @@ import os
 import secrets
 import signal
 import subprocess
+import sys
 import time
 import urllib.error
 import urllib.request
@@ -19,12 +20,17 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from scripts.benchmark.run_9b_base_eval import (
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+for import_root in (PROJECT_ROOT, PROJECT_ROOT / "src"):
+    if str(import_root) not in sys.path:
+        sys.path.insert(0, str(import_root))
+
+from scripts.benchmark.run_9b_base_eval import (  # noqa: E402
     launch_server,
     resolve_model_artifact,
     wait_for_server,
 )
-from studyhub_agent.eval.protocol_holdout import (
+from studyhub_agent.eval.protocol_holdout import (  # noqa: E402
     ProtocolItem,
     build_protocol_items,
     canonical_json,
@@ -257,7 +263,7 @@ def git_value(project: Path, *args: str) -> str:
 
 
 def parse_args() -> argparse.Namespace:
-    project = Path(__file__).resolve().parents[2]
+    project = PROJECT_ROOT
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--config",
@@ -279,7 +285,7 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> int:
     args = parse_args()
-    project = Path(__file__).resolve().parents[2]
+    project = PROJECT_ROOT
     contract, data_audit = validate_contract(project, args.config.resolve())
     dataset_path = project / contract["dataset"]["selected_relative_path"]
     selected_rows = select_protocol_rows(read_jsonl(dataset_path), max_rows=args.max_rows, seed=args.seed)

@@ -8,6 +8,7 @@ import hashlib
 import json
 import os
 import subprocess
+import sys
 from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
@@ -15,6 +16,10 @@ from typing import Any
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 REPOSITORY_ROOT = PROJECT_ROOT.parent
+for import_root in (PROJECT_ROOT, PROJECT_ROOT / "src"):
+    if str(import_root) not in sys.path:
+        sys.path.insert(0, str(import_root))
+
 DEFAULT_CHECKPOINT_ROOT = (
     PROJECT_ROOT
     / "artifacts/areal/checkpoints"
