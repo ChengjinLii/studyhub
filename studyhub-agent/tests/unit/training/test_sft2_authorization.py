@@ -92,3 +92,13 @@ def test_sft2_evidence_and_lr_collector_share_canonical_artifact_root() -> None:
 
     assert '--output "${ARTIFACT_ROOT}/artifacts/experiments/${ATTEMPT_ID}"' in launcher
     assert '--evidence-root "${ARTIFACT_ROOT}/artifacts/experiments"' in launcher
+
+
+def test_sft2_formal_completion_requires_recovery_inventory() -> None:
+    recorder = (
+        PROJECT_ROOT / "scripts/train/record_qwen35_4b_sft2_completion.py"
+    ).read_text()
+
+    assert 'if args.mode == "smoke":\n        metadata_files' not in recorder
+    assert '"metadata_sha256": sha256(metadata_files[0])' in recorder
+    assert 'raise RuntimeError("SFT-2 has no complete recovery checkpoint")' in recorder

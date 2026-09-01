@@ -127,19 +127,16 @@ def main() -> int:
     final_weights = Path(marker["checkpoint"]["path"])
     if sha256(final_weights) == sha256(initial):
         raise RuntimeError("SFT-2 LoRA parameters did not update")
-    recovery_inventory = None
-    if args.mode == "smoke":
-        metadata_files = list(
-            args.checkpoint_root.rglob("recover_checkpoint/.metadata")
-        )
-        state_files = list(args.checkpoint_root.rglob("recover_checkpoint/*.distcp"))
-        if len(metadata_files) != 1 or not state_files:
-            raise RuntimeError("SFT-2 smoke has no complete recovery checkpoint")
-        recovery_inventory = {
-            "metadata": str(metadata_files[0].resolve()),
-            "state_files": len(state_files),
-            "state_bytes": sum(path.stat().st_size for path in state_files),
-        }
+    metadata_files = list(args.checkpoint_root.rglob("recover_checkpoint/.metadata"))
+    state_files = list(args.checkpoint_root.rglob("recover_checkpoint/*.distcp"))
+    if len(metadata_files) != 1 or not state_files:
+        raise RuntimeError("SFT-2 has no complete recovery checkpoint")
+    recovery_inventory = {
+        "metadata": str(metadata_files[0].resolve()),
+        "metadata_sha256": sha256(metadata_files[0]),
+        "state_files": len(state_files),
+        "state_bytes": sum(path.stat().st_size for path in state_files),
+    }
     teacher_identities = authorization.get("scope", {}).get("teacher_identities")
     if not teacher_identities:
         scope = authorization.get("scope", {})
