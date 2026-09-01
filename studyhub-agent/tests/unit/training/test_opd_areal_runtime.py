@@ -9,6 +9,7 @@ import torch.nn.functional as F
 from training.opd.areal_runtime import (
     _chunked_selected_log_probs,
     _chunked_top_k_log_probs,
+    _install_colocated_proxy_start_bridge,
     aggregate_opd_diagnostics,
     assistant_prediction_mask,
     compute_opd_diagnostics,
@@ -239,3 +240,45 @@ def test_opd_bridge_makes_only_redundant_fsdp_offload_a_noop() -> None:
     assert FSDPEngine.offload(engine) is None
     assert messages == ["StudyHub skipped redundant FSDP offload"]
     assert callable(FSDPEngine.offload._studyhub_upstream)
+
+
+def test_opd_proxy_bridge_temporarily_onloads_colocated_rollout() -> None:
+    events: list[str] = []
+    trainer = SimpleNamespace(
+        _proxy_started=False,
+        _should_offload_rollout=True,
+        _onload_rollout=lambda: events.append("onload"),
+        _offload_rollout=lambda: events.append("offload"),
+    )
+
+    def start_proxy() -> None:
+        events.append("start_proxy")
+        trainer._proxy_started = True
+
+    trainer._ensure_proxy_started = start_proxy
+    _install_colocated_proxy_start_bridge(trainer)
+
+    trainer._ensure_proxy_started()
+    trainer._ensure_proxy_started()
+
+    assert events == ["onload", "start_proxy", "offload", "start_proxy"]
+    assert trainer._ensure_proxy_started._studyhub_opd_colocated_proxy_start_v1
+
+
+def test_opd_proxy_bridge_leaves_separated_rollout_unchanged() -> None:
+    events: list[str] = []
+    trainer = SimpleNamespace(
+        _proxy_started=False,
+        _should_offload_rollout=False,
+        _onload_rollout=lambda: events.append("onload"),
+        _offload_rollout=lambda: events.append("offload"),
+    )
+
+    def start_proxy() -> None:
+        events.append("start_proxy")
+
+    trainer._ensure_proxy_started = start_proxy
+    _install_colocated_proxy_start_bridge(trainer)
+    trainer._ensure_proxy_started()
+
+    assert events == ["start_proxy"]

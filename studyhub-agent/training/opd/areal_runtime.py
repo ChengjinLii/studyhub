@@ -22,6 +22,7 @@ import torch.distributed as dist
 _PATCH_MARKER = "_studyhub_opd_runtime_v1"
 _RPC_BROADCAST_PATCH_MARKER = "_studyhub_opd_single_rank_rpc_v1"
 _FSDP_OFFLOAD_PATCH_MARKER = "_studyhub_opd_idempotent_offload_v1"
+_PROXY_START_PATCH_MARKER = "_studyhub_opd_colocated_proxy_start_v1"
 _ADAPTER_ENV = "STUDYHUB_OPD_STUDENT_ADAPTER"
 _MAX_DIAGNOSTIC_TURNS = 6
 
@@ -78,6 +79,45 @@ def _install_idempotent_fsdp_offload_bridge(fsdp_engine: type[Any]) -> None:
     fsdp_engine.offload = offload_once
 
 
+def _install_colocated_proxy_start_bridge(trainer: Any) -> None:
+    """Start AgentWorkflow proxies while their colocated SGLang server is live.
+
+    Pinned AReaL applies its initial colocation offload policy in the trainer
+    constructor, then starts AgentWorkflow proxies at the beginning of
+    ``train()``. Proxy initialization performs a server health check, which
+    cannot pass while that same server is offloaded. Temporarily restoring the
+    rollout only around first-time proxy initialization preserves the upstream
+    train-loop handoff while avoiding the startup deadlock.
+    """
+
+    current = trainer._ensure_proxy_started
+    if getattr(current, _PROXY_START_PATCH_MARKER, False):
+        return
+
+    def ensure_proxy_started_with_live_rollout(self: Any) -> Any:
+        if getattr(self, "_proxy_started", False):
+            return current()
+        restore_offload = bool(getattr(self, "_should_offload_rollout", False))
+        if restore_offload:
+            self._onload_rollout()
+        try:
+            return current()
+        finally:
+            if restore_offload:
+                self._offload_rollout()
+
+    setattr(
+        ensure_proxy_started_with_live_rollout,
+        _PROXY_START_PATCH_MARKER,
+        True,
+    )
+    ensure_proxy_started_with_live_rollout._studyhub_upstream = current  # type: ignore[attr-defined]
+    trainer._ensure_proxy_started = types.MethodType(
+        ensure_proxy_started_with_live_rollout,
+        trainer,
+    )
+
+
 def assistant_prediction_mask(loss_mask: torch.Tensor) -> torch.Tensor:
     """Align assistant-token labels to the logits that predict them.
 
@@ -111,9 +151,7 @@ def _chunked_selected_log_probs(
     chunk_size: int = 256,
 ) -> torch.Tensor:
     if logits.ndim != 2 or token_ids.ndim != 2:
-        raise ValueError(
-            "logits and token_ids must have shapes [tokens, vocab] and [tokens, k]"
-        )
+        raise ValueError("logits and token_ids must have shapes [tokens, vocab] and [tokens, k]")
     if logits.shape[0] != token_ids.shape[0]:
         raise ValueError("logits and selected IDs have different token dimensions")
     if not 0 < temperature:
@@ -159,9 +197,7 @@ def _prepare_opd_input(data: list[dict[str, Any]]) -> list[dict[str, Any]]:
     prepared: list[dict[str, Any]] = []
     for item in data:
         row = dict(item)
-        row["opd_response_mask"] = assistant_prediction_mask(row["loss_mask"]).to(
-            dtype=torch.float32
-        )
+        row["opd_response_mask"] = assistant_prediction_mask(row["loss_mask"]).to(dtype=torch.float32)
         if row.get("turn_ids") is not None:
             row["opd_prediction_turn_ids"] = prediction_turn_ids(row["turn_ids"])
         prepared.append(row)
@@ -200,9 +236,7 @@ def _forward_sparse_outputs(
         if split is None:
             raise RuntimeError(f"AReaL did not split OPD output {key}")
         result[key] = split
-    return [
-        {key: result[key][index] for key in result} for index in range(len(prepared))
-    ]
+    return [{key: result[key][index] for key in result} for index in range(len(prepared))]
 
 
 @torch.no_grad()
@@ -215,9 +249,7 @@ def _opd_compute_anchor(
 ) -> list[dict[str, torch.Tensor]]:
     self.eval()
 
-    def process(
-        logits: torch.Tensor, mb_input: dict[str, Any]
-    ) -> dict[str, torch.Tensor]:
+    def process(logits: torch.Tensor, mb_input: dict[str, Any]) -> dict[str, torch.Tensor]:
         ids, log_probs = _chunked_top_k_log_probs(
             logits,
             top_k=top_k,
@@ -229,9 +261,7 @@ def _opd_compute_anchor(
             "opd_response_mask": mb_input["opd_response_mask"].float(),
         }
         if mb_input.get("opd_prediction_turn_ids") is not None:
-            values["opd_prediction_turn_ids"] = mb_input[
-                "opd_prediction_turn_ids"
-            ].long()
+            values["opd_prediction_turn_ids"] = mb_input["opd_prediction_turn_ids"].long()
         return values
 
     return _forward_sparse_outputs(self, data, process)
@@ -247,9 +277,7 @@ def _opd_score_selected(
 ) -> list[dict[str, torch.Tensor]]:
     self.eval()
 
-    def process(
-        logits: torch.Tensor, mb_input: dict[str, Any]
-    ) -> dict[str, torch.Tensor]:
+    def process(logits: torch.Tensor, mb_input: dict[str, Any]) -> dict[str, torch.Tensor]:
         student_ids = mb_input["opd_top_k_ids"].long()
         teacher_on_student = _chunked_selected_log_probs(
             logits,
@@ -297,52 +325,33 @@ def compute_opd_diagnostics(
     student_mass = student_log_probs.exp().sum(dim=-1)
     teacher_on_student_mass = teacher_on_student.exp().sum(dim=-1)
     teacher_mass = teacher_log_probs.exp().sum(dim=-1)
-    overlaps = (
-        (student_ids.unsqueeze(-1) == teacher_ids.unsqueeze(-2)).any(dim=-1).float()
-    )
+    overlaps = (student_ids.unsqueeze(-1) == teacher_ids.unsqueeze(-2)).any(dim=-1).float()
     valid_positions = response_mask.bool()
-    conditional_kl = (
-        student_weights
-        * (student_conditional_log_probs - teacher_conditional_log_probs)
-    ).sum(dim=-1)
-    student_conditional_entropy = -(
-        student_weights * student_conditional_log_probs
-    ).sum(dim=-1)
-    teacher_conditional_entropy = -(
-        teacher_weights * teacher_conditional_log_probs
-    ).sum(dim=-1)
+    conditional_kl = (student_weights * (student_conditional_log_probs - teacher_conditional_log_probs)).sum(dim=-1)
+    student_conditional_entropy = -(student_weights * student_conditional_log_probs).sum(dim=-1)
+    teacher_conditional_entropy = -(teacher_weights * teacher_conditional_log_probs).sum(dim=-1)
     result = {
         "opd_token_reward_mean": valid_rewards.mean(),
         "opd_token_reward_std": valid_rewards.std(unbiased=False),
         "opd_token_reward_min": valid_rewards.min(),
         "opd_token_reward_max": valid_rewards.max(),
-        "opd_teacher_logprob_advantage": _masked_values(
-            teacher_on_student - student_log_probs, response_mask
-        ).mean(),
+        "opd_teacher_logprob_advantage": _masked_values(teacher_on_student - student_log_probs, response_mask).mean(),
         "opd_teacher_student_kl": conditional_kl[valid_positions].mean(),
         "opd_overlap_ratio": overlaps[valid_positions].mean(),
         "opd_student_top_k_mass": student_mass[valid_positions].mean(),
         "opd_teacher_on_student_mass": teacher_on_student_mass[valid_positions].mean(),
         "opd_teacher_top_k_mass": teacher_mass[valid_positions].mean(),
-        "opd_student_top_k_entropy": student_conditional_entropy[
-            valid_positions
-        ].mean(),
-        "opd_teacher_on_student_entropy": teacher_conditional_entropy[
-            valid_positions
-        ].mean(),
+        "opd_student_top_k_entropy": student_conditional_entropy[valid_positions].mean(),
+        "opd_teacher_on_student_entropy": teacher_conditional_entropy[valid_positions].mean(),
         "opd_scored_tokens": response_mask.sum(),
-        "opd_reward_wings": torch.tensor(
-            valid_rewards.numel(), device=valid_rewards.device, dtype=torch.float32
-        ),
+        "opd_reward_wings": torch.tensor(valid_rewards.numel(), device=valid_rewards.device, dtype=torch.float32),
         "_opd_token_reward_sum": valid_rewards.sum(),
         "_opd_token_reward_sumsq": valid_rewards.square().sum(),
     }
     if prediction_turn_ids is None:
         prediction_turn_ids = torch.full_like(response_mask, -1, dtype=torch.long)
     if prediction_turn_ids.shape != response_mask.shape:
-        raise ValueError(
-            "prediction turn IDs must have the same shape as response_mask"
-        )
+        raise ValueError("prediction turn IDs must have the same shape as response_mask")
 
     active_turns = 0
     for turn in range(_MAX_DIAGNOSTIC_TURNS):
@@ -360,12 +369,8 @@ def compute_opd_diagnostics(
             result[f"{prefix}_token_reward_std"] = wing_values.std(unbiased=False)
             result[f"{prefix}_teacher_student_kl"] = conditional_kl[turn_mask].mean()
             result[f"{prefix}_overlap_ratio"] = overlaps[turn_mask].mean()
-            result[f"{prefix}_student_top_k_entropy"] = student_conditional_entropy[
-                turn_mask
-            ].mean()
-            result[f"{prefix}_teacher_on_student_entropy"] = (
-                teacher_conditional_entropy[turn_mask].mean()
-            )
+            result[f"{prefix}_student_top_k_entropy"] = student_conditional_entropy[turn_mask].mean()
+            result[f"{prefix}_teacher_on_student_entropy"] = teacher_conditional_entropy[turn_mask].mean()
             result[f"_{prefix}_token_reward_sum"] = wing_values.sum()
             result[f"_{prefix}_token_reward_sumsq"] = wing_values.square().sum()
         else:
@@ -378,9 +383,7 @@ def compute_opd_diagnostics(
             result[f"{prefix}_teacher_on_student_entropy"] = zero
             result[f"_{prefix}_token_reward_sum"] = zero
             result[f"_{prefix}_token_reward_sumsq"] = zero
-    result["opd_active_turns"] = torch.tensor(
-        active_turns, device=response_mask.device, dtype=torch.float32
-    )
+    result["opd_active_turns"] = torch.tensor(active_turns, device=response_mask.device, dtype=torch.float32)
     return result
 
 
@@ -401,14 +404,9 @@ def aggregate_opd_diagnostics(
     reward_mean = reward_sum / total_wings
     result = {
         "opd_token_reward_mean": reward_mean,
-        "opd_token_reward_std": max(reward_sumsq / total_wings - reward_mean**2, 0.0)
-        ** 0.5,
-        "opd_token_reward_min": min(
-            float(row["opd_token_reward_min"].item()) for row in rows
-        ),
-        "opd_token_reward_max": max(
-            float(row["opd_token_reward_max"].item()) for row in rows
-        ),
+        "opd_token_reward_std": max(reward_sumsq / total_wings - reward_mean**2, 0.0) ** 0.5,
+        "opd_token_reward_min": min(float(row["opd_token_reward_min"].item()) for row in rows),
+        "opd_token_reward_max": max(float(row["opd_token_reward_max"].item()) for row in rows),
         "opd_scored_tokens": total_tokens,
         "opd_reward_wings": total_wings,
     }
@@ -424,11 +422,7 @@ def aggregate_opd_diagnostics(
     )
     for key in token_weighted:
         result[key] = (
-            sum(
-                float(row[key].item()) * float(row["opd_scored_tokens"].item())
-                for row in rows
-            )
-            / total_tokens
+            sum(float(row[key].item()) * float(row["opd_scored_tokens"].item()) for row in rows) / total_tokens
         )
 
     active_turns = 0
@@ -446,14 +440,10 @@ def aggregate_opd_diagnostics(
             continue
         active_turns += 1
         turn_sum = sum(float(row[f"_{prefix}_token_reward_sum"].item()) for row in rows)
-        turn_sumsq = sum(
-            float(row[f"_{prefix}_token_reward_sumsq"].item()) for row in rows
-        )
+        turn_sumsq = sum(float(row[f"_{prefix}_token_reward_sumsq"].item()) for row in rows)
         turn_mean = turn_sum / turn_wings
         result[f"{prefix}_token_reward_mean"] = turn_mean
-        result[f"{prefix}_token_reward_std"] = (
-            max(turn_sumsq / turn_wings - turn_mean**2, 0.0) ** 0.5
-        )
+        result[f"{prefix}_token_reward_std"] = max(turn_sumsq / turn_wings - turn_mean**2, 0.0) ** 0.5
         for suffix in (
             "teacher_student_kl",
             "overlap_ratio",
@@ -462,12 +452,7 @@ def aggregate_opd_diagnostics(
         ):
             key = f"{prefix}_{suffix}"
             result[key] = (
-                sum(
-                    float(row[key].item())
-                    * float(row[f"{prefix}_scored_tokens"].item())
-                    for row in rows
-                )
-                / turn_tokens
+                sum(float(row[key].item()) * float(row[f"{prefix}_scored_tokens"].item()) for row in rows) / turn_tokens
             )
     result["opd_active_turns"] = float(active_turns)
     return result
@@ -512,11 +497,7 @@ def _opd_update(
             temperature=student_temperature,
         )
         student_weights = torch.softmax(old_log_probs, dim=-1)
-        advantages = (
-            (teacher_log_probs - old_log_probs)
-            * student_weights
-            * response_mask.unsqueeze(-1)
-        ).detach()
+        advantages = ((teacher_log_probs - old_log_probs) * student_weights * response_mask.unsqueeze(-1)).detach()
         log_ratio = (current - old_log_probs).clamp(-20.0, 20.0)
         ratio = log_ratio.exp()
         loss_unclipped = -advantages * ratio
@@ -527,9 +508,7 @@ def _opd_update(
         token_losses = wing_losses.sum(dim=-1)
         local_weight = response_mask.sum()
         loss = (token_losses * response_mask).sum() / local_weight.clamp(min=1)
-        scaled_loss = (
-            loss * (local_weight / total_weight) * self.parallel_helper.dp_size
-        )
+        scaled_loss = loss * (local_weight / total_weight) * self.parallel_helper.dp_size
         loss_numerator_rows.append((loss.detach() * local_weight).float())
         loss_weight_rows.append(local_weight.detach().float())
         diagnostic_rows.append(
@@ -585,9 +564,7 @@ def _load_existing_adapter(self: Any) -> None:
     }
     actual = {key: int(payload.get(key, -1)) for key in expected}
     if actual != expected:
-        raise RuntimeError(
-            f"OPD adapter/config mismatch: expected={expected}, actual={actual}"
-        )
+        raise RuntimeError(f"OPD adapter/config mismatch: expected={expected}, actual={actual}")
     expected_targets = set(map(str, self.config.target_modules))
     actual_target_value = payload.get("target_modules", [])
     if isinstance(actual_target_value, str):
@@ -596,8 +573,7 @@ def _load_existing_adapter(self: Any) -> None:
         actual_targets = set(map(str, actual_target_value))
     if actual_targets != expected_targets:
         raise RuntimeError(
-            "OPD adapter target-module mismatch: "
-            f"expected={sorted(expected_targets)}, actual={sorted(actual_targets)}"
+            f"OPD adapter target-module mismatch: expected={sorted(expected_targets)}, actual={sorted(actual_targets)}"
         )
 
     # Nonzero ranks hold meta tensors here. AReaL later broadcasts rank 0's
@@ -620,17 +596,11 @@ def _load_existing_adapter(self: Any) -> None:
     unexpected = list(getattr(result, "unexpected_keys", []))
     unexpected_lora = [key for key in unexpected if "lora_" in key]
     if unexpected_lora:
-        raise RuntimeError(
-            f"unexpected LoRA keys while loading M2 adapter: {unexpected_lora[:8]}"
-        )
+        raise RuntimeError(f"unexpected LoRA keys while loading M2 adapter: {unexpected_lora[:8]}")
     loaded = sum(1 for key in state if "lora_" in key)
     if loaded == 0:
         raise RuntimeError("M2 adapter contains no LoRA tensors")
-    nonzero = sum(
-        int(torch.count_nonzero(value).item())
-        for key, value in state.items()
-        if "lora_" in key
-    )
+    nonzero = sum(int(torch.count_nonzero(value).item()) for key, value in state.items() if "lora_" in key)
     if nonzero == 0:
         raise RuntimeError("M2 adapter LoRA tensors are all zero")
     self._studyhub_opd_adapter = {
@@ -689,9 +659,9 @@ def install_opd_controller_hooks(trainer: Any, config: Any) -> None:
     if trainer.teacher is None:
         raise RuntimeError("strict OPD requires a frozen teacher engine")
     if not hasattr(trainer.actor, "_custom_function_call"):
-        raise RuntimeError(
-            "strict OPD currently requires the pinned AReaL v1 controller"
-        )
+        raise RuntimeError("strict OPD currently requires the pinned AReaL v1 controller")
+
+    _install_colocated_proxy_start_bridge(trainer)
 
     top_k = int(config.opd_top_k)
     student_temperature = float(config.opd_student_temperature)
@@ -733,9 +703,7 @@ def install_opd_controller_hooks(trainer: Any, config: Any) -> None:
             result.append(score["opd_teacher_on_student_log_probs"])
         return result
 
-    def identity_advantages(
-        _actor: Any, data: list[dict[str, Any]]
-    ) -> list[dict[str, Any]]:
+    def identity_advantages(_actor: Any, data: list[dict[str, Any]]) -> list[dict[str, Any]]:
         required = {
             "opd_top_k_ids",
             "opd_student_top_k_log_probs",
@@ -746,9 +714,7 @@ def install_opd_controller_hooks(trainer: Any, config: Any) -> None:
         for index, trajectory in enumerate(data):
             missing = required - trajectory.keys()
             if missing:
-                raise RuntimeError(
-                    f"trajectory {index} lacks OPD tensors: {sorted(missing)}"
-                )
+                raise RuntimeError(f"trajectory {index} lacks OPD tensors: {sorted(missing)}")
         return data
 
     def opd_update(_actor: Any, data: list[dict[str, Any]]) -> None:
@@ -769,7 +735,5 @@ def install_opd_controller_hooks(trainer: Any, config: Any) -> None:
         stats_tracker.scalar(**{key: float(value) for key, value in result.items()})
 
     trainer.teacher.compute_logp = types.MethodType(teacher_scores, trainer.teacher)
-    trainer.actor.compute_advantages = types.MethodType(
-        identity_advantages, trainer.actor
-    )
+    trainer.actor.compute_advantages = types.MethodType(identity_advantages, trainer.actor)
     trainer.actor.ppo_update = types.MethodType(opd_update, trainer.actor)

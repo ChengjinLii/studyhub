@@ -80,6 +80,21 @@
       "stage_marker_written": false,
       "runtime_progress": "The single-rank RPC bridge passed connect_engine; all model and rollout components initialized before the duplicate offload.",
       "remediation": "Make FSDPEngine.offload idempotent only inside the StudyHub OPD runtime, preserving the upstream transition whenever the engine is resident."
+    },
+    {
+      "attempt_id": "qwen35-4b-opd-lr1e6-seed-20260827-attempt-20260901_211814",
+      "status": "INFRA_FAILED_NO_UPDATE",
+      "failure_stage": "AReaL AgentWorkflow proxy initialization after initial rollout offload",
+      "root_cause": "Pinned AReaL applied the colocated rollout offload policy before lazily starting Hermes proxy workers; proxy initialization then health-checked an intentionally offloaded SGLang server and timed out.",
+      "native_error": "Inference server failed to become healthy within 300 seconds after release_memory_occupation",
+      "launcher_log_sha256": "5eb31c3ba54d6ca9edda93a419cce09a5fe03b46ea23bbcfd2e52fc669d57893",
+      "gpu_telemetry_sha256": "68d04eb4ee9ddf892499d5d857ac4646b1a9ecf1eff521bd8beb76215e132ed2",
+      "sglang_overlay_audit_sha256": "c3f3564cb4b25c8cedf1feb567751177d81c9945f47900fdf756573821a84cee",
+      "initial_lora_sha256": "4b7ee7462d82cd17a7c55fdb27335eee70b4df7a08f282697efafc577c173e6e",
+      "optimizer_updates": 0,
+      "stage_marker_written": false,
+      "runtime_progress": "Actor, frozen teacher, SGLang, M2 LoRA, connect_engine, and the idempotent actor offload bridge all passed before proxy startup waited on the offloaded server.",
+      "remediation": "For the first proxy start only, temporarily onload the colocated rollout for proxy health binding and restore the original offloaded state before the upstream train loop begins."
     }
   ],
   "claim_boundary": "No recorded attempt produced a reward batch, optimizer update, passing LR marker, or OPD model result."
