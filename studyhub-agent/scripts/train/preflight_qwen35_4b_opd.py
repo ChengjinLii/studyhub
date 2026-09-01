@@ -65,17 +65,13 @@ def gpu_state(gpus: str) -> dict[str, Any]:
             for row in rows
             if (values := [part.strip() for part in row.split(",")])
         ],
-        "compute_pids": [
-            int(value.strip()) for value in processes if value.strip().isdigit()
-        ],
+        "compute_pids": [int(value.strip()) for value in processes if value.strip().isdigit()],
     }
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument(
-        "--mode", choices=("lr1e6", "lr3e6", "pilot", "formal"), required=True
-    )
+    parser.add_argument("--mode", choices=("lr1e6", "lr3e6", "pilot", "formal"), required=True)
     parser.add_argument("--config", type=Path, required=True)
     parser.add_argument("--program", type=Path, required=True)
     parser.add_argument("--authorization", type=Path, required=True)
@@ -111,10 +107,7 @@ def main() -> int:
         "formal": 300,
     }
     expected_batch = {"lr1e6": 2, "lr3e6": 2, "pilot": 4, "formal": 8}
-    if (
-        args.updates != expected_updates[args.mode]
-        or args.batch_size != expected_batch[args.mode]
-    ):
+    if args.updates != expected_updates[args.mode] or args.batch_size != expected_batch[args.mode]:
         raise RuntimeError("OPD mode budget drift")
 
     overrides = [
@@ -127,23 +120,19 @@ def main() -> int:
     ]
     config, _ = load_expr_config(overrides, StudyHubOPDConfig)
     pool = Path(config.environment_root).resolve()
+    sglang_overlay = Path(config.sglang.model_path).resolve()
     paths = {
         "program_sha256": args.program,
         "config_sha256": args.config,
         "opd_upstream_lock_sha256": PROJECT_ROOT / "training/opd/upstream.lock.json",
-        "opd_parity_sha256": PROJECT_ROOT
-        / "docs/training/evidence/qwen35-4b-opd-token-reward-parity.json",
+        "opd_parity_sha256": PROJECT_ROOT / "docs/training/evidence/qwen35-4b-opd-token-reward-parity.json",
         "prompt_pool_manifest_sha256": pool / "manifest.json",
         "prompt_pool_train_sha256": pool / "tasks/train.jsonl",
         "prompt_pool_dev_sha256": pool / "tasks/validation.jsonl",
-        "teacher_novelty_sha256": PROJECT_ROOT
-        / "docs/training/evidence/qwen35-4b-opd-teacher-novelty.json",
-        "tokenizer_parity_sha256": PROJECT_ROOT
-        / "docs/training/evidence/qwen35-4b-9b-tokenizer-parity.json",
-        "thinking_contract_sha256": PROJECT_ROOT
-        / "docs/training/evidence/qwen35-4b-9b-thinking-contract.json",
-        "benchmark_manifest_sha256": PROJECT_ROOT
-        / "benchmarks/studyhub-agent-v2/manifest.json",
+        "teacher_novelty_sha256": PROJECT_ROOT / "docs/training/evidence/qwen35-4b-opd-teacher-novelty.json",
+        "tokenizer_parity_sha256": PROJECT_ROOT / "docs/training/evidence/qwen35-4b-9b-tokenizer-parity.json",
+        "thinking_contract_sha256": PROJECT_ROOT / "docs/training/evidence/qwen35-4b-9b-thinking-contract.json",
+        "benchmark_manifest_sha256": PROJECT_ROOT / "benchmarks/studyhub-agent-v2/manifest.json",
         "areal_lock_sha256": PROJECT_ROOT / "training/areal/upstream.lock.json",
         "hermes_lock_sha256": PROJECT_ROOT / "integrations/hermes/upstream.lock.json",
         "m2_completion_sha256": Path(
@@ -155,11 +144,11 @@ def main() -> int:
                 "QWEN35_4B_SFT2_COMPLETE.json",
             )
         ),
-        "teacher_download_manifest_sha256": Path(config.teacher.path)
-        / "studyhub_download_manifest.json",
+        "teacher_download_manifest_sha256": Path(config.teacher.path) / "studyhub_download_manifest.json",
         "teacher_config_sha256": Path(config.teacher.path) / "config.json",
-        "teacher_index_sha256": Path(config.teacher.path)
-        / "model.safetensors.index.json",
+        "teacher_index_sha256": Path(config.teacher.path) / "model.safetensors.index.json",
+        "sglang_overlay_config_sha256": sglang_overlay / "config.json",
+        "sglang_overlay_manifest_sha256": sglang_overlay / "studyhub_sglang_overlay_manifest.json",
     }
     lineage = authorization["lineage"]
     drift = {
@@ -178,26 +167,37 @@ def main() -> int:
     tokenizer = load_json(paths["tokenizer_parity_sha256"])
     thinking = load_json(paths["thinking_contract_sha256"])
     m2 = load_json(paths["m2_completion_sha256"])
+    overlay_manifest = load_json(paths["sglang_overlay_manifest_sha256"])
     if parity.get("status") != "PASS_OPD_COMPATIBILITY_SPIKE":
         raise RuntimeError("OPD mathematical parity drift")
     if pool_manifest.get("status") != "PASS_TEACHER_ALIGNED_SELECTION":
         raise RuntimeError("OPD prompt pool is not teacher-aligned")
     if novelty.get("status") != "PASS_TEACHER_NOVELTY":
         raise RuntimeError("teacher novelty gate drift")
-    if (
-        tokenizer.get("canonical_opd_allowed") is not True
-        or thinking.get("enable_thinking") is not False
-    ):
+    if tokenizer.get("canonical_opd_allowed") is not True or thinking.get("enable_thinking") is not False:
         raise RuntimeError("tokenizer/thinking compatibility drift")
     if m2.get("status") != "COMPLETE":
         raise RuntimeError("M2 completion drift")
+    if Path(str(overlay_manifest.get("base_model", ""))).resolve() != Path(config.actor.path).resolve() or lineage.get(
+        "sglang_overlay_path"
+    ) != str(sglang_overlay):
+        raise RuntimeError("SGLang overlay base-model lineage drift")
+    expected_overlay_fields = {
+        "vocab_size",
+        "hidden_size",
+        "num_hidden_layers",
+        "intermediate_size",
+        "num_attention_heads",
+        "num_key_value_heads",
+        "head_dim",
+    }
+    if set(overlay_manifest.get("mapped_text_config_fields", {})) != expected_overlay_fields:
+        raise RuntimeError("SGLang overlay LoRA config contract drift")
     m2_adapter = Path(lineage["m2_adapter_path"]).resolve()
     if (
         os.environ.get("STUDYHUB_AREAL_OPD_BRIDGE") != "1"
-        or Path(os.environ.get("STUDYHUB_OPD_STUDENT_ADAPTER", "")).resolve()
-        != m2_adapter
-        or sha256(m2_adapter / "adapter_model.safetensors")
-        != lineage["m2_adapter_sha256"]
+        or Path(os.environ.get("STUDYHUB_OPD_STUDENT_ADAPTER", "")).resolve() != m2_adapter
+        or sha256(m2_adapter / "adapter_model.safetensors") != lineage["m2_adapter_sha256"]
     ):
         raise RuntimeError("OPD student is not initialized from the locked M2 adapter")
 
@@ -232,14 +232,12 @@ def main() -> int:
         raise RuntimeError(f"strict OPD recipe drift: {mismatch}")
     if config.ref is not None or config.teacher.rl_loss_weight != 0.0:
         raise RuntimeError("OPD teacher/reference role isolation failed")
-    if config.environment_root != str(pool) or Path(config.verifier_root).resolve() != (
-        pool / "verifiers"
-    ):
+    if config.environment_root != str(pool) or Path(config.verifier_root).resolve() != (pool / "verifiers"):
         raise RuntimeError("OPD Hermes environment path drift")
     dataset = load_from_disk(Path(config.train_dataset.path))
-    if len(dataset["train"]) != int(pool_manifest["train_rows"]) or len(
-        dataset["validation"]
-    ) != int(pool_manifest["validation_rows"]):
+    if len(dataset["train"]) != int(pool_manifest["train_rows"]) or len(dataset["validation"]) != int(
+        pool_manifest["validation_rows"]
+    ):
         raise RuntimeError("OPD DatasetDict differs from its prompt-pool manifest")
 
     if args.mode in {"pilot", "formal"}:
@@ -265,9 +263,7 @@ def main() -> int:
     state = gpu_state(args.gpus)
     if len(state["gpus"]) != 2 or state["compute_pids"]:
         raise RuntimeError(f"strict OPD requires two idle GPUs: {state}")
-    low_memory = [
-        row for row in state["gpus"] if row["memory_free_mib"] < args.min_free_mib
-    ]
+    low_memory = [row for row in state["gpus"] if row["memory_free_mib"] < args.min_free_mib]
     if low_memory:
         raise RuntimeError(f"requested GPUs do not meet memory gate: {low_memory}")
     print(

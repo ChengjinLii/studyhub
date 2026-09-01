@@ -1,0 +1,31 @@
+{
+  "schema_version": "studyhub.qwen35-4b-opd-infra-attempts.v1",
+  "experiment": "studyhub-qwen35-4b-strict-opd",
+  "trial": "qwen35-4b-opd-lr1e6-seed-20260827",
+  "status": "INFRA_ATTEMPTS_RECORDED_NO_STAGE_PASS",
+  "attempts": [
+    {
+      "attempt_id": "qwen35-4b-opd-lr1e6-seed-20260827-attempt-20260901_195815",
+      "status": "INFRA_FAILED_NO_UPDATE",
+      "failure_stage": "AReaL worker startup",
+      "root_cause": "The TMS worker preload library could not resolve libcudart.so.12.",
+      "launcher_log_sha256": "0a7156bbda04a743e760b971ae769ada3c0e0732d41d835716451ec224c7f295",
+      "optimizer_updates": 0,
+      "stage_marker_written": false,
+      "remediation": "Propagate the pinned venv CUDA runtime directory through every AReaL scheduling spec."
+    },
+    {
+      "attempt_id": "qwen35-4b-opd-lr1e6-seed-20260827-attempt-20260901_200339",
+      "status": "INFRA_FAILED_NO_UPDATE",
+      "failure_stage": "SGLang LoRA initialization",
+      "root_cause": "Pinned SGLang read Qwen3_5Config.vocab_size, while the composite model exposes it under text_config.vocab_size.",
+      "launcher_log_sha256": "5d160076408579a829f7e21f54c9bead3f3324dbd46e39db541dd0f1835c51e8",
+      "rollout_log_sha256": "245c85b5b9b9eefc5c1ef869f05a12deaecd053f88d4bca82cc30625c219cc59",
+      "initial_lora_sha256": "4b7ee7462d82cd17a7c55fdb27335eee70b4df7a08f282697efafc577c173e6e",
+      "optimizer_updates": 0,
+      "stage_marker_written": false,
+      "remediation": "Use the existing SGLang-only model overlay to expose seven text config dimensions without changing actor weights."
+    }
+  ],
+  "claim_boundary": "Neither attempt produced a reward batch, optimizer update, passing LR marker, or OPD model result."
+}

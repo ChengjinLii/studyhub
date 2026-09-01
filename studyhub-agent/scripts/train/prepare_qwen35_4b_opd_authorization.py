@@ -31,9 +31,7 @@ def load_json(path: Path) -> dict[str, Any]:
 def write_json(path: Path, value: Any) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_suffix(path.suffix + ".partial")
-    temporary.write_text(
-        json.dumps(value, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
-    )
+    temporary.write_text(json.dumps(value, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     temporary.replace(path)
 
 
@@ -44,16 +42,14 @@ def parse_args() -> argparse.Namespace:
         "--m2-marker",
         type=Path,
         default=(
-            CANONICAL_ROOT
-            / "artifacts/areal/checkpoints/chengjin/studyhub-qwen35-4b-codex-sft2/"
+            CANONICAL_ROOT / "artifacts/areal/checkpoints/chengjin/studyhub-qwen35-4b-codex-sft2/"
             "qwen35-4b-sft2-formal-r32-seed-20260827/QWEN35_4B_SFT2_COMPLETE.json"
         ),
     )
     parser.add_argument(
         "--novelty-gate",
         type=Path,
-        default=PROJECT_ROOT
-        / "docs/training/evidence/qwen35-4b-opd-teacher-novelty.json",
+        default=PROJECT_ROOT / "docs/training/evidence/qwen35-4b-opd-teacher-novelty.json",
     )
     parser.add_argument(
         "--output",
@@ -68,29 +64,28 @@ def main() -> int:
     root = args.artifact_root.resolve()
     teacher_model = Path("/data/chengjin/studyhub/models/P1/Qwen3.5-9B")
     pool = root / "datasets/processed/opd_prompt_pool_v1"
+    actor_model = root / "artifacts/areal/model-overlays/qwen35-4b-base-canonical-tokenizer"
+    sglang_overlay = root / "artifacts/areal/model-overlays/qwen35-4b-opd-sglang-lora"
     paths = {
         "program_sha256": PROJECT_ROOT / "configs/program-v4/qwen35-4b-opd-v1.json",
         "config_sha256": PROJECT_ROOT / "configs/train/qwen35-4b-strict-opd.yaml",
         "opd_upstream_lock_sha256": PROJECT_ROOT / "training/opd/upstream.lock.json",
-        "opd_parity_sha256": PROJECT_ROOT
-        / "docs/training/evidence/qwen35-4b-opd-token-reward-parity.json",
+        "opd_parity_sha256": PROJECT_ROOT / "docs/training/evidence/qwen35-4b-opd-token-reward-parity.json",
         "prompt_pool_manifest_sha256": pool / "manifest.json",
         "prompt_pool_train_sha256": pool / "tasks/train.jsonl",
         "prompt_pool_dev_sha256": pool / "tasks/validation.jsonl",
         "teacher_novelty_sha256": args.novelty_gate,
-        "tokenizer_parity_sha256": PROJECT_ROOT
-        / "docs/training/evidence/qwen35-4b-9b-tokenizer-parity.json",
-        "thinking_contract_sha256": PROJECT_ROOT
-        / "docs/training/evidence/qwen35-4b-9b-thinking-contract.json",
-        "benchmark_manifest_sha256": PROJECT_ROOT
-        / "benchmarks/studyhub-agent-v2/manifest.json",
+        "tokenizer_parity_sha256": PROJECT_ROOT / "docs/training/evidence/qwen35-4b-9b-tokenizer-parity.json",
+        "thinking_contract_sha256": PROJECT_ROOT / "docs/training/evidence/qwen35-4b-9b-thinking-contract.json",
+        "benchmark_manifest_sha256": PROJECT_ROOT / "benchmarks/studyhub-agent-v2/manifest.json",
         "areal_lock_sha256": PROJECT_ROOT / "training/areal/upstream.lock.json",
         "hermes_lock_sha256": PROJECT_ROOT / "integrations/hermes/upstream.lock.json",
         "m2_completion_sha256": args.m2_marker,
-        "teacher_download_manifest_sha256": teacher_model
-        / "studyhub_download_manifest.json",
+        "teacher_download_manifest_sha256": teacher_model / "studyhub_download_manifest.json",
         "teacher_config_sha256": teacher_model / "config.json",
         "teacher_index_sha256": teacher_model / "model.safetensors.index.json",
+        "sglang_overlay_config_sha256": sglang_overlay / "config.json",
+        "sglang_overlay_manifest_sha256": sglang_overlay / "studyhub_sglang_overlay_manifest.json",
     }
     missing = [str(path) for path in paths.values() if not path.is_file()]
     if missing:
@@ -105,6 +100,7 @@ def main() -> int:
     benchmark = load_json(paths["benchmark_manifest_sha256"])
     m2 = load_json(args.m2_marker)
     teacher_manifest = load_json(paths["teacher_download_manifest_sha256"])
+    overlay_manifest = load_json(paths["sglang_overlay_manifest_sha256"])
     if program.get("status") != "PREPARED_NOT_AUTHORIZED":
         raise RuntimeError("unexpected OPD program status")
     if parity.get("status") != "PASS_OPD_COMPATIBILITY_SPIKE":
@@ -118,15 +114,9 @@ def main() -> int:
         or pool_manifest.get("validation_or_protocol_holdout_used") is not False
     ):
         raise RuntimeError("OPD prompt pool split isolation failed")
-    if (
-        novelty.get("status") != "PASS_TEACHER_NOVELTY"
-        or int(novelty["teacher_only_successes"]) < 20
-    ):
+    if novelty.get("status") != "PASS_TEACHER_NOVELTY" or int(novelty["teacher_only_successes"]) < 20:
         raise RuntimeError("T9 does not satisfy the frozen novelty gate")
-    if (
-        tokenizer.get("status") != "PASS"
-        or tokenizer.get("canonical_opd_allowed") is not True
-    ):
+    if tokenizer.get("status") != "PASS" or tokenizer.get("canonical_opd_allowed") is not True:
         raise RuntimeError("canonical 4B/9B tokenizer parity is not proven")
     if thinking.get("enable_thinking") is not False:
         raise RuntimeError("OPD thinking-mode contract drift")
@@ -137,11 +127,22 @@ def main() -> int:
     m2_adapter = Path(str(m2.get("checkpoint", {}).get("path", ""))).resolve()
     if not m2_adapter.is_file() or sha256(m2_adapter) != m2["checkpoint"]["sha256"]:
         raise RuntimeError("M2 adapter is missing or differs from its marker")
-    teacher_revision = teacher_manifest.get("revision") or teacher_manifest.get(
-        "resolved_revision"
-    )
+    teacher_revision = teacher_manifest.get("revision") or teacher_manifest.get("resolved_revision")
     if teacher_revision != "c202236235762e1c871ad0ccb60c8ee5ba337b9a":
         raise RuntimeError("T9 revision drift")
+    if Path(str(overlay_manifest.get("base_model", ""))).resolve() != actor_model.resolve():
+        raise RuntimeError("SGLang overlay is not derived from the frozen actor model")
+    expected_overlay_fields = {
+        "vocab_size",
+        "hidden_size",
+        "num_hidden_layers",
+        "intermediate_size",
+        "num_attention_heads",
+        "num_key_value_heads",
+        "head_dim",
+    }
+    if set(overlay_manifest.get("mapped_text_config_fields", {})) != expected_overlay_fields:
+        raise RuntimeError("SGLang overlay does not expose the complete LoRA config contract")
 
     value = {
         "schema_version": "studyhub.qwen35-4b-opd-authorization.v1",
@@ -167,6 +168,7 @@ def main() -> int:
             "teacher_model_path": str(teacher_model),
             "teacher_revision": "c202236235762e1c871ad0ccb60c8ee5ba337b9a",
             "prompt_pool_path": str(pool),
+            "sglang_overlay_path": str(sglang_overlay),
             "run_commit_required": "SET_AT_LAUNCH_FROM_CLEAN_WORKTREE",
         },
         "recipe": {

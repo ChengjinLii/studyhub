@@ -184,7 +184,9 @@ ref: null
 critic: null
 
 sglang:
-  model_path: ${actor.path}
+  # The pinned SGLang LoRA loader expects text dimensions on the top-level
+  # composite config. This overlay maps only those fields and symlinks weights.
+  model_path: /data/chengjin/studyhub/studyhub-agent/artifacts/areal/model-overlays/qwen35-4b-opd-sglang-lora
   random_seed: ${seed}
   skip_tokenizer_init: true
   dtype: ${actor.dtype}

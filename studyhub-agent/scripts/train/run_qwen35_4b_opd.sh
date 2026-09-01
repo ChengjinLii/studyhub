@@ -9,6 +9,8 @@ CONFIG="${PROJECT_ROOT}/configs/train/qwen35-4b-strict-opd.yaml"
 PROGRAM="${PROJECT_ROOT}/configs/program-v4/qwen35-4b-opd-v1.json"
 AUTHORIZATION="${PROJECT_ROOT}/configs/program-v4/qwen35-4b-opd-v1-authorization.json"
 LR_SELECTION="${PROJECT_ROOT}/docs/training/evidence/qwen35-4b-opd-lr-selection.json"
+ACTOR_MODEL="${ARTIFACT_ROOT}/artifacts/areal/model-overlays/qwen35-4b-base-canonical-tokenizer"
+SGLANG_MODEL="${ARTIFACT_ROOT}/artifacts/areal/model-overlays/qwen35-4b-opd-sglang-lora"
 MODE="${1:-}"
 SEED="${2:-20260827}"
 GPUS="${STUDYHUB_TRAIN_GPUS:-0,1}"
@@ -64,6 +66,7 @@ ATTEMPT_ID="${TRIAL}-attempt-$(date +%Y%m%d_%H%M%S)"
 LOG_FILE="${LOG_ROOT}/${ATTEMPT_ID}.log"
 GPU_CSV="${LOG_ROOT}/${ATTEMPT_ID}.gpu.csv"
 RUN_METADATA="${LOG_ROOT}/${TRIAL}.run.json"
+SGLANG_OVERLAY_AUDIT="${LOG_ROOT}/${ATTEMPT_ID}.sglang-overlay.json"
 DATA_MANIFEST="${ARTIFACT_ROOT}/datasets/processed/opd_prompt_pool_v1/manifest.json"
 PILOT_MARKER="${ARTIFACT_ROOT}/artifacts/areal/checkpoints/$(id -un)/${EXPERIMENT}/qwen35-4b-opd-pilot-seed-20260827/QWEN35_4B_OPD_PILOT_PASS.json"
 case "${MODE}" in
@@ -107,6 +110,11 @@ PY
 export STUDYHUB_AREAL_ADMIN_API_KEY="$(${VENV_DIR}/bin/python -c 'import secrets; print(secrets.token_urlsafe(48))')"
 export PYTHONPATH="${RUNTIME_SHIM}:${PROJECT_ROOT}:${PROJECT_ROOT}/src${PYTHONPATH:+:${PYTHONPATH}}"
 
+mkdir -p "${LOG_ROOT}"
+"${VENV_DIR}/bin/python" "${PROJECT_ROOT}/scripts/train/prepare_sglang_model_overlay.py" \
+  --model "${ACTOR_MODEL}" \
+  --output "${SGLANG_MODEL}" >"${SGLANG_OVERLAY_AUDIT}"
+
 PREFLIGHT_ARGS=(
   --mode "${MODE}"
   --config "${CONFIG}"
@@ -145,7 +153,6 @@ else
   OVERRIDES+=("recover.mode=disabled" "recover.freq_steps=null" "recover.freq_secs=null")
 fi
 
-mkdir -p "${LOG_ROOT}"
 METADATA_ARGS=()
 for override in "${OVERRIDES[@]}"; do
   METADATA_ARGS+=(--override "${override}")
@@ -158,7 +165,7 @@ done
   --dataset-manifest "${DATA_MANIFEST}" \
   --benchmark-manifest "${PROJECT_ROOT}/benchmarks/studyhub-agent-v2/manifest.json" \
   --authorization "${AUTHORIZATION}" \
-  --model "${ARTIFACT_ROOT}/artifacts/areal/model-overlays/qwen35-4b-base-canonical-tokenizer" \
+  --model "${ACTOR_MODEL}" \
   --model-hash-cache "${ARTIFACT_ROOT}/artifacts/areal/hash-cache/qwen35-4b-base.json" \
   --areal-lock "${PROJECT_ROOT}/training/areal/upstream.lock.json" \
   --hermes-lock "${PROJECT_ROOT}/integrations/hermes/upstream.lock.json" \

@@ -26,17 +26,19 @@ def test_opd_launcher_separates_code_and_artifact_roots() -> None:
     assert 'VENV_DIR="${STUDYHUB_TRAIN_VENV:-${ARTIFACT_ROOT}/.venv-train}"' in launcher
     assert 'DATA_MANIFEST="${ARTIFACT_ROOT}/datasets/processed/' in launcher
     assert 'CHECKPOINT_ROOT="${ARTIFACT_ROOT}/artifacts/areal/checkpoints/' in launcher
-    assert '${PROJECT_ROOT}/artifacts/areal' not in launcher
+    assert "${PROJECT_ROOT}/artifacts/areal" not in launcher
     assert "libcudart.so.12" in launcher
     assert "STUDYHUB_CUDA_RUNTIME_LIBRARY_PATH" in launcher
-    assert config.count(
-        "LD_LIBRARY_PATH: ${oc.env:STUDYHUB_CUDA_RUNTIME_LIBRARY_PATH}"
-    ) >= 5
+    assert "prepare_sglang_model_overlay.py" in launcher
+    assert "SGLANG_OVERLAY_AUDIT" in launcher
+    assert "qwen35-4b-opd-sglang-lora" in config
+    assert "model_path: ${actor.path}" not in config
+    assert config.count("LD_LIBRARY_PATH: ${oc.env:STUDYHUB_CUDA_RUNTIME_LIBRARY_PATH}") >= 5
 
     probe = (PROJECT_ROOT / "scripts/train/run_opd_policy_probe.py").read_text()
     assert 'parser.add_argument("--artifact-root"' in probe
     assert 'artifact_root / ".vendor/hermes-agent"' in probe
-    assert 'model_overlay = artifact_root /' in probe
+    assert "model_overlay = artifact_root /" in probe
 
 
 def test_prediction_mask_does_not_cross_trajectory_boundaries() -> None:
@@ -64,9 +66,7 @@ def test_chunked_sparse_scores_match_full_log_softmax() -> None:
     token_ids = torch.tensor([[0, 2], [1, 0], [2, 1]])
     expected = F.log_softmax(logits / 0.7, dim=-1).gather(-1, token_ids)
 
-    actual = _chunked_selected_log_probs(
-        logits, token_ids, temperature=0.7, chunk_size=1
-    )
+    actual = _chunked_selected_log_probs(logits, token_ids, temperature=0.7, chunk_size=1)
     top_ids, top_log_probs = _chunked_top_k_log_probs(
         logits,
         top_k=2,
@@ -161,9 +161,7 @@ def test_opd_config_is_fail_closed(monkeypatch: pytest.MonkeyPatch) -> None:
     from training.opd.config import StudyHubOPDConfig
 
     monkeypatch.setenv("STUDYHUB_AREAL_ADMIN_API_KEY", "unit-test-only")
-    monkeypatch.setenv(
-        "STUDYHUB_CUDA_RUNTIME_LIBRARY_PATH", "/unit-test/cuda-runtime/lib"
-    )
+    monkeypatch.setenv("STUDYHUB_CUDA_RUNTIME_LIBRARY_PATH", "/unit-test/cuda-runtime/lib")
     for name in (
         "ALL_PROXY",
         "all_proxy",
