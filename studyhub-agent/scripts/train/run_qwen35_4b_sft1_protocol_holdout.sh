@@ -2,10 +2,11 @@
 set -euo pipefail
 
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-VENV_DIR="${PROJECT_ROOT}/.venv-train"
-MODEL="${STUDYHUB_SFT1_MERGED_MODEL:-${PROJECT_ROOT}/artifacts/areal/merged/qwen35-4b-sft1-r32-seed-20260827}"
-OUTPUT_ROOT="${PROJECT_ROOT}/artifacts/protocol-holdout/qwen35-4b-sft1"
-CHECKPOINT_ROOT="${PROJECT_ROOT}/artifacts/areal/checkpoints/$(id -un)/studyhub-qwen35-4b-open-agentic-sft1/qwen35-4b-sft1-formal-r32-seed-20260827"
+ARTIFACT_ROOT="${STUDYHUB_EVAL_ARTIFACT_ROOT:-${PROJECT_ROOT}}"
+VENV_DIR="${STUDYHUB_TRAIN_VENV:-${ARTIFACT_ROOT}/.venv-train}"
+MODEL="${STUDYHUB_SFT1_MERGED_MODEL:-${ARTIFACT_ROOT}/artifacts/areal/merged/qwen35-4b-sft1-r32-seed-20260827}"
+OUTPUT_ROOT="${STUDYHUB_PROTOCOL_OUTPUT_ROOT:-${ARTIFACT_ROOT}/artifacts/protocol-holdout/qwen35-4b-sft1}"
+CHECKPOINT_ROOT="${ARTIFACT_ROOT}/artifacts/areal/checkpoints/$(id -un)/studyhub-qwen35-4b-open-agentic-sft1/qwen35-4b-sft1-formal-r32-seed-20260827"
 COMPLETION_MARKER="${CHECKPOINT_ROOT}/QWEN35_4B_SFT1_COMPLETE.json"
 GPUS="${STUDYHUB_EVAL_GPUS:-0,1}"
 MAX_ROWS="${STUDYHUB_PROTOCOL_MAX_ROWS:-0}"
@@ -13,7 +14,7 @@ MIN_FREE="${STUDYHUB_MIN_GPU_FREE_MIB:-70000}"
 MAX_USED="${STUDYHUB_MAX_GPU_USED_MIB:-76000}"
 MAX_WALL="${STUDYHUB_PROTOCOL_MAX_WALL_SECONDS:-14400}"
 TIMESTAMP="$(date +%Y%m%d_%H%M%S)"
-LOG_ROOT="${PROJECT_ROOT}/artifacts/areal/launcher_logs/qwen35-4b-sft1-protocol"
+LOG_ROOT="${ARTIFACT_ROOT}/artifacts/areal/launcher_logs/qwen35-4b-sft1-protocol"
 LOG_FILE="${LOG_ROOT}/protocol-${TIMESTAMP}.log"
 GPU_CSV="${LOG_ROOT}/protocol-${TIMESTAMP}.gpu.csv"
 
@@ -44,6 +45,7 @@ mkdir -p "${LOG_ROOT}"
   --log "${LOG_FILE}" \
   --gpu-csv "${GPU_CSV}" \
   -- "${VENV_DIR}/bin/python" "${PROJECT_ROOT}/scripts/train/evaluate_qwen35_4b_protocol_holdout.py" \
+    --artifact-root "${ARTIFACT_ROOT}" \
     --model "${MODEL}" \
     --output-root "${OUTPUT_ROOT}" \
     --gpus "${GPUS}" \

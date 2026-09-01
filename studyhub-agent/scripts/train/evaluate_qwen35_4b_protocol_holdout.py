@@ -75,7 +75,10 @@ def write_json(path: Path, value: Any) -> None:
     os.replace(temporary, path)
 
 
-def validate_contract(project: Path, config_path: Path) -> tuple[dict[str, Any], dict[str, Any]]:
+def validate_contract(
+    artifact_root: Path,
+    config_path: Path,
+) -> tuple[dict[str, Any], dict[str, Any]]:
     contract = read_json(config_path)
     if contract.get("status") != "FROZEN_BEFORE_M1_COMPLETION":
         raise RuntimeError("protocol holdout contract is not frozen")
@@ -85,10 +88,10 @@ def validate_contract(project: Path, config_path: Path) -> tuple[dict[str, Any],
         ("tokenized_manifest_relative_path", "tokenized_manifest_sha256"),
         ("data_audit_relative_path", "data_audit_sha256"),
     ):
-        path = project / str(dataset[relative_key])
+        path = artifact_root / str(dataset[relative_key])
         if not path.is_file() or sha256(path) != dataset[hash_key]:
             raise RuntimeError(f"protocol holdout lineage drift: {path}")
-    audit = read_json(project / str(dataset["data_audit_relative_path"]))
+    audit = read_json(artifact_root / str(dataset["data_audit_relative_path"]))
     expected_rows = int(contract["expected_rows"])
     if int(audit.get("rows", {}).get("protocol_holdout", -1)) != expected_rows:
         raise RuntimeError("protocol holdout row count drift")
@@ -270,6 +273,7 @@ def parse_args() -> argparse.Namespace:
         type=Path,
         default=project / "configs/eval/qwen35-4b-sft1-protocol-holdout-v1.json",
     )
+    parser.add_argument("--artifact-root", type=Path, default=project)
     parser.add_argument("--model", type=Path, required=True)
     parser.add_argument("--output-root", type=Path, required=True)
     parser.add_argument("--run-id")
@@ -286,8 +290,9 @@ def parse_args() -> argparse.Namespace:
 def main() -> int:
     args = parse_args()
     project = PROJECT_ROOT
-    contract, data_audit = validate_contract(project, args.config.resolve())
-    dataset_path = project / contract["dataset"]["selected_relative_path"]
+    artifact_root = args.artifact_root.resolve()
+    contract, data_audit = validate_contract(artifact_root, args.config.resolve())
+    dataset_path = artifact_root / contract["dataset"]["selected_relative_path"]
     selected_rows = select_protocol_rows(read_jsonl(dataset_path), max_rows=args.max_rows, seed=args.seed)
     if not args.max_rows and len(selected_rows) != int(contract["expected_rows"]):
         raise RuntimeError("formal protocol holdout did not select all frozen rows")
@@ -328,7 +333,7 @@ def main() -> int:
         "git_status_clean": repository_clean,
         "config_sha256": sha256(args.config.resolve()),
         "dataset_sha256": sha256(dataset_path),
-        "data_audit_sha256": sha256(project / contract["dataset"]["data_audit_relative_path"]),
+        "data_audit_sha256": sha256(artifact_root / contract["dataset"]["data_audit_relative_path"]),
         "model": model_identity,
         "model_manifest": model_manifest,
         "selected_rows": len(selected_rows),

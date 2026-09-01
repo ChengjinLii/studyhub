@@ -109,6 +109,12 @@ def test_m2_merge_and_eval_use_canonical_artifact_root() -> None:
     eval_4b = (PROJECT_ROOT / "scripts/benchmark/run_qwen35_4b_model_eval_v2.sh").read_text()
     eval_shared = (PROJECT_ROOT / "scripts/benchmark/run_9b_model_eval_v2.sh").read_text()
     eval_runner = (PROJECT_ROOT / "scripts/benchmark/run_9b_base_eval.py").read_text()
+    protocol_runner = (
+        PROJECT_ROOT / "scripts/train/evaluate_qwen35_4b_protocol_holdout.py"
+    ).read_text()
+    protocol_launcher = (
+        PROJECT_ROOT / "scripts/train/run_qwen35_4b_sft1_protocol_holdout.sh"
+    ).read_text()
 
     assert "qwen35-4b-sft2-compact-v1" in merger
     assert "expected_optimizer_updates\") != 300" in merger
@@ -121,3 +127,7 @@ def test_m2_merge_and_eval_use_canonical_artifact_root() -> None:
     assert 'artifact_root = args.artifact_root.resolve()' in eval_runner
     assert 'artifact_root / f"artifacts/benchmark-{benchmark_generation}' in eval_runner
     assert 'model_overlay = artifact_root /' in eval_runner
+    assert 'parser.add_argument("--artifact-root"' in protocol_runner
+    assert 'dataset_path = artifact_root / contract["dataset"]' in protocol_runner
+    assert 'ARTIFACT_ROOT="${STUDYHUB_EVAL_ARTIFACT_ROOT:-${PROJECT_ROOT}}"' in protocol_launcher
+    assert '--artifact-root "${ARTIFACT_ROOT}"' in protocol_launcher
