@@ -1,0 +1,100 @@
+{
+  "schema_version": "studyhub.qwen35-4b-opd-authorization.v1",
+  "authorization_id": "qwen35-4b-m2-to-t9-strict-opd-seed-20260827",
+  "status": "AUTHORIZED_PENDING_LR_PILOTS",
+  "scope": {
+    "student": "M2",
+    "teacher": "Qwen/Qwen3.5-9B",
+    "method": "THUNLP token_reward_direct over real Hermes rollouts",
+    "lr_pilots": [
+      1e-06,
+      3e-06
+    ],
+    "pilot_updates": 64,
+    "formal_updates": 300,
+    "no_main_grpo": true,
+    "no_spark": true,
+    "no_sealed": true,
+    "teacher_executes_tools": false
+  },
+  "lineage": {
+    "program_sha256": "c41ada10e228631f490041f7552c5ed1eb2db381908317c0a4155a6f4f010a5e",
+    "config_sha256": "7debb6731fac70391a5782052c49446524ce86f9a4148780c57e531c7fde1eaf",
+    "opd_upstream_lock_sha256": "d8b135de3148e10dfc64fbe65b30d81d4771fead377b1e0c85453d3a9b396830",
+    "opd_parity_sha256": "ba0df4b3c237728bd6e6dfddb8e55c17d2f09e8c316686bfba1179334ed52183",
+    "prompt_pool_manifest_sha256": "b27c70cad9991533b438d962346f0e2a8721fcfe1fc1eb7630e426e2c6d35f67",
+    "prompt_pool_train_sha256": "22efc5aa8f17d215575eeaa838f269a225c194123a2041f7bf23f6a4d2a97a2f",
+    "prompt_pool_dev_sha256": "1bd8a68ca21df00d9fc6b915278cfe9fb94515bd8bed549713c42a0dbe3bcfeb",
+    "teacher_novelty_sha256": "1544f92778c7cbaef5331e0a6da240dfa822a446139069926ffb1fd74cc4c7a5",
+    "tokenizer_parity_sha256": "53749c20f3b7658cb3cbe27e0bc27d3b4e5db4556e1a4e0c32d5d93d6ffe8ec6",
+    "thinking_contract_sha256": "0b1af943d6166aa5e802d26f95082a79f7753058328ef627bd3843bee3908069",
+    "benchmark_manifest_sha256": "da804b10f53dec585255598c3e256445b8ade3acf35fd8c766ca0ab4d759c88b",
+    "areal_lock_sha256": "4c55c625520c02f76b600820832d5ed10f9f8be745b04d3ec7c9d47b980b8916",
+    "hermes_lock_sha256": "d580dc46ad5eea8f4e6c58b7e91318f2e84ac4f4c3d59fbf34cebe1941eb826e",
+    "m2_completion_sha256": "bad70d193debd14e62178acca0b1250a5cf4c6eeec0afa67708584caaa3c7b33",
+    "teacher_download_manifest_sha256": "b00bde79c4272817442b1aa1c6a8acbbf8c465bc1117421dfd45d8681f00582a",
+    "teacher_config_sha256": "d0883072e01861ed0b2d47be3c16c36a8e81c224c7ffaa310c6558fb3f932b05",
+    "teacher_index_sha256": "26d3539b516be613f39563617cb9d33b3f83d401298125be392c80cefb8f7fe5",
+    "m2_adapter_path": "/data/chengjin/studyhub/studyhub-agent/artifacts/areal/checkpoints/chengjin/studyhub-qwen35-4b-compact-sft2/qwen35-4b-sft2-compact-v1-formal-r32-seed-20260827/default/epoch0epochstep299globalstep299",
+    "m2_adapter_sha256": "4b7ee7462d82cd17a7c55fdb27335eee70b4df7a08f282697efafc577c173e6e",
+    "m2_completion_path": "/data/chengjin/studyhub/studyhub-agent/artifacts/areal/checkpoints/chengjin/studyhub-qwen35-4b-compact-sft2/qwen35-4b-sft2-compact-v1-formal-r32-seed-20260827/QWEN35_4B_SFT2_COMPLETE.json",
+    "teacher_model_path": "/data/chengjin/studyhub/models/P1/Qwen3.5-9B",
+    "teacher_revision": "c202236235762e1c871ad0ccb60c8ee5ba337b9a",
+    "prompt_pool_path": "/data/chengjin/studyhub/studyhub-agent/datasets/processed/opd_prompt_pool_v1",
+    "run_commit_required": "SET_AT_LAUNCH_FROM_CLEAN_WORKTREE"
+  },
+  "recipe": {
+    "upstream": "thunlp/OPD",
+    "algorithm": "token_reward_direct",
+    "top_k": 16,
+    "top_k_strategy": "only_stu",
+    "reward_weight": "student_p",
+    "loss_aggregation": "sum-k-then-token-mean",
+    "student_temperature": 0.7,
+    "teacher_temperature": 1.0,
+    "reference_kl": 0.0,
+    "responses_per_prompt": 2,
+    "student_backend": "fsdp:d1",
+    "rollout_backend": "sglang:d1",
+    "teacher_backend": "fsdp:d1",
+    "lora_rank": 32,
+    "lora_alpha": 32,
+    "target_modules": [
+      "o_proj",
+      "gate_proj",
+      "up_proj",
+      "down_proj"
+    ],
+    "max_context_tokens": 16384,
+    "max_assistant_tokens": 4096,
+    "max_turns": 6,
+    "seed": 20260827
+  },
+  "budgets": {
+    "lr_pilot_updates": 16,
+    "algorithm_pilot_updates": 64,
+    "formal_updates": 300,
+    "formal_batch_size": 8,
+    "checkpoint_every_updates": 50,
+    "maximum_wall_seconds": 28800
+  },
+  "hard_gates": {
+    "novelty_status": "PASS_TEACHER_NOVELTY",
+    "teacher_successes": 241,
+    "student_successes": 165,
+    "teacher_only_successes": 126,
+    "student_baseline_tool_validity": 0.92261,
+    "tokenizer_parity": "PASS",
+    "thinking_enabled": false,
+    "sealed_used": false
+  },
+  "completion_contract": {
+    "lr_selection_evidence": "docs/training/evidence/qwen35-4b-opd-lr-selection.json",
+    "pilot_marker": "QWEN35_4B_OPD_PILOT_PASS.json",
+    "formal_marker": "QWEN35_4B_OPD_COMPLETE.json",
+    "require_m2_initialization": true,
+    "require_positive_teacher_signal": true,
+    "require_lora_update": true,
+    "require_runtime_backend_parity": true
+  }
+}
