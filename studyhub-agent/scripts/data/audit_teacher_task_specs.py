@@ -101,6 +101,10 @@ def audit_root(root: Path) -> dict[str, Any]:
     tasks = read_jsonl(tasks_path)
     manifest = read_json(manifest_path)
     manifest_schema = str(manifest.get("schema_version", ""))
+    diverse_v2_schema = manifest_schema in {
+        "studyhub.codex-hermes-training-tasks.v2",
+        "studyhub.spark-hermes-training-tasks.v2",
+    }
     benchmark_prompt_overlap = manifest.get(
         "benchmark_prompt_overlap",
         manifest.get("exact_public_benchmark_overlap"),
@@ -110,7 +114,7 @@ def audit_root(root: Path) -> dict[str, Any]:
         manifest.get("sealed_or_fresh_external_holdouts_opened"),
     )
     public_task_has_verifier = manifest.get("public_task_has_verifier")
-    if public_task_has_verifier is None and manifest_schema == "studyhub.codex-hermes-training-tasks.v2":
+    if public_task_has_verifier is None and diverse_v2_schema:
         public_task_has_verifier = any(
             bool(FORBIDDEN_PUBLIC_FIELDS & task.keys()) for task in tasks
         )
@@ -253,7 +257,7 @@ def audit_root(root: Path) -> dict[str, Any]:
         _record(errors, "<manifest>", "family_count_mismatch")
     maximum_group_rows = max(source_groups.values(), default=0)
     group_cap_value = manifest.get("max_rows_per_source_group_contract")
-    if group_cap_value is None and manifest_schema == "studyhub.codex-hermes-training-tasks.v2":
+    if group_cap_value is None and diverse_v2_schema:
         group_cap_value = 1
     group_cap = int(group_cap_value or 0)
     if maximum_group_rows > group_cap:

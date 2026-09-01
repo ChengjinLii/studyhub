@@ -82,6 +82,37 @@ def test_teacher_task_contract_audit_accepts_v2_manifest(tmp_path: Path) -> None
     assert report["rows_per_source_group"]["max"] == 1
 
 
+def test_diverse_task_builder_preserves_spark_dataset_identity(tmp_path: Path) -> None:
+    root = tmp_path / "spark-v2"
+
+    manifest = build_codex_hermes_tasks(
+        root,
+        total_tasks=14,
+        seed=20260901,
+        force=False,
+        ordinal_offset=7000,
+        teacher_kind="spark",
+    )
+    tasks = [
+        json.loads(line)
+        for line in (root / "task_specs.jsonl").read_text().splitlines()
+    ]
+    report = audit_teacher_task_root(root)
+
+    assert report["status"] == "PASS"
+    assert manifest["dataset_id"] == "spark_hermes_teacher_v1"
+    assert manifest["schema_version"] == "studyhub.spark-hermes-training-tasks.v2"
+    assert all(task["task_id"].startswith("spark-train-") for task in tasks)
+    assert all(
+        task["metadata"]["teacher_dataset"] == "spark_hermes_teacher_v1"
+        for task in tasks
+    )
+    assert all(
+        task["metadata"]["source_group_id"].startswith("spark-")
+        for task in tasks
+    )
+
+
 def test_teacher_task_ordinal_offsets_create_disjoint_source_groups(
     tmp_path: Path,
 ) -> None:

@@ -29,6 +29,7 @@ from scripts.data.verify_teacher_trajectories import verify_run  # noqa: E402
 from studyhub_agent.benchmark_v1.tool_contracts import tool_schemas  # noqa: E402
 from training.rl.frozen_environment import FrozenTaskEnvironment  # noqa: E402
 
+TEACHER_KIND = "codex"
 SCHEMA_VERSION = "studyhub.codex-hermes-training-tasks.v2"
 DATASET_ID = "codex_hermes_teacher_v1"
 TASK_DESIGN_REVISION = "semantic-diversity-v2"
@@ -203,7 +204,7 @@ def _write_jsonl(path: Path, rows: list[dict[str, Any]]) -> None:
 
 def _stable_id(family: str, ordinal: int, seed: int) -> str:
     digest = hashlib.sha256(f"{DATASET_ID}:{TASK_DESIGN_REVISION}:{seed}:{family}:{ordinal}".encode()).hexdigest()[:18]
-    return f"codex-train-{digest}"
+    return f"{TEACHER_KIND}-train-{digest}"
 
 
 def _pick(values: tuple[str, ...], *, family: str, ordinal: int, seed: int, label: str) -> str:
@@ -298,7 +299,7 @@ def _base_task(
     max_tool_calls: int = 8,
 ) -> dict[str, Any]:
     return {
-        "schema_version": "studyhub.codex-hermes-task.v1",
+        "schema_version": f"studyhub.{TEACHER_KIND}-hermes-task.v1",
         "task_id": task_id,
         "family": family,
         "user_request": user_request,
@@ -340,7 +341,7 @@ def _base_verifier(
     require_no_tools: bool = False,
 ) -> dict[str, Any]:
     return {
-        "schema_version": "studyhub.codex-hermes-verifier.v1",
+        "schema_version": f"studyhub.{TEACHER_KIND}-hermes-verifier.v1",
         "verifier_mode": "path_agnostic_v2",
         "task_id": task_id,
         "family": family,
@@ -406,7 +407,7 @@ def _rag(ordinal: int, seed: int) -> Scenario:
                 "text": f"该资料讨论 {other_topic}，建议活动为 {other_activity}。",
             }
         )
-    source_group = f"codex-rag:{ordinal:04d}"
+    source_group = f"{TEACHER_KIND}-rag:{ordinal:04d}"
     request_templates = (
         "我在做{context}。请从 StudyHub 训练库定位《{title}》，核对首个复习动作和每周投入，并引用正文。",
         "请检索《{title}》而不是同名辅助材料，告诉我它建议先做什么、每周学多久，并给出来源引用。",
@@ -514,7 +515,7 @@ def _web(ordinal: int, seed: int) -> Scenario:
         "published_at": "2025-08-20",
         "text": "旧安排为 2025-09-01，地点 B101；页面标注已过期。",
     }
-    source_group = f"codex-web:{ordinal:04d}"
+    source_group = f"{TEACHER_KIND}-web:{ordinal:04d}"
     request_templates = (
         "请查证{course}通知 {notice_id} 中当前有效的{notice_kind}日期和地点，优先采用最新官方来源并附引用。",
         "网上有新旧两版{course}{notice_kind}。请核对 {notice_id}，只报告现行日期、教室和官方依据。",
@@ -648,7 +649,7 @@ def _memory(ordinal: int, seed: int) -> Scenario:
         ],
         "cross_user_records": [],
     }
-    source_group = f"codex-memory:{ordinal:04d}"
+    source_group = f"{TEACHER_KIND}-memory:{ordinal:04d}"
     request_templates = (
         "请结合我对{course}的当前偏好，在《{target_title}》和《{other_title}》中选一本用于{context}。先查记忆，再读资料并引用。",
         "我的学习偏好可能已经更新。请核对最新记忆，比较《{target_title}》与《{other_title}》，推荐更匹配{topic}的一本。",
@@ -744,7 +745,7 @@ def _cross_tool(ordinal: int, seed: int) -> Scenario:
     material_id = 720_000 + ordinal
     source_id = f"training-cross:{ordinal:04d}:material"
     title = f"{course}·{topic}{material_kind} {ordinal + 1:04d}"
-    source_group = f"codex-cross:{ordinal:04d}"
+    source_group = f"{TEACHER_KIND}-cross:{ordinal:04d}"
     request_templates = (
         "找到《{title}》并核对内容，然后收藏它；再为“{topic}”建立每周 {minutes} 分钟计划。"
         "完成后引用资料并确认两项状态。",
@@ -861,7 +862,7 @@ def _recovery(ordinal: int, seed: int) -> Scenario:
     material_id = 740_000 + ordinal
     source_id = f"training-recovery:{ordinal:04d}:public"
     title = f"{course}·{topic}公开{material_kind} {ordinal + 1:04d}"
-    source_group = f"codex-recovery:{ordinal:04d}"
+    source_group = f"{TEACHER_KIND}-recovery:{ordinal:04d}"
     documents = [
         {
             "source_id": source_id,
@@ -996,7 +997,7 @@ def _stateful(ordinal: int, seed: int) -> Scenario:
     minutes = 90 + 15 * _pick_int(11, family=family, ordinal=ordinal, seed=seed, label="minutes")
     score = 55 + _pick_int(40, family=family, ordinal=ordinal, seed=seed, label="score")
     resource_id = 760_000 + ordinal
-    source_group = f"codex-state:{ordinal:04d}"
+    source_group = f"{TEACHER_KIND}-state:{ordinal:04d}"
     plan_marker = f"state-plan:{ordinal:04d}:updated"
     progress_marker = f"state-progress:{ordinal:04d}:recorded"
     request_templates = (
@@ -1116,7 +1117,7 @@ def _direct(ordinal: int, seed: int) -> Scenario:
     minutes = 20 + 5 * _pick_int(25, family=family, ordinal=ordinal, seed=seed, label="minutes")
     weeks = 1 + _pick_int(16, family=family, ordinal=ordinal, seed=seed, label="weeks")
     total = sessions * minutes * weeks
-    source_group = f"codex-direct:{ordinal:04d}"
+    source_group = f"{TEACHER_KIND}-direct:{ordinal:04d}"
     request_templates = (
         "未来 {weeks} 周，我会在{context}中复习{course}的{topic}：每周 {sessions} 次、每次 {minutes} 分钟。"
         "总共多少分钟？",
@@ -1266,7 +1267,14 @@ def build(
     seed: int,
     force: bool,
     ordinal_offset: int = 0,
+    teacher_kind: str = "codex",
 ) -> dict[str, Any]:
+    global DATASET_ID, SCHEMA_VERSION, TEACHER_KIND
+    if teacher_kind not in {"codex", "spark"}:
+        raise ValueError("teacher_kind must be codex or spark")
+    TEACHER_KIND = teacher_kind
+    DATASET_ID = f"{teacher_kind}_hermes_teacher_v1"
+    SCHEMA_VERSION = f"studyhub.{teacher_kind}-hermes-training-tasks.v2"
     if total_tasks < len(FAMILY_WEIGHTS):
         raise ValueError(f"--total-tasks must be at least {len(FAMILY_WEIGHTS)}")
     if ordinal_offset < 0:
@@ -1340,7 +1348,7 @@ def build(
 
     _write_jsonl(root / "task_specs.jsonl", tasks)
     provenance = {
-        "schema_version": "studyhub.codex-hermes-source-provenance.v1",
+        "schema_version": f"studyhub.{TEACHER_KIND}-hermes-source-provenance.v1",
         "dataset_id": DATASET_ID,
         "task_design_revision": TASK_DESIGN_REVISION,
         "source": "independent deterministic training simulator",
@@ -1355,7 +1363,11 @@ def build(
     _write_json(root / "source_provenance.json", provenance)
     manifest = {
         "schema_version": SCHEMA_VERSION,
-        "status": ("PASS_READY_FOR_CODEX_PILOT" if total_tasks == 50 else "PASS_READY_FOR_COLLECTION"),
+        "status": (
+            f"PASS_READY_FOR_{TEACHER_KIND.upper()}_PILOT"
+            if total_tasks == 50
+            else "PASS_READY_FOR_COLLECTION"
+        ),
         "dataset_id": DATASET_ID,
         "seed": seed,
         "ordinal_offset": ordinal_offset,
@@ -1391,6 +1403,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--total-tasks", type=int, default=50)
     parser.add_argument("--seed", type=int, default=DEFAULT_SEED)
     parser.add_argument("--ordinal-offset", type=int, default=0)
+    parser.add_argument("--teacher-kind", choices=("codex", "spark"), default="codex")
     parser.add_argument("--force", action="store_true")
     return parser.parse_args()
 
@@ -1405,6 +1418,7 @@ def main() -> int:
                 seed=args.seed,
                 force=args.force,
                 ordinal_offset=args.ordinal_offset,
+                teacher_kind=args.teacher_kind,
             ),
             indent=2,
         )
