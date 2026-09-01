@@ -104,7 +104,7 @@ actor:
   mb_spec:
     # The actor shares GPU 0 with the offloaded SGLang allocation. Keep the
     # backward microbatch below the pinned AReaL colocated GRPO examples.
-    max_tokens_per_mb: 2048
+    max_tokens_per_mb: 1024
   optimizer:
     type: adam
     lr: 1.0e-6

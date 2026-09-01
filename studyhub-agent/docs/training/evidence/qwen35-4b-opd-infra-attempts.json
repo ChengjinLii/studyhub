@@ -174,7 +174,24 @@
       "stage_marker_written": false,
       "runtime_progress": "The sparse-wing bridge passed: four real Hermes trajectories completed, the 4B student anchor was restored, and the frozen 9B teacher scored all selected tokens. AReaL then entered the first actor OPD update before backward memory allocation failed.",
       "remediation": "Reduce only actor max_tokens_per_mb from 4,096 to 2,048 so forward/backward activations fit beside the frozen colocated allocation. Keep global batch, learning rate, data, OPD objective, LoRA, top-k, and teacher microbatch unchanged."
+    },
+    {
+      "attempt_id": "qwen35-4b-opd-lr1e6-seed-20260827-attempt-20260901_222916",
+      "status": "GUARD_STOPPED_NO_UPDATE",
+      "failure_stage": "First 4B OPD backward with 2,048-token actor microbatches",
+      "root_cause": "Reducing the actor microbatch lowered the anchor-forward peak from approximately 77.44 GiB to 73.65 GiB, but the first gradient-checkpointed backward still reached 80,156 MiB and crossed the pre-existing 79,000 MiB safety guard.",
+      "native_error": "GPU guard stopped only process group 3001676: GPU 0 reached 80156 MiB; guard is 79000 MiB",
+      "launcher_log_sha256": "2e89959a924a721142a60c3ca4bd6f5a8e253d78346267a609aed6d3ea698d19",
+      "gpu_telemetry_sha256": "73007b89f772e8f30a1c410c9ba4ad05f9b89933c644060373f9501656d0b762",
+      "sglang_overlay_audit_sha256": "fdea2f3fd7a8297339172e25ee8b4e86378d83126c9e0b059a53ae7f17a862b3",
+      "reward_v3_sha256": "f03e77ebb01b21fd4da42e7609d56662f7848a3c86a184b499aed983a5a8429c",
+      "reward_v3_rows": 4,
+      "initial_lora_sha256": "4b7ee7462d82cd17a7c55fdb27335eee70b4df7a08f282697efafc577c173e6e",
+      "optimizer_updates": 0,
+      "stage_marker_written": false,
+      "runtime_progress": "Hermes rollout, Reward v3, 4B student anchor, and frozen 9B teacher scoring all passed again. The guard terminated only the owned run process group during the first actor backward; no foreign process was touched and no CUDA OOM occurred.",
+      "remediation": "Reduce only actor max_tokens_per_mb from 2,048 to 1,024. Do not raise the 79,000 MiB guard; retain all scientific variables and the 8,192-token frozen-teacher microbatch."
     }
   ],
-  "claim_boundary": "Attempts 20260901_214833, 20260901_220024, 20260901_220910, and 20260901_222155 each produced four real Hermes trajectories and four Reward v3 rows. Attempt 20260901_220910 completed the 4B student anchor; attempt 20260901_222155 additionally completed frozen 9B teacher scoring and entered actor backward. No recorded attempt produced an optimizer update, passing LR marker, or OPD model result."
+  "claim_boundary": "Attempts 20260901_214833, 20260901_220024, 20260901_220910, 20260901_222155, and 20260901_222916 each produced four real Hermes trajectories and four Reward v3 rows. Attempts 20260901_222155 and 20260901_222916 completed frozen 9B teacher scoring and entered actor backward. No recorded attempt produced an optimizer update, passing LR marker, or OPD model result."
 }
