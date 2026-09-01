@@ -1,0 +1,101 @@
+{
+  "schema_version": "studyhub.qwen35-4b-sft2-authorization.v1",
+  "authorization_id": "qwen35-4b-sft2-compact-mixed-v1-r32-seed-20260827",
+  "status": "AUTHORIZED_PENDING_SMOKE_AND_FORMAL_RUN",
+  "scope": {
+    "model": "Qwen/Qwen3.5-4B-Base",
+    "student_input": "M1",
+    "program_id": "qwen35-4b-sft2-compact-mixed-v1",
+    "dataset_id": "qwen35_4b_sft2_compact_mixed_v1",
+    "evidence_prefix": "qwen35-4b-sft2-compact-v1",
+    "teacher_identities": [
+      {
+        "source_dataset": "codex_hermes_teacher_v1",
+        "interface": "codex-cli",
+        "model": "gpt-5.6-sol"
+      },
+      {
+        "source_dataset": "spark_hermes_teacher_v1",
+        "interface": "codex-spark-cli",
+        "model": "gpt-5.3-codex-spark"
+      }
+    ],
+    "method": "AReaL SFT BF16 FSDP2 LoRA continuation",
+    "smoke_runs": 1,
+    "formal_training_runs": 1,
+    "spark_training_data_allowed": true,
+    "no_spark_runtime_calls": true,
+    "no_main_grpo": true,
+    "no_opd_in_sft2": true,
+    "no_sealed": true
+  },
+  "lineage": {
+    "program_sha256": "a044d041467dd9b11a6d17f7bfe85944ab781ca36ef410bcf779f3af4ddd7b79",
+    "config_sha256": "a34d1f6d1f0713a84dc524c61c1ee4bd1dbcf3b2c0b03db1f91890882ed56f5a",
+    "dataset_manifest_sha256": "cde3fbb78e6ef1cfaa66656d41bf9403e231afcda71caf84b2ab99c77b0f246b",
+    "selected_jsonl_sha256": "bcfcf5132614d2eeab251eed5e1cf2722e15085fff2b8235b3994c0fbc619dd5",
+    "selected_manifest_sha256": "2b60df2c2707e84be2a3b129033f3d8d3b471b9b5777b6a973a795e69e95615e",
+    "data_audit_sha256": "e4b34bfcbe47d99da452267823aba39f1ddad3c9c9b6c7bc1984305e3d402087",
+    "semantic_audit_sha256": "d13a57db9c983fa43749735e2027f8f2a988a7f03571c6d70bdb372c22bcd57a",
+    "teacher_audit_sha256": "ee3858ce18e0e92e5c2d23d5ceff258061fdf038a53754a33605c5487a084e08",
+    "benchmark_manifest_sha256": "da804b10f53dec585255598c3e256445b8ade3acf35fd8c766ca0ab4d759c88b",
+    "model_lock_sha256": "1e879f9197b6313b231c36f8137242d581f29f3de12963666757e748ebbe3967",
+    "tokenizer_overlay_sha256": "bfbf6ff4aa328bde682c1a0751113bc3b3e963b228863cbb443a4c229ea0307a",
+    "tokenizer_parity_sha256": "53749c20f3b7658cb3cbe27e0bc27d3b4e5db4556e1a4e0c32d5d93d6ffe8ec6",
+    "thinking_contract_sha256": "0b1af943d6166aa5e802d26f95082a79f7753058328ef627bd3843bee3908069",
+    "m1_completion_sha256": "a2fc7bd2fab3bec1eb7660eabd9f12b92478998be29cf78721559c69d96d48ce",
+    "model_revision": "1001bb4d826a52d1f399e183466143f4da7b741b",
+    "model_weight_set_sha256": "4b114d4cd1f3311ec6b25709416053a5009b9aa6b582dbd496beaef17c930b26",
+    "canonical_tokenizer_overlay": "/data/chengjin/studyhub/studyhub-agent/artifacts/areal/model-overlays/qwen35-4b-base-canonical-tokenizer",
+    "m1_adapter_path": "/data/chengjin/studyhub/studyhub-agent/artifacts/areal/checkpoints/chengjin/studyhub-qwen35-4b-open-agentic-sft1/qwen35-4b-sft1-formal-r32-seed-20260827/default/epoch0epochstep2099globalstep2099",
+    "m1_adapter_sha256": "6ba7f15fa70db22d56fcf8ea3923f8173a9a374de399cd3f4e9450120a7a007f",
+    "run_commit_required": "SET_AT_LAUNCH_FROM_CLEAN_WORKTREE"
+  },
+  "budget": {
+    "global_batch_size": 8,
+    "smoke_optimizer_updates": 24,
+    "smoke_checkpoint_every_updates": 24,
+    "smoke_maximum_wall_time_seconds": 3600,
+    "planned_optimizer_updates": 300,
+    "planned_sequences": 2400,
+    "actual_total_tokens": 2403948,
+    "actual_assistant_loss_tokens": 408819,
+    "checkpoint_every_updates": 50,
+    "maximum_wall_time_seconds": 10800
+  },
+  "recipe": {
+    "backend": "fsdp:d2p1t1",
+    "dtype": "bfloat16",
+    "lora_rank": 32,
+    "lora_alpha": 32,
+    "target_modules": [
+      "o_proj",
+      "gate_proj",
+      "up_proj",
+      "down_proj"
+    ],
+    "learning_rate": 1e-05,
+    "weight_decay": 0.05,
+    "beta1": 0.9,
+    "beta2": 0.95,
+    "eps": 1e-05,
+    "scheduler": "cosine",
+    "scheduler_total_steps": 300,
+    "warmup_fraction": 0.03,
+    "warmup_steps": 9,
+    "gradient_clip": 1.0,
+    "seed": 20260827,
+    "enable_thinking": false
+  },
+  "completion_contract": {
+    "smoke_marker": "QWEN35_4B_SFT2_SMOKE_PASS.json",
+    "formal_marker": "QWEN35_4B_SFT2_COMPLETE.json",
+    "require_exact_m1_initialization": true,
+    "require_lora_update": true,
+    "require_complete_recovery_checkpoint": true,
+    "require_exact_lr_schedule_audit": true,
+    "expected_scheduler_total_steps": 300,
+    "expected_warmup_steps": 9,
+    "require_sealed_used_false": true
+  }
+}
