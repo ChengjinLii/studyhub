@@ -28,6 +28,14 @@ DEFAULT_SOURCE_ROOT = Path(
 )
 DEFAULT_OUTPUT_ROOT = Path("/data/chengjin/studyhub/studyhub-agent/artifacts/external-benchmarks/runs")
 DEFAULT_SERVER_PYTHON = Path("/data/chengjin/studyhub/studyhub-agent/.venv-train/bin/python")
+PROXY_ENVIRONMENT_KEYS = (
+    "ALL_PROXY",
+    "all_proxy",
+    "HTTP_PROXY",
+    "http_proxy",
+    "HTTPS_PROXY",
+    "https_proxy",
+)
 
 
 def sha256(path: Path) -> str:
@@ -71,6 +79,15 @@ def git_value(*args: str) -> str:
         capture_output=True,
         text=True,
     ).stdout.strip()
+
+
+def local_bfcl_environment() -> dict[str, str]:
+    """Build an environment that cannot proxy localhost benchmark traffic."""
+
+    environment = os.environ.copy()
+    for key in PROXY_ENVIRONMENT_KEYS:
+        environment.pop(key, None)
+    return environment
 
 
 def validate_replication_contract(
@@ -193,7 +210,7 @@ def launch_server(
 ) -> tuple[subprocess.Popen[str], Any]:
     log_path.parent.mkdir(parents=True, exist_ok=True)
     stream = log_path.open("w", encoding="utf-8")
-    environment = os.environ.copy()
+    environment = local_bfcl_environment()
     environment.update(
         {
             "CUDA_VISIBLE_DEVICES": str(gpu),

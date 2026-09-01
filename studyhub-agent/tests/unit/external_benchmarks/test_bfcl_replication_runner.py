@@ -5,9 +5,11 @@ from pathlib import Path
 
 from external_benchmarks.adapters.bfcl_prompt import disable_thinking_generation_prefix
 from scripts.benchmark.external.run_bfcl_replication import (
+    PROXY_ENVIRONMENT_KEYS,
     absolute_executable,
     bfcl_commands,
     collect_score_summary,
+    local_bfcl_environment,
     temporary_test_ids,
     validate_replication_contract,
 )
@@ -90,6 +92,13 @@ def test_venv_executable_path_is_not_symlink_resolved(tmp_path: Path) -> None:
     link.symlink_to(target)
     assert absolute_executable(link) == link
     assert absolute_executable(link) != target
+
+
+def test_local_bfcl_environment_drops_proxy_variables(monkeypatch) -> None:
+    for key in PROXY_ENVIRONMENT_KEYS:
+        monkeypatch.setenv(key, "socks5://proxy.invalid:1080")
+    environment = local_bfcl_environment()
+    assert all(key not in environment for key in PROXY_ENVIRONMENT_KEYS)
 
 
 def test_score_summary_preserves_official_category_counts(tmp_path: Path) -> None:
