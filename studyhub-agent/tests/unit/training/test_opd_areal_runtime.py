@@ -33,6 +33,7 @@ def test_opd_launcher_separates_code_and_artifact_roots() -> None:
     assert "SGLANG_OVERLAY_AUDIT" in launcher
     assert "qwen35-4b-opd-sglang-lora" in config
     assert "model_path: ${actor.path}" not in config
+    assert "mem_fraction_static: 0.55" in config
     assert config.count("LD_LIBRARY_PATH: ${oc.env:STUDYHUB_CUDA_RUNTIME_LIBRARY_PATH}") >= 5
 
     probe = (PROJECT_ROOT / "scripts/train/run_opd_policy_probe.py").read_text()

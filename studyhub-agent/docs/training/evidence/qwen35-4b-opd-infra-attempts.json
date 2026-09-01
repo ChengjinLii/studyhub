@@ -25,6 +25,18 @@
       "optimizer_updates": 0,
       "stage_marker_written": false,
       "remediation": "Use the existing SGLang-only model overlay to expose seven text config dimensions without changing actor weights."
+    },
+    {
+      "attempt_id": "qwen35-4b-opd-lr1e6-seed-20260827-attempt-20260901_201628",
+      "status": "INFRA_FAILED_NO_UPDATE",
+      "failure_stage": "SGLang KV/cache pool initialization",
+      "root_cause": "The OPD config reserved only mem_fraction_static=0.45, below the existing Qwen3.5-4B SGLang recipe's 0.55 allocation.",
+      "launcher_log_sha256": "cc1c0f3fdbbe24f665900ec969518caa14b2168e97e22797980856dc00d15a13",
+      "rollout_log_sha256": "564b97681c7b6e69b88a0b14bc87a5ca24b9aa098e0fd59789ee1cdfb399ee11",
+      "initial_lora_sha256": "4b7ee7462d82cd17a7c55fdb27335eee70b4df7a08f282697efafc577c173e6e",
+      "optimizer_updates": 0,
+      "stage_marker_written": false,
+      "remediation": "Reuse the repository's proven Qwen3.5-4B SGLang mem_fraction_static=0.55 setting."
     }
   ],
   "claim_boundary": "Neither attempt produced a reward batch, optimizer update, passing LR marker, or OPD model result."
