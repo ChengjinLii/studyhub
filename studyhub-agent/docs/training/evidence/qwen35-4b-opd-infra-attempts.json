@@ -110,7 +110,22 @@
       "stage_marker_written": false,
       "runtime_progress": "Both train and eval proxies bound to the temporarily live SGLang server, the rollout returned to its upstream offloaded state, and the first workflow submission began.",
       "remediation": "Package selected verifiers into hashed train/validation JSONL files and fail preflight unless every task maps to an identity-matched verifier and environment."
+    },
+    {
+      "attempt_id": "qwen35-4b-opd-lr1e6-seed-20260827-attempt-20260901_214833",
+      "status": "INFRA_FAILED_NO_UPDATE",
+      "failure_stage": "First OPD student anchor forward after successful Hermes rollout",
+      "root_cause": "The StudyHub sparse-output bridge supplied one padded width per trajectory to AReaL, while AReaL reordered one output sequence per API interaction inside each trajectory. The generic split helper would also have trimmed the final top-k axis instead of the sequence axis for rank-3 sparse tensors.",
+      "native_error": "IndexError: list index out of range in reorder_and_pad_outputs while indexing output_seqlens with interaction-level forward_indices",
+      "launcher_log_sha256": "a2a860a4f8494b1a63e8036bb49672451a6feb02665766561264b4be400e6d66",
+      "gpu_telemetry_sha256": "cbeb8f0d9a40d4da72c00548746c222f0e5ec24702aa36e7ac6a5254a80f247f",
+      "sglang_overlay_audit_sha256": "966efd2b4ed91c9d24265eb7df62ff20ffb97b0dd6d8e0f8e0bbc7ff89540681",
+      "initial_lora_sha256": "4b7ee7462d82cd17a7c55fdb27335eee70b4df7a08f282697efafc577c173e6e",
+      "optimizer_updates": 0,
+      "stage_marker_written": false,
+      "runtime_progress": "Four real Hermes trajectories completed and produced four Reward v3 records before the first student anchor forward; two were strict successes and all four were eligible for policy update.",
+      "remediation": "Flatten unpadded attention-mask lengths per API interaction for AReaL reordering, then split by trajectory interaction counts and trim the sequence axis explicitly."
     }
   ],
-  "claim_boundary": "No recorded attempt produced a reward batch, optimizer update, passing LR marker, or OPD model result."
+  "claim_boundary": "Attempt 20260901_214833 produced four real Hermes trajectories and a four-row Reward v3 batch. No recorded attempt produced an optimizer update, passing LR marker, or OPD model result."
 }

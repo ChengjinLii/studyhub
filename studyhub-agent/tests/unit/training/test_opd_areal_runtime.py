@@ -9,7 +9,9 @@ import torch.nn.functional as F
 from training.opd.areal_runtime import (
     _chunked_selected_log_probs,
     _chunked_top_k_log_probs,
+    _flatten_sequence_lengths,
     _install_colocated_proxy_start_bridge,
+    _split_sparse_outputs,
     aggregate_opd_diagnostics,
     assistant_prediction_mask,
     compute_opd_diagnostics,
@@ -59,6 +61,33 @@ def test_prediction_turn_ids_follow_next_token_alignment() -> None:
     turn_ids = torch.tensor([[-1, 0, 0, 1, 1]])
 
     assert torch.equal(prediction_turn_ids(turn_ids), torch.tensor([[0, 0, 1, 1, -1]]))
+
+
+def test_opd_sequence_lengths_flatten_all_interactions_without_padding() -> None:
+    trajectories = [
+        {"attention_mask": torch.tensor([[1, 1, 1, 1, 1], [1, 1, 1, 1, 0], [1, 1, 1, 0, 0]])},
+        {"attention_mask": torch.tensor([[1, 1, 1, 1, 1, 1, 1], [1, 1, 1, 1, 1, 1, 0]])},
+    ]
+
+    assert _flatten_sequence_lengths(trajectories) == [5, 4, 3, 7, 6]
+
+
+def test_opd_sparse_outputs_split_interactions_and_trim_sequence_axis() -> None:
+    padded = torch.arange(5 * 7 * 2).reshape(5, 7, 2)
+    meta = SimpleNamespace(traj_group_sizes=[3, 2], traj_seqlens=[5, 7])
+
+    split = _split_sparse_outputs(padded, meta)
+
+    assert [tuple(value.shape) for value in split] == [(3, 5, 2), (2, 7, 2)]
+    assert torch.equal(split[0], padded[:3, :5])
+    assert torch.equal(split[1], padded[3:, :7])
+
+
+def test_opd_sparse_outputs_reject_interaction_count_mismatch() -> None:
+    meta = SimpleNamespace(traj_group_sizes=[2, 2], traj_seqlens=[4, 4])
+
+    with pytest.raises(RuntimeError, match="interaction count"):
+        _split_sparse_outputs(torch.zeros((3, 4, 2)), meta)
 
 
 def test_chunked_sparse_scores_match_full_log_softmax() -> None:

@@ -189,8 +189,45 @@ def _chunked_top_k_log_probs(
     return torch.cat(ids, dim=0), torch.cat(log_probs, dim=0)
 
 
-def _sequence_lengths(data: list[dict[str, Any]]) -> list[int]:
-    return [int(item["attention_mask"].shape[-1]) for item in data]
+def _flatten_sequence_lengths(data: list[dict[str, Any]]) -> list[int]:
+    """Return one unpadded length for every interaction in every trajectory."""
+
+    lengths: list[int] = []
+    for trajectory_index, item in enumerate(data):
+        attention_mask = item["attention_mask"]
+        if not isinstance(attention_mask, torch.Tensor) or attention_mask.ndim != 2:
+            raise ValueError(
+                "OPD trajectory attention_mask must have shape "
+                f"[interactions, sequence], got trajectory {trajectory_index}: "
+                f"{getattr(attention_mask, 'shape', None)}"
+            )
+        item_lengths = [int(value) for value in attention_mask.long().sum(dim=-1).tolist()]
+        if any(length <= 0 for length in item_lengths):
+            raise ValueError(f"OPD trajectory {trajectory_index} contains an empty interaction")
+        lengths.extend(item_lengths)
+    return lengths
+
+
+def _split_sparse_outputs(
+    padded: torch.Tensor,
+    meta: Any,
+) -> list[torch.Tensor]:
+    """Restore interaction tensors to trajectories and trim the sequence axis."""
+
+    group_sizes = [int(value) for value in meta.traj_group_sizes]
+    sequence_lengths = [int(value) for value in meta.traj_seqlens]
+    if len(group_sizes) != len(sequence_lengths):
+        raise RuntimeError("OPD trajectory group and sequence metadata disagree")
+    if padded.ndim < 2:
+        raise RuntimeError(f"OPD sparse output must include a sequence axis: {padded.shape}")
+    if padded.shape[0] != sum(group_sizes):
+        raise RuntimeError(
+            "OPD sparse output interaction count does not match trajectory metadata: "
+            f"{padded.shape[0]} != {sum(group_sizes)}"
+        )
+
+    split = list(padded.split(group_sizes, dim=0))
+    return [value[:, :sequence_length, ...] for value, sequence_length in zip(split, sequence_lengths, strict=True)]
 
 
 def _prepare_opd_input(data: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -210,12 +247,19 @@ def _forward_sparse_outputs(
     process_logits: Any,
 ) -> list[dict[str, torch.Tensor]]:
     from areal.engine.core import reorder_and_pad_outputs
-    from areal.utils.data import split_batch
 
     prepared = _prepare_opd_input(data)
     input_batched, meta = engine._normalize_batch_input(prepared)
-    output_seqlens = _sequence_lengths(prepared)
+    if meta is None:
+        raise RuntimeError("OPD sparse forward requires per-trajectory batch metadata")
+    output_seqlens = _flatten_sequence_lengths(prepared)
     mb_list = engine._prepare_mb_list(input_batched).to(engine.device)
+    if mb_list.forward_indices is None or len(output_seqlens) != len(mb_list.forward_indices):
+        raise RuntimeError(
+            "OPD interaction lengths do not match AReaL forward indices: "
+            f"{len(output_seqlens)} != "
+            f"{None if mb_list.forward_indices is None else len(mb_list.forward_indices)}"
+        )
     collected: dict[str, list[torch.Tensor]] = {}
 
     def process_output(logits: torch.Tensor, ctx_dict: dict[str, Any]) -> None:
@@ -232,10 +276,7 @@ def _forward_sparse_outputs(
     result: dict[str, list[torch.Tensor]] = {}
     for key, values in collected.items():
         padded = reorder_and_pad_outputs(values, output_seqlens, mb_list)
-        split = split_batch(padded, meta)
-        if split is None:
-            raise RuntimeError(f"AReaL did not split OPD output {key}")
-        result[key] = split
+        result[key] = _split_sparse_outputs(padded, meta)
     return [{key: result[key][index] for key in result} for index in range(len(prepared))]
 
 
