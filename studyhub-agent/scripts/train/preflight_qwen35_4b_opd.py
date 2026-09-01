@@ -125,6 +125,8 @@ def main() -> int:
         "program_sha256": args.program,
         "config_sha256": args.config,
         "opd_upstream_lock_sha256": PROJECT_ROOT / "training/opd/upstream.lock.json",
+        "opd_runtime_sha256": PROJECT_ROOT / "training/opd/areal_runtime.py",
+        "runtime_sitecustomize_sha256": PROJECT_ROOT / "training/runtime_shims/sitecustomize.py",
         "opd_parity_sha256": PROJECT_ROOT / "docs/training/evidence/qwen35-4b-opd-token-reward-parity.json",
         "prompt_pool_manifest_sha256": pool / "manifest.json",
         "prompt_pool_train_sha256": pool / "tasks/train.jsonl",

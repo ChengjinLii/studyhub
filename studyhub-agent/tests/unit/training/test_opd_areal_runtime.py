@@ -1,5 +1,6 @@
 import os
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 import torch
@@ -197,3 +198,28 @@ def test_areal_bridge_install_is_idempotent(monkeypatch: pytest.MonkeyPatch) -> 
     assert callable(FSDPPPOActor.opd_score_selected)
     assert callable(FSDPPPOActor.opd_update)
     assert os.environ.get("STUDYHUB_OPD_STUDENT_ADAPTER") is None
+
+
+def test_opd_bridge_skips_only_single_rank_rpc_broadcast(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    pytest.importorskip("areal")
+    from areal.infra.rpc.guard import engine_blueprint
+
+    install_areal_opd_bridge()
+    engine = SimpleNamespace(
+        initialized=True,
+        context_and_model_parallel_group=object(),
+    )
+    monkeypatch.setattr(torch.distributed, "is_available", lambda: True)
+    monkeypatch.setattr(torch.distributed, "is_initialized", lambda: True)
+    monkeypatch.setattr(torch.distributed, "get_world_size", lambda group=None: 1)
+
+    assert engine_blueprint._should_broadcast_payload(engine, {"broadcast": True}) is False
+
+    monkeypatch.setattr(torch.distributed, "get_world_size", lambda group=None: 2)
+    assert engine_blueprint._should_broadcast_payload(engine, {"broadcast": True}) is True
+
+    engine.initialized = False
+    monkeypatch.setattr(torch.distributed, "get_world_size", lambda group=None: 1)
+    assert engine_blueprint._should_broadcast_payload(engine, {"broadcast": True}) is True

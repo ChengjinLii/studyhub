@@ -49,7 +49,22 @@
       "optimizer_updates": 0,
       "stage_marker_written": false,
       "remediation": "Use the repository's higher-context Qwen3.5 SGLang allocation mem_fraction_static=0.65 while retaining the 79 GiB guard."
+    },
+    {
+      "attempt_id": "qwen35-4b-opd-lr1e6-seed-20260827-attempt-20260901_205502",
+      "status": "INFRA_FAILED_NO_UPDATE",
+      "failure_stage": "AReaL actor-to-rollout connect_engine RPC",
+      "root_cause": "The colocated single-rank FSDP actor was already offloaded when AReaL broadcast locally available RPC metadata over its paused CUDA/NCCL communicator.",
+      "launcher_log_sha256": "b57494a3d6654e7e53e84df4f098b3ffb1424f3f4ffd7730cafa5c881fcd6207",
+      "rollout_log_sha256": "3a65b9367e37d1b371f104e781f2cbaabec5b707e11e1e708ce2c96b80023e43",
+      "gpu_telemetry_sha256": "1de282fb2735bd7248a5a11036b80e1bc3ec1fa1881dec9d4defb108f95fed95",
+      "sglang_overlay_audit_sha256": "13f66c017e217d88b3919b2c5f3ed50b1255a03acb1aba9104bcf1afcbdf2beb",
+      "initial_lora_sha256": "4b7ee7462d82cd17a7c55fdb27335eee70b4df7a08f282697efafc577c173e6e",
+      "optimizer_updates": 0,
+      "stage_marker_written": false,
+      "runtime_progress": "M2 actor, frozen 9B teacher, SGLang overlay, M2 LoRA, CUDA graphs, and the 16k rollout server all initialized successfully before the RPC failure.",
+      "remediation": "Skip redundant RPC payload broadcast only when the initialized context/model-parallel group has world size one; retain upstream behavior for every multi-rank engine."
     }
   ],
-  "claim_boundary": "Neither attempt produced a reward batch, optimizer update, passing LR marker, or OPD model result."
+  "claim_boundary": "No recorded attempt produced a reward batch, optimizer update, passing LR marker, or OPD model result."
 }

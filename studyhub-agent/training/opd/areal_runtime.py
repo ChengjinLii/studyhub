@@ -17,10 +17,44 @@ from pathlib import Path
 from typing import Any
 
 import torch
+import torch.distributed as dist
 
 _PATCH_MARKER = "_studyhub_opd_runtime_v1"
+_RPC_BROADCAST_PATCH_MARKER = "_studyhub_opd_single_rank_rpc_v1"
 _ADAPTER_ENV = "STUDYHUB_OPD_STUDENT_ADAPTER"
 _MAX_DIAGNOSTIC_TURNS = 6
+
+
+def _install_single_rank_rpc_broadcast_bridge() -> None:
+    """Skip a payload collective when the train engine has only one rank.
+
+    AReaL normally broadcasts RPC arguments from the data-parallel head to the
+    model-parallel group. In this experiment the FSDP actor is a single rank,
+    so its arguments are already local. Avoiding the no-op collective also
+    keeps an offloaded actor from trying to use its paused CUDA communicator.
+    Multi-rank engines retain the upstream behavior unchanged.
+    """
+
+    from areal.infra.rpc.guard import engine_blueprint
+
+    current = engine_blueprint._should_broadcast_payload
+    if getattr(current, _RPC_BROADCAST_PATCH_MARKER, False):
+        return
+
+    def should_broadcast_payload(engine: Any, rpc_meta: dict[str, Any] | None) -> bool:
+        should_broadcast = current(engine, rpc_meta)
+        if not should_broadcast or not getattr(engine, "initialized", False):
+            return should_broadcast
+        group = getattr(engine, "context_and_model_parallel_group", None)
+        if group is None or not dist.is_available() or not dist.is_initialized():
+            return should_broadcast
+        if dist.get_world_size(group=group) == 1:
+            return False
+        return should_broadcast
+
+    setattr(should_broadcast_payload, _RPC_BROADCAST_PATCH_MARKER, True)
+    should_broadcast_payload._studyhub_upstream = current  # type: ignore[attr-defined]
+    engine_blueprint._should_broadcast_payload = should_broadcast_payload
 
 
 def assistant_prediction_mask(loss_mask: torch.Tensor) -> torch.Tensor:
@@ -594,6 +628,7 @@ def install_areal_opd_bridge() -> None:
 
     from areal.engine.fsdp_engine import FSDPEngine, FSDPPPOActor
 
+    _install_single_rank_rpc_broadcast_bridge()
     if getattr(FSDPPPOActor, _PATCH_MARKER, False):
         return
 
