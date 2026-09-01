@@ -18,6 +18,16 @@ from training.opd.areal_runtime import (
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 
 
+def test_opd_launcher_separates_code_and_artifact_roots() -> None:
+    launcher = (PROJECT_ROOT / "scripts/train/run_qwen35_4b_opd.sh").read_text()
+
+    assert 'ARTIFACT_ROOT="${STUDYHUB_OPD_ARTIFACT_ROOT:-${PROJECT_ROOT}}"' in launcher
+    assert 'VENV_DIR="${STUDYHUB_TRAIN_VENV:-${ARTIFACT_ROOT}/.venv-train}"' in launcher
+    assert 'DATA_MANIFEST="${ARTIFACT_ROOT}/datasets/processed/' in launcher
+    assert 'CHECKPOINT_ROOT="${ARTIFACT_ROOT}/artifacts/areal/checkpoints/' in launcher
+    assert '${PROJECT_ROOT}/artifacts/areal' not in launcher
+
+
 def test_prediction_mask_does_not_cross_trajectory_boundaries() -> None:
     mask = torch.tensor([[0, 0, 1, 1], [0, 1, 0, 1]], dtype=torch.float32)
 

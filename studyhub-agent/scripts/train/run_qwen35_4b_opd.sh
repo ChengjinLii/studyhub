@@ -2,7 +2,8 @@
 set -euo pipefail
 
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-VENV_DIR="${PROJECT_ROOT}/.venv-train"
+ARTIFACT_ROOT="${STUDYHUB_OPD_ARTIFACT_ROOT:-${PROJECT_ROOT}}"
+VENV_DIR="${STUDYHUB_TRAIN_VENV:-${ARTIFACT_ROOT}/.venv-train}"
 RUNTIME_SHIM="${PROJECT_ROOT}/training/runtime_shims"
 CONFIG="${PROJECT_ROOT}/configs/train/qwen35-4b-strict-opd.yaml"
 PROGRAM="${PROJECT_ROOT}/configs/program-v4/qwen35-4b-opd-v1.json"
@@ -56,15 +57,15 @@ fi
 
 EXPERIMENT="studyhub-qwen35-4b-strict-opd"
 TRIAL="qwen35-4b-opd-${MODE}-seed-20260827"
-LOG_ROOT="${PROJECT_ROOT}/artifacts/areal/launcher_logs/qwen35-4b-opd"
-CHECKPOINT_ROOT="${PROJECT_ROOT}/artifacts/areal/checkpoints/$(id -un)/${EXPERIMENT}/${TRIAL}"
-REWARD_ROOT="${PROJECT_ROOT}/artifacts/areal/strict-opd/rewards/${TRIAL}"
+LOG_ROOT="${ARTIFACT_ROOT}/artifacts/areal/launcher_logs/qwen35-4b-opd"
+CHECKPOINT_ROOT="${ARTIFACT_ROOT}/artifacts/areal/checkpoints/$(id -un)/${EXPERIMENT}/${TRIAL}"
+REWARD_ROOT="${ARTIFACT_ROOT}/artifacts/areal/strict-opd/rewards/${TRIAL}"
 ATTEMPT_ID="${TRIAL}-attempt-$(date +%Y%m%d_%H%M%S)"
 LOG_FILE="${LOG_ROOT}/${ATTEMPT_ID}.log"
 GPU_CSV="${LOG_ROOT}/${ATTEMPT_ID}.gpu.csv"
 RUN_METADATA="${LOG_ROOT}/${TRIAL}.run.json"
-DATA_MANIFEST="${PROJECT_ROOT}/datasets/processed/opd_prompt_pool_v1/manifest.json"
-PILOT_MARKER="${PROJECT_ROOT}/artifacts/areal/checkpoints/$(id -un)/${EXPERIMENT}/qwen35-4b-opd-pilot-seed-20260827/QWEN35_4B_OPD_PILOT_PASS.json"
+DATA_MANIFEST="${ARTIFACT_ROOT}/datasets/processed/opd_prompt_pool_v1/manifest.json"
+PILOT_MARKER="${ARTIFACT_ROOT}/artifacts/areal/checkpoints/$(id -un)/${EXPERIMENT}/qwen35-4b-opd-pilot-seed-20260827/QWEN35_4B_OPD_PILOT_PASS.json"
 case "${MODE}" in
   lr1e6) STAGE_MARKER="${CHECKPOINT_ROOT}/QWEN35_4B_OPD_LR1E6_PASS.json" ;;
   lr3e6) STAGE_MARKER="${CHECKPOINT_ROOT}/QWEN35_4B_OPD_LR3E6_PASS.json" ;;
@@ -143,8 +144,8 @@ done
   --dataset-manifest "${DATA_MANIFEST}" \
   --benchmark-manifest "${PROJECT_ROOT}/benchmarks/studyhub-agent-v2/manifest.json" \
   --authorization "${AUTHORIZATION}" \
-  --model "${PROJECT_ROOT}/artifacts/areal/model-overlays/qwen35-4b-base-canonical-tokenizer" \
-  --model-hash-cache "${PROJECT_ROOT}/artifacts/areal/hash-cache/qwen35-4b-base.json" \
+  --model "${ARTIFACT_ROOT}/artifacts/areal/model-overlays/qwen35-4b-base-canonical-tokenizer" \
+  --model-hash-cache "${ARTIFACT_ROOT}/artifacts/areal/hash-cache/qwen35-4b-base.json" \
   --areal-lock "${PROJECT_ROOT}/training/areal/upstream.lock.json" \
   --hermes-lock "${PROJECT_ROOT}/integrations/hermes/upstream.lock.json" \
   --gpu "${GPUS}" \
@@ -157,7 +158,7 @@ done
 redact_admin_key() {
   STUDYHUB_SECRET_TO_REDACT="${STUDYHUB_AREAL_ADMIN_API_KEY:-}" \
     "${VENV_DIR}/bin/python" "${PROJECT_ROOT}/scripts/train/redact_trial_secret.py" \
-      --artifacts-root "${PROJECT_ROOT}/artifacts/areal" \
+      --artifacts-root "${ARTIFACT_ROOT}/artifacts/areal" \
       --trial "${TRIAL}" \
       --summary "${LOG_ROOT}/${TRIAL}.redaction.json" >/dev/null 2>&1 || true
 }
@@ -188,7 +189,7 @@ trap - EXIT
 "${VENV_DIR}/bin/python" "${PROJECT_ROOT}/scripts/train/capture_run_metadata.py" finish \
   --output "${RUN_METADATA}" --gpu-csv "${GPU_CSV}" --status "${STATUS}"
 
-TRAJECTORY_ROOT="${PROJECT_ROOT}/artifacts/areal/logs/$(id -un)/${EXPERIMENT}/${TRIAL}/rollout"
+TRAJECTORY_ROOT="${ARTIFACT_ROOT}/artifacts/areal/logs/$(id -un)/${EXPERIMENT}/${TRIAL}/rollout"
 EVIDENCE_TIER="DIAGNOSTIC"
 [[ "${MODE}" == "formal" ]] && EVIDENCE_TIER="CLAIM"
 if ! "${VENV_DIR}/bin/python" "${PROJECT_ROOT}/scripts/train/build_experiment_evidence.py" \
@@ -196,13 +197,13 @@ if ! "${VENV_DIR}/bin/python" "${PROJECT_ROOT}/scripts/train/build_experiment_ev
   --reward-root "${REWARD_ROOT}" \
   --checkpoint-root "${CHECKPOINT_ROOT}" \
   --trajectory-root "${TRAJECTORY_ROOT}" \
-  --task-root "${PROJECT_ROOT}/datasets/processed/opd_prompt_pool_v1/tasks" \
+  --task-root "${ARTIFACT_ROOT}/datasets/processed/opd_prompt_pool_v1/tasks" \
   --max-sequence-tokens 16384 \
   --evidence-tier "${EVIDENCE_TIER}" >/dev/null; then
   [[ "${STATUS}" -ne 0 ]] || STATUS=74
 fi
 
-TRAINER_METRICS="${PROJECT_ROOT}/artifacts/experiments/${TRIAL}/metrics/trainer.json"
+TRAINER_METRICS="${ARTIFACT_ROOT}/artifacts/experiments/${TRIAL}/metrics/trainer.json"
 if [[ "${STATUS}" -eq 0 ]]; then
   "${VENV_DIR}/bin/python" "${PROJECT_ROOT}/scripts/train/record_qwen35_4b_opd_stage.py" \
     --mode "${MODE}" \
