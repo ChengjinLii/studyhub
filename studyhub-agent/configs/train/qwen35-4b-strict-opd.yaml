@@ -65,6 +65,9 @@ rollout:
     chat_template_type: hf
     export_style: individual
     turn_discount: 1.0
+    scheduling_spec:
+      - env_vars:
+          LD_LIBRARY_PATH: ${oc.env:STUDYHUB_CUDA_RUNTIME_LIBRARY_PATH}
 
 gconfig:
   n_samples: 2
@@ -140,6 +143,7 @@ actor:
         HF_HUB_OFFLINE: "1"
         TRANSFORMERS_OFFLINE: "1"
         STUDYHUB_AREAL_OPD_BRIDGE: "1"
+        LD_LIBRARY_PATH: ${oc.env:STUDYHUB_CUDA_RUNTIME_LIBRARY_PATH}
 
 teacher:
   engine_type: train
@@ -172,6 +176,7 @@ teacher:
           HF_HUB_OFFLINE: "1"
           TRANSFORMERS_OFFLINE: "1"
           STUDYHUB_AREAL_OPD_BRIDGE: "1"
+          LD_LIBRARY_PATH: ${oc.env:STUDYHUB_CUDA_RUNTIME_LIBRARY_PATH}
   rl_loss_weight: 0.0
   distill_loss_weight: 1.0
 
@@ -213,6 +218,9 @@ train_dataset:
   path: /data/chengjin/studyhub/studyhub-agent/datasets/processed/opd_prompt_pool_v1/hf_dataset
   type: rl
   max_length: 16384
+  scheduling_spec:
+    env_vars:
+      LD_LIBRARY_PATH: ${oc.env:STUDYHUB_CUDA_RUNTIME_LIBRARY_PATH}
 
 valid_dataset:
   batch_size: 2
@@ -223,6 +231,9 @@ valid_dataset:
   path: /data/chengjin/studyhub/studyhub-agent/datasets/processed/opd_prompt_pool_v1/hf_dataset
   type: rl
   max_length: 16384
+  scheduling_spec:
+    env_vars:
+      LD_LIBRARY_PATH: ${oc.env:STUDYHUB_CUDA_RUNTIME_LIBRARY_PATH}
 
 saver:
   experiment_name: ${experiment_name}

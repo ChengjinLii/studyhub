@@ -20,12 +20,18 @@ PROJECT_ROOT = Path(__file__).resolve().parents[3]
 
 def test_opd_launcher_separates_code_and_artifact_roots() -> None:
     launcher = (PROJECT_ROOT / "scripts/train/run_qwen35_4b_opd.sh").read_text()
+    config = (PROJECT_ROOT / "configs/train/qwen35-4b-strict-opd.yaml").read_text()
 
     assert 'ARTIFACT_ROOT="${STUDYHUB_OPD_ARTIFACT_ROOT:-${PROJECT_ROOT}}"' in launcher
     assert 'VENV_DIR="${STUDYHUB_TRAIN_VENV:-${ARTIFACT_ROOT}/.venv-train}"' in launcher
     assert 'DATA_MANIFEST="${ARTIFACT_ROOT}/datasets/processed/' in launcher
     assert 'CHECKPOINT_ROOT="${ARTIFACT_ROOT}/artifacts/areal/checkpoints/' in launcher
     assert '${PROJECT_ROOT}/artifacts/areal' not in launcher
+    assert "libcudart.so.12" in launcher
+    assert "STUDYHUB_CUDA_RUNTIME_LIBRARY_PATH" in launcher
+    assert config.count(
+        "LD_LIBRARY_PATH: ${oc.env:STUDYHUB_CUDA_RUNTIME_LIBRARY_PATH}"
+    ) >= 5
 
     probe = (PROJECT_ROOT / "scripts/train/run_opd_policy_probe.py").read_text()
     assert 'parser.add_argument("--artifact-root"' in probe
@@ -155,6 +161,9 @@ def test_opd_config_is_fail_closed(monkeypatch: pytest.MonkeyPatch) -> None:
     from training.opd.config import StudyHubOPDConfig
 
     monkeypatch.setenv("STUDYHUB_AREAL_ADMIN_API_KEY", "unit-test-only")
+    monkeypatch.setenv(
+        "STUDYHUB_CUDA_RUNTIME_LIBRARY_PATH", "/unit-test/cuda-runtime/lib"
+    )
     for name in (
         "ALL_PROXY",
         "all_proxy",

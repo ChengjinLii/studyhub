@@ -79,6 +79,20 @@ fi
 
 export PATH="${VENV_DIR}/bin:${PATH}"
 unset PYTHONHOME ALL_PROXY all_proxy HTTP_PROXY http_proxy HTTPS_PROXY https_proxy
+CUDA_RUNTIME_LIB="$(${VENV_DIR}/bin/python -S - "${VENV_DIR}" <<'PY'
+import pathlib
+import sys
+
+venv = pathlib.Path(sys.argv[1])
+print(venv / "lib" / f"python{sys.version_info.major}.{sys.version_info.minor}" / "site-packages" / "nvidia" / "cuda_runtime" / "lib")
+PY
+)"
+if [[ ! -f "${CUDA_RUNTIME_LIB}/libcudart.so.12" ]]; then
+  echo "Missing CUDA runtime library in pinned training venv: ${CUDA_RUNTIME_LIB}" >&2
+  exit 6
+fi
+export STUDYHUB_CUDA_RUNTIME_LIBRARY_PATH="${CUDA_RUNTIME_LIB}${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}"
+export LD_LIBRARY_PATH="${STUDYHUB_CUDA_RUNTIME_LIBRARY_PATH}"
 export STUDYHUB_DISABLE_DEEP_GEMM_WITHOUT_NVCC=1
 export STUDYHUB_SGLANG_TORCH_FALLBACKS_WITHOUT_NVCC=1
 export STUDYHUB_AREAL_CHAT_TEMPLATE_METADATA_BRIDGE=1
