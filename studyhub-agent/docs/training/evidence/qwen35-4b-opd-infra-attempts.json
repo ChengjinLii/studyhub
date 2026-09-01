@@ -191,7 +191,24 @@
       "stage_marker_written": false,
       "runtime_progress": "Hermes rollout, Reward v3, 4B student anchor, and frozen 9B teacher scoring all passed again. The guard terminated only the owned run process group during the first actor backward; no foreign process was touched and no CUDA OOM occurred.",
       "remediation": "Reduce only actor max_tokens_per_mb from 2,048 to 1,024. Do not raise the 79,000 MiB guard; retain all scientific variables and the 8,192-token frozen-teacher microbatch."
+    },
+    {
+      "attempt_id": "qwen35-4b-opd-lr1e6-seed-20260827-attempt-20260901_223535",
+      "status": "INFRA_FAILED_NO_UPDATE",
+      "failure_stage": "First 4B student anchor microbatch allocation with a 1,024-token capacity",
+      "root_cause": "AReaL cannot split one autoregressive interaction across microbatches. The real Hermes batch contained individual packed sequence lengths up to 1,235 tokens, exceeding the 1,024-token actor capacity before any anchor forward or backward began.",
+      "native_error": "Values [631 896 1124 582 827 998 1235 674 803 661 782] is larger than capacity 1024",
+      "launcher_log_sha256": "bca4ec2fe466faa4967faf0b518adf23e25b5248c97ae14db3cdbce065ae30d5",
+      "gpu_telemetry_sha256": "e5db657960d75ee17fcfeeb531adf92d7adbb27fc77a44606c081661dad0aa9e",
+      "sglang_overlay_audit_sha256": "43bdd6f95f77754b60d0e8038d88fe7b8d53f8d7b6dc4776bcfd9be2cc823c74",
+      "reward_v3_sha256": "01de5102e0f333f85017529142527f460eb840749b825327e52b04d96b20fe94",
+      "reward_v3_rows": 4,
+      "initial_lora_sha256": "4b7ee7462d82cd17a7c55fdb27335eee70b4df7a08f282697efafc577c173e6e",
+      "optimizer_updates": 0,
+      "stage_marker_written": false,
+      "runtime_progress": "Four new Hermes trajectories and attempt-isolated Reward v3 records completed. The run failed closed at deterministic microbatch allocation, before student anchor, teacher scoring, backward, or parameter update.",
+      "remediation": "Use a 1,536-token actor microbatch: it exceeds the observed 1,235-token single-interaction maximum while remaining 25% below the 2,048-token configuration that crossed the GPU guard during backward."
     }
   ],
-  "claim_boundary": "Attempts 20260901_214833, 20260901_220024, 20260901_220910, 20260901_222155, and 20260901_222916 each produced four real Hermes trajectories and four Reward v3 rows. Attempts 20260901_222155 and 20260901_222916 completed frozen 9B teacher scoring and entered actor backward. No recorded attempt produced an optimizer update, passing LR marker, or OPD model result."
+  "claim_boundary": "Attempts 20260901_214833, 20260901_220024, 20260901_220910, 20260901_222155, 20260901_222916, and 20260901_223535 each produced four real Hermes trajectories and four Reward v3 rows. Attempts 20260901_222155 and 20260901_222916 completed frozen 9B teacher scoring and entered actor backward. No recorded attempt produced an optimizer update, passing LR marker, or OPD model result."
 }
