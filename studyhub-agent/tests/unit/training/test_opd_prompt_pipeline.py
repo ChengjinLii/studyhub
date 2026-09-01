@@ -3,7 +3,11 @@ from scripts.data.build_opd_prompt_pool_v1 import (
     validate_candidate,
     validate_environment,
 )
-from scripts.data.select_opd_training_pool_v1 import family_scores, task_priority
+from scripts.data.select_opd_training_pool_v1 import (
+    family_scores,
+    task_priority,
+    verifier_map,
+)
 from scripts.train.run_opd_policy_probe import aggregate
 
 
@@ -164,3 +168,29 @@ def test_teacher_only_task_has_priority_over_unevaluated_family_fill() -> None:
         family=scores,
         seed=1,
     )
+
+
+def test_verifier_map_reads_jsonl_and_rejects_duplicate_tasks(tmp_path) -> None:
+    path = tmp_path / "train.jsonl"
+    path.write_text(
+        "\n".join(
+            [
+                '{"task_id":"task-a","verifier_id":"verifier-a"}',
+                '{"task_id":"task-b","verifier_id":"verifier-b"}',
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    assert sorted(verifier_map(path)) == ["task-a", "task-b"]
+
+    path.write_text(
+        '{"task_id":"task-a"}\n{"task_id":"task-a"}\n', encoding="utf-8"
+    )
+    try:
+        verifier_map(path)
+    except RuntimeError as error:
+        assert "duplicate verifier task IDs" in str(error)
+    else:
+        raise AssertionError("duplicate verifier task IDs were accepted")

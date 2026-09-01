@@ -67,6 +67,14 @@ def episode_map(path: Path) -> dict[str, dict[str, Any]]:
     return result
 
 
+def verifier_map(path: Path) -> dict[str, dict[str, Any]]:
+    rows = read_jsonl(path)
+    result = {str(row["task_id"]): row for row in rows}
+    if len(result) != len(rows):
+        raise RuntimeError(f"duplicate verifier task IDs: {path}")
+    return result
+
+
 def family_scores(
     teacher: dict[str, dict[str, Any]], student: dict[str, dict[str, Any]]
 ) -> dict[str, dict[str, float]]:
@@ -203,6 +211,15 @@ def main() -> int:
     candidates = read_jsonl(candidate_root / "tasks/train.jsonl")
     if len(candidates) != int(candidate_manifest["candidate_rows"]):
         raise RuntimeError("OPD candidate task count drift")
+    candidate_verifiers = candidate_root / "verifiers/train.jsonl"
+    if (
+        sha256(candidate_root / "tasks/train.jsonl")
+        != candidate_manifest["lineage"]["candidate_tasks_sha256"]
+        or sha256(candidate_verifiers)
+        != candidate_manifest["lineage"]["candidate_verifiers_sha256"]
+    ):
+        raise RuntimeError("OPD candidate task or verifier lineage drift")
+    verifiers = verifier_map(candidate_verifiers)
     scores = family_scores(teacher, student)
     ranked = sorted(
         candidates,
@@ -258,14 +275,14 @@ def main() -> int:
     for task in [*selected, *dev]:
         environment_id = str(task["environment_id"])
         verifier_id = str(task["metadata"]["verifier_id"])
+        verifier = verifiers.get(str(task["task_id"]))
+        if verifier is None or str(verifier.get("verifier_id")) != verifier_id:
+            raise RuntimeError(f"missing or mismatched verifier for {task['task_id']}")
         copy_artifact(
             candidate_root / "environments" / f"{environment_id}.json",
             staging / "environments" / f"{environment_id}.json",
         )
-        copy_artifact(
-            candidate_root / "verifiers" / f"{verifier_id}.json",
-            staging / "verifiers" / f"{verifier_id}.json",
-        )
+        write_json(staging / "verifiers" / f"{verifier_id}.json", verifier)
     DatasetDict(
         {
             "train": Dataset.from_list([dataset_row(task) for task in selected]),
