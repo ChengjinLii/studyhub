@@ -104,3 +104,44 @@ def test_merge_fails_closed_on_stale_content_fingerprint(tmp_path: Path) -> None
 
     with pytest.raises(RuntimeError, match="stale content fingerprint"):
         merge_batches([first, second])
+
+
+def test_merge_accepts_explicitly_allowlisted_spark_without_erasing_identity(
+    tmp_path: Path,
+) -> None:
+    codex = tmp_path / "codex"
+    spark = tmp_path / "spark"
+    codex_row = _row("run-codex", "codex visible trajectory")
+    spark_row = _row("run-spark", "spark visible trajectory")
+    spark_row["source_dataset"] = "spark_hermes_teacher_v1"
+    spark_row["teacher"] = {
+        "interface": "codex-spark-cli",
+        "model": "gpt-5.3-codex-spark",
+    }
+    spark_row["content_sha256"] = trajectory_fingerprint(spark_row)
+    _batch(codex, [codex_row])
+    _batch(spark, [spark_row])
+
+    rows, report = merge_batches(
+        [codex, spark],
+        allowed_source_datasets={
+            "codex_hermes_teacher_v1",
+            "spark_hermes_teacher_v1",
+        },
+        allowed_teacher_identities={
+            ("codex_hermes_teacher_v1", "codex-cli", "gpt-5.6-sol"),
+            (
+                "spark_hermes_teacher_v1",
+                "codex-spark-cli",
+                "gpt-5.3-codex-spark",
+            ),
+        },
+    )
+
+    assert len(rows) == 2
+    assert report["spark_used"] is True
+    assert report["teacher_interface"] == "mixed"
+    assert report["teacher_identities"] == {
+        "codex_hermes_teacher_v1|codex-cli|gpt-5.6-sol": 1,
+        "spark_hermes_teacher_v1|codex-spark-cli|gpt-5.3-codex-spark": 1,
+    }

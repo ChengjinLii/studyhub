@@ -179,3 +179,56 @@ def test_sft2_gate_rejects_non_codex_teacher_identity() -> None:
     assert selected == []
     assert drops["teacher_interface"] == 1
     assert drops["teacher_model"] == 1
+
+
+def test_sft2_mixed_gate_accepts_separately_identified_spark_teacher() -> None:
+    spark = _record("row-spark")
+    spark["source_dataset"] = "spark_hermes_teacher_v1"
+    spark["teacher"] = {
+        **spark["teacher"],
+        "interface": "codex-spark-cli",
+        "model": "gpt-5.3-codex-spark",
+    }
+    spark["content_sha256"] = trajectory_fingerprint(spark)
+    contract = _contract()
+    gate = contract["teacher_gate"]
+    gate.pop("source_dataset")
+    gate.pop("required_teacher_interface")
+    gate.pop("required_teacher_model")
+    gate.update(
+        {
+            "source_datasets": [
+                "codex_hermes_teacher_v1",
+                "spark_hermes_teacher_v1",
+            ],
+            "allowed_teacher_identities": [
+                {
+                    "source_dataset": "codex_hermes_teacher_v1",
+                    "interface": "codex-cli",
+                    "model": "gpt-5.6-sol",
+                },
+                {
+                    "source_dataset": "spark_hermes_teacher_v1",
+                    "interface": "codex-spark-cli",
+                    "model": "gpt-5.3-codex-spark",
+                },
+            ],
+            "minimum_identity_rows": {
+                "codex-spark-cli|gpt-5.3-codex-spark": 1
+            },
+        }
+    )
+
+    selected, drops, checked = select_eligible(
+        [spark],
+        contract=contract,
+        benchmark_prompt_hashes=set(),
+        count_tokens=lambda _row: (100, 25),
+    )
+    report = summarize(selected, checked=checked, drops=drops, contract=contract)
+
+    assert len(selected) == 1
+    assert report["status"] == "PASS"
+    assert report["teacher_identity_rows"] == {
+        "codex-spark-cli|gpt-5.3-codex-spark": 1
+    }

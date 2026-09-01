@@ -8,16 +8,18 @@ SEMANTIC_MODEL="${STUDYHUB_SFT2_SEMANTIC_MODEL:-/data/chengjin/studyhub/models/P
 SEMANTIC_DEVICE="${STUDYHUB_SFT2_SEMANTIC_DEVICE:-cuda:0}"
 TEACHER_DATA="${STUDYHUB_SFT2_TEACHER_DATA:-${PROJECT_ROOT}/datasets/interim/codex_hermes_teacher_v1/accepted.jsonl}"
 RETENTION_DATA="${STUDYHUB_SFT2_RETENTION_DATA:-${PROJECT_ROOT}/datasets/interim/open_agentic_sft_v2/selected.jsonl}"
-PROGRAM="${PROJECT_ROOT}/configs/program-v4/sft2-codex-retention-v1.json"
-INTERIM="${PROJECT_ROOT}/datasets/interim/qwen35_4b_sft2_codex_retention_v1"
-PROCESSED="${PROJECT_ROOT}/datasets/processed/qwen35_4b_sft2_codex_retention_v1"
+DATASET_ID="${STUDYHUB_SFT2_DATASET_ID:-qwen35_4b_sft2_codex_retention_v1}"
+EVIDENCE_PREFIX="${STUDYHUB_SFT2_EVIDENCE_PREFIX:-qwen35-4b-sft2}"
+PROGRAM="${STUDYHUB_SFT2_PROGRAM:-${PROJECT_ROOT}/configs/program-v4/sft2-codex-retention-v1.json}"
+INTERIM="${PROJECT_ROOT}/datasets/interim/${DATASET_ID}"
+PROCESSED="${PROJECT_ROOT}/datasets/processed/${DATASET_ID}"
 EVIDENCE="${PROJECT_ROOT}/docs/training/evidence"
 
 CANDIDATES="${INTERIM}/candidates.jsonl"
 CANDIDATE_BLOCKLIST="${INTERIM}/candidate-semantic-blocklist.jsonl"
-CANDIDATE_SEMANTIC="${EVIDENCE}/qwen35-4b-sft2-candidate-semantic-dedup.json"
+CANDIDATE_SEMANTIC="${EVIDENCE}/${EVIDENCE_PREFIX}-candidate-semantic-dedup.json"
 SELECTED="${INTERIM}/selected.jsonl"
-SELECTED_SEMANTIC="${EVIDENCE}/qwen35-4b-sft2-selected-semantic-dedup.json"
+SELECTED_SEMANTIC="${EVIDENCE}/${EVIDENCE_PREFIX}-selected-semantic-dedup.json"
 
 export HF_HUB_OFFLINE=1
 export TRANSFORMERS_OFFLINE=1
@@ -28,7 +30,7 @@ export TRANSFORMERS_OFFLINE=1
   --program "${PROGRAM}" \
   --model "${TOKENIZER_MODEL}" \
   --output "${CANDIDATES}" \
-  --teacher-audit-output "${EVIDENCE}/codex-hermes-sft2-input-audit.json"
+  --teacher-audit-output "${EVIDENCE}/${EVIDENCE_PREFIX}-teacher-input-audit.json"
 
 "${PYTHON_BIN}" "${PROJECT_ROOT}/scripts/data/audit_open_agentic_semantic_dedup.py" \
   --input "${CANDIDATES}" \
@@ -59,5 +61,5 @@ export TRANSFORMERS_OFFLINE=1
   --processed "${PROCESSED}" \
   --model "${TOKENIZER_MODEL}" \
   --semantic-evidence "${SELECTED_SEMANTIC}" \
-  --evidence "${EVIDENCE}/qwen35-4b-sft2-data-audit.json" \
-  --data-card "${PROJECT_ROOT}/docs/training/QWEN35_4B_SFT2_DATA_CARD.md"
+  --evidence "${EVIDENCE}/${EVIDENCE_PREFIX}-data-audit.json" \
+  --data-card "${PROJECT_ROOT}/docs/training/${EVIDENCE_PREFIX^^}_DATA_CARD.md"

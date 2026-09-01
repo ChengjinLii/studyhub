@@ -147,9 +147,13 @@ def main() -> int:
         "areal_lock_sha256": PROJECT_ROOT / "training/areal/upstream.lock.json",
         "hermes_lock_sha256": PROJECT_ROOT / "integrations/hermes/upstream.lock.json",
         "m2_completion_sha256": Path(
-            "/data/chengjin/studyhub/studyhub-agent/artifacts/areal/checkpoints/chengjin/"
-            "studyhub-qwen35-4b-codex-sft2/"
-            "qwen35-4b-sft2-formal-r32-seed-20260827/QWEN35_4B_SFT2_COMPLETE.json"
+            authorization["lineage"].get(
+                "m2_completion_path",
+                "/data/chengjin/studyhub/studyhub-agent/artifacts/areal/checkpoints/"
+                "chengjin/studyhub-qwen35-4b-codex-sft2/"
+                "qwen35-4b-sft2-formal-r32-seed-20260827/"
+                "QWEN35_4B_SFT2_COMPLETE.json",
+            )
         ),
         "teacher_download_manifest_sha256": Path(config.teacher.path)
         / "studyhub_download_manifest.json",

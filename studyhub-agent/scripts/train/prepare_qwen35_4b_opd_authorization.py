@@ -163,6 +163,7 @@ def main() -> int:
             **{key: sha256(path) for key, path in paths.items()},
             "m2_adapter_path": str(m2_adapter.parent),
             "m2_adapter_sha256": sha256(m2_adapter),
+            "m2_completion_path": str(args.m2_marker.resolve()),
             "teacher_model_path": str(teacher_model),
             "teacher_revision": "c202236235762e1c871ad0ccb60c8ee5ba337b9a",
             "prompt_pool_path": str(pool),

@@ -41,6 +41,20 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--artifact-root", type=Path, default=CANONICAL_ROOT)
     parser.add_argument(
+        "--program",
+        type=Path,
+        default=PROJECT_ROOT / "configs/program-v4/sft2-codex-retention-v1.json",
+    )
+    parser.add_argument(
+        "--config",
+        type=Path,
+        default=PROJECT_ROOT / "configs/train/qwen35-4b-codex-sft2.yaml",
+    )
+    parser.add_argument(
+        "--dataset-id", default="qwen35_4b_sft2_codex_retention_v1"
+    )
+    parser.add_argument("--evidence-prefix", default="qwen35-4b-sft2")
+    parser.add_argument(
         "--m1-marker",
         type=Path,
         default=(
@@ -61,21 +75,20 @@ def main() -> int:
     args = parse_args()
     artifact_root = args.artifact_root.resolve()
     paths = {
-        "program_sha256": PROJECT_ROOT
-        / "configs/program-v4/sft2-codex-retention-v1.json",
-        "config_sha256": PROJECT_ROOT / "configs/train/qwen35-4b-codex-sft2.yaml",
+        "program_sha256": args.program,
+        "config_sha256": args.config,
         "dataset_manifest_sha256": artifact_root
-        / "datasets/processed/qwen35_4b_sft2_codex_retention_v1/manifest.json",
+        / f"datasets/processed/{args.dataset_id}/manifest.json",
         "selected_jsonl_sha256": artifact_root
-        / "datasets/interim/qwen35_4b_sft2_codex_retention_v1/selected.jsonl",
+        / f"datasets/interim/{args.dataset_id}/selected.jsonl",
         "selected_manifest_sha256": artifact_root
-        / "datasets/interim/qwen35_4b_sft2_codex_retention_v1/selected.manifest.json",
+        / f"datasets/interim/{args.dataset_id}/selected.manifest.json",
         "data_audit_sha256": artifact_root
-        / "docs/training/evidence/qwen35-4b-sft2-data-audit.json",
+        / f"docs/training/evidence/{args.evidence_prefix}-data-audit.json",
         "semantic_audit_sha256": artifact_root
-        / "docs/training/evidence/qwen35-4b-sft2-selected-semantic-dedup.json",
+        / f"docs/training/evidence/{args.evidence_prefix}-selected-semantic-dedup.json",
         "teacher_audit_sha256": artifact_root
-        / "docs/training/evidence/codex-hermes-sft2-input-audit.json",
+        / f"docs/training/evidence/{args.evidence_prefix}-teacher-input-audit.json",
         "benchmark_manifest_sha256": PROJECT_ROOT
         / "benchmarks/studyhub-agent-v2/manifest.json",
         "model_lock_sha256": PROJECT_ROOT
@@ -129,19 +142,35 @@ def main() -> int:
 
     model_lock = load_json(paths["model_lock_sha256"])
     overlay = load_json(paths["tokenizer_overlay_sha256"])
+    teacher_gate = program["teacher_gate"]
+    teacher_identities = teacher_gate.get("allowed_teacher_identities")
+    if not teacher_identities:
+        teacher_identities = [
+            {
+                "source_dataset": teacher_gate["source_dataset"],
+                "interface": teacher_gate["required_teacher_interface"],
+                "model": teacher_gate["required_teacher_model"],
+            }
+        ]
     value = {
         "schema_version": "studyhub.qwen35-4b-sft2-authorization.v1",
-        "authorization_id": "qwen35-4b-codex-hermes-sft2-r32-seed-20260827",
+        "authorization_id": f"{program['program_id']}-r32-seed-20260827",
         "status": "AUTHORIZED_PENDING_SMOKE_AND_FORMAL_RUN",
         "scope": {
             "model": "Qwen/Qwen3.5-4B-Base",
             "student_input": "M1",
-            "teacher_interface": "codex-cli",
-            "teacher_model": "gpt-5.6-sol",
+            "program_id": program["program_id"],
+            "dataset_id": args.dataset_id,
+            "evidence_prefix": args.evidence_prefix,
+            "teacher_identities": teacher_identities,
             "method": "AReaL SFT BF16 FSDP2 LoRA continuation",
             "smoke_runs": 1,
             "formal_training_runs": 1,
-            "no_spark": True,
+            "spark_training_data_allowed": any(
+                item["interface"] == "codex-spark-cli"
+                for item in teacher_identities
+            ),
+            "no_spark_runtime_calls": True,
             "no_main_grpo": True,
             "no_opd_in_sft2": True,
             "no_sealed": True,

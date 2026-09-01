@@ -28,9 +28,7 @@ from scripts.data.select_runtime_sft_v3 import (  # noqa: E402
     sha256,
 )
 from scripts.data.tokenize_runtime_sft_v3 import assistant_loss_mask  # noqa: E402
-from studyhub_agent.trajectory.runtime_sft import (
-    validate_runtime_trajectory,
-)  # noqa: E402
+from studyhub_agent.trajectory.runtime_sft import validate_runtime_trajectory  # noqa: E402
 
 STATE_TOOLS = {
     "learning_profile_get",
@@ -120,11 +118,12 @@ def _abstract_path(record: dict[str, Any]) -> str:
 def _prepare_teacher(row: EligibleTrajectory) -> dict[str, Any]:
     prepared = dict(row.record)
     calls = _tool_sequence(prepared)
+    teacher_interface = str(prepared.get("teacher", {}).get("interface", "unknown"))
     prepared.update(
         {
             "split": "train",
             "source_family": "codex_teacher",
-            "environment_origin": "codex_hermes_actual_observation",
+            "environment_origin": f"{teacher_interface}_hermes_actual_observation",
             "behavior_tags": _behavior_tags(prepared),
             "abstract_tool_path": _abstract_path(prepared),
             "tool_path_signature": row.path_signature,

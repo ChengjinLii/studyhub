@@ -1,0 +1,151 @@
+{
+  "schema_version": "studyhub.qwen35-4b-sft2-data-contract.v2",
+  "program_id": "qwen35-4b-sft2-mixed-teacher-retention-v2",
+  "dataset_id": "qwen35-4b-sft2-mixed-teacher-retention-v2",
+  "status": "DATA_GATE_PREPARED_TRAINING_NOT_AUTHORIZED",
+  "seed": 20260827,
+  "model": {
+    "id": "Qwen/Qwen3.5-4B-Base",
+    "revision": "1001bb4d826a52d1f399e183466143f4da7b741b",
+    "manifest_sha256": "f47a44b5282834367ce8e6fe7a203623c2ab4f6eaf65ebd0915e0f9b1a4b3650"
+  },
+  "benchmark_lock": {
+    "benchmark_version": "studyhub-agentbench-v2",
+    "benchmark_revision": "2.0.0",
+    "status": "FROZEN_FOR_BASELINE",
+    "manifest_sha256": "da804b10f53dec585255598c3e256445b8ade3acf35fd8c766ca0ab4d759c88b",
+    "sealed_access": false
+  },
+  "teacher_gate": {
+    "source_datasets": [
+      "codex_hermes_teacher_v1",
+      "spark_hermes_teacher_v1"
+    ],
+    "minimum_selected_rows": 1000,
+    "minimum_assistant_loss_tokens": 300000,
+    "allowed_quality_tiers": [
+      "teacher_verified_complete",
+      "teacher_repaired_complete"
+    ],
+    "maximum_rows_per_source_group": 2,
+    "maximum_rows_per_source_group_and_path": 1,
+    "replay_only_tools": ["web_fetch"],
+    "required_teacher_controller": "pinned_hermes_registry_dispatch",
+    "allowed_teacher_identities": [
+      {
+        "source_dataset": "codex_hermes_teacher_v1",
+        "interface": "codex-cli",
+        "model": "gpt-5.6-sol"
+      },
+      {
+        "source_dataset": "spark_hermes_teacher_v1",
+        "interface": "codex-spark-cli",
+        "model": "gpt-5.3-codex-spark"
+      }
+    ],
+    "minimum_identity_rows": {
+      "codex-cli|gpt-5.6-sol": 800,
+      "codex-spark-cli|gpt-5.3-codex-spark": 1
+    },
+    "maximum_identity_assistant_token_share": {
+      "codex-spark-cli|gpt-5.3-codex-spark": 0.10
+    },
+    "required_hermes_commit": "5c1a304ce890276a4334d8ced3f29ffeedbbbf93"
+  },
+  "mix": {
+    "teacher_assistant_token_target_share": 0.35,
+    "retention_assistant_token_target_share": 0.65,
+    "teacher_assistant_token_share_bounds": [0.30, 0.40]
+  },
+  "selection": {
+    "target_train_rows": 6400,
+    "target_assistant_loss_tokens": 1000000,
+    "assistant_loss_token_tolerance_fraction": 0.20,
+    "target_total_tokens": 7300000,
+    "total_token_tolerance_fraction": 0.25,
+    "split": {
+      "train": 0.90,
+      "validation": 0.05,
+      "protocol_holdout": 0.05
+    },
+    "source_family_assistant_token_bounds": {
+      "codex_teacher": [0.30, 0.40],
+      "hermes": [0.19, 0.30],
+      "toolbench": [0.11, 0.21],
+      "agent_flan": [0.04, 0.12],
+      "rag_replay": [0.05, 0.14],
+      "coig": [0.01, 0.07],
+      "toolace": [0.00, 0.05]
+    },
+    "source_family_target_shares": {
+      "codex_teacher": 0.35,
+      "hermes": 0.244,
+      "toolbench": 0.162,
+      "agent_flan": 0.078,
+      "rag_replay": 0.097,
+      "coig": 0.042,
+      "toolace": 0.027
+    },
+    "behavior_minimum_shares": {
+      "observation_conditioned": 0.60,
+      "multi_turn": 0.50,
+      "multi_tool": 0.25,
+      "recovery_negative": 0.10
+    },
+    "behavior_maximum_shares": {
+      "planning_only": 0.08,
+      "oracle_replay": 0.20
+    },
+    "largest_abstract_tool_path_share_max": 0.25,
+    "max_rows_per_conversation_group": 128,
+    "largest_conversation_group_assistant_token_share_max": 0.01,
+    "action_only_rows": 0,
+    "two_wiki_assistant_token_share_max": 0.12
+  },
+  "training": {
+    "student_input": "M1",
+    "primary_updates": 800,
+    "allowed_update_range": [600, 900],
+    "global_batch_size": 8,
+    "learning_rate": 0.00001,
+    "lora_rank": 32,
+    "lora_alpha": 32,
+    "enable_thinking": false
+  },
+  "recipe": {
+    "optimizer_updates": 800,
+    "global_batch_size": 8,
+    "precision": "bf16",
+    "backend": "AReaL-FSDP2",
+    "lora": {
+      "rank": 32,
+      "alpha": 32,
+      "target_modules": ["o_proj", "gate_proj", "up_proj", "down_proj"]
+    },
+    "optimizer": {
+      "name": "Adam",
+      "lr": 0.00001,
+      "weight_decay": 0.05,
+      "beta1": 0.9,
+      "beta2": 0.95,
+      "eps": 0.00001,
+      "gradient_clip": 1.0
+    },
+    "scheduler": {
+      "name": "cosine",
+      "warmup_fraction": 0.03
+    }
+  },
+  "prohibited_sources": [
+    "AgentBench_v2_all_splits",
+    "BFCL_holdout",
+    "tau2_holdout",
+    "sealed_data",
+    "legacy_teacher_reverse_replay"
+  ],
+  "data_card": {
+    "title": "Qwen3.5 4B SFT-2 Mixed Codex Teacher + Retention Data Card",
+    "purpose": "Second-stage 4B Agent SFT using independently identified verifier-accepted Codex and Spark Hermes trajectories with Open-Agentic v2 retention.",
+    "exclusions": "Teacher identities remain separate; replay-only Web aliases, semantic duplicates, legacy reverse replay, deterministic StudyHub fixtures, and evaluation tasks are excluded."
+  }
+}

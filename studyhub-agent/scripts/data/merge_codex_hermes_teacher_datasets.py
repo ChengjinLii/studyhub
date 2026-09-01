@@ -17,6 +17,11 @@ sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
 from studyhub_agent.trajectory.runtime_sft import trajectory_fingerprint  # noqa: E402
 
+DEFAULT_SOURCE_DATASETS = {"codex_hermes_teacher_v1"}
+DEFAULT_TEACHER_IDENTITIES = {
+    ("codex_hermes_teacher_v1", "codex-cli", "gpt-5.6-sol")
+}
+
 
 def sha256(path: Path) -> str:
     digest = hashlib.sha256()
@@ -52,9 +57,16 @@ def stable_row_sha256(row: dict[str, Any]) -> str:
     ).hexdigest()
 
 
-def merge_batches(roots: list[Path]) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+def merge_batches(
+    roots: list[Path],
+    *,
+    allowed_source_datasets: set[str] | None = None,
+    allowed_teacher_identities: set[tuple[str, str, str]] | None = None,
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     if len(roots) < 2:
         raise RuntimeError("at least two verified teacher batches are required")
+    allowed_source_datasets = allowed_source_datasets or DEFAULT_SOURCE_DATASETS
+    allowed_teacher_identities = allowed_teacher_identities or DEFAULT_TEACHER_IDENTITIES
     rows_by_content: dict[str, tuple[str, dict[str, Any]]] = {}
     run_ids: dict[str, str] = {}
     duplicate_content = 0
@@ -63,6 +75,7 @@ def merge_batches(roots: list[Path]) -> tuple[list[dict[str, Any]], dict[str, An
     family_counts: Counter[str] = Counter()
     quality_counts: Counter[str] = Counter()
     source_groups: Counter[str] = Counter()
+    teacher_identities: Counter[str] = Counter()
 
     for root in sorted(path.resolve() for path in roots):
         manifest_path = root / "manifest.json"
@@ -87,11 +100,17 @@ def merge_batches(roots: list[Path]) -> tuple[list[dict[str, Any]], dict[str, An
             }
         )
         for row in batch_rows:
-            if row.get("source_dataset") != "codex_hermes_teacher_v1":
+            source_dataset = str(row.get("source_dataset", ""))
+            if source_dataset not in allowed_source_datasets:
                 raise RuntimeError("unexpected teacher source_dataset")
             teacher = row.get("teacher", {})
-            if teacher.get("interface") != "codex-cli" or teacher.get("model") != "gpt-5.6-sol":
-                raise RuntimeError("non-Codex teacher identity in verified batch")
+            identity = (
+                source_dataset,
+                str(teacher.get("interface", "")),
+                str(teacher.get("model", "")),
+            )
+            if identity not in allowed_teacher_identities:
+                raise RuntimeError("unapproved teacher identity in verified batch")
             if row.get("quality_tier") not in {
                 "teacher_verified_complete",
                 "teacher_repaired_complete",
@@ -127,13 +146,24 @@ def merge_batches(roots: list[Path]) -> tuple[list[dict[str, Any]], dict[str, An
     for row in merged:
         family_counts[str(row.get("task_family", "unknown"))] += 1
         quality_counts[str(row.get("quality_tier", "unknown"))] += 1
+        teacher = row.get("teacher", {})
+        teacher_identities[
+            "|".join(
+                (
+                    str(row.get("source_dataset", "")),
+                    str(teacher.get("interface", "")),
+                    str(teacher.get("model", "")),
+                )
+            )
+        ] += 1
         for group in set(map(str, row.get("source_group_ids", []))):
             source_groups[group] += 1
     report = {
         "schema_version": "studyhub.codex-hermes-teacher-merge.v1",
         "status": "PASS",
-        "teacher_interface": "codex-cli",
-        "teacher_model": "gpt-5.6-sol",
+        "teacher_interface": "codex-cli" if len(teacher_identities) == 1 else "mixed",
+        "teacher_model": "gpt-5.6-sol" if len(teacher_identities) == 1 else "mixed",
+        "teacher_identities": dict(sorted(teacher_identities.items())),
         "inputs": inputs,
         "input_rows": sum(item["accepted_rows"] for item in inputs),
         "merged_rows": len(merged),
@@ -145,7 +175,9 @@ def merge_batches(roots: list[Path]) -> tuple[list[dict[str, Any]], dict[str, An
         "family_counts": dict(sorted(family_counts.items())),
         "quality_tiers": dict(sorted(quality_counts.items())),
         "sealed_used": False,
-        "spark_used": False,
+        "spark_used": any(
+            "|codex-spark-cli|" in identity for identity in teacher_identities
+        ),
     }
     return merged, report
 
@@ -163,12 +195,33 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--input-root", action="append", type=Path, required=True)
     parser.add_argument("--output-root", type=Path, required=True)
+    parser.add_argument("--program", type=Path)
     return parser.parse_args()
 
 
 def main() -> int:
     args = parse_args()
-    rows, report = merge_batches(args.input_root)
+    sources = None
+    identities = None
+    if args.program is not None:
+        gate = read_json(args.program)["teacher_gate"]
+        sources = set(gate.get("source_datasets", [gate.get("source_dataset")]))
+        sources.discard(None)
+        identities = {
+            (
+                str(item["source_dataset"]),
+                str(item["interface"]),
+                str(item["model"]),
+            )
+            for item in gate.get("allowed_teacher_identities", [])
+        }
+        if not sources or not identities:
+            raise RuntimeError("teacher program has no explicit source/identity allowlist")
+    rows, report = merge_batches(
+        args.input_root,
+        allowed_source_datasets=sources,
+        allowed_teacher_identities=identities,
+    )
     output = args.output_root.resolve()
     accepted = output / "accepted.jsonl"
     write_jsonl(accepted, rows)

@@ -112,7 +112,12 @@ def _row_failures(
 ) -> list[str]:
     failures = list(validate_runtime_trajectory(record))
     gate = contract["teacher_gate"]
-    if record.get("source_dataset") != gate["source_dataset"]:
+    source_dataset = str(record.get("source_dataset", ""))
+    allowed_sources = set(
+        gate.get("source_datasets", [gate.get("source_dataset")])
+    )
+    allowed_sources.discard(None)
+    if source_dataset not in allowed_sources:
         failures.append("source_dataset")
     if record.get("quality_tier") not in set(gate["allowed_quality_tiers"]):
         failures.append("quality_tier_not_teacher_verified")
@@ -124,10 +129,20 @@ def _row_failures(
     teacher = record.get("teacher", {})
     if teacher.get("controller") != gate["required_teacher_controller"]:
         failures.append("teacher_controller")
-    if teacher.get("interface") != gate["required_teacher_interface"]:
-        failures.append("teacher_interface")
-    if teacher.get("model") != gate["required_teacher_model"]:
-        failures.append("teacher_model")
+    allowed_identities = gate.get("allowed_teacher_identities")
+    if allowed_identities:
+        identity = {
+            "source_dataset": source_dataset,
+            "interface": str(teacher.get("interface", "")),
+            "model": str(teacher.get("model", "")),
+        }
+        if identity not in allowed_identities:
+            failures.append("teacher_identity")
+    else:
+        if teacher.get("interface") != gate["required_teacher_interface"]:
+            failures.append("teacher_interface")
+        if teacher.get("model") != gate["required_teacher_model"]:
+            failures.append("teacher_model")
     if teacher.get("hermes_commit") != gate["required_hermes_commit"]:
         failures.append("hermes_commit")
     replay_tools = _tool_names(record) & set(gate["replay_only_tools"])
@@ -221,13 +236,28 @@ def summarize(
         str(row.record.get("task_family", "unknown")) for row in selected
     )
     tool_counts: Counter[str] = Counter()
+    identity_rows: Counter[str] = Counter()
+    identity_assistant_tokens: Counter[str] = Counter()
     for row in selected:
         tool_counts.update(_tool_names(row.record))
+        teacher = row.record.get("teacher", {})
+        identity = f"{teacher.get('interface', '')}|{teacher.get('model', '')}"
+        identity_rows[identity] += 1
+        identity_assistant_tokens[identity] += row.assistant_tokens
     failures = []
     if len(selected) < int(gate["minimum_selected_rows"]):
         failures.append("minimum_selected_rows")
     if assistant_tokens < int(gate["minimum_assistant_loss_tokens"]):
         failures.append("minimum_assistant_loss_tokens")
+    for identity, minimum in gate.get("minimum_identity_rows", {}).items():
+        if identity_rows[identity] < int(minimum):
+            failures.append(f"minimum_identity_rows:{identity}")
+    for identity, maximum in gate.get(
+        "maximum_identity_assistant_token_share", {}
+    ).items():
+        share = identity_assistant_tokens[identity] / max(assistant_tokens, 1)
+        if share > float(maximum):
+            failures.append(f"maximum_identity_assistant_token_share:{identity}")
     return {
         "schema_version": "studyhub.codex-hermes-sft2-input-audit.v1",
         "status": (
@@ -246,6 +276,10 @@ def summarize(
         ),
         "family_counts": dict(sorted(family_counts.items())),
         "tool_counts": dict(sorted(tool_counts.items())),
+        "teacher_identity_rows": dict(sorted(identity_rows.items())),
+        "teacher_identity_assistant_tokens": dict(
+            sorted(identity_assistant_tokens.items())
+        ),
         "drop_reasons": dict(drops.most_common()),
         "gate_failures": failures,
         "selected_ids_sha256": hashlib.sha256(

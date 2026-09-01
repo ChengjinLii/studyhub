@@ -140,6 +140,16 @@ def main() -> int:
             "state_files": len(state_files),
             "state_bytes": sum(path.stat().st_size for path in state_files),
         }
+    teacher_identities = authorization.get("scope", {}).get("teacher_identities")
+    if not teacher_identities:
+        scope = authorization.get("scope", {})
+        teacher_identities = [
+            {
+                "source_dataset": "codex_hermes_teacher_v1",
+                "interface": scope.get("teacher_interface", "codex-cli"),
+                "model": scope.get("teacher_model", "gpt-5.6-sol"),
+            }
+        ]
     marker.update(
         {
             "schema_version": "studyhub.qwen35-4b-sft2-completion.v1",
@@ -147,8 +157,17 @@ def main() -> int:
             "mode": args.mode,
             "authorization_id": authorization["authorization_id"],
             "authorization_sha256": sha256(args.authorization),
-            "teacher_interface": "codex-cli",
-            "teacher_model": "gpt-5.6-sol",
+            "teacher_interface": (
+                teacher_identities[0]["interface"]
+                if len(teacher_identities) == 1
+                else "mixed"
+            ),
+            "teacher_model": (
+                teacher_identities[0]["model"]
+                if len(teacher_identities) == 1
+                else "mixed"
+            ),
+            "teacher_identities": teacher_identities,
             "m1_initialization_verified": True,
             "m1_initialization": initialization,
             "lora_update_observed": True,

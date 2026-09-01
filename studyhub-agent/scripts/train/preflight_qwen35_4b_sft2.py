@@ -97,31 +97,38 @@ def main() -> int:
 
     from areal.api import FinetuneSpec
     from areal.api.cli_args import SFTConfig, load_expr_config
+
     from datasets import load_from_disk
 
     config, _ = load_expr_config(["--config", str(args.config)], SFTConfig)
     authorization = load_json(args.authorization)
     if authorization.get("status") != "AUTHORIZED_PENDING_SMOKE_AND_FORMAL_RUN":
         raise RuntimeError("SFT-2 is not authorized")
-    if authorization.get("scope", {}).get("no_spark") is not True:
-        raise RuntimeError("SFT-2 authorization does not explicitly exclude Spark")
+    scope = authorization.get("scope", {})
+    if (
+        scope.get("no_spark_runtime_calls") is not True
+        and scope.get("no_spark") is not True
+    ):
+        raise RuntimeError("SFT-2 must not call a teacher provider during training")
 
     artifact_root = Path(config.cluster.fileroot).resolve().parents[1]
+    dataset_id = str(scope.get("dataset_id", "qwen35_4b_sft2_codex_retention_v1"))
+    evidence_prefix = str(scope.get("evidence_prefix", "qwen35-4b-sft2"))
     paths = {
         "program_sha256": args.program,
         "config_sha256": args.config,
         "dataset_manifest_sha256": Path(config.train_dataset.path).resolve().parent
         / "manifest.json",
         "selected_jsonl_sha256": artifact_root
-        / "datasets/interim/qwen35_4b_sft2_codex_retention_v1/selected.jsonl",
+        / f"datasets/interim/{dataset_id}/selected.jsonl",
         "selected_manifest_sha256": artifact_root
-        / "datasets/interim/qwen35_4b_sft2_codex_retention_v1/selected.manifest.json",
+        / f"datasets/interim/{dataset_id}/selected.manifest.json",
         "data_audit_sha256": artifact_root
-        / "docs/training/evidence/qwen35-4b-sft2-data-audit.json",
+        / f"docs/training/evidence/{evidence_prefix}-data-audit.json",
         "semantic_audit_sha256": artifact_root
-        / "docs/training/evidence/qwen35-4b-sft2-selected-semantic-dedup.json",
+        / f"docs/training/evidence/{evidence_prefix}-selected-semantic-dedup.json",
         "teacher_audit_sha256": artifact_root
-        / "docs/training/evidence/codex-hermes-sft2-input-audit.json",
+        / f"docs/training/evidence/{evidence_prefix}-teacher-input-audit.json",
         "benchmark_manifest_sha256": PROJECT_ROOT
         / "benchmarks/studyhub-agent-v2/manifest.json",
         "model_lock_sha256": PROJECT_ROOT
@@ -159,8 +166,32 @@ def main() -> int:
     parity = load_json(paths["tokenizer_parity_sha256"])
     thinking = load_json(paths["thinking_contract_sha256"])
     m1 = load_json(paths["m1_completion_sha256"])
-    if program.get("program_id") != "qwen35-4b-sft2-codex-retention-v1":
-        raise RuntimeError("unexpected SFT-2 program")
+    authorized_program = scope.get(
+        "program_id", "qwen35-4b-sft2-codex-retention-v1"
+    )
+    if program.get("program_id") != authorized_program:
+        raise RuntimeError("SFT-2 program differs from authorization")
+    configured_identities = program["teacher_gate"].get("allowed_teacher_identities")
+    if configured_identities is None:
+        gate = program["teacher_gate"]
+        configured_identities = [
+            {
+                "source_dataset": gate["source_dataset"],
+                "interface": gate["required_teacher_interface"],
+                "model": gate["required_teacher_model"],
+            }
+        ]
+    authorized_identities = scope.get("teacher_identities")
+    if authorized_identities is None:
+        authorized_identities = [
+            {
+                "source_dataset": program["teacher_gate"]["source_dataset"],
+                "interface": scope.get("teacher_interface"),
+                "model": scope.get("teacher_model"),
+            }
+        ]
+    if configured_identities != authorized_identities:
+        raise RuntimeError("SFT-2 teacher identity allowlist drift")
     if teacher.get("status") != "PASS" or audit.get("status") != "PASS":
         raise RuntimeError("SFT-2 teacher/data audit is not passing")
     if semantic.get("status") != "PASS":
@@ -266,8 +297,7 @@ def main() -> int:
                 "schema_version": "studyhub.qwen35-4b-sft2-preflight.v1",
                 "status": "PASS",
                 "mode": args.mode,
-                "teacher_interface": "codex-cli",
-                "teacher_model": "gpt-5.6-sol",
+                "teacher_identities": configured_identities,
                 "m1_adapter_sha256": lineage["m1_adapter_sha256"],
                 "dataset_splits": actual_splits,
                 "sealed_used": False,
