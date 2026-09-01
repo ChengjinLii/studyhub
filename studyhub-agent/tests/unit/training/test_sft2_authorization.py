@@ -85,3 +85,10 @@ def test_compact_program_is_independent_and_matches_300_update_budget() -> None:
     assert compact["training"]["primary_updates"] == 300
     assert compact["training"]["smoke_updates"] == 24
     assert legacy["training"]["primary_updates"] == 800
+
+
+def test_sft2_evidence_and_lr_collector_share_canonical_artifact_root() -> None:
+    launcher = (PROJECT_ROOT / "scripts/train/run_qwen35_4b_sft2.sh").read_text()
+
+    assert '--output "${ARTIFACT_ROOT}/artifacts/experiments/${ATTEMPT_ID}"' in launcher
+    assert '--evidence-root "${ARTIFACT_ROOT}/artifacts/experiments"' in launcher

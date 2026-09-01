@@ -218,7 +218,10 @@ set -e
   --output "${RUN_METADATA}" --gpu-csv "${GPU_CSV}" --status "${STATUS}"
 
 if ! "${VENV_DIR}/bin/python" "${PROJECT_ROOT}/scripts/train/build_experiment_evidence.py" \
-  --run-metadata "${RUN_METADATA}" --checkpoint-root "${CHECKPOINT_ROOT}" --evidence-tier CLAIM >/dev/null; then
+  --run-metadata "${RUN_METADATA}" \
+  --checkpoint-root "${CHECKPOINT_ROOT}" \
+  --output "${ARTIFACT_ROOT}/artifacts/experiments/${ATTEMPT_ID}" \
+  --evidence-tier CLAIM >/dev/null; then
   [[ "${STATUS}" -ne 0 ]] || STATUS=74
 fi
 
