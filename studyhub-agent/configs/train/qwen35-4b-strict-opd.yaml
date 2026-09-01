@@ -102,7 +102,9 @@ actor:
   gradient_checkpointing: true
   dtype: bfloat16
   mb_spec:
-    max_tokens_per_mb: 16384
+    # The actor shares GPU 0 with the offloaded SGLang allocation. Keep the
+    # forward microbatch below the pinned AReaL colocated GRPO examples.
+    max_tokens_per_mb: 4096
   optimizer:
     type: adam
     lr: 1.0e-6
@@ -161,7 +163,7 @@ teacher:
     dtype: bfloat16
     temperature: ${opd_teacher_temperature}
     mb_spec:
-      max_tokens_per_mb: 16384
+      max_tokens_per_mb: 8192
     optimizer: null
     use_lora: false
     scheduling_spec:

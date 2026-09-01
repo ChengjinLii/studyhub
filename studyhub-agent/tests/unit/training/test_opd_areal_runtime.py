@@ -39,6 +39,7 @@ def test_opd_launcher_separates_code_and_artifact_roots() -> None:
     assert "model_path: ${actor.path}" not in config
     assert "mem_fraction_static: 0.65" in config
     assert config.count("LD_LIBRARY_PATH: ${oc.env:STUDYHUB_CUDA_RUNTIME_LIBRARY_PATH}") >= 5
+    assert 'REWARD_ROOT="${ARTIFACT_ROOT}/artifacts/areal/strict-opd/rewards/${TRIAL}/${ATTEMPT_ID}"' in launcher
 
     probe = (PROJECT_ROOT / "scripts/train/run_opd_policy_probe.py").read_text()
     assert 'parser.add_argument("--artifact-root"' in probe
@@ -210,6 +211,8 @@ def test_opd_config_is_fail_closed(monkeypatch: pytest.MonkeyPatch) -> None:
 
     assert config.opd_top_k == 16
     assert config.opd_top_k_strategy == "only_stu"
+    assert config.actor.mb_spec.max_tokens_per_mb == 4096
+    assert config.teacher.train.mb_spec.max_tokens_per_mb == 8192
     assert config.actor.kl_ctl == 0
     assert config.ref is None
     assert config.teacher.engine_type == "train"

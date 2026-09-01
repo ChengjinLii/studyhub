@@ -125,7 +125,22 @@
       "stage_marker_written": false,
       "runtime_progress": "Four real Hermes trajectories completed and produced four Reward v3 records before the first student anchor forward; two were strict successes and all four were eligible for policy update.",
       "remediation": "Flatten unpadded attention-mask lengths per API interaction for AReaL reordering, then split by trajectory interaction counts and trim the sequence axis explicitly."
+    },
+    {
+      "attempt_id": "qwen35-4b-opd-lr1e6-seed-20260827-attempt-20260901_220024",
+      "status": "INFRA_FAILED_NO_UPDATE",
+      "failure_stage": "First OPD student anchor forward after packed-output repair",
+      "root_cause": "The colocated 4B actor used a 16,384-token microbatch limit. A 12,866-token anchor microbatch began with 69.91 GiB already resident after SGLang offload and exhausted CUDA virtual-memory allocation during forward.",
+      "native_error": "torch_memory_saver.cpp CUresult error: 2 (out of memory) in cu_mem_create",
+      "launcher_log_sha256": "935d41a585ca953e32a5e10f532cb7c89dda21d1d11e0a35cb777f6e5d35769f",
+      "gpu_telemetry_sha256": "69c898a48ac50ef146ec7880719b52b591625f93946aa2973a0d8f618ed3d324",
+      "sglang_overlay_audit_sha256": "b930c65548e3ccc4da8ca2d2aec7eeeffd74fba9c853737a495ba72658a26b54",
+      "initial_lora_sha256": "4b7ee7462d82cd17a7c55fdb27335eee70b4df7a08f282697efafc577c173e6e",
+      "optimizer_updates": 0,
+      "stage_marker_written": false,
+      "runtime_progress": "The packed interaction-length repair passed, four additional real Hermes trajectories and Reward v3 rows completed, and AReaL reached the first anchor forward before CUDA OOM.",
+      "remediation": "Use 4,096 actor and 8,192 teacher max tokens per microbatch, retaining the same global batch, data, OPD objective, and learning rate. Isolate Reward v3 output by attempt so failed runs cannot contaminate a passing stage marker."
     }
   ],
-  "claim_boundary": "Attempt 20260901_214833 produced four real Hermes trajectories and a four-row Reward v3 batch. No recorded attempt produced an optimizer update, passing LR marker, or OPD model result."
+  "claim_boundary": "Attempts 20260901_214833 and 20260901_220024 each produced four real Hermes trajectories and four Reward v3 rows. No recorded attempt produced an optimizer update, passing LR marker, or OPD model result."
 }
