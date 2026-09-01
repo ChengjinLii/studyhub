@@ -208,7 +208,24 @@
       "stage_marker_written": false,
       "runtime_progress": "Four new Hermes trajectories and attempt-isolated Reward v3 records completed. The run failed closed at deterministic microbatch allocation, before student anchor, teacher scoring, backward, or parameter update.",
       "remediation": "Use a 1,536-token actor microbatch: it exceeds the observed 1,235-token single-interaction maximum while remaining 25% below the 2,048-token configuration that crossed the GPU guard during backward."
+    },
+    {
+      "attempt_id": "qwen35-4b-opd-lr1e6-seed-20260827-attempt-20260901_224210",
+      "status": "GUARD_STOPPED_NO_UPDATE",
+      "failure_stage": "First 4B OPD backward with 1,536-token actor microbatches",
+      "root_cause": "The 1,536-token capacity accommodated every real interaction in the batch and completed the student anchor plus frozen-teacher scoring. During the first actor update, gradient-checkpointed backward raised GPU 0 use to 79,628 MiB and crossed the pre-existing 79,000 MiB safety guard.",
+      "native_error": "GPU guard stopped only the owned run process group after GPU 0 reached 79628 MiB; guard is 79000 MiB",
+      "launcher_log_sha256": "2d08ecf4c42b3c0355cff2210f625498987ac2582791bcce482c9d33a1821603",
+      "gpu_telemetry_sha256": "95d1ab857fab6e170de6b8b898b48aca8a09236ae7908a5613ed54192b6490c9",
+      "sglang_overlay_audit_sha256": "de7dd57eb86e434ebed20bdb1f8a6ed799858133c6ee66247cd861a091d3b84d",
+      "reward_v3_sha256": "de9dd555ac75ca5caefb46cbb008e81a5223f3ea09d67196fa986499fd03af97",
+      "reward_v3_rows": 4,
+      "initial_lora_sha256": "4b7ee7462d82cd17a7c55fdb27335eee70b4df7a08f282697efafc577c173e6e",
+      "optimizer_updates": 0,
+      "stage_marker_written": false,
+      "runtime_progress": "Four real Hermes trajectories and four isolated Reward v3 records completed. The 4B student anchor used interaction microbatches up to 1,518 tokens, the frozen 9B teacher scored the selected tokens, and AReaL computed advantages before entering the first actor update. The safety guard then terminated only the owned run process group; no foreign process was touched and no stage marker or updated adapter was produced.",
+      "remediation": "Experiment stopped at the user's request. Do not raise the 79,000 MiB guard or claim an OPD result; any future continuation requires a separately reviewed memory-layout change rather than another parameter-only retry."
     }
   ],
-  "claim_boundary": "Attempts 20260901_214833, 20260901_220024, 20260901_220910, 20260901_222155, 20260901_222916, and 20260901_223535 each produced four real Hermes trajectories and four Reward v3 rows. Attempts 20260901_222155 and 20260901_222916 completed frozen 9B teacher scoring and entered actor backward. No recorded attempt produced an optimizer update, passing LR marker, or OPD model result."
+  "claim_boundary": "Attempts 20260901_214833, 20260901_220024, 20260901_220910, 20260901_222155, 20260901_222916, 20260901_223535, and 20260901_224210 each produced four real Hermes trajectories and four Reward v3 rows. Attempts 20260901_222155, 20260901_222916, and 20260901_224210 completed frozen 9B teacher scoring and entered actor backward. The final attempt proved that a 1,536-token actor microbatch can carry the observed interaction lengths, but it crossed the conservative GPU guard during backward. No recorded attempt produced an optimizer update, passing LR marker, updated OPD adapter, or OPD model result; OPD remains not completed."
 }
