@@ -95,6 +95,21 @@
       "stage_marker_written": false,
       "runtime_progress": "Actor, frozen teacher, SGLang, M2 LoRA, connect_engine, and the idempotent actor offload bridge all passed before proxy startup waited on the offloaded server.",
       "remediation": "For the first proxy start only, temporarily onload the colocated rollout for proxy health binding and restore the original offloaded state before the upstream train loop begins."
+    },
+    {
+      "attempt_id": "qwen35-4b-opd-lr1e6-seed-20260827-attempt-20260901_213518",
+      "status": "INFRA_FAILED_NO_UPDATE",
+      "failure_stage": "First Hermes workflow construction after successful proxy initialization",
+      "root_cause": "The selected OPD pool contained complete per-task verifier JSON files but no split-level verifier JSONL consumed by StudyHubHermesWorkflow.",
+      "native_error": "no verifier JSONL files under the processed OPD prompt pool verifier root",
+      "launcher_log_sha256": "dccf627ac5ade592b651b0b91159d3a6941aea2a3522599c5ebc653227dcdb8a",
+      "gpu_telemetry_sha256": "7425127ea054e9b125bbc337523bfb67ea4e03b95b7dcd9ce52d16515ddc49f0",
+      "sglang_overlay_audit_sha256": "ec0cec43fff13727dcb973bab45f2d5694451306b87440bb9bf76fcdb07c92d8",
+      "initial_lora_sha256": "4b7ee7462d82cd17a7c55fdb27335eee70b4df7a08f282697efafc577c173e6e",
+      "optimizer_updates": 0,
+      "stage_marker_written": false,
+      "runtime_progress": "Both train and eval proxies bound to the temporarily live SGLang server, the rollout returned to its upstream offloaded state, and the first workflow submission began.",
+      "remediation": "Package selected verifiers into hashed train/validation JSONL files and fail preflight unless every task maps to an identity-matched verifier and environment."
     }
   ],
   "claim_boundary": "No recorded attempt produced a reward batch, optimizer update, passing LR marker, or OPD model result."

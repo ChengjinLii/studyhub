@@ -76,6 +76,8 @@ def main() -> int:
         "prompt_pool_manifest_sha256": pool / "manifest.json",
         "prompt_pool_train_sha256": pool / "tasks/train.jsonl",
         "prompt_pool_dev_sha256": pool / "tasks/validation.jsonl",
+        "prompt_pool_train_verifiers_sha256": pool / "verifiers/train.jsonl",
+        "prompt_pool_dev_verifiers_sha256": pool / "verifiers/validation.jsonl",
         "teacher_novelty_sha256": args.novelty_gate,
         "tokenizer_parity_sha256": PROJECT_ROOT / "docs/training/evidence/qwen35-4b-9b-tokenizer-parity.json",
         "thinking_contract_sha256": PROJECT_ROOT / "docs/training/evidence/qwen35-4b-9b-thinking-contract.json",

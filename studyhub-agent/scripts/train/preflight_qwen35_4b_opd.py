@@ -29,6 +29,21 @@ def load_json(path: Path) -> dict[str, Any]:
     return value
 
 
+def load_jsonl(path: Path) -> list[dict[str, Any]]:
+    with path.open(encoding="utf-8") as stream:
+        return [json.loads(line) for line in stream if line.strip()]
+
+
+def inventory_sha256(paths: list[Path], root: Path) -> str:
+    digest = hashlib.sha256()
+    for path in sorted(paths):
+        digest.update(str(path.relative_to(root)).encode("utf-8"))
+        digest.update(b"\0")
+        digest.update(sha256(path).encode("ascii"))
+        digest.update(b"\n")
+    return digest.hexdigest()
+
+
 def gpu_state(gpus: str) -> dict[str, Any]:
     rows = subprocess.run(
         [
@@ -131,6 +146,8 @@ def main() -> int:
         "prompt_pool_manifest_sha256": pool / "manifest.json",
         "prompt_pool_train_sha256": pool / "tasks/train.jsonl",
         "prompt_pool_dev_sha256": pool / "tasks/validation.jsonl",
+        "prompt_pool_train_verifiers_sha256": pool / "verifiers/train.jsonl",
+        "prompt_pool_dev_verifiers_sha256": pool / "verifiers/validation.jsonl",
         "teacher_novelty_sha256": PROJECT_ROOT / "docs/training/evidence/qwen35-4b-opd-teacher-novelty.json",
         "tokenizer_parity_sha256": PROJECT_ROOT / "docs/training/evidence/qwen35-4b-9b-tokenizer-parity.json",
         "thinking_contract_sha256": PROJECT_ROOT / "docs/training/evidence/qwen35-4b-9b-thinking-contract.json",
@@ -241,6 +258,42 @@ def main() -> int:
         pool_manifest["validation_rows"]
     ):
         raise RuntimeError("OPD DatasetDict differs from its prompt-pool manifest")
+    tasks_by_split = {
+        "train": load_jsonl(pool / "tasks/train.jsonl"),
+        "validation": load_jsonl(pool / "tasks/validation.jsonl"),
+    }
+    verifiers_by_split = {
+        "train": load_jsonl(pool / "verifiers/train.jsonl"),
+        "validation": load_jsonl(pool / "verifiers/validation.jsonl"),
+    }
+    environment_paths: set[Path] = set()
+    for split, tasks in tasks_by_split.items():
+        verifiers = {str(row["task_id"]): row for row in verifiers_by_split[split]}
+        if len(verifiers) != len(tasks):
+            raise RuntimeError(f"OPD {split} task/verifier cardinality mismatch")
+        for task in tasks:
+            task_id = str(task["task_id"])
+            verifier_id = str(task["metadata"]["verifier_id"])
+            verifier = verifiers.get(task_id)
+            environment_path = pool / "environments" / f"{task['environment_id']}.json"
+            if verifier is None or str(verifier.get("verifier_id")) != verifier_id or not environment_path.is_file():
+                raise RuntimeError(f"OPD runtime fixture mapping failed: {task_id}")
+            environment = load_json(environment_path)
+            if str(environment.get("task_id")) != task_id:
+                raise RuntimeError(f"OPD environment identity mismatch: {task_id}")
+            environment_paths.add(environment_path)
+    pool_lineage = pool_manifest.get("lineage", {})
+    runtime_packaging = pool_manifest.get("runtime_packaging", {})
+    if (
+        runtime_packaging.get("task_verifier_environment_mapping_complete") is not True
+        or int(runtime_packaging.get("train_verifiers", -1)) != len(tasks_by_split["train"])
+        or int(runtime_packaging.get("validation_verifiers", -1)) != len(tasks_by_split["validation"])
+        or int(runtime_packaging.get("environments", -1)) != len(environment_paths)
+        or pool_lineage.get("train_verifiers_sha256") != sha256(pool / "verifiers/train.jsonl")
+        or pool_lineage.get("validation_verifiers_sha256") != sha256(pool / "verifiers/validation.jsonl")
+        or pool_lineage.get("environment_inventory_sha256") != inventory_sha256(list(environment_paths), pool)
+    ):
+        raise RuntimeError("OPD runtime packaging lineage drift")
 
     if args.mode in {"pilot", "formal"}:
         if args.lr_selection is None or not args.lr_selection.is_file():

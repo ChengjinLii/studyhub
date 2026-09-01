@@ -24,9 +24,7 @@ def sha256(path: Path) -> str:
 
 
 def stable_rank(seed: int, *parts: str) -> str:
-    return hashlib.sha256(
-        (str(seed) + "\0" + "\0".join(parts)).encode("utf-8")
-    ).hexdigest()
+    return hashlib.sha256((str(seed) + "\0" + "\0".join(parts)).encode("utf-8")).hexdigest()
 
 
 def read_json(path: Path) -> dict[str, Any]:
@@ -44,9 +42,7 @@ def read_jsonl(path: Path) -> list[dict[str, Any]]:
 def write_json(path: Path, value: Any) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_suffix(path.suffix + ".partial")
-    temporary.write_text(
-        json.dumps(value, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
-    )
+    temporary.write_text(json.dumps(value, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     os.replace(temporary, path)
 
 
@@ -84,15 +80,11 @@ def family_scores(
     result = {}
     for family, task_ids in by_family.items():
         teacher_only = sum(
-            bool(teacher[key]["strict_success"])
-            and not bool(student[key]["strict_success"])
-            for key in task_ids
+            bool(teacher[key]["strict_success"]) and not bool(student[key]["strict_success"]) for key in task_ids
         )
         teacher_success = sum(bool(teacher[key]["strict_success"]) for key in task_ids)
         delta = sum(
-            float(teacher[key]["diagnostic_score"])
-            - float(student[key]["diagnostic_score"])
-            for key in task_ids
+            float(teacher[key]["diagnostic_score"]) - float(student[key]["diagnostic_score"]) for key in task_ids
         ) / len(task_ids)
         result[family] = {
             "tasks": float(len(task_ids)),
@@ -119,14 +111,8 @@ def task_priority(
     if teacher_row is not None and student_row is not None:
         teacher_pass = bool(teacher_row["strict_success"])
         student_pass = bool(student_row["strict_success"])
-        delta = float(teacher_row["diagnostic_score"]) - float(
-            student_row["diagnostic_score"]
-        )
-        tier = (
-            0
-            if teacher_pass and not student_pass
-            else 1 if teacher_pass and delta > 0 else 2 if delta > 0 else 4
-        )
+        delta = float(teacher_row["diagnostic_score"]) - float(student_row["diagnostic_score"])
+        tier = 0 if teacher_pass and not student_pass else 1 if teacher_pass and delta > 0 else 2 if delta > 0 else 4
     else:
         delta = float(family_row["mean_diagnostic_delta"])
         tier = 3 if delta > 0 or family_row["teacher_only_rate"] > 0 else 5
@@ -146,6 +132,16 @@ def copy_artifact(source: Path, destination: Path) -> None:
         os.link(source, destination)
     except OSError:
         shutil.copy2(source, destination)
+
+
+def inventory_sha256(paths: list[Path], root: Path) -> str:
+    digest = hashlib.sha256()
+    for path in sorted(paths):
+        digest.update(str(path.relative_to(root)).encode("utf-8"))
+        digest.update(b"\0")
+        digest.update(sha256(path).encode("ascii"))
+        digest.update(b"\n")
+    return digest.hexdigest()
 
 
 def dataset_row(task: dict[str, Any]) -> dict[str, str]:
@@ -187,24 +183,18 @@ def main() -> int:
         raise RuntimeError("OPD candidate pool has not passed its data gate")
     if (
         candidate_manifest.get("source", {}).get("validation_read") is not False
-        or candidate_manifest.get("source", {}).get("protocol_holdout_read")
-        is not False
+        or candidate_manifest.get("source", {}).get("protocol_holdout_read") is not False
     ):
         raise RuntimeError("OPD candidate pool accessed a prohibited split")
     if novelty.get("status") != "PASS_TEACHER_NOVELTY":
         raise RuntimeError("teacher novelty gate is not passing")
     if set(teacher) != set(student) or len(teacher) != int(novelty["tasks"]):
         raise RuntimeError("teacher/student novelty episodes do not match")
-    if any(
-        row.get("status") != "SCORED" for row in [*teacher.values(), *student.values()]
-    ):
-        raise RuntimeError(
-            "teacher-aligned selection contains infrastructure exclusions"
-        )
+    if any(row.get("status") != "SCORED" for row in [*teacher.values(), *student.values()]):
+        raise RuntimeError("teacher-aligned selection contains infrastructure exclusions")
     if (
         sha256(args.teacher_episodes) != novelty["lineage"]["teacher_episodes_sha256"]
-        or sha256(args.student_episodes)
-        != novelty["lineage"]["student_episodes_sha256"]
+        or sha256(args.student_episodes) != novelty["lineage"]["student_episodes_sha256"]
     ):
         raise RuntimeError("novelty gate episode lineage drift")
 
@@ -213,10 +203,8 @@ def main() -> int:
         raise RuntimeError("OPD candidate task count drift")
     candidate_verifiers = candidate_root / "verifiers/train.jsonl"
     if (
-        sha256(candidate_root / "tasks/train.jsonl")
-        != candidate_manifest["lineage"]["candidate_tasks_sha256"]
-        or sha256(candidate_verifiers)
-        != candidate_manifest["lineage"]["candidate_verifiers_sha256"]
+        sha256(candidate_root / "tasks/train.jsonl") != candidate_manifest["lineage"]["candidate_tasks_sha256"]
+        or sha256(candidate_verifiers) != candidate_manifest["lineage"]["candidate_verifiers_sha256"]
     ):
         raise RuntimeError("OPD candidate task or verifier lineage drift")
     verifiers = verifier_map(candidate_verifiers)
@@ -245,9 +233,7 @@ def main() -> int:
         if len(selected) == args.train_size:
             break
     if len(selected) != args.train_size:
-        raise RuntimeError(
-            f"only {len(selected)} OPD train tasks survived source-group caps"
-        )
+        raise RuntimeError(f"only {len(selected)} OPD train tasks survived source-group caps")
 
     train_groups = {str(task["metadata"]["source_group_id"]) for task in selected}
     dev: list[dict[str, Any]] = []
@@ -272,7 +258,13 @@ def main() -> int:
     (staging / "verifiers").mkdir()
     write_jsonl(staging / "tasks/train.jsonl", selected)
     write_jsonl(staging / "tasks/validation.jsonl", dev)
-    for task in [*selected, *dev]:
+    selected_verifiers: list[dict[str, Any]] = []
+    validation_verifiers: list[dict[str, Any]] = []
+    environment_paths: list[Path] = []
+    for task, verifier_rows in [
+        *((task, selected_verifiers) for task in selected),
+        *((task, validation_verifiers) for task in dev),
+    ]:
         environment_id = str(task["environment_id"])
         verifier_id = str(task["metadata"]["verifier_id"])
         verifier = verifiers.get(str(task["task_id"]))
@@ -282,7 +274,11 @@ def main() -> int:
             candidate_root / "environments" / f"{environment_id}.json",
             staging / "environments" / f"{environment_id}.json",
         )
+        environment_paths.append(staging / "environments" / f"{environment_id}.json")
         write_json(staging / "verifiers" / f"{verifier_id}.json", verifier)
+        verifier_rows.append(verifier)
+    write_jsonl(staging / "verifiers/train.jsonl", selected_verifiers)
+    write_jsonl(staging / "verifiers/validation.jsonl", validation_verifiers)
     DatasetDict(
         {
             "train": Dataset.from_list([dataset_row(task) for task in selected]),
@@ -303,15 +299,9 @@ def main() -> int:
         "seed": args.seed,
         "train_rows": len(selected),
         "validation_rows": len(dev),
-        "train_family_counts": dict(
-            sorted(Counter(task["metadata"]["family"] for task in selected).items())
-        ),
-        "validation_family_counts": dict(
-            sorted(Counter(task["metadata"]["family"] for task in dev).items())
-        ),
-        "train_budget_counts": dict(
-            sorted(Counter(task["budget_tier"] for task in selected).items())
-        ),
+        "train_family_counts": dict(sorted(Counter(task["metadata"]["family"] for task in selected).items())),
+        "validation_family_counts": dict(sorted(Counter(task["metadata"]["family"] for task in dev).items())),
+        "train_budget_counts": dict(sorted(Counter(task["budget_tier"] for task in selected).items())),
         "unique_train_source_groups": len(train_groups),
         "unique_validation_source_groups": len(dev_groups),
         "train_validation_group_overlap": 0,
@@ -327,6 +317,13 @@ def main() -> int:
         ],
         "sealed_used": False,
         "validation_or_protocol_holdout_used": False,
+        "runtime_packaging": {
+            "format": "split-verifier-jsonl-plus-per-task-environment-json",
+            "train_verifiers": len(selected_verifiers),
+            "validation_verifiers": len(validation_verifiers),
+            "environments": len(environment_paths),
+            "task_verifier_environment_mapping_complete": True,
+        },
         "lineage": {
             "candidate_manifest_sha256": sha256(candidate_root / "manifest.json"),
             "candidate_tasks_sha256": sha256(candidate_root / "tasks/train.jsonl"),
@@ -335,6 +332,9 @@ def main() -> int:
             "novelty_gate_sha256": sha256(args.novelty_gate),
             "train_tasks_sha256": sha256(staging / "tasks/train.jsonl"),
             "validation_tasks_sha256": sha256(staging / "tasks/validation.jsonl"),
+            "train_verifiers_sha256": sha256(staging / "verifiers/train.jsonl"),
+            "validation_verifiers_sha256": sha256(staging / "verifiers/validation.jsonl"),
+            "environment_inventory_sha256": inventory_sha256(environment_paths, staging),
         },
     }
     write_json(staging / "manifest.json", manifest)

@@ -1,8 +1,11 @@
+import json
+
 from scripts.data.build_opd_prompt_pool_v1 import (
     stratified_probe,
     validate_candidate,
     validate_environment,
 )
+from scripts.data.package_opd_prompt_pool_runtime import package_pool
 from scripts.data.select_opd_training_pool_v1 import (
     family_scores,
     task_priority,
@@ -11,9 +14,7 @@ from scripts.data.select_opd_training_pool_v1 import (
 from scripts.train.run_opd_policy_probe import aggregate
 
 
-def task(
-    task_id: str, *, family: str = "rag_and_multihop", tools: list[str] | None = None
-) -> dict:
+def task(task_id: str, *, family: str = "rag_and_multihop", tools: list[str] | None = None) -> dict:
     return {
         "schema_version": "studyhub.agent-rl-task.v3",
         "task_id": task_id,
@@ -91,8 +92,7 @@ def test_environment_requires_exact_task_tool_surface() -> None:
 
 def test_probe_is_deterministic_and_family_stratified() -> None:
     rows = [task(f"rag-{index}") for index in range(8)] + [
-        task(f"direct-{index}", family="direct_answer_and_abstention", tools=[])
-        for index in range(2)
+        task(f"direct-{index}", family="direct_answer_and_abstention", tools=[]) for index in range(2)
     ]
 
     first = stratified_probe(rows, 5, 7)
@@ -185,12 +185,47 @@ def test_verifier_map_reads_jsonl_and_rejects_duplicate_tasks(tmp_path) -> None:
 
     assert sorted(verifier_map(path)) == ["task-a", "task-b"]
 
-    path.write_text(
-        '{"task_id":"task-a"}\n{"task_id":"task-a"}\n', encoding="utf-8"
-    )
+    path.write_text('{"task_id":"task-a"}\n{"task_id":"task-a"}\n', encoding="utf-8")
     try:
         verifier_map(path)
     except RuntimeError as error:
         assert "duplicate verifier task IDs" in str(error)
     else:
         raise AssertionError("duplicate verifier task IDs were accepted")
+
+
+def test_runtime_packaging_materializes_split_verifier_jsonl(tmp_path) -> None:
+    root = tmp_path / "pool"
+    (root / "tasks").mkdir(parents=True)
+    (root / "verifiers").mkdir()
+    (root / "environments").mkdir()
+    train = task("train-task")
+    validation = task("validation-task")
+    (root / "tasks/train.jsonl").write_text(json.dumps(train) + "\n", encoding="utf-8")
+    (root / "tasks/validation.jsonl").write_text(json.dumps(validation) + "\n", encoding="utf-8")
+    for row in (train, validation):
+        task_id = row["task_id"]
+        (root / f"verifiers/{task_id}.json").write_text(json.dumps(verifier(task_id)), encoding="utf-8")
+        (root / f"environments/{task_id}.json").write_text(
+            json.dumps(environment(task_id, row["available_tools"])),
+            encoding="utf-8",
+        )
+    (root / "manifest.json").write_text(
+        json.dumps(
+            {
+                "status": "PASS_TEACHER_ALIGNED_SELECTION",
+                "train_rows": 1,
+                "validation_rows": 1,
+                "lineage": {},
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    first = package_pool(root)
+    second = package_pool(root)
+
+    assert first["status"] == "PASS_OPD_RUNTIME_PACKAGING"
+    assert first["manifest_sha256"] == second["manifest_sha256"]
+    assert len((root / "verifiers/train.jsonl").read_text().splitlines()) == 1
+    assert len((root / "verifiers/validation.jsonl").read_text().splitlines()) == 1
