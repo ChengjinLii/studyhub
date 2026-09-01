@@ -140,7 +140,24 @@
       "stage_marker_written": false,
       "runtime_progress": "The packed interaction-length repair passed, four additional real Hermes trajectories and Reward v3 rows completed, and AReaL reached the first anchor forward before CUDA OOM.",
       "remediation": "Use 4,096 actor and 8,192 teacher max tokens per microbatch, retaining the same global batch, data, OPD objective, and learning rate. Isolate Reward v3 output by attempt so failed runs cannot contaminate a passing stage marker."
+    },
+    {
+      "attempt_id": "qwen35-4b-opd-lr1e6-seed-20260827-attempt-20260901_220910",
+      "status": "INFRA_FAILED_NO_UPDATE",
+      "failure_stage": "First frozen 9B teacher selected-token score after a successful 4B student anchor",
+      "root_cause": "Pinned AReaL microbatch-splits token tensors only when their element count equals batch times sequence. The OPD [batch, sequence, top_k] student anchor was consequently copied as a whole-batch constant into each teacher microbatch instead of following AReaL's forward indices and packing order.",
+      "native_error": "ValueError: logits and token_ids must have shapes [tokens, vocab] and [tokens, k]",
+      "launcher_log_sha256": "3c6bd6b315e0e72cab394ae545f385778a20eda2b00cc3032e58a033bd05a70a",
+      "gpu_telemetry_sha256": "e3542ad35ffa012726cbeccad99a4f5e926311ef326264d2b425620222b8a57f",
+      "sglang_overlay_audit_sha256": "f589fa0f1c4efc4b488476b35e4fc87a1c5f6e9805017668b7c15e9ab4096478",
+      "reward_v3_sha256": "538d92cabb82c13a6e58cd2378f76a5ed50494d688e9856a625593c55d84c815",
+      "reward_v3_rows": 4,
+      "initial_lora_sha256": "4b7ee7462d82cd17a7c55fdb27335eee70b4df7a08f282697efafc577c173e6e",
+      "optimizer_updates": 0,
+      "stage_marker_written": false,
+      "runtime_progress": "Four real Hermes trajectories and attempt-isolated Reward v3 rows completed. The 4B actor anchor passed with 4,096-token microbatches and was restored to every trajectory; the frozen 9B teacher then began its first two microbatches before the sparse payload shape failure. Peak actor-anchor memory remained below the 79 GiB guard and no OOM occurred.",
+      "remediation": "Encode each of the 16 top-k wings as a standard [batch, sequence] token field before the pinned AReaL splitter, then reassemble [tokens, k] inside the teacher and actor callbacks. This reuses upstream forward indices, packing, and padding without changing AReaL source or OPD math."
     }
   ],
-  "claim_boundary": "Attempts 20260901_214833 and 20260901_220024 each produced four real Hermes trajectories and four Reward v3 rows. No recorded attempt produced an optimizer update, passing LR marker, or OPD model result."
+  "claim_boundary": "Attempts 20260901_214833, 20260901_220024, and 20260901_220910 each produced four real Hermes trajectories and four Reward v3 rows. Attempt 20260901_220910 additionally completed the 4B student anchor. No recorded attempt produced an optimizer update, passing LR marker, or OPD model result."
 }

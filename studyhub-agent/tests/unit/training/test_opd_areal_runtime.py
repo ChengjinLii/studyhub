@@ -9,6 +9,8 @@ import torch.nn.functional as F
 from training.opd.areal_runtime import (
     _chunked_selected_log_probs,
     _chunked_top_k_log_probs,
+    _decode_sparse_token_field,
+    _encode_sparse_token_fields,
     _flatten_sequence_lengths,
     _install_colocated_proxy_start_bridge,
     _split_sparse_outputs,
@@ -89,6 +91,48 @@ def test_opd_sparse_outputs_reject_interaction_count_mismatch() -> None:
 
     with pytest.raises(RuntimeError, match="interaction count"):
         _split_sparse_outputs(torch.zeros((3, 4, 2)), meta)
+
+
+def test_opd_sparse_wings_follow_areal_token_packing() -> None:
+    pytest.importorskip("areal")
+    from areal.utils.data import pack_tensor_dict
+
+    attention_mask = torch.tensor([[1, 1, 0], [1, 1, 1]])
+    sparse = torch.arange(2 * 3 * 3).reshape(2, 3, 3)
+    encoded = _encode_sparse_token_fields(
+        {
+            "attention_mask": attention_mask,
+            "input_ids": torch.arange(6).reshape(2, 3),
+            "opd_top_k_ids": sparse,
+        }
+    )
+
+    assert "opd_top_k_ids" not in encoded
+    assert all(tuple(encoded[f"opd_top_k_ids__wing_{wing:03d}"].shape) == (2, 3) for wing in range(3))
+    packed = pack_tensor_dict(encoded)
+    restored = _decode_sparse_token_field(
+        packed,
+        "opd_top_k_ids",
+        expected_wings=3,
+    )
+    expected = torch.cat([sparse[0, :2], sparse[1, :3]], dim=0)
+
+    assert tuple(restored.shape) == (5, 3)
+    assert torch.equal(restored, expected)
+
+
+def test_opd_sparse_wing_decode_fails_closed_on_missing_wing() -> None:
+    packed = {
+        "opd_top_k_ids__wing_000": torch.tensor([1, 2]),
+        "opd_top_k_ids__wing_002": torch.tensor([3, 4]),
+    }
+
+    with pytest.raises(RuntimeError, match="sparse wings are incomplete"):
+        _decode_sparse_token_field(
+            packed,
+            "opd_top_k_ids",
+            expected_wings=3,
+        )
 
 
 def test_chunked_sparse_scores_match_full_log_softmax() -> None:

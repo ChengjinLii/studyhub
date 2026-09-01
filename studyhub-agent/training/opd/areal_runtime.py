@@ -25,6 +25,14 @@ _FSDP_OFFLOAD_PATCH_MARKER = "_studyhub_opd_idempotent_offload_v1"
 _PROXY_START_PATCH_MARKER = "_studyhub_opd_colocated_proxy_start_v1"
 _ADAPTER_ENV = "STUDYHUB_OPD_STUDENT_ADAPTER"
 _MAX_DIAGNOSTIC_TURNS = 6
+_SPARSE_WING_SEPARATOR = "__wing_"
+_SPARSE_TOKEN_FIELDS = (
+    "opd_top_k_ids",
+    "opd_student_top_k_log_probs",
+    "opd_teacher_on_student_log_probs",
+    "opd_teacher_top_k_ids",
+    "opd_teacher_top_k_log_probs",
+)
 
 
 def _install_single_rank_rpc_broadcast_bridge() -> None:
@@ -230,6 +238,72 @@ def _split_sparse_outputs(
     return [value[:, :sequence_length, ...] for value, sequence_length in zip(split, sequence_lengths, strict=True)]
 
 
+def _encode_sparse_token_fields(row: dict[str, Any]) -> dict[str, Any]:
+    """Expose each top-k wing as an ordinary AReaL token field.
+
+    Pinned AReaL only microbatch-splits tensors whose element count equals
+    ``batch * sequence``. A sparse ``[batch, sequence, k]`` tensor is therefore
+    treated as a batch-level constant. Encoding each wing as ``[batch,
+    sequence]`` lets the upstream splitter, reorderer, packer, and padding code
+    preserve token alignment without patching AReaL itself.
+    """
+
+    encoded = dict(row)
+    attention_mask = encoded.get("attention_mask")
+    if not isinstance(attention_mask, torch.Tensor) or attention_mask.ndim != 2:
+        raise ValueError("OPD sparse fields require a 2D attention mask")
+
+    for field in _SPARSE_TOKEN_FIELDS:
+        value = encoded.get(field)
+        if value is None:
+            continue
+        if not isinstance(value, torch.Tensor) or value.ndim != 3:
+            raise ValueError(f"{field} must have shape [interactions, sequence, k]")
+        if value.shape[:2] != attention_mask.shape:
+            raise ValueError(
+                f"{field} does not align with attention_mask: {tuple(value.shape[:2])} != {tuple(attention_mask.shape)}"
+            )
+        for wing in range(value.shape[-1]):
+            wing_key = f"{field}{_SPARSE_WING_SEPARATOR}{wing:03d}"
+            if wing_key in encoded:
+                raise ValueError(f"duplicate OPD sparse wing field: {wing_key}")
+            encoded[wing_key] = value[..., wing]
+        del encoded[field]
+    return encoded
+
+
+def _decode_sparse_token_field(
+    mb_input: dict[str, Any],
+    field: str,
+    *,
+    expected_wings: int,
+) -> torch.Tensor:
+    """Reassemble packed AReaL token wings into ``[tokens, k]``."""
+
+    prefix = f"{field}{_SPARSE_WING_SEPARATOR}"
+    indexed: list[tuple[int, torch.Tensor]] = []
+    for key, value in mb_input.items():
+        if not key.startswith(prefix):
+            continue
+        suffix = key[len(prefix) :]
+        if not suffix.isdigit() or not isinstance(value, torch.Tensor):
+            raise ValueError(f"invalid OPD sparse wing field: {key}")
+        if value.ndim != 1:
+            raise ValueError(f"packed OPD sparse wing must be 1D: {key}={tuple(value.shape)}")
+        indexed.append((int(suffix), value))
+
+    indexed.sort(key=lambda item: item[0])
+    indices = [index for index, _ in indexed]
+    if indices != list(range(expected_wings)):
+        raise RuntimeError(
+            f"{field} sparse wings are incomplete: expected {list(range(expected_wings))}, got {indices}"
+        )
+    lengths = {int(value.shape[0]) for _, value in indexed}
+    if len(lengths) != 1:
+        raise RuntimeError(f"{field} sparse wings have inconsistent token dimensions")
+    return torch.stack([value for _, value in indexed], dim=-1)
+
+
 def _prepare_opd_input(data: list[dict[str, Any]]) -> list[dict[str, Any]]:
     prepared: list[dict[str, Any]] = []
     for item in data:
@@ -237,7 +311,7 @@ def _prepare_opd_input(data: list[dict[str, Any]]) -> list[dict[str, Any]]:
         row["opd_response_mask"] = assistant_prediction_mask(row["loss_mask"]).to(dtype=torch.float32)
         if row.get("turn_ids") is not None:
             row["opd_prediction_turn_ids"] = prediction_turn_ids(row["turn_ids"])
-        prepared.append(row)
+        prepared.append(_encode_sparse_token_fields(row))
     return prepared
 
 
@@ -319,7 +393,11 @@ def _opd_score_selected(
     self.eval()
 
     def process(logits: torch.Tensor, mb_input: dict[str, Any]) -> dict[str, torch.Tensor]:
-        student_ids = mb_input["opd_top_k_ids"].long()
+        student_ids = _decode_sparse_token_field(
+            mb_input,
+            "opd_top_k_ids",
+            expected_wings=top_k,
+        ).long()
         teacher_on_student = _chunked_selected_log_probs(
             logits,
             student_ids,
@@ -503,6 +581,7 @@ def _opd_update(
     self: Any,
     data: list[dict[str, Any]],
     *,
+    top_k: int,
     student_temperature: float,
     eps_clip: float,
     clip_ratio_c: float,
@@ -513,7 +592,8 @@ def _opd_update(
     self.train()
     self._ensure_ready()
     self.optimizer_zero_grad()
-    input_batched, _ = self._normalize_batch_input(data)
+    prepared = _prepare_opd_input(data)
+    input_batched, _ = self._normalize_batch_input(prepared)
     mb_list = self._prepare_mb_list(input_batched).to(self.device)
 
     def loss_weight_fn(mb: dict[str, Any]) -> torch.Tensor:
@@ -528,9 +608,29 @@ def _opd_update(
         ctx = FSDPTrainContext(**ctx_dict)
         mb = ctx.mb_input
         token_count = int(mb["input_ids"].shape[0])
-        ids = mb["opd_top_k_ids"].long()
-        old_log_probs = mb["opd_student_top_k_log_probs"].float().detach()
-        teacher_log_probs = mb["opd_teacher_on_student_log_probs"].float().detach()
+        ids = _decode_sparse_token_field(
+            mb,
+            "opd_top_k_ids",
+            expected_wings=top_k,
+        ).long()
+        old_log_probs = (
+            _decode_sparse_token_field(
+                mb,
+                "opd_student_top_k_log_probs",
+                expected_wings=top_k,
+            )
+            .float()
+            .detach()
+        )
+        teacher_log_probs = (
+            _decode_sparse_token_field(
+                mb,
+                "opd_teacher_on_student_log_probs",
+                expected_wings=top_k,
+            )
+            .float()
+            .detach()
+        )
         response_mask = mb["opd_response_mask"].float()
         current = _chunked_selected_log_probs(
             logits[:token_count],
@@ -557,8 +657,16 @@ def _opd_update(
                 ids,
                 old_log_probs,
                 teacher_log_probs,
-                mb["opd_teacher_top_k_ids"].long(),
-                mb["opd_teacher_top_k_log_probs"].float(),
+                _decode_sparse_token_field(
+                    mb,
+                    "opd_teacher_top_k_ids",
+                    expected_wings=top_k,
+                ).long(),
+                _decode_sparse_token_field(
+                    mb,
+                    "opd_teacher_top_k_log_probs",
+                    expected_wings=top_k,
+                ).float(),
                 response_mask,
                 mb["opd_prediction_turn_ids"].long(),
             )
@@ -749,6 +857,8 @@ def install_opd_controller_hooks(trainer: Any, config: Any) -> None:
             "opd_top_k_ids",
             "opd_student_top_k_log_probs",
             "opd_teacher_on_student_log_probs",
+            "opd_teacher_top_k_ids",
+            "opd_teacher_top_k_log_probs",
             "opd_response_mask",
             "opd_prediction_turn_ids",
         }
@@ -764,6 +874,7 @@ def install_opd_controller_hooks(trainer: Any, config: Any) -> None:
         result = _actor._custom_function_call(
             "opd_update",
             data,
+            top_k=top_k,
             student_temperature=student_temperature,
             eps_clip=eps_clip,
             clip_ratio_c=clip_ratio_c,
