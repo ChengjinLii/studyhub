@@ -64,6 +64,22 @@
       "stage_marker_written": false,
       "runtime_progress": "M2 actor, frozen 9B teacher, SGLang overlay, M2 LoRA, CUDA graphs, and the 16k rollout server all initialized successfully before the RPC failure.",
       "remediation": "Skip redundant RPC payload broadcast only when the initialized context/model-parallel group has world size one; retain upstream behavior for every multi-rank engine."
+    },
+    {
+      "attempt_id": "qwen35-4b-opd-lr1e6-seed-20260827-attempt-20260901_211126",
+      "status": "INFRA_FAILED_NO_UPDATE",
+      "failure_stage": "AReaL initial offload policy after actor-rollout connection",
+      "root_cause": "AReaL offloaded the colocated FSDP actor before SGLang initialization and then called FSDPEngine.offload a second time; torch_memory_saver aborted on the inactive allocation.",
+      "native_error": "Cannot pause allocation that is not active",
+      "launcher_log_sha256": "fdc9382b9d2935946f7d6b18f9671032861bfa1a4bb5536063aaf6af3d0e2267",
+      "rollout_log_sha256": "7875de25a56c727b7a4a3c41d14a4adcee1c17bf030513fe1fb937c40553413f",
+      "gpu_telemetry_sha256": "0c5b758cd37058cf1c76c4f4c84b17ac0c8f744fb22873177a769762112aec45",
+      "sglang_overlay_audit_sha256": "e527a712ac0e365adf4d2bea387ffe04eb87064b72e1efc2e44fbeea87f40d72",
+      "initial_lora_sha256": "4b7ee7462d82cd17a7c55fdb27335eee70b4df7a08f282697efafc577c173e6e",
+      "optimizer_updates": 0,
+      "stage_marker_written": false,
+      "runtime_progress": "The single-rank RPC bridge passed connect_engine; all model and rollout components initialized before the duplicate offload.",
+      "remediation": "Make FSDPEngine.offload idempotent only inside the StudyHub OPD runtime, preserving the upstream transition whenever the engine is resident."
     }
   ],
   "claim_boundary": "No recorded attempt produced a reward batch, optimizer update, passing LR marker, or OPD model result."

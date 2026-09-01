@@ -223,3 +223,19 @@ def test_opd_bridge_skips_only_single_rank_rpc_broadcast(
     engine.initialized = False
     monkeypatch.setattr(torch.distributed, "get_world_size", lambda group=None: 1)
     assert engine_blueprint._should_broadcast_payload(engine, {"broadcast": True}) is True
+
+
+def test_opd_bridge_makes_only_redundant_fsdp_offload_a_noop() -> None:
+    pytest.importorskip("areal")
+    from areal.engine.fsdp_engine import FSDPEngine
+
+    install_areal_opd_bridge()
+    messages: list[str] = []
+    engine = SimpleNamespace(
+        is_offload=True,
+        logger=SimpleNamespace(info=lambda message: messages.append(message)),
+    )
+
+    assert FSDPEngine.offload(engine) is None
+    assert messages == ["StudyHub skipped redundant FSDP offload"]
+    assert callable(FSDPEngine.offload._studyhub_upstream)

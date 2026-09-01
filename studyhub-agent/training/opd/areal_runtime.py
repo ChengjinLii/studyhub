@@ -21,6 +21,7 @@ import torch.distributed as dist
 
 _PATCH_MARKER = "_studyhub_opd_runtime_v1"
 _RPC_BROADCAST_PATCH_MARKER = "_studyhub_opd_single_rank_rpc_v1"
+_FSDP_OFFLOAD_PATCH_MARKER = "_studyhub_opd_idempotent_offload_v1"
 _ADAPTER_ENV = "STUDYHUB_OPD_STUDENT_ADAPTER"
 _MAX_DIAGNOSTIC_TURNS = 6
 
@@ -55,6 +56,26 @@ def _install_single_rank_rpc_broadcast_bridge() -> None:
     setattr(should_broadcast_payload, _RPC_BROADCAST_PATCH_MARKER, True)
     should_broadcast_payload._studyhub_upstream = current  # type: ignore[attr-defined]
     engine_blueprint._should_broadcast_payload = should_broadcast_payload
+
+
+def _install_idempotent_fsdp_offload_bridge(fsdp_engine: type[Any]) -> None:
+    """Keep AReaL's colocated initialization from pausing TMS twice."""
+
+    current = fsdp_engine.offload
+    if getattr(current, _FSDP_OFFLOAD_PATCH_MARKER, False):
+        return
+
+    def offload_once(self: Any) -> Any:
+        if getattr(self, "is_offload", False):
+            logger = getattr(self, "logger", None)
+            if logger is not None:
+                logger.info("StudyHub skipped redundant FSDP offload")
+            return None
+        return current(self)
+
+    setattr(offload_once, _FSDP_OFFLOAD_PATCH_MARKER, True)
+    offload_once._studyhub_upstream = current  # type: ignore[attr-defined]
+    fsdp_engine.offload = offload_once
 
 
 def assistant_prediction_mask(loss_mask: torch.Tensor) -> torch.Tensor:
@@ -629,6 +650,7 @@ def install_areal_opd_bridge() -> None:
     from areal.engine.fsdp_engine import FSDPEngine, FSDPPPOActor
 
     _install_single_rank_rpc_broadcast_bridge()
+    _install_idempotent_fsdp_offload_bridge(FSDPEngine)
     if getattr(FSDPPPOActor, _PATCH_MARKER, False):
         return
 
