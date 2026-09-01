@@ -27,6 +27,11 @@ def test_opd_launcher_separates_code_and_artifact_roots() -> None:
     assert 'CHECKPOINT_ROOT="${ARTIFACT_ROOT}/artifacts/areal/checkpoints/' in launcher
     assert '${PROJECT_ROOT}/artifacts/areal' not in launcher
 
+    probe = (PROJECT_ROOT / "scripts/train/run_opd_policy_probe.py").read_text()
+    assert 'parser.add_argument("--artifact-root"' in probe
+    assert 'artifact_root / ".vendor/hermes-agent"' in probe
+    assert 'model_overlay = artifact_root /' in probe
+
 
 def test_prediction_mask_does_not_cross_trajectory_boundaries() -> None:
     mask = torch.tensor([[0, 0, 1, 1], [0, 1, 0, 1]], dtype=torch.float32)

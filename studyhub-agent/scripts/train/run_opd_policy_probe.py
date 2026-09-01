@@ -193,8 +193,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--model-role", choices=("teacher", "student"), required=True)
     parser.add_argument("--trial", required=True)
     parser.add_argument("--output-root", type=Path, required=True)
+    parser.add_argument("--artifact-root", type=Path, default=PROJECT_ROOT)
     parser.add_argument(
-        "--hermes-checkout", type=Path, default=PROJECT_ROOT / ".vendor/hermes-agent"
+        "--hermes-checkout", type=Path
     )
     parser.add_argument("--gpus", type=int, nargs="+", default=[0, 1])
     parser.add_argument("--workers-per-gpu", type=int, default=2, choices=(1, 2, 3, 4))
@@ -221,11 +222,13 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
     model_identity, model_manifest = resolve_model_artifact(args.model.resolve())
     output_root = args.output_root.resolve()
     output_root.mkdir(parents=True, exist_ok=True)
+    artifact_root = args.artifact_root.resolve()
+    hermes_checkout = (
+        args.hermes_checkout or artifact_root / ".vendor/hermes-agent"
+    ).resolve()
     api_key = secrets.token_urlsafe(36)
     overlay_key = hashlib.sha256(model_identity.encode()).hexdigest()[:16]
-    model_overlay = (
-        PROJECT_ROOT / f"artifacts/areal/model-overlays/opd-probe-{overlay_key}"
-    )
+    model_overlay = artifact_root / f"artifacts/areal/model-overlays/opd-probe-{overlay_key}"
     prepare_overlay(args.model.resolve(), model_overlay)
     ports = [args.port_base + index for index in range(len(args.gpus))]
     endpoints = [f"http://127.0.0.1:{port}/v1" for port in ports]
@@ -264,7 +267,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
                 "model_role": args.model_role,
                 "model_identity": model_identity,
                 "pool_root": str(pool),
-                "hermes_checkout": str(args.hermes_checkout.resolve()),
+                "hermes_checkout": str(hermes_checkout),
                 "tokenizer_path": str(args.model.resolve()),
                 "base_url": endpoints[server_id],
                 "api_key": api_key,
@@ -334,6 +337,8 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         "metrics": aggregate(list(by_id.values())),
         "git_commit": git_value(PROJECT_ROOT, "rev-parse", "HEAD"),
         "model_manifest": model_manifest,
+        "artifact_root": str(artifact_root),
+        "hermes_checkout": str(hermes_checkout),
         "sealed_used": False,
         "validation_or_protocol_holdout_used": False,
         "optimizer_updates": 0,
