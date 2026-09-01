@@ -37,6 +37,18 @@
       "optimizer_updates": 0,
       "stage_marker_written": false,
       "remediation": "Reuse the repository's proven Qwen3.5-4B SGLang mem_fraction_static=0.55 setting."
+    },
+    {
+      "attempt_id": "qwen35-4b-opd-lr1e6-seed-20260827-attempt-20260901_202133",
+      "status": "INFRA_FAILED_NO_UPDATE",
+      "failure_stage": "SGLang KV/cache pool initialization",
+      "root_cause": "The 8k Qwen3.5-4B cache setting mem_fraction_static=0.55 was still insufficient for the frozen 16k OPD context contract.",
+      "launcher_log_sha256": "af72da1a0755c22a0eb7dbf991f0dcf354ed410423d58bc3bfca011c8f6cb4e8",
+      "rollout_log_sha256": "9cc14ecf48428018af5e363756b2e04d2369e5f00ad8d3654f2426cf41db42d1",
+      "initial_lora_sha256": "4b7ee7462d82cd17a7c55fdb27335eee70b4df7a08f282697efafc577c173e6e",
+      "optimizer_updates": 0,
+      "stage_marker_written": false,
+      "remediation": "Use the repository's higher-context Qwen3.5 SGLang allocation mem_fraction_static=0.65 while retaining the 79 GiB guard."
     }
   ],
   "claim_boundary": "Neither attempt produced a reward batch, optimizer update, passing LR marker, or OPD model result."
