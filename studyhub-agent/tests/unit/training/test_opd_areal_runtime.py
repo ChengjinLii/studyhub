@@ -45,7 +45,13 @@ def test_opd_launcher_separates_code_and_artifact_roots() -> None:
     assert 'ARTIFACT_ROOT="${STUDYHUB_OPD_ARTIFACT_ROOT:-${PROJECT_ROOT}}"' in launcher
     assert 'VENV_DIR="${STUDYHUB_TRAIN_VENV:-${ARTIFACT_ROOT}/.venv-train}"' in launcher
     assert 'DATA_MANIFEST="${ARTIFACT_ROOT}/datasets/processed/' in launcher
-    assert 'CHECKPOINT_ROOT="${ARTIFACT_ROOT}/artifacts/areal/checkpoints/' in launcher
+    assert 'CHECKPOINT_ROOT="${RUN_ROOT}/checkpoints/' in launcher
+    assert 'RUN_ROOT="${ARTIFACT_ROOT}/artifacts/areal/opd-attempts/${ATTEMPT_ID}"' in launcher
+    assert '"cluster.fileroot=${RUN_ROOT}"' in launcher
+    assert 'STAGE_MARKER="${STAGE_ROOT}/QWEN35_4B_OPD_LR1E6_PASS.json"' in launcher
+    assert '--reward-root "${REWARD_ROOT}/reward-v3.jsonl"' in launcher
+    assert "--expected-group-size 2" in launcher
+    assert "BATCH_SIZE=2; CHECKPOINT_EVERY=1" in launcher
     assert "${PROJECT_ROOT}/artifacts/areal" not in launcher
     assert "libcudart.so.12" in launcher
     assert "STUDYHUB_CUDA_RUNTIME_LIBRARY_PATH" in launcher

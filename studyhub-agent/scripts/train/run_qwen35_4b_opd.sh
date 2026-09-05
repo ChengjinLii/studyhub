@@ -18,8 +18,8 @@ MIN_FREE="${STUDYHUB_MIN_GPU_FREE_MIB:-76000}"
 MAX_USED="${STUDYHUB_MAX_GPU_USED_MIB:-79000}"
 
 case "${MODE}" in
-  lr1e6) LEARNING_RATE="1e-6"; UPDATES=16; BATCH_SIZE=2; CHECKPOINT_EVERY=16 ;;
-  lr3e6) LEARNING_RATE="3e-6"; UPDATES=16; BATCH_SIZE=2; CHECKPOINT_EVERY=16 ;;
+  lr1e6) LEARNING_RATE="1e-6"; UPDATES=16; BATCH_SIZE=2; CHECKPOINT_EVERY=1 ;;
+  lr3e6) LEARNING_RATE="3e-6"; UPDATES=16; BATCH_SIZE=2; CHECKPOINT_EVERY=1 ;;
   pilot) UPDATES=64; BATCH_SIZE=4; CHECKPOINT_EVERY=16 ;;
   formal) UPDATES=300; BATCH_SIZE=8; CHECKPOINT_EVERY=50 ;;
   *) echo "Usage: $0 {lr1e6|lr3e6|pilot|formal} [seed]" >&2; exit 2 ;;
@@ -60,8 +60,15 @@ fi
 EXPERIMENT="studyhub-qwen35-4b-strict-opd"
 TRIAL="qwen35-4b-opd-${MODE}-seed-20260827"
 LOG_ROOT="${ARTIFACT_ROOT}/artifacts/areal/launcher_logs/qwen35-4b-opd"
-CHECKPOINT_ROOT="${ARTIFACT_ROOT}/artifacts/areal/checkpoints/$(id -un)/${EXPERIMENT}/${TRIAL}"
+STAGE_ROOT="${ARTIFACT_ROOT}/artifacts/areal/checkpoints/$(id -un)/${EXPERIMENT}/${TRIAL}"
 ATTEMPT_ID="${TRIAL}-attempt-$(date +%Y%m%d_%H%M%S)"
+RUN_ROOT="${ARTIFACT_ROOT}/artifacts/areal"
+# LR probes always restart from M2; preserve each attempt's weights and traces.
+# Pilot/formal keep their existing recovery root and do not resume a LR probe.
+if [[ "${MODE}" == "lr1e6" || "${MODE}" == "lr3e6" ]]; then
+  RUN_ROOT="${ARTIFACT_ROOT}/artifacts/areal/opd-attempts/${ATTEMPT_ID}"
+fi
+CHECKPOINT_ROOT="${RUN_ROOT}/checkpoints/$(id -un)/${EXPERIMENT}/${TRIAL}"
 REWARD_ROOT="${ARTIFACT_ROOT}/artifacts/areal/strict-opd/rewards/${TRIAL}/${ATTEMPT_ID}"
 LOG_FILE="${LOG_ROOT}/${ATTEMPT_ID}.log"
 GPU_CSV="${LOG_ROOT}/${ATTEMPT_ID}.gpu.csv"
@@ -71,10 +78,10 @@ EVIDENCE_ROOT="${ARTIFACT_ROOT}/artifacts/experiments/${ATTEMPT_ID}"
 DATA_MANIFEST="${ARTIFACT_ROOT}/datasets/processed/opd_prompt_pool_v1_1/manifest.json"
 PILOT_MARKER="${ARTIFACT_ROOT}/artifacts/areal/checkpoints/$(id -un)/${EXPERIMENT}/qwen35-4b-opd-pilot-seed-20260827/QWEN35_4B_OPD_PILOT_PASS.json"
 case "${MODE}" in
-  lr1e6) STAGE_MARKER="${CHECKPOINT_ROOT}/QWEN35_4B_OPD_LR1E6_PASS.json" ;;
-  lr3e6) STAGE_MARKER="${CHECKPOINT_ROOT}/QWEN35_4B_OPD_LR3E6_PASS.json" ;;
-  pilot) STAGE_MARKER="${CHECKPOINT_ROOT}/QWEN35_4B_OPD_PILOT_PASS.json" ;;
-  formal) STAGE_MARKER="${CHECKPOINT_ROOT}/QWEN35_4B_OPD_COMPLETE.json" ;;
+  lr1e6) STAGE_MARKER="${STAGE_ROOT}/QWEN35_4B_OPD_LR1E6_PASS.json" ;;
+  lr3e6) STAGE_MARKER="${STAGE_ROOT}/QWEN35_4B_OPD_LR3E6_PASS.json" ;;
+  pilot) STAGE_MARKER="${STAGE_ROOT}/QWEN35_4B_OPD_PILOT_PASS.json" ;;
+  formal) STAGE_MARKER="${STAGE_ROOT}/QWEN35_4B_OPD_COMPLETE.json" ;;
 esac
 if [[ -f "${STAGE_MARKER}" ]]; then
   echo "OPD ${MODE} already complete: ${STAGE_MARKER}" >&2
@@ -139,6 +146,7 @@ OVERRIDES=(
   "seed=${SEED}"
   "trial_name=${TRIAL}"
   "experiment_name=${EXPERIMENT}"
+  "cluster.fileroot=${RUN_ROOT}"
   "total_train_steps=${UPDATES}"
   "actor.optimizer.lr=${LEARNING_RATE}"
   "train_dataset.batch_size=${BATCH_SIZE}"
@@ -211,17 +219,19 @@ trap - EXIT
 "${VENV_DIR}/bin/python" "${PROJECT_ROOT}/scripts/train/capture_run_metadata.py" finish \
   --output "${RUN_METADATA}" --gpu-csv "${GPU_CSV}" --status "${STATUS}"
 
-TRAJECTORY_ROOT="${ARTIFACT_ROOT}/artifacts/areal/logs/$(id -un)/${EXPERIMENT}/${TRIAL}/rollout"
+TRAJECTORY_ROOT="${RUN_ROOT}/logs/$(id -un)/${EXPERIMENT}/${TRIAL}/rollout"
 EVIDENCE_TIER="DIAGNOSTIC"
 [[ "${MODE}" == "formal" ]] && EVIDENCE_TIER="CLAIM"
 if ! "${VENV_DIR}/bin/python" "${PROJECT_ROOT}/scripts/train/build_experiment_evidence.py" \
   --run-metadata "${RUN_METADATA}" \
   --output "${EVIDENCE_ROOT}" \
-  --reward-root "${REWARD_ROOT}" \
+  --reward-root "${REWARD_ROOT}/reward-v3.jsonl" \
   --checkpoint-root "${CHECKPOINT_ROOT}" \
   --trajectory-root "${TRAJECTORY_ROOT}" \
   --task-root "${ARTIFACT_ROOT}/datasets/processed/opd_prompt_pool_v1_1/tasks" \
   --max-sequence-tokens 16384 \
+  --system-prompt-marker "You are StudyHub Agent in an isolated post-training environment." \
+  --expected-group-size 2 \
   --evidence-tier "${EVIDENCE_TIER}" >/dev/null; then
   [[ "${STATUS}" -ne 0 ]] || STATUS=74
 fi

@@ -43,6 +43,23 @@ def test_summarize_metric_series_preserves_endpoints_and_range() -> None:
     }
 
 
+def test_parse_metric_series_keeps_bare_opd_metrics() -> None:
+    log = """
+│ lr │ 0.0000e+00 │ opd_loss │ 1.8662e-01 │ grad_norm │ 4.2998e+00 │
+│ update_successful │ 1.0000e+00 │ opd_scored_tokens │ 534 │ │ 123 │
+│ lr │ 1.0000e-06 │ opd_loss │ 2.8174e-01 │ opd_overlap_ratio │ 0.61 │
+│ opd_loss │ nan │ grad_norm │ inf │ invalid heading │ 123 │
+"""
+    series = parse_metric_series(log)
+    assert series["lr"] == [0.0, 1e-6]
+    assert series["opd_loss"] == [0.18662, 0.28174]
+    assert series["grad_norm"] == [4.2998]
+    assert series["update_successful"] == [1.0]
+    assert series["opd_scored_tokens"] == [534.0]
+    assert "" not in series
+    assert "invalid heading" not in series
+
+
 def test_eval_lora_immutability_compares_initial_and_latest_step() -> None:
     checkpoints = [
         {
@@ -186,3 +203,28 @@ def test_rollout_index_accepts_a_single_task_jsonl(tmp_path) -> None:
     assert summary is not None
     assert summary["mapped_tasks"] == 1
     assert summary["unmapped_files"] == 0
+
+
+def test_rollout_index_maps_v3_goal_and_explicit_prompt_marker(tmp_path) -> None:
+    marker = "You are StudyHub Agent in an isolated post-training environment."
+    task = {"task_id": "v3-task", "goal": "Read a free source.", "metadata": {"family": "recovery_and_acl"}}
+    tasks = tmp_path / "tasks.jsonl"
+    tasks.write_text(json.dumps(task) + "\n")
+    version = tmp_path / "rollout" / "0"
+    version.mkdir(parents=True)
+    (version / "0.jsonl").write_text(
+        json.dumps({"prompt": f"<|im_start|>system\n{marker}<|im_end|><|im_start|>user\n{task['goal']}<|im_end|>"})
+        + "\n"
+    )
+    _, records, summary = index_rollout_interactions(
+        version.parent,
+        task_root=tasks,
+        trial="attempt",
+        run_seed=20260827,
+        max_sequence_tokens=16384,
+        system_prompt_marker=marker,
+    )
+    assert records[0]["task_id"] == "v3-task"
+    assert records[0]["task_family"] == "recovery_and_acl"
+    assert summary["unmapped_files"] == 0
+    assert summary["system_prompt_integrity"]["all_records_exactly_once"] is True

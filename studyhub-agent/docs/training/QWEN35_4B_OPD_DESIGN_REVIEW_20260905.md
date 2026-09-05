@@ -87,3 +87,35 @@ Positive token diagnostics alone do not establish downstream benefit.
   it is not a failed model-quality result.
 - GPU execution and downstream benefit after these corrections must be reported
   from actual run artifacts, not inferred from this design review or unit tests.
+
+## First nonzero-LR execution
+
+Attempt `20260905_134214`, run commit `f035f75`, completed eight optimizer
+steps before the GPU guard stopped our process group at 14:00:28 +08:00.
+An unrelated compute PID `1145327` appeared on GPU 1. Its owner was not
+established; no external process was killed. This is a resource interruption,
+not a completed 16-step probe or an Agent quality result.
+
+- First step used the existing zero-LR warmup; seven subsequent steps used 1e-6.
+- All eight reported `update_successful=1`, finite loss and gradients.
+- Teacher scored 5,935 assistant tokens; 103 exported interactions span policy
+  versions 0 through 7. All have exactly one v3 system prompt.
+- GPU peaks: 65,864 MiB and 48,157 MiB. No OOM occurred in this attempt.
+- 33 completed reward rows include one response from an interrupted group;
+  only 16 complete two-response groups fed the eight completed updates.
+- No final saved adapter exists: the original save cadence was 16. Logs show
+  optimizer execution, but an initial/final file-hash comparison is NOT_DONE.
+- Real multi-turn tool calls are present. Per-interaction export resets turn
+  indices, so `opd_active_turns=1` must not be reported as episode-level depth.
+
+Evidence is under the canonical artifact root at
+`artifacts/experiments/qwen35-4b-opd-lr1e6-seed-20260827-attempt-20260905_134214/corrected-evidence/`.
+Its artifact-completeness status concerns available files, not training success.
+The raw shared rollout files remain intact. A manifest records the pre-run
+37/57-row prefixes removed from the version-0 snapshot; later versions are new.
+
+The next LR probe retains the same data, objective, learning rate and seed.
+Save its adapter every step and use an attempt-specific AReaL artifact root.
+These are evidence-preservation changes, not a new training recipe. An adapter
+snapshot alone is not an optimizer/RNG recovery checkpoint; LR retries still
+start independently from M2. Keep the foreign-process guard enabled.

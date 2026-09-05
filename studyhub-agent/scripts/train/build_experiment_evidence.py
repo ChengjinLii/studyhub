@@ -63,7 +63,7 @@ def parse_metric_series(log_text: str) -> dict[str, list[float]]:
         cells = [cell.strip() for cell in line.split("│")[1:-1]]
         for index in range(0, len(cells) - 1, 2):
             metric, raw_value = cells[index : index + 2]
-            if "/" not in metric:
+            if not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_./-]*", metric):
                 continue
             try:
                 value = float(raw_value)
@@ -185,7 +185,7 @@ def _load_task_lookup(task_root: Path | None) -> tuple[dict[str, dict[str, Any]]
         with path.open(encoding="utf-8") as stream:
             for line in stream:
                 row = json.loads(line)
-                request = str(row.get("user_request", ""))
+                request = str(row.get("user_request", row.get("goal", "")))
                 if not request:
                     continue
                 if request in by_request and by_request[request]["task_id"] != row["task_id"]:
@@ -202,6 +202,7 @@ def index_rollout_interactions(
     trial: str,
     run_seed: int | None,
     max_sequence_tokens: int,
+    system_prompt_marker: str = SYSTEM_PROMPT_MARKER,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], dict[str, Any] | None]:
     """Index AReaL's raw interaction dumps without copying prompt contents."""
 
@@ -269,7 +270,7 @@ def index_rollout_interactions(
             reward = float(row.get("reward", 0.0))
             rewards.append(reward)
             versions[str(tail_version)] += 1
-            system_prompt_count = str(row.get("prompt", "")).count(SYSTEM_PROMPT_MARKER)
+            system_prompt_count = str(row.get("prompt", "")).count(system_prompt_marker)
             if system_prompt_count == 0:
                 missing_system_prompt_records += 1
             elif system_prompt_count > 1:
@@ -282,7 +283,7 @@ def index_rollout_interactions(
                     "line_number": line_number,
                     "internal_task_id": row.get("task_id"),
                     "task_id": task.get("task_id") if task else None,
-                    "task_family": task.get("family") if task else None,
+                    "task_family": task.get("family", task.get("metadata", {}).get("family")) if task else None,
                     "source_dataset": (task.get("metadata", {}).get("source_dataset") if task else None),
                     "split": task.get("metadata", {}).get("split") if task else None,
                     "run_seed": run_seed,
@@ -316,7 +317,7 @@ def index_rollout_interactions(
         "policy_version_counts": dict(sorted(versions.items(), key=lambda item: int(item[0]))),
         "mixed_policy_records": mixed_policy_records,
         "system_prompt_integrity": {
-            "marker": SYSTEM_PROMPT_MARKER,
+            "marker": system_prompt_marker,
             "missing_records": missing_system_prompt_records,
             "duplicated_records": duplicated_system_prompt_records,
             "all_records_exactly_once": (
@@ -407,6 +408,7 @@ def build_bundle(args: argparse.Namespace) -> dict[str, Any]:
         trial=trial,
         run_seed=metadata.get("run_metadata", {}).get("seed") if "run_metadata" in metadata else None,
         max_sequence_tokens=args.max_sequence_tokens,
+        system_prompt_marker=getattr(args, "system_prompt_marker", SYSTEM_PROMPT_MARKER),
     )
     # Run metadata stores the seed in the config overrides rather than a
     # top-level field. Preserve the configured seed when it can be recovered.
@@ -541,6 +543,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--trajectory-root", type=Path)
     parser.add_argument("--task-root", type=Path)
     parser.add_argument("--max-sequence-tokens", type=int, default=4096)
+    parser.add_argument("--system-prompt-marker", default=SYSTEM_PROMPT_MARKER)
     parser.add_argument("--output", type=Path)
     parser.add_argument("--expected-group-size", type=int, default=4)
     parser.add_argument("--require-unchanged-lora", action="store_true")
@@ -554,6 +557,8 @@ def parse_args() -> argparse.Namespace:
         parser.error("--expected-group-size must be positive")
     if args.max_sequence_tokens < 1:
         parser.error("--max-sequence-tokens must be positive")
+    if not args.system_prompt_marker.strip():
+        parser.error("--system-prompt-marker must not be empty")
     return args
 
 
