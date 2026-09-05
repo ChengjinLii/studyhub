@@ -119,3 +119,24 @@ Save its adapter every step and use an attempt-specific AReaL artifact root.
 These are evidence-preservation changes, not a new training recipe. An adapter
 snapshot alone is not an optimizer/RNG recovery checkpoint; LR retries still
 start independently from M2. Keep the foreign-process guard enabled.
+
+## Saved weight update and shared-GPU interruption
+
+Attempt `20260905_141157`, run commit `9e9f706`, saved global steps 0 and 1.
+The zero-LR step is tensor-identical to M2. At step 1, all 208 LoRA tensors
+differ from M2, with adapter SHA256
+`b2a59db43442d704e0ac2197ac199c6180d94aaab20e1ffb84b0f333355264f6`.
+Two optimizer steps are logged, one at nonzero LR, with 1,024 scored assistant
+tokens. This proves a saved distillation update, not a completed probe.
+
+At 14:19:43 the separate process inventory captured GPU 1 PID `1192213`,
+UID `1001`, PGID `1192213`; training workers use UID `1002`, PGID `1175168`.
+Thus the interruption is not an AReaL child-process classification error.
+The launcher exited 70 after stopping only its own process group. Do not relax
+the resource guard or repeatedly reload models into a busy GPU window.
+
+Full attempt artifacts and checkpoint hashes are preserved under
+`artifacts/experiments/qwen35-4b-opd-lr1e6-seed-20260827-attempt-20260905_141157/`.
+Tracked summary: `docs/training/evidence/qwen35-4b-opd-saved-update-20260905.json`.
+The 16-step probe, second LR probe, 64-step pilot, formal run and downstream
+comparison are still incomplete/not run. No model-quality conclusion is made.

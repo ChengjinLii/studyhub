@@ -1,0 +1,48 @@
+{
+  "schema_version": "studyhub.opd-saved-update.v1",
+  "status": "WEIGHT_UPDATE_VERIFIED_RUN_INTERRUPTED",
+  "attempt": "qwen35-4b-opd-lr1e6-seed-20260827-attempt-20260905_141157",
+  "run_commit": "9e9f706323c4604ee2b54d2b5b595f1aff1e0b6c",
+  "exit_status": 70,
+  "optimizer_steps": 2,
+  "zero_lr_warmup_steps": 1,
+  "nonzero_lr_steps": 1,
+  "learning_rate": 0.000001,
+  "scored_assistant_tokens": 1024,
+  "loss": [0.23585, 0.29487],
+  "gradient_norm": [4.455, 8.0214],
+  "all_updates_successful": true,
+  "checkpoint_global_step": 1,
+  "initial_adapter_sha256": "4b7ee7462d82cd17a7c55fdb27335eee70b4df7a08f282697efafc577c173e6e",
+  "saved_adapter_sha256": "b2a59db43442d704e0ac2197ac199c6180d94aaab20e1ffb84b0f333355264f6",
+  "tensor_comparison": {
+    "method": "compare safetensors names, dtype, shape and each tensor's data bytes",
+    "tensor_count": 208,
+    "changed_tensors_at_step_0": 0,
+    "changed_tensors_at_step_1": 208
+  },
+  "resource_interruption": {
+    "at": "2026-09-05T14:19:43+08:00",
+    "gpu": 1,
+    "foreign_pid": 1192213,
+    "foreign_uid": 1001,
+    "foreign_pgid": 1192213,
+    "training_uid": 1002,
+    "training_pgid": 1175168,
+    "external_process_killed": false
+  },
+  "gpu_peak_mib": {"0": 64604, "1": 48143},
+  "raw_artifact_root": "/data/chengjin/studyhub/studyhub-agent/artifacts",
+  "evidence_directory": "experiments/qwen35-4b-opd-lr1e6-seed-20260827-attempt-20260905_141157",
+  "raw_hashes": {
+    "run_metadata": "29c474c591cda74cc2ebf3ed4f5da2d10d3b3cff517f4486ff28030890acad90",
+    "training_log": "2b4205c357b81af3f517fe8ae8b326b9f6025f711c924ad914d0275be71fc52f",
+    "gpu_csv": "b4da49d0c582e3ca8ccd5660e60c847395322979629547a58611571acd9ed7b8",
+    "process_inventory": "4813c199728738fdb879135d4f4255bbf8c56e5ebeeed553ea8246071175bd95"
+  },
+  "new_bulk_data_generated": false,
+  "sealed_used": false,
+  "probe_16_steps": "NOT_COMPLETE",
+  "downstream_evaluation": "NOT_RUN",
+  "quality_improvement": "NOT_EVALUATED"
+}
