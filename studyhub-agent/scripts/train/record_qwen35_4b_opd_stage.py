@@ -24,11 +24,7 @@ def load_json(path: Path) -> dict[str, Any]:
 def series(payload: dict[str, Any], name: str) -> list[float]:
     values = payload.get("series", {}).get(name)
     if values is None:
-        matching = [
-            value
-            for key, value in payload.get("series", {}).items()
-            if key.endswith("/" + name)
-        ]
+        matching = [value for key, value in payload.get("series", {}).items() if key.endswith("/" + name)]
         if len(matching) != 1:
             raise RuntimeError(f"missing or ambiguous trainer metric: {name}")
         values = matching[0]
@@ -53,11 +49,24 @@ def reward_rows(root: Path) -> list[dict[str, Any]]:
     return rows
 
 
+def distillation_signal_failures(
+    overlap: list[float], absolute_gap: list[float], scored_tokens: list[float], grad_norm: list[float]
+) -> list[str]:
+    failures = []
+    if sum(overlap) / len(overlap) <= 0:
+        failures.append("no_teacher_student_topk_overlap")
+    if max(absolute_gap) <= 1.0e-6:
+        failures.append("teacher_signal_indistinguishable_from_zero")
+    if min(scored_tokens) <= 0:
+        failures.append("no_scored_assistant_tokens")
+    if max(grad_norm) <= 0:
+        failures.append("zero_grad_norm")
+    return failures
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument(
-        "--mode", choices=("lr1e6", "lr3e6", "pilot", "formal"), required=True
-    )
+    parser.add_argument("--mode", choices=("lr1e6", "lr3e6", "pilot", "formal"), required=True)
     parser.add_argument("--trainer-metrics", type=Path, required=True)
     parser.add_argument("--reward-root", type=Path, required=True)
     parser.add_argument("--checkpoint-root", type=Path, required=True)
@@ -75,6 +84,7 @@ def main() -> int:
     opd_loss = series(metrics, "opd_loss")
     overlap = series(metrics, "opd_overlap_ratio")
     advantage = series(metrics, "opd_teacher_logprob_advantage")
+    absolute_gap = series(metrics, "opd_teacher_logprob_gap_abs")
     scored_tokens = series(metrics, "opd_scored_tokens")
     grad_norm = series(metrics, "grad_norm")
     update_success = optional_series(metrics, "update_successful")
@@ -82,40 +92,31 @@ def main() -> int:
     seq_len = optional_series(metrics, "seq_len/avg")
     if any(
         len(values) != args.expected_updates
-        for values in (opd_loss, overlap, advantage, scored_tokens, grad_norm)
+        for values in (opd_loss, overlap, advantage, absolute_gap, scored_tokens, grad_norm)
     ):
-        raise RuntimeError(
-            "OPD trainer metric coverage does not match expected updates"
-        )
+        raise RuntimeError("OPD trainer metric coverage does not match expected updates")
     if update_success and (
-        len(update_success) != args.expected_updates
-        or any(value != 1.0 for value in update_success)
+        len(update_success) != args.expected_updates or any(value != 1.0 for value in update_success)
     ):
         raise RuntimeError("one or more OPD optimizer updates failed")
 
     rewards = reward_rows(args.reward_root)
     if not rewards:
         raise RuntimeError("OPD run has no Reward v3 trajectory evidence")
-    scored_rewards = [
-        row for row in rewards if row.get("reward", {}).get("status") == "SCORED"
-    ]
+    scored_rewards = [row for row in rewards if row.get("reward", {}).get("status") == "SCORED"]
     if len(scored_rewards) != len(rewards):
         raise RuntimeError("OPD run contains non-scored rollout evidence")
     tool_validity = [float(row["reward"]["tool_validity"]) for row in scored_rewards]
     hard_gates = [bool(row["reward"]["hard_gate_triggered"]) for row in scored_rewards]
 
-    m2_weights = (
-        Path(authorization["lineage"]["m2_adapter_path"]) / "adapter_model.safetensors"
-    )
+    m2_weights = Path(authorization["lineage"]["m2_adapter_path"]) / "adapter_model.safetensors"
     initial = args.checkpoint_root / "actor/initial_lora/adapter_model.safetensors"
     initialization = exact_adapter_match(initial, m2_weights)
     if initialization["status"] != "PASS":
         raise RuntimeError("OPD actor did not initialize exactly from M2")
     final_step, final_weights = final_adapter(args.checkpoint_root)
     if final_step != args.expected_updates - 1:
-        raise RuntimeError(
-            f"OPD checkpoint stopped at global step {final_step}; expected {args.expected_updates - 1}"
-        )
+        raise RuntimeError(f"OPD checkpoint stopped at global step {final_step}; expected {args.expected_updates - 1}")
     if sha256(final_weights) == sha256(initial):
         raise RuntimeError("OPD LoRA adapter did not update")
 
@@ -125,19 +126,11 @@ def main() -> int:
     mean_tool_validity = mean(tool_validity)
     mean_no_eos = mean(no_eos) if no_eos else None
     mean_seq_len = mean(seq_len) if seq_len else None
-    baseline_tool_validity = float(
-        authorization["hard_gates"]["student_baseline_tool_validity"]
-    )
-    failures = []
-    if mean_overlap <= 0:
-        failures.append("no_teacher_student_topk_overlap")
-    if max(abs(value) for value in advantage) <= 1.0e-6:
-        failures.append("teacher_signal_indistinguishable_from_zero")
-    if max(grad_norm) <= 0:
-        failures.append("zero_grad_norm")
+    baseline_tool_validity = float(authorization["hard_gates"]["student_baseline_tool_validity"])
+    failures = distillation_signal_failures(overlap, absolute_gap, scored_tokens, grad_norm)
     if args.mode in {"pilot", "formal"}:
-        if mean_advantage <= 0:
-            failures.append("nonpositive_teacher_logprob_advantage")
+        # Signed log-prob gaps can cancel or be negative for valid distillation.
+        # Novelty is established by independent task outcomes, not this sign.
         if mean_tool_validity < baseline_tool_validity - 0.05:
             failures.append("tool_validity_collapse")
         if mean_no_eos is None or mean_no_eos >= 0.05:
@@ -166,6 +159,7 @@ def main() -> int:
             "grad_norm_max": max(grad_norm),
             "teacher_student_overlap_mean": mean_overlap,
             "teacher_logprob_advantage_mean": mean_advantage,
+            "teacher_logprob_gap_abs_mean": mean(absolute_gap),
             "teacher_scored_tokens": int(sum(scored_tokens)),
             "tool_validity_mean": mean_tool_validity,
             "hard_gate_rate": sum(hard_gates) / len(hard_gates),
@@ -187,9 +181,7 @@ def main() -> int:
     }
     args.output.parent.mkdir(parents=True, exist_ok=True)
     temporary = args.output.with_suffix(args.output.suffix + ".partial")
-    temporary.write_text(
-        json.dumps(result, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
-    )
+    temporary.write_text(json.dumps(result, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     os.replace(temporary, args.output)
     print(json.dumps(result, ensure_ascii=False, indent=2))
     return 0 if not failures else 3

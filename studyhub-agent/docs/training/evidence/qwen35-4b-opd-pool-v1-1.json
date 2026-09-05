@@ -1,0 +1,102 @@
+{
+  "schema_version": "studyhub.opd-prompt-pool.v1",
+  "status": "PASS_TEACHER_ALIGNED_SELECTION",
+  "seed": 20260827,
+  "train_rows": 2000,
+  "validation_rows": 128,
+  "train_family_counts": {
+    "cross_tool": 19,
+    "direct_answer_and_abstention": 2,
+    "function_calling": 797,
+    "memory": 220,
+    "rag_and_multihop": 36,
+    "recovery_and_acl": 926
+  },
+  "validation_family_counts": {
+    "cross_tool": 22,
+    "direct_answer_and_abstention": 22,
+    "function_calling": 21,
+    "memory": 21,
+    "rag_and_multihop": 21,
+    "recovery_and_acl": 21
+  },
+  "train_budget_counts": {
+    "direct": 2,
+    "extended": 964,
+    "short": 1034
+  },
+  "unique_train_source_groups": 2000,
+  "unique_validation_source_groups": 128,
+  "train_validation_group_overlap": 0,
+  "validation_selection": "family_balanced_before_teacher_ranking_excluding_probe_groups",
+  "validation_is_population_weighted": false,
+  "validation_probe_task_overlap": 0,
+  "novelty_probe_tasks_in_train": 201,
+  "directly_observed_teacher_only_tasks_in_train": 126,
+  "family_novelty_scores": {
+    "rag_and_multihop": {
+      "tasks": 122.0,
+      "teacher_only_rate": 0.13114754098360656,
+      "teacher_success_rate": 0.18032786885245902,
+      "mean_diagnostic_delta": -0.16009590163934426
+    },
+    "direct_answer_and_abstention": {
+      "tasks": 53.0,
+      "teacher_only_rate": 0.03773584905660377,
+      "teacher_success_rate": 0.33962264150943394,
+      "mean_diagnostic_delta": -0.22641509433962265
+    },
+    "function_calling": {
+      "tasks": 72.0,
+      "teacher_only_rate": 0.4444444444444444,
+      "teacher_success_rate": 0.6666666666666666,
+      "mean_diagnostic_delta": 0.2589611111111111
+    },
+    "cross_tool": {
+      "tasks": 91.0,
+      "teacher_only_rate": 0.10989010989010989,
+      "teacher_success_rate": 0.3516483516483517,
+      "mean_diagnostic_delta": 0.027070329670329674
+    },
+    "memory": {
+      "tasks": 81.0,
+      "teacher_only_rate": 0.3333333333333333,
+      "teacher_success_rate": 0.8518518518518519,
+      "mean_diagnostic_delta": 0.3148543209876543
+    },
+    "recovery_and_acl": {
+      "tasks": 81.0,
+      "teacher_only_rate": 0.48148148148148145,
+      "teacher_success_rate": 0.6419753086419753,
+      "mean_diagnostic_delta": 1.1633333333333333
+    }
+  },
+  "selection_order": [
+    "teacher_pass_student_fail",
+    "teacher_pass_positive_diagnostic_delta",
+    "positive_per_task_delta",
+    "positive_family_novelty",
+    "deterministic_hash"
+  ],
+  "sealed_used": false,
+  "validation_or_protocol_holdout_used": false,
+  "runtime_packaging": {
+    "format": "split-verifier-jsonl-plus-per-task-environment-json",
+    "train_verifiers": 2000,
+    "validation_verifiers": 128,
+    "environments": 2128,
+    "task_verifier_environment_mapping_complete": true
+  },
+  "lineage": {
+    "candidate_manifest_sha256": "3e3734c8d04fd8c233801d9a6c08da88f3a751e7cf63f8284f7e1cc685b1505a",
+    "candidate_tasks_sha256": "97f034e7ef6b65e491ce772d1904f480e2c684b8285d70ba05932280794a2b4f",
+    "teacher_episodes_sha256": "2391aab7afaa314e1576ceb805d43907f9de1a5c67d78f407e20875c1afccaca",
+    "student_episodes_sha256": "55ebd9c2ec61655e2c91a8a891f091bc4941884a566aede962bb2d1fa0db606d",
+    "novelty_gate_sha256": "1544f92778c7cbaef5331e0a6da240dfa822a446139069926ffb1fd74cc4c7a5",
+    "train_tasks_sha256": "b3e1feb9bbfccff765358bc8122b53f47bccb04debe4805b6cd3dadf71bf1b1b",
+    "validation_tasks_sha256": "ae6c2738ae10dc1cc3b2f47d32ecaadbfd8b16e3ad053fa2a3b8f72cb9936341",
+    "train_verifiers_sha256": "3173b18679d4ad08aaa77bf0606c230b3306a94a90a5489d370e4893388fc21b",
+    "validation_verifiers_sha256": "fd1b4ddd801ff0f75f61a1145b12e76776514eaeb19fc82a77ff929442382997",
+    "environment_inventory_sha256": "9a2bfc9f05cb715bdfc206f5fed7fecbbab9536805779b3908ce5cd49df85b6a"
+  }
+}

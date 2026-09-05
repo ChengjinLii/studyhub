@@ -63,7 +63,7 @@ def main() -> int:
     args = parse_args()
     root = args.artifact_root.resolve()
     teacher_model = Path("/data/chengjin/studyhub/models/P1/Qwen3.5-9B")
-    pool = root / "datasets/processed/opd_prompt_pool_v1"
+    pool = root / "datasets/processed/opd_prompt_pool_v1_1"
     actor_model = root / "artifacts/areal/model-overlays/qwen35-4b-base-canonical-tokenizer"
     sglang_overlay = root / "artifacts/areal/model-overlays/qwen35-4b-opd-sglang-lora"
     paths = {
@@ -211,7 +211,8 @@ def main() -> int:
             "pilot_marker": "QWEN35_4B_OPD_PILOT_PASS.json",
             "formal_marker": "QWEN35_4B_OPD_COMPLETE.json",
             "require_m2_initialization": True,
-            "require_positive_teacher_signal": True,
+            "require_nonzero_teacher_signal": True,
+            "teacher_logprob_gap_sign_is_quality_gate": False,
             "require_lora_update": True,
             "require_runtime_backend_parity": True,
         },

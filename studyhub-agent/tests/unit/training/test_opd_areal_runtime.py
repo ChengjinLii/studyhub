@@ -13,6 +13,7 @@ from training.opd.areal_runtime import (
     _encode_sparse_token_fields,
     _flatten_sequence_lengths,
     _install_colocated_proxy_start_bridge,
+    _prepare_opd_microbatches,
     _split_sparse_outputs,
     aggregate_opd_diagnostics,
     assistant_prediction_mask,
@@ -71,6 +72,26 @@ def test_prediction_mask_does_not_cross_trajectory_boundaries() -> None:
         shifted,
         torch.tensor([[0, 1, 1, 0], [1, 0, 1, 0]], dtype=torch.float32),
     )
+
+
+def test_opd_signal_does_not_require_positive_mean_logprob_gap() -> None:
+    from scripts.train.record_qwen35_4b_opd_stage import distillation_signal_failures
+
+    student = torch.log(torch.tensor([[[0.8, 0.2]]]))
+    teacher = torch.log(torch.tensor([[[0.2, 0.8]]]))
+    ids = torch.tensor([[[0, 1]]])
+    stats = compute_opd_diagnostics(
+        student_ids=ids,
+        student_log_probs=student,
+        teacher_on_student=teacher,
+        teacher_ids=ids,
+        teacher_log_probs=teacher,
+        response_mask=torch.ones(1, 1),
+    )
+    assert stats["opd_teacher_logprob_advantage"].abs() < 1e-6
+    assert stats["opd_teacher_logprob_gap_abs"] > 1
+    assert not distillation_signal_failures([1], [1.3], [10], [0.1])
+    assert distillation_signal_failures([1], [0], [10], [0.1]) == ["teacher_signal_indistinguishable_from_zero"]
 
 
 def test_prediction_turn_ids_follow_next_token_alignment() -> None:
@@ -268,8 +289,16 @@ def test_opd_config_is_fail_closed(monkeypatch: pytest.MonkeyPatch) -> None:
 
     assert config.opd_top_k == 16
     assert config.opd_top_k_strategy == "only_stu"
-    assert config.actor.mb_spec.max_tokens_per_mb == 1536
-    assert config.teacher.train.mb_spec.max_tokens_per_mb == 8192
+    assert config.actor.mb_spec.max_tokens_per_mb == config.gconfig.max_tokens
+    assert config.teacher.train.mb_spec.max_tokens_per_mb == config.gconfig.max_tokens
+    assert config.actor.mb_spec.n_mbs == 128
+    from areal.utils.data import allocate_balanced_mbs
+
+    engine = SimpleNamespace(config=config.actor)
+    engine._prepare_mb_list = lambda inputs: allocate_balanced_mbs(engine.config.mb_spec, [1000, 2000, 16000])
+    groups = _prepare_opd_microbatches(engine, {"attention_mask": torch.ones(3, 1)})
+    assert sorted(groups) == [[0], [1], [2]]
+    assert config.actor.mb_spec.n_mbs == 128
     assert config.actor.kl_ctl == 0
     assert config.ref is None
     assert config.teacher.engine_type == "train"
@@ -277,6 +306,10 @@ def test_opd_config_is_fail_closed(monkeypatch: pytest.MonkeyPatch) -> None:
 
     validate_rollout_memory_config(config)
     assert config.sglang.enable_memory_saver is True
+    assert config.rollout.scheduling_spec[0].env_vars["TMS_INIT_ENABLE"] == "0"
+    config.rollout.scheduling_spec[0].env_vars["TMS_INIT_ENABLE"] = "1"
+    with pytest.raises(RuntimeError, match="SGLang must own"):
+        validate_rollout_memory_config(config)
 
 
 def test_areal_bridge_install_is_idempotent(monkeypatch: pytest.MonkeyPatch) -> None:

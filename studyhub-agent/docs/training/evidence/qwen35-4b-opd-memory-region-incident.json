@@ -1,0 +1,15 @@
+{
+  "schema_version": "studyhub.opd-runtime-incident.v1",
+  "attempt_id": "qwen35-4b-opd-lr1e6-seed-20260827-attempt-20260905_122745",
+  "run_commit": "58ba82d",
+  "status": "FAILED_SGLANG_NESTED_TMS_REGION",
+  "optimizer_updates": 0,
+  "root_cause": "SGLang tagged memory region nested inside inherited TMS_INIT_ENABLE=1 process-wide region",
+  "repair": "Set TMS_INIT_ENABLE=0 and TMS_INIT_ENABLE_CPU_BACKUP=0 only on rollout scheduling environment; keep SGLang memory saver and actor offload enabled",
+  "tagged_cuda_pause_resume_probe": "PASS_EXACT_CONTENT_RESTORATION",
+  "full_training_after_repair": "NOT_YET_VERIFIED",
+  "log_sha256": "86eb4feaa920221b6784d64535677b7a2b7d4a72400d8200d39edf9594c28840",
+  "gpu_csv_sha256": "9fd45becec00dfc78874f6f1392be4e81f540a4c096fc8063b9986b2f9e21b06",
+  "artifact_root": "/data/chengjin/studyhub/studyhub-agent/artifacts/areal/launcher_logs/qwen35-4b-opd",
+  "claim": "Infrastructure failure before policy training, not model-quality evidence"
+}

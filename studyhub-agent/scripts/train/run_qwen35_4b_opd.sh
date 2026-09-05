@@ -67,7 +67,7 @@ LOG_FILE="${LOG_ROOT}/${ATTEMPT_ID}.log"
 GPU_CSV="${LOG_ROOT}/${ATTEMPT_ID}.gpu.csv"
 RUN_METADATA="${LOG_ROOT}/${ATTEMPT_ID}.run.json"
 SGLANG_OVERLAY_AUDIT="${LOG_ROOT}/${ATTEMPT_ID}.sglang-overlay.json"
-DATA_MANIFEST="${ARTIFACT_ROOT}/datasets/processed/opd_prompt_pool_v1/manifest.json"
+DATA_MANIFEST="${ARTIFACT_ROOT}/datasets/processed/opd_prompt_pool_v1_1/manifest.json"
 PILOT_MARKER="${ARTIFACT_ROOT}/artifacts/areal/checkpoints/$(id -un)/${EXPERIMENT}/qwen35-4b-opd-pilot-seed-20260827/QWEN35_4B_OPD_PILOT_PASS.json"
 case "${MODE}" in
   lr1e6) STAGE_MARKER="${CHECKPOINT_ROOT}/QWEN35_4B_OPD_LR1E6_PASS.json" ;;
@@ -218,7 +218,7 @@ if ! "${VENV_DIR}/bin/python" "${PROJECT_ROOT}/scripts/train/build_experiment_ev
   --reward-root "${REWARD_ROOT}" \
   --checkpoint-root "${CHECKPOINT_ROOT}" \
   --trajectory-root "${TRAJECTORY_ROOT}" \
-  --task-root "${ARTIFACT_ROOT}/datasets/processed/opd_prompt_pool_v1/tasks" \
+  --task-root "${ARTIFACT_ROOT}/datasets/processed/opd_prompt_pool_v1_1/tasks" \
   --max-sequence-tokens 16384 \
   --evidence-tier "${EVIDENCE_TIER}" >/dev/null; then
   [[ "${STATUS}" -ne 0 ]] || STATUS=74

@@ -8,6 +8,7 @@ from scripts.data.build_opd_prompt_pool_v1 import (
 from scripts.data.package_opd_prompt_pool_runtime import package_pool
 from scripts.data.select_opd_training_pool_v1 import (
     family_scores,
+    reserve_validation,
     task_priority,
     verifier_map,
 )
@@ -168,6 +169,22 @@ def test_teacher_only_task_has_priority_over_unevaluated_family_fill() -> None:
         family=scores,
         seed=1,
     )
+
+
+def test_validation_reserved_before_ranking_is_balanced_and_excludes_probe_groups() -> None:
+    rows = [
+        task(f"{family}-{index}", family=family)
+        for family in ("memory", "function_calling", "recovery_and_acl")
+        for index in range(12)
+    ]
+    duplicate_group = task("probe-sibling", family="memory")
+    duplicate_group["metadata"]["source_group_id"] = "group-memory-0"
+    rows.append(duplicate_group)
+    first = reserve_validation(rows, {"memory-0"}, 9, 7)
+    assert first == reserve_validation(list(reversed(rows)), {"memory-0"}, 9, 7)
+    assert {row["metadata"]["family"] for row in first} == {"memory", "function_calling", "recovery_and_acl"}
+    assert len({row["metadata"]["source_group_id"] for row in first}) == 9
+    assert "group-memory-0" not in {row["metadata"]["source_group_id"] for row in first}
 
 
 def test_verifier_map_reads_jsonl_and_rejects_duplicate_tasks(tmp_path) -> None:

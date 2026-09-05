@@ -156,6 +156,40 @@ def dataset_row(task: dict[str, Any]) -> dict[str, str]:
     }
 
 
+def reserve_validation(
+    candidates: list[dict[str, Any]], probe_ids: set[str], size: int, seed: int
+) -> list[dict[str, Any]]:
+    """Reserve a family-balanced, group-isolated dev panel before outcome ranking."""
+    probe_groups = {
+        str(task["metadata"]["source_group_id"]) for task in candidates if str(task["task_id"]) in probe_ids
+    }
+    by_family: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    for task in sorted(candidates, key=lambda row: stable_rank(seed, str(row["task_id"]))):
+        if str(task["metadata"]["source_group_id"]) not in probe_groups:
+            by_family[str(task["metadata"]["family"])].append(task)
+    if size < len(by_family):
+        raise RuntimeError("validation size cannot cover every task family")
+    selected: list[dict[str, Any]] = []
+    groups: set[str] = set()
+    while len(selected) < size:
+        before = len(selected)
+        for family in sorted(by_family):
+            while by_family[family]:
+                row = by_family[family].pop(0)
+                group = str(row["metadata"]["source_group_id"])
+                if group not in groups:
+                    selected.append(row)
+                    groups.add(group)
+                    break
+            if len(selected) == size:
+                break
+        if len(selected) == before:
+            raise RuntimeError("insufficient non-probe groups for validation")
+    if {row["metadata"]["family"] for row in selected} != {row["metadata"]["family"] for row in candidates}:
+        raise RuntimeError("validation does not cover all candidate families")
+    return selected
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--candidate-root", type=Path, required=True)
@@ -172,6 +206,8 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> int:
     args = parse_args()
+    if args.output.exists():
+        raise RuntimeError("output already exists; preserve previous pool evidence")
     if not 1500 <= args.train_size <= 3000:
         raise RuntimeError("OPD train size must remain in the frozen 1500-3000 range")
     candidate_root = args.candidate_root.resolve()
@@ -208,6 +244,8 @@ def main() -> int:
     ):
         raise RuntimeError("OPD candidate task or verifier lineage drift")
     verifiers = verifier_map(candidate_verifiers)
+    dev = reserve_validation(candidates, set(teacher), args.dev_size, args.seed)
+    dev_groups = {str(task["metadata"]["source_group_id"]) for task in dev}
     scores = family_scores(teacher, student)
     ranked = sorted(
         candidates,
@@ -225,7 +263,7 @@ def main() -> int:
     group_counts: Counter[str] = Counter()
     for task in ranked:
         group = str(task["metadata"]["source_group_id"])
-        if group_counts[group] >= args.max_per_source_group:
+        if group in dev_groups or group_counts[group] >= args.max_per_source_group:
             continue
         selected.append(task)
         selected_ids.add(str(task["task_id"]))
@@ -236,19 +274,8 @@ def main() -> int:
         raise RuntimeError(f"only {len(selected)} OPD train tasks survived source-group caps")
 
     train_groups = {str(task["metadata"]["source_group_id"]) for task in selected}
-    dev: list[dict[str, Any]] = []
-    dev_groups: set[str] = set()
-    for task in reversed(ranked):
-        task_id = str(task["task_id"])
-        group = str(task["metadata"]["source_group_id"])
-        if task_id in selected_ids or group in train_groups or group in dev_groups:
-            continue
-        dev.append(task)
-        dev_groups.add(group)
-        if len(dev) == args.dev_size:
-            break
-    if len(dev) != args.dev_size:
-        raise RuntimeError("insufficient group-isolated OPD training-dev tasks")
+    if train_groups & dev_groups:
+        raise RuntimeError("OPD training-dev source groups overlap")
 
     output = args.output.resolve()
     staging = output.with_name(output.name + ".partial")
@@ -305,6 +332,9 @@ def main() -> int:
         "unique_train_source_groups": len(train_groups),
         "unique_validation_source_groups": len(dev_groups),
         "train_validation_group_overlap": 0,
+        "validation_selection": "family_balanced_before_teacher_ranking_excluding_probe_groups",
+        "validation_is_population_weighted": False,
+        "validation_probe_task_overlap": 0,
         "novelty_probe_tasks_in_train": selected_probe,
         "directly_observed_teacher_only_tasks_in_train": teacher_only_selected,
         "family_novelty_scores": scores,
@@ -338,7 +368,6 @@ def main() -> int:
         },
     }
     write_json(staging / "manifest.json", manifest)
-    shutil.rmtree(output, ignore_errors=True)
     os.replace(staging, output)
     print(json.dumps(manifest, ensure_ascii=False, indent=2))
     return 0

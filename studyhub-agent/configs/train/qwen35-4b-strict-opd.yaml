@@ -11,7 +11,7 @@ eval_workflow: ${workflow}
 max_turns: 6
 context_finalization_ratio: 0.80
 context_safety_margin_tokens: 768
-environment_root: /data/chengjin/studyhub/studyhub-agent/datasets/processed/opd_prompt_pool_v1
+environment_root: /data/chengjin/studyhub/studyhub-agent/datasets/processed/opd_prompt_pool_v1_1
 verifier_root: ${environment_root}/verifiers
 hermes_checkout: /data/chengjin/studyhub/studyhub-agent/.vendor/hermes-agent
 reward_artifact_root: /data/chengjin/studyhub/studyhub-agent/artifacts/areal/strict-opd/rewards
@@ -50,7 +50,18 @@ rollout:
   scheduling_strategy:
     type: colocation
     target: actor
-  scheduling_spec: ${actor.scheduling_spec}
+  scheduling_spec:
+    - task_type: worker
+      port_count: 2
+      gpu: 1
+      cpu: 8
+      mem: 64
+      cmd: python3 -m areal.infra.rpc.rpc_server
+      env_vars:
+        LD_LIBRARY_PATH: ${oc.env:STUDYHUB_CUDA_RUNTIME_LIBRARY_PATH}
+        # SGLang tags its own regions; AReaL's process-wide region would nest.
+        TMS_INIT_ENABLE: "0"
+        TMS_INIT_ENABLE_CPU_BACKUP: "0"
   use_lora: true
   fileroot: ${cluster.fileroot}
   tokenizer_path: ${tokenizer_path}
@@ -102,9 +113,10 @@ actor:
   gradient_checkpointing: true
   dtype: bfloat16
   mb_spec:
-    # The actor shares GPU 0 with the offloaded SGLang allocation. Keep the
-    # backward microbatch below the pinned AReaL colocated GRPO examples.
-    max_tokens_per_mb: 1536
+    # Accept the full context while splitting each interaction into its own
+    # microbatch (at most 8 prompts * 2 samples * 6 turns = 96 interactions).
+    max_tokens_per_mb: 16384
+    n_mbs: 128
   optimizer:
     type: adam
     lr: 1.0e-6
@@ -163,7 +175,8 @@ teacher:
     dtype: bfloat16
     temperature: ${opd_teacher_temperature}
     mb_spec:
-      max_tokens_per_mb: 8192
+      max_tokens_per_mb: 16384
+      n_mbs: 128
     optimizer: null
     use_lora: false
     scheduling_spec:
@@ -221,7 +234,7 @@ train_dataset:
   drop_last: true
   pin_memory: true
   num_workers: 2
-  path: /data/chengjin/studyhub/studyhub-agent/datasets/processed/opd_prompt_pool_v1/hf_dataset
+  path: /data/chengjin/studyhub/studyhub-agent/datasets/processed/opd_prompt_pool_v1_1/hf_dataset
   type: rl
   max_length: 16384
   scheduling_spec:
@@ -234,7 +247,7 @@ valid_dataset:
   drop_last: false
   pin_memory: true
   num_workers: 2
-  path: /data/chengjin/studyhub/studyhub-agent/datasets/processed/opd_prompt_pool_v1/hf_dataset
+  path: /data/chengjin/studyhub/studyhub-agent/datasets/processed/opd_prompt_pool_v1_1/hf_dataset
   type: rl
   max_length: 16384
   scheduling_spec:

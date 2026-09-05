@@ -315,6 +315,21 @@ def _prepare_opd_input(data: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return prepared
 
 
+def _prepare_opd_microbatches(engine: Any, input_batched: dict[str, Any]) -> Any:
+    """Cap AReaL's requested microbatch count at the actual interaction count."""
+    from areal.api.cli_args import MicroBatchSpec
+
+    original = engine.config.mb_spec
+    interactions = int(input_batched["attention_mask"].shape[0])
+    if interactions <= 0:
+        raise RuntimeError("OPD requires at least one interaction")
+    engine.config.mb_spec = MicroBatchSpec.new(original, n_mbs=min(original.n_mbs or 1, interactions))
+    try:
+        return engine._prepare_mb_list(input_batched)
+    finally:
+        engine.config.mb_spec = original
+
+
 def _forward_sparse_outputs(
     engine: Any,
     data: list[dict[str, Any]],
@@ -327,7 +342,7 @@ def _forward_sparse_outputs(
     if meta is None:
         raise RuntimeError("OPD sparse forward requires per-trajectory batch metadata")
     output_seqlens = _flatten_sequence_lengths(prepared)
-    mb_list = engine._prepare_mb_list(input_batched).to(engine.device)
+    mb_list = _prepare_opd_microbatches(engine, input_batched).to(engine.device)
     if mb_list.forward_indices is None or len(output_seqlens) != len(mb_list.forward_indices):
         raise RuntimeError(
             "OPD interaction lengths do not match AReaL forward indices: "
@@ -455,6 +470,9 @@ def compute_opd_diagnostics(
         "opd_token_reward_min": valid_rewards.min(),
         "opd_token_reward_max": valid_rewards.max(),
         "opd_teacher_logprob_advantage": _masked_values(teacher_on_student - student_log_probs, response_mask).mean(),
+        "opd_teacher_logprob_gap_abs": _masked_values(teacher_on_student - student_log_probs, response_mask)
+        .abs()
+        .mean(),
         "opd_teacher_student_kl": conditional_kl[valid_positions].mean(),
         "opd_overlap_ratio": overlaps[valid_positions].mean(),
         "opd_student_top_k_mass": student_mass[valid_positions].mean(),
@@ -531,6 +549,7 @@ def aggregate_opd_diagnostics(
     }
     token_weighted = (
         "opd_teacher_logprob_advantage",
+        "opd_teacher_logprob_gap_abs",
         "opd_teacher_student_kl",
         "opd_overlap_ratio",
         "opd_student_top_k_mass",
@@ -594,7 +613,7 @@ def _opd_update(
     self.optimizer_zero_grad()
     prepared = _prepare_opd_input(data)
     input_batched, _ = self._normalize_batch_input(prepared)
-    mb_list = self._prepare_mb_list(input_batched).to(self.device)
+    mb_list = _prepare_opd_microbatches(self, input_batched).to(self.device)
 
     def loss_weight_fn(mb: dict[str, Any]) -> torch.Tensor:
         return mb["opd_response_mask"].count_nonzero()
