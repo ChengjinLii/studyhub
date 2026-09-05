@@ -230,3 +230,31 @@ the KV pool still contained 32,768 tokens and two request slots. This isolates
 35,328 MiB of unnecessary resident buffers without lowering model precision.
 The one-off worker's interpreter teardown still aborts even after resume;
 these measurements establish allocation behavior, not a clean service run.
+
+## First completed 16-step OPD probe
+
+Attempt `20260905_152303`, code `c1ad48b`, completed at 15:45 with launcher
+exit zero and `PASS_OPD_LR_MICRO_PILOT`. All 16 optimizer steps were recorded:
+one zero-LR warmup and 15 updates at `1e-6`. The run preserved 64 student
+rollouts, 11,530 scored assistant tokens and every step's adapter. All 208
+final LoRA tensors differ from M2 and remain finite. The final adapter hash is
+`040e3ac1f917687c2202d2eeb8428f453f8594d407a2c0b0dbefc317d8368831`.
+
+Including initialization, peak owned GPU memory was 37,178 / 47,644 MiB;
+no resource guard fired. No foreign GPU process occurred, so this verifies
+the reduced resource envelope, not interference-free concurrent workloads.
+Wall time including initialization and metadata was 1,288 seconds. The
+artifact completeness report is `COMPLETE` with no missing categories.
+
+Final OPD loss was 0.14429; training-rollout tool validity was 0.89245 and
+hard-gate rate 0.1875. These are diagnostics, not independent Agent quality
+results. No-EOS and sequence-length aggregates remain absent in the stage
+marker and must be available before pilot/formal promotion. Shutdown also
+logged cancellation/connection errors for an in-flight version-16 prefetch
+after the requested training steps; it did not invalidate the 64 scored rows
+or the successful launcher exit. This is not a 64-step pilot or a formal run.
+
+Tracked evidence and raw artifact hashes:
+`docs/training/evidence/qwen35-4b-opd-shared-lr1e6-20260905.json`.
+Next: the independently M2-initialized `3e-6` probe, then LR selection and
+the existing pilot checks. No new teacher data or Sealed evaluation is used.
