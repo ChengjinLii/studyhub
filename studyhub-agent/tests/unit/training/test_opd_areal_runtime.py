@@ -59,7 +59,9 @@ def test_opd_launcher_separates_code_and_artifact_roots() -> None:
     assert "SGLANG_OVERLAY_AUDIT" in launcher
     assert "qwen35-4b-opd-sglang-lora" in config
     assert "model_path: ${actor.path}" not in config
-    assert "mem_fraction_static: 0.40" in config
+    assert "mem_fraction_static: 0.65" in config
+    assert "max_total_tokens: 32768" in config
+    assert "max_mamba_cache_size: 8" in config
     assert "max_concurrent_rollouts: 2" in config
     assert "max_running_requests: 2" in config
     assert launcher.count("--allow-shared-gpu") == 3
@@ -104,7 +106,12 @@ def test_opd_shared_resource_limits_are_frozen() -> None:
     from scripts.train.preflight_qwen35_4b_opd import validate_shared_resource_policy
 
     config = SimpleNamespace(
-        sglang=SimpleNamespace(mem_fraction_static=0.4, max_running_requests=2),
+        sglang=SimpleNamespace(
+            mem_fraction_static=0.65,
+            max_running_requests=2,
+            max_total_tokens=32768,
+            max_mamba_cache_size=8,
+        ),
         rollout=SimpleNamespace(max_concurrent_rollouts=2),
     )
     args = SimpleNamespace(
@@ -121,13 +128,19 @@ def test_opd_shared_resource_limits_are_frozen() -> None:
             "max_total_used_mib": 68000,
             "max_own_used_mib": 52000,
             "min_runtime_free_mib": 12000,
-            "sglang_mem_fraction_static": 0.4,
+            "sglang_mem_fraction_static": 0.65,
+            "sglang_max_total_tokens": 32768,
+            "sglang_max_mamba_cache_size": 8,
             "max_concurrent_rollouts": 2,
             "max_running_requests": 2,
         }
     }
     validate_shared_resource_policy(config, args, auth)
     args.max_own_used_mib = 70000
+    with pytest.raises(RuntimeError, match="differs from authorization"):
+        validate_shared_resource_policy(config, args, auth)
+    args.max_own_used_mib = 52000
+    config.sglang.max_total_tokens = 65536
     with pytest.raises(RuntimeError, match="differs from authorization"):
         validate_shared_resource_policy(config, args, auth)
 
@@ -394,6 +407,9 @@ def test_opd_config_is_fail_closed(monkeypatch: pytest.MonkeyPatch) -> None:
 
     args = SGLangConfig.build_args(config.sglang, tp_size=1, base_gpu_id=0)
     assert args["enable_weights_cpu_backup"] is True
+    assert args["max_total_tokens"] == 32768
+    assert args["max_mamba_cache_size"] == 8
+    assert args["max_total_tokens"] >= config.sglang.context_length * config.sglang.max_running_requests
 
 
 def test_areal_bridge_install_is_idempotent(monkeypatch: pytest.MonkeyPatch) -> None:

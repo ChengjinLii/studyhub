@@ -11,6 +11,9 @@ from training.rl.config import StudyHubAgentGRPOConfig, StudyHubSGLangConfig
 class OPDSGLangConfig(StudyHubSGLangConfig):
     # LoRA updates do not reload base weights after SGLang releases them.
     enable_weights_cpu_backup: bool = True
+    # Pinned SGLang supports these pool caps; AReaL's base dataclass omits them.
+    max_total_tokens: int = 32768
+    max_mamba_cache_size: int = 8
 
 
 @dataclass

@@ -117,6 +117,8 @@ def validate_shared_resource_policy(config: Any, args: Any, authorization: dict[
         "max_own_used_mib": args.max_own_used_mib,
         "min_runtime_free_mib": args.min_runtime_free_mib,
         "sglang_mem_fraction_static": config.sglang.mem_fraction_static,
+        "sglang_max_total_tokens": config.sglang.max_total_tokens,
+        "sglang_max_mamba_cache_size": config.sglang.max_mamba_cache_size,
         "max_concurrent_rollouts": config.rollout.max_concurrent_rollouts,
         "max_running_requests": config.sglang.max_running_requests,
     }

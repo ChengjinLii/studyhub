@@ -200,8 +200,11 @@ sglang:
   sampling_backend: pytorch
   max_running_requests: 2
   context_length: 16384
-  # Smaller model/KV pool for shared H100s; keep the token/algorithm budget.
-  mem_fraction_static: 0.40
+  # Keep the working profiler fraction, but cap actual pools for two 16K requests.
+  mem_fraction_static: 0.65
+  max_total_tokens: 32768
+  max_mamba_cache_size: 8
+  log_level: info
   # release_memory_occupation needs this to release weights, KV, and graphs.
   enable_memory_saver: true
   # Preserve base parameters across release/resume; updates reload only LoRA.

@@ -169,3 +169,26 @@ launcher has been cancelled. Generic launchers remain exclusive by default.
 
 The new policy is fixed in the program, authorization and run metadata.
 Primary reference: [SGLang memory and scheduling arguments](https://docs.sglang.io/docs/advanced_features/server_arguments).
+
+### Shared-pool initialization correction
+
+Attempt `20260905_144153` at commit `7dd340a` failed before any optimizer step.
+SGLang rejected a nonpositive profiled token capacity at fraction `0.40`.
+This was not a foreign-PID guard stop or evidence of an OPD update failure.
+The secondary `PPOTrainer.saver` cleanup exception is not the startup cause.
+GPU telemetry peaked at 37,200 / 45,653 MiB total with no external processes.
+
+The pinned SGLang profiler subtracts `(1 - fraction) * pre_load_free` from
+post-load free memory and then reserves Mamba states. A fraction is therefore
+not an independent cap on KV tokens. The failed logs do not expose both profiler
+inputs, so they do not establish which reservation exhausted that estimate.
+
+For the retry, restore the previously working `0.65` profiler fraction and use
+SGLang's explicit `max_total_tokens=32768` and `max_mamba_cache_size=8` caps.
+Two 16K requests retain their context budget; eight states also cover two
+requests at the pinned non-overlap Mamba cache ratio of four. Enable SGLang
+INFO logs to retain actual pool sizing. These two existing upstream arguments
+are exposed only in the OPD configuration dataclass, not an upstream patch.
+The 52,000-MiB own-memory cap, 68,000-MiB total cap, 12,000-MiB free reserve and
+concurrency of two remain unchanged. Successful reduced-memory operation is
+pending a real retry, not inferred from these settings.
