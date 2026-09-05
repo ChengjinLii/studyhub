@@ -258,3 +258,41 @@ Tracked evidence and raw artifact hashes:
 `docs/training/evidence/qwen35-4b-opd-shared-lr1e6-20260905.json`.
 Next: the independently M2-initialized `3e-6` probe, then LR selection and
 the existing pilot checks. No new teacher data or Sealed evaluation is used.
+
+## LR probes completed; 64-update pilot preparation
+
+The second probe (`20260905_155117`, code `e156a2c`) finished at 16:11:55
+with exit zero. It completed 16 updates and 64 rollouts, scoring 10,754
+assistant tokens. Its final adapter is
+`5d6fa6808f12266229c09aac069dd3aadc078eee9f93874ec6222bc0c7d2a0dd`;
+all 208 tensors changed from M2 and remain finite. Peak owned GPU memory
+was 47,642 MiB and no foreign GPU process was observed.
+
+Both probes used the same 32 tasks twice. Reward task counters, initial
+request prompt multisets and policy-version prompt cohorts match. They
+started with the exact same M2 adapter and authorization. Training tool
+validity was 0.89245 / 0.91875 for `1e-6` / `3e-6`; maximum pre-clip gradient
+norm was 8.0012 / 7.9625. The pre-existing stability rule selects `3e-6`,
+not because of a claimed downstream quality improvement.
+
+Retrospective raw interaction audit found 214 / 200 interactions, mean full
+sequence lengths 953.58 / 922.25, and all decoded completions ending in
+`<|im_end|>`. Group dumps contain both samples, so 32 files represent 64
+rollouts. These observations supplement, but do not overwrite, the missing
+generation metrics in the original immutable stage markers.
+
+The pilot adds generation telemetry to the existing OPD update: count real
+unpadded interactions, terminal EOS/pad absence, prompt-plus-completion
+length and the last generated suffix length. It does not infer truncation
+from a batch's padded width, change the loss mask, or alter the objective.
+No-EOS is a terminal-token diagnostic, not a recorded provider finish reason.
+Pilot/formal recording requires coverage of every update and retains the
+existing thresholds. The runtime hash is renewed in the authorization;
+model, data, optimizer and resource limits are unchanged.
+
+Selection and raw evidence are in
+`docs/training/evidence/qwen35-4b-opd-lr-selection.json` and
+`docs/training/evidence/qwen35-4b-opd-lr-probe-comparison-20260905.json`.
+The 64-update pilot starts from frozen M2 with batch 4 and selected LR
+`3e-6`, rather than continuing either short probe. Formal 300 updates and
+independent quality evaluation remain pending. No new data is collected.

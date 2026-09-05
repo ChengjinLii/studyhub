@@ -216,6 +216,52 @@ def _flatten_sequence_lengths(data: list[dict[str, Any]]) -> list[int]:
     return lengths
 
 
+def opd_generation_diagnostics(data: list[dict[str, Any]], *, stop_token_ids: set[int]) -> dict[str, float]:
+    """Measure exported interactions, not padded widths or whole episodes.
+
+    AReaL preserves generated EOS/pad tokens in each interaction's input_ids.
+    Missing terminal tokens are a no-EOS diagnostic, not a provider finish_reason.
+    This does not mask, drop, or otherwise change any training token.
+    """
+
+    if not stop_token_ids:
+        raise ValueError("OPD diagnostics require tokenizer EOS/pad IDs")
+    lengths: list[int] = []
+    output_lengths: list[int] = []
+    no_eos = 0
+    for item in data:
+        tensors = [item.get(key) for key in ("input_ids", "attention_mask", "loss_mask")]
+        if any(not isinstance(value, torch.Tensor) or value.ndim != 2 for value in tensors):
+            raise ValueError("OPD diagnostics require [interactions, sequence] tensors")
+        ids, attention, loss = [value.detach().cpu() for value in tensors]
+        if ids.shape != attention.shape or ids.shape != loss.shape:
+            raise ValueError("OPD diagnostic tensor shapes differ")
+        if not torch.all((attention == 0) | (attention == 1)) or not torch.all((loss == 0) | (loss == 1)):
+            raise ValueError("OPD diagnostic masks must be binary")
+        if torch.any(loss.bool() & ~attention.bool()):
+            raise ValueError("OPD loss mask includes padding")
+        for row in range(ids.shape[0]):
+            active = attention[row].bool()
+            active_ids, active_loss = ids[row][active], loss[row][active]
+            if active_ids.numel() == 0 or active_loss[-1].item() != 1:
+                raise ValueError("OPD interaction must end with generated assistant tokens")
+            lengths.append(active_ids.numel())
+            # Count only the last generated suffix, even in concatenated multi-turn exports.
+            output_lengths.append(int(active_loss.flip(0).long().cumprod(0).sum().item()))
+            no_eos += int(int(active_ids[-1].item()) not in stop_token_ids)
+    if not lengths:
+        raise ValueError("OPD generation diagnostics received an empty batch")
+    return {
+        "no_eos_ratios/avg": no_eos / len(lengths),
+        "seq_len/avg": sum(lengths) / len(lengths),
+        "seq_len/max": float(max(lengths)),
+        "opd_completion_length_mean": sum(output_lengths) / len(output_lengths),
+        "opd_completion_length_max": float(max(output_lengths)),
+        "opd_interaction_count": float(len(lengths)),
+        "opd_no_eos_interaction_count": float(no_eos),
+    }
+
+
 def _split_sparse_outputs(
     padded: torch.Tensor,
     meta: Any,
@@ -611,6 +657,12 @@ def _opd_update(
     self.train()
     self._ensure_ready()
     self.optimizer_zero_grad()
+    generation_stats = opd_generation_diagnostics(
+        data,
+        stop_token_ids={
+            value for value in (self.tokenizer.eos_token_id, self.tokenizer.pad_token_id) if value is not None
+        },
+    )
     prepared = _prepare_opd_input(data)
     input_batched, _ = self._normalize_batch_input(prepared)
     mb_list = _prepare_opd_microbatches(self, input_batched).to(self.device)
@@ -705,6 +757,7 @@ def _opd_update(
         raise RuntimeError("OPD update contains no trainable assistant tokens")
     stats["opd_loss"] = float((loss_totals[0] / loss_totals[1]).item())
     stats.update(aggregate_opd_diagnostics(diagnostic_rows))
+    stats.update(generation_stats)
     return stats
 
 

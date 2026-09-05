@@ -90,6 +90,11 @@ def main() -> int:
     update_success = optional_series(metrics, "update_successful")
     no_eos = optional_series(metrics, "no_eos_ratios/avg")
     seq_len = optional_series(metrics, "seq_len/avg")
+    if args.mode in {"pilot", "formal"}:
+        if len(no_eos) != args.expected_updates or len(seq_len) != args.expected_updates:
+            raise RuntimeError("OPD generation metric coverage does not match expected updates")
+        if any(not 0 <= value <= 1 for value in no_eos) or any(value <= 0 for value in seq_len):
+            raise RuntimeError("OPD generation metrics are outside their valid range")
     if any(
         len(values) != args.expected_updates
         for values in (opd_loss, overlap, advantage, absolute_gap, scored_tokens, grad_norm)
@@ -165,6 +170,14 @@ def main() -> int:
             "hard_gate_rate": sum(hard_gates) / len(hard_gates),
             "no_eos_rate_mean": mean_no_eos,
             "sequence_length_mean": mean_seq_len,
+        },
+        "generation_metric_definition": {
+            "no_eos": (
+                "fraction of unpadded exported interactions without terminal tokenizer EOS/pad; "
+                "not provider finish_reason"
+            ),
+            "sequence_length": "unpadded prompt plus completion tokens per exported interaction",
+            "aggregation": "mean of per-update interaction means",
         },
         "initialization": initialization,
         "checkpoint": {

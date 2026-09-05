@@ -19,6 +19,7 @@ from training.opd.areal_runtime import (
     assistant_prediction_mask,
     compute_opd_diagnostics,
     install_areal_opd_bridge,
+    opd_generation_diagnostics,
     prediction_turn_ids,
 )
 
@@ -203,6 +204,64 @@ def test_opd_sequence_lengths_flatten_all_interactions_without_padding() -> None
     ]
 
     assert _flatten_sequence_lengths(trajectories) == [5, 4, 3, 7, 6]
+
+
+def test_opd_generation_diagnostics_use_actual_terminal_tokens_not_padding_width() -> None:
+    rows = [
+        {
+            "input_ids": torch.tensor([[8, 2, 9, 0], [8, 2, 3, 4], [0, 8, 2, 9]]),
+            "attention_mask": torch.tensor([[1, 1, 1, 0], [1, 1, 1, 1], [0, 1, 1, 1]]),
+            "loss_mask": torch.tensor([[0, 1, 1, 0], [0, 1, 1, 1], [0, 0, 1, 1]]),
+        }
+    ]
+    before = {key: value.clone() for key, value in rows[0].items()}
+    stats = opd_generation_diagnostics(rows, stop_token_ids={0, 9})
+    assert stats["no_eos_ratios/avg"] == pytest.approx(1 / 3)
+    assert stats["seq_len/avg"] == pytest.approx(10 / 3)
+    assert stats["opd_completion_length_mean"] == pytest.approx(7 / 3)
+    assert stats["opd_interaction_count"] == 3
+    assert stats["seq_len/max"] == 4
+    assert all(torch.equal(value, before[key]) for key, value in rows[0].items())
+
+
+def test_opd_generation_diagnostics_count_last_completion_not_previous_turns() -> None:
+    row = {
+        "input_ids": torch.tensor([[8, 2, 9, 8, 2, 3, 9]]),
+        "attention_mask": torch.ones(1, 7),
+        "loss_mask": torch.tensor([[0, 1, 1, 0, 1, 1, 1]]),
+    }
+    stats = opd_generation_diagnostics([row], stop_token_ids={9})
+    assert stats["opd_completion_length_mean"] == 3
+    assert stats["no_eos_ratios/avg"] == 0
+
+
+@pytest.mark.parametrize("invalid", ["padding_loss", "nonbinary", "empty", "no_assistant", "shape"])
+def test_opd_generation_diagnostics_reject_invalid_masks(invalid: str) -> None:
+    row = {
+        "input_ids": torch.tensor([[8, 2, 9, 0]]),
+        "attention_mask": torch.tensor([[1, 1, 1, 0]]),
+        "loss_mask": torch.tensor([[0, 1, 1, 0]]),
+    }
+    if invalid == "padding_loss":
+        row["loss_mask"][0, -1] = 1
+    elif invalid == "nonbinary":
+        row["attention_mask"][0, 0] = 2
+    elif invalid == "empty":
+        row["attention_mask"].zero_()
+        row["loss_mask"].zero_()
+    elif invalid == "no_assistant":
+        row["loss_mask"].zero_()
+    else:
+        row["loss_mask"] = row["loss_mask"][:, :2]
+    with pytest.raises(ValueError):
+        opd_generation_diagnostics([row], stop_token_ids={9})
+
+
+def test_opd_generation_diagnostics_require_data_and_stop_tokens() -> None:
+    with pytest.raises(ValueError, match="empty batch"):
+        opd_generation_diagnostics([], stop_token_ids={9})
+    with pytest.raises(ValueError, match="EOS/pad"):
+        opd_generation_diagnostics([], stop_token_ids=set())
 
 
 def test_opd_sparse_outputs_split_interactions_and_trim_sequence_axis() -> None:

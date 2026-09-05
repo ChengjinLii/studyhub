@@ -1,0 +1,98 @@
+{
+  "schema_version": "studyhub.qwen35-4b-opd-lr-selection.v1",
+  "status": "PASS_OPD_LR_SELECTION",
+  "selected_learning_rate": 3e-06,
+  "selection_rule": "prefer_3e-6_when_both_pass_and_no_grad_tool_or_length_instability; otherwise_select_the_only_passing_pilot",
+  "same_prompt_seed_contract": true,
+  "high_lr_stable": true,
+  "failures": [],
+  "pilots": {
+    "1e-6": {
+      "schema_version": "studyhub.qwen35-4b-opd-stage.v1",
+      "status": "PASS_OPD_LR_MICRO_PILOT",
+      "mode": "lr1e6",
+      "learning_rate": 1e-06,
+      "optimizer_updates": 16,
+      "rollout_rows": 64,
+      "metrics": {
+        "opd_loss_mean": 0.210728125,
+        "opd_loss_final": 0.14429,
+        "grad_norm_mean": 3.15193125,
+        "grad_norm_max": 8.0012,
+        "teacher_student_overlap_mean": 0.606625,
+        "teacher_logprob_advantage_mean": 4.1838,
+        "teacher_logprob_gap_abs_mean": 5.0552,
+        "teacher_scored_tokens": 11530,
+        "tool_validity_mean": 0.892447921875,
+        "hard_gate_rate": 0.1875,
+        "no_eos_rate_mean": null,
+        "sequence_length_mean": null
+      },
+      "initialization": {
+        "status": "PASS",
+        "keys_match": true,
+        "tensor_count": 208,
+        "first_mismatched_keys": [],
+        "left_sha256": "4b7ee7462d82cd17a7c55fdb27335eee70b4df7a08f282697efafc577c173e6e",
+        "right_sha256": "4b7ee7462d82cd17a7c55fdb27335eee70b4df7a08f282697efafc577c173e6e"
+      },
+      "checkpoint": {
+        "global_step": 15,
+        "path": "/data/chengjin/studyhub/studyhub-agent/artifacts/areal/opd-attempts/qwen35-4b-opd-lr1e6-seed-20260827-attempt-20260905_152303/checkpoints/chengjin/studyhub-qwen35-4b-strict-opd/qwen35-4b-opd-lr1e6-seed-20260827/default/epoch0epochstep15globalstep15/adapter_model.safetensors",
+        "sha256": "040e3ac1f917687c2202d2eeb8428f453f8594d407a2c0b0dbefc317d8368831",
+        "lora_updated": true
+      },
+      "failures": [],
+      "authorization_sha256": "a9587c1c90bd9d4d68573453a17933accdcd9d0705d4e572dc825ad40c04decc",
+      "trainer_metrics_sha256": "b904b1a6ca8376f202cdcd9a6be2568a898c3b1617867c457f80839092e71f88",
+      "sealed_used": false,
+      "main_grpo_started": false
+    },
+    "3e-6": {
+      "schema_version": "studyhub.qwen35-4b-opd-stage.v1",
+      "status": "PASS_OPD_LR_MICRO_PILOT",
+      "mode": "lr3e6",
+      "learning_rate": 3e-06,
+      "optimizer_updates": 16,
+      "rollout_rows": 64,
+      "metrics": {
+        "opd_loss_mean": 0.20711175,
+        "opd_loss_final": 0.14552,
+        "grad_norm_mean": 2.536334375,
+        "grad_norm_max": 7.9625,
+        "teacher_student_overlap_mean": 0.6111037500000001,
+        "teacher_logprob_advantage_mean": 4.18359375,
+        "teacher_logprob_gap_abs_mean": 5.04411875,
+        "teacher_scored_tokens": 10754,
+        "tool_validity_mean": 0.91875,
+        "hard_gate_rate": 0.109375,
+        "no_eos_rate_mean": null,
+        "sequence_length_mean": null
+      },
+      "initialization": {
+        "status": "PASS",
+        "keys_match": true,
+        "tensor_count": 208,
+        "first_mismatched_keys": [],
+        "left_sha256": "4b7ee7462d82cd17a7c55fdb27335eee70b4df7a08f282697efafc577c173e6e",
+        "right_sha256": "4b7ee7462d82cd17a7c55fdb27335eee70b4df7a08f282697efafc577c173e6e"
+      },
+      "checkpoint": {
+        "global_step": 15,
+        "path": "/data/chengjin/studyhub/studyhub-agent/artifacts/areal/opd-attempts/qwen35-4b-opd-lr3e6-seed-20260827-attempt-20260905_155117/checkpoints/chengjin/studyhub-qwen35-4b-strict-opd/qwen35-4b-opd-lr3e6-seed-20260827/default/epoch0epochstep15globalstep15/adapter_model.safetensors",
+        "sha256": "5d6fa6808f12266229c09aac069dd3aadc078eee9f93874ec6222bc0c7d2a0dd",
+        "lora_updated": true
+      },
+      "failures": [],
+      "authorization_sha256": "a9587c1c90bd9d4d68573453a17933accdcd9d0705d4e572dc825ad40c04decc",
+      "trainer_metrics_sha256": "01056dc7665a0f614fb9fadd18444c8e1081b81b77104bee1bb4c5c5d39a673e",
+      "sealed_used": false,
+      "main_grpo_started": false
+    }
+  },
+  "lineage": {
+    "lr1e6_sha256": "95caa49c5c47f11cd1f9a39b4e494462d935ba2a0e1bb607e9fed3131b3a85eb",
+    "lr3e6_sha256": "780981dc1b2f17978653877103e648dc24a2c435c2b9c5d3d6dd79f3359cbf93"
+  },
+  "sealed_used": false
+}

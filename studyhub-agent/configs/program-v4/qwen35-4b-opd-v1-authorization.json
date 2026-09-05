@@ -21,7 +21,7 @@
     "program_sha256": "a89f0ae53e13bd496deddd40b3a13e03378861542fb5df6ed139af7c7dd3fd46",
     "config_sha256": "a06cbad7f65e1a24f1c948f3566d640814fc0c08d69ebc06654c89939fc55c82",
     "opd_upstream_lock_sha256": "d8b135de3148e10dfc64fbe65b30d81d4771fead377b1e0c85453d3a9b396830",
-    "opd_runtime_sha256": "0fb4c624cc2ada5140c679f68e6dd25d1ad2ceccaa6b92189d04cd775f6684f6",
+    "opd_runtime_sha256": "03b0ddb009fadab718381656436a907663dc5f4f6c90d8a8c991cd277ee6eb1d",
     "runtime_sitecustomize_sha256": "d08f24ba168aa8089b334146d1c92c800bd0b9e52fe4a831e57193bf08b339a1",
     "opd_parity_sha256": "ba0df4b3c237728bd6e6dfddb8e55c17d2f09e8c316686bfba1179334ed52183",
     "prompt_pool_manifest_sha256": "1bb617b5cce6979e30ed9abab4034def2e273a7e16c1d73a18206ee0b154ab78",
