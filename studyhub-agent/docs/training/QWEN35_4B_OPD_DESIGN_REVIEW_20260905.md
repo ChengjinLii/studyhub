@@ -38,9 +38,11 @@ evidence.
    enough to isolate at most 8 prompts x 2 samples x 6 turns per update.
    This changes packing, not the global batch or token-mean objective.
 4. Colocated SGLang must actually release memory. Enable its memory saver,
-   and use scheduling environment variables to disable AReaL's process-wide
-   TMS region only for the rollout worker. Otherwise SGLang's tagged regions
-   nest inside the inherited region and fail at initialization. Actor offload
+   and isolate AReaL's process-wide TMS region in `SGLangBackend.build_server_env`
+   only for the new inference subprocess. The 12:47 attempt proved scheduling
+   environment overrides ineffective: colocated workers inherit the actor's
+   environment. Otherwise SGLang's tagged regions nest inside the inherited
+   region and fail at initialization. Actor offload
    remains enabled. Do not bypass the 79,000 MiB/foreign-process guard.
 
 ## Unchanged algorithm and execution

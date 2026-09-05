@@ -786,6 +786,20 @@ def install_areal_opd_bridge() -> None:
     """Install the OPD worker methods on the pinned AReaL process."""
 
     from areal.engine.fsdp_engine import FSDPEngine, FSDPPPOActor
+    from areal.engine.sglang_remote import SGLangBackend
+
+    if not getattr(SGLangBackend.build_server_env, "_studyhub_opd_tms_boundary", False):
+        original_server_env = SGLangBackend.build_server_env
+
+        def build_sglang_owned_memory_env(env: Any) -> dict[str, str]:
+            # Colocated workers inherit actor env; isolate only the new server.
+            child_env = original_server_env(env)
+            child_env["TMS_INIT_ENABLE"] = "0"
+            child_env["TMS_INIT_ENABLE_CPU_BACKUP"] = "0"
+            return child_env
+
+        build_sglang_owned_memory_env._studyhub_opd_tms_boundary = True
+        SGLangBackend.build_server_env = staticmethod(build_sglang_owned_memory_env)
 
     _install_single_rank_rpc_broadcast_bridge()
     _install_idempotent_fsdp_offload_bridge(FSDPEngine)

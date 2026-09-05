@@ -67,6 +67,7 @@ LOG_FILE="${LOG_ROOT}/${ATTEMPT_ID}.log"
 GPU_CSV="${LOG_ROOT}/${ATTEMPT_ID}.gpu.csv"
 RUN_METADATA="${LOG_ROOT}/${ATTEMPT_ID}.run.json"
 SGLANG_OVERLAY_AUDIT="${LOG_ROOT}/${ATTEMPT_ID}.sglang-overlay.json"
+EVIDENCE_ROOT="${ARTIFACT_ROOT}/artifacts/experiments/${ATTEMPT_ID}"
 DATA_MANIFEST="${ARTIFACT_ROOT}/datasets/processed/opd_prompt_pool_v1_1/manifest.json"
 PILOT_MARKER="${ARTIFACT_ROOT}/artifacts/areal/checkpoints/$(id -un)/${EXPERIMENT}/qwen35-4b-opd-pilot-seed-20260827/QWEN35_4B_OPD_PILOT_PASS.json"
 case "${MODE}" in
@@ -215,6 +216,7 @@ EVIDENCE_TIER="DIAGNOSTIC"
 [[ "${MODE}" == "formal" ]] && EVIDENCE_TIER="CLAIM"
 if ! "${VENV_DIR}/bin/python" "${PROJECT_ROOT}/scripts/train/build_experiment_evidence.py" \
   --run-metadata "${RUN_METADATA}" \
+  --output "${EVIDENCE_ROOT}" \
   --reward-root "${REWARD_ROOT}" \
   --checkpoint-root "${CHECKPOINT_ROOT}" \
   --trajectory-root "${TRAJECTORY_ROOT}" \
@@ -224,7 +226,7 @@ if ! "${VENV_DIR}/bin/python" "${PROJECT_ROOT}/scripts/train/build_experiment_ev
   [[ "${STATUS}" -ne 0 ]] || STATUS=74
 fi
 
-TRAINER_METRICS="${ARTIFACT_ROOT}/artifacts/experiments/${TRIAL}/metrics/trainer.json"
+TRAINER_METRICS="${EVIDENCE_ROOT}/metrics/trainer.json"
 if [[ "${STATUS}" -eq 0 ]]; then
   "${VENV_DIR}/bin/python" "${PROJECT_ROOT}/scripts/train/record_qwen35_4b_opd_stage.py" \
     --mode "${MODE}" \

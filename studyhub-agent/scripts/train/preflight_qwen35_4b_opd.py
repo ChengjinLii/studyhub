@@ -92,8 +92,6 @@ def validate_rollout_memory_config(config: Any) -> None:
                 "Colocated OPD requires enable_offload=true and "
                 "sglang.enable_memory_saver=true; otherwise rollout memory stays resident during backward"
             )
-        if any(str(spec.env_vars.get("TMS_INIT_ENABLE")) != "0" for spec in config.rollout.scheduling_spec):
-            raise RuntimeError("SGLang must own its TMS regions: rollout TMS_INIT_ENABLE must be 0")
 
 
 def parse_args() -> argparse.Namespace:

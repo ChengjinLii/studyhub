@@ -50,18 +50,8 @@ rollout:
   scheduling_strategy:
     type: colocation
     target: actor
-  scheduling_spec:
-    - task_type: worker
-      port_count: 2
-      gpu: 1
-      cpu: 8
-      mem: 64
-      cmd: python3 -m areal.infra.rpc.rpc_server
-      env_vars:
-        LD_LIBRARY_PATH: ${oc.env:STUDYHUB_CUDA_RUNTIME_LIBRARY_PATH}
-        # SGLang tags its own regions; AReaL's process-wide region would nest.
-        TMS_INIT_ENABLE: "0"
-        TMS_INIT_ENABLE_CPU_BACKUP: "0"
+  # Colocation forks actor workers; the OPD bridge isolates SGLang's TMS env.
+  scheduling_spec: ${actor.scheduling_spec}
   use_lora: true
   fileroot: ${cluster.fileroot}
   tokenizer_path: ${tokenizer_path}

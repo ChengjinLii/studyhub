@@ -5,7 +5,17 @@
   "status": "FAILED_SGLANG_NESTED_TMS_REGION",
   "optimizer_updates": 0,
   "root_cause": "SGLang tagged memory region nested inside inherited TMS_INIT_ENABLE=1 process-wide region",
-  "repair": "Set TMS_INIT_ENABLE=0 and TMS_INIT_ENABLE_CPU_BACKUP=0 only on rollout scheduling environment; keep SGLang memory saver and actor offload enabled",
+  "initial_repair": "Rollout scheduling env TMS overrides; later disproved by the colocated worker fork",
+  "repair": "Override SGLangBackend.build_server_env only for the new inference subprocess; actor retains process-wide TMS and SGLang retains tagged memory saver",
+  "followup_attempt": {
+    "attempt_id": "qwen35-4b-opd-lr1e6-seed-20260827-attempt-20260905_124708",
+    "run_commit": "25c41e9",
+    "status": "FAILED_SGLANG_NESTED_TMS_REGION",
+    "optimizer_updates": 0,
+    "finding": "LocalScheduler._fork_worker inherits target actor env; rollout scheduling env overrides are not applied",
+    "log_sha256": "6bc39bd9d1d2347f7447dd162501e23dc471ef2e16d211893472b7066cf22996",
+    "gpu_csv_sha256": "d510bc28fdc8dd0eb53c86ed70f094ba789c134ea47cce0838f6f68c0aa4f242"
+  },
   "tagged_cuda_pause_resume_probe": "PASS_EXACT_CONTENT_RESTORATION",
   "full_training_after_repair": "NOT_YET_VERIFIED",
   "log_sha256": "86eb4feaa920221b6784d64535677b7a2b7d4a72400d8200d39edf9594c28840",

@@ -306,10 +306,6 @@ def test_opd_config_is_fail_closed(monkeypatch: pytest.MonkeyPatch) -> None:
 
     validate_rollout_memory_config(config)
     assert config.sglang.enable_memory_saver is True
-    assert config.rollout.scheduling_spec[0].env_vars["TMS_INIT_ENABLE"] == "0"
-    config.rollout.scheduling_spec[0].env_vars["TMS_INIT_ENABLE"] = "1"
-    with pytest.raises(RuntimeError, match="SGLang must own"):
-        validate_rollout_memory_config(config)
 
 
 def test_areal_bridge_install_is_idempotent(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -325,6 +321,15 @@ def test_areal_bridge_install_is_idempotent(monkeypatch: pytest.MonkeyPatch) -> 
     assert callable(FSDPPPOActor.opd_score_selected)
     assert callable(FSDPPPOActor.opd_update)
     assert os.environ.get("STUDYHUB_OPD_STUDENT_ADAPTER") is None
+    from areal.engine.sglang_remote import SGLangBackend
+
+    actor_env = {"TMS_INIT_ENABLE": "1", "TMS_INIT_ENABLE_CPU_BACKUP": "1", "CUDA_VISIBLE_DEVICES": "0"}
+    child_env = SGLangBackend.build_server_env(actor_env)
+    assert child_env["TMS_INIT_ENABLE"] == "0"
+    assert child_env["TMS_INIT_ENABLE_CPU_BACKUP"] == "0"
+    assert child_env["CUDA_VISIBLE_DEVICES"] == "0"
+    assert actor_env["TMS_INIT_ENABLE"] == "1"
+    assert actor_env["TMS_INIT_ENABLE_CPU_BACKUP"] == "1"
 
 
 def test_opd_bridge_skips_only_single_rank_rpc_broadcast(
