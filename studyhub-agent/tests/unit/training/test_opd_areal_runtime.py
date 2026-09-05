@@ -24,6 +24,19 @@ from training.opd.areal_runtime import (
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 
 
+@pytest.mark.parametrize("actor_offload,rollout_saver", [(True, False), (False, True), (False, False)])
+def test_colocated_opd_rejects_inactive_memory_release(actor_offload: bool, rollout_saver: bool) -> None:
+    from scripts.train.preflight_qwen35_4b_opd import validate_rollout_memory_config
+
+    config = SimpleNamespace(
+        rollout=SimpleNamespace(scheduling_strategy=SimpleNamespace(type="colocation", target="actor")),
+        enable_offload=actor_offload,
+        sglang=SimpleNamespace(enable_memory_saver=rollout_saver),
+    )
+    with pytest.raises(RuntimeError, match="Colocated OPD requires"):
+        validate_rollout_memory_config(config)
+
+
 def test_opd_launcher_separates_code_and_artifact_roots() -> None:
     launcher = (PROJECT_ROOT / "scripts/train/run_qwen35_4b_opd.sh").read_text()
     config = (PROJECT_ROOT / "configs/train/qwen35-4b-strict-opd.yaml").read_text()
@@ -260,6 +273,10 @@ def test_opd_config_is_fail_closed(monkeypatch: pytest.MonkeyPatch) -> None:
     assert config.actor.kl_ctl == 0
     assert config.ref is None
     assert config.teacher.engine_type == "train"
+    from scripts.train.preflight_qwen35_4b_opd import validate_rollout_memory_config
+
+    validate_rollout_memory_config(config)
+    assert config.sglang.enable_memory_saver is True
 
 
 def test_areal_bridge_install_is_idempotent(monkeypatch: pytest.MonkeyPatch) -> None:

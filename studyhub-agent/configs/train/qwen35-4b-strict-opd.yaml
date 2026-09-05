@@ -198,6 +198,8 @@ sglang:
   max_running_requests: 4
   context_length: 16384
   mem_fraction_static: 0.65
+  # release_memory_occupation needs this to release weights, KV, and graphs.
+  enable_memory_saver: true
   enable_lora: true
   max_lora_rank: 32
   max_loaded_loras: 1

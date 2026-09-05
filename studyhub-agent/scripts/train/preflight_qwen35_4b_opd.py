@@ -84,6 +84,16 @@ def gpu_state(gpus: str) -> dict[str, Any]:
     }
 
 
+def validate_rollout_memory_config(config: Any) -> None:
+    strategy = config.rollout.scheduling_strategy
+    if strategy.type == "colocation" and strategy.target == "actor":
+        if not config.enable_offload or not config.sglang.enable_memory_saver:
+            raise RuntimeError(
+                "Colocated OPD requires enable_offload=true and "
+                "sglang.enable_memory_saver=true; otherwise rollout memory stays resident during backward"
+            )
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--mode", choices=("lr1e6", "lr3e6", "pilot", "formal"), required=True)
@@ -134,6 +144,7 @@ def main() -> int:
         f"rollout.consumer_batch_size={args.batch_size}",
     ]
     config, _ = load_expr_config(overrides, StudyHubOPDConfig)
+    validate_rollout_memory_config(config)
     pool = Path(config.environment_root).resolve()
     sglang_overlay = Path(config.sglang.model_path).resolve()
     paths = {
