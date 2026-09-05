@@ -17,6 +17,21 @@
     "gpu_csv_sha256": "d510bc28fdc8dd0eb53c86ed70f094ba789c134ea47cce0838f6f68c0aa4f242"
   },
   "tagged_cuda_pause_resume_probe": "PASS_EXACT_CONTENT_RESTORATION",
+  "weight_backup_followup": {
+    "attempt_id": "qwen35-4b-opd-lr1e6-seed-20260827-attempt-20260905_130748",
+    "run_commit": "5edd111",
+    "status": "STOPPED_INVALID_ROLLOUT_BASE_WEIGHT_RESTORE",
+    "optimizer_updates": 0,
+    "completed_trajectories": 4,
+    "actual_tool_calls": 0,
+    "finding": "SGLang model loader disables weight CPU backup by default; resume restores only buffers unless parameter backup is enabled. Adapter-only updates cannot restore base weights.",
+    "repair": "Enable official enable_weights_cpu_backup through an OPD-local SGLangConfig extension; reject LoRA colocation without backup.",
+    "secondary_finding": "OPD thinking=false was not transmitted on ordinary requests; only forced-final requests carried it.",
+    "termination": "SIGTERM to own process group 1010456 before any recorded optimizer update; TMS also emitted an out-of-memory message in the terminal log",
+    "log_sha256": "eedf800ca1955216873d4eee3d2d038c4e7cf30ff0064f10ebd29a3e0350a1b7",
+    "reward_jsonl_sha256": "42b1eed80d75f2b58f293bbfeeb3bcbaa3b115dac4a21e9075b7efce84d3c8ca",
+    "policy_quality_evidence": false
+  },
   "full_training_after_repair": "ROLLOUT_STARTED_THEN_FOREIGN_GPU_PROCESS_GUARD",
   "post_repair_attempt": {
     "attempt_id": "qwen35-4b-opd-lr1e6-seed-20260827-attempt-20260905_125612",

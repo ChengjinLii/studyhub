@@ -63,6 +63,34 @@ def test_opd_launcher_separates_code_and_artifact_roots() -> None:
     assert "model_overlay = artifact_root /" in probe
 
 
+def test_lora_only_opd_rejects_base_weights_without_cpu_backup() -> None:
+    from scripts.train.preflight_qwen35_4b_opd import validate_rollout_memory_config
+
+    config = SimpleNamespace(
+        rollout=SimpleNamespace(scheduling_strategy=SimpleNamespace(type="colocation", target="actor"), use_lora=True),
+        enable_offload=True,
+        sglang=SimpleNamespace(enable_memory_saver=True, enable_weights_cpu_backup=False),
+    )
+    with pytest.raises(RuntimeError, match="weight CPU backup"):
+        validate_rollout_memory_config(config)
+    config.sglang.enable_weights_cpu_backup = True
+    validate_rollout_memory_config(config)
+
+
+def test_opd_disables_thinking_without_changing_other_workflows() -> None:
+    from training.rl.hermes_workflow_v3 import StudyHubHermesWorkflowV3
+
+    workflow = object.__new__(StudyHubHermesWorkflowV3)
+    workflow.temperature, workflow.top_p = 0.7, 1.0
+    workflow.enable_thinking = None
+    assert workflow._request_overrides() == {"temperature": 0.7, "top_p": 1.0}
+    workflow.enable_thinking = False
+    overrides = workflow._request_overrides()
+    assert overrides["extra_body"]["chat_template_kwargs"]["enable_thinking"] is False
+    assert overrides["metadata"] == {"studyhub_chat_template": "disable_thinking_v1"}
+    assert '"enable_thinking": False' in (PROJECT_ROOT / "training/opd/driver.py").read_text()
+
+
 def test_prediction_mask_does_not_cross_trajectory_boundaries() -> None:
     mask = torch.tensor([[0, 0, 1, 1], [0, 1, 0, 1]], dtype=torch.float32)
 
@@ -306,6 +334,11 @@ def test_opd_config_is_fail_closed(monkeypatch: pytest.MonkeyPatch) -> None:
 
     validate_rollout_memory_config(config)
     assert config.sglang.enable_memory_saver is True
+    assert config.sglang.enable_weights_cpu_backup is True
+    from areal.api.cli_args import SGLangConfig
+
+    args = SGLangConfig.build_args(config.sglang, tp_size=1, base_gpu_id=0)
+    assert args["enable_weights_cpu_backup"] is True
 
 
 def test_areal_bridge_install_is_idempotent(monkeypatch: pytest.MonkeyPatch) -> None:

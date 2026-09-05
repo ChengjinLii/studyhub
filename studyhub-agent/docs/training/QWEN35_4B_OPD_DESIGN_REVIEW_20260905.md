@@ -44,6 +44,17 @@ evidence.
    environment. Otherwise SGLang's tagged regions nest inside the inherited
    region and fail at initialization. Actor offload
    remains enabled. Do not bypass the 79,000 MiB/foreign-process guard.
+5. A subsequent real rollout exposed SGLang's separate weight-backup contract:
+   `enable_memory_saver` alone reallocates parameters without restoring their
+   values. Since OPD reloads only adapters, enable the official
+   `enable_weights_cpu_backup` option. The aborted attempt produced four
+   incoherent, zero-tool trajectories and no optimizer update; it is excluded
+   from all policy-quality claims. CPU-backup unit probes with explicit backup
+   did not establish that the model loader actually enabled that option.
+6. Explicitly disable thinking on every OPD request, using both chat-template
+   kwargs and the existing AReaL metadata bridge. Previously only forced-final
+   requests disabled it, inconsistent with the declared M2/teacher contract.
+   Other workflows keep their prior default.
 
 ## Unchanged algorithm and execution
 

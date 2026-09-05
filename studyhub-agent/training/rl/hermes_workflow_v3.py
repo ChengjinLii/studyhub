@@ -13,6 +13,8 @@ from studyhub_agent.integrations.hermes_registry import HermesRegistryOverlay
 from training.rl.dataset_v3 import budget_for, validate_public_task
 from training.rl.environment_v3 import TrainingTaskEnvironmentV3
 from training.rl.hermes_workflow import (
+    _AREAL_CHAT_TEMPLATE_METADATA_KEY,
+    _AREAL_DISABLE_THINKING_VALUE,
     _CONTEXT_LIMIT_PATTERN,
     ContextBudgetController,
     StudyHubHermesWorkflow,
@@ -76,6 +78,18 @@ def _enable_v3_guardrails(agent: Any, tool_names: list[str], mutating_tools: set
 class StudyHubHermesWorkflowV3(StudyHubHermesWorkflow):
     """Hermes policy loop over v3 open-path tasks and Reward v3."""
 
+    def __init__(self, *, enable_thinking: bool | None = None, **kwargs: Any) -> None:
+        super().__init__(**kwargs)
+        self.enable_thinking = enable_thinking
+
+    def _request_overrides(self) -> dict[str, Any]:
+        overrides: dict[str, Any] = {"temperature": self.temperature, "top_p": self.top_p}
+        if self.enable_thinking is False:
+            overrides["extra_body"] = {"chat_template_kwargs": {"enable_thinking": False}}
+            # The SDK consumes extra_body; this existing proxy contract survives HTTP.
+            overrides["metadata"] = {_AREAL_CHAT_TEMPLATE_METADATA_KEY: _AREAL_DISABLE_THINKING_VALUE}
+        return overrides
+
     async def run(self, data: dict[str, Any], **extra_kwargs: Any) -> float:
         data = decode_public_task_row(data)
         validate_public_task(data)
@@ -135,7 +149,7 @@ class StudyHubHermesWorkflowV3(StudyHubHermesWorkflow):
                 tool_progress_mode="off",
                 session_id=f"{task_id}-{uuid.uuid4().hex[:12]}",
                 max_tokens=self.max_tokens,
-                request_overrides={"temperature": self.temperature, "top_p": self.top_p},
+                request_overrides=self._request_overrides(),
                 platform="batch",
                 skip_context_files=True,
                 load_soul_identity=False,

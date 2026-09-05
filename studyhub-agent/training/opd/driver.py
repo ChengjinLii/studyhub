@@ -36,6 +36,7 @@ def main(args: list[str]) -> int:
         "run_kind": "train",
         "seed": config.seed,
         "max_turns": config.max_turns,
+        "enable_thinking": False,
         "tokenizer_path": config.tokenizer_path,
         "engine_max_tokens": config.rollout.agent.engine_max_tokens,
         "context_finalization_ratio": config.context_finalization_ratio,

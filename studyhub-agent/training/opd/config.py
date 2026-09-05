@@ -4,11 +4,18 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from training.rl.config import StudyHubAgentGRPOConfig
+from training.rl.config import StudyHubAgentGRPOConfig, StudyHubSGLangConfig
+
+
+@dataclass
+class OPDSGLangConfig(StudyHubSGLangConfig):
+    # LoRA updates do not reload base weights after SGLang releases them.
+    enable_weights_cpu_backup: bool = True
 
 
 @dataclass
 class StudyHubOPDConfig(StudyHubAgentGRPOConfig):
+    sglang: OPDSGLangConfig = field(default_factory=OPDSGLangConfig)
     opd_top_k: int = field(default=16)
     opd_student_temperature: float = field(default=0.7)
     opd_teacher_temperature: float = field(default=1.0)
@@ -40,15 +47,11 @@ class StudyHubOPDConfig(StudyHubAgentGRPOConfig):
         if self.opd_top_k != 16:
             raise ValueError("canonical OPD requires top_k=16")
         if self.actor.kl_ctl != 0:
-            raise ValueError(
-                "canonical OPD requires standard reference KL to be disabled"
-            )
+            raise ValueError("canonical OPD requires standard reference KL to be disabled")
         if self.ref is not None:
             raise ValueError("canonical OPD must not configure a reference model")
         if self.teacher is None or self.teacher.engine_type != "train":
-            raise ValueError(
-                "canonical OPD requires the frozen AReaL train-engine teacher"
-            )
+            raise ValueError("canonical OPD requires the frozen AReaL train-engine teacher")
         if self.actor.backend != "fsdp:d1":
             raise ValueError("strict two-H100 OPD requires actor backend fsdp:d1")
         if self.rollout.backend != "sglang:d1":
@@ -56,9 +59,7 @@ class StudyHubOPDConfig(StudyHubAgentGRPOConfig):
         if self.teacher.train is None or self.teacher.train.backend != "fsdp:d1":
             raise ValueError("strict two-H100 OPD requires teacher backend fsdp:d1")
         if self.gconfig.n_samples != 2:
-            raise ValueError(
-                "canonical OPD requires exactly two student rollouts per prompt"
-            )
+            raise ValueError("canonical OPD requires exactly two student rollouts per prompt")
         if self.max_turns > 6:
             raise ValueError("canonical OPD pilot is limited to six assistant turns")
         if self.gconfig.max_new_tokens > 4096:

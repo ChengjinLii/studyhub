@@ -92,6 +92,11 @@ def validate_rollout_memory_config(config: Any) -> None:
                 "Colocated OPD requires enable_offload=true and "
                 "sglang.enable_memory_saver=true; otherwise rollout memory stays resident during backward"
             )
+        if config.rollout.use_lora and not config.sglang.enable_weights_cpu_backup:
+            raise RuntimeError(
+                "LoRA-only OPD requires SGLang weight CPU backup; resume without backup "
+                "reallocates uninitialized base parameters"
+            )
 
 
 def parse_args() -> argparse.Namespace:
