@@ -192,3 +192,41 @@ are exposed only in the OPD configuration dataclass, not an upstream patch.
 The 52,000-MiB own-memory cap, 68,000-MiB total cap, 12,000-MiB free reserve and
 concurrency of two remain unchanged. Successful reduced-memory operation is
 pending a real retry, not inferred from these settings.
+
+### Dense Qwen LoRA buffer misclassification
+
+The next attempt `20260905_145803` initialized successfully and generated its
+first student tool trajectories. The guard stopped only our group at 59,976 MiB
+owned memory during the rollout-to-training transition; no optimizer update was
+completed. Raising the guard was not the remedy.
+
+A one-worker diagnostic localized the allocation to `init_lora_manager`:
+allocated memory rose from 8,756 to 44,166 MiB. Its tensor inventory included
+32 buffers of each shape `(1,512,32,9216)`, `(1,512,64,2560)`,
+`(1,512,2560,32)` and `(1,512,18432,32)`. Explicit KV/Mamba limits did work:
+the pool had 32,768 tokens and two requests. Pausing KV and weights still left
+36,904 MiB, because these LoRA buffers are outside those releasable regions.
+
+Root cause in the pinned runtime: SGLang's dense `Qwen3_5TextConfig` inherits
+`Qwen3NextConfig`, including its default `num_experts=512`. The Qwen dense
+forward implementation selects its MLP by model type, but `LoRAMemoryPool`
+uses `num_experts > 1` to allocate expert-shaped buffers. The SGLang-only
+overlay now explicitly sets nested `text_config.num_experts=1` for dense
+models and refuses to apply this change to a MoE configuration. Model weights,
+architecture, adapters and original model configuration remain untouched.
+
+Raw diagnostic logs: `artifacts/diagnostics/opd-memory-20260905/`. The first
+standalone probes needed environment/constructor corrections; `probe6.log`
+contains the allocation evidence but exits abnormally during teardown after
+pausing live tensors. It is a diagnostic, not a successful training run.
+The retry must validate reduced allocation and real OPD updates under the same
+shared memory limits before any stage can pass.
+
+With the corrected dense overlay, `probe7.log` measured 8,838 MiB allocated
+after LoRA initialization (formerly 44,166), 11,878 MiB device use after full
+inference initialization (formerly 47,206), and 1,576 MiB after releasing KV,
+weights and graphs (formerly 36,904). The spurious 512-expert tensors vanished;
+the KV pool still contained 32,768 tokens and two request slots. This isolates
+35,328 MiB of unnecessary resident buffers without lowering model precision.
+The one-off worker's interpreter teardown still aborts even after resume;
+these measurements establish allocation behavior, not a clean service run.

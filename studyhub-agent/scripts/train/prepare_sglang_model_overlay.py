@@ -31,6 +31,13 @@ def prepare_overlay(model: Path, output: Path) -> dict[str, object]:
     text_config = config.get("text_config")
     if config.get("model_type") != "qwen3_5" or not isinstance(text_config, dict):
         raise ValueError(f"expected a composite Qwen3.5 config: {config_path}")
+    if text_config.get("model_type", "qwen3_5_text") != "qwen3_5_text" or any(
+        text_config.get(name) not in (None, 0, 1) for name in ("num_experts", "num_local_experts", "n_routed_experts")
+    ):
+        raise ValueError("dense Qwen3.5 overlay must not rewrite a MoE architecture")
+    # Pinned SGLang's dense text config inherits Qwen3Next's 512-expert default.
+    # The dense forward path is correct, but LoRAMemoryPool misclassifies its MLP.
+    text_config["num_experts"] = 1
 
     mapped = {}
     for name in LORA_CONFIG_FIELDS:
@@ -59,6 +66,7 @@ def prepare_overlay(model: Path, output: Path) -> dict[str, object]:
         "base_config_sha256": sha256_bytes(config_path.read_bytes()),
         "overlay_config_sha256": sha256_bytes(config_payload),
         "mapped_text_config_fields": mapped,
+        "dense_lora_num_experts": 1,
         "weight_files_are_symlinks": True,
     }
     (output / "studyhub_sglang_overlay_manifest.json").write_text(
