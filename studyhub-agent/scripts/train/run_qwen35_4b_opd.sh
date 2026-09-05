@@ -14,8 +14,10 @@ SGLANG_MODEL="${ARTIFACT_ROOT}/artifacts/areal/model-overlays/qwen35-4b-opd-sgla
 MODE="${1:-}"
 SEED="${2:-20260827}"
 GPUS="${STUDYHUB_TRAIN_GPUS:-0,1}"
-MIN_FREE="${STUDYHUB_MIN_GPU_FREE_MIB:-76000}"
-MAX_USED="${STUDYHUB_MAX_GPU_USED_MIB:-79000}"
+MIN_FREE="${STUDYHUB_MIN_GPU_FREE_MIB:-64000}"
+MAX_USED="${STUDYHUB_MAX_GPU_USED_MIB:-68000}"
+MAX_OWN_USED=52000
+MIN_RUNTIME_FREE=12000
 
 case "${MODE}" in
   lr1e6) LEARNING_RATE="1e-6"; UPDATES=16; BATCH_SIZE=2; CHECKPOINT_EVERY=1 ;;
@@ -133,6 +135,10 @@ PREFLIGHT_ARGS=(
   --batch-size "${BATCH_SIZE}"
   --gpus "${GPUS}"
   --min-free-mib "${MIN_FREE}"
+  --allow-shared-gpu
+  --max-used-mib "${MAX_USED}"
+  --max-own-used-mib "${MAX_OWN_USED}"
+  --min-runtime-free-mib "${MIN_RUNTIME_FREE}"
 )
 if [[ "${MODE}" == "pilot" || "${MODE}" == "formal" ]]; then
   PREFLIGHT_ARGS+=(--lr-selection "${LR_SELECTION}")
@@ -181,6 +187,9 @@ done
   --gpu "${GPUS}" \
   --max-used-mib "${MAX_USED}" \
   --min-free-mib "${MIN_FREE}" \
+  --allow-shared-gpu \
+  --max-own-used-mib "${MAX_OWN_USED}" \
+  --min-runtime-free-mib "${MIN_RUNTIME_FREE}" \
   --log-file "${LOG_FILE}" \
   --gpu-csv "${GPU_CSV}" \
   "${METADATA_ARGS[@]}"
@@ -202,6 +211,9 @@ set +e
   --gpus "${GPUS}" \
   --min-free-mib "${MIN_FREE}" \
   --max-used-mib "${MAX_USED}" \
+  --allow-shared-gpu \
+  --max-own-used-mib "${MAX_OWN_USED}" \
+  --min-runtime-free-mib "${MIN_RUNTIME_FREE}" \
   --max-wall-seconds 28800 \
   --interrupt-grace-seconds 180 \
   --log "${LOG_FILE}" \

@@ -59,7 +59,12 @@ def test_opd_launcher_separates_code_and_artifact_roots() -> None:
     assert "SGLANG_OVERLAY_AUDIT" in launcher
     assert "qwen35-4b-opd-sglang-lora" in config
     assert "model_path: ${actor.path}" not in config
-    assert "mem_fraction_static: 0.65" in config
+    assert "mem_fraction_static: 0.40" in config
+    assert "max_concurrent_rollouts: 2" in config
+    assert "max_running_requests: 2" in config
+    assert launcher.count("--allow-shared-gpu") == 3
+    assert launcher.count('--max-own-used-mib "${MAX_OWN_USED}"') == 3
+    assert launcher.count('--min-runtime-free-mib "${MIN_RUNTIME_FREE}"') == 3
     assert config.count("LD_LIBRARY_PATH: ${oc.env:STUDYHUB_CUDA_RUNTIME_LIBRARY_PATH}") >= 5
     assert 'REWARD_ROOT="${ARTIFACT_ROOT}/artifacts/areal/strict-opd/rewards/${TRIAL}/${ATTEMPT_ID}"' in launcher
 
@@ -81,6 +86,50 @@ def test_lora_only_opd_rejects_base_weights_without_cpu_backup() -> None:
         validate_rollout_memory_config(config)
     config.sglang.enable_weights_cpu_backup = True
     validate_rollout_memory_config(config)
+
+
+def test_opd_shared_admission_requires_headroom_not_empty_gpu() -> None:
+    from scripts.train.preflight_qwen35_4b_opd import validate_gpu_admission
+
+    state = {"gpus": [{"memory_free_mib": 65000}, {"memory_free_mib": 67000}], "compute_pids": [123]}
+    validate_gpu_admission(state, allow_shared=True, min_free_mib=64000)
+    with pytest.raises(RuntimeError, match="sharing policy"):
+        validate_gpu_admission(state, allow_shared=False, min_free_mib=64000)
+    state["gpus"][0]["memory_free_mib"] = 63999
+    with pytest.raises(RuntimeError, match="memory gate"):
+        validate_gpu_admission(state, allow_shared=True, min_free_mib=64000)
+
+
+def test_opd_shared_resource_limits_are_frozen() -> None:
+    from scripts.train.preflight_qwen35_4b_opd import validate_shared_resource_policy
+
+    config = SimpleNamespace(
+        sglang=SimpleNamespace(mem_fraction_static=0.4, max_running_requests=2),
+        rollout=SimpleNamespace(max_concurrent_rollouts=2),
+    )
+    args = SimpleNamespace(
+        allow_shared_gpu=True,
+        min_free_mib=64000,
+        max_used_mib=68000,
+        max_own_used_mib=52000,
+        min_runtime_free_mib=12000,
+    )
+    auth = {
+        "resource_policy": {
+            "mode": "budgeted_shared",
+            "min_start_free_mib": 64000,
+            "max_total_used_mib": 68000,
+            "max_own_used_mib": 52000,
+            "min_runtime_free_mib": 12000,
+            "sglang_mem_fraction_static": 0.4,
+            "max_concurrent_rollouts": 2,
+            "max_running_requests": 2,
+        }
+    }
+    validate_shared_resource_policy(config, args, auth)
+    args.max_own_used_mib = 70000
+    with pytest.raises(RuntimeError, match="differs from authorization"):
+        validate_shared_resource_policy(config, args, auth)
 
 
 def test_opd_disables_thinking_without_changing_other_workflows() -> None:

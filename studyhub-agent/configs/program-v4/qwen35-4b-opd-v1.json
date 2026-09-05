@@ -64,6 +64,19 @@
     "maximum_assistant_tokens": 4096,
     "maximum_turns": 6
   },
+  "resource_policy": {
+    "mode": "budgeted_shared",
+    "min_start_free_mib": 64000,
+    "max_total_used_mib": 68000,
+    "max_own_used_mib": 52000,
+    "min_runtime_free_mib": 12000,
+    "sglang_mem_fraction_static": 0.40,
+    "max_concurrent_rollouts": 2,
+    "max_running_requests": 2,
+    "foreign_pid_alone_is_stop_condition": false,
+    "stop_only_own_process_group": true,
+    "gpu_compute_isolation_guaranteed": false
+  },
   "hard_stops": [
     "teacher_novelty_gate_failed",
     "tokenizer_or_vocabulary_mismatch",
@@ -73,7 +86,7 @@
     "opd_parity_failed",
     "nan_or_inf",
     "lora_not_updated",
-    "foreign_gpu_pid",
+    "gpu_resource_budget_exceeded",
     "checkpoint_corruption"
   ]
 }

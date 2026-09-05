@@ -140,3 +140,32 @@ Full attempt artifacts and checkpoint hashes are preserved under
 Tracked summary: `docs/training/evidence/qwen35-4b-opd-saved-update-20260905.json`.
 The 16-step probe, second LR probe, 64-step pilot, formal run and downstream
 comparison are still incomplete/not run. No model-quality conclusion is made.
+
+## User-authorized shared GPU policy
+
+The subsequent user instruction explicitly permits coexistence with other GPU
+jobs when StudyHub uses fewer resources. This supersedes the earlier exclusive
+foreign-PID stop policy for this OPD experiment only. The old deferred idle-only
+launcher has been cancelled. Generic launchers remain exclusive by default.
+
+- SGLang static model/KV allocation: 0.65 -> 0.40; serving and rollout
+  concurrency: 4 -> 2. This follows SGLang's documented memory-pool controls,
+  not quantization, a new teacher, or a different distillation objective.
+- Per selected GPU, admission needs 64,000 MiB free. Runtime monitors cap our
+  process group's aggregate memory at 52,000 MiB and all use at 68,000 MiB,
+  retaining at least 12,000 MiB free. Foreign PIDs alone no longer cause a stop.
+- Other jobs may grow into the remaining space. If the reserve or either cap
+  is breached, only our process group is stopped. Unknown process-memory
+  accounting also fails closed. No other job, clock, power limit or MPS setting
+  is changed.
+- Telemetry separately records owned/external memory and external process count.
+  These are sampled application guards, not a hard VRAM partition or a guarantee
+  of isolated GPU compute throughput. Lower concurrency can still affect timing
+  and stochastic rollout ordering; do not claim bitwise-equivalent trajectories.
+- The model, M2 initialization, teacher, data, seed, learning rates, group size,
+  per-mode batch/update counts, context budget and OPD loss remain unchanged.
+  This is another independent M2-starting 16-step probe, not continuation from
+  the interrupted adapter without optimizer state.
+
+The new policy is fixed in the program, authorization and run metadata.
+Primary reference: [SGLang memory and scheduling arguments](https://docs.sglang.io/docs/advanced_features/server_arguments).

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Launch one explicit training command while yielding to every unrelated GPU job."""
+"""Launch one training group with exclusive or explicitly budgeted shared GPUs."""
 
 from __future__ import annotations
 
@@ -62,6 +62,51 @@ def process_group(pid: int) -> int | None:
         return None
 
 
+def memory_ownership(gpu: str, own_pgid: int) -> dict:
+    result = subprocess.run(
+        ["nvidia-smi", "-i", gpu, "--query-compute-apps=pid,used_gpu_memory", "--format=csv,noheader,nounits"],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    own_mib, foreign_mib, foreign_pids = 0, 0, []
+    for row in result.stdout.splitlines():
+        if not row.strip():
+            continue
+        values = [part.strip() for part in row.split(",")]
+        if len(values) != 2 or not all(value.isdigit() for value in values):
+            raise RuntimeError(f"GPU {gpu}: process memory accounting unavailable")
+        pid, memory = map(int, values)
+        if process_group(pid) == own_pgid:
+            own_mib += memory
+        else:
+            foreign_mib += memory
+            foreign_pids.append(pid)
+    return {"own_mib": own_mib, "foreign_mib": foreign_mib, "foreign_pids": foreign_pids}
+
+
+def validate_resource_sample(
+    *,
+    gpu: str,
+    used_mib: int,
+    free_mib: int,
+    ownership: dict,
+    allow_shared: bool,
+    max_used_mib: int,
+    max_own_used_mib: int | None,
+    min_runtime_free_mib: int,
+) -> None:
+    if used_mib > max_used_mib:
+        raise RuntimeError(f"GPU {gpu} reached {used_mib} MiB; total guard is {max_used_mib} MiB")
+    if allow_shared:
+        if max_own_used_mib is None or ownership["own_mib"] > max_own_used_mib:
+            raise RuntimeError(f"GPU {gpu}: own memory {ownership['own_mib']} MiB exceeds guard {max_own_used_mib}")
+        if free_mib < min_runtime_free_mib:
+            raise RuntimeError(f"GPU {gpu}: free memory {free_mib} MiB below shared reserve {min_runtime_free_mib}")
+    elif ownership["foreign_pids"]:
+        raise RuntimeError(f"unrelated compute processes appeared on GPU {gpu}: {ownership['foreign_pids']}")
+
+
 def process_group_exists(pgid: int) -> bool:
     try:
         os.killpg(pgid, 0)
@@ -117,6 +162,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--gpus", required=True)
     parser.add_argument("--min-free-mib", type=int, required=True)
     parser.add_argument("--max-used-mib", type=int, required=True)
+    parser.add_argument("--allow-shared-gpu", action="store_true")
+    parser.add_argument("--max-own-used-mib", type=int)
+    parser.add_argument("--min-runtime-free-mib", type=int, default=0)
     parser.add_argument("--log", type=Path, required=True)
     parser.add_argument("--gpu-csv", type=Path, required=True)
     parser.add_argument("--max-wall-seconds", type=int)
@@ -136,6 +184,13 @@ def main() -> int:
         raise ValueError("--max-wall-seconds must be positive")
     if args.interrupt_grace_seconds < 1:
         raise ValueError("--interrupt-grace-seconds must be positive")
+    if args.allow_shared_gpu and (
+        args.max_own_used_mib is None
+        or args.max_own_used_mib <= 0
+        or args.min_runtime_free_mib <= 0
+        or args.min_free_mib < args.max_own_used_mib + args.min_runtime_free_mib
+    ):
+        raise ValueError("shared GPUs require an explicit own-memory cap and reserved headroom at admission")
     command = args.command[1:] if args.command[0] == "--" else args.command
 
     initial = nvidia_query(",".join(gpus), "index,memory.free")
@@ -145,7 +200,7 @@ def main() -> int:
         if int(free) < args.min_free_mib:
             raise RuntimeError(f"GPU {gpu} has {free} MiB free; require {args.min_free_mib} MiB")
         pids = compute_pids(gpu)
-        if pids:
+        if pids and not args.allow_shared_gpu:
             raise RuntimeError(f"GPU {gpu} already has compute processes: {pids}")
 
     args.log.parent.mkdir(parents=True, exist_ok=True)
@@ -163,6 +218,9 @@ def main() -> int:
                 "memory_free_mib",
                 "utilization_gpu_pct",
                 "power_w",
+                "own_memory_used_mib",
+                "foreign_memory_used_mib",
+                "foreign_process_count",
             ]
         )
         csv_stream.flush()
@@ -184,17 +242,43 @@ def main() -> int:
                     "index,memory.used,memory.free,utilization.gpu,power.draw",
                 )
                 timestamp = datetime.now().astimezone().isoformat(timespec="seconds")
+                if len(samples) != len(gpus) or any(len(sample) != 5 for sample in samples):
+                    raise RuntimeError("GPU telemetry became incomplete")
                 for sample in samples:
-                    writer.writerow([timestamp, *sample])
-                    if int(sample[1]) > args.max_used_mib:
-                        raise RuntimeError(f"GPU {sample[0]} reached {sample[1]} MiB; guard is {args.max_used_mib} MiB")
-                csv_stream.flush()
-                for gpu in gpus:
-                    unrelated = [pid for pid in compute_pids(gpu) if process_group(pid) not in (None, process.pid)]
-                    if unrelated:
-                        raise RuntimeError(f"unrelated compute processes appeared on GPU {gpu}: {unrelated}")
+                    gpu = sample[0]
+                    ownership = (
+                        memory_ownership(gpu, process.pid)
+                        if args.allow_shared_gpu
+                        else {
+                            "own_mib": None,
+                            "foreign_mib": None,
+                            "foreign_pids": [
+                                pid for pid in compute_pids(gpu) if process_group(pid) not in (None, process.pid)
+                            ],
+                        }
+                    )
+                    writer.writerow(
+                        [
+                            timestamp,
+                            *sample,
+                            ownership["own_mib"],
+                            ownership["foreign_mib"],
+                            len(ownership["foreign_pids"]),
+                        ]
+                    )
+                    csv_stream.flush()
+                    validate_resource_sample(
+                        gpu=gpu,
+                        used_mib=int(sample[1]),
+                        free_mib=int(sample[2]),
+                        ownership=ownership,
+                        allow_shared=args.allow_shared_gpu,
+                        max_used_mib=args.max_used_mib,
+                        max_own_used_mib=args.max_own_used_mib,
+                        min_runtime_free_mib=args.min_runtime_free_mib,
+                    )
                 time.sleep(5)
-        except (KeyboardInterrupt, RuntimeError) as exc:
+        except (KeyboardInterrupt, RuntimeError, subprocess.SubprocessError, OSError, ValueError) as exc:
             print(f"GPU guard stopped only process group {process.pid}: {exc}", file=sys.stderr)
             if isinstance(exc, (KeyboardInterrupt, WallTimeExceeded)):
                 interrupt_group(process, args.interrupt_grace_seconds)

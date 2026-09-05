@@ -18,8 +18,8 @@
     "teacher_executes_tools": false
   },
   "lineage": {
-    "program_sha256": "c41ada10e228631f490041f7552c5ed1eb2db381908317c0a4155a6f4f010a5e",
-    "config_sha256": "1d64f32bcfeaf99276464b6f1fec1313ee21f2e4be53c2f25fdb83eeb8939aae",
+    "program_sha256": "cc65ae702f198e93e3eb0a8856453d8a95b415189c15cb92c2918224a72b803c",
+    "config_sha256": "f169d942fca2671e3efbad1396218ad328e61eb7484021a6ead1be92465ed530",
     "opd_upstream_lock_sha256": "d8b135de3148e10dfc64fbe65b30d81d4771fead377b1e0c85453d3a9b396830",
     "opd_runtime_sha256": "0fb4c624cc2ada5140c679f68e6dd25d1ad2ceccaa6b92189d04cd775f6684f6",
     "runtime_sitecustomize_sha256": "d08f24ba168aa8089b334146d1c92c800bd0b9e52fe4a831e57193bf08b339a1",
@@ -84,6 +84,19 @@
     "formal_batch_size": 8,
     "checkpoint_every_updates": 50,
     "maximum_wall_seconds": 28800
+  },
+  "resource_policy": {
+    "mode": "budgeted_shared",
+    "min_start_free_mib": 64000,
+    "max_total_used_mib": 68000,
+    "max_own_used_mib": 52000,
+    "min_runtime_free_mib": 12000,
+    "sglang_mem_fraction_static": 0.4,
+    "max_concurrent_rollouts": 2,
+    "max_running_requests": 2,
+    "foreign_pid_alone_is_stop_condition": false,
+    "stop_only_own_process_group": true,
+    "gpu_compute_isolation_guaranteed": false
   },
   "hard_gates": {
     "novelty_status": "PASS_TEACHER_NOVELTY",

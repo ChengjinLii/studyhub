@@ -99,6 +99,31 @@ def validate_rollout_memory_config(config: Any) -> None:
             )
 
 
+def validate_gpu_admission(state: dict[str, Any], *, allow_shared: bool, min_free_mib: int) -> None:
+    if len(state["gpus"]) != 2 or (state["compute_pids"] and not allow_shared):
+        raise RuntimeError(f"OPD requires two GPUs under the requested sharing policy: {state}")
+    low_memory = [row for row in state["gpus"] if row["memory_free_mib"] < min_free_mib]
+    if low_memory:
+        raise RuntimeError(f"requested GPUs do not meet memory gate: {low_memory}")
+
+
+def validate_shared_resource_policy(config: Any, args: Any, authorization: dict[str, Any]) -> None:
+    policy = authorization.get("resource_policy", {})
+    if policy.get("mode") != "budgeted_shared" or not args.allow_shared_gpu:
+        raise RuntimeError("OPD requires explicit budgeted-shared GPU authorization")
+    actual = {
+        "min_start_free_mib": args.min_free_mib,
+        "max_total_used_mib": args.max_used_mib,
+        "max_own_used_mib": args.max_own_used_mib,
+        "min_runtime_free_mib": args.min_runtime_free_mib,
+        "sglang_mem_fraction_static": config.sglang.mem_fraction_static,
+        "max_concurrent_rollouts": config.rollout.max_concurrent_rollouts,
+        "max_running_requests": config.sglang.max_running_requests,
+    }
+    if any(policy.get(key) != value for key, value in actual.items()):
+        raise RuntimeError(f"shared OPD resource policy differs from authorization: {actual}")
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--mode", choices=("lr1e6", "lr3e6", "pilot", "formal"), required=True)
@@ -112,6 +137,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--pilot-marker", type=Path)
     parser.add_argument("--gpus", default="0,1")
     parser.add_argument("--min-free-mib", type=int, default=76000)
+    parser.add_argument("--allow-shared-gpu", action="store_true")
+    parser.add_argument("--max-used-mib", type=int)
+    parser.add_argument("--max-own-used-mib", type=int)
+    parser.add_argument("--min-runtime-free-mib", type=int, default=0)
     return parser.parse_args()
 
 
@@ -150,6 +179,7 @@ def main() -> int:
     ]
     config, _ = load_expr_config(overrides, StudyHubOPDConfig)
     validate_rollout_memory_config(config)
+    validate_shared_resource_policy(config, args, authorization)
     pool = Path(config.environment_root).resolve()
     sglang_overlay = Path(config.sglang.model_path).resolve()
     paths = {
@@ -332,11 +362,7 @@ def main() -> int:
             raise RuntimeError("OPD pilot marker drift")
 
     state = gpu_state(args.gpus)
-    if len(state["gpus"]) != 2 or state["compute_pids"]:
-        raise RuntimeError(f"strict OPD requires two idle GPUs: {state}")
-    low_memory = [row for row in state["gpus"] if row["memory_free_mib"] < args.min_free_mib]
-    if low_memory:
-        raise RuntimeError(f"requested GPUs do not meet memory gate: {low_memory}")
+    validate_gpu_admission(state, allow_shared=args.allow_shared_gpu, min_free_mib=args.min_free_mib)
     print(
         json.dumps(
             {
@@ -354,6 +380,7 @@ def main() -> int:
                 },
                 "sealed_used": False,
                 "gpu_state": state,
+                "resource_policy": authorization["resource_policy"],
             },
             ensure_ascii=False,
             indent=2,

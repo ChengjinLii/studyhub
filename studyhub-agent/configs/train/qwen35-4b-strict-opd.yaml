@@ -41,7 +41,7 @@ rollout:
   backend: sglang:d1
   experiment_name: ${experiment_name}
   trial_name: ${trial_name}
-  max_concurrent_rollouts: 4
+  max_concurrent_rollouts: 2
   queue_size: null
   consumer_batch_size: ${train_dataset.batch_size}
   max_head_offpolicyness: 0
@@ -198,9 +198,10 @@ sglang:
   disable_overlap_schedule: true
   enable_deterministic_inference: false
   sampling_backend: pytorch
-  max_running_requests: 4
+  max_running_requests: 2
   context_length: 16384
-  mem_fraction_static: 0.65
+  # Smaller model/KV pool for shared H100s; keep the token/algorithm budget.
+  mem_fraction_static: 0.40
   # release_memory_occupation needs this to release weights, KV, and graphs.
   enable_memory_saver: true
   # Preserve base parameters across release/resume; updates reload only LoRA.

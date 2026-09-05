@@ -177,7 +177,14 @@ def start(args: argparse.Namespace) -> None:
             "physical_gpus": args.gpu,
             "max_used_mib": args.max_used_mib,
             "min_free_mib": args.min_free_mib,
-            "foreign_process_policy": "stop only the StudyHub process group when an unrelated GPU process appears",
+            "foreign_process_policy": (
+                "allow shared GPU jobs; stop only StudyHub on own/total memory cap or reserved headroom breach"
+                if getattr(args, "allow_shared_gpu", False)
+                else "stop only the StudyHub process group when an unrelated GPU process appears"
+            ),
+            "sharing_enabled": getattr(args, "allow_shared_gpu", False),
+            "max_own_used_mib": getattr(args, "max_own_used_mib", None),
+            "min_runtime_free_mib": getattr(args, "min_runtime_free_mib", 0),
         },
         "log_file": str(args.log_file.resolve()),
         "gpu_csv": str(args.gpu_csv.resolve()),
@@ -240,6 +247,10 @@ def finish(args: argparse.Namespace) -> None:
         "peak_memory_used_mib": max(used, default=None),
         "peak_utilization_gpu_pct": max(utilization, default=None),
     }
+    for field in ("own_memory_used_mib", "foreign_memory_used_mib", "foreign_process_count"):
+        values = [int(row[field]) for row in rows if row.get(field)]
+        if values:
+            metadata["resource_summary"][f"peak_{field}"] = max(values)
     args.output.write_text(json.dumps(metadata, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 
@@ -261,6 +272,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--gpu", default="0")
     parser.add_argument("--max-used-mib", type=int, default=28672)
     parser.add_argument("--min-free-mib", type=int, default=60000)
+    parser.add_argument("--allow-shared-gpu", action="store_true")
+    parser.add_argument("--max-own-used-mib", type=int)
+    parser.add_argument("--min-runtime-free-mib", type=int, default=0)
     parser.add_argument("--log-file", type=Path)
     parser.add_argument("--gpu-csv", type=Path, required=True)
     parser.add_argument("--override", action="append", default=[])

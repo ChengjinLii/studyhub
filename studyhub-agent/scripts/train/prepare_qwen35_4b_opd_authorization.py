@@ -196,6 +196,7 @@ def main() -> int:
             "checkpoint_every_updates": 50,
             "maximum_wall_seconds": 28800,
         },
+        "resource_policy": program["resource_policy"],
         "hard_gates": {
             "novelty_status": novelty["status"],
             "teacher_successes": novelty["teacher_successes"],
