@@ -11,6 +11,8 @@ import SafeMarkdown from '../../components/SafeMarkdown';
 import ShareSheet from '../../components/ShareSheet';
 import CommentSection from '../../components/comments/CommentSection';
 import StarRating from '../../components/StarRating';
+import MaterialIconSprite from '../../components/MaterialIconSprite';
+import styles from '../../styles/MaterialDetail.module.css';
 import { useMobileBottomBar } from '../../components/mobile/MobileBottomBarProvider';
 import { readSession, hasRole } from '../../lib/auth';
 import { fetchMaterialDetail } from '../../lib/api';
@@ -79,10 +81,10 @@ export default function MaterialDetailPage({ material, user }: MaterialDetailPag
     handleShare,
   } = useMaterialActions({ material, user, canManage, isSuperAdmin, router });
   const [autoDownloadTriggered, setAutoDownloadTriggered] = useState(false);
+  const [contentTab, setContentTab] = useState<'preview' | 'comments'>('preview');
   const previewPageSize = 1;
   const uploaderLabel = material?.uploaderNickname || material?.uploaderUsername || '匿名同学';
-  const hasCustomPreview =
-    Boolean(material?.customPreviewText?.trim()) || (material?.customPreviewImages?.length ?? 0) > 0;
+  const hasCustomPreview = Boolean(material?.customPreviewText?.trim()) || (material?.customPreviewImages?.length ?? 0) > 0;
   const isManualPreview = Boolean(material?.previewSource === 'MANUAL');
   const isPdfMaterial = Boolean(material?.hasFile && material?.fileType?.toLowerCase() === 'pdf');
   const isExperienceMaterial = Boolean(material?.tags?.includes('经验分享'));
@@ -100,7 +102,7 @@ export default function MaterialDetailPage({ material, user }: MaterialDetailPag
       ? ordering
         ? '下单中...'
         : '立即下单'
-        : !canDownload
+      : !canDownload
         ? securityScanBlocked
           ? securityScanStatus === 'INFECTED'
             ? '文件未通过安全检查'
@@ -164,7 +166,6 @@ export default function MaterialDetailPage({ material, user }: MaterialDetailPag
     }
     return `${size.toFixed(unitIndex === 0 ? 0 : 1)} ${units[unitIndex]}`;
   };
-  const canViewNetdisk = Boolean(material?.hasNetdisk && (material.netdiskAccessible || canManage));
 
   const formattedRatingAvg = Number(ratingAvg ?? 0).toFixed(1);
   const detailCommentCount = material?.commentCount ?? material?.reviews.length ?? 0;
@@ -174,9 +175,7 @@ export default function MaterialDetailPage({ material, user }: MaterialDetailPag
     : 'MAJOR';
   const courseCategoryLabel = COURSE_CATEGORY_LABELS[resolvedCategory];
   const courseBreadcrumb =
-    resolvedCategory === 'MAJOR'
-      ? formatMajorDisplay(material?.major) || material?.college || '专业课'
-      : courseCategoryLabel;
+    resolvedCategory === 'MAJOR' ? formatMajorDisplay(material?.major) || material?.college || '专业课' : courseCategoryLabel;
 
   useEffect(() => {
     if (!router.isReady || autoDownloadTriggered || !material) {
@@ -184,7 +183,7 @@ export default function MaterialDetailPage({ material, user }: MaterialDetailPag
     }
     if (router.query.autoDownload === '1') {
       setAutoDownloadTriggered(true);
-      const targetId = material.hasFile ? 'download-card' : material.hasNetdisk ? 'netdisk-card' : null;
+      const targetId = material.hasFile || material.hasNetdisk ? 'download-card' : null;
       const proceed = async () => {
         if (material.hasFile) {
           await handleDownload();
@@ -210,6 +209,7 @@ export default function MaterialDetailPage({ material, user }: MaterialDetailPag
   return (
     <>
       <NavBar user={user} />
+      <MaterialIconSprite />
       <main className="container detail-container">
         {!material ? (
           <section className="card">
@@ -221,7 +221,17 @@ export default function MaterialDetailPage({ material, user }: MaterialDetailPag
           </section>
         ) : (
           <>
-            <section className={`card detail-hero${isExperienceMaterial ? ' detail-hero--experience' : ''}`} id={isExperienceMaterial ? 'article-overview' : 'download-card'}>
+            {!isExperienceMaterial && (
+              <nav className={styles.returnNav} aria-label="资料导航">
+                <Link href="/materials">返回资料库</Link>
+                <span aria-hidden="true">/</span>
+                <span>资料详情</span>
+              </nav>
+            )}
+            <section
+              className={isExperienceMaterial ? 'card detail-hero detail-hero--experience' : styles.sheet}
+              id={isExperienceMaterial ? 'article-overview' : 'download-card'}
+            >
               <div className="detail-main">
                 {isExperienceMaterial ? (
                   <div className="experience-hero">
@@ -237,30 +247,9 @@ export default function MaterialDetailPage({ material, user }: MaterialDetailPag
                               strokeLinecap="round"
                               strokeLinejoin="round"
                             />
-                            <circle
-                              cx="6"
-                              cy="12"
-                              r="2.5"
-                              fill="none"
-                              stroke="currentColor"
-                              strokeWidth="1.6"
-                            />
-                            <circle
-                              cx="18"
-                              cy="6"
-                              r="2.5"
-                              fill="none"
-                              stroke="currentColor"
-                              strokeWidth="1.6"
-                            />
-                            <circle
-                              cx="18"
-                              cy="18"
-                              r="2.5"
-                              fill="none"
-                              stroke="currentColor"
-                              strokeWidth="1.6"
-                            />
+                            <circle cx="6" cy="12" r="2.5" fill="none" stroke="currentColor" strokeWidth="1.6" />
+                            <circle cx="18" cy="6" r="2.5" fill="none" stroke="currentColor" strokeWidth="1.6" />
+                            <circle cx="18" cy="18" r="2.5" fill="none" stroke="currentColor" strokeWidth="1.6" />
                           </svg>
                         </span>
                         分享文章
@@ -312,9 +301,7 @@ export default function MaterialDetailPage({ material, user }: MaterialDetailPag
                         )}
                       </span>
                     </div>
-                    {copyrightOwner && (
-                      <p className="material-meta experience-hero__copyright">版权持有者：{copyrightOwner}</p>
-                    )}
+                    {copyrightOwner && <p className="material-meta experience-hero__copyright">版权持有者：{copyrightOwner}</p>}
                     <div className="material-tags material-tags--experience">
                       {material.tags
                         ?.filter((tag) => tag !== '经验分享')
@@ -326,15 +313,19 @@ export default function MaterialDetailPage({ material, user }: MaterialDetailPag
                     </div>
                   </div>
                 ) : (
-                  <div className="detail-main__surface">
-                    <div className="detail-main__header">
-                      <p className="breadcrumb">
-                        {material.school} / {courseBreadcrumb}
-                      </p>
+                  <div className={styles.reading}>
+                    <div className={styles.header}>
+                      <div className={styles.metadata}>
+                        {material.school && <span>{material.school}</span>}
+                        <span>{courseBreadcrumb}</span>
+                        {material.gradeValue && <span>{material.gradeValue}</span>}
+                      </div>
                       <h1>{material.title}</h1>
-                      <div className="detail-main__byline">
+                      <div className={styles.byline}>
+                        <span className={styles.avatar} aria-hidden="true">
+                          {Array.from(uploaderLabel)[0]}
+                        </span>
                         <span>
-                          发布者：
                           {material?.uploaderId ? (
                             <Link className="text-button" href={userPath(material.uploaderId, uploaderLabel)}>
                               {uploaderLabel}
@@ -343,38 +334,36 @@ export default function MaterialDetailPage({ material, user }: MaterialDetailPag
                             uploaderLabel
                           )}
                         </span>
+                        <span className={styles.bylineLabel}>发布的资料</span>
                         {copyrightOwner && <span>版权持有者：{copyrightOwner}</span>}
                       </div>
                     </div>
-                    {material.description ? (
-                      <div className="material-desc markdown-body">
-                        <SafeMarkdown>{material.description}</SafeMarkdown>
-                      </div>
-                    ) : (
-                      <p className="material-desc">投稿者暂无详细描述。</p>
-                    )}
-                    <div className="material-tags">
-                      {resolvedCategory !== 'MAJOR' && <span className="badge badge-ghost">{courseCategoryLabel}</span>}
-                      {material.gradeValue && <span className="badge">{material.gradeValue}</span>}
+                    <section className={styles.description} aria-label="资料简介">
+                      <h2>资料简介</h2>
+                      {material.description ? (
+                        <div className="markdown-body">
+                          <SafeMarkdown>{material.description}</SafeMarkdown>
+                        </div>
+                      ) : (
+                        <p>投稿者暂无详细描述。</p>
+                      )}
+                    </section>
+                    <div className={styles.tags}>
                       {material.tags?.map((tag) => (
-                        <Link key={tag} className="badge badge-outline" href={`/?tag=${encodeURIComponent(tag)}`}>
+                        <Link key={tag} href={`/?tag=${encodeURIComponent(tag)}`}>
                           #{tag}
                         </Link>
                       ))}
                     </div>
-                    <div className="detail-main__footer">
-                      <div className="rating-widget">
-                        <StarRating
-                          value={myRating ?? 0}
-                          onChange={handleRatingChange}
-                          readOnly={ratingSubmitting}
-                          size={30}
-                        />
+                    <div className={styles.footer}>
+                      <div className={styles.rating}>
+                        <StarRating value={myRating ?? 0} onChange={handleRatingChange} readOnly={ratingSubmitting} size={20} />
                         <p>
-                          平均 {formattedRatingAvg} / 5（{ratingCount} 人评分）{myRating ? ` · 我的评分 ${myRating} 星` : ''}
+                          {ratingCount ? `${formattedRatingAvg} / 5 · ${ratingCount} 人评分` : '暂无评分 · 0 人评价'}
+                          {myRating ? ` · 我的评分 ${myRating} 星` : ''}
                         </p>
                       </div>
-                      <div className="detail-share">
+                      <div className={styles.share}>
                         <button className="button ghost small" type="button" onClick={handleShare}>
                           <span className="button-icon" aria-hidden="true">
                             <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -386,33 +375,12 @@ export default function MaterialDetailPage({ material, user }: MaterialDetailPag
                                 strokeLinecap="round"
                                 strokeLinejoin="round"
                               />
-                              <circle
-                                cx="6"
-                                cy="12"
-                                r="2.5"
-                                fill="none"
-                                stroke="currentColor"
-                                strokeWidth="1.6"
-                              />
-                              <circle
-                                cx="18"
-                                cy="6"
-                                r="2.5"
-                                fill="none"
-                                stroke="currentColor"
-                                strokeWidth="1.6"
-                              />
-                              <circle
-                                cx="18"
-                                cy="18"
-                                r="2.5"
-                                fill="none"
-                                stroke="currentColor"
-                                strokeWidth="1.6"
-                              />
+                              <circle cx="6" cy="12" r="2.5" fill="none" stroke="currentColor" strokeWidth="1.6" />
+                              <circle cx="18" cy="6" r="2.5" fill="none" stroke="currentColor" strokeWidth="1.6" />
+                              <circle cx="18" cy="18" r="2.5" fill="none" stroke="currentColor" strokeWidth="1.6" />
                             </svg>
                           </span>
-                          分享链接
+                          分享
                         </button>
                       </div>
                     </div>
@@ -484,49 +452,45 @@ export default function MaterialDetailPage({ material, user }: MaterialDetailPag
                     {isExperienceMaterial && error && <p className="error-text">{error}</p>}
                     {!user && (
                       <p className="help-text">
-                        提示：<a className="login-link" href={`/login?next=${encodeURIComponent(router.asPath)}`}>登录</a>后可点赞与举报。
+                        提示：
+                        <a className="login-link" href={`/login?next=${encodeURIComponent(router.asPath)}`}>
+                          登录
+                        </a>
+                        后可点赞与举报。
                       </p>
                     )}
                   </>
                 )}
               </div>
               {!isExperienceMaterial && (
-                <div className="detail-price-card">
-                  <div className="detail-price-card__summary">
-                    <div className="detail-price-card__price-group">
-                      <span className="detail-price-card__eyebrow">{material.free ? '公开资料' : '付费资料'}</span>
-                      <span className={`price-tag detail${material.free ? ' free' : ''}`}>
+                <aside className={styles.access} aria-label="资料获取">
+                  <div className={styles.summary}>
+                    <div className={styles.priceGroup}>
+                      <span className={styles.eyebrow}>{material.free ? '公开资料' : '付费资料'}</span>
+                      <span className={`${styles.price}${material.free ? ` ${styles.free}` : ''}`}>
                         {material.free ? '免费' : `¥${material.price.toFixed(2)}`}
                       </span>
+                      <span className={styles.priceCaption}>
+                        {material.free ? '由创作者免费分享' : purchased && !canManage ? '已购买，可直接获取' : '一次购买，获取这份资料'}
+                      </span>
                     </div>
-                    <span className="detail-price-card__type">{material.hasFile ? '站内文件' : '网盘资料'}</span>
-                  </div>
-                  <div className="detail-price-card__stats" aria-label="资料数据">
-                    <span className="detail-price-card__stat">
-                      <strong>{material.downloadCount ?? 0}</strong>
-                      <span>下载</span>
-                    </span>
-                    <span className="detail-price-card__stat">
-                      <strong>{likeCount}</strong>
-                      <span>点赞</span>
-                    </span>
-                    <span className="detail-price-card__stat">
-                      <strong>{material.commentCount ?? material.reviews.length}</strong>
-                      <span>评论</span>
+                    <span className={styles.deliveryType}>
+                      {material.hasFile ? '站内文件' : material.hasNetdisk ? '网盘交付' : '暂无交付文件'}
                     </span>
                   </div>
                   {material.hasFile ? (
-                    <div className="detail-price-card__file">
-                      <span className="detail-price-card__file-label">文件</span>
+                    <div className={styles.file}>
+                      <span className={styles.fileLabel}>文件</span>
                       <p>{material.originalFilename || '未知'}</p>
                       <span className="material-meta">
                         {formatFileSize(material.fileSize)} · {material.fileType?.toUpperCase() || 'ZIP/PDF/Office 等'}
                       </span>
                     </div>
                   ) : (
-                    <div className="detail-price-card__file">
-                      <span className="detail-price-card__file-label">网盘</span>
-                      <p>购买后可查看链接。</p>
+                    <div className={styles.file}>
+                      <span className={styles.fileLabel}>网盘</span>
+                      <p>{material.hasNetdisk ? '网盘资源' : '暂未提供交付内容'}</p>
+                      {material.hasNetdisk && <span className="material-meta">网盘链接 · 提取码（如有）</span>}
                     </div>
                   )}
                   {securityScanBlocked && (
@@ -539,45 +503,78 @@ export default function MaterialDetailPage({ material, user }: MaterialDetailPag
                             : '文件安全检查中'}
                       </strong>
                       <span>
-                        {securityScanStatus === 'INFECTED'
-                          ? '该文件已被隔离，无法下载。'
-                          : '检查通过后会自动开放，无需重复投稿。'}
+                        {securityScanStatus === 'INFECTED' ? '该文件已被隔离，无法下载。' : '检查通过后会自动开放，无需重复投稿。'}
                       </span>
                     </div>
                   )}
                   {((!material.free && !canManage) || material.hasFile || material.hasNetdisk) && (
-                    <div className="detail-price-card__actions">
-	                      {!material.free && !canManage && (
-	                        <button className="button primary detail-action-order" type="button" onClick={handlePurchase} disabled={ordering || purchased}>
-	                          {purchased ? '已下单' : ordering ? '下单中...' : '立即下单'}
-	                        </button>
-	                      )}
-	                      {(material.hasFile || material.hasNetdisk) && (
-	                        <button
-	                          className={`button detail-action-download ${material.free || canManage || purchased ? 'primary' : 'ghost'}`}
-	                          type="button"
-	                          onClick={handleDownload}
-	                          disabled={downloading || securityScanBlocked}
+                    <div className={styles.actions}>
+                      {!material.free && !canManage && !purchased && (
+                        <button
+                          className="button primary detail-action-order"
+                          type="button"
+                          onClick={handlePurchase}
+                          disabled={ordering || purchased}
                         >
+                          {purchased ? '已下单' : ordering ? '下单中...' : '立即下单'}
+                        </button>
+                      )}
+                      {(material.hasFile || material.hasNetdisk) && (material.free || canManage || purchased) && (
+                        <button
+                          className={`button detail-action-download ${material.free || canManage || purchased ? 'primary' : 'ghost'}`}
+                          type="button"
+                          onClick={handleDownload}
+                          disabled={downloading || securityScanBlocked}
+                        >
+                          <span className="button-icon" aria-hidden="true">
+                            <svg viewBox="0 0 24 24"><use href="#studyhub-material-icon-download" /></svg>
+                          </span>
                           {securityScanBlocked
                             ? securityScanStatus === 'INFECTED'
                               ? '文件已隔离'
                               : '安全检查中'
                             : downloading
-                            ? material.hasNetdisk
-                              ? '处理中...'
-                              : '生成链接中...'
-                            : material.hasNetdisk
-                              ? '获取网盘链接'
-                              : material.free
-                                ? '获取免费链接'
-                                : '获取下载链接'}
+                              ? material.hasNetdisk
+                                ? '处理中...'
+                                : '生成链接中...'
+                              : material.hasNetdisk
+                                ? '获取网盘链接'
+                                : material.free
+                                  ? '获取免费链接'
+                                  : '获取下载链接'}
                         </button>
                       )}
                     </div>
                   )}
-                  <div className="detail-price-card__secondary-actions">
-	                    <button className={`button ghost detail-action-like${liked ? ' is-active' : ''}`} type="button" onClick={handleToggleLike} disabled={likeSubmitting}>
+                  <p className={styles.actionNote}>
+                    {material.free || canManage || purchased
+                      ? material.hasFile
+                        ? '文件由创作者上传至 StudyHub'
+                        : '链接及提取码由发布者提供'
+                      : '通过支付宝完成支付'}
+                  </p>
+                  <div className={styles.stats} aria-label="资料数据">
+                    <span className={styles.stat}>
+                      <strong>{material.downloadCount ?? 0}</strong>
+                      <span>下载</span>
+                    </span>
+                    <span className={styles.stat}>
+                      <strong>{likeCount}</strong>
+                      <span>点赞</span>
+                    </span>
+                    <span className={styles.stat}>
+                      <strong>{material.commentCount ?? material.reviews.length}</strong>
+                      <span>评论</span>
+                    </span>
+                  </div>
+                  <div className={styles.secondary}>
+                    <button
+                      className={`button ghost detail-action-like${liked ? ' is-active' : ''}`}
+                      type="button"
+                      onClick={handleToggleLike}
+                      disabled={likeSubmitting}
+                      aria-pressed={liked}
+                    >
                       <span className="button-icon" aria-hidden="true">
                         <svg viewBox="0 0 24 24" aria-hidden="true">
                           <path
@@ -600,7 +597,7 @@ export default function MaterialDetailPage({ material, user }: MaterialDetailPag
                       </span>
                       {liked ? '已点赞' : '点赞'}
                     </button>
-	                    <button className="button ghost detail-action-report" type="button" onClick={handleReport}>
+                    <button className="button ghost detail-action-report" type="button" onClick={handleReport}>
                       <span className="button-icon" aria-hidden="true">
                         <svg viewBox="0 0 24 24" aria-hidden="true">
                           <path
@@ -611,20 +608,14 @@ export default function MaterialDetailPage({ material, user }: MaterialDetailPag
                             strokeLinecap="round"
                             strokeLinejoin="round"
                           />
-                          <path
-                            d="M12 9v4"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="1.6"
-                            strokeLinecap="round"
-                          />
+                          <path d="M12 9v4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
                           <circle cx="12" cy="17" r="1" fill="currentColor" />
                         </svg>
                       </span>
                       举报
                     </button>
                     {canManage && material && (
-	                      <Link className="button ghost detail-action-edit" href={`/upload?materialId=${material.id}`}>
+                      <Link className="button ghost detail-action-edit" href={`/upload?materialId=${material.id}`}>
                         <span className="button-icon" aria-hidden="true">
                           <svg viewBox="0 0 24 24" aria-hidden="true">
                             <path
@@ -649,9 +640,18 @@ export default function MaterialDetailPage({ material, user }: MaterialDetailPag
                       </Link>
                     )}
                   </div>
+                  {material.hasNetdisk && showNetdiskLink && (
+                    <button type="button" className={styles.reopen} onClick={() => setNetdiskModalOpen(true)}>
+                      再次查看网盘链接
+                    </button>
+                  )}
                   {!user && (
                     <p className="help-text detail-price-card__note">
-                      提示：<a className="login-link" href={`/login?next=${encodeURIComponent(router.asPath)}`}>登录</a>后可收藏、评分、下单与下载。
+                      提示：
+                      <a className="login-link" href={`/login?next=${encodeURIComponent(router.asPath)}`}>
+                        登录
+                      </a>
+                      后可收藏、评分、下单与下载。
                     </p>
                   )}
                   {info && <p className="success-text">{info}</p>}
@@ -665,7 +665,7 @@ export default function MaterialDetailPage({ material, user }: MaterialDetailPag
                     </p>
                   )}
                   {error && <p className="error-text">{error}</p>}
-                </div>
+                </aside>
               )}
             </section>
 
@@ -711,7 +711,10 @@ export default function MaterialDetailPage({ material, user }: MaterialDetailPag
                       <div className="experience-post__placeholder">
                         <span>{experiencePlaceholder}</span>
                         {!user && (
-                          <Link className="button ghost small experience-post__login" href={`/login?next=${encodeURIComponent(router.asPath)}`}>
+                          <Link
+                            className="button ghost small experience-post__login"
+                            href={`/login?next=${encodeURIComponent(router.asPath)}`}
+                          >
                             立即登录
                           </Link>
                         )}
@@ -721,49 +724,77 @@ export default function MaterialDetailPage({ material, user }: MaterialDetailPag
                 </div>
               </section>
             ) : (
-              <MaterialPreviewPanel
-                material={material}
-                user={user}
-                loginHref={`/login?next=${encodeURIComponent(router.asPath)}`}
-                hasPreviewContent={hasPreviewContent}
-                hasCustomPreview={hasCustomPreview}
-                isManualPreview={Boolean(isManualPreview)}
-                isPdfMaterial={isPdfMaterial}
-                previewHint={previewHint}
-                preview={previewState.preview}
-                previewLoading={previewState.previewLoading}
-                previewError={previewState.previewError}
-                previewExpanded={previewState.previewExpanded}
-                previewPage={previewState.previewPage}
-                previewPageSize={previewPageSize}
-                onPreviewToggle={previewState.handlePreviewToggle}
-                onPreviewPageChange={previewState.setPreviewPage}
-              />
-            )}
-
-            {material.hasNetdisk && !isExperienceMaterial && (
-              <section className="card netdisk-card" id="netdisk-card">
-                <h2>网盘资源</h2>
-                {canViewNetdisk ? (
-                  <>
-                    {showNetdiskLink ? (
-                      <div className="netdisk-info netdisk-info--ready">
-                        <p>链接与提取码已获取，可在弹窗中复制或打开网盘。</p>
-                        <button className="button ghost small" type="button" onClick={() => setNetdiskModalOpen(true)}>
-                          再次查看
-                        </button>
-                      </div>
-                    ) : (
-                      <p className="help-text">点击右侧操作区的“获取网盘链接”后查看链接与提取码。</p>
-                    )}
-                  </>
-                ) : (
-                  <p className="help-text">包含付费资料，请下单完成后查看真实的网盘地址与提取码。</p>
-                )}
+              <section className={styles.content} aria-label="资料内容">
+                <div className={styles.tabs} role="tablist" aria-label="预览与评论">
+                  {(['preview', 'comments'] as const).map((tab) => (
+                    <button
+                      key={tab}
+                      type="button"
+                      role="tab"
+                      id={`material-${tab}-tab`}
+                      aria-controls={`material-${tab}-panel`}
+                      aria-selected={contentTab === tab}
+                      tabIndex={contentTab === tab ? 0 : -1}
+                      onClick={() => setContentTab(tab)}
+                      onKeyDown={(event) => {
+                        if (['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) {
+                          event.preventDefault();
+                          const next =
+                            event.key === 'Home'
+                              ? 'preview'
+                              : event.key === 'End'
+                                ? 'comments'
+                                : tab === 'preview'
+                                  ? 'comments'
+                                  : 'preview';
+                          setContentTab(next);
+                          document.getElementById(`material-${next}-tab`)?.focus();
+                        }
+                      }}
+                    >
+                      {tab === 'preview' ? (
+                        '资料预览'
+                      ) : (
+                        <>
+                          评论 <small>{detailCommentCount}</small>
+                        </>
+                      )}
+                    </button>
+                  ))}
+                </div>
+                <div role="tabpanel" id="material-preview-panel" aria-labelledby="material-preview-tab" hidden={contentTab !== 'preview'}>
+                  <MaterialPreviewPanel
+                    embedded
+                    material={material}
+                    user={user}
+                    loginHref={`/login?next=${encodeURIComponent(router.asPath)}`}
+                    hasPreviewContent={hasPreviewContent}
+                    hasCustomPreview={hasCustomPreview}
+                    isManualPreview={Boolean(isManualPreview)}
+                    isPdfMaterial={isPdfMaterial}
+                    previewHint={previewHint}
+                    preview={previewState.preview}
+                    previewLoading={previewState.previewLoading}
+                    previewError={previewState.previewError}
+                    previewExpanded={previewState.previewExpanded}
+                    previewPage={previewState.previewPage}
+                    previewPageSize={previewPageSize}
+                    onPreviewToggle={previewState.handlePreviewToggle}
+                    onPreviewPageChange={previewState.setPreviewPage}
+                  />
+                </div>
+                <div
+                  role="tabpanel"
+                  id="material-comments-panel"
+                  aria-labelledby="material-comments-tab"
+                  hidden={contentTab !== 'comments'}
+                >
+                  <CommentSection materialId={material.id} user={user} initialCount={material.commentCount ?? 0} />
+                </div>
               </section>
             )}
 
-            <section className="card" id={isExperienceMaterial ? 'article-comments' : undefined}>
+            <section className={isExperienceMaterial ? 'card' : styles.versions} id={isExperienceMaterial ? 'article-comments' : undefined}>
               <h2>版本与更新</h2>
               {material.versions.length === 0 ? (
                 <p className="help-text">暂无版本信息。</p>
@@ -780,13 +811,7 @@ export default function MaterialDetailPage({ material, user }: MaterialDetailPag
               )}
             </section>
 
-            {material && (
-              <CommentSection
-                materialId={material.id}
-                user={user}
-                initialCount={material.commentCount ?? 0}
-              />
-            )}
+            {isExperienceMaterial && <CommentSection materialId={material.id} user={user} initialCount={material.commentCount ?? 0} />}
           </>
         )}
       </main>
@@ -819,31 +844,6 @@ export default function MaterialDetailPage({ material, user }: MaterialDetailPag
           onNext={imageModal.handlePreviewImageNext}
         />
       )}
-      <style jsx>{`
-        .rating-widget {
-          margin-top: 12px;
-          display: flex;
-          align-items: center;
-          gap: 12px;
-        }
-        .rating-widget p {
-          margin: 0;
-          color: var(--text-muted);
-        }
-        @media (max-width: 720px) {
-          .rating-widget {
-            width: 100%;
-            margin-top: 0;
-            align-items: flex-start;
-            flex-direction: column;
-            gap: 4px;
-          }
-          .rating-widget p {
-            font-size: 0.82rem;
-            line-height: 1.45;
-          }
-        }
-      `}</style>
     </>
   );
 }
@@ -872,9 +872,7 @@ export const getServerSideProps: GetServerSideProps<MaterialDetailPageProps> = a
       const resolvedUrl = ctx.resolvedUrl || '';
       const queryString = resolvedUrl.includes('?') ? resolvedUrl.split('?')[1] : '';
       const encodedCanonicalId = encodeURIComponent(canonicalId);
-      const destination = queryString
-        ? `/materials/${encodedCanonicalId}?${queryString}`
-        : `/materials/${encodedCanonicalId}`;
+      const destination = queryString ? `/materials/${encodedCanonicalId}?${queryString}` : `/materials/${encodedCanonicalId}`;
       return {
         redirect: {
           destination,

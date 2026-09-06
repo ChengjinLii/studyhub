@@ -137,7 +137,8 @@ function StudyHubEntryPoster() {
         <rect x="336" y="613" width="26" height="76" rx="13" fill="#f7f7f8" />
         <g className="studyhub-popup-poster__hotspot">
           <rect className="studyhub-popup-poster__hotspot-bg" x="480" y="500" width="1180" height="300" rx="34" />
-          <text className="studyhub-popup-poster__title" x="503" y="734">
+          {/* Pin the width and leave clearance above the diagonal across platform fonts. */}
+          <text className="studyhub-popup-poster__title" x="493" y="706" textLength="1200" lengthAdjust="spacingAndGlyphs">
             StudyHub
           </text>
         </g>
