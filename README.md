@@ -1,3 +1,5 @@
+
+
 # StudyHub
 
 [![FastAPI](https://img.shields.io/badge/Backend-FastAPI-009688?logo=fastapi&logoColor=white)](#技术栈)
@@ -23,7 +25,7 @@
 ## 技术栈
 
 - 后端：FastAPI、SQLAlchemy、Pydantic Settings、Uvicorn
-- 前端：Next.js 14、React、TypeScript
+- 前端：Next.js 15、React、TypeScript
 - 数据层：MySQL（preview / production）、SQLite（local-dev / quickstart）
 - 存储与缓存：阿里云 OSS 、Redis（可选缓存与锁）
 - 任务与异步：BackgroundTasks、独立 worker、局部 async DB 与异步 I/O 路径
