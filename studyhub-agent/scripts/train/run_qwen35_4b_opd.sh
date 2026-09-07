@@ -26,6 +26,9 @@ case "${MODE}" in
   formal) UPDATES=300; BATCH_SIZE=8; CHECKPOINT_EVERY=50 ;;
   *) echo "Usage: $0 {lr1e6|lr3e6|pilot|formal} [seed]" >&2; exit 2 ;;
 esac
+if [[ "${MODE}" == "formal" ]]; then
+  AUTHORIZATION="${PROJECT_ROOT}/configs/program-v4/qwen35-4b-opd-formal-authorization.json"
+fi
 if [[ "${SEED}" != "20260827" ]]; then
   echo "Strict OPD is authorized only for seed 20260827." >&2
   exit 2
@@ -65,9 +68,9 @@ LOG_ROOT="${ARTIFACT_ROOT}/artifacts/areal/launcher_logs/qwen35-4b-opd"
 STAGE_ROOT="${ARTIFACT_ROOT}/artifacts/areal/checkpoints/$(id -un)/${EXPERIMENT}/${TRIAL}"
 ATTEMPT_ID="${TRIAL}-attempt-$(date +%Y%m%d_%H%M%S)"
 RUN_ROOT="${ARTIFACT_ROOT}/artifacts/areal"
-# LR probes always restart from M2; preserve each attempt's weights and traces.
-# Pilot/formal keep their existing recovery root and do not resume a LR probe.
-if [[ "${MODE}" == "lr1e6" || "${MODE}" == "lr3e6" ]]; then
+# Probes and formal runs start from M2 in isolated attempt roots. Never overwrite
+# an interrupted attempt or accidentally resume its optimizer under a new run ID.
+if [[ "${MODE}" == "lr1e6" || "${MODE}" == "lr3e6" || "${MODE}" == "formal" ]]; then
   RUN_ROOT="${ARTIFACT_ROOT}/artifacts/areal/opd-attempts/${ATTEMPT_ID}"
 fi
 CHECKPOINT_ROOT="${RUN_ROOT}/checkpoints/$(id -un)/${EXPERIMENT}/${TRIAL}"
@@ -147,6 +150,12 @@ if [[ "${MODE}" == "formal" ]]; then
   PREFLIGHT_ARGS+=(--pilot-marker "${PILOT_MARKER}")
 fi
 "${VENV_DIR}/bin/python" "${PROJECT_ROOT}/scripts/train/preflight_qwen35_4b_opd.py" "${PREFLIGHT_ARGS[@]}"
+MAX_WALL_SECONDS="$(${VENV_DIR}/bin/python -S - "${AUTHORIZATION}" <<'PY'
+import json
+import sys
+print(json.load(open(sys.argv[1]))["budgets"]["maximum_wall_seconds"])
+PY
+)"
 
 OVERRIDES=(
   "seed=${SEED}"
@@ -216,7 +225,7 @@ set +e
   --allow-shared-gpu \
   --max-own-used-mib "${MAX_OWN_USED}" \
   --min-runtime-free-mib "${MIN_RUNTIME_FREE}" \
-  --max-wall-seconds 28800 \
+  --max-wall-seconds "${MAX_WALL_SECONDS}" \
   --interrupt-grace-seconds 180 \
   --log "${LOG_FILE}" \
   --gpu-csv "${GPU_CSV}" \

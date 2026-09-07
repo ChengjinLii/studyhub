@@ -14,8 +14,15 @@ one epoch permits only 250 updates. The step cap remains 300, consuming
 2,400 prompt slots (a partial second pass), not 2,400 unique tasks.
 No data, objective, LoRA, teacher, or benchmark changes are introduced.
 
-Save checkpoints/recovery every 50 updates. Keep the existing eight-hour
-wall-time limit and shared GPU memory guards. Completion requires the actual
+Save checkpoints/recovery every 50 updates. Keep shared GPU memory guards.
+Formal has a separately recorded 20-hour wall-time ceiling; probes/pilot retain
+eight hours. The first formal attempt (20260907_114451) was deliberately stopped
+after two completed updates: measured batch-8 throughput projects beyond eight
+hours. Its original logs/evidence remain intact. The replacement starts from M2
+in an isolated attempt root and does not count those diagnostic updates.
+The extension's parent hash preserves the original passing pilot authorization;
+preflight rejects changes to anything other than maximum wall time.
+Completion requires the actual
 300-update marker, changed finite LoRA tensors, and auditable run evidence.
 An interrupted run is not a completed experiment.
 

@@ -6,6 +6,7 @@ from pathlib import Path
 import pytest
 
 from scripts.train.merge_sft_lora import completion_lineage
+from scripts.train.preflight_qwen35_4b_opd import validate_pilot_authorization
 from scripts.train.run_qwen35_4b_opd_evaluation_suite import paired_agentbench
 
 
@@ -32,6 +33,32 @@ def marker_fixture(tmp_path):
     }
     marker.write_text(json.dumps(value))
     return marker, value
+
+
+def test_pilot_allows_only_declared_wall_time_extension(tmp_path):
+    parent = tmp_path / "qwen35-4b-opd-v1-authorization.json"
+    original = {"budgets": {"maximum_wall_seconds": 28800}, "recipe": {"lr": 3e-6}}
+    parent.write_text(json.dumps(original))
+    digest = hashlib.sha256(parent.read_bytes()).hexdigest()
+    marker = {"authorization_sha256": digest}
+    validate_pilot_authorization(marker, parent)
+    updated = json.loads(json.dumps(original))
+    updated["budgets"]["maximum_wall_seconds"] = 72000
+    updated["resource_extension"] = {"parent_authorization_sha256": digest, "formal_only": True}
+    path = tmp_path / "formal.json"
+    path.write_text(json.dumps(updated))
+    validate_pilot_authorization(marker, path)
+    updated["recipe"]["lr"] = 1e-3
+    path.write_text(json.dumps(updated))
+    with pytest.raises(RuntimeError, match="more than wall-time"):
+        validate_pilot_authorization(marker, path)
+
+
+def test_frozen_formal_authorization_only_extends_time():
+    project = Path(__file__).resolve().parents[3]
+    parent = project / "configs/program-v4/qwen35-4b-opd-v1-authorization.json"
+    formal = parent.with_name("qwen35-4b-opd-formal-authorization.json")
+    validate_pilot_authorization({"authorization_sha256": hashlib.sha256(parent.read_bytes()).hexdigest()}, formal)
 
 
 def test_opd_merge_keeps_opd_lineage(tmp_path):

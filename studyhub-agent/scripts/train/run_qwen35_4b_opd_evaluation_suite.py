@@ -68,7 +68,7 @@ def main():
     parser.add_argument("--artifact-root", type=Path, required=True)
     parser.add_argument("--training-run", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
-    parser.add_argument("--wait-seconds", type=int, default=32400)
+    parser.add_argument("--wait-seconds", type=int, default=75600)
     args = parser.parse_args()
     root, output = args.artifact_root.resolve(), args.output.resolve()
     if output.exists():
@@ -105,7 +105,7 @@ def main():
                 raise RuntimeError("timed out waiting for completed formal OPD evidence")
             time.sleep(30)
         lineage = completion_lineage(marker, "opd")
-        authorization = PROJECT / "configs/program-v4/qwen35-4b-opd-v1-authorization.json"
+        authorization = PROJECT / "configs/program-v4/qwen35-4b-opd-formal-authorization.json"
         if lineage["authorization_sha256"] != sha256(authorization):
             raise RuntimeError("OPD authorization drift")
         auth = read(authorization)

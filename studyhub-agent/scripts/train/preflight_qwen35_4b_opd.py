@@ -34,6 +34,26 @@ def load_jsonl(path: Path) -> list[dict[str, Any]]:
         return [json.loads(line) for line in stream if line.strip()]
 
 
+def validate_pilot_authorization(marker: dict[str, Any], authorization_path: Path) -> None:
+    if marker.get("authorization_sha256") == sha256(authorization_path):
+        return
+    authorization = load_json(authorization_path)
+    extension = authorization.pop("resource_extension", {})
+    parent_path = authorization_path.with_name("qwen35-4b-opd-v1-authorization.json")
+    parent_hash = sha256(parent_path)
+    parent = load_json(parent_path)
+    if (
+        marker.get("authorization_sha256") != parent_hash
+        or extension.get("parent_authorization_sha256") != parent_hash
+        or extension.get("formal_only") is not True
+        or authorization["budgets"].get("maximum_wall_seconds") != 72000
+    ):
+        raise RuntimeError("OPD pilot resource-only authorization lineage drift")
+    authorization["budgets"]["maximum_wall_seconds"] = parent["budgets"]["maximum_wall_seconds"]
+    if authorization != parent:
+        raise RuntimeError("OPD formal authorization changes more than wall-time budget")
+
+
 def inventory_sha256(paths: list[Path], root: Path) -> str:
     digest = hashlib.sha256()
     for path in sorted(paths):
@@ -149,8 +169,8 @@ def parse_args() -> argparse.Namespace:
 def main() -> int:
     args = parse_args()
     from areal.api.cli_args import load_expr_config
-
     from datasets import load_from_disk
+
     from training.opd.config import StudyHubOPDConfig
 
     authorization = load_json(args.authorization)
@@ -356,11 +376,8 @@ def main() -> int:
         if args.pilot_marker is None or not args.pilot_marker.is_file():
             raise RuntimeError("formal OPD requires a passing 64-update pilot")
         marker = load_json(args.pilot_marker)
-        if (
-            marker.get("status") != "OPD_PILOT_PASS"
-            or marker.get("authorization_sha256") != sha256(args.authorization)
-            or float(marker.get("learning_rate", -1)) != args.learning_rate
-        ):
+        validate_pilot_authorization(marker, args.authorization)
+        if marker.get("status") != "OPD_PILOT_PASS" or float(marker.get("learning_rate", -1)) != args.learning_rate:
             raise RuntimeError("OPD pilot marker drift")
 
     state = gpu_state(args.gpus)
