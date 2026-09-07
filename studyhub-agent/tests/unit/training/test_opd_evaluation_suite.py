@@ -1,5 +1,6 @@
 import hashlib
 import json
+import re
 from pathlib import Path
 
 import pytest
@@ -99,7 +100,7 @@ def test_suite_reuses_existing_evaluators_without_sealed():
         "run_tau2_replication.py",
     ):
         assert script in source
-    assert '"--max-rows", "128"' in source
-    assert '"--benchmark-version", "v2"' in source
+    assert re.search(r'"--max-rows",\s*"128"', source)
+    assert re.search(r'"--benchmark-version",\s*"v2"', source)
     assert '"--allow-shared-gpu"' in source
     assert 'completion_lineage(marker, "opd")' in source
