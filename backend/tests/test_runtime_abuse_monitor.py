@@ -18,6 +18,7 @@ def _notification_args(tmp_path: Path) -> Namespace:
     return Namespace(
         alert_state_file=str(tmp_path / "alert-state.json"),
         alert_cooldown_seconds=3600,
+        certificate_alert_cooldown_seconds=86400,
         alert_retry_seconds=300,
         alert_confirm_runs=3,
         recovery_confirm_runs=2,
@@ -154,6 +155,44 @@ def test_transient_alert_never_sends_alert_or_recovery(tmp_path: Path, monkeypat
     assert pending == {"status": "pending_confirmation", "observedRuns": 1, "requiredRuns": 3}
     assert healthy == {"status": "idle"}
     assert deliveries == []
+
+
+def test_certificate_alert_repeats_daily_while_other_alerts_repeat_hourly(tmp_path: Path, monkeypatch) -> None:
+    deliveries: list[str] = []
+    monkeypatch.setattr(runtime_monitor, "send_email", lambda **kwargs: deliveries.append(kwargs["subject"]))
+    args = _notification_args(tmp_path)
+    args.alert_confirm_runs = 1
+    started_at = datetime(2026, 8, 9, 8, 0, tzinfo=timezone.utc)
+
+    certificate_alert = {"certificate_days_remaining": "20.5"}
+    assert runtime_monitor.notify(args=args, now=started_at, alerts=certificate_alert, payload={})["status"] == "sent"
+    assert runtime_monitor.notify(
+        args=args,
+        now=started_at + timedelta(hours=2),
+        alerts=certificate_alert,
+        payload={},
+    ) == {"status": "deduplicated"}
+    assert runtime_monitor.notify(
+        args=args,
+        now=started_at + timedelta(days=1),
+        alerts=certificate_alert,
+        payload={},
+    )["status"] == "sent"
+
+    traffic_alert = {"requests_per_ip_minute": "400"}
+    assert runtime_monitor.notify(
+        args=args,
+        now=started_at + timedelta(days=1, minutes=1),
+        alerts=traffic_alert,
+        payload={},
+    )["status"] == "sent"
+    assert runtime_monitor.notify(
+        args=args,
+        now=started_at + timedelta(days=1, hours=2, minutes=1),
+        alerts=traffic_alert,
+        payload={},
+    )["status"] == "sent"
+    assert len(deliveries) == 4
 
 
 def test_load_env_file_accepts_exported_and_quoted_values(tmp_path: Path) -> None:

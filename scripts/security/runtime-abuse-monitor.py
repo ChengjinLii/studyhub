@@ -24,6 +24,7 @@ ACCESS_PATTERN = re.compile(
     r'^(?P<ip>\S+) .* \[(?P<timestamp>[^\]]+)\] "(?P<method>\S+) (?P<path>\S+) [^"]+" '
     r'(?P<status>\d{3}) '
 )
+CERTIFICATE_ALERT_CODES = frozenset({"certificate_days_remaining", "certificate_probe_failed"})
 PROMETHEUS_LINE_PATTERN = re.compile(
     r"^(?P<name>[A-Za-z_:][A-Za-z0-9_:]*)(?:\{(?P<labels>.*)\})?\s+(?P<value>-?[0-9.eE+]+)$"
 )
@@ -55,6 +56,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--env-file")
     parser.add_argument("--alert-email", action="append", default=[])
     parser.add_argument("--alert-cooldown-seconds", type=positive_int, default=3600)
+    parser.add_argument("--certificate-alert-cooldown-seconds", type=positive_int, default=86400)
     parser.add_argument("--alert-retry-seconds", type=positive_int, default=300)
     parser.add_argument("--alert-confirm-runs", type=positive_int, default=3)
     parser.add_argument("--recovery-confirm-runs", type=positive_int, default=2)
@@ -405,6 +407,12 @@ def _alert_fingerprint(codes: set[str]) -> str | None:
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()[:12]
 
 
+def _alert_cooldown_seconds(args: argparse.Namespace, codes: set[str]) -> int:
+    if codes and codes.issubset(CERTIFICATE_ALERT_CODES):
+        return args.certificate_alert_cooldown_seconds
+    return args.alert_cooldown_seconds
+
+
 def notify(
     *,
     args: argparse.Namespace,
@@ -439,9 +447,10 @@ def notify(
             observed_codes = current_codes
             observed_runs = 1
         if observed_runs >= args.alert_confirm_runs:
+            cooldown_seconds = _alert_cooldown_seconds(args, current_codes)
             cooldown_elapsed = (
                 fingerprint_last_sent is None
-                or (now - fingerprint_last_sent).total_seconds() >= args.alert_cooldown_seconds
+                or (now - fingerprint_last_sent).total_seconds() >= cooldown_seconds
             )
             if retry_elapsed and cooldown_elapsed:
                 notification_type = "alert"

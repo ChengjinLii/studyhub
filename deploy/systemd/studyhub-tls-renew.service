@@ -1,0 +1,12 @@
+[Unit]
+Description=Renew and deploy the StudyHub TLS certificate
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+EnvironmentFile=-/etc/studyhub/tls-renew.env
+ExecStart=/usr/local/sbin/studyhub-renew-tls
+Nice=10
+PrivateTmp=true
+NoNewPrivileges=true

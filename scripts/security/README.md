@@ -18,6 +18,7 @@ bash scripts/security/check-sensitive-files.sh
 - `deploy/nginx/studyhub-abuse-server.conf`：连接限制、慢请求保护、仅本机 metrics 与 Nginx status，以及前端和 API 统一安全响应头
 - `deploy/systemd/studyhub-backend-hardening.conf`：Uvicorn 并发和 backlog 上限
 - `runtime-abuse-monitor.py`：每分钟检查请求峰值、429、5xx、连接数、CPU、内存、磁盘、inode、证书、服务和本机探针，并保留 14 天精简趋势与错误指纹
+- `renew-tls-certificate.sh`：在 HTTP-01 受网络侧拦截时使用 TLS-ALPN-01 续签证书；仅在证书不足 30 天时短暂停止 Nginx，并在新证书和 Nginx 配置验证通过后原子部署
 - `install-material-scanner.sh`：启用低优先级异步投稿扫描；普通 PDF 和图片先做低内存结构检查，包含主动内容、加密、解析异常等可疑特征的文件以及 Office/压缩包再交给 ClamAV。新站内文件在检查通过前保持隐藏且不能生成下载链接，旧资料不回溯改状态
 
 生产安装入口：
@@ -30,7 +31,7 @@ sudo STUDYHUB_ENABLE_UFW=1 bash scripts/security/install-runtime-guards.sh --app
 
 应用限流默认保留校园 NAT 突发空间，同时收紧登录、邮件验证码、投稿、AI 和 MCP。Nginx 对投稿保留当前 128MB body 上限，不改变站内 50MB 文件加预览图的业务能力。详细 readiness 和 metrics 只允许源站本机访问，公网 health 只返回最小存活状态。
 
-监控复用 `private/.env.production` 中的 SMTP 配置，并从同一私有文件的 `STUDYHUB_ABUSE_MONITOR_ALERT_EMAILS` 读取逗号分隔的管理员地址。它会发送已确认告警、每小时持续告警提醒和恢复通知；异常默认连续出现 3 次才发首封，之后连续健康 2 次才发一次恢复，失败通知每五分钟重试。告警集合会生成稳定指纹，同一指纹在冷却期内不会重复发送。单次 CPU 抖动或一分钟内完成的正常部署不会发信。公开的 systemd unit 不应写入真实收件地址。私有配置示例：
+监控复用 `private/.env.production` 中的 SMTP 配置，并从同一私有文件的 `STUDYHUB_ABUSE_MONITOR_ALERT_EMAILS` 读取逗号分隔的管理员地址。它会发送已确认告警、持续告警提醒和恢复通知；流量、服务和资源类告警每小时最多重复一次，证书类持续告警每天最多重复一次。异常默认连续出现 3 次才发首封，之后连续健康 2 次才发一次恢复，失败通知每五分钟重试。告警集合会生成稳定指纹，同一指纹在冷却期内不会重复发送。单次 CPU 抖动或一分钟内完成的正常部署不会发信。公开的 systemd unit 不应写入真实收件地址。私有配置示例：
 
 ```dotenv
 STUDYHUB_ABUSE_MONITOR_ALERT_EMAILS=admin@example.com,ops@example.com
@@ -56,6 +57,26 @@ sudo /usr/bin/python3 scripts/security/runtime-abuse-monitor.py \
 ```
 
 该层可以缓解 HTTP/CC、暴力请求和资源耗尽，不能替代云端 L3/L4 流量清洗。`/api/metrics` 安装后仅允许从源站本机访问，生产 smoke 仍通过后端 loopback 地址检查指标。
+
+## TLS Renewal
+
+当云平台网络侧拦截 Let's Encrypt 的 HTTP-01 多路径验证时，可以使用系统仓库中的 `lego` 通过 TLS-ALPN-01 续签。首次安装需要在仅 root 可读的 `/etc/studyhub/tls-renew.env` 中配置联系邮箱，然后启用每日检查：
+
+```dotenv
+STUDYHUB_TLS_DOMAIN=study-hub.cn
+STUDYHUB_ACME_EMAIL=admin@example.com
+```
+
+```bash
+sudo apt-get install lego
+sudo install -m 0755 scripts/security/renew-tls-certificate.sh /usr/local/sbin/studyhub-renew-tls
+sudo install -m 0644 deploy/systemd/studyhub-tls-renew.service /etc/systemd/system/
+sudo install -m 0644 deploy/systemd/studyhub-tls-renew.timer /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now studyhub-tls-renew.timer
+```
+
+Nginx 应读取 `/etc/studyhub/tls/<domain>.fullchain.pem` 和 `/etc/studyhub/tls/<domain>.key`。脚本平时只检查证书有效期，不停止 Nginx；进入 30 天续签窗口后才短暂让出 443 端口。任何签发或校验失败都会保留上一份部署证书并恢复 Nginx。启用该方案后应停用旧 `certbot.timer`，避免两个 ACME 客户端并行管理同一域名。
 
 Nginx 会为页面、静态资源、API 和错误响应统一设置 HSTS、`nosniff`、frame、referrer 与 permissions 策略。HSTS 仅在 HTTPS 响应中发送；CSP 当前仅使用 `Content-Security-Policy-Report-Only`，违规报告匿名提交到 `/api/security/csp-reports`，不会阻断支付、OSS 预览或前端资源。上线后可运行：
 
