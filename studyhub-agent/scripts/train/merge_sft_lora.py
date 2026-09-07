@@ -24,8 +24,37 @@ def sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
-def completion_lineage(path: Path) -> dict[str, Any]:
+def completion_lineage(path: Path, stage: str = "sft") -> dict[str, Any]:
     value = json.loads(path.read_text(encoding="utf-8"))
+    if stage == "opd":
+        checkpoint = value.get("checkpoint", {})
+        checkpoint_path = Path(str(checkpoint.get("path", "")))
+        if (
+            value.get("status") != "OPD_COMPLETE"
+            or value.get("mode") != "formal"
+            or value.get("optimizer_updates") != 300
+            or value.get("sealed_used") is not False
+            or value.get("main_grpo_started") is not False
+            or value.get("failures") != []
+            or value.get("initialization", {}).get("status") != "PASS"
+            or checkpoint.get("global_step") != 299
+            or checkpoint.get("lora_updated") is not True
+        ):
+            raise RuntimeError("OPD lineage is not a completed 300-update formal run")
+        if not checkpoint_path.is_file() or sha256(checkpoint_path) != checkpoint.get("sha256"):
+            raise RuntimeError("OPD checkpoint is missing or has hash drift")
+        return {
+            "completion_marker_sha256": sha256(path),
+            "expected_optimizer_updates": 300,
+            "final_global_step": 299,
+            "checkpoint_sha256": checkpoint["sha256"],
+            "authorization_sha256": value["authorization_sha256"],
+            "trainer_metrics_sha256": value["trainer_metrics_sha256"],
+            "initialization": value["initialization"],
+            "sealed_used": False,
+            "main_grpo_started": False,
+            "training_method": "opd",
+        }
     if value.get("status") != "COMPLETE" or value.get("mode") != "formal":
         raise RuntimeError("training lineage is not a completed formal run")
     if value.get("sealed_used") is not False or value.get("rl_started") is not False:
@@ -102,6 +131,9 @@ def main() -> int:
     adapter_config = args.adapter / "adapter_config.json"
     if not adapter_weights.is_file() or not adapter_config.is_file():
         raise FileNotFoundError("adapter_model.safetensors or adapter_config.json is missing")
+    lineage = completion_lineage(args.completion_lineage.resolve(), args.stage) if args.completion_lineage else None
+    if lineage is not None and sha256(adapter_weights) != lineage["checkpoint_sha256"]:
+        raise RuntimeError("merge adapter differs from the completion marker")
 
     import torch
     from peft import PeftModel
@@ -144,8 +176,8 @@ def main() -> int:
         "weight_shards": [{"name": path.name, "bytes": path.stat().st_size} for path in shards],
         "model_io_assets": model_io_assets,
     }
-    if args.completion_lineage is not None:
-        manifest["training_lineage"] = completion_lineage(args.completion_lineage.resolve())
+    if lineage is not None:
+        manifest["training_lineage"] = lineage
     (args.output / "studyhub_merged_manifest.json").write_text(
         json.dumps(manifest, ensure_ascii=False, indent=2) + "\n",
         encoding="utf-8",
