@@ -163,7 +163,9 @@ OVERRIDES=(
   "evaluator.freq_secs=null"
 )
 if [[ "${MODE}" == "formal" ]]; then
-  OVERRIDES+=("recover.mode=auto" "recover.freq_steps=50" "recover.freq_secs=null")
+  # 2,000 tasks / batch 8 is 250 steps; allow a partial second pass,
+  # while total_train_steps remains the hard 300-update cap.
+  OVERRIDES+=("total_train_epochs=2" "recover.mode=auto" "recover.freq_steps=50" "recover.freq_secs=null")
 else
   OVERRIDES+=("recover.mode=disabled" "recover.freq_steps=null" "recover.freq_secs=null")
 fi

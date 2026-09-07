@@ -26,6 +26,14 @@ from training.opd.areal_runtime import (
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 
 
+def test_formal_opd_epoch_ceiling_covers_300_updates() -> None:
+    launcher = (PROJECT_ROOT / "scripts/train/run_qwen35_4b_opd.sh").read_text()
+    assert "formal) UPDATES=300; BATCH_SIZE=8; CHECKPOINT_EVERY=50" in launcher
+    assert '"total_train_steps=${UPDATES}"' in launcher
+    assert 'OVERRIDES+=("total_train_epochs=2" "recover.mode=auto"' in launcher
+    assert 2000 // 8 < 300 <= 2 * (2000 // 8)
+
+
 @pytest.mark.parametrize("actor_offload,rollout_saver", [(True, False), (False, True), (False, False)])
 def test_colocated_opd_rejects_inactive_memory_release(actor_offload: bool, rollout_saver: bool) -> None:
     from scripts.train.preflight_qwen35_4b_opd import validate_rollout_memory_config
