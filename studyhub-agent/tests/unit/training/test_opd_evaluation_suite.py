@@ -5,9 +5,19 @@ from pathlib import Path
 
 import pytest
 
+from scripts.train import run_qwen35_4b_opd_evaluation_suite as suite
 from scripts.train.merge_sft_lora import completion_lineage
 from scripts.train.preflight_qwen35_4b_opd import validate_pilot_authorization
 from scripts.train.run_qwen35_4b_opd_evaluation_suite import paired_agentbench
+
+
+@pytest.mark.parametrize("free,ready", [(64000, False), (75999, False), (76000, True)])
+def test_gpu_admission_reserves_runtime_headroom(monkeypatch, free, ready):
+    from types import SimpleNamespace
+
+    monkeypatch.setattr(suite.subprocess, "run", lambda *a, **kw: SimpleNamespace(stdout=f"0, {free}\n1, {free}\n"))
+    assert suite.ADMISSION_FREE_MIB == suite.MAX_OWN_GPU_MIB + suite.RESERVED_GPU_MIB
+    assert suite.gpu_ready() is ready
 
 
 def marker_fixture(tmp_path):

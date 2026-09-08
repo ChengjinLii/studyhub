@@ -16,6 +16,10 @@ sys.path[:0] = [str(PROJECT), str(PROJECT / "src")]
 
 from scripts.train.merge_sft_lora import completion_lineage, sha256  # noqa: E402
 
+MAX_OWN_GPU_MIB = 64000
+RESERVED_GPU_MIB = 12000
+ADMISSION_FREE_MIB = MAX_OWN_GPU_MIB + RESERVED_GPU_MIB
+
 
 def read(path: Path):
     return json.loads(path.read_text())
@@ -60,7 +64,7 @@ def gpu_ready():
         text=True,
     )
     free = {int(line.split(",")[0]): int(line.split(",")[1]) for line in result.stdout.splitlines()}
-    return all(free.get(gpu, 0) >= 64000 for gpu in (0, 1))
+    return all(free.get(gpu, 0) >= ADMISSION_FREE_MIB for gpu in (0, 1))
 
 
 def main():
@@ -151,14 +155,14 @@ def main():
                     "--gpus",
                     "0,1",
                     "--min-free-mib",
-                    "64000",
+                    str(ADMISSION_FREE_MIB),
                     "--max-used-mib",
                     "68000",
                     "--allow-shared-gpu",
                     "--max-own-used-mib",
-                    "64000",
+                    str(MAX_OWN_GPU_MIB),
                     "--min-runtime-free-mib",
-                    "12000",
+                    str(RESERVED_GPU_MIB),
                     "--max-wall-seconds",
                     "10800",
                     "--log",

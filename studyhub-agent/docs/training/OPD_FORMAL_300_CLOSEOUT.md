@@ -47,3 +47,12 @@ artifact hashes and adapter binding. It does not invent a successful launcher
 exit. Fresh M2 and OPD evaluation uses the existing Protocol128, Development51,
 BFCL70 and tau2-15 panels with unchanged metrics. No training is rerun and no
 Sealed data is used.
+
+The first evaluation launch on September 8 failed before model loading: shared
+GPU admission required 64,000 MiB but the own-process cap plus reserved headroom
+required 76,000 MiB. All eight stage exits were infrastructure failures, not
+model scores. That suite remains preserved under
+`artifacts/evaluation-suite/qwen35-4b-opd-closeout-20260908`.
+The retry uses a consistent 76,000 MiB admission check while retaining the
+64,000 MiB own-memory cap and 12,000 MiB runtime reserve. It reuses the verified
+merged checkpoint and writes a new output directory.
