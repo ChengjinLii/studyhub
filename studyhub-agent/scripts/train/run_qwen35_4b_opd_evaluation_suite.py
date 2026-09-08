@@ -69,6 +69,7 @@ def main():
     parser.add_argument("--training-run", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--wait-seconds", type=int, default=75600)
+    parser.add_argument("--closeout-audit", type=Path)
     args = parser.parse_args()
     root, output = args.artifact_root.resolve(), args.output.resolve()
     if output.exists():
@@ -94,6 +95,16 @@ def main():
     deadline = time.monotonic() + args.wait_seconds
     try:
         while True:
+            if args.closeout_audit:
+                from scripts.train.recover_opd_closeout import verify_closeout
+
+                verify_closeout(args.closeout_audit, args.training_run, marker)
+                manifest["recovered_closeout"] = {
+                    "path": str(args.closeout_audit.resolve()),
+                    "sha256": sha256(args.closeout_audit),
+                    "launcher_exit_assumed_success": False,
+                }
+                break
             run = read(args.training_run)
             if run.get("finished_at"):
                 if run.get("exit_status") != 0:
