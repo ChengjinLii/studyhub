@@ -56,3 +56,9 @@ model scores. That suite remains preserved under
 The retry uses a consistent 76,000 MiB admission check while retaining the
 64,000 MiB own-memory cap and 12,000 MiB runtime reserve. It reuses the verified
 merged checkpoint and writes a new output directory.
+
+The managed retry then exposed a separate server argument bug: a randomly
+generated temporary key beginning with a dash was parsed as an option.
+Both Protocol servers exited before inference. The service was stopped;
+its output remains in the `-managed` directory. Passing `--api-key=<value>`
+fixes argument parsing without changing authentication or evaluation settings.

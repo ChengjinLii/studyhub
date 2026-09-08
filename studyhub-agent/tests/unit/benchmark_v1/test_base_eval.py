@@ -165,12 +165,13 @@ def test_base_server_exposes_hermes_minimum_context(monkeypatch, tmp_path: Path)
         model=tmp_path / "model",
         gpu=0,
         port=30120,
-        api_key="ephemeral",
+        api_key="-ephemeral",
         log_path=tmp_path / "server.log",
         project=PROJECT,
     )
     stream.close()
 
+    assert "--api-key=-ephemeral" in captured["command"]
     context_index = captured["command"].index("--context-length")
     assert captured["command"][context_index + 1] == "65536"
     assert isinstance(process, Process)
