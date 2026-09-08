@@ -565,15 +565,19 @@ test('mock page mode covers more page secondary navigation', async ({ page }) =>
   await expect(page.getByText('投稿、收款码、收益结算与隐私相关说明。')).toBeVisible();
 });
 
-test('about page shows the static user growth trend without horizontal overflow', async ({ page }) => {
+test('about page shows the platform impact report without horizontal overflow', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/join');
 
   const growthSection = page.locator('#growth');
-  await expect(growthSection.getByRole('heading', { name: '用户增长' })).toBeVisible();
-  await expect(growthSection.getByLabel('用户增长摘要').getByText('345', { exact: true })).toBeVisible();
-  await expect(growthSection.getByText(/数据截至 2026\.07\.08/)).toBeVisible();
-  await expect(growthSection.locator('.join-growth-chart__svg--mobile')).toBeVisible();
+  await expect(growthSection.getByRole('heading', { name: '平台成果' })).toBeVisible();
+  await expect(growthSection.getByLabel('平台累计成果').getByText('362', { exact: true })).toBeVisible();
+  await expect(growthSection.getByText(/累计数据截至 2026\.09\.08/)).toBeVisible();
+  await expect(growthSection.getByRole('heading', { name: '月活跃与回访趋势' })).toBeVisible();
+  await expect(growthSection.getByRole('heading', { name: '行为深度与内容使用' })).toBeVisible();
+  const mobileCharts = growthSection.locator('.join-growth-chart__svg--mobile');
+  await expect(mobileCharts).toHaveCount(3);
+  await expect(mobileCharts.first()).toBeVisible();
 
   const hasHorizontalOverflow = await page.evaluate(
     () => document.documentElement.scrollWidth > window.innerWidth + 1
