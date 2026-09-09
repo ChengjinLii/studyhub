@@ -86,6 +86,16 @@ jobs:
       - name: Run frontend unit tests
         working-directory: frontend
         run: npm run test:unit
+      - name: Exclude unrelated Chrome apt repository
+        shell: bash
+        run: |
+          # Playwright downloads its own Chromium. An inconsistent third-party
+          # Chrome index must not break installation of Ubuntu system libraries.
+          for source in /etc/apt/sources.list.d/*.list /etc/apt/sources.list.d/*.sources; do
+            if [ -f "$source" ] && grep -Eq 'https?://dl\.google\.com/linux/chrome(-stable)?/deb' "$source"; then
+              sudo mv -- "$source" "$source.studyhub-disabled"
+            fi
+          done
       - name: Install Playwright browsers
         working-directory: frontend
         shell: bash
