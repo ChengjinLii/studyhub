@@ -91,10 +91,14 @@ jobs:
         shell: bash
         run: |
           for attempt in 1 2 3; do
-            if npx playwright install --with-deps chromium; then
+            if npx playwright install --with-deps chromium > /tmp/studyhub-browser-install.log 2>&1; then
+              cat /tmp/studyhub-browser-install.log
               exit 0
             fi
+            cat /tmp/studyhub-browser-install.log
             if [ "$attempt" -eq 3 ]; then
+              detail="$(node -e 'const fs = require("fs"); const text = fs.readFileSync("/tmp/studyhub-browser-install.log", "utf8").slice(-6000); process.stdout.write(text.replaceAll("%", "%25").replaceAll("\r", "%0D").replaceAll("\n", "%0A"))')"
+              echo "::error title=Browser installation diagnostics::${detail}"
               echo "::error::Playwright browser installation failed after three attempts"
               exit 1
             fi
