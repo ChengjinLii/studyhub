@@ -50,6 +50,15 @@ def _table_row_count(session: Session, table_name: str) -> int:
 
 
 class AuthRepository:
+    def find_user_with_session_version(self, session: Session, user_id: int) -> tuple[AuthUserModel | None, int]:
+        user_model = resolve_user_model(session)
+        row = session.execute(
+            select(user_model, AuthSessionStateRecord.session_version)
+            .outerjoin(AuthSessionStateRecord, AuthSessionStateRecord.user_id == user_model.id)
+            .where(user_model.id == user_id)
+        ).first()
+        return (row[0], int(row[1] or 0)) if row is not None else (None, 0)
+
     def get_session_version(self, session: Session, user_id: int) -> int:
         state = session.get(AuthSessionStateRecord, user_id)
         return int(state.session_version or 0) if state is not None else 0

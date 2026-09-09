@@ -4,6 +4,7 @@ from collections import defaultdict, deque
 from dataclasses import dataclass
 from ipaddress import ip_address, ip_network
 import secrets
+from threading import RLock
 from time import monotonic, time
 from typing import Any
 
@@ -11,6 +12,7 @@ from fastapi import Request
 
 from app.core.config import Settings
 from app.core.redis_client import create_redis_client, redis_namespace
+from app.core.observability import get_runtime_metrics
 
 
 @dataclass(frozen=True)
@@ -22,11 +24,17 @@ class RateLimitRule:
 class InMemoryRateLimiter:
     def __init__(self) -> None:
         self._hits: dict[str, deque[float]] = defaultdict(deque)
+        self._lock = RLock()
 
     def clear(self) -> None:
-        self._hits.clear()
+        with self._lock:
+            self._hits.clear()
 
     def check(self, key: str, *, limit: int, window_seconds: int) -> bool:
+        with self._lock:
+            return self._check(key, limit=limit, window_seconds=window_seconds)
+
+    def _check(self, key: str, *, limit: int, window_seconds: int) -> bool:
         if limit <= 0:
             return True
         now = monotonic()
@@ -60,18 +68,27 @@ return 1
 
     def __init__(self) -> None:
         self._redis_client: Any | None = None
+        self._retry_at = 0.0
 
     def clear(self) -> None:
         self._redis_client = None
+        self._retry_at = 0.0
 
     def check(self, settings: Settings, key: str, *, limit: int, window_seconds: int) -> bool:
         if limit <= 0:
             return True
-        client = self._client(settings)
+        if monotonic() < self._retry_at:
+            raise ConnectionError("Rate limiter circuit is open")
         window = max(1, int(window_seconds))
         redis_key = f"{redis_namespace(settings)}:rate-limit:{key}"
         member = f"{time():.9f}:{secrets.token_hex(4)}"
-        result = client.eval(self._CHECK_SCRIPT, 1, redis_key, time(), window, int(limit), member)
+        try:
+            client = self._client(settings)
+            result = client.eval(self._CHECK_SCRIPT, 1, redis_key, time(), window, int(limit), member)
+        except Exception:
+            self._retry_at = monotonic() + 5.0
+            raise
+        self._retry_at = 0.0
         return int(result) == 1
 
     def _client(self, settings: Settings):
@@ -194,5 +211,6 @@ def rate_limit_key_allowed(settings: Settings, key: str, *, limit: int, window_s
                 window_seconds=window_seconds,
             )
         except Exception:
+            get_runtime_metrics().record_security_event(event="rate_limit_backend", reason="local_fallback")
             return get_rate_limiter().check(key, limit=limit, window_seconds=window_seconds)
     return get_rate_limiter().check(key, limit=limit, window_seconds=window_seconds)

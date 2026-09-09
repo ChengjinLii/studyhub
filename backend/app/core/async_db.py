@@ -6,6 +6,7 @@ from typing import AsyncGenerator
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.core.config import get_settings
+from app.core.query_timing import instrument_engine
 
 
 _ASYNC_ENGINE = None
@@ -46,6 +47,7 @@ def get_async_engine():
                 }
             )
         _ASYNC_ENGINE = create_async_engine(database_url, **engine_kwargs)
+        instrument_engine(_ASYNC_ENGINE.sync_engine)
     return _ASYNC_ENGINE
 
 

@@ -9,7 +9,8 @@ const paths = (process.env.STUDYHUB_PREWARM_PATHS || DEFAULT_PATHS.join(','))
 const detailLinkLimit = Math.max(0, Number.parseInt(process.env.STUDYHUB_PREWARM_DETAIL_LINK_LIMIT || '8', 10) || 0);
 const maxAttempts = Math.max(1, Number.parseInt(process.env.STUDYHUB_PREWARM_ATTEMPTS || '12', 10) || 12);
 const retryDelayMs = Math.max(100, Number.parseInt(process.env.STUDYHUB_PREWARM_RETRY_DELAY_MS || '1000', 10) || 1000);
-const requestTimeoutMs = Math.max(500, Number.parseInt(process.env.STUDYHUB_PREWARM_TIMEOUT_MS || '2500', 10) || 2500);
+const requestTimeoutMs = Math.max(500, Number.parseInt(process.env.STUDYHUB_PREWARM_TIMEOUT_MS || '8000', 10) || 8000);
+let failedPaths = 0;
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -26,7 +27,9 @@ const fetchWithTimeout = async (url) => {
       },
       signal: controller.signal,
     });
-    return response;
+    // Consume the body inside the deadline, including streaming responses.
+    const body = await response.text();
+    return { ok: response.ok, status: response.status, text: async () => body };
   } finally {
     clearTimeout(timeout);
   }
@@ -95,7 +98,7 @@ const extractDetailLinks = (html) => {
   return Array.from(links);
 };
 
-const prewarmPath = async (path, options = {}) => {
+const prewarmPath = async (path, options = {}, attempt = 0) => {
   const url = buildUrl(path);
   const startedAt = Date.now();
   try {
@@ -103,13 +106,18 @@ const prewarmPath = async (path, options = {}) => {
     const elapsedMs = Date.now() - startedAt;
     if (!response.ok) {
       console.warn(`[prewarm] ${path} returned HTTP ${response.status} in ${elapsedMs}ms`);
-      return;
+      throw new Error(`HTTP ${response.status}`);
     }
     console.log(`[prewarm] ${path} ${elapsedMs}ms`);
     if (options.readBody) {
       return await response.text();
     }
   } catch (error) {
+    if (attempt < 1) {
+      await sleep(retryDelayMs);
+      return prewarmPath(path, options, attempt + 1);
+    }
+    failedPaths += 1;
     console.warn(`[prewarm] ${path} failed: ${error instanceof Error ? error.message : String(error)}`);
   }
   return '';
@@ -118,6 +126,7 @@ const prewarmPath = async (path, options = {}) => {
 const main = async () => {
   const ready = await waitForServer();
   if (!ready) {
+    process.exitCode = 1;
     return;
   }
   const discoveredDetailLinks = new Set();
@@ -131,8 +140,11 @@ const main = async () => {
   for (const path of discoveredDetailLinks) {
     await prewarmPath(path);
   }
+  console.log(`[prewarm] completed; failed=${failedPaths}`);
+  if (failedPaths && process.env.STUDYHUB_PREWARM_STRICT === '1') process.exitCode = 1;
 };
 
 main().catch((error) => {
+  process.exitCode = 1;
   console.warn(`[prewarm] failed: ${error instanceof Error ? error.message : String(error)}`);
 });

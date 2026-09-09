@@ -37,6 +37,13 @@ if [[ "$("$NODE_BIN_DIR/node" --version)" != v"$NODE_MAJOR".* ]]; then
 fi
 
 mkdir -p "$RELEASES_ROOT"
+# Installation/building temporarily needs a full extra release and compiler memory.
+AVAILABLE_KB="$(df -Pk "$RELEASES_ROOT" | awk 'NR == 2 {print $4}')"
+AVAILABLE_MEMORY_KB="$(awk '/MemAvailable:/ {print $2}' /proc/meminfo)"
+if (( AVAILABLE_KB < 3 * 1024 * 1024 || AVAILABLE_MEMORY_KB < 1024 * 1024 )); then
+  echo "insufficient deployment headroom: require 3 GiB disk and 1 GiB available memory"
+  exit 1
+fi
 exec 9>"$LOCK_FILE"
 if ! flock -n 9; then
   echo "another deployment is already running"
@@ -49,6 +56,7 @@ RELEASE="$RELEASES_ROOT/$SHORT_SHA"
 PREVIOUS="$(readlink -f "$CURRENT_LINK" 2>/dev/null || true)"
 BACKEND_PID=""
 FRONTEND_PID=""
+RELEASE_CREATED=0
 
 cleanup_smoke() {
   [[ -z "$FRONTEND_PID" ]] || kill "$FRONTEND_PID" 2>/dev/null || true
@@ -57,7 +65,7 @@ cleanup_smoke() {
 cleanup_on_exit() {
   local status=$?
   cleanup_smoke
-  if (( status != 0 )) && [[ -d "$RELEASE" && "$(readlink -f "$CURRENT_LINK" 2>/dev/null || true)" != "$RELEASE" ]]; then
+  if (( status != 0 && RELEASE_CREATED == 1 )) && [[ -d "$RELEASE" && "$(readlink -f "$CURRENT_LINK" 2>/dev/null || true)" != "$RELEASE" ]]; then
     rm -rf --one-file-system "$RELEASE"
   fi
 }
@@ -68,6 +76,7 @@ if [[ -e "$RELEASE" ]]; then
   exit 1
 fi
 mkdir "$RELEASE"
+RELEASE_CREATED=1
 git -C "$CONTROL_ROOT" archive "$FULL_SHA" | tar -x -C "$RELEASE"
 printf '%s\n' "$SHORT_SHA" > "$RELEASE/.build-git-sha"
 ln -s "$PRIVATE_DIR" "$RELEASE/private"
@@ -122,6 +131,9 @@ STUDYHUB_SMOKE_EXPECTED_GIT_SHA="$SHORT_SHA" \
 STUDYHUB_PYTHON_BIN="$RELEASE/.venv/bin/python" \
 bash "$RELEASE/scripts/runtime/production-smoke.sh" \
   "http://127.0.0.1:$BACKEND_SMOKE_PORT" "http://127.0.0.1:$FRONTEND_SMOKE_PORT"
+STUDYHUB_PREWARM_BASE_URL="http://127.0.0.1:$FRONTEND_SMOKE_PORT" \
+STUDYHUB_PREWARM_STRICT=1 \
+"$NODE_BIN_DIR/node" "$RELEASE/frontend/scripts/prewarm-public-pages.mjs"
 cleanup_smoke
 BACKEND_PID=""
 FRONTEND_PID=""

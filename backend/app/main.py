@@ -11,6 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse, RedirectResponse
 from starlette.middleware.trustedhost import TrustedHostMiddleware
+from starlette.concurrency import run_in_threadpool
 
 from app.api.deps import get_auth_service
 from app.api.main import api_router
@@ -19,6 +20,7 @@ from app.core.db import prepare_database_runtime, session_scope
 from app.core.exceptions import install_exception_handlers
 from app.core.logging import bind_request_context, configure_logging, reset_request_context, sanitize_request_id
 from app.core.observability import get_runtime_metrics
+from app.core.query_timing import QueryTiming, query_timing
 from app.core.origin_guard import write_origin_allowed
 from app.core.rate_limit import rate_limit_allowed
 from app.core.response import api_fail
@@ -109,6 +111,8 @@ def create_app() -> FastAPI:
     @app.middleware("http")
     async def record_http_observability(request: Request, call_next):
         started_at = perf_counter()
+        sql_timing = QueryTiming()
+        sql_token = query_timing.set(sql_timing)
         request_id = sanitize_request_id(request.headers.get("x-request-id") or uuid4().hex[:16])
         request.state.request_id = request_id
         context_tokens = bind_request_context(request_id=request_id, method=request.method, path=request.url.path)
@@ -135,7 +139,7 @@ def create_app() -> FastAPI:
             return error_response
 
         try:
-            rate_allowed, rate_error = rate_limit_allowed(settings, request)
+            rate_allowed, rate_error = await run_in_threadpool(rate_limit_allowed, settings, request)
             if not rate_allowed:
                 status_code = 429
                 get_runtime_metrics().record_security_event(
@@ -214,6 +218,8 @@ def create_app() -> FastAPI:
                         "path": route_path,
                         "status_code": status_code,
                         "duration_ms": duration_ms,
+                        "db_query_count": sql_timing.count,
+                        "db_query_ms": round(sql_timing.seconds * 1000, 2),
                         "client_ip": request.client.host if request.client else None,
                     },
                 )
@@ -228,6 +234,7 @@ def create_app() -> FastAPI:
                     },
                 )
             reset_request_context(context_tokens)
+            query_timing.reset(sql_token)
 
     install_exception_handlers(app)
 

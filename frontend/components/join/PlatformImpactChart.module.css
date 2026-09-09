@@ -1,0 +1,753 @@
+
+
+
+.scope :global(.join-growth-chart) {
+  min-width: 0;
+}
+
+.scope :global(.join-growth-chart__intro) {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 2px 0 18px;
+}
+
+.scope :global(.join-growth-chart__lead),
+.scope :global(.join-growth-chart__period),
+.scope :global(.join-growth-chart__source) {
+  margin: 0;
+}
+
+.scope :global(.join-growth-chart__lead) {
+  max-width: 590px;
+  color: #334155;
+  font-size: 0.96rem;
+  line-height: 1.75;
+}
+
+.scope :global(.join-growth-chart__period) {
+  margin-top: 5px;
+  color: #94a3b8;
+  font-size: 0.78rem;
+  font-weight: 650;
+}
+
+.scope :global(.join-growth-chart__legend) {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px 14px;
+  color: #64748b;
+  font-size: 0.78rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.scope :global(.join-growth-chart__legend span) {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.scope :global(.join-growth-chart__legend i) {
+  display: inline-block;
+  flex: 0 0 auto;
+}
+
+.scope :global(.join-growth-chart__legend-line) {
+  width: 20px;
+  height: 3px;
+  border-radius: 999px;
+  background: #3c5488;
+}
+
+.scope :global(.join-growth-chart__legend-bar) {
+  width: 8px;
+  height: 12px;
+  border-radius: 2px 2px 0 0;
+  background: rgba(230, 75, 53, 0.34);
+}
+
+.scope :global(.join-growth-chart__stats) {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  border-top: 1px solid rgba(226, 232, 240, 0.92);
+  border-bottom: 1px solid rgba(226, 232, 240, 0.92);
+}
+
+.scope :global(.join-growth-chart__stats > div) {
+  display: flex;
+  align-items: baseline;
+  gap: 9px;
+  min-width: 0;
+  padding: 16px 18px;
+  border-left: 1px solid rgba(226, 232, 240, 0.92);
+}
+
+.scope :global(.join-growth-chart__stats > div:first-child) {
+  padding-left: 0;
+  border-left: none;
+}
+
+.scope :global(.join-growth-chart__stats strong) {
+  color: #173765;
+  font-size: 1.48rem;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.scope :global(.join-growth-chart__stats span) {
+  color: #64748b;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.scope :global(.join-growth-chart__plot) {
+  width: 100%;
+  padding-top: 16px;
+}
+
+.scope :global(.join-growth-chart__svg) {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+
+.scope :global(.join-growth-chart__svg--mobile) {
+  display: none;
+}
+
+.scope :global(.join-growth-chart__grid) {
+  stroke: #e5e7eb;
+  stroke-width: 1;
+}
+
+.scope :global(.join-growth-chart__axis-title) {
+  fill: #64748b;
+  font-size: 11px;
+  font-weight: 750;
+}
+
+.scope :global(.join-growth-chart__axis-label),
+.scope :global(.join-growth-chart__date-label) {
+  fill: #94a3b8;
+  font-size: 10px;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
+
+.scope :global(.join-growth-chart__axis-label--right) {
+  fill: #b08982;
+}
+
+.scope :global(.join-growth-chart__tick) {
+  stroke: #cbd5e1;
+  stroke-width: 1;
+}
+
+.scope :global(.join-growth-chart__bar) {
+  fill: rgba(230, 75, 53, 0.28);
+}
+
+.scope :global(.join-growth-chart__area) {
+  fill: rgba(60, 84, 136, 0.07);
+}
+
+.scope :global(.join-growth-chart__line) {
+  fill: none;
+  stroke: #3c5488;
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.scope :global(.join-growth-chart__end-ring) {
+  fill: #ffffff;
+  stroke: rgba(60, 84, 136, 0.34);
+  stroke-width: 5;
+}
+
+.scope :global(.join-growth-chart__end-dot) {
+  fill: #3c5488;
+}
+
+.scope :global(.join-growth-chart__end-label) {
+  fill: #173765;
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.scope :global(.join-growth-chart__source) {
+  margin-top: -2px;
+  color: #94a3b8;
+  font-size: 0.74rem;
+  line-height: 1.6;
+  text-align: right;
+}
+
+.scope :global(.join-impact-chart__status) {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: #64748b;
+  font-size: 0.78rem;
+  font-weight: 750;
+}
+
+.scope :global(.join-impact-chart__status::before) {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #e64b35;
+  box-shadow: 0 0 0 4px rgba(230, 75, 53, 0.1);
+  content: '';
+}
+
+.scope :global(.join-impact-chart__stats) {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.scope :global(.join-impact-chart__section) {
+  padding-top: 29px;
+}
+
+.scope :global(.join-impact-chart__section + .join-impact-chart__section) {
+  margin-top: 27px;
+  border-top: 1px solid rgba(214, 225, 239, 0.88);
+}
+
+.scope :global(.join-impact-chart__section-head),
+.scope :global(.join-impact-chart__meta) {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 22px;
+}
+
+.scope :global(.join-impact-chart__section-head) {
+  margin-bottom: 15px;
+}
+
+.scope :global(.join-impact-chart__section-head > div) {
+  min-width: 0;
+}
+
+.scope :global(.join-impact-chart__section-head h3),
+.scope :global(.join-impact-chart__section-head p),
+.scope :global(.join-impact-chart__evidence h4) {
+  margin: 0;
+}
+
+.scope :global(.join-impact-chart__section-head h3) {
+  color: #0f172a;
+  font-size: 1.04rem;
+  line-height: 1.35;
+}
+
+.scope :global(.join-impact-chart__section-head p) {
+  margin-top: 4px;
+  color: #94a3b8;
+  font-size: 0.75rem;
+  font-weight: 620;
+  line-height: 1.6;
+}
+
+.scope :global(.join-impact-chart__kpi) {
+  flex: 0 0 auto;
+  color: #64748b;
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
+.scope :global(.join-impact-chart__kpi strong) {
+  margin-left: 4px;
+  color: #173765;
+  font-size: 1rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.scope :global(.join-impact-chart__tabs) {
+  display: inline-flex;
+  flex: 0 0 auto;
+  gap: 4px;
+  padding: 3px;
+  border: 1px solid #d7e1ef;
+  border-radius: 8px;
+  background: #f7f9fd;
+}
+
+.scope :global(.join-impact-chart__tabs button) {
+  min-width: 66px;
+  height: 34px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 6px;
+  color: #64748b;
+  background: transparent;
+  font-size: 0.78rem;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.scope :global(.join-impact-chart__tabs button:hover) {
+  color: #173765;
+}
+
+.scope :global(.join-impact-chart__tabs button[aria-selected='true']) {
+  color: #ffffff;
+  background: #3c5488;
+  box-shadow: 0 4px 12px rgba(60, 84, 136, 0.2);
+}
+
+.scope :global(.join-impact-chart__meta) {
+  align-items: center;
+  margin-bottom: 3px;
+}
+
+.scope :global(.join-impact-chart__average) {
+  stroke: rgba(230, 75, 53, 0.58);
+  stroke-width: 1.5;
+  stroke-dasharray: 5 5;
+}
+
+.scope :global(.join-impact-chart__peak) {
+  fill: #e64b35;
+  stroke: rgba(230, 75, 53, 0.18);
+  stroke-width: 7;
+}
+
+.scope :global(.join-impact-chart__activity-point) {
+  fill: #ffffff;
+  stroke: #3c5488;
+  stroke-width: 2.5;
+}
+
+.scope :global(.join-impact-chart__hours) {
+  position: relative;
+  height: 280px;
+  padding: 22px 8px 34px 46px;
+}
+
+.scope :global(.join-impact-chart__hour-grid) {
+  position: absolute;
+  inset: 22px 8px 34px 46px;
+  display: grid;
+  grid-template-rows: repeat(4, 1fr);
+  pointer-events: none;
+}
+
+.scope :global(.join-impact-chart__hour-grid span) {
+  position: relative;
+  display: block;
+  border-top: 1px solid #e5eaf1;
+  color: #8291a8;
+  font-size: 10px;
+  font-weight: 650;
+  text-indent: -34px;
+  transform: translateY(-7px);
+}
+
+.scope :global(.join-impact-chart__hour-grid span:last-child) {
+  border-bottom: 1px solid #e5eaf1;
+}
+
+.scope :global(.join-impact-chart__hour-bars) {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: repeat(24, minmax(0, 1fr));
+  align-items: end;
+  gap: 7px;
+  height: 100%;
+}
+
+.scope :global(.join-impact-chart__hour-item) {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  height: 100%;
+}
+
+.scope :global(.join-impact-chart__hour-item > span) {
+  display: block;
+  width: min(18px, 78%);
+  min-height: 2px;
+  border-radius: 3px 3px 0 0;
+  background: rgba(60, 84, 136, 0.28);
+  transition: background-color 0.15s ease, transform 0.15s ease;
+}
+
+.scope :global(.join-impact-chart__hour-item > span:hover),
+.scope :global(.join-impact-chart__hour-item > span.is-peak) {
+  background: #3c5488;
+  transform: scaleX(1.08);
+}
+
+.scope :global(.join-impact-chart__hour-item::after) {
+  position: absolute;
+  top: calc(100% + 10px);
+  left: 50%;
+  color: #8291a8;
+  font-size: 10px;
+  font-weight: 650;
+  content: attr(data-label);
+  transform: translateX(-50%);
+}
+
+.scope :global(.join-impact-chart__note) {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 18px 0 0;
+  color: #64748b;
+  font-size: 0.76rem;
+  line-height: 1.72;
+}
+
+.scope :global(.join-impact-chart__note::before) {
+  flex: 0 0 auto;
+  width: 5px;
+  height: 5px;
+  margin-top: 8px;
+  border-radius: 50%;
+  background: #e64b35;
+  box-shadow: 0 0 0 4px rgba(230, 75, 53, 0.1);
+  content: '';
+}
+
+.scope :global(.join-impact-chart__evidence) {
+  display: grid;
+  grid-template-columns: minmax(0, 1.18fr) minmax(0, 0.82fr);
+  gap: 28px;
+}
+
+.scope :global(.join-impact-chart__evidence > div + div) {
+  padding-left: 28px;
+  border-left: 1px solid rgba(214, 225, 239, 0.88);
+}
+
+.scope :global(.join-impact-chart__evidence h4) {
+  margin-bottom: 16px;
+  color: #0f172a;
+  font-size: 0.92rem;
+}
+
+.scope :global(.join-impact-chart__depth-list),
+.scope :global(.join-impact-chart__ring-list) {
+  display: grid;
+  gap: 14px;
+}
+
+.scope :global(.join-impact-chart__depth-row) {
+  display: grid;
+  grid-template-columns: 110px minmax(0, 1fr) 46px;
+  align-items: center;
+  gap: 12px;
+}
+
+.scope :global(.join-impact-chart__depth-row > span),
+.scope :global(.join-impact-chart__depth-row > strong) {
+  color: #64748b;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.scope :global(.join-impact-chart__depth-row > strong) {
+  color: #173765;
+  font-size: 0.86rem;
+  text-align: right;
+}
+
+.scope :global(.join-impact-chart__depth-row > i) {
+  height: 8px;
+  overflow: hidden;
+  border-radius: 3px;
+  background: #edf2f8;
+}
+
+.scope :global(.join-impact-chart__depth-row > i > b) {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: rgba(60, 84, 136, 0.78);
+}
+
+.scope :global(.join-impact-chart__depth-summary) {
+  display: flex;
+  gap: 18px;
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(214, 225, 239, 0.88);
+}
+
+.scope :global(.join-impact-chart__depth-summary div),
+.scope :global(.join-impact-chart__ring-item > div) {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.scope :global(.join-impact-chart__depth-summary strong),
+.scope :global(.join-impact-chart__ring-item strong) {
+  color: #173765;
+  font-size: 1.05rem;
+}
+
+.scope :global(.join-impact-chart__depth-summary span) {
+  color: #94a3b8;
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+.scope :global(.join-impact-chart__ring-list) {
+  gap: 16px;
+}
+
+.scope :global(.join-impact-chart__ring-item) {
+  display: grid;
+  grid-template-columns: 62px minmax(0, 1fr);
+  align-items: center;
+  gap: 13px;
+}
+
+.scope :global(.join-impact-chart__ring) {
+  width: 62px;
+  height: 62px;
+  transform: rotate(-90deg);
+}
+
+.scope :global(.join-impact-chart__ring-track),
+.scope :global(.join-impact-chart__ring-value) {
+  fill: none;
+  stroke-width: 7;
+}
+
+.scope :global(.join-impact-chart__ring-track) {
+  stroke: #edf2f8;
+}
+
+.scope :global(.join-impact-chart__ring-value) {
+  stroke: #3c5488;
+  stroke-linecap: round;
+}
+
+.scope :global(.join-impact-chart__ring-item--accent .join-impact-chart__ring-value) {
+  stroke: rgba(230, 75, 53, 0.76);
+}
+
+.scope :global(.join-impact-chart__ring-item span) {
+  color: #64748b;
+  font-size: 0.74rem;
+  font-weight: 700;
+  line-height: 1.45;
+}
+
+@media (max-width: 900px) {
+
+  .scope :global(.join-growth-chart__intro) {
+    flex-direction: column;
+    gap: 10px;
+  }
+}
+
+@media (max-width: 900px) {
+
+  .scope :global(.join-growth-chart__legend) {
+    justify-content: flex-start;
+  }
+}
+
+@media (max-width: 640px) {
+
+  .scope :global(.join-growth-chart__intro) {
+    padding-bottom: 14px;
+  }
+}
+
+@media (max-width: 640px) {
+
+  .scope :global(.join-growth-chart__lead) {
+    font-size: 0.9rem;
+    line-height: 1.65;
+  }
+}
+
+@media (max-width: 640px) {
+
+  .scope :global(.join-growth-chart__stats > div) {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 5px;
+    padding: 13px 10px;
+  }
+}
+
+@media (max-width: 640px) {
+
+  .scope :global(.join-growth-chart__stats > div:first-child) {
+    padding-left: 0;
+  }
+}
+
+@media (max-width: 640px) {
+
+  .scope :global(.join-growth-chart__stats strong) {
+    font-size: 1.3rem;
+  }
+}
+
+@media (max-width: 640px) {
+
+  .scope :global(.join-growth-chart__stats span) {
+    font-size: 0.7rem;
+    line-height: 1.3;
+  }
+}
+
+@media (max-width: 640px) {
+
+  .scope :global(.join-growth-chart__plot) {
+    padding-top: 12px;
+  }
+}
+
+@media (max-width: 640px) {
+
+  .scope :global(.join-growth-chart__svg--desktop) {
+    display: none;
+  }
+}
+
+@media (max-width: 640px) {
+
+  .scope :global(.join-growth-chart__svg--mobile) {
+    display: block;
+  }
+}
+
+@media (max-width: 640px) {
+
+  .scope :global(.join-growth-chart__source) {
+    margin-top: 2px;
+    text-align: left;
+  }
+}
+
+@media (max-width: 640px) {
+
+  .scope :global(.join-impact-chart__stats) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+
+  .scope :global(.join-impact-chart__stats > div:first-child) {
+    padding-left: 10px;
+  }
+}
+
+@media (max-width: 640px) {
+
+  .scope :global(.join-impact-chart__stats > div:nth-child(odd)) {
+    border-left: 0;
+  }
+}
+
+@media (max-width: 640px) {
+
+  .scope :global(.join-impact-chart__stats > div:nth-child(n + 3)) {
+    border-top: 1px solid rgba(226, 232, 240, 0.92);
+  }
+}
+
+@media (max-width: 640px) {
+
+  .scope :global(.join-impact-chart__section-head),
+  .scope :global(.join-impact-chart__meta) {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 9px;
+  }
+}
+
+@media (max-width: 640px) {
+
+  .scope :global(.join-impact-chart__tabs) {
+    width: 100%;
+  }
+}
+
+@media (max-width: 640px) {
+
+  .scope :global(.join-impact-chart__tabs button) {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+}
+
+@media (max-width: 640px) {
+
+  .scope :global(.join-impact-chart__hours) {
+    height: 240px;
+    padding-left: 35px;
+  }
+}
+
+@media (max-width: 640px) {
+
+  .scope :global(.join-impact-chart__hour-grid) {
+    left: 35px;
+  }
+}
+
+@media (max-width: 640px) {
+
+  .scope :global(.join-impact-chart__hour-bars) {
+    gap: 3px;
+  }
+}
+
+@media (max-width: 640px) {
+
+  .scope :global(.join-impact-chart__hour-item > span) {
+    width: 72%;
+  }
+}
+
+@media (max-width: 640px) {
+
+  .scope :global(.join-impact-chart__hour-item:nth-child(3n + 2)::after),
+  .scope :global(.join-impact-chart__hour-item:nth-child(3n + 3)::after) {
+    content: '';
+  }
+}
+
+@media (max-width: 640px) {
+
+  .scope :global(.join-impact-chart__evidence) {
+    grid-template-columns: 1fr;
+    gap: 25px;
+  }
+}
+
+@media (max-width: 640px) {
+
+  .scope :global(.join-impact-chart__evidence > div + div) {
+    padding-top: 24px;
+    padding-left: 0;
+    border-top: 1px solid rgba(214, 225, 239, 0.88);
+    border-left: 0;
+  }
+}
+
+@media (max-width: 640px) {
+
+  .scope :global(.join-impact-chart__depth-row) {
+    grid-template-columns: 96px minmax(0, 1fr) 42px;
+    gap: 8px;
+  }
+}

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import styles from './PlatformImpactChart.module.css';
 
 type MetricKey = 'users' | 'materials' | 'downloads';
 
@@ -413,7 +414,7 @@ export default function PlatformImpactChart() {
   const peakHour = HOUR_VALUES.indexOf(Math.max(...HOUR_VALUES));
 
   return (
-    <div className="join-growth-chart join-impact-chart">
+    <div className={styles.scope}><div className="join-growth-chart join-impact-chart">
       <div className="join-growth-chart__intro">
         <p className="join-growth-chart__period">累计数据截至 {SNAPSHOT_DATE}</p>
         <span className="join-impact-chart__status">真实业务记录</span>
@@ -635,6 +636,6 @@ export default function PlatformImpactChart() {
           </div>
         </div>
       </section>
-    </div>
+    </div></div>
   );
 }

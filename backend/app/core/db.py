@@ -7,6 +7,7 @@ from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.orm import Session, close_all_sessions, sessionmaker
 
 from app.core.config import get_settings
+from app.core.query_timing import instrument_engine
 
 
 _ENGINE = None
@@ -38,6 +39,7 @@ def get_engine():
                 }
             )
         _ENGINE = create_engine(settings.resolved_database_url, **engine_kwargs)
+        instrument_engine(_ENGINE)
     return _ENGINE
 
 
