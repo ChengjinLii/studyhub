@@ -50,6 +50,7 @@ import { resolveUploadSectionCompletion } from '../lib/uploadSectionCompletion';
 import { buildUploadDraftKey, UploadTextDraftValue } from '../lib/uploadDraft';
 import { useUploadTextDraftPersistence } from '../lib/useUploadTextDraft';
 import { useUploadSubmissionToast } from '../lib/useUploadSubmissionToast';
+import { deriveUploadAutoTitle, resolveUploadSubmissionContext } from '../lib/uploadSubmissionContext';
 
 const MAX_FILE_BYTES = 50 * 1024 * 1024;
 const MAX_TAGS = 3;
@@ -560,31 +561,23 @@ export default function UploadPage({ user, token, account }: UploadPageProps) {
   };
 
   const deriveAutoTitle = (name: string) => {
-    const withoutExt = name.replace(/\.[^/.]+$/, '');
-    return withoutExt.slice(0, MAX_TITLE_LENGTH);
+    return deriveUploadAutoTitle(name, MAX_TITLE_LENGTH);
   };
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
     if (submissionInFlightRef.current) return;
     setStatus(null);
-    const fallbackGradeValue = gradeStageOptions[0];
-    const effectiveTitle = (title.trim() || (isQuickMode && zipFile ? deriveAutoTitle(zipFile.name) : '')).slice(0, MAX_TITLE_LENGTH);
-    const effectiveGradeValue = isQuickMode ? quickProfile.gradeValue || fallbackGradeValue : gradeValue;
-    const effectiveCourseCategory: CourseCategorySelection = isExperience ? 'GENERAL' : courseCategory;
-    const effectiveCollege = effectiveCourseCategory === 'MAJOR' ? (isQuickMode ? quickProfile.college : college) : '';
-    const effectiveMajors = effectiveCourseCategory === 'MAJOR' ? (isQuickMode ? quickProfile.majors : selectedMajors) : [];
-    const effectiveTagList = isQuickMode ? [] : tagList;
-    const trimmedNetdiskUrl = netdiskUrl.trim();
-    const resolvedDelivery = isExperience ? 'FILE' : deliveryMethod === 'NETDISK' ? 'NETDISK' : 'FILE';
-    const effectivePreviewSource = isExperience
-      ? PREVIEW_SOURCE_AUTO
-      : isRequestResponse
-        ? PREVIEW_SOURCE_MANUAL
-        : isQuickMode
-          ? PREVIEW_SOURCE_AUTO
-          : previewSource;
-    const allowCustomPreview = isExperience;
+    const {
+      effectiveTitle, effectiveGradeValue, effectiveCourseCategory, effectiveCollege,
+      effectiveMajors, effectiveTagList, trimmedNetdiskUrl, resolvedDelivery,
+      effectivePreviewSource, allowCustomPreview,
+    } = resolveUploadSubmissionContext({
+      title, zipFile, maxTitleLength: MAX_TITLE_LENGTH, isQuickMode, isExperience,
+      isRequestResponse, quickProfile, fallbackGradeValue: gradeStageOptions[0],
+      gradeValue, courseCategory, college, selectedMajors, tagList, netdiskUrl,
+      deliveryMethod, previewSource,
+    });
     const validation = validateUploadSubmitInput({
       token,
       isExperience,

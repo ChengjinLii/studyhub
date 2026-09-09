@@ -20,6 +20,7 @@
     "lib/sessionApi.ts",
     "lib/share.ts",
     "lib/slug.ts",
+    "lib/uploadSubmissionContext.ts",
     "components/SafeMarkdown.tsx"
   ],
   "exclude": ["node_modules"]
