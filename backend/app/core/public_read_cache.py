@@ -210,26 +210,22 @@ class PublicReadCache:
                     producer = False
             if producer:
                 break
-            await inflight.wait()
+            await asyncio.wait_for(inflight.wait(), timeout=min(15, self.ttl_seconds))
 
         try:
             value = await self._await_if_needed(factory())
-        except Exception:
+            with self._lock:
+                self._purge_expired_locked(monotonic())
+                self._store_local_entry_locked(composite_key, value)
+                self._record_event(namespace, "miss")
+                self._record_event(namespace, "set")
+            return value
+        finally:
+            # Cancellation must release followers as well as ordinary failures.
             with self._lock:
                 waiter = self._async_inflight.pop(composite_key, None)
                 if waiter is not None:
                     waiter.set()
-            raise
-
-        with self._lock:
-            self._purge_expired_locked(monotonic())
-            self._store_local_entry_locked(composite_key, value)
-            self._record_event(namespace, "miss")
-            self._record_event(namespace, "set")
-            waiter = self._async_inflight.pop(composite_key, None)
-            if waiter is not None:
-                waiter.set()
-        return value
 
     async def _redis_get_or_set_async(
         self,
@@ -266,41 +262,27 @@ class PublicReadCache:
                     producer = False
             if producer:
                 break
-            await inflight.wait()
+            await asyncio.wait_for(inflight.wait(), timeout=min(15, self.ttl_seconds))
 
         try:
             value = await self._await_if_needed(factory())
-        except Exception:
-            with self._lock:
-                waiter = self._async_inflight.pop(composite_key, None)
-                if waiter is not None:
-                    waiter.set()
-            raise
-
-        try:
-            await asyncio.to_thread(client.set, redis_key, self._serialize_value(value), self.ttl_seconds)
-        except TypeError:
             try:
                 await asyncio.to_thread(client.set, redis_key, self._serialize_value(value), ex=self.ttl_seconds)
             except Exception:
+                # We already own this key's inflight marker. Re-entering the
+                # local get-or-set path here would wait on our own completion.
                 self._record_event(namespace, "error")
-                value = await self._local_get_or_set_async(namespace, key, lambda: self._constant_async_value(value))
-        except Exception:
-            self._record_event(namespace, "error")
-            value = await self._local_get_or_set_async(namespace, key, lambda: self._constant_async_value(value))
-        else:
             with self._lock:
                 self._purge_expired_locked(monotonic())
                 self._store_local_entry_locked(composite_key, value)
             self._record_event(namespace, "miss")
             self._record_event(namespace, "set")
+            return value
         finally:
             with self._lock:
                 waiter = self._async_inflight.pop(composite_key, None)
                 if waiter is not None:
                     waiter.set()
-        return value
-
     def _invalidate_local_prefix(self, prefix: str) -> None:
         with self._lock:
             doomed = [key for key in self._entries if key[0].startswith(prefix)]

@@ -47,6 +47,9 @@ const cloneCacheValue = <T,>(value: T): T => {
 export const shouldUseServerPublicApiCache = (path: string, init: RequestInit = {}, token?: string) => {
   if (typeof window !== 'undefined') return false;
   if (token) return false;
+  if (init.signal) return false;
+  const headers = new Headers(init.headers);
+  if (headers.has('authorization') || headers.has('cookie')) return false;
   if (PUBLIC_API_CACHE_TTL_MS <= 0) return false;
   const method = (init.method || 'GET').toUpperCase();
   if (method !== 'GET') return false;
@@ -78,14 +81,35 @@ export const refreshServerPublicApiCache = <T,>(key: string, refresh: () => Prom
     return;
   }
   refreshes.add(key);
-  void refresh()
-    .then((value) => writeServerPublicApiCache(key, value))
+  void loadServerPublicApiCache(key, refresh)
     .catch(() => {
       // Keep stale data until staleUntil; foreground requests can refresh later.
     })
     .finally(() => {
       refreshes.delete(key);
     });
+};
+
+// Only used after the anonymous server-side request guard. The API loader has
+// its own deadline, so failed or stalled calls cannot retain a key indefinitely.
+export const loadServerPublicApiCache = async <T,>(key: string, loader: () => Promise<T>): Promise<T> => {
+  const store = globalThis as typeof globalThis & {
+    __studyhubPublicApiLoads?: Map<string, Promise<unknown>>;
+  };
+  const pending = store.__studyhubPublicApiLoads ||= new Map();
+  const existing = pending.get(key);
+  if (existing) return cloneCacheValue(await existing as T);
+  if (pending.size >= PUBLIC_API_CACHE_MAX_ENTRIES) return loader();
+  const task = Promise.resolve().then(loader).then((value) => {
+    writeServerPublicApiCache(key, value);
+    return value;
+  });
+  pending.set(key, task);
+  try {
+    return cloneCacheValue(await task);
+  } finally {
+    if (pending.get(key) === task) pending.delete(key);
+  }
 };
 
 export const deleteExpiredServerPublicApiCache = () => {

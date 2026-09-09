@@ -17,7 +17,7 @@ import {
   readServerPublicApiCache,
   refreshServerPublicApiCache,
   shouldUseServerPublicApiCache,
-  writeServerPublicApiCache,
+  loadServerPublicApiCache,
 } from './serverPublicApiCache';
 
 export interface MaterialListResponse {
@@ -72,12 +72,9 @@ async function apiFetch<T>(path: string, init: RequestInit = {}, token?: string,
       }
       return cached.value;
     }
+    return loadServerPublicApiCache(cacheKey, requestBackend);
   }
-  const data = await requestBackend();
-  if (shouldUseServerPublicApiCache(path, init, token)) {
-    writeServerPublicApiCache(cacheKey, data);
-  }
-  return data;
+  return requestBackend();
 }
 
 const buildQuery = (params: Record<string, string | number | undefined>) => {
