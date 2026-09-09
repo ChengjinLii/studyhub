@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
 import hashlib
 import json
@@ -63,6 +64,12 @@ VISIBLE_STATUSES = {"VISIBLE", "visible", "", None}
 VISIBLE_MATERIAL_STATUS_SQL = "(m.status IS NULL OR LOWER(m.status) NOT IN ('hidden', 'removed'))"
 
 
+@dataclass
+class _SummaryLoadGate:
+    lock: asyncio.Lock = field(default_factory=asyncio.Lock)
+    users: int = 0
+
+
 class MaterialsService(MaterialSecurityPolicyMixin, MaterialsStorageMutationMixin, MaterialsCompatMixin):
     def __init__(
         self,
@@ -77,6 +84,7 @@ class MaterialsService(MaterialSecurityPolicyMixin, MaterialsStorageMutationMixi
         self.auth_repo = auth_repo
         self.material_repo = material_repo
         self.asset_store = asset_store
+        self._summary_load_gates: dict[tuple[asyncio.AbstractEventLoop, str], _SummaryLoadGate] = {}
 
     def list_materials(
         self,
@@ -233,9 +241,13 @@ class MaterialsService(MaterialSecurityPolicyMixin, MaterialsStorageMutationMixi
             course_category=course_category,
             price=price,
         )
-        stats_call = self._call_with_new_async_session(self._compat_load_material_stats_async)
-        tags_call = self._call_with_new_async_session(self._compat_load_available_tags_async)
-        if current_user_id is None:
+        stats_call = self._call_summary_with_new_async_session(self._compat_load_material_stats_async)
+        tags_call = self._call_summary_with_new_async_session(self._compat_load_available_tags_async)
+        # These explicit sort branches do not reference profile fields in SQL.
+        profile_independent = (sort or "latest").strip().lower() in {
+            "newest", "downloads", "recent_downloads", "price", "sales",
+        }
+        if current_user_id is None or profile_independent:
             profile = None
             total, stats, available_tags, page_rows = await asyncio.gather(
                 count_call,
@@ -365,6 +377,25 @@ class MaterialsService(MaterialSecurityPolicyMixin, MaterialsStorageMutationMixi
     async def _call_with_new_async_session(self, loader, *args, **kwargs):
         async with async_session_scope() as session:
             return await loader(session, *args, **kwargs)
+
+    async def _call_summary_with_new_async_session(self, loader):
+        # Loaders recheck their existing TTL cache while holding this gate.
+        # Keep locks per event loop and remove them after the last waiter leaves.
+        key = (asyncio.get_running_loop(), loader.__name__)
+        gate = self._summary_load_gates.setdefault(key, _SummaryLoadGate())
+        gate.users += 1
+        acquired = False
+        try:
+            async with asyncio.timeout(15):
+                await gate.lock.acquire()
+            acquired = True
+            return await self._call_with_new_async_session(loader)
+        finally:
+            if acquired:
+                gate.lock.release()
+            gate.users -= 1
+            if gate.users == 0:
+                self._summary_load_gates.pop(key, None)
 
     def get_detail(self, session: Session, current_user_id: int | None, material_id: int, can_manage_all: bool = False) -> dict[str, Any]:
         if self.settings.requires_private_env_file:
