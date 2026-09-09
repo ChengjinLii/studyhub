@@ -210,7 +210,11 @@ def create_app() -> FastAPI:
                 log_level = logging.ERROR if status_code >= 500 else logging.INFO
                 logger.log(
                     log_level,
-                    "HTTP request completed",
+                    "HTTP request completed status=%s duration_ms=%.2f db_query_count=%s db_query_ms=%.2f",
+                    status_code,
+                    duration_ms,
+                    sql_timing.count,
+                    sql_timing.seconds * 1000,
                     extra={
                         "event": "http_request",
                         "environment": settings.environment,

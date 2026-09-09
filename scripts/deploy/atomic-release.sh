@@ -86,6 +86,9 @@ python3.12 -m venv "$RELEASE/.venv"
 "$RELEASE/.venv/bin/python" -m pip install --disable-pip-version-check --index-url "$PIP_INDEX_URL" \
   --require-hashes -r "$RELEASE/backend/requirements.lock"
 PATH="$NODE_BIN_DIR:$PATH" "$NPM_BIN" --prefix "$RELEASE/frontend" ci --no-audit --no-fund
+# Advisories can change without a lockfile change. Fail before touching live services.
+PATH="$NODE_BIN_DIR:$PATH" "$NPM_BIN" --prefix "$RELEASE/frontend" audit \
+  --omit=dev --audit-level=high --registry=https://registry.npmjs.org
 
 echo "[2/5] build frontend in isolated release"
 (

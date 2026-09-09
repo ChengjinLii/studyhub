@@ -27,7 +27,8 @@ References:
 # Deployment and measurement boundaries
 
 Atomic release now requires 3 GiB free disk and 1 GiB available memory before
-installation. Candidate prewarming has bounded retries and must succeed before
+installation. Production dependency audit uses the official npm registry and must
+pass before building or switching services. Candidate prewarming has bounded retries and must succeed before
 switching. A failed attempt only removes a release created by that attempt.
 
 The service restart remains a restart, not zero-downtime blue/green deployment.

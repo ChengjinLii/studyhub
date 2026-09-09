@@ -76,7 +76,7 @@ jobs:
         run: npm ci
       - name: Reject high-risk production dependency advisories
         working-directory: frontend
-        run: npm audit --omit=dev --audit-level=high
+        run: npm audit --omit=dev --audit-level=high --registry=https://registry.npmjs.org
       - name: Run frontend checks
         working-directory: frontend
         run: npm run check
