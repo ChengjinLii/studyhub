@@ -106,7 +106,8 @@ class PublicReadCache:
                     producer = False
             if producer:
                 break
-            inflight.wait(timeout=max(1, self.ttl_seconds))
+            if not inflight.wait(timeout=min(15, self.ttl_seconds)):
+                raise TimeoutError("Public cache producer wait exceeded deadline")
 
         try:
             value = factory()
@@ -157,35 +158,26 @@ class PublicReadCache:
                     producer = False
             if producer:
                 break
-            inflight.wait(timeout=max(1, self.ttl_seconds))
+            if not inflight.wait(timeout=min(15, self.ttl_seconds)):
+                raise TimeoutError("Public cache producer wait exceeded deadline")
 
         try:
             value = factory()
-        except Exception:
-            with self._lock:
-                waiter = self._inflight.pop(composite_key, None)
-                if waiter is not None:
-                    waiter.set()
-            raise
-
-        try:
-            client.set(redis_key, self._serialize_value(value), ex=self.ttl_seconds)
-        except Exception:
-            self._record_event(namespace, "error")
-            value = self._local_get_or_set(namespace, key, lambda: value)
-        else:
+            try:
+                client.set(redis_key, self._serialize_value(value), ex=self.ttl_seconds)
+            except Exception:
+                self._record_event(namespace, "error")
             with self._lock:
                 self._purge_expired_locked(monotonic())
                 self._store_local_entry_locked(composite_key, value)
             self._record_event(namespace, "miss")
             self._record_event(namespace, "set")
+            return value
         finally:
             with self._lock:
                 waiter = self._inflight.pop(composite_key, None)
                 if waiter is not None:
                     waiter.set()
-        return value
-
     async def _local_get_or_set_async(
         self,
         namespace: str,

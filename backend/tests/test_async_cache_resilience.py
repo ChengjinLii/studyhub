@@ -93,6 +93,14 @@ def test_redis_set_failure_returns_completed_value_without_self_wait():
     asyncio.run(scenario())
 
 
+def test_sync_redis_set_failure_never_reenters_local_singleflight(monkeypatch):
+    cache = cache_for("redis", fail_set=True)
+    monkeypatch.setattr(cache, "_local_get_or_set", lambda *args: pytest.fail("recursive fallback"))
+    assert cache.get_or_set("n", "k", lambda: 42) == 42
+    assert cache._entries[("n", "k")].value == 42
+    assert not cache._inflight
+
+
 @pytest.mark.parametrize("backend", ["local", "redis"])
 def test_failed_factory_can_be_retried(backend):
     async def scenario():
