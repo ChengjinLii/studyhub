@@ -10,15 +10,7 @@ import { ProfileSummary } from '../types/profile';
 import { ContributorRank, LeaderboardPeriod } from '../types/contributor';
 import { PublicUserProfile, UserAccountProfile } from '../types/userProfile';
 import { MaterialRequestItem } from '../types/request';
-import { resolveApiBase, buildBackendUrl } from './apiBase';
-import { ApiEnvelope, unwrapApiResponse } from './apiEnvelope';
-import { normalizeMockAssets } from './mockAsset';
-import {
-  readServerPublicApiCache,
-  refreshServerPublicApiCache,
-  shouldUseServerPublicApiCache,
-  loadServerPublicApiCache,
-} from './serverPublicApiCache';
+import { apiFetch, webApiFetch } from './apiTransport';
 
 export interface MaterialListResponse {
   items: MaterialListItem[];
@@ -34,49 +26,6 @@ export interface MaterialListStats {
   userCount: number;
 }
 
-async function apiFetch<T>(path: string, init: RequestInit = {}, token?: string, origin?: string): Promise<T> {
-  const headers: Record<string, string> = {
-    Accept: 'application/json',
-    ...(init.headers as Record<string, string> | undefined),
-  };
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
-  }
-  const apiBase = resolveApiBase(origin);
-  const cacheKey = `${apiBase}${path}`;
-  const requestBackend = async () => {
-    const isRead = ['GET', 'HEAD'].includes((init.method || 'GET').toUpperCase());
-    const controller = new AbortController();
-    const cancel = () => controller.abort();
-    if (init.signal?.aborted) controller.abort();
-    init.signal?.addEventListener('abort', cancel, { once: true });
-    const timer = isRead ? setTimeout(cancel, 15000) : undefined;
-    try {
-      const res = await fetch(cacheKey, {
-        ...init,
-        headers,
-        cache: 'no-store',
-        signal: isRead ? controller.signal : init.signal,
-      });
-      return await unwrapApiResponse<T>(res, '请求失败');
-    } finally {
-      if (timer) clearTimeout(timer);
-      init.signal?.removeEventListener('abort', cancel);
-    }
-  };
-  if (shouldUseServerPublicApiCache(path, init, token)) {
-    const cached = readServerPublicApiCache<T>(cacheKey);
-    if (cached) {
-      if (cached.state === 'stale') {
-        refreshServerPublicApiCache(cacheKey, requestBackend);
-      }
-      return cached.value;
-    }
-    return loadServerPublicApiCache(cacheKey, requestBackend);
-  }
-  return requestBackend();
-}
-
 const buildQuery = (params: Record<string, string | number | undefined>) => {
   const search = new URLSearchParams();
   Object.entries(params).forEach(([key, value]) => {
@@ -86,19 +35,6 @@ const buildQuery = (params: Record<string, string | number | undefined>) => {
   const qs = search.toString();
   return qs ? `?${qs}` : '';
 };
-
-async function webApiFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
-  const headers: Record<string, string> = {
-    Accept: 'application/json',
-    ...(init.headers as Record<string, string> | undefined),
-  };
-  const res = await fetch(buildBackendUrl(path), {
-    ...init,
-    headers,
-    credentials: init.credentials ?? 'include',
-  });
-  return unwrapApiResponse<T>(res, '请求失败');
-}
 
 export async function fetchMaterials(
   params: Record<string, string | number | undefined>,

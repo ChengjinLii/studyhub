@@ -9,6 +9,7 @@
     "next-env.d.ts",
     "types/**/*.ts",
     "lib/apiBase.ts",
+    "lib/apiTransport.ts",
     "lib/apiEnvelope.ts",
     "lib/auth.ts",
     "lib/authApi.ts",
