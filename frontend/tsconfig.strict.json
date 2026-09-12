@@ -22,7 +22,8 @@
     "lib/slug.ts",
     "lib/uploadSubmissionContext.ts",
     "lib/uploadTags.ts",
-    "components/SafeMarkdown.tsx"
+    "components/SafeMarkdown.tsx",
+    "components/profile/ProfilePublications.tsx"
   ],
   "exclude": ["node_modules"]
 }
