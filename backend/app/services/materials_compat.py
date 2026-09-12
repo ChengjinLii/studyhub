@@ -11,6 +11,7 @@ from sqlalchemy import bindparam, inspect, text
 from sqlalchemy.orm import Session
 
 from app.core.async_db import async_session_scope
+from app.services import materials_related_reads as related_reads
 from app.services.materials_query_support import (
     compat_extract_primary_major,
     compat_major_matches,
@@ -857,68 +858,26 @@ class MaterialsCompatMixin:
     def _compat_load_tags_map(self, session: Session, material_ids: list[int]) -> dict[int, list[str]]:
         if not material_ids:
             return {}
-        stmt = text(
-            """
-            SELECT material_id, tag
-            FROM material_tags
-            WHERE material_id IN :material_ids
-            ORDER BY id ASC
-            """
-        ).bindparams(bindparam("material_ids", expanding=True))
-        rows = session.execute(stmt, {"material_ids": material_ids}).mappings().all()
-        result: dict[int, list[str]] = {material_id: [] for material_id in material_ids}
-        for row in rows:
-            material_id = int(row["material_id"])
-            if self._compat_has_text(row["tag"]):
-                result.setdefault(material_id, []).append(str(row["tag"]))
-        return result
+        rows = session.execute(related_reads.tags_statement(), {"material_ids": material_ids}).mappings().all()
+        return related_reads.tags_map(rows, material_ids, has_text=self._compat_has_text)
 
     async def _compat_load_tags_map_async(self, session, material_ids: list[int]) -> dict[int, list[str]]:
         if not material_ids:
             return {}
-        stmt = text(
-            """
-            SELECT material_id, tag
-            FROM material_tags
-            WHERE material_id IN :material_ids
-            ORDER BY id ASC
-            """
-        ).bindparams(bindparam("material_ids", expanding=True))
-        rows = (await session.execute(stmt, {"material_ids": material_ids})).mappings().all()
-        result: dict[int, list[str]] = {material_id: [] for material_id in material_ids}
-        for row in rows:
-            material_id = int(row["material_id"])
-            if self._compat_has_text(row["tag"]):
-                result.setdefault(material_id, []).append(str(row["tag"]))
-        return result
+        rows = (await session.execute(related_reads.tags_statement(), {"material_ids": material_ids})).mappings().all()
+        return related_reads.tags_map(rows, material_ids, has_text=self._compat_has_text)
 
     def _compat_load_comment_counts(self, session: Session, material_ids: list[int]) -> dict[int, int]:
         if not material_ids:
             return {}
-        stmt = text(
-            """
-            SELECT material_id, COUNT(*) AS total
-            FROM comments
-            WHERE status = 'visible' AND material_id IN :material_ids
-            GROUP BY material_id
-            """
-        ).bindparams(bindparam("material_ids", expanding=True))
-        rows = session.execute(stmt, {"material_ids": material_ids}).mappings().all()
-        return {int(row["material_id"]): int(row["total"]) for row in rows}
+        rows = session.execute(related_reads.comment_counts_statement(), {"material_ids": material_ids}).mappings().all()
+        return related_reads.comment_counts(rows)
 
     async def _compat_load_comment_counts_async(self, session, material_ids: list[int]) -> dict[int, int]:
         if not material_ids:
             return {}
-        stmt = text(
-            """
-            SELECT material_id, COUNT(*) AS total
-            FROM comments
-            WHERE status = 'visible' AND material_id IN :material_ids
-            GROUP BY material_id
-            """
-        ).bindparams(bindparam("material_ids", expanding=True))
-        rows = (await session.execute(stmt, {"material_ids": material_ids})).mappings().all()
-        return {int(row["material_id"]): int(row["total"]) for row in rows}
+        rows = (await session.execute(related_reads.comment_counts_statement(), {"material_ids": material_ids})).mappings().all()
+        return related_reads.comment_counts(rows)
 
     def _compat_load_material_stats(self, session: Session) -> dict[str, int]:
         cache_key = ("material_stats",)
@@ -1024,100 +983,20 @@ class MaterialsCompatMixin:
         )
 
     def _compat_load_versions(self, session: Session, material_id: int) -> list[dict[str, Any]]:
-        rows = session.execute(
-            text(
-                """
-                SELECT id, version_label, changelog, file_type, created_at
-                FROM material_versions
-                WHERE material_id = :material_id
-                ORDER BY created_at DESC, id DESC
-                """
-            ),
-            {"material_id": material_id},
-        ).mappings().all()
-        return [
-            {
-                "id": int(row["id"]),
-                "versionLabel": row["version_label"],
-                "changelog": row["changelog"],
-                "fileType": row["file_type"],
-                "createdAt": self._compat_serialize_datetime(row["created_at"]),
-            }
-            for row in rows
-        ]
+        rows = session.execute(related_reads.versions_statement(), {"material_id": material_id}).mappings().all()
+        return related_reads.versions(rows, serialize_datetime=self._compat_serialize_datetime)
 
     async def _compat_load_versions_async(self, session, material_id: int) -> list[dict[str, Any]]:
-        rows = (
-            await session.execute(
-                text(
-                    """
-                    SELECT id, version_label, changelog, file_type, created_at
-                    FROM material_versions
-                    WHERE material_id = :material_id
-                    ORDER BY created_at DESC, id DESC
-                    """
-                ),
-                {"material_id": material_id},
-            )
-        ).mappings().all()
-        return [
-            {
-                "id": int(row["id"]),
-                "versionLabel": row["version_label"],
-                "changelog": row["changelog"],
-                "fileType": row["file_type"],
-                "createdAt": self._compat_serialize_datetime(row["created_at"]),
-            }
-            for row in rows
-        ]
+        rows = (await session.execute(related_reads.versions_statement(), {"material_id": material_id})).mappings().all()
+        return related_reads.versions(rows, serialize_datetime=self._compat_serialize_datetime)
 
     def _compat_load_reviews(self, session: Session, material_id: int) -> list[dict[str, Any]]:
-        rows = session.execute(
-            text(
-                """
-                SELECT id, reviewer, rating, comment, created_at
-                FROM reviews
-                WHERE material_id = :material_id
-                ORDER BY created_at DESC, id DESC
-                """
-            ),
-            {"material_id": material_id},
-        ).mappings().all()
-        return [
-            {
-                "id": int(row["id"]),
-                "reviewer": row["reviewer"],
-                "rating": self._compat_as_int(row["rating"]),
-                "comment": row["comment"],
-                "createdAt": self._compat_serialize_datetime(row["created_at"]),
-            }
-            for row in rows
-        ]
+        rows = session.execute(related_reads.reviews_statement(), {"material_id": material_id}).mappings().all()
+        return related_reads.reviews(rows, as_int=self._compat_as_int, serialize_datetime=self._compat_serialize_datetime)
 
     async def _compat_load_reviews_async(self, session, material_id: int) -> list[dict[str, Any]]:
-        rows = (
-            await session.execute(
-                text(
-                    """
-                    SELECT id, reviewer, rating, comment, created_at
-                    FROM reviews
-                    WHERE material_id = :material_id
-                    ORDER BY created_at DESC, id DESC
-                    """
-                ),
-                {"material_id": material_id},
-            )
-        ).mappings().all()
-        return [
-            {
-                "id": int(row["id"]),
-                "reviewer": row["reviewer"],
-                "rating": self._compat_as_int(row["rating"]),
-                "comment": row["comment"],
-                "createdAt": self._compat_serialize_datetime(row["created_at"]),
-            }
-            for row in rows
-        ]
+        rows = (await session.execute(related_reads.reviews_statement(), {"material_id": material_id})).mappings().all()
+        return related_reads.reviews(rows, as_int=self._compat_as_int, serialize_datetime=self._compat_serialize_datetime)
 
     def _compat_material_relation_exists(self, session: Session, sql: str, material_id: int, user_id: int) -> bool:
         row = session.execute(text(sql), {"material_id": material_id, "user_id": user_id}).first()
