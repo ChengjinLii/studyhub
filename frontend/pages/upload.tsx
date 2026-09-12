@@ -51,6 +51,7 @@ import { buildUploadDraftKey, UploadTextDraftValue } from '../lib/uploadDraft';
 import { useUploadTextDraftPersistence } from '../lib/useUploadTextDraft';
 import { useUploadSubmissionToast } from '../lib/useUploadSubmissionToast';
 import { deriveUploadAutoTitle, resolveUploadSubmissionContext } from '../lib/uploadSubmissionContext';
+import { deriveUploadTags } from '../lib/uploadTags';
 
 const MAX_FILE_BYTES = 50 * 1024 * 1024;
 const MAX_TAGS = 3;
@@ -434,45 +435,14 @@ export default function UploadPage({ user, token, account }: UploadPageProps) {
   });
 
   const tagComputation = useMemo(() => {
-    if (isExperience) {
-      return {
-        list: ['经验分享', ...(resolvedExperienceExtraTag ? [resolvedExperienceExtraTag] : [])],
-        trimmedCustom: false,
-      };
-    }
-    const trimmedYear = yearTag.trim();
-    const baseSet = new Set<string>(selectedTags.filter((tag) => tag !== '经验分享'));
-    if (trimmedYear) {
-      if (trimmedYear !== '经验分享') {
-        baseSet.add(trimmedYear);
-      }
-    }
-    const customEntries = Array.from(
-      new Set(
-        customTags
-          .split(/[,，\s]+/)
-          .map((tag) => tag.trim())
-          .filter((tag) => tag && tag !== '经验分享')
-      )
-    );
-    const combined: string[] = [];
-    Array.from(baseSet).forEach((tag) => {
-      if (combined.length < MAX_TAGS) combined.push(tag);
+    return deriveUploadTags({
+      selectedTags,
+      customTags,
+      yearTag,
+      isExperience,
+      resolvedExperienceExtraTag,
+      maxTags: MAX_TAGS,
     });
-    let trimmedCustom = false;
-    for (const tag of customEntries) {
-      if (combined.length >= MAX_TAGS) {
-        trimmedCustom = true;
-        break;
-      }
-      if (!combined.includes(tag)) {
-        combined.push(tag);
-      }
-    }
-    return {
-      list: combined.slice(0, MAX_TAGS),
-      trimmedCustom,
-    };
   }, [selectedTags, customTags, yearTag, isExperience, resolvedExperienceExtraTag]);
   const tagList = tagComputation.list;
   const trimmedCustom = tagComputation.trimmedCustom;

@@ -21,6 +21,7 @@
     "lib/share.ts",
     "lib/slug.ts",
     "lib/uploadSubmissionContext.ts",
+    "lib/uploadTags.ts",
     "components/SafeMarkdown.tsx"
   ],
   "exclude": ["node_modules"]
