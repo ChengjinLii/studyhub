@@ -28,6 +28,7 @@ from app.providers.kyc import KycProvider
 from app.providers.transfer import PayoutTransferProvider, TransferResult
 from app.repos.auth_repo import AuthRepository
 from app.repos.finance_repo import FinanceRepository
+from app.services import payout_presentation
 from app.services.kyc_crypto_service import KycCryptoService
 from app.services.read_support import build_payout_qr_url
 from app.integrations.payout_qr_store import PayoutQrStore
@@ -317,28 +318,7 @@ class PayoutService:
             end_dt = datetime(month.year, month.month + 1, 1, tzinfo=SH_TZ)
 
         rows = self.finance_repo.list_paid_orders_between(session, start_dt.astimezone(UTC), end_dt.astimezone(UTC))
-        grouped: dict[int, dict[str, Any]] = {}
-        for order in rows:
-            if order.uploader_id is None:
-                continue
-            item = grouped.setdefault(
-                int(order.uploader_id),
-                {
-                    "uploaderId": int(order.uploader_id),
-                    "uploaderUsername": None,
-                    "uploaderNickname": None,
-                    "paidDownloadCount": 0,
-                    "payoutAmount": 0,
-                    "hasPayoutQr": False,
-                    "markedPaid": False,
-                    "markedAt": None,
-                    "markedById": None,
-                    "markedByName": None,
-                    "markedAmountSnapshot": None,
-                },
-            )
-            item["paidDownloadCount"] += 1
-            item["payoutAmount"] += int(order.creator_payable_amount or max(0, int(order.amount or 0) - int(order.platform_fee_amount or 0)))
+        grouped = payout_presentation.group_paid_orders(rows)
 
         marks = {mark.uploader_id: mark for mark in self.finance_repo.list_monthly_payout_marks(session, month_key)}
         for mark in marks.values():
@@ -875,19 +855,7 @@ class PayoutService:
         }
 
     def _to_settlement_detail(self, entity: SettlementRecord) -> dict[str, Any]:
-        return {
-            "settlementId": entity.id,
-            "sourceType": entity.source_type,
-            "sourceId": entity.source_id,
-            "materialTitle": entity.material_title,
-            "grossAmount": entity.gross_amount,
-            "platformFee": entity.platform_fee,
-            "payoutAmount": entity.payout_amount,
-            "policyVersion": entity.policy_version,
-            "scheduledPayoutAt": entity.scheduled_payout_at.isoformat() if entity.scheduled_payout_at else None,
-            "createdAt": entity.created_at.isoformat() if entity.created_at else None,
-            "status": entity.status,
-        }
+        return payout_presentation.settlement_detail(entity)
 
     def _hydrate_monthly_overview_items(
         self,
@@ -946,23 +914,7 @@ class PayoutService:
         item["markedAmountSnapshot"] = mark.amount_snapshot
 
     def _compute_recent_dates(self, entity: PayoutScheduleRecord) -> list[date]:
-        result: list[date] = []
-        launch = entity.launch_date
-        next_date = entity.next_payout_date
-        first_cycle = (launch + timedelta(days=7)) if launch is not None else None
-        if next_date is not None:
-            prev1 = next_date - timedelta(days=30)
-            prev2 = next_date - timedelta(days=60)
-            if first_cycle is not None and prev2 >= first_cycle:
-                result.append(prev2)
-            if first_cycle is not None and prev1 >= first_cycle:
-                result.append(prev1)
-            result.append(next_date)
-        elif first_cycle is not None:
-            result.extend([first_cycle, first_cycle + timedelta(days=30), first_cycle + timedelta(days=60)])
-        if entity.last_payout_date is not None and entity.last_payout_date not in result:
-            result.insert(0, entity.last_payout_date)
-        return result[:3]
+        return payout_presentation.recent_dates(entity)
 
     def _looks_like_id_card(self, value: str) -> bool:
         return bool(re.fullmatch(r"\d{15}|\d{17}[\dX]", value))
@@ -1015,24 +967,7 @@ class PayoutService:
         return user
 
     def _account_payload(self, user: AuthUser) -> dict[str, Any]:
-        grade_stages = [item for item in (user.grade_stages or "").split(",") if item]
-        return {
-            "id": user.id,
-            "username": user.username,
-            "nickname": user.nickname,
-            "signature": user.signature,
-            "school": user.school,
-            "college": user.college,
-            "major": user.major,
-            "gradeStages": grade_stages,
-            "email": user.email,
-            "emailPrivacy": bool(user.email_privacy),
-            "avatar": user.avatar,
-            "payoutQrUrl": build_payout_qr_url(user.id, user.payout_qr_key),
-            "legendaryContributorUntil": user.legendary_contributor_until.isoformat() if user.legendary_contributor_until else None,
-            "purchaseCount": 0,
-            "saleCount": 0,
-        }
+        return payout_presentation.account_payload(user)
 
     def _resolve_month(self, month_key_raw: str | None) -> date:
         if not month_key_raw:
