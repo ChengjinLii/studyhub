@@ -10,6 +10,7 @@ import { AppDialogProvider } from '../components/AppDialogProvider';
 import { AppToastProvider } from '../components/AppToastProvider';
 import { SessionProvider } from '../components/SessionProvider';
 import BottomTabBar from '../components/mobile/BottomTabBar';
+import PwaInstall from '../components/pwa/PwaInstall';
 import { MobileBottomBarProvider } from '../components/mobile/MobileBottomBarProvider';
 import { SessionUser } from '../types/user';
 
@@ -224,13 +225,14 @@ export default function MyApp({ Component, pageProps }: AppProps) {
   const [globalChromeReady, setGlobalChromeReady] = useState(false);
 
   useEffect(() => {
-    if (!('serviceWorker' in navigator)) {
+    if (!window.isSecureContext || !('serviceWorker' in navigator) || process.env.NODE_ENV !== 'production') {
       return;
     }
     const handleLoad = () => {
-      navigator.serviceWorker.register('/sw.js').catch(() => {});
+      void navigator.serviceWorker.register('/sw.js', { updateViaCache: 'none' }).catch(() => {});
     };
-    window.addEventListener('load', handleLoad);
+    if (document.readyState === 'complete') handleLoad();
+    else window.addEventListener('load', handleLoad, { once: true });
     return () => window.removeEventListener('load', handleLoad);
   }, []);
 
@@ -332,7 +334,7 @@ export default function MyApp({ Component, pageProps }: AppProps) {
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
         <meta name="apple-mobile-web-app-title" content="StudyHub·学汇" />
-        <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+        <link rel="apple-touch-icon" href="/icons/bot-apple-touch-icon.png" />
       </Head>
       <AppProviders initialUser={initialSessionUser}>
       <div className="page-with-footer">
@@ -531,6 +533,7 @@ export default function MyApp({ Component, pageProps }: AppProps) {
           </div>
         )}
         <BottomTabBar />
+        <PwaInstall />
       </div>
       </AppProviders>
     </>

@@ -20,6 +20,14 @@
 - 求购协作：支持求购、互助与资源交换
 - 校园集市：面向校内场景的二手交易与信息发布
 
+## 手机端 PWA
+
+通过 HTTPS 打开网站，手机端右下角的下载箭头可用于安装 StudyHub。支持 `beforeinstallprompt` 的浏览器会打开原生安装窗口；iPhone 使用分享菜单中的“添加到主屏幕”，微信等内嵌浏览器会提示先用系统浏览器打开。安装并不是下载 APK，不能绕过浏览器的用户确认。
+
+PWA 使用原有页面、账户和 API，不新增数据库表。登录、文件下载、支付和投稿需要联网；Service Worker 只缓存版本化前端资源、应用图标和无用户信息的离线提示页，不缓存 API、资料文件、订单或账户页面，也不排队重试写操作。更新不会强制刷新正在使用的页面，关闭所有旧窗口后新 Worker 才会激活。
+
+图标源文件为 `frontend/public/icons/studyhub-app.svg`；运行 `node frontend/scripts/build-pwa-icons.mjs` 可重新生成 PNG 与 maskable 图标。安装与缓存边界测试纳入 `test:unit`、`test:critical` 和 `test:critical:prod`。浏览器模拟测试不能替代 iOS/Android 真机安装及支付宝返回流程验收。
+
 ## 技术栈
 
 - 后端：FastAPI、SQLAlchemy、Pydantic Settings、Uvicorn

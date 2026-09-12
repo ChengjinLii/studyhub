@@ -1,26 +1,35 @@
 {
   "name": "StudyHub · 学汇",
   "short_name": "StudyHub",
+  "id": "/?source=pwa",
+  "scope": "/",
+  "lang": "zh-CN",
+  "description": "StudyHub 学汇：校园资料共享与学习互助。",
   "start_url": "/?source=pwa",
   "display": "standalone",
   "background_color": "#f4f6fb",
   "theme_color": "#2563eb",
+  "shortcuts": [
+    { "name": "资料搜索", "url": "/materials" },
+    { "name": "我要投稿", "url": "/upload" },
+    { "name": "我的主页", "url": "/me" }
+  ],
   "icons": [
     {
-      "src": "/icons/icon-192.png",
+      "src": "/icons/bot-192.png",
       "sizes": "192x192",
       "type": "image/png"
     },
     {
-      "src": "/icons/icon-512.png",
+      "src": "/icons/bot-512.png",
       "sizes": "512x512",
       "type": "image/png"
     },
     {
-      "src": "/icons/icon-512.png",
+      "src": "/icons/bot-maskable.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "maskable"
     }
   ]
 }

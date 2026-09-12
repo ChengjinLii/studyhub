@@ -59,7 +59,7 @@ export default function FloatingSidebar() {
     if (typeof window === 'undefined') return null;
     if (window.innerWidth > MOBILE_BREAKPOINT) return null;
     const blockers = Array.from(
-      document.querySelectorAll<HTMLElement>('.mobile-bottom-nav, .mobile-detail-action-bar')
+      document.querySelectorAll<HTMLElement>('.mobile-bottom-nav, .mobile-detail-action-bar, [data-pwa-install]')
     )
       .map((element) => element.getBoundingClientRect().top)
       .filter((top) => top > 0 && top < window.innerHeight);
@@ -97,7 +97,7 @@ export default function FloatingSidebar() {
     const minY = 96;
     const maxX = Math.max(minX, window.innerWidth - width - horizontalGap);
     const blockers = window.innerWidth <= MOBILE_BREAKPOINT
-      ? Array.from(document.querySelectorAll<HTMLElement>('.mobile-bottom-nav, .mobile-detail-action-bar'))
+      ? Array.from(document.querySelectorAll<HTMLElement>('.mobile-bottom-nav, .mobile-detail-action-bar, [data-pwa-install]'))
           .map((element) => element.getBoundingClientRect().top)
           .filter((top) => top > 0 && top < window.innerHeight)
       : [];
@@ -217,6 +217,7 @@ export default function FloatingSidebar() {
     const handleFocusOut = () => window.setTimeout(handler, 120);
     if (typeof window === 'undefined') return undefined;
     window.addEventListener('resize', handler);
+    window.addEventListener('pwa:layout', handler);
     window.addEventListener('scroll', handler, { passive: true });
     window.addEventListener('focusin', handler);
     window.addEventListener('focusout', handleFocusOut);
@@ -224,6 +225,7 @@ export default function FloatingSidebar() {
     window.visualViewport?.addEventListener('scroll', handler);
     return () => {
       window.removeEventListener('resize', handler);
+      window.removeEventListener('pwa:layout', handler);
       window.removeEventListener('scroll', handler);
       window.removeEventListener('focusin', handler);
       window.removeEventListener('focusout', handleFocusOut);

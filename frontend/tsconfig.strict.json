@@ -10,6 +10,8 @@
     "types/**/*.ts",
     "lib/apiBase.ts",
     "lib/apiTransport.ts",
+    "lib/pwaInstall.ts",
+    "components/pwa/PwaInstall.tsx",
     "lib/apiEnvelope.ts",
     "lib/auth.ts",
     "lib/authApi.ts",

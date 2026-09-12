@@ -14,8 +14,8 @@
     "test:unit": "vitest run tests/unit",
     "format": "prettier --write .",
     "test:smoke": "playwright test tests/smoke.spec.ts",
-    "test:critical": "playwright test tests/critical-paths.spec.ts tests/material-detail.spec.ts",
-    "test:critical:prod": "PLAYWRIGHT_SERVER_MODE=production playwright test tests/critical-paths.spec.ts tests/material-detail.spec.ts",
+    "test:critical": "playwright test tests/critical-paths.spec.ts tests/material-detail.spec.ts tests/pwa.spec.ts",
+    "test:critical:prod": "PLAYWRIGHT_SERVER_MODE=production playwright test tests/critical-paths.spec.ts tests/material-detail.spec.ts tests/pwa.spec.ts",
     "test:perf": "node scripts/perf-budget.mjs",
     "xmas:hat": "node scripts/vectorize-hat.mjs"
   },
@@ -25,6 +25,7 @@
   },
   "dependencies": {
     "jszip": "^3.10.1",
+    "lucide-react": "1.45.0",
     "next": "15.5.25",
     "react": "18.2.0",
     "react-dom": "18.2.0",

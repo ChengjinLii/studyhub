@@ -1,0 +1,62 @@
+.install {
+  position: fixed;
+  right: max(16px, env(safe-area-inset-right));
+  z-index: 39;
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  padding: 0;
+  border: 1px solid #d5dff1;
+  border-radius: 50%;
+  background: #fff;
+  color: #2458ce;
+  box-shadow: 0 4px 18px #203b6524;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.install:hover { background: #eff5ff; border-color: #9ab7ec; }
+.install:focus-visible, .close:focus-visible, .copy:focus-visible { outline: 3px solid #8cadf0; outline-offset: 3px; }
+.install:disabled { cursor: wait; }
+.dialog {
+  box-sizing: border-box;
+  width: min(420px, calc(100% - 32px));
+  max-height: calc(100dvh - 40px);
+  margin: auto;
+  padding: 28px 24px 22px;
+  border: 1px solid #e1e7ef;
+  border-radius: 8px;
+  background: #fff;
+  color: #202e42;
+  box-shadow: 0 20px 64px #0c1b3933;
+  overflow: auto;
+  letter-spacing: 0;
+}
+.dialog::backdrop { background: #10182880; }
+.close {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border: 0;
+  background: transparent;
+  color: #617084;
+  cursor: pointer;
+}
+.brand { display: flex; align-items: center; gap: 14px; padding-right: 8px; }
+.brand img { flex-shrink: 0; border-radius: 8px; }
+.brand h2 { margin: 0; font-size: 21px; font-weight: 700; line-height: 1.4; }
+.brand h2 span { font-size: 15px; font-weight: 500; }
+.brand p { margin: 4px 0 0; color: #6a7788; font-size: 13px; }
+.steps { margin: 24px 0 18px; padding-left: 22px; font-size: 14px; line-height: 1.8; }
+.steps li { padding-left: 5px; margin-bottom: 12px; overflow-wrap: anywhere; }
+.steps li::marker { color: #2458ce; font-weight: 700; }
+.note, .notice { color: #6a7788; font-size: 12px; line-height: 1.7; }
+.notice { color: #974300; }
+.copy { display: flex; justify-content: center; align-items: center; gap: 8px; width: 100%; min-height: 44px; margin-top: 18px; border: 1px solid #d5dff1; border-radius: 6px; background: #f4f7fc; color: #2458ce; font-size: 14px; font-weight: 600; cursor: pointer; }
+.spin { animation: rotate 1s linear infinite; }
+@keyframes rotate { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .spin { animation: none; } }
