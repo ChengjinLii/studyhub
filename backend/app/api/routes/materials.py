@@ -3,6 +3,7 @@ from __future__ import annotations
 from io import BytesIO
 from pathlib import Path
 from urllib.parse import quote
+import re
 import zipfile
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, UploadFile, status
@@ -15,6 +16,7 @@ from app.api.deps import (
     get_materials_column_service,
     get_public_read_cache,
     get_materials_service,
+    get_material_asset_store,
     get_optional_auth_context,
     get_requests_service,
     get_upload_authorization_service,
@@ -26,6 +28,8 @@ from app.core.rate_limit import client_key_for_request
 from app.core.response import api_ok
 from app.core.security import AuthContext
 from app.core.upload_validation import detect_upload_size
+from app.core.upload_validation import validate_image_upload, validate_material_upload
+from app.integrations.material_asset_store import MaterialAssetStore
 from app.schemas.materials import (
     BatchDownloadPayload,
     MaterialCreatePayload,
@@ -215,6 +219,7 @@ async def create_material(
     service: MaterialsService = Depends(get_materials_service),
     requests_service: RequestsService = Depends(get_requests_service),
     upload_authorization: UploadAuthorizationService = Depends(get_upload_authorization_service),
+    asset_store: MaterialAssetStore = Depends(get_material_asset_store),
 ) -> dict[str, object]:
     form = await request.form()
     payload = parse_payload_json(form.get("payload"), MaterialCreatePayload)
@@ -224,7 +229,18 @@ async def create_material(
     custom_previews = _coerce_upload_list(form.getlist("customPreviews"))
     material_uploads = _coerce_upload_list([zip_file, markdown_file])
     upload_token = request.headers.get("x-studyhub-upload-token", "").strip()
-    if upload_authorization.settings.resolved_upload_authorization_required or upload_token:
+    staged_assets: list[dict[str, object]] = []
+    if payload.stagedUploadTokens:
+        if material_uploads or previews or custom_previews:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="暂存投稿不能重复附带文件")
+        if not payload.submissionId:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="暂存投稿必须包含投稿标识")
+        staged_assets = asset_store.verify_staged_upload_tokens(
+            tokens=payload.stagedUploadTokens,
+            user_id=auth.user_id or 0,
+            submission_id=payload.submissionId,
+        )
+    elif upload_authorization.settings.resolved_upload_authorization_required or upload_token:
         if not payload.submissionId:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="受保护的投稿必须包含投稿标识")
         upload_authorization.consume(
@@ -242,6 +258,7 @@ async def create_material(
             markdown_file=markdown_file if hasattr(markdown_file, "filename") else None,
             previews=previews,
             custom_previews=custom_previews,
+            staged_assets=staged_assets,
         )
         if payload.requestId is not None:
             requests_service.attach_material_to_request(
@@ -255,6 +272,92 @@ async def create_material(
     detail = await run_in_threadpool(create_and_attach)
     _invalidate_material_read_caches()
     return api_ok(detail)
+
+
+@router.post("/api/material-uploads/stage")
+async def stage_material_uploads(
+    request: Request,
+    auth: AuthContext = Depends(require_auth_context),
+    upload_authorization: UploadAuthorizationService = Depends(get_upload_authorization_service),
+    asset_store: MaterialAssetStore = Depends(get_material_asset_store),
+) -> dict[str, object]:
+    form = await request.form()
+    submission_id = str(form.get("submissionId") or "").strip()
+    authorization_submission_id = str(form.get("authorizationSubmissionId") or submission_id).strip()
+    if not re.fullmatch(r"[A-Za-z0-9_-]{16,64}", submission_id):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="投稿标识格式非法")
+    if not re.fullmatch(r"[A-Za-z0-9_-]{16,64}", authorization_submission_id):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="上传授权标识格式非法")
+    material_uploads = _coerce_upload_list([form.get("zip")])
+    previews = _coerce_upload_list(form.getlist("previews"))
+    custom_previews = _coerce_upload_list(form.getlist("customPreviews"))
+    descriptors = _upload_descriptors(material_uploads, previews, custom_previews)
+    if not descriptors:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="请选择需要上传的文件")
+    upload_authorization.consume(
+        token=request.headers.get("x-studyhub-upload-token", "").strip(),
+        user_id=auth.user_id or 0,
+        submission_id=authorization_submission_id,
+        files=descriptors,
+    )
+    saved_keys: list[str] = []
+    assets: list[dict[str, object]] = []
+
+    def validate_and_save() -> None:
+        try:
+            groups = [
+                ("MATERIAL", material_uploads),
+                ("PREVIEW", previews),
+                ("CUSTOM_PREVIEW", custom_previews),
+            ]
+            for role, uploads in groups:
+                for upload in uploads:
+                    if role == "MATERIAL":
+                        validate_material_upload(
+                            upload,
+                            max_size_bytes=asset_store.settings.material_file_max_size_bytes,
+                            missing_detail="请上传有效的资料文件",
+                            invalid_type_detail="资料文件内容与文件类型不匹配",
+                            too_large_detail="资料文件不能超过 50MB",
+                        )
+                    else:
+                        validate_image_upload(
+                            upload,
+                            settings=asset_store.settings,
+                            max_size_bytes=asset_store.settings.material_preview_image_max_size_bytes,
+                            missing_detail="请上传有效的预览图片",
+                            invalid_type_detail="预览图片格式不支持",
+                            too_large_detail="预览图片不能超过 5MB",
+                        )
+                    upload.file.seek(0)
+                    key, size = asset_store.save_staged_upload(
+                        user_id=auth.user_id or 0,
+                        submission_id=submission_id,
+                        role=role,
+                        upload=upload,
+                    )
+                    saved_keys.append(key)
+                    assets.append(
+                        {
+                            "key": key,
+                            "role": role,
+                            "name": upload.filename or "file.bin",
+                            "size": size,
+                            "contentType": upload.content_type or "",
+                        }
+                    )
+        except Exception:
+            for key in saved_keys:
+                asset_store.delete_key(key)
+            raise
+
+    await run_in_threadpool(validate_and_save)
+    staged_token = asset_store.issue_staged_upload_token(
+        user_id=auth.user_id or 0,
+        submission_id=submission_id,
+        assets=assets,
+    )
+    return api_ok({"stagedUploadToken": staged_token, "files": len(assets)})
 
 
 @router.post("/api/material-upload-authorizations")

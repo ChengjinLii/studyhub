@@ -191,3 +191,75 @@ def test_material_submission_accepts_only_matching_one_time_upload_ticket(
         ],
     )
     assert replay.status_code == 409
+
+
+def test_staged_upload_is_bound_to_the_material_without_reuploading_on_publish(
+    client: TestClient,
+    auth_service: AuthService,
+) -> None:
+    seed_read_users(auth_service)
+    headers = build_auth_headers(1, 1)
+    submission_id = "staged_publish_01HZZZZZZZZZ"
+    authorization_id = "staged_auth_01HZZZZZZZZZZZZ"
+    content = b"%PDF-1.4\nstaged upload\n%%EOF\n"
+    authorization = client.post(
+        "/api/material-upload-authorizations",
+        headers=headers,
+        json={
+            "submissionId": authorization_id,
+            "files": [
+                {
+                    "role": "MATERIAL",
+                    "name": "staged.pdf",
+                    "sizeBytes": len(content),
+                    "contentType": "application/pdf",
+                }
+            ],
+        },
+    )
+    assert authorization.status_code == 200, authorization.text
+
+    staged = client.post(
+        "/api/material-uploads/stage",
+        headers={
+            **headers,
+            "X-StudyHub-Upload-Token": authorization.json()["data"]["uploadToken"],
+        },
+        data={
+            "submissionId": submission_id,
+            "authorizationSubmissionId": authorization_id,
+        },
+        files=[("zip", ("staged.pdf", content, "application/pdf"))],
+    )
+    assert staged.status_code == 200, staged.text
+    staged_token = staged.json()["data"]["stagedUploadToken"]
+
+    published = client.post(
+        "/api/materials",
+        headers=headers,
+        files=[
+            (
+                "payload",
+                (
+                    None,
+                    json.dumps(
+                        {
+                            "title": "预上传资料",
+                            "description": "",
+                            "price": 0,
+                            "school": "电子科技大学",
+                            "deliveryMethod": "FILE",
+                            "previewSource": "AUTO",
+                            "submissionId": submission_id,
+                            "stagedUploadTokens": [staged_token],
+                        },
+                        ensure_ascii=False,
+                    ),
+                    "application/json",
+                ),
+            )
+        ],
+    )
+    assert published.status_code == 200, published.text
+    assert published.json()["data"]["originalFilename"] == "staged.pdf"
+    assert published.json()["data"]["fileSize"] == len(content)

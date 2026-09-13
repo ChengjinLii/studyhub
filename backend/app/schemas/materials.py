@@ -6,7 +6,7 @@ import re
 from typing import Any
 
 from fastapi import HTTPException, status
-from pydantic import BaseModel, ConfigDict, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class MaterialMutationBase(BaseModel):
@@ -71,6 +71,7 @@ class MaterialCreatePayload(MaterialMutationBase):
     school: str
     requestId: int | None = None
     submissionId: str | None = None
+    stagedUploadTokens: list[str] = Field(default_factory=list)
 
     @field_validator("submissionId")
     @classmethod
@@ -80,6 +81,16 @@ class MaterialCreatePayload(MaterialMutationBase):
             return None
         if not re.fullmatch(r"[A-Za-z0-9_-]{16,64}", normalized):
             raise ValueError("投稿标识格式非法")
+        return normalized
+
+    @field_validator("stagedUploadTokens")
+    @classmethod
+    def validate_staged_upload_tokens(cls, value: list[str]) -> list[str]:
+        if len(value) > 3:
+            raise ValueError("暂存上传凭证数量过多")
+        normalized = [item.strip() for item in value if item.strip()]
+        if any(len(item) > 16_384 for item in normalized):
+            raise ValueError("暂存上传凭证格式非法")
         return normalized
 
 

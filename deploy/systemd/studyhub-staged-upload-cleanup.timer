@@ -1,0 +1,11 @@
+[Unit]
+Description=Clean abandoned StudyHub staged uploads daily
+
+[Timer]
+OnBootSec=15m
+OnUnitActiveSec=1d
+RandomizedDelaySec=30m
+Persistent=true
+
+[Install]
+WantedBy=timers.target

@@ -24,9 +24,16 @@ class MaterialsStorageMutationMixin:
         file_upload: UploadFile | None,
         previews: list[UploadFile],
         custom_previews: list[UploadFile],
+        staged_assets: list[dict[str, object]] | None,
         is_create: bool,
         storage_mutation: StorageMutation,
     ) -> None:
+        staged_assets = staged_assets or []
+        staged_files = [item for item in staged_assets if item.get("role") == "MATERIAL"]
+        staged_previews = [item for item in staged_assets if item.get("role") == "PREVIEW"]
+        staged_custom_previews = [item for item in staged_assets if item.get("role") == "CUSTOM_PREVIEW"]
+        if len(staged_files) > 1:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="资料文件数量不符合要求")
         if file_upload is not None:
             validate_material_upload(
                 file_upload,
@@ -35,9 +42,9 @@ class MaterialsStorageMutationMixin:
                 invalid_type_detail="资料文件内容与文件类型不匹配",
                 too_large_detail="资料文件不能超过 50MB",
             )
-        if len(previews) > self.settings.material_manual_preview_max_images:
+        if len(previews) + len(staged_previews) > self.settings.material_manual_preview_max_images:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="手动预览图最多上传 10 张")
-        if len(custom_previews) > self.settings.material_custom_preview_max_images:
+        if len(custom_previews) + len(staged_custom_previews) > self.settings.material_custom_preview_max_images:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="自定义配图最多上传 5 张")
         for preview_file in previews:
             validate_image_upload(
@@ -58,7 +65,7 @@ class MaterialsStorageMutationMixin:
                 too_large_detail="自定义配图不能超过 5MB",
             )
         delivery_method = (payload.deliveryMethod or material.delivery_method or "FILE").upper()
-        if delivery_method == "NETDISK" and file_upload is not None:
+        if delivery_method == "NETDISK" and (file_upload is not None or staged_files):
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="网盘交付无需上传站内文件")
         material.title = payload.title.strip()
         material.description = payload.description
@@ -100,6 +107,12 @@ class MaterialsStorageMutationMixin:
             material.original_filename = file_upload.filename or material.original_filename
             material.file_size = size
             material.file_type = self._resolve_file_type(file_upload.filename)
+        elif staged_files:
+            staged_file = staged_files[0]
+            material.file_storage_key = str(staged_file.get("key") or "")
+            material.original_filename = str(staged_file.get("name") or "file.bin")
+            material.file_size = int(staged_file.get("size") or 0)
+            material.file_type = self._resolve_file_type(material.original_filename)
         elif is_create and delivery_method == "NETDISK":
             material.file_storage_key = None
             material.original_filename = None
@@ -115,7 +128,7 @@ class MaterialsStorageMutationMixin:
             material.file_size = 0 if material.file_storage_key is None else material.file_size
             material.file_type = "netdisk" if material.file_storage_key is None else material.file_type
 
-        if previews:
+        if previews or staged_previews:
             for existing_key in self._loads(material.manual_preview_keys_json):
                 if not self._is_external_url(existing_key):
                     storage_mutation.replace_after_commit(existing_key)
@@ -128,11 +141,12 @@ class MaterialsStorageMutationMixin:
                 )[0]
                 storage_mutation.record_new(preview_key)
                 preview_keys.append(preview_key)
+            preview_keys.extend(str(item.get("key") or "") for item in staged_previews)
             material.manual_preview_keys_json = self._json_dumps(preview_keys)
         elif is_create:
             material.manual_preview_keys_json = material.manual_preview_keys_json or self._json_dumps([])
 
-        if custom_previews:
+        if custom_previews or staged_custom_previews:
             for existing_key in self._loads(material.custom_preview_images_json):
                 if not self._is_external_url(existing_key):
                     storage_mutation.replace_after_commit(existing_key)
@@ -145,6 +159,7 @@ class MaterialsStorageMutationMixin:
                 )[0]
                 storage_mutation.record_new(custom_key)
                 custom_keys.append(custom_key)
+            custom_keys.extend(str(item.get("key") or "") for item in staged_custom_previews)
             material.custom_preview_images_json = self._json_dumps(custom_keys)
         elif getattr(payload, "customPreviewClear", False):
             for existing_key in self._loads(material.custom_preview_images_json):

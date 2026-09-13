@@ -684,6 +684,7 @@ class MaterialsService(MaterialSecurityPolicyMixin, MaterialsStorageMutationMixi
         markdown_file: UploadFile | None,
         previews: list[UploadFile],
         custom_previews: list[UploadFile],
+        staged_assets: list[dict[str, object]] | None = None,
     ) -> dict[str, Any]:
         self._bootstrap(session)
         uploader = self._require_user(session, uploader_id)
@@ -697,14 +698,18 @@ class MaterialsService(MaterialSecurityPolicyMixin, MaterialsStorageMutationMixi
             if existing is not None:
                 return self.get_detail(session, uploader_id, existing.id)
         file_upload = zip_file or markdown_file
-        if (payload.deliveryMethod or "FILE").upper() == "FILE" and file_upload is None:
+        staged_assets = staged_assets or []
+        staged_file = next((item for item in staged_assets if item.get("role") == "MATERIAL"), None)
+        if (payload.deliveryMethod or "FILE").upper() == "FILE" and file_upload is None and staged_file is None:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="资料缺少有效的下载方式")
 
         delivery_method = (payload.deliveryMethod or "FILE").upper()
         initial_file_type = (
             "netdisk"
             if delivery_method == "NETDISK"
-            else self._resolve_file_type(file_upload.filename if file_upload is not None else None)
+            else self._resolve_file_type(
+                file_upload.filename if file_upload is not None else str(staged_file.get("name") or "") if staged_file else None
+            )
         )
         material = MaterialRecord(
             source="local",
@@ -714,7 +719,11 @@ class MaterialsService(MaterialSecurityPolicyMixin, MaterialsStorageMutationMixi
             uploader_nickname=uploader.nickname or uploader.username,
             title=payload.title,
             description=payload.description,
-            original_filename=file_upload.filename if file_upload is not None else None,
+            original_filename=(
+                file_upload.filename
+                if file_upload is not None
+                else str(staged_file.get("name") or "") if staged_file else None
+            ),
             file_type=initial_file_type,
             file_size=0,
             price=int(payload.price or 0),
@@ -747,6 +756,7 @@ class MaterialsService(MaterialSecurityPolicyMixin, MaterialsStorageMutationMixi
                 file_upload=file_upload,
                 previews=previews,
                 custom_previews=custom_previews,
+                staged_assets=staged_assets,
                 is_create=True,
                 storage_mutation=storage_mutation,
             )
@@ -813,6 +823,7 @@ class MaterialsService(MaterialSecurityPolicyMixin, MaterialsStorageMutationMixi
                 file_upload=file_upload,
                 previews=previews,
                 custom_previews=custom_previews,
+                staged_assets=None,
                 is_create=False,
                 storage_mutation=storage_mutation,
             )

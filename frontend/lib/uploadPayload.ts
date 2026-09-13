@@ -28,6 +28,7 @@ export interface BuildUploadPayloadInput {
   isEditing: boolean;
   requestId: number | null;
   customPreviewClear: boolean;
+  stagedUploadTokens?: string[];
 }
 
 export interface UploadPayload {
@@ -54,6 +55,7 @@ export interface UploadPayload {
   requestId?: number;
   customPreviewClear?: boolean;
   submissionId?: string;
+  stagedUploadTokens?: string[];
 }
 
 export const deriveUploadGradeType = (stage: string) => {
@@ -86,6 +88,7 @@ export function buildUploadPayload({
   isEditing,
   requestId,
   customPreviewClear,
+  stagedUploadTokens,
 }: BuildUploadPayloadInput): UploadPayload {
   const usesMajorProfile = !isExperience && courseCategory === 'MAJOR';
   const payload: UploadPayload = {
@@ -112,6 +115,9 @@ export function buildUploadPayload({
   };
   if (!isEditing && requestId) {
     payload.requestId = requestId;
+  }
+  if (!isEditing && stagedUploadTokens?.length) {
+    payload.stagedUploadTokens = stagedUploadTokens;
   }
   if (isEditing) {
     payload.customPreviewClear = customPreviewClear;

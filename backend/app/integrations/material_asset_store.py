@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -37,11 +38,97 @@ class MaterialAssetStore:
             fallback_name="file.bin",
         )
 
+    def save_staged_upload(
+        self,
+        *,
+        user_id: int,
+        submission_id: str,
+        role: str,
+        upload: UploadFile,
+    ) -> tuple[str, int]:
+        normalized_role = role.strip().lower().replace("_", "-")
+        return self.storage_provider.save_upload(
+            root=self.settings.resolved_material_asset_dir,
+            relative_dir=Path("staged") / str(user_id) / submission_id / normalized_role,
+            upload=upload,
+            fallback_name="file.bin",
+        )
+
+    def issue_staged_upload_token(
+        self,
+        *,
+        user_id: int,
+        submission_id: str,
+        assets: list[dict[str, Any]],
+    ) -> str:
+        return self.token_codec.encode(
+            {
+                "sub": f"material-staged-upload:{user_id}:{submission_id}",
+                "kind": "material-staged-upload",
+                "userId": user_id,
+                "submissionId": submission_id,
+                "assets": assets,
+            },
+            ttl_seconds=max(600, int(self.settings.staged_upload_token_ttl_seconds)),
+        )
+
+    def verify_staged_upload_tokens(
+        self,
+        *,
+        tokens: list[str],
+        user_id: int,
+        submission_id: str,
+    ) -> list[dict[str, Any]]:
+        assets: list[dict[str, Any]] = []
+        expected_prefix = f"staged/{user_id}/{submission_id}/"
+        for token in tokens:
+            try:
+                claims = self.token_codec.decode(token)
+            except Exception as exc:  # noqa: BLE001
+                raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="暂存文件凭证无效或已过期") from exc
+            if (
+                claims.get("kind") != "material-staged-upload"
+                or int(claims.get("userId") or 0) != user_id
+                or claims.get("submissionId") != submission_id
+            ):
+                raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="暂存文件凭证不属于当前投稿")
+            claimed_assets = claims.get("assets")
+            if not isinstance(claimed_assets, list):
+                raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="暂存文件凭证格式非法")
+            for asset in claimed_assets:
+                if not isinstance(asset, dict):
+                    raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="暂存文件凭证格式非法")
+                key = str(asset.get("key") or "")
+                role = str(asset.get("role") or "")
+                normalized_key = key.lstrip("/")
+                belongs_to_submission = normalized_key.startswith(expected_prefix) or f"/{expected_prefix}" in f"/{normalized_key}"
+                if not belongs_to_submission or role not in {"MATERIAL", "PREVIEW", "CUSTOM_PREVIEW"}:
+                    raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="暂存文件凭证格式非法")
+                assets.append(
+                    {
+                        "key": key,
+                        "role": role,
+                        "name": str(asset.get("name") or "")[:255],
+                        "size": max(0, int(asset.get("size") or 0)),
+                        "contentType": str(asset.get("contentType") or "")[:128],
+                    }
+                )
+        if len(assets) > 16:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="暂存文件数量过多")
+        return assets
+
     def delete_key(self, key: str | None) -> None:
         self.storage_provider.delete_key(root=self.settings.resolved_material_asset_dir, key=key)
 
     async def delete_key_async(self, key: str | None) -> None:
         await self.storage_provider.delete_key_async(root=self.settings.resolved_material_asset_dir, key=key)
+
+    def cleanup_staged_uploads(self, *, protected_keys: set[str], older_than: datetime) -> int:
+        return self.storage_provider.cleanup_staged_uploads(
+            root=self.settings.resolved_material_asset_dir,
+            protected_keys=protected_keys,
+            older_than=older_than,
+        )
 
     def build_download_url(self, *, material_id: int, key: str, filename: str | None) -> tuple[str, str | None]:
         direct_url = self.storage_provider.build_signed_download_url(

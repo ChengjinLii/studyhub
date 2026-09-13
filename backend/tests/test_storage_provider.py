@@ -1,4 +1,6 @@
+from datetime import UTC, datetime, timedelta
 from io import BytesIO
+import os
 from pathlib import Path
 
 from fastapi import UploadFile
@@ -59,6 +61,30 @@ def test_local_save_upload_streams_to_disk_in_chunks(tmp_path):
     assert (tmp_path / "assets" / key).read_bytes() == content
     assert file_obj.read_sizes[:2] == [1024 * 1024, 1024 * 1024]
     assert -1 not in file_obj.read_sizes
+
+
+def test_local_staged_cleanup_removes_only_old_unreferenced_files(tmp_path):
+    root = tmp_path / "materials"
+    protected = root / "staged" / "1" / "submission" / "material" / "protected.pdf"
+    abandoned = root / "staged" / "1" / "abandoned" / "material" / "abandoned.pdf"
+    recent = root / "staged" / "1" / "recent" / "material" / "recent.pdf"
+    for path in (protected, abandoned, recent):
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(b"pdf")
+    old_timestamp = (datetime.now(UTC) - timedelta(days=2)).timestamp()
+    os.utime(protected, (old_timestamp, old_timestamp))
+    os.utime(abandoned, (old_timestamp, old_timestamp))
+
+    removed = LocalFileStorageProvider().cleanup_staged_uploads(
+        root=root,
+        protected_keys={protected.relative_to(root).as_posix()},
+        older_than=datetime.now(UTC) - timedelta(days=1),
+    )
+
+    assert removed == 1
+    assert protected.exists()
+    assert not abandoned.exists()
+    assert recent.exists()
 
 
 def test_oss_signed_download_url_does_not_override_content_type(monkeypatch):

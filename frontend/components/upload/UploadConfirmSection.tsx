@@ -8,6 +8,7 @@ interface UploadConfirmSectionProps {
   copyrightOwner: string;
   maxCopyrightLength: number;
   submitting: boolean;
+  assetsUploading: boolean;
   submissionStage: UploadSubmissionStage;
   uploadProgress: number | null;
   successPath: string | null;
@@ -25,6 +26,7 @@ export default function UploadConfirmSection({
   copyrightOwner,
   maxCopyrightLength,
   submitting,
+  assetsUploading,
   submissionStage,
   uploadProgress,
   successPath,
@@ -34,7 +36,9 @@ export default function UploadConfirmSection({
   onPolicyOpen,
   onAgreementAcceptedChange,
 }: UploadConfirmSectionProps) {
-  const submitLabel = submitting
+  const submitLabel = assetsUploading
+    ? '资料上传中...'
+    : submitting
     ? submissionStage === 'preparing'
       ? '正在准备文件...'
       : submissionStage === 'uploading'
@@ -115,7 +119,7 @@ export default function UploadConfirmSection({
             </label>
           </div>
           <div className="form-item">
-            <button className="button primary" type="submit" disabled={submitting}>
+            <button className="button primary" type="submit" disabled={submitting || assetsUploading}>
               {submitLabel}
             </button>
           </div>

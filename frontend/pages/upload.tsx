@@ -1,7 +1,7 @@
 import { GetServerSideProps } from 'next';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import AppImage from '../components/AppImage';
 import NavBar from '../components/NavBar';
 import UploadBasicSection from '../components/upload/UploadBasicSection';
@@ -36,6 +36,7 @@ import { buildZipName, resolveZipFileName, zipFiles, zipMarkdownContent } from '
 import { buildUploadPayload } from '../lib/uploadPayload';
 import { describeUploadFile, requestMaterialUploadAuthorization } from '../lib/uploadAuthorization';
 import { isUploadResultUncertain, sendUploadFormData } from '../lib/uploadSubmit';
+import { sendStagedUploadFormData } from '../lib/stagedUpload';
 import {
   buildUploadSubmissionFingerprint,
   clearUploadSubmission,
@@ -124,6 +125,19 @@ export default function UploadPage({ user, token, account }: UploadPageProps) {
   const [zipPreparing, setZipPreparing] = useState(false);
   const zipTaskRef = useRef(0);
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
+  const [activeSubmissionId, setActiveSubmissionId] = useState<string | null>(null);
+  const [stagedMaterial, setStagedMaterial] = useState<{ signature: string; token: string } | null>(null);
+  const [stagedPreviews, setStagedPreviews] = useState<{ signature: string; token: string } | null>(null);
+  const [stagedCustomPreviews, setStagedCustomPreviews] = useState<{ signature: string; token: string } | null>(null);
+  const [materialUploading, setMaterialUploading] = useState(false);
+  const [previewsUploading, setPreviewsUploading] = useState(false);
+  const [customPreviewsUploading, setCustomPreviewsUploading] = useState(false);
+  const materialStageRequestRef = useRef<XMLHttpRequest | null>(null);
+  const previewStageRequestRef = useRef<XMLHttpRequest | null>(null);
+  const customPreviewStageRequestRef = useRef<XMLHttpRequest | null>(null);
+  const materialStageTaskRef = useRef(0);
+  const previewStageTaskRef = useRef(0);
+  const customPreviewStageTaskRef = useRef(0);
   const [deliveryMethod, setDeliveryMethod] = useState<'FILE' | 'NETDISK'>('FILE');
   const [previewWatermarkEnabled, setPreviewWatermarkEnabled] = useState(true);
   const [previewSource, setPreviewSource] = useState<'AUTO' | 'MANUAL'>(PREVIEW_SOURCE_AUTO);
@@ -162,6 +176,7 @@ export default function UploadPage({ user, token, account }: UploadPageProps) {
   const submissionInFlightRef = useRef(false);
   const allowSubmissionNavigationRef = useRef(false);
   const submitting = submissionStage !== 'idle';
+  const assetsUploading = materialUploading || previewsUploading || customPreviewsUploading;
   const draftScope = useMemo(() => {
     if (!router.isReady || !user) return null;
     const queryRequestId = typeof router.query.requestId === 'string' ? router.query.requestId : '';
@@ -468,6 +483,22 @@ export default function UploadPage({ user, token, account }: UploadPageProps) {
     setZipSourceCount(0);
     setZipPreparing(false);
     setUploadProgress(null);
+    materialStageRequestRef.current?.abort();
+    materialStageRequestRef.current = null;
+    materialStageTaskRef.current += 1;
+    setMaterialUploading(false);
+    setStagedMaterial(null);
+    setActiveSubmissionId(null);
+    previewStageRequestRef.current?.abort();
+    previewStageRequestRef.current = null;
+    previewStageTaskRef.current += 1;
+    setPreviewsUploading(false);
+    setStagedPreviews(null);
+    customPreviewStageRequestRef.current?.abort();
+    customPreviewStageRequestRef.current = null;
+    customPreviewStageTaskRef.current += 1;
+    setCustomPreviewsUploading(false);
+    setStagedCustomPreviews(null);
     if (zipInputRef.current) {
       zipInputRef.current.value = '';
     }
@@ -488,8 +519,80 @@ export default function UploadPage({ user, token, account }: UploadPageProps) {
     clearCustomPreviewFiles();
   };
 
+  const fileSignature = (files: File[]) =>
+    files.map((file) => `${file.name}:${file.size}:${file.lastModified}:${file.type}`).join('|');
+
+  const stageFiles = useCallback(
+    async (
+      role: 'MATERIAL' | 'PREVIEW' | 'CUSTOM_PREVIEW',
+      files: File[],
+      submissionId: string,
+      authorizationSubmissionId: string,
+      requestRef: { current: XMLHttpRequest | null },
+      onProgress: (value: number) => void
+    ) => {
+      const authorization = await requestMaterialUploadAuthorization(
+        authorizationSubmissionId,
+        files.map((file) => describeUploadFile(role, file)),
+        token
+      );
+      const formData = new FormData();
+      formData.append('submissionId', submissionId);
+      formData.append('authorizationSubmissionId', authorizationSubmissionId);
+      const field = role === 'MATERIAL' ? 'zip' : role === 'PREVIEW' ? 'previews' : 'customPreviews';
+      files.forEach((file) => formData.append(field, file));
+      return sendStagedUploadFormData(`${apiBase}/material-uploads/stage`, formData, {
+        token,
+        uploadToken: authorization.uploadToken,
+        onProgress,
+        requestRef,
+      });
+    },
+    [apiBase, token]
+  );
+
+  const stageMaterialFile = useCallback(
+    async (file: File, taskId: number) => {
+      if (isEditing || isExperience) return;
+      const signature = fileSignature([file]);
+      const fingerprint = await buildUploadSubmissionFingerprint({ kind: 'material-upload', signature });
+      const submissionId = resolveUploadSubmissionId(fingerprint, window.sessionStorage);
+      setActiveSubmissionId(submissionId);
+      setStagedMaterial(null);
+      setMaterialUploading(true);
+      setUploadProgress(0);
+      try {
+        const result = await stageFiles(
+          'MATERIAL',
+          [file],
+          submissionId,
+          globalThis.crypto.randomUUID(),
+          materialStageRequestRef,
+          setUploadProgress
+        );
+        if (materialStageTaskRef.current !== taskId) return;
+        setStagedMaterial({ signature, token: result.stagedUploadToken });
+        setUploadProgress(100);
+        setStatus(null);
+      } catch (error: unknown) {
+        if (materialStageTaskRef.current !== taskId) return;
+        setUploadProgress(null);
+        setStatus({ type: 'error', message: toErrorMessage(error, '文件上传失败，请重新选择。') });
+      } finally {
+        if (materialStageTaskRef.current === taskId) setMaterialUploading(false);
+        materialStageRequestRef.current = null;
+      }
+    },
+    [isEditing, isExperience, stageFiles]
+  );
+
   const handleZipSelection = async (fileList: FileList | null) => {
     if (submissionInFlightRef.current) return;
+    materialStageRequestRef.current?.abort();
+    materialStageRequestRef.current = null;
+    materialStageTaskRef.current += 1;
+    setMaterialUploading(false);
+    setStagedMaterial(null);
     const files = fileList ? Array.from(fileList) : [];
     const taskId = ++zipTaskRef.current;
     if (files.length === 0) {
@@ -511,6 +614,8 @@ export default function UploadPage({ user, token, account }: UploadPageProps) {
     }
     if (files.length === 1) {
       setZipFile(files[0]);
+      materialStageTaskRef.current += 1;
+      await stageMaterialFile(files[0], materialStageTaskRef.current);
       return;
     }
     setZipPreparing(true);
@@ -519,6 +624,9 @@ export default function UploadPage({ user, token, account }: UploadPageProps) {
       const zipped = await zipFiles(files, zipName, MAX_FILE_BYTES);
       if (zipTaskRef.current !== taskId) return;
       setZipFile(zipped);
+      setZipPreparing(false);
+      materialStageTaskRef.current += 1;
+      await stageMaterialFile(zipped, materialStageTaskRef.current);
     } catch (error: unknown) {
       if (zipTaskRef.current !== taskId) return;
       setStatus({ type: 'error', message: toErrorMessage(error, '文件打包失败，请重试。') });
@@ -529,6 +637,86 @@ export default function UploadPage({ user, token, account }: UploadPageProps) {
       }
     }
   };
+
+  useEffect(() => {
+    if (isEditing || isExperience || !activeSubmissionId) return;
+    const files = previewSource === PREVIEW_SOURCE_MANUAL || isRequestResponse ? manualPreviewFiles : [];
+    previewStageRequestRef.current?.abort();
+    previewStageRequestRef.current = null;
+    const taskId = ++previewStageTaskRef.current;
+    if (files.length === 0) {
+      setStagedPreviews(null);
+      setPreviewsUploading(false);
+      return;
+    }
+    const signature = fileSignature(files);
+    setStagedPreviews(null);
+    setPreviewsUploading(true);
+    void stageFiles(
+      'PREVIEW',
+      files,
+      activeSubmissionId,
+      globalThis.crypto.randomUUID(),
+      previewStageRequestRef,
+      () => undefined
+    )
+      .then((result) => {
+        if (previewStageTaskRef.current !== taskId) return;
+        setStagedPreviews({ signature, token: result.stagedUploadToken });
+        setStatus(null);
+      })
+      .catch((error: unknown) => {
+        if (previewStageTaskRef.current !== taskId) return;
+        setStatus({ type: 'error', message: toErrorMessage(error, '预览图上传失败，请重新选择。') });
+      })
+      .finally(() => {
+        if (previewStageTaskRef.current === taskId) setPreviewsUploading(false);
+        previewStageRequestRef.current = null;
+      });
+    return () => {
+      if (previewStageTaskRef.current === taskId) previewStageRequestRef.current?.abort();
+    };
+  }, [activeSubmissionId, isEditing, isExperience, isRequestResponse, manualPreviewFiles, previewSource, stageFiles]);
+
+  useEffect(() => {
+    if (isEditing || isExperience || isQuickMode || !activeSubmissionId) return;
+    const files = customPreviewFiles;
+    customPreviewStageRequestRef.current?.abort();
+    customPreviewStageRequestRef.current = null;
+    const taskId = ++customPreviewStageTaskRef.current;
+    if (files.length === 0) {
+      setStagedCustomPreviews(null);
+      setCustomPreviewsUploading(false);
+      return;
+    }
+    const signature = fileSignature(files);
+    setStagedCustomPreviews(null);
+    setCustomPreviewsUploading(true);
+    void stageFiles(
+      'CUSTOM_PREVIEW',
+      files,
+      activeSubmissionId,
+      globalThis.crypto.randomUUID(),
+      customPreviewStageRequestRef,
+      () => undefined
+    )
+      .then((result) => {
+        if (customPreviewStageTaskRef.current !== taskId) return;
+        setStagedCustomPreviews({ signature, token: result.stagedUploadToken });
+        setStatus(null);
+      })
+      .catch((error: unknown) => {
+        if (customPreviewStageTaskRef.current !== taskId) return;
+        setStatus({ type: 'error', message: toErrorMessage(error, '自定义预览图上传失败，请重新选择。') });
+      })
+      .finally(() => {
+        if (customPreviewStageTaskRef.current === taskId) setCustomPreviewsUploading(false);
+        customPreviewStageRequestRef.current = null;
+      });
+    return () => {
+      if (customPreviewStageTaskRef.current === taskId) customPreviewStageRequestRef.current?.abort();
+    };
+  }, [activeSubmissionId, customPreviewFiles, isEditing, isExperience, isQuickMode, stageFiles]);
 
   const deriveAutoTitle = (name: string) => {
     return deriveUploadAutoTitle(name, MAX_TITLE_LENGTH);
@@ -596,6 +784,40 @@ export default function UploadPage({ user, token, account }: UploadPageProps) {
       return;
     }
     const selectedCourseCategory: CourseCategoryValue = effectiveCourseCategory;
+    const expectedMaterialSignature = zipFile ? fileSignature([zipFile]) : '';
+    const submittedPreviewsForStaging =
+      !isExperience && !isQuickMode && effectivePreviewSource === PREVIEW_SOURCE_MANUAL ? manualPreviewFiles : [];
+    const expectedPreviewSignature = fileSignature(submittedPreviewsForStaging);
+    const submittedCustomPreviewsForStaging = !isExperience && !isQuickMode ? customPreviewFiles : [];
+    const expectedCustomPreviewSignature = fileSignature(submittedCustomPreviewsForStaging);
+    const hasStagedMaterial = Boolean(
+      resolvedDelivery === 'FILE' && !isEditing && zipFile && stagedMaterial?.signature === expectedMaterialSignature
+    );
+    const hasStagedPreviews = Boolean(
+      submittedPreviewsForStaging.length > 0 && stagedPreviews?.signature === expectedPreviewSignature
+    );
+    const hasStagedCustomPreviews = Boolean(
+      submittedCustomPreviewsForStaging.length > 0 &&
+        stagedCustomPreviews?.signature === expectedCustomPreviewSignature
+    );
+    if (!isEditing && !isExperience && resolvedDelivery === 'FILE') {
+      if (
+        assetsUploading ||
+        !hasStagedMaterial ||
+        (submittedPreviewsForStaging.length > 0 && !hasStagedPreviews) ||
+        (submittedCustomPreviewsForStaging.length > 0 && !hasStagedCustomPreviews)
+      ) {
+        const message = assetsUploading ? '文件仍在上传，请上传完成后再发布。' : '文件尚未上传成功，请重新选择后再发布。';
+        setStatus({ type: 'error', message });
+        submissionToast.invalid(message);
+        return;
+      }
+    }
+    const stagedUploadTokens = [
+      ...(hasStagedMaterial && stagedMaterial ? [stagedMaterial.token] : []),
+      ...(hasStagedPreviews && stagedPreviews ? [stagedPreviews.token] : []),
+      ...(hasStagedCustomPreviews && stagedCustomPreviews ? [stagedCustomPreviews.token] : []),
+    ];
     const resolvedPriceValue = validation.priceValue;
     let completed = false;
     let uploadTransferred = false;
@@ -634,6 +856,7 @@ export default function UploadPage({ user, token, account }: UploadPageProps) {
         isEditing,
         requestId,
         customPreviewClear,
+        stagedUploadTokens,
       });
       const formData = new FormData();
       let uploadFile = zipFile && zipSourceCount > 1 ? resolveZipFileName(zipFile, trimmedTitle, MAX_TITLE_LENGTH) : zipFile;
@@ -646,11 +869,11 @@ export default function UploadPage({ user, token, account }: UploadPageProps) {
         }
       }
       formData.append('payload', new Blob([JSON.stringify(payload)], { type: 'application/json' }));
-      if (uploadFile) {
+      if (resolvedDelivery === 'FILE' && uploadFile && !hasStagedMaterial) {
         formData.append('zip', uploadFile);
       }
-      const submittedPreviews = !isExperience && !isQuickMode && effectivePreviewSource === PREVIEW_SOURCE_MANUAL ? manualPreviewFiles : [];
-      const submittedCustomPreviews = allowCustomPreview ? customPreviewFiles : [];
+      const submittedPreviews = hasStagedPreviews ? [] : submittedPreviewsForStaging;
+      const submittedCustomPreviews = allowCustomPreview && !hasStagedCustomPreviews ? customPreviewFiles : [];
       submittedPreviews.forEach((file) => formData.append('previews', file));
       submittedCustomPreviews.forEach((file) => formData.append('customPreviews', file));
       if (!isEditing) {
@@ -667,22 +890,21 @@ export default function UploadPage({ user, token, account }: UploadPageProps) {
           previews: manualPreviewFiles.map((file) => [file.name, file.size, file.lastModified]),
           customPreviews: customPreviewFiles.map((file) => [file.name, file.size, file.lastModified]),
         });
-        submissionId = resolveUploadSubmissionId(fingerprint, window.sessionStorage);
+        submissionId = activeSubmissionId || resolveUploadSubmissionId(fingerprint, window.sessionStorage);
         payload.submissionId = submissionId;
         formData.set('payload', new Blob([JSON.stringify(payload)], { type: 'application/json' }));
       }
       let uploadAuthorizationToken: string | null = null;
       if (!isEditing && submissionId) {
-        const authorization = await requestMaterialUploadAuthorization(
-          submissionId,
-          [
-            ...(uploadFile ? [describeUploadFile('MATERIAL', uploadFile)] : []),
-            ...submittedPreviews.map((file) => describeUploadFile('PREVIEW', file)),
-            ...submittedCustomPreviews.map((file) => describeUploadFile('CUSTOM_PREVIEW', file)),
-          ],
-          token
-        );
-        uploadAuthorizationToken = authorization.uploadToken;
+        const filesRequiringUpload = [
+          ...(uploadFile && !hasStagedMaterial ? [describeUploadFile('MATERIAL', uploadFile)] : []),
+          ...submittedPreviews.map((file) => describeUploadFile('PREVIEW', file)),
+          ...submittedCustomPreviews.map((file) => describeUploadFile('CUSTOM_PREVIEW', file)),
+        ];
+        if (filesRequiringUpload.length > 0) {
+          const authorization = await requestMaterialUploadAuthorization(submissionId, filesRequiringUpload, token);
+          uploadAuthorizationToken = authorization.uploadToken;
+        }
       }
       const endpoint = isEditing ? `${apiBase}/materials/${editingId}` : `${apiBase}/materials`;
       const method = isEditing ? 'PUT' : 'POST';
@@ -1059,6 +1281,7 @@ export default function UploadPage({ user, token, account }: UploadPageProps) {
         copyrightOwner={copyrightOwner}
         maxCopyrightLength={MAX_COPYRIGHT_LENGTH}
         submitting={submitting}
+        assetsUploading={assetsUploading}
         submissionStage={submissionStage}
         uploadProgress={uploadProgress}
         successPath={successPath}

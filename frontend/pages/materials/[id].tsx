@@ -82,14 +82,43 @@ export default function MaterialDetailPage({ material, user }: MaterialDetailPag
   } = useMaterialActions({ material, user, canManage, isSuperAdmin, router });
   const [autoDownloadTriggered, setAutoDownloadTriggered] = useState(false);
   const [contentTab, setContentTab] = useState<'preview' | 'comments'>('preview');
+  const [liveSecurityScanStatus, setLiveSecurityScanStatus] = useState(material?.securityScanStatus ?? null);
   const previewPageSize = 1;
   const uploaderLabel = material?.uploaderNickname || material?.uploaderUsername || '匿名同学';
   const hasCustomPreview = Boolean(material?.customPreviewText?.trim()) || (material?.customPreviewImages?.length ?? 0) > 0;
   const isManualPreview = Boolean(material?.previewSource === 'MANUAL');
   const isPdfMaterial = Boolean(material?.hasFile && material?.fileType?.toLowerCase() === 'pdf');
   const isExperienceMaterial = Boolean(material?.tags?.includes('经验分享'));
-  const securityScanStatus = material?.securityScanStatus ?? null;
+  const securityScanStatus = liveSecurityScanStatus;
   const securityScanBlocked = Boolean(securityScanStatus && securityScanStatus !== 'CLEAN');
+
+  useEffect(() => {
+    setLiveSecurityScanStatus(material?.securityScanStatus ?? null);
+  }, [material?.id, material?.securityScanStatus]);
+
+  useEffect(() => {
+    if (!material || !securityScanStatus || !['PENDING', 'SCANNING'].includes(securityScanStatus)) return;
+    let cancelled = false;
+    let timer: number | null = null;
+    const poll = async () => {
+      try {
+        const session = readSession();
+        const latest = await fetchMaterialDetail(String(material.id), session.token || undefined);
+        if (cancelled) return;
+        setLiveSecurityScanStatus(latest.securityScanStatus ?? null);
+        if (latest.securityScanStatus && ['PENDING', 'SCANNING'].includes(latest.securityScanStatus)) {
+          timer = window.setTimeout(poll, 3000);
+        }
+      } catch {
+        if (!cancelled) timer = window.setTimeout(poll, 5000);
+      }
+    };
+    timer = window.setTimeout(poll, 2500);
+    return () => {
+      cancelled = true;
+      if (timer !== null) window.clearTimeout(timer);
+    };
+  }, [material, securityScanStatus]);
 
   useEffect(() => {
     if (!material || isExperienceMaterial) {

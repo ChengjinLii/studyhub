@@ -79,6 +79,39 @@ def _escape_like(value: str) -> str:
 
 
 class MaterialRepository:
+    def list_referenced_asset_keys(self, session: Session) -> set[str]:
+        columns = _table_columns(session, "materials")
+        candidates = [
+            name
+            for name in (
+                "file_storage_key",
+                "file_key",
+                "manual_preview_keys_json",
+                "custom_preview_images_json",
+                "custom_preview_images",
+            )
+            if name in columns
+        ]
+        if not candidates:
+            return set()
+        rows = session.execute(text(f"SELECT {', '.join(candidates)} FROM materials"))  # noqa: S608
+        keys: set[str] = set()
+        for row in rows.mappings():
+            for name in candidates:
+                raw = row.get(name)
+                if not raw:
+                    continue
+                if name in {"file_storage_key", "file_key"}:
+                    keys.add(str(raw))
+                    continue
+                try:
+                    values = json.loads(str(raw))
+                except (TypeError, ValueError):
+                    continue
+                if isinstance(values, list):
+                    keys.update(str(item) for item in values if isinstance(item, str) and item.strip())
+        return keys
+
     def get_security_scan(self, session: Session, material_id: int) -> MaterialSecurityScanRecord | None:
         stmt = select(MaterialSecurityScanRecord).where(MaterialSecurityScanRecord.material_id == material_id).limit(1)
         return session.scalar(stmt)

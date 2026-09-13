@@ -88,6 +88,8 @@ class StorageProvider(Protocol):
     def probe(self, *, root: Path, deep: bool = False) -> dict[str, Any]: ...
     async def probe_async(self, *, root: Path, deep: bool = False) -> dict[str, Any]: ...
 
+    def cleanup_staged_uploads(self, *, root: Path, protected_keys: set[str], older_than: datetime) -> int: ...
+
 
 class LocalFileStorageProvider:
     provider_name = "local_fs"
@@ -256,6 +258,22 @@ class LocalFileStorageProvider:
 
     async def probe_async(self, *, root: Path, deep: bool = False) -> dict[str, Any]:
         return await asyncio.to_thread(self.probe, root=root, deep=deep)
+
+    def cleanup_staged_uploads(self, *, root: Path, protected_keys: set[str], older_than: datetime) -> int:
+        staged_root = root / "staged"
+        if not staged_root.exists():
+            return 0
+        removed = 0
+        cutoff = older_than.timestamp()
+        for path in staged_root.rglob("*"):
+            if not path.is_file() or path.stat().st_mtime >= cutoff:
+                continue
+            key = path.relative_to(root).as_posix()
+            if key in protected_keys:
+                continue
+            path.unlink(missing_ok=True)
+            removed += 1
+        return removed
 
     def _sanitize_filename(self, value: str, *, fallback_name: str) -> str:
         normalized = re.sub(r"[^A-Za-z0-9._\-\u4e00-\u9fff]+", "-", value).strip("-")
@@ -476,6 +494,21 @@ class AliyunOssStorageProvider:
 
     async def probe_async(self, *, root: Path, deep: bool = False) -> dict[str, Any]:
         return await asyncio.to_thread(self.probe, root=root, deep=deep)
+
+    def cleanup_staged_uploads(self, *, root: Path, protected_keys: set[str], older_than: datetime) -> int:
+        oss2 = self._import_oss2()
+        bucket = self._bucket()
+        prefix = self._build_relative_key(root, Path("staged")) + "/"
+        protected = {self._normalize_key_from_any(key) for key in protected_keys}
+        cutoff = int(older_than.timestamp())
+        removed = 0
+        for item in oss2.ObjectIterator(bucket, prefix=prefix):
+            key = str(item.key)
+            if key in protected or int(getattr(item, "last_modified", 0) or 0) >= cutoff:
+                continue
+            bucket.delete_object(key)
+            removed += 1
+        return removed
 
     def _bucket(self):
         auth_module = self._import_oss2()

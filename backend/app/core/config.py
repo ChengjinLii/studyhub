@@ -141,8 +141,9 @@ class Settings(BaseSettings):
     upload_authorization_required: bool | None = None
     upload_authorization_ttl_seconds: int = 600
     upload_authorization_consumed_marker_ttl_seconds: int = 60
-    upload_daily_submission_limit: int = 50
-    upload_daily_bytes_limit: int = 1024 * 1024 * 1024
+    staged_upload_token_ttl_seconds: int = 2 * 60 * 60
+    upload_daily_submission_limit: int = 12
+    upload_daily_bytes_limit: int = 256 * 1024 * 1024
     upload_max_concurrent_authorizations: int = 3
     upload_max_file_count: int = 16
     upload_allowed_material_extensions: str = ".pdf,.zip,.rar,.7z,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.md,.csv"
