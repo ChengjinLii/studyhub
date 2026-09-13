@@ -27,8 +27,8 @@ describe('PWA network and privacy boundary', () => {
   });
   it('does not cache authenticated static requests or query-string tokens', () => {
     const w = worker();
-    expect(w.request('/icons/bot-192.png', 'GET', 'cors', new Headers({ authorization: 'Bearer private' })).respondWith).not.toHaveBeenCalled();
-    expect(w.request('/icons/bot-192.png?token=private').respondWith).not.toHaveBeenCalled();
+    expect(w.request('/icons/bot-192-v2.png', 'GET', 'cors', new Headers({ authorization: 'Bearer private' })).respondWith).not.toHaveBeenCalled();
+    expect(w.request('/icons/bot-192-v2.png?token=private').respondWith).not.toHaveBeenCalled();
   });
   it('serves online navigation directly and never caches its HTML', async () => {
     const w = worker();

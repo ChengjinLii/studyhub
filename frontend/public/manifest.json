@@ -16,17 +16,17 @@
   ],
   "icons": [
     {
-      "src": "/icons/bot-192.png",
+      "src": "/icons/bot-192-v2.png",
       "sizes": "192x192",
       "type": "image/png"
     },
     {
-      "src": "/icons/bot-512.png",
+      "src": "/icons/bot-512-v2.png",
       "sizes": "512x512",
       "type": "image/png"
     },
     {
-      "src": "/icons/bot-maskable.png",
+      "src": "/icons/bot-maskable-v2.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable"

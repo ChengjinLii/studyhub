@@ -334,7 +334,7 @@ export default function MyApp({ Component, pageProps }: AppProps) {
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
         <meta name="apple-mobile-web-app-title" content="StudyHub·学汇" />
-        <link rel="apple-touch-icon" href="/icons/bot-apple-touch-icon.png" />
+        <link rel="apple-touch-icon" href="/icons/bot-apple-touch-icon-v2.png" />
       </Head>
       <AppProviders initialUser={initialSessionUser}>
       <div className="page-with-footer">
