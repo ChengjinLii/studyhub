@@ -18,8 +18,8 @@ describe('PWA installation assets', () => {
     expect(icon.type).toBe('image/png');
   });
   it('provides a distinct maskable icon and a 180px Apple icon', () => {
-    expect(manifest.icons.find(icon => icon.purpose === 'maskable').src).toBe('/icons/bot-maskable-v2.png');
-    const apple = readFileSync(new URL('../../public/icons/bot-apple-touch-icon-v2.png', import.meta.url));
+    expect(manifest.icons.find(icon => icon.purpose === 'maskable').src).toBe('/icons/bot-maskable-v3.png');
+    const apple = readFileSync(new URL('../../public/icons/bot-apple-touch-icon-v3.png', import.meta.url));
     expect(apple.readUInt32BE(16)).toBe(180);
     expect(apple.readUInt32BE(20)).toBe(180);
   });

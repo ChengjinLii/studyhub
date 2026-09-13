@@ -2,7 +2,7 @@
 const STATIC_CACHE = 'studyhub-static-v4';
 const MAX_ENTRIES = 160;
 const OFFLINE_PAGE = '/offline.html';
-const SHELL_ASSETS = [OFFLINE_PAGE, '/icons/bot-192-v2.png', '/icons/bot-512-v2.png', '/icons/bot-apple-touch-icon-v2.png', '/icons/bot-maskable-v2.png'];
+const SHELL_ASSETS = [OFFLINE_PAGE, '/icons/bot-192-v3.png', '/icons/bot-512-v3.png', '/icons/bot-apple-touch-icon-v3.png', '/icons/bot-maskable-v3.png'];
 const CACHEABLE_FILES = new Set([...SHELL_ASSETS, '/favicon.png']);
 
 const isCacheableStaticRequest = (request) => {

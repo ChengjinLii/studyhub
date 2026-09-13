@@ -154,7 +154,7 @@ export default function PwaInstall() {
       <div className={styles.brand}>
         {/* Existing application artwork, shared with the installed app. */}
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/icons/bot-192-v2.png" alt="" width={52} height={52} />
+        <img src="/icons/bot-192-v3.png" alt="" width={52} height={52} />
         <div><h2 id={titleId}>StudyHub <span>学汇</span></h2><p>添加到主屏幕</p></div>
       </div>
       {promptFailed && <p className={styles.notice} role="status">安装窗口未能打开，请通过浏览器菜单添加。</p>}
