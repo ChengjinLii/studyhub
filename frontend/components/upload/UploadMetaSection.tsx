@@ -189,17 +189,21 @@ export default function UploadMetaSection({
                   <span className="upload-quick-summary__label">年级/阶段</span>
                   <strong className="upload-quick-summary__value">{quickProfile.gradeValue}</strong>
                 </div>
-                <div className="upload-quick-summary__item">
-                  <span className="upload-quick-summary__label">学院</span>
-                  <strong className="upload-quick-summary__value">{quickProfile.college || '未填写'}</strong>
-                </div>
-                <div className="upload-quick-summary__item">
-                  <span className="upload-quick-summary__label">专业</span>
-                  <strong className="upload-quick-summary__value">{quickProfile.majorDisplay}</strong>
-                </div>
+                {courseCategory === 'MAJOR' && (
+                  <>
+                    <div className="upload-quick-summary__item">
+                      <span className="upload-quick-summary__label">学院</span>
+                      <strong className="upload-quick-summary__value">{quickProfile.college || '未填写'}</strong>
+                    </div>
+                    <div className="upload-quick-summary__item">
+                      <span className="upload-quick-summary__label">专业</span>
+                      <strong className="upload-quick-summary__value">{quickProfile.majorDisplay}</strong>
+                    </div>
+                  </>
+                )}
               </div>
               <p className="help-text">
-                一键投稿会优先使用“我的”里个人主页概览所填的学校、学院、专业与年级信息；未填写的字段将按默认值补齐。
+                一键投稿会优先使用“我的”里个人主页概览所填的信息；只有专业课会关联学院和专业。
               </p>
             </div>
           ) : (
@@ -208,23 +212,6 @@ export default function UploadMetaSection({
                 <UploadSectionLabel htmlFor="school" text="学校" />
                 <select id="school" value={school} onChange={(e) => onSchoolChange(e.target.value)} required>
                   <option value={SUPPORTED_SCHOOL}>{SUPPORTED_SCHOOL}</option>
-                </select>
-              </div>
-              <div className="form-item">
-                <UploadSectionLabel htmlFor="college" text="学院" />
-                <select
-                  id="college"
-                  value={college}
-                  onChange={(e) => onCollegeChange(e.target.value)}
-                  disabled={courseCategory !== 'MAJOR'}
-                  required={courseCategory === 'MAJOR'}
-                >
-                  <option value="">{courseCategory === 'MAJOR' ? '请选择学院' : '无需选择'}</option>
-                  {collegeOptions.map((name) => (
-                    <option key={name} value={name}>
-                      {name}
-                    </option>
-                  ))}
                 </select>
               </div>
               <div className="form-item">
@@ -237,26 +224,45 @@ export default function UploadMetaSection({
                   ))}
                 </select>
               </div>
-              <div className="form-item">
-                <UploadSectionLabel text="专业" optional />
-                <div className="inline-group wrap">
-                  {majorOptions.map((name) => {
-                    const checked = selectedMajors.includes(name);
-                    return (
-                      <label key={name} className={`choice badge-outline ${checked ? 'active' : ''}`}>
-                        <input
-                          type="checkbox"
-                          value={name}
-                          checked={checked}
-                          disabled={courseCategory !== 'MAJOR'}
-                          onChange={(e) => onMajorToggle(name, e.target.checked)}
-                        />
-                        {name}
-                      </label>
-                    );
-                  })}
-                </div>
-              </div>
+              {courseCategory === 'MAJOR' && (
+                <>
+                  <div className="form-item">
+                    <UploadSectionLabel htmlFor="college" text="学院" />
+                    <select
+                      id="college"
+                      value={college}
+                      onChange={(e) => onCollegeChange(e.target.value)}
+                      required
+                    >
+                      <option value="">请选择学院</option>
+                      {collegeOptions.map((name) => (
+                        <option key={name} value={name}>
+                          {name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="form-item">
+                    <UploadSectionLabel text="专业" optional />
+                    <div className="inline-group wrap">
+                      {majorOptions.map((name) => {
+                        const checked = selectedMajors.includes(name);
+                        return (
+                          <label key={name} className={`choice badge-outline ${checked ? 'active' : ''}`}>
+                            <input
+                              type="checkbox"
+                              value={name}
+                              checked={checked}
+                              onChange={(e) => onMajorToggle(name, e.target.checked)}
+                            />
+                            {name}
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </>
+              )}
               <div className="form-item full">
                 <UploadSectionLabel text="标签" optional />
                 <div className="inline-group wrap">

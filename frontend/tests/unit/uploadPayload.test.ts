@@ -84,4 +84,35 @@ describe('uploadPayload', () => {
     expect(deriveUploadGradeType('技能')).toBe('SKILL');
     expect(deriveUploadGradeType('大一')).toBe('UG');
   });
+
+  it('drops college and majors for a general course', () => {
+    const payload = buildUploadPayload({
+      title: '大学物理资料',
+      description: '',
+      priceValue: 0,
+      school: '电子科技大学',
+      college: '计算机科学与工程学院',
+      majors: ['计算机科学与技术'],
+      gradeValue: '大一',
+      courseCategory: 'GENERAL',
+      tags: [],
+      deliveryMethod: 'FILE',
+      netdiskUrl: '',
+      netdiskPassword: '',
+      netdiskExpiredAt: '',
+      netdiskReminderAt: '',
+      previewWatermarkEnabled: true,
+      previewSource: 'AUTO',
+      customPreviewText: '',
+      copyrightOwner: '',
+      isExperience: false,
+      isQuickMode: false,
+      isEditing: false,
+      requestId: null,
+      customPreviewClear: false,
+    });
+
+    expect(payload.college).toBe('');
+    expect(payload.major).toBe('');
+  });
 });

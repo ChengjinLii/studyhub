@@ -87,13 +87,14 @@ export function buildUploadPayload({
   requestId,
   customPreviewClear,
 }: BuildUploadPayloadInput): UploadPayload {
+  const usesMajorProfile = !isExperience && courseCategory === 'MAJOR';
   const payload: UploadPayload = {
     title,
     description,
     price: priceValue * 100,
     school,
-    college,
-    major: majors.length > 0 ? serializeMajorList(majors) : '',
+    college: usesMajorProfile ? college : '',
+    major: usesMajorProfile && majors.length > 0 ? serializeMajorList(majors) : '',
     gradeValue,
     gradeType: deriveUploadGradeType(gradeValue),
     generalCourse: courseCategory === 'GENERAL',
