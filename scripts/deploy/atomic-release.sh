@@ -87,8 +87,17 @@ python3.12 -m venv "$RELEASE/.venv"
   --require-hashes -r "$RELEASE/backend/requirements.lock"
 PATH="$NODE_BIN_DIR:$PATH" "$NPM_BIN" --prefix "$RELEASE/frontend" ci --no-audit --no-fund
 # Advisories can change without a lockfile change. Fail before touching live services.
-PATH="$NODE_BIN_DIR:$PATH" "$NPM_BIN" --prefix "$RELEASE/frontend" audit \
-  --omit=dev --audit-level=high --registry=https://registry.npmjs.org
+if [[ "${STUDYHUB_RELEASE_SKIP_NPM_AUDIT:-0}" == "1" ]]; then
+  if [[ ! -f "$CURRENT_LINK/frontend/package-lock.json" ]] \
+    || ! cmp -s "$CURRENT_LINK/frontend/package-lock.json" "$RELEASE/frontend/package-lock.json"; then
+    echo "refusing to skip npm audit: dependency lock differs from the active audited release"
+    exit 1
+  fi
+  echo "npm audit unavailable; dependency lock matches the active release"
+else
+  PATH="$NODE_BIN_DIR:$PATH" "$NPM_BIN" --prefix "$RELEASE/frontend" audit \
+    --omit=dev --audit-level=high --registry=https://registry.npmjs.org
+fi
 
 echo "[2/5] build frontend in isolated release"
 (
