@@ -176,6 +176,8 @@ def _rule_for_request(settings: Settings, request: Request) -> RateLimitRule | N
         return RateLimitRule("email-verification", settings.rate_limit_email_verification)
     if method == "POST" and path == "/api/comments":
         return RateLimitRule("comment-create-ip", settings.rate_limit_comment_create_ip_minute)
+    if method in {"POST", "PUT", "PATCH"} and path.startswith("/api/batch-submissions"):
+        return RateLimitRule("upload", settings.rate_limit_upload)
     if method == "POST" and path in {
         "/api/material-upload-authorizations",
         "/api/material-uploads/stage",

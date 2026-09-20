@@ -144,6 +144,10 @@ class Settings(BaseSettings):
     staged_upload_token_ttl_seconds: int = 2 * 60 * 60
     upload_daily_submission_limit: int = 12
     upload_daily_bytes_limit: int = 256 * 1024 * 1024
+    batch_submission_max_files: int = 20
+    batch_submission_max_bytes: int = 100 * 1024 * 1024
+    batch_submission_upload_concurrency: int = 2
+    batch_submission_draft_retention_days: int = 7
     upload_max_concurrent_authorizations: int = 3
     upload_max_file_count: int = 16
     upload_allowed_material_extensions: str = ".pdf,.zip,.rar,.7z,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.md,.csv"

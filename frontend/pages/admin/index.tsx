@@ -493,6 +493,7 @@ export default function AdminPage({
             <div className="admin-hero__left">
               <span className="admin-hero__eyebrow">{roleLabel}控制台</span>
               <h1>管理后台</h1>
+              <Link className="button ghost" href="/admin/batch">批量投稿审核</Link>
               <div className="admin-hero__meta">
                 <span className="admin-meta-chip">当前登录：{user.nickname}</span>
                 <span className="admin-meta-chip">角色：{roleLabel}</span>

@@ -120,6 +120,10 @@ class MaterialAssetStore:
     def delete_key(self, key: str | None) -> None:
         self.storage_provider.delete_key(root=self.settings.resolved_material_asset_dir, key=key)
 
+    def delete_key_strict(self, key: str) -> None:
+        """Cleanup receipts require confirmed deletion, unlike best-effort rollback."""
+        self.storage_provider.delete_key_strict(root=self.settings.resolved_material_asset_dir, key=key)
+
     async def delete_key_async(self, key: str | None) -> None:
         await self.storage_provider.delete_key_async(root=self.settings.resolved_material_asset_dir, key=key)
 

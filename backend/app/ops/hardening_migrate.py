@@ -12,10 +12,17 @@ from app.core.db import get_engine
 from app.models.finance import FinanceInstructionRecord
 from app.models.auth import AuthSessionStateRecord
 from app.models.materials import MaterialSecurityScanRecord
+from app.models.batch_submissions import (
+    BatchAuditRecord, BatchPublicationRecord, BatchSubmissionItemRecord, BatchSubmissionRecord,
+)
 from app.ops.schema_audit import require_recent_nonempty_backup
 
 
 MODULE_TABLES = {
+    "batch-submissions": (
+        BatchSubmissionRecord.__table__, BatchSubmissionItemRecord.__table__,
+        BatchPublicationRecord.__table__, BatchAuditRecord.__table__,
+    ),
     "finance-outbox": (FinanceInstructionRecord.__table__,),
     "material-security": (MaterialSecurityScanRecord.__table__,),
     "auth-session": (AuthSessionStateRecord.__table__,),

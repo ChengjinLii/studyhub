@@ -4,6 +4,7 @@ import { useRouter } from 'next/router';
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import MeAccountSections from '../components/me/MeAccountSections';
 import MeContentSections from '../components/me/MeContentSections';
+import OwnBatchStatus from '../components/batch/OwnBatchStatus';
 import MePayoutSection from '../components/me/MePayoutSection';
 import MeSecuritySection from '../components/me/MeSecuritySection';
 import { useAppDialog } from '../components/AppDialogProvider';
@@ -49,6 +50,7 @@ const ME_NAV_GROUPS = [
     items: [
       { id: 'download-quota', label: '下载次数' },
       { id: 'uploads', label: '我的投稿' },
+      { id: 'batch-submissions', label: '批量投稿' },
       { id: 'purchases', label: '最近购买' },
       { id: 'wants', label: '我的想要' },
     ],
@@ -718,6 +720,7 @@ export default function MePage({ user, summary, account }: MePageProps) {
                 onSendBindCode={sendBindCode}
                 onConfirmBindEmail={confirmBindEmail}
               />
+              <OwnBatchStatus />
               <MeContentSections
                 uploads={sortedUploads} visibleUploads={visibleUploads} uploadsExpanded={uploadsExpanded}
                 canExpandUploads={canExpandUploads} uploadTimeOrder={uploadTimeOrder}

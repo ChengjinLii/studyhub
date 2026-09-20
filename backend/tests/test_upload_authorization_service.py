@@ -134,3 +134,155 @@ def test_upload_authorization_fails_closed_when_redis_is_unavailable(monkeypatch
     with pytest.raises(HTTPException) as failure:
         service.authorize(user_id=7, submission_id="upload_redis_down_001", files=[_material()])
     assert failure.value.status_code == 503
+
+
+def test_bulk_limits_and_normal_material_limit() -> None:
+    service = _service()
+    files = [_material(name=f"notes-{index}.pdf", size=5 * 1024 * 1024) for index in range(20)]
+    assert service.validate_descriptors(files, bulk=True) == files
+    assert service.validate_descriptors([_material(size=50 * 1024 * 1024)], bulk=True)
+    invalid = [
+        files + [_material()],
+        [_material(size=50 * 1024 * 1024 + 1)],
+        files[:-1] + [_material(size=5 * 1024 * 1024 + 1)],
+        [_material(name="unsafe.exe")],
+        [UploadFileDescriptorPayload(role="PREVIEW", name="image.png", sizeBytes=1, contentType="image/png")],
+    ]
+    for descriptors in invalid:
+        with pytest.raises(HTTPException) as failure:
+            service.validate_descriptors(descriptors, bulk=True)
+        assert failure.value.status_code == 400
+    with pytest.raises(HTTPException) as normal:
+        service.validate_descriptors([_material(), _material()])
+    assert normal.value.status_code == 400
+
+
+def test_batch_reservation_consumes_once_and_shares_normal_quota() -> None:
+    service = _service(upload_max_concurrent_authorizations=1)
+    files = [_material(), _material(name="second.pdf")]
+    remaining = service.reserve_batch(user_id=7, submission_id="batch_1", files=files)
+    assert remaining == {"remainingDailySubmissions": 1, "remainingDailyBytes": 768}
+    assert service.reserve_batch(user_id=7, submission_id="batch_1", files=files) == remaining
+    assert all(ticket.used for ticket in service._local_tickets.values())
+    assert service._local_reservations[service._reservation_key(7, "bulk-batch_1")].active_ticket_key is None
+    # The ordinary submission ID does not collide with the bulk reservation.
+    normal = service.authorize(user_id=7, submission_id="batch_1", files=[_material()])
+    assert normal.remainingDailySubmissions == 0
+    assert normal.remainingDailyBytes == 640
+    service.consume(token=normal.uploadToken, user_id=7, submission_id="batch_1", files=[_material()])
+    with pytest.raises(HTTPException) as exhausted:
+        service.reserve_batch(user_id=7, submission_id="batch_2", files=[])
+    assert exhausted.value.status_code == 429
+    assert service.reserve_batch(user_id=8, submission_id="batch_1", files=files) == remaining
+
+
+def test_normal_and_bulk_share_byte_limit_without_charging_failed_reservation() -> None:
+    service = _service(upload_daily_bytes_limit=300)
+    normal = service.authorize(user_id=7, submission_id="normal", files=[_material(size=100)])
+    with pytest.raises(HTTPException) as exhausted:
+        service.reserve_batch(user_id=7, submission_id="batch", files=[_material(size=201)])
+    assert exhausted.value.status_code == 429
+    remaining = service.reserve_batch(user_id=7, submission_id="batch", files=[_material(size=200)])
+    assert remaining == {"remainingDailySubmissions": 0, "remainingDailyBytes": 0}
+    service.consume(token=normal.uploadToken, user_id=7, submission_id="normal", files=[_material(size=100)])
+
+
+def test_batch_retry_rejects_changed_descriptors() -> None:
+    service = _service()
+    service.reserve_batch(user_id=7, submission_id="batch", files=[_material()])
+    with pytest.raises(HTTPException) as changed:
+        service.reserve_batch(user_id=7, submission_id="batch", files=[_material(size=129)])
+    assert changed.value.status_code == 409
+
+
+def test_batch_retry_after_ticket_expiry_and_daily_rollover(monkeypatch: pytest.MonkeyPatch) -> None:
+    from datetime import UTC, datetime
+    import app.services.upload_authorization_service as module
+
+    now = datetime(2026, 9, 20, 12, tzinfo=UTC).timestamp()
+
+    class Clock(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return datetime.fromtimestamp(now, tz=tz)
+
+    monkeypatch.setattr(module, "datetime", Clock)
+    monkeypatch.setattr(module, "time", lambda: now)
+    service = _service(upload_daily_submission_limit=1)
+    files = [_material()]
+    first = service.reserve_batch(user_id=7, submission_id="batch", files=files)
+    now += 3600
+    assert service.reserve_batch(user_id=7, submission_id="batch", files=files) == first
+    now += 86400
+    # A retry from yesterday does not use today's quota while its reservation survives.
+    assert service.reserve_batch(user_id=7, submission_id="batch", files=files) == {
+        "remainingDailySubmissions": 1, "remainingDailyBytes": 1024,
+    }
+    assert service.reserve_batch(user_id=7, submission_id="new_batch", files=files) == first
+
+
+def test_bulk_authorize_consume_and_replay() -> None:
+    service = _service()
+    files = [_material(), _material(name="second.pdf")]
+    issued = service.authorize(user_id=7, submission_id="bulk-batch", files=files, bulk=True)
+    service.consume(token=issued.uploadToken, user_id=7, submission_id="bulk-batch", files=files, bulk=True)
+    with pytest.raises(HTTPException) as replay:
+        service.consume(token=issued.uploadToken, user_id=7, submission_id="bulk-batch", files=files, bulk=True)
+    assert replay.value.status_code == 409
+
+
+def test_batch_redis_shared_quota_retry_and_day_rollover(tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
+    import shutil
+    import subprocess
+    import time
+
+    import redis
+
+    executable = shutil.which("redis-server")
+    if executable is None:
+        pytest.skip("redis-server is required for isolated Lua integration coverage")
+    socket = str(tmp_path / "redis.sock")
+    process = subprocess.Popen(
+        [executable, "--port", "0", "--unixsocket", socket, "--save", "", "--appendonly", "no"],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    client = redis.Redis(unix_socket_path=socket)
+    try:
+        for _ in range(100):
+            try:
+                if client.ping():
+                    break
+            except redis.ConnectionError:
+                time.sleep(0.02)
+        else:
+            pytest.fail("isolated Redis did not start")
+        service = _service(security_state_backend="redis", upload_max_concurrent_authorizations=1)
+        service._redis_client = client
+        files = [_material(), _material(name="second.pdf")]
+        first = service.reserve_batch(user_id=7, submission_id="batch", files=files)
+        assert first == {"remainingDailySubmissions": 1, "remainingDailyBytes": 768}
+        assert service.reserve_batch(user_id=7, submission_id="batch", files=files) == first
+        assert client.zcard(service._active_key(7)) == 0
+        with pytest.raises(HTTPException) as changed:
+            service.reserve_batch(user_id=7, submission_id="batch", files=[_material(size=129)])
+        assert changed.value.status_code == 409
+        with pytest.raises(HTTPException) as bytes_exhausted:
+            service.authorize(user_id=7, submission_id="too_large", files=[_material(size=769)])
+        assert bytes_exhausted.value.status_code == 429
+        normal = service.authorize(user_id=7, submission_id="normal", files=[_material()])
+        assert normal.remainingDailySubmissions == 0 and normal.remainingDailyBytes == 640
+        service.consume(token=normal.uploadToken, user_id=7, submission_id="normal", files=[_material()])
+        with pytest.raises(HTTPException) as exhausted:
+            service.reserve_batch(user_id=7, submission_id="batch_2", files=[])
+        assert exhausted.value.status_code == 429
+        original_quota_key = service._quota_key
+        monkeypatch.setattr(service, "_quota_key", lambda user_id: original_quota_key(user_id) + ":next-day")
+        assert service.reserve_batch(user_id=7, submission_id="batch", files=files) == {
+            "remainingDailySubmissions": 2, "remainingDailyBytes": 1024,
+        }
+        assert service.reserve_batch(user_id=7, submission_id="batch_2", files=files) == first
+    finally:
+        client.close()
+        process.terminate()
+        process.wait(timeout=5)

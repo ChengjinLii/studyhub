@@ -3,6 +3,12 @@
 from app.models.admin import UserNoteRecord
 from app.models.auth import AuthSessionStateRecord, AuthUser, EmailVerification
 from app.models.base import Base
+from app.models.batch_submissions import (
+    BatchAuditRecord,
+    BatchPublicationRecord,
+    BatchSubmissionItemRecord,
+    BatchSubmissionRecord,
+)
 from app.models.comments import CommentLikeRecord, CommentRecord
 from app.models.community import FeedbackRecord, NotificationRecord, ReportRecord, VolunteerApplicationRecord
 from app.models.finance import (
@@ -47,6 +53,10 @@ __all__ = [
     "AlipayGatewayNotificationRecord",
     "FinanceInstructionRecord",
     "Base",
+    "BatchAuditRecord",
+    "BatchPublicationRecord",
+    "BatchSubmissionItemRecord",
+    "BatchSubmissionRecord",
     "CommentLikeRecord",
     "CommentRecord",
     "CreatorPayoutApplicationRecord",

@@ -138,8 +138,9 @@ return {1}
         user_id: int,
         submission_id: str,
         files: Sequence[UploadFileDescriptorPayload],
+        bulk: bool = False,
     ) -> MaterialUploadAuthorizationResponsePayload:
-        normalized = self.validate_descriptors(files)
+        normalized = self.validate_descriptors(files, bulk=bulk)
         descriptor_digest = self.descriptor_digest(normalized)
         total_bytes = sum(item.sizeBytes for item in normalized)
         token = secrets.token_urlsafe(32)
@@ -188,11 +189,12 @@ return {1}
         user_id: int,
         submission_id: str,
         files: Sequence[UploadFileDescriptorPayload],
+        bulk: bool = False,
     ) -> None:
         normalized_token = (token or "").strip()
         if not normalized_token:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="缺少上传授权，请重新提交")
-        normalized = self.validate_descriptors(files)
+        normalized = self.validate_descriptors(files, bulk=bulk)
         digest = self.descriptor_digest(normalized)
         ticket_key = self._ticket_key(self._token_digest(normalized_token))
         reservation_key = self._reservation_key(user_id, submission_id)
@@ -216,12 +218,44 @@ return {1}
             return
         self._consume_local(ticket_key, user_id=user_id, submission_id=submission_id, descriptor_digest=digest)
 
+    def reserve_batch(
+        self,
+        *,
+        user_id: int,
+        submission_id: str,
+        files: Sequence[UploadFileDescriptorPayload],
+    ) -> dict[str, int]:
+        """Reserve a batch once; callers supply an unprefixed, stable submission ID.
+
+        Subsequent per-file uploads must use separate server authorization, not
+        reserve quota again. Retries retain the existing reservation lifetime.
+        """
+        reservation_id = f"bulk-{submission_id}"
+        issued = self.authorize(user_id=user_id, submission_id=reservation_id, files=files, bulk=True)
+        self.consume(
+            token=issued.uploadToken,
+            user_id=user_id,
+            submission_id=reservation_id,
+            files=files,
+            bulk=True,
+        )
+        return {
+            "remainingDailySubmissions": issued.remainingDailySubmissions,
+            "remainingDailyBytes": issued.remainingDailyBytes,
+        }
+
     def validate_descriptors(
         self,
         files: Sequence[UploadFileDescriptorPayload],
+        *,
+        bulk: bool = False,
     ) -> list[UploadFileDescriptorPayload]:
         normalized = list(files)
-        if len(normalized) > int(self.settings.upload_max_file_count):
+        if bulk and any(item.role != "MATERIAL" for item in normalized):
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Bulk uploads accept material files only")
+        if bulk and sum(item.sizeBytes for item in normalized) > 100 * 1024 * 1024:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Bulk uploads cannot exceed 100 MiB")
+        if len(normalized) > (20 if bulk else int(self.settings.upload_max_file_count)):
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="本次上传文件数量过多")
         role_counts = {"MATERIAL": 0, "PREVIEW": 0, "CUSTOM_PREVIEW": 0}
         for item in normalized:
@@ -239,7 +273,7 @@ return {1}
                     raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="预览图类型不支持")
                 if item.sizeBytes > int(self.settings.material_preview_image_max_size_bytes):
                     raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="单张预览图不能超过 5MB")
-        if role_counts["MATERIAL"] > 1 or role_counts["PREVIEW"] > 10 or role_counts["CUSTOM_PREVIEW"] > 5:
+        if role_counts["MATERIAL"] > (20 if bulk else 1) or role_counts["PREVIEW"] > 10 or role_counts["CUSTOM_PREVIEW"] > 5:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="本次上传文件数量不符合要求")
         return normalized
 

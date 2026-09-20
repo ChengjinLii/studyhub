@@ -36,6 +36,7 @@ class StorageProvider(Protocol):
     async def save_upload_async(self, *, root: Path, relative_dir: Path, upload: UploadFile, fallback_name: str) -> tuple[str, int]: ...
 
     def delete_key(self, *, root: Path, key: str | None) -> None: ...
+    def delete_key_strict(self, *, root: Path, key: str) -> None: ...
     async def delete_key_async(self, *, root: Path, key: str | None) -> None: ...
 
     def resolve_path(self, *, root: Path, key: str, invalid_detail: str) -> Path: ...
@@ -88,11 +89,14 @@ class StorageProvider(Protocol):
     def probe(self, *, root: Path, deep: bool = False) -> dict[str, Any]: ...
     async def probe_async(self, *, root: Path, deep: bool = False) -> dict[str, Any]: ...
 
-    def cleanup_staged_uploads(self, *, root: Path, protected_keys: set[str], older_than: datetime) -> int: ...
+    def cleanup_staged_uploads(self, *, root: Path, protected_keys: set[str], older_than: datetime, namespace: str = "staged") -> int: ...
 
 
 class LocalFileStorageProvider:
     provider_name = "local_fs"
+
+    def delete_key_strict(self, *, root: Path, key: str) -> None:
+        self.resolve_path(root=root, key=key, invalid_detail="无效的文件路径").unlink(missing_ok=True)
 
     def save_upload(self, *, root: Path, relative_dir: Path, upload: UploadFile, fallback_name: str) -> tuple[str, int]:
         original_name = upload.filename or fallback_name
@@ -259,8 +263,10 @@ class LocalFileStorageProvider:
     async def probe_async(self, *, root: Path, deep: bool = False) -> dict[str, Any]:
         return await asyncio.to_thread(self.probe, root=root, deep=deep)
 
-    def cleanup_staged_uploads(self, *, root: Path, protected_keys: set[str], older_than: datetime) -> int:
-        staged_root = root / "staged"
+    def cleanup_staged_uploads(self, *, root: Path, protected_keys: set[str], older_than: datetime, namespace: str = "staged") -> int:
+        if namespace not in {"staged", "bulk"}:
+            raise ValueError("Unsupported cleanup namespace")
+        staged_root = root / namespace
         if not staged_root.exists():
             return 0
         removed = 0
@@ -285,6 +291,15 @@ class LocalFileStorageProvider:
 
 class AliyunOssStorageProvider:
     provider_name = "oss"
+
+    def delete_key_strict(self, *, root: Path, key: str) -> None:
+        normalized = self._normalize_key_from_any(key)
+        if not normalized:
+            raise ValueError("Missing object key")
+        bucket = self._bucket()
+        bucket.delete_object(normalized)
+        if bucket.object_exists(normalized):
+            raise RuntimeError("Object still exists after deletion")
 
     def __init__(self, settings: Settings) -> None:
         self.settings = settings
@@ -495,10 +510,12 @@ class AliyunOssStorageProvider:
     async def probe_async(self, *, root: Path, deep: bool = False) -> dict[str, Any]:
         return await asyncio.to_thread(self.probe, root=root, deep=deep)
 
-    def cleanup_staged_uploads(self, *, root: Path, protected_keys: set[str], older_than: datetime) -> int:
+    def cleanup_staged_uploads(self, *, root: Path, protected_keys: set[str], older_than: datetime, namespace: str = "staged") -> int:
+        if namespace not in {"staged", "bulk"}:
+            raise ValueError("Unsupported cleanup namespace")
         oss2 = self._import_oss2()
         bucket = self._bucket()
-        prefix = self._build_relative_key(root, Path("staged")) + "/"
+        prefix = self._build_relative_key(root, Path(namespace)) + "/"
         protected = {self._normalize_key_from_any(key) for key in protected_keys}
         cutoff = int(older_than.timestamp())
         removed = 0

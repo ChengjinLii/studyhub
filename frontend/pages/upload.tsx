@@ -1298,6 +1298,7 @@ export default function UploadPage({ user, token, account }: UploadPageProps) {
     <>
       <NavBar user={user} />
       <main className="container upload-page">
+        <Link className="button ghost" href="/upload/batch">批量投稿</Link>
         {!user ? (
           <section className="card upload-card">
             <h2>投稿中心 ✍️</h2>
