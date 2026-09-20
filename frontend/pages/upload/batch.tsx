@@ -1,7 +1,7 @@
 import { GetServerSideProps } from 'next';
 import Link from 'next/link';
 import { FormEvent, useEffect, useRef, useState } from 'react';
-import { Copy, Trash2, Upload } from 'lucide-react';
+import { ArrowLeft, Copy, Files, Link2, Trash2, Upload } from 'lucide-react';
 import NavBar from '../../components/NavBar';
 import OwnBatchStatus from '../../components/batch/OwnBatchStatus';
 import { readSession } from '../../lib/auth';
@@ -68,20 +68,20 @@ export default function BatchUploadPage({ user }: { user: SessionUser }) {
     if (validation) { setError(validation); return; }
     setFiles(next); setError('');
   }
-  return <><NavBar user={user} /><main className={`container ${styles.page}`}>
-    <section className={styles.section}><Link href="/upload">单份投稿</Link><h1>批量投稿</h1>
+  return <><NavBar user={user} /><main className={`container ${styles.page} ${styles.intake}`}>
+    <section className={`${styles.section} ${styles.intro}`}><Link className={styles.back} href="/upload"><ArrowLeft size={16} aria-hidden="true" />单份投稿</Link><h1><Files size={30} aria-hidden="true" />批量投稿</h1>
       <p>无需填写标题、课程等资料信息，管理员将统一整理后发布，并关联你的账号。</p>
       <p className={styles.muted}>每个文件上限 50 MB，每批上限 100 MB、20 个文件；与普通投稿共享每日 256 MB 文件额度。网盘内容大小不受此限制。</p>
-      <div className={styles.row}><span>也可以私聊管理员投稿：</span><strong>QQ：2731938007</strong>
+      <div className={`${styles.row} ${styles.contact}`}><span>也可以私聊管理员投稿：</span><strong>QQ：2731938007</strong>
         <button type="button" className={styles.icon} title="复制管理员 QQ" aria-label="复制管理员 QQ" onClick={async () => { try { await navigator.clipboard.writeText('2731938007'); setCopied(true); } catch { setError('复制失败，请手动选择 QQ 号复制'); } }}><Copy size={18} /></button>
         {copied && <span role="status">QQ 号已复制</span>}</div></section>
     <section className={styles.section}>
       {done ? <div role="status"><h2 className={styles.success}>批次 #{batch?.id} 已提交</h2><Link className="button primary" href="/me#batch-submissions">查看投稿状态</Link></div> :
         <form className={styles.form} onSubmit={submit}>
-          <fieldset disabled={locked}><legend>交付方式</legend><div className={styles.row}>
-            <label><input type="radio" name="delivery" checked={method === 'FILE'} onChange={() => setMethod('FILE')} />文件</label>
-            <label><input type="radio" name="delivery" checked={method === 'NETDISK'} onChange={() => setMethod('NETDISK')} />网盘</label></div>
-            {method === 'FILE' ? <label className={`${styles.dropzone} ${dragging ? styles.dragging : ''}`}
+          <fieldset disabled={locked}><legend>交付方式</legend><div className={styles.choices}>
+            <label data-selected={method === 'FILE'}><input type="radio" name="delivery" checked={method === 'FILE'} onChange={() => setMethod('FILE')} /><Files size={19} aria-hidden="true" />文件</label>
+            <label data-selected={method === 'NETDISK'}><input type="radio" name="delivery" checked={method === 'NETDISK'} onChange={() => setMethod('NETDISK')} /><Link2 size={19} aria-hidden="true" />网盘</label></div>
+            {method === 'FILE' ? <label className={`${styles.dropzone} ${files.length ? styles.hasFiles : ''} ${dragging ? styles.dragging : ''}`}
               onDragOver={event => { event.preventDefault(); if (!locked) setDragging(true); }}
               onDragLeave={() => setDragging(false)}
               onDrop={event => { event.preventDefault(); setDragging(false); if (!locked) addFiles(event.dataTransfer.files); }}>
@@ -92,13 +92,15 @@ export default function BatchUploadPage({ user }: { user: SessionUser }) {
           </fieldset>
           {method === 'FILE' && <ul className={styles.list}>{files.map((file, index) => <li key={file.name} className={styles.item}><span className={styles.name}>{file.name} <span className={styles.muted}>({(file.size / 1024 / 1024).toFixed(2)} MiB)</span></span>
             <span role="status">{progress[file.name] || '待上传'}</span><button type="button" disabled={locked} className={styles.icon} title={`移除 ${file.name}`} aria-label={`移除 ${file.name}`} onClick={() => setFiles(previous => previous.filter((_, i) => i !== index))}><Trash2 size={18} /></button></li>)}</ul>}
-          <fieldset disabled={locked}><legend>发布意向</legend><div className={styles.row}>{([['FREE', '免费'], ['PAID', '付费'], ['CONTACT', '联系后决定']] as const).map(([value, label]) => <label key={value}><input required type="radio" name="intent" checked={intent === value} onChange={() => setIntent(value)} />{label}</label>)}</div>
+          <fieldset disabled={locked}><legend>发布意向</legend><div className={`${styles.choices} ${styles.intentChoices}`}>{([['FREE', '免费'], ['PAID', '付费'], ['CONTACT', '联系后决定']] as const).map(([value, label]) => <label key={value} data-selected={intent === value}><input required type="radio" name="intent" checked={intent === value} onChange={() => setIntent(value)} />{label}</label>)}</div>
+            <div className={styles.notes}>
             <label className={styles.field}>定价说明（选填）<textarea placeholder="例如：笔记免费，真题解析每份 2 元；合并发布前请联系我。" value={pricingNote} maxLength={2000} onChange={event => setPricingNote(event.target.value)} /></label>
             <label className={styles.field}>投稿备注<textarea placeholder="例如：联系 QQ 号、资料内容说明或其他整理要求" value={note} maxLength={2000} onChange={event => setNote(event.target.value)} /></label>
-            <label><input required type="checkbox" checked={consent} onChange={event => setConsent(event.target.checked)} /> 我拥有分享这些资料的权利，同意管理员审核、整理并按确认的发布意向发布。</label>
+            </div>
+            <label className={styles.consent}><input required type="checkbox" checked={consent} onChange={event => setConsent(event.target.checked)} /><span>我拥有分享这些资料的权利，同意管理员审核、整理并按确认的发布意向发布。</span></label>
           </fieldset>
           {locked && <p className={styles.muted}>批次清单已锁定。请保留此页面直到提交完成。</p>}
-          <button className="button primary" disabled={busy} type="submit"><Upload size={18} />{busy ? '正在提交...' : locked ? '重试未完成步骤' : '创建批次并提交'}</button>
+          <button className={`button primary ${styles.submit}`} disabled={busy} type="submit"><Upload size={18} />{busy ? '正在提交...' : locked ? '重试未完成步骤' : '创建批次并提交'}</button>
           {locked && !batch && !busy && <button className="button ghost" type="button" onClick={() => { payload.current = null; setLocked(false); setError(''); }}>调整投稿信息</button>}
         </form>}
       {error && <p role="alert" className={styles.error}>{error}</p>}
