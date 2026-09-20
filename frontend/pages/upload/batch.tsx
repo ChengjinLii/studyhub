@@ -72,9 +72,9 @@ export default function BatchUploadPage({ user }: { user: SessionUser }) {
     <section className={styles.section}><Link href="/upload">单份投稿</Link><h1>批量投稿</h1>
       <p>无需填写标题、课程等资料信息，管理员将统一整理后发布，并关联你的账号。</p>
       <p className={styles.muted}>每个文件上限 50 MB，每批上限 100 MB、20 个文件；与普通投稿共享每日 256 MB 文件额度。网盘内容大小不受此限制。</p>
-      <div className={styles.row}><span>也可以私聊管理员投稿：</span><a href="mailto:chengjinli@std.uestc.edu.cn">chengjinli@std.uestc.edu.cn</a>
-        <button type="button" className={styles.icon} title="复制管理员邮箱" aria-label="复制管理员邮箱" onClick={async () => { try { await navigator.clipboard.writeText('chengjinli@std.uestc.edu.cn'); setCopied(true); } catch { setError('复制失败，请手动选择邮箱复制'); } }}><Copy size={18} /></button>
-        {copied && <span role="status">邮箱已复制</span>}</div></section>
+      <div className={styles.row}><span>也可以私聊管理员投稿：</span><strong>QQ：2731938007</strong>
+        <button type="button" className={styles.icon} title="复制管理员 QQ" aria-label="复制管理员 QQ" onClick={async () => { try { await navigator.clipboard.writeText('2731938007'); setCopied(true); } catch { setError('复制失败，请手动选择 QQ 号复制'); } }}><Copy size={18} /></button>
+        {copied && <span role="status">QQ 号已复制</span>}</div></section>
     <section className={styles.section}>
       {done ? <div role="status"><h2 className={styles.success}>批次 #{batch?.id} 已提交</h2><Link className="button primary" href="/me#batch-submissions">查看投稿状态</Link></div> :
         <form className={styles.form} onSubmit={submit}>
@@ -94,7 +94,7 @@ export default function BatchUploadPage({ user }: { user: SessionUser }) {
             <span role="status">{progress[file.name] || '待上传'}</span><button type="button" disabled={locked} className={styles.icon} title={`移除 ${file.name}`} aria-label={`移除 ${file.name}`} onClick={() => setFiles(previous => previous.filter((_, i) => i !== index))}><Trash2 size={18} /></button></li>)}</ul>}
           <fieldset disabled={locked}><legend>发布意向</legend><div className={styles.row}>{([['FREE', '免费'], ['PAID', '付费'], ['CONTACT', '联系后决定']] as const).map(([value, label]) => <label key={value}><input required type="radio" name="intent" checked={intent === value} onChange={() => setIntent(value)} />{label}</label>)}</div>
             <label className={styles.field}>定价说明（选填）<textarea placeholder="例如：笔记免费，真题解析每份 2 元；合并发布前请联系我。" value={pricingNote} maxLength={2000} onChange={event => setPricingNote(event.target.value)} /></label>
-            <label className={styles.field}>投稿备注<textarea value={note} maxLength={2000} onChange={event => setNote(event.target.value)} /></label>
+            <label className={styles.field}>投稿备注<textarea placeholder="例如：联系 QQ 号、资料内容说明或其他整理要求" value={note} maxLength={2000} onChange={event => setNote(event.target.value)} /></label>
             <label><input required type="checkbox" checked={consent} onChange={event => setConsent(event.target.checked)} /> 我拥有分享这些资料的权利，同意管理员审核、整理并按确认的发布意向发布。</label>
           </fieldset>
           {locked && <p className={styles.muted}>批次清单已锁定。请保留此页面直到提交完成。</p>}

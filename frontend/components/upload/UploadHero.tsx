@@ -90,6 +90,9 @@ export default function UploadHero({
                     >
                       <span className="upload-hero__action-label">开始经验分享</span>
                     </button>
+                    <Link className="upload-hero__action upload-hero__action--secondary" href="/upload/batch">
+                      <span className="upload-hero__action-label">批量投稿</span>
+                    </Link>
                   </>
                 )}
               </div>
