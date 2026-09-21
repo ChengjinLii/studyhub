@@ -58,6 +58,10 @@ export interface VerificationSendResult {
   resendAfterSeconds: number;
 }
 
+const notifySessionChanged = () => {
+  if (typeof window !== 'undefined') window.dispatchEvent(new Event('studyhub:session-changed'));
+};
+
 export interface RegistrationTicketResult {
   registrationTicket: string;
   expiresInSeconds: number;
@@ -91,12 +95,16 @@ export const loginWithPassword = async (payload: LoginPayload) => {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
   });
-  return ensureApiSuccess(response, '登录失败');
+  const result = await ensureApiSuccess(response, '登录失败');
+  notifySessionChanged();
+  return result;
 };
 
 export const loginWithLocalDev = async () => {
   const response = await fetchBackend('/dev-session', { method: 'POST' });
-  return ensureApiSuccess(response, '进入 local-dev 账号失败');
+  const result = await ensureApiSuccess(response, '进入 local-dev 账号失败');
+  notifySessionChanged();
+  return result;
 };
 
 export const completeRegistration = async (payload: RegistrationPayload) => {
@@ -105,7 +113,9 @@ export const completeRegistration = async (payload: RegistrationPayload) => {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
   });
-  return ensureApiSuccess(response, '注册失败');
+  const result = await ensureApiSuccess(response, '注册失败');
+  notifySessionChanged();
+  return result;
 };
 
 export const issueRegistrationTicket = async (payload: RegistrationTicketPayload) => {

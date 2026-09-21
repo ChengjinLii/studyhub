@@ -20,6 +20,7 @@ export default function NavBar({ user }: NavBarProps) {
   const handleLogout = async () => {
     setSubmitting(true);
     await fetchBackend('/session', { method: 'DELETE' });
+    window.dispatchEvent(new Event('studyhub:session-changed'));
     router.replace('/');
   };
 

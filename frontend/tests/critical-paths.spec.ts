@@ -449,7 +449,7 @@ test('material filtering updates one toast from loading to completion', async ({
   await expect(page.locator('.app-toast')).toContainText('筛选完成，共 0 条结果');
 });
 
-test('StudyHub Bot wardrobe hats align with the head and include the imperial mianliu', async ({ page }) => {
+test('StudyHub Bot wardrobe hats sit over the upper-left like the Santa hat', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.addInitScript(() => {
     window.localStorage.removeItem('floating-sidebar-pos');
@@ -495,14 +495,50 @@ test('StudyHub Bot wardrobe hats align with the head and include the imperial mi
     expect((hatBox?.y ?? 0) + (hatBox?.height ?? 0) / 2).toBeLessThan(
       (bubbleBox?.y ?? 0) + (bubbleBox?.height ?? 0) / 2
     );
-    if (hatId === 'graduation') {
-      expect(hatCenterX).toBeLessThan(bubbleCenterX);
-      expect(styles.rotation).toBeLessThanOrEqual(-10);
-    } else {
-      expect(Math.abs(hatCenterX - bubbleCenterX)).toBeLessThanOrEqual(16);
-    }
-    if (hatId === 'party' || hatId === 'wizard') expect(styles.x).toBeGreaterThanOrEqual(-60);
+    expect(hatCenterX).toBeLessThan(bubbleCenterX);
+    if (hatId === 'graduation') expect(styles.rotation).toBeLessThanOrEqual(-10);
+    if (hatId === 'party') expect(styles.x).toBeLessThanOrEqual(-90);
+    if (hatId === 'wizard') expect(styles.x).toBeLessThanOrEqual(-80);
+    if (hatId === 'mianliu') expect(styles.x).toBeLessThanOrEqual(-70);
   }
+});
+
+test('StudyHub Bot resolves login state through the server session endpoint', async ({ page }) => {
+  let loggedIn = true;
+  const sessionUser = {
+    id: 1643,
+    username: 'session-user',
+    nickname: '会话识别用户',
+    roleMask: 1,
+    verified: true,
+    email: 'session@example.com',
+  };
+  await page.route('**/api/session', (route) => {
+    if (!loggedIn) {
+      return route.fulfill({
+        status: 401,
+        contentType: 'application/json',
+        body: JSON.stringify({ ok: false, error: { message: '请先登录' } }),
+      });
+    }
+    return route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ ok: true, data: { user: sessionUser } }),
+    });
+  });
+  await page.goto('/more');
+  await closeEntryModalIfPresent(page);
+
+  await page.locator('.floating-sidebar__bubble').click({ force: true });
+  const profile = page.locator('.floating-sidebar__panel .sidebar-profile');
+  await expect(profile.getByText(sessionUser.nickname, { exact: true })).toBeVisible();
+  await expect(profile.getByText(`@${sessionUser.username}`, { exact: true })).toBeVisible();
+  await expect(page.locator('.floating-sidebar__panel').getByText('未登录', { exact: true })).toHaveCount(0);
+
+  loggedIn = false;
+  await page.evaluate(() => window.dispatchEvent(new Event('studyhub:session-changed')));
+  await expect(page.locator('.floating-sidebar__panel').getByText('未登录', { exact: true })).toBeVisible();
 });
 
 test('StudyHub Bot eyes remain centered and symmetric while looking sideways', async ({ page }) => {

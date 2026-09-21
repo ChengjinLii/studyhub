@@ -361,7 +361,7 @@ export default function FloatingSidebar() {
     const handleOpen = (event: Event) => {
       const custom = event as CustomEvent<string>;
       setSidebarOpen(custom.detail === 'toggle' ? (prev) => !prev : true);
-      refreshSession();
+      void refreshSession();
     };
     window.addEventListener('floating-sidebar:toggle', handleOpen as EventListener);
     return () => window.removeEventListener('floating-sidebar:toggle', handleOpen as EventListener);
