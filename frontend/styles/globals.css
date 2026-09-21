@@ -2325,10 +2325,10 @@ main {
 
 .floating-sidebar.hat-party {
   --hat-image: url('/bot-hats/party-hat.svg');
-  --hat-scale: 0.82;
+  --hat-scale: 0.84;
   --hat-x: -92%;
-  --hat-y: -96%;
-  --hat-rot: -18deg;
+  --hat-y: -112%;
+  --hat-rot: -20deg;
   --hat-width: 104%;
   --hat-height: 126%;
   --hat-origin: 78% 90%;
@@ -2336,9 +2336,9 @@ main {
 
 .floating-sidebar.hat-wizard {
   --hat-image: url('/bot-hats/wizard-hat.svg');
-  --hat-scale: 0.86;
+  --hat-scale: 0.88;
   --hat-x: -82%;
-  --hat-y: -101%;
+  --hat-y: -114%;
   --hat-rot: -16deg;
   --hat-width: 118%;
   --hat-height: 124%;
@@ -2347,13 +2347,13 @@ main {
 
 .floating-sidebar.hat-mianliu {
   --hat-image: url('/bot-hats/imperial-mianliu.svg');
-  --hat-scale: 1;
-  --hat-x: -72%;
-  --hat-y: -96%;
-  --hat-rot: 0deg;
-  --hat-width: 150%;
-  --hat-height: 105%;
-  --hat-origin: 50% 64%;
+  --hat-scale: 0.92;
+  --hat-x: -75%;
+  --hat-y: -101%;
+  --hat-rot: -6deg;
+  --hat-width: 146%;
+  --hat-height: 102%;
+  --hat-origin: 66% 68%;
 }
 
 .floating-sidebar.hat-santa .floating-sidebar__hat,
