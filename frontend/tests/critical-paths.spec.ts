@@ -449,7 +449,7 @@ test('material filtering updates one toast from loading to completion', async ({
   await expect(page.locator('.app-toast')).toContainText('筛选完成，共 0 条结果');
 });
 
-test('StudyHub Bot wardrobe hats sit over the upper-left like the Santa hat', async ({ page }) => {
+test('StudyHub Bot wardrobe hats use their calibrated head contact points', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.addInitScript(() => {
     window.localStorage.removeItem('floating-sidebar-pos');
@@ -483,6 +483,7 @@ test('StudyHub Bot wardrobe hats sit over the upper-left like the Santa hat', as
         const computed = window.getComputedStyle(element);
         return {
           x: Number.parseFloat(computed.getPropertyValue('--hat-x')),
+          y: Number.parseFloat(computed.getPropertyValue('--hat-y')),
           rotation: Number.parseFloat(computed.getPropertyValue('--hat-rot')),
         };
       }),
@@ -495,11 +496,21 @@ test('StudyHub Bot wardrobe hats sit over the upper-left like the Santa hat', as
     expect((hatBox?.y ?? 0) + (hatBox?.height ?? 0) / 2).toBeLessThan(
       (bubbleBox?.y ?? 0) + (bubbleBox?.height ?? 0) / 2
     );
-    expect(hatCenterX).toBeLessThan(bubbleCenterX);
+    if (hatId === 'mianliu') {
+      expect(Math.abs(hatCenterX - bubbleCenterX)).toBeLessThanOrEqual(6);
+    } else {
+      expect(hatCenterX).toBeLessThan(bubbleCenterX);
+    }
     if (hatId === 'graduation') expect(styles.rotation).toBeLessThanOrEqual(-10);
     if (hatId === 'party') expect(styles.x).toBeLessThanOrEqual(-90);
     if (hatId === 'wizard') expect(styles.x).toBeLessThanOrEqual(-80);
-    if (hatId === 'mianliu') expect(styles.x).toBeLessThanOrEqual(-70);
+    if (hatId === 'mianliu') {
+      expect(styles.x).toBeGreaterThanOrEqual(-60);
+      expect(styles.x).toBeLessThanOrEqual(-54);
+      expect(styles.y).toBeGreaterThanOrEqual(-85);
+      expect(styles.y).toBeLessThanOrEqual(-79);
+      expect(styles.rotation).toBe(0);
+    }
   }
 });
 

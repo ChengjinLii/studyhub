@@ -2348,12 +2348,12 @@ main {
 .floating-sidebar.hat-mianliu {
   --hat-image: url('/bot-hats/imperial-mianliu.svg');
   --hat-scale: 0.92;
-  --hat-x: -75%;
-  --hat-y: -101%;
-  --hat-rot: -6deg;
+  --hat-x: -57%;
+  --hat-y: -82%;
+  --hat-rot: 0deg;
   --hat-width: 146%;
   --hat-height: 102%;
-  --hat-origin: 66% 68%;
+  --hat-origin: 50% 68%;
 }
 
 .floating-sidebar.hat-santa .floating-sidebar__hat,
