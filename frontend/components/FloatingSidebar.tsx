@@ -17,13 +17,14 @@ const MOBILE_BREAKPOINT = 720;
 const MOBILE_EDGE_GAP = 16;
 const MOBILE_DOCK_GAP = 8;
 const MOBILE_BUBBLE_SIZE = 50;
-const BOT_HAT_IDS = ['santa', 'graduation', 'party', 'wizard', 'none'] as const;
+const BOT_HAT_IDS = ['santa', 'graduation', 'party', 'wizard', 'mianliu', 'none'] as const;
 type BotHat = (typeof BOT_HAT_IDS)[number];
 const BOT_HATS: { id: BotHat; label: string; previewClass: string }[] = [
   { id: 'santa', label: '圣诞帽', previewClass: 'hat-preview-santa' },
   { id: 'graduation', label: '学士帽', previewClass: 'hat-preview-graduation' },
   { id: 'party', label: '派对帽', previewClass: 'hat-preview-party' },
   { id: 'wizard', label: '魔法帽', previewClass: 'hat-preview-wizard' },
+  { id: 'mianliu', label: '皇帝冕旒', previewClass: 'hat-preview-mianliu' },
   { id: 'none', label: '不佩戴', previewClass: 'hat-preview-none' },
 ];
 

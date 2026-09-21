@@ -449,7 +449,7 @@ test('material filtering updates one toast from loading to completion', async ({
   await expect(page.locator('.app-toast')).toContainText('筛选完成，共 0 条结果');
 });
 
-test('StudyHub Bot wardrobe hats sit diagonally over the upper-left corner', async ({ page }) => {
+test('StudyHub Bot wardrobe hats align with the head and include the imperial mianliu', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.addInitScript(() => {
     window.localStorage.removeItem('floating-sidebar-pos');
@@ -463,9 +463,16 @@ test('StudyHub Bot wardrobe hats sit diagonally over the upper-left corner', asy
   const hat = page.locator('.floating-sidebar__hat');
   await expect(bubble).toBeVisible();
 
-  for (const hatId of ['graduation', 'party', 'wizard']) {
+  await bubble.click({ force: true });
+  await page.getByRole('button', { name: /衣帽间/ }).click();
+  await page.getByRole('radio', { name: '皇帝冕旒' }).click();
+  await expect(sidebar).toHaveClass(/hat-mianliu/);
+  await expect.poll(() => page.evaluate(() => window.localStorage.getItem('studyhub-bot-hat'))).toBe('mianliu');
+  await page.getByRole('button', { name: '关闭衣帽间' }).click();
+
+  for (const hatId of ['graduation', 'party', 'wizard', 'mianliu']) {
     await sidebar.evaluate((element, id) => {
-      element.classList.remove('hat-santa', 'hat-graduation', 'hat-party', 'hat-wizard', 'hat-none');
+      element.classList.remove('hat-santa', 'hat-graduation', 'hat-party', 'hat-wizard', 'hat-mianliu', 'hat-none');
       element.classList.add(`hat-${id}`);
     }, hatId);
 
@@ -483,14 +490,18 @@ test('StudyHub Bot wardrobe hats sit diagonally over the upper-left corner', asy
 
     expect(bubbleBox).not.toBeNull();
     expect(hatBox).not.toBeNull();
-    expect((hatBox?.x ?? 0) + (hatBox?.width ?? 0) / 2).toBeLessThan(
-      (bubbleBox?.x ?? 0) + (bubbleBox?.width ?? 0) / 2
-    );
+    const hatCenterX = (hatBox?.x ?? 0) + (hatBox?.width ?? 0) / 2;
+    const bubbleCenterX = (bubbleBox?.x ?? 0) + (bubbleBox?.width ?? 0) / 2;
     expect((hatBox?.y ?? 0) + (hatBox?.height ?? 0) / 2).toBeLessThan(
       (bubbleBox?.y ?? 0) + (bubbleBox?.height ?? 0) / 2
     );
-    expect(styles.x).toBeLessThanOrEqual(-66);
-    expect(styles.rotation).toBeLessThanOrEqual(-10);
+    if (hatId === 'graduation') {
+      expect(hatCenterX).toBeLessThan(bubbleCenterX);
+      expect(styles.rotation).toBeLessThanOrEqual(-10);
+    } else {
+      expect(Math.abs(hatCenterX - bubbleCenterX)).toBeLessThanOrEqual(16);
+    }
+    if (hatId === 'party' || hatId === 'wizard') expect(styles.x).toBeGreaterThanOrEqual(-60);
   }
 });
 

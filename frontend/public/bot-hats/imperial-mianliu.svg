@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 144 104" role="img" aria-label="Chinese imperial mianliu crown">
+  <defs>
+    <linearGradient id="board" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#18181b"/>
+      <stop offset="1" stop-color="#3f1018"/>
+    </linearGradient>
+    <linearGradient id="cap" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#991b1b"/>
+      <stop offset="1" stop-color="#450a0a"/>
+    </linearGradient>
+  </defs>
+  <path d="M43 35c4-14 15-22 29-22s25 8 29 22v28H43V35Z" fill="url(#cap)" stroke="#f6c453" stroke-width="3"/>
+  <path d="M36 58h72l-8 13H44L36 58Z" fill="#18181b" stroke="#d99b2b" stroke-width="3" stroke-linejoin="round"/>
+  <path d="M8 23 111 8l25 19L33 43 8 23Z" fill="url(#board)" stroke="#f6c453" stroke-width="4" stroke-linejoin="round"/>
+  <path d="m14 24 98-14 18 14L32 39 14 24Z" fill="none" stroke="#7f1d1d" stroke-width="3" stroke-linejoin="round"/>
+  <circle cx="72" cy="25" r="5" fill="#f6c453" stroke="#7c2d12" stroke-width="2"/>
+  <g fill="none" stroke="#d99b2b" stroke-width="2" stroke-linecap="round">
+    <path d="M22 29v51"/><path d="M35 35v52"/><path d="M48 33v58"/>
+    <path d="M109 25v55"/><path d="M121 24v61"/><path d="M132 26v55"/>
+  </g>
+  <g stroke="#7c2d12" stroke-width="1.2">
+    <g fill="#f6c453"><circle cx="22" cy="44" r="3.5"/><circle cx="35" cy="51" r="3.5"/><circle cx="48" cy="48" r="3.5"/><circle cx="109" cy="42" r="3.5"/><circle cx="121" cy="42" r="3.5"/><circle cx="132" cy="44" r="3.5"/></g>
+    <g fill="#dc2626"><circle cx="22" cy="61" r="3.5"/><circle cx="35" cy="69" r="3.5"/><circle cx="48" cy="68" r="3.5"/><circle cx="109" cy="61" r="3.5"/><circle cx="121" cy="62" r="3.5"/><circle cx="132" cy="62" r="3.5"/></g>
+    <g fill="#f8fafc"><circle cx="22" cy="79" r="3.5"/><circle cx="35" cy="87" r="3.5"/><circle cx="48" cy="91" r="3.5"/><circle cx="109" cy="80" r="3.5"/><circle cx="121" cy="85" r="3.5"/><circle cx="132" cy="81" r="3.5"/></g>
+  </g>
+</svg>

@@ -1544,6 +1544,10 @@ main {
   background: url('/bot-hats/wizard-hat.svg') no-repeat 50% 50% / contain;
 }
 
+.hat-preview-mianliu {
+  background: url('/bot-hats/imperial-mianliu.svg') no-repeat 50% 50% / contain;
+}
+
 .hat-preview-none {
   width: 30px;
   height: 30px;
@@ -2322,7 +2326,7 @@ main {
 .floating-sidebar.hat-party {
   --hat-image: url('/bot-hats/party-hat.svg');
   --hat-scale: 0.82;
-  --hat-x: -92%;
+  --hat-x: -58%;
   --hat-y: -96%;
   --hat-rot: -18deg;
   --hat-width: 104%;
@@ -2333,7 +2337,7 @@ main {
 .floating-sidebar.hat-wizard {
   --hat-image: url('/bot-hats/wizard-hat.svg');
   --hat-scale: 0.86;
-  --hat-x: -87%;
+  --hat-x: -58%;
   --hat-y: -101%;
   --hat-rot: -16deg;
   --hat-width: 118%;
@@ -2341,10 +2345,22 @@ main {
   --hat-origin: 78% 90%;
 }
 
+.floating-sidebar.hat-mianliu {
+  --hat-image: url('/bot-hats/imperial-mianliu.svg');
+  --hat-scale: 1;
+  --hat-x: -50%;
+  --hat-y: -96%;
+  --hat-rot: 0deg;
+  --hat-width: 150%;
+  --hat-height: 105%;
+  --hat-origin: 50% 64%;
+}
+
 .floating-sidebar.hat-santa .floating-sidebar__hat,
 .floating-sidebar.hat-graduation .floating-sidebar__hat,
 .floating-sidebar.hat-party .floating-sidebar__hat,
-.floating-sidebar.hat-wizard .floating-sidebar__hat {
+.floating-sidebar.hat-wizard .floating-sidebar__hat,
+.floating-sidebar.hat-mianliu .floating-sidebar__hat {
   display: block;
   position: absolute;
   left: 50%;
