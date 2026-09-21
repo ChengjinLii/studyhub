@@ -12,6 +12,7 @@ from app.models.batch_submissions import (
 from app.models.comments import CommentLikeRecord, CommentRecord
 from app.models.community import (
     BotSpeechConfigRecord,
+    BotSpeechMessageRecord,
     FeedbackRecord,
     NotificationRecord,
     ReportRecord,
@@ -64,6 +65,7 @@ __all__ = [
     "BatchSubmissionItemRecord",
     "BatchSubmissionRecord",
     "BotSpeechConfigRecord",
+    "BotSpeechMessageRecord",
     "CommentLikeRecord",
     "CommentRecord",
     "CreatorPayoutApplicationRecord",

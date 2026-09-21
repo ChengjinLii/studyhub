@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { FormEvent, useEffect, useState } from 'react';
 import AdminMarketPanel from '../../components/admin/AdminMarketPanel';
 import AdminMaterialsPanel from '../../components/admin/AdminMaterialsPanel';
+import AdminBotSpeechPanel from '../../components/admin/AdminBotSpeechPanel';
 import AdminPayoutQrModal from '../../components/admin/AdminPayoutQrModal';
 import { useAppDialog } from '../../components/AppDialogProvider';
 import NavBar from '../../components/NavBar';
@@ -23,7 +24,6 @@ import {
   updateAdminVolunteerStatus,
 } from '../../lib/adminApi';
 import { toErrorMessage } from '../../lib/errors';
-import { fetchBotSpeechConfig, updateAdminBotSpeechConfig } from '../../lib/botSpeechApi';
 import { useAdminMonthlyPayout } from '../../lib/useAdminMonthlyPayout';
 import { formatDateTime } from '../../lib/format';
 import { useSectionNavigation } from '../../lib/useSectionNavigation';
@@ -149,11 +149,6 @@ export default function AdminPage({
   const [volunteerMessage, setVolunteerMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [userSearch, setUserSearch] = useState('');
-  const [botSpeechText, setBotSpeechText] = useState('');
-  const [botSpeechEnabled, setBotSpeechEnabled] = useState(false);
-  const [botSpeechLoading, setBotSpeechLoading] = useState(true);
-  const [botSpeechSaving, setBotSpeechSaving] = useState(false);
-  const [botSpeechStatus, setBotSpeechStatus] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [actualTotalRaw, setActualTotalRaw] = useState('');
   const [actualTotalValue, setActualTotalValue] = useState<number | null>(null);
   const [actualTotalNotice, setActualTotalNotice] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
@@ -429,28 +424,6 @@ export default function AdminPage({
     }
   };
 
-  const handleBotSpeechSave = async (e: FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const messageText = botSpeechText.trim();
-    if (botSpeechEnabled && !messageText) {
-      setBotSpeechStatus({ type: 'error', text: '启用气泡时台词不能为空' });
-      return;
-    }
-    setBotSpeechSaving(true);
-    setBotSpeechStatus(null);
-    try {
-      const config = await updateAdminBotSpeechConfig({ enabled: botSpeechEnabled, message: messageText });
-      setBotSpeechText(config.message);
-      setBotSpeechEnabled(config.enabled);
-      window.dispatchEvent(new CustomEvent('bot-speech:updated', { detail: config }));
-      setBotSpeechStatus({ type: 'success', text: config.enabled ? '宠物台词已发布' : '宠物对话气泡已关闭' });
-    } catch (err: unknown) {
-      setBotSpeechStatus({ type: 'error', text: toErrorMessage(err, '保存宠物台词失败') });
-    } finally {
-      setBotSpeechSaving(false);
-    }
-  };
-
   const handleConfirmActualTotal = () => {
     const parsed = parseFloat(actualTotalRaw);
     if (Number.isNaN(parsed) || parsed < 0) {
@@ -465,15 +438,6 @@ export default function AdminPage({
     reloadPayouts();
     reloadMonthlyPayoutOverview();
     loadSchedule();
-    void fetchBotSpeechConfig()
-      .then((config) => {
-        setBotSpeechText(config.message);
-        setBotSpeechEnabled(config.enabled);
-      })
-      .catch((err: unknown) => {
-        setBotSpeechStatus({ type: 'error', text: toErrorMessage(err, '加载宠物台词失败') });
-      })
-      .finally(() => setBotSpeechLoading(false));
   }, [loadSchedule, reloadMonthlyPayoutOverview, reloadPayouts]);
 
   return (
@@ -551,44 +515,7 @@ export default function AdminPage({
           </div>
         </section>
 
-        <section id="admin-bot-speech" className="card admin-section">
-          <div className="card-title">悬浮宠物台词</div>
-          <p className="help-text">发布后，所有页面的悬浮宠物旁都会显示漫画对话气泡。用户关闭后，新台词发布时会再次出现。</p>
-          <form className="form-grid" onSubmit={handleBotSpeechSave}>
-            <div className="form-item">
-              <label htmlFor="bot-speech-message">气泡台词</label>
-              <textarea
-                id="bot-speech-message"
-                className="input"
-                rows={3}
-                maxLength={120}
-                placeholder="例如：今天也要记得收藏喜欢的学习资料哦！"
-                value={botSpeechText}
-                disabled={botSpeechLoading}
-                onChange={(e) => setBotSpeechText(e.target.value)}
-              />
-              <span className="help-text">{botSpeechText.length}/120 字</span>
-            </div>
-            <label className="admin-switch" htmlFor="bot-speech-enabled">
-              <input
-                id="bot-speech-enabled"
-                type="checkbox"
-                checked={botSpeechEnabled}
-                disabled={botSpeechLoading}
-                onChange={(e) => setBotSpeechEnabled(e.target.checked)}
-              />
-              <span>在悬浮宠物旁显示这句台词</span>
-            </label>
-            {botSpeechStatus && (
-              <p className={botSpeechStatus.type === 'error' ? 'error-text' : 'success-text'}>{botSpeechStatus.text}</p>
-            )}
-            <div className="form-item">
-              <button className="button primary" type="submit" disabled={botSpeechLoading || botSpeechSaving}>
-                {botSpeechSaving ? '保存中...' : '保存宠物台词'}
-              </button>
-            </div>
-          </form>
-        </section>
+        <AdminBotSpeechPanel />
 
         <AdminMaterialsPanel
           materials={materials}

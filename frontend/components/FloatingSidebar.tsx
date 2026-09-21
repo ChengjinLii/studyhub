@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { hasRole } from '../lib/auth';
-import { BotSpeechConfig, fetchBotSpeechConfig } from '../lib/botSpeechApi';
+import { BotSpeechConfig, BotSpeechMessage, fetchBotSpeechConfig } from '../lib/botSpeechApi';
 import { formatDateTime } from '../lib/format';
 import { RoleMask } from '../types/user';
 import { useSession } from './SessionProvider';
@@ -27,7 +27,18 @@ const BOT_HATS: { id: BotHat; label: string; previewClass: string }[] = [
   { id: 'none', label: '不佩戴', previewClass: 'hat-preview-none' },
 ];
 
-const getSpeechVersion = (config: BotSpeechConfig) => `${config.updatedAt || ''}:${config.message}`;
+const getSpeechVersion = (message: BotSpeechMessage) => `${message.id}:${message.updatedAt || ''}:${message.message}`;
+
+const readSeenSpeechVersions = () => {
+  try {
+    const stored = window.localStorage.getItem(SPEECH_DISMISSED_STORAGE_KEY);
+    if (!stored) return [];
+    const parsed: unknown = JSON.parse(stored);
+    return Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === 'string') : [stored];
+  } catch {
+    return [];
+  }
+};
 
 function isBotHat(value: string | null): value is BotHat {
   return BOT_HAT_IDS.includes(value as BotHat);
@@ -48,7 +59,8 @@ export default function FloatingSidebar() {
   const [sidebarPosition, setSidebarPosition] = useState({ x: 60, y: 220 });
   const [selectedHat, setSelectedHat] = useState<BotHat>('santa');
   const [botSpeech, setBotSpeech] = useState<BotSpeechConfig | null>(null);
-  const [speechDismissed, setSpeechDismissed] = useState(false);
+  const [seenSpeechVersions, setSeenSpeechVersions] = useState<string[]>([]);
+  const [activeSpeechVersion, setActiveSpeechVersion] = useState<string | null>(null);
   const sidebarRef = useRef<HTMLDivElement>(null);
   const bubbleRef = useRef<HTMLButtonElement>(null);
   const draggingRef = useRef(false);
@@ -183,37 +195,48 @@ export default function FloatingSidebar() {
     }
   }, []);
 
-  useEffect(() => {
-    let active = true;
-    void fetchBotSpeechConfig()
-      .then((config) => {
-        if (!active) return;
-        setBotSpeech(config);
-        const version = getSpeechVersion(config);
-        try {
-          setSpeechDismissed(window.localStorage.getItem(SPEECH_DISMISSED_STORAGE_KEY) === version);
-        } catch {
-          setSpeechDismissed(false);
-        }
-      })
-      .catch(() => {
-        if (active) setBotSpeech(null);
-      });
-    return () => {
-      active = false;
-    };
+  const refreshBotSpeech = useCallback(async () => {
+    const config = await fetchBotSpeechConfig();
+    setBotSpeech(config);
   }, []);
 
   useEffect(() => {
-    const handleUpdated = (event: Event) => {
-      const config = (event as CustomEvent<BotSpeechConfig>).detail;
-      if (!config) return;
-      setBotSpeech(config);
-      setSpeechDismissed(false);
+    let active = true;
+    setSeenSpeechVersions(readSeenSpeechVersions());
+    void refreshBotSpeech().catch(() => {
+      if (active) setBotSpeech(null);
+    });
+    const poll = window.setInterval(() => {
+      if (document.visibilityState === 'visible') void refreshBotSpeech().catch(() => undefined);
+    }, 15_000);
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') void refreshBotSpeech().catch(() => undefined);
     };
-    window.addEventListener('bot-speech:updated', handleUpdated);
-    return () => window.removeEventListener('bot-speech:updated', handleUpdated);
-  }, []);
+    const handleRefresh = () => void refreshBotSpeech().catch(() => undefined);
+    const handleStorage = (event: StorageEvent) => {
+      if (event.key === SPEECH_DISMISSED_STORAGE_KEY) setSeenSpeechVersions(readSeenSpeechVersions());
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+    window.addEventListener('bot-speech:refresh', handleRefresh);
+    window.addEventListener('storage', handleStorage);
+    return () => {
+      active = false;
+      window.clearInterval(poll);
+      document.removeEventListener('visibilitychange', handleVisibility);
+      window.removeEventListener('bot-speech:refresh', handleRefresh);
+      window.removeEventListener('storage', handleStorage);
+    };
+  }, [refreshBotSpeech]);
+
+  useEffect(() => {
+    const available = botSpeech?.messages || [];
+    const currentStillAvailable = available.some(
+      (item) => getSpeechVersion(item) === activeSpeechVersion && !seenSpeechVersions.includes(getSpeechVersion(item))
+    );
+    if (currentStillAvailable) return;
+    const next = available.find((item) => !seenSpeechVersions.includes(getSpeechVersion(item)));
+    setActiveSpeechVersion(next ? getSpeechVersion(next) : null);
+  }, [activeSpeechVersion, botSpeech, seenSpeechVersions]);
 
   useEffect(() => {
     setSidebarPosition((pos) =>
@@ -438,16 +461,25 @@ export default function FloatingSidebar() {
   const registerLink = { pathname: '/login', query: { mode: 'register' } };
   const selectedHatLabel = BOT_HATS.find((hat) => hat.id === selectedHat)?.label || '圣诞帽';
   const speechSide = typeof window !== 'undefined' && sidebarPosition.x > window.innerWidth / 2 ? 'left' : 'right';
-  const showBotSpeech = Boolean(botSpeech?.enabled && botSpeech.message && !speechDismissed && !sidebarOpen);
-  const dismissBotSpeech = () => {
-    setSpeechDismissed(true);
-    if (!botSpeech) return;
+  const activeSpeech = botSpeech?.messages.find((item) => getSpeechVersion(item) === activeSpeechVersion) || null;
+  const showBotSpeech = Boolean(botSpeech?.enabled && activeSpeech && !sidebarOpen);
+  const dismissBotSpeech = useCallback(() => {
+    if (!activeSpeech) return;
+    const version = getSpeechVersion(activeSpeech);
+    const nextSeen = Array.from(new Set(seenSpeechVersions.concat(version))).slice(-100);
+    setSeenSpeechVersions(nextSeen);
     try {
-      window.localStorage.setItem(SPEECH_DISMISSED_STORAGE_KEY, getSpeechVersion(botSpeech));
+      window.localStorage.setItem(SPEECH_DISMISSED_STORAGE_KEY, JSON.stringify(nextSeen));
     } catch {
       // ignore
     }
-  };
+  }, [activeSpeech, seenSpeechVersions]);
+
+  useEffect(() => {
+    if (!activeSpeech || activeSpeech.displayDurationSeconds === 0 || sidebarOpen) return undefined;
+    const timer = window.setTimeout(dismissBotSpeech, activeSpeech.displayDurationSeconds * 1000);
+    return () => window.clearTimeout(timer);
+  }, [activeSpeech, dismissBotSpeech, sidebarOpen]);
   const wardrobeModal = wardrobeOpen ? (
     <div
       className="floating-wardrobe-mask"
@@ -507,9 +539,13 @@ export default function FloatingSidebar() {
           top: sidebarPosition.y,
         }}
       >
-        {showBotSpeech && (
-          <div className="floating-sidebar__speech" role="status" aria-live="polite">
-            <p>{botSpeech?.message}</p>
+        {showBotSpeech && activeSpeech && (
+          <div
+            className={`floating-sidebar__speech style-${activeSpeech.displayStyle.toLowerCase()}`}
+            role="status"
+            aria-live="polite"
+          >
+            <p>{activeSpeech.message}</p>
             <button type="button" onClick={dismissBotSpeech} aria-label="关闭宠物对话气泡">
               ×
             </button>

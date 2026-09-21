@@ -162,23 +162,50 @@ test('mobile StudyHub Bot stays fully above the bottom navigation', async ({ pag
   expect((botBox?.x ?? 0) + (botBox?.width ?? 0)).toBeLessThanOrEqual(320);
 });
 
-test('administrator speech appears as a dismissible comic bubble and returns for a new message', async ({ page }) => {
+test('administrator speech queue advances, remembers dismissal, and shows updated messages', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.addInitScript(() => {
     window.localStorage.removeItem('floating-sidebar-pos');
     window.localStorage.removeItem('studyhub-bot-speech-dismissed');
   });
+  const firstMessage = {
+    id: 11,
+    message: '这条高优先级消息会自动进入下一条。',
+    displayStyle: 'TYPEWRITER',
+    displayDurationSeconds: 1,
+    priority: 90,
+    status: 'PUBLISHED',
+    startsAt: null,
+    endsAt: null,
+    updatedAt: '2026-09-21T07:00:00Z',
+  };
+  let secondMessage = {
+    id: 12,
+    message: '今天也要记得收藏喜欢的学习资料哦！',
+    displayStyle: 'EMPHASIS',
+    displayDurationSeconds: 0,
+    priority: 50,
+    status: 'PUBLISHED',
+    startsAt: null,
+    endsAt: null,
+    updatedAt: '2026-09-21T08:00:00Z',
+  };
   let speech = {
     enabled: true,
-    message: '今天也要记得收藏喜欢的学习资料哦！',
+    message: firstMessage.message,
     updatedAt: '2026-09-21T08:00:00Z',
+    messages: [firstMessage, secondMessage],
+    pollIntervalSeconds: 15,
   };
   await page.route('**/api/bot-speech', (route) => route.fulfill({ json: { ok: true, data: speech } }));
   await page.goto('/more');
   await closeEntryModalIfPresent(page);
 
   const bubble = page.locator('.floating-sidebar__speech');
-  await expect(bubble).toContainText(speech.message);
+  await expect(bubble).toContainText(firstMessage.message);
+  await expect(bubble).toHaveClass(/style-typewriter/);
+  await expect(bubble).toContainText(secondMessage.message, { timeout: 3000 });
+  await expect(bubble).toHaveClass(/style-emphasis/);
   const bubbleBox = await bubble.boundingBox();
   expect(bubbleBox).not.toBeNull();
   expect(bubbleBox?.x ?? -1).toBeGreaterThanOrEqual(0);
@@ -190,7 +217,8 @@ test('administrator speech appears as a dismissible comic bubble and returns for
   await closeEntryModalIfPresent(page);
   await expect(page.locator('.floating-sidebar__speech')).toHaveCount(0);
 
-  speech = { ...speech, message: '新的学习资料已经上线啦！', updatedAt: '2026-09-21T09:00:00Z' };
+  secondMessage = { ...secondMessage, message: '新的学习资料已经上线啦！', updatedAt: '2026-09-21T09:00:00Z' };
+  speech = { ...speech, message: secondMessage.message, updatedAt: secondMessage.updatedAt, messages: [secondMessage] };
   await page.reload();
   await closeEntryModalIfPresent(page);
   await expect(page.locator('.floating-sidebar__speech')).toContainText(speech.message);

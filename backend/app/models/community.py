@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from sqlalchemy import Boolean, Integer, String, Text
+from datetime import datetime
+
+from sqlalchemy import Boolean, DateTime, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base, TimestampMixin
@@ -49,6 +51,23 @@ class BotSpeechConfigRecord(TimestampMixin, Base):
     enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     message: Mapped[str] = mapped_column(String(120), nullable=False, default="")
     updated_by_user_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
+
+class BotSpeechMessageRecord(TimestampMixin, Base):
+    __tablename__ = "bot_speech_messages"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    message: Mapped[str] = mapped_column(String(120), nullable=False)
+    display_style: Mapped[str] = mapped_column(String(24), nullable=False, default="STANDARD")
+    display_duration_seconds: Mapped[int] = mapped_column(Integer, nullable=False, default=8)
+    priority: Mapped[int] = mapped_column(Integer, nullable=False, default=50, index=True)
+    status: Mapped[str] = mapped_column(String(24), nullable=False, default="DRAFT", index=True)
+    starts_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
+    ends_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
+    created_by_user_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
+    updated_by_user_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    revoked_by_user_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
 
 class ReportRecord(TimestampMixin, Base):

@@ -973,6 +973,24 @@ main {
   outline: none;
 }
 
+.floating-sidebar__speech.style-emphasis {
+  border-color: #7c3aed;
+  background: linear-gradient(145deg, #fff7ed, #f5f3ff);
+  color: #4c1d95;
+  box-shadow: 4px 5px 0 rgba(91, 33, 182, 0.9);
+  font-size: 0.94rem;
+}
+
+.floating-sidebar__speech.style-emphasis::before,
+.floating-sidebar__speech.style-emphasis::after {
+  border-color: #7c3aed;
+  background: #f5f3ff;
+}
+
+.floating-sidebar__speech.style-typewriter p {
+  animation: speech-typewriter 1.1s steps(18, end) both;
+}
+
 .admin-switch {
   display: inline-flex;
   align-items: center;
@@ -987,6 +1005,115 @@ main {
   width: 18px;
   height: 18px;
   accent-color: var(--brand, #2563eb);
+}
+
+.admin-speech-form {
+  margin-top: 18px;
+}
+
+.admin-speech-form__message {
+  max-width: 760px;
+}
+
+.admin-speech-form__options {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 14px;
+}
+
+.admin-speech-form__actions,
+.admin-speech-item__actions,
+.admin-speech-queue__header,
+.admin-speech-item__meta,
+.admin-speech-item__schedule {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.admin-speech-queue {
+  display: grid;
+  gap: 10px;
+  margin-top: 26px;
+  padding-top: 18px;
+  border-top: 1px solid var(--border, #e2e8f0);
+}
+
+.admin-speech-queue__header {
+  justify-content: space-between;
+}
+
+.admin-speech-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 16px;
+  padding: 14px;
+  border: 1px solid #dbe4ef;
+  border-radius: 14px;
+  background: #f8fafc;
+}
+
+.admin-speech-item.status-published {
+  border-color: #86efac;
+  background: #f0fdf4;
+}
+
+.admin-speech-item.status-scheduled {
+  border-color: #93c5fd;
+  background: #eff6ff;
+}
+
+.admin-speech-item.status-revoked,
+.admin-speech-item.status-expired {
+  opacity: 0.68;
+}
+
+.admin-speech-item__content p {
+  margin: 9px 0;
+  color: #172033;
+  font-weight: 650;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.admin-speech-item__meta,
+.admin-speech-item__schedule {
+  color: #64748b;
+  font-size: 0.78rem;
+}
+
+.admin-speech-status {
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: #e2e8f0;
+  color: #334155;
+  font-weight: 750;
+}
+
+.status-published .admin-speech-status {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.status-scheduled .admin-speech-status {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.admin-speech-item__actions {
+  align-self: center;
+}
+
+@media (max-width: 720px) {
+  .admin-speech-item {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-speech-form__actions .button,
+  .admin-speech-item__actions .button {
+    flex: 1 1 auto;
+  }
 }
 
 .floating-sidebar__badge {
@@ -1133,6 +1260,11 @@ main {
 @keyframes speech-pop {
   0% { opacity: 0; transform: translateY(6px) scale(0.92); }
   100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes speech-typewriter {
+  from { clip-path: inset(0 100% 0 0); }
+  to { clip-path: inset(0 0 0 0); }
 }
 
 @keyframes orbit-dot {
