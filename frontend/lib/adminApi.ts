@@ -123,15 +123,6 @@ export const fetchAdminMarketItems = async (params: { page: number; size: number
   return unwrapApiResponse<AdminListResponse<AdminMarketItem>>(response, '加载校园集市商品失败');
 };
 
-export const broadcastAdminNotification = async (message: string) => {
-  const response = await fetchBackend('/admin/notifications', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ message, userId: null }),
-  });
-  return ensureApiSuccess(response, '广播失败');
-};
-
 export const batchUpdateAdminMaterials = async (payload: object) => {
   const response = await fetchBackend('/admin/materials', {
     method: 'PATCH',

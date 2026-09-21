@@ -283,6 +283,13 @@ def test_step9_community_reports_and_admin_aliases(
     )
     assert alias_notice.status_code == 200
 
+    removed_broadcast = client.post(
+        "/api/admin/notifications",
+        headers=admin_headers,
+        json={"userId": None, "message": "已停用的广播通知"},
+    )
+    assert removed_broadcast.status_code == 400
+
     alice_notifications = client.get("/api/notifications/list", headers=alice_headers)
     assert alice_notifications.status_code == 200
     assert any(item["message"] == "Step 9 单播通知" for item in alice_notifications.json()["data"])

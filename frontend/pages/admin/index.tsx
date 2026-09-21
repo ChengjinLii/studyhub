@@ -10,7 +10,6 @@ import PaginationBar from '../../components/PaginationBar';
 import { readSession, hasRole } from '../../lib/auth';
 import { getRequestOrigin } from '../../lib/apiBase';
 import {
-  broadcastAdminNotification,
   createAdminUser,
   fetchAdminFeedbacks,
   fetchAdminInitialDashboard,
@@ -103,7 +102,6 @@ const REPORT_TARGET_OPTIONS = [
 const ADMIN_QUICK_NAV_ITEMS = [
   { id: 'admin-income', label: '收入总览', icon: '💹' },
   { id: 'admin-bot-speech', label: '宠物台词', icon: '💬' },
-  { id: 'admin-broadcast', label: '广播通知', icon: '📣' },
   { id: 'admin-materials', label: '资料管理', icon: '📄' },
   { id: 'admin-market', label: '集市管理', icon: '🏪' },
   { id: 'admin-reports', label: '举报工单', icon: '🚨' },
@@ -151,9 +149,6 @@ export default function AdminPage({
   const [volunteerMessage, setVolunteerMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [userSearch, setUserSearch] = useState('');
-  const [broadcastText, setBroadcastText] = useState('');
-  const [broadcastStatus, setBroadcastStatus] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
-  const [broadcasting, setBroadcasting] = useState(false);
   const [botSpeechText, setBotSpeechText] = useState('');
   const [botSpeechEnabled, setBotSpeechEnabled] = useState(false);
   const [botSpeechLoading, setBotSpeechLoading] = useState(true);
@@ -434,26 +429,6 @@ export default function AdminPage({
     }
   };
 
-  const handleBroadcast = async (e: FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const messageText = broadcastText.trim();
-    if (!messageText) {
-      setBroadcastStatus({ type: 'error', text: '通知内容不能为空' });
-      return;
-    }
-    setBroadcasting(true);
-    setBroadcastStatus(null);
-    try {
-      await broadcastAdminNotification(messageText);
-      setBroadcastStatus({ type: 'success', text: '已广播给所有用户' });
-      setBroadcastText('');
-    } catch (err: unknown) {
-      setBroadcastStatus({ type: 'error', text: toErrorMessage(err, '广播失败') });
-    } finally {
-      setBroadcasting(false);
-    }
-  };
-
   const handleBotSpeechSave = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const messageText = botSpeechText.trim();
@@ -610,32 +585,6 @@ export default function AdminPage({
             <div className="form-item">
               <button className="button primary" type="submit" disabled={botSpeechLoading || botSpeechSaving}>
                 {botSpeechSaving ? '保存中...' : '保存宠物台词'}
-              </button>
-            </div>
-          </form>
-        </section>
-
-        <section id="admin-broadcast" className="card admin-section">
-          <div className="card-title">广播通知</div>
-          <p className="help-text">发送后所有用户的悬浮窗会出现“新消息”提示。</p>
-          <form className="form-grid" onSubmit={handleBroadcast}>
-            <div className="form-item">
-              <label htmlFor="broadcast-message">通知内容</label>
-              <textarea
-                id="broadcast-message"
-                className="input"
-                rows={3}
-                placeholder="填写要广播的消息，所有用户都会收到"
-                value={broadcastText}
-                onChange={(e) => setBroadcastText(e.target.value)}
-              />
-            </div>
-            {broadcastStatus && (
-              <p className={broadcastStatus.type === 'error' ? 'error-text' : 'success-text'}>{broadcastStatus.text}</p>
-            )}
-            <div className="form-item">
-              <button className="button primary" type="submit" disabled={broadcasting}>
-                {broadcasting ? '发送中...' : '广播给所有用户'}
               </button>
             </div>
           </form>
