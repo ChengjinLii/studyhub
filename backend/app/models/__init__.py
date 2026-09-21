@@ -10,7 +10,13 @@ from app.models.batch_submissions import (
     BatchSubmissionRecord,
 )
 from app.models.comments import CommentLikeRecord, CommentRecord
-from app.models.community import FeedbackRecord, NotificationRecord, ReportRecord, VolunteerApplicationRecord
+from app.models.community import (
+    BotSpeechConfigRecord,
+    FeedbackRecord,
+    NotificationRecord,
+    ReportRecord,
+    VolunteerApplicationRecord,
+)
 from app.models.finance import (
     AdminMonthlyPayoutMarkRecord,
     AlipayGatewayNotificationRecord,
@@ -57,6 +63,7 @@ __all__ = [
     "BatchPublicationRecord",
     "BatchSubmissionItemRecord",
     "BatchSubmissionRecord",
+    "BotSpeechConfigRecord",
     "CommentLikeRecord",
     "CommentRecord",
     "CreatorPayoutApplicationRecord",

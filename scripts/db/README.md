@@ -170,18 +170,27 @@ STUDYHUB_INDEX_PLAN_TOKEN=<PLAN_TOKEN> \
 
 模块包括 `engagement`、`auth-community` 和 `finance`。每次只执行一个模块，随后运行生产 smoke；脚本不支持删除或修改索引。
 
-资金 Outbox 等新增运行表使用独立的 additive hardening migration：
+资金 Outbox、批量投稿和站点宠物配置等新增运行表使用独立的 additive hardening migration：
 
 ```bash
 bash scripts/db/db-hardening-migrate.sh plan finance-outbox
 YES_PRODUCTION_HARDENING_MIGRATION=I_UNDERSTAND_ADDITIVE_SCHEMA \
 STUDYHUB_HARDENING_PLAN_TOKEN=<PLAN_TOKEN> \
   bash scripts/db/db-hardening-migrate.sh apply finance-outbox
+```
+
+宠物台词配置表使用同一套备份、计划 token 和显式确认流程：
+
+```bash
+bash scripts/db/db-hardening-migrate.sh plan bot-speech
+YES_PRODUCTION_HARDENING_MIGRATION=I_UNDERSTAND_ADDITIVE_SCHEMA \
+STUDYHUB_HARDENING_PLAN_TOKEN=<PLAN_TOKEN> \
+  bash scripts/db/db-hardening-migrate.sh apply bot-speech
+```
 
 资金 Outbox 启用后，用 `bash scripts/finance/install-reconciliation.sh` 安装每日只读对账任务。报告写入
 `private/reports/finance/`，不包含收款账户、姓名或渠道密钥，历史报告保留 90 天；支付宝转账由 worker
 主动查询，退款重试前也会先按同一 `out_request_no` 查询渠道状态，避免未知超时后盲目重复提交。
-```
 
 该入口只允许创建代码中明确登记的新表，不执行删除、重命名或数据回填。
 

@@ -12,6 +12,7 @@ from app.core.db import get_engine
 from app.models.finance import FinanceInstructionRecord
 from app.models.auth import AuthSessionStateRecord
 from app.models.materials import MaterialSecurityScanRecord
+from app.models.community import BotSpeechConfigRecord
 from app.models.batch_submissions import (
     BatchAuditRecord, BatchPublicationRecord, BatchSubmissionItemRecord, BatchSubmissionRecord,
 )
@@ -19,6 +20,7 @@ from app.ops.schema_audit import require_recent_nonempty_backup
 
 
 MODULE_TABLES = {
+    "bot-speech": (BotSpeechConfigRecord.__table__,),
     "batch-submissions": (
         BatchSubmissionRecord.__table__, BatchSubmissionItemRecord.__table__,
         BatchPublicationRecord.__table__, BatchAuditRecord.__table__,

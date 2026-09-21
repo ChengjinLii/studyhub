@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from sqlalchemy import Integer, String, Text
+from sqlalchemy import Boolean, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base, TimestampMixin
@@ -40,6 +40,15 @@ class NotificationRecord(TimestampMixin, Base):
     admin_user_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
     user_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
     message: Mapped[str] = mapped_column(Text, nullable=False)
+
+
+class BotSpeechConfigRecord(TimestampMixin, Base):
+    __tablename__ = "bot_speech_config"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, default=1)
+    enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    message: Mapped[str] = mapped_column(String(120), nullable=False, default="")
+    updated_by_user_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
 
 class ReportRecord(TimestampMixin, Base):

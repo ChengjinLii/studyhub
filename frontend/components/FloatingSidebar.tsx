@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { hasRole } from '../lib/auth';
+import { BotSpeechConfig, fetchBotSpeechConfig } from '../lib/botSpeechApi';
 import { formatDateTime } from '../lib/format';
 import { RoleMask } from '../types/user';
 import { useSession } from './SessionProvider';
@@ -11,6 +12,7 @@ type EyeOffset = { x: number; y: number };
 
 const POS_STORAGE_KEY = 'floating-sidebar-pos';
 const HAT_STORAGE_KEY = 'studyhub-bot-hat';
+const SPEECH_DISMISSED_STORAGE_KEY = 'studyhub-bot-speech-dismissed';
 const MOBILE_BREAKPOINT = 720;
 const MOBILE_EDGE_GAP = 16;
 const MOBILE_DOCK_GAP = 8;
@@ -24,6 +26,8 @@ const BOT_HATS: { id: BotHat; label: string; previewClass: string }[] = [
   { id: 'wizard', label: '魔法帽', previewClass: 'hat-preview-wizard' },
   { id: 'none', label: '不佩戴', previewClass: 'hat-preview-none' },
 ];
+
+const getSpeechVersion = (config: BotSpeechConfig) => `${config.updatedAt || ''}:${config.message}`;
 
 function isBotHat(value: string | null): value is BotHat {
   return BOT_HAT_IDS.includes(value as BotHat);
@@ -43,6 +47,8 @@ export default function FloatingSidebar() {
   const [wardrobeOpen, setWardrobeOpen] = useState(false);
   const [sidebarPosition, setSidebarPosition] = useState({ x: 60, y: 220 });
   const [selectedHat, setSelectedHat] = useState<BotHat>('santa');
+  const [botSpeech, setBotSpeech] = useState<BotSpeechConfig | null>(null);
+  const [speechDismissed, setSpeechDismissed] = useState(false);
   const sidebarRef = useRef<HTMLDivElement>(null);
   const bubbleRef = useRef<HTMLButtonElement>(null);
   const draggingRef = useRef(false);
@@ -175,6 +181,38 @@ export default function FloatingSidebar() {
     } catch {
       // ignore
     }
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    void fetchBotSpeechConfig()
+      .then((config) => {
+        if (!active) return;
+        setBotSpeech(config);
+        const version = getSpeechVersion(config);
+        try {
+          setSpeechDismissed(window.localStorage.getItem(SPEECH_DISMISSED_STORAGE_KEY) === version);
+        } catch {
+          setSpeechDismissed(false);
+        }
+      })
+      .catch(() => {
+        if (active) setBotSpeech(null);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    const handleUpdated = (event: Event) => {
+      const config = (event as CustomEvent<BotSpeechConfig>).detail;
+      if (!config) return;
+      setBotSpeech(config);
+      setSpeechDismissed(false);
+    };
+    window.addEventListener('bot-speech:updated', handleUpdated);
+    return () => window.removeEventListener('bot-speech:updated', handleUpdated);
   }, []);
 
   useEffect(() => {
@@ -399,6 +437,17 @@ export default function FloatingSidebar() {
   const loginLink = { pathname: '/login' };
   const registerLink = { pathname: '/login', query: { mode: 'register' } };
   const selectedHatLabel = BOT_HATS.find((hat) => hat.id === selectedHat)?.label || '圣诞帽';
+  const speechSide = typeof window !== 'undefined' && sidebarPosition.x > window.innerWidth / 2 ? 'left' : 'right';
+  const showBotSpeech = Boolean(botSpeech?.enabled && botSpeech.message && !speechDismissed && !sidebarOpen);
+  const dismissBotSpeech = () => {
+    setSpeechDismissed(true);
+    if (!botSpeech) return;
+    try {
+      window.localStorage.setItem(SPEECH_DISMISSED_STORAGE_KEY, getSpeechVersion(botSpeech));
+    } catch {
+      // ignore
+    }
+  };
   const wardrobeModal = wardrobeOpen ? (
     <div
       className="floating-wardrobe-mask"
@@ -452,12 +501,20 @@ export default function FloatingSidebar() {
     <>
       <aside
         ref={sidebarRef}
-        className={`floating-sidebar ${sidebarOpen ? 'open' : ''} hat-${selectedHat}`}
+        className={`floating-sidebar ${sidebarOpen ? 'open' : ''} hat-${selectedHat} speech-${speechSide}`}
         style={{
           left: sidebarPosition.x,
           top: sidebarPosition.y,
         }}
       >
+        {showBotSpeech && (
+          <div className="floating-sidebar__speech" role="status" aria-live="polite">
+            <p>{botSpeech?.message}</p>
+            <button type="button" onClick={dismissBotSpeech} aria-label="关闭宠物对话气泡">
+              ×
+            </button>
+          </div>
+        )}
         <button
           ref={bubbleRef}
           type="button"

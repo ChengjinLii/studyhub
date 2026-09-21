@@ -162,6 +162,40 @@ test('mobile StudyHub Bot stays fully above the bottom navigation', async ({ pag
   expect((botBox?.x ?? 0) + (botBox?.width ?? 0)).toBeLessThanOrEqual(320);
 });
 
+test('administrator speech appears as a dismissible comic bubble and returns for a new message', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.addInitScript(() => {
+    window.localStorage.removeItem('floating-sidebar-pos');
+    window.localStorage.removeItem('studyhub-bot-speech-dismissed');
+  });
+  let speech = {
+    enabled: true,
+    message: '今天也要记得收藏喜欢的学习资料哦！',
+    updatedAt: '2026-09-21T08:00:00Z',
+  };
+  await page.route('**/api/bot-speech', (route) => route.fulfill({ json: { ok: true, data: speech } }));
+  await page.goto('/more');
+  await closeEntryModalIfPresent(page);
+
+  const bubble = page.locator('.floating-sidebar__speech');
+  await expect(bubble).toContainText(speech.message);
+  const bubbleBox = await bubble.boundingBox();
+  expect(bubbleBox).not.toBeNull();
+  expect(bubbleBox?.x ?? -1).toBeGreaterThanOrEqual(0);
+  expect((bubbleBox?.x ?? 0) + (bubbleBox?.width ?? 0)).toBeLessThanOrEqual(390);
+
+  await page.getByRole('button', { name: '关闭宠物对话气泡' }).click();
+  await expect(bubble).toHaveCount(0);
+  await page.reload();
+  await closeEntryModalIfPresent(page);
+  await expect(page.locator('.floating-sidebar__speech')).toHaveCount(0);
+
+  speech = { ...speech, message: '新的学习资料已经上线啦！', updatedAt: '2026-09-21T09:00:00Z' };
+  await page.reload();
+  await closeEntryModalIfPresent(page);
+  await expect(page.locator('.floating-sidebar__speech')).toContainText(speech.message);
+});
+
 test('mobile detail actions reuse the global bottom navigation layer', async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 780 });
   await page.addInitScript(() => window.localStorage.removeItem('floating-sidebar-pos'));

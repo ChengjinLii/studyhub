@@ -16,6 +16,7 @@ from app.api.routes import (
     market,
     materials,
     notifications,
+    bot_speech,
     orders,
     payments,
     profile,
@@ -44,6 +45,7 @@ api_router.include_router(market.router)
 api_router.include_router(comments.router)
 api_router.include_router(community.router)
 api_router.include_router(notifications.router)
+api_router.include_router(bot_speech.router)
 api_router.include_router(reports.router)
 api_router.include_router(admin.router)
 api_router.include_router(batch_submissions.router)

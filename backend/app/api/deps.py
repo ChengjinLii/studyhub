@@ -34,6 +34,7 @@ from app.services.account_service import AccountService
 from app.services.admin_user_service import AdminUserService
 from app.services.auth_cookie_service import AuthCookieService
 from app.services.auth_service import AuthService
+from app.services.bot_speech_service import BotSpeechService
 from app.services.captcha_service import CaptchaService
 from app.services.comments_service import CommentsService
 from app.services.community_service import CommunityService
@@ -77,6 +78,11 @@ def get_public_read_cache() -> PublicReadCache:
 @lru_cache(maxsize=1)
 def get_system_repo() -> SystemRepository:
     return SystemRepository()
+
+
+@lru_cache(maxsize=1)
+def get_bot_speech_service() -> BotSpeechService:
+    return BotSpeechService(get_system_repo())
 
 
 @lru_cache(maxsize=1)
@@ -450,6 +456,7 @@ def clear_dependency_caches() -> None:
     get_material_catalog_repo.cache_clear()
     get_read_api_repo.cache_clear()
     get_system_repo.cache_clear()
+    get_bot_speech_service.cache_clear()
     get_auth_repo.cache_clear()
     get_admin_repo.cache_clear()
     get_material_repo.cache_clear()
