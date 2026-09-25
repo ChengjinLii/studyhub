@@ -37,6 +37,7 @@ export default function RequestNewPage({ user }: RequestNewProps) {
   const [major, setMajor] = useState('');
   const [status, setStatus] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const submissionInFlightRef = useRef(false);
   const [payFormHtml, setPayFormHtml] = useState('');
   const [activeSection, setActiveSection] = useState('request-overview');
   const collegeOptions = getCollegeOptions(college);
@@ -49,9 +50,24 @@ export default function RequestNewPage({ user }: RequestNewProps) {
     try {
       submitTrustedPaymentForm(formContainerRef.current, payFormHtml);
     } catch (error: unknown) {
+      submissionInFlightRef.current = false;
+      setSubmitting(false);
       setStatus({ type: 'error', text: toErrorMessage(error, '支付表单校验失败') });
     }
   }, [payFormHtml]);
+
+  useEffect(() => {
+    // Returning from the payment gateway via the back button can restore this page from bfcache
+    // with the form still locked; unlock it so the user is not stuck.
+    const handlePageShow = (event: PageTransitionEvent) => {
+      if (!event.persisted) return;
+      submissionInFlightRef.current = false;
+      setSubmitting(false);
+      setPayFormHtml('');
+    };
+    window.addEventListener('pageshow', handlePageShow);
+    return () => window.removeEventListener('pageshow', handlePageShow);
+  }, []);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -82,6 +98,7 @@ export default function RequestNewPage({ user }: RequestNewProps) {
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (submissionInFlightRef.current) return;
     setStatus(null);
     const trimmedTitle = title.trim();
     const trimmedIntro = intro.trim();
@@ -119,7 +136,9 @@ export default function RequestNewPage({ user }: RequestNewProps) {
         return;
       }
     }
+    submissionInFlightRef.current = true;
     setSubmitting(true);
+    let redirectingToPayment = false;
     try {
       const payload = {
         course: trimmedTitle,
@@ -137,6 +156,7 @@ export default function RequestNewPage({ user }: RequestNewProps) {
         if (!data.form) {
           throw new Error('支付表单获取失败');
         }
+        redirectingToPayment = true;
         setStatus({ type: 'success', text: '订单已创建，正在跳转支付…' });
         setPayFormHtml(data.form as string);
         return;
@@ -154,7 +174,10 @@ export default function RequestNewPage({ user }: RequestNewProps) {
     } catch (error: unknown) {
       setStatus({ type: 'error', text: toErrorMessage(error, '发布失败') });
     } finally {
-      setSubmitting(false);
+      if (!redirectingToPayment) {
+        submissionInFlightRef.current = false;
+        setSubmitting(false);
+      }
     }
   };
 

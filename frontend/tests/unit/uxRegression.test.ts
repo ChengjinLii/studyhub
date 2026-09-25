@@ -35,3 +35,22 @@ describe('public UX regressions', () => {
     expect(requests).toContain('发布求购');
   });
 });
+
+describe('submit double-click guards', () => {
+  it.each(['pages/requests/new.tsx', 'pages/market/sell.tsx'])('%s guards against overlapping submissions', (relativePath) => {
+    const source = readSource(relativePath);
+    expect(source).toContain('if (submissionInFlightRef.current) return;');
+    expect(source).toContain('submissionInFlightRef.current = true;');
+    expect(source).not.toMatch(/finally\s*{\s*setSubmitting\(false\);\s*}/);
+  });
+
+  it('keeps market sell locked until navigation to the new item finishes', () => {
+    const source = readSource('pages/market/sell.tsx');
+    expect(source).toContain('await router.push(marketPath(');
+  });
+
+  it('keeps request creation locked while redirecting to payment', () => {
+    const source = readSource('pages/requests/new.tsx');
+    expect(source).toMatch(/if \(!redirectingToPayment\) {\s*submissionInFlightRef\.current = false;\s*setSubmitting\(false\);/);
+  });
+});

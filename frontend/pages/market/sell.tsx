@@ -1,7 +1,7 @@
 import { GetServerSideProps } from 'next';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import { FormEvent, useState } from 'react';
+import { FormEvent, useRef, useState } from 'react';
 import NavBar from '../../components/NavBar';
 import { readSession } from '../../lib/auth';
 import { createMarketItem } from '../../lib/market';
@@ -36,6 +36,7 @@ export default function SellPage({ user }: SellPageProps) {
   const [images, setImages] = useState<File[]>([]);
   const [status, setStatus] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const submissionInFlightRef = useRef(false);
 
   const handleImageSelection = (files: File[], replace: boolean) => {
     setImages((prev) => {
@@ -46,8 +47,11 @@ export default function SellPage({ user }: SellPageProps) {
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
+    if (submissionInFlightRef.current) return;
+    submissionInFlightRef.current = true;
     setStatus(null);
     setSubmitting(true);
+    let item: Awaited<ReturnType<typeof createMarketItem>>;
     try {
       const payload = {
         title,
@@ -61,13 +65,19 @@ export default function SellPage({ user }: SellPageProps) {
       const formData = new FormData();
       formData.append('payload', new Blob([JSON.stringify(payload)], { type: 'application/json' }));
       images.forEach((file) => formData.append('images', file));
-      const item = await createMarketItem(formData, typeof window !== 'undefined' ? window.location.origin : undefined);
-      setStatus({ type: 'success', text: '发布成功，正在跳转…' });
-      router.push(marketPath(item.id, item.title || title));
+      item = await createMarketItem(formData, typeof window !== 'undefined' ? window.location.origin : undefined);
     } catch (error: unknown) {
-      setStatus({ type: 'error', text: toErrorMessage(error, '发布失败') });
-    } finally {
+      submissionInFlightRef.current = false;
       setSubmitting(false);
+      setStatus({ type: 'error', text: toErrorMessage(error, '发布失败') });
+      return;
+    }
+    // The item now exists: keep the form locked so a retry cannot publish a duplicate.
+    setStatus({ type: 'success', text: '发布成功，正在跳转…' });
+    try {
+      await router.push(marketPath(item.id, item.title || title));
+    } catch {
+      setStatus({ type: 'success', text: '发布成功，请返回集市查看商品。' });
     }
   };
 
