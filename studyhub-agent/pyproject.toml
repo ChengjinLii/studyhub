@@ -27,6 +27,9 @@ dev = [
 [tool.hatch.build.targets.wheel]
 packages = ["src/studyhub_agent"]
 
+[tool.hatch.build.targets.wheel.force-include]
+"src/studyhub_agent/contracts/templates" = "studyhub_agent/contracts/templates"
+
 [tool.pytest.ini_options]
 addopts = "-q"
 testpaths = ["tests"]
