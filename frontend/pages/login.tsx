@@ -16,6 +16,7 @@ import {
   sendRegistrationVerification,
 } from '../lib/authApi';
 import { toErrorMessage } from '../lib/errors';
+import { resolveSafeNextPath } from '../lib/safeNextPath';
 import { SessionUser } from '../types/user';
 
 type AuthMode = 'login' | 'register';
@@ -37,12 +38,7 @@ interface LocalDevInfo {
 
 export default function Login({ user }: LoginPageProps) {
   const router = useRouter();
-  const nextPath = useMemo(() => {
-    if (typeof router.query.next === 'string' && router.query.next.startsWith('/')) {
-      return router.query.next;
-    }
-    return '/';
-  }, [router.query.next]);
+  const nextPath = useMemo(() => resolveSafeNextPath(router.query.next), [router.query.next]);
 
   const [mode, setMode] = useState<AuthMode>('login');
   const [loginForm, setLoginForm] = useState({ identifier: '', password: '', captchaCode: '', rememberMe: false });
@@ -782,7 +778,7 @@ export default function Login({ user }: LoginPageProps) {
 
 export const getServerSideProps: GetServerSideProps<LoginPageProps> = async (ctx) => {
   const session = readSession(ctx.req);
-  const next = typeof ctx.query.next === 'string' && ctx.query.next.startsWith('/') ? ctx.query.next : '/';
+  const next = resolveSafeNextPath(ctx.query.next);
   if (session.user) {
     return {
       redirect: {
