@@ -21,6 +21,7 @@ class ToolCall(_Frozen):
 class Message(_Frozen):
     role: Literal["system", "user", "assistant", "tool"]
     content: str = ""
+    reasoning: str = ""
     tool_calls: tuple[ToolCall, ...] = ()
     tool_call_id: str | None = None
     name: str | None = None
@@ -76,6 +77,7 @@ class TurnKind(StrEnum):
 class AssistantTurn(_Frozen):
     kind: TurnKind
     content: str = ""
+    reasoning: str = ""
     tool_calls: tuple[ToolCall, ...] = ()
     raw_text: str
     canonical_text: str

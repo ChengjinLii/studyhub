@@ -148,6 +148,18 @@ def test_unknown_tool_name_in_spec_is_a_configuration_error() -> None:
         _run(_spec(tool_names=("web_fetch",)), [])
 
 
+def test_reasoning_is_carried_into_message_history() -> None:
+    episode, _ = _run(
+        _spec(),
+        [
+            tool_turn(("materials_search", {"query": "高数"}), reasoning="先想想要不要查"),
+            final_turn("完成", reasoning="复核一下"),
+        ],
+    )
+    assistant_messages = [message for message in episode.messages if message.role == "assistant"]
+    assert [message.reasoning for message in assistant_messages] == ["先想想要不要查", "复核一下"]
+
+
 def test_contract_hash_depends_on_thinking() -> None:
     tools = episode_tools()
     assert RUNNER.contract_for(_spec(), tools) != RUNNER.contract_for(_spec(thinking=True), tools)

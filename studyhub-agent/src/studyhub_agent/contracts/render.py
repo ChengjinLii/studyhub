@@ -34,6 +34,7 @@ class ParsedCompletion:
     content: str
     tool_calls: tuple[ToolCall, ...]
     error: str | None
+    reasoning: str = ""
 
 
 def _raise_exception(message: str) -> None:
@@ -65,26 +66,31 @@ def _ordered_arguments(arguments: dict[str, Any], spec: ToolSpec | None) -> dict
 
 
 def _message_dict(message: Message, specs: dict[str, ToolSpec]) -> dict[str, Any]:
-    if message.role == "assistant" and message.tool_calls:
+    if message.role != "assistant":
+        return {"role": message.role, "content": message.content}
+    result: dict[str, Any] = {"role": "assistant", "content": message.content}
+    # Only set reasoning_content when we actually have reasoning to carry. Passing "" here would
+    # make the template treat it as a defined string and skip its own </think> extraction fallback
+    # (used e.g. for historical parse-error feedback whose content still contains a literal
+    # "</think>" marker), which would otherwise double up the closing tag.
+    if message.reasoning:
+        result["reasoning_content"] = message.reasoning
+    if message.tool_calls:
         for call in message.tool_calls:
             for value in call.arguments.values():
                 if isinstance(value, str) and "</parameter>" in value:
                     raise RenderError(f"argument of {call.name} contains a </parameter> tag")
-        return {
-            "role": "assistant",
-            "content": message.content,
-            "tool_calls": [
-                {
-                    "type": "function",
-                    "function": {
-                        "name": call.name,
-                        "arguments": _ordered_arguments(call.arguments, specs.get(call.name)),
-                    },
-                }
-                for call in message.tool_calls
-            ],
-        }
-    return {"role": message.role, "content": message.content}
+        result["tool_calls"] = [
+            {
+                "type": "function",
+                "function": {
+                    "name": call.name,
+                    "arguments": _ordered_arguments(call.arguments, specs.get(call.name)),
+                },
+            }
+            for call in message.tool_calls
+        ]
+    return result
 
 
 def render_text(
@@ -121,16 +127,18 @@ def canonical_completion_text(
 
 def parse_completion(text: str, tools: Sequence[ToolSpec], *, thinking: bool) -> ParsedCompletion:
     body = text.split(END_OF_TURN, 1)[0]
+    reasoning = ""
     if thinking:
         if _THINK_CLOSE not in body:
             return _error("unclosed_think")
-        body = body.split(_THINK_CLOSE, 1)[1]
+        reasoning_part, body = body.split(_THINK_CLOSE, 1)
+        reasoning = reasoning_part.strip()
     start = body.find("<tool_call>")
     if start < 0:
         content = body.strip()
         if not content:
             return _error("empty_response")
-        return ParsedCompletion(TurnKind.FINAL, content, (), None)
+        return ParsedCompletion(TurnKind.FINAL, content, (), None, reasoning)
     preamble = body[:start].strip()
     specs = {tool.name: tool for tool in tools}
     calls: list[ToolCall] = []
@@ -149,7 +157,7 @@ def parse_completion(text: str, tools: Sequence[ToolSpec], *, thinking: bool) ->
         return _error("malformed_tool_call" if "<tool_call>" in remainder else "text_after_tool_call")
     if not calls:
         return _error("malformed_tool_call")
-    return ParsedCompletion(TurnKind.TOOL_CALLS, preamble, tuple(calls), None)
+    return ParsedCompletion(TurnKind.TOOL_CALLS, preamble, tuple(calls), None, reasoning)
 
 
 def _error(code: str) -> ParsedCompletion:

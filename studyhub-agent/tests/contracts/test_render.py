@@ -136,6 +136,30 @@ def test_prefix_property_holds_for_tool_turns() -> None:
     assert full == prompt + canonical_completion_text(HISTORY, assistant, TOOLS, thinking=False)
 
 
+def test_prefix_property_holds_for_thinking_turns() -> None:
+    call = ToolCall(call_id="c", name="materials_search", arguments={"query": "概率论"})
+    assistant = Message(role="assistant", content="检索中", tool_calls=(call,), reasoning="想一下要不要查")
+    prompt = render_text(HISTORY, TOOLS, thinking=True, add_generation_prompt=True)
+    full = render_text((*HISTORY, assistant), TOOLS, thinking=True, add_generation_prompt=False)
+    assert full == prompt + canonical_completion_text(HISTORY, assistant, TOOLS, thinking=True)
+
+
+def test_assistant_reasoning_renders_inside_think_block() -> None:
+    assistant = Message(role="assistant", content="最终答案", reasoning="推理过程")
+    completion = canonical_completion_text(HISTORY, assistant, TOOLS, thinking=True)
+    assert completion == "推理过程\n</think>\n\n最终答案<|im_end|>\n"
+
+
+def test_historical_message_with_literal_think_marker_renders_once() -> None:
+    # Regression guard: an assistant message with no explicit `reasoning` (e.g. the raw parse-error
+    # feedback text fed back into history) may still contain a literal "</think>" substring in its
+    # content. Passing an empty reasoning_content must not suppress the template's own fallback
+    # extraction, or the marker would be rendered twice.
+    bad = Message(role="assistant", content="推理\n</think>\n\n坏输出")
+    text = render_text((*HISTORY, bad), TOOLS, thinking=True, add_generation_prompt=False)
+    assert text.count("</think>") == 1
+
+
 def test_canonical_argument_order_follows_schema() -> None:
     reordered = ToolCall(call_id="c", name="materials_search", arguments={"limit": 3, "query": "概率论"})
     in_order = ToolCall(call_id="c", name="materials_search", arguments={"query": "概率论", "limit": 3})
@@ -153,6 +177,24 @@ def test_thinking_completion_splits_reasoning() -> None:
     parsed = parse_completion("先想想\n</think>\n\n最终答案", TOOLS, thinking=True)
     assert parsed.kind is TurnKind.FINAL
     assert parsed.content == "最终答案"
+
+
+def test_thinking_completion_extracts_reasoning() -> None:
+    parsed = parse_completion("  先想想  \n</think>\n\n最终答案", TOOLS, thinking=True)
+    assert parsed.kind is TurnKind.FINAL
+    assert parsed.reasoning == "先想想"
+    assert parsed.content == "最终答案"
+
+
+def test_thinking_tool_call_extracts_reasoning() -> None:
+    text = (
+        "推理一下\n</think>\n\n先检索一下。\n\n<tool_call>\n<function=materials_search>\n"
+        "<parameter=query>\n高等数学\n</parameter>\n</function>\n</tool_call>"
+    )
+    parsed = parse_completion(text, TOOLS, thinking=True)
+    assert parsed.kind is TurnKind.TOOL_CALLS
+    assert parsed.reasoning == "推理一下"
+    assert parsed.content == "先检索一下。"
 
 
 def test_trailing_end_of_turn_token_is_ignored() -> None:

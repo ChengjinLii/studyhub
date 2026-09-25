@@ -8,21 +8,22 @@ from studyhub_agent.contracts.tools import ToolSpec
 from studyhub_agent.runtime.policy import PolicyInfraError
 
 
-def tool_turn(*calls: tuple[str, dict], preamble: str = "") -> AssistantTurn:
+def tool_turn(*calls: tuple[str, dict], preamble: str = "", reasoning: str = "") -> AssistantTurn:
     tool_calls = tuple(
         ToolCall(call_id=f"call_{i}", name=name, arguments=args) for i, (name, args) in enumerate(calls)
     )
     return AssistantTurn(
         kind=TurnKind.TOOL_CALLS,
         content=preamble,
+        reasoning=reasoning,
         tool_calls=tool_calls,
         raw_text="<tool>",
         canonical_text="<tool>",
     )
 
 
-def final_turn(text: str) -> AssistantTurn:
-    return AssistantTurn(kind=TurnKind.FINAL, content=text, raw_text=text, canonical_text=text)
+def final_turn(text: str, reasoning: str = "") -> AssistantTurn:
+    return AssistantTurn(kind=TurnKind.FINAL, content=text, reasoning=reasoning, raw_text=text, canonical_text=text)
 
 
 def parse_error_turn(code: str = "malformed_tool_call") -> AssistantTurn:

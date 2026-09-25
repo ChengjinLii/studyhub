@@ -125,11 +125,13 @@ class EpisodeRunner:
                 progress.messages.append(_feedback({"error": error_code, "detail": turn.parse_error}))
                 continue
             if turn.kind is TurnKind.FINAL:
-                progress.messages.append(Message(role="assistant", content=turn.content))
+                progress.messages.append(Message(role="assistant", content=turn.content, reasoning=turn.reasoning))
                 return Termination.FINAL_ANSWER, FailureOwner.NONE, turn.content, None
             if progress.tool_calls_used + len(turn.tool_calls) > budget.max_tool_calls:
                 return Termination.TOOL_BUDGET, FailureOwner.MODEL, None, None
-            progress.messages.append(Message(role="assistant", content=turn.content, tool_calls=turn.tool_calls))
+            progress.messages.append(
+                Message(role="assistant", content=turn.content, tool_calls=turn.tool_calls, reasoning=turn.reasoning)
+            )
             progress.tool_calls_used += len(turn.tool_calls)
             for call in turn.tool_calls:
                 try:
