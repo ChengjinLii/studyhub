@@ -77,7 +77,8 @@
 .intake .section > .row:last-child { gap: 12px; color: #64748b; font-size: 14px; }
 .intake .section > .row:last-child button { min-height: 44px; border-radius: 8px; }
 @media (max-width: 600px) {
-  .intake { width: calc(100% - 24px); margin: 20px auto 32px; padding: 0 18px 24px; }
+  /* .page.intake outranks the global phone rule `main.container { width: 100% }`, restoring the side margins. */
+  .page.intake { width: calc(100% - 24px); margin: 20px auto 32px; padding: 0 18px 24px; }
   .intake > .section { padding: 24px 0; }
   .intro h1 { font-size: 25px; gap: 10px; margin-top: 14px; }
   .intro > p { font-size: 14px; }
