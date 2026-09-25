@@ -465,10 +465,62 @@ class MaterialsService(MaterialSecurityPolicyMixin, MaterialsStorageMutationMixi
         if not (self.settings.requires_private_env_file and self.settings.async_read_db_enabled):
             return await asyncio.to_thread(self.get_detail, session, current_user_id, material_id, can_manage_all)
 
-        row = await self._call_with_new_async_session(self._compat_load_material_detail_row_async, material_id)
-        is_owner = current_user_id is not None and int(row["uploader_id"] or 0) == current_user_id
-        if not (can_manage_all or is_owner) and self._compat_is_hidden_material(row["status"]):
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="资料不存在")
+        # All reads below share a single async session/connection instead of one
+        # per query. The previous fan-out (up to ~10 concurrent async sessions for
+        # a single logged-in detail request) could exhaust the async pool
+        # (pool_size + max_overflow) under modest concurrency; these lookups are
+        # independent point reads, so running them sequentially on one connection
+        # trades a small amount of per-request latency for bounded pool usage.
+        async with async_session_scope() as aux_session:
+            row = await self._compat_load_material_detail_row_async(aux_session, material_id)
+            is_owner = current_user_id is not None and int(row["uploader_id"] or 0) == current_user_id
+            if not (can_manage_all or is_owner) and self._compat_is_hidden_material(row["status"]):
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="资料不存在")
+            tags_map = await self._compat_load_tags_map_async(aux_session, [material_id])
+            comment_counts = await self._compat_load_comment_counts_async(aux_session, [material_id])
+            versions = await self._compat_load_versions_async(aux_session, material_id)
+            reviews = await self._compat_load_reviews_async(aux_session, material_id)
+            favorited = False
+            liked = False
+            my_rating = None
+            purchased = False
+            if current_user_id is not None:
+                favorited = bool(
+                    await self._compat_material_relation_exists_async(
+                        aux_session,
+                        """
+                        SELECT 1
+                        FROM favorites
+                        WHERE material_id = :material_id AND user_id = :user_id
+                        LIMIT 1
+                        """,
+                        material_id,
+                        current_user_id,
+                    )
+                )
+                liked = bool(
+                    await self._compat_material_relation_exists_async(
+                        aux_session,
+                        """
+                        SELECT 1
+                        FROM material_likes
+                        WHERE material_id = :material_id AND user_id = :user_id
+                        LIMIT 1
+                        """,
+                        material_id,
+                        current_user_id,
+                    )
+                )
+                my_rating = await self._compat_load_my_rating_async(aux_session, material_id, current_user_id)
+                purchased = await self._compat_has_paid_access_async(aux_session, material_id, current_user_id)
+        # Signing/building preview URLs does not touch the database, so it runs
+        # after the aux session (and its connection) has already been released.
+        custom_preview_images: list[str] = []
+        if current_user_id is not None:
+            custom_preview_images = await self._compat_build_custom_preview_urls_async(
+                material_id,
+                self._compat_json_loads(row["custom_preview_images"]),
+            )
         detail_base = {
             "id": int(row["id"]),
             "uploaderId": self._compat_as_int(row["uploader_id"]),
@@ -502,58 +554,6 @@ class MaterialsService(MaterialSecurityPolicyMixin, MaterialsStorageMutationMixi
             "downloadCount": self._compat_as_int(row["download_count"]),
             "salesCount": self._compat_as_int(row["sales_count"]),
         }
-        favorited = False
-        liked = False
-        my_rating = None
-        purchased = False
-        auxiliary_calls = [
-            self._call_with_new_async_session(self._compat_load_tags_map_async, [material_id]),
-            self._call_with_new_async_session(self._compat_load_comment_counts_async, [material_id]),
-            self._call_with_new_async_session(self._compat_load_versions_async, material_id),
-            self._call_with_new_async_session(self._compat_load_reviews_async, material_id),
-        ]
-        if current_user_id is not None:
-            auxiliary_calls.extend(
-                [
-                    self._call_with_new_async_session(
-                        self._compat_material_relation_exists_async,
-                        """
-                        SELECT 1
-                        FROM favorites
-                        WHERE material_id = :material_id AND user_id = :user_id
-                        LIMIT 1
-                        """,
-                        material_id,
-                        current_user_id,
-                    ),
-                    self._call_with_new_async_session(
-                        self._compat_material_relation_exists_async,
-                        """
-                        SELECT 1
-                        FROM material_likes
-                        WHERE material_id = :material_id AND user_id = :user_id
-                        LIMIT 1
-                        """,
-                        material_id,
-                        current_user_id,
-                    ),
-                    self._call_with_new_async_session(self._compat_load_my_rating_async, material_id, current_user_id),
-                    self._call_with_new_async_session(self._compat_has_paid_access_async, material_id, current_user_id),
-                    self._compat_build_custom_preview_urls_async(
-                        material_id,
-                        self._compat_json_loads(row["custom_preview_images"]),
-                    ),
-                ]
-            )
-        auxiliary_results = await asyncio.gather(*auxiliary_calls)
-        tags_map, comment_counts, versions, reviews = auxiliary_results[:4]
-        custom_preview_images = []
-        if current_user_id is not None:
-            favorited = bool(auxiliary_results[4])
-            liked = bool(auxiliary_results[5])
-            my_rating = auxiliary_results[6]
-            purchased = bool(auxiliary_results[7])
-            custom_preview_images = auxiliary_results[8]
         netdisk_accessible = detail_base["hasNetdisk"] and (detail_base["free"] or purchased or can_manage_all or is_owner)
         detail_base.update(
             {
