@@ -103,7 +103,11 @@ class EpisodeRunner:
                 progress.messages.append(_feedback({"notice": "final_turn", "instruction": instruction}))
             token_count = self._count_tokens(progress.messages, tools, spec.thinking)
             if token_count > budget.max_context_tokens - budget.max_new_tokens:
-                return Termination.CONTEXT_BUDGET, FailureOwner.MODEL, None, None
+                # If this fires before the model ever got a turn, the budget was too small for the
+                # prompt itself -- a configuration problem, not something the model did. Once at
+                # least one turn has happened, the model's own output growing the context is on it.
+                owner = FailureOwner.ENV if not progress.turns else FailureOwner.MODEL
+                return Termination.CONTEXT_BUDGET, owner, None, None
             try:
                 turn = policy.step(
                     progress.messages,
@@ -128,6 +132,17 @@ class EpisodeRunner:
                 progress.messages.append(Message(role="assistant", content=turn.content, reasoning=turn.reasoning))
                 return Termination.FINAL_ANSWER, FailureOwner.NONE, turn.content, None
             if progress.tool_calls_used + len(turn.tool_calls) > budget.max_tool_calls:
+                # This turn is already recorded in progress.turns (appended above); keep messages
+                # consistent with it by recording the assistant's tool-call message too, just
+                # without executing any of the calls (no tool-response messages/observations).
+                progress.messages.append(
+                    Message(
+                        role="assistant",
+                        content=turn.content,
+                        tool_calls=turn.tool_calls,
+                        reasoning=turn.reasoning,
+                    )
+                )
                 return Termination.TOOL_BUDGET, FailureOwner.MODEL, None, None
             progress.messages.append(
                 Message(role="assistant", content=turn.content, tool_calls=turn.tool_calls, reasoning=turn.reasoning)

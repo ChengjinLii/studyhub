@@ -57,3 +57,12 @@ def infra_failure() -> PolicyInfraError:
 
 def count_chars(messages: Sequence[Message], tools: Sequence[ToolSpec], thinking: bool) -> int:
     return sum(len(message.content) for message in messages)
+
+
+def count_messages(messages: Sequence[Message], tools: Sequence[ToolSpec], thinking: bool) -> int:
+    """A token counter that grows with message *count* rather than content length.
+
+    Useful for exercising a context-budget check that fires only after some turns have already
+    happened (a single turn's tool call + tool response messages push the count over budget).
+    """
+    return len(messages)

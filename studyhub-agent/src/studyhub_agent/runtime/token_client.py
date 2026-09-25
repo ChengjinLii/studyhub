@@ -61,10 +61,15 @@ class SGLangGenerateBackend:
             if pairs is None:
                 raise PolicyInfraError("sglang response is missing output_token_logprobs")
             finish = meta.get("finish_reason")
+            finish_reason = finish.get("type") if isinstance(finish, dict) else finish
+            if finish_reason == "abort":
+                # The request was cancelled/aborted at the infra level (e.g. server shutdown); this
+                # is not a model output, so it must never reach the parser as a real completion.
+                raise PolicyInfraError("sglang generate aborted")
             return Generation(
                 output_ids=tuple(int(item[1]) for item in pairs),
                 logprobs=tuple(float(item[0]) for item in pairs),
-                finish_reason=finish.get("type") if isinstance(finish, dict) else finish,
+                finish_reason=finish_reason,
             )
         except (httpx.HTTPError, KeyError, ValueError, TypeError, IndexError) as exc:
             raise PolicyInfraError(f"sglang generate failed: {exc}") from exc
@@ -91,6 +96,10 @@ class TokenPolicyClient:
         )
         latency_ms = (time.perf_counter() - started) * 1000
         raw_text = self._tokenizer.decode(generation.output_ids).split(END_OF_TURN, 1)[0]
+        if generation.finish_reason == "length":
+            # The completion was cut off by max_new_tokens; it must never be treated as a valid
+            # FINAL/TOOL_CALLS turn (that would silently produce truncated SFT data).
+            return _parse_error_turn(raw_text, "truncated", prompt_ids, generation, latency_ms)
         parsed = parse_completion(raw_text, tools, thinking=thinking)
         canonical = raw_text
         if parsed.kind is not TurnKind.PARSE_ERROR:

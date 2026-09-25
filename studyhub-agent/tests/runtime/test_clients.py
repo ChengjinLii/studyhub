@@ -31,22 +31,25 @@ class CharTokenizer:
 
 
 class CannedBackend:
-    def __init__(self, text: str) -> None:
+    def __init__(self, text: str, *, finish_reason: str = "stop") -> None:
         self.text = text
+        self.finish_reason = finish_reason
         self.last_input: list[int] = []
 
     def generate(self, input_ids, *, sampling, max_new_tokens, stop_token_ids) -> Generation:
         self.last_input = list(input_ids)
         ids = tuple(ord(ch) for ch in self.text)
-        return Generation(output_ids=ids, logprobs=tuple(-0.1 for _ in ids), finish_reason="stop")
+        return Generation(output_ids=ids, logprobs=tuple(-0.1 for _ in ids), finish_reason=self.finish_reason)
 
 
-def _openai_transport(message: dict, *, thinking: bool = False) -> httpx.MockTransport:
+def _openai_transport(
+    message: dict, *, thinking: bool = False, finish_reason: str = "tool_calls"
+) -> httpx.MockTransport:
     def handler(request: httpx.Request) -> httpx.Response:
         body = json.loads(request.content)
         assert body["tools"][0]["function"]["name"] == "materials_search"
         assert body["chat_template_kwargs"] == {"enable_thinking": thinking}
-        return httpx.Response(200, json={"choices": [{"message": message, "finish_reason": "tool_calls"}]})
+        return httpx.Response(200, json={"choices": [{"message": message, "finish_reason": finish_reason}]})
 
     return httpx.MockTransport(handler)
 
@@ -219,6 +222,38 @@ def test_sglang_backend_malformed_logprob_entries_raise_policy_infra_error() -> 
     backend = SGLangGenerateBackend("http://sglang", client=httpx.Client(transport=httpx.MockTransport(handler)))
     with pytest.raises(PolicyInfraError):
         backend.generate([1], sampling=Sampling(), max_new_tokens=4, stop_token_ids=())
+
+
+def test_sglang_backend_abort_finish_reason_raises_policy_infra_error() -> None:
+    # "abort" means the request was cancelled/aborted at the infra level (e.g. server shutdown,
+    # request cancellation) -- it is not a model output at all, so it must never reach the parser.
+    def handler(request: httpx.Request) -> httpx.Response:
+        meta_info = {"output_token_logprobs": [[-0.1, 97, "a"]], "finish_reason": {"type": "abort"}}
+        return httpx.Response(200, json={"text": "a", "meta_info": meta_info})
+
+    backend = SGLangGenerateBackend("http://sglang", client=httpx.Client(transport=httpx.MockTransport(handler)))
+    with pytest.raises(PolicyInfraError):
+        backend.generate([1], sampling=Sampling(), max_new_tokens=4, stop_token_ids=())
+
+
+def test_token_client_finish_reason_length_becomes_truncated_parse_error() -> None:
+    # A truncated completion must never be treated as a valid FINAL/TOOL_CALLS turn -- it would
+    # otherwise silently become bad SFT data (a cut-off "final answer" or a cut-off tool call).
+    turn = TokenPolicyClient(CharTokenizer(), CannedBackend("这是一个被截断的答", finish_reason="length")).step(
+        HISTORY, TOOLS, thinking=False, sampling=Sampling(), max_new_tokens=8
+    )
+    assert turn.kind is TurnKind.PARSE_ERROR
+    assert turn.parse_error == "truncated"
+
+
+def test_openai_finish_reason_length_becomes_truncated_parse_error() -> None:
+    message = {"role": "assistant", "content": "这是一个被截断的答"}
+    client = OpenAICompatPolicyClient(
+        "http://t", "m", client=httpx.Client(transport=_openai_transport(message, finish_reason="length"))
+    )
+    turn = client.step(HISTORY, TOOLS, thinking=False, sampling=Sampling(), max_new_tokens=8)
+    assert turn.kind is TurnKind.PARSE_ERROR
+    assert turn.parse_error == "truncated"
 
 
 def test_wire_message_sends_tool_result_with_its_real_call_id() -> None:

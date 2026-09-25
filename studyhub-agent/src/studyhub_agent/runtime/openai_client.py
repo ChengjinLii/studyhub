@@ -111,6 +111,10 @@ class OpenAICompatPolicyClient:
         content = (message.get("content") or "").strip()
         reasoning = message.get("reasoning_content") or message.get("reasoning") or ""
         raw_text = _raw_completion_text(content, message.get("tool_calls"))
+        if choice.get("finish_reason") == "length":
+            # The completion was cut off by max_tokens; it must never be treated as a valid
+            # FINAL/TOOL_CALLS turn (that would silently produce truncated SFT data).
+            return self._error(raw_text, "truncated", choice, latency_ms)
         calls: list[ToolCall] = []
         for index, item in enumerate(message.get("tool_calls") or []):
             function = item.get("function") or {}

@@ -6,7 +6,15 @@ from studyhub_agent.contracts.prompts import DEFAULT_PROMPTS
 from studyhub_agent.environments.base import EnvironmentInfraError
 from studyhub_agent.environments.replay import ReplayEnvironment, load_snapshot
 from studyhub_agent.runtime.runner import EpisodeRunner
-from tests.runtime.fakes import ScriptedPolicy, count_chars, final_turn, infra_failure, parse_error_turn, tool_turn
+from tests.runtime.fakes import (
+    ScriptedPolicy,
+    count_chars,
+    count_messages,
+    final_turn,
+    infra_failure,
+    parse_error_turn,
+    tool_turn,
+)
 
 SNAPSHOT = load_snapshot(Path(__file__).parent.parent / "fixtures" / "replay_snapshot.json")
 RUNNER = EpisodeRunner(prompts=DEFAULT_PROMPTS, tokenizer_revision="test-rev", count_tokens=count_chars)
@@ -96,6 +104,13 @@ def test_tool_budget_stops_before_executing() -> None:
     )
     assert episode.termination is Termination.TOOL_BUDGET
     assert episode.observations == ()
+    # The budget-exceeding turn is recorded in episode.turns; messages must stay consistent with
+    # it (the assistant's tool-call message present, just no tool-response messages for it).
+    assert len(episode.turns) == 1
+    assistant_messages = [m for m in episode.messages if m.role == "assistant"]
+    assert len(assistant_messages) == 1
+    assert assistant_messages[0].tool_calls == episode.turns[0].tool_calls
+    assert [m for m in episode.messages if m.role == "tool"] == []
 
 
 def test_turn_with_one_invalid_call_executes_nothing() -> None:
@@ -135,10 +150,25 @@ def test_environment_infra_error_ends_episode_as_infra_error() -> None:
     assert "replay backend unavailable" in (episode.error_detail or "")
 
 
-def test_context_budget_checked_before_each_step() -> None:
+def test_context_budget_before_first_policy_call_is_an_env_config_error() -> None:
+    # The episode spec/budget made the prompt too big before the model ever got a turn -- that is a
+    # configuration problem (budget too small for the prompt), not something the model did.
     episode, policy = _run(_spec(user_message="长" * 200, budget=Budget(max_context_tokens=150, max_new_tokens=10)), [])
     assert episode.termination is Termination.CONTEXT_BUDGET
+    assert episode.failure_owner is FailureOwner.ENV
     assert policy.seen == []
+
+
+def test_context_budget_after_some_turns_is_still_a_model_failure() -> None:
+    # Once the model has already taken at least one turn, later blowing the context budget with its
+    # own verbose output is attributed to the model, not the environment/config.
+    runner = EpisodeRunner(prompts=DEFAULT_PROMPTS, tokenizer_revision="test-rev", count_tokens=count_messages)
+    policy = ScriptedPolicy([tool_turn(("materials_search", {"query": "高数"}))])
+    spec = _spec(budget=Budget(max_context_tokens=13, max_new_tokens=10))
+    episode = runner.run(spec, ReplayEnvironment(SNAPSHOT), policy)
+    assert episode.termination is Termination.CONTEXT_BUDGET
+    assert episode.failure_owner is FailureOwner.MODEL
+    assert len(policy.seen) == 1
 
 
 def test_unknown_tool_name_in_spec_is_a_configuration_error() -> None:
