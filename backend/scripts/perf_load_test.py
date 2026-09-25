@@ -22,12 +22,26 @@ import statistics
 import sys
 import time
 from dataclasses import dataclass, field
+from urllib.parse import urlsplit
 
 # Must match backend/scripts/perf_seed_data.py's id ranges so the load test
 # hits ids that actually exist (and stays clear of the app's static demo
 # seed rows at low ids).
 USER_ID_BASE = 1000
 MATERIAL_ID_BASE = 100_000
+
+_LOOPBACK_HOSTS = {"127.0.0.1", "localhost", "::1", "[::1]"}
+
+
+def _require_loopback_or_allow_remote(base_url: str, *, allow_remote: bool) -> None:
+    host = (urlsplit(base_url).hostname or "").strip().lower()
+    if host in _LOOPBACK_HOSTS or allow_remote:
+        return
+    raise SystemExit(
+        f"refusing to load-test non-loopback host {host!r} without --allow-remote "
+        "(this tool signs auth tokens and can hit admin endpoints -- it must not "
+        "be pointed at anything but a disposable local scratch server by accident)"
+    )
 
 
 @dataclass
@@ -59,13 +73,30 @@ class EndpointResult:
         }
 
 
-def _bearer_token(user_id: int, role_mask: int) -> str:
-    # Mirrors tests/support.py:build_auth_headers so tokens are valid against
-    # a server started with the same (default dev) STUDYHUB_JWT_SECRET.
+def _refuse_non_dev_settings() -> None:
     sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-    from app.api.deps import get_token_codec
+    from app.core.config import get_settings
 
-    return get_token_codec().encode({"sub": str(user_id), "roleMask": role_mask}, ttl_seconds=3600)
+    settings = get_settings()
+    if settings.requires_private_env_file:
+        raise SystemExit(
+            f"refusing to run against STUDYHUB_ENVIRONMENT={settings.environment!r}: "
+            "this tool signs its own auth tokens and must never run in a mode that "
+            "could resolve a real (non-default) JWT secret."
+        )
+
+
+def _bearer_token(user_id: int, role_mask: int) -> str:
+    # Always signs with the hardcoded default dev secret -- never whatever
+    # get_settings().jwt_secret happens to resolve to -- so a stray
+    # STUDYHUB_JWT_SECRET in this process's environment can't leak a real
+    # secret into a locally-run, throwaway benchmarking token.
+    sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+    from app.core.config import DEFAULT_DEV_JWT_SECRET
+    from app.core.security import JwtTokenCodec
+
+    codec = JwtTokenCodec(DEFAULT_DEV_JWT_SECRET, "HS256")
+    return codec.encode({"sub": str(user_id), "roleMask": role_mask}, ttl_seconds=3600)
 
 
 async def _run_endpoint(client, name: str, build_request, n_requests: int, concurrency: int) -> EndpointResult:
@@ -144,6 +175,9 @@ def _build_scenarios(rng: random.Random, n_materials: int, user_token: str, admi
 async def main_async(args: argparse.Namespace) -> None:
     import httpx
 
+    _require_loopback_or_allow_remote(args.base_url, allow_remote=args.allow_remote)
+    _refuse_non_dev_settings()
+
     rng = random.Random(20260926)
     user_token = _bearer_token(USER_ID_BASE + 2, 1)
     admin_token = _bearer_token(USER_ID_BASE + 1, 8)
@@ -187,6 +221,11 @@ def main() -> None:
     parser.add_argument("--out", default=None)
     parser.add_argument("--only", nargs="*", default=None)
     parser.add_argument("--no-warmup", action="store_true")
+    parser.add_argument(
+        "--allow-remote",
+        action="store_true",
+        help="allow a non-loopback base_url (this tool signs its own admin-capable auth tokens; only pass this for a disposable scratch server you control)",
+    )
     args = parser.parse_args()
     asyncio.run(main_async(args))
 

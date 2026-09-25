@@ -44,7 +44,13 @@ def _configure_environment(db_path: Path) -> None:
     db_path.parent.mkdir(parents=True, exist_ok=True)
     if db_path.exists():
         db_path.unlink()
-    os.environ.setdefault("STUDYHUB_ENVIRONMENT", "local-dev")
+    # Force (not setdefault): this script must never run against
+    # preview/production settings, regardless of what's already in the
+    # environment (e.g. a stray STUDYHUB_ENVIRONMENT=production from the
+    # calling shell) -- requires_private_env_file mode also forbids SQLite
+    # outright, so this would fail loudly rather than seed the wrong thing,
+    # but don't rely on that.
+    os.environ["STUDYHUB_ENVIRONMENT"] = "local-dev"
     os.environ["STUDYHUB_DATABASE_URL"] = f"sqlite+pysqlite:///{db_path}"
     os.environ.setdefault("STUDYHUB_LOCAL_DEV_ROOT_DIR", str(db_path.parent / "local-dev-root"))
     os.environ.setdefault("STUDYHUB_LOCAL_DEV_BOOTSTRAP_USER", "false")
