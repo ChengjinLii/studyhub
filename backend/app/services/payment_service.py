@@ -66,17 +66,25 @@ class PaymentService:
         if existing is not None and existing.status in PAID_ORDER_STATUSES:
             return self._to_order_payload(existing)
 
+        # Free materials and existing purchase records grant access without collecting money,
+        # so the order must carry nothing payable to the creator.
+        grants_without_payment = bool(material.is_free or already_purchased)
+        amount = 0 if grants_without_payment else int(material.price or 0)
+        if existing is not None and existing.out_trade_no and int(existing.amount or 0) != amount:
+            # A checkout was already issued for the old amount under this trade number; never
+            # change the amount behind it — start a fresh order instead.
+            existing = None
         if existing is None:
-            existing = self._build_order(material=material, user_id=user_id, channel=channel)
+            existing = self._build_order(material=material, user_id=user_id, channel=channel, amount=amount)
         else:
             existing.channel = channel
-            existing.amount = int(material.price or 0)
+            existing.amount = amount
             existing.material_title = material.title
             existing.uploader_id = material.uploader_id
-            existing.platform_fee_amount, existing.creator_payable_amount, existing.commission_rate = self._split_amount(existing.amount)
+            existing.platform_fee_amount, existing.creator_payable_amount, existing.commission_rate = self._split_amount(amount)
         self.finance_repo.save_order(session, existing)
 
-        if material.is_free or already_purchased or (channel == "simulated" and self._allows_simulated_payment()):
+        if grants_without_payment or (channel == "simulated" and self._allows_simulated_payment()):
             self._mark_order_paid(session, existing, pay_channel=channel, trade_no=None, paid_at=datetime.now(UTC))
 
         session.commit()
@@ -170,6 +178,25 @@ class PaymentService:
 
         if force_check and order.status == "CREATED":
             local_notification = self.payment_provider.build_force_check_notification(out_trade_no=out_trade_no, order=order)
+            if local_notification is not None and local_notification.amount_cents != int(order.amount or 0):
+                # Same rule as the async notify: a trade for a different amount never pays this order.
+                self.finance_repo.save_payment_notification(
+                    session,
+                    PaymentNotificationRecord(
+                        channel="alipay",
+                        out_trade_no=out_trade_no,
+                        trade_no=local_notification.trade_no,
+                        payload=json.dumps(
+                            {"source": "force_check", "amountCents": local_notification.amount_cents},
+                            separators=(",", ":"),
+                        ),
+                        sign_verified=local_notification.sign_verified,
+                        processed=False,
+                        process_result="AMOUNT_MISMATCH",
+                    ),
+                )
+                session.commit()
+                local_notification = None
             if local_notification is not None:
                 self._mark_order_paid(
                     session,
@@ -290,15 +317,15 @@ class PaymentService:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="资料不存在")
         return material
 
-    def _build_order(self, *, material: MaterialRecord, user_id: int, channel: str) -> OrderRecord:
-        platform_fee_amount, creator_payable_amount, commission_rate = self._split_amount(int(material.price or 0))
+    def _build_order(self, *, material: MaterialRecord, user_id: int, channel: str, amount: int) -> OrderRecord:
+        platform_fee_amount, creator_payable_amount, commission_rate = self._split_amount(amount)
         return OrderRecord(
             user_id=user_id,
             material_id=material.id,
             uploader_id=material.uploader_id,
             material_title=material.title,
             status="CREATED",
-            amount=int(material.price or 0),
+            amount=amount,
             channel=channel,
             commission_rate=commission_rate,
             platform_fee_amount=platform_fee_amount,
