@@ -207,7 +207,7 @@ def test_submit_report_counts_active_reports_without_loading_all_reports() -> No
         _add_report(session, report_id=2, status="PENDING", target_id=99, reporter_id=5, created_at=base)
         session.commit()
 
-        entity = service.submit_report(
+        entity, hidden = service.submit_report(
             session,
             reporter_id=6,
             target_type="user",
@@ -217,6 +217,7 @@ def test_submit_report_counts_active_reports_without_loading_all_reports() -> No
         created_report = (entity.target_type, entity.target_id, entity.reporter_id)
 
     assert created_report == ("USER", 99, 6)
+    assert hidden is True
     assert [(user.id, user.status) for user in auth_repo.saved_users] == [(99, "hidden")]
     assert auth_repo.revoked_user_ids == [99]
 

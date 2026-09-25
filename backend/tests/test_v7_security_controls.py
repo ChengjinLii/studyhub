@@ -50,6 +50,7 @@ def strict_security_client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> T
     monkeypatch.setenv("STUDYHUB_RATE_LIMIT_VIEW", "2")
     monkeypatch.setenv("STUDYHUB_RATE_LIMIT_MCP", "2")
     monkeypatch.setenv("STUDYHUB_RATE_LIMIT_COMMENT_CREATE_IP_MINUTE", "2")
+    monkeypatch.setenv("STUDYHUB_RATE_LIMIT_REPORT_SUBMIT_USER_HOUR", "1")
 
     get_settings.cache_clear()
     clear_dependency_caches()
@@ -199,6 +200,26 @@ def test_material_view_rate_limit_returns_429(strict_security_client: TestClient
 
     assert response.status_code == 429
     assert_error_envelope(response, "RATE_LIMITED", "Too many view requests")
+
+
+def test_report_submit_rate_limit_returns_429(strict_security_client: TestClient, auth_service: AuthService) -> None:
+    # A per-user cap on /api/reports: each report that crosses the auto-hide
+    # threshold invalidates a public-read-cache prefix (scan + delete on the
+    # Redis backend), so one user must not be able to trigger that an
+    # unbounded number of times by reporting many targets in a row. The rate
+    # limit is enforced before any of that, keyed only by user id, so it
+    # doesn't matter that both calls target the same (already-reported)
+    # material -- the second call must never even reach the duplicate check.
+    seed_read_users(auth_service)
+    headers = build_auth_headers(1, 1)
+    payload = {"targetType": "MATERIAL", "targetId": 101, "reason": "限流验证"}
+    first = strict_security_client.post("/api/reports", headers=headers, json=payload)
+    assert first.status_code != 429
+
+    response = strict_security_client.post("/api/reports", headers=headers, json=payload)
+
+    assert response.status_code == 429
+    assert_error_envelope(response, "REPORT_RATE_LIMITED", "举报操作过于频繁，请稍后再试")
 
 
 def test_market_publish_rate_limit_returns_429_from_same_bucket(strict_security_client: TestClient) -> None:

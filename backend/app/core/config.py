@@ -126,6 +126,7 @@ class Settings(BaseSettings):
     rate_limit_comment_action_user_minute: int = 30
     rate_limit_comment_report_user_hour: int = 10
     rate_limit_comment_duplicate_seconds: int = 300
+    rate_limit_report_submit_user_hour: int = 20
     comments_write_enabled: bool = True
 
     lock_provider: str = "db_row"

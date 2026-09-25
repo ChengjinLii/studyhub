@@ -192,11 +192,14 @@ def report_comment(
     settings: Settings = Depends(get_settings),
 ) -> dict[str, object]:
     enforce_comment_user_rate_limit(settings, user_id=auth.user_id or 0, action="report")
-    service.report(session, id, auth.user_id or 0, payload)
+    hidden = service.report(session, id, auth.user_id or 0, payload)
     # Reporting a comment can auto-hide it (see ReportService.AUTO_HIDE_THRESHOLD),
     # which changes both the visible comment list and the commentCount embedded
-    # in the cached materials:detail payload, unlike like/unlike.
-    _invalidate_comment_content_caches()
+    # in the cached materials:detail payload, unlike like/unlike. Only bust the
+    # cache when this call actually flipped that (invalidate_prefixes does a
+    # scan + delete on the Redis backend), not on every report.
+    if hidden:
+        _invalidate_comment_content_caches()
     return api_ok({"success": True})
 
 

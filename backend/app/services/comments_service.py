@@ -282,9 +282,13 @@ class CommentsService:
         session.commit()
         return next_like_count
 
-    def report(self, session: Session, comment_id: int, user_id: int, payload: CommentReportPayload) -> None:
+    def report(self, session: Session, comment_id: int, user_id: int, payload: CommentReportPayload) -> bool:
+        """Report a comment; returns whether this call auto-hid it."""
         self._bootstrap(session)
-        self.report_service.submit_report(session, reporter_id=user_id, target_type="COMMENT", target_id=comment_id, reason=payload.reason)
+        _entity, hidden = self.report_service.submit_report(
+            session, reporter_id=user_id, target_type="COMMENT", target_id=comment_id, reason=payload.reason
+        )
+        return hidden
 
     def _compat_create_comment(self, session: Session, payload: CommentCreatePayload, user_id: int) -> dict[str, Any]:
         self._compat_ensure_material_exists(session, payload.materialId)

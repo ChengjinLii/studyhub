@@ -488,9 +488,15 @@ def test_report_restore_invalidates_anonymous_market_cache(
     assert client.post("/api/reports", headers=baishan_headers, json=payload).status_code == 200
     report = client.post("/api/reports", headers=admin_headers, json=payload)
     assert report.status_code == 200
-
-    # Warm the anonymous cache on the now-hidden item before restoring it.
     assert client.get("/api/market/201").status_code == 404
+
+    # Warm the anonymous *list* cache while item 201 is hidden (a 404 detail
+    # response is never cached -- see cache_if_anonymous_async/get_or_set_async,
+    # which only memoizes successful factory() results -- so this must be a
+    # 200 whose content changes once the restore below takes effect).
+    warm_list = client.get("/api/market")
+    assert warm_list.status_code == 200
+    assert all(item["id"] != 201 for item in warm_list.json()["data"]["items"])
 
     restored = client.patch(
         f"/api/admin/reports/{report.json()['data']['id']}",
@@ -500,6 +506,103 @@ def test_report_restore_invalidates_anonymous_market_cache(
     assert restored.status_code == 200
     assert restored.json()["data"]["targetStatus"] == "SALE"
 
-    # Without invalidating the cache on restore, this would still 404 from
-    # the stale cached (hidden) response until the cache TTL expires.
+    # Without invalidating the cache on restore, this would still return the
+    # stale cached list (missing item 201) until the cache TTL expires.
+    refreshed_list = client.get("/api/market")
+    assert refreshed_list.status_code == 200
+    assert any(item["id"] == 201 for item in refreshed_list.json()["data"]["items"])
+
+    # The detail endpoint (a separate cache namespace) must also reflect the
+    # restore immediately.
     assert client.get("/api/market/201").status_code == 200
+
+
+def test_report_auto_hide_invalidates_anonymous_materials_cache(
+    client: TestClient,
+    auth_service: AuthService,
+) -> None:
+    seed_read_users(auth_service)
+    alice_headers = build_auth_headers(1, 1)
+    baishan_headers = build_auth_headers(2, 2)
+    admin_headers = build_auth_headers(3, 8)
+
+    warm = client.get("/api/materials/101")
+    assert warm.status_code == 200
+
+    payload = {"targetType": "MATERIAL", "targetId": 101, "reason": "缓存失效验证"}
+    assert client.post("/api/reports", headers=alice_headers, json=payload).status_code == 200
+    assert client.post("/api/reports", headers=baishan_headers, json=payload).status_code == 200
+    assert client.post("/api/reports", headers=admin_headers, json=payload).status_code == 200
+
+    # Without invalidating on auto-hide, this would still return the stale
+    # cached (pre-hide) 200 response until the cache TTL expires.
+    hidden = client.get("/api/materials/101")
+    assert hidden.status_code == 404
+
+
+def test_report_auto_hide_invalidates_anonymous_comments_cache(
+    client: TestClient,
+    auth_service: AuthService,
+) -> None:
+    # Exercises the COMMENT branch of /api/reports directly (as opposed to
+    # /api/comments/{id}/report, covered separately below).
+    seed_read_users(auth_service)
+    alice_headers = build_auth_headers(1, 1)
+    baishan_headers = build_auth_headers(2, 2)
+    admin_headers = build_auth_headers(3, 8)
+
+    created = client.post(
+        "/api/comments",
+        headers=alice_headers,
+        json={"materialId": 101, "content": "缓存失效验证评论"},
+    )
+    assert created.status_code == 200
+    comment_id = created.json()["data"]["id"]
+
+    warm = client.get("/api/comments", params={"materialId": 101})
+    assert warm.status_code == 200
+    assert any(item["id"] == comment_id for item in warm.json()["data"]["items"])
+
+    payload = {"targetType": "COMMENT", "targetId": comment_id, "reason": "缓存失效验证"}
+    assert client.post("/api/reports", headers=alice_headers, json=payload).status_code == 200
+    assert client.post("/api/reports", headers=baishan_headers, json=payload).status_code == 200
+    assert client.post("/api/reports", headers=admin_headers, json=payload).status_code == 200
+
+    # Without invalidating on auto-hide, this would still return the stale
+    # cached list still including the now-hidden comment.
+    refreshed = client.get("/api/comments", params={"materialId": 101})
+    assert refreshed.status_code == 200
+    assert all(item["id"] != comment_id for item in refreshed.json()["data"]["items"])
+
+
+def test_comment_report_route_invalidates_anonymous_comments_cache(
+    client: TestClient,
+    auth_service: AuthService,
+) -> None:
+    # Same as above but through /api/comments/{id}/report (CommentsService.report),
+    # a separate entry point into the same auto-hide path.
+    seed_read_users(auth_service)
+    alice_headers = build_auth_headers(1, 1)
+    baishan_headers = build_auth_headers(2, 2)
+    admin_headers = build_auth_headers(3, 8)
+
+    created = client.post(
+        "/api/comments",
+        headers=alice_headers,
+        json={"materialId": 101, "content": "缓存失效验证评论二"},
+    )
+    assert created.status_code == 200
+    comment_id = created.json()["data"]["id"]
+
+    warm = client.get("/api/comments", params={"materialId": 101})
+    assert warm.status_code == 200
+    assert any(item["id"] == comment_id for item in warm.json()["data"]["items"])
+
+    report_payload = {"reason": "缓存失效验证"}
+    assert client.post(f"/api/comments/{comment_id}/report", headers=alice_headers, json=report_payload).status_code == 200
+    assert client.post(f"/api/comments/{comment_id}/report", headers=baishan_headers, json=report_payload).status_code == 200
+    assert client.post(f"/api/comments/{comment_id}/report", headers=admin_headers, json=report_payload).status_code == 200
+
+    refreshed = client.get("/api/comments", params={"materialId": 101})
+    assert refreshed.status_code == 200
+    assert all(item["id"] != comment_id for item in refreshed.json()["data"]["items"])

@@ -6,6 +6,10 @@ from fastapi import HTTPException, status
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+from app.core.config import Settings
+from app.core.exceptions import BizException
+from app.core.observability import get_runtime_metrics
+from app.core.rate_limit import rate_limit_key_allowed
 from app.models.community import ReportRecord
 from app.repos.auth_repo import AuthRepository
 from app.repos.comment_repo import CommentRepository
@@ -21,6 +25,23 @@ from app.services.read_support import serialize_datetime
 AUTO_HIDE_THRESHOLD = 3
 REPORT_STATUSES = {"PENDING", "IN_PROGRESS", "RESOLVED", "REJECTED"}
 TARGET_TYPES = {"MATERIAL", "COMMENT", "MARKET_ITEM", "USER"}
+
+
+def enforce_report_submit_rate_limit(settings: Settings, *, user_id: int) -> None:
+    """Bound how often one user can submit reports.
+
+    Each report submission that crosses the auto-hide threshold triggers a
+    cache-prefix invalidation (see app/api/routes/reports.py), which for the
+    Redis backend does a scan + delete. Without a per-user cap, one user
+    could report N different targets to trigger that N times in a row.
+    """
+    if not settings.rate_limit_enabled:
+        return
+    key = f"report-submit-user-hour:user:{int(user_id)}"
+    if rate_limit_key_allowed(settings, key, limit=settings.rate_limit_report_submit_user_hour, window_seconds=3600):
+        return
+    get_runtime_metrics().record_security_event(event="report_rate_limit", reason="report-submit-user-hour")
+    raise BizException("REPORT_RATE_LIMITED", "举报操作过于频繁，请稍后再试", status_code=429)
 
 
 class ReportService:
@@ -41,7 +62,7 @@ class ReportService:
         self.community_repo = community_repo
 
     def submit(self, session: Session, reporter_id: int, payload: ReportCreatePayload) -> dict[str, int]:
-        entity = self.submit_report(
+        entity, _hidden = self.submit_report(
             session,
             reporter_id=reporter_id,
             target_type=payload.targetType,
@@ -50,7 +71,16 @@ class ReportService:
         )
         return {"id": entity.id}
 
-    def submit_report(self, session: Session, *, reporter_id: int, target_type: str, target_id: int, reason: str) -> ReportRecord:
+    def submit_report(
+        self, session: Session, *, reporter_id: int, target_type: str, target_id: int, reason: str
+    ) -> tuple[ReportRecord, bool]:
+        """Create a report; returns (report, hidden).
+
+        `hidden` is True only when this call's auto-hide actually flipped the
+        target's visibility (not merely that the report was recorded), so
+        callers can skip invalidating the anonymous read cache when nothing
+        about the public-facing content changed.
+        """
         self._bootstrap(session)
         reporter = self.auth_repo.find_user_by_id(session, reporter_id)
         if reporter is None:
@@ -75,10 +105,11 @@ class ReportService:
             target_type=normalized_target_type,
             target_id=target_id,
         )
+        hidden = False
         if active_count >= AUTO_HIDE_THRESHOLD:
-            self._apply_auto_hide(session, normalized_target_type, target_id)
+            hidden = self._apply_auto_hide(session, normalized_target_type, target_id)
         session.commit()
-        return entity
+        return entity, hidden
 
     def list_for_admin(self, session: Session, *, status_value: str | None, target_type: str | None, page: int, size: int) -> dict[str, Any]:
         self._bootstrap(session)
@@ -104,7 +135,14 @@ class ReportService:
             "meta": {"page": safe_page, "size": safe_size, "total": total},
         }
 
-    def update_report(self, session: Session, report_id: int, payload: AdminReportUpdatePayload) -> dict[str, Any]:
+    def update_report(self, session: Session, report_id: int, payload: AdminReportUpdatePayload) -> tuple[dict[str, Any], bool]:
+        """Update a report; returns (admin_item, restored).
+
+        `restored` is True only when restoreTarget was requested *and* it
+        actually flipped the target back to visible, so callers can skip
+        invalidating the anonymous read cache otherwise (e.g. the target was
+        already visible, held by a security scan, or already deleted).
+        """
         self._bootstrap(session)
         entity = self.community_repo.get_report(session, report_id)
         if entity is None:
@@ -114,11 +152,12 @@ class ReportService:
         if payload.adminNote is not None:
             normalized_note = payload.adminNote.strip()
             entity.admin_note = normalized_note or None
+        restored = False
         if payload.restoreTarget:
-            self._restore_target(session, entity.target_type, entity.target_id)
+            restored = self._restore_target(session, entity.target_type, entity.target_id)
         self.community_repo.save_report(session, entity)
         session.commit()
-        return self._to_admin_item(session, entity)
+        return self._to_admin_item(session, entity), restored
 
     def _bootstrap(self, session: Session) -> None:
         seed = self.read_repo.load_seed()
@@ -165,29 +204,38 @@ class ReportService:
         if reporter_id == target_id:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="不能举报自己")
 
-    def _apply_auto_hide(self, session: Session, target_type: str, target_id: int) -> None:
+    def _apply_auto_hide(self, session: Session, target_type: str, target_id: int) -> bool:
+        """Hide the target if it isn't already; returns whether it flipped."""
         if target_type == "MATERIAL":
             entity = self.material_repo.get_material(session, target_id)
-            if entity is not None:
+            if entity is not None and entity.status != "HIDDEN":
                 entity.status = "HIDDEN"
                 self.material_repo.save_material(session, entity)
-            return
+                return True
+            return False
         if target_type == "COMMENT":
-            session.execute(text("UPDATE comments SET status = 'hidden', updated_at = CURRENT_TIMESTAMP WHERE id = :target_id"), {"target_id": target_id})
-            return
+            result = session.execute(
+                text("UPDATE comments SET status = 'hidden', updated_at = CURRENT_TIMESTAMP WHERE id = :target_id AND status != 'hidden'"),
+                {"target_id": target_id},
+            )
+            return result.rowcount > 0
         if target_type == "MARKET_ITEM":
             entity = self.market_repo.get_item(session, target_id)
             if entity is not None and entity.status == "SALE":
                 entity.status = "HIDDEN"
                 self.market_repo.save_item(session, entity)
-            return
+                return True
+            return False
         user = self.auth_repo.find_user_by_id(session, target_id)
-        if user is not None:
+        if user is not None and user.status != "hidden":
             user.status = "hidden"
             self.auth_repo.save_user(session, user)
             self.auth_repo.bump_session_version(session, user.id, reason="account_hidden")
+            return True
+        return False
 
-    def _restore_target(self, session: Session, target_type: str, target_id: int) -> None:
+    def _restore_target(self, session: Session, target_type: str, target_id: int) -> bool:
+        """Restore the target if it's hidden; returns whether it flipped."""
         if target_type == "MATERIAL":
             entity = self.material_repo.get_material(session, target_id)
             # Materials held by the malware scan are released by the scanner, not by report restores.
@@ -199,9 +247,10 @@ class ReportService:
             ):
                 entity.status = "VISIBLE"
                 self.material_repo.save_material(session, entity)
-            return
+                return True
+            return False
         if target_type == "COMMENT":
-            session.execute(
+            result = session.execute(
                 text(
                     """
                     UPDATE comments
@@ -212,18 +261,21 @@ class ReportService:
                 ),
                 {"target_id": target_id},
             )
-            return
+            return result.rowcount > 0
         if target_type == "MARKET_ITEM":
             entity = self.market_repo.get_item(session, target_id)
             if entity is not None and entity.status == "HIDDEN":
                 entity.status = "SALE"
                 self.market_repo.save_item(session, entity)
-            return
+                return True
+            return False
         user = self.auth_repo.find_user_by_id(session, target_id)
         if user is not None and user.status == "hidden":
             user.status = "active"
             self.auth_repo.save_user(session, user)
             self.auth_repo.bump_session_version(session, user.id, reason="account_restored")
+            return True
+        return False
 
     def _build_report_lookups(self, session: Session, items: list[ReportRecord]) -> dict[str, dict[int, Any]]:
         lookups = {
