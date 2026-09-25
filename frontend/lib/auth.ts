@@ -37,3 +37,15 @@ export function hasRole(mask: number | null | undefined, role: RoleMask): boolea
   if (typeof mask !== 'number') return false;
   return (mask & role) === role;
 }
+
+export function hasAuthenticatedSession(session: SessionState): boolean {
+  return Boolean(session.user && session.token);
+}
+
+export type AdminPageAccess = 'login' | 'forbidden' | 'allowed';
+
+export function resolveAdminPageAccess(session: SessionState): AdminPageAccess {
+  if (!session.user || !hasAuthenticatedSession(session)) return 'login';
+  const privileged = hasRole(session.user.roleMask, RoleMask.ADMIN) || hasRole(session.user.roleMask, RoleMask.DEVELOPER);
+  return privileged ? 'allowed' : 'forbidden';
+}

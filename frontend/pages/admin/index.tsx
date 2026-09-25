@@ -8,7 +8,7 @@ import AdminPayoutQrModal from '../../components/admin/AdminPayoutQrModal';
 import { useAppDialog } from '../../components/AppDialogProvider';
 import NavBar from '../../components/NavBar';
 import PaginationBar from '../../components/PaginationBar';
-import { readSession, hasRole } from '../../lib/auth';
+import { readSession, hasRole, resolveAdminPageAccess } from '../../lib/auth';
 import { getRequestOrigin } from '../../lib/apiBase';
 import {
   createAdminUser,
@@ -1094,16 +1094,17 @@ export default function AdminPage({
 
 export const getServerSideProps: GetServerSideProps<AdminPageProps> = async (ctx) => {
   const session = readSession(ctx.req);
-  if (
-    !session.user ||
-    (!hasRole(session.user.roleMask, RoleMask.ADMIN) && !hasRole(session.user.roleMask, RoleMask.DEVELOPER))
-  ) {
+  const access = resolveAdminPageAccess(session);
+  if (access === 'login') {
     return {
       redirect: {
         destination: '/login?next=/admin',
         permanent: false,
       },
     };
+  }
+  if (access === 'forbidden' || !session.user) {
+    return { notFound: true };
   }
   let users: UserSummary[] = [];
   let feedbacks: FeedbackEntry[] = [];

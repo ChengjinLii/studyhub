@@ -3,7 +3,7 @@ import { useRouter } from 'next/router';
 import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from 'react';
 import AppImage from '../components/AppImage';
 import NavBar from '../components/NavBar';
-import { readSession } from '../lib/auth';
+import { hasAuthenticatedSession, readSession } from '../lib/auth';
 import {
   completeRegistration,
   confirmPasswordReset,
@@ -779,7 +779,7 @@ export default function Login({ user }: LoginPageProps) {
 export const getServerSideProps: GetServerSideProps<LoginPageProps> = async (ctx) => {
   const session = readSession(ctx.req);
   const next = resolveSafeNextPath(ctx.query.next);
-  if (session.user) {
+  if (hasAuthenticatedSession(session)) {
     return {
       redirect: {
         destination: next,

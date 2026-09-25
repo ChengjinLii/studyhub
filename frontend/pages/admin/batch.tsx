@@ -3,13 +3,13 @@ import Link from 'next/link';
 import { FormEvent, useEffect, useRef, useState } from 'react';
 import { Download, RefreshCw } from 'lucide-react';
 import NavBar from '../../components/NavBar';
-import { hasRole, readSession } from '../../lib/auth';
+import { readSession, resolveAdminPageAccess } from '../../lib/auth';
 import { downloadBatchItem, getAdminBatch, listAdminBatches, publishBatch, reviewBatch } from '../../lib/batchApi';
 import { batchStatusLabel, safeBatchUrl } from '../../lib/batchSubmission';
 import { toErrorMessage } from '../../lib/errors';
 import { COURSE_CATEGORY_OPTIONS, SUPPORTED_SCHOOL } from '../../constants/metadata';
 import { BatchDetail, BatchId, BatchPage, PublishBatch } from '../../types/batch';
-import { RoleMask, SessionUser } from '../../types/user';
+import { SessionUser } from '../../types/user';
 import styles from '../../styles/Batch.module.css';
 
 function BatchReview({ batch, reload }: { batch: BatchDetail; reload: () => Promise<void> }) {
@@ -141,8 +141,9 @@ export default function AdminBatchPage({ user }: { user: SessionUser }) {
   </main></>;
 }
 export const getServerSideProps: GetServerSideProps = async ({ req }) => {
-  const { user, token } = readSession(req);
-  if (!user || !token || (!hasRole(user.roleMask, RoleMask.ADMIN) && !hasRole(user.roleMask, RoleMask.DEVELOPER)))
-    return { redirect: { destination: '/login?next=/admin/batch', permanent: false } };
-  return { props: { user } };
+  const session = readSession(req);
+  const access = resolveAdminPageAccess(session);
+  if (access === 'login') return { redirect: { destination: '/login?next=/admin/batch', permanent: false } };
+  if (access === 'forbidden' || !session.user) return { notFound: true };
+  return { props: { user: session.user } };
 };
