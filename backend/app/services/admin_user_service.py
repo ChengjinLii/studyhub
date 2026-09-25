@@ -65,6 +65,8 @@ class AdminUserService:
         user = self.auth_repo.find_user_by_id(session, user_id)
         if user is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="用户不存在")
+        if has_role(user.role_mask, ROLE_DEVELOPER) and not has_role(operator_role_mask, ROLE_DEVELOPER):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="仅超级管理员可以修改超级管理员账号")
         user.role_mask = role_mask
         self.auth_repo.save_user(session, user)
         self.auth_repo.bump_session_version(session, user.id, reason="roles_changed")

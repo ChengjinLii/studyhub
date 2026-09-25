@@ -2,11 +2,15 @@ from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
 
+from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
+from app.core.db import session_scope
 from app.models.auth import AuthUser
 from app.services.admin_user_service import AdminUserService
+from app.services.auth_service import AuthService
+from tests.support import build_auth_headers, seed_read_users
 
 
 class _DummyReadRepo:
@@ -98,3 +102,40 @@ def test_admin_user_list_reuses_seed_for_summaries() -> None:
 
     assert read_repo.loads == 1
     assert [user["totalEarnings"] for user in users] == [30.0, 12.5]
+
+
+def _set_role_mask(user_id: int, role_mask: int) -> None:
+    with session_scope() as session:
+        user = session.get(AuthUser, user_id)
+        assert user is not None
+        user.role_mask = role_mask
+
+
+def _role_mask(user_id: int) -> int | None:
+    with session_scope() as session:
+        user = session.get(AuthUser, user_id)
+        assert user is not None
+        return user.role_mask
+
+
+def test_admin_cannot_strip_developer_role(client: TestClient, auth_service: AuthService) -> None:
+    seed_read_users(auth_service)
+    _set_role_mask(2, 24)
+
+    response = client.patch("/api/admin/users?id=2", headers=build_auth_headers(3, 8), json={"roleMask": 8})
+    path_response = client.patch("/api/admin/users/2/roles", headers=build_auth_headers(3, 8), json={"roleMask": 1})
+
+    assert response.status_code == 403
+    assert path_response.status_code == 403
+    assert _role_mask(2) == 24
+
+
+def test_developer_can_change_developer_roles(client: TestClient, auth_service: AuthService) -> None:
+    seed_read_users(auth_service)
+    _set_role_mask(2, 24)
+    _set_role_mask(3, 24)
+
+    response = client.patch("/api/admin/users?id=2", headers=build_auth_headers(3, 24), json={"roleMask": 8})
+
+    assert response.status_code == 200
+    assert _role_mask(2) == 8
