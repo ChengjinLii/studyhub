@@ -29,3 +29,15 @@ jobs:
       - run: ruff check src tests
       - run: lint-imports --config .importlinter
       - run: pytest --cov --cov-report=term-missing
+      - name: Build and install the wheel non-editable (catches force-include/packaging regressions)
+        run: |
+          python -m pip wheel . --no-deps -w /tmp/studyhub-agent-wheel
+          python -m venv /tmp/studyhub-agent-wheel-venv
+          /tmp/studyhub-agent-wheel-venv/bin/pip install /tmp/studyhub-agent-wheel/*.whl
+          /tmp/studyhub-agent-wheel-venv/bin/python -c "
+          from studyhub_agent.contracts.render import render_text
+          from studyhub_agent.contracts.episode import Message
+          text = render_text([Message(role='user', content='hi')], [], thinking=False, add_generation_prompt=True)
+          assert text, 'wheel-installed package failed to render the chat template'
+          print('wheel install OK:', len(text), 'chars rendered')
+          "
