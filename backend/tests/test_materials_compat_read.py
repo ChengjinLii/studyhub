@@ -955,6 +955,119 @@ def test_async_legacy_material_detail_uses_one_shared_session(monkeypatch) -> No
     assert session_scope_entries["count"] == 1
 
 
+def test_async_legacy_material_detail_anonymous_uses_one_shared_session(monkeypatch) -> None:
+    # An anonymous request must skip every user-specific auxiliary lookup
+    # (favorited/liked/myRating/purchased/customPreviewImages) entirely, not
+    # just default their results, and must still only open one aux session.
+    import app.services.materials_service as materials_service_module
+
+    service = _build_service()
+    row = {
+        "id": 77, "uploader_id": 8, "uploader_username": "owner", "uploader_nickname": "Owner",
+        "title": "t", "description": "d", "original_filename": "f.pdf", "file_type": "pdf",
+        "file_size": 1, "price": 0, "is_free": 1, "school": "s", "college": "c", "major": "m",
+        "is_general_education": 0, "netdisk_url": None, "netdisk_password": None,
+        "netdisk_expired_at": None, "netdisk_reminder_at": None, "course_category": "MAJOR",
+        "grade_type": "UG", "grade_value": "1", "preview_watermark_enabled": 1,
+        "preview_source": "AUTO", "preview_manifest": None, "custom_preview_text": None,
+        "custom_preview_images": "[]", "rating_avg": 0, "rating_count": 0, "like_count": 0,
+        "view_count": 0, "download_count": 0, "sales_count": 0, "file_key": "k", "keywords": None,
+        "status": "VISIBLE",
+    }
+
+    session_scope_entries = {"count": 0}
+
+    @asynccontextmanager
+    async def counting_session_scope():
+        session_scope_entries["count"] += 1
+        yield object()
+
+    async def fake_row(session, material_id):
+        del session, material_id
+        return row
+
+    async def fake_empty_map(session, material_ids):
+        del session, material_ids
+        return {}
+
+    async def fake_empty_list(session, material_id):
+        del session, material_id
+        return []
+
+    def fail_if_called(*_args, **_kwargs):
+        raise AssertionError("user-specific auxiliary loader must not run for an anonymous request")
+
+    monkeypatch.setattr(materials_service_module, "async_session_scope", counting_session_scope)
+    monkeypatch.setattr(service, "_compat_load_material_detail_row_async", fake_row)
+    monkeypatch.setattr(service, "_compat_load_tags_map_async", fake_empty_map)
+    monkeypatch.setattr(service, "_compat_load_comment_counts_async", fake_empty_map)
+    monkeypatch.setattr(service, "_compat_load_versions_async", fake_empty_list)
+    monkeypatch.setattr(service, "_compat_load_reviews_async", fake_empty_list)
+    monkeypatch.setattr(service, "_compat_material_relation_exists_async", fail_if_called)
+    monkeypatch.setattr(service, "_compat_load_my_rating_async", fail_if_called)
+    monkeypatch.setattr(service, "_compat_has_paid_access_async", fail_if_called)
+    monkeypatch.setattr(service, "_compat_build_custom_preview_urls_async", fail_if_called)
+
+    data = asyncio.run(service.get_detail_async(session=None, current_user_id=None, material_id=77, can_manage_all=False))
+
+    assert data["id"] == 77
+    assert data["favorited"] is False
+    assert data["liked"] is False
+    assert data["myRating"] is None
+    assert data["purchased"] is False
+    assert data["customPreviewImages"] == []
+    assert session_scope_entries["count"] == 1
+
+
+def test_async_legacy_material_detail_hidden_material_raises_inside_shared_session(monkeypatch) -> None:
+    # The 404-for-hidden-material check runs inside the shared aux session
+    # block (it needs the just-loaded row); the session must still be
+    # entered exactly once and exit cleanly (no leaked/half-open session)
+    # when that check raises.
+    import app.services.materials_service as materials_service_module
+
+    service = _build_service()
+    row = {
+        "id": 77, "uploader_id": 8, "uploader_username": "owner", "uploader_nickname": "Owner",
+        "title": "t", "description": "d", "original_filename": "f.pdf", "file_type": "pdf",
+        "file_size": 1, "price": 0, "is_free": 1, "school": "s", "college": "c", "major": "m",
+        "is_general_education": 0, "netdisk_url": None, "netdisk_password": None,
+        "netdisk_expired_at": None, "netdisk_reminder_at": None, "course_category": "MAJOR",
+        "grade_type": "UG", "grade_value": "1", "preview_watermark_enabled": 1,
+        "preview_source": "AUTO", "preview_manifest": None, "custom_preview_text": None,
+        "custom_preview_images": "[]", "rating_avg": 0, "rating_count": 0, "like_count": 0,
+        "view_count": 0, "download_count": 0, "sales_count": 0, "file_key": "k", "keywords": None,
+        "status": "HIDDEN",
+    }
+
+    entries = {"count": 0}
+    exits = {"count": 0}
+
+    @asynccontextmanager
+    async def counting_session_scope():
+        entries["count"] += 1
+        try:
+            yield object()
+        finally:
+            exits["count"] += 1
+
+    async def fake_row(session, material_id):
+        del session, material_id
+        return row
+
+    monkeypatch.setattr(materials_service_module, "async_session_scope", counting_session_scope)
+    monkeypatch.setattr(service, "_compat_load_material_detail_row_async", fake_row)
+
+    with pytest.raises(HTTPException) as exc_info:
+        asyncio.run(
+            service.get_detail_async(session=None, current_user_id=12, material_id=77, can_manage_all=False)
+        )
+
+    assert exc_info.value.status_code == 404
+    assert entries["count"] == 1
+    assert exits["count"] == 1
+
+
 def test_compat_file_key_sql_caches_schema_introspection_per_engine(monkeypatch) -> None:
     import app.services.materials_compat as materials_compat_module
 
@@ -998,3 +1111,78 @@ def test_compat_file_key_sql_caches_schema_introspection_per_engine(monkeypatch)
         legacy = service._compat_file_key_sql(other_session)
     assert legacy == "m.file_key"
     assert calls["count"] == 2
+
+
+def test_compat_file_key_sql_async_runs_sync_inspect_via_run_sync(monkeypatch) -> None:
+    # Regression for the async path: calling inspect() directly on an
+    # AsyncEngine's .sync_engine facade from inside a coroutine raises
+    # MissingGreenlet on every call (silently swallowed by the except-clause
+    # fallback), so this must go through AsyncSession.run_sync instead. This
+    # uses a real aiosqlite engine/session (not a mock) specifically to prove
+    # that path doesn't raise.
+    from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
+
+    import app.services.materials_compat as materials_compat_module
+
+    service = _build_service()
+    engine = create_async_engine("sqlite+aiosqlite:///:memory:", future=True)
+
+    calls = {"count": 0}
+    original_inspect = materials_compat_module.inspect
+
+    def counting_inspect(bind):
+        calls["count"] += 1
+        return original_inspect(bind)
+
+    monkeypatch.setattr(materials_compat_module, "inspect", counting_inspect)
+
+    async def scenario() -> tuple[str, str]:
+        async with engine.begin() as connection:
+            await connection.execute(
+                text("CREATE TABLE materials (id INTEGER PRIMARY KEY, file_key VARCHAR(512), file_storage_key VARCHAR(512))")
+            )
+        async with AsyncSession(engine) as session:
+            first = await service._compat_file_key_sql_async(session)
+            second = await service._compat_file_key_sql_async(session)
+        return first, second
+
+    try:
+        first, second = asyncio.run(scenario())
+    finally:
+        asyncio.run(engine.dispose())
+
+    assert first == "COALESCE(m.file_storage_key, m.file_key) AS file_key"
+    assert second == first
+    # Cached after the first real introspection -- not re-run (and not
+    # re-attempted after a swallowed MissingGreenlet) on the second call.
+    assert calls["count"] == 1
+
+
+def test_compat_file_key_sql_async_does_not_cache_a_failed_introspection() -> None:
+    service = _build_service()
+
+    class _FakeAsyncEngine:
+        pass
+
+    class _FailingRunSyncSession:
+        def __init__(self) -> None:
+            self._engine = _FakeAsyncEngine()
+            self.run_sync_attempts = 0
+
+        def get_bind(self):
+            return self._engine
+
+        async def run_sync(self, _fn):
+            self.run_sync_attempts += 1
+            raise RuntimeError("boom")
+
+    session = _FailingRunSyncSession()
+    first = asyncio.run(service._compat_file_key_sql_async(session))
+    second = asyncio.run(service._compat_file_key_sql_async(session))
+
+    # Falls back both times (nothing was cached from the failure), retrying
+    # introspection on every call rather than pinning the fallback as if it
+    # were a real, permanent answer for this engine.
+    assert first == "COALESCE(m.file_storage_key, m.file_key) AS file_key"
+    assert second == first
+    assert session.run_sync_attempts == 2

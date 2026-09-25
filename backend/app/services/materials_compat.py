@@ -41,44 +41,108 @@ VISIBLE_MATERIAL_STATUS_SQL = "(m.status IS NULL OR LOWER(m.status) NOT IN ('hid
 
 # The materials table schema does not change while the process is running, so
 # the column-presence check below (used to bridge pre/post migration schemas)
-# only needs to run once per engine, not once per request. Without this cache,
-# every list/detail/preview/download read paid for a schema introspection
-# round trip (or, on the async path, a blocking reflection call) on every
-# request. Keyed by the engine object itself (via a weak reference) rather
-# than its URL: tests spin up many distinct sqlite ":memory:" engines that
-# share the same URL string but intentionally have different (legacy vs.
-# current) schemas, so a URL-keyed cache would leak results between them.
+# only needs to run once per engine, not once per request -- and its result
+# must reflect the schema for the *whole remaining life of this process*: if
+# an additive migration (e.g. adding file_storage_key) runs against a live
+# database, a process that already cached "no such column" for that engine
+# will keep generating SQL for the old schema until it is restarted. Keyed by
+# the engine object itself (via a weak reference) rather than its URL: tests
+# spin up many distinct sqlite ":memory:" engines that share the same URL
+# string but intentionally have different (legacy vs. current) schemas, so a
+# URL-keyed cache would leak results between them.
 _materials_columns_cache: WeakKeyDictionary = WeakKeyDictionary()
 _materials_columns_lock = RLock()
 _FALLBACK_MATERIALS_COLUMNS = frozenset({"file_key", "file_storage_key"})
 
 
+def reset_compat_materials_columns_cache() -> None:
+    """Drop all cached materials-table column introspection results.
+
+    Called from app.core.async_db.reset_async_database_runtime whenever the
+    async engine is disposed/replaced, so a later call can't return a stale
+    answer pinned to a previous engine. A WeakKeyDictionary would eventually
+    self-clean once the old engine is garbage collected, but that isn't
+    guaranteed to happen before the next call (e.g. lingering references from
+    pool/event-listener internals), so this is explicit instead of relying on
+    GC timing -- most relevant for tests, which recreate engines often.
+    """
+    with _materials_columns_lock:
+        _materials_columns_cache.clear()
+
+
+def _compat_materials_columns_cache_key(session: Session) -> Any:
+    bind = session.get_bind()
+    sync_bind = bind.sync_engine if hasattr(bind, "sync_engine") else bind
+    # Normalize a Connection down to its parent Engine so the cache is keyed
+    # consistently regardless of whether the session is bound to an Engine or
+    # to a specific Connection.
+    return getattr(sync_bind, "engine", sync_bind)
+
+
 class MaterialsCompatMixin:
     def _compat_materials_columns(self, session: Session) -> frozenset[str]:
+        # Sync sessions only. An AsyncSession's bind is an AsyncEngine/
+        # AsyncConnection; inspect() on its .sync_engine facade from outside a
+        # greenlet context raises MissingGreenlet every time. Async callers
+        # must use _compat_materials_columns_async (via
+        # _compat_file_key_sql_async) instead, which bridges into a real
+        # greenlet context via AsyncSession.run_sync.
         try:
-            bind = session.get_bind()
-            sync_bind = bind.sync_engine if hasattr(bind, "sync_engine") else bind
-            # Normalize a Connection down to its parent Engine so the cache is
-            # keyed consistently regardless of whether the session is bound to
-            # an Engine or to a specific Connection.
-            sync_bind = getattr(sync_bind, "engine", sync_bind)
+            cache_key = _compat_materials_columns_cache_key(session)
         except Exception:
             return _FALLBACK_MATERIALS_COLUMNS
         with _materials_columns_lock:
-            cached = _materials_columns_cache.get(sync_bind)
+            cached = _materials_columns_cache.get(cache_key)
         if cached is not None:
             return cached
         try:
-            columns = frozenset(column["name"] for column in inspect(sync_bind).get_columns("materials"))
+            columns = frozenset(column["name"] for column in inspect(cache_key).get_columns("materials"))
         except Exception:
-            columns = _FALLBACK_MATERIALS_COLUMNS
+            # Don't cache a result that came from an exception: a transient
+            # failure here should be retried on the next call, not pinned as
+            # the answer for this engine's remaining lifetime.
+            return _FALLBACK_MATERIALS_COLUMNS
         with _materials_columns_lock:
-            _materials_columns_cache[sync_bind] = columns
+            _materials_columns_cache[cache_key] = columns
+        return columns
+
+    async def _compat_materials_columns_async(self, session) -> frozenset[str]:
+        try:
+            cache_key = _compat_materials_columns_cache_key(session)
+        except Exception:
+            return _FALLBACK_MATERIALS_COLUMNS
+        with _materials_columns_lock:
+            cached = _materials_columns_cache.get(cache_key)
+        if cached is not None:
+            return cached
+        try:
+            # AsyncSession.run_sync bridges into a real greenlet context, so
+            # this is safe (unlike calling inspect() on the sync_engine
+            # facade directly from a coroutine, which raises MissingGreenlet
+            # every time -- previously silently swallowed by the fallback
+            # below, which happened to match the current schema but would be
+            # wrong during a migration window, and burns the checked-out
+            # pooled connection under pool_pre_ping in the process).
+            column_names = await session.run_sync(
+                lambda sync_session: [column["name"] for column in inspect(sync_session.get_bind()).get_columns("materials")]
+            )
+        except Exception:
+            return _FALLBACK_MATERIALS_COLUMNS
+        columns = frozenset(column_names)
+        with _materials_columns_lock:
+            _materials_columns_cache[cache_key] = columns
         return columns
 
     def _compat_file_key_sql(self, session: Session, table_alias: str | None = "m") -> str:
         prefix = f"{table_alias}." if table_alias else ""
         columns = self._compat_materials_columns(session)
+        if "file_storage_key" in columns:
+            return f"COALESCE({prefix}file_storage_key, {prefix}file_key) AS file_key"
+        return f"{prefix}file_key"
+
+    async def _compat_file_key_sql_async(self, session, table_alias: str | None = "m") -> str:
+        prefix = f"{table_alias}." if table_alias else ""
+        columns = await self._compat_materials_columns_async(session)
         if "file_storage_key" in columns:
             return f"COALESCE({prefix}file_storage_key, {prefix}file_key) AS file_key"
         return f"{prefix}file_key"
@@ -1291,7 +1355,7 @@ class MaterialsCompatMixin:
                 paging_sql = "\n            LIMIT :limit"
             params["offset"] = safe_offset
             paging_sql += "\n            OFFSET :offset"
-        file_key_sql = self._compat_file_key_sql(session)
+        file_key_sql = await self._compat_file_key_sql_async(session)
         rows = (
             await session.execute(
                 text(
@@ -1336,7 +1400,7 @@ class MaterialsCompatMixin:
         return [dict(row) for row in rows]
 
     async def _compat_load_material_detail_row_async(self, session, material_id: int) -> dict[str, Any]:
-        file_key_sql = self._compat_file_key_sql(session)
+        file_key_sql = await self._compat_file_key_sql_async(session)
         row = (
             await session.execute(
                 text(

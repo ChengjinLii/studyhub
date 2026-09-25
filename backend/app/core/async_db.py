@@ -84,3 +84,8 @@ async def reset_async_database_runtime() -> None:
         await _ASYNC_ENGINE.dispose()
     _ASYNC_ENGINE = None
     _ASYNC_SESSION_FACTORY = None
+    # Deferred import: materials_compat imports async_session_scope from this
+    # module, so importing it at module level here would be circular.
+    from app.services.materials_compat import reset_compat_materials_columns_cache
+
+    reset_compat_materials_columns_cache()
