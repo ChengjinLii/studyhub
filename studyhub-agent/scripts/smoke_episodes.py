@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import argparse
-import json
+import hashlib
 from pathlib import Path
 
 from studyhub_agent.contracts.episode import EpisodeSpec
@@ -14,6 +14,23 @@ from studyhub_agent.runtime.token_client import SGLangGenerateBackend, TokenPoli
 from studyhub_agent.runtime.tokenizer import HFTokenizer, token_counter
 
 
+def _validated_args(parser: argparse.ArgumentParser) -> argparse.Namespace:
+    args = parser.parse_args()
+    tokenizer_path = args.model_dir / "tokenizer.json"
+    if not tokenizer_path.is_file():
+        parser.error(f"--model-dir {args.model_dir} has no tokenizer.json (looked for {tokenizer_path})")
+    if not args.snapshot.is_file():
+        parser.error(f"--snapshot {args.snapshot} does not exist")
+    if not args.tasks.is_file():
+        parser.error(f"--tasks {args.tasks} does not exist")
+    return args
+
+
+def _tokenizer_revision(model_dir: Path) -> str:
+    digest = hashlib.sha256((model_dir / "tokenizer.json").read_bytes()).hexdigest()
+    return f"{model_dir.name}@sha256:{digest[:12]}"
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--model-dir", type=Path, required=True)
@@ -21,11 +38,14 @@ def main() -> None:
     parser.add_argument("--snapshot", type=Path, required=True)
     parser.add_argument("--tasks", type=Path, required=True)
     parser.add_argument("--out", type=Path, required=True)
-    args = parser.parse_args()
+    args = _validated_args(parser)
 
     tokenizer = HFTokenizer.from_model_dir(args.model_dir)
-    revision = f"{args.model_dir.name}@{(args.model_dir / 'tokenizer.json').stat().st_size}"
-    runner = EpisodeRunner(prompts=DEFAULT_PROMPTS, tokenizer_revision=revision, count_tokens=token_counter(tokenizer))
+    runner = EpisodeRunner(
+        prompts=DEFAULT_PROMPTS,
+        tokenizer_revision=_tokenizer_revision(args.model_dir),
+        count_tokens=token_counter(tokenizer),
+    )
     policy = TokenPolicyClient(tokenizer, SGLangGenerateBackend(args.sglang_url))
     environment = ReplayEnvironment(load_snapshot(args.snapshot))
     args.out.parent.mkdir(parents=True, exist_ok=True)
@@ -35,7 +55,10 @@ def main() -> None:
                 continue
             episode = runner.run(EpisodeSpec.model_validate_json(line), environment, policy)
             handle.write(episode.model_dump_json() + "\n")
-            print(f"{episode.spec.episode_id}: {episode.termination} turns={len(episode.turns)} hash={episode.contract_hash[:19]}")
+            print(
+                f"{episode.spec.episode_id}: {episode.termination} "
+                f"turns={len(episode.turns)} hash={episode.contract_hash[:19]}"
+            )
 
 
 if __name__ == "__main__":
