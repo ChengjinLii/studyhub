@@ -1,15 +1,19 @@
 # OPD evaluation: archived conclusions
 
 This note archives the conclusions of the Optimal Policy Distillation (OPD)
-experiment for the Qwen3.5-4B StudyHub agent before the branches and
-worktrees that produced it were deleted (Task 15 of the v3 foundation plan,
-with the repository owner's explicit authorization). Full commit history for
-this work is retained forever via the tags pushed in Task 1 — nothing here is
-otherwise recoverable only from this summary. Every source below is cited as
-`archive/opd-evaluation:<path>` (or the sibling `archive/opd-execution`,
-`archive/opd-preflight` tags) and can be read at any time with
-`git show <tag>:<path>` on `/data/chengjin/studyhub`, since tags are never
-deleted.
+experiment for the Qwen3.5-4B StudyHub agent before the GitHub branches (and
+most of the local branches/worktrees) that produced it were deleted (Task 15
+of the v3 foundation plan, with the repository owner's explicit
+authorization; see "Where the code went" below for exactly what was and
+was not removed). Full commit history for this work is retained forever via
+the tags pushed in Task 1. The numeric results in this doc, however, come
+from a gitignored, untagged evaluation-suite run directory on the server
+(see "Run" below) — that raw data is *not* reachable from any tag or
+branch, so this summary (plus that directory, while it exists) is the only
+record of it. Every source below is cited as `archive/opd-evaluation:<path>`
+(or the sibling `archive/opd-execution`, `archive/opd-preflight` tags) and
+can be read at any time with `git show <tag>:<path>` on
+`/data/chengjin/studyhub`, since tags are never deleted.
 
 ## What OPD was
 
@@ -138,9 +142,21 @@ in Task 1 (never deleted):
 - `archive/opd-evaluation` → `43011283d8bb5bd6653db07e27737fa4a2891609`
   (was branch `codex/qwen35-4b-opd-evaluation`)
 
-The corresponding local branches and worktrees (on
-`/data/chengjin/studyhub`) and the matching branches on GitHub were deleted
-in Task 15. Any path cited above as `archive/opd-evaluation:<path>` (or
-under the other three tags) remains retrievable at any time with
-`git show <tag>:<path>` — deleting the branch only removes the mutable
-pointer, not the commits, which stay reachable from the tag.
+In Task 15, the GitHub branches `codex/qwen35-4b-opd-execution` and
+`codex/qwen35-4b-opd-preflight` were deleted (`codex/qwen35-4b-opd-evaluation`
+was never pushed to GitHub in the first place). On the server
+(`/data/chengjin/studyhub`), the local branch and worktree for
+`opd-preflight` and `opd-evaluation` were also removed. The local branch
+`codex/qwen35-4b-opd-execution` and its worktree
+(`/data/chengjin/studyhub-opd-execution-worktree`) were **retained** — not
+deleted — because that worktree holds gitignored, untagged run artifacts
+(`artifacts/experiments/*/{checkpoints,trajectories,metrics}`,
+`datasets/interim`, ~62M total) that `git worktree remove` would destroy
+along with the checkout. Its commits are already fully covered by the
+`archive/opd-execution` and `archive/opd-evaluation` tags, so no history is
+at risk either way; only the convenience of a local checkout differs.
+
+Any path cited above as `archive/opd-evaluation:<path>` (or under the other
+three tags) remains retrievable at any time with `git show <tag>:<path>` —
+deleting a branch only removes the mutable pointer, not the commits, which
+stay reachable from the tag.
