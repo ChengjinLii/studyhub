@@ -44,13 +44,13 @@ studyhub_agent/
     render.py       # 唯一的 render(messages, tools, thinking) → token ids；工具调用解析
     fingerprint.py  # 契约哈希
   runtime/          # EpisodeRunner、PolicyClient 协议与两种实现、预算控制
-  environments/     # Environment 协议 + ReplayEnvironment
-  tools/            # 7 个工具的实现 + MCP 名称适配
+  environments/     # Environment 协议 + ReplayEnvironment（replay 专用的工具实现放在 environments/replay/）
+  tools/            # 7 个工具的 ToolSpec + MCP 名称映射（与具体环境无关）
   graders/          # Grader 协议 + 测试用精确匹配 grader
   guardrails/       # 移植：PermissionContext、隐私脱敏、SSRF 策略
 ```
 
-依赖方向是单向的：`contracts` ← `guardrails` ← `tools` / `environments` ← `runtime` ← `graders`。子项目 2、3 的 eval 和 training 只能依赖这些层，不允许反向依赖。这一约束用 import-linter 写进 CI。
+依赖方向是单向的：`contracts` ← `guardrails` ← `tools` ← `environments` ← `runtime`；`graders` 只依赖 `contracts`。子项目 2、3 的 eval 和 training 只能依赖这些层，不允许反向依赖。这一约束用 import-linter 写进 CI。
 
 ## 3. 运行契约
 
@@ -66,7 +66,7 @@ studyhub_agent/
 **契约规则**（每条都有对应测试）：
 
 1. 一个 episode 在整个生命周期内契约哈希不变。prompt、工具、thinking、模板都不允许中途切换，包括"强制结束轮"。
-2. 每个 assistant 回合要么是 1 个或多个工具调用，要么是最终文本，不能混合。混合输出按解析失败处理。
+2. 回合类型只由是否包含工具调用决定：含工具调用的回合是 TOOL_CALLS 回合，其中的文本（Qwen3.5 模板允许在工具调用前写推理）只作为内部前言保存，永远不作为答案；不含工具调用的回合是 FINAL 回合，其文本就是面向用户的回答。工具调用之后出现文本、标签不闭合、参数不符合 schema，都按解析失败处理，并且整个回合的工具调用都不执行。
 3. `EpisodeSpec`、SFT 样本、RL rollout、评测结果都记录契约哈希。哈希不一致的数据不能混入同一次训练或同一张对比表。
 4. 所有配置对象使用 `extra="forbid"`，未知参数直接报错。
 5. schema lint 拒绝非 JSON Schema 标准的类型（例如 `int`），拒绝缺少 `description` 的参数和超长的 enum。
