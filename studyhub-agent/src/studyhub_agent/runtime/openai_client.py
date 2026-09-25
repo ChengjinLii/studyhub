@@ -110,6 +110,13 @@ class OpenAICompatPolicyClient:
         message = choice.get("message") or {}
         content = (message.get("content") or "").strip()
         reasoning = message.get("reasoning_content") or message.get("reasoning") or ""
+        # A server can return reasoning_content even when thinking was disabled for this turn (a
+        # misconfigured or non-compliant server). Rendering it anyway would inject a
+        # reasoning_content field the chat template was never asked to produce for this turn (and
+        # broke the parse round-trip); drop it and flag that it happened instead.
+        dropped_reasoning = bool(reasoning) and not thinking
+        if dropped_reasoning:
+            reasoning = ""
         raw_text = _raw_completion_text(content, message.get("tool_calls"))
         if choice.get("finish_reason") == "length":
             # The completion was cut off by max_tokens; it must never be treated as a valid
@@ -142,8 +149,9 @@ class OpenAICompatPolicyClient:
             tool_calls=reparsed.tool_calls,
             raw_text=raw_text,
             canonical_text=canonical,
-            completion_token_ids=tuple(self._tokenizer.encode(canonical)) if self._tokenizer else (),
+            canonical_token_ids=tuple(self._tokenizer.encode(canonical)) if self._tokenizer else (),
             server_parse_mismatch=reparsed.tool_calls != tuple(calls),
+            dropped_reasoning=dropped_reasoning,
             finish_reason=choice.get("finish_reason"),
             latency_ms=latency_ms,
         )

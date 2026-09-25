@@ -55,6 +55,18 @@ def infra_failure() -> PolicyInfraError:
     return PolicyInfraError("sglang connection refused")
 
 
+class CharTokenizer:
+    """A trivial, lossless tokenizer (1 char = 1 token id) shared by the client parity tests."""
+
+    stop_token_ids: tuple[int, ...] = ()
+
+    def encode(self, text: str) -> list[int]:
+        return [ord(ch) for ch in text]
+
+    def decode(self, ids: Sequence[int]) -> str:
+        return "".join(chr(i) for i in ids)
+
+
 def count_chars(messages: Sequence[Message], tools: Sequence[ToolSpec], thinking: bool) -> int:
     return sum(len(message.content) for message in messages)
 

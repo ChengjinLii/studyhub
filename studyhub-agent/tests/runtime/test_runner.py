@@ -1,15 +1,29 @@
 import json
 from pathlib import Path
 
+import httpx
 import pytest
 
-from studyhub_agent.contracts.episode import Budget, EpisodeSpec, FailureOwner, Principal, Termination, TurnKind
+from studyhub_agent.contracts.episode import (
+    Budget,
+    EpisodeSpec,
+    FailureOwner,
+    Message,
+    Principal,
+    Termination,
+    ToolCall,
+    TurnKind,
+)
 from studyhub_agent.contracts.prompts import DEFAULT_PROMPTS
+from studyhub_agent.contracts.render import canonical_completion_text
 from studyhub_agent.environments.base import EnvironmentInfraError
 from studyhub_agent.environments.replay import ReplayEnvironment, load_snapshot
+from studyhub_agent.runtime.openai_client import OpenAICompatPolicyClient
 from studyhub_agent.runtime.runner import EpisodeRunner
-from studyhub_agent.tools.specs import TOOL_SPECS
+from studyhub_agent.runtime.token_client import Generation, TokenPolicyClient
+from studyhub_agent.tools.specs import TOOL_SPECS, select_tools
 from tests.runtime.fakes import (
+    CharTokenizer,
     ScriptedPolicy,
     count_chars,
     count_messages,
@@ -215,3 +229,78 @@ def test_reasoning_is_carried_into_message_history() -> None:
 def test_contract_hash_depends_on_thinking() -> None:
     tools = episode_tools()
     assert RUNNER.contract_for(_spec(), tools) != RUNNER.contract_for(_spec(thinking=True), tools)
+
+
+class _SequencedBackend:
+    """A GenerateBackend that returns one canned raw text per call, in order."""
+
+    def __init__(self, texts: list[str]) -> None:
+        self._texts = list(texts)
+
+    def generate(self, input_ids, *, sampling, max_new_tokens, stop_token_ids) -> Generation:
+        text = self._texts.pop(0)
+        ids = tuple(ord(ch) for ch in text)
+        return Generation(output_ids=ids, logprobs=tuple(-0.1 for _ in ids), finish_reason="stop")
+
+
+def test_token_and_openai_clients_produce_identical_episode_canonical_data() -> None:
+    # Full-episode parity: the same 2-turn scenario (a tool call, then a final answer) driven
+    # through EpisodeRunner by each real PolicyClient must produce identical per-turn canonical
+    # data and the same contract hash. Each client independently recomputes canonical_text from
+    # the *real* history EpisodeRunner gives it at call time, so the raw text fed to the token
+    # backend below only needs to parse to the intended content -- it does not need to itself be
+    # rendered against the real conversation history.
+    spec = _spec()
+    tools = select_tools(TOOLS)
+    dummy_history = (Message(role="system", content="sys"), Message(role="user", content="usr"))
+    tool_call = ToolCall(call_id="x", name="materials_search", arguments={"query": "高等数学 提纲"})
+    turn0_assistant = Message(role="assistant", content="", tool_calls=(tool_call,))
+    turn1_assistant = Message(role="assistant", content="先看提纲。")
+    raw0 = canonical_completion_text(dummy_history, turn0_assistant, tools, thinking=False).removesuffix(
+        "<|im_end|>\n"
+    )
+    raw1 = canonical_completion_text(dummy_history, turn1_assistant, tools, thinking=False).removesuffix(
+        "<|im_end|>\n"
+    )
+
+    tokenizer = CharTokenizer()
+    token_policy = TokenPolicyClient(tokenizer, _SequencedBackend([raw0, raw1]))
+    token_episode = EpisodeRunner(
+        prompts=DEFAULT_PROMPTS, tokenizer_revision="parity-rev", count_tokens=count_chars
+    ).run(spec, ReplayEnvironment(SNAPSHOT), token_policy)
+
+    openai_messages = [
+        {
+            "role": "assistant",
+            "content": "",
+            "tool_calls": [
+                {
+                    "id": "x",
+                    "type": "function",
+                    "function": {
+                        "name": "materials_search",
+                        "arguments": json.dumps({"query": "高等数学 提纲"}, ensure_ascii=False),
+                    },
+                }
+            ],
+        },
+        {"role": "assistant", "content": "先看提纲。"},
+    ]
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        message = openai_messages.pop(0)
+        finish_reason = "tool_calls" if message.get("tool_calls") else "stop"
+        return httpx.Response(200, json={"choices": [{"message": message, "finish_reason": finish_reason}]})
+
+    openai_policy = OpenAICompatPolicyClient(
+        "http://t", "m", tokenizer=tokenizer, client=httpx.Client(transport=httpx.MockTransport(handler))
+    )
+    openai_episode = EpisodeRunner(
+        prompts=DEFAULT_PROMPTS, tokenizer_revision="parity-rev", count_tokens=count_chars
+    ).run(spec, ReplayEnvironment(SNAPSHOT), openai_policy)
+
+    assert len(token_episode.turns) == len(openai_episode.turns) == 2
+    for token_turn, openai_turn in zip(token_episode.turns, openai_episode.turns, strict=True):
+        assert token_turn.canonical_text == openai_turn.canonical_text
+        assert token_turn.canonical_token_ids == openai_turn.canonical_token_ids
+    assert token_episode.contract_hash == openai_episode.contract_hash

@@ -83,10 +83,18 @@ class AssistantTurn(_Frozen):
     canonical_text: str
     parse_error: str | None = None
     prompt_token_ids: tuple[int, ...] = ()
-    completion_token_ids: tuple[int, ...] = ()
+    # The token client's literal sampled ids; always empty for the OpenAI client (no token-level
+    # sampling info is available over that API).
+    sampled_token_ids: tuple[int, ...] = ()
+    # encode(canonical_text), when a tokenizer is available; populated by both clients so their
+    # output is directly comparable regardless of which one produced a given turn.
+    canonical_token_ids: tuple[int, ...] = ()
     completion_logprobs: tuple[float, ...] = ()
     non_canonical: bool = False
     server_parse_mismatch: bool = False
+    # Set when a server returned reasoning_content while thinking was disabled for this turn; the
+    # reasoning was dropped rather than rendered (see runtime.openai_client).
+    dropped_reasoning: bool = False
     finish_reason: str | None = None
     latency_ms: float = 0.0
 

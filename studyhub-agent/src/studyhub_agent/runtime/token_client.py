@@ -99,7 +99,7 @@ class TokenPolicyClient:
         if generation.finish_reason == "length":
             # The completion was cut off by max_new_tokens; it must never be treated as a valid
             # FINAL/TOOL_CALLS turn (that would silently produce truncated SFT data).
-            return _parse_error_turn(raw_text, "truncated", prompt_ids, generation, latency_ms)
+            return self._parse_error_turn(raw_text, "truncated", prompt_ids, generation, latency_ms)
         parsed = parse_completion(raw_text, tools, thinking=thinking)
         canonical = raw_text
         if parsed.kind is not TurnKind.PARSE_ERROR:
@@ -109,7 +109,7 @@ class TokenPolicyClient:
             try:
                 canonical = canonical_completion_text(messages, assistant, tools, thinking=thinking)
             except RenderError as exc:
-                return _parse_error_turn(raw_text, f"unrenderable: {exc}", prompt_ids, generation, latency_ms)
+                return self._parse_error_turn(raw_text, f"unrenderable: {exc}", prompt_ids, generation, latency_ms)
         stripped_canonical = canonical.removesuffix(END_OF_TURN + "\n")
         non_canonical = parsed.kind is not TurnKind.PARSE_ERROR and stripped_canonical != raw_text
         return AssistantTurn(
@@ -121,25 +121,26 @@ class TokenPolicyClient:
             canonical_text=canonical,
             parse_error=parsed.error,
             prompt_token_ids=tuple(prompt_ids),
-            completion_token_ids=generation.output_ids,
+            sampled_token_ids=generation.output_ids,
+            canonical_token_ids=tuple(self._tokenizer.encode(canonical)),
             completion_logprobs=generation.logprobs,
             non_canonical=non_canonical,
             finish_reason=generation.finish_reason,
             latency_ms=latency_ms,
         )
 
-
-def _parse_error_turn(
-    raw_text: str, error: str, prompt_ids: Sequence[int], generation: Generation, latency_ms: float
-) -> AssistantTurn:
-    return AssistantTurn(
-        kind=TurnKind.PARSE_ERROR,
-        raw_text=raw_text,
-        canonical_text=raw_text,
-        parse_error=error,
-        prompt_token_ids=tuple(prompt_ids),
-        completion_token_ids=generation.output_ids,
-        completion_logprobs=generation.logprobs,
-        finish_reason=generation.finish_reason,
-        latency_ms=latency_ms,
-    )
+    def _parse_error_turn(
+        self, raw_text: str, error: str, prompt_ids: Sequence[int], generation: Generation, latency_ms: float
+    ) -> AssistantTurn:
+        return AssistantTurn(
+            kind=TurnKind.PARSE_ERROR,
+            raw_text=raw_text,
+            canonical_text=raw_text,
+            parse_error=error,
+            prompt_token_ids=tuple(prompt_ids),
+            sampled_token_ids=generation.output_ids,
+            canonical_token_ids=tuple(self._tokenizer.encode(raw_text)),
+            completion_logprobs=generation.logprobs,
+            finish_reason=generation.finish_reason,
+            latency_ms=latency_ms,
+        )

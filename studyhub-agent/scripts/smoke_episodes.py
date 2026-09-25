@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import argparse
-import hashlib
 from pathlib import Path
 
 from studyhub_agent.contracts.episode import EpisodeSpec
@@ -26,11 +25,6 @@ def _validated_args(parser: argparse.ArgumentParser) -> argparse.Namespace:
     return args
 
 
-def _tokenizer_revision(model_dir: Path) -> str:
-    digest = hashlib.sha256((model_dir / "tokenizer.json").read_bytes()).hexdigest()
-    return f"{model_dir.name}@sha256:{digest[:12]}"
-
-
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--model-dir", type=Path, required=True)
@@ -43,7 +37,7 @@ def main() -> None:
     tokenizer = HFTokenizer.from_model_dir(args.model_dir)
     runner = EpisodeRunner(
         prompts=DEFAULT_PROMPTS,
-        tokenizer_revision=_tokenizer_revision(args.model_dir),
+        tokenizer_revision=tokenizer.revision,
         count_tokens=token_counter(tokenizer),
     )
     policy = TokenPolicyClient(tokenizer, SGLangGenerateBackend(args.sglang_url))

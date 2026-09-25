@@ -10,9 +10,15 @@ Sample output from this exact run: [`docs/evidence/foundation-smoke-2026-09-25.j
 > `scripts/smoke_episodes.py` that derived `tokenizer_revision` from the tokenizer file's size
 > (`Qwen3.5-4B@12807982`). A later fix changed this to a sha256 of the file's contents
 > (`Qwen3.5-4B@sha256:5f9e4d4901a9`), which is also an input to `contract_hash`. Re-running the
-> commands below at the current script version will reproduce the same turns, tool calls, final
-> answers and termination reasons, but with **different `contract_hash` values** than the checked-in
-> file — that is expected, not a regression.
+> commands below at the current script version is only guaranteed to differ from the checked-in
+> file in `contract_hash`; sampled outputs (turns, tool calls, final answers, termination reasons)
+> may also differ — that is expected, not a regression.
+>
+> **Note on the checked-in evidence's field names:** it also predates the `AssistantTurn` field
+> rename `completion_token_ids` → `sampled_token_ids` / `canonical_token_ids` (the token client's
+> literal sampled ids vs. `encode(canonical_text)`, populated by both clients). The evidence file's
+> `completion_token_ids` key is a historical artifact of the schema at the time it was captured, not
+> the current one.
 
 ## Shared-GPU etiquette (read first)
 

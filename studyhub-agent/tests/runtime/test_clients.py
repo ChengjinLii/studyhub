@@ -1,5 +1,4 @@
 import json
-from collections.abc import Sequence
 
 import httpx
 import pytest
@@ -10,6 +9,7 @@ from studyhub_agent.runtime.openai_client import OpenAICompatPolicyClient, _wire
 from studyhub_agent.runtime.policy import PolicyInfraError
 from studyhub_agent.runtime.token_client import Generation, SGLangGenerateBackend, TokenPolicyClient
 from studyhub_agent.tools.specs import select_tools
+from tests.runtime.fakes import CharTokenizer
 
 TOOLS = select_tools(["materials_search", "materials_read"])
 HISTORY = (Message(role="system", content="系统"), Message(role="user", content="找线性代数笔记"))
@@ -18,16 +18,6 @@ ASSISTANT = Message(role="assistant", content="我先检索。", tool_calls=(CAL
 CANONICAL = canonical_completion_text(HISTORY, ASSISTANT, TOOLS, thinking=False)
 ASSISTANT_THINKING = Message(role="assistant", content="我先检索。", tool_calls=(CALL,), reasoning="推理一下")
 CANONICAL_THINKING = canonical_completion_text(HISTORY, ASSISTANT_THINKING, TOOLS, thinking=True)
-
-
-class CharTokenizer:
-    stop_token_ids: tuple[int, ...] = ()
-
-    def encode(self, text: str) -> list[int]:
-        return [ord(ch) for ch in text]
-
-    def decode(self, ids: Sequence[int]) -> str:
-        return "".join(chr(i) for i in ids)
 
 
 class CannedBackend:
@@ -84,7 +74,11 @@ def test_token_and_openai_clients_produce_identical_canonical_completion() -> No
     assert token_turn.kind is openai_turn.kind is TurnKind.TOOL_CALLS
     assert token_turn.tool_calls == openai_turn.tool_calls
     assert token_turn.canonical_text == openai_turn.canonical_text == CANONICAL
-    assert openai_turn.completion_token_ids == tuple(ord(ch) for ch in CANONICAL)
+    assert token_turn.canonical_token_ids == openai_turn.canonical_token_ids == tuple(ord(ch) for ch in CANONICAL)
+    # sampled_token_ids is the token client's literal sampled ids; the OpenAI client never gets
+    # token-level sampling info, so it stays empty.
+    assert token_turn.sampled_token_ids == tuple(ord(ch) for ch in generated)
+    assert openai_turn.sampled_token_ids == ()
     assert token_turn.non_canonical is False and openai_turn.server_parse_mismatch is False
 
 
@@ -120,6 +114,7 @@ def test_token_and_openai_clients_produce_identical_canonical_completion_with_th
     assert token_turn.tool_calls == openai_turn.tool_calls
     assert token_turn.canonical_text == openai_turn.canonical_text == CANONICAL_THINKING
     assert token_turn.reasoning == openai_turn.reasoning == "推理一下"
+    assert openai_turn.dropped_reasoning is False
     assert token_turn.non_canonical is False and openai_turn.server_parse_mismatch is False
 
 
@@ -129,7 +124,7 @@ def test_token_client_sends_rendered_prompt_and_keeps_logprobs() -> None:
         HISTORY, TOOLS, thinking=False, sampling=Sampling(), max_new_tokens=64
     )
     assert "".join(chr(i) for i in backend.last_input).endswith("<think>\n\n</think>\n\n")
-    assert turn.kind is TurnKind.FINAL and len(turn.completion_logprobs) == len(turn.completion_token_ids)
+    assert turn.kind is TurnKind.FINAL and len(turn.completion_logprobs) == len(turn.sampled_token_ids)
     assert turn.prompt_token_ids == tuple(backend.last_input)
 
 
@@ -164,6 +159,20 @@ def test_openai_mixed_answer_and_tool_call_is_a_tool_turn_with_preamble() -> Non
     client = OpenAICompatPolicyClient("http://t", "m", client=httpx.Client(transport=_openai_transport(message)))
     turn = client.step(HISTORY, TOOLS, thinking=False, sampling=Sampling(), max_new_tokens=64)
     assert turn.kind is TurnKind.TOOL_CALLS and turn.content == "答案是 A"
+
+
+def test_openai_drops_reasoning_when_thinking_is_false() -> None:
+    # A server can return reasoning_content even when the caller asked for enable_thinking=False
+    # (e.g. a misconfigured or non-compliant server). Rendering it anyway would inject a
+    # reasoning_content field the chat template was never asked to produce. Drop it instead, and
+    # flag that it happened.
+    message = {"role": "assistant", "content": "答案是 A", "reasoning_content": "不应该出现"}
+    client = OpenAICompatPolicyClient("http://t", "m", client=httpx.Client(transport=_openai_transport(message)))
+    turn = client.step(HISTORY, TOOLS, thinking=False, sampling=Sampling(), max_new_tokens=64)
+    assert turn.kind is TurnKind.FINAL
+    assert turn.reasoning == ""
+    assert turn.dropped_reasoning is True
+    assert "不应该出现" not in turn.canonical_text
 
 
 def test_http_failures_raise_policy_infra_error() -> None:
