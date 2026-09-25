@@ -10,7 +10,7 @@ import { MaterialDetail } from '../types/material';
 import { ColumnTopicKey, resolveExperienceTopicFromTags } from './column';
 import { toErrorMessage } from './errors';
 import { parseMajorList } from './major';
-import { fetchMaterialDetail } from './api';
+import { webApiFetch } from './apiTransport';
 
 type StatusSetter = Dispatch<SetStateAction<{ type: 'success' | 'error'; message: string } | null>>;
 type StringSetter = Dispatch<SetStateAction<string>>;
@@ -103,7 +103,7 @@ export function useUploadExistingMaterial({
       if (!isEditing || !editingId) return;
       setLoadingExisting(true);
       try {
-        const detail: MaterialDetail = await fetchMaterialDetail(editingId);
+        const detail = await webApiFetch<MaterialDetail>(`/materials/${encodeURIComponent(editingId)}`);
         setTitle(detail.title || '');
         setDescription(detail.description || '');
         const detailPrice = detail.price != null ? Math.round(detail.price) : 0;
