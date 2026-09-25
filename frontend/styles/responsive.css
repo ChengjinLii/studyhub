@@ -663,3 +663,61 @@ h2 {
     font-size: 11px;
   }
 }
+
+/* ---------------------------------------------------------------------------
+ * Touch targets on phones (audit at 390px: controls under 36px tall)
+ * ------------------------------------------------------------------------- */
+
+@media (max-width: 768px) {
+  .site-title a {
+    min-height: 40px;
+    align-items: center;
+  }
+
+  .leaderboard-actions .button.small {
+    min-width: 48px;
+    min-height: 40px;
+    height: 40px;
+  }
+
+  .request-leaderboard__list {
+    gap: 0;
+  }
+
+  .request-leaderboard__item {
+    min-height: 40px;
+  }
+
+  .request-leaderboard__item a {
+    padding-block: 10px;
+  }
+
+  .view-toggle button,
+  .profile-card__edit,
+  .profile-card__expand,
+  .column-latest-tab {
+    min-height: 40px;
+  }
+
+  .profile-tab,
+  .more-header__nav a {
+    min-height: var(--touch-target);
+  }
+
+  .column-article-card__readmore {
+    display: inline-flex;
+    align-items: center;
+    min-height: 40px;
+  }
+
+  .market-detail__info-body .market-want-toggle {
+    width: var(--touch-target);
+    height: var(--touch-target);
+  }
+
+  /* Stretch row links to the full row height without changing the layout. */
+  .material-row > a {
+    padding-block: 12px;
+    margin-block: -12px;
+  }
+}
