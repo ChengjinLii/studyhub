@@ -447,3 +447,59 @@ def test_report_restore_keeps_security_held_material_hidden(
 
     assert restored.status_code == 200
     assert _material_state(101) == ("HIDDEN", "SECURITY_PENDING")
+
+
+def test_report_auto_hide_invalidates_anonymous_market_cache(
+    client: TestClient,
+    auth_service: AuthService,
+) -> None:
+    seed_read_users(auth_service)
+    alice_headers = build_auth_headers(1, 1)
+    baishan_headers = build_auth_headers(2, 2)
+    admin_headers = build_auth_headers(3, 8)
+
+    # Warm the anonymous public-read cache for this market item before it is
+    # auto-hidden below. Without invalidating that cache on auto-hide, the
+    # next anonymous read would keep serving this stale (pre-hide) response
+    # until the cache TTL expires instead of reflecting the hide immediately.
+    warm = client.get("/api/market/201")
+    assert warm.status_code == 200
+
+    payload = {"targetType": "MARKET_ITEM", "targetId": 201, "reason": "缓存失效验证"}
+    assert client.post("/api/reports", headers=alice_headers, json=payload).status_code == 200
+    assert client.post("/api/reports", headers=baishan_headers, json=payload).status_code == 200
+    assert client.post("/api/reports", headers=admin_headers, json=payload).status_code == 200
+
+    hidden = client.get("/api/market/201")
+    assert hidden.status_code == 404
+
+
+def test_report_restore_invalidates_anonymous_market_cache(
+    client: TestClient,
+    auth_service: AuthService,
+) -> None:
+    seed_read_users(auth_service)
+    alice_headers = build_auth_headers(1, 1)
+    baishan_headers = build_auth_headers(2, 2)
+    admin_headers = build_auth_headers(3, 8)
+
+    payload = {"targetType": "MARKET_ITEM", "targetId": 201, "reason": "缓存失效验证"}
+    assert client.post("/api/reports", headers=alice_headers, json=payload).status_code == 200
+    assert client.post("/api/reports", headers=baishan_headers, json=payload).status_code == 200
+    report = client.post("/api/reports", headers=admin_headers, json=payload)
+    assert report.status_code == 200
+
+    # Warm the anonymous cache on the now-hidden item before restoring it.
+    assert client.get("/api/market/201").status_code == 404
+
+    restored = client.patch(
+        f"/api/admin/reports/{report.json()['data']['id']}",
+        headers=admin_headers,
+        json={"status": "RESOLVED", "restoreTarget": True},
+    )
+    assert restored.status_code == 200
+    assert restored.json()["data"]["targetStatus"] == "SALE"
+
+    # Without invalidating the cache on restore, this would still 404 from
+    # the stale cached (hidden) response until the cache TTL expires.
+    assert client.get("/api/market/201").status_code == 200

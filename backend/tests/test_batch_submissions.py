@@ -88,6 +88,75 @@ def test_upload_retry_and_private_download(batch_client):
     assert "no-store" in result.headers["cache-control"]
 
 
+def test_private_download_releases_locks_before_object_copy(batch_client, monkeypatch):
+    # download_item takes FOR UPDATE locks on the batch/item rows to guard its
+    # access check. The route must commit (releasing those locks) before the
+    # potentially slow object-storage copy, not hold them for its duration.
+    from sqlalchemy.orm import Session as OrmSession
+
+    from app.api.deps import get_material_asset_store
+
+    c = batch_client
+    batch, _ = create(c)
+    item = batch["items"][0]
+    upload(c, batch, item)
+    submit(c, batch)
+
+    events: list[str] = []
+    original_commit = OrmSession.commit
+
+    def recording_commit(self, *args, **kwargs):
+        events.append("commit")
+        return original_commit(self, *args, **kwargs)
+
+    monkeypatch.setattr(OrmSession, "commit", recording_commit)
+
+    asset_store = get_material_asset_store()
+    original_copy_to_path = asset_store.copy_to_path
+
+    def recording_copy_to_path(*args, **kwargs):
+        events.append("copy_to_path")
+        return original_copy_to_path(*args, **kwargs)
+
+    monkeypatch.setattr(asset_store, "copy_to_path", recording_copy_to_path)
+
+    private = f'/api/admin/batch-submissions/{batch["id"]}/items/{item["id"]}/file'
+    result = c.get(private, headers=headers(3))
+    assert result.status_code == 200 and result.content == b"hello"
+
+    assert "commit" in events and "copy_to_path" in events
+    assert events.index("commit") < events.index("copy_to_path")
+
+
+def test_list_batches_query_count_is_independent_of_page_size(batch_client):
+    # list_batches used to run 2 extra queries (items, publications) per
+    # batch on the page, so a bigger page meant proportionally more queries.
+    # It now loads a page's items/publications in 2 queries total, so asking
+    # for more rows from the same underlying data must not add queries.
+    from app.core.query_timing import QueryTiming, query_timing
+
+    c = batch_client
+    for _ in range(6):
+        create(c, count=1)
+
+    service = get_batch_submission_service()
+
+    def count_queries(limit: int) -> int:
+        timing = QueryTiming()
+        token = query_timing.set(timing)
+        try:
+            with session_scope() as session:
+                result = service.list_batches(session, user_id=None, offset=0, limit=limit)
+        finally:
+            query_timing.reset(token)
+        assert len(result["items"]) == limit
+        return timing.count
+
+    small_page_queries = count_queries(2)
+    large_page_queries = count_queries(6)
+    assert small_page_queries == large_page_queries
+
+
 def test_netdisk_publish_intent_attribution_and_retry(batch_client):
     c = batch_client
     batch, _ = create(c, netdisk=True, intent="CONTACT")

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from contextlib import asynccontextmanager
 import json
 from types import SimpleNamespace
 from typing import Any
@@ -815,32 +816,58 @@ def test_async_legacy_material_detail_keeps_user_state(monkeypatch) -> None:
         "status": "VISIBLE",
     }
 
-    async def fake_call(loader, *args, **kwargs):
-        del kwargs
-        name = loader.__name__
-        if name == "_compat_load_material_detail_row_async":
-            return row
-        if name == "_compat_load_tags_map_async":
-            return {77: ["真题", "期末"]}
-        if name == "_compat_load_comment_counts_async":
-            return {77: 11}
-        if name == "_compat_load_versions_async":
-            return [{"id": 1, "versionLabel": "v1"}]
-        if name == "_compat_load_reviews_async":
-            return [{"id": 2, "rating": 5}]
-        if name == "_compat_material_relation_exists_async":
-            sql = str(args[0])
-            return "favorites" in sql
-        if name == "_compat_load_my_rating_async":
-            return 5
-        if name == "_compat_has_paid_access_async":
-            return True
-        raise AssertionError(f"unexpected loader: {name}")
+    # get_detail_async shares a single aux session across these loaders instead
+    # of opening one per loader (see materials_service.get_detail_async), so
+    # the test stubs the loaders themselves plus a no-op session scope rather
+    # than a single dispatching _call_with_new_async_session.
+    @asynccontextmanager
+    async def fake_session_scope():
+        yield None
+
+    async def fake_load_row(session, material_id):
+        del session, material_id
+        return row
+
+    async def fake_tags_map(session, material_ids):
+        del session, material_ids
+        return {77: ["真题", "期末"]}
+
+    async def fake_comment_counts(session, material_ids):
+        del session, material_ids
+        return {77: 11}
+
+    async def fake_versions(session, material_id):
+        del session, material_id
+        return [{"id": 1, "versionLabel": "v1"}]
+
+    async def fake_reviews(session, material_id):
+        del session, material_id
+        return [{"id": 2, "rating": 5}]
+
+    async def fake_relation_exists(session, sql, material_id, user_id):
+        del session, material_id, user_id
+        return "favorites" in str(sql)
+
+    async def fake_my_rating(session, material_id, user_id):
+        del session, material_id, user_id
+        return 5
+
+    async def fake_paid_access(session, material_id, user_id):
+        del session, material_id, user_id
+        return True
 
     async def fake_preview_urls(material_id, keys):
         return [f"/api/materials/{material_id}/assets/custom/{index + 1}" for index, _ in enumerate(keys)]
 
-    monkeypatch.setattr(service, "_call_with_new_async_session", fake_call)
+    monkeypatch.setattr("app.services.materials_service.async_session_scope", fake_session_scope)
+    monkeypatch.setattr(service, "_compat_load_material_detail_row_async", fake_load_row)
+    monkeypatch.setattr(service, "_compat_load_tags_map_async", fake_tags_map)
+    monkeypatch.setattr(service, "_compat_load_comment_counts_async", fake_comment_counts)
+    monkeypatch.setattr(service, "_compat_load_versions_async", fake_versions)
+    monkeypatch.setattr(service, "_compat_load_reviews_async", fake_reviews)
+    monkeypatch.setattr(service, "_compat_material_relation_exists_async", fake_relation_exists)
+    monkeypatch.setattr(service, "_compat_load_my_rating_async", fake_my_rating)
+    monkeypatch.setattr(service, "_compat_has_paid_access_async", fake_paid_access)
     monkeypatch.setattr(service, "_compat_build_custom_preview_urls_async", fake_preview_urls)
 
     data = asyncio.run(service.get_detail_async(session=None, current_user_id=12, material_id=77, can_manage_all=False))
@@ -856,3 +883,118 @@ def test_async_legacy_material_detail_keeps_user_state(monkeypatch) -> None:
     assert data["customPreviewImages"] == ["/api/materials/77/assets/custom/1"]
     assert data["versions"] == [{"id": 1, "versionLabel": "v1"}]
     assert data["reviews"] == [{"id": 2, "rating": 5}]
+
+
+def test_async_legacy_material_detail_uses_one_shared_session(monkeypatch) -> None:
+    # get_detail_async used to open one async session per auxiliary loader
+    # (main row, tags, comments, versions, reviews, and up to 5 user-specific
+    # lookups) -- up to ~10 concurrent connections checked out from the async
+    # pool for one logged-in detail request. It must now share a single
+    # session/connection across all of them.
+    import app.services.materials_service as materials_service_module
+
+    service = _build_service()
+    row = {
+        "id": 77, "uploader_id": 8, "uploader_username": "owner", "uploader_nickname": "Owner",
+        "title": "t", "description": "d", "original_filename": "f.pdf", "file_type": "pdf",
+        "file_size": 1, "price": 0, "is_free": 1, "school": "s", "college": "c", "major": "m",
+        "is_general_education": 0, "netdisk_url": None, "netdisk_password": None,
+        "netdisk_expired_at": None, "netdisk_reminder_at": None, "course_category": "MAJOR",
+        "grade_type": "UG", "grade_value": "1", "preview_watermark_enabled": 1,
+        "preview_source": "AUTO", "preview_manifest": None, "custom_preview_text": None,
+        "custom_preview_images": "[]", "rating_avg": 0, "rating_count": 0, "like_count": 0,
+        "view_count": 0, "download_count": 0, "sales_count": 0, "file_key": "k", "keywords": None,
+        "status": "VISIBLE",
+    }
+
+    session_scope_entries = {"count": 0}
+
+    @asynccontextmanager
+    async def counting_session_scope():
+        session_scope_entries["count"] += 1
+        yield object()
+
+    async def fake_row(session, material_id):
+        del session, material_id
+        return row
+
+    async def fake_empty_map(session, material_ids):
+        del session, material_ids
+        return {}
+
+    async def fake_empty_list(session, material_id):
+        del session, material_id
+        return []
+
+    async def fake_relation(session, sql, material_id, user_id):
+        del session, sql, material_id, user_id
+        return False
+
+    async def fake_none(session, material_id, user_id):
+        del session, material_id, user_id
+        return None
+
+    async def fake_preview_urls(material_id, keys):
+        del material_id, keys
+        return []
+
+    monkeypatch.setattr(materials_service_module, "async_session_scope", counting_session_scope)
+    monkeypatch.setattr(service, "_compat_load_material_detail_row_async", fake_row)
+    monkeypatch.setattr(service, "_compat_load_tags_map_async", fake_empty_map)
+    monkeypatch.setattr(service, "_compat_load_comment_counts_async", fake_empty_map)
+    monkeypatch.setattr(service, "_compat_load_versions_async", fake_empty_list)
+    monkeypatch.setattr(service, "_compat_load_reviews_async", fake_empty_list)
+    monkeypatch.setattr(service, "_compat_material_relation_exists_async", fake_relation)
+    monkeypatch.setattr(service, "_compat_load_my_rating_async", fake_none)
+    monkeypatch.setattr(service, "_compat_has_paid_access_async", fake_none)
+    monkeypatch.setattr(service, "_compat_build_custom_preview_urls_async", fake_preview_urls)
+
+    data = asyncio.run(service.get_detail_async(session=None, current_user_id=12, material_id=77, can_manage_all=False))
+
+    assert data["id"] == 77
+    assert session_scope_entries["count"] == 1
+
+
+def test_compat_file_key_sql_caches_schema_introspection_per_engine(monkeypatch) -> None:
+    import app.services.materials_compat as materials_compat_module
+
+    service = _build_service()
+    engine = create_engine("sqlite+pysqlite:///:memory:", future=True)
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                "CREATE TABLE materials (id INTEGER PRIMARY KEY, file_key VARCHAR(512), file_storage_key VARCHAR(512))"
+            )
+        )
+
+    calls = {"count": 0}
+    original_inspect = materials_compat_module.inspect
+
+    def counting_inspect(bind):
+        calls["count"] += 1
+        return original_inspect(bind)
+
+    monkeypatch.setattr(materials_compat_module, "inspect", counting_inspect)
+
+    with Session(engine) as session:
+        first = service._compat_file_key_sql(session)
+        second = service._compat_file_key_sql(session)
+        third = service._compat_file_key_sql(session, table_alias=None)
+
+    assert first == "COALESCE(m.file_storage_key, m.file_key) AS file_key"
+    assert second == first
+    assert third == "COALESCE(file_storage_key, file_key) AS file_key"
+    # Real schema introspection (which opens its own connection -- see
+    # sqlalchemy.engine.reflection.Inspector._init_engine) must only happen
+    # once per engine, not once per call.
+    assert calls["count"] == 1
+
+    # A different engine (e.g. a legacy schema without file_storage_key) gets
+    # its own, independent cache entry rather than reusing this one.
+    other_engine = create_engine("sqlite+pysqlite:///:memory:", future=True)
+    with other_engine.begin() as connection:
+        connection.execute(text("CREATE TABLE materials (id INTEGER PRIMARY KEY, file_key VARCHAR(512))"))
+    with Session(other_engine) as other_session:
+        legacy = service._compat_file_key_sql(other_session)
+    assert legacy == "m.file_key"
+    assert calls["count"] == 2
