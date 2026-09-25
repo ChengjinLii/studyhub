@@ -52,3 +52,26 @@ def test_unknown_outcome_stays_pending_instead_of_failed(monkeypatch: pytest.Mon
 
 def test_definite_business_rejection_is_failed(monkeypatch: pytest.MonkeyPatch) -> None:
     assert _submit(monkeypatch, {"code": "40004", "sub_code": "PAYEE_NOT_EXIST", "sub_msg": "收款账号不存在"}) == "FAILED"
+
+
+class _FakeQueryClient:
+    def __init__(self, response: Any) -> None:
+        self.response = response
+
+    def api_alipay_fund_trans_common_query(self, **_: Any) -> Any:
+        return self.response
+
+
+def test_query_reports_not_found_when_alipay_never_registered_the_transfer(monkeypatch: pytest.MonkeyPatch) -> None:
+    provider = AlipayTransferProvider(Settings())
+    monkeypatch.setattr(provider, "_client", lambda: _FakeQueryClient({"code": "40004", "sub_code": "ORDER_NOT_EXIST"}))
+    transfer = PayoutTransferRecord(
+        payout_application_id=1,
+        uploader_id=2,
+        out_biz_no="PO202609250002",
+        amount=1800,
+        payee_account="chengjin@example.com",
+        payee_name="白山",
+        status="PENDING",
+    )
+    assert provider.query_transfer(transfer).status == "NOT_FOUND"

@@ -13,6 +13,7 @@ from app.providers.alipay_support import build_alipay_client
 # the transfer may still execute, so it must stay pending rather than be treated as failed.
 ALIPAY_CODE_UNKNOWN = "20000"
 ALIPAY_UNKNOWN_SUB_CODES = frozenset({"SYSTEM_ERROR", "ISP.UNKNOW-ERROR", "ACQ.SYSTEM_ERROR"})
+ALIPAY_ORDER_NOT_EXIST_SUB_CODES = frozenset({"ORDER_NOT_EXIST"})
 
 
 @dataclass(slots=True)
@@ -131,6 +132,9 @@ class AlipayTransferProvider:
         result = client.api_alipay_fund_trans_common_query(out_biz_no=transfer.out_biz_no)
         if not isinstance(result, dict):
             return TransferResult(status="PENDING", provider_name=self.provider_name)
+        if str(result.get("sub_code") or "").upper() in ALIPAY_ORDER_NOT_EXIST_SUB_CODES:
+            # Alipay never registered this out_biz_no, so resubmitting it cannot pay twice.
+            return TransferResult(status="NOT_FOUND", provider_name=self.provider_name, failure_reason="支付宝未找到该转账")
         status_value = str(result.get("status") or result.get("order_status") or "").upper()
         normalized = "SUCCESS" if status_value in {"SUCCESS", "PAY_SUCCESS"} else ("FAILED" if status_value in {"FAIL", "FAILED"} else "PENDING")
         return TransferResult(

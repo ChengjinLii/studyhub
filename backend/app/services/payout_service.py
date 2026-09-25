@@ -52,6 +52,7 @@ TRANSFER_STATUS_PENDING = "PENDING"
 TRANSFER_STATUS_SUCCESS = "SUCCESS"
 TRANSFER_STATUS_FAILED = "FAILED"
 TERMINAL_TRANSFER_STATUSES = frozenset({TRANSFER_STATUS_SUCCESS, TRANSFER_STATUS_FAILED})
+TRANSFER_RESULT_NOT_FOUND = "NOT_FOUND"
 INSTRUCTION_PAYOUT_TRANSFER = "PAYOUT_TRANSFER"
 
 
@@ -434,7 +435,7 @@ class PayoutService:
             session.commit()
             return self.transfer_provider.success_response_text()
 
-        self._apply_transfer_provider_result(
+        applied = self._apply_transfer_provider_result(
             session,
             transfer,
             TransferResult(
@@ -442,8 +443,8 @@ class PayoutService:
                 provider_name=self.transfer_provider.provider_name,
             ),
         )
-        notification.processed = True
-        notification.process_result = "OK"
+        notification.processed = applied
+        notification.process_result = "OK" if applied else "IGNORED_TERMINAL_TRANSFER"
         self.finance_repo.save_gateway_notification(session, notification)
         session.commit()
         return self.transfer_provider.success_response_text()
@@ -455,7 +456,15 @@ class PayoutService:
                 instruction = self.finance_repo.find_finance_instruction(session, self._payout_operation_key(transfer.id))
                 if instruction is not None and instruction.status != "SUCCEEDED":
                     continue
-            self._apply_transfer_provider_result(session, transfer, self.transfer_provider.query_transfer(transfer))
+            try:
+                result = self.transfer_provider.query_transfer(transfer)
+                if result.status == TRANSFER_RESULT_NOT_FOUND:
+                    # The submit never reached Alipay; the same out_biz_no makes the retry idempotent.
+                    result = self.transfer_provider.submit_transfer(transfer)
+                self._apply_transfer_provider_result(session, transfer, result)
+            except Exception:  # noqa: BLE001
+                logger.exception("Refreshing payout transfer %s (out_biz_no=%s) failed", transfer.id, transfer.out_biz_no)
+                continue
             processed += 1
         session.commit()
         return processed
@@ -565,7 +574,7 @@ class PayoutService:
                 self.finance_repo.save_finance_instruction(session, instruction)
                 session.commit()
                 continue
-            if transfer.status in {TRANSFER_STATUS_SUCCESS, TRANSFER_STATUS_FAILED}:
+            if transfer.status in TERMINAL_TRANSFER_STATUSES:
                 instruction.status = "SUCCEEDED"
                 instruction.last_error = None
                 self.finance_repo.save_finance_instruction(session, instruction)
@@ -602,20 +611,23 @@ class PayoutService:
     def _payout_operation_key(transfer_id: int | None) -> str:
         return f"payout-transfer:{int(transfer_id or 0)}"
 
-    def _apply_transfer_provider_result(self, session: Session, transfer: PayoutTransferRecord, result: TransferResult) -> None:
+    def _apply_transfer_provider_result(self, session: Session, transfer: PayoutTransferRecord, result: TransferResult) -> bool:
+        """Apply a provider result; returns False when a terminal transfer ignored it."""
         normalized = (result.status or TRANSFER_STATUS_PENDING).strip().upper()
         if transfer.status in TERMINAL_TRANSFER_STATUSES:
-            if normalized != transfer.status:
-                # A FAILED transfer has already released its settlements to later payouts, so a
-                # late SUCCESS must not settle anything; it needs manual reconciliation instead.
-                logger.error(
-                    "Ignoring %s result for terminal %s payout transfer %s (out_biz_no=%s); reconcile manually",
-                    normalized,
-                    transfer.status,
-                    transfer.id,
-                    transfer.out_biz_no,
-                )
-            return
+            final_status = TRANSFER_STATUS_FAILED if normalized == "FAIL" else normalized
+            if final_status == transfer.status:
+                return True  # duplicate delivery of the same final state
+            # A FAILED transfer has already released its settlements to later payouts, so a
+            # late SUCCESS must not settle anything; it needs manual reconciliation instead.
+            logger.error(
+                "Ignoring %s result for terminal %s payout transfer %s (out_biz_no=%s); reconcile manually",
+                normalized,
+                transfer.status,
+                transfer.id,
+                transfer.out_biz_no,
+            )
+            return False
         transfer.alipay_order_id = result.alipay_order_id or transfer.alipay_order_id
         transfer.pay_fund_order_id = result.pay_fund_order_id or transfer.pay_fund_order_id
         if normalized == "SUCCESS":
@@ -623,7 +635,7 @@ class PayoutService:
             transfer.paid_at = transfer.paid_at or datetime.now(UTC)
             self.finance_repo.save_payout_transfer(session, transfer)
             self._settle_transfer(session, transfer)
-            return
+            return True
         if normalized in {"FAIL", TRANSFER_STATUS_FAILED}:
             transfer.status = TRANSFER_STATUS_FAILED
             transfer.failure_reason = result.failure_reason or transfer.failure_reason or "支付宝转账失败"
@@ -631,12 +643,14 @@ class PayoutService:
             # Release still-PENDING settlements so the money returns to claimable and is
             # picked up by a later payout instead of being stranded behind a dead transfer.
             self.finance_repo.unbind_pending_settlements_from_transfer(session, transfer.id)
-            return
+            return True
         if normalized in {"SUBMITTED", TRANSFER_STATUS_SUBMITTED}:
             transfer.status = TRANSFER_STATUS_SUBMITTED
         else:
             transfer.status = TRANSFER_STATUS_PENDING
+            transfer.failure_reason = result.failure_reason or transfer.failure_reason
         self.finance_repo.save_payout_transfer(session, transfer)
+        return True
 
     def _settle_transfer(self, session: Session, transfer: PayoutTransferRecord) -> None:
         application = self.finance_repo.get_payout_application(session, transfer.payout_application_id)
