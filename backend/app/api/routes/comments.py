@@ -193,7 +193,10 @@ def report_comment(
 ) -> dict[str, object]:
     enforce_comment_user_rate_limit(settings, user_id=auth.user_id or 0, action="report")
     service.report(session, id, auth.user_id or 0, payload)
-    _invalidate_comment_thread_caches()
+    # Reporting a comment can auto-hide it (see ReportService.AUTO_HIDE_THRESHOLD),
+    # which changes both the visible comment list and the commentCount embedded
+    # in the cached materials:detail payload, unlike like/unlike.
+    _invalidate_comment_content_caches()
     return api_ok({"success": True})
 
 
