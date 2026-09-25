@@ -21,7 +21,7 @@
 - All 8 tools carry `capability="snapshot"` in v3 (replay data); the four materials/policy tools also set `mcp_name`.
 - JSON serialization of tool payloads and tool arguments: `json.dumps(..., ensure_ascii=False, sort_keys=True, separators=(",", ":"))`.
 - Data sources: open data and self-hosted open models only; no Codex/gpt outputs; no uploader personal data.
-- Coverage of `studyhub_agent` ≥ 80%; `ruff check` clean; import-linter contracts pass.
+- Coverage of `studyhub_agent` ≥ 80%; `ruff check` clean (running `ruff check --fix` to sort imports in code copied from this plan is expected); import-linter contracts pass.
 - Commit messages: conventional (`feat:`, `test:`, `refactor:`, `chore:`, `ci:`, `docs:`), English, no Co-Authored-By line, author `ChengjinLii <2731938007@qq.com>`.
 - Do not delete gitignored large artifacts (`artifacts/`, `training_artifacts/`, `evaluation_artifacts/`, `datasets/`) or non-agent remote branches.
 
@@ -907,6 +907,15 @@ def test_prefix_property_holds_for_tool_turns() -> None:
     assert full == prompt + canonical_completion_text(HISTORY, assistant, TOOLS, thinking=False)
 
 
+def test_canonical_argument_order_follows_schema() -> None:
+    reordered = ToolCall(call_id="c", name="materials_search", arguments={"limit": 3, "query": "概率论"})
+    in_order = ToolCall(call_id="c", name="materials_search", arguments={"query": "概率论", "limit": 3})
+    first = canonical_completion_text(HISTORY, Message(role="assistant", tool_calls=(reordered,)), TOOLS, thinking=False)
+    second = canonical_completion_text(HISTORY, Message(role="assistant", tool_calls=(in_order,)), TOOLS, thinking=False)
+    assert first == second
+    assert first.index("<parameter=query>") < first.index("<parameter=limit>")
+
+
 def test_thinking_completion_splits_reasoning() -> None:
     parsed = parse_completion("先想想\n</think>\n\n最终答案", TOOLS, thinking=True)
     assert parsed.kind is TurnKind.FINAL
@@ -984,7 +993,14 @@ def _template():
     return env.from_string(source)
 
 
-def _message_dict(message: Message) -> dict[str, Any]:
+def _ordered_arguments(arguments: dict[str, Any], spec: ToolSpec | None) -> dict[str, Any]:
+    """Canonical argument order: the tool schema's property order, unknown keys last (alphabetical)."""
+    order = list(spec.parameters.get("properties", {})) if spec else []
+    rank = {name: index for index, name in enumerate(order)}
+    return {key: arguments[key] for key in sorted(arguments, key=lambda key: (rank.get(key, len(order)), key))}
+
+
+def _message_dict(message: Message, specs: dict[str, ToolSpec]) -> dict[str, Any]:
     if message.role == "assistant" and message.tool_calls:
         for call in message.tool_calls:
             for value in call.arguments.values():
@@ -994,7 +1010,7 @@ def _message_dict(message: Message) -> dict[str, Any]:
             "role": "assistant",
             "content": message.content,
             "tool_calls": [
-                {"type": "function", "function": {"name": call.name, "arguments": call.arguments}}
+                {"type": "function", "function": {"name": call.name, "arguments": _ordered_arguments(call.arguments, specs.get(call.name))}}
                 for call in message.tool_calls
             ],
         }
@@ -1010,7 +1026,7 @@ def render_text(
 ) -> str:
     try:
         return _template().render(
-            messages=[_message_dict(message) for message in messages],
+            messages=[_message_dict(message, {tool.name: tool for tool in tools}) for message in messages],
             tools=[tool.to_openai() for tool in tools] or None,
             add_generation_prompt=add_generation_prompt,
             enable_thinking=thinking,
@@ -2360,7 +2376,7 @@ def test_search_read_answer_happy_path() -> None:
     assert episode.final_answer == "先看提纲第一章 [101:1]。"
     assert [obs.ok for obs in episode.observations] == [True, True]
     assert episode.turns[1].tool_calls[0].call_id == "t1_c0"
-    tool_message = episode.messages[4]
+    tool_message = episode.messages[3]
     assert tool_message.role == "tool" and tool_message.tool_call_id == "t0_c0"
     assert json.loads(tool_message.content)["results"][0]["material_id"] == 101
     assert episode.environment_trace["read_material_ids"] == [101]
