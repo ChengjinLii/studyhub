@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, replace
 from types import MappingProxyType
@@ -14,6 +15,11 @@ from studyhub_agent.guardrails.web_security import UnsafeUrlError, WebSecurityPo
 
 SNAPSHOT_HOST_ADDRESS = "93.184.216.34"
 _WEB_POLICY = WebSecurityPolicy()
+# Matches the memory_update tool's own description ("记忆键，小写英文和下划线" / lowercase English
+# and underscore). ASCII-only on purpose: str.isalnum() is Unicode-aware and treats Han/other
+# non-ASCII "alphanumeric" characters as valid, which would let a non-English key silently bypass
+# the (English-only) FORBIDDEN_KEYS set below.
+_MEMORY_KEY_PATTERN = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
 
 
 @dataclass(frozen=True, slots=True)
@@ -179,7 +185,7 @@ def memory_get(context: ReplayContext, state: ReplayState, args: dict[str, Any])
 
 def memory_update(context: ReplayContext, state: ReplayState, args: dict[str, Any]) -> Result:
     key = str(args["key"]).strip().lower()
-    if key in FORBIDDEN_KEYS or not key.replace("_", "").isalnum():
+    if key in FORBIDDEN_KEYS or not _MEMORY_KEY_PATTERN.match(key):
         return _error(state, "forbidden_memory_key", key=key)
     value = sanitize_output(str(args["value"]))
     new_memory = MappingProxyType({**state.memory, key: value})

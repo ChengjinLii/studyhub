@@ -110,6 +110,17 @@ def test_memory_update_is_per_episode_and_rejects_personal_keys() -> None:
     assert "weak_topic" not in SNAPSHOT.memory["u-1001"]
 
 
+def test_memory_update_rejects_non_ascii_keys() -> None:
+    # A pre-Unicode-normalization bug used str.isalnum() to check the key, which is Unicode-aware
+    # and treats Han characters as alphanumeric -- so a Chinese key would bypass the (English-only)
+    # FORBIDDEN_KEYS set entirely. The key pattern must be ASCII-only, matching the tool's own
+    # description ("小写英文和下划线" / lowercase English and underscore).
+    env = _env()
+    assert env.execute(_call("memory_update", key="电话", value="123")).error_code == "forbidden_memory_key"
+    assert env.execute(_call("memory_update", key="Weak_Topic", value="x")).ok
+    assert env.execute(_call("memory_update", key="9weak", value="x")).error_code == "forbidden_memory_key"
+
+
 def test_trace_records_discovery_reads_and_calls() -> None:
     env = _env()
     env.execute(_call("materials_search", query="提纲"))
