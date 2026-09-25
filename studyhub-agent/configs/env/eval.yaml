@@ -1,5 +1,0 @@
-environment:
-  name: eval
-  artifact_root: artifacts/eval
-  fixture_mode: true
-  allow_network: false

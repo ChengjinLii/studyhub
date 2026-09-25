@@ -1,7 +1,3 @@
-"""StudyHub Agent V2 public contracts."""
+"""StudyHub agent v3 foundation."""
 
-from studyhub_agent.runtime.identity import AgentIdentity
-from studyhub_agent.runtime.profile import AgentProfile
-from studyhub_agent.runtime.session import TaskSpec
-
-__all__ = ["AgentIdentity", "AgentProfile", "TaskSpec"]
+__version__ = "3.0.0"

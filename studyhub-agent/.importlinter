@@ -1,0 +1,23 @@
+[importlinter]
+root_package = studyhub_agent
+
+[importlinter:contract:layers]
+name = Foundation layers
+type = layers
+layers =
+    studyhub_agent.runtime
+    studyhub_agent.environments
+    studyhub_agent.tools
+    studyhub_agent.guardrails
+    studyhub_agent.contracts
+
+[importlinter:contract:graders]
+name = Graders depend only on contracts
+type = forbidden
+source_modules =
+    studyhub_agent.graders
+forbidden_modules =
+    studyhub_agent.runtime
+    studyhub_agent.environments
+    studyhub_agent.tools
+    studyhub_agent.guardrails
