@@ -157,6 +157,26 @@ def test_list_batches_query_count_is_independent_of_page_size(batch_client):
     assert small_page_queries == large_page_queries
 
 
+def test_list_batches_items_match_individual_detail(batch_client):
+    # Guards the list_batches batching refactor itself: the items/publications
+    # it attaches to each row (loaded for the whole page up front and grouped
+    # by batch id) must be identical to what a plain per-batch detail() call
+    # (which queries that one batch's items/publications directly) computes
+    # for the same batch. Varying item counts per batch makes a grouping bug
+    # (e.g. items attributed to the wrong batch) show up as a mismatch.
+    c = batch_client
+    for count in (1, 2, 3, 4):
+        create(c, count=count)
+
+    service = get_batch_submission_service()
+    with session_scope() as session:
+        listed = service.list_batches(session, user_id=None, offset=0, limit=10)
+        assert len(listed["items"]) == 4
+        for item in listed["items"]:
+            detail = service.detail(session, item["id"], user_id=None)
+            assert item == detail
+
+
 def test_netdisk_publish_intent_attribution_and_retry(batch_client):
     c = batch_client
     batch, _ = create(c, netdisk=True, intent="CONTACT")
