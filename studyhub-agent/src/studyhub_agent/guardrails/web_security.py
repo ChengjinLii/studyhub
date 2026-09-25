@@ -35,7 +35,11 @@ class WebSecurityPolicy:
             raise UnsafeUrlError("only http and https URLs are allowed")
         if not parsed.hostname or parsed.username or parsed.password:
             raise UnsafeUrlError("URL must contain a plain hostname")
-        if parsed.port not in self.allowed_ports:
+        try:
+            port = parsed.port
+        except ValueError as error:
+            raise UnsafeUrlError("invalid port") from error
+        if port not in self.allowed_ports:
             raise UnsafeUrlError("non-standard ports are blocked")
         try:
             addresses = [str(ipaddress.ip_address(parsed.hostname))]

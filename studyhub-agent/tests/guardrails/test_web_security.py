@@ -25,6 +25,8 @@ def test_public_https_url_is_allowed() -> None:
         "http://example.com:8080",
         "http://127.0.0.1/",
         "https:///nohost",
+        "http://example.com:abc/",
+        "http://example.com:99999/",
     ],
 )
 def test_unsafe_urls_are_rejected(url) -> None:
