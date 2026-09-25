@@ -202,3 +202,35 @@ def test_queued_follower_refund_releases_funds_immediately_and_keeps_request_ope
     assert request.status == "OPEN"
     assert int(request.funded_amount_cents or 0) == 2000
     assert int(request.contribution_count or 0) == 1
+
+
+def test_payment_arriving_after_request_closed_is_refunded_not_pooled(
+    client: TestClient,
+    auth_service: AuthService,
+) -> None:
+    seed_read_users(auth_service, with_follow_graph=True)
+    alice_headers = build_auth_headers(1, 1)
+    baishan_headers = build_auth_headers(2, 2)
+    created = _create_paid_request(client, alice_headers, budget=2000)
+    request_id = int(created["request"]["id"])
+    _notify_paid(client, created["outTradeNo"], total_amount="20.00")
+    follow = client.post(f"/api/requests/{request_id}/follow", headers=baishan_headers, json={"amount": 1500, "deadlineTier": "WEEK"})
+    assert follow.status_code == 200, follow.text
+    follower_order_no = follow.json()["data"]["outTradeNo"]
+
+    # The request closes (e.g. fulfilled or timed out) while the follower's checkout is still open.
+    service = get_requests_service()
+    with session_scope() as session:
+        request = service.request_repo.get_request(session, request_id)
+        assert request is not None
+        request.status = "FULFILLED"
+        service.request_repo.save_request(session, request)
+        session.commit()
+
+    _notify_paid(client, follower_order_no, total_amount="15.00")
+
+    contribution = _load_contribution(follower_order_no)
+    assert contribution.status == "REFUNDED"
+    request = _load_request(request_id)
+    assert request.status == "FULFILLED"
+    assert int(request.funded_amount_cents or 0) == 2000

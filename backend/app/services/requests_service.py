@@ -315,11 +315,12 @@ class RequestsService(RequestsRefundMixin, RequestsCompatMixin):
             status_value=CONTRIBUTION_STATUS_CREATED,
             seed=seed,
         )
+        form = self._build_contribution_checkout_form(contribution, request)
         session.commit()
         return {
             "contributionId": contribution.id,
             "outTradeNo": contribution.out_trade_no,
-            "form": self._build_contribution_checkout_form(contribution, request),
+            "form": form,
         }
 
     def get_contribution_status(self, session: Session, out_trade_no: str, user_id: int, *, force_check: bool) -> dict[str, Any]:
@@ -757,6 +758,10 @@ class RequestsService(RequestsRefundMixin, RequestsCompatMixin):
     ) -> None:
         if contribution.status != CONTRIBUTION_STATUS_CREATED:
             return
+        request = self._require_request(session, contribution.request_id)
+        accepts_payment = request.status == REQUEST_STATUS_OPEN or (
+            contribution.type == TYPE_OWNER and request.status == REQUEST_STATUS_PENDING_PAYMENT
+        )
         contribution.status = CONTRIBUTION_STATUS_PAID
         contribution.trade_no = trade_no or f"TRADE{contribution.id}"
         contribution.pay_channel = pay_channel
@@ -764,13 +769,19 @@ class RequestsService(RequestsRefundMixin, RequestsCompatMixin):
         if contribution.deadline_tier:
             contribution.deadline_at = self._compute_deadline_datetime(contribution.paid_at, contribution.deadline_tier)
         self.request_repo.save_contribution(session, contribution)
-        request = self._require_request(session, contribution.request_id)
         request.funded_amount_cents = int(request.funded_amount_cents or 0) + int(contribution.amount_cents or 0)
         request.contribution_count = int(request.contribution_count or 0) + 1
         request.max_contribution_amount_cents = max(int(request.max_contribution_amount_cents or 0), int(contribution.amount_cents or 0))
         if contribution.type == TYPE_OWNER and request.status == REQUEST_STATUS_PENDING_PAYMENT:
             request.status = REQUEST_STATUS_OPEN
         self.request_repo.save_request(session, request)
+        if not accepts_payment:
+            # The checkout was paid after the request closed: the money can neither be settled
+            # nor stay with the platform, so send it straight back.
+            self._begin_contribution_refund(session, request, contribution)
+            if self._execute_refund(session, contribution, reason="求购已结束，自动退回付款"):
+                contribution.status = CONTRIBUTION_STATUS_REFUNDED
+                self.request_repo.save_contribution(session, contribution)
 
     def _enter_auto_arbitration(self, session: Session, request: RequestRecord, response: RequestResponseRecord, reason: str) -> None:
         if self.request_repo.find_pending_arbitration(session, request.id) is not None:
