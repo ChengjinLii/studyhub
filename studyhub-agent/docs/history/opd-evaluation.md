@@ -1,6 +1,6 @@
 # OPD evaluation: archived conclusions
 
-This note archives the conclusions of the Optimal Policy Distillation (OPD)
+This note archives the conclusions of the On-Policy Distillation (OPD)
 experiment for the Qwen3.5-4B StudyHub agent before the GitHub branches (and
 most of the local branches/worktrees) that produced it were deleted (Task 15
 of the v3 foundation plan, with the repository owner's explicit
@@ -148,13 +148,24 @@ was never pushed to GitHub in the first place). On the server
 (`/data/chengjin/studyhub`), the local branch and worktree for
 `opd-preflight` and `opd-evaluation` were also removed. The local branch
 `codex/qwen35-4b-opd-execution` and its worktree
-(`/data/chengjin/studyhub-opd-execution-worktree`) were **retained** — not
-deleted — because that worktree holds gitignored, untagged run artifacts
-(`artifacts/experiments/*/{checkpoints,trajectories,metrics}`,
-`datasets/interim`, ~62M total) that `git worktree remove` would destroy
-along with the checkout. Its commits are already fully covered by the
-`archive/opd-execution` and `archive/opd-evaluation` tags, so no history is
-at risk either way; only the convenience of a local checkout differs.
+(`/data/chengjin/studyhub-opd-execution-worktree`) were retained at the
+time — not deleted — because that worktree held gitignored, untagged run
+artifacts (`artifacts/experiments/*/{checkpoints,trajectories,metrics}`,
+`datasets/interim`, ~62M total) that `git worktree remove` would have
+destroyed along with the checkout. Its commits were already fully covered
+by the `archive/opd-execution` and `archive/opd-evaluation` tags, so no
+history was at risk either way; only the convenience of a local checkout
+differed.
+
+**Retained worktrees archived (2026-09-25):** studyhub-offline-pilot,
+studyhub-opd-execution-worktree, studyhub-sft2-worktree,
+studyhub-spark-worktree, studyhub-m2-prep-validation were archived as
+tar.gz (working tree incl. untracked/ignored artifacts, excluding caches)
+to `/data/chengjin/archive/studyhub-agent-legacy/` on the training server,
+with `<name>.head.txt` (branch + HEAD) and `<name>.status.txt` (uncommitted
+files) beside each archive and an `INDEX.txt`; the worktrees and their
+local branches were then deleted. Code history remains available via the
+tags `legacy-agent-v2` and `archive/opd-*`.
 
 Any path cited above as `archive/opd-evaluation:<path>` (or under the other
 three tags) remains retrievable at any time with `git show <tag>:<path>` —

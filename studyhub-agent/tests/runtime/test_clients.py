@@ -128,6 +128,16 @@ def test_token_client_sends_rendered_prompt_and_keeps_logprobs() -> None:
     assert turn.prompt_token_ids == tuple(backend.last_input)
 
 
+def test_token_client_trims_raw_text_at_endoftext_stop_token() -> None:
+    # <|endoftext|> is a valid stop token alongside <|im_end|>; text generated after it must not
+    # leak into the turn.
+    turn = TokenPolicyClient(CharTokenizer(), CannedBackend("答案是 A<|endoftext|>junk")).step(
+        HISTORY, TOOLS, thinking=False, sampling=Sampling(), max_new_tokens=64
+    )
+    assert turn.kind is TurnKind.FINAL
+    assert turn.raw_text == "答案是 A"
+
+
 def test_token_client_flags_non_canonical_whitespace() -> None:
     turn = TokenPolicyClient(CharTokenizer(), CannedBackend("答案。   ")).step(
         HISTORY, TOOLS, thinking=False, sampling=Sampling(), max_new_tokens=64

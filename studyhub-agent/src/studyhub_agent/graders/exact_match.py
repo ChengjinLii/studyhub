@@ -12,7 +12,10 @@ class ExactMatchGrader:
     """Test grader: normalized exact match plus required-tool usage."""
 
     def grade(self, episode: Episode, task: TaskSpec) -> GradeResult:
-        used = {call.name for turn in episode.turns for call in turn.tool_calls}
+        # From observations (calls actually executed), not turns (calls attempted): a tool call can
+        # appear in episode.turns without a matching observation, e.g. when the runner cuts a turn
+        # off at the tool budget before executing any of its calls (see runtime.runner).
+        used = {observation.name for observation in episode.observations}
         matches = task.expected_final is None or _normalize(
             episode.final_answer
         ) == _normalize(task.expected_final)

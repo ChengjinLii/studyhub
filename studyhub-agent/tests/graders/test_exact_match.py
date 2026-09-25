@@ -4,6 +4,7 @@ from studyhub_agent.contracts.episode import (
     EpisodeSpec,
     FailureOwner,
     Message,
+    Observation,
     Principal,
     Termination,
     ToolCall,
@@ -36,12 +37,13 @@ def _episode(
         )
         for name in tools
     )
+    observations = tuple(Observation(call_id="c", name=name, ok=True, payload={}) for name in tools)
     return Episode(
         spec=SPEC,
         contract_hash="sha256:x",
         messages=(Message(role="user", content="q"),),
         turns=turns,
-        observations=(),
+        observations=observations,
         termination=termination,
         failure_owner=owner,
         final_answer=final,
@@ -87,3 +89,29 @@ def test_wrong_answer_is_model_failure() -> None:
         result.failure_owner is FailureOwner.MODEL
         and result.scores["answer_match"] == 0.0
     )
+
+
+def test_required_tool_only_attempted_not_executed_fails_gate() -> None:
+    # A tool call can appear in episode.turns (the model attempted it) without a matching
+    # observation -- e.g. the runner cut it off at the tool budget before executing it (see
+    # runtime.runner). "used" must reflect what actually ran, not what the model merely attempted.
+    episode = Episode(
+        spec=SPEC,
+        contract_hash="sha256:x",
+        messages=(Message(role="user", content="q"),),
+        turns=(
+            AssistantTurn(
+                kind=TurnKind.TOOL_CALLS,
+                tool_calls=(ToolCall(call_id="c", name="materials_search", arguments={}),),
+                raw_text="",
+                canonical_text="",
+            ),
+        ),
+        observations=(),
+        termination=Termination.TOOL_BUDGET,
+        failure_owner=FailureOwner.MODEL,
+        final_answer=None,
+    )
+    task = TaskSpec(task_id="t", required_tools=("materials_search",))
+    result = ExactMatchGrader().grade(episode, task)
+    assert result.hard_gates["required_tools_used"] is False

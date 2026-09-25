@@ -74,6 +74,15 @@ def test_read_page_out_of_range() -> None:
     assert env.execute(_call("materials_read", material_id=101, page=9)).error_code == "page_out_of_range"
 
 
+def test_read_page_zero_is_out_of_range_not_silently_defaulted() -> None:
+    # `int(args.get("page") or 1)` treats an explicit page=0 the same as "not provided" (0 is
+    # falsy), silently defaulting it to page 1 instead of reporting it as out of range. Only a
+    # missing `page` (None) should default.
+    env = _env()
+    env.execute(_call("materials_search", query="提纲"))
+    assert env.execute(_call("materials_read", material_id=101, page=0)).error_code == "page_out_of_range"
+
+
 def test_policy_and_web_extract() -> None:
     env = _env()
     assert "24 小时" in env.execute(_call("platform_policy", topic="refund")).payload["text"]
@@ -108,6 +117,22 @@ def test_memory_update_is_per_episode_and_rejects_personal_keys() -> None:
     fresh = _env()
     assert "weak_topic" not in fresh.execute(_call("memory_get")).payload["memory"]
     assert "weak_topic" not in SNAPSHOT.memory["u-1001"]
+
+
+def test_memory_get_empty_keys_list_means_nothing_not_everything() -> None:
+    # `if not keys` treats an explicit keys=[] the same as "not provided" (an empty list is
+    # falsy), silently returning everything. Only `keys is None` should mean "return all".
+    env = _env()
+    result = env.execute(_call("memory_get", keys=[]))
+    assert result.payload["memory"] == {}
+    assert result.payload["available_keys"] == ["exam_date", "goal"]
+
+
+def test_memory_get_without_keys_also_lists_available_keys() -> None:
+    env = _env()
+    result = env.execute(_call("memory_get"))
+    assert result.payload["memory"] == {"exam_date": "2027-01-08", "goal": "高数 85 分"}
+    assert result.payload["available_keys"] == ["exam_date", "goal"]
 
 
 def test_memory_update_rejects_non_ascii_keys() -> None:

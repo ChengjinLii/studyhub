@@ -136,7 +136,8 @@ def materials_read(context: ReplayContext, state: ReplayState, args: dict[str, A
         return _error(
             state, "material_locked", material_id=material.material_id, read_first=list(material.unlock_after)
         )
-    page = int(args.get("page") or 1)
+    raw_page = args.get("page")
+    page = 1 if raw_page is None else int(raw_page)
     if not 1 <= page <= len(material.preview_pages):
         return _error(
             state, "page_out_of_range", material_id=material.material_id, page_count=len(material.preview_pages)
@@ -179,8 +180,9 @@ def web_extract(context: ReplayContext, state: ReplayState, args: dict[str, Any]
 
 def memory_get(context: ReplayContext, state: ReplayState, args: dict[str, Any]) -> Result:
     keys = args.get("keys")
-    memory = dict(state.memory) if not keys else {key: state.memory[key] for key in keys if key in state.memory}
-    return True, {"memory": memory}, None, state
+    # Only a missing `keys` (None) means "all"; an explicit empty list means "none of them".
+    memory = dict(state.memory) if keys is None else {key: state.memory[key] for key in keys if key in state.memory}
+    return True, {"memory": memory, "available_keys": sorted(state.memory)}, None, state
 
 
 def memory_update(context: ReplayContext, state: ReplayState, args: dict[str, Any]) -> Result:

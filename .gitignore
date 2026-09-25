@@ -1,6 +1,5 @@
 docs/
 !studyhub-agent/docs/
-!studyhub-agent/docs/phase1-completion.md
 /models/
 private/
 .local-dev/

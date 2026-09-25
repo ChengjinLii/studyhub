@@ -18,6 +18,8 @@ from studyhub_agent.contracts.tools import ToolSpec
 TEMPLATE_PATH = Path(__file__).parent / "templates" / "qwen3_5.jinja"
 TEMPLATE_SHA256 = "a4aee8afcf2e0711942cf848899be66016f8d14a889ff9ede07bca099c28f715"
 END_OF_TURN = "<|im_end|>"
+END_OF_TEXT = "<|endoftext|>"
+_STOP_TOKENS = (END_OF_TURN, END_OF_TEXT)
 _THINK_CLOSE = "</think>"
 
 _CALL = re.compile(r"\s*<tool_call>\s*<function=([^>\n]+)>\n?(.*?)</function>\s*</tool_call>", re.DOTALL)
@@ -125,8 +127,18 @@ def canonical_completion_text(
     return full[len(prompt) :]
 
 
+def split_at_stop_token(text: str) -> str:
+    """Trim `text` at whichever stop token (<|im_end|> or <|endoftext|>) appears first, if any."""
+    cut = len(text)
+    for token in _STOP_TOKENS:
+        index = text.find(token)
+        if index != -1:
+            cut = min(cut, index)
+    return text[:cut]
+
+
 def parse_completion(text: str, tools: Sequence[ToolSpec], *, thinking: bool) -> ParsedCompletion:
-    body = text.split(END_OF_TURN, 1)[0]
+    body = split_at_stop_token(text)
     reasoning = ""
     if thinking:
         if _THINK_CLOSE not in body:

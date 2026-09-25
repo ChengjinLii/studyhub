@@ -14,6 +14,7 @@ from studyhub_agent.contracts.render import (
     canonical_completion_text,
     parse_completion,
     render_text,
+    split_at_stop_token,
 )
 from studyhub_agent.contracts.tools import ToolSpec
 from studyhub_agent.runtime.policy import PolicyInfraError
@@ -95,7 +96,7 @@ class TokenPolicyClient:
             prompt_ids, sampling=sampling, max_new_tokens=max_new_tokens, stop_token_ids=self._tokenizer.stop_token_ids
         )
         latency_ms = (time.perf_counter() - started) * 1000
-        raw_text = self._tokenizer.decode(generation.output_ids).split(END_OF_TURN, 1)[0]
+        raw_text = split_at_stop_token(self._tokenizer.decode(generation.output_ids))
         if generation.finish_reason == "length":
             # The completion was cut off by max_new_tokens; it must never be treated as a valid
             # FINAL/TOOL_CALLS turn (that would silently produce truncated SFT data).

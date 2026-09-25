@@ -201,6 +201,16 @@ def test_trailing_end_of_turn_token_is_ignored() -> None:
     assert parse_completion("答案<|im_end|>", TOOLS, thinking=False).content == "答案"
 
 
+def test_trailing_end_of_text_token_is_also_ignored() -> None:
+    # <|endoftext|> is the tokenizer's other stop token (alongside <|im_end|>); anything a model
+    # generates after either one is not part of the turn.
+    assert parse_completion("答案<|endoftext|>", TOOLS, thinking=False).content == "答案"
+
+
+def test_earliest_stop_token_wins_when_both_are_present() -> None:
+    assert parse_completion("答案<|im_end|>\n<|endoftext|>junk", TOOLS, thinking=False).content == "答案"
+
+
 def test_unclosed_think_block_is_a_parse_error() -> None:
     parsed = parse_completion("先想想，但是被截断了", TOOLS, thinking=True)
     assert parsed.kind is TurnKind.PARSE_ERROR
