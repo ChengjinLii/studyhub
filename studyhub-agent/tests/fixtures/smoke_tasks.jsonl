@@ -1,0 +1,3 @@
+{"episode_id": "smoke-1", "task_id": "smoke-policy-refund", "user_message": "我买的资料还没下载，能退款吗？", "principal": {"principal_id": "u-1001"}, "tool_names": ["platform_policy", "materials_search"]}
+{"episode_id": "smoke-2", "task_id": "smoke-search-read", "user_message": "电子科技大学高数期末复习先看什么？请引用资料。", "principal": {"principal_id": "u-1001"}, "tool_names": ["materials_search", "materials_get", "materials_read"]}
+{"episode_id": "smoke-3", "task_id": "smoke-memory", "user_message": "我的考试是哪天？顺便记住我积分比较薄弱。", "principal": {"principal_id": "u-1001"}, "tool_names": ["memory_get", "memory_update"]}
