@@ -350,7 +350,7 @@ class CommunityRepository:
             .where(
                 ReportRecord.target_type == target_type,
                 ReportRecord.target_id == target_id,
-                ReportRecord.status != "REJECTED",
+                ReportRecord.status.in_(("PENDING", "IN_PROGRESS")),
             )
         )
         return int(session.scalar(stmt) or 0)

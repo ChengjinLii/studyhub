@@ -6,6 +6,10 @@ from sqlalchemy.orm import Session
 from app.models.materials import MaterialRecord, MaterialSecurityScanRecord
 
 
+# review_status values set while a material is held by the malware scan.
+SECURITY_HOLD_REVIEW_STATUSES = frozenset({"SECURITY_PENDING", "SECURITY_REJECTED"})
+
+
 class MaterialSecurityPolicyMixin:
     def _queue_material_security_scan(
         self,

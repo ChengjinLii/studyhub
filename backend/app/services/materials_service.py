@@ -39,7 +39,7 @@ from app.services.materials_search import material_matches_search, material_sear
 from app.services.materials_compat import MaterialsCompatMixin
 from app.services.materials_serializers import admin_material_item, load_json_list, material_has_file, material_list_item
 from app.services.materials_storage_mutation import MaterialsStorageMutationMixin
-from app.services.material_security_policy import MaterialSecurityPolicyMixin
+from app.services.material_security_policy import SECURITY_HOLD_REVIEW_STATUSES, MaterialSecurityPolicyMixin
 from app.services.read_support import (
     clamp_limit,
     compat_as_float,
@@ -61,7 +61,6 @@ from app.services.read_support import (
 ROLE_ADMIN = 8
 ROLE_DEVELOPER = 16
 VISIBLE_STATUSES = {"VISIBLE", "visible", "", None}
-SECURITY_HOLD_REVIEW_STATUSES = {"SECURITY_PENDING", "SECURITY_REJECTED"}
 VISIBLE_MATERIAL_STATUS_SQL = "(m.status IS NULL OR LOWER(m.status) NOT IN ('hidden', 'removed'))"
 
 

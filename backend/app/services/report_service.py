@@ -14,6 +14,7 @@ from app.repos.market_repo import MarketRepository
 from app.repos.material_repo import MaterialRepository
 from app.repos.read_api_repo import ReadApiRepository
 from app.schemas.reports import AdminReportUpdatePayload, ReportCreatePayload
+from app.services.material_security_policy import SECURITY_HOLD_REVIEW_STATUSES
 from app.services.read_support import serialize_datetime
 
 
@@ -189,7 +190,13 @@ class ReportService:
     def _restore_target(self, session: Session, target_type: str, target_id: int) -> None:
         if target_type == "MATERIAL":
             entity = self.material_repo.get_material(session, target_id)
-            if entity is not None and entity.status == "HIDDEN":
+            # Materials held by the malware scan are released by the scanner, not by report restores.
+            if (
+                entity is not None
+                and entity.status == "HIDDEN"
+                and entity.deleted_at is None
+                and entity.review_status not in SECURITY_HOLD_REVIEW_STATUSES
+            ):
                 entity.status = "VISIBLE"
                 self.material_repo.save_material(session, entity)
             return

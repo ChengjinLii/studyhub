@@ -5,8 +5,10 @@ import json
 
 from fastapi.testclient import TestClient
 
+from app.api.deps import get_materials_service
 from app.core.db import session_scope
 from app.models.comments import CommentRecord
+from app.models.materials import MaterialRecord
 from app.services.auth_service import AuthService
 from tests.support import build_auth_headers, seed_read_users
 
@@ -372,3 +374,76 @@ def test_deleting_reply_twice_decrements_parent_reply_count_once(
         parent_record = session.get(CommentRecord, parent_id)
         assert parent_record is not None
         assert parent_record.reply_count == 1
+
+
+def _material_state(material_id: int) -> tuple[str | None, str | None]:
+    with session_scope() as session:
+        material = session.get(MaterialRecord, material_id)
+        assert material is not None
+        return material.status, material.review_status
+
+
+def test_resolved_reports_do_not_count_towards_auto_hide_after_restore(
+    client: TestClient,
+    auth_service: AuthService,
+) -> None:
+    seed_read_users(auth_service)
+    with session_scope() as session:
+        extra_user = auth_service.create_local_user(
+            session,
+            username="reporter4",
+            password="secret123",
+            email="reporter4@example.com",
+            verified=True,
+            nickname="Reporter 4",
+        )
+        extra_user_id = int(extra_user.id)
+    admin_headers = build_auth_headers(3, 8)
+    report_payload = {"targetType": "MATERIAL", "targetId": 101, "reason": "疑似违规资料"}
+
+    report_ids = []
+    for user_id, role_mask in ((1, 1), (2, 2), (3, 8)):
+        response = client.post("/api/reports", headers=build_auth_headers(user_id, role_mask), json=report_payload)
+        assert response.status_code == 200
+        report_ids.append(response.json()["data"]["id"])
+    assert _material_state(101)[0] == "HIDDEN"
+
+    for index, report_id in enumerate(report_ids):
+        body = {"status": "RESOLVED", "restoreTarget": index == 0}
+        assert client.patch(f"/api/admin/reports/{report_id}", headers=admin_headers, json=body).status_code == 200
+    assert _material_state(101)[0] == "VISIBLE"
+
+    fourth_report = client.post("/api/reports", headers=build_auth_headers(extra_user_id, 1), json=report_payload)
+
+    assert fourth_report.status_code == 200
+    assert _material_state(101)[0] == "VISIBLE"
+
+
+def test_report_restore_keeps_security_held_material_hidden(
+    client: TestClient,
+    auth_service: AuthService,
+) -> None:
+    seed_read_users(auth_service)
+    with session_scope() as session:
+        get_materials_service()._bootstrap(session)
+    with session_scope() as session:
+        material = session.get(MaterialRecord, 101)
+        assert material is not None
+        material.status = "HIDDEN"
+        material.review_status = "SECURITY_PENDING"
+
+    report = client.post(
+        "/api/reports",
+        headers=build_auth_headers(1, 1),
+        json={"targetType": "MATERIAL", "targetId": 101, "reason": "疑似违规资料"},
+    )
+    assert report.status_code == 200
+
+    restored = client.patch(
+        f"/api/admin/reports/{report.json()['data']['id']}",
+        headers=build_auth_headers(3, 8),
+        json={"status": "RESOLVED", "restoreTarget": True},
+    )
+
+    assert restored.status_code == 200
+    assert _material_state(101) == ("HIDDEN", "SECURITY_PENDING")
