@@ -5,6 +5,7 @@ import json
 from threading import RLock
 from time import monotonic
 from typing import Any
+from weakref import WeakKeyDictionary
 
 from fastapi import HTTPException, status
 from sqlalchemy import bindparam, inspect, text
@@ -38,17 +39,46 @@ from app.services.read_support import (
 
 VISIBLE_MATERIAL_STATUS_SQL = "(m.status IS NULL OR LOWER(m.status) NOT IN ('hidden', 'removed'))"
 
+# The materials table schema does not change while the process is running, so
+# the column-presence check below (used to bridge pre/post migration schemas)
+# only needs to run once per engine, not once per request. Without this cache,
+# every list/detail/preview/download read paid for a schema introspection
+# round trip (or, on the async path, a blocking reflection call) on every
+# request. Keyed by the engine object itself (via a weak reference) rather
+# than its URL: tests spin up many distinct sqlite ":memory:" engines that
+# share the same URL string but intentionally have different (legacy vs.
+# current) schemas, so a URL-keyed cache would leak results between them.
+_materials_columns_cache: WeakKeyDictionary = WeakKeyDictionary()
+_materials_columns_lock = RLock()
+_FALLBACK_MATERIALS_COLUMNS = frozenset({"file_key", "file_storage_key"})
+
 
 class MaterialsCompatMixin:
-    def _compat_file_key_sql(self, session: Session, table_alias: str | None = "m") -> str:
-        prefix = f"{table_alias}." if table_alias else ""
+    def _compat_materials_columns(self, session: Session) -> frozenset[str]:
         try:
             bind = session.get_bind()
-            if hasattr(bind, "sync_engine"):
-                bind = bind.sync_engine
-            columns = {column["name"] for column in inspect(bind).get_columns("materials")}
+            sync_bind = bind.sync_engine if hasattr(bind, "sync_engine") else bind
+            # Normalize a Connection down to its parent Engine so the cache is
+            # keyed consistently regardless of whether the session is bound to
+            # an Engine or to a specific Connection.
+            sync_bind = getattr(sync_bind, "engine", sync_bind)
         except Exception:
-            columns = {"file_key", "file_storage_key"}
+            return _FALLBACK_MATERIALS_COLUMNS
+        with _materials_columns_lock:
+            cached = _materials_columns_cache.get(sync_bind)
+        if cached is not None:
+            return cached
+        try:
+            columns = frozenset(column["name"] for column in inspect(sync_bind).get_columns("materials"))
+        except Exception:
+            columns = _FALLBACK_MATERIALS_COLUMNS
+        with _materials_columns_lock:
+            _materials_columns_cache[sync_bind] = columns
+        return columns
+
+    def _compat_file_key_sql(self, session: Session, table_alias: str | None = "m") -> str:
+        prefix = f"{table_alias}." if table_alias else ""
+        columns = self._compat_materials_columns(session)
         if "file_storage_key" in columns:
             return f"COALESCE({prefix}file_storage_key, {prefix}file_key) AS file_key"
         return f"{prefix}file_key"
