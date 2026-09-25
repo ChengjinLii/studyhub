@@ -36,6 +36,19 @@ no-nvcc compatibility shim and shared-GPU etiquette for the current host, is doc
 [`scripts/serving/README.md`](scripts/serving/README.md). Sample output:
 [`docs/evidence/foundation-smoke-2026-09-25.jsonl`](docs/evidence/foundation-smoke-2026-09-25.jsonl).
 
+## Roadmap
+
+The agent loop stays a plain ReAct-style tool loop on purpose; added complexity must earn its place with a measured gain
+on the sub-project 2 benchmark (paired comparison with confidence intervals). Planned extensions:
+
+| Direction | What | Metric | Sub-project |
+|---|---|---|---|
+| Fault injection and recovery | Replay environment injects tool errors, timeouts and dirty data; evaluate (then train) recovery | Success rate under injected faults | 2 (eval), 3/4 (training) |
+| Answer self-verification | Before a final answer, check that every citation comes from a page actually read | Citation precision, hallucination rate | 2 |
+| Context engineering | Observation truncation, summarisation and memory compaction for long trajectories | Long-task success rate, tokens per episode | 2-3 |
+| Small-to-large cascade | 4B answers first and escalates to a 27B baseline when not confident | Cost and latency at equal accuracy | after 3 |
+| RL with verifiable rewards | GRPO on environment-state rewards using the token-level rollouts this harness produces | Paired gain over SFT with CIs | 4 |
+
 ## History
 
 The v2 code (Hermes/AReaL workflows, benchmark v1/v2, SFT/GRPO/OPD scripts) is preserved at tag `legacy-agent-v2`
