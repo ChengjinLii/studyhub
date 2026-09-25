@@ -1,0 +1,31 @@
+name: Agent
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ["studyhub-agent/**", ".github/workflows/agent.yml"]
+  pull_request:
+    paths: ["studyhub-agent/**", ".github/workflows/agent.yml"]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: studyhub-agent
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: studyhub-agent/pyproject.toml
+      - run: pip install -e ".[dev]"
+      - run: ruff check src tests
+      - run: lint-imports --config .importlinter
+      - run: pytest --cov --cov-report=term-missing
