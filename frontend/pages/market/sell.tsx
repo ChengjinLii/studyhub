@@ -22,10 +22,9 @@ type ContactType = 'QQ' | 'WECHAT' | 'PHONE';
 
 interface SellPageProps {
   user: SessionUser;
-  token: string;
 }
 
-export default function SellPage({ user, token }: SellPageProps) {
+export default function SellPage({ user }: SellPageProps) {
   const router = useRouter();
   const [title, setTitle] = useState('');
   const [category, setCategory] = useState('BOOK');
@@ -62,7 +61,7 @@ export default function SellPage({ user, token }: SellPageProps) {
       const formData = new FormData();
       formData.append('payload', new Blob([JSON.stringify(payload)], { type: 'application/json' }));
       images.forEach((file) => formData.append('images', file));
-      const item = await createMarketItem(formData, token, typeof window !== 'undefined' ? window.location.origin : undefined);
+      const item = await createMarketItem(formData, typeof window !== 'undefined' ? window.location.origin : undefined);
       setStatus({ type: 'success', text: '发布成功，正在跳转…' });
       router.push(marketPath(item.id, item.title || title));
     } catch (error: unknown) {
@@ -217,7 +216,6 @@ export const getServerSideProps: GetServerSideProps<SellPageProps> = async (ctx)
   return {
     props: {
       user: session.user,
-      token: session.token || '',
     },
   };
 };

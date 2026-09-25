@@ -19,7 +19,7 @@ const limits = {
 };
 
 const validInput = {
-  token: 'token',
+  signedIn: true,
   isExperience: false,
   description: 'course notes',
   isExperienceCustomTopic: false,
@@ -58,7 +58,7 @@ describe('uploadValidation', () => {
   });
 
   it('requires login before upload submission', () => {
-    const result = validateUploadSubmitInput({ ...validInput, token: null });
+    const result = validateUploadSubmitInput({ ...validInput, signedIn: false });
     expect(result.error).toBe('请先登录后再投稿。');
   });
 

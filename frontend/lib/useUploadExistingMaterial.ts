@@ -20,7 +20,6 @@ type FileListSetter = Dispatch<SetStateAction<File[]>>;
 interface UseUploadExistingMaterialOptions {
   isEditing: boolean;
   editingId: string | null;
-  token: string | null;
   setTitle: StringSetter;
   setDescription: StringSetter;
   setPrice: StringSetter;
@@ -66,7 +65,6 @@ const EXPERIENCE_SYSTEM_TAGS = new Set([
 export function useUploadExistingMaterial({
   isEditing,
   editingId,
-  token,
   setTitle,
   setDescription,
   setPrice,
@@ -105,7 +103,7 @@ export function useUploadExistingMaterial({
       if (!isEditing || !editingId) return;
       setLoadingExisting(true);
       try {
-        const detail: MaterialDetail = await fetchMaterialDetail(editingId, token || undefined);
+        const detail: MaterialDetail = await fetchMaterialDetail(editingId);
         setTitle(detail.title || '');
         setDescription(detail.description || '');
         const detailPrice = detail.price != null ? Math.round(detail.price) : 0;
@@ -192,7 +190,6 @@ export function useUploadExistingMaterial({
     setTitle,
     setUploadMode,
     setZipPlaceholder,
-    token,
   ]);
 
   return { loadingExisting };

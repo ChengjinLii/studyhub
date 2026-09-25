@@ -46,7 +46,6 @@ import { AdminMonthlyPayoutOverview, AdminMonthlyPayoutItem, AdminPayoutQr } fro
 interface AdminPageProps {
   user: SessionUser;
   users: UserSummary[];
-  token: string;
   feedbacks: FeedbackEntry[];
   volunteers: VolunteerApplicationEntry[];
   materials: AdminMaterial[];
@@ -1135,7 +1134,6 @@ export const getServerSideProps: GetServerSideProps<AdminPageProps> = async (ctx
     props: {
       user: session.user,
       users,
-      token: session.token || '',
       feedbacks,
       volunteers,
       materials,

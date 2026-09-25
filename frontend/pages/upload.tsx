@@ -79,7 +79,6 @@ const UPLOAD_NAV_ITEMS = [
 
 interface UploadPageProps {
   user: SessionUser | null;
-  token: string | null;
   account: UserAccountProfile | null;
 }
 
@@ -97,7 +96,7 @@ const resolveMaterialProfilePrefill = (account: UserAccountProfile | null) => {
   };
 };
 
-export default function UploadPage({ user, token, account }: UploadPageProps) {
+export default function UploadPage({ user, account }: UploadPageProps) {
   const router = useRouter();
   const submissionToast = useUploadSubmissionToast();
   const editingId = typeof router.query.materialId === 'string' ? router.query.materialId : null;
@@ -285,7 +284,6 @@ export default function UploadPage({ user, token, account }: UploadPageProps) {
   const { loadingExisting } = useUploadExistingMaterial({
     isEditing,
     editingId,
-    token,
     setTitle,
     setDescription,
     setPrice,
@@ -533,8 +531,7 @@ export default function UploadPage({ user, token, account }: UploadPageProps) {
     ) => {
       const authorization = await requestMaterialUploadAuthorization(
         authorizationSubmissionId,
-        files.map((file) => describeUploadFile(role, file)),
-        token
+        files.map((file) => describeUploadFile(role, file))
       );
       const formData = new FormData();
       formData.append('submissionId', submissionId);
@@ -542,13 +539,12 @@ export default function UploadPage({ user, token, account }: UploadPageProps) {
       const field = role === 'MATERIAL' ? 'zip' : role === 'PREVIEW' ? 'previews' : 'customPreviews';
       files.forEach((file) => formData.append(field, file));
       return sendStagedUploadFormData(`${apiBase}/material-uploads/stage`, formData, {
-        token,
         uploadToken: authorization.uploadToken,
         onProgress,
         requestRef,
       });
     },
-    [apiBase, token]
+    [apiBase]
   );
 
   const stageMaterialFile = useCallback(
@@ -737,7 +733,7 @@ export default function UploadPage({ user, token, account }: UploadPageProps) {
       deliveryMethod, previewSource,
     });
     const validation = validateUploadSubmitInput({
-      token,
+      signedIn: Boolean(user),
       isExperience,
       description,
       isExperienceCustomTopic,
@@ -902,7 +898,7 @@ export default function UploadPage({ user, token, account }: UploadPageProps) {
           ...submittedCustomPreviews.map((file) => describeUploadFile('CUSTOM_PREVIEW', file)),
         ];
         if (filesRequiringUpload.length > 0) {
-          const authorization = await requestMaterialUploadAuthorization(submissionId, filesRequiringUpload, token);
+          const authorization = await requestMaterialUploadAuthorization(submissionId, filesRequiringUpload);
           uploadAuthorizationToken = authorization.uploadToken;
         }
       }
@@ -911,7 +907,6 @@ export default function UploadPage({ user, token, account }: UploadPageProps) {
       setSubmissionStage('uploading');
       submissionToast.uploading(isEditing);
       const json = await sendUploadFormData(endpoint, method, formData, {
-        token,
         uploadToken: uploadAuthorizationToken,
         onProgress: (value) => {
           setUploadProgress(value);
@@ -1370,7 +1365,6 @@ export const getServerSideProps: GetServerSideProps<UploadPageProps> = async (ct
   return {
     props: {
       user: session.user,
-      token: session.token,
       account,
     },
   };

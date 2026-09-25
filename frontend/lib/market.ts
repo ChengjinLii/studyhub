@@ -1,6 +1,6 @@
 import { MarketItemDetail, MarketListResponse } from '../types/market';
 import { unwrapApiResponse } from './apiEnvelope';
-import { resolveApiBase } from './apiBase';
+import { fetchBackend, resolveApiBase } from './apiBase';
 import {
   readServerPublicApiCache,
   refreshServerPublicApiCache,
@@ -55,14 +55,7 @@ export async function fetchMarketItemDetail(id: string, token?: string, origin?:
   return apiFetch<MarketItemDetail>(`/market/${id}`, token, origin);
 }
 
-export async function createMarketItem(formData: FormData, token: string, origin?: string) {
-  const headers: Record<string, string> = { Accept: 'application/json' };
-  if (token) headers.Authorization = `Bearer ${token}`;
-  const apiBase = resolveApiBase(origin);
-  const response = await fetch(`${apiBase}/market`, {
-    method: 'POST',
-    headers,
-    body: formData,
-  });
+export async function createMarketItem(formData: FormData, origin?: string) {
+  const response = await fetchBackend('/market', { method: 'POST', body: formData, credentials: 'include' }, origin);
   return unwrapApiResponse<MarketItemDetail>(response, '发布失败');
 }

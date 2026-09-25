@@ -35,7 +35,7 @@ interface UploadValidationLimits {
 }
 
 interface UploadSubmitValidationInput {
-  token: string | null;
+  signedIn: boolean;
   isExperience: boolean;
   description: string;
   isExperienceCustomTopic: boolean;
@@ -63,7 +63,7 @@ interface UploadSubmitValidationInput {
 }
 
 export const validateUploadSubmitInput = ({
-  token,
+  signedIn,
   isExperience,
   description,
   isExperienceCustomTopic,
@@ -89,7 +89,7 @@ export const validateUploadSubmitInput = ({
   courseCategory,
   limits,
 }: UploadSubmitValidationInput): { error: string | null; priceValue: number } => {
-  if (!token) {
+  if (!signedIn) {
     return { error: '请先登录后再投稿。', priceValue: 0 };
   }
   if (isExperience && !description.trim()) {

@@ -26,15 +26,11 @@ export const describeUploadFile = (role: UploadFileRole, file: File): UploadFile
 
 export const requestMaterialUploadAuthorization = async (
   submissionId: string,
-  files: UploadFileDescriptor[],
-  token?: string | null
+  files: UploadFileDescriptor[]
 ) => {
   const response = await fetchBackend('/material-upload-authorizations', {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ submissionId, files }),
   });
   return unwrapApiResponse<MaterialUploadAuthorizationResult>(response, '获取上传授权失败');
