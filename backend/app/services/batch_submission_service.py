@@ -97,9 +97,16 @@ class BatchSubmissionService:
         session.add(Audit(batch_id=batch.id, operator_id=operator_id if operator_id is not None else 0, action=action,
                           detail=json.dumps({"itemIds": sorted(ids)})))
 
-    def _serialize(self, session, batch, *, admin=False, created=False):
+    def _serialize(self, session, batch, *, admin=False, created=False, items=None, publications=None):
+        # items/publications: pre-loaded by list_batches for a whole page (avoids
+        # an extra query pair per batch); single-batch callers load their own.
         session.flush()
-        items = self._items(session, batch.id)
+        if items is None:
+            items = self._items(session, batch.id)
+        if publications is None:
+            publications = list(session.execute(
+                select(Publication, MaterialRecord.title).join(MaterialRecord, MaterialRecord.id == Publication.material_id)
+                .where(Publication.batch_id == batch.id, Publication.status == "PUBLISHED")))
         result = {"id": batch.id, "status": batch.status, "deliveryMethod": batch.delivery_method,
                   "publicationIntent": batch.publication_intent, "createdAt": batch.created_at,
                   "updatedAt": batch.updated_at, "itemCount": len(items),
@@ -111,11 +118,7 @@ class BatchSubmissionService:
         result["publications"] = [
             {"id": publication.id, "materialId": publication.material_id,
              "title": title, "url": f"/materials/{publication.material_id}"}
-            for publication, title in session.execute(
-                select(Publication, MaterialRecord.title)
-                .join(MaterialRecord, MaterialRecord.id == Publication.material_id)
-                .where(Publication.batch_id == batch.id, Publication.status == "PUBLISHED")
-            )
+            for publication, title in publications
         ]
         if admin:
             result.update(uploaderId=batch.uploader_id, note=batch.note, pricingNote=batch.pricing_note,
@@ -197,8 +200,24 @@ class BatchSubmissionService:
         if user_id is not None:
             query = query.where(Batch.uploader_id == user_id)
         total = session.scalar(select(func.count()).select_from(query.subquery()))
-        rows = session.scalars(query.order_by(Batch.id.desc()).offset(max(0, offset)).limit(max(1, min(50, limit))))
-        return {"items": [self._serialize(session, b, admin=user_id is None) for b in rows], "total": total}
+        session.flush()
+        batches = session.scalars(query.order_by(Batch.id.desc()).offset(max(0, offset)).limit(max(1, min(50, limit)))).all()
+        # Load items/publications for the whole page in two queries instead of
+        # one round trip per batch (previously 2N extra queries for N batches).
+        batch_ids = [b.id for b in batches]
+        items_by_batch: dict[int, list[Item]] = {batch_id: [] for batch_id in batch_ids}
+        publications_by_batch: dict[int, list] = {batch_id: [] for batch_id in batch_ids}
+        if batch_ids:
+            for item in session.scalars(select(Item).where(Item.batch_id.in_(batch_ids)).order_by(Item.id)):
+                items_by_batch[item.batch_id].append(item)
+            for publication, title in session.execute(
+                select(Publication, MaterialRecord.title).join(MaterialRecord, MaterialRecord.id == Publication.material_id)
+                .where(Publication.batch_id.in_(batch_ids), Publication.status == "PUBLISHED")
+            ):
+                publications_by_batch[publication.batch_id].append((publication, title))
+        items = [self._serialize(session, b, admin=user_id is None, items=items_by_batch[b.id],
+                                 publications=publications_by_batch[b.id]) for b in batches]
+        return {"items": items, "total": total}
 
     def detail(self, session: Session, batch_id: int, *, user_id: int | None = None) -> dict:
         return self._serialize(session, self._batch(session, batch_id, user_id=user_id), admin=user_id is None)
