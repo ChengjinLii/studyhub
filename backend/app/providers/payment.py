@@ -12,6 +12,16 @@ from app.models.finance import OrderRecord, PaymentRecord
 from app.providers.alipay_support import build_alipay_client, gateway_url_for_env
 
 
+@dataclass(frozen=True, slots=True)
+class CheckoutSubject:
+    """Order-shaped view of a non-order payable (e.g. a request contribution) for the payment providers."""
+
+    id: int | None
+    material_id: int | None
+    amount: int
+    material_title: str
+
+
 @dataclass(slots=True)
 class PaymentNotification:
     out_trade_no: str

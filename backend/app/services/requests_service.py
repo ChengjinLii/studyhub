@@ -14,7 +14,7 @@ from app.core.async_db import async_session_scope
 from app.core.config import Settings
 from app.models.finance import SettlementRecord
 from app.models.materials import MaterialRecord
-from app.providers.payment import PaymentGatewayProvider
+from app.providers.payment import CheckoutSubject, PaymentGatewayProvider, PaymentNotification
 from app.repos.finance_repo import FinanceRepository
 from app.models.requests import (
     RequestArbitrationRecord,
@@ -285,7 +285,7 @@ class RequestsService(RequestsRefundMixin, RequestsCompatMixin):
                     "paymentRequired": True,
                     "contributionId": contribution.id,
                     "outTradeNo": contribution.out_trade_no,
-                    "form": self._build_local_pay_form(contribution.out_trade_no or ""),
+                    "form": self._build_contribution_checkout_form(contribution, entity),
                 }
             )
         session.commit()
@@ -319,7 +319,7 @@ class RequestsService(RequestsRefundMixin, RequestsCompatMixin):
         return {
             "contributionId": contribution.id,
             "outTradeNo": contribution.out_trade_no,
-            "form": self._build_local_pay_form(contribution.out_trade_no or ""),
+            "form": self._build_contribution_checkout_form(contribution, request),
         }
 
     def get_contribution_status(self, session: Session, out_trade_no: str, user_id: int, *, force_check: bool) -> dict[str, Any]:
@@ -330,8 +330,15 @@ class RequestsService(RequestsRefundMixin, RequestsCompatMixin):
         if contribution.contributor_id is not None and contribution.contributor_id != user_id:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="无权查看该记录")
         if force_check and contribution.status == CONTRIBUTION_STATUS_CREATED:
-            self._mark_contribution_paid(session, contribution)
-            session.commit()
+            confirmed = self._query_gateway_payment(session, contribution)
+            if confirmed is not None:
+                self._mark_contribution_paid(
+                    session,
+                    contribution,
+                    trade_no=confirmed.trade_no,
+                    pay_channel=self._payment_channel_name(),
+                )
+                session.commit()
         return {
             "status": contribution.status,
             "requestId": contribution.request_id,
@@ -487,13 +494,11 @@ class RequestsService(RequestsRefundMixin, RequestsCompatMixin):
         request = self._require_request(session, contribution.request_id)
         if request.status != REQUEST_STATUS_OPEN or request.accepted_response_id is not None:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="求购当前不可结束贡献")
-        contribution.status = CONTRIBUTION_STATUS_REFUNDING
-        self.request_repo.save_contribution(session, contribution)
+        self._begin_contribution_refund(session, request, contribution)
         refund_ok = self._execute_refund(session, contribution, reason="用户主动取消")
         if refund_ok:
             contribution.status = CONTRIBUTION_STATUS_REFUNDED
             self.request_repo.save_contribution(session, contribution)
-            self._apply_refund_to_request(request, contribution.amount_cents)
         elif not self.settings.resolved_finance_outbox_enabled:
             raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="退款请求失败，请稍后重试")
         session.commit()
@@ -558,11 +563,10 @@ class RequestsService(RequestsRefundMixin, RequestsCompatMixin):
             return {"status": "AMOUNT_MISMATCH"}
         if contribution.status == CONTRIBUTION_STATUS_PAID:
             return {"status": "DUPLICATE"}
-        self._mark_contribution_paid(session, contribution)
-        if trade_no:
-            contribution.trade_no = trade_no
-            contribution.pay_channel = "alipay_page"
-            self.request_repo.save_contribution(session, contribution)
+        if contribution.status != CONTRIBUTION_STATUS_CREATED:
+            # A retried notification must never pull a refunding/refunded contribution back into the pool.
+            return {"status": "ALREADY_REFUNDED"}
+        self._mark_contribution_paid(session, contribution, trade_no=trade_no, pay_channel="alipay_page")
         session.commit()
         return {"status": "PAID"}
 
@@ -743,12 +747,19 @@ class RequestsService(RequestsRefundMixin, RequestsCompatMixin):
         self.request_repo.save_contribution(session, entity)
         return entity
 
-    def _mark_contribution_paid(self, session: Session, contribution: RequestContributionRecord) -> None:
-        if contribution.status == CONTRIBUTION_STATUS_PAID:
+    def _mark_contribution_paid(
+        self,
+        session: Session,
+        contribution: RequestContributionRecord,
+        *,
+        trade_no: str | None,
+        pay_channel: str,
+    ) -> None:
+        if contribution.status != CONTRIBUTION_STATUS_CREATED:
             return
         contribution.status = CONTRIBUTION_STATUS_PAID
-        contribution.trade_no = f"TRADE{contribution.id}"
-        contribution.pay_channel = "local_page"
+        contribution.trade_no = trade_no or f"TRADE{contribution.id}"
+        contribution.pay_channel = pay_channel
         contribution.paid_at = datetime.now(UTC)
         if contribution.deadline_tier:
             contribution.deadline_at = self._compute_deadline_datetime(contribution.paid_at, contribution.deadline_tier)
@@ -887,11 +898,39 @@ class RequestsService(RequestsRefundMixin, RequestsCompatMixin):
         deadline = self._compute_deadline_datetime(base, tier)
         return None if deadline is None else deadline.date()
 
-    def _build_local_pay_form(self, out_trade_no: str) -> str:
-        return (
-            "<form method=\"GET\" action=\"/pay/result\">"
-            f"<input type=\"hidden\" name=\"orderNo\" value=\"{out_trade_no}\" />"
-            "</form>"
+    def _build_contribution_checkout_form(self, contribution: RequestContributionRecord, request: RequestRecord) -> str:
+        if self.payment_provider is None:
+            raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="支付通道暂不可用")
+        payload = self.payment_provider.build_checkout_payload(
+            out_trade_no=contribution.out_trade_no or "",
+            order=self._contribution_checkout_subject(contribution, request),
+        )
+        return str(payload.get("form") or "")
+
+    def _query_gateway_payment(self, session: Session, contribution: RequestContributionRecord) -> PaymentNotification | None:
+        """Only the gateway can confirm a contribution was paid, and only for the exact amount."""
+        if self.payment_provider is None or not contribution.out_trade_no:
+            return None
+        request = self._require_request(session, contribution.request_id)
+        notification = self.payment_provider.build_force_check_notification(
+            out_trade_no=contribution.out_trade_no,
+            order=self._contribution_checkout_subject(contribution, request),
+        )
+        if notification is None or notification.amount_cents != int(contribution.amount_cents or 0):
+            return None
+        return notification
+
+    def _payment_channel_name(self) -> str:
+        return self.payment_provider.channel_name if self.payment_provider is not None else "alipay_page"
+
+    @staticmethod
+    def _contribution_checkout_subject(contribution: RequestContributionRecord, request: RequestRecord) -> CheckoutSubject:
+        title = (request.course or request.keyword or "").strip()
+        return CheckoutSubject(
+            id=contribution.id,
+            material_id=None,
+            amount=int(contribution.amount_cents or 0),
+            material_title=f"StudyHub 求购 #{request.id}" + (f" {title[:40]}" if title else ""),
         )
 
     def _is_publicly_visible(self, request: RequestRecord) -> bool:

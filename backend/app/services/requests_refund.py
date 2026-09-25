@@ -32,17 +32,33 @@ class RequestsRefundMixin:
             return
         all_refunded = True
         for contribution in active:
-            contribution.status = CONTRIBUTION_STATUS_REFUNDING
-            self.request_repo.save_contribution(session, contribution)
+            self._begin_contribution_refund(session, request, contribution)
             refund_ok = self._execute_refund(session, contribution, reason=reason)
             if refund_ok:
                 contribution.status = CONTRIBUTION_STATUS_REFUNDED
                 self.request_repo.save_contribution(session, contribution)
-                self._apply_refund_to_request(request, contribution.amount_cents)
             else:
                 all_refunded = False
         request.status = REQUEST_STATUS_REFUNDED if all_refunded else REQUEST_STATUS_REFUNDING
         request.settled_at = datetime.now(UTC) if all_refunded else None
+        self.request_repo.save_request(session, request)
+
+    def _begin_contribution_refund(
+        self,
+        session: Session,
+        request: RequestRecord,
+        contribution: RequestContributionRecord,
+    ) -> None:
+        """Take the money out of the request's funded pool the moment its refund starts.
+
+        A queued (outbox) refund can take minutes; the funds must not stay settleable to a
+        responder meanwhile. Contributions already REFUNDING were deducted when they entered it.
+        """
+        if contribution.status != CONTRIBUTION_STATUS_PAID:
+            return
+        contribution.status = CONTRIBUTION_STATUS_REFUNDING
+        self.request_repo.save_contribution(session, contribution)
+        self._apply_refund_to_request(request, contribution.amount_cents)
         self.request_repo.save_request(session, request)
 
     def _apply_refund_to_request(self, request: RequestRecord, amount_cents: int | None) -> None:
@@ -200,27 +216,27 @@ class RequestsRefundMixin:
         *,
         refund_trade_no: str | None,
     ) -> None:
-        already_refunded = contribution.status == CONTRIBUTION_STATUS_REFUNDED
+        request = self._require_request(session, contribution.request_id)
+        # Funds already left the pool in _begin_contribution_refund; only close out the refund here.
+        self._begin_contribution_refund(session, request, contribution)
         contribution.refund_status = SUCCESS_REFUND_STATUS
         contribution.refund_trade_no = refund_trade_no or contribution.refund_trade_no
         contribution.refunded_at = contribution.refunded_at or datetime.now(UTC)
         contribution.status = CONTRIBUTION_STATUS_REFUNDED
         self.request_repo.save_contribution(session, contribution)
-        request = self._require_request(session, contribution.request_id)
-        if not already_refunded:
-            self._apply_refund_to_request(request, contribution.amount_cents)
-        remaining = self.request_repo.list_contributions(session, request.id)
-        unsettled_paid = [
-            item
-            for item in remaining
-            if item.id != contribution.id and item.status in {CONTRIBUTION_STATUS_PAID, CONTRIBUTION_STATUS_REFUNDING}
-        ]
-        if not unsettled_paid:
-            request.status = REQUEST_STATUS_REFUNDED
-            request.settled_at = request.settled_at or datetime.now(UTC)
-        else:
-            request.status = REQUEST_STATUS_REFUNDING
-        self.request_repo.save_request(session, request)
+        if request.status == REQUEST_STATUS_REFUNDING:
+            # Whole-request refund: finish it once nothing is left in flight. A single
+            # follower cancelling out of an open request must not change the request's status.
+            remaining = self.request_repo.list_contributions(session, request.id)
+            unsettled_paid = [
+                item
+                for item in remaining
+                if item.id != contribution.id and item.status in {CONTRIBUTION_STATUS_PAID, CONTRIBUTION_STATUS_REFUNDING}
+            ]
+            if not unsettled_paid:
+                request.status = REQUEST_STATUS_REFUNDED
+                request.settled_at = request.settled_at or datetime.now(UTC)
+            self.request_repo.save_request(session, request)
         instruction.status = "SUCCEEDED"
         instruction.provider_reference = refund_trade_no or instruction.provider_reference
         instruction.result_json = json.dumps({"success": True, "verified": True}, separators=(",", ":"))
