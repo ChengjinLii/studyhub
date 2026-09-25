@@ -57,15 +57,17 @@ class SGLangGenerateBackend:
             )
             response.raise_for_status()
             meta = response.json()["meta_info"]
-        except (httpx.HTTPError, KeyError, ValueError) as exc:
+            pairs = meta.get("output_token_logprobs")
+            if pairs is None:
+                raise PolicyInfraError("sglang response is missing output_token_logprobs")
+            finish = meta.get("finish_reason")
+            return Generation(
+                output_ids=tuple(int(item[1]) for item in pairs),
+                logprobs=tuple(float(item[0]) for item in pairs),
+                finish_reason=finish.get("type") if isinstance(finish, dict) else finish,
+            )
+        except (httpx.HTTPError, KeyError, ValueError, TypeError, IndexError) as exc:
             raise PolicyInfraError(f"sglang generate failed: {exc}") from exc
-        pairs = meta.get("output_token_logprobs") or []
-        finish = meta.get("finish_reason")
-        return Generation(
-            output_ids=tuple(int(item[1]) for item in pairs),
-            logprobs=tuple(float(item[0]) for item in pairs),
-            finish_reason=finish.get("type") if isinstance(finish, dict) else finish,
-        )
 
 
 class TokenPolicyClient:
@@ -92,7 +94,9 @@ class TokenPolicyClient:
         parsed = parse_completion(raw_text, tools, thinking=thinking)
         canonical = raw_text
         if parsed.kind is not TurnKind.PARSE_ERROR:
-            assistant = Message(role="assistant", content=parsed.content, tool_calls=parsed.tool_calls)
+            assistant = Message(
+                role="assistant", content=parsed.content, tool_calls=parsed.tool_calls, reasoning=parsed.reasoning
+            )
             try:
                 canonical = canonical_completion_text(messages, assistant, tools, thinking=thinking)
             except RenderError as exc:
@@ -102,6 +106,7 @@ class TokenPolicyClient:
         return AssistantTurn(
             kind=parsed.kind,
             content=parsed.content,
+            reasoning=parsed.reasoning,
             tool_calls=parsed.tool_calls,
             raw_text=raw_text,
             canonical_text=canonical,

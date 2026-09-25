@@ -29,12 +29,24 @@ def _wire_message(message: Message) -> dict[str, Any]:
             ],
         }
     if message.role == "tool":
-        return {
-            "role": "tool",
-            "content": message.content,
-            "tool_call_id": message.tool_call_id or message.name or "runtime",
-        }
+        if message.tool_call_id:
+            return {"role": "tool", "content": message.content, "tool_call_id": message.tool_call_id}
+        # No real tool_call_id to bind to (e.g. runtime feedback: parse-error notices, the finalize
+        # prompt). A fake id would match no assistant tool call and strict servers reject that, so
+        # send the same text the Qwen template itself produces for a standalone tool turn.
+        return {"role": "user", "content": f"<tool_response>\n{message.content}\n</tool_response>"}
     return {"role": message.role, "content": message.content}
+
+
+def _raw_completion_text(content: str, tool_calls: Any) -> str:
+    """The assistant content plus, if present, the raw tool_calls JSON on a new line.
+
+    Used for both AssistantTurn.raw_text and PARSE_ERROR feedback: the runner feeds raw_text back
+    into history on a parse error, so it must never be the whole response envelope.
+    """
+    if tool_calls:
+        return f"{content}\n{json.dumps(tool_calls, ensure_ascii=False)}"
+    return content
 
 
 class OpenAICompatPolicyClient:
@@ -97,7 +109,8 @@ class OpenAICompatPolicyClient:
     ) -> AssistantTurn:
         message = choice.get("message") or {}
         content = (message.get("content") or "").strip()
-        raw_text = json.dumps(message, ensure_ascii=False, sort_keys=True)
+        reasoning = message.get("reasoning_content") or message.get("reasoning") or ""
+        raw_text = _raw_completion_text(content, message.get("tool_calls"))
         calls: list[ToolCall] = []
         for index, item in enumerate(message.get("tool_calls") or []):
             function = item.get("function") or {}
@@ -110,7 +123,7 @@ class OpenAICompatPolicyClient:
             calls.append(ToolCall(call_id=f"call_{index}", name=str(function.get("name")), arguments=arguments))
         if not calls and not content:
             return self._error(raw_text, "empty_response", choice, latency_ms)
-        assistant = Message(role="assistant", content=content, tool_calls=tuple(calls))
+        assistant = Message(role="assistant", content=content, tool_calls=tuple(calls), reasoning=reasoning)
         try:
             canonical = canonical_completion_text(messages, assistant, tools, thinking=thinking)
         except RenderError as exc:
@@ -121,6 +134,7 @@ class OpenAICompatPolicyClient:
         return AssistantTurn(
             kind=reparsed.kind,
             content=reparsed.content,
+            reasoning=reparsed.reasoning,
             tool_calls=reparsed.tool_calls,
             raw_text=raw_text,
             canonical_text=canonical,
