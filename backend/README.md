@@ -238,6 +238,12 @@ PATCH  /api/notifications                   标记通知已读
 - `/api/materials/column` 支持 `ETag` / `304`
 - 健康检查和指标接口默认跳过普通访问日志
 - 求购超时推进这类维护逻辑继续由 worker 驱动，避免公开读请求顺手做后台工作
+- 2026-09-26 API 性能专项（详见提交历史 `perf:`/`fix:` 系列）：
+  - 资料详情的异步（兼容层）读取改为共享一个数据库会话，避免一次登录态详情请求最多占用约 10 个异步连接
+  - 兼容层的 `materials` 表结构探测（是否已有 `file_storage_key` 列）按引擎缓存，不再每次请求都做 schema introspection；同时修复了异步路径下直接对 `AsyncEngine.sync_engine` 调用 `inspect()` 必然抛 `MissingGreenlet`、异常又被吞掉导致连接在 `pool_pre_ping` 下被判失效的问题，现在异步路径统一走 `AsyncSession.run_sync`
+  - 批量投稿管理列表按整页批量加载 items / publications，避免原来 `1 + 2N` 次查询
+  - 批量投稿文件下载在做对象存储拷贝前先提交释放行锁，不再把锁持有到整个拷贝过程结束
+  - 举报自动隐藏 / 管理员恢复只在可见性真的发生变化时才失效匿名只读缓存（而不是每次举报或恢复都失效），并给 `/api/reports` 加了按用户的提交频率限制，避免被同一用户高频触发缓存失效扫描
 
 这些优化为什么适合现在这个项目：
 
@@ -252,6 +258,35 @@ PATCH  /api/notifications                   标记通知已读
 - 把一部分热点只读链路迁到真正的异步数据库访问
 - 继续优化少数长尾查询和更复杂的管理后台读链路
 - 把更重的资产处理、报表生成、外部回调处理进一步移到 worker
+
+## 性能基准脚本
+
+`backend/scripts/perf_seed_data.py` 和 `backend/scripts/perf_load_test.py` 是 2026-09-26 API 性能专项遗留的手工压测工具，只用于本地或临时环境的一次性测量，不在 CI 中运行，也不应该在生产/预发环境使用。
+
+用法示例：
+
+```bash
+cd backend
+
+# 1. 在一个临时 SQLite 文件里生成压测数据（材料/评论/浏览量/集市/求购/批量投稿）。
+#    目标路径必须在 /tmp 下，脚本会拒绝其它路径，也会拒绝 .local-dev 目录，
+#    避免误覆盖真实的本地开发数据库；脚本内部会强制 STUDYHUB_ENVIRONMENT=local-dev。
+.venv/bin/python scripts/perf_seed_data.py /tmp/studyhub-perf-bench/db.sqlite3
+
+# 2. 用这个数据库启动一个临时的 uvicorn（端口、环境变量按需替换）
+STUDYHUB_DATABASE_URL="sqlite+pysqlite:////tmp/studyhub-perf-bench/db.sqlite3" \
+STUDYHUB_LOCAL_DEV_ROOT_DIR=/tmp/studyhub-perf-bench/local-dev-root \
+  .venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port 18931
+
+# 3. 跑压测脚本，输出各接口的 p50/p95/p99 和吞吐
+.venv/bin/python scripts/perf_load_test.py http://127.0.0.1:18931 --requests 200 --concurrency 8
+```
+
+内置的安全限制（防止误用到真实环境）：
+
+- `perf_load_test.py` 默认只允许压测 `127.0.0.1` / `localhost` 这类回环地址；要打到其它主机必须显式加 `--allow-remote`
+- `perf_load_test.py` 自己签发的 Bearer token 固定用内置的 `DEFAULT_DEV_JWT_SECRET` 签名，不会读取当前进程环境变量里配置的真实 JWT secret；如果检测到 `settings.requires_private_env_file`（即 preview / production 环境）会直接拒绝运行
+- `perf_seed_data.py` 会强制（而不是仅在未设置时）把 `STUDYHUB_ENVIRONMENT` 设为 `local-dev`，并且只接受 `/tmp` 下的目标数据库路径
 
 ## 常用验证接口
 
