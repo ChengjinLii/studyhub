@@ -1,11 +1,14 @@
 import json
 from pathlib import Path
 
+import pytest
+
 from studyhub_agent.contracts.episode import Budget, EpisodeSpec, FailureOwner, Principal, Termination, TurnKind
 from studyhub_agent.contracts.prompts import DEFAULT_PROMPTS
 from studyhub_agent.environments.base import EnvironmentInfraError
 from studyhub_agent.environments.replay import ReplayEnvironment, load_snapshot
 from studyhub_agent.runtime.runner import EpisodeRunner
+from studyhub_agent.tools.specs import TOOL_SPECS
 from tests.runtime.fakes import (
     ScriptedPolicy,
     count_chars,
@@ -32,9 +35,9 @@ def _spec(**overrides) -> EpisodeSpec:
     return EpisodeSpec(**{**base, **overrides})
 
 
-def _run(spec, turns):
+def _run(spec, turns, environment=None):
     policy = ScriptedPolicy(list(turns))
-    return RUNNER.run(spec, ReplayEnvironment(SNAPSHOT), policy), policy
+    return RUNNER.run(spec, environment or ReplayEnvironment(SNAPSHOT), policy), policy
 
 
 def test_search_read_answer_happy_path() -> None:
@@ -172,10 +175,29 @@ def test_context_budget_after_some_turns_is_still_a_model_failure() -> None:
 
 
 def test_unknown_tool_name_in_spec_is_a_configuration_error() -> None:
-    import pytest
-
     with pytest.raises(KeyError, match="web_fetch"):
         _run(_spec(tool_names=("web_fetch",)), [])
+
+
+def test_duplicate_tool_names_in_spec_is_a_configuration_error() -> None:
+    with pytest.raises(ValueError, match="materials_search"):
+        _run(_spec(tool_names=("materials_search", "materials_search")), [])
+
+
+class _SubsetEnvironment(ReplayEnvironment):
+    """An environment that only actually provides a strict subset of the global tool registry."""
+
+    def tool_specs(self):
+        return tuple(spec for spec in TOOL_SPECS if spec.name != "materials_read")
+
+
+def test_environment_tool_subset_is_a_configuration_error_for_a_missing_tool() -> None:
+    # A tool name can be perfectly valid in the *global* registry yet unavailable from this
+    # particular environment; the runner must resolve tools against what the environment actually
+    # provides (environment.tool_specs()), not the global registry, or it would silently prompt the
+    # model with a tool the environment can never execute.
+    with pytest.raises(KeyError, match="materials_read"):
+        _run(_spec(), [], environment=_SubsetEnvironment(SNAPSHOT))
 
 
 def test_reasoning_is_carried_into_message_history() -> None:

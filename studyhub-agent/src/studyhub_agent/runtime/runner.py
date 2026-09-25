@@ -64,7 +64,11 @@ class EpisodeRunner:
         )
 
     def run(self, spec: EpisodeSpec, environment: Environment, policy: PolicyClient) -> Episode:
-        tools = select_tools(spec.tool_names)
+        # Resolve against what this environment actually provides, not the global tool registry: a
+        # tool name can be valid globally yet unavailable from a particular environment, and
+        # prompting the model with a tool the environment can never execute is a configuration bug,
+        # not something to discover only when the model tries to call it.
+        tools = select_tools(spec.tool_names, environment.tool_specs())
         contract = self.contract_for(spec, tools)
         environment.reset(spec)
         progress = _Progress(
