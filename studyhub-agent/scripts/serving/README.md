@@ -6,6 +6,14 @@ only — not part of the local test suite.
 
 Sample output from this exact run: [`docs/evidence/foundation-smoke-2026-09-25.jsonl`](../../docs/evidence/foundation-smoke-2026-09-25.jsonl).
 
+> **Note on re-running this:** the checked-in evidence file was produced by the version of
+> `scripts/smoke_episodes.py` that derived `tokenizer_revision` from the tokenizer file's size
+> (`Qwen3.5-4B@12807982`). A later fix changed this to a sha256 of the file's contents
+> (`Qwen3.5-4B@sha256:5f9e4d4901a9`), which is also an input to `contract_hash`. Re-running the
+> commands below at the current script version will reproduce the same turns, tool calls, final
+> answers and termination reasons, but with **different `contract_hash` values** than the checked-in
+> file — that is expected, not a regression.
+
 ## Shared-GPU etiquette (read first)
 
 This host's two GPUs are shared with other people's jobs. Before doing anything:
@@ -71,8 +79,8 @@ needed only because Qwen3.5-4B is hybrid, not a plain dense model):
 - `--mem-fraction-static 0.40`: the smallest value that produced a non-negative KV/mamba token-pool
   budget on this shared GPU (~28 GB free at process start; `0.28`, a reasonable-looking starting point
   for "4B bf16 weights ≈ 9 GB + KV cache" on an *idle* GPU, produced a negative profiled-token count here
-  because of the formula above). A larger value (`0.75`) was blocked by an unrelated safety control before
-  it ran; `0.40` was verified against live `nvidia-smi` output to never exceed actually-free memory.
+  because of the formula above). A larger value (`0.75`) was not attempted; `0.40` was verified against
+  live `nvidia-smi` output to never exceed actually-free memory.
 - `--max-mamba-cache-size 8`: the hybrid model's Mamba/GDN layers need a fixed per-request state cache
   independent of context length. Left at its default (auto-sized from `mamba_full_memory_ratio`), it
   consumed the entire static memory budget and left nothing for the actual KV token pool. `8` is enough
