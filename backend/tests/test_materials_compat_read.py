@@ -379,6 +379,54 @@ def test_compat_record_view_accepts_legacy_visible_material_status() -> None:
     assert records == 1
 
 
+def test_compat_record_view_increments_atomically() -> None:
+    service = _build_service()
+    engine = create_engine("sqlite+pysqlite:///:memory:", future=True)
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                """
+                CREATE TABLE materials (
+                    id INTEGER PRIMARY KEY,
+                    title VARCHAR(80) NOT NULL,
+                    status VARCHAR(16) NOT NULL DEFAULT 'PUBLISHED',
+                    view_count INTEGER NOT NULL DEFAULT 0
+                )
+                """
+            )
+        )
+        connection.execute(
+            text(
+                """
+                CREATE TABLE material_views (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    material_id INTEGER NOT NULL,
+                    user_id INTEGER NULL,
+                    viewer_token_hash VARCHAR(128) NULL,
+                    viewed_at DATETIME NULL
+                )
+                """
+            )
+        )
+        connection.execute(text("INSERT INTO materials (id, title, status, view_count) VALUES (41, 'Legacy PDF', 'PUBLISHED', 5)"))
+
+    original_add_view = service.material_repo.add_view
+
+    def add_view_with_concurrent_view(session, **kwargs):
+        session.execute(text("UPDATE materials SET view_count = view_count + 10 WHERE id = 41"))
+        return original_add_view(session, **kwargs)
+
+    service.material_repo.add_view = add_view_with_concurrent_view
+    with Session(engine) as session:
+        viewed = service.record_view(session, 41, user_id=None, can_manage_all=False, viewer_token="viewer-a")
+
+    with engine.connect() as connection:
+        view_count = connection.execute(text("SELECT view_count FROM materials WHERE id = 41")).scalar_one()
+
+    assert view_count == 16
+    assert viewed == 16
+
+
 def test_legacy_material_summary_cache_reuses_stats_until_invalidated() -> None:
     service = _build_service()
     session = _StatsSession()

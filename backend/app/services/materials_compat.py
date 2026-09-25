@@ -106,10 +106,16 @@ class MaterialsCompatMixin:
         else:
             return current_view_count
 
-        next_view_count = current_view_count + 1
         session.execute(
-            text("UPDATE materials SET view_count = :view_count WHERE id = :material_id"),
-            {"material_id": material_id, "view_count": next_view_count},
+            text("UPDATE materials SET view_count = COALESCE(view_count, 0) + 1 WHERE id = :material_id"),
+            {"material_id": material_id},
+        )
+        next_view_count = int(
+            session.execute(
+                text("SELECT view_count FROM materials WHERE id = :material_id"),
+                {"material_id": material_id},
+            ).scalar()
+            or 0
         )
         session.commit()
         return next_view_count

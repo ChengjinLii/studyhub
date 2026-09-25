@@ -190,3 +190,23 @@ def test_comment_service_compat_delete_is_idempotent_for_parent_reply_count() ->
         service.delete(session, reply_id, user_id=7, can_moderate=False)
 
         assert _reply_count(session, parent_id) == 1
+
+
+def test_comment_service_compat_like_counts_increment_atomically() -> None:
+    engine = _create_legacy_comment_schema()
+    service = _build_service()
+
+    with Session(engine) as session:
+        comment_id = int(service.create(session, CommentCreatePayload(materialId=41, parentId=None, content="计数评论"), user_id=7)["id"])
+
+        def find_user_with_concurrent_like(session_arg, user_id):
+            session_arg.execute(text("UPDATE comments SET like_count = like_count + 5 WHERE id = :id"), {"id": comment_id})
+            return SimpleNamespace(id=user_id, nickname="Alice", username="alice", avatar=None)
+
+        service.auth_repo = SimpleNamespace(find_user_by_id=find_user_with_concurrent_like)
+        assert service.like(session, comment_id, 7) == 6
+
+        session.execute(text("UPDATE comments SET like_count = like_count + 5 WHERE id = :id"), {"id": comment_id})
+        assert service.unlike(session, comment_id, 7) == 10
+        stored = session.execute(text("SELECT like_count FROM comments WHERE id = :id"), {"id": comment_id}).scalar_one()
+        assert stored == 10

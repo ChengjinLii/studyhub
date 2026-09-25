@@ -263,9 +263,7 @@ class CommentsService:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="已点赞")
         self._require_user(session, user_id)
         self.comment_repo.add_like(session, comment_id=comment_id, user_id=user_id)
-        next_like_count = int(entity.like_count or 0) + 1
-        entity.like_count = next_like_count
-        self.comment_repo.save_comment(session, entity)
+        next_like_count = self._shift_comment_like_count(session, comment_id, increment=True)
         session.commit()
         return next_like_count
 
@@ -280,9 +278,7 @@ class CommentsService:
         if like is None:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="尚未点赞")
         self.comment_repo.remove_like(session, like)
-        next_like_count = max(0, int(entity.like_count or 0) - 1)
-        entity.like_count = next_like_count
-        self.comment_repo.save_comment(session, entity)
+        next_like_count = self._shift_comment_like_count(session, comment_id, increment=False)
         session.commit()
         return next_like_count
 
@@ -411,7 +407,6 @@ class CommentsService:
         if self._compat_comment_liked(session, comment_id, user_id):
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="已点赞")
         self._require_user(session, user_id)
-        next_like_count = int(row["like_count"] or 0) + 1
         session.execute(
             text(
                 """
@@ -421,17 +416,7 @@ class CommentsService:
             ),
             {"comment_id": comment_id, "user_id": user_id},
         )
-        session.execute(
-            text(
-                """
-                UPDATE comments
-                SET like_count = :like_count,
-                    updated_at = CURRENT_TIMESTAMP
-                WHERE id = :comment_id
-                """
-            ),
-            {"comment_id": comment_id, "like_count": next_like_count},
-        )
+        next_like_count = self._shift_comment_like_count(session, comment_id, increment=True)
         session.commit()
         return next_like_count
 
@@ -441,7 +426,6 @@ class CommentsService:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="评论不存在")
         if not self._compat_comment_liked(session, comment_id, user_id):
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="尚未点赞")
-        next_like_count = max(0, int(row["like_count"] or 0) - 1)
         session.execute(
             text(
                 """
@@ -451,19 +435,31 @@ class CommentsService:
             ),
             {"comment_id": comment_id, "user_id": user_id},
         )
+        next_like_count = self._shift_comment_like_count(session, comment_id, increment=False)
+        session.commit()
+        return next_like_count
+
+    def _shift_comment_like_count(self, session: Session, comment_id: int, *, increment: bool) -> int:
+        next_value_sql = (
+            "COALESCE(like_count, 0) + 1"
+            if increment
+            else "CASE WHEN COALESCE(like_count, 0) > 0 THEN COALESCE(like_count, 0) - 1 ELSE 0 END"
+        )
         session.execute(
             text(
-                """
+                f"""
                 UPDATE comments
-                SET like_count = :like_count,
+                SET like_count = {next_value_sql},
                     updated_at = CURRENT_TIMESTAMP
                 WHERE id = :comment_id
                 """
             ),
-            {"comment_id": comment_id, "like_count": next_like_count},
+            {"comment_id": comment_id},
         )
-        session.commit()
-        return next_like_count
+        return int(
+            session.execute(text("SELECT like_count FROM comments WHERE id = :comment_id"), {"comment_id": comment_id}).scalar()
+            or 0
+        )
 
     def _compat_get_comment_base(self, session: Session, comment_id: int) -> dict[str, Any] | None:
         row = session.execute(
