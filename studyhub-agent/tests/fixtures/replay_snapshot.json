@@ -1,0 +1,22 @@
+{
+  "schema_version": "studyhub.replay.v3",
+  "snapshot_id": "fixture-2026-09-25",
+  "materials": [
+    {"material_id": 101, "title": "高等数学（上）期末复习提纲", "course": "高等数学", "school": "电子科技大学", "summary": "极限、导数、积分三大块的题型总结", "tags": ["期末", "提纲"], "access_scope": "public", "owner_id": null, "price_cents": 0, "downloads": 320, "preview_pages": ["第一章 极限：夹逼准则与两个重要极限。", "第二章 导数：链式法则与隐函数求导。"], "unlock_after": []},
+    {"material_id": 102, "title": "高等数学历年期末真题（含解析）", "course": "高等数学", "school": "电子科技大学", "summary": "2021-2025 年期末真题及详细解析", "tags": ["真题", "期末"], "access_scope": "paid", "owner_id": null, "price_cents": 990, "downloads": 510, "preview_pages": ["2025 年期末第一题：求极限 lim(x→0) sin x / x。"], "unlock_after": []},
+    {"material_id": 103, "title": "线性代数重点笔记", "course": "线性代数", "school": "四川大学", "summary": "矩阵、行列式、特征值笔记", "tags": ["笔记"], "access_scope": "public", "owner_id": null, "price_cents": 0, "downloads": 150, "preview_pages": ["特征值：det(A-λI)=0 的根。"], "unlock_after": []},
+    {"material_id": 104, "title": "线性代数习题答案（进阶）", "course": "线性代数", "school": "四川大学", "summary": "配套进阶习题答案，需先阅读重点笔记", "tags": ["习题"], "access_scope": "public", "owner_id": null, "price_cents": 0, "downloads": 90, "preview_pages": ["习题 3.2 答案：特征值为 1 和 3。"], "unlock_after": [103]},
+    {"material_id": 105, "title": "私人草稿：概率论", "course": "概率论", "school": "电子科技大学", "summary": "作者私人草稿", "tags": ["草稿"], "access_scope": "owner", "owner_id": "u-2002", "price_cents": 0, "downloads": 0, "preview_pages": ["仅作者可见。"], "unlock_after": []}
+  ],
+  "policies": {
+    "refund": "购买后 24 小时内未下载可申请退款。",
+    "copyright": "上传资料须为本人原创或已获授权。",
+    "download": "免费资料每日可下载 20 次。",
+    "account": "每个手机号只能注册一个账号。",
+    "payout": "创作者收益在订单完成 7 天后可提现。"
+  },
+  "web_pages": [
+    {"url": "https://www.example.edu.cn/exam-schedule", "title": "2026 秋季期末考试安排", "text": "高等数学期末考试时间为 2027 年 1 月 8 日。"}
+  ],
+  "memory": {"u-1001": {"exam_date": "2027-01-08", "goal": "高数 85 分"}}
+}
