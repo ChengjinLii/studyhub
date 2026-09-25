@@ -54,18 +54,25 @@ h2 {
  */
 .login-title,
 .more-header h1,
-.market-detail__title,
 .mobile-library-hero h1,
 .requests-page .requests-hero h1 {
   font-size: var(--fs-page-title);
 }
 
+/* Shares the scale on phones but keeps its desktop 1.75rem cap inside the 0.9fr info column. */
+.market-detail__title {
+  font-size: clamp(1.45rem, 1.12rem + 1.3vw, 1.75rem);
+}
+
+/*
+ * Reduced motion: drop transitions and smooth scrolling everywhere. Keyframe animations are
+ * left alone here because loading spinners (upload, login, toast) must keep turning; decorative
+ * animations already have their own reduced-motion rules in globals.css.
+ */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
   *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
