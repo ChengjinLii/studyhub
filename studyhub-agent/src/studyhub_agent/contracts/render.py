@@ -220,13 +220,25 @@ def _matches_schema(value: Any, schema: dict[str, Any]) -> bool:
     return True
 
 
+_PYTHON_LITERALS: dict[str, dict[str, Any]] = {
+    "boolean": {"true": True, "false": False},
+    "null": {"none": None, "null": None},
+}
+
+
 def _coerce(raw: str, schema: dict[str, Any]) -> tuple[Any, bool]:
     kind = schema.get("type")
+    stripped = raw.strip()
     if kind == "string":
         value: Any = raw
+    elif kind in _PYTHON_LITERALS and stripped.lower() in _PYTHON_LITERALS[kind]:
+        # The template renders a scalar (non-list/dict) argument with Jinja's `string` filter, so a
+        # Python bool/None value comes out as the literal text "True"/"False"/"None", not JSON's
+        # "true"/"false"/"null". Accept both spellings, case-insensitively, so these round-trip.
+        value = _PYTHON_LITERALS[kind][stripped.lower()]
     else:
         try:
-            value = json.loads(raw.strip())
+            value = json.loads(stripped)
         except json.JSONDecodeError:
             return None, False
     if not _matches_schema(value, schema):

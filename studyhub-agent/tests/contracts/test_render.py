@@ -234,6 +234,35 @@ def test_array_parameter_rejects_mistyped_items() -> None:
     assert parsed.tool_calls == ()
 
 
+BOOL_NULL_TOOL = ToolSpec(
+    name="materials_flag",
+    version="1.0",
+    description="设置资料标记",
+    parameters={
+        "type": "object",
+        "properties": {
+            "starred": {"type": "boolean", "description": "是否收藏"},
+            "note": {"type": "null", "description": "占位空值"},
+        },
+        "required": ["starred", "note"],
+        "additionalProperties": False,
+    },
+)
+
+
+@pytest.mark.parametrize("starred", [True, False])
+def test_boolean_and_null_arguments_round_trip(starred: bool) -> None:
+    # The template renders a scalar (non-list/dict) argument with Jinja's `string` filter, so a
+    # Python bool/None argument comes out as the literal text "True"/"False"/"None" -- not JSON's
+    # "true"/"false"/"null" -- which json.loads() cannot parse back.
+    call = ToolCall(call_id="call_0", name="materials_flag", arguments={"starred": starred, "note": None})
+    assistant = Message(role="assistant", tool_calls=(call,))
+    completion = canonical_completion_text(HISTORY, assistant, (BOOL_NULL_TOOL,), thinking=False)
+    parsed = parse_completion(completion, (BOOL_NULL_TOOL,), thinking=False)
+    assert parsed.kind is TurnKind.TOOL_CALLS
+    assert parsed.tool_calls == (call,)
+
+
 def test_array_parameter_accepts_matching_items() -> None:
     text = (
         "<tool_call>\n<function=materials_batch_get>\n<parameter=ids>\n"
