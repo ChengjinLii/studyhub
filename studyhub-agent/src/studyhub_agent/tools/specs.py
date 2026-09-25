@@ -121,8 +121,23 @@ def mcp_name_for(tool_name: str) -> str | None:
     return TOOLS_BY_NAME[tool_name].mcp_name
 
 
-def select_tools(names: Sequence[str]) -> tuple[ToolSpec, ...]:
-    unknown = [name for name in names if name not in TOOLS_BY_NAME]
+def select_tools(names: Sequence[str], available: Sequence[ToolSpec] = TOOL_SPECS) -> tuple[ToolSpec, ...]:
+    """Resolve `names` against `available`, always returning `available`'s own (canonical) order.
+
+    Request order is never preserved: render_text renders tools in list order, and contract_hash
+    only partially accounts for tool order, so a stable canonical order is required to guarantee
+    that requesting the same tool set (in any order) always produces the same prompt and hash.
+    `available` defaults to the global TOOL_SPECS registry, but callers (e.g. EpisodeRunner) can
+    pass an environment's own `tool_specs()` to also catch a spec naming a tool that particular
+    environment does not actually provide.
+    """
+    seen: set[str] = set()
+    duplicates = sorted({name for name in names if name in seen or seen.add(name)})  # type: ignore[func-returns-value]
+    if duplicates:
+        raise ValueError(f"duplicate tools requested: {', '.join(duplicates)}")
+    by_name = {spec.name: spec for spec in available}
+    unknown = [name for name in names if name not in by_name]
     if unknown:
         raise KeyError(f"unknown tools: {', '.join(unknown)}")
-    return tuple(TOOLS_BY_NAME[name] for name in names)
+    requested = set(names)
+    return tuple(spec for spec in available if spec.name in requested)

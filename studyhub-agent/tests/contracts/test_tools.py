@@ -1,3 +1,5 @@
+import json
+
 import pytest
 
 from studyhub_agent.contracts.tools import ToolSpec, ToolSpecError
@@ -46,9 +48,28 @@ def test_lint_rejects_bad_version_and_empty_description() -> None:
         ToolSpec(name="ok", version="1.0", description=" ", parameters=_params())
 
 
-def test_canonical_form_is_order_independent() -> None:
-    params_a = {"type": "object", "properties": {}, "required": [], "additionalProperties": False}
-    params_b = {"additionalProperties": False, "required": [], "properties": {}, "type": "object"}
+def test_canonical_form_is_order_sensitive() -> None:
+    # canonical() must hash exactly what the chat template renders (insertion order of
+    # `properties`), not an alphabetically-resorted copy — otherwise two schemas that render
+    # different prompts (and different SFT targets) could hash identically.
+    params_a = _params(x={"type": "string", "description": "d"}, y={"type": "string", "description": "d"})
+    params_b = _params(y={"type": "string", "description": "d"}, x={"type": "string", "description": "d"})
     a = ToolSpec(name="t", version="1.0", description="d", parameters=params_a)
     b = ToolSpec(name="t", version="1.0", description="d", parameters=params_b)
-    assert a.canonical() == b.canonical()
+    # Plain dict `==` is order-insensitive, so compare the serialized form (what actually gets
+    # hashed) as well as the key order directly.
+    assert json.dumps(a.canonical()) != json.dumps(b.canonical())
+    assert list(a.canonical()["parameters"]["properties"]) == ["x", "y"]
+    assert list(b.canonical()["parameters"]["properties"]) == ["y", "x"]
+
+
+def test_to_openai_returns_a_copy_callers_cannot_mutate() -> None:
+    spec = ToolSpec(
+        name="materials_get",
+        version="1.0",
+        description="读取资料详情",
+        parameters=_params(material_id={"type": "integer", "description": "资料 ID"}),
+    )
+    payload = spec.to_openai()
+    payload["function"]["parameters"]["properties"]["material_id"]["type"] = "string"
+    assert spec.parameters["properties"]["material_id"]["type"] == "integer"

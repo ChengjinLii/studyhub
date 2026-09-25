@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import re
+from copy import deepcopy
 from dataclasses import dataclass
 from typing import Any, Literal
 
@@ -30,12 +31,18 @@ class ToolSpec:
         lint_tool_spec(self)
 
     def to_openai(self) -> dict[str, Any]:
+        # A deep copy: callers (e.g. render_text) must not be able to mutate this spec's own
+        # parameters dict through the returned payload.
         return {
             "type": "function",
-            "function": {"name": self.name, "description": self.description, "parameters": self.parameters},
+            "function": {"name": self.name, "description": self.description, "parameters": deepcopy(self.parameters)},
         }
 
     def canonical(self) -> dict[str, Any]:
+        # No sort_keys: this must hash exactly what the chat template renders. render_text /
+        # to_openai() both use `parameters` in its authored (insertion) order, so canonical() has
+        # to preserve that order too, or a schema-property reorder could change the rendered
+        # prompt and SFT target without changing contract_hash.
         return json.loads(
             json.dumps(
                 {
@@ -47,7 +54,6 @@ class ToolSpec:
                     "mcp_name": self.mcp_name,
                 },
                 ensure_ascii=False,
-                sort_keys=True,
             )
         )
 
