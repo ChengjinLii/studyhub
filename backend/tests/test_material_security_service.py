@@ -11,7 +11,11 @@ from sqlalchemy.orm import Session
 from app.core.config import Settings
 from app.models.materials import MaterialRecord, MaterialSecurityScanRecord
 from app.repos.material_repo import MaterialRepository
-from app.services.material_security_service import LIGHTWEIGHT_SCANNER_VERSION, MaterialSecurityService
+from app.services.material_security_service import (
+    LIGHTWEIGHT_SCANNER_VERSION,
+    MalwareScanResult,
+    MaterialSecurityService,
+)
 
 
 def test_material_security_scan_requires_explicit_enablement() -> None:
@@ -99,3 +103,67 @@ def test_lightweight_scan_sends_office_and_archives_to_clamav(tmp_path: Path) ->
     path.write_bytes(b"PK\x03\x04")
 
     assert _security_service(tmp_path)._lightweight_scan(path) is None
+
+
+def _run_clean_scan_for(tmp_path: Path, material: MaterialRecord) -> MaterialRecord:
+    engine = create_engine("sqlite+pysqlite:///:memory:", future=True)
+    MaterialRecord.__table__.create(bind=engine)
+    MaterialSecurityScanRecord.__table__.create(bind=engine)
+    service = _security_service(tmp_path)
+    service._scan_object = lambda object_key: MalwareScanResult(status="CLEAN", version="test")  # type: ignore[method-assign]
+    with Session(engine) as session:
+        session.add(material)
+        service.material_repo.save_security_scan(
+            session,
+            MaterialSecurityScanRecord(
+                material_id=int(material.id),
+                object_key=f"{material.id}/file/test.pdf",
+                status="PENDING",
+                release_status="VISIBLE",
+                release_review_status="APPROVED",
+            ),
+        )
+        session.commit()
+
+        assert service.run_once(session)["clean"] == 1
+
+        scan = service.material_repo.get_security_scan(session, int(material.id))
+        assert scan is not None and scan.status == "CLEAN"
+        refreshed = session.get(MaterialRecord, int(material.id))
+        assert refreshed is not None
+        session.expunge(refreshed)
+        return refreshed
+
+
+def test_clean_scan_releases_material_still_on_security_hold(tmp_path: Path) -> None:
+    material = _run_clean_scan_for(
+        tmp_path,
+        MaterialRecord(id=1, title="held", status="HIDDEN", review_status="SECURITY_PENDING"),
+    )
+
+    assert (material.status, material.review_status) == ("VISIBLE", "APPROVED")
+
+
+def test_clean_scan_does_not_resurrect_deleted_material(tmp_path: Path) -> None:
+    material = _run_clean_scan_for(
+        tmp_path,
+        MaterialRecord(
+            id=1,
+            title="deleted while scanning",
+            status="REMOVED",
+            review_status="SECURITY_PENDING",
+            deleted_at=datetime.now(UTC),
+        ),
+    )
+
+    assert material.status == "REMOVED"
+    assert material.deleted_at is not None
+
+
+def test_clean_scan_does_not_release_material_hidden_for_other_reasons(tmp_path: Path) -> None:
+    material = _run_clean_scan_for(
+        tmp_path,
+        MaterialRecord(id=1, title="moderated", status="HIDDEN", review_status="APPROVED"),
+    )
+
+    assert (material.status, material.review_status) == ("HIDDEN", "APPROVED")

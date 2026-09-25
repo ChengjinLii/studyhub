@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import Settings
 from app.integrations.material_asset_store import MaterialAssetStore
+from app.models.materials import MaterialRecord
 from app.repos.material_repo import MaterialRepository
 
 
@@ -87,9 +88,10 @@ class MaterialSecurityService:
                     scan.status = "CLEAN"
                     scan.finding = None
                     scan.last_error = None
-                    material.status = scan.release_status or "VISIBLE"
-                    material.review_status = scan.release_review_status or "APPROVED"
-                    self.material_repo.save_material(session, material)
+                    if self._is_on_security_hold(material):
+                        material.status = scan.release_status or "VISIBLE"
+                        material.review_status = scan.release_review_status or "APPROVED"
+                        self.material_repo.save_material(session, material)
                     result_counts["clean"] += 1
             elif result.status == "INFECTED":
                 material = self.material_repo.get_material(session, scan.material_id)
@@ -110,6 +112,16 @@ class MaterialSecurityService:
             self.material_repo.save_security_scan(session, scan)
             session.commit()
         return result_counts
+
+    @staticmethod
+    def _is_on_security_hold(material: MaterialRecord) -> bool:
+        # Only lift the hold this scan placed; never undo a deletion or a
+        # moderation decision taken while the scan was running.
+        return (
+            material.deleted_at is None
+            and material.status == "HIDDEN"
+            and material.review_status == "SECURITY_PENDING"
+        )
 
     def _scan_object(self, object_key: str) -> MalwareScanResult:
         quarantine_dir = self.settings.private_dir / "quarantine"
