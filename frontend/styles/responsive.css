@@ -21,7 +21,6 @@
   --touch-target: 44px;
   --fs-page-title: clamp(1.45rem, 1.12rem + 1.3vw, 2rem);
   --fs-section-title: clamp(1.08rem, 0.98rem + 0.4vw, 1.3rem);
-  --reading-width: 72ch;
 }
 
 /* ---------------------------------------------------------------------------
@@ -533,23 +532,31 @@ h2 {
 }
 
 @media (max-width: 480px) {
-  /* Two cards per row: the whole card opens the item, so the extra "查看" button goes. */
-  .market-item-card .market-item__actions .button,
+  /* Two cards per row: price and interest on one line, actions on a full-width row below. */
   .market-item-card .market-media-locked__text {
     display: none;
   }
 
   .market-item-card .market-item__footer {
-    align-items: flex-end;
+    flex-wrap: wrap;
+    gap: 8px;
   }
 
-  .market-item-card .market-item__price-line {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 4px;
+  .market-item-card .market-item__actions {
+    width: 100%;
+  }
+
+  .market-item-card .market-item__actions .button {
+    flex: 1;
+    min-width: 0;
+    height: 40px;
+    min-height: 40px;
+    padding: 0 10px;
+    font-size: 0.84rem;
   }
 
   .market-item-card .market-want-toggle {
+    flex: 0 0 auto;
     width: 40px;
     height: 40px;
   }
