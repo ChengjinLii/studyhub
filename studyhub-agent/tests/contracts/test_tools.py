@@ -47,6 +47,8 @@ def test_lint_rejects_bad_version_and_empty_description() -> None:
 
 
 def test_canonical_form_is_order_independent() -> None:
-    a = ToolSpec(name="t", version="1.0", description="d", parameters={"type": "object", "properties": {}, "required": [], "additionalProperties": False})
-    b = ToolSpec(name="t", version="1.0", description="d", parameters={"additionalProperties": False, "required": [], "properties": {}, "type": "object"})
+    params_a = {"type": "object", "properties": {}, "required": [], "additionalProperties": False}
+    params_b = {"additionalProperties": False, "required": [], "properties": {}, "type": "object"}
+    a = ToolSpec(name="t", version="1.0", description="d", parameters=params_a)
+    b = ToolSpec(name="t", version="1.0", description="d", parameters=params_b)
     assert a.canonical() == b.canonical()
