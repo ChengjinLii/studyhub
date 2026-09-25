@@ -10,6 +10,13 @@ from app.models.materials import MaterialRecord, MaterialSecurityScanRecord
 SECURITY_HOLD_REVIEW_STATUSES = frozenset({"SECURITY_PENDING", "SECURITY_REJECTED"})
 
 
+def is_moderation_locked(material: MaterialRecord) -> bool:
+    """Deleted, removed, or hidden by moderation (not by the malware scan hold)."""
+    if material.deleted_at is not None or material.status == "REMOVED":
+        return True
+    return material.status == "HIDDEN" and material.review_status not in SECURITY_HOLD_REVIEW_STATUSES
+
+
 class MaterialSecurityPolicyMixin:
     def _queue_material_security_scan(
         self,

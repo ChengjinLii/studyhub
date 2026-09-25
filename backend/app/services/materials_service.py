@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import HTTPException, UploadFile, status
-from sqlalchemy import bindparam, case, func, text, update
+from sqlalchemy import bindparam, func, text, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -39,7 +39,8 @@ from app.services.materials_search import material_matches_search, material_sear
 from app.services.materials_compat import MaterialsCompatMixin
 from app.services.materials_serializers import admin_material_item, load_json_list, material_has_file, material_list_item
 from app.services.materials_storage_mutation import MaterialsStorageMutationMixin
-from app.services.material_security_policy import SECURITY_HOLD_REVIEW_STATUSES, MaterialSecurityPolicyMixin
+from app.services.material_security_policy import MaterialSecurityPolicyMixin, is_moderation_locked
+from app.services.materials_counters import apply_material_rating, shift_material_counter
 from app.services.read_support import (
     clamp_limit,
     compat_as_float,
@@ -612,7 +613,7 @@ class MaterialsService(MaterialSecurityPolicyMixin, MaterialsStorageMutationMixi
             self.material_repo.add_view(session, material_id=material_id, user_id=None, viewer_token_hash=anonymous_hash)
         else:
             return current_view_count
-        next_view_count = self._shift_material_counter(session, material, "view_count", 1)
+        next_view_count = shift_material_counter(session, material, "view_count", 1)
         session.commit()
         return next_view_count
 
@@ -802,7 +803,7 @@ class MaterialsService(MaterialSecurityPolicyMixin, MaterialsStorageMutationMixi
     ) -> dict[str, Any]:
         self._bootstrap(session)
         material = self._load_accessible_material(session, material_id, operator_id, can_manage_all, require_owner=True)
-        if not can_manage_all and self._is_moderation_locked(material):
+        if not can_manage_all and is_moderation_locked(material):
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="资料不存在")
         file_upload = zip_file or markdown_file
         release_status = material.status or "VISIBLE"
@@ -1091,7 +1092,7 @@ class MaterialsService(MaterialSecurityPolicyMixin, MaterialsStorageMutationMixi
         if self.material_repo.find_like(session, material_id, user_id) is not None:
             return current_like_count
         self.material_repo.add_like(session, material_id=material_id, user_id=user_id)
-        next_like_count = self._shift_material_counter(session, material, "like_count", 1)
+        next_like_count = shift_material_counter(session, material, "like_count", 1)
         session.commit()
         return next_like_count
 
@@ -1103,7 +1104,7 @@ class MaterialsService(MaterialSecurityPolicyMixin, MaterialsStorageMutationMixi
         if entity is None:
             return current_like_count
         self.material_repo.remove_like(session, entity)
-        next_like_count = self._shift_material_counter(session, material, "like_count", -1)
+        next_like_count = shift_material_counter(session, material, "like_count", -1)
         session.commit()
         return next_like_count
 
@@ -1112,30 +1113,15 @@ class MaterialsService(MaterialSecurityPolicyMixin, MaterialsStorageMutationMixi
         material = self._ensure_material_exists(session, material_id)
         user = self._require_user(session, user_id)
         entity = self.material_repo.find_rating(session, material_id, user_id)
-        count = func.coalesce(MaterialRecord.rating_count, 0)
-        avg = func.coalesce(MaterialRecord.rating_avg, 0.0)
         if entity is None:
             entity = MaterialRatingRecord(material_id=material_id, user_id=user_id, rating=rating)
             self.material_repo.save_rating(session, entity)
-            next_avg = func.round(((avg * count) + rating) / (count + 1), 2)
-            next_count = count + 1
+            previous = None
         else:
             previous = int(entity.rating)
             entity.rating = rating
             self.material_repo.save_rating(session, entity)
-            next_avg = case((count > 0, func.round(((avg * count) - previous + rating) / count, 2)), else_=float(rating))
-            next_count = count
-        # rating_avg must be assigned first: MySQL evaluates SET left to right
-        # with already-updated values, SQLite with the original row.
-        session.execute(
-            update(MaterialRecord)
-            .where(MaterialRecord.id == material.id)
-            .ordered_values((MaterialRecord.rating_avg, next_avg), (MaterialRecord.rating_count, next_count))
-            .execution_options(synchronize_session=False)
-        )
-        session.expire(material, ["rating_avg", "rating_count"])
-        rounded_avg = round(float(material.rating_avg or 0), 2)
-        rating_count = int(material.rating_count or 0)
+        rounded_avg, rating_count = apply_material_rating(session, material, rating=rating, previous=previous)
         reviewer_name = user.nickname
         session.commit()
         return {"ratingAvg": rounded_avg, "ratingCount": rating_count, "rating": rating, "reviewer": reviewer_name}
@@ -1348,12 +1334,6 @@ class MaterialsService(MaterialSecurityPolicyMixin, MaterialsStorageMutationMixi
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="资料不存在")
         return material
 
-    @staticmethod
-    def _is_moderation_locked(material: MaterialRecord) -> bool:
-        if material.deleted_at is not None or material.status == "REMOVED":
-            return True
-        return material.status == "HIDDEN" and material.review_status not in SECURITY_HOLD_REVIEW_STATUSES
-
     def _ensure_material_exists(self, session: Session, material_id: int) -> MaterialRecord:
         material = self.material_repo.get_material(session, material_id)
         if material is None:
@@ -1408,18 +1388,6 @@ class MaterialsService(MaterialSecurityPolicyMixin, MaterialsStorageMutationMixi
         if result.rowcount != 1:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="DOWNLOAD_QUOTA_EXHAUSTED")
         session.expire(user, ["free_download_quota"])
-
-    def _shift_material_counter(self, session: Session, material: MaterialRecord, column_name: str, delta: int) -> int:
-        current = func.coalesce(getattr(MaterialRecord, column_name), 0)
-        next_value = current + 1 if delta > 0 else case((current > 0, current - 1), else_=0)
-        session.execute(
-            update(MaterialRecord)
-            .where(MaterialRecord.id == material.id)
-            .values({column_name: next_value})
-            .execution_options(synchronize_session=False)
-        )
-        session.expire(material, [column_name])
-        return int(getattr(material, column_name) or 0)
 
     def _register_download(self, session: Session, material: MaterialRecord, user_id: int) -> bool:
         if self.material_repo.has_download(session, material.id, user_id):
