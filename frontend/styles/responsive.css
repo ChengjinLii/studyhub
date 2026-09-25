@@ -49,6 +49,18 @@ h2 {
   text-wrap: balance;
 }
 
+/*
+ * Page titles share one fluid size (23px at 360px, 32px from ~1200px) instead of
+ * per-page fixed sizes that jumped at each breakpoint.
+ */
+.login-title,
+.more-header h1,
+.market-detail__title,
+.mobile-library-hero h1,
+.requests-page .requests-hero h1 {
+  font-size: var(--fs-page-title);
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -143,7 +155,6 @@ h2 {
   .mobile-library-hero h1 {
     grid-column: 1;
     grid-row: 2;
-    font-size: var(--fs-page-title);
   }
 
   .mobile-library-hero p {
@@ -418,7 +429,6 @@ h2 {
 
   .requests-hero h1 {
     color: #0f172a;
-    font-size: var(--fs-page-title);
     line-height: 1.15;
   }
 
