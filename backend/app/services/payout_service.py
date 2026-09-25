@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import UTC, date, datetime, timedelta
 import json
+import logging
 from pathlib import Path
 import re
 from typing import Any
@@ -34,6 +35,8 @@ from app.services.read_support import build_payout_qr_url
 from app.integrations.payout_qr_store import PayoutQrStore
 
 
+logger = logging.getLogger(__name__)
+
 SH_TZ = ZoneInfo("Asia/Shanghai")
 PAYOUT_STATUS_PENDING = "PENDING"
 PAYOUT_STATUS_APPROVED = "APPROVED"
@@ -48,6 +51,7 @@ TRANSFER_STATUS_SUBMITTED = "SUBMITTED"
 TRANSFER_STATUS_PENDING = "PENDING"
 TRANSFER_STATUS_SUCCESS = "SUCCESS"
 TRANSFER_STATUS_FAILED = "FAILED"
+TERMINAL_TRANSFER_STATUSES = frozenset({TRANSFER_STATUS_SUCCESS, TRANSFER_STATUS_FAILED})
 INSTRUCTION_PAYOUT_TRANSFER = "PAYOUT_TRANSFER"
 
 
@@ -600,6 +604,18 @@ class PayoutService:
 
     def _apply_transfer_provider_result(self, session: Session, transfer: PayoutTransferRecord, result: TransferResult) -> None:
         normalized = (result.status or TRANSFER_STATUS_PENDING).strip().upper()
+        if transfer.status in TERMINAL_TRANSFER_STATUSES:
+            if normalized != transfer.status:
+                # A FAILED transfer has already released its settlements to later payouts, so a
+                # late SUCCESS must not settle anything; it needs manual reconciliation instead.
+                logger.error(
+                    "Ignoring %s result for terminal %s payout transfer %s (out_biz_no=%s); reconcile manually",
+                    normalized,
+                    transfer.status,
+                    transfer.id,
+                    transfer.out_biz_no,
+                )
+            return
         transfer.alipay_order_id = result.alipay_order_id or transfer.alipay_order_id
         transfer.pay_fund_order_id = result.pay_fund_order_id or transfer.pay_fund_order_id
         if normalized == "SUCCESS":

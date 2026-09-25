@@ -9,6 +9,12 @@ from app.models.finance import PayoutTransferRecord
 from app.providers.alipay_support import build_alipay_client
 
 
+# Alipay 20000 ("service unavailable") and system-error sub codes mean the outcome is unknown:
+# the transfer may still execute, so it must stay pending rather than be treated as failed.
+ALIPAY_CODE_UNKNOWN = "20000"
+ALIPAY_UNKNOWN_SUB_CODES = frozenset({"SYSTEM_ERROR", "ISP.UNKNOW-ERROR", "ACQ.SYSTEM_ERROR"})
+
+
 @dataclass(slots=True)
 class TransferResult:
     status: str
@@ -100,12 +106,20 @@ class AlipayTransferProvider:
             },
         )
         if not isinstance(result, dict):
-            return TransferResult(status="FAILED", provider_name=self.provider_name, failure_reason="支付宝转账返回为空")
+            # No answer does not mean Alipay rejected it; keep it pending and let the query settle it.
+            return TransferResult(status="PENDING", provider_name=self.provider_name, failure_reason="支付宝转账返回为空")
         code = str(result.get("code") or "")
         sub_code = str(result.get("sub_code") or "")
         success = code == "10000"
+        outcome_unknown = code == ALIPAY_CODE_UNKNOWN or sub_code.upper() in ALIPAY_UNKNOWN_SUB_CODES
+        if success:
+            status_value = "SUBMITTED"
+        elif outcome_unknown:
+            status_value = "PENDING"
+        else:
+            status_value = "FAILED"
         return TransferResult(
-            status="SUBMITTED" if success else "FAILED",
+            status=status_value,
             provider_name=self.provider_name,
             alipay_order_id=str(result.get("order_id") or "") or None,
             pay_fund_order_id=str(result.get("pay_fund_order_id") or "") or None,

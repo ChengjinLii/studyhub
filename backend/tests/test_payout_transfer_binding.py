@@ -391,3 +391,43 @@ def test_reapproving_application_is_idempotent(
         again = finance_repo.find_transfer_by_application(session, application_id)
         assert again is not None
         assert int(again.id) == first_transfer_id  # 同一笔转账，未重复创建
+
+
+def test_late_success_after_failed_transfer_does_not_settle_anything(
+    client: TestClient,
+    auth_service: AuthService,
+) -> None:
+    """终态保护：FAILED 之后迟到的 SUCCESS 不得改写状态，也不得走遗留回退盖章其他结算单。"""
+    seed_read_users(auth_service, with_follow_graph=True)
+    alice_headers = build_auth_headers(1, 1)
+    baishan_headers = build_auth_headers(2, 2)
+    admin_headers = build_auth_headers(3, 8)
+    finance_repo = get_finance_repo()
+
+    material_id = _create_paid_material(client, baishan_headers, title="终态保护资料", price_cents=2000)
+    out_trade_no, order_id = _pay_order(client, alice_headers, material_id, total_amount="20.00")
+    _make_settlement_due(out_trade_no)
+
+    application_id = _create_payout_application(client, baishan_headers)
+    _approve_application(client, admin_headers, application_id)
+
+    with session_scope() as session:
+        transfer = finance_repo.find_transfer_by_application(session, application_id)
+        assert transfer is not None
+        transfer_id = int(transfer.id)
+        out_biz_no = transfer.out_biz_no
+
+    _gateway_status(client, out_biz_no, "FAILED")
+    _gateway_success(client, out_biz_no)
+
+    with session_scope() as session:
+        transfer = finance_repo.get_payout_transfer(session, transfer_id)
+        assert transfer is not None
+        assert transfer.status == "FAILED"
+        settlements = finance_repo.list_settlements_for_uploader(session, 2)
+        s1 = next(item for item in settlements if item.order_id == order_id)
+        assert s1.status == "PENDING"
+        assert s1.payout_transfer_id is None
+
+    latest = client.get("/api/creator-payout-applications/me", headers=baishan_headers)
+    assert latest.json()["data"]["status"] != "SETTLED"
