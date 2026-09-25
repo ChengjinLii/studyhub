@@ -18,7 +18,7 @@ from studyhub_agent.contracts.episode import (
 from studyhub_agent.contracts.fingerprint import ContractInputs, contract_hash
 from studyhub_agent.contracts.prompts import PromptRegistry
 from studyhub_agent.contracts.tools import ToolSpec
-from studyhub_agent.environments.base import Environment
+from studyhub_agent.environments.base import Environment, EnvironmentInfraError
 from studyhub_agent.runtime.policy import PolicyClient, PolicyInfraError
 from studyhub_agent.tools.specs import select_tools
 
@@ -98,10 +98,9 @@ class EpisodeRunner:
     ) -> tuple[Termination, FailureOwner, str | None, str | None]:
         budget = spec.budget
         for turn_index in range(budget.max_turns):
-            if turn_index == budget.max_turns - 1 and turn_index > 0:
-                progress.messages.append(
-                    Message(role="tool", name="runtime_feedback", content=self._prompts.get(spec.finalize_prompt).text)
-                )
+            if turn_index == budget.max_turns - 1:
+                instruction = self._prompts.get(spec.finalize_prompt).text
+                progress.messages.append(_feedback({"notice": "final_turn", "instruction": instruction}))
             token_count = self._count_tokens(progress.messages, tools, spec.thinking)
             if token_count > budget.max_context_tokens - budget.max_new_tokens:
                 return Termination.CONTEXT_BUDGET, FailureOwner.MODEL, None, None
@@ -135,6 +134,8 @@ class EpisodeRunner:
             for call in turn.tool_calls:
                 try:
                     observation = environment.execute(call)
+                except EnvironmentInfraError as exc:
+                    return Termination.INFRA_ERROR, FailureOwner.INFRA, None, str(exc)
                 except Exception as exc:  # noqa: BLE001 - any tool crash is an environment failure
                     return Termination.ENV_ERROR, FailureOwner.ENV, None, f"{type(exc).__name__}: {exc}"
                 progress.observations.append(observation)

@@ -3,6 +3,7 @@ from pathlib import Path
 
 from studyhub_agent.contracts.episode import Budget, EpisodeSpec, FailureOwner, Principal, Termination, TurnKind
 from studyhub_agent.contracts.prompts import DEFAULT_PROMPTS
+from studyhub_agent.environments.base import EnvironmentInfraError
 from studyhub_agent.environments.replay import ReplayEnvironment, load_snapshot
 from studyhub_agent.runtime.runner import EpisodeRunner
 from tests.runtime.fakes import ScriptedPolicy, count_chars, final_turn, infra_failure, parse_error_turn, tool_turn
@@ -71,7 +72,21 @@ def test_max_turns_injects_finalize_prompt_on_last_turn() -> None:
     )
     assert episode.termination is Termination.MAX_TURNS
     last_prompt = policy.seen[-1][-1]
-    assert last_prompt.name == "runtime_feedback" and "最后一轮" in last_prompt.content
+    assert last_prompt.name == "runtime_feedback"
+    payload = json.loads(last_prompt.content)
+    assert "最后一轮" in payload["instruction"]
+
+
+def test_max_turns_one_still_injects_finalize_prompt() -> None:
+    episode, policy = _run(
+        _spec(budget=Budget(max_turns=1)),
+        [tool_turn(("materials_search", {"query": "高数"}))],
+    )
+    assert episode.termination is Termination.MAX_TURNS
+    first_prompt = policy.seen[0][-1]
+    assert first_prompt.role == "tool" and first_prompt.name == "runtime_feedback"
+    payload = json.loads(first_prompt.content)
+    assert "最后一轮" in payload["instruction"]
 
 
 def test_tool_budget_stops_before_executing() -> None:
@@ -106,6 +121,18 @@ def test_environment_exception_ends_episode_as_env_error() -> None:
     episode = RUNNER.run(_spec(), ExplodingEnvironment(SNAPSHOT), policy)
     assert episode.termination is Termination.ENV_ERROR
     assert episode.failure_owner is FailureOwner.ENV
+
+
+def test_environment_infra_error_ends_episode_as_infra_error() -> None:
+    class InfraFailingEnvironment(ReplayEnvironment):
+        def execute(self, call):
+            raise EnvironmentInfraError("replay backend unavailable")
+
+    policy = ScriptedPolicy([tool_turn(("materials_search", {"query": "a"}))])
+    episode = RUNNER.run(_spec(), InfraFailingEnvironment(SNAPSHOT), policy)
+    assert episode.termination is Termination.INFRA_ERROR
+    assert episode.failure_owner is FailureOwner.INFRA
+    assert "replay backend unavailable" in (episode.error_detail or "")
 
 
 def test_context_budget_checked_before_each_step() -> None:

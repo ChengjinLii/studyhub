@@ -1,3 +1,5 @@
+import json
+
 import pytest
 
 from studyhub_agent.contracts.episode import Message, ToolCall, TurnKind
@@ -215,3 +217,13 @@ def test_tool_call_substring_in_prose_without_valid_call_is_malformed(text) -> N
     assert parsed.kind is TurnKind.PARSE_ERROR
     assert parsed.error is not None and parsed.error.startswith("malformed_tool_call")
     assert parsed.tool_calls == ()
+
+
+def test_runtime_feedback_tool_message_renders_without_tool_call_id() -> None:
+    call = ToolCall(call_id="c", name="materials_search", arguments={"query": "概率论"})
+    assistant = Message(role="assistant", content="", tool_calls=(call,))
+    feedback_json = json.dumps({"notice": "final_turn", "instruction": "这是最后一轮。"}, ensure_ascii=False)
+    feedback = Message(role="tool", name="runtime_feedback", content=feedback_json)
+    text = render_text((*HISTORY, assistant, feedback), TOOLS, thinking=False, add_generation_prompt=False)
+    assert "<tool_response>" in text
+    assert feedback_json in text
