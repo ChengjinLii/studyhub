@@ -33,8 +33,5 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    inspector = sa.inspect(op.get_bind())
-    existing = {col["name"] for col in inspector.get_columns(TABLE)}
-    for name, _ in COLUMNS:
-        if name in existing:
-            op.drop_column(TABLE, name)
+    # Production downgrades must not delete finance fields; the columns are nullable and harmless to keep.
+    pass

@@ -35,10 +35,5 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    inspector = sa.inspect(op.get_bind())
-    indexes = {index["name"] for index in inspector.get_indexes("settlements")}
-    if INDEX_NAME in indexes:
-        op.drop_index(INDEX_NAME, table_name="settlements")
-    columns = {column["name"] for column in inspector.get_columns("settlements")}
-    if "payout_transfer_id" in columns:
-        op.drop_column("settlements", "payout_transfer_id")
+    # Production downgrades must not delete finance fields; the columns are nullable and harmless to keep.
+    pass
