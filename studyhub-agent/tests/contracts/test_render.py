@@ -200,8 +200,17 @@ def test_array_parameter_accepts_matching_items() -> None:
     assert parsed.tool_calls[0].arguments["ids"] == [1, 2]
 
 
-def test_tool_call_substring_in_prose_without_valid_call_is_malformed() -> None:
-    text = "提到 <tool_call> 但这不是有效调用"
+@pytest.mark.parametrize(
+    "text",
+    [
+        "提到 <tool_call> 但这不是有效调用",
+        (
+            "先说明一下，这里提一下 <tool_call> 只是举例，不是真正调用。\n\n"
+            "<tool_call>\n<function=materials_search>\n<parameter=query>\nq\n</parameter>\n</function>\n</tool_call>"
+        ),
+    ],
+)
+def test_tool_call_substring_in_prose_without_valid_call_is_malformed(text) -> None:
     parsed = parse_completion(text, TOOLS, thinking=False)
     assert parsed.kind is TurnKind.PARSE_ERROR
     assert parsed.error is not None and parsed.error.startswith("malformed_tool_call")
