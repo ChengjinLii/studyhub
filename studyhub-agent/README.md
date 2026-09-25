@@ -49,6 +49,16 @@ on the sub-project 2 benchmark (paired comparison with confidence intervals). Pl
 | Small-to-large cascade | 4B answers first and escalates to a 27B baseline when not confident | Cost and latency at equal accuracy | after 3 |
 | RL with verifiable rewards | GRPO on environment-state rewards using the token-level rollouts this harness produces | Paired gain over SFT with CIs | 4 |
 
+Decisions recorded 2026-09-25:
+
+- The harness stays in-house (a small Python loop with the render contract). pi
+  ([badlogic/pi-mono](https://github.com/badlogic/pi-mono)) is a design reference for the minimal-harness philosophy,
+  not a code base. Adopted from it at the start of sub-project 2: tool results split into model-facing content and
+  structured `details` for graders and analysis.
+- Training framework is chosen by a spike at the start of sub-project 3 comparing SkyRL, verl AgentLoop and
+  Verifiers. Hard criteria: uses this package's renderer (not the framework's chat template), fits two shared H100s,
+  supports Qwen3.5's hybrid GDN architecture in its inference engine, supports LoRA.
+
 ## History
 
 The v2 code (Hermes/AReaL workflows, benchmark v1/v2, SFT/GRPO/OPD scripts) is preserved at tag `legacy-agent-v2`
