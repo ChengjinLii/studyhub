@@ -189,7 +189,10 @@ async def record_view(
         "client": client_key_for_request(service.settings, request),
         "userAgent": request.headers.get("user-agent", ""),
     }
-    view_count = service.record_view(
+    # View counts may stay stale in the anonymous detail cache until its TTL
+    # expires; invalidating on every view would scan the whole cache keyspace.
+    view_count = await run_in_threadpool(
+        service.record_view,
         session,
         id,
         auth.user_id if auth else None,
@@ -197,7 +200,6 @@ async def record_view(
         payload.viewerToken,
         viewer_context=viewer_context,
     )
-    _invalidate_material_detail_caches()
     return api_ok({"viewCount": view_count})
 
 
@@ -604,10 +606,6 @@ def _upload_descriptors(
 def _invalidate_material_read_caches() -> None:
     invalidate_prefixes(get_public_read_cache(), "materials", "leaderboard")
     _invalidate_contributor_leaderboard_cache()
-
-
-def _invalidate_material_detail_caches() -> None:
-    invalidate_prefixes(get_public_read_cache(), "materials:detail")
 
 
 def _invalidate_material_download_caches() -> None:

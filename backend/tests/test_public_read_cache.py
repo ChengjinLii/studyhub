@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from concurrent.futures import ThreadPoolExecutor
 from threading import Event
 import time
@@ -136,29 +137,43 @@ def test_invalidate_prefixes_evicts_matching_namespaces() -> None:
     assert 'studyhub_cache_events_total{namespace="materials",backend="local",event="invalidate"} 1' in metrics
 
 
-def test_material_view_invalidation_preserves_list_caches(monkeypatch) -> None:
+def _fake_view_materials_service(observed: dict[str, object]):
+    class FakeMaterialsService:
+        settings = Settings(environment="test")
+
+        def record_view(self, session, material_id, user_id, can_manage_all, viewer_token, viewer_context=None):
+            try:
+                asyncio.get_running_loop()
+                observed["on_event_loop"] = True
+            except RuntimeError:
+                observed["on_event_loop"] = False
+            observed["material_id"] = material_id
+            return 42
+
+    return FakeMaterialsService()
+
+
+def test_material_view_runs_off_event_loop_and_keeps_public_caches(client, monkeypatch) -> None:
     cache = _build_cache()
     cache.get_or_set("materials:list", ("page", 1), lambda: {"kind": "list"})
-    cache.get_or_set("materials:recommendations", ("limit", 6), lambda: {"kind": "recommendations"})
     cache.get_or_set("materials:detail", (101,), lambda: {"kind": "detail"})
-    cache.get_or_set("leaderboard:contributors", ("all", 6), lambda: {"kind": "leaderboard"})
-    leaderboard_invalidations = 0
-
-    class FakeLeaderboardService:
-        def invalidate_contributor_cache(self):
-            nonlocal leaderboard_invalidations
-            leaderboard_invalidations += 1
+    cache.get_or_set("materials:detail", (102,), lambda: {"kind": "detail"})
+    observed: dict[str, object] = {}
 
     monkeypatch.setattr(material_routes, "get_public_read_cache", lambda: cache)
-    monkeypatch.setattr(material_routes, "get_leaderboard_read_service", lambda: FakeLeaderboardService())
+    client.app.dependency_overrides[get_public_read_cache] = lambda: cache
+    client.app.dependency_overrides[get_materials_service] = lambda: _fake_view_materials_service(observed)
+    try:
+        response = client.post("/api/materials/101/view", json={"viewerToken": "viewer-a"})
+    finally:
+        client.app.dependency_overrides.clear()
 
-    material_routes._invalidate_material_detail_caches()
-
+    assert response.status_code == 200
+    assert response.json()["data"] == {"viewCount": 42}
+    assert observed == {"on_event_loop": False, "material_id": 101}
     assert ("materials:list", ("page", 1)) in cache._entries
-    assert ("materials:recommendations", ("limit", 6)) in cache._entries
-    assert ("leaderboard:contributors", ("all", 6)) in cache._entries
-    assert ("materials:detail", (101,)) not in cache._entries
-    assert leaderboard_invalidations == 0
+    assert ("materials:detail", (101,)) in cache._entries
+    assert ("materials:detail", (102,)) in cache._entries
 
 
 def test_material_download_invalidation_preserves_material_list_caches(monkeypatch) -> None:
