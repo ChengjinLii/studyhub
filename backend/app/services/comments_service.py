@@ -239,6 +239,9 @@ class CommentsService:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="评论不存在")
         if entity.user_id != user_id and not can_moderate:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="无权删除评论")
+        if entity.status == "deleted":
+            session.commit()
+            return
         entity.status = "deleted"
         entity.content = ""
         self.comment_repo.save_comment(session, entity)
@@ -371,7 +374,7 @@ class CommentsService:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="评论不存在")
         if int(row["user_id"]) != int(user_id) and not can_moderate:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="无权删除评论")
-        session.execute(
+        deleted = session.execute(
             text(
                 """
                 UPDATE comments
@@ -379,11 +382,12 @@ class CommentsService:
                     content = '',
                     updated_at = CURRENT_TIMESTAMP
                 WHERE id = :comment_id
+                  AND COALESCE(status, '') <> 'deleted'
                 """
             ),
             {"comment_id": comment_id},
         )
-        if row["parent_id"] is not None:
+        if deleted.rowcount == 1 and row["parent_id"] is not None:
             session.execute(
                 text(
                     """

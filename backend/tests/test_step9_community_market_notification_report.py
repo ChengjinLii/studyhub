@@ -5,6 +5,8 @@ import json
 
 from fastapi.testclient import TestClient
 
+from app.core.db import session_scope
+from app.models.comments import CommentRecord
 from app.services.auth_service import AuthService
 from tests.support import build_auth_headers, seed_read_users
 
@@ -339,3 +341,34 @@ def test_step9_community_reports_and_admin_aliases(
 
     restored_market = client.get("/api/market/201")
     assert restored_market.status_code == 200
+
+
+def test_deleting_reply_twice_decrements_parent_reply_count_once(
+    client: TestClient,
+    auth_service: AuthService,
+) -> None:
+    seed_read_users(auth_service)
+    alice_headers = build_auth_headers(1, 1)
+    baishan_headers = build_auth_headers(2, 2)
+
+    parent = client.post("/api/comments", headers=alice_headers, json={"materialId": 101, "content": "父评论"})
+    assert parent.status_code == 200
+    parent_id = parent.json()["data"]["id"]
+    replies = [
+        client.post(
+            "/api/comments",
+            headers=baishan_headers,
+            json={"materialId": 101, "parentId": parent_id, "content": content},
+        )
+        for content in ("回复一", "回复二")
+    ]
+    assert [reply.status_code for reply in replies] == [200, 200]
+    reply_id = replies[0].json()["data"]["id"]
+
+    assert client.delete(f"/api/comments/{reply_id}", headers=baishan_headers).status_code == 200
+    assert client.delete(f"/api/comments/{reply_id}", headers=baishan_headers).status_code == 200
+
+    with session_scope() as session:
+        parent_record = session.get(CommentRecord, parent_id)
+        assert parent_record is not None
+        assert parent_record.reply_count == 1

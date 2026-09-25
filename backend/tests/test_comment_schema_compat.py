@@ -170,3 +170,23 @@ def test_comment_service_compat_write_flow_uses_legacy_columns() -> None:
         row = session.execute(text("SELECT status, content FROM comments WHERE id = :id"), {"id": comment_id}).mappings().one()
         assert row["status"] == "deleted"
         assert row["content"] == ""
+
+
+def _reply_count(session: Session, comment_id: int) -> int:
+    return int(session.execute(text("SELECT reply_count FROM comments WHERE id = :id"), {"id": comment_id}).scalar_one())
+
+
+def test_comment_service_compat_delete_is_idempotent_for_parent_reply_count() -> None:
+    engine = _create_legacy_comment_schema()
+    service = _build_service()
+
+    with Session(engine) as session:
+        parent_id = int(service.create(session, CommentCreatePayload(materialId=41, parentId=None, content="父评论"), user_id=7)["id"])
+        reply_id = int(service.create(session, CommentCreatePayload(materialId=41, parentId=parent_id, content="回复一"), user_id=7)["id"])
+        service.create(session, CommentCreatePayload(materialId=41, parentId=parent_id, content="回复二"), user_id=7)
+        assert _reply_count(session, parent_id) == 2
+
+        service.delete(session, reply_id, user_id=7, can_moderate=False)
+        service.delete(session, reply_id, user_id=7, can_moderate=False)
+
+        assert _reply_count(session, parent_id) == 1
