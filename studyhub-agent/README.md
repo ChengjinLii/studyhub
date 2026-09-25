@@ -31,6 +31,11 @@ python3.12 -m venv .venv && .venv/bin/pip install -e ".[dev,tokenizers]"
 
 Model-dependent acceptance tests: `STUDYHUB_AGENT_MODEL_DIR=/path/to/Qwen3.5-4B pytest -m requires_model`.
 
+Serving Qwen3.5-4B with SGLang for the smoke episodes (`scripts/smoke_episodes.py`), including the
+no-nvcc compatibility shim and shared-GPU etiquette for the current host, is documented in
+[`scripts/serving/README.md`](scripts/serving/README.md). Sample output:
+[`docs/evidence/foundation-smoke-2026-09-25.jsonl`](docs/evidence/foundation-smoke-2026-09-25.jsonl).
+
 ## History
 
 The v2 code (Hermes/AReaL workflows, benchmark v1/v2, SFT/GRPO/OPD scripts) is preserved at tag `legacy-agent-v2`
