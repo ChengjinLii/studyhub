@@ -155,3 +155,54 @@ def test_thinking_completion_splits_reasoning() -> None:
 
 def test_trailing_end_of_turn_token_is_ignored() -> None:
     assert parse_completion("答案<|im_end|>", TOOLS, thinking=False).content == "答案"
+
+
+def test_unclosed_think_block_is_a_parse_error() -> None:
+    parsed = parse_completion("先想想，但是被截断了", TOOLS, thinking=True)
+    assert parsed.kind is TurnKind.PARSE_ERROR
+    assert parsed.error is not None and parsed.error.startswith("unclosed_think")
+    assert parsed.tool_calls == ()
+
+
+ARRAY_TOOL = ToolSpec(
+    name="materials_batch_get",
+    version="1.0",
+    description="批量获取资料",
+    parameters={
+        "type": "object",
+        "properties": {
+            "ids": {"type": "array", "items": {"type": "integer"}, "description": "资料 ID 列表"},
+        },
+        "required": ["ids"],
+        "additionalProperties": False,
+    },
+)
+
+
+def test_array_parameter_rejects_mistyped_items() -> None:
+    text = (
+        "<tool_call>\n<function=materials_batch_get>\n<parameter=ids>\n"
+        '["a", "b"]\n</parameter>\n</function>\n</tool_call>'
+    )
+    parsed = parse_completion(text, (ARRAY_TOOL,), thinking=False)
+    assert parsed.kind is TurnKind.PARSE_ERROR
+    assert parsed.error is not None and parsed.error.startswith("invalid_argument")
+    assert parsed.tool_calls == ()
+
+
+def test_array_parameter_accepts_matching_items() -> None:
+    text = (
+        "<tool_call>\n<function=materials_batch_get>\n<parameter=ids>\n"
+        "[1, 2]\n</parameter>\n</function>\n</tool_call>"
+    )
+    parsed = parse_completion(text, (ARRAY_TOOL,), thinking=False)
+    assert parsed.kind is TurnKind.TOOL_CALLS
+    assert parsed.tool_calls[0].arguments["ids"] == [1, 2]
+
+
+def test_tool_call_substring_in_prose_without_valid_call_is_malformed() -> None:
+    text = "提到 <tool_call> 但这不是有效调用"
+    parsed = parse_completion(text, TOOLS, thinking=False)
+    assert parsed.kind is TurnKind.PARSE_ERROR
+    assert parsed.error is not None and parsed.error.startswith("malformed_tool_call")
+    assert parsed.tool_calls == ()

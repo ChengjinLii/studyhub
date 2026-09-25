@@ -121,7 +121,9 @@ def canonical_completion_text(
 
 def parse_completion(text: str, tools: Sequence[ToolSpec], *, thinking: bool) -> ParsedCompletion:
     body = text.split(END_OF_TURN, 1)[0]
-    if thinking and _THINK_CLOSE in body:
+    if thinking:
+        if _THINK_CLOSE not in body:
+            return _error("unclosed_think")
         body = body.split(_THINK_CLOSE, 1)[1]
     start = body.find("<tool_call>")
     if start < 0:
@@ -182,6 +184,34 @@ def _parse_call(
     return ToolCall(call_id=f"call_{index}", name=name, arguments=arguments), None
 
 
+_TYPE_MAP: dict[str, type | tuple[type, ...]] = {
+    "integer": int,
+    "number": (int, float),
+    "boolean": bool,
+    "array": list,
+    "object": dict,
+    "null": type(None),
+}
+
+
+def _matches_schema(value: Any, schema: dict[str, Any]) -> bool:
+    kind = schema.get("type")
+    if kind == "string":
+        if not isinstance(value, str):
+            return False
+    else:
+        expected = _TYPE_MAP.get(kind)
+        if expected is None:
+            return False
+        if kind in {"integer", "number"} and isinstance(value, bool):
+            return False
+        if not isinstance(value, expected):
+            return False
+    if "enum" in schema and value not in schema["enum"]:
+        return False
+    return True
+
+
 def _coerce(raw: str, schema: dict[str, Any]) -> tuple[Any, bool]:
     kind = schema.get("type")
     if kind == "string":
@@ -191,18 +221,10 @@ def _coerce(raw: str, schema: dict[str, Any]) -> tuple[Any, bool]:
             value = json.loads(raw.strip())
         except json.JSONDecodeError:
             return None, False
-        expected = {
-            "integer": int,
-            "number": (int, float),
-            "boolean": bool,
-            "array": list,
-            "object": dict,
-            "null": type(None),
-        }[kind]
-        if kind in {"integer", "number"} and isinstance(value, bool):
-            return None, False
-        if not isinstance(value, expected):
-            return None, False
-    if "enum" in schema and value not in schema["enum"]:
+    if not _matches_schema(value, schema):
         return None, False
+    if kind == "array":
+        items_schema = schema.get("items")
+        if isinstance(items_schema, dict) and not all(_matches_schema(element, items_schema) for element in value):
+            return None, False
     return value, True
