@@ -384,6 +384,7 @@ async def update_material(
     auth: AuthContext = Depends(require_auth_context),
     session: Session = Depends(get_db_session),
     service: MaterialsService = Depends(get_materials_service),
+    upload_authorization: UploadAuthorizationService = Depends(get_upload_authorization_service),
 ) -> dict[str, object]:
     form = await request.form()
     payload = parse_payload_json(form.get("payload"), MaterialUpdatePayload)
@@ -391,6 +392,10 @@ async def update_material(
     markdown_file = form.get("markdown")
     previews = _coerce_upload_list(form.getlist("previews"))
     custom_previews = _coerce_upload_list(form.getlist("customPreviews"))
+    # Same extension/size/count rules the create path enforces through upload authorization.
+    upload_authorization.validate_descriptors(
+        _upload_descriptors(_coerce_upload_list([zip_file, markdown_file]), previews, custom_previews)
+    )
     detail = await run_in_threadpool(
         service.update_material,
         session,

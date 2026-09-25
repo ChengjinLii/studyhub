@@ -134,3 +134,27 @@ def test_owner_metadata_edit_keeps_visible_material_visible(client: TestClient, 
     assert response.status_code == 200
     assert _material_state(material_id) == ("VISIBLE", "APPROVED", False)
     assert client.get(f"/api/materials/{material_id}").status_code == 200
+
+
+def test_update_rejects_material_file_extension_outside_upload_allow_list(
+    client: TestClient,
+    auth_service: AuthService,
+) -> None:
+    seed_read_users(auth_service, with_follow_graph=True)
+    material_id = _create_material(client)
+
+    response = client.put(
+        f"/api/materials/{material_id}",
+        headers=build_auth_headers(*ALICE_HEADERS_ARGS),
+        files=[
+            ("payload", _payload_part(_material_payload("替换文件"))),
+            ("zip", ("evil.exe", b"MZ\x90\x00payload", "application/octet-stream")),
+        ],
+    )
+
+    assert response.status_code == 400
+    with session_scope() as session:
+        material = session.get(MaterialRecord, material_id)
+        assert material is not None
+        assert material.original_filename == "notes.zip"
+        assert material.title == "原始资料"
