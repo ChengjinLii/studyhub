@@ -61,6 +61,7 @@ from app.services.read_support import (
 ROLE_ADMIN = 8
 ROLE_DEVELOPER = 16
 VISIBLE_STATUSES = {"VISIBLE", "visible", "", None}
+SECURITY_HOLD_REVIEW_STATUSES = {"SECURITY_PENDING", "SECURITY_REJECTED"}
 VISIBLE_MATERIAL_STATUS_SQL = "(m.status IS NULL OR LOWER(m.status) NOT IN ('hidden', 'removed'))"
 
 
@@ -804,6 +805,8 @@ class MaterialsService(MaterialSecurityPolicyMixin, MaterialsStorageMutationMixi
     ) -> dict[str, Any]:
         self._bootstrap(session)
         material = self._load_accessible_material(session, material_id, operator_id, can_manage_all, require_owner=True)
+        if not can_manage_all and self._is_moderation_locked(material):
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="资料不存在")
         file_upload = zip_file or markdown_file
         release_status = material.status or "VISIBLE"
         release_review_status = material.review_status
@@ -1344,6 +1347,12 @@ class MaterialsService(MaterialSecurityPolicyMixin, MaterialsStorageMutationMixi
         if material.status not in VISIBLE_STATUSES and not (is_owner or can_manage_all):
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="资料不存在")
         return material
+
+    @staticmethod
+    def _is_moderation_locked(material: MaterialRecord) -> bool:
+        if material.deleted_at is not None or material.status == "REMOVED":
+            return True
+        return material.status == "HIDDEN" and material.review_status not in SECURITY_HOLD_REVIEW_STATUSES
 
     def _ensure_material_exists(self, session: Session, material_id: int) -> MaterialRecord:
         material = self.material_repo.get_material(session, material_id)

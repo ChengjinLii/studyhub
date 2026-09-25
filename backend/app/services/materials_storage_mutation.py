@@ -93,9 +93,6 @@ class MaterialsStorageMutationMixin:
         material.preview_source = payload.previewSource or material.preview_source or "AUTO"
         material.custom_preview_text = payload.customPreviewText
         material.copyright_owner = payload.copyrightOwner
-        material.status = "VISIBLE"
-        material.review_status = "APPROVED"
-        material.deleted_at = None
         material.updated_at = datetime.now(UTC)
 
         if file_upload is not None:
