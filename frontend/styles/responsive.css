@@ -454,6 +454,21 @@ h2 {
  * Upload
  * ------------------------------------------------------------------------- */
 
+@media (max-width: 768px) {
+  /* The hero intro shrink-wrapped to its title, leaving the mode buttons at 240px. */
+  .upload-hero .me-hero__intro {
+    align-self: stretch;
+    width: 100%;
+    min-width: 0;
+  }
+}
+
+@media (min-width: 560px) and (max-width: 768px) {
+  .upload-hero__tools {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
 @media (max-width: 640px) {
   /* A later base rule forced two columns, leaving one CJK character per line. */
   .upload-preview-source-options {
@@ -514,15 +529,114 @@ h2 {
   }
 }
 
-@media (max-width: 768px) {
-  .market-detail-page {
-    margin-top: 0;
-  }
+/* The detail card was pulled 20px up under the header, hiding its category chip. */
+.market-detail-page {
+  margin-top: 0;
 }
 
 @media (max-width: 960px) {
   /* The stacked detail inherited align-items: start from the desktop grid and shrink-wrapped every block. */
   .market-detail {
     align-items: stretch;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+ * Column (/column)
+ * ------------------------------------------------------------------------- */
+
+@media (max-width: 560px) {
+  /* Two 138px columns squeezed titles to a few characters and stacked the stats. */
+  .column-article-list {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* ---------------------------------------------------------------------------
+ * Entry modal on landscape phones
+ * Its width is derived from the viewport height (16:9 poster), which left a 185px
+ * column with the QQ number wrapping one digit per line at 844x390.
+ * ------------------------------------------------------------------------- */
+
+@media (orientation: landscape) and (max-height: 520px) {
+  .stable-version-mask {
+    padding: 10px max(10px, env(safe-area-inset-right)) 10px max(10px, env(safe-area-inset-left));
+  }
+
+  .stable-version-modal {
+    flex-direction: row;
+    align-items: center;
+    width: min(780px, calc(100vw - 20px));
+    max-width: calc(100vw - 20px);
+    max-height: calc(100vh - 20px);
+    max-height: calc(100dvh - 20px);
+    border-radius: 22px;
+  }
+
+  .stable-version-modal__media {
+    flex: 0 0 46%;
+    width: 46%;
+    min-height: 0;
+    border-radius: 22px 8px 8px 22px;
+  }
+
+  .stable-version-modal__content {
+    flex: 1 1 auto;
+    min-width: 0;
+    padding: 14px 18px;
+    gap: 6px;
+  }
+
+  .stable-version-modal__close {
+    top: 10px;
+    right: 10px;
+    width: 40px;
+    height: 40px;
+  }
+
+  .stable-version-modal__title {
+    font-size: 20px;
+    line-height: 1.15;
+  }
+
+  .stable-version-modal__text {
+    font-size: 13px;
+    line-height: 1.38;
+  }
+
+  .stable-version-modal__content > .stable-version-modal__text + .stable-version-modal__text {
+    display: none;
+  }
+
+  .stable-version-modal__meta-row {
+    grid-template-columns: 70px 1fr;
+    gap: 6px;
+    padding: 5px 0;
+  }
+
+  .stable-version-modal__meta-label,
+  .stable-version-modal__meta-value,
+  .stable-version-modal__meta-link {
+    font-size: 12px;
+    line-height: 1.3;
+  }
+
+  .stable-version-modal__actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .stable-version-modal__cta,
+  .stable-version-modal__stay {
+    width: 100%;
+    min-height: 40px;
+    padding: 0 12px;
+    font-size: 13px;
+  }
+
+  .stable-version-modal__dismiss-hint {
+    margin-top: 0;
+    font-size: 11px;
   }
 }
