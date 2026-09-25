@@ -213,6 +213,11 @@ def download_link(
     service: BatchSubmissionService = Depends(get_batch_submission_service),
 ):
     service.download_item(session, batch_id, item_id)
+    # download_item only reads (via SELECT ... FOR UPDATE guards against a
+    # concurrent status change while we look). Release those row locks
+    # immediately instead of holding them until the dependency tears down the
+    # session at the end of the request.
+    session.commit()
     return api_ok({"url": f"/api/admin/batch-submissions/{batch_id}/items/{item_id}/file"})
 
 
@@ -224,15 +229,21 @@ def download_file(
     service: BatchSubmissionService = Depends(get_batch_submission_service),
 ):
     item = service.download_item(session, batch_id, item_id)
+    object_key, filename = item.object_key, item.name
+    # Release the batch/item FOR UPDATE locks taken by download_item before
+    # doing the (potentially slow, network-bound) object storage copy below.
+    # Without this, the row locks stay held for the full OSS transfer time,
+    # blocking any concurrent admin action on the same batch/item.
+    session.commit()
     with tempfile.NamedTemporaryFile(prefix="studyhub-batch-", delete=False) as output:
         path = Path(output.name)
     try:
-        service.asset_store.copy_to_path(item.object_key, path, max_size_bytes=50 * 1024 * 1024)
+        service.asset_store.copy_to_path(object_key, path, max_size_bytes=50 * 1024 * 1024)
     except Exception:
         path.unlink(missing_ok=True)
         raise
     return FileResponse(
-        path, filename=item.name, media_type="application/octet-stream",
+        path, filename=filename, media_type="application/octet-stream",
         headers={"Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff"},
         background=BackgroundTask(path.unlink, missing_ok=True),
     )
