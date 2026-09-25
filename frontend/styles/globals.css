@@ -5213,24 +5213,31 @@ g.studyhub-popup-poster__hotspot:hover > text {
     gap: 14px;
   }
 
+  .market-item__body {
+    padding: 12px 12px 14px;
+    gap: 8px;
+  }
+
   .market-item__title {
-    font-size: 1.95rem;
+    font-size: 0.98rem;
   }
 
   .market-item__meta {
-    font-size: 19px;
+    font-size: 12px;
   }
 
   .market-meta-chip {
-    font-size: 18px;
+    padding: 3px 8px;
+    font-size: 11px;
   }
 
   .market-item__price {
-    font-size: 2.2rem;
+    padding: 3px 9px;
+    font-size: 1rem;
   }
 
   .market-item__want {
-    font-size: 19px;
+    font-size: 12px;
   }
 }
 
