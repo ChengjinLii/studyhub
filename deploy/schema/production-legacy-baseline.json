@@ -1,12 +1,12 @@
 {
   "version": 1,
-  "reviewedAt": "2026-08-16",
-  "fingerprint": "b5e4c042c967d5aaea1468bd999c9c2c30907aa74c4136e4a84dfa8f2a62ddd9",
+  "reviewedAt": "2026-09-26",
+  "fingerprint": "b63902021c4314fa59049cedaf3ae37e326738d3745b6bc9ee7b4f19bc1ce6ac",
   "counts": {
-    "missingTables": 7,
+    "missingTables": 0,
     "missingColumns": 40,
-    "columnWarnings": 292,
+    "columnWarnings": 299,
     "missingIndexes": 0
   },
-  "note": "The seven missing tables belong to disabled Agentic features. The remaining reviewed differences are legacy aliases/defaults handled by compatibility repositories. Any drift from this exact fingerprint blocks production preflight."
+  "note": "Read-only review against the 2026-08-16 audit: seven legacy Agentic models were removed, so their tables are no longer required. Seven additional default warnings concern bot_speech_config (id, enabled, message) and bot_speech_messages (display_style, display_duration_seconds, priority, status); application/ORM writes supply these values. Missing columns and indexes are unchanged. Active c1d52aa and candidate 877c524 produce the same fingerprint. Remaining differences are legacy aliases/defaults handled by compatibility repositories. No database mutation was performed. Any drift from this exact fingerprint blocks production preflight."
 }
