@@ -11,6 +11,11 @@ request bodies to 256 KiB; do not reuse it for multipart upload endpoints.
 It intentionally inherits existing authentication-independent abuse controls and
 security response headers. Registration limits and CSP are not changed.
 
+Replace the server's existing exact `/mcp` location with
+`studyhub-mcp-location.conf`. It applies a separate 256 KiB transport limit;
+the application also counts streamed bytes and rejects oversized chunked bodies.
+Do not include both this file and another exact `/mcp` location in one server.
+
 For a direct-origin deployment, overwrite `X-Forwarded-For` with `$remote_addr`.
 If a CDN is added later, configure trusted `set_real_ip_from` ranges and origin
 ingress restrictions first. Never trust arbitrary client forwarding headers.
@@ -28,8 +33,11 @@ References:
 
 Atomic release now requires 3 GiB free disk and 1 GiB available memory before
 installation. Production dependency audit uses the official npm registry and must
-pass before building or switching services. Candidate prewarming has bounded retries and must succeed before
-switching. A failed attempt only removes a release created by that attempt.
+pass before building or switching services. The read-only provider and schema
+preflight is mandatory before candidate smoke tests. Candidate prewarming has
+bounded retries and must succeed before switching. A failed attempt only removes a
+release created by that attempt. The candidate also retains the previous release's
+immutable `/_next/static` files so existing browser tabs can finish loading them.
 
 The service restart remains a restart, not zero-downtime blue/green deployment.
 Candidate memory caches do not survive restarting production services; production

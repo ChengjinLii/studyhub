@@ -41,7 +41,13 @@ def build_finance_reconciliation(engine: Engine, *, now: datetime | None = None)
     report: dict[str, Any] = {
         "checkedAt": checked_at.isoformat(),
         "outbox": {"statusByType": {}, "stale": 0},
-        "payouts": {"status": {}, "stale": 0, "inconsistentSettlements": 0},
+        "payouts": {
+            "status": {},
+            "stale": 0,
+            "inconsistentSettlements": 0,
+            "amountMismatches": 0,
+            "successfulWithoutBindings": 0,
+        },
         "refunds": {"status": {}, "stale": 0},
         "issues": issues,
     }
@@ -84,15 +90,25 @@ def build_finance_reconciliation(engine: Engine, *, now: datetime | None = None)
     if {"payout_transfers", "settlements"}.issubset(tables):
         settlement_columns = {str(item["name"]) for item in inspector.get_columns("settlements")}
         if {"payout_transfer_id", "status"}.issubset(settlement_columns):
+            transfer_columns = {str(item["name"]) for item in inspector.get_columns("payout_transfers")}
+            payout_columns = ("id", "status", "amount") if "amount" in transfer_columns else ("id", "status")
             transfers_by_id = {
-                int(item["id"]): item for item in _rows(engine, "payout_transfers", ("id", "status")) if item["id"] is not None
+                int(item["id"]): item for item in _rows(engine, "payout_transfers", payout_columns) if item["id"] is not None
             }
-            settlements = _rows(engine, "settlements", ("payout_transfer_id", "status"))
+            settlement_fields = (
+                ("payout_transfer_id", "status", "payout_amount")
+                if "payout_amount" in settlement_columns
+                else ("payout_transfer_id", "status")
+            )
+            settlements = _rows(engine, "settlements", settlement_fields)
             inconsistent = 0
+            settlements_by_transfer: dict[int, list[Any]] = {}
             for settlement in settlements:
                 if settlement["payout_transfer_id"] is None:
                     continue
-                transfer = transfers_by_id.get(int(settlement["payout_transfer_id"]))
+                transfer_id = int(settlement["payout_transfer_id"])
+                settlements_by_transfer.setdefault(transfer_id, []).append(settlement)
+                transfer = transfers_by_id.get(transfer_id)
                 if transfer is None:
                     inconsistent += 1
                 elif transfer["status"] == "SUCCESS" and settlement["status"] != "PAID":
@@ -102,6 +118,30 @@ def build_finance_reconciliation(engine: Engine, *, now: datetime | None = None)
             report["payouts"]["inconsistentSettlements"] = inconsistent
             if inconsistent:
                 issues.append({"severity": "error", "code": "PAYOUT_SETTLEMENT_MISMATCH", "count": inconsistent})
+            if "amount" in transfer_columns and "payout_amount" in settlement_columns:
+                amount_mismatches = sum(
+                    1
+                    for transfer_id, bound in settlements_by_transfer.items()
+                    if transfer_id in transfers_by_id
+                    and sum(int(item["payout_amount"] or 0) for item in bound)
+                    != int(transfers_by_id[transfer_id]["amount"] or 0)
+                )
+                report["payouts"]["amountMismatches"] = amount_mismatches
+                if amount_mismatches:
+                    issues.append({"severity": "error", "code": "PAYOUT_AMOUNT_MISMATCH", "count": amount_mismatches})
+            successful_without_bindings = sum(
+                item["status"] == "SUCCESS" and int(item["id"]) not in settlements_by_transfer
+                for item in transfers_by_id.values()
+            )
+            report["payouts"]["successfulWithoutBindings"] = successful_without_bindings
+            if successful_without_bindings:
+                issues.append(
+                    {
+                        "severity": "warning",
+                        "code": "SUCCESSFUL_PAYOUT_WITHOUT_SETTLEMENT_BINDINGS",
+                        "count": successful_without_bindings,
+                    }
+                )
 
     contribution_columns = (
         {str(item["name"]) for item in inspector.get_columns("material_request_contributions")}

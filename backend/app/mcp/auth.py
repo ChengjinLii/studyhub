@@ -227,14 +227,50 @@ def scopes_for_request(settings: Settings, request: Request) -> set[str] | None:
     return set(principal.scopes) if principal else None
 
 
-async def _json_rpc_payload(request: Request) -> dict | list | None:
+class McpRequestBodyTooLarge(ValueError):
+    pass
+
+
+async def load_json_rpc_payload(request: Request, *, max_body_bytes: int) -> dict | list | None:
+    if hasattr(request.state, "mcp_json_rpc_payload"):
+        return request.state.mcp_json_rpc_payload
     if request.method.upper() != "POST":
+        request.state.mcp_json_rpc_payload = None
         return None
+    raw_content_length = request.headers.get("content-length")
+    if raw_content_length:
+        try:
+            content_length = int(raw_content_length)
+        except ValueError as exc:
+            raise ValueError("Invalid Content-Length header") from exc
+        if content_length < 0:
+            raise ValueError("Invalid Content-Length header")
+        if content_length > max_body_bytes:
+            raise McpRequestBodyTooLarge("MCP request body exceeds configured limit")
+    body = bytearray()
+    async for chunk in request.stream():
+        body.extend(chunk)
+        if len(body) > max_body_bytes:
+            raise McpRequestBodyTooLarge("MCP request body exceeds configured limit")
+    raw_body = bytes(body)
+    # Starlette caches Request.body() in this attribute. Preserve the bounded
+    # body so the mounted MCP application can consume the same bytes later.
+    request._body = raw_body  # type: ignore[attr-defined]
     try:
-        payload = json.loads((await request.body()).decode("utf-8") or "{}")
+        payload = json.loads(raw_body or b"{}")
     except Exception:
-        return None
-    return payload if isinstance(payload, (dict, list)) else None
+        payload = None
+    normalized = payload if isinstance(payload, (dict, list)) else None
+    request.state.mcp_json_rpc_payload = normalized
+    return normalized
+
+
+async def _json_rpc_payload(request: Request) -> dict | list | None:
+    if hasattr(request.state, "mcp_json_rpc_payload"):
+        return request.state.mcp_json_rpc_payload
+    # Direct unit callers do not pass Settings. The application middleware
+    # always preloads with the configured limit before reaching this fallback.
+    return await load_json_rpc_payload(request, max_body_bytes=256 * 1024)
 
 
 async def requested_tool_name(request: Request) -> str | None:

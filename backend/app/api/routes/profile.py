@@ -3,12 +3,14 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_user_follow_service, get_user_read_service, require_auth_context
+from app.api.deps import get_account_service, get_user_follow_service, get_user_read_service, require_auth_context
 from app.core.db import get_db_session
 from app.core.response import api_ok
 from app.core.security import AuthContext
 from app.services.user_follow_service import UserFollowService
 from app.services.user_read_service import UserReadService
+from app.services.account_service import AccountService
+from starlette.concurrency import run_in_threadpool
 
 
 router = APIRouter(tags=["profile"])
@@ -20,6 +22,20 @@ async def profile_overview(
     service: UserReadService = Depends(get_user_read_service),
 ) -> dict[str, object]:
     return api_ok(await service.get_overview_async(auth.user_id or 0))
+
+
+@router.get("/api/me/home-context")
+async def home_profile_context(
+    auth: AuthContext = Depends(require_auth_context),
+    session: Session = Depends(get_db_session),
+    profile_service: UserReadService = Depends(get_user_read_service),
+    account_service: AccountService = Depends(get_account_service),
+) -> dict[str, object]:
+    # Keep these reads sequential so a single SSR request does not reserve two
+    # database connections for one user's profile context.
+    summary = await profile_service.get_overview_async(auth.user_id or 0)
+    account = await run_in_threadpool(account_service.get_account, session, auth.user_id or 0)
+    return api_ok({"summary": summary, "account": account})
 
 
 @router.get("/api/users/{id}/profile")

@@ -23,6 +23,31 @@ def assert_middleware_error(response, code: str, message: str) -> None:
     assert response.headers["x-request-id"]
 
 
+def test_mcp_rejects_unauthenticated_request_before_reading_oversized_body(auth_required_client: TestClient) -> None:
+    response = auth_required_client.post(
+        "/mcp",
+        content=b'{' + (b'"padding":"' + b'x' * (256 * 1024) + b'"}'),
+        headers={"content-type": "application/json"},
+    )
+
+    assert response.status_code == 401
+    assert_middleware_error(response, "MCP_UNAUTHORIZED", "MCP authentication required")
+
+
+def test_mcp_rejects_authenticated_oversized_body(auth_required_client: TestClient) -> None:
+    response = auth_required_client.post(
+        "/mcp",
+        content=b'{' + (b'"padding":"' + b'x' * (256 * 1024) + b'"}'),
+        headers={
+            "authorization": "Bearer test-mcp-token",
+            "content-type": "application/json",
+        },
+    )
+
+    assert response.status_code == 413
+    assert_middleware_error(response, "MCP_REQUEST_TOO_LARGE", "MCP request body is too large")
+
+
 @pytest.fixture()
 def origin_locked_client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> TestClient:
     db_path = tmp_path / "studyhub-fastapi-test.sqlite3"

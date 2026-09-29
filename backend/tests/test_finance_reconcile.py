@@ -62,9 +62,11 @@ def test_finance_reconciliation_detects_stale_and_mismatched_records() -> None:
 
     assert report["ok"] is False
     assert report["payouts"]["inconsistentSettlements"] == 1
+    assert report["payouts"]["amountMismatches"] == 1
     assert report["refunds"]["stale"] == 1
     assert {item["code"] for item in report["issues"]} >= {
         "FAILED_FINANCE_INSTRUCTIONS",
         "PAYOUT_SETTLEMENT_MISMATCH",
+        "PAYOUT_AMOUNT_MISMATCH",
         "STALE_REQUEST_REFUNDS",
     }

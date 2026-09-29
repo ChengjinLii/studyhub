@@ -219,11 +219,11 @@ def test_in_flight_settlements_excluded_from_withdrawable_earnings(
     assert earnings["unclaimedPayoutTotal"] == 1800  # 仍是 PENDING，未结总额口径不变
 
 
-def test_legacy_unbound_transfer_falls_back_and_repeat_callback_is_idempotent(
+def test_legacy_unbound_transfer_requires_reconciliation_and_does_not_settle(
     client: TestClient,
     auth_service: AuthService,
 ) -> None:
-    """遗留兼容：部署前已提交、无绑定结算单的在途转账，SUCCESS 时按旧口径认领；重复回调幂等。"""
+    """无绑定的遗留转账不能根据回调时余额猜测结算范围。"""
     seed_read_users(auth_service, with_follow_graph=True)
     alice_headers = build_auth_headers(1, 1)
     baishan_headers = build_auth_headers(2, 2)
@@ -258,8 +258,15 @@ def test_legacy_unbound_transfer_falls_back_and_repeat_callback_is_idempotent(
     with session_scope() as session:
         settlements = finance_repo.list_settlements_for_uploader(session, 2)
         s1 = next(item for item in settlements if item.order_id == order_id_1)
-        assert s1.status == "PAID"  # 回退口径认领并结算
-        assert s1.payout_transfer_id == legacy_id  # 盖章，防重复
+        assert s1.status == "PENDING"
+        assert s1.payout_transfer_id is None
+        transfer = finance_repo.get_payout_transfer(session, legacy_id)
+        assert transfer is not None
+        assert transfer.status == "SUCCESS"
+        assert transfer.failure_reason == "SETTLEMENT_RECONCILIATION_REQUIRED"
+        application = finance_repo.get_payout_application(session, application_id)
+        assert application is not None
+        assert application.status != "SETTLED"
 
     # 在途期间又有新结算单到期，然后重复投递 SUCCESS 回调
     material_2 = _create_paid_material(client, baishan_headers, title="遗留回退资料二", price_cents=1000)
@@ -271,7 +278,7 @@ def test_legacy_unbound_transfer_falls_back_and_repeat_callback_is_idempotent(
     with session_scope() as session:
         settlements = finance_repo.list_settlements_for_uploader(session, 2)
         s2 = next(item for item in settlements if item.order_id == order_id_2)
-        # 幂等关键断言：已盖章的转账重复回调不得再认领新结算单
+        # 重复回调仍不得根据新的当前余额猜测结算范围。
         assert s2.status == "PENDING"
         assert s2.payout_transfer_id is None
 

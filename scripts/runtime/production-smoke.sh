@@ -78,7 +78,9 @@ check_health_git_sha() {
   if [[ -n "$EXPECTED_GIT_SHA" ]]; then
     local actual_sha
     actual_sha="$(printf '%s' "$response" | extract_health_git_sha)"
-    if [[ "$actual_sha" != "$EXPECTED_GIT_SHA" ]]; then
+    if [[ -z "$actual_sha" || ( "$actual_sha" != "$EXPECTED_GIT_SHA" \
+        && "$actual_sha" != "$EXPECTED_GIT_SHA"* \
+        && "$EXPECTED_GIT_SHA" != "$actual_sha"* ) ]]; then
       echo "$label gitSha mismatch: expected $EXPECTED_GIT_SHA, got ${actual_sha:-<empty>}"
       exit 1
     fi
@@ -92,6 +94,18 @@ check_public_health() {
   response="$(curl "${CURL_ARGS[@]}" "$health_url")"
   if ! printf '%s' "$response" | "$PYTHON_BIN" -c 'import json, sys; payload=json.load(sys.stdin); raise SystemExit(0 if (payload.get("data") or {}).get("status") == "ok" else 1)'; then
     echo "$label did not return status=ok"
+    exit 1
+  fi
+}
+
+check_public_model_proxy_closed() {
+  local public_base="$1"
+  local status
+  status="$(curl --silent --show-error --connect-timeout "$CURL_CONNECT_TIMEOUT" \
+    --max-time "$CURL_MAX_TIME" --output /dev/null --write-out '%{http_code}' \
+    "${public_base%/}/v1/models")"
+  if [[ "$status" != "404" ]]; then
+    echo "$public_base unexpectedly exposes /v1/models (status=$status)"
     exit 1
   fi
 }
@@ -132,6 +146,8 @@ if [[ -n "$PUBLIC_SMOKE_BASES" ]]; then
     curl "${CURL_ARGS[@]}" "$public_base/" >/dev/null
     echo "[public] $public_base security headers"
     bash "$ROOT_DIR/scripts/security/check-security-headers.sh" "$public_base"
+    echo "[public] $public_base model proxy isolation"
+    check_public_model_proxy_closed "$public_base"
   done
 fi
 

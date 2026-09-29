@@ -69,6 +69,28 @@ while IFS= read -r match; do
   violations+=("$match: tracked operational recipient must come from private environment configuration")
 done < <(git grep -nI -E -- '--alert-email([=[:space:]]+)[^[:space:]]+@[^[:space:]]+' -- deploy scripts 2>/dev/null || true)
 
+secret_pattern='-----BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY-----|AKIA[0-9A-Z]{16}|LTAI[A-Za-z0-9]{16,}|(ghp|github_pat)_[A-Za-z0-9_]{20,}|sk-[A-Za-z0-9]{32,}'
+while IFS= read -r match; do
+  [[ -z "$match" ]] && continue
+  violations+=("$match: tracked content resembles a high-confidence secret")
+done < <(
+  git grep -nI -E -- "$secret_pattern" -- . \
+    ':(exclude)backend/tests/**' \
+    ':(exclude)frontend/tests/**' \
+    ':(exclude)scripts/security/check-sensitive-files.sh' 2>/dev/null || true
+)
+
+while IFS= read -r match; do
+  [[ -z "$match" ]] && continue
+  violations+=("$match: repository history resembles a high-confidence secret")
+done < <(
+  git log --all -p --no-ext-diff -- . \
+    ':(exclude)backend/tests/**' \
+    ':(exclude)frontend/tests/**' \
+    ':(exclude)scripts/security/check-sensitive-files.sh' \
+    | grep -En -- "$secret_pattern" || true
+)
+
 if [[ "${#violations[@]}" -gt 0 ]]; then
   echo "Sensitive file check failed:"
   printf -- '- %s\n' "${violations[@]}"

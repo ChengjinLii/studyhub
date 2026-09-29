@@ -54,6 +54,26 @@ def test_readyz_and_metrics_are_exposed(tmp_path: Path, monkeypatch) -> None:
 def test_http_metrics_include_duration_histogram_buckets() -> None:
     metrics = get_runtime_metrics()
     metrics.clear()
+
+
+def test_http_metrics_bound_untrusted_route_cardinality() -> None:
+    metrics = get_runtime_metrics()
+    metrics.clear()
+
+    for index in range(600):
+        metrics.record_http_request(
+            method="GET",
+            route=f"/untrusted-{index}",
+            status_code=404,
+            duration_seconds=0.001,
+        )
+
+    assert len(metrics._http_request_durations) <= 257
+    rendered = metrics.render_prometheus(
+        SimpleNamespace(app_name="test", environment="test", resolved_build_git_sha="test")
+    )
+    assert 'route="<overflow>"' in rendered
+    metrics.clear()
     metrics.record_http_request(method="GET", route="/api/materials", status_code=200, duration_seconds=0.012)
     metrics.record_http_request(method="GET", route="/api/materials", status_code=200, duration_seconds=0.28)
     metrics.record_worker_job(job="preview.generate", status="ok", duration_seconds=1.2)

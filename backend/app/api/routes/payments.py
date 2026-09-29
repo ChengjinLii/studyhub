@@ -1,8 +1,11 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Request
+from urllib.parse import parse_qsl
+
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import PlainTextResponse
 from sqlalchemy.orm import Session
+from starlette.concurrency import run_in_threadpool
 
 from app.api.deps import get_payment_service, get_payout_service, require_auth_context, require_privileged_auth_context
 from app.core.db import get_db_session
@@ -14,6 +17,47 @@ from app.services.payout_service import PayoutService
 
 
 router = APIRouter(tags=["payments"])
+
+MAX_CALLBACK_BODY_BYTES = 64 * 1024
+MAX_CALLBACK_FIELDS = 64
+MAX_CALLBACK_KEY_CHARS = 128
+MAX_CALLBACK_VALUE_CHARS = 16 * 1024
+
+
+async def _parse_callback_params(request: Request) -> dict[str, str]:
+    content_length = request.headers.get("content-length", "").strip()
+    if content_length.isdigit() and int(content_length) > MAX_CALLBACK_BODY_BYTES:
+        raise HTTPException(status_code=413, detail="Payment callback is too large")
+
+    body = bytearray()
+    async for chunk in request.stream():
+        body.extend(chunk)
+        if len(body) > MAX_CALLBACK_BODY_BYTES:
+            raise HTTPException(status_code=413, detail="Payment callback is too large")
+
+    encoded = bytes(body)
+    if not encoded:
+        encoded = request.scope.get("query_string", b"")
+        if len(encoded) > MAX_CALLBACK_BODY_BYTES:
+            raise HTTPException(status_code=413, detail="Payment callback is too large")
+    elif not request.headers.get("content-type", "").lower().startswith("application/x-www-form-urlencoded"):
+        raise HTTPException(status_code=415, detail="Unsupported payment callback content type")
+
+    try:
+        pairs = parse_qsl(
+            encoded.decode("utf-8"),
+            keep_blank_values=True,
+            max_num_fields=MAX_CALLBACK_FIELDS,
+        )
+    except (UnicodeDecodeError, ValueError) as exc:
+        raise HTTPException(status_code=400, detail="Invalid payment callback form") from exc
+
+    params: dict[str, str] = {}
+    for key, value in pairs:
+        if len(key) > MAX_CALLBACK_KEY_CHARS or len(value) > MAX_CALLBACK_VALUE_CHARS:
+            raise HTTPException(status_code=413, detail="Payment callback field is too large")
+        params[key] = value
+    return params
 
 
 @router.post("/api/alipay-payments")
@@ -41,11 +85,8 @@ async def alipay_notify(
     session: Session = Depends(get_db_session),
     service: PaymentService = Depends(get_payment_service),
 ) -> str:
-    form = await request.form()
-    params = {key: str(value) for key, value in form.items()}
-    if not params:
-        params = {key: value for key, value in request.query_params.items()}
-    return service.handle_alipay_notify(session, params)
+    params = await _parse_callback_params(request)
+    return await run_in_threadpool(service.handle_alipay_notify, session, params)
 
 
 @router.post("/api/alipay-gateway-notifications", response_class=PlainTextResponse)
@@ -55,11 +96,8 @@ async def alipay_gateway(
     session: Session = Depends(get_db_session),
     service: PayoutService = Depends(get_payout_service),
 ) -> str:
-    form = await request.form()
-    params = {key: str(value) for key, value in form.items()}
-    if not params:
-        params = {key: value for key, value in request.query_params.items()}
-    return service.handle_gateway_notification(session, params)
+    params = await _parse_callback_params(request)
+    return await run_in_threadpool(service.handle_gateway_notification, session, params)
 
 
 @router.get("/api/pay/orders/status", include_in_schema=False)

@@ -4,9 +4,11 @@ from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import func, select
 
 from app.api.deps import get_payment_service
 from app.core.db import session_scope
+from app.models.finance import PaymentNotificationRecord
 from app.providers.payment import PaymentNotification
 from app.services.auth_service import AuthService
 from tests.support import build_auth_headers, seed_read_users
@@ -110,3 +112,25 @@ def test_repricing_never_changes_amount_behind_an_issued_trade_number(client: Te
     second_trade_no, _ = _create_alipay_order(client, alice_headers, material_id)
     assert second_trade_no != first_trade_no
     assert int(_load_order(second_trade_no).amount or 0) == 50000
+
+
+def test_missing_payment_callback_identity_is_not_persisted(client: TestClient) -> None:
+    with session_scope() as session:
+        before = session.scalar(select(func.count()).select_from(PaymentNotificationRecord)) or 0
+
+    response = client.post("/api/pay/alipay/notify", data={"trade_status": "TRADE_SUCCESS", "payload": "x" * 4096})
+
+    assert response.status_code == 200
+    with session_scope() as session:
+        after = session.scalar(select(func.count()).select_from(PaymentNotificationRecord)) or 0
+    assert after == before
+
+
+def test_payment_callback_rejects_oversized_body_before_processing(client: TestClient) -> None:
+    response = client.post(
+        "/api/pay/alipay/notify",
+        content="payload=" + ("x" * (64 * 1024)),
+        headers={"content-type": "application/x-www-form-urlencoded"},
+    )
+
+    assert response.status_code == 413

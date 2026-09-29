@@ -15,6 +15,9 @@ DEFAULT_SYNONYM_FILE = Path(__file__).resolve().parents[3] / "private" / "materi
 SYNONYM_FILE_ENV = "STUDYHUB_MATERIAL_SEARCH_SYNONYMS_PATH"
 MATCHED_GROUP_SCORE = 10_000
 FULL_QUERY_MATCH_SCORE = 100_000
+MAX_SEARCH_QUERY_CHARS = 200
+MAX_SEARCH_TERM_GROUPS = 12
+MAX_SYNONYMS_PER_GROUP = 8
 
 AUXILIARY_TERMS = {
     "答案",
@@ -89,7 +92,7 @@ def _load_synonym_map() -> dict[str, tuple[str, ...]]:
             terms = [_normalize_term(key)]
             if isinstance(values, list):
                 terms.extend(_normalize_term(item) for item in values if isinstance(item, str))
-            unique = tuple(term for term in dict.fromkeys(terms) if term)
+            unique = tuple(term for term in dict.fromkeys(terms) if term)[:MAX_SYNONYMS_PER_GROUP]
             if unique:
                 for term in unique:
                     synonyms[term] = unique
@@ -99,7 +102,7 @@ def _load_synonym_map() -> dict[str, tuple[str, ...]]:
 
 
 def parse_material_search_query(keyword: str | None) -> MaterialSearchQuery:
-    raw = (keyword or "").strip()
+    raw = (keyword or "").strip()[:MAX_SEARCH_QUERY_CHARS]
     if not raw:
         return MaterialSearchQuery(raw="", required_groups=(), boost_terms=())
     synonyms = _load_synonym_map()
@@ -108,6 +111,8 @@ def parse_material_search_query(keyword: str | None) -> MaterialSearchQuery:
     seen_groups: set[tuple[str, ...]] = set()
     seen_boosts: set[str] = set()
     for token in TOKEN_SPLIT_PATTERN.split(raw):
+        if len(required_groups) + len(boost_terms) >= MAX_SEARCH_TERM_GROUPS:
+            break
         term = _normalize_term(token)
         if not term:
             continue

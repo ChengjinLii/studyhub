@@ -26,9 +26,8 @@ import {
 } from '../constants/metadata';
 import { UPLOAD_PRESET_TAGS, UPLOAD_YEAR_SUGGESTIONS } from '../constants/uploadOptions';
 import { fetchAccountProfile } from '../lib/api';
-import { getRequestOrigin } from '../lib/apiBase';
+import { getRequestOrigin, resolveApiBase } from '../lib/apiBase';
 import { ColumnTopicKey, getColumnTopicExtraTag, getColumnTopicTitle, isCommunityColumnTopic, normalizeColumnTopic } from '../lib/column';
-import { resolveApiBase } from '../lib/apiBase';
 import { toErrorMessage } from '../lib/errors';
 import { parseMajorList } from '../lib/major';
 import { materialPath } from '../lib/slug';
@@ -76,7 +75,6 @@ const UPLOAD_NAV_ITEMS = [
   { id: 'upload-delivery', label: '交付与预览' },
   { id: 'upload-confirm', label: '发布确认' },
 ];
-
 interface UploadPageProps {
   user: SessionUser | null;
   account: UserAccountProfile | null;
@@ -891,16 +889,24 @@ export default function UploadPage({ user, account }: UploadPageProps) {
         formData.set('payload', new Blob([JSON.stringify(payload)], { type: 'application/json' }));
       }
       let uploadAuthorizationToken: string | null = null;
-      if (!isEditing && submissionId) {
-        const filesRequiringUpload = [
-          ...(uploadFile && !hasStagedMaterial ? [describeUploadFile('MATERIAL', uploadFile)] : []),
-          ...submittedPreviews.map((file) => describeUploadFile('PREVIEW', file)),
-          ...submittedCustomPreviews.map((file) => describeUploadFile('CUSTOM_PREVIEW', file)),
-        ];
-        if (filesRequiringUpload.length > 0) {
-          const authorization = await requestMaterialUploadAuthorization(submissionId, filesRequiringUpload);
-          uploadAuthorizationToken = authorization.uploadToken;
+      const filesRequiringUpload = [
+        ...(uploadFile && !hasStagedMaterial ? [describeUploadFile('MATERIAL', uploadFile)] : []),
+        ...submittedPreviews.map((file) => describeUploadFile('PREVIEW', file)),
+        ...submittedCustomPreviews.map((file) => describeUploadFile('CUSTOM_PREVIEW', file)),
+      ];
+      if (filesRequiringUpload.length > 0) {
+        if (!submissionId) {
+          const fingerprint = await buildUploadSubmissionFingerprint({
+            kind: 'material-edit-upload',
+            materialId: editingId,
+            files: filesRequiringUpload,
+          });
+          submissionId = resolveUploadSubmissionId(fingerprint, window.sessionStorage);
+          payload.submissionId = submissionId;
+          formData.set('payload', new Blob([JSON.stringify(payload)], { type: 'application/json' }));
         }
+        const authorization = await requestMaterialUploadAuthorization(submissionId, filesRequiringUpload);
+        uploadAuthorizationToken = authorization.uploadToken;
       }
       const endpoint = isEditing ? `${apiBase}/materials/${editingId}` : `${apiBase}/materials`;
       const method = isEditing ? 'PUT' : 'POST';
@@ -908,6 +914,7 @@ export default function UploadPage({ user, account }: UploadPageProps) {
       submissionToast.uploading(isEditing);
       const json = await sendUploadFormData(endpoint, method, formData, {
         uploadToken: uploadAuthorizationToken,
+        metadataOnly: !uploadAuthorizationToken && filesRequiringUpload.length === 0,
         onProgress: (value) => {
           setUploadProgress(value);
           if (value >= 100) {

@@ -9,7 +9,11 @@ from app.api.deps import get_auth_repo, get_material_asset_store
 from app.api.routes.batch_submissions import get_batch_submission_service
 from app.core.config import get_settings
 from app.core.db import session_scope
-from app.models.batch_submissions import BatchSubmissionItemRecord as Item, BatchSubmissionRecord as Batch
+from app.models.batch_submissions import (
+    BatchPublicationRecord as Publication,
+    BatchSubmissionItemRecord as Item,
+    BatchSubmissionRecord as Batch,
+)
 from app.models.materials import MaterialRecord
 from tests.support import build_auth_headers, seed_read_users
 
@@ -196,6 +200,38 @@ def test_netdisk_publish_intent_attribution_and_retry(batch_client):
     own = c.get('/api/batch-submissions', headers=headers()).json()["data"]["items"][0]
     assert own["publications"][0]["url"] == f"/materials/{material_id}"
     assert "netdiskUrl" not in own
+
+
+def test_file_publish_outer_failure_rolls_back_material_and_new_object(batch_client, monkeypatch):
+    c = batch_client
+    batch, _ = create(c)
+    upload(c, batch, batch["items"][0])
+    submit(c, batch)
+    service = get_batch_submission_service()
+    monkeypatch.setattr(get_settings(), "material_security_scan_enabled", True)
+    with session_scope() as session:
+        service.run_once(session, scanner=SimpleNamespace(_scan_object=lambda key: SimpleNamespace(status="CLEAN")))
+    asset_root = get_settings().resolved_material_asset_dir
+    files_before = {path.relative_to(asset_root) for path in asset_root.rglob("*") if path.is_file()}
+    service_class = type(service)
+    original_audit = service_class._audit
+
+    def fail_publication_audit(self, session, record, operator_id, action, ids=()):
+        if action == "PUBLISH":
+            raise RuntimeError("outer transaction failure")
+        return original_audit(self, session, record, operator_id, action, ids)
+
+    monkeypatch.setattr(service_class, "_audit", fail_publication_audit)
+    path = f'/api/admin/batch-submissions/{batch["id"]}/publish'
+    with pytest.raises(RuntimeError, match="outer transaction failure"):
+        c.post(path, headers=headers(3), json=publication(batch))
+
+    files_after = {path.relative_to(asset_root) for path in asset_root.rglob("*") if path.is_file()}
+    assert files_after == files_before
+    with session_scope() as session:
+        assert session.scalar(select(MaterialRecord).where(MaterialRecord.title == "Batch course notes")) is None
+        assert session.scalar(select(Publication).where(Publication.batch_id == batch["id"])) is None
+        assert session.get(Item, batch["items"][0]["id"]).status == "UPLOADED"
 
 
 def test_return_supplement_and_reject_clear_private_metadata(batch_client):

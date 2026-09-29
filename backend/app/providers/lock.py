@@ -35,6 +35,7 @@ class DbRowLockProvider:
         lock = self.finance_repo.get_worker_lock(session, lock_name)
         if (
             lock is not None
+            and lock.owner_token is not None
             and lock.expires_at is not None
             and self._normalize_dt(lock.expires_at) > now
             and lock.owner_token != owner_token

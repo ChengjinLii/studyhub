@@ -125,6 +125,10 @@ export async function fetchAccountProfile(token: string, origin?: string) {
   return apiFetch<UserAccountProfile>(`/me/account`, {}, token, origin);
 }
 
+export async function fetchHomeProfileData(token: string, origin?: string) {
+  return apiFetch<{ summary: ProfileSummary; account: UserAccountProfile }>(`/me/home-context`, {}, token, origin);
+}
+
 export async function fetchUserProfile(userId: string | number, token: string, origin?: string) {
   return apiFetch<PublicUserProfile>(`/users/${userId}/profile`, {}, token, origin);
 }

@@ -218,6 +218,39 @@ return {1}
             return
         self._consume_local(ticket_key, user_id=user_id, submission_id=submission_id, descriptor_digest=digest)
 
+    def preflight(self, *, token: str, user_id: int) -> None:
+        """Reject missing, expired, used, or foreign tickets before multipart parsing."""
+        normalized_token = (token or "").strip()
+        if not normalized_token:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="缺少上传授权，请重新提交")
+        ticket_key = self._ticket_key(self._token_digest(normalized_token))
+        if self._backend() == "redis":
+            try:
+                values = self._client().hmget(ticket_key, "user_id", "used")
+            except Exception as exc:  # noqa: BLE001
+                self._raise_unavailable(exc)
+            stored_user, used = [
+                value.decode("utf-8") if isinstance(value, bytes) else value
+                for value in values
+            ]
+            if stored_user is None:
+                self._raise_consume_error(-1)
+            if used == "1":
+                self._raise_consume_error(-2)
+            if stored_user != str(user_id):
+                self._raise_consume_error(-3)
+            return
+        now = time()
+        with self._lock:
+            self._purge_local(now)
+            ticket = self._local_tickets.get(ticket_key)
+            if ticket is None:
+                self._raise_consume_error(-1)
+            if ticket.used:
+                self._raise_consume_error(-2)
+            if ticket.user_id != user_id:
+                self._raise_consume_error(-3)
+
     def reserve_batch(
         self,
         *,

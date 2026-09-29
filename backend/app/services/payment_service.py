@@ -9,6 +9,7 @@ from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.core.config import Settings
+from app.core.observability import get_runtime_metrics
 from app.models.finance import OrderRecord, PaymentNotificationRecord, PaymentRecord
 from app.models.materials import MaterialRecord
 from app.providers.payment import PaymentGatewayProvider
@@ -222,25 +223,26 @@ class PaymentService:
         app_id = str(params.get("app_id") or "").strip()
         seller_id = str(params.get("seller_id") or "").strip()
 
-        notification = PaymentNotificationRecord(
-            channel="alipay",
-            out_trade_no=out_trade_no or None,
-            trade_no=trade_no,
-            payload=json.dumps(params, ensure_ascii=False, separators=(",", ":")),
-            sign_verified=parsed_notification.sign_verified,
-            processed=False,
-        )
-
         if not out_trade_no:
-            notification.process_result = "MISSING_OUT_TRADE_NO"
-            self.finance_repo.save_payment_notification(session, notification)
-            session.commit()
+            get_runtime_metrics().record_security_event(
+                event="payment_callback_rejected",
+                reason="missing_out_trade_no",
+            )
             return "success"
         if not parsed_notification.sign_verified:
-            notification.process_result = "INVALID_SIGN"
-            self.finance_repo.save_payment_notification(session, notification)
-            session.commit()
+            get_runtime_metrics().record_security_event(
+                event="payment_callback_rejected",
+                reason="invalid_signature",
+            )
             return self.payment_provider.success_response_text()
+        notification = PaymentNotificationRecord(
+            channel="alipay",
+            out_trade_no=out_trade_no,
+            trade_no=trade_no,
+            payload=json.dumps(params, ensure_ascii=False, separators=(",", ":")),
+            sign_verified=True,
+            processed=False,
+        )
         if trade_status not in ALIPAY_SUCCESS_STATUSES:
             notification.process_result = "TRADE_NOT_SUCCESS"
             self.finance_repo.save_payment_notification(session, notification)

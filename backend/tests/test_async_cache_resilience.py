@@ -101,6 +101,35 @@ def test_sync_redis_set_failure_never_reenters_local_singleflight(monkeypatch):
     assert not cache._inflight
 
 
+def test_redis_generation_failure_releases_singleflight_and_falls_back():
+    class RedisWithGenerationFailure(FakeRedis):
+        def __init__(self):
+            super().__init__()
+            self.get_calls = 0
+
+        def get(self, key):
+            self.get_calls += 1
+            if self.get_calls == 2:
+                raise ConnectionError("generation unavailable")
+            return super().get(key)
+
+    cache = cache_for("redis")
+    cache._safe_redis_client = lambda: RedisWithGenerationFailure()
+
+    assert cache.get_or_set("n", "k", lambda: 42) == 42
+    assert cache._entries[("n", "k")].value == 42
+    assert not cache._inflight
+
+
+def test_redis_hit_is_not_duplicated_into_process_local_cache():
+    cache = cache_for("redis")
+    redis_key = cache._redis_key("n", "k")
+    cache._safe_redis_client().values[redis_key] = b'{"visibility":"VISIBLE"}'
+
+    assert cache.get_or_set("n", "k", lambda: pytest.fail("cache miss")) == {"visibility": "VISIBLE"}
+    assert ("n", "k") not in cache._entries
+
+
 @pytest.mark.parametrize("backend", ["local", "redis"])
 def test_failed_factory_can_be_retried(backend):
     async def scenario():
@@ -132,4 +161,29 @@ def test_wait_timeout_does_not_start_duplicate_factory():
         finally:
             release.set()
             await owner
+    asyncio.run(scenario())
+
+
+@pytest.mark.parametrize("backend", ["local", "redis"])
+def test_invalidation_discards_value_from_older_inflight_producer(backend):
+    async def scenario():
+        cache = cache_for(backend)
+        started, release = asyncio.Event(), asyncio.Event()
+
+        async def old_value():
+            started.set()
+            await release.wait()
+            return {"visibility": "VISIBLE"}
+
+        producer = asyncio.create_task(cache.get_or_set_async("materials:detail", 42, old_value))
+        await started.wait()
+        cache.invalidate_prefix("materials")
+        release.set()
+        assert await producer == {"visibility": "VISIBLE"}
+        assert await cache.get_or_set_async(
+            "materials:detail",
+            42,
+            lambda: {"visibility": "HIDDEN"},
+        ) == {"visibility": "HIDDEN"}
+
     asyncio.run(scenario())

@@ -50,6 +50,7 @@ from app.services.upload_authorization_service import UploadAuthorizationService
 
 
 router = APIRouter(tags=["materials"])
+MAX_METADATA_ONLY_MULTIPART_BYTES = 256 * 1024
 
 
 def _call_service_method(service, async_name: str, sync_name: str, *args, **kwargs):
@@ -59,19 +60,26 @@ def _call_service_method(service, async_name: str, sync_name: str, *args, **kwar
     return getattr(service, sync_name)(*args, **kwargs)
 
 
+def _validate_metadata_only_request(request: Request) -> None:
+    content_length = request.headers.get("content-length", "").strip()
+    metadata_only = request.headers.get("x-studyhub-upload-mode", "").strip().lower() == "metadata"
+    if not metadata_only or not content_length.isdigit() or int(content_length) > MAX_METADATA_ONLY_MULTIPART_BYTES:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="缺少上传授权，请重新提交")
+
+
 @router.get("/api/materials")
 async def list_materials(
-    keyword: str | None = None,
-    school: str | None = None,
-    college: str | None = None,
-    major: str | None = None,
-    tag: str | None = None,
-    gradeValue: str | None = None,
-    courseCategory: str | None = None,
-    price: str | None = None,
-    sort: str = "latest",
-    page: int = 1,
-    size: int = 20,
+    keyword: str | None = Query(default=None, max_length=200),
+    school: str | None = Query(default=None, max_length=120),
+    college: str | None = Query(default=None, max_length=120),
+    major: str | None = Query(default=None, max_length=120),
+    tag: str | None = Query(default=None, max_length=80),
+    gradeValue: str | None = Query(default=None, max_length=40),
+    courseCategory: str | None = Query(default=None, max_length=40),
+    price: str | None = Query(default=None, max_length=24),
+    sort: str = Query(default="latest", max_length=32),
+    page: int = Query(default=1, ge=1, le=1000),
+    size: int = Query(default=20, ge=1, le=100),
     auth: AuthContext | None = Depends(get_optional_auth_context),
     session: Session = Depends(get_db_session),
     cache: PublicReadCache = Depends(get_public_read_cache),
@@ -223,14 +231,24 @@ async def create_material(
     upload_authorization: UploadAuthorizationService = Depends(get_upload_authorization_service),
     asset_store: MaterialAssetStore = Depends(get_material_asset_store),
 ) -> dict[str, object]:
-    form = await request.form()
+    upload_token = request.headers.get("x-studyhub-upload-token", "").strip()
+    if upload_authorization.settings.resolved_upload_authorization_required and not upload_token:
+        _validate_metadata_only_request(request)
+    if upload_token:
+        await run_in_threadpool(upload_authorization.preflight, token=upload_token, user_id=auth.user_id or 0)
+    form = await request.form(max_files=16, max_fields=4)
     payload = parse_payload_json(form.get("payload"), MaterialCreatePayload)
     zip_file = form.get("zip")
     markdown_file = form.get("markdown")
     previews = _coerce_upload_list(form.getlist("previews"))
     custom_previews = _coerce_upload_list(form.getlist("customPreviews"))
     material_uploads = _coerce_upload_list([zip_file, markdown_file])
-    upload_token = request.headers.get("x-studyhub-upload-token", "").strip()
+    if (
+        upload_authorization.settings.resolved_upload_authorization_required
+        and not upload_token
+        and (material_uploads or previews or custom_previews)
+    ):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="文件投稿必须先获取上传授权")
     staged_assets: list[dict[str, object]] = []
     if payload.stagedUploadTokens:
         if material_uploads or previews or custom_previews:
@@ -242,15 +260,17 @@ async def create_material(
             user_id=auth.user_id or 0,
             submission_id=payload.submissionId,
         )
-    elif upload_authorization.settings.resolved_upload_authorization_required or upload_token:
-        if not payload.submissionId:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="受保护的投稿必须包含投稿标识")
-        upload_authorization.consume(
-            token=upload_token,
-            user_id=auth.user_id or 0,
-            submission_id=payload.submissionId,
-            files=_upload_descriptors(material_uploads, previews, custom_previews),
-        )
+    elif material_uploads or previews or custom_previews:
+        if upload_authorization.settings.resolved_upload_authorization_required or upload_token:
+            if not payload.submissionId:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="受保护的投稿必须包含投稿标识")
+            await run_in_threadpool(
+                upload_authorization.consume,
+                token=upload_token,
+                user_id=auth.user_id or 0,
+                submission_id=payload.submissionId,
+                files=_upload_descriptors(material_uploads, previews, custom_previews),
+            )
     def create_and_attach() -> dict[str, object]:
         detail = service.create_material(
             session,
@@ -272,7 +292,7 @@ async def create_material(
         return detail
 
     detail = await run_in_threadpool(create_and_attach)
-    _invalidate_material_read_caches()
+    await run_in_threadpool(_invalidate_material_read_caches)
     return api_ok(detail)
 
 
@@ -283,7 +303,12 @@ async def stage_material_uploads(
     upload_authorization: UploadAuthorizationService = Depends(get_upload_authorization_service),
     asset_store: MaterialAssetStore = Depends(get_material_asset_store),
 ) -> dict[str, object]:
-    form = await request.form()
+    upload_token = request.headers.get("x-studyhub-upload-token", "").strip()
+    if upload_authorization.settings.resolved_upload_authorization_required and not upload_token:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="缺少上传授权，请重新选择文件")
+    if upload_token:
+        await run_in_threadpool(upload_authorization.preflight, token=upload_token, user_id=auth.user_id or 0)
+    form = await request.form(max_files=16, max_fields=4)
     submission_id = str(form.get("submissionId") or "").strip()
     authorization_submission_id = str(form.get("authorizationSubmissionId") or submission_id).strip()
     if not re.fullmatch(r"[A-Za-z0-9_-]{16,64}", submission_id):
@@ -296,8 +321,9 @@ async def stage_material_uploads(
     descriptors = _upload_descriptors(material_uploads, previews, custom_previews)
     if not descriptors:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="请选择需要上传的文件")
-    upload_authorization.consume(
-        token=request.headers.get("x-studyhub-upload-token", "").strip(),
+    await run_in_threadpool(
+        upload_authorization.consume,
+        token=upload_token,
         user_id=auth.user_id or 0,
         submission_id=authorization_submission_id,
         files=descriptors,
@@ -386,16 +412,32 @@ async def update_material(
     service: MaterialsService = Depends(get_materials_service),
     upload_authorization: UploadAuthorizationService = Depends(get_upload_authorization_service),
 ) -> dict[str, object]:
-    form = await request.form()
+    upload_token = request.headers.get("x-studyhub-upload-token", "").strip()
+    if upload_authorization.settings.resolved_upload_authorization_required and not upload_token:
+        _validate_metadata_only_request(request)
+    if upload_token:
+        await run_in_threadpool(upload_authorization.preflight, token=upload_token, user_id=auth.user_id or 0)
+    form = await request.form(max_files=16, max_fields=4)
     payload = parse_payload_json(form.get("payload"), MaterialUpdatePayload)
     zip_file = form.get("zip")
     markdown_file = form.get("markdown")
     previews = _coerce_upload_list(form.getlist("previews"))
     custom_previews = _coerce_upload_list(form.getlist("customPreviews"))
     # Same extension/size/count rules the create path enforces through upload authorization.
-    upload_authorization.validate_descriptors(
-        _upload_descriptors(_coerce_upload_list([zip_file, markdown_file]), previews, custom_previews)
-    )
+    descriptors = _upload_descriptors(_coerce_upload_list([zip_file, markdown_file]), previews, custom_previews)
+    if upload_authorization.settings.resolved_upload_authorization_required and not upload_token and descriptors:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="文件更新必须先获取上传授权")
+    upload_authorization.validate_descriptors(descriptors)
+    if descriptors and (upload_authorization.settings.resolved_upload_authorization_required or upload_token):
+        if not payload.submissionId:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="文件更新必须包含投稿标识")
+        await run_in_threadpool(
+            upload_authorization.consume,
+            token=upload_token,
+            user_id=auth.user_id or 0,
+            submission_id=payload.submissionId,
+            files=descriptors,
+        )
     detail = await run_in_threadpool(
         service.update_material,
         session,
@@ -408,7 +450,7 @@ async def update_material(
         previews=previews,
         custom_previews=custom_previews,
     )
-    _invalidate_material_read_caches()
+    await run_in_threadpool(_invalidate_material_read_caches)
     return api_ok(detail)
 
 

@@ -1,6 +1,12 @@
 from __future__ import annotations
 
+from datetime import UTC, datetime, timedelta
+
+from fastapi.testclient import TestClient
+
+from app.api.deps import get_finance_repo, get_worker_service
 from app.core.config import Settings
+from app.core.db import session_scope
 from app.providers.lock import RedisLockProvider
 
 
@@ -87,3 +93,39 @@ def test_redis_lock_renewal_and_release_require_the_current_owner(monkeypatch) -
     assert client.values[key] == "worker-a"
     provider.release(None, lock_name="agent-execution:run-1", owner_token="worker-a")
     assert key not in client.values
+
+
+def test_released_db_lock_is_reclaimable_when_expiry_rounds_forward(client: TestClient) -> None:
+    del client
+    worker_service = get_worker_service()
+    finance_repo = get_finance_repo()
+    lock_name = "studyhub:test-released-lock"
+
+    with session_scope() as session:
+        assert worker_service.try_acquire_lock(
+            session,
+            lock_name=lock_name,
+            owner_token="worker-a",
+            ttl_seconds=120,
+        )
+        worker_service.release_lock(session, lock_name=lock_name, owner_token="worker-a")
+
+    # MySQL DATETIME may store a released timestamp slightly ahead of the
+    # application clock after fractional-second normalization. No owner still
+    # means the row is free and must not block the next worker.
+    with session_scope() as session:
+        lock = finance_repo.get_worker_lock(session, lock_name)
+        assert lock is not None
+        assert lock.owner_token is None
+        lock.expires_at = datetime.now(UTC) + timedelta(seconds=1)
+        finance_repo.save_worker_lock(session, lock)
+        session.commit()
+
+    with session_scope() as session:
+        assert worker_service.try_acquire_lock(
+            session,
+            lock_name=lock_name,
+            owner_token="worker-b",
+            ttl_seconds=120,
+        )
+        worker_service.release_lock(session, lock_name=lock_name, owner_token="worker-b")

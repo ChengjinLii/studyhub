@@ -684,6 +684,7 @@ class MaterialsService(MaterialSecurityPolicyMixin, MaterialsStorageMutationMixi
         previews: list[UploadFile],
         custom_previews: list[UploadFile],
         staged_assets: list[dict[str, object]] | None = None,
+        storage_mutation: StorageMutation | None = None,
     ) -> dict[str, Any]:
         self._bootstrap(session)
         uploader = self._require_user(session, uploader_id)
@@ -744,7 +745,8 @@ class MaterialsService(MaterialSecurityPolicyMixin, MaterialsStorageMutationMixi
             created_at=datetime.now(UTC),
             updated_at=datetime.now(UTC),
         )
-        storage_mutation = StorageMutation(self.asset_store.delete_key)
+        owns_storage_mutation = storage_mutation is None
+        storage_mutation = storage_mutation or StorageMutation(self.asset_store.delete_key)
         try:
             # Reserve the database-generated material ID and submission key before
             # writing objects, so concurrent retries cannot create separate rows.
@@ -770,7 +772,8 @@ class MaterialsService(MaterialSecurityPolicyMixin, MaterialsStorageMutationMixi
             session.commit()
         except IntegrityError:
             session.rollback()
-            storage_mutation.rollback()
+            if owns_storage_mutation:
+                storage_mutation.rollback()
             if submission_key:
                 existing = self.material_repo.find_by_submission_key(
                     session,
@@ -782,10 +785,12 @@ class MaterialsService(MaterialSecurityPolicyMixin, MaterialsStorageMutationMixi
             raise
         except Exception:
             session.rollback()
-            storage_mutation.rollback()
+            if owns_storage_mutation:
+                storage_mutation.rollback()
             raise
-        storage_mutation.finalize()
-        self.invalidate_material_summary_cache()
+        if owns_storage_mutation:
+            storage_mutation.finalize()
+            self.invalidate_material_summary_cache()
         return self.get_detail(session, uploader_id, material.id)
 
     def update_material(

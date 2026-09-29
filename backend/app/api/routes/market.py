@@ -3,6 +3,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, status
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
+from starlette.concurrency import run_in_threadpool
 
 from app.api.deps import (
     get_market_asset_store,
@@ -128,11 +129,11 @@ async def create_market_item(
     session: Session = Depends(get_db_session),
     service: MarketService = Depends(get_market_service),
 ) -> dict[str, object]:
-    form = await request.form()
+    form = await request.form(max_files=10, max_fields=4)
     payload = parse_payload_json(form.get("payload"), MarketCreatePayload)
     images = _coerce_upload_list(form.getlist("images"))
-    data = service.create_item(session, payload, images, auth.user_id or 0)
-    _invalidate_market_read_caches()
+    data = await run_in_threadpool(service.create_item, session, payload, images, auth.user_id or 0)
+    await run_in_threadpool(_invalidate_market_read_caches)
     return api_ok(data)
 
 

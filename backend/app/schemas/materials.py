@@ -96,6 +96,17 @@ class MaterialCreatePayload(MaterialMutationBase):
 
 class MaterialUpdatePayload(MaterialMutationBase):
     customPreviewClear: bool | None = None
+    submissionId: str | None = None
+
+    @field_validator("submissionId")
+    @classmethod
+    def validate_submission_id(cls, value: str | None) -> str | None:
+        normalized = str(value or "").strip()
+        if not normalized:
+            return None
+        if not re.fullmatch(r"[A-Za-z0-9_-]{16,64}", normalized):
+            raise ValueError("投稿标识格式非法")
+        return normalized
 
 
 class RatingPayload(BaseModel):

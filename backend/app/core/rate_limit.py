@@ -22,13 +22,18 @@ class RateLimitRule:
 
 
 class InMemoryRateLimiter:
-    def __init__(self) -> None:
+    def __init__(self, *, max_entries: int = 10_000) -> None:
         self._hits: dict[str, deque[float]] = defaultdict(deque)
+        self._expires_at: dict[str, float] = {}
         self._lock = RLock()
+        self._max_entries = max(128, int(max_entries))
+        self._checks = 0
 
     def clear(self) -> None:
         with self._lock:
             self._hits.clear()
+            self._expires_at.clear()
+            self._checks = 0
 
     def check(self, key: str, *, limit: int, window_seconds: int) -> bool:
         with self._lock:
@@ -38,14 +43,27 @@ class InMemoryRateLimiter:
         if limit <= 0:
             return True
         now = monotonic()
-        window_start = now - max(1, window_seconds)
+        normalized_window = max(1, window_seconds)
+        window_start = now - normalized_window
+        self._checks += 1
+        if self._checks % 256 == 0 or (key not in self._hits and len(self._hits) >= self._max_entries):
+            self._purge_expired(now)
+        if key not in self._hits and len(self._hits) >= self._max_entries:
+            return False
         bucket = self._hits[key]
         while bucket and bucket[0] < window_start:
             bucket.popleft()
         if len(bucket) >= limit:
             return False
         bucket.append(now)
+        self._expires_at[key] = max(self._expires_at.get(key, 0.0), now + normalized_window)
         return True
+
+    def _purge_expired(self, now: float) -> None:
+        for existing_key, expires_at in list(self._expires_at.items()):
+            if expires_at <= now:
+                self._expires_at.pop(existing_key, None)
+                self._hits.pop(existing_key, None)
 
 
 class RedisRateLimiter:
@@ -157,6 +175,13 @@ def _rule_for_request(settings: Settings, request: Request) -> RateLimitRule | N
     method = request.method.upper()
     if path.startswith("/mcp"):
         return RateLimitRule("mcp", settings.rate_limit_mcp)
+    if method == "POST" and path in {
+        "/api/alipay-payment-notifications",
+        "/api/pay/alipay/notify",
+        "/api/alipay-gateway-notifications",
+        "/api/pay/alipay/gateway",
+    }:
+        return RateLimitRule("payment-callback", settings.rate_limit_payment_callback)
     if method == "POST" and path in {"/api/session", "/api/auth/login", "/api/dev-session", "/api/auth/dev-login"}:
         return RateLimitRule("login", settings.rate_limit_login)
     if method == "GET" and path in {"/api/captchas", "/api/captcha", "/api/auth/captcha"}:
@@ -177,6 +202,8 @@ def _rule_for_request(settings: Settings, request: Request) -> RateLimitRule | N
     if method == "POST" and path == "/api/comments":
         return RateLimitRule("comment-create-ip", settings.rate_limit_comment_create_ip_minute)
     if method in {"POST", "PUT", "PATCH"} and path.startswith("/api/batch-submissions"):
+        return RateLimitRule("upload", settings.rate_limit_upload)
+    if method == "PUT" and path.startswith("/api/materials/"):
         return RateLimitRule("upload", settings.rate_limit_upload)
     if method == "POST" and path in {
         "/api/material-upload-authorizations",

@@ -25,7 +25,15 @@ from app.core.origin_guard import write_origin_allowed
 from app.core.rate_limit import rate_limit_allowed
 from app.core.response import api_fail
 from app.core.security_headers import apply_security_headers
-from app.mcp.auth import mcp_audit_identity, mcp_request_allowed, public_mcp_scopes, requested_tool_name
+from app.mcp.auth import (
+    McpRequestBodyTooLarge,
+    authenticate_mcp_request,
+    load_json_rpc_payload,
+    mcp_audit_identity,
+    mcp_request_allowed,
+    public_mcp_scopes,
+    requested_tool_name,
+)
 from app.mcp.governance import check_mcp_client_budget
 from app.mcp.server import create_studyhub_mcp
 
@@ -122,7 +130,7 @@ def create_app() -> FastAPI:
         is_mcp_protocol_request = route_path == "/mcp" or (
             route_path.startswith("/mcp/") and route_path != "/mcp/docs"
         )
-        mcp_tool_name = await requested_tool_name(request) if is_mcp_protocol_request else None
+        mcp_tool_name = None
 
         def middleware_error_response(code: str, message: str, status: int) -> JSONResponse:
             error_response = JSONResponse(api_fail(code, message), status_code=status)
@@ -161,6 +169,36 @@ def create_app() -> FastAPI:
                     status_code,
                 )
                 return response
+            if (
+                is_mcp_protocol_request
+                and settings.resolved_mcp_require_auth
+                and authenticate_mcp_request(settings, request) is None
+            ):
+                status_code = 401
+                response = mcp_unauthorized_response("MCP authentication required")
+                return response
+            if is_mcp_protocol_request:
+                try:
+                    await load_json_rpc_payload(
+                        request,
+                        max_body_bytes=settings.mcp_max_request_body_bytes,
+                    )
+                except McpRequestBodyTooLarge:
+                    status_code = 413
+                    response = middleware_error_response(
+                        "MCP_REQUEST_TOO_LARGE",
+                        "MCP request body is too large",
+                        status_code,
+                    )
+                    return response
+                except ValueError:
+                    status_code = 400
+                    response = middleware_error_response(
+                        "MCP_INVALID_REQUEST",
+                        "MCP request headers are invalid",
+                        status_code,
+                    )
+                    return response
             mcp_allowed, mcp_error = (
                 await mcp_request_allowed(settings, request)
                 if is_mcp_protocol_request
@@ -179,7 +217,12 @@ def create_app() -> FastAPI:
                     )
                 return response
             if is_mcp_protocol_request:
-                budget_allowed, budget_error, retry_after = check_mcp_client_budget(settings, request)
+                mcp_tool_name = await requested_tool_name(request)
+                budget_allowed, budget_error, retry_after = await run_in_threadpool(
+                    check_mcp_client_budget,
+                    settings,
+                    request,
+                )
                 if not budget_allowed:
                     status_code = 429
                     response = middleware_error_response(
@@ -200,9 +243,17 @@ def create_app() -> FastAPI:
         finally:
             duration_seconds = perf_counter() - started_at
             duration_ms = round(duration_seconds * 1000, 2)
+            route = request.scope.get("route")
+            route_template = getattr(route, "path", None)
+            if route_template:
+                metric_route = route_template
+            elif response is not None and response.status_code == 404:
+                metric_route = "<unmatched>"
+            else:
+                metric_route = "<middleware>"
             get_runtime_metrics().record_http_request(
                 method=request.method,
-                route=route_path,
+                route=metric_route,
                 status_code=status_code,
                 duration_seconds=duration_seconds,
             )

@@ -4,9 +4,11 @@ from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import func, select
 
 from app.api.deps import get_finance_repo, get_payout_service
 from app.core.db import session_scope
+from app.models.finance import AlipayGatewayNotificationRecord
 from app.providers.transfer import TransferResult
 from app.services.auth_service import AuthService
 from tests.support import build_auth_headers, seed_read_users
@@ -132,3 +134,15 @@ def test_late_success_after_failed_is_recorded_as_ignored_on_the_notification(
             )
         ]
     assert rows == [("OK", True), ("IGNORED_TERMINAL_TRANSFER", False)]
+
+
+def test_missing_payout_callback_identity_is_not_persisted(client: TestClient) -> None:
+    with session_scope() as session:
+        before = session.scalar(select(func.count()).select_from(AlipayGatewayNotificationRecord)) or 0
+
+    response = client.post("/api/pay/alipay/gateway", data={"status": "SUCCESS", "payload": "x" * 4096})
+
+    assert response.status_code == 200
+    with session_scope() as session:
+        after = session.scalar(select(func.count()).select_from(AlipayGatewayNotificationRecord)) or 0
+    assert after == before

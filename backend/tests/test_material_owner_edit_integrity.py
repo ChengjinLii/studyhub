@@ -4,10 +4,14 @@ from io import BytesIO
 import json
 import zipfile
 
+import pytest
+from fastapi import HTTPException
 from fastapi.testclient import TestClient
 
+from app.api.deps import get_upload_authorization_service
 from app.core.db import session_scope
 from app.models.materials import MaterialRecord
+from app.schemas.upload_authorization import UploadFileDescriptorPayload
 from app.services.auth_service import AuthService
 from tests.support import build_auth_headers, seed_read_users
 
@@ -158,3 +162,95 @@ def test_update_rejects_material_file_extension_outside_upload_allow_list(
         assert material is not None
         assert material.original_filename == "notes.zip"
         assert material.title == "原始资料"
+
+
+def test_owner_file_replacement_consumes_upload_authorization(
+    client: TestClient,
+    auth_service: AuthService,
+) -> None:
+    seed_read_users(auth_service, with_follow_graph=True)
+    material_id = _create_material(client)
+    replacement = _zip_bytes("replacement.txt", "new content")
+    submission_id = "material_edit_upload_001"
+    descriptor = UploadFileDescriptorPayload(
+        role="MATERIAL",
+        name="replacement.zip",
+        sizeBytes=len(replacement),
+        contentType="application/zip",
+    )
+    authorization = get_upload_authorization_service().authorize(
+        user_id=1,
+        submission_id=submission_id,
+        files=[descriptor],
+    )
+    payload = _material_payload("替换后的资料")
+    payload["submissionId"] = submission_id
+
+    response = client.put(
+        f"/api/materials/{material_id}",
+        headers={
+            **build_auth_headers(*ALICE_HEADERS_ARGS),
+            "X-StudyHub-Upload-Token": authorization.uploadToken,
+        },
+        files=[
+            ("payload", _payload_part(payload)),
+            ("zip", ("replacement.zip", replacement, "application/zip")),
+        ],
+    )
+
+    assert response.status_code == 200, response.text
+    assert response.json()["data"]["title"] == "替换后的资料"
+    with pytest.raises(HTTPException) as replay:
+        get_upload_authorization_service().consume(
+            token=authorization.uploadToken,
+            user_id=1,
+            submission_id=submission_id,
+            files=[descriptor],
+        )
+    assert getattr(replay.value, "status_code", None) == 409
+
+
+def test_protected_create_rejects_file_before_form_parsing_without_ticket(
+    client: TestClient,
+    auth_service: AuthService,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    seed_read_users(auth_service, with_follow_graph=True)
+    monkeypatch.setattr(get_upload_authorization_service().settings, "upload_authorization_required", True)
+
+    response = client.post(
+        "/api/materials",
+        headers=build_auth_headers(*ALICE_HEADERS_ARGS),
+        files=[
+            ("payload", _payload_part(_material_payload("无票据文件"))),
+            ("zip", ("notes.zip", _zip_bytes("notes.txt", "hello"), "application/zip")),
+        ],
+    )
+
+    assert response.status_code == 403
+
+
+def test_protected_create_allows_bounded_metadata_only_netdisk_submission(
+    client: TestClient,
+    auth_service: AuthService,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    seed_read_users(auth_service, with_follow_graph=True)
+    monkeypatch.setattr(get_upload_authorization_service().settings, "upload_authorization_required", True)
+    payload = _material_payload("网盘资料")
+    payload.update(
+        deliveryMethod="NETDISK",
+        netdiskUrl="https://example.com/studyhub",
+        submissionId="metadata_only_upload_001",
+    )
+
+    response = client.post(
+        "/api/materials",
+        headers={
+            **build_auth_headers(*ALICE_HEADERS_ARGS),
+            "X-StudyHub-Upload-Mode": "metadata",
+        },
+        files=[("payload", _payload_part(payload))],
+    )
+
+    assert response.status_code == 200, response.text

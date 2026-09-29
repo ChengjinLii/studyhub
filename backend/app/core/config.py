@@ -99,6 +99,7 @@ class Settings(BaseSettings):
     mcp_client_rate_limit: int = 60
     mcp_client_quota: int = 1000
     mcp_client_quota_window_seconds: int = 86400
+    mcp_max_request_body_bytes: int = 256 * 1024
     public_site_base_url: str = "https://study-hub.cn"
     security_headers_enabled: bool = True
     security_hsts_enabled: bool | None = None
@@ -120,6 +121,7 @@ class Settings(BaseSettings):
     rate_limit_upload: int = 20
     rate_limit_view: int = 300
     rate_limit_mcp: int = 120
+    rate_limit_payment_callback: int = 300
     rate_limit_comment_create_user_minute: int = 6
     rate_limit_comment_create_user_hour: int = 30
     rate_limit_comment_create_ip_minute: int = 60
@@ -241,6 +243,8 @@ class Settings(BaseSettings):
     material_security_scan_enabled: bool = False
     material_security_scanner_command: str = "clamscan"
     material_security_scan_timeout_seconds: int = 240
+    material_security_lightweight_timeout_seconds: int = 20
+    material_security_lightweight_memory_mb: int = 384
     material_security_scan_max_attempts: int = 5
     material_preview_image_max_size_bytes: int = 5 * 1024 * 1024
     material_manual_preview_max_images: int = 10

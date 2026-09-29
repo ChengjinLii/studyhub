@@ -2,13 +2,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
+import os
 from pathlib import Path
 import subprocess
+import sys
 import tempfile
 
-from PIL import Image, UnidentifiedImageError
-from pypdf import PdfReader
-from pypdf.generic import ArrayObject, DictionaryObject, IndirectObject
 from sqlalchemy.orm import Session
 
 from app.core.config import Settings
@@ -25,23 +24,8 @@ class MalwareScanResult:
     error: str | None = None
 
 
-LIGHTWEIGHT_SCANNER_VERSION = "studyhub-structural/1"
+LIGHTWEIGHT_SCANNER_VERSION = "studyhub-structural/2"
 LIGHTWEIGHT_IMAGE_SUFFIXES = {".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp"}
-PDF_ACTIVE_CONTENT_KEYS = {
-    "/AA",
-    "/EmbeddedFile",
-    "/EmbeddedFiles",
-    "/ImportData",
-    "/JavaScript",
-    "/JS",
-    "/Launch",
-    "/OpenAction",
-    "/RichMedia",
-    "/SubmitForm",
-    "/XFA",
-}
-PDF_OBJECT_INSPECTION_LIMIT = 20_000
-IMAGE_PIXEL_LIMIT = 100_000_000
 
 
 class MaterialSecurityService:
@@ -144,67 +128,46 @@ class MaterialSecurityService:
 
     def _lightweight_scan(self, path: Path) -> MalwareScanResult | None:
         suffix = path.suffix.lower()
-        if suffix == ".pdf":
-            return self._lightweight_pdf_scan(path)
-        if suffix in LIGHTWEIGHT_IMAGE_SUFFIXES:
-            return self._lightweight_image_scan(path)
-        return None
-
-    def _lightweight_pdf_scan(self, path: Path) -> MalwareScanResult | None:
-        try:
-            with path.open("rb") as handle:
-                if handle.read(8).lstrip()[:5] != b"%PDF-":
-                    return None
-            reader = PdfReader(str(path), strict=False)
-            if reader.is_encrypted or len(reader.pages) < 1:
-                return None
-            if self._pdf_contains_active_content(reader):
-                return None
-        except Exception:  # noqa: BLE001
+        if suffix != ".pdf" and suffix not in LIGHTWEIGHT_IMAGE_SUFFIXES:
             return None
-        return MalwareScanResult(status="CLEAN", version=LIGHTWEIGHT_SCANNER_VERSION)
-
-    def _pdf_contains_active_content(self, reader: PdfReader) -> bool:
-        stack: list[object] = [reader.trailer]
-        seen_indirect: set[tuple[int, int]] = set()
-        seen_containers: set[int] = set()
-        inspected = 0
-        while stack:
-            current = stack.pop()
-            if isinstance(current, IndirectObject):
-                reference = (int(current.idnum), int(current.generation))
-                if reference in seen_indirect:
-                    continue
-                seen_indirect.add(reference)
-                current = current.get_object()
-            if isinstance(current, (DictionaryObject, ArrayObject)):
-                container_id = id(current)
-                if container_id in seen_containers:
-                    continue
-                seen_containers.add(container_id)
-            inspected += 1
-            if inspected > PDF_OBJECT_INSPECTION_LIMIT:
-                return True
-            if isinstance(current, DictionaryObject):
-                if PDF_ACTIVE_CONTENT_KEYS.intersection(str(key) for key in current.keys()):
-                    return True
-                stack.extend(current.values())
-            elif isinstance(current, ArrayObject):
-                stack.extend(current)
-        return False
-
-    def _lightweight_image_scan(self, path: Path) -> MalwareScanResult | None:
+        timeout = max(2, int(self.settings.material_security_lightweight_timeout_seconds))
+        environment = {
+            **os.environ,
+            "STUDYHUB_SCANNER_MEMORY_MB": str(self.settings.material_security_lightweight_memory_mb),
+            "STUDYHUB_SCANNER_CPU_SECONDS": str(timeout),
+        }
         try:
-            with Image.open(path) as image:
-                width, height = image.size
-                if width <= 0 or height <= 0 or width * height > IMAGE_PIXEL_LIMIT:
-                    return None
-                if (image.format or "").upper() not in {"PNG", "JPEG", "WEBP", "GIF", "BMP"}:
-                    return None
-                image.verify()
-        except (Image.DecompressionBombError, UnidentifiedImageError, OSError, SyntaxError, ValueError):
+            completed = subprocess.run(
+                [sys.executable, "-m", "app.services.material_lightweight_scanner", str(path)],
+                check=False,
+                capture_output=True,
+                text=True,
+                timeout=timeout + 2,
+                cwd=Path(__file__).resolve().parents[2],
+                env=environment,
+            )
+        except subprocess.TimeoutExpired:
+            return MalwareScanResult(
+                status="ERROR",
+                version=LIGHTWEIGHT_SCANNER_VERSION,
+                error="lightweight scanner timed out",
+            )
+        if completed.returncode != 0:
+            return MalwareScanResult(
+                status="ERROR",
+                version=LIGHTWEIGHT_SCANNER_VERSION,
+                error=(completed.stderr or "lightweight scanner exited abnormally")[-512:],
+            )
+        decision = completed.stdout.strip()
+        if decision == "CLEAN":
+            return MalwareScanResult(status="CLEAN", version=LIGHTWEIGHT_SCANNER_VERSION)
+        if decision == "ESCALATE":
             return None
-        return MalwareScanResult(status="CLEAN", version=LIGHTWEIGHT_SCANNER_VERSION)
+        return MalwareScanResult(
+            status="ERROR",
+            version=LIGHTWEIGHT_SCANNER_VERSION,
+            error="lightweight scanner returned an invalid decision",
+        )
 
     def _clamav_scan(self, path: Path) -> MalwareScanResult:
         version = self._scanner_version()

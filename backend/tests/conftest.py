@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 import pytest
@@ -8,16 +9,21 @@ from fastapi.testclient import TestClient
 from app.api.deps import clear_dependency_caches, get_auth_service, get_captcha_service
 from app.core.async_db import reset_async_database_runtime
 from app.core.config import get_settings
-from app.core.db import reset_database_runtime
+from app.core.db import get_engine, reset_database_runtime
 from app.core.rate_limit import get_rate_limiter
 from app.main import create_app
+from app.models import Base
 
 
 @pytest.fixture()
 def client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> TestClient:
     db_path = tmp_path / "studyhub-fastapi-test.sqlite3"
+    external_test_database_url = os.getenv("STUDYHUB_TEST_DATABASE_URL", "").strip()
     monkeypatch.setenv("STUDYHUB_ENVIRONMENT", "test")
-    monkeypatch.setenv("STUDYHUB_DATABASE_URL", f"sqlite+pysqlite:///{db_path}")
+    monkeypatch.setenv(
+        "STUDYHUB_DATABASE_URL",
+        external_test_database_url or f"sqlite+pysqlite:///{db_path}",
+    )
     monkeypatch.setenv("STUDYHUB_JWT_SECRET", "studyhub-fastapi-test-secret-1234567890abcdefghijkl")
     monkeypatch.setenv("STUDYHUB_CONTRACT_REPORT_DIR", str(tmp_path / "artifacts"))
     monkeypatch.setenv("STUDYHUB_MATERIAL_ASSET_DIR", str(tmp_path / "materials"))
@@ -30,6 +36,8 @@ def client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> TestClient:
     clear_dependency_caches()
     get_rate_limiter().clear()
     reset_database_runtime()
+    if external_test_database_url:
+        Base.metadata.drop_all(bind=get_engine())
     import asyncio
 
     asyncio.run(reset_async_database_runtime())
@@ -41,6 +49,8 @@ def client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> TestClient:
 
     clear_dependency_caches()
     get_rate_limiter().clear()
+    if external_test_database_url:
+        Base.metadata.drop_all(bind=get_engine())
     reset_database_runtime()
     asyncio.run(reset_async_database_runtime())
     get_settings.cache_clear()

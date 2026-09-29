@@ -41,6 +41,8 @@ class PublicReadCache:
         self._entries: dict[tuple[str, Hashable], _CacheEntry] = {}
         self._lock = RLock()
         self._redis_client: Any | None = None
+        self._redis_retry_at = 0.0
+        self._generation = 0
         self._inflight: dict[tuple[str, Hashable], Event] = {}
         self._async_inflight: dict[tuple[str, Hashable], asyncio.Event] = {}
 
@@ -69,12 +71,15 @@ class PublicReadCache:
         if not self.enabled:
             return
         self._record_event(prefix, "invalidate")
+        with self._lock:
+            self._generation += 1
         self._invalidate_local_prefix(prefix)
         if self.backend == "redis":
             self._invalidate_redis_prefix(prefix)
 
     def clear(self) -> None:
         with self._lock:
+            self._generation += 1
             self._entries.clear()
         if self.backend == "redis":
             self._clear_redis()
@@ -101,6 +106,7 @@ class PublicReadCache:
                 if inflight is None:
                     inflight = Event()
                     self._inflight[composite_key] = inflight
+                    generation = self._generation
                     producer = True
                 else:
                     producer = False
@@ -120,9 +126,12 @@ class PublicReadCache:
 
         with self._lock:
             self._purge_expired_locked(monotonic())
-            self._store_local_entry_locked(composite_key, value)
+            if generation == self._generation:
+                self._store_local_entry_locked(composite_key, value)
+                self._record_event(namespace, "set")
+            else:
+                self._record_event(namespace, "discard")
             self._record_event(namespace, "miss")
-            self._record_event(namespace, "set")
             waiter = self._inflight.pop(composite_key, None)
             if waiter is not None:
                 waiter.set()
@@ -139,12 +148,10 @@ class PublicReadCache:
                 cached = client.get(redis_key)
                 if cached:
                     value = json.loads(cached.decode("utf-8"))
-                    with self._lock:
-                        self._purge_expired_locked(monotonic())
-                        self._store_local_entry_locked(composite_key, value)
                     self._record_event(namespace, "hit")
                     return value
             except Exception:
+                self._mark_redis_failure()
                 self._record_event(namespace, "error")
                 return self._local_get_or_set(namespace, key, factory)
 
@@ -153,25 +160,49 @@ class PublicReadCache:
                 if inflight is None:
                     inflight = Event()
                     self._inflight[composite_key] = inflight
+                    generation = self._generation
                     producer = True
                 else:
                     producer = False
             if producer:
+                try:
+                    redis_generation = self._redis_generation(client)
+                except Exception:
+                    self._mark_redis_failure()
+                    self._record_event(namespace, "error")
+                    with self._lock:
+                        waiter = self._inflight.pop(composite_key, None)
+                        if waiter is not None:
+                            waiter.set()
+                    return self._local_get_or_set(namespace, key, factory)
                 break
             if not inflight.wait(timeout=min(15, self.ttl_seconds)):
                 raise TimeoutError("Public cache producer wait exceeded deadline")
 
         try:
             value = factory()
+            redis_error = False
             try:
-                client.set(redis_key, self._serialize_value(value), ex=self.ttl_seconds)
+                stored = self._redis_store_if_generation(
+                    client,
+                    redis_key=redis_key,
+                    generation=redis_generation,
+                    value=self._serialize_value(value),
+                )
             except Exception:
+                self._mark_redis_failure()
                 self._record_event(namespace, "error")
+                stored = False
+                redis_error = True
             with self._lock:
                 self._purge_expired_locked(monotonic())
-                self._store_local_entry_locked(composite_key, value)
+                if (stored or redis_error) and generation == self._generation:
+                    self._store_local_entry_locked(composite_key, value)
             self._record_event(namespace, "miss")
-            self._record_event(namespace, "set")
+            self._record_event(
+                namespace,
+                "set" if (stored or redis_error) and generation == self._generation else "discard",
+            )
             return value
         finally:
             with self._lock:
@@ -197,6 +228,7 @@ class PublicReadCache:
                 if inflight is None:
                     inflight = asyncio.Event()
                     self._async_inflight[composite_key] = inflight
+                    generation = self._generation
                     producer = True
                 else:
                     producer = False
@@ -208,9 +240,12 @@ class PublicReadCache:
             value = await self._await_if_needed(factory())
             with self._lock:
                 self._purge_expired_locked(monotonic())
-                self._store_local_entry_locked(composite_key, value)
+                if generation == self._generation:
+                    self._store_local_entry_locked(composite_key, value)
+                    self._record_event(namespace, "set")
+                else:
+                    self._record_event(namespace, "discard")
                 self._record_event(namespace, "miss")
-                self._record_event(namespace, "set")
             return value
         finally:
             # Cancellation must release followers as well as ordinary failures.
@@ -235,12 +270,10 @@ class PublicReadCache:
                 cached = await asyncio.to_thread(client.get, redis_key)
                 if cached:
                     value = json.loads(cached.decode("utf-8"))
-                    with self._lock:
-                        self._purge_expired_locked(monotonic())
-                        self._store_local_entry_locked(composite_key, value)
                     self._record_event(namespace, "hit")
                     return value
             except Exception:
+                self._mark_redis_failure()
                 self._record_event(namespace, "error")
                 return await self._local_get_or_set_async(namespace, key, factory)
 
@@ -249,26 +282,51 @@ class PublicReadCache:
                 if inflight is None:
                     inflight = asyncio.Event()
                     self._async_inflight[composite_key] = inflight
+                    generation = self._generation
                     producer = True
                 else:
                     producer = False
             if producer:
+                try:
+                    redis_generation = await asyncio.to_thread(self._redis_generation, client)
+                except Exception:
+                    self._mark_redis_failure()
+                    self._record_event(namespace, "error")
+                    with self._lock:
+                        waiter = self._async_inflight.pop(composite_key, None)
+                        if waiter is not None:
+                            waiter.set()
+                    return await self._local_get_or_set_async(namespace, key, factory)
                 break
             await asyncio.wait_for(inflight.wait(), timeout=min(15, self.ttl_seconds))
 
         try:
             value = await self._await_if_needed(factory())
+            redis_error = False
             try:
-                await asyncio.to_thread(client.set, redis_key, self._serialize_value(value), ex=self.ttl_seconds)
+                stored = await asyncio.to_thread(
+                    self._redis_store_if_generation,
+                    client,
+                    redis_key=redis_key,
+                    generation=redis_generation,
+                    value=self._serialize_value(value),
+                )
             except Exception:
                 # We already own this key's inflight marker. Re-entering the
                 # local get-or-set path here would wait on our own completion.
+                self._mark_redis_failure()
                 self._record_event(namespace, "error")
+                stored = False
+                redis_error = True
             with self._lock:
                 self._purge_expired_locked(monotonic())
-                self._store_local_entry_locked(composite_key, value)
+                if (stored or redis_error) and generation == self._generation:
+                    self._store_local_entry_locked(composite_key, value)
             self._record_event(namespace, "miss")
-            self._record_event(namespace, "set")
+            self._record_event(
+                namespace,
+                "set" if (stored or redis_error) and generation == self._generation else "discard",
+            )
             return value
         finally:
             with self._lock:
@@ -287,10 +345,13 @@ class PublicReadCache:
             return
         pattern = f"{self.redis_namespace}:{self.redis_prefix}:{prefix}*"
         try:
-            keys = list(client.scan_iter(match=pattern, count=200))
+            generation_key = self._redis_generation_key()
+            self._redis_bump_generation(client)
+            keys = [key for key in client.scan_iter(match=pattern, count=200) if self._decoded_key(key) != generation_key]
             if keys:
                 client.delete(*keys)
         except Exception:
+            self._mark_redis_failure()
             return
 
     def _clear_redis(self) -> None:
@@ -299,17 +360,73 @@ class PublicReadCache:
             return
         pattern = f"{self.redis_namespace}:{self.redis_prefix}:*"
         try:
-            keys = list(client.scan_iter(match=pattern, count=500))
+            generation_key = self._redis_generation_key()
+            self._redis_bump_generation(client)
+            keys = [key for key in client.scan_iter(match=pattern, count=500) if self._decoded_key(key) != generation_key]
             if keys:
                 client.delete(*keys)
         except Exception:
+            self._mark_redis_failure()
             return
 
     def _safe_redis_client(self):
+        if monotonic() < self._redis_retry_at:
+            return None
         try:
             return self._client()
         except Exception:
+            self._mark_redis_failure()
             return None
+
+    def _mark_redis_failure(self) -> None:
+        self._redis_retry_at = monotonic() + 5.0
+
+    def _redis_generation_key(self) -> str:
+        return f"{self.redis_namespace}:{self.redis_prefix}:generation"
+
+    def _redis_generation(self, client: Any) -> int:
+        raw = client.get(self._redis_generation_key())
+        return int(raw or 0)
+
+    def _redis_bump_generation(self, client: Any) -> int:
+        if hasattr(client, "incr"):
+            return int(client.incr(self._redis_generation_key()))
+        generation = self._redis_generation(client) + 1
+        client.set(self._redis_generation_key(), str(generation).encode("ascii"), ex=365 * 24 * 60 * 60)
+        return generation
+
+    @staticmethod
+    def _decoded_key(value: Any) -> str:
+        return value.decode("utf-8") if isinstance(value, bytes) else str(value)
+
+    def _redis_store_if_generation(
+        self,
+        client: Any,
+        *,
+        redis_key: str,
+        generation: int,
+        value: bytes,
+    ) -> bool:
+        if hasattr(client, "eval"):
+            result = client.eval(
+                """
+local current = tonumber(redis.call('GET', KEYS[1]) or '0')
+if current ~= tonumber(ARGV[1]) then return 0 end
+redis.call('SET', KEYS[2], ARGV[2], 'EX', ARGV[3])
+return 1
+""",
+                2,
+                self._redis_generation_key(),
+                redis_key,
+                generation,
+                value,
+                self.ttl_seconds,
+            )
+            return int(result) == 1
+        if self._redis_generation(client) != generation:
+            return False
+        client.set(redis_key, value, ex=self.ttl_seconds)
+        return True
 
     def _client(self):
         if self._redis_client is not None:

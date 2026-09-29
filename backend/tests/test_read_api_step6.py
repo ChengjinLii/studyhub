@@ -84,6 +84,13 @@ def test_step6_authenticated_read_endpoints_follow_expected_shapes(
     assert me_data["uploads"][0]["materialId"] == 104
     assert me_data["marketWants"][0]["itemId"] == 201
 
+    home_context_response = client.get("/api/me/home-context", headers=alice_headers)
+    assert home_context_response.status_code == 200
+    home_context = home_context_response.json()["data"]
+    assert home_context["summary"] == me_data
+    assert home_context["account"]["id"] == 1
+    assert home_context["account"]["username"] == "alice"
+
     profile_response = client.get("/api/users/2/profile", headers=alice_headers)
     assert profile_response.status_code == 200
     profile_data = profile_response.json()["data"]

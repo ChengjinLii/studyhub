@@ -28,6 +28,7 @@ def validate_runtime_configuration(settings: Any, *, default_dev_jwt_secret: str
             raise RuntimeError("production 模式禁止自动创建数据库 schema，请改用显式迁移脚本。")
 
     _validate_storage(settings)
+    _validate_material_security(settings)
     _validate_mail(settings)
     _validate_lock(settings)
     _validate_payment(settings)
@@ -98,6 +99,13 @@ def _validate_storage(settings: Any) -> None:
         raise RuntimeError(f"OSS provider 缺少必要配置：{missing}")
 
 
+def _validate_material_security(settings: Any) -> None:
+    if not 2 <= int(settings.material_security_lightweight_timeout_seconds) <= 120:
+        raise RuntimeError("STUDYHUB_MATERIAL_SECURITY_LIGHTWEIGHT_TIMEOUT_SECONDS 必须在 2 到 120 秒之间。")
+    if not 128 <= int(settings.material_security_lightweight_memory_mb) <= 1024:
+        raise RuntimeError("STUDYHUB_MATERIAL_SECURITY_LIGHTWEIGHT_MEMORY_MB 必须在 128 到 1024 MiB 之间。")
+
+
 def _validate_mail(settings: Any) -> None:
     if settings.mail_provider != "smtp":
         return
@@ -149,6 +157,8 @@ def _validate_kyc(settings: Any) -> None:
 
 
 def _validate_mcp(settings: Any) -> None:
+    if not 1024 <= int(settings.mcp_max_request_body_bytes) <= 1024 * 1024:
+        raise RuntimeError("STUDYHUB_MCP_MAX_REQUEST_BODY_BYTES 必须在 1 KiB 到 1 MiB 之间。")
     mode = settings.resolved_mcp_auth_mode
     if mode not in {"static", "oauth", "hybrid"}:
         raise RuntimeError("STUDYHUB_MCP_AUTH_MODE 只允许为 static、oauth 或 hybrid。")

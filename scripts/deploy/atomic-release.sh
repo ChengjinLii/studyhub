@@ -50,6 +50,11 @@ if ! flock -n 9; then
   exit 1
 fi
 
+# Remove only old, incomplete release directories created by interrupted
+# deployments. The helper refuses current or process-referenced paths.
+STUDYHUB_RELEASE_ROOT="$RUNTIME_ROOT" \
+  bash "$CONTROL_ROOT/scripts/deploy/cleanup-stale-releases.sh" --apply
+
 FULL_SHA="$(git -C "$CONTROL_ROOT" rev-parse --verify "$COMMIT^{commit}")"
 SHORT_SHA="$(git -C "$CONTROL_ROOT" rev-parse --short=12 "$FULL_SHA")"
 RELEASE="$RELEASES_ROOT/$SHORT_SHA"
@@ -81,7 +86,7 @@ git -C "$CONTROL_ROOT" archive "$FULL_SHA" | tar -x -C "$RELEASE"
 printf '%s\n' "$SHORT_SHA" > "$RELEASE/.build-git-sha"
 ln -s "$PRIVATE_DIR" "$RELEASE/private"
 
-echo "[1/5] install locked dependencies"
+echo "[1/6] install locked dependencies"
 python3.12 -m venv "$RELEASE/.venv"
 "$RELEASE/.venv/bin/python" -m pip install --disable-pip-version-check --index-url "$PIP_INDEX_URL" \
   --require-hashes -r "$RELEASE/backend/requirements.lock"
@@ -95,11 +100,13 @@ if [[ "${STUDYHUB_RELEASE_SKIP_NPM_AUDIT:-0}" == "1" ]]; then
   fi
   echo "npm audit unavailable; dependency lock matches the active release"
 else
-  PATH="$NODE_BIN_DIR:$PATH" "$NPM_BIN" --prefix "$RELEASE/frontend" audit \
-    --omit=dev --audit-level=high --registry=https://registry.npmjs.org
+  STUDYHUB_FRONTEND_DIR="$RELEASE/frontend" \
+  STUDYHUB_AUDIT_NETWORK_POLICY=fail \
+  PATH="$NODE_BIN_DIR:$PATH" \
+    bash "$RELEASE/scripts/security/audit-frontend-dependencies.sh"
 fi
 
-echo "[2/5] build frontend in isolated release"
+echo "[2/6] build frontend in isolated release"
 (
   cd "$RELEASE/frontend"
   NEXT_PUBLIC_API_BASE=/api \
@@ -107,7 +114,17 @@ echo "[2/5] build frontend in isolated release"
   PATH="$NODE_BIN_DIR:$PATH" "$NPM_BIN" run build
 )
 
-echo "[3/5] smoke isolated release"
+if [[ -n "$PREVIOUS" && -d "$PREVIOUS/frontend/.next/static" ]]; then
+  # Keep one previous generation of immutable hashed chunks so browser tabs
+  # opened before the switch do not fail while loading a deferred route.
+  cp -a --no-clobber "$PREVIOUS/frontend/.next/static/." "$RELEASE/frontend/.next/static/"
+fi
+
+echo "[3/6] run read-only production preflight"
+STUDYHUB_PRIVATE_DIR_PATH="$PRIVATE_DIR" \
+  bash "$RELEASE/scripts/runtime/production-preflight.sh"
+
+echo "[4/6] smoke isolated release"
 (
   cd "$RELEASE/backend"
   STUDYHUB_ENVIRONMENT=production \
@@ -173,7 +190,7 @@ rollback() {
   fi
 }
 
-echo "[4/5] switch current and restart services"
+echo "[5/6] switch current and restart services"
 sudo -n systemctl stop studyhub-frontend.service studyhub-worker.service
 switch_current "$RELEASE"
 if ! sudo -n systemctl restart studyhub-backend.service; then
@@ -206,7 +223,7 @@ if ! STUDYHUB_SMOKE_EXPECTED_GIT_SHA="$SHORT_SHA" bash "$RELEASE/scripts/runtime
   exit 1
 fi
 
-echo "[5/5] prune old releases"
+echo "[6/6] prune old releases"
 mapfile -t releases < <(find "$RELEASES_ROOT" -mindepth 1 -maxdepth 1 -type d -printf '%T@ %p\n' | sort -nr | cut -d' ' -f2-)
 for old_release in "${releases[@]:$KEEP_RELEASES}"; do
   if [[ "$old_release" != "$PREVIOUS" && "$old_release" != "$(readlink -f "$CURRENT_LINK")" ]]; then

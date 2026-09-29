@@ -51,6 +51,27 @@ def test_upload_ticket_is_bound_and_single_use() -> None:
     assert replay.value.status_code == 409
 
 
+def test_upload_ticket_preflight_rejects_foreign_and_used_tokens() -> None:
+    service = _service()
+    files = [_material()]
+    issued = service.authorize(user_id=7, submission_id="upload_preflight_001", files=files)
+
+    service.preflight(token=issued.uploadToken, user_id=7)
+    with pytest.raises(HTTPException) as foreign:
+        service.preflight(token=issued.uploadToken, user_id=8)
+    assert foreign.value.status_code == 400
+
+    service.consume(
+        token=issued.uploadToken,
+        user_id=7,
+        submission_id="upload_preflight_001",
+        files=files,
+    )
+    with pytest.raises(HTTPException) as used:
+        service.preflight(token=issued.uploadToken, user_id=7)
+    assert used.value.status_code == 409
+
+
 def test_upload_ticket_rejects_user_submission_and_file_changes() -> None:
     service = _service()
     issued = service.authorize(user_id=7, submission_id="upload_binding_00001", files=[_material()])

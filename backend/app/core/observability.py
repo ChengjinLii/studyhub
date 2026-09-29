@@ -10,6 +10,8 @@ from app.core.config import Settings
 
 
 DURATION_BUCKETS_SECONDS = (0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0)
+MAX_HTTP_ROUTE_SERIES = 256
+MAX_ERROR_SERIES = 256
 
 
 def _sanitize_label(value: str) -> str:
@@ -89,6 +91,9 @@ class RuntimeMetrics:
         route_key = route or "/"
         status_key = str(int(status_code or 500))
         with self._lock:
+            known_routes = {existing_route for _, existing_route in self._http_request_durations}
+            if route_key not in known_routes and len(known_routes) >= MAX_HTTP_ROUTE_SERIES:
+                route_key = "<overflow>"
             self._http_requests_total[(method_key, route_key, status_key)] += 1
             self._http_request_durations[(method_key, route_key)].observe(duration_seconds)
 
@@ -135,9 +140,12 @@ class RuntimeMetrics:
         kind = _bounded_label(exception_type or "unknown")
         route_key = (route or "/")[:160]
         status_key = str(int(status_code or 500))
-        canonical = f"{kind}|{route_key}|{status_key}"
-        fingerprint = hashlib.sha256(canonical.encode("utf-8")).hexdigest()[:12]
         with self._lock:
+            known_error_routes = {existing_route for _, _, existing_route, _ in self._errors_total}
+            if route_key not in known_error_routes and len(known_error_routes) >= MAX_ERROR_SERIES:
+                route_key = "<overflow>"
+            canonical = f"{kind}|{route_key}|{status_key}"
+            fingerprint = hashlib.sha256(canonical.encode("utf-8")).hexdigest()[:12]
             self._errors_total[(fingerprint, kind, route_key, status_key)] += 1
         return fingerprint
 

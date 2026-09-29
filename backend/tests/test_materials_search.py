@@ -10,6 +10,7 @@ from app.services.materials_query_support import (
     compat_sort_material_rows,
 )
 from app.services.materials_search import (
+    MAX_SEARCH_TERM_GROUPS,
     SYNONYM_FILE_ENV,
     clear_material_search_cache,
     material_mapping_matches_search,
@@ -80,6 +81,22 @@ def test_auxiliary_only_query_prioritizes_all_requested_terms() -> None:
     assert material_mapping_matches_search(partial_match, query) is True
     assert material_mapping_matches_search({"title": "微积分复习资料", "tags": []}, query) is False
     assert material_mapping_search_score(full_match, query) > material_mapping_search_score(partial_match, query)
+
+
+def test_search_query_caps_term_and_synonym_expansion(monkeypatch, tmp_path) -> None:
+    synonym_file = tmp_path / "synonyms.json"
+    synonym_file.write_text(
+        json.dumps({"course": [f"alias-{index}" for index in range(20)]}),
+        encoding="utf-8",
+    )
+    monkeypatch.setenv(SYNONYM_FILE_ENV, str(synonym_file))
+    clear_material_search_cache()
+
+    query = parse_material_search_query("course " + " ".join(f"term-{index}" for index in range(40)))
+
+    assert len(query.required_groups) == MAX_SEARCH_TERM_GROUPS
+    assert len(query.required_groups[0]) == 8
+    assert len(query.raw) <= 200
 
 
 def test_private_synonym_file_expands_short_course_names(monkeypatch, tmp_path) -> None:

@@ -12,6 +12,7 @@ from fastapi import HTTPException, UploadFile, status
 from sqlalchemy.orm import Session
 
 from app.core.config import Settings
+from app.core.observability import get_runtime_metrics
 from app.core.storage_mutation import StorageMutation
 from app.core.upload_validation import validate_image_upload
 from app.models.auth import AuthUser
@@ -407,26 +408,28 @@ class PayoutService:
         parsed = self.transfer_provider.parse_gateway_notification(params)
         out_biz_no = parsed.out_biz_no
         status_value = parsed.status
+        if not out_biz_no:
+            get_runtime_metrics().record_security_event(
+                event="payout_callback_rejected",
+                reason="missing_out_biz_no",
+            )
+            return self.transfer_provider.success_response_text()
+        if not parsed.sign_verified:
+            get_runtime_metrics().record_security_event(
+                event="payout_callback_rejected",
+                reason="invalid_signature",
+            )
+            return self.transfer_provider.success_response_text()
         notification = AlipayGatewayNotificationRecord(
             biz_type=(params.get("biz_type") or "").strip() or None,
-            out_biz_no=out_biz_no or None,
+            out_biz_no=out_biz_no,
             status=status_value or None,
             event_id=parsed.event_id,
             notify_time=self._parse_notify_time(params.get("notify_time")),
             payload=str(params),
-            sign_verified=parsed.sign_verified,
+            sign_verified=True,
             processed=False,
         )
-        if not out_biz_no:
-            notification.process_result = "MISSING_OUT_BIZ_NO"
-            self.finance_repo.save_gateway_notification(session, notification)
-            session.commit()
-            return self.transfer_provider.success_response_text()
-        if not parsed.sign_verified:
-            notification.process_result = "INVALID_SIGN"
-            self.finance_repo.save_gateway_notification(session, notification)
-            session.commit()
-            return self.transfer_provider.success_response_text()
 
         transfer = self.finance_repo.find_transfer_by_out_biz_no(session, out_biz_no)
         if transfer is None:
@@ -444,7 +447,12 @@ class PayoutService:
             ),
         )
         notification.processed = applied
-        notification.process_result = "OK" if applied else "IGNORED_TERMINAL_TRANSFER"
+        if applied:
+            notification.process_result = "OK"
+        elif transfer.status == TRANSFER_STATUS_SUCCESS and transfer.failure_reason == "SETTLEMENT_RECONCILIATION_REQUIRED":
+            notification.process_result = "RECONCILIATION_REQUIRED"
+        else:
+            notification.process_result = "IGNORED_TERMINAL_TRANSFER"
         self.finance_repo.save_gateway_notification(session, notification)
         session.commit()
         return self.transfer_provider.success_response_text()
@@ -617,6 +625,11 @@ class PayoutService:
         if transfer.status in TERMINAL_TRANSFER_STATUSES:
             final_status = TRANSFER_STATUS_FAILED if normalized == "FAIL" else normalized
             if final_status == transfer.status:
+                if (
+                    transfer.status == TRANSFER_STATUS_SUCCESS
+                    and transfer.failure_reason == "SETTLEMENT_RECONCILIATION_REQUIRED"
+                ):
+                    return False
                 return True  # duplicate delivery of the same final state
             # A FAILED transfer has already released its settlements to later payouts, so a
             # late SUCCESS must not settle anything; it needs manual reconciliation instead.
@@ -634,8 +647,7 @@ class PayoutService:
             transfer.status = TRANSFER_STATUS_SUCCESS
             transfer.paid_at = transfer.paid_at or datetime.now(UTC)
             self.finance_repo.save_payout_transfer(session, transfer)
-            self._settle_transfer(session, transfer)
-            return True
+            return self._settle_transfer(session, transfer)
         if normalized in {"FAIL", TRANSFER_STATUS_FAILED}:
             transfer.status = TRANSFER_STATUS_FAILED
             transfer.failure_reason = result.failure_reason or transfer.failure_reason or "支付宝转账失败"
@@ -652,24 +664,37 @@ class PayoutService:
         self.finance_repo.save_payout_transfer(session, transfer)
         return True
 
-    def _settle_transfer(self, session: Session, transfer: PayoutTransferRecord) -> None:
+    def _settle_transfer(self, session: Session, transfer: PayoutTransferRecord) -> bool:
         application = self.finance_repo.get_payout_application(session, transfer.payout_application_id)
         if application is None:
-            return
-        application.status = PAYOUT_STATUS_SETTLED
-        application.settled_at = transfer.paid_at or datetime.now(UTC)
-        self.finance_repo.save_payout_application(session, application)
+            return False
 
         now = datetime.now(UTC)
         bound = self.finance_repo.list_settlements_for_transfer(session, transfer.id)
         if not bound:
-            # 遗留兼容：部署前提交的在途转账没有绑定记录，按旧口径认领当前到期结算单。
-            # 仅认领未被任何转账绑定的到期结算单，避免抢走其他在途转账已绑定的单子；
-            # 认领即盖章，因此重复回调不会再次进入该分支。
-            bound = self.finance_repo.list_claimable_due_settlements_for_uploader(session, application.user_id, now)
-            for settlement in bound:
-                settlement.payout_transfer_id = transfer.id
-                self.finance_repo.save_settlement(session, settlement)
+            transfer.failure_reason = "SETTLEMENT_RECONCILIATION_REQUIRED"
+            self.finance_repo.save_payout_transfer(session, transfer)
+            logger.error(
+                "Successful payout transfer %s has no bound settlements; leaving application %s unsettled for reconciliation",
+                transfer.id,
+                application.id,
+            )
+            return False
+        settlement_total = sum(int(settlement.payout_amount or 0) for settlement in bound)
+        if settlement_total != int(transfer.amount or 0):
+            transfer.failure_reason = "SETTLEMENT_RECONCILIATION_REQUIRED"
+            self.finance_repo.save_payout_transfer(session, transfer)
+            logger.error(
+                "Successful payout transfer %s amount mismatch: transfer=%s settlements=%s; leaving application %s unsettled",
+                transfer.id,
+                transfer.amount,
+                settlement_total,
+                application.id,
+            )
+            return False
+        application.status = PAYOUT_STATUS_SETTLED
+        application.settled_at = transfer.paid_at or now
+        self.finance_repo.save_payout_application(session, application)
         for settlement in bound:
             if settlement.status != "PENDING":
                 continue
@@ -683,6 +708,7 @@ class PayoutService:
             if schedule.last_payout_date is None or schedule.last_payout_date < today:
                 schedule.last_payout_date = today
                 self.finance_repo.save_payout_schedule(session, schedule)
+        return True
 
     def _build_earnings(self, session: Session, user_id: int) -> dict[str, Any]:
         now = datetime.now(UTC)

@@ -10,16 +10,14 @@ import hashlib
 import json
 from pathlib import Path
 import secrets
-from tempfile import SpooledTemporaryFile
 from urllib.parse import urlsplit
-from zipfile import ZIP_DEFLATED, ZipFile
 
 from fastapi import HTTPException, UploadFile
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
-from starlette.datastructures import Headers
 
 from app.core.upload_validation import validate_material_upload
+from app.core.storage_mutation import StorageMutation
 from app.repos.auth_repo import resolve_user_model
 from app.models.materials import MaterialRecord
 from app.services.read_support import ROLE_ADMIN, ROLE_DEVELOPER
@@ -31,6 +29,8 @@ from app.models.batch_submissions import (
 )
 from app.schemas.materials import MaterialCreatePayload
 from app.schemas.upload_authorization import UploadFileDescriptorPayload
+from app.services.batch_publication_archive import create_publication_upload
+from app.services.batch_submission_presenter import serialize_batch
 
 
 MIB = 1024 * 1024
@@ -97,34 +97,6 @@ class BatchSubmissionService:
         session.add(Audit(batch_id=batch.id, operator_id=operator_id if operator_id is not None else 0, action=action,
                           detail=json.dumps({"itemIds": sorted(ids)})))
 
-    def _serialize(self, session, batch, *, admin=False, created=False, items=None, publications=None):
-        # items/publications: pre-loaded by list_batches for a whole page (avoids
-        # an extra query pair per batch); single-batch callers load their own.
-        session.flush()
-        if items is None:
-            items = self._items(session, batch.id)
-        if publications is None:
-            publications = list(session.execute(
-                select(Publication, MaterialRecord.title).join(MaterialRecord, MaterialRecord.id == Publication.material_id)
-                .where(Publication.batch_id == batch.id, Publication.status == "PUBLISHED")))
-        result = {"id": batch.id, "status": batch.status, "deliveryMethod": batch.delivery_method,
-                  "publicationIntent": batch.publication_intent, "createdAt": batch.created_at,
-                  "updatedAt": batch.updated_at, "itemCount": len(items),
-                  "totalBytes": sum(i.size_bytes for i in items),
-                  "items": [{"id": i.id, "status": i.status, "scanStatus": i.scan_status,
-                             "sizeBytes": i.size_bytes,
-                             **({"name": i.name, "contentType": i.content_type} if admin or created else {}),
-                             "reason": i.reason} for i in items]}
-        result["publications"] = [
-            {"id": publication.id, "materialId": publication.material_id,
-             "title": title, "url": f"/materials/{publication.material_id}"}
-            for publication, title in publications
-        ]
-        if admin:
-            result.update(uploaderId=batch.uploader_id, note=batch.note, pricingNote=batch.pricing_note,
-                          netdiskUrl=batch.netdisk_url, netdiskPassword=batch.netdisk_password)
-        return result
-
     def create(self, session: Session, *, user_id: int, payload: dict) -> dict:
         self._user(session, user_id, lock=True)
         key = str(payload.get("submissionKey") or payload.get("submissionId") or "").strip()
@@ -175,7 +147,7 @@ class BatchSubmissionService:
         if existing:
             if existing.payload_digest != digest:
                 _fail(409, "Submission key already used for different content")
-            return self._serialize(session, existing, created=True)
+            return serialize_batch(session, existing, created=True)
         if len(values["netdisk_password"] or "") > 64:
             _fail(400, "Netdisk password too long")
         self.upload_authorization.reserve_batch(user_id=user_id, submission_id=key,
@@ -193,7 +165,7 @@ class BatchSubmissionService:
                              scan_status="NOT_APPLICABLE", scan_attempts=0, cleanup_attempts=0))
         self._audit(session, batch, user_id, "CREATE")
         session.commit()
-        return self._serialize(session, batch, created=True)
+        return serialize_batch(session, batch, created=True)
 
     def list_batches(self, session: Session, *, user_id: int | None = None, offset=0, limit=20) -> dict:
         query = select(Batch)
@@ -215,12 +187,12 @@ class BatchSubmissionService:
                 .where(Publication.batch_id.in_(batch_ids), Publication.status == "PUBLISHED")
             ):
                 publications_by_batch[publication.batch_id].append((publication, title))
-        items = [self._serialize(session, b, admin=user_id is None, items=items_by_batch[b.id],
+        items = [serialize_batch(session, b, admin=user_id is None, items=items_by_batch[b.id],
                                  publications=publications_by_batch[b.id]) for b in batches]
         return {"items": items, "total": total}
 
     def detail(self, session: Session, batch_id: int, *, user_id: int | None = None) -> dict:
-        return self._serialize(session, self._batch(session, batch_id, user_id=user_id), admin=user_id is None)
+        return serialize_batch(session, self._batch(session, batch_id, user_id=user_id), admin=user_id is None)
 
     def authorize_upload(self, session: Session, batch_id: int, item_id: int, *, user_id: int) -> dict:
         self._user(session, user_id, lock=True)
@@ -330,14 +302,14 @@ class BatchSubmissionService:
         self._user(session, user_id)
         batch = self._batch(session, batch_id, user_id=user_id, lock=True)
         if batch.status != "DRAFT":
-            return self._serialize(session, batch)
+            return serialize_batch(session, batch)
         items = self._items(session, batch_id, lock=True)
         if batch.status != "DRAFT" or any(i.status != "UPLOADED" for i in items):
             _fail(409, "All files must be uploaded before submission")
         batch.status = "WAITING"
         self._audit(session, batch, user_id, "SUBMIT")
         session.commit()
-        return self._serialize(session, batch)
+        return serialize_batch(session, batch)
 
     def amend(self, session, batch_id, *, user_id, payload):
         batch = self._batch(session, batch_id, user_id=user_id, lock=True)
@@ -358,12 +330,12 @@ class BatchSubmissionService:
         batch.status = "PARTIAL" if any(i.status == "PUBLISHED" for i in items) else "WAITING"
         self._audit(session, batch, user_id, "SUPPLEMENT")
         session.commit()
-        return self._serialize(session, batch)
+        return serialize_batch(session, batch)
 
-    def _subset(self, session, batch, ids):
+    def _subset(self, session, batch, ids, *, lock=True):
         if not isinstance(ids, list) or not ids or any(type(i) is not int for i in ids) or len(set(ids)) != len(ids):
             _fail(400, "Select distinct item IDs")
-        items = [i for i in self._items(session, batch.id, lock=True) if i.id in ids]
+        items = [i for i in self._items(session, batch.id, lock=lock) if i.id in ids]
         if len(items) != len(ids):
             _fail(404, "Selected item not found in batch")
         return items
@@ -391,16 +363,16 @@ class BatchSubmissionService:
             "REVIEW": "REVIEW", "RETURN": "RETURNED", "REJECT": "REVIEW" if items else "REJECTED"}[action]
         self._audit(session, batch, operator_id, action, [i.id for i in items])
         session.commit()
-        return self._serialize(session, batch, admin=True)
+        return serialize_batch(session, batch, admin=True)
 
     def publish(self, session: Session, batch_id: int, *, operator_id: int, payload: dict) -> dict:
         self._user(session, operator_id, admin=True)
-        batch = self._batch(session, batch_id, lock=True)
+        batch = self._batch(session, batch_id)
         key = str(payload.get("publicationId") or "").strip()
         if not 16 <= len(key) <= 64:
             _fail(400, "publicationKey must contain 16-64 characters")
         digest = _digest(payload)
-        existing = session.scalar(select(Publication).where(Publication.publication_key == key).with_for_update())
+        existing = session.scalar(select(Publication).where(Publication.publication_key == key))
         if existing:
             if existing.batch_id != batch.id or existing.payload_digest != digest:
                 _fail(409, "Publication key already used for different content")
@@ -409,7 +381,7 @@ class BatchSubmissionService:
             _fail(409, "Publication is already in progress")
         if batch.status not in {"WAITING", "REVIEW", "PARTIAL"}:
             _fail(409, "Batch is not ready for publication")
-        items = self._subset(session, batch, payload.get("itemIds"))
+        items = self._subset(session, batch, payload.get("itemIds"), lock=False)
         if batch.delivery_method == "NETDISK" and session.scalar(select(Publication.id).where(
                 Publication.batch_id == batch.id, Publication.status == "PUBLISHED")):
             _fail(409, "Netdisk batch already published")
@@ -434,57 +406,82 @@ class BatchSubmissionService:
         if material_data["generalCourse"]:
             material_data.update(college=None, major=None)
         material_payload = MaterialCreatePayload.model_validate(material_data)
-        publication = Publication(batch_id=batch.id, publication_key=key, payload_digest=digest,
-                                  item_ids_json=json.dumps(sorted(i.id for i in items)), operator_id=operator_id,
-                                  pricing_confirmation=confirmation or None, status="PENDING")
-        session.add(publication)
-        session.flush()
-        upload = self._publication_upload(items) if batch.delivery_method == "FILE" else None
+        source_snapshot = tuple(
+            (item.id, item.status, item.scan_status, item.object_key, item.size_bytes, item.name, item.content_type)
+            for item in items
+        )
+        batch_snapshot = (
+            batch.uploader_id,
+            batch.delivery_method,
+            batch.publication_intent,
+            batch.netdisk_url,
+            batch.netdisk_password,
+        )
+        upload = create_publication_upload(self.asset_store, items, max_size_bytes=50 * MIB) \
+            if batch.delivery_method == "FILE" else None
+        # Preparing a potentially large archive must not keep publication rows
+        # locked. Re-open a short transaction and verify the exact source set.
+        session.rollback()
         try:
-            # MaterialsService commits internally. A separate identity map and
-            # savepoint keep that commit inside this locked publication transaction.
-            with Session(bind=session.connection(), join_transaction_mode="create_savepoint") as inner:
-                material = self.materials_service.create_material(inner, material_payload,
-                    uploader_id=batch.uploader_id, zip_file=upload, markdown_file=None,
-                    previews=[], custom_previews=[])
-            publication.material_id = int(material["id"])
-            publication.status = "PUBLISHED"
-            for item in items:
-                item.status = "PUBLISHED"
+            self._user(session, operator_id, admin=True)
+            batch = self._batch(session, batch_id, lock=True)
+            existing = session.scalar(
+                select(Publication).where(Publication.publication_key == key).with_for_update()
+            )
+            if existing:
+                if existing.batch_id != batch.id or existing.payload_digest != digest:
+                    _fail(409, "Publication key already used for different content")
+                if existing.status == "PUBLISHED":
+                    return {"id": existing.id, "materialId": existing.material_id, "status": existing.status}
+                _fail(409, "Publication is already in progress")
+            if batch.status not in {"WAITING", "REVIEW", "PARTIAL"} or batch_snapshot != (
+                batch.uploader_id,
+                batch.delivery_method,
+                batch.publication_intent,
+                batch.netdisk_url,
+                batch.netdisk_password,
+            ):
+                _fail(409, "Batch changed while preparing publication; retry")
+            items = self._subset(session, batch, payload.get("itemIds"))
+            current_snapshot = tuple(
+                (item.id, item.status, item.scan_status, item.object_key, item.size_bytes, item.name, item.content_type)
+                for item in items
+            )
+            if current_snapshot != source_snapshot:
+                _fail(409, "Selected files changed while preparing publication; retry")
+
+            publication = Publication(batch_id=batch.id, publication_key=key, payload_digest=digest,
+                                      item_ids_json=json.dumps(sorted(i.id for i in items)), operator_id=operator_id,
+                                      pricing_confirmation=confirmation or None, status="PENDING")
+            session.add(publication)
             session.flush()
-            batch.status = "PUBLISHED" if all(i.status in {"PUBLISHED", "CLEANED", "REJECTED"}
-                for i in self._items(session, batch.id)) else "PARTIAL"
-            self._audit(session, batch, operator_id, "PUBLISH", [i.id for i in items])
-            session.commit()
-        except Exception:
-            session.rollback()
-            raise
+            storage_mutation = StorageMutation(self.asset_store.delete_key)
+            try:
+                # The caller owns object compensation until the outer database
+                # transaction commits successfully.
+                with Session(bind=session.connection(), join_transaction_mode="create_savepoint") as inner:
+                    material = self.materials_service.create_material(inner, material_payload,
+                        uploader_id=batch.uploader_id, zip_file=upload, markdown_file=None,
+                        previews=[], custom_previews=[], storage_mutation=storage_mutation)
+                publication.material_id = int(material["id"])
+                publication.status = "PUBLISHED"
+                for item in items:
+                    item.status = "PUBLISHED"
+                session.flush()
+                batch.status = "PUBLISHED" if all(i.status in {"PUBLISHED", "CLEANED", "REJECTED"}
+                    for i in self._items(session, batch.id)) else "PARTIAL"
+                self._audit(session, batch, operator_id, "PUBLISH", [i.id for i in items])
+                session.commit()
+            except Exception:
+                session.rollback()
+                storage_mutation.rollback()
+                raise
+            storage_mutation.finalize()
+            self.materials_service.invalidate_material_summary_cache()
         finally:
             if upload:
                 upload.file.close()
         return {"id": publication.id, "materialId": publication.material_id, "status": publication.status}
-
-    def _publication_upload(self, items):
-        stream = SpooledTemporaryFile(max_size=2 * MIB)
-        try:
-            if len(items) == 1:
-                stream.write(self.asset_store.read_bytes(items[0].object_key, max_size_bytes=50 * MIB))
-                name = items[0].name
-                media_type = items[0].content_type
-            else:
-                with ZipFile(stream, "w", compression=ZIP_DEFLATED) as archive:
-                    for item in items:
-                        archive.writestr(f"{item.id}_{Path(item.name).name}",
-                            self.asset_store.read_bytes(item.object_key, max_size_bytes=item.size_bytes))
-                name, media_type = "batch.zip", "application/zip"
-            size = stream.tell()
-            if size > 50 * MIB:
-                _fail(400, "Generated publication exceeds 50 MiB; select fewer files")
-            stream.seek(0)
-            return UploadFile(file=stream, filename=name, size=size, headers=Headers({"content-type": media_type}))
-        except Exception:
-            stream.close()
-            raise
 
     def download_item(self, session: Session, batch_id: int, item_id: int):
         """Privileged route only: return a private object reference, never a URL."""

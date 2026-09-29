@@ -26,6 +26,7 @@ export const sendUploadFormData = (
   formData: FormData,
   options: {
     uploadToken?: string | null;
+    metadataOnly?: boolean;
     onProgress: (value: number) => void;
     requestRef: { current: XMLHttpRequest | null };
   }
@@ -39,6 +40,8 @@ export const sendUploadFormData = (
     xhr.withCredentials = true;
     if (options.uploadToken) {
       xhr.setRequestHeader('X-StudyHub-Upload-Token', options.uploadToken);
+    } else if (options.metadataOnly) {
+      xhr.setRequestHeader('X-StudyHub-Upload-Mode', 'metadata');
     }
     xhr.upload.onprogress = (event) => {
       if (!event.lengthComputable) return;
