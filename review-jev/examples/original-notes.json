@@ -1,0 +1,10 @@
+{
+  "request_id": "original-notes-001",
+  "content": {
+    "title": "Calculus revision notes",
+    "description": "My personal study notes, written from scratch.",
+    "text": "A limit describes the value approached by a function. These notes explain the concept using my own examples."
+  },
+  "context": {"kind": "material", "publication_intent": "FREE", "course": "Calculus"},
+  "rights": {"basis": "original", "copyrightOwner": "Demo author", "attested": true}
+}

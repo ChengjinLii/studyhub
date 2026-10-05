@@ -1,0 +1,38 @@
+name: Review-Jev
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ["review-jev/**", ".github/workflows/review-jev.yml"]
+  pull_request:
+    paths: ["review-jev/**", ".github/workflows/review-jev.yml"]
+
+permissions:
+  contents: read
+
+jobs:
+  standalone-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.12"]
+    defaults:
+      run:
+        working-directory: review-jev
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python-version }}
+      - run: python -m pip install -e '.[dev]'
+      - run: ruff check review_jev tests/test_review*.py
+      - run: pytest -q
+      - name: Build a standalone wheel
+        run: python -m pip wheel . --no-deps -w /tmp/review-jev-wheel
+      - name: Verify wheel installation without website or database
+        run: |
+          python -m venv /tmp/review-jev-wheel-venv
+          /tmp/review-jev-wheel-venv/bin/pip install /tmp/review-jev-wheel/*.whl
+          /tmp/review-jev-wheel-venv/bin/review-jev review examples/original-notes.json --backend demo

@@ -1,0 +1,5 @@
+assets/** linguist-vendored=true -diff
+qev/** linguist-vendored=true
+train/** linguist-vendored=true
+benchmarks/** linguist-vendored=true
+README.onejev.md linguist-vendored=true

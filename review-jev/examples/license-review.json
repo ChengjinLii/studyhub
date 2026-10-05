@@ -1,0 +1,10 @@
+{
+  "request_id": "license-review-001",
+  "content": {"title": "Lecture slides", "text": "Redistributed teaching material."},
+  "context": {"kind": "material", "publication_intent": "PAID"},
+  "rights": {
+    "basis": "open_license", "attested": true,
+    "source_url": "https://example.org/lecture-slides",
+    "license": "CC-BY-NC-4.0", "attribution": "Original lecturer"
+  }
+}
