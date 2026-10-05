@@ -17,7 +17,7 @@
 [![Website](https://img.shields.io/badge/Website-study--hub.cn-111827)](https://study-hub.cn)
 [![MIT](https://img.shields.io/badge/License-MIT-22c55e)](LICENSE)
 
-[功能概览](#功能概览) | [快速开始](#快速开始) | [技术栈](#技术栈) | [Agent](#studyhub-agent) | [内容审核](#studyhub-review-jev)
+[功能概览](#功能概览) | [快速开始](#快速开始) | [技术栈](#技术栈) | [Agent](#studyhub-agent) | [内容审核](#studyhub-review-jev) | [ENG](README.en.md)
 
 </div>
 
@@ -39,16 +39,6 @@ StudyHub 连接学习资料、经验分享与校园互助，围绕高校学生�
 | 校园集市 | 发布校内二手交易与校园信息 |
 
 官网：[study-hub.cn](https://study-hub.cn)
-
----
-
-## 手机端体验
-
-StudyHub 支持 PWA 安装。通过手机浏览器打开网站，点击右下角的下载箭头即可进入安装流程；iPhone 使用分享菜单中的“添加到主屏幕”，微信等内嵌浏览器可按提示在系统浏览器中打开。
-
-安装后沿用网站的页面、账户和 API。版本化前端资源与离线提示页由 Service Worker 缓存，登录、投稿、文件下载与支付通过在线服务完成；页面更新会在旧窗口关闭后生效。
-
-PWA 图标位于 `frontend/public/icons/`，生成命令为 `node frontend/scripts/build-pwa-icons.mjs`。缓存策略、更新机制和验收说明见 [PWA 技术说明](docs/PWA.md)。
 
 ---
 
@@ -207,6 +197,16 @@ CI 与本地质量检查可使用 `bash scripts/ci-check.sh`。完整门禁包�
 | 图片或图文 | OneJev-4B |
 
 审核组件提供 **FastAPI 服务、JSON 命令行、可配置规则与批量评测工具**，覆盖内容风险、隐私信息、投稿操纵、版权声明、开放许可与参考内容匹配等检查。模型分流、请求示例和使用方法见 [Review-Jev 文档](review-jev/README.md)。
+
+---
+
+## 手机端体验
+
+StudyHub 支持 PWA 安装。通过手机浏览器打开网站，点击右下角的下载箭头即可进入安装流程；iPhone 使用分享菜单中的“添加到主屏幕”，微信等内嵌浏览器可按提示在系统浏览器中打开。
+
+安装后沿用网站的页面、账户和 API。版本化前端资源与离线提示页由 Service Worker 缓存，登录、投稿、文件下载与支付通过在线服务完成；页面更新会在旧窗口关闭后生效。
+
+PWA 图标位于 `frontend/public/icons/`，生成命令为 `node frontend/scripts/build-pwa-icons.mjs`。缓存策略、更新机制和验收说明见 [PWA 技术说明](docs/PWA.md)。
 
 ---
 
