@@ -72,6 +72,13 @@ def test_tool_parameter_order_changes_the_hash() -> None:
         {"tokenizer_revision": "qwen3.5-4b@rev2"},
         {"max_context_tokens": 8192},
         {"max_new_tokens": 1024},
+        {"max_turns": 6},
+        {"max_tool_calls": 8},
+        {"max_parse_errors": 1},
+        {"architecture": "react_verify@1.0"},
+        {"architecture_parameters": {"max_rejections": 2}},
+        {"architecture_prompts": (PromptTemplate("verify", "1.0", "check citations"),)},
+        {"models": (("small", "4B", "rev1"),)},
         {"template_sha256": "0" * 64},
         {"turn_rule_version": "turn-rule@2"},
         {"tools": (_tool("a"),)},
@@ -81,3 +88,15 @@ def test_tool_parameter_order_changes_the_hash() -> None:
 )
 def test_every_component_changes_the_hash(change) -> None:
     assert contract_hash(dataclasses.replace(BASE, **change)) != contract_hash(BASE)
+
+
+def test_model_and_parameter_mapping_order_does_not_change_contract() -> None:
+    left = dataclasses.replace(
+        BASE,
+        models=(("small", "4B", "r4"), ("large", "9B", "r9")),
+        architecture_parameters={"a": 1, "nested": {"b": 2, "c": 3}},
+    )
+    right = dataclasses.replace(
+        left, models=tuple(reversed(left.models)), architecture_parameters={"nested": {"c": 3, "b": 2}, "a": 1}
+    )
+    assert contract_hash(left) == contract_hash(right)

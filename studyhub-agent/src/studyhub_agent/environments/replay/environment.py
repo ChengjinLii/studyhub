@@ -47,9 +47,14 @@ class ReplayEnvironment:
                 payload={"error": "unknown_tool"},
                 error_code="unknown_tool",
             )
-        ok, payload, error_code, self._state = handler(self._context, self._state, dict(call.arguments))
+        ok, payload, error_code, self._state, details = handler(self._context, self._state, dict(call.arguments))
         return Observation(
-            call_id=call.call_id, name=call.name, ok=ok, payload=sanitize_output(payload), error_code=error_code
+            call_id=call.call_id,
+            name=call.name,
+            ok=ok,
+            payload=sanitize_output(payload),
+            error_code=error_code,
+            details=details,
         )
 
     def trace(self) -> dict[str, Any]:
@@ -60,4 +65,5 @@ class ReplayEnvironment:
             "discovered_material_ids": sorted(state.discovered) if state else [],
             "read_material_ids": list(state.read) if state else [],
             "tool_calls": list(self._calls),
+            "memory": sanitize_output(dict(state.memory)) if state else {},
         }

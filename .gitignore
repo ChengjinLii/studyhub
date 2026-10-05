@@ -1,5 +1,13 @@
 docs/
 !studyhub-agent/docs/
+!/docs/
+/docs/*
+!/docs/PWA.md
+!/docs/ROADMAP.md
+!review-jev/docs/
+review-jev/docs/*
+!review-jev/docs/CONFIGURATION.md
+!review-jev/docs/REVIEW_SEMANTICS.md
 /models/
 private/
 .local-dev/

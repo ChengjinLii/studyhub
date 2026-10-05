@@ -1,8 +1,10 @@
 # StudyHub Agent v3 · 子项目 1：基础层设计
 
 - 日期：2026-09-25
-- 状态：待审阅
+- 状态：基础层实现已合入，后续接口扩展见架构实现记录
 - 范围：studyhub-agent 重构的第一个子项目（共 4 个：基础层 → 评测 → 训练流水线 → RL/OPD）
+
+---
 
 ## 1. 背景与目标
 
@@ -22,7 +24,7 @@
 
 | 决策 | 结论 |
 |---|---|
-| 主线模型 | Qwen3.5-4B（官方 post-trained instruct 版起步）；9B、27B 作 prompted 对照 |
+| 主线模型 | 从 Qwen3.5-4B 官方后训练指令版起步；9B、27B 作为提示式对照 |
 | 数据来源 | 只用开源数据和自托管的开源教师；下线 Codex/gpt-5.6 生成的数据；生产素材最多只用公开预览，且去除上传者信息 |
 | 执行循环 | 自写精简 `EpisodeRunner`，去掉 Hermes 依赖；AReaL 只作训练后端 |
 | 模型接口 | 统一 `PolicyClient`，提供 token 级和 OpenAI 兼容两种实现 |
@@ -30,6 +32,8 @@
 | 工具环境 | 离线 replay 环境，工具接口对齐后端 MCP |
 | 旧代码 | 新建干净的包，只移植精华；旧代码和旧分支删除，用 tag 留存历史 |
 | 训练方法与数据集 | 不受旧方案约束，按评测结果选择 SFT/RL/OPD 和数据集（负责人 2026-09-25 授权） |
+
+---
 
 ## 2. 包结构与依赖方向
 
@@ -52,6 +56,8 @@ studyhub_agent/
 
 依赖方向是单向的：`contracts` ← `guardrails` ← `tools` ← `environments` ← `runtime`；`graders` 只依赖 `contracts`。子项目 2、3 的 eval 和 training 只能依赖这些层，不允许反向依赖。这一约束用 import-linter 写进 CI。
 
+---
+
 ## 3. 运行契约
 
 **契约哈希**由以下内容的规范化 JSON 取 SHA-256 得到：
@@ -60,7 +66,7 @@ studyhub_agent/
 - 工具 ToolSpec 集合，按名称排序；
 - thinking 开关；
 - chat template 的 tokenizer revision；
-- max context 和 max new tokens；
+- 上下文长度与新生成 token 数上限；
 - 单回合互斥规则的版本号。
 
 **契约规则**（每条都有对应测试）：
@@ -77,7 +83,9 @@ studyhub_agent/
 - 底层使用 tokenizer 自带的 chat template（Qwen3.5 官方 revision 固定在契约里），不做 overlay 软链。
 - 工具调用的解析和渲染成对实现，并有往返测试：渲染后再解析，结果必须和原来一致。
 
-## 4. EpisodeRunner
+---
+
+## 4. 任务执行器
 
 大约 300 行。输入：`EpisodeSpec`、`Environment`、`PolicyClient`、预算。循环逻辑：
 
@@ -103,7 +111,9 @@ studyhub_agent/
 
 上下文预算控制移植自现有的 `ContextBudgetController`，只保留精确的 token 计数和遥测。它注入的"请收尾"引导文本属于 prompt 注册表的一部分，受契约哈希约束。
 
-## 5. PolicyClient
+---
+
+## 5. 策略客户端
 
 ```python
 class PolicyClient(Protocol):
@@ -120,6 +130,8 @@ class PolicyClient(Protocol):
   1. 调 `/v1/chat/completions`，传入 messages 和 tools；
   2. 回复用 `render()` 重新渲染一遍，作为标准化的 token 序列，SFT 数据只使用这份；
   3. 校验服务端解析出的工具调用和本地解析结果一致，不一致时记为 `PARSE_MISMATCH` 并计入指标。
+
+---
 
 ## 6. 工具集与环境
 
@@ -154,7 +166,9 @@ class Environment(Protocol):
 
 本子项目不负责快照数据的内容，数据由子项目 2 构建。这里只提供一份用于测试的小型 fixture 快照。
 
-## 7. Grader 协议
+---
+
+## 7. 判分协议
 
 ```python
 class Grader(Protocol):
@@ -170,6 +184,8 @@ class Grader(Protocol):
 - `evidence: list[str]`
 
 训练 reward 和 benchmark 评测是两个独立实现，由子项目 2 编写，并共用一套对抗校准集。本子项目只交付协议和测试用的 `ExactMatchGrader`。
+
+---
 
 ## 8. 旧代码与旧分支的处理
 
@@ -191,6 +207,8 @@ class Grader(Protocol):
    - 被 gitignore 的大体积产物，即 `artifacts/`（约 836G）、`training_artifacts/`、`evaluation_artifacts/`、`datasets/`。删除前需列出清单，再由负责人确认。
    - 与 agent 无关的远端分支，包括 dependabot、`upgrade/next-16`、`fix/payout-settlement-integrity`。
 
+---
+
 ## 9. 测试策略
 
 新包的覆盖率要求不低于 80%。
@@ -208,7 +226,9 @@ class Grader(Protocol):
 - **一致性（parity）**：同一 `EpisodeSpec` 分别经 `TokenPolicyClient`（fake generate）和 `OpenAICompatPolicyClient`（fake server）运行，要求标准化 token ids 完全相同、契约哈希相同。
 - **依赖方向**：import-linter。
 - **guardrails**：随代码移植原有测试。
-- **CI**：`.github/workflows` 新增 studyhub-agent job，运行 ruff、pytest 与覆盖率检查、import-linter。
+- **持续集成**：在 `.github/workflows` 增加 Agent 工作流，运行 Ruff、pytest、覆盖率与 import-linter 检查。
+
+---
 
 ## 10. 完成标准
 
@@ -216,6 +236,8 @@ class Grader(Protocol):
 2. 在服务器上用 SGLang 部署官方 Qwen3.5-4B（instruct）。`EpisodeRunner` 跑通 fixture 快照中的 3 个任务，并生成带契约哈希的 `Episode` JSONL。
 3. 第 8 节列出的旧代码、旧分支、旧 worktree 全部删除；tag 已推送。
 4. README 按新架构重写。
+
+---
 
 ## 11. 不在本子项目范围内
 

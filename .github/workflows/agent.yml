@@ -26,7 +26,7 @@ jobs:
           cache: pip
           cache-dependency-path: studyhub-agent/pyproject.toml
       - run: pip install -e ".[dev]"
-      - run: ruff check src tests
+      - run: ruff check src tests scripts/smoke_episodes.py
       - run: lint-imports --config .importlinter
       - run: pytest --cov --cov-report=term-missing
       - name: Build and install the wheel non-editable (catches force-include/packaging regressions)
@@ -35,9 +35,16 @@ jobs:
           python -m venv /tmp/studyhub-agent-wheel-venv
           /tmp/studyhub-agent-wheel-venv/bin/pip install /tmp/studyhub-agent-wheel/*.whl
           /tmp/studyhub-agent-wheel-venv/bin/python -c "
+          from studyhub_agent.architectures import CascadeArchitecture, PlanExecuteArchitecture, ReactContextArchitecture, ReactVerifyArchitecture
+          from studyhub_agent.architectures.citations import check_citations
           from studyhub_agent.contracts.render import render_text
           from studyhub_agent.contracts.episode import Message
           text = render_text([Message(role='user', content='hi')], [], thinking=False, add_generation_prompt=True)
           assert text, 'wheel-installed package failed to render the chat template'
+          assert ReactVerifyArchitecture().max_rejections == 2
+          assert PlanExecuteArchitecture().max_plan_chars == 400
+          assert ReactContextArchitecture().keep_recent_tools == 2
+          assert CascadeArchitecture().required_policy_keys == ('small', 'large')
+          assert check_citations('[101:1]', frozenset({(101, 1)})).ok
           print('wheel install OK:', len(text), 'chars rendered')
           "

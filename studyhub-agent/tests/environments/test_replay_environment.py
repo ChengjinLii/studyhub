@@ -162,3 +162,40 @@ def test_unknown_tool_is_an_error_observation() -> None:
 def test_execute_before_reset_is_a_programming_error() -> None:
     with pytest.raises(RuntimeError, match="reset"):
         ReplayEnvironment(SNAPSHOT).execute(_call("memory_get"))
+
+
+def test_details_record_only_successfully_read_pages_and_visible_ids() -> None:
+    env = _env()
+    failed = env.execute(_call("materials_read", material_id=101))
+    assert "read_pages" not in failed.details
+    search = env.execute(_call("materials_search", query="高等数学 提纲"))
+    assert search.details["returned_material_ids"] == [row["material_id"] for row in search.payload["results"]]
+    assert 101 in search.details["returned_material_ids"]
+    read = env.execute(_call("materials_read", material_id=101, page=2))
+    assert read.details == {"material_id": 101, "read_pages": [[101, 2]]}
+    assert "read_pages" not in read.payload
+    detail = env.execute(_call("materials_get", material_id=101))
+    assert detail.details == {"material_id": 101}
+    assert "read_pages" not in env.execute(_call("materials_read", material_id=101, page=99)).details
+
+
+def test_permission_filter_details_do_not_expose_hidden_material_ids() -> None:
+    env = _env()
+    result = env.execute(_call("materials_search", query="概率论 草稿"))
+    assert result.details["blocked"] is True
+    assert 105 not in result.details["returned_material_ids"]
+    denied = env.execute(_call("materials_get", material_id=105))
+    assert denied.details == {"blocked": True}
+    owner_result = _env(Principal(principal_id="u-2002")).execute(_call("materials_recommend", context="概率论"))
+    assert owner_result.details["blocked"] is False
+    assert 105 in owner_result.details["returned_material_ids"]
+
+
+def test_trace_records_final_memory_without_sharing_or_leaking_values() -> None:
+    env = _env()
+    env.execute(_call("memory_update", key="weak_topic", value="积分 a@example.com"))
+    trace = env.trace()
+    assert trace["memory"]["weak_topic"] == "积分 [redacted-email]"
+    trace["memory"]["weak_topic"] = "changed"
+    assert env.trace()["memory"]["weak_topic"] == "积分 [redacted-email]"
+    assert "weak_topic" not in _env().trace()["memory"]

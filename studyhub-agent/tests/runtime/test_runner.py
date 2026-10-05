@@ -303,4 +303,5 @@ def test_token_and_openai_clients_produce_identical_episode_canonical_data() -> 
     for token_turn, openai_turn in zip(token_episode.turns, openai_episode.turns, strict=True):
         assert token_turn.canonical_text == openai_turn.canonical_text
         assert token_turn.canonical_token_ids == openai_turn.canonical_token_ids
+        assert token_turn.prompt_token_ids == openai_turn.prompt_token_ids
     assert token_episode.contract_hash == openai_episode.contract_hash

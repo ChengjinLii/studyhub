@@ -1,15 +1,19 @@
 # StudyHub Agent v3 · 子项目 2：Agent 架构对比与 Benchmark 设计
 
 - 日期：2026-09-26
-- 状态：待审阅
+- 状态：五种架构、结构化证据与统一钩子已完成代码和离线验收；AgentBench v3 与正式对比实验继续开发
 - 前置：子项目 1 基础层（`docs/specs/2026-09-25-foundation-design.md`，已合入 main）
 - 交付：main 中包含 ① 5 种 agent 架构的实现，② StudyHub AgentBench v3（快照、任务、判分、统计），③ 基于 benchmark 的架构对比分析报告
+
+钩子与分层调整见 [前置开发记录](2026-10-05-architecture-hooks-progress.md)，五种架构的验收见 [2026-10-06 实现记录](2026-10-06-architectures-progress.md)。以下仍是完整目标规格，不代表正式对比实验已经完成。
+
+---
 
 ## 1. 目标
 
 在同一套工具、环境和渲染契约下，只改变编排方式，公平比较 5 种 agent 架构在 Qwen3.5-4B 与 Qwen3.5-9B 上的效果、可靠性和成本，并给出有统计支撑的结论。
 
-主循环仍然是朴素的 ReAct；任何额外复杂度都必须在本 benchmark 上用配对统计证明有提升（见 README Roadmap 的原则）。
+主循环仍然是朴素的 ReAct；任何额外复杂度都必须在本 benchmark 上用配对统计证明有提升，原则见 [开发路线](../ROADMAP.md)。
 
 ### 已确定的决策
 
@@ -23,6 +27,8 @@
 | 判分 | 全部确定性（参考 AppWorld / tau-bench 的状态断言、GAIA 的短答案、HotpotQA 的支持事实），配对抗校准集 |
 | 规模 | Dev 240 题 + Test 160 题（封存，只在最终报告运行一次），每题 3 次采样 |
 | 报告 | Markdown + 脚本生成的图表 + 汇总数据，入库 `docs/reports/`；原始 episode 不入库 |
+
+---
 
 ## 2. 架构层
 
@@ -63,12 +69,14 @@ class Architecture(Protocol):
 | `react` | 现有循环，全部钩子为空操作 | 无 |
 | `react_verify` | `on_final` 做确定性引用核查：回答中每个 `[资料ID:页码]` 必须属于本 episode 已读页面集合；存在读过的页面但回答没有任何引用时也视为不通过。不通过则回填结构化问题清单让模型修正，最多 2 次，之后接受 | `studyhub.agent.verify_feedback@1.0` |
 | `plan_execute` | `on_start` 注入规划指令：先写出编号计划、本轮不调用工具。第一个 FINAL 回合被 `on_final` 识别为计划：存入 `trace["plan"]`，返回 `Continue`，追加“按计划执行”提示；之后每步 `before_step` 在历史末尾附一条简短的计划提醒 | `studyhub.agent.plan_request@1.0`、`studyhub.agent.plan_reminder@1.0` |
-| `react_context` | `before_step` 在消息视图的 token 数超过 `context_threshold`（默认预算的 50%）时，把除最近 2 个以外的工具结果确定性压缩为摘要：保留资料 ID、页码、标题和 details 中的关键字段，正文截断到 120 字并注明“已压缩”；压缩记录写入 trace | `studyhub.agent.compaction_note@1.0` |
+| `react_context` | `before_step` 在消息视图的 token 数超过 `context_threshold`（默认预算的 50%）时，把除最近 2 个以外的工具结果确定性压缩为摘要：保留模型已见的资料 ID、页码、标题和数值，正文截断到 120 字并注明“已压缩”；不向摘要注入 details，压缩记录写入 trace | `studyhub.agent.compaction_note@1.0` |
 | `cascade` | 起始策略 `small`（4B）。遇到以下任一触发条件时切换为 `large`（9B）并保持到结束：出现解析失败、引用核查不通过（复用 `react_verify` 的核查）、工具调用或回合用量超过预算 70%。切换时携带完整历史；trace 记录触发原因与回合 | 与 `react_verify` 相同 |
 
 `cascade` 要求两个模型使用同一 chat template；tokenizer revision 分别计入契约。成本按模型参数量加权（4B=1、9B=2.25）统计。
 
-## 3. Benchmark：StudyHub AgentBench v3
+---
+
+## 3. 评测基准：StudyHub AgentBench v3
 
 ### 3.1 快照
 
@@ -114,6 +122,8 @@ class Architecture(Protocol):
 - 与同模型 `react` 基线比较：以任务为单位的配对 bootstrap（10,000 次重采样）给出成功率差的 95% 置信区间；McNemar 检验（每题多数投票结果）；多重比较用 Holm 校正。
 - 最小可检测效应：在报告中给出 Dev/Test 规模下的 MDE，明确哪些差异不可下结论。
 
+---
+
 ## 4. 实验协议
 
 - 配置：`react`、`react_verify`、`plan_execute`、`react_context` × {4B, 9B} = 8 组，加 `cascade`（4B→9B）= 9 组。
@@ -121,11 +131,15 @@ class Architecture(Protocol):
 - 服务：两张共享 H100 上各起一个 SGLang 服务（4B、9B），显存占用在当前空闲范围内（参照 `scripts/serving/README.md`）；运行器多线程并发 episode，结果按 episode 写 JSONL（服务器 `/data/chengjin/studyhub-agent-runs/<run_id>/`），支持断点续跑。
 - 先在 Dev 上完成全部调试与 grader 校准，再对 Test 一次性运行 9 组配置；报告以 Test 结果为主，Dev 作补充。
 
+---
+
 ## 5. 报告
 
 - `docs/reports/2026-09-agent-architectures.md`（中文）：研究问题、架构说明（含示意图）、benchmark 设计与参考来源、grader 校准结果、主结果表（带 CI）、分族结果、可靠性（pass^3）、成本-效果前沿、典型成功/失败案例分析、局限与威胁有效性（合成数据、单一快照、模型规模）、结论与下一步。
 - 图表由 `scripts/bench/make_report_figures.py` 从汇总数据生成（SVG），汇总数据 `docs/reports/data/agent-architectures-summary.json` 入库，报告中每个数字可由脚本复现。
 - 复现信息：git commit、快照摘要、任务集摘要、每组配置的契约哈希、模型与 SGLang 版本、运行命令。
+
+---
 
 ## 6. 包结构与依赖
 
@@ -140,12 +154,16 @@ benchmarks/agentbench-v3/  # 快照、Dev/Test 任务、校准集、EXPOSURE 台
 
 import-linter 分层更新为：`bench` > `architectures` > `runtime` > `environments` > `tools` > `guardrails` > `contracts`；`graders` 仍只依赖 `contracts`，`bench` 可依赖 `graders`。
 
+---
+
 ## 7. 测试策略
 
 - 架构：每种架构用脚本化假模型和假环境写 golden 测试（计划被识别并继续、引用核查拒绝后修正、压缩只作用于发送视图、级联在每种触发条件下升级且历史完整）；`react` 与现有 runner 行为逐字节一致（回归测试）。
 - Benchmark：模板生成的确定性（同种子同输出）、划分无泄漏（Dev/Test 资料分组不重叠）、每道题的标准答案可由 oracle 脚本在环境中实际走通（oracle 成功率必须 100%）、故障注入按配置触发、grader 校准集 100%。
 - 统计：bootstrap 与 McNemar 在已知小样本上的数值测试。
 - 覆盖率 ≥ 80%，ruff、import-linter、wheel 检查沿用子项目 1 的 CI。
+
+---
 
 ## 8. 完成标准
 
@@ -154,6 +172,8 @@ import-linter 分层更新为：`bench` > `architectures` > `runtime` > `environ
 3. 9 组配置在 Dev 与 Test 上跑完（每题 3 次采样），INFRA 失败率 < 2%（超过则重跑受影响的 episode）。
 4. 分析报告与图表、汇总数据入库 main，报告中的每个数字可由脚本从汇总数据复现。
 
+---
+
 ## 9. 不在本子项目范围内
 
-后训练（SFT/RL，子项目 3/4）、训练框架选型 spike（子项目 3 开头）、27B 模型、线上后端接入、LLM-as-judge 判分。
+后训练（SFT / RL，子项目 3 / 4）、训练框架的小规模选型验证（子项目 3 开始时）、27B 模型、线上后端接入，以及大模型裁判判分。

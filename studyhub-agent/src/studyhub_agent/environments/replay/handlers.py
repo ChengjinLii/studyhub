@@ -30,7 +30,7 @@ class ReplayState:
     memory: Mapping[str, str] = MappingProxyType({})
 
 
-Result = tuple[bool, dict[str, Any], str | None, ReplayState]
+Result = tuple[bool, dict[str, Any], str | None, ReplayState, dict[str, Any]]
 Handler = Callable[["ReplayContext", ReplayState, dict[str, Any]], Result]
 
 
@@ -66,8 +66,8 @@ def _summary(material: SnapshotMaterial) -> dict[str, Any]:
     }
 
 
-def _error(state: ReplayState, code: str, **details: Any) -> Result:
-    return False, {"error": code, **details}, code, state
+def _error(state: ReplayState, code: str, *, evidence: dict[str, Any] | None = None, **payload: Any) -> Result:
+    return False, {"error": code, **payload}, code, state, evidence or {}
 
 
 def _clamp(value: Any, *, default: int, upper: int) -> int:
@@ -76,17 +76,18 @@ def _clamp(value: Any, *, default: int, upper: int) -> int:
 
 def _search_rows(
     context: ReplayContext, state: ReplayState, query: str, limit: int, **filters: str | None
-) -> list[SnapshotMaterial]:
+) -> tuple[list[SnapshotMaterial], bool]:
     hits = context.index.search(query, limit=len(context.materials))
-    rows = [row for _, row in hits if _visible(context, state, row)]
+    rows = [row for _, row in hits]
     for field, expected in filters.items():
         if expected:
             rows = [row for row in rows if getattr(row, field) == expected]
-    return rows[:limit]
+    visible = [row for row in rows if _visible(context, state, row)]
+    return visible[:limit], len(visible) != len(rows)
 
 
 def materials_search(context: ReplayContext, state: ReplayState, args: dict[str, Any]) -> Result:
-    rows = _search_rows(
+    rows, blocked = _search_rows(
         context,
         state,
         args["query"],
@@ -95,15 +96,27 @@ def materials_search(context: ReplayContext, state: ReplayState, args: dict[str,
         course=args.get("course"),
     )
     new_state = replace(state, discovered=state.discovered | {row.material_id for row in rows})
-    return True, {"results": [_summary(row) for row in rows]}, None, new_state
+    return (
+        True,
+        {"results": [_summary(row) for row in rows]},
+        None,
+        new_state,
+        {"returned_material_ids": [row.material_id for row in rows], "blocked": blocked},
+    )
 
 
 def materials_recommend(context: ReplayContext, state: ReplayState, args: dict[str, Any]) -> Result:
-    candidates = _search_rows(context, state, args["context"], len(context.materials))
+    candidates, blocked = _search_rows(context, state, args["context"], len(context.materials))
     limit = _clamp(args.get("limit"), default=3, upper=5)
     rows = sorted(candidates, key=lambda row: (-row.downloads, row.material_id))[:limit]
     new_state = replace(state, discovered=state.discovered | {row.material_id for row in rows})
-    return True, {"results": [_summary(row) for row in rows]}, None, new_state
+    return (
+        True,
+        {"results": [_summary(row) for row in rows]},
+        None,
+        new_state,
+        {"returned_material_ids": [row.material_id for row in rows], "blocked": blocked},
+    )
 
 
 def _discovered_material(context: ReplayContext, state: ReplayState, material_id: int) -> SnapshotMaterial | str:
@@ -115,23 +128,39 @@ def _discovered_material(context: ReplayContext, state: ReplayState, material_id
     return material
 
 
+def _blocked_details(context: ReplayContext, state: ReplayState, material_id: int) -> dict[str, Any]:
+    material = context.materials.get(material_id)
+    # Private ids/titles stay absent from evidence; only the permission-filter flag is recorded.
+    return {"blocked": True} if material is not None and not _visible(context, state, material) else {}
+
+
 def materials_get(context: ReplayContext, state: ReplayState, args: dict[str, Any]) -> Result:
     material = _discovered_material(context, state, args["material_id"])
     if isinstance(material, str):
-        return _error(state, material, material_id=args["material_id"])
+        return _error(
+            state,
+            material,
+            material_id=args["material_id"],
+            evidence=_blocked_details(context, state, args["material_id"]),
+        )
     payload = {
         **_summary(material),
         "summary": material.summary,
         "preview_page_count": len(material.preview_pages),
         "downloads": material.downloads,
     }
-    return True, payload, None, state
+    return True, payload, None, state, {"material_id": material.material_id}
 
 
 def materials_read(context: ReplayContext, state: ReplayState, args: dict[str, Any]) -> Result:
     material = _discovered_material(context, state, args["material_id"])
     if isinstance(material, str):
-        return _error(state, material, material_id=args["material_id"])
+        return _error(
+            state,
+            material,
+            material_id=args["material_id"],
+            evidence=_blocked_details(context, state, args["material_id"]),
+        )
     if not set(material.unlock_after) <= set(state.read):
         return _error(
             state, "material_locked", material_id=material.material_id, read_first=list(material.unlock_after)
@@ -149,14 +178,20 @@ def materials_read(context: ReplayContext, state: ReplayState, args: dict[str, A
         "text": material.preview_pages[page - 1],
         "citation": f"[{material.material_id}:{page}]",
     }
-    return True, payload, None, replace(state, read=read)
+    return (
+        True,
+        payload,
+        None,
+        replace(state, read=read),
+        {"material_id": material.material_id, "read_pages": [[material.material_id, page]]},
+    )
 
 
 def platform_policy(context: ReplayContext, state: ReplayState, args: dict[str, Any]) -> Result:
     text = context.snapshot.policies.get(args["topic"])
     if text is None:
         return _error(state, "policy_not_found", topic=args["topic"])
-    return True, {"topic": args["topic"], "text": text}, None, state
+    return True, {"topic": args["topic"], "text": text}, None, state, {}
 
 
 def web_extract(context: ReplayContext, state: ReplayState, args: dict[str, Any]) -> Result:
@@ -175,14 +210,14 @@ def web_extract(context: ReplayContext, state: ReplayState, args: dict[str, Any]
             pages.append({"url": url, "title": page.title, "text": page.text})
         else:
             pages.append({"url": url, "error": "not_in_snapshot"})
-    return True, {"pages": pages}, None, state
+    return True, {"pages": pages}, None, state, {}
 
 
 def memory_get(context: ReplayContext, state: ReplayState, args: dict[str, Any]) -> Result:
     keys = args.get("keys")
     # Only a missing `keys` (None) means "all"; an explicit empty list means "none of them".
     memory = dict(state.memory) if keys is None else {key: state.memory[key] for key in keys if key in state.memory}
-    return True, {"memory": memory, "available_keys": sorted(state.memory)}, None, state
+    return True, {"memory": memory, "available_keys": sorted(state.memory)}, None, state, {}
 
 
 def memory_update(context: ReplayContext, state: ReplayState, args: dict[str, Any]) -> Result:
@@ -191,7 +226,7 @@ def memory_update(context: ReplayContext, state: ReplayState, args: dict[str, An
         return _error(state, "forbidden_memory_key", key=key)
     value = sanitize_output(str(args["value"]))
     new_memory = MappingProxyType({**state.memory, key: value})
-    return True, {"key": key, "stored": True}, None, replace(state, memory=new_memory)
+    return True, {"key": key, "stored": True}, None, replace(state, memory=new_memory), {}
 
 
 HANDLERS: Mapping[str, Handler] = MappingProxyType(

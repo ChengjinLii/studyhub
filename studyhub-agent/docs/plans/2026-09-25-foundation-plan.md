@@ -1,58 +1,62 @@
-# StudyHub Agent v3 Foundation Implementation Plan
+# StudyHub Agent v3 基础层执行计划
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **执行方式：** 按任务逐项推进，使用复选框跟踪过程，遵循测试先行、实现、验证与提交的顺序。
 
-**Goal:** Replace the legacy studyhub-agent code with a small, tested foundation: one versioned runtime contract, one `EpisodeRunner` shared by data generation / RL rollout / evaluation, token-level and OpenAI-compatible policy clients, a gated replay environment with 7 MCP-aligned tools, and a grader protocol.
+**目标：** 用精简且经过测试的基础层替代旧版 Agent：统一版本化运行契约，共用数据生成、强化学习采样与评测执行器，提供两类策略客户端、带门控的回放环境和判分协议。
 
-**Architecture:** Pure-data `contracts` (tool specs, prompts, episode models, the single Qwen3.5 chat renderer/parser, contract hash) sit at the bottom. `guardrails` → `tools` (specs + MCP names) → `environments` (replay implementation) → `runtime` (runner + clients) build on it; `graders` depends only on `contracts`. The direction is enforced by import-linter in CI.
+**架构：** 纯数据 contracts 位于底层，包含工具定义、提示、回合模型、唯一的 Qwen3.5 渲染解析器与契约哈希。guardrails、tools、environments、runtime 逐层依赖；graders 只依赖 contracts，依赖方向由 CI 中的 import-linter 检查。
 
-**Tech Stack:** Python 3.12, pydantic v2, jinja2 (sandboxed, to render the vendored Qwen3.5 chat template), httpx (SGLang `/generate`, OpenAI-compatible `/v1/chat/completions`), `tokenizers` (optional, real tokenizer), pytest + pytest-cov, ruff, import-linter.
+**技术栈：** Python 3.12、Pydantic v2、Jinja2 沙箱、httpx、可选 tokenizers、pytest、pytest-cov、Ruff 与 import-linter。模型接口使用 SGLang `/generate` 和 OpenAI-compatible `/v1/chat/completions`。
 
-**Spec:** `studyhub-agent/docs/specs/2026-09-25-foundation-design.md`
+**设计依据：** [基础层设计](../specs/2026-09-25-foundation-design.md)。
 
-## Global Constraints
-
-- Package: directory `studyhub-agent/`, import package `studyhub_agent` in `studyhub-agent/src/studyhub_agent/`, project name `studyhub-agent`, version `3.0.0`, `requires-python = ">=3.12,<3.13"`.
-- Main-line model: official post-trained `Qwen3.5-4B` (instruct). Chat template vendored verbatim from `/data/chengjin/studyhub/models/P1/Qwen3.5-4B/chat_template.jinja`; its SHA-256 is part of the contract.
-- Every config/data model: pydantic `ConfigDict(frozen=True, extra="forbid")` — unknown fields are errors.
-- `thinking` is an `EpisodeSpec` field, default `False`, constant for the whole episode.
-- Turn rule `turn-rule@1`: a turn containing any tool call is a TOOL_CALLS turn (its text is an internal preamble, never an answer); a turn without tool calls is FINAL; text after a tool call, unclosed tags or schema-invalid arguments make the whole turn PARSE_ERROR and none of its calls execute.
-- Tool names (8; the spec's "7 tools" counts `memory_get`/`memory_update` as one memory pair): `materials_search`, `materials_get`, `materials_recommend`, `platform_policy`, `materials_read`, `web_extract`, `memory_get`, `memory_update`.
-- All 8 tools carry `capability="snapshot"` in v3 (replay data); the four materials/policy tools also set `mcp_name`.
-- JSON serialization of tool payloads and tool arguments: `json.dumps(..., ensure_ascii=False, sort_keys=True, separators=(",", ":"))`.
-- Data sources: open data and self-hosted open models only; no Codex/gpt outputs; no uploader personal data.
-- Coverage of `studyhub_agent` ≥ 80%; `ruff check` clean (running `ruff check --fix` to sort imports in code copied from this plan is expected); import-linter contracts pass.
-- Commit messages: conventional (`feat:`, `test:`, `refactor:`, `chore:`, `ci:`, `docs:`), English, no Co-Authored-By line, author `ChengjinLii <2731938007@qq.com>`.
-- Do not delete gitignored large artifacts (`artifacts/`, `training_artifacts/`, `evaluation_artifacts/`, `datasets/`) or non-agent remote branches.
-
-## Execution Environment
-
-- Repo root on the server: a worktree of `/data/chengjin/studyhub` at `origin/main` (the orchestrator creates it, e.g. `/data/chengjin/studyhub-agent-v3`). All paths below are relative to the repo root.
-- Python env (Task 1 creates it): `PY=/data/chengjin/.venvs/studyhub-agent/bin/python`. Commands below write `$PY`; expand it literally.
-- Run tests from `studyhub-agent/`: `cd studyhub-agent && $PY -m pytest ...`.
-
-## Review Focus
-
-1. Tool argument strings with newlines, Chinese text, or a literal `</parameter>` inside a value — the parser must round-trip multi-line and non-ASCII values, and reject (PARSE_ERROR, not crash) values it cannot represent. Pinned in Task 5 (`test_parse_multiline_chinese_value_round_trips`, `test_value_containing_parameter_close_tag_is_rejected_by_renderer`).
-2. Models emitting integers as strings (`"101"`) or garbage (`"abc"`) for integer parameters — coerce valid numerals, PARSE_ERROR on garbage, never an exception. Pinned in Task 5 (`test_integer_parameter_coercion`).
-3. A turn with two tool calls where the second is invalid — nothing executes (no partial side effects such as a `memory_update`). Pinned in Task 10 (`test_turn_with_one_invalid_call_executes_nothing`).
-4. A tool implementation raising an unexpected exception — the episode ends with `ENV_ERROR` / `FailureOwner.ENV`, the batch keeps going. Pinned in Task 10 (`test_environment_exception_ends_episode_as_env_error`).
-5. Rendering determinism across the two policy clients — the canonical completion text for the same logical turn is byte-identical whether it came from SGLang tokens or an OpenAI-style message, including Chinese content and argument key order. Pinned in Task 11 (`test_token_and_openai_clients_produce_identical_canonical_completion`).
+本计划记录基础层搭建过程，示例代码保留原始接口；后续接口调整以源码与 [架构实现记录](../specs/2026-10-05-architecture-hooks-progress.md) 为准。
 
 ---
 
-### Task 1: Tag legacy, remove old code, scaffold the v3 package
+## 总体约定
 
-**Files:**
-- Delete (git rm): everything under `studyhub-agent/` except `docs/` and `design-defects/`
-- Move: `studyhub-agent/docs/*` (except `specs/`, `plans/`) → `studyhub-agent/docs/history/`; `studyhub-agent/design-defects/` → `studyhub-agent/docs/history/design-defects/`; `studyhub-agent/README.md` → `studyhub-agent/docs/history/README-v2.md`
-- Delete: `.github/workflows/agent-v2.yml`
-- Create: `studyhub-agent/pyproject.toml`, `studyhub-agent/README.md`, `studyhub-agent/src/studyhub_agent/__init__.py`, `studyhub-agent/src/studyhub_agent/{contracts,guardrails,tools,environments,runtime,graders}/__init__.py`, `studyhub-agent/tests/__init__.py`, `studyhub-agent/tests/test_package.py`, `studyhub-agent/.importlinter`
+- 包目录为 `studyhub-agent/`，导入名为 `studyhub_agent`，源码位于 `src/studyhub_agent/`；项目版本 3.0.0，Python 要求为 `>=3.12,<3.13`。
+- 主线采用官方后训练的 Qwen3.5-4B 指令模型。聊天模板从 `/data/chengjin/studyhub/models/P1/Qwen3.5-4B/chat_template.jinja` 原样复制，SHA-256 纳入契约。
+- 配置与数据模型使用 Pydantic `ConfigDict(frozen=True, extra="forbid")`，未知字段报错。
+- `thinking` 位于 `EpisodeSpec`，默认 `False`，整条任务保持不变。
+- 回合规则 `turn-rule@1`：含工具调用的回合为 `TOOL_CALLS`，文本作为内部前言；无工具调用的回合为 `FINAL`。工具调用后的文本、未闭合标签或非法参数使整个回合成为 `PARSE_ERROR`，所有调用均不执行。
+- 工具共八个名称：`materials_search`、`materials_get`、`materials_recommend`、`platform_policy`、`materials_read`、`web_extract`、`memory_get`、`memory_update`。设计中的“七类工具”将记忆读写计为一类。
+- v3 的八个工具均标记 `capability="snapshot"`，四个检索或政策工具另设 MCP 名称。
+- 工具内容与参数统一使用 `json.dumps(..., ensure_ascii=False, sort_keys=True, separators=(",", ":"))` 序列化。
+- 数据采用开放数据与自托管开放模型，不使用 Codex / GPT 输出或上传者个人信息。
+- 包覆盖率至少 80%；Ruff 与 import-linter 通过。示例代码的导入排序可由 `ruff check --fix` 整理。
+- 提交消息使用 Conventional Commits 英文格式，不添加 Co-Authored-By；作者为 `ChengjinLii <2731938007@qq.com>`。
+- 保留 Git 忽略的大型产物目录与无关远端分支，包括 `artifacts/`、`training_artifacts/`、`evaluation_artifacts/`、`datasets/`。
 
-**Interfaces:**
-- Produces: importable package `studyhub_agent` with `__version__ = "3.0.0"`; venv at `/data/chengjin/.venvs/studyhub-agent`.
+## 执行环境
 
-- [ ] **Step 1: Create tags for history (run in `/data/chengjin/studyhub`)**
+- 服务端使用 `/data/chengjin/studyhub` 的工作树，基于 `origin/main`；路径示例为 `/data/chengjin/studyhub-agent-v3`。下文路径相对仓库根目录。
+- Python 环境由任务 1 创建：`PY=/data/chengjin/.venvs/studyhub-agent/bin/python`。
+- 测试从 `studyhub-agent/` 运行，使用 `$PY -m pytest ...`。
+
+## 核查重点
+
+1. 多行、中文及含 `</parameter>` 的字符串参数必须正确往返；不能表示的内容返回解析错误而不崩溃。由任务 5 的 `test_parse_multiline_chinese_value_round_trips` 与 `test_value_containing_parameter_close_tag_is_rejected_by_renderer` 固定。
+2. 整数参数中的有效数字字符串可以转换，无效字符串返回解析错误。由任务 5 的 `test_integer_parameter_coercion` 固定。
+3. 同一回合中任一工具调用无效，则整个回合不执行，避免记忆更新等部分副作用。由任务 10 的 `test_turn_with_one_invalid_call_executes_nothing` 固定。
+4. 工具异常以 `ENV_ERROR` / `FailureOwner.ENV` 结束当前任务，不中断整个批次。由任务 10 的 `test_environment_exception_ends_episode_as_env_error` 固定。
+5. 两类客户端对同一逻辑回合的标准化文本逐字节一致，涵盖中文与参数顺序。由任务 11 的 `test_token_and_openai_clients_produce_identical_canonical_completion` 固定。
+
+---
+
+### 任务 1：历史标签与 v3 包骨架
+
+**涉及文件：**
+- 删除旧代码：`studyhub-agent/` 下除 `docs/` 与 `design-defects/` 外的旧实现。
+- 归档文档：原文档和设计缺陷记录移入 `docs/history/`，原 README 保存为 `docs/history/README-v2.md`。
+- 删除旧工作流：`.github/workflows/agent-v2.yml`。
+- 新建包配置、README、源码模块、测试骨架与 `.importlinter`。
+
+**接口约定：**
+- 提供可导入的 `studyhub_agent` 包，版本为 `3.0.0`，环境位于 `/data/chengjin/.venvs/studyhub-agent`。
+
+- [ ] **步骤 1：创建历史标签（在项目根目录执行）**
 
 ```bash
 cd /data/chengjin/studyhub
@@ -63,9 +67,9 @@ git tag archive/opd-execution codex/qwen35-4b-opd-execution
 git tag archive/opd-preflight codex/qwen35-4b-opd-preflight
 git push origin legacy-agent-v2 archive/opd-evaluation archive/opd-execution archive/opd-preflight
 ```
-Expected: 4 new tags on the remote (`git ls-remote --tags origin | grep -E "legacy-agent-v2|archive/opd"` shows 4 lines).
+预期结果：远端增加四个历史标签，可通过 `git ls-remote --tags origin` 核对。
 
-- [ ] **Step 2: Move docs to history and remove legacy code (in the worktree)**
+- [ ] **步骤 2：在工作树中归档文档与整理旧代码**
 
 ```bash
 cd studyhub-agent
@@ -84,9 +88,9 @@ cd ..
 git rm -q .github/workflows/agent-v2.yml
 git ls-files studyhub-agent | cut -d/ -f2 | sort -u
 ```
-Expected last output: only `docs`.
+预期最后输出：只保留 `docs`。
 
-- [ ] **Step 3: Write `studyhub-agent/pyproject.toml`**
+- [ ] **步骤 3：编写 `studyhub-agent/pyproject.toml`**
 
 ```toml
 [build-system]
@@ -138,7 +142,7 @@ target-version = "py312"
 select = ["E", "F", "I", "UP", "B"]
 ```
 
-- [ ] **Step 4: Write `studyhub-agent/.importlinter`**
+- [ ] **步骤 4：编写 `studyhub-agent/.importlinter`**
 
 ```ini
 [importlinter]
@@ -166,7 +170,7 @@ forbidden_modules =
     studyhub_agent.guardrails
 ```
 
-- [ ] **Step 5: Package skeleton and first test**
+- [ ] **步骤 5：包骨架与首项测试**
 
 `studyhub-agent/src/studyhub_agent/__init__.py`:
 ```python
@@ -174,7 +178,7 @@ forbidden_modules =
 
 __version__ = "3.0.0"
 ```
-Each of `contracts/__init__.py`, `guardrails/__init__.py`, `tools/__init__.py`, `environments/__init__.py`, `runtime/__init__.py`, `graders/__init__.py`, `tests/__init__.py`: empty file.
+各源码模块与测试目录的 `__init__.py` 初始化为空文件。
 
 `studyhub-agent/tests/test_package.py`:
 ```python
@@ -185,25 +189,25 @@ def test_version_is_v3() -> None:
     assert studyhub_agent.__version__ == "3.0.0"
 ```
 
-`studyhub-agent/README.md` (short; rewritten fully in Task 13):
+`studyhub-agent/README.md` 的初始化示例如下，任务 13 再补充完整说明：
 ```markdown
 # StudyHub Agent v3
 
-Foundation for the StudyHub agent research project. Design: `docs/specs/2026-09-25-foundation-design.md`.
-Legacy v2 code is preserved at git tag `legacy-agent-v2`; its reports live in `docs/history/`.
+面向高校学习场景的工具调用框架。基础层设计见 `docs/specs/2026-09-25-foundation-design.md`。
+旧版代码保留在 `legacy-agent-v2` 标签，历史报告位于 `docs/history/`。
 ```
 
-- [ ] **Step 6: Create the venv and run the test**
+- [ ] **步骤 6：创建环境并运行测试**
 
 ```bash
 /home/chengjin/.local/share/uv/python/cpython-3.12.13-linux-x86_64-gnu/bin/python3.12 -m venv /data/chengjin/.venvs/studyhub-agent
 /data/chengjin/.venvs/studyhub-agent/bin/pip install -q -e "studyhub-agent[dev,tokenizers]"
 cd studyhub-agent && $PY -m pytest tests/test_package.py && $PY -m ruff check src tests && lint-imports --config .importlinter
 ```
-(`lint-imports` is `/data/chengjin/.venvs/studyhub-agent/bin/lint-imports`.)
-Expected: `1 passed`; ruff clean; import-linter "Contracts: 2 kept, 0 broken".
+`lint-imports` 路径为 `/data/chengjin/.venvs/studyhub-agent/bin/lint-imports`。
+预期结果：一项测试通过，Ruff 通过，两个依赖契约均保持。
 
-- [ ] **Step 7: Commit**
+- [ ] **步骤 7：提交**
 
 ```bash
 git add -A studyhub-agent .github/workflows
@@ -214,16 +218,16 @@ Legacy code is preserved at tag legacy-agent-v2; reports and design-defects move
 
 ---
 
-### Task 2: ToolSpec contract and schema lint
+### 任务 2：工具契约与 Schema 校验
 
-**Files:**
-- Create: `studyhub-agent/src/studyhub_agent/contracts/tools.py`
-- Test: `studyhub-agent/tests/contracts/test_tools.py` (+ empty `tests/contracts/__init__.py`)
+**涉及文件：**
+- 新建：`studyhub-agent/src/studyhub_agent/contracts/tools.py`
+- 测试：`studyhub-agent/tests/contracts/test_tools.py` (+ empty `tests/contracts/__init__.py`)
 
-**Interfaces:**
-- Produces: `ToolSpec(name, version, description, parameters, capability="snapshot", mcp_name=None)` frozen dataclass with `.to_openai() -> dict`, `.canonical() -> dict`; `ToolSpecError(ValueError)`; `lint_tool_spec(spec) -> None`.
+**接口约定：**
+- 提供冻结的 `ToolSpec(name, version, description, parameters, capability="snapshot", mcp_name=None)`，以及 `.to_openai()`、`.canonical()`、`ToolSpecError` 与 `lint_tool_spec`。
 
-- [ ] **Step 1: Write the failing tests**
+- [ ] **步骤 1：编写预期失败的测试**
 
 ```python
 import pytest
@@ -280,12 +284,12 @@ def test_canonical_form_is_order_independent() -> None:
     assert a.canonical() == b.canonical()
 ```
 
-- [ ] **Step 2: Run to verify failure**
+- [ ] **步骤 2：运行并确认预期失败**
 
-Run: `cd studyhub-agent && $PY -m pytest tests/contracts/test_tools.py -q`
-Expected: FAIL — `ModuleNotFoundError: No module named 'studyhub_agent.contracts.tools'`.
+执行：`cd studyhub-agent && $PY -m pytest tests/contracts/test_tools.py -q`
+预期结果：测试失败，提示 `studyhub_agent.contracts.tools` 尚不存在。
 
-- [ ] **Step 3: Implement `contracts/tools.py`**
+- [ ] **步骤 3：实现 `contracts/tools.py`**
 
 ```python
 from __future__ import annotations
@@ -376,12 +380,12 @@ def _lint_property(tool: str, prop_name: str, schema: dict[str, Any]) -> None:
             raise ToolSpecError(f"tool {tool}: array property {prop_name} needs typed items")
 ```
 
-- [ ] **Step 4: Run to verify pass**
+- [ ] **步骤 4：运行并确认通过**
 
-Run: `cd studyhub-agent && $PY -m pytest tests/contracts/test_tools.py -q`
-Expected: all passed.
+执行：`cd studyhub-agent && $PY -m pytest tests/contracts/test_tools.py -q`
+预期结果：全部通过。
 
-- [ ] **Step 5: Commit**
+- [ ] **步骤 5：提交**
 
 ```bash
 git add studyhub-agent/src/studyhub_agent/contracts/tools.py studyhub-agent/tests/contracts
@@ -390,16 +394,16 @@ git commit -m "feat: add ToolSpec contract with schema lint"
 
 ---
 
-### Task 3: Versioned prompt registry
+### 任务 3：版本化提示注册表
 
-**Files:**
-- Create: `studyhub-agent/src/studyhub_agent/contracts/prompts.py`
-- Test: `studyhub-agent/tests/contracts/test_prompts.py`
+**涉及文件：**
+- 新建：`studyhub-agent/src/studyhub_agent/contracts/prompts.py`
+- 测试：`studyhub-agent/tests/contracts/test_prompts.py`
 
-**Interfaces:**
-- Produces: `PromptTemplate(prompt_id, version, text)` with `.key -> "id@version"`; `PromptRegistry(prompts)` with `.get(key) -> PromptTemplate`, `.with_prompt(prompt) -> PromptRegistry`, `.keys() -> tuple[str, ...]`; constants `SYSTEM_PROMPT_KEY = "studyhub.agent.system@1.0"`, `FINALIZE_PROMPT_KEY = "studyhub.agent.finalize@1.0"`, `DEFAULT_PROMPTS: PromptRegistry`.
+**接口约定：**
+- 提供 `PromptTemplate`、`PromptRegistry` 与默认提示键。提示以 `id@version` 访问，注册表支持查找、扩展副本和键列表。
 
-- [ ] **Step 1: Write the failing tests**
+- [ ] **步骤 1：编写预期失败的测试**
 
 ```python
 import pytest
@@ -440,12 +444,12 @@ def test_prompt_version_must_be_numeric() -> None:
         PromptTemplate("p", "latest", "text")
 ```
 
-- [ ] **Step 2: Run to verify failure**
+- [ ] **步骤 2：运行并确认预期失败**
 
-Run: `cd studyhub-agent && $PY -m pytest tests/contracts/test_prompts.py -q`
-Expected: FAIL — module not found.
+执行：`cd studyhub-agent && $PY -m pytest tests/contracts/test_prompts.py -q`
+预期结果：模块尚未实现，测试按预期失败。
 
-- [ ] **Step 3: Implement `contracts/prompts.py`**
+- [ ] **步骤 3：实现 `contracts/prompts.py`**
 
 ```python
 from __future__ import annotations
@@ -518,12 +522,12 @@ DEFAULT_PROMPTS = PromptRegistry(
 )
 ```
 
-- [ ] **Step 4: Run to verify pass**
+- [ ] **步骤 4：运行并确认通过**
 
-Run: `cd studyhub-agent && $PY -m pytest tests/contracts/test_prompts.py -q`
-Expected: all passed.
+执行：`cd studyhub-agent && $PY -m pytest tests/contracts/test_prompts.py -q`
+预期结果：全部通过。
 
-- [ ] **Step 5: Commit**
+- [ ] **步骤 5：提交**
 
 ```bash
 git add studyhub-agent/src/studyhub_agent/contracts/prompts.py studyhub-agent/tests/contracts/test_prompts.py
@@ -532,18 +536,18 @@ git commit -m "feat: add versioned prompt registry"
 
 ---
 
-### Task 4: Episode data models
+### 任务 4：任务与回合数据模型
 
-**Files:**
-- Create: `studyhub-agent/src/studyhub_agent/contracts/episode.py`
-- Test: `studyhub-agent/tests/contracts/test_episode.py`
+**涉及文件：**
+- 新建：`studyhub-agent/src/studyhub_agent/contracts/episode.py`
+- 测试：`studyhub-agent/tests/contracts/test_episode.py`
 
-**Interfaces:**
-- Produces (all pydantic, frozen, `extra="forbid"`):
+**接口约定：**
+- 提供下列冻结的 Pydantic 模型，未知字段由 `extra="forbid"` 拒绝：
   - `ToolCall(call_id: str, name: str, arguments: dict[str, Any])`
   - `Message(role: Literal["system","user","assistant","tool"], content: str = "", tool_calls: tuple[ToolCall, ...] = (), tool_call_id: str | None = None, name: str | None = None)`
   - `Sampling(temperature: float = 0.0, top_p: float = 1.0, seed: int | None = None)`
-  - `Budget(max_turns=12, max_tool_calls=16, max_parse_errors=2, max_context_tokens=16384, max_new_tokens=2048)` (all `ge=1`; validator: `max_new_tokens < max_context_tokens`)
+  - `Budget(max_turns=12, max_tool_calls=16, max_parse_errors=2, max_context_tokens=16384, max_new_tokens=2048)`；要求为提示预留空间。
   - `Principal(principal_id: str, purchased_material_ids: frozenset[int] = frozenset(), owned_material_ids: frozenset[int] = frozenset(), is_admin: bool = False)`
   - `EpisodeSpec(episode_id, task_id, user_message, principal: Principal, system_prompt: str = SYSTEM_PROMPT_KEY, finalize_prompt: str = FINALIZE_PROMPT_KEY, tool_names: tuple[str, ...], thinking: bool = False, budget: Budget = Budget(), sampling: Sampling = Sampling(), metadata: dict[str, str] = {})`
   - `TurnKind(StrEnum)`: `TOOL_CALLS`, `FINAL`, `PARSE_ERROR`
@@ -553,7 +557,7 @@ git commit -m "feat: add versioned prompt registry"
   - `FailureOwner(StrEnum)`: `NONE`, `MODEL`, `ENV`, `INFRA`
   - `Episode(spec, contract_hash: str, messages: tuple[Message, ...], turns: tuple[AssistantTurn, ...], observations: tuple[Observation, ...], termination: Termination, failure_owner: FailureOwner, final_answer: str | None = None, error_detail: str | None = None, environment_trace: dict[str, Any] = {})`
 
-- [ ] **Step 1: Write the failing tests**
+- [ ] **步骤 1：编写预期失败的测试**
 
 ```python
 import pytest
@@ -617,12 +621,12 @@ def test_episode_round_trips_through_json() -> None:
     assert Episode.model_validate_json(episode.model_dump_json()) == episode
 ```
 
-- [ ] **Step 2: Run to verify failure**
+- [ ] **步骤 2：运行并确认预期失败**
 
-Run: `cd studyhub-agent && $PY -m pytest tests/contracts/test_episode.py -q`
-Expected: FAIL — module not found.
+执行：`cd studyhub-agent && $PY -m pytest tests/contracts/test_episode.py -q`
+预期结果：模块尚未实现，测试按预期失败。
 
-- [ ] **Step 3: Implement `contracts/episode.py`**
+- [ ] **步骤 3：实现 `contracts/episode.py`**
 
 ```python
 from __future__ import annotations
@@ -754,12 +758,12 @@ class Episode(_Frozen):
     environment_trace: dict[str, Any] = Field(default_factory=dict)
 ```
 
-- [ ] **Step 4: Run to verify pass**
+- [ ] **步骤 4：运行并确认通过**
 
-Run: `cd studyhub-agent && $PY -m pytest tests/contracts/test_episode.py -q`
-Expected: all passed.
+执行：`cd studyhub-agent && $PY -m pytest tests/contracts/test_episode.py -q`
+预期结果：全部通过。
 
-- [ ] **Step 5: Commit**
+- [ ] **步骤 5：提交**
 
 ```bash
 git add studyhub-agent/src/studyhub_agent/contracts/episode.py studyhub-agent/tests/contracts/test_episode.py
@@ -768,34 +772,34 @@ git commit -m "feat: add episode data models"
 
 ---
 
-### Task 5: The single chat renderer and tool-call parser
+### 任务 5：统一聊天渲染与工具调用解析
 
-**Files:**
-- Create: `studyhub-agent/src/studyhub_agent/contracts/templates/qwen3_5.jinja` (verbatim copy), `studyhub-agent/src/studyhub_agent/contracts/render.py`
-- Modify: `studyhub-agent/pyproject.toml` — add `[tool.hatch.build.targets.wheel.force-include]` so the template ships: `"src/studyhub_agent/contracts/templates" = "studyhub_agent/contracts/templates"`
-- Test: `studyhub-agent/tests/contracts/test_render.py`
+**涉及文件：**
+- 新建聊天模板的原样副本与 `contracts/render.py`。
+- 配置 wheel 包含模板资源，并通过非 editable 安装验证。
+- 测试：`studyhub-agent/tests/contracts/test_render.py`
 
-**Interfaces:**
-- Consumes: `ToolSpec` (Task 2), `Message`, `ToolCall`, `TurnKind` (Task 4).
-- Produces:
-  - `TEMPLATE_SHA256: str` (hex digest of the vendored template, checked at import)
+**接口约定：**
+- 依赖任务 2 的 `ToolSpec` 和任务 4 的消息、工具调用与回合类型。
+- 提供：
+  - `TEMPLATE_SHA256`：模板摘要，加载时核对。
   - `render_text(messages: Sequence[Message], tools: Sequence[ToolSpec], *, thinking: bool, add_generation_prompt: bool) -> str`
-  - `ParsedCompletion(kind: TurnKind, content: str, tool_calls: tuple[ToolCall, ...], error: str | None)` frozen dataclass
-  - `parse_completion(text: str, tools: Sequence[ToolSpec], *, thinking: bool) -> ParsedCompletion` (call ids are `call_0`, `call_1`, …; the runner re-labels them)
-  - `canonical_completion_text(history: Sequence[Message], assistant: Message, tools: Sequence[ToolSpec], *, thinking: bool) -> str` — the exact text the template renders for `assistant` after the generation prompt, including the trailing `<|im_end|>\n`
+  - 冻结的 `ParsedCompletion(kind, content, tool_calls, error)`。
+  - `parse_completion(...) -> ParsedCompletion`：生成调用编号，执行器随后重新编号。
+  - `canonical_completion_text(...) -> str`：获得生成提示后本回合的准确文本，包含结束标记。
   - `END_OF_TURN = "<|im_end|>"`
-  - `RenderError(ValueError)` — raised by `render_text` when a value cannot be represented (e.g. string argument containing `</parameter>`)
+  - `RenderError`：无法表示参数时抛出，例如字符串包含关闭参数标签。
 
-- [ ] **Step 1: Vendor the template**
+- [ ] **步骤 1：保存聊天模板原样副本**
 
 ```bash
 mkdir -p studyhub-agent/src/studyhub_agent/contracts/templates
 cp /data/chengjin/studyhub/models/P1/Qwen3.5-4B/chat_template.jinja studyhub-agent/src/studyhub_agent/contracts/templates/qwen3_5.jinja
 sha256sum studyhub-agent/src/studyhub_agent/contracts/templates/qwen3_5.jinja
 ```
-Expected digest: `a4aee8afcf2e0711942cf848899be66016f8d14a889ff9ede07bca099c28f715` (already pinned in Step 4). A different digest means the model files changed — stop and report.
+预期摘要：`a4aee8afcf2e0711942cf848899be66016f8d14a889ff9ede07bca099c28f715`。摘要变化时先确认模型文件版本。
 
-- [ ] **Step 2: Write the failing tests**
+- [ ] **步骤 2：编写预期失败的测试**
 
 ```python
 import pytest
@@ -926,12 +930,12 @@ def test_trailing_end_of_turn_token_is_ignored() -> None:
     assert parse_completion("答案<|im_end|>", TOOLS, thinking=False).content == "答案"
 ```
 
-- [ ] **Step 3: Run to verify failure**
+- [ ] **步骤 3：运行并确认预期失败**
 
-Run: `cd studyhub-agent && $PY -m pytest tests/contracts/test_render.py -q`
-Expected: FAIL — module not found.
+执行：`cd studyhub-agent && $PY -m pytest tests/contracts/test_render.py -q`
+预期结果：模块尚未实现，测试按预期失败。
 
-- [ ] **Step 4: Implement `contracts/render.py`**
+- [ ] **步骤 4：实现 `contracts/render.py`**
 
 ```python
 from __future__ import annotations
@@ -1138,18 +1142,18 @@ def _coerce(raw: str, schema: dict[str, Any]) -> tuple[Any, bool]:
     return value, True
 ```
 
-Add to `pyproject.toml`:
+在 `pyproject.toml` 中配置：
 ```toml
 [tool.hatch.build.targets.wheel.force-include]
 "src/studyhub_agent/contracts/templates" = "studyhub_agent/contracts/templates"
 ```
 
-- [ ] **Step 5: Run to verify pass**
+- [ ] **步骤 5：运行并确认通过**
 
-Run: `cd studyhub-agent && $PY -m pytest tests/contracts/test_render.py -q`
-Expected: all passed. If `test_prefix_property_holds_for_tool_turns` fails, print both strings and fix `_message_dict` (the template must see exactly the OpenAI-style message shape) — do not weaken the test.
+执行：`cd studyhub-agent && $PY -m pytest tests/contracts/test_render.py -q`
+预期结果：全部通过。若提示前缀属性测试失败，对比两份字符串并修正 `_message_dict`；模板必须接收正确的 OpenAI 风格消息，不能弱化测试。
 
-- [ ] **Step 6: Commit**
+- [ ] **步骤 6：提交**
 
 ```bash
 git add studyhub-agent/src/studyhub_agent/contracts/render.py studyhub-agent/src/studyhub_agent/contracts/templates studyhub-agent/tests/contracts/test_render.py studyhub-agent/pyproject.toml
@@ -1158,17 +1162,17 @@ git commit -m "feat: add single Qwen3.5 chat renderer and tool-call parser"
 
 ---
 
-### Task 6: Contract hash
+### 任务 6：契约哈希
 
-**Files:**
-- Create: `studyhub-agent/src/studyhub_agent/contracts/fingerprint.py`
-- Test: `studyhub-agent/tests/contracts/test_fingerprint.py`
+**涉及文件：**
+- 新建：`studyhub-agent/src/studyhub_agent/contracts/fingerprint.py`
+- 测试：`studyhub-agent/tests/contracts/test_fingerprint.py`
 
-**Interfaces:**
-- Consumes: `PromptTemplate` (Task 3), `ToolSpec` (Task 2), `TEMPLATE_SHA256` (Task 5).
-- Produces: `TURN_RULE_VERSION = "turn-rule@1"`; `ContractInputs(system_prompt: PromptTemplate, finalize_prompt: PromptTemplate, tools: tuple[ToolSpec, ...], thinking: bool, tokenizer_revision: str, max_context_tokens: int, max_new_tokens: int, template_sha256: str = TEMPLATE_SHA256, turn_rule_version: str = TURN_RULE_VERSION)` frozen dataclass; `contract_hash(inputs: ContractInputs) -> str` returning `"sha256:<64 hex>"`.
+**接口约定：**
+- 依赖提示模板、工具定义和聊天模板摘要。
+- 提供 `TURN_RULE_VERSION`、冻结的 `ContractInputs` 和 `contract_hash`，返回 `sha256:<64 位摘要>`。
 
-- [ ] **Step 1: Write the failing tests**
+- [ ] **步骤 1：编写预期失败的测试**
 
 ```python
 import dataclasses
@@ -1223,12 +1227,12 @@ def test_every_component_changes_the_hash(change) -> None:
     assert contract_hash(dataclasses.replace(BASE, **change)) != contract_hash(BASE)
 ```
 
-- [ ] **Step 2: Run to verify failure**
+- [ ] **步骤 2：运行并确认预期失败**
 
-Run: `cd studyhub-agent && $PY -m pytest tests/contracts/test_fingerprint.py -q`
-Expected: FAIL — module not found.
+执行：`cd studyhub-agent && $PY -m pytest tests/contracts/test_fingerprint.py -q`
+预期结果：模块尚未实现，测试按预期失败。
 
-- [ ] **Step 3: Implement `contracts/fingerprint.py`**
+- [ ] **步骤 3：实现 `contracts/fingerprint.py`**
 
 ```python
 from __future__ import annotations
@@ -1273,12 +1277,12 @@ def contract_hash(inputs: ContractInputs) -> str:
     return "sha256:" + hashlib.sha256(payload.encode("utf-8")).hexdigest()
 ```
 
-- [ ] **Step 4: Run to verify pass**
+- [ ] **步骤 4：运行并确认通过**
 
-Run: `cd studyhub-agent && $PY -m pytest tests/contracts -q`
-Expected: all passed.
+执行：`cd studyhub-agent && $PY -m pytest tests/contracts -q`
+预期结果：全部通过。
 
-- [ ] **Step 5: Commit**
+- [ ] **步骤 5：提交**
 
 ```bash
 git add studyhub-agent/src/studyhub_agent/contracts/fingerprint.py studyhub-agent/tests/contracts/test_fingerprint.py
@@ -1287,20 +1291,20 @@ git commit -m "feat: add runtime contract hash"
 
 ---
 
-### Task 7: Port guardrails
+### 任务 7：权限、隐私与网页保护
 
-**Files:**
-- Create: `studyhub-agent/src/studyhub_agent/guardrails/permissions.py`, `privacy.py`, `web_security.py`
-- Test: `studyhub-agent/tests/guardrails/test_permissions.py`, `test_privacy.py`, `test_web_security.py` (+ `tests/guardrails/__init__.py`)
+**涉及文件：**
+- 新建：`studyhub-agent/src/studyhub_agent/guardrails/permissions.py`, `privacy.py`, `web_security.py`
+- 测试：`studyhub-agent/tests/guardrails/test_permissions.py`, `test_privacy.py`, `test_web_security.py` (+ `tests/guardrails/__init__.py`)
 
-**Interfaces:**
-- Consumes: `Principal` (Task 4).
-- Produces:
+**接口约定：**
+- 依赖任务 4 的 `Principal`。
+- 提供：
   - `permissions.can_read(principal: Principal, *, material_id: int, access_scope: str, owner_id: str | None) -> bool`
   - `privacy.FORBIDDEN_KEYS: frozenset[str]`, `privacy.redact_text(value: str) -> str`, `privacy.sanitize_output(value: Any) -> Any`
-  - `web_security.UnsafeUrlError(ValueError)`, `web_security.WebSecurityPolicy(max_urls_per_call=3, allowed_ports=(None, 80, 443))` with `.validate_url(url: str, *, resolver: Callable[[str], Iterable[str]]) -> str`
+  - `UnsafeUrlError` 与 `WebSecurityPolicy`，限制每次 URL 数、协议、端口及解析地址。
 
-- [ ] **Step 1: Write the failing tests**
+- [ ] **步骤 1：编写预期失败的测试**
 
 `tests/guardrails/test_permissions.py`:
 ```python
@@ -1384,12 +1388,12 @@ def test_hostname_resolving_to_private_address_is_rejected() -> None:
         POLICY.validate_url("https://intranet.example.com", resolver=_private)
 ```
 
-- [ ] **Step 2: Run to verify failure**
+- [ ] **步骤 2：运行并确认预期失败**
 
-Run: `cd studyhub-agent && $PY -m pytest tests/guardrails -q`
-Expected: FAIL — modules not found.
+执行：`cd studyhub-agent && $PY -m pytest tests/guardrails -q`
+预期结果：相关模块尚未实现，测试按预期失败。
 
-- [ ] **Step 3: Implement the three modules**
+- [ ] **步骤 3：实现三个保护模块**
 
 `guardrails/permissions.py`:
 ```python
@@ -1483,12 +1487,12 @@ class WebSecurityPolicy:
         return url
 ```
 
-- [ ] **Step 4: Run to verify pass**
+- [ ] **步骤 4：运行并确认通过**
 
-Run: `cd studyhub-agent && $PY -m pytest tests/guardrails -q`
-Expected: all passed.
+执行：`cd studyhub-agent && $PY -m pytest tests/guardrails -q`
+预期结果：全部通过。
 
-- [ ] **Step 5: Commit**
+- [ ] **步骤 5：提交**
 
 ```bash
 git add studyhub-agent/src/studyhub_agent/guardrails studyhub-agent/tests/guardrails
@@ -1497,17 +1501,17 @@ git commit -m "feat: port permission, privacy and SSRF guardrails"
 
 ---
 
-### Task 8: Tool specs and MCP names
+### 任务 8：工具定义与 MCP 名称
 
-**Files:**
-- Create: `studyhub-agent/src/studyhub_agent/tools/specs.py`
-- Test: `studyhub-agent/tests/tools/test_specs.py` (+ `tests/tools/__init__.py`)
+**涉及文件：**
+- 新建：`studyhub-agent/src/studyhub_agent/tools/specs.py`
+- 测试：`studyhub-agent/tests/tools/test_specs.py` (+ `tests/tools/__init__.py`)
 
-**Interfaces:**
-- Consumes: `ToolSpec` (Task 2).
-- Produces: `TOOL_SPECS: tuple[ToolSpec, ...]` (8 specs, names listed in Global Constraints), `TOOLS_BY_NAME: Mapping[str, ToolSpec]`, `POLICY_TOPICS: tuple[str, ...] = ("refund", "copyright", "download", "account", "payout")`, `mcp_name_for(tool_name: str) -> str | None`, `select_tools(names: Sequence[str]) -> tuple[ToolSpec, ...]` (raises `KeyError` listing unknown names).
+**接口约定：**
+- 依赖任务 2 的 `ToolSpec`。
+- 提供八个工具定义、按名称索引、政策主题列表、MCP 名称映射与工具选择函数；未知名称抛出 `KeyError`。
 
-- [ ] **Step 1: Write the failing tests**
+- [ ] **步骤 1：编写预期失败的测试**
 
 ```python
 import pytest
@@ -1541,12 +1545,12 @@ def test_select_tools_preserves_request_order_and_rejects_unknown() -> None:
         select_tools(["web_fetch"])
 ```
 
-- [ ] **Step 2: Run to verify failure**
+- [ ] **步骤 2：运行并确认预期失败**
 
-Run: `cd studyhub-agent && $PY -m pytest tests/tools -q`
-Expected: FAIL — module not found.
+执行：`cd studyhub-agent && $PY -m pytest tests/tools -q`
+预期结果：模块尚未实现，测试按预期失败。
 
-- [ ] **Step 3: Implement `tools/specs.py`**
+- [ ] **步骤 3：实现 `tools/specs.py`**
 
 ```python
 from __future__ import annotations
@@ -1668,12 +1672,12 @@ def select_tools(names: Sequence[str]) -> tuple[ToolSpec, ...]:
     return tuple(TOOLS_BY_NAME[name] for name in names)
 ```
 
-- [ ] **Step 4: Run to verify pass**
+- [ ] **步骤 4：运行并确认通过**
 
-Run: `cd studyhub-agent && $PY -m pytest tests/tools -q`
-Expected: all passed.
+执行：`cd studyhub-agent && $PY -m pytest tests/tools -q`
+预期结果：全部通过。
 
-- [ ] **Step 5: Commit**
+- [ ] **步骤 5：提交**
 
 ```bash
 git add studyhub-agent/src/studyhub_agent/tools studyhub-agent/tests/tools
@@ -1682,23 +1686,23 @@ git commit -m "feat: define MCP-aligned tool specs"
 
 ---
 
-### Task 9: Replay environment with discovery/unlock gating
+### 任务 9：带发现和解锁门控的回放环境
 
-**Files:**
-- Create: `studyhub-agent/src/studyhub_agent/environments/base.py`, `environments/replay/__init__.py`, `environments/replay/snapshot.py`, `environments/replay/index.py`, `environments/replay/handlers.py`, `environments/replay/environment.py`
-- Create fixture: `studyhub-agent/tests/fixtures/replay_snapshot.json`
-- Test: `studyhub-agent/tests/environments/test_replay_index.py`, `tests/environments/test_replay_environment.py` (+ `tests/environments/__init__.py`)
+**涉及文件：**
+- 新建：`studyhub-agent/src/studyhub_agent/environments/base.py`, `environments/replay/__init__.py`, `environments/replay/snapshot.py`, `environments/replay/index.py`, `environments/replay/handlers.py`, `environments/replay/environment.py`
+- 新建快照：`studyhub-agent/tests/fixtures/replay_snapshot.json`
+- 测试：`studyhub-agent/tests/environments/test_replay_index.py`, `tests/environments/test_replay_environment.py` (+ `tests/environments/__init__.py`)
 
-**Interfaces:**
-- Consumes: `EpisodeSpec`, `Principal`, `ToolCall`, `Observation` (Task 4); guardrails (Task 7); `TOOL_SPECS`, `POLICY_TOPICS` (Task 8).
-- Produces:
-  - `environments.base.Environment` Protocol: `reset(spec: EpisodeSpec) -> None`, `tool_specs() -> tuple[ToolSpec, ...]`, `execute(call: ToolCall) -> Observation`, `trace() -> dict[str, Any]`
+**接口约定：**
+- 依赖任务模型、权限隐私保护、工具定义与政策主题。
+- 提供：
+  - `Environment` 协议：重置任务、提供工具、执行调用与返回轨迹。
   - `environments.base.EnvironmentInfraError(RuntimeError)`
-  - `replay.snapshot.ReplaySnapshot` (pydantic frozen) with `materials: tuple[SnapshotMaterial, ...]`, `policies: dict[str, str]`, `web_pages: tuple[SnapshotWebPage, ...]`, `memory: dict[str, dict[str, str]]`, `snapshot_id: str`, `schema_version: Literal["studyhub.replay.v3"]`; `load_snapshot(path: Path) -> ReplaySnapshot`; `snapshot_digest(snapshot) -> str`
-  - `replay.index.mixed_tokens(text: str) -> list[str]`, `replay.index.Bm25Index(rows: Sequence[SnapshotMaterial])` with `.search(query: str, *, limit: int) -> list[tuple[float, SnapshotMaterial]]`
-  - `replay.environment.ReplayEnvironment(snapshot: ReplaySnapshot)` implementing `Environment`
+  - 冻结的 `ReplaySnapshot`：保存资料、政策、网页、记忆、快照标识和版本；提供加载与摘要函数。
+  - `mixed_tokens` 与 `Bm25Index`：混合分词和快照检索。
+  - 实现环境协议的 `ReplayEnvironment`。
 
-- [ ] **Step 1: Write the fixture snapshot**
+- [ ] **步骤 1：编写测试快照**
 
 `tests/fixtures/replay_snapshot.json`:
 ```json
@@ -1726,7 +1730,7 @@ git commit -m "feat: define MCP-aligned tool specs"
 }
 ```
 
-- [ ] **Step 2: Write the failing tests**
+- [ ] **步骤 2：编写预期失败的测试**
 
 `tests/environments/test_replay_index.py`:
 ```python
@@ -1875,12 +1879,12 @@ def test_execute_before_reset_is_a_programming_error() -> None:
         ReplayEnvironment(SNAPSHOT).execute(_call("memory_get"))
 ```
 
-- [ ] **Step 3: Run to verify failure**
+- [ ] **步骤 3：运行并确认预期失败**
 
-Run: `cd studyhub-agent && $PY -m pytest tests/environments -q`
-Expected: FAIL — modules not found.
+执行：`cd studyhub-agent && $PY -m pytest tests/environments -q`
+预期结果：相关模块尚未实现，测试按预期失败。
 
-- [ ] **Step 4: Implement**
+- [ ] **步骤 4：实现**
 
 `environments/base.py`:
 ```python
@@ -2023,7 +2027,7 @@ def _document_text(row: SnapshotMaterial) -> str:
     return " ".join([row.title, row.course, row.school, row.summary, *row.tags])
 ```
 
-`environments/replay/handlers.py` (pure functions over an explicit state; each returns `(ok, payload, error_code)` and a new state — no mutation):
+`environments/replay/handlers.py` 使用显式状态的纯函数，返回执行结果与新状态，不原地修改输入：
 ```python
 from __future__ import annotations
 
@@ -2257,12 +2261,12 @@ from studyhub_agent.environments.replay.snapshot import ReplaySnapshot, load_sna
 __all__ = ["ReplayEnvironment", "ReplaySnapshot", "load_snapshot"]
 ```
 
-- [ ] **Step 5: Run to verify pass**
+- [ ] **步骤 5：运行并确认通过**
 
-Run: `cd studyhub-agent && $PY -m pytest tests/environments -q && lint-imports --config .importlinter`
-Expected: all passed; contracts kept.
+执行：`cd studyhub-agent && $PY -m pytest tests/environments -q && lint-imports --config .importlinter`
+预期结果：全部通过，依赖契约保持。
 
-- [ ] **Step 6: Commit**
+- [ ] **步骤 6：提交**
 
 ```bash
 git add studyhub-agent/src/studyhub_agent/environments studyhub-agent/tests/environments studyhub-agent/tests/fixtures/replay_snapshot.json
@@ -2271,22 +2275,22 @@ git commit -m "feat: add gated replay environment with MCP-aligned tools"
 
 ---
 
-### Task 10: EpisodeRunner
+### 任务 10：统一任务执行器
 
-**Files:**
-- Create: `studyhub-agent/src/studyhub_agent/runtime/policy.py`, `runtime/runner.py`
-- Test: `studyhub-agent/tests/runtime/test_runner.py`, `tests/runtime/fakes.py` (+ `tests/runtime/__init__.py`)
+**涉及文件：**
+- 新建：`studyhub-agent/src/studyhub_agent/runtime/policy.py`, `runtime/runner.py`
+- 测试：`studyhub-agent/tests/runtime/test_runner.py`, `tests/runtime/fakes.py` (+ `tests/runtime/__init__.py`)
 
-**Interfaces:**
-- Consumes: Tasks 3–9.
-- Produces:
-  - `runtime.policy.PolicyClient` Protocol: `step(messages: Sequence[Message], tools: Sequence[ToolSpec], *, thinking: bool, sampling: Sampling, max_new_tokens: int) -> AssistantTurn`
+**接口约定：**
+- 依赖任务 3–9。
+- 提供：
+  - `PolicyClient` 协议，输入消息、工具、thinking、采样参数与生成预算，返回 `AssistantTurn`。
   - `runtime.policy.PolicyInfraError(RuntimeError)`
   - `runtime.runner.TokenCounter = Callable[[Sequence[Message], Sequence[ToolSpec], bool], int]`
-  - `runtime.runner.EpisodeRunner(*, prompts: PromptRegistry, tokenizer_revision: str, count_tokens: TokenCounter)` with `.run(spec: EpisodeSpec, environment: Environment, policy: PolicyClient) -> Episode` and `.contract_for(spec: EpisodeSpec, tools: Sequence[ToolSpec]) -> str`
-  - Runtime feedback messages use `Message(role="tool", name="runtime_feedback", content=<json>)`.
+  - `EpisodeRunner` 提供任务运行和契约计算接口。
+  - 运行时反馈使用 `Message(role="tool", name="runtime_feedback", content=<JSON>)`。
 
-- [ ] **Step 1: Write the test fakes**
+- [ ] **步骤 1：编写测试替身**
 
 `tests/runtime/fakes.py`:
 ```python
@@ -2334,7 +2338,7 @@ def count_chars(messages: Sequence[Message], tools: Sequence[ToolSpec], thinking
     return sum(len(message.content) for message in messages)
 ```
 
-- [ ] **Step 2: Write the failing tests**
+- [ ] **步骤 2：编写预期失败的测试**
 
 `tests/runtime/test_runner.py`:
 ```python
@@ -2460,12 +2464,12 @@ def test_contract_hash_depends_on_thinking() -> None:
     assert RUNNER.contract_for(_spec(), tools) != RUNNER.contract_for(_spec(thinking=True), tools)
 ```
 
-- [ ] **Step 3: Run to verify failure**
+- [ ] **步骤 3：运行并确认预期失败**
 
-Run: `cd studyhub-agent && $PY -m pytest tests/runtime/test_runner.py -q`
-Expected: FAIL — modules not found.
+执行：`cd studyhub-agent && $PY -m pytest tests/runtime/test_runner.py -q`
+预期结果：相关模块尚未实现，测试按预期失败。
 
-- [ ] **Step 4: Implement**
+- [ ] **步骤 4：实现**
 
 `runtime/policy.py`:
 ```python
@@ -2640,12 +2644,12 @@ def _relabel(turn: AssistantTurn, turn_index: int) -> AssistantTurn:
     return turn.model_copy(update={"tool_calls": calls})
 ```
 
-- [ ] **Step 5: Run to verify pass**
+- [ ] **步骤 5：运行并确认通过**
 
-Run: `cd studyhub-agent && $PY -m pytest tests/runtime/test_runner.py -q && lint-imports --config .importlinter`
-Expected: all passed; contracts kept.
+执行：`cd studyhub-agent && $PY -m pytest tests/runtime/test_runner.py -q && lint-imports --config .importlinter`
+预期结果：全部通过，依赖契约保持。
 
-- [ ] **Step 6: Commit**
+- [ ] **步骤 6：提交**
 
 ```bash
 git add studyhub-agent/src/studyhub_agent/runtime studyhub-agent/tests/runtime
@@ -2654,20 +2658,20 @@ git commit -m "feat: add EpisodeRunner shared by datagen, rollout and eval"
 
 ---
 
-### Task 11: Token-level and OpenAI-compatible policy clients + parity
+### 任务 11：两类策略客户端与一致性
 
-**Files:**
-- Create: `studyhub-agent/src/studyhub_agent/runtime/tokenizer.py`, `runtime/token_client.py`, `runtime/openai_client.py`
-- Test: `studyhub-agent/tests/runtime/test_clients.py`
+**涉及文件：**
+- 新建：`studyhub-agent/src/studyhub_agent/runtime/tokenizer.py`, `runtime/token_client.py`, `runtime/openai_client.py`
+- 测试：`studyhub-agent/tests/runtime/test_clients.py`
 
-**Interfaces:**
-- Consumes: `render_text`, `parse_completion`, `canonical_completion_text`, `END_OF_TURN` (Task 5); `PolicyInfraError` (Task 10).
-- Produces:
-  - `runtime.tokenizer.Tokenizer` Protocol: `encode(text: str) -> list[int]`, `decode(ids: Sequence[int]) -> str`, `stop_token_ids: tuple[int, ...]`; `HFTokenizer.from_model_dir(path: Path)` (uses `tokenizers.Tokenizer.from_file(path / "tokenizer.json")`, stop ids = ids of `<|im_end|>` and `<|endoftext|>`); `token_counter(tokenizer) -> TokenCounter`
-  - `runtime.token_client.Generation(output_ids: tuple[int, ...], logprobs: tuple[float, ...], finish_reason: str | None)`; `GenerateBackend` Protocol `generate(input_ids, *, sampling, max_new_tokens, stop_token_ids) -> Generation`; `SGLangGenerateBackend(base_url: str, *, timeout_s: float = 120.0, client: httpx.Client | None = None)`; `TokenPolicyClient(tokenizer: Tokenizer, backend: GenerateBackend)` implementing `PolicyClient`
-  - `runtime.openai_client.OpenAICompatPolicyClient(base_url: str, model: str, *, api_key: str | None = None, tokenizer: Tokenizer | None = None, timeout_s: float = 120.0, client: httpx.Client | None = None)` implementing `PolicyClient`
+**接口约定：**
+- 依赖渲染、解析、标准化文本、结束标记和模型基础设施错误类型。
+- 提供：
+  - `Tokenizer` 协议和 `HFTokenizer.from_model_dir`，从本地 tokenizer 文件加载编码器并确定停止 token。
+  - `Generation`、`GenerateBackend`、`SGLangGenerateBackend` 和 `TokenPolicyClient`，实现 token 级生成与解析。
+  - `OpenAICompatPolicyClient`，实现兼容接口调用与本地标准化渲染。
 
-- [ ] **Step 1: Write the failing tests**
+- [ ] **步骤 1：编写预期失败的测试**
 
 ```python
 import json
@@ -2796,12 +2800,12 @@ def test_sglang_backend_request_and_response_shape() -> None:
     assert generation == Generation(output_ids=(97, 98), logprobs=(-0.5, -0.25), finish_reason="stop")
 ```
 
-- [ ] **Step 2: Run to verify failure**
+- [ ] **步骤 2：运行并确认预期失败**
 
-Run: `cd studyhub-agent && $PY -m pytest tests/runtime/test_clients.py -q`
-Expected: FAIL — modules not found.
+执行：`cd studyhub-agent && $PY -m pytest tests/runtime/test_clients.py -q`
+预期结果：相关模块尚未实现，测试按预期失败。
 
-- [ ] **Step 3: Implement**
+- [ ] **步骤 3：实现**
 
 `runtime/tokenizer.py`:
 ```python
@@ -2961,7 +2965,7 @@ def _parse_error_turn(raw_text: str, error: str, prompt_ids: Sequence[int], gene
     )
 ```
 
-Note for the implementer: `non_canonical` compares the generated text with the canonical render minus the end marker. With thinking disabled the canonical render of a FINAL turn is `content + "<|im_end|>\n"` where the template trims `content`, so trailing spaces in the raw text make the turn non-canonical (as the test expects).
+实现说明：`non_canonical` 比较原始生成文本与去除结束标记后的标准化文本。关闭 thinking 时，模板会裁剪正文，因此原始文本的尾部空格可使回合被标记为非标准化。
 
 `runtime/openai_client.py`:
 ```python
@@ -3078,12 +3082,12 @@ class OpenAICompatPolicyClient:
         return AssistantTurn(kind=TurnKind.PARSE_ERROR, raw_text=raw_text, canonical_text=raw_text, parse_error=error, finish_reason=choice.get("finish_reason"), latency_ms=latency_ms)
 ```
 
-- [ ] **Step 4: Run to verify pass**
+- [ ] **步骤 4：运行并确认通过**
 
-Run: `cd studyhub-agent && $PY -m pytest tests/runtime -q && lint-imports --config .importlinter`
-Expected: all passed. If the parity test fails, diff the two `canonical_text` values; the fix belongs in the client that deviates, never in the test.
+执行：`cd studyhub-agent && $PY -m pytest tests/runtime -q && lint-imports --config .importlinter`
+预期结果：全部通过。若客户端一致性测试失败，对比两份 `canonical_text`，修正偏离契约的客户端，不修改测试预期。
 
-- [ ] **Step 5: Commit**
+- [ ] **步骤 5：提交**
 
 ```bash
 git add studyhub-agent/src/studyhub_agent/runtime studyhub-agent/tests/runtime/test_clients.py
@@ -3092,17 +3096,17 @@ git commit -m "feat: add token-level and OpenAI-compatible policy clients with r
 
 ---
 
-### Task 12: Grader protocol and exact-match grader
+### 任务 12：判分协议与精确匹配
 
-**Files:**
-- Create: `studyhub-agent/src/studyhub_agent/graders/base.py`, `graders/exact_match.py`
-- Test: `studyhub-agent/tests/graders/test_exact_match.py` (+ `tests/graders/__init__.py`)
+**涉及文件：**
+- 新建：`studyhub-agent/src/studyhub_agent/graders/base.py`, `graders/exact_match.py`
+- 测试：`studyhub-agent/tests/graders/test_exact_match.py` (+ `tests/graders/__init__.py`)
 
-**Interfaces:**
-- Consumes: `Episode`, `FailureOwner`, `Termination` (Task 4).
-- Produces: `TaskSpec(task_id: str, expected_final: str | None = None, required_tools: tuple[str, ...] = ())` (pydantic frozen, extra forbid); `GradeResult(strict_pass: bool, hard_gates: dict[str, bool], scores: dict[str, float], failure_owner: FailureOwner, evidence: tuple[str, ...] = ())`; `Grader` Protocol `grade(episode: Episode, task: TaskSpec) -> GradeResult`; `ExactMatchGrader()`.
+**接口约定：**
+- 依赖任务 4 的 `Episode`、`FailureOwner` 与 `Termination`。
+- 提供 `TaskSpec`、`GradeResult`、`Grader.grade(...)` 与 `ExactMatchGrader`。结果包含硬门槛、分项得分、失败归属和证据。
 
-- [ ] **Step 1: Write the failing tests**
+- [ ] **步骤 1：编写预期失败的测试**
 
 ```python
 from studyhub_agent.contracts.episode import Episode, EpisodeSpec, FailureOwner, Message, Principal, Termination, ToolCall, AssistantTurn, TurnKind
@@ -3142,12 +3146,12 @@ def test_wrong_answer_is_model_failure() -> None:
     assert result.failure_owner is FailureOwner.MODEL and result.scores["answer_match"] == 0.0
 ```
 
-- [ ] **Step 2: Run to verify failure**
+- [ ] **步骤 2：运行并确认预期失败**
 
-Run: `cd studyhub-agent && $PY -m pytest tests/graders -q`
-Expected: FAIL — modules not found.
+执行：`cd studyhub-agent && $PY -m pytest tests/graders -q`
+预期结果：相关模块尚未实现，测试按预期失败。
 
-- [ ] **Step 3: Implement**
+- [ ] **步骤 3：实现**
 
 `graders/base.py`:
 ```python
@@ -3214,12 +3218,12 @@ class ExactMatchGrader:
         return GradeResult(strict_pass=strict and owner is FailureOwner.NONE, hard_gates=gates, scores={"answer_match": 1.0 if matches else 0.0}, failure_owner=owner, evidence=evidence)
 ```
 
-- [ ] **Step 4: Run to verify pass**
+- [ ] **步骤 4：运行并确认通过**
 
-Run: `cd studyhub-agent && $PY -m pytest tests/graders -q && lint-imports --config .importlinter`
-Expected: all passed; graders contract kept.
+执行：`cd studyhub-agent && $PY -m pytest tests/graders -q && lint-imports --config .importlinter`
+预期结果：全部通过，判分器依赖契约保持。
 
-- [ ] **Step 5: Commit**
+- [ ] **步骤 5：提交**
 
 ```bash
 git add studyhub-agent/src/studyhub_agent/graders studyhub-agent/tests/graders
@@ -3228,16 +3232,16 @@ git commit -m "feat: add grader protocol and exact-match grader"
 
 ---
 
-### Task 13: CI workflow, coverage gate and README
+### 任务 13：CI、覆盖率门禁与项目说明
 
-**Files:**
-- Create: `.github/workflows/agent.yml`
-- Modify: `studyhub-agent/README.md` (full rewrite)
+**涉及文件：**
+- 新建：`.github/workflows/agent.yml`
+- 修改：`studyhub-agent/README.md`，补充完整项目说明。
 
-**Interfaces:**
-- Consumes: everything above.
+**接口约定：**
+- 依赖前述所有模块。
 
-- [ ] **Step 1: Write `.github/workflows/agent.yml`**
+- [ ] **步骤 1：编写 `.github/workflows/agent.yml`**
 
 ```yaml
 name: Agent
@@ -3273,54 +3277,51 @@ jobs:
       - run: pytest --cov --cov-report=term-missing
 ```
 
-- [ ] **Step 2: Rewrite `studyhub-agent/README.md`**
+- [ ] **步骤 2：整理 `studyhub-agent/README.md`**
 
-```markdown
+````markdown
 # StudyHub Agent v3
 
-A research codebase for a StudyHub study-assistant agent built on Qwen3.5-4B, with 9B/27B as prompted baselines.
-Design: [`docs/specs/2026-09-25-foundation-design.md`](docs/specs/2026-09-25-foundation-design.md).
+面向高校学习场景的工具调用 Agent，使用 Qwen3.5-4B 与统一任务执行器。
 
-## Layout
+## 模块结构
 
-| Package | Responsibility |
-|---|---|
-| `contracts` | ToolSpec + lint, versioned prompts, episode models, the single Qwen3.5 renderer/parser, contract hash |
-| `guardrails` | permissions, privacy redaction, SSRF policy |
-| `tools` | the 8 tool specs and their backend MCP names |
-| `environments` | `Environment` protocol and the gated `ReplayEnvironment` |
-| `runtime` | `EpisodeRunner`, token-level (SGLang) and OpenAI-compatible policy clients |
-| `graders` | `Grader` protocol (benchmark and reward graders arrive in sub-project 2) |
+| 模块 | 职责 |
+| --- | --- |
+| `contracts` | 工具定义、提示注册表、回合模型、渲染解析与契约哈希 |
+| `guardrails` | 权限、隐私与网页访问保护 |
+| `tools` | 八项工具定义与 MCP 名称映射 |
+| `environments` | 环境协议与回放实现 |
+| `runtime` | 任务执行器与两类策略客户端 |
+| `graders` | 判分协议 |
 
-Layering is enforced by `lint-imports --config .importlinter`.
+依赖方向使用 `lint-imports --config .importlinter` 检查。
 
-## Contract
+## 运行契约
 
-Every episode, SFT sample, rollout and evaluation row carries a `contract_hash` covering the prompts, tool specs,
-thinking flag, chat-template digest, tokenizer revision, token limits and the turn rule. Rows with different hashes are
-never mixed. Tools marked `capability="snapshot"` run against frozen data and are not claims about the live product.
+每次任务使用 `contract_hash` 标识提示、工具、聊天模板、tokenizer 版本和预算。
+工具的 `capability="snapshot"` 标识冻结快照能力，不同契约的数据分别使用。
 
-## Development
+## 开发检查
 
 ```bash
 python3.12 -m venv .venv && .venv/bin/pip install -e ".[dev,tokenizers]"
 .venv/bin/ruff check src tests && .venv/bin/lint-imports --config .importlinter && .venv/bin/pytest --cov
 ```
 
-Model-dependent acceptance tests: `STUDYHUB_AGENT_MODEL_DIR=/path/to/Qwen3.5-4B pytest -m requires_model`.
+模板验收通过 `STUDYHUB_AGENT_MODEL_DIR=/path/to/Qwen3.5-4B pytest -m requires_model` 启用。
 
-## History
+## 历史档案
 
-The v2 code (Hermes/AReaL workflows, benchmark v1/v2, SFT/GRPO/OPD scripts) is preserved at tag `legacy-agent-v2`
-(unmerged OPD work at `archive/opd-*`). Reports and design-defect post-mortems are in `docs/history/`.
-```
+旧版代码保留在 `legacy-agent-v2` 和 `archive/opd-*` 标签，报告与复盘位于 `docs/history/`。
+````
 
-- [ ] **Step 3: Run the full gate**
+- [ ] **步骤 3：运行完整门禁**
 
-Run: `cd studyhub-agent && $PY -m ruff check src tests && lint-imports --config .importlinter && $PY -m pytest --cov`
-Expected: ruff clean; 2 contracts kept; all tests pass; coverage ≥ 80% (`Required test coverage of 80% reached`).
+执行：`cd studyhub-agent && $PY -m ruff check src tests && lint-imports --config .importlinter && $PY -m pytest --cov`
+预期结果：Ruff 通过，两个依赖契约保持，全部测试通过，覆盖率至少 80%。
 
-- [ ] **Step 4: Commit**
+- [ ] **步骤 4：提交**
 
 ```bash
 git add .github/workflows/agent.yml studyhub-agent/README.md
@@ -3329,16 +3330,16 @@ git commit -m "ci: add studyhub-agent v3 workflow with coverage and layering gat
 
 ---
 
-### Task 14: Server acceptance — real template, real tokenizer, real model
+### 任务 14：模板、tokenizer 与模型服务验收
 
-**Files:**
-- Create: `studyhub-agent/tests/acceptance/__init__.py`, `tests/acceptance/test_template_matches_transformers.py`, `studyhub-agent/scripts/smoke_episodes.py`, `studyhub-agent/tests/fixtures/smoke_tasks.jsonl`
+**涉及文件：**
+- 新建：`studyhub-agent/tests/acceptance/__init__.py`, `tests/acceptance/test_template_matches_transformers.py`, `studyhub-agent/scripts/smoke_episodes.py`, `studyhub-agent/tests/fixtures/smoke_tasks.jsonl`
 
-**Interfaces:**
-- Consumes: `render_text`, `HFTokenizer`, `TokenPolicyClient`, `SGLangGenerateBackend`, `EpisodeRunner`, `ReplayEnvironment`.
-- Produces: `scripts/smoke_episodes.py --model-dir PATH --sglang-url URL --snapshot PATH --tasks PATH --out PATH` writing one `Episode` JSON per line.
+**接口约定：**
+- 依赖渲染器、真实 tokenizer、两类推理组件、执行器与回放环境。
+- 提供 `scripts/smoke_episodes.py`，按行写入 Episode JSON。
 
-- [ ] **Step 1: Write the transformers equivalence test**
+- [ ] **步骤 1：编写 Transformers 一致性测试**
 
 ```python
 import os
@@ -3382,7 +3383,7 @@ def test_render_matches_transformers_apply_chat_template(conversation, thinking)
     assert render_text(conversation, TOOL_SPECS, thinking=thinking, add_generation_prompt=True) == expected
 ```
 
-- [ ] **Step 2: Write `tests/fixtures/smoke_tasks.jsonl`**
+- [ ] **步骤 2：编写 `tests/fixtures/smoke_tasks.jsonl`**
 
 ```json
 {"episode_id": "smoke-1", "task_id": "smoke-policy-refund", "user_message": "我买的资料还没下载，能退款吗？", "principal": {"principal_id": "u-1001"}, "tool_names": ["platform_policy", "materials_search"]}
@@ -3390,7 +3391,7 @@ def test_render_matches_transformers_apply_chat_template(conversation, thinking)
 {"episode_id": "smoke-3", "task_id": "smoke-memory", "user_message": "我的考试是哪天？顺便记住我积分比较薄弱。", "principal": {"principal_id": "u-1001"}, "tool_names": ["memory_get", "memory_update"]}
 ```
 
-- [ ] **Step 3: Write `scripts/smoke_episodes.py`**
+- [ ] **步骤 3：编写 `scripts/smoke_episodes.py`**
 
 ```python
 """Run fixture tasks against a served model and write Episode JSONL (sub-project 1 acceptance)."""
@@ -3437,15 +3438,15 @@ if __name__ == "__main__":
     main()
 ```
 
-- [ ] **Step 4: Run the equivalence test on the server**
+- [ ] **步骤 4：运行服务端模板验收**
 
 ```bash
 /data/chengjin/.venvs/studyhub-agent/bin/pip install -q -e "studyhub-agent[acceptance]"
 cd studyhub-agent && STUDYHUB_AGENT_MODEL_DIR=/data/chengjin/studyhub/models/P1/Qwen3.5-4B $PY -m pytest -m requires_model tests/acceptance -q
 ```
-Expected: 4 passed. A failure here means `render_text` diverges from transformers — fix `render.py` (filters/env options), not the test.
+预期结果：原始四项验收通过。模板与 Transformers 不一致时，修正渲染器的过滤器或环境配置，不弱化测试。
 
-- [ ] **Step 5: Serve Qwen3.5-4B with SGLang and run the smoke episodes**
+- [ ] **步骤 5：启动 Qwen3.5-4B 并运行冒烟任务**
 
 ```bash
 nvidia-smi --query-gpu=index,memory.used,memory.total,utilization.gpu --format=csv
@@ -3457,9 +3458,9 @@ CUDA_VISIBLE_DEVICES=<free gpu> <sglang python> -m sglang.launch_server --model-
 cd studyhub-agent && $PY scripts/smoke_episodes.py --model-dir /data/chengjin/studyhub/models/P1/Qwen3.5-4B --sglang-url http://127.0.0.1:30411 --snapshot tests/fixtures/replay_snapshot.json --tasks tests/fixtures/smoke_tasks.jsonl --out /tmp/studyhub-agent-smoke/episodes.jsonl
 # stop the server afterwards (kill the launch_server PID)
 ```
-Expected: 3 lines printed, each with a termination and the same contract hash per tool set; `/tmp/studyhub-agent-smoke/episodes.jsonl` has 3 JSON lines that `Episode.model_validate_json` accepts. INFRA errors mean the server is not reachable — fix the server, not the runner. Record the printed lines in the commit message body.
+预期结果：三个任务均记录终止状态与契约，输出文件含三条可校验的 Episode JSON。基础设施错误先排查服务连接，运行结果写入提交说明。
 
-- [ ] **Step 6: Commit**
+- [ ] **步骤 6：提交**
 
 ```bash
 git add studyhub-agent/tests/acceptance studyhub-agent/scripts/smoke_episodes.py studyhub-agent/tests/fixtures/smoke_tasks.jsonl
@@ -3468,24 +3469,24 @@ git commit -m "test: add real-model acceptance for renderer parity and smoke epi
 
 ---
 
-### Task 15: Archive OPD conclusions, delete legacy branches and worktrees
+### 任务 15：OPD 结论归档与旧工作树整理
 
-**Files:**
-- Create: `studyhub-agent/docs/history/opd-evaluation.md`
+**涉及文件：**
+- 新建：`studyhub-agent/docs/history/opd-evaluation.md`
 
-**Interfaces:**
-- Consumes: tags from Task 1.
+**接口约定：**
+- 依赖任务 1 保存的标签。
 
-- [ ] **Step 1: Write the OPD history note from the archived branch**
+- [ ] **步骤 1：从归档分支整理 OPD 记录**
 
 ```bash
 cd /data/chengjin/studyhub
 git show archive/opd-evaluation --stat | head -40
 git ls-tree -r --name-only archive/opd-evaluation | grep -iE "OPD_FORMAL_300_CLOSEOUT|opd.*evaluation.*\.md" 
 ```
-Write `studyhub-agent/docs/history/opd-evaluation.md` with: run dates, teacher/student, steps, Dev51 result (M2 4/51 vs OPD 4/51, 3W/3L/45T), Protocol128 metrics (tool parse 97.1%→89.1%, tool-name match 90.2%→79.2%, non-empty final 87.3%→98.4%), BFCL/tau2 not produced (`uv` missing), and the conclusion "no measurable gain; teacher not stronger than student on the target distribution". Cite the source paths as `archive/opd-evaluation:<path>`.
+OPD 历史记录包含日期、教师与学生、训练步数、Dev51 结果（M2 与 OPD 均为 4/51，3 胜 / 3 负 / 45 平）、Protocol128 指标变化（工具解析 97.1%→89.1%、名称匹配 90.2%→79.2%、非空回答 87.3%→98.4%）、未运行 BFCL / tau2 的原因及未观察到可测增益的结论。来源按 `archive/opd-evaluation:<path>` 标注。
 
-- [ ] **Step 2: Verify worktrees are clean and unused before deletion**
+- [ ] **步骤 2：确认工作树没有变更且未被使用**
 
 ```bash
 cd /data/chengjin/studyhub
@@ -3494,9 +3495,9 @@ for wt in $(git worktree list --porcelain | awk '/^worktree /{print $2}' | grep 
   ls -l /proc/*/cwd 2>/dev/null | grep -F "$wt" | head -2
 done
 ```
-Expected: every worktree prints no status lines and no process cwd lines. If any worktree is dirty or in use (e.g. a running bot under `studyhub-offline-pilot`), STOP and report the list to the owner instead of deleting.
+预期结果：工作树无未提交变更，也没有运行进程使用它。若存在变更或运行中的任务，先向负责人确认，不删除。
 
-- [ ] **Step 3: Remove worktrees and local branches**
+- [ ] **步骤 3：整理旧工作树与本地分支**
 
 ```bash
 cd /data/chengjin/studyhub
@@ -3510,9 +3511,9 @@ git branch -D agent/fix-agent-security-boundaries agent/offline-pilot-runtime-gu
   refactor/studyhub-agent-package research/agent-sft-completion research/router-rl-readiness-v1
 git worktree list
 ```
-Expected: only the main checkout and the v3 worktree remain.
+预期结果：只保留主目录与 v3 工作树。
 
-- [ ] **Step 4: Delete the remote agent branches**
+- [ ] **步骤 4：整理旧 Agent 远端分支**
 
 ```bash
 git push origin --delete agent-v2/hermes-rebuild agent/fix-agent-security-boundaries agent/offline-pilot-runtime-guards \
@@ -3521,9 +3522,9 @@ git push origin --delete agent-v2/hermes-rebuild agent/fix-agent-security-bounda
   research/agent-sft-completion research/router-rl-readiness-v1
 git ls-remote --heads origin | grep -E "agent|codex|research" || echo "no agent branches left"
 ```
-Expected: `no agent branches left`.
+预期结果：不再存在旧 Agent 远端分支。
 
-- [ ] **Step 5: Commit the history note**
+- [ ] **步骤 5：提交历史记录**
 
 ```bash
 git add studyhub-agent/docs/history/opd-evaluation.md
@@ -3532,9 +3533,9 @@ git commit -m "docs: archive OPD evaluation conclusions before deleting legacy b
 
 ---
 
-## Self-Review Notes
+## 规格对应
 
-- Spec §2 layout → Tasks 1, 2–6, 7, 8, 9, 10–11, 12; import-linter in Task 1/13.
-- Spec §3 contract rules 1–5 → Task 6 (hash), Task 5 (turn rule, lint via Task 2), Task 4 (`extra="forbid"`), Task 10 (hash fixed per episode; finalize prompt from registry).
-- Spec §4 runner outputs and INFRA handling → Task 10; §5 clients → Task 11; §6 tools/env → Tasks 8–9; §7 graders → Task 12; §8 legacy → Tasks 1 and 15; §9 tests/CI → Tasks 2–13; §10 acceptance → Task 14.
-- The spec's "7 tools" counts the memory pair as one tool; 8 names are implemented (see Global Constraints).
+- 设计第 2 节的布局对应任务 1–12，依赖检查对应任务 1 与 13。
+- 设计第 3 节的契约规则对应任务 2、4、5、6、10，覆盖校验、回合互斥、哈希与注册提示。
+- 执行器对应任务 10，客户端对应任务 11，工具环境对应任务 8–9，判分器对应任务 12，历史归档对应任务 1、15，质量门禁对应任务 2–13，服务器验收对应任务 14。
+- 七类工具包含记忆读写这一组，实际实现八个工具名称。

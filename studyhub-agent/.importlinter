@@ -2,9 +2,10 @@
 root_package = studyhub_agent
 
 [importlinter:contract:layers]
-name = Foundation layers
+name = Agent layers
 type = layers
 layers =
+    studyhub_agent.architectures
     studyhub_agent.runtime
     studyhub_agent.environments
     studyhub_agent.tools
@@ -17,6 +18,7 @@ type = forbidden
 source_modules =
     studyhub_agent.graders
 forbidden_modules =
+    studyhub_agent.architectures
     studyhub_agent.runtime
     studyhub_agent.environments
     studyhub_agent.tools

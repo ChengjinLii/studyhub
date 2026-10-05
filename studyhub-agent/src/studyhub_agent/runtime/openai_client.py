@@ -8,7 +8,7 @@ from typing import Any
 import httpx
 
 from studyhub_agent.contracts.episode import AssistantTurn, Message, Sampling, ToolCall, TurnKind
-from studyhub_agent.contracts.render import RenderError, canonical_completion_text, parse_completion
+from studyhub_agent.contracts.render import RenderError, canonical_completion_text, parse_completion, render_text
 from studyhub_agent.contracts.tools import ToolSpec
 from studyhub_agent.runtime.policy import PolicyInfraError
 from studyhub_agent.runtime.tokenizer import Tokenizer
@@ -118,30 +118,44 @@ class OpenAICompatPolicyClient:
         if dropped_reasoning:
             reasoning = ""
         raw_text = _raw_completion_text(content, message.get("tool_calls"))
+        try:
+            prompt_ids = (
+                tuple(
+                    self._tokenizer.encode(render_text(messages, tools, thinking=thinking, add_generation_prompt=True))
+                )
+                if self._tokenizer
+                else ()
+            )
+        except RenderError as exc:
+            return self._error(raw_text, f"unrenderable: {exc}", choice, latency_ms)
         if choice.get("finish_reason") == "length":
             # The completion was cut off by max_tokens; it must never be treated as a valid
             # FINAL/TOOL_CALLS turn (that would silently produce truncated SFT data).
-            return self._error(raw_text, "truncated", choice, latency_ms)
+            return self._error(raw_text, "truncated", choice, latency_ms, prompt_ids)
         calls: list[ToolCall] = []
         for index, item in enumerate(message.get("tool_calls") or []):
             function = item.get("function") or {}
             try:
                 arguments = json.loads(function.get("arguments") or "{}")
             except json.JSONDecodeError:
-                return self._error(raw_text, f"invalid_arguments_json: {function.get('name')}", choice, latency_ms)
+                return self._error(
+                    raw_text, f"invalid_arguments_json: {function.get('name')}", choice, latency_ms, prompt_ids
+                )
             if not isinstance(arguments, dict):
-                return self._error(raw_text, f"invalid_arguments_json: {function.get('name')}", choice, latency_ms)
+                return self._error(
+                    raw_text, f"invalid_arguments_json: {function.get('name')}", choice, latency_ms, prompt_ids
+                )
             calls.append(ToolCall(call_id=f"call_{index}", name=str(function.get("name")), arguments=arguments))
         if not calls and not content:
-            return self._error(raw_text, "empty_response", choice, latency_ms)
+            return self._error(raw_text, "empty_response", choice, latency_ms, prompt_ids)
         assistant = Message(role="assistant", content=content, tool_calls=tuple(calls), reasoning=reasoning)
         try:
             canonical = canonical_completion_text(messages, assistant, tools, thinking=thinking)
         except RenderError as exc:
-            return self._error(raw_text, f"unrenderable: {exc}", choice, latency_ms)
+            return self._error(raw_text, f"unrenderable: {exc}", choice, latency_ms, prompt_ids)
         reparsed = parse_completion(canonical, tools, thinking=thinking)
         if reparsed.kind is TurnKind.PARSE_ERROR:
-            return self._error(raw_text, reparsed.error or "parse_error", choice, latency_ms)
+            return self._error(raw_text, reparsed.error or "parse_error", choice, latency_ms, prompt_ids)
         return AssistantTurn(
             kind=reparsed.kind,
             content=reparsed.content,
@@ -149,6 +163,7 @@ class OpenAICompatPolicyClient:
             tool_calls=reparsed.tool_calls,
             raw_text=raw_text,
             canonical_text=canonical,
+            prompt_token_ids=prompt_ids,
             canonical_token_ids=tuple(self._tokenizer.encode(canonical)) if self._tokenizer else (),
             server_parse_mismatch=reparsed.tool_calls != tuple(calls),
             dropped_reasoning=dropped_reasoning,
@@ -156,13 +171,21 @@ class OpenAICompatPolicyClient:
             latency_ms=latency_ms,
         )
 
-    @staticmethod
-    def _error(raw_text: str, error: str, choice: dict[str, Any], latency_ms: float) -> AssistantTurn:
+    def _error(
+        self,
+        raw_text: str,
+        error: str,
+        choice: dict[str, Any],
+        latency_ms: float,
+        prompt_ids: tuple[int, ...] = (),
+    ) -> AssistantTurn:
         return AssistantTurn(
             kind=TurnKind.PARSE_ERROR,
             raw_text=raw_text,
             canonical_text=raw_text,
             parse_error=error,
+            prompt_token_ids=prompt_ids,
+            canonical_token_ids=tuple(self._tokenizer.encode(raw_text)) if self._tokenizer else (),
             finish_reason=choice.get("finish_reason"),
             latency_ms=latency_ms,
         )

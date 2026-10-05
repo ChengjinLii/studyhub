@@ -97,6 +97,8 @@ class AssistantTurn(_Frozen):
     dropped_reasoning: bool = False
     finish_reason: str | None = None
     latency_ms: float = 0.0
+    policy_key: str = "small"
+    model_id: str = ""
 
 
 class Observation(_Frozen):
@@ -105,6 +107,8 @@ class Observation(_Frozen):
     ok: bool
     payload: dict[str, Any]
     error_code: str | None = None
+    # Environment evidence for graders/hooks; never rendered as model-facing tool content.
+    details: dict[str, Any] = Field(default_factory=dict)
 
 
 class Termination(StrEnum):
@@ -135,3 +139,7 @@ class Episode(_Frozen):
     final_answer: str | None = None
     error_detail: str | None = None
     environment_trace: dict[str, Any] = Field(default_factory=dict)
+    architecture: str = "react@1.0"
+    architecture_trace: dict[str, Any] = Field(default_factory=dict)
+    models: dict[str, str] = Field(default_factory=dict)
+    model_revisions: dict[str, str] = Field(default_factory=dict)

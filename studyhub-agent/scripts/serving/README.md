@@ -1,69 +1,61 @@
-# Serving Qwen3.5-4B with SGLang (this host)
+# Qwen3.5-4B 推理服务说明
 
-Exact recipe used for the Task 14 acceptance run (server acceptance: renderer parity against
-`transformers`, plus 3 smoke episodes through `scripts/smoke_episodes.py`). Model-dependent, GPU host
-only — not part of the local test suite.
+本文记录当前机器上使用 SGLang 启动 Qwen3.5-4B 的配置，以及基础层冒烟任务的运行方式。
 
-Sample output from this exact run: [`docs/evidence/foundation-smoke-2026-09-25.jsonl`](../../docs/evidence/foundation-smoke-2026-09-25.jsonl).
+[历史运行样例](../../docs/evidence/foundation-smoke-2026-09-25.jsonl) 包含三条任务轨迹；模板一致性通过本地 Transformers tokenizer 验收。
 
-> **Note on re-running this:** the checked-in evidence file was produced by the version of
-> `scripts/smoke_episodes.py` that derived `tokenizer_revision` from the tokenizer file's size
-> (`Qwen3.5-4B@12807982`). A later fix changed this to a sha256 of the file's contents
-> (`Qwen3.5-4B@sha256:5f9e4d4901a9`), which is also an input to `contract_hash`. Re-running the
-> commands below at the current script version is only guaranteed to differ from the checked-in
-> file in `contract_hash`; sampled outputs (turns, tool calls, final answers, termination reasons)
-> may also differ — that is expected, not a regression.
->
-> **Note on the checked-in evidence's field names:** it also predates the `AssistantTurn` field
-> rename `completion_token_ids` → `sampled_token_ids` / `canonical_token_ids` (the token client's
-> literal sampled ids vs. `encode(canonical_text)`, populated by both clients). The evidence file's
-> `completion_token_ids` key is a historical artifact of the schema at the time it was captured, not
-> the current one.
+---
 
-## Shared-GPU etiquette (read first)
+## 环境配置
 
-This host's two GPUs are shared with other people's jobs. Before doing anything:
+| 项目 | 配置 |
+| --- | --- |
+| 推理环境 | `/data/chengjin/studyhub/studyhub-agent/.venv-train` |
+| 版本 | Python 3.12.13、SGLang 0.5.10.post1、PyTorch 2.9.1+cu129 |
+| 模型目录 | `/data/chengjin/studyhub/models/P1/Qwen3.5-4B` |
+| 模型结构 | BF16，混合 Gated-DeltaNet / Mamba 与注意力层 |
+| 服务地址 | `http://127.0.0.1:30411` |
+| 兼容补丁 | 本目录的 `sitecustomize.py` |
 
-1. `nvidia-smi --query-gpu=index,memory.used,memory.total,utilization.gpu --format=csv` — pick the GPU
-   with the most free memory. Re-check every time; usage on this host changes minute to minute.
-2. Never stop, signal, or otherwise disturb a process you did not start.
-3. Never request more memory than is currently free. `--mem-fraction-static` is close to a fraction of
-   the GPU's *total* capacity only when the GPU is otherwise idle. On a shared GPU, SGLang's memory-pool
-   formula (`model_runner_kv_cache_mixin.py`) actually computes
-   `rest_memory = post_load_avail − pre_load_avail · (1 − mem_fraction_static)`, where both `avail`
-   terms are the real free bytes measured at that moment — so raising the fraction only shrinks
-   SGLang's own safety headroom carved out of memory that is already free; it never reserves memory
-   beyond what `nvidia-smi` already shows as unused. Still, size it conservatively and verify with
-   `nvidia-smi` before and after every launch attempt.
-4. Stop only the PID (process group) you started, and confirm with `nvidia-smi` that the memory you used
-   has been released before considering the job done.
+此模型的 `config.json.text_config.num_experts` 已为 `None`，无需旧版 `num_experts=1` 覆盖配置。
 
-## Environment
+当前机器只有 pip 安装的 CUDA 运行库，没有 `nvcc`。SGLang 的 `deep_gemm` 导入检查需要通过环境变量启用本目录的兼容补丁；将本目录加入 `PYTHONPATH`，Python 启动时会自动加载。
 
-- **SGLang install (reused read-only, not modified):** `/data/chengjin/studyhub/studyhub-agent/.venv-train`
-  — Python 3.12.13, `sglang==0.5.10.post1`, `torch==2.9.1+cu129`. This is the same SGLang version pinned
-  by the legacy OPD evidence files (`sglang: "0.5.10.post1"` in the pre-v3 benchmark evidence), found via
-  `find /data/chengjin /home/chengjin -path "*site-packages/sglang" -maxdepth 9 -type d`.
-- **Model:** `/data/chengjin/studyhub/models/P1/Qwen3.5-4B` (bf16, hybrid Gated-DeltaNet/Mamba +
-  attention architecture — not a plain dense transformer; its `config.json.text_config.num_experts`
-  is already `None` on this checkpoint, so the legacy `num_experts=1` SGLang overlay is **not** needed
-  here).
-- **No CUDA toolkit on this host:** only pip-installed CUDA *runtime* libraries are present (no `nvcc`).
-  SGLang's bundled `deep_gemm` package unconditionally asserts `CUDA_HOME` at import time, which crashes
-  `sglang.launch_server` immediately. `sitecustomize.py` in this directory is a vendored, minimal extract
-  of the legacy no-nvcc compatibility shim (see its header for exact provenance) that stubs this out via
-  two env-gated blocks. Put this directory on `PYTHONPATH` so Python auto-imports it at interpreter start.
+---
 
-## Launch command
+## GPU 资源检查
+
+两张 GPU 为共享资源，启动前检查当前占用：
+
+```bash
+nvidia-smi --query-gpu=index,memory.used,memory.total,utilization.gpu --format=csv
+```
+
+选择空闲显存较多的 GPU，按实际资源设置参数；只停止自己启动的进程，运行结束后确认显存释放。
+
+SGLang 的显存池根据模型加载前后的空闲显存计算：
+
+```text
+rest_memory = post_load_avail - pre_load_avail * (1 - mem_fraction_static)
+```
+
+共享 GPU 上的 `--mem-fraction-static` 不能简单理解为总显存的使用比例。每次启动前后都应重新检查显存。
+
+---
+
+## 启动服务
+
+将 `GPU` 设置为已检查的可用设备编号：
 
 ```bash
 V=/data/chengjin/studyhub/studyhub-agent/.venv-train
-REPO=/data/chengjin/studyhub-agent-v3/studyhub-agent   # or wherever this repo is checked out
+REPO=/data/chengjin/studyhub/studyhub-agent
+GPU=1
 CUDA_RUNTIME_LIB="$V/lib/python3.12/site-packages/nvidia/cuda_runtime/lib"
 
 mkdir -p /tmp/studyhub-agent-smoke
 
-CUDA_VISIBLE_DEVICES=<free gpu, e.g. 1> \
+CUDA_VISIBLE_DEVICES="$GPU" \
 STUDYHUB_DISABLE_DEEP_GEMM_WITHOUT_NVCC=1 \
 STUDYHUB_SGLANG_TORCH_FALLBACKS_WITHOUT_NVCC=1 \
 PYTHONPATH="${REPO}/scripts/serving" \
@@ -79,64 +71,80 @@ setsid nohup "$V/bin/python" -m sglang.launch_server \
 echo $! > /tmp/studyhub-agent-smoke/sglang.pid
 ```
 
-Notes on the flags (all beyond `--mem-fraction-static`/`--context-length`/`--max-total-tokens` were
-needed only because Qwen3.5-4B is hybrid, not a plain dense model):
+### 参数说明
 
-- `--mem-fraction-static 0.40`: the smallest value that produced a non-negative KV/mamba token-pool
-  budget on this shared GPU (~28 GB free at process start; `0.28`, a reasonable-looking starting point
-  for "4B bf16 weights ≈ 9 GB + KV cache" on an *idle* GPU, produced a negative profiled-token count here
-  because of the formula above). A larger value (`0.75`) was not attempted; `0.40` was verified against
-  live `nvidia-smi` output to never exceed actually-free memory.
-- `--max-mamba-cache-size 8`: the hybrid model's Mamba/GDN layers need a fixed per-request state cache
-  independent of context length. Left at its default (auto-sized from `mamba_full_memory_ratio`), it
-  consumed the entire static memory budget and left nothing for the actual KV token pool. `8` is enough
-  headroom for `--max-running-requests` (SGLang internally requires
-  `max_mamba_cache_size // mamba_ratio >= max_running_requests`, and the ratio is 3-4 with radix cache
-  enabled).
-- `--disable-cuda-graph`: works around an unrelated SGLang bug where `--max-running-requests 1` produces
-  an empty CUDA-graph capture batch-size list (`capture_bs=[0]` assertion) during graph capture. Harmless
-  for a 3-episode smoke/acceptance run; would matter for throughput serving.
-- `setsid` makes the server's PID equal to its process group ID, so the whole process tree (scheduler,
-  detokenizer, tokenizer workers) can be torn down with one signal (see "Stop the server" below).
+| 参数 | 用途 |
+| --- | --- |
+| `--mem-fraction-static 0.40` | 历史运行在约 28 GB 空闲显存下验证的配置，按实时空闲量调整 |
+| `--max-mamba-cache-size 8` | 为混合模型提供固定请求状态缓存，保留 KV token 池空间 |
+| `--max-running-requests 1` | 冒烟任务使用单请求并发 |
+| `--disable-cuda-graph` | 避开此版本单请求配置的空捕获批大小问题 |
+| `--context-length 8192` | 覆盖示例短任务，长任务按预算与显存扩展 |
+| `setsid` | 创建独立进程组，便于完整停止本次服务 |
 
-`--context-length`/`--max-total-tokens 8192` comfortably covers the smoke fixture's short conversations
-(system prompt + a handful of tool specs + 1-4 tool round-trips); it is **not** meant to satisfy the
-episode contract's own `Budget.max_context_tokens` (16384 by default) for longer conversations — raise it
-if a task needs more room, subject to the same free-memory check.
+历史运行中，`0.28` 的显存比例产生了负的 token 池预算；`0.40` 通过资源检查。Mamba / GDN 缓存独立于上下文长度，过大的默认缓存可能占满静态预算；开启 radix cache 时，其缓存大小与并发数还受内部比例约束。
 
-## Health check
+示例的 8192 上下文长度并不覆盖所有任务默认的 16384 token 预算，长任务需同时调整服务参数与任务预算。
+
+---
+
+## 检查服务
 
 ```bash
 until [ "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:30411/health)" = "200" ]; do
-  kill -0 "$(cat /tmp/studyhub-agent-smoke/sglang.pid)" || { echo "server process died, see sglang.log"; break; }
+  kill -0 "$(cat /tmp/studyhub-agent-smoke/sglang.pid)" || { echo "服务进程退出，请查看 sglang.log"; break; }
   sleep 5
 done
 ```
 
-Weight loading + memory-pool setup took about 30-35s in this run (from a warm OS page cache). Watch
-`/tmp/studyhub-agent-smoke/sglang.log` for `RuntimeError: Not enough memory` (raise
-`--mem-fraction-static` a little, staying inside currently-free memory) or `AssertionError` from
-`deep_gemm`/`capture_bs` (check the `PYTHONPATH`/env vars above are actually set).
+历史运行在操作系统热缓存下，权重加载和显存池初始化约需 30–35 秒。可通过 `/tmp/studyhub-agent-smoke/sglang.log` 排查：
 
-## Run the smoke episodes
+| 日志 | 检查项 |
+| --- | --- |
+| `RuntimeError: Not enough memory` | 空闲显存和显存比例 |
+| `deep_gemm` 断言 | `PYTHONPATH` 与兼容补丁环境变量 |
+| `capture_bs` 断言 | CUDA graph 配置 |
+
+---
+
+## 运行示例任务
+
+在 Agent 目录中，使用已安装项目依赖的 Python 环境执行：
 
 ```bash
 cd "$REPO"
-/data/chengjin/.venvs/studyhub-agent/bin/python scripts/smoke_episodes.py \
+.venv/bin/python scripts/smoke_episodes.py \
   --model-dir /data/chengjin/studyhub/models/P1/Qwen3.5-4B \
   --sglang-url http://127.0.0.1:30411 \
   --snapshot tests/fixtures/replay_snapshot.json \
   --tasks tests/fixtures/smoke_tasks.jsonl \
+  --architecture react_verify \
+  --model-id Qwen/Qwen3.5-4B \
   --out /tmp/studyhub-agent-smoke/episodes.jsonl
 ```
 
-## Stop the server
+`--architecture` 支持 `react`、`react_verify`、`plan_execute`、`react_context` 与 `cascade`。级联通过 `--large-model-dir` 和 `--large-sglang-url` 指定第二个服务，完整示例见 [Agent README](../../README.md#双模型级联)。
+
+---
+
+## 停止服务
+
+以下命令只针对上面记录的本次服务 PID；`setsid` 使 PID 与进程组 ID 一致：
 
 ```bash
 PID=$(cat /tmp/studyhub-agent-smoke/sglang.pid)
-kill -TERM -- -"$PID"        # negative PID = whole process group (setsid made PID == PGID)
+kill -TERM -- -"$PID"
 sleep 5
-kill -0 "$PID" 2>/dev/null && kill -KILL -- -"$PID"   # only if TERM didn't finish it in time
-pgrep -af sglang                                       # should print nothing but this pgrep itself
-nvidia-smi --query-gpu=index,memory.used,memory.total,utilization.gpu --format=csv   # confirm memory returned
+kill -0 "$PID" 2>/dev/null && kill -KILL -- -"$PID"
+nvidia-smi --query-gpu=index,memory.used,memory.total,utilization.gpu --format=csv
 ```
+
+确认本次服务退出、占用显存释放后结束运行。
+
+---
+
+## 历史记录说明
+
+历史样例使用文件大小生成 tokenizer 版本标识，如 `Qwen3.5-4B@12807982`；当前实现使用内容 SHA-256，如 `Qwen3.5-4B@sha256:5f9e4d4901a9`，并纳入契约哈希。架构与预算字段的扩展也会改变新运行的哈希，重新采样得到的文本、工具调用与终止结果可能不同。
+
+旧样例中的 `completion_token_ids` 对应当时的数据结构。当前回合分别记录模型实际采样的 `sampled_token_ids` 与标准化文本编码后的 `canonical_token_ids`。
