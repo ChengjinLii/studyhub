@@ -47,7 +47,7 @@ Website: [study-hub.cn](https://study-hub.cn)
 | Layer | Technologies |
 | --- | --- |
 | Backend | FastAPI, SQLAlchemy, Pydantic Settings, Uvicorn |
-| Frontend | Next.js 14, React, TypeScript |
+| Frontend | Next.js 15, React, TypeScript |
 | Storage | MySQL, SQLite, Alibaba Cloud OSS |
 | Caching and Tasks | Redis, BackgroundTasks, standalone workers |
 | Async Processing | Selected asynchronous database access and I/O |

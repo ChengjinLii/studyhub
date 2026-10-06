@@ -51,6 +51,7 @@
     "mdast-util-to-hast": "13.2.1",
     "nanoid": "3.3.18",
     "postcss": "8.5.26",
-    "sharp": "0.35.4"
+    "sharp": "0.35.4",
+    "source-map-js": "1.2.2"
   }
 }

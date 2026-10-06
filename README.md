@@ -47,7 +47,7 @@ StudyHub 连接学习资料、经验分享与校园互助，围绕高校学生�
 | 层次 | 技术 |
 | --- | --- |
 | 后端服务 | FastAPI、SQLAlchemy、Pydantic Settings、Uvicorn |
-| 前端界面 | Next.js 14、React、TypeScript |
+| 前端界面 | Next.js 15、React、TypeScript |
 | 数据存储 | MySQL、SQLite、阿里云 OSS |
 | 缓存与任务 | Redis、BackgroundTasks、独立 Worker |
 | 异步处理 | 局部异步数据库访问与异步 I/O |
