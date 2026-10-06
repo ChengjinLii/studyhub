@@ -42,11 +42,31 @@
 | 分支 | 输出 | 规则方式 |
 | --- | --- | --- |
 | Qwen3Guard-Gen-0.6B | `Safe`、`Controversial`、`Unsafe` 与原生类别 | 原生类别映射到部分 StudyHub 风险项 |
-| OneJev-4B | 各项规则的风险概率 | 按十一项 StudyHub 规则进行图文推理 |
+| OneJev-4B / 9B | 各项规则的风险概率 | 按十一项 StudyHub 规则进行图文或文字推理 |
 
-文字分支不执行自定义规则提示，不生成逐项概率。未支持的规则使用 `outcome=unavailable`，整体状态为 `partial`；`model_assessment` 保留原生判断。图文概率由 OneJev 实际提供，尚未完成 StudyHub 场景校准。
+Qwen3Guard 分支不执行自定义规则提示，不生成逐项概率。未支持的规则使用 `outcome=unavailable`，整体状态为 `partial`；`model_assessment` 保留原生判断。OneJev 的逐项概率由模型实际提供，尚未完成 StudyHub 场景校准。
 
 Qwen3Guard 的 0.6B 与 4B 均为文字模型，图片分支使用多模态 OneJev-4B。
+
+---
+
+## 置信度与升级轨迹
+
+自动模式采用 0.6B → 4B → 9B → 人工的级联；含图片时跳过纯文字 0.6B，从 4B 开始。
+
+| 模型 | 置信度信号 | 升级条件 |
+| --- | --- | --- |
+| Qwen3Guard-Gen-0.6B | 原生安全等级与类别对应生成 token 的实际条件概率，取最小值 | 低于门槛、概率缺失、原生 `Controversial` 或推理失败 |
+| OneJev-4B | 每项规则取 `max(p, 1-p)`，整体取最小值 | 低于门槛或推理失败 |
+| OneJev-9B | 与 4B 相同 | 仍低于门槛或不可用时转人工 |
+
+置信度用于控制升级，风险概率用于逐项规则判定，两者不能互换。这些信号不是 StudyHub 场景的校准正确率；原生类别不会被转换成伪造的逐项风险概率。
+
+各级读取同一份经过校验的原始内容，较大模型的有效输出作为本轮规则判定依据；不把多级概率平均，也不把前一级的模型文字当作指令。版权声明和参考匹配独立计算，升级不会消除这些检查。
+
+`model_attempts` 逐级保留模型及版本、后端、置信度、门槛、计算方式、逐项结果、原生类别、用量与耗时。`outcome` 为 `accepted`、`escalated`、`manual_review`、`unavailable` 或 `demo`；`accepted` 仅表示模型阶段达到门槛，不代表投稿被自动通过。
+
+最终低置信度使用 `decision_reasons=low_confidence_after_escalation`；最终模型失败使用 `model_unavailable`。9B 失败时保留前一级有效证据，同时将整体标为 `degraded` 并转人工。顶层 `model`、`confidence` 对应最后一次有效输出，顶层 `usage` 汇总各级有效推理用量；完整经过可由 `model_attempts` 查看。
 
 ---
 
@@ -59,6 +79,7 @@ Qwen3Guard 的 0.6B 与 4B 均为文字模型，图片分支使用多模态 OneJ
 | `findings` | 独立规则结果及作用范围 `scope`，文字或整个投稿 |
 | `risk_probability` | 后端提供的真实概率；没有概率时为 `null` |
 | `model_assessment` | 文字分支的原生等级、类别与适用范围 |
+| `confidence` / `model_attempts` | 最后有效结果的置信度与完整模型升级轨迹 |
 | `model` / `backend` / `model_revision` | 实际推理模型、后端与版本 |
 | `copyright.status` | `no_obvious_risk`、`needs_review` 或 `undetermined` |
 | `calibrated_for_studyhub` | 当前为 `false`，表示尚未完成场景校准 |
@@ -79,7 +100,7 @@ Qwen3Guard 的 0.6B 与 4B 均为文字模型，图片分支使用多模态 OneJ
 
 ## 门禁与评测
 
-自动通过、自动拒绝默认关闭。部分覆盖、推理失败、非法概率、演示结果和版权疑点不能作为自动通过依据；开启自动建议门禁时仍保留这些约束。
+自动通过、自动拒绝默认关闭。部分覆盖、级联后仍低置信度、最终推理失败、演示结果和版权疑点不能作为自动通过依据；开启自动建议门禁时仍保留这些约束。高置信度 0.6B 可停止升级，但其未覆盖的自定义规则依然保留为 `unavailable`，不会被自动放行。
 
 评测报告将两类输出分别统计：
 

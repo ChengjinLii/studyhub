@@ -7,7 +7,8 @@
 [![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python&logoColor=white)](#快速开始)
 [![FastAPI](https://img.shields.io/badge/API-FastAPI-009688?logo=fastapi&logoColor=white)](#审核接口)
 [![Qwen3Guard](https://img.shields.io/badge/Text-Qwen3Guard--0.6B-2563eb)](#模型分流)
-[![OneJev](https://img.shields.io/badge/Multimodal-OneJev--4B-15803d)](#模型分流)
+[![OneJev](https://img.shields.io/badge/Multimodal-OneJev--4B_%2F_9B-15803d)](#模型分流)
+[![Cascade](https://img.shields.io/badge/Review-0.6B_→_4B_→_9B-c2410c)](#模型分流)
 [![Apache-2.0](https://img.shields.io/badge/License-Apache--2.0-22c55e)](LICENSE)
 
 [功能概览](#功能概览) | [快速开始](#快速开始) | [模型分流](#模型分流) | [审核接口](#审核接口) | [测试与评测](#测试与评测)
@@ -16,7 +17,7 @@
 
 StudyHub Review-Jev 基于 [OneJev](https://github.com/OmniJev/OneJev) 构建，将模型推理、投稿规则、版权辅助分析与结构化结果整合为一个审核流程，支持资料、经验、评论、求购和集市内容。
 
-**纯文字交给轻量模型，图片与图文交给多模态模型。**
+**文字从轻量模型开始，图文由多模态模型处理；不确定时逐级升级，最后转人工。**
 
 ---
 
@@ -29,10 +30,11 @@ StudyHub Review-Jev 基于 [OneJev](https://github.com/OmniJev/OneJev) 构建，
 | 场景规则 | 广告与站外支付、学术作弊、审核操纵与可读性 |
 | 版权辅助 | 原创或授权声明、署名、开放许可、NC / ND 条件 |
 | 参考匹配 | 参考文本相似性、图片原文件 SHA-256 匹配 |
+| 置信度级联 | 0.6B → 4B → 9B → 人工，逐级判断与按需升级 |
 | 结果追踪 | 模型版本、规则哈希、内容哈希与逐项结果 |
 | 使用方式 | FastAPI 服务、JSON 命令行、批量评测与演示模式 |
 
-图文分支按十一项 StudyHub 规则推理，文字分支保留模型原生安全等级与类别。各字段的判定方式见 [审核结果说明](docs/REVIEW_SEMANTICS.md)。
+OneJev 分支按十一项 StudyHub 规则推理，0.6B 分支保留模型原生安全等级与类别。各字段的判定方式见 [审核结果说明](docs/REVIEW_SEMANTICS.md)。
 
 ---
 
@@ -73,19 +75,35 @@ python -m venv .venv
 ## 模型分流
 
 ```text
-投稿内容 -> 解析与媒体校验 -> 自动选择模型 -> 规则与版权辅助检查 -> 审核结果
-                              |
-                              +-- 纯文字：Qwen3Guard-Gen-0.6B
-                              |
-                              +-- 图片 / 图文：OneJev-4B
+纯文字 -> Qwen3Guard-Gen-0.6B -> 低置信度 -> OneJev-4B
+图片 / 图文 ---------------------------------> OneJev-4B
+                                                |
+                                             低置信度
+                                                v
+                                            OneJev-9B
+                                                |
+                                             低置信度
+                                                v
+                                              人工审核
 ```
 
 | 内容类型 | 默认模型 | 默认设备 | 结果形式 |
 | --- | --- | --- | --- |
 | 纯文字 | [Qwen3Guard-Gen-0.6B](https://huggingface.co/Qwen/Qwen3Guard-Gen-0.6B) | CPU | 原生安全等级与类别 |
 | 纯图片或图文 | [OneJev-4B](https://huggingface.co/OmniJev/OneJev-4B) | 优先 CUDA | 逐项规则风险概率 |
+| 升级复核 | [OneJev-9B](https://huggingface.co/OmniJev/OneJev-9B) | 优先 CUDA | 逐项规则风险概率 |
 
 路由依据经过解码校验的图片确定；图文模型同时读取文字与全部图片。可通过 `--device` 和 `--text-device` 指定设备。
+
+默认各级置信度门槛均为 `0.85`，低于门槛、置信度缺失或推理失败时尝试下一级。达到门槛后停止升级，继续按规则与版权检查输出审核建议；9B 仍不确定或不可用时转人工。各级结果保存在 `model_attempts`，不会把风险概率简单平均。
+
+门槛、9B 设备及独立 HTTP 服务均可配置，例如：
+
+```bash
+.venv/bin/review-jev serve --text-confidence-threshold 0.85 \
+  --image-confidence-threshold 0.85 --large-confidence-threshold 0.90 \
+  --large-device cuda:1
+```
 
 单独运行文字模型：
 
@@ -145,6 +163,7 @@ curl --noproxy "*" -s http://127.0.0.1:8011/v1/reviews \
 | `status` | 完成、部分完成、降级或演示状态 |
 | `findings` | 逐项规则结果、风险信号与作用范围 |
 | `model_assessment` | 文字模型的原生安全等级与类别 |
+| `confidence` / `model_attempts` | 最后有效结果的置信度，以及各级结果、门槛与升级原因 |
 | `copyright` | 声明、许可条件与参考匹配分析 |
 | `model` / `backend` / `model_revision` | 实际模型、推理后端与权重版本 |
 | 内容及规则哈希 | 用于结果追踪与评测复现 |
@@ -157,7 +176,7 @@ curl --noproxy "*" -s http://127.0.0.1:8011/v1/reviews \
 
 | 后端 | 使用方式 |
 | --- | --- |
-| `auto` | 默认自动分流 |
+| `auto` | 默认按内容分流与置信度级联 |
 | `qwen3guard` | 固定使用文字模型 |
 | `torch` | 固定使用 OneJev 多模态模型 |
 | `onejev-http` | 调用 OneJev HTTP 推理服务 |
@@ -176,6 +195,8 @@ curl --noproxy "*" -s http://127.0.0.1:8011/v1/reviews \
 ```
 
 自动分流也可使用 `--image-backend onejev-http` 指定图片推理服务。GGUF 后端、设备选择与完整环境变量见 [配置说明](docs/CONFIGURATION.md)。
+
+9B 独立服务使用 `--large-backend onejev-http --large-onejev-url http://127.0.0.1:8002`，与 4B 服务分别配置。固定单模型后端保持单模型运行；自动模式使用 `--no-cascade-enabled` 可关闭升级。
 
 ---
 
@@ -203,7 +224,7 @@ OMP_NUM_THREADS=4 MKL_NUM_THREADS=4 \
   .venv/bin/python -m review_jev.smoke --http --output artifacts/smoke.json
 ```
 
-覆盖中文文字、隐私风险、图文、纯图片、多图片与本机 HTTP 分流。测试环境和结果见 [验证记录](VALIDATION.md)。
+覆盖中文文字、隐私风险、图文、纯图片、多图片与本机 HTTP 分流，并验证实际级联轨迹。仅测试初始 0.6B / 4B 模型时增加 `--no-cascade`。测试环境和结果见 [验证记录](VALIDATION.md)。
 
 ---
 

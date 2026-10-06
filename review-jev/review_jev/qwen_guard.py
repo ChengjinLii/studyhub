@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 import re
 import threading
 from typing import get_args
@@ -18,14 +19,14 @@ RULE_CATEGORIES = {
     "sensitive_personal_data": {"PII"},
     "review_manipulation": {"Jailbreak"},
 }
+ASSESSMENT_PATTERN = (
+    r"\s*Safety:\s*(Safe|Controversial|Unsafe)\s*\nCategories:\s*([^\n]+)\s*"
+)
 
 
 def parse_assessment(output: str) -> ModelAssessment:
     # Only accept the guard's native labels, never arbitrary generated explanations.
-    match = re.fullmatch(
-        r"\s*Safety:\s*(Safe|Controversial|Unsafe)\s*\nCategories:\s*([^\n]+)\s*",
-        output,
-    )
+    match = re.fullmatch(ASSESSMENT_PATTERN, output)
     if not match:
         raise ValueError("invalid guard response")
     severity, labels = match.groups()
@@ -35,6 +36,32 @@ def parse_assessment(output: str) -> ModelAssessment:
     if set(categories) - CATEGORIES:
         raise ValueError("unknown guard category")
     return ModelAssessment(safety=severity, categories=categories)
+
+
+def generation_confidence(
+    output: str, token_end_offsets: list[int], log_probabilities: list[float]
+) -> float | None:
+    match = re.fullmatch(ASSESSMENT_PATTERN, output)
+    if (
+        match is None
+        or not token_end_offsets
+        or len(token_end_offsets) != len(log_probabilities)
+        or token_end_offsets[-1] != len(output)
+    ):
+        return None
+    spans = [match.span(1), match.span(2)]
+    probabilities = []
+    previous = 0
+    for end, log_probability in zip(token_end_offsets, log_probabilities):
+        if not previous <= end <= len(output):
+            return None
+        if any(end > start and previous < stop for start, stop in spans):
+            if not math.isfinite(log_probability) or log_probability > 0:
+                return None
+            probabilities.append(math.exp(log_probability))
+        previous = end
+    # Template tokens must not inflate certainty in the native safety/category labels.
+    return min(probabilities) if probabilities else None
 
 
 def guard_findings(assessment: ModelAssessment, policy: Policy, has_images: bool) -> list[Finding]:
@@ -159,17 +186,28 @@ class Qwen3GuardBackend:
                         do_sample=False,
                         max_time=self.settings.timeout_seconds,
                         pad_token_id=self.tokenizer.eos_token_id,
+                        return_dict_in_generate=True,
+                        output_scores=True,
                     )
-                tokens = output[0][input_tokens:]
-                assessment = parse_assessment(
-                    self.tokenizer.decode(tokens, skip_special_tokens=True)
-                )
+                    log_probabilities = self.model.compute_transition_scores(
+                        output.sequences, output.scores, normalize_logits=True
+                    )[0].tolist()
+                tokens = output.sequences[0][input_tokens:]
+                decoded = self.tokenizer.decode(tokens, skip_special_tokens=True)
+                assessment = parse_assessment(decoded)
+                token_end_offsets = [
+                    len(self.tokenizer.decode(tokens[:end], skip_special_tokens=True))
+                    for end in range(1, len(tokens) + 1)
+                ]
                 return DecisionResult(
                     self.settings.model,
                     {},
                     {"input_tokens": input_tokens, "output_tokens": len(tokens)},
                     assessment,
                     model_revision=self.settings.model_revision,
+                    confidence=generation_confidence(
+                        decoded, token_end_offsets, log_probabilities
+                    ),
                 )
         except BackendUnavailable:
             raise

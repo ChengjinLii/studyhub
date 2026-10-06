@@ -13,7 +13,7 @@
 [![SGLang](https://img.shields.io/badge/Serving-SGLang-15803d)](#studyhub-agent)
 [![PyTorch](https://img.shields.io/badge/AI-PyTorch_%2B_Transformers-EE4C2C?logo=pytorch&logoColor=white)](#tech-stack)
 [![Qwen3Guard](https://img.shields.io/badge/Text-Qwen3Guard--0.6B-0f766e)](#studyhub-review-jev)
-[![OneJev](https://img.shields.io/badge/Vision-OneJev--4B-c2410c)](#studyhub-review-jev)
+[![OneJev](https://img.shields.io/badge/Vision-OneJev--4B_%2F_9B-c2410c)](#studyhub-review-jev)
 [![Website](https://img.shields.io/badge/Website-study--hub.cn-111827)](https://study-hub.cn)
 [![MIT](https://img.shields.io/badge/License-MIT-22c55e)](LICENSE)
 
@@ -53,7 +53,7 @@ Website: [study-hub.cn](https://study-hub.cn)
 | Async Processing | Selected asynchronous database access and I/O |
 | Deployment | Docker Compose, systemd, Nginx |
 | Agent | Qwen3.5-4B / 9B, SGLang, tokenizers, a shared Agent runner |
-| Content Review | Qwen3Guard-Gen-0.6B, OneJev-4B, PyTorch, Transformers |
+| Content Review | Qwen3Guard-Gen-0.6B, OneJev-4B / 9B, PyTorch, Transformers |
 
 MySQL is used for preview and production environments; SQLite supports local development and quick evaluation.
 
@@ -195,6 +195,7 @@ Stack: **Python 3.12, Pydantic, Jinja2, httpx, and SGLang**. See the [Agent docu
 | --- | --- |
 | Text Only | Qwen3Guard-Gen-0.6B |
 | Images or Text with Images | OneJev-4B |
+| Low-Confidence Escalation | OneJev-4B → OneJev-9B → Human Review |
 
 The component includes a **FastAPI service, JSON CLI, configurable rules, and batch evaluation tools**. Checks cover content risks, private information, submission manipulation, copyright declarations, open-license conditions, and reference-content matching. See the [Review-Jev documentation](review-jev/README.md) for routing, request examples, and usage.
 

@@ -133,6 +133,24 @@ class CopyrightAssessment(StrictModel):
     limitations: list[str] = Field(default_factory=list)
 
 
+class ModelAttempt(StrictModel):
+    tier: Literal["0.6b", "4b", "9b", "single"]
+    model: str
+    model_revision: str | None = None
+    backend: str
+    outcome: Literal["accepted", "escalated", "manual_review", "unavailable", "demo"]
+    confidence: float | None = Field(default=None, ge=0, le=1, allow_inf_nan=False)
+    confidence_threshold: float | None = Field(default=None, gt=0.5, le=1, allow_inf_nan=False)
+    confidence_method: Literal["native_label_probability", "rule_probability"] | None = None
+    escalation_reason: Literal[
+        "low_confidence", "confidence_missing", "backend_unavailable", "native_controversial"
+    ] | None = None
+    findings: list[Finding] = Field(default_factory=list)
+    model_assessment: ModelAssessment | None = None
+    usage: dict[str, int] = Field(default_factory=dict)
+    elapsed_ms: float = Field(ge=0)
+
+
 class ReviewResponse(StrictModel):
     request_id: str
     review_id: str
@@ -145,6 +163,8 @@ class ReviewResponse(StrictModel):
     model_revision: str | None = None
     backend: str
     model_assessment: ModelAssessment | None = None
+    confidence: float | None = Field(default=None, ge=0, le=1, allow_inf_nan=False)
+    model_attempts: list[ModelAttempt] = Field(default_factory=list, max_length=3)
     calibrated_for_studyhub: Literal[False] = False
     content_sha256: str
     image_sha256: dict[str, str]

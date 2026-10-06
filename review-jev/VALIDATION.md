@@ -22,7 +22,7 @@
 | 文字推理 | CPU，四线程 |
 | 图片推理 | NVIDIA H100 PCIe，根据空闲显存自动选择 `cuda:1` |
 
-OneJev 权重按官方 SHA-256 校验：
+OneJev-4B 权重按官方 SHA-256 校验：
 
 ```text
 c725978346bb87ff598b04b6ffe7ea89461368e9b20a0081a3c6a85d377c8f91
@@ -55,7 +55,7 @@ c725978346bb87ff598b04b6ffe7ea89461368e9b20a0081a3c6a85d377c8f91
 
 ```bash
 HF_HUB_OFFLINE=1 OMP_NUM_THREADS=4 MKL_NUM_THREADS=4 TOKENIZERS_PARALLELISM=false \
-  .venv/bin/python -m review_jev.smoke --http --output artifacts/smoke.json
+  .venv/bin/python -m review_jev.smoke --no-cascade --http --output artifacts/smoke.json
 ```
 
 首次下载模型时移除 `HF_HUB_OFFLINE=1`。
@@ -75,3 +75,25 @@ HF_HUB_OFFLINE=1 OMP_NUM_THREADS=4 MKL_NUM_THREADS=4 TOKENIZERS_PARALLELISM=fals
 此次结果用于证明开发链路可运行。模型尚未针对 StudyHub 训练或校准；医学教学图、出版社扫描件和中文截图需在目标样本上单独评测。合成样例的耗时也不作为服务延迟承诺。
 
 版权辅助检查的范围、原生类别与概率指标的统计方式见 [请求与结果说明](docs/REVIEW_SEMANTICS.md)。本次未使用真实投稿或访问生产系统。
+
+---
+
+## 置信度级联验证
+
+验证日期：2026-10-06，组件版本：`0.3.0`。
+
+新增 0.6B → 4B → 9B → 人工的审核级联。59 项专项测试覆盖逐级门槛、原始媒体传递、原生类别概率、缺失或非法结果、9B HTTP 后端、人工兜底、自动建议开关、版权检查与升级轨迹。
+
+| 检查 | 结果 |
+| --- | --- |
+| Python 3.12 源码测试 | **194 项通过，3 项跳过** |
+| Python 3.10 独立 wheel 测试 | **193 项通过，4 项跳过**，从安装目录加载，无模型推理依赖 |
+| Ruff 与文档检查 | 通过，五份说明文档的本地链接与锚点验证通过 |
+| 独立安装包 | `studyhub_review_jev-0.3.0` wheel 构建与安装通过 |
+| 0.6B 实模置信度 | 原创笔记示例输出约 `0.991288`，由真实生成 token 概率计算 |
+| 初始模型实测 | 五个 0.6B / 4B 样例与两个本机 HTTP 样例通过 |
+| 真实文字升级 | 0.6B → 4B 推理通过，并汇总两级用量与轨迹 |
+
+文字升级样例通过把文字门槛设为 `1.0` 触发：0.6B 置信度为 `0.976244`，4B 为 `0.883091`，结果保留两级轨迹。该次测试的 4B 门槛为 `0.500001`；其输出也高于默认门槛 `0.85`。这种控制门槛的样例用于验证升级链路，不代表自然分布下的升级比例。
+
+9B 默认模型固定为 `OmniJev/OneJev-9B`，版本为 `59429e80aa6cbb82c49d4ff8802359044a084eee`。其逐级决策、HTTP 请求、低置信度与异常兜底已使用受控后端验证；本次未完成 9B 全量权重的实模推理，不能据此声称三模型准确率或运行性能已验证。

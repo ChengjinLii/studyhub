@@ -108,6 +108,7 @@ def create_app(service: ReviewService | None = None, settings: Settings | None =
             details = {
                 "text": service.backend.text.ready(),
                 "images": service.backend.images.ready(),
+                "large": service.backend.large.ready(),
             }
         return JSONResponse(
             status_code=200 if ready else 503,
@@ -130,6 +131,13 @@ def create_app(service: ReviewService | None = None, settings: Settings | None =
                 "text_model": settings.text_model if settings.backend == "auto" else settings.model,
                 "image_model": settings.model if settings.backend == "auto" else None,
                 "text_custom_policy_applied": settings.backend not in {"auto", "qwen3guard"},
+                "cascade_enabled": settings.backend == "auto" and settings.cascade_enabled,
+                "large_model": settings.large_model if settings.backend == "auto" else None,
+                "confidence_thresholds": {
+                    "0.6b": settings.text_confidence_threshold,
+                    "4b": settings.image_confidence_threshold,
+                    "9b": settings.large_confidence_threshold,
+                },
             },
         }
 

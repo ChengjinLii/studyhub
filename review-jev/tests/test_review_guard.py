@@ -1,5 +1,6 @@
 import contextlib
 import json
+import math
 import sys
 from dataclasses import replace
 from types import SimpleNamespace
@@ -28,8 +29,9 @@ class NativeBackend:
     name = "qwen3guard"
     demo = False
 
-    def __init__(self, output="Safety: Safe\nCategories: None"):
+    def __init__(self, output="Safety: Safe\nCategories: None", confidence=0.99):
         self.output = output
+        self.confidence = confidence
         self.calls = []
 
     def decide(self, state, questions, media):
@@ -39,6 +41,7 @@ class NativeBackend:
             {},
             {"input_tokens": 42, "output_tokens": 8},
             parse_assessment(self.output),
+            confidence=self.confidence,
         )
 
     def ready(self):
@@ -115,6 +118,7 @@ def test_auto_routing_uses_actual_validated_media(text, has_images):
 def test_failed_image_backend_never_falls_back_to_text():
     backend = AutoBackend(Settings(allow_auto_approve=True))
     backend.text, backend.images = NativeBackend(), ImageBackend(failure=True)
+    backend.large = ImageBackend(failure=True)
     result = ReviewService(backend.settings, backend).review(
         request(images=[{"id": "preview", "data": image_uri()}])
     )
@@ -152,7 +156,7 @@ def test_readiness_distinguishes_both_routes():
     with TestClient(create_app(service)) as client:
         response = client.get("/ready")
         assert response.status_code == 503
-        assert response.json()["backends"] == {"text": False, "images": False}
+        assert response.json()["backends"] == {"text": False, "images": False, "large": False}
         routing = client.get("/v1/policy").json()["routing"]
         assert routing["text_model"] == DEFAULT_GUARD_MODEL
         assert routing["image_model"] == DEFAULT_ONEJEV_MODEL
@@ -308,7 +312,11 @@ def fake_runtime(monkeypatch, output, input_tokens=20):
 
         def generate(self, **kwargs):
             calls["generate_kwargs"] = kwargs
-            return [[0] * input_tokens + list(output)]
+            return SimpleNamespace(sequences=[[0] * input_tokens + list(output)], scores=())
+
+        def compute_transition_scores(self, *args, **kwargs):
+            calls["score_kwargs"] = kwargs
+            return [SimpleNamespace(tolist=lambda: [math.log(0.99)] * len(output))]
 
     backend = Qwen3GuardBackend(Settings(backend="qwen3guard"))
     backend.tokenizer, backend.model = Tokenizer(), Model()
@@ -326,6 +334,9 @@ def test_local_inference_follows_guard_template(monkeypatch):
     assert calls["template_kwargs"] == {"tokenize": False}
     assert calls["tokenizer_kwargs"]["truncation"] is False
     assert calls["generate_kwargs"]["do_sample"] is False
+    assert calls["generate_kwargs"]["output_scores"] is True
+    assert calls["score_kwargs"] == {"normalize_logits": True}
+    assert result.confidence == pytest.approx(0.99)
     assert "rights" not in calls["messages"][0]["content"]
     assert backend.ready()
     backend.close()

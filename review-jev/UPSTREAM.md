@@ -27,7 +27,7 @@
 - 投稿与评测样例、中文文档。
 - 面向审核组件的打包配置与忽略规则。
 
-文字分支使用 Qwen 的 Qwen3Guard-Gen-0.6B，含图片的投稿使用 OneJev-4B；默认模型版本固定在 `review_jev/config.py`。结构化结果同时保留原生类别、规则结果与实际推理后端。
+文字分支从 Qwen 的 Qwen3Guard-Gen-0.6B 开始，含图片的投稿从 OneJev-4B 开始；低置信度时按 4B、9B 逐级升级，最后转人工。默认模型版本固定在 `review_jev/config.py`，结构化结果保留各级置信度、原生类别、规则结果与实际推理后端。
 
 本目录是 StudyHub 改造版本，新增代码采用 Apache-2.0 许可，不属于 OmniJev 或 TypeSafe 的官方发行版。
 

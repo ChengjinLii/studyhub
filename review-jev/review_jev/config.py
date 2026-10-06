@@ -8,8 +8,10 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 
 DEFAULT_GUARD_MODEL = "Qwen/Qwen3Guard-Gen-0.6B"
 DEFAULT_ONEJEV_MODEL = "OmniJev/OneJev-4B"
+DEFAULT_LARGE_MODEL = "OmniJev/OneJev-9B"
 DEFAULT_GUARD_REVISION = "fada3b2f655b89601929198343c94cd2f64d93cc"
 DEFAULT_ONEJEV_REVISION = "c88e18653ceb7a8770716287f55fdefc79d6b588"
+DEFAULT_LARGE_REVISION = "59429e80aa6cbb82c49d4ff8802359044a084eee"
 
 
 class Settings(BaseModel):
@@ -21,6 +23,16 @@ class Settings(BaseModel):
     model_revision: str | None = None
     text_model: str = DEFAULT_GUARD_MODEL
     text_model_revision: str | None = DEFAULT_GUARD_REVISION
+    cascade_enabled: bool = True
+    text_confidence_threshold: float = Field(default=0.85, gt=0.5, le=1, allow_inf_nan=False)
+    image_confidence_threshold: float = Field(default=0.85, gt=0.5, le=1, allow_inf_nan=False)
+    large_confidence_threshold: float = Field(default=0.85, gt=0.5, le=1, allow_inf_nan=False)
+    large_backend: Literal["torch", "onejev-http"] = "torch"
+    large_model: str = DEFAULT_LARGE_MODEL
+    large_model_revision: str | None = DEFAULT_LARGE_REVISION
+    large_device: str = "auto"
+    large_onejev_url: str = "http://127.0.0.1:8002"
+    large_served_model: str = "jev-latest"
     served_model: str = "jev-latest"
     timeout_seconds: float = Field(default=120, gt=0, le=600)
     device: str = "auto"
@@ -51,9 +63,14 @@ class Settings(BaseModel):
                 and values.get("text_model", DEFAULT_GUARD_MODEL) != DEFAULT_GUARD_MODEL
             ):
                 values["text_model_revision"] = None
+            if (
+                "large_model_revision" not in values
+                and values.get("large_model", DEFAULT_LARGE_MODEL) != DEFAULT_LARGE_MODEL
+            ):
+                values["large_model_revision"] = None
         return values
 
-    @field_validator("onejev_url")
+    @field_validator("onejev_url", "large_onejev_url")
     @classmethod
     def valid_backend_url(cls, value: str) -> str:
         parts = urlsplit(value)
@@ -78,6 +95,16 @@ class Settings(BaseModel):
             "model_revision": "REVIEW_JEV_MODEL_REVISION",
             "text_model": "REVIEW_JEV_TEXT_MODEL",
             "text_model_revision": "REVIEW_JEV_TEXT_MODEL_REVISION",
+            "cascade_enabled": "REVIEW_JEV_CASCADE_ENABLED",
+            "text_confidence_threshold": "REVIEW_JEV_TEXT_CONFIDENCE_THRESHOLD",
+            "image_confidence_threshold": "REVIEW_JEV_IMAGE_CONFIDENCE_THRESHOLD",
+            "large_confidence_threshold": "REVIEW_JEV_LARGE_CONFIDENCE_THRESHOLD",
+            "large_backend": "REVIEW_JEV_LARGE_BACKEND",
+            "large_model": "REVIEW_JEV_LARGE_MODEL",
+            "large_model_revision": "REVIEW_JEV_LARGE_MODEL_REVISION",
+            "large_device": "REVIEW_JEV_LARGE_DEVICE",
+            "large_onejev_url": "REVIEW_JEV_LARGE_ONEJEV_URL",
+            "large_served_model": "REVIEW_JEV_LARGE_SERVED_MODEL",
             "served_model": "REVIEW_JEV_SERVED_MODEL",
             "timeout_seconds": "REVIEW_JEV_TIMEOUT",
             "device": "REVIEW_JEV_DEVICE",

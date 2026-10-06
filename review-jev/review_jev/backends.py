@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import threading
 from dataclasses import dataclass, field
+from importlib import import_module
 from pathlib import Path
 from typing import Any, Protocol
 
@@ -22,6 +23,7 @@ class DecisionResult:
     usage: dict[str, int] = field(default_factory=dict)
     assessment: ModelAssessment | None = None
     model_revision: str | None = None
+    confidence: float | None = None
 
 
 def resolve_device(device: str) -> str:
@@ -106,6 +108,9 @@ class TorchBackend:
 
     def _load(self):
         if self.engine is None:
+            # Fail before fetching weights when optional inference dependencies are missing.
+            import_module("torch")
+            import_module("transformers")
             from qev.calibrate import Calibration
             from qev.mm_engine import MMDecisionEngine, local_model_dir
 
@@ -200,6 +205,22 @@ class AutoBackend:
             if settings.image_backend == "torch"
             else OneJevHTTPBackend(settings)
         )
+        large_settings = Settings.model_validate(
+            {
+                **settings.model_dump(),
+                "backend": settings.large_backend,
+                "model": settings.large_model,
+                "model_revision": settings.large_model_revision,
+                "device": settings.large_device,
+                "onejev_url": settings.large_onejev_url,
+                "served_model": settings.large_served_model,
+            }
+        )
+        self.large = (
+            TorchBackend(large_settings)
+            if settings.large_backend == "torch"
+            else OneJevHTTPBackend(large_settings)
+        )
 
     def select(self, media: list[dict]) -> Backend:
         # Routing depends on validated media, never filenames or untrusted text claims.
@@ -208,12 +229,27 @@ class AutoBackend:
     def decide(self, state: dict, questions: dict, media: list[dict]) -> DecisionResult:
         return self.select(media).decide(state, questions, media)
 
+    def stages(self, media: list[dict]) -> list[tuple[str, Backend, float | None]]:
+        if not self.settings.cascade_enabled:
+            return [("4b" if media else "0.6b", self.select(media), None)]
+        stages = []
+        if not media:
+            stages.append(("0.6b", self.text, self.settings.text_confidence_threshold))
+        stages.extend(
+            [
+                ("4b", self.images, self.settings.image_confidence_threshold),
+                ("9b", self.large, self.settings.large_confidence_threshold),
+            ]
+        )
+        return stages
+
     def ready(self) -> bool:
         return self.text.ready() and self.images.ready()
 
     def close(self) -> None:
         self.text.close()
         self.images.close()
+        self.large.close()
 
 
 def make_backend(settings: Settings) -> Backend:

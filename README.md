@@ -13,7 +13,7 @@
 [![SGLang](https://img.shields.io/badge/Serving-SGLang-15803d)](#studyhub-agent)
 [![PyTorch](https://img.shields.io/badge/AI-PyTorch_%2B_Transformers-EE4C2C?logo=pytorch&logoColor=white)](#技术栈)
 [![Qwen3Guard](https://img.shields.io/badge/Text-Qwen3Guard--0.6B-0f766e)](#studyhub-review-jev)
-[![OneJev](https://img.shields.io/badge/Vision-OneJev--4B-c2410c)](#studyhub-review-jev)
+[![OneJev](https://img.shields.io/badge/Vision-OneJev--4B_%2F_9B-c2410c)](#studyhub-review-jev)
 [![Website](https://img.shields.io/badge/Website-study--hub.cn-111827)](https://study-hub.cn)
 [![MIT](https://img.shields.io/badge/License-MIT-22c55e)](LICENSE)
 
@@ -53,7 +53,7 @@ StudyHub 连接学习资料、经验分享与校园互助，围绕高校学生�
 | 异步处理 | 局部异步数据库访问与异步 I/O |
 | 部署运维 | Docker Compose、systemd、Nginx |
 | Agent | Qwen3.5-4B / 9B、SGLang、tokenizers、统一 Agent 执行器 |
-| 内容审核 | Qwen3Guard-Gen-0.6B、OneJev-4B、PyTorch、Transformers |
+| 内容审核 | Qwen3Guard-Gen-0.6B、OneJev-4B / 9B、PyTorch、Transformers |
 
 MySQL 用于预览与生产环境，SQLite 用于本地开发和快速体验。
 
@@ -195,6 +195,7 @@ CI 与本地质量检查可使用 `bash scripts/ci-check.sh`。完整门禁包�
 | --- | --- |
 | 纯文字 | Qwen3Guard-Gen-0.6B |
 | 图片或图文 | OneJev-4B |
+| 低置信度升级 | OneJev-4B → OneJev-9B → 人工审核 |
 
 审核组件提供 **FastAPI 服务、JSON 命令行、可配置规则与批量评测工具**，覆盖内容风险、隐私信息、投稿操纵、版权声明、开放许可与参考内容匹配等检查。模型分流、请求示例和使用方法见 [Review-Jev 文档](review-jev/README.md)。
 
