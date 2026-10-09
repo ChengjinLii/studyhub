@@ -38,8 +38,8 @@ if [[ -n "$(ss -H -lnt "sport = :$SMOKE_PORT")" ]]; then
   exit 1
 fi
 
-PREVIOUS="$(readlink -f "$FRONTEND_LINK" 2>/dev/null || true)"
-PREVIOUS="${PREVIOUS:-$(readlink -f "$RUNTIME_ROOT/current")}"
+PREVIOUS="$(readlink -e "$FRONTEND_LINK" 2>/dev/null || true)"
+PREVIOUS="${PREVIOUS:-$(readlink -e "$RUNTIME_ROOT/current")}"
 BASE_SHA="$(cat "$PREVIOUS/.frontend-base-git-sha" 2>/dev/null || cat "$PREVIOUS/.build-git-sha")"
 BASE_SHA="$(git -C "$CONTROL_ROOT" rev-parse --verify "$BASE_SHA^{commit}")"
 FULL_SHA="$(git -C "$CONTROL_ROOT" rev-parse --verify "$COMMIT^{commit}")"
