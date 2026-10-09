@@ -10,6 +10,8 @@ import MaterialIconSprite from '../components/MaterialIconSprite';
 import HomeMaterialLibrary from '../components/home/HomeMaterialLibrary';
 import { materialBrowseScope } from '../lib/materialBrowseSession';
 import { MaterialBrowseMode, useMaterialSubjects } from '../lib/useMaterialSubjects';
+import type { SubjectSearchAliases } from '../lib/materialSubjects';
+import { readMaterialSubjectAliases } from '../lib/server/materialSubjectAliases';
 import { useMaterialBrowseReturn } from '../lib/useMaterialBrowseReturn';
 import { MaterialListItem, PaginationMeta } from '../types/material';
 import { SessionUser, RoleMask } from '../types/user';
@@ -94,6 +96,7 @@ interface FilterState {
 }
 
 interface HomeProps {
+  subjectSearchAliases?: SubjectSearchAliases;
   materials: MaterialListItem[];
   meta: PaginationMeta;
   filters: FilterState;
@@ -125,6 +128,7 @@ export default function Home({
   requests,
   requestLeaderboard,
   contributors: initialContributors,
+  subjectSearchAliases,
 }: HomeProps) {
   const router = useRouter();
   const isAdmin = Boolean(user && hasRole(user.roleMask, RoleMask.ADMIN));
@@ -293,7 +297,7 @@ export default function Home({
   const [browseMode, setBrowseMode] = useState<MaterialBrowseMode>('materials');
   const [subjectId, setSubjectId] = useState<string | null>(null);
   const [subjectPage, setSubjectPage] = useState(1);
-  const subjects = useMaterialSubjects({ ...appliedFilters });
+  const subjects = useMaterialSubjects({ ...appliedFilters }, subjectSearchAliases);
   const [contributors, setContributors] = useState<ContributorRank[]>(initialContributors);
   const [leaderboardPeriod, setLeaderboardPeriod] = useState<LeaderboardPeriod>('all');
   const didRunInitialLeaderboardEffect = useRef(false);
@@ -825,8 +829,9 @@ export default function Home({
 
           <HomeMaterialLibrary
             materialsRef={materialsRef} materials={materialList} meta={pageMeta}
-            keyword={filtersState.keyword} sort={filtersState.sort} loading={loadingPage}
-            error={paginationError} notice={paginationNotice} mode={browseMode} onModeChange={setBrowseMode}
+            keyword={appliedFilters.keyword} sort={filtersState.sort} loading={loadingPage}
+            error={paginationError} notice={paginationNotice} mode={browseMode}
+            onModeChange={(mode) => { setBrowseMode(mode); setSubjectId(null); setSubjectPage(1); }}
             onSortChange={(value) => void handleMaterialSortChange(value)} onPageChange={handlePageChange}
             subjects={subjects} subjectId={subjectId} subjectPage={subjectPage}
             onSubjectChange={(id) => { setSubjectId(id); setSubjectPage(1); }} onSubjectPageChange={setSubjectPage}
@@ -1042,6 +1047,7 @@ export const getServerSideProps: GetServerSideProps<HomeProps> = async (ctx) => 
 
   return {
     props: {
+      subjectSearchAliases: readMaterialSubjectAliases(),
       materials,
       meta,
       filters,

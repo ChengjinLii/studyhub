@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { filterSubjectFolders, groupMaterialSubjects, materialSubject } from '../../lib/materialSubjects';
+import { filterSubjectFolders, groupMaterialSubjects, materialSubject, searchSubjectFolders } from '../../lib/materialSubjects';
 import catalogue from '../../data/material-subject-catalogue.json';
 import type { MaterialListItem } from '../../types/material';
 
@@ -69,5 +69,29 @@ describe('material subjects', () => {
     expect(filterSubjectFolders(folders, { college: '信通' })).toEqual([]);
     expect(filterSubjectFolders(folders, { price: 'free' })[0].materials.map((x) => x.id)).toEqual([1]);
     expect(folders[0].materials.map((x) => x.id)).toEqual([1, 2]);
+  });
+
+  it('finds course folders by private aliases alongside material results, not incidental descriptions', () => {
+    const folders = [
+      { id: 'calculus', name: '微积分', materials: [material(1, '微积分笔记')] },
+      { id: 'probability', name: '概率论与数理统计', materials: [material(2, '概率论期末真题')] },
+      { id: 'esd', name: '电子系统设计', materials: [material(3, 'ESD笔记')] },
+      { id: 'other', name: '其他资料', materials: [{ ...material(4, '未知课程'), description: '可能用到概率论' }] },
+    ];
+    const aliases = { calculus: ['高数', '高等数学', 'Calculus'], probability: ['概率统计'] };
+    expect(searchSubjectFolders(folders, '高数 期末', aliases).map((folder) => folder.id)).toEqual(['calculus']);
+    expect(searchSubjectFolders(folders, '概率统计 真题', aliases).map((folder) => folder.id)).toEqual(['probability']);
+    expect(searchSubjectFolders(folders, 'ESD 2022', aliases).map((folder) => folder.id)).toEqual(['esd']);
+    expect(searchSubjectFolders(folders, 'Electronic System Design', aliases).map((folder) => folder.id)).toEqual(['esd']);
+    expect(searchSubjectFolders(folders, '', aliases)).toEqual([]);
+    expect(searchSubjectFolders(folders, '没有这门课', aliases)).toEqual([]);
+    expect(filterSubjectFolders(folders, { keyword: '高数' }, aliases).map((folder) => folder.id)).toEqual(['calculus']);
+    expect(filterSubjectFolders(folders, { keyword: '概率统计，期末/真题' }, aliases).map((folder) => folder.id)).toEqual(['probability']);
+  });
+
+  it('does not treat short ASCII aliases as parts of unrelated words', () => {
+    const folders = [{ id: 'ai-ml', name: '人工智能与机器学习', materials: [material(1, 'AI期末复习')] }];
+    expect(searchSubjectFolders(folders, 'domain')).toEqual([]);
+    expect(searchSubjectFolders(folders, 'AI 期末').map((folder) => folder.id)).toEqual(['ai-ml']);
   });
 });

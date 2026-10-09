@@ -48,6 +48,11 @@
 
 .folders li { min-width: 0; }
 
+.searchFolders { margin: 20px 0 24px; }
+.searchFolders > h3 { display: flex; align-items: center; gap: 8px; margin: 0; color: #263348; font-size: 15px; font-weight: 600; }
+.searchFolders > h3 > span { color: #738097; font-size: 13px; font-weight: 400; }
+.searchFolders .folders { margin-top: 12px; }
+
 .folders button {
   display: grid;
   grid-template-columns: 56px minmax(0, 1fr) 17px;

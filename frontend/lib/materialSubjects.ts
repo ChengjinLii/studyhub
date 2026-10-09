@@ -5,6 +5,8 @@ export interface MaterialSubjectFolder extends Pick<MaterialSubject, 'id' | 'nam
   materials: MaterialListItem[];
 }
 
+export type SubjectSearchAliases = Record<string, string[]>;
+
 const normalize = (value: string) => value.normalize('NFKC').replace(/_/g, ' ').toLowerCase();
 const escapePattern = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const matchers = MATERIAL_SUBJECTS.map((subject) => ({
@@ -41,17 +43,47 @@ export function groupMaterialSubjects(materials: MaterialListItem[]): MaterialSu
   });
 }
 
-export function filterSubjectFolders(folders: MaterialSubjectFolder[], filters: Record<string, string>): MaterialSubjectFolder[] {
-  const terms = normalize(filters.keyword || '').trim().split(/\s+/).filter(Boolean);
+function folderAliases(folder: MaterialSubjectFolder, aliases: SubjectSearchAliases): string[] {
+  const subject = MATERIAL_SUBJECTS.find((item) => item.id === folder.id);
+  return Array.from(new Set([folder.name, ...(subject?.aliases || []), ...(aliases[folder.id] || [])].map(normalize)));
+}
+
+function includesTerm(text: string, term: string): boolean {
+  return /^[a-z\d &-]+$/.test(term)
+    ? new RegExp(`(?:^|[^a-z])${escapePattern(term)}(?:$|[^a-z])`, 'i').test(text)
+    : text.includes(term);
+}
+
+export function searchSubjectFolders(
+  folders: MaterialSubjectFolder[], keyword: string, aliases: SubjectSearchAliases = {},
+): MaterialSubjectFolder[] {
+  const query = normalize(keyword).trim().slice(0, 200);
+  if (!query) return [];
+  const terms = query.split(/[\s,，、;；|/\\]+/).filter(Boolean).slice(0, 12);
+  const matches = folders.map((folder) => {
+    const names = folderAliases(folder, aliases);
+    const exact = names.filter((name) => includesTerm(query, name));
+    const partial = terms.filter((term) => names.some((name) => includesTerm(name, term)));
+    return { folder, score: Math.max(0, ...exact.map((name) => name.length * 100)) + partial.length };
+  }).filter(({ score }) => score > 0);
+  return matches.sort((a, b) => b.score - a.score || b.folder.materials.length - a.folder.materials.length)
+    .map(({ folder }) => folder);
+}
+
+export function filterSubjectFolders(
+  folders: MaterialSubjectFolder[], filters: Record<string, string>, aliases: SubjectSearchAliases = {},
+): MaterialSubjectFolder[] {
+  const terms = normalize(filters.keyword || '').trim().slice(0, 200).split(/[\s,，、;；|/\\]+/).filter(Boolean).slice(0, 12);
   const fields = ['school', 'college', 'major', 'gradeValue', 'courseCategory'] as const;
   return folders.map((folder) => {
+    const names = folderAliases(folder, aliases);
     const materials = folder.materials.filter((item) => {
       if (fields.some((field) => filters[field] && item[field] !== filters[field])) return false;
       if (filters.tag && !item.tags?.includes(filters.tag)) return false;
       if (filters.price === 'free' && !item.free) return false;
       if (filters.price === 'paid' && item.free) return false;
       const text = normalize([folder.name, item.title, item.description, ...(item.tags || [])].join(' '));
-      return terms.every((term) => text.includes(term));
+      return terms.every((term) => includesTerm(text, term) || names.some((name) => name === term));
     });
     materials.sort((a, b) => {
       const downloads = (b.downloadCount || 0) - (a.downloadCount || 0);

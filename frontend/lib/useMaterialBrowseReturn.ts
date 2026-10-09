@@ -63,8 +63,8 @@ export function useMaterialBrowseReturn({ source, scope, state, onRestore }: {
   onRestore: (state: MaterialBrowseState) => void;
 }) {
   const router = useRouter();
-  const latest = useRef({ state, onRestore });
-  latest.current = { state, onRestore };
+  const latest = useRef({ state, onRestore, url: router.asPath });
+  latest.current = { state, onRestore, url: router.asPath };
 
   useEffect(() => {
     const snapshot = validateBrowseSnapshot(cache.current, scope) || readBrowseSnapshot(window.sessionStorage, scope);
@@ -93,7 +93,7 @@ export function useMaterialBrowseReturn({ source, scope, state, onRestore }: {
         savedAt: Date.now(),
         scope,
         source,
-        url: router.asPath,
+        url: latest.current.url,
         detailPath,
         historyIndex: typeof window.history.state?.idx === 'number' ? window.history.state.idx : null,
         pendingRestore: true,

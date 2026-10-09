@@ -7,6 +7,8 @@ import MaterialBrowseToggle from '../materials/MaterialBrowseToggle';
 import MaterialSearchEmpty from '../materials/MaterialSearchEmpty';
 import MaterialSortSelect from '../materials/MaterialSortSelect';
 import MaterialSubjectBrowser from '../materials/MaterialSubjectBrowser';
+import MaterialSubjectFolders from '../materials/MaterialSubjectFolders';
+import styles from '../../styles/MaterialSubjects.module.css';
 
 interface Props {
   materialsRef: RefObject<HTMLDivElement>;
@@ -34,6 +36,8 @@ interface Props {
 
 export default function HomeMaterialLibrary(props: Props) {
   const { meta, mode, materials, subjects, selectedIds } = props;
+  const openFolder = subjects.allFolders.find((folder) => folder.id === props.subjectId);
+  const browsingFolder = Boolean(openFolder);
   const pageSize = meta.size || 24;
   const totalPages = Math.max(1, Math.ceil(meta.total / pageSize));
   const renderMaterial = (item: MaterialListItem) => <MaterialCard
@@ -51,7 +55,7 @@ export default function HomeMaterialLibrary(props: Props) {
             </svg>
           </h2>
           <p className="help-text">
-            {mode === 'materials'
+            {openFolder ? `${openFolder.name} · ${openFolder.materials.length} 份资料` : mode === 'materials'
               ? `当前第 ${meta.page} / ${totalPages} 页 · 每页 ${pageSize} 条 · 共 ${meta.total} 条结果`
               : `${subjects.folders.length} 个学科 · ${subjects.items.length} 份资料 · 整理于 ${subjects.updatedAt.slice(0, 10)}`}
           </p>
@@ -62,19 +66,26 @@ export default function HomeMaterialLibrary(props: Props) {
           <MaterialBrowseToggle value={mode} onChange={props.onModeChange} />
         </div>
       </div>
-      {mode === 'materials' && <PaginationBar
+      {mode === 'materials' && !browsingFolder && <PaginationBar
         currentPage={meta.page} totalItems={meta.total} pageSize={pageSize} loading={props.loading} onPageChange={props.onPageChange}
       />}
       {props.error && <p className="error-text">{props.error}</p>}
       {props.notice && !props.error && <p className="help-text">{props.notice}</p>}
-      {mode === 'subjects' ? <MaterialSubjectBrowser
-        folders={subjects.folders}
+      {mode === 'subjects' || browsingFolder ? <MaterialSubjectBrowser
+        folders={browsingFolder ? subjects.allFolders : subjects.folders}
         subjectId={props.subjectId} page={props.subjectPage}
+        backLabel={mode === 'materials' ? '返回搜索结果' : '全部学科'}
         onSubjectChange={props.onSubjectChange} onPageChange={props.onSubjectPageChange}
         gridClassName="materials-list materials-grid" renderMaterial={renderMaterial}
-      /> : !materials.length ? <MaterialSearchEmpty onReset={props.onReset} onEditKeyword={props.onEditKeyword} /> : (
-        <ul className="materials-list materials-grid">{materials.map(renderMaterial)}</ul>
-      )}
+      /> : <>
+        {subjects.relatedFolders.length > 0 && <section className={styles.searchFolders} aria-label="相关学科">
+          <h3>相关学科 <span>{subjects.relatedFolders.length}</span></h3>
+          <MaterialSubjectFolders folders={subjects.relatedFolders} onOpen={props.onSubjectChange} label="相关学科文件夹" />
+        </section>}
+        {!materials.length
+          ? <MaterialSearchEmpty onReset={props.onReset} onEditKeyword={props.onEditKeyword} />
+          : <ul className="materials-list materials-grid">{materials.map(renderMaterial)}</ul>}
+      </>}
     </section>
   );
 }

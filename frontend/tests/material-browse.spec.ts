@@ -42,6 +42,7 @@ async function openHomepage(page: Page) {
       pageProps = { user: null, material: { ...item, hasFile: false, hasNetdisk: true, versions: [], reviews: [] } };
     } else {
       pageProps = {
+        subjectSearchAliases: { calculus: ['微积分', '高数', 'Calculus'] },
         user: null, materials: materials.slice(24, 48), meta: { page: 2, size: 24, total: 48 }, filters,
         stats: null, tagOptions: ['期末真题'], profileSummary: null, profileMissingFields: [],
         recommendations: [materials[32]], popularMaterials: [], requests: [], requestLeaderboard: [], contributors: [],
@@ -128,12 +129,47 @@ test('homepage filters the prepared catalogue locally after the existing search'
   await input.press('Enter');
   await expect(page.locator('#materials-list .material-card')).toHaveCount(9);
   expect(calls).toHaveLength(1);
+  const related = page.getByRole('list', { name: '相关学科文件夹' });
+  await expect(related.getByRole('button')).toHaveCount(1);
+  await related.getByRole('button', { name: /电子系统设计/ }).click();
+  await expect(page.locator('#materials-list .material-card')).toHaveCount(9);
+  await page.getByRole('button', { name: '返回搜索结果', exact: true }).click();
+  await expect(related).toBeVisible();
   await page.getByRole('button', { name: '按学科', exact: true }).click();
   const folders = page.getByRole('list', { name: '学科文件夹' });
   await expect(folders.getByRole('button')).toHaveCount(1);
   await folders.getByRole('button', { name: /电子系统设计/ }).click();
   await expect(page.locator('#materials-list .material-card')).toHaveCount(9);
   expect(calls).toHaveLength(1);
+});
+
+test('course aliases still show a full folder when no literal material title matches', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  const { calls, documents } = await openHomepage(page);
+  await page.locator('#keyword').fill('高数');
+  await page.locator('#keyword').press('Enter');
+  const folder = page.getByRole('list', { name: '相关学科文件夹' }).getByRole('button', { name: /微积分/ });
+  await expect(folder).toBeVisible();
+  await folder.click();
+  const library = page.locator('#materials-list');
+  const count = catalogue.folders.find((item) => item.id === 'calculus')!.materials.length;
+  await expect(library.locator('.material-card')).toHaveCount(Math.min(24, count));
+  expect(calls).toHaveLength(1);
+  const card = library.locator('.material-card').first();
+  const id = await card.getAttribute('data-material-id');
+  await card.scrollIntoViewIfNeeded();
+  const top = (await card.boundingBox())!.y;
+  await card.locator('.material-card__overlay-link').click();
+  await expect(page.locator('#download-card')).toBeVisible();
+  await page.goBack();
+  await expect(library.getByRole('button', { name: '返回搜索结果', exact: true })).toBeVisible();
+  await page.waitForTimeout(1400);
+  expect(Math.abs((await library.locator(`[data-material-id="${id}"]`).boundingBox())!.y - top)).toBeLessThan(6);
+  await library.getByRole('button', { name: '返回搜索结果', exact: true }).click();
+  await expect(folder).toBeVisible();
+  await expect(page.locator('#keyword')).toHaveValue('高数');
+  expect(calls).toHaveLength(1);
+  expect(documents).toHaveLength(1);
 });
 
 for (const mode of ['materials', 'subjects'] as const) {

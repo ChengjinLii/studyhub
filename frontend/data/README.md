@@ -26,6 +26,17 @@ download access and current availability still use the existing live checks.
 No storage keys, download URLs, netdisk links/passwords, email addresses or private
 user records are exported. Do not add these fields to the metadata allowlist.
 
+Search also shows relevant subject folders alongside the live material results.
+Folder names and course abbreviations use the existing public alias rules plus
+the relevant course groups from `private/material_search_synonyms.json`. The
+server reads and mtime-caches that private file; only aliases for public subjects
+reach homepage props. Unrelated glossary entries are not serialized. Set
+`STUDYHUB_MATERIAL_SEARCH_SYNONYMS_PATH` to override the shared path. Missing or
+invalid files fall back to the public course aliases and do not break browsing.
+Keep the full glossary and its backups out of Git. Folder search and opening a
+folder do not make extra requests; opening shows the full curated subject within
+the selected metadata/price filters. Returning keeps the original search results.
+
 For a local preview against the running backend, set `NEXT_PUBLIC_API_BASE=/api`
 and `API_BASE_INTERNAL=http://127.0.0.1:8311/api` for both build and start. Use a
 separate `NEXT_DIST_DIR` and port. Without the public setting, loopback browser

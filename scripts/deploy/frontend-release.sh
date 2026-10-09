@@ -89,6 +89,7 @@ switch_frontend() {
 mkdir -p "$RELEASE"
 git -C "$CONTROL_ROOT" archive "$BASE_SHA" frontend | tar -x -C "$RELEASE"
 git -C "$CONTROL_ROOT" archive "$FULL_SHA" "${FILES[@]}" | tar -x -C "$RELEASE"
+ln -s "${STUDYHUB_PRIVATE_DIR_PATH:-$CONTROL_ROOT/private}" "$RELEASE/private"
 printf '%s\n' "$SHORT_SHA" > "$RELEASE/.build-git-sha"
 printf '%s\n' "$BASE_SHA" > "$RELEASE/.frontend-base-git-sha"
 printf '%s\n' "${FILES[@]}" > "$RELEASE/.frontend-deployed-files"

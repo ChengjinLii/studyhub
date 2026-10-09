@@ -3,11 +3,13 @@ frontend/components/MaterialCard.tsx
 frontend/components/home/HomeMaterialLibrary.tsx
 frontend/components/materials/MaterialBrowseToggle.tsx
 frontend/components/materials/MaterialSubjectBrowser.tsx
+frontend/components/materials/MaterialSubjectFolders.tsx
 frontend/constants/materialSubjects.ts
 frontend/data/README.md
 frontend/data/material-subject-catalogue.json
 frontend/lib/materialBrowseSession.ts
 frontend/lib/materialSubjects.ts
+frontend/lib/server/materialSubjectAliases.ts
 frontend/lib/useMaterialBrowseReturn.ts
 frontend/lib/useMaterialSubjects.ts
 frontend/package.json
@@ -19,3 +21,4 @@ frontend/tests/material-browse.spec.ts
 frontend/tests/unit/homeSsrLimits.test.ts
 frontend/tests/unit/materialBrowseSession.test.ts
 frontend/tests/unit/materialSubjects.test.ts
+frontend/tests/unit/materialSubjectAliases.test.ts
