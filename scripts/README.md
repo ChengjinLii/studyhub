@@ -26,6 +26,7 @@
 - 非生产 CI 检查：`bash scripts/ci-check.sh`
 - 发布前检查：`bash scripts/predeploy-check.sh`
 - 原子生产发布：先运行 `bash scripts/deploy/install-atomic-services.sh` 安装稳定的 `current` 服务路径，后续使用 `bash scripts/deploy/atomic-release.sh <commit>`。脚本在独立 release 安装锁定依赖、构建并以备用端口 smoke，通过后才切换软链接；启动或生产 smoke 失败会自动回滚。
+- 首页资料展示独立发布：`bash scripts/deploy/frontend-release.sh <commit> scripts/deploy/home-materials.files`。仅覆盖清单中的前端文件，其余前端沿用线上基线；锁定安装、构建、关键流程测试和预热通过后，切换 `frontend-current` 并仅重启前端。后端、worker 与数据库不变；失败恢复旧前端。后续全量发布会同步切换两条链接。`frontend-releases/` 保留旧版本供回滚，不会由全量发布的清理阶段删除。
 - 中断发布清理：`bash scripts/deploy/cleanup-stale-releases.sh` 默认只预览 7 天以上且未被引用的 `interrupted-<commit>` 目录；`--apply` 仅清理该类中断构建，不处理正式 release、备份或业务文件。
 - 浏览器加载性能预算：`npm --prefix frontend run test:perf`
 

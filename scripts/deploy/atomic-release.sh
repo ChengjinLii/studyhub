@@ -5,6 +5,7 @@ CONTROL_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 RUNTIME_ROOT="${STUDYHUB_RELEASE_ROOT:-/data/studyhub-runtime}"
 RELEASES_ROOT="$RUNTIME_ROOT/releases"
 CURRENT_LINK="$RUNTIME_ROOT/current"
+FRONTEND_LINK="$RUNTIME_ROOT/frontend-current"
 PRIVATE_DIR="${STUDYHUB_PRIVATE_DIR_PATH:-$CONTROL_ROOT/private}"
 COMMIT="${1:-HEAD}"
 KEEP_RELEASES="${STUDYHUB_RELEASE_KEEP:-3}"
@@ -59,6 +60,7 @@ FULL_SHA="$(git -C "$CONTROL_ROOT" rev-parse --verify "$COMMIT^{commit}")"
 SHORT_SHA="$(git -C "$CONTROL_ROOT" rev-parse --short=12 "$FULL_SHA")"
 RELEASE="$RELEASES_ROOT/$SHORT_SHA"
 PREVIOUS="$(readlink -f "$CURRENT_LINK" 2>/dev/null || true)"
+PREVIOUS_FRONTEND="$(readlink -f "$FRONTEND_LINK" 2>/dev/null || true)"
 BACKEND_PID=""
 FRONTEND_PID=""
 RELEASE_CREATED=0
@@ -172,6 +174,10 @@ switch_current() {
   local temporary="$RUNTIME_ROOT/.current-$SHORT_SHA-$$"
   ln -s "$target" "$temporary"
   mv -Tf "$temporary" "$CURRENT_LINK"
+  if [[ -L "$FRONTEND_LINK" ]]; then
+    ln -s "$target" "$temporary-frontend"
+    mv -Tf "$temporary-frontend" "$FRONTEND_LINK"
+  fi
 }
 
 rollback() {
@@ -179,6 +185,11 @@ rollback() {
     echo "deployment failed; rolling back to $PREVIOUS"
     sudo -n systemctl stop studyhub-frontend.service studyhub-worker.service || true
     switch_current "$PREVIOUS"
+    if [[ -n "$PREVIOUS_FRONTEND" && -d "$PREVIOUS_FRONTEND" && "$PREVIOUS_FRONTEND" != "$PREVIOUS" ]]; then
+      local temporary="$RUNTIME_ROOT/.frontend-rollback-$SHORT_SHA-$$"
+      ln -s "$PREVIOUS_FRONTEND" "$temporary"
+      mv -Tf "$temporary" "$FRONTEND_LINK"
+    fi
     sudo -n systemctl restart studyhub-backend.service || true
     for _attempt in $(seq 1 45); do
       if curl -fsS --max-time 2 http://127.0.0.1:8311/api/readyz >/dev/null; then

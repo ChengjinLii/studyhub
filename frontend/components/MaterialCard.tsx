@@ -165,6 +165,7 @@ export default function MaterialCard({
 
   return (
     <li
+      data-material-id={material.id}
       className={`material-card material-card-clickable ${isExperienceTag ? 'material-card--experience' : ''} ${checked ? 'selected' : ''} ${
         selectable ? 'selectable' : ''
       }`}

@@ -1,0 +1,63 @@
+export interface MaterialSubject {
+  id: string;
+  name: string;
+  aliases: readonly string[];
+}
+
+// Course names and abbreviations used by the current public catalogue.
+export const MATERIAL_SUBJECTS: readonly MaterialSubject[] = [
+  { id: 'physics-lab', name: '大学物理实验', aliases: ['大物实验', '物理实验', 'Physics EXP'] },
+  { id: 'physics', name: '大学物理', aliases: ['大学物理', '大物'] },
+  { id: 'calculus', name: '微积分', aliases: ['微积分', '高等数学', 'Calculus'] },
+  { id: 'linear-algebra', name: '线性代数', aliases: ['线性代数', '线代', 'Linear Algebra'] },
+  { id: 'probability', name: '概率论与数理统计', aliases: ['概率论', '数理统计', 'Probability Theory'] },
+  { id: 'matrix', name: '矩阵理论', aliases: ['矩阵理论', 'Matrix Theory'] },
+  { id: 'numerical-analysis', name: '数值分析', aliases: ['数值分析', 'Numerical Analysis'] },
+  { id: 'graph-theory', name: '图论', aliases: ['图论', 'Graph Theory'] },
+  { id: 'optimization', name: '最优化', aliases: ['最优化', 'Optimization'] },
+  { id: 'statistical-signal', name: '统计信号处理', aliases: ['统计信号处理', 'Statistical Signal'] },
+  { id: 'signal-detection', name: '信号检测与估计', aliases: ['信号检测与估计', '信检估'] },
+  { id: 'random-signal', name: '随机信号分析', aliases: ['随机信号', 'Random Signal'] },
+  { id: 'signals-systems', name: '信号与系统', aliases: ['信号与系统', 'Signals and Systems'] },
+  { id: 'dsp', name: '数字信号处理', aliases: ['数字信号处理', 'Digital Signal Processing', 'DSP'] },
+  { id: 'adc', name: '高阶数字通信', aliases: ['高阶数字通信', 'Advanced Digital Communication', 'ADC'] },
+  { id: 'digital-communication', name: '数字通信', aliases: ['数字通信', 'Digital Communication', 'DC'] },
+  { id: 'communication-principles', name: '通信原理', aliases: ['通信原理', 'CPS'] },
+  { id: 'information-theory', name: '信息论', aliases: ['信息论', 'Information Theory'] },
+  { id: 'communication-networks', name: '通信网络', aliases: ['通信网络', 'Communication Networks'] },
+  { id: 'mobile-communication', name: '移动通信与 5G', aliases: ['移动通信', '5G'] },
+  { id: 'communication-contest', name: '通信竞赛', aliases: ['大唐杯', '通信竞赛'] },
+  { id: 'rf-circuits', name: '射频电路理论与应用', aliases: ['射频电路', 'RF Circuit'] },
+  { id: 'microwave-circuits', name: '微波集成电路', aliases: ['微波集成电路', 'MIC'] },
+  { id: 'electromagnetic-theory', name: '高等电磁理论', aliases: ['高等电磁理论'] },
+  { id: 'electromagnetic-fields', name: '电磁场与波', aliases: ['电磁场', '电磁波'] },
+  { id: 'esd', name: '电子系统设计', aliases: ['电子系统设计', 'Electronic System Design', 'ESD'] },
+  { id: 'electronic-devices', name: '电子器件', aliases: ['电子器件', 'Electronic Device', 'ED'] },
+  { id: 'power-electronics', name: '功率器件与电力电子', aliases: ['功率半导体', '功率器件', '电力电子', 'Power Electronics', 'PE'] },
+  { id: 'micro-nano', name: '微纳工艺', aliases: ['微纳工艺', 'Micro and Nano Technology', 'MNNT'] },
+  { id: 'digital-logic', name: '数字电路与逻辑设计', aliases: ['数字电路', '数字逻辑', '数电', 'DCD', 'ADDL', 'Digital Circuit'] },
+  { id: 'digital-ic', name: '数字 IC 与 FPGA', aliases: ['数字IC', '数字 IC', 'FPGA'] },
+  { id: 'analogue-circuits', name: '模拟电路', aliases: ['模拟电路', '模电', 'Analogue Circuit', 'Analog Circuit'] },
+  { id: 'cad', name: '电路分析与设计', aliases: ['电路分析', 'CAD'] },
+  { id: 'ccd', name: '通信电路设计', aliases: ['通信电路设计', 'CCD'] },
+  { id: 'embedded', name: '嵌入式处理器', aliases: ['嵌入式处理器', 'Embedded Processor', 'EP'] },
+  { id: 'image-processing', name: '数字图像处理', aliases: ['数字图像处理', 'Digital Image Processing'] },
+  { id: 'ai-ml', name: '人工智能与机器学习', aliases: ['机器学习', '人工智能', 'AI & ML', 'AI and ML', 'AIML', 'AI', 'Machine Learning'] },
+  { id: 'dynamics-control', name: '动力学与控制', aliases: ['动力学与控制', 'Dynamics & Control'] },
+  { id: 'engineering-management', name: '工程项目管理与财务', aliases: ['工程项目管理', '工财', 'Engineering Project Management', 'EPM&F'] },
+  { id: 'marxism', name: '马克思主义基本原理', aliases: ['马原', '马克思主义'] },
+  { id: 'mao-theory', name: '毛泽东思想概论', aliases: ['毛概', '毛泽东思想'] },
+  { id: 'modern-history', name: '中国近现代史纲要', aliases: ['近代史', '近现代史'] },
+  { id: 'ethics-law', name: '思想道德与法治', aliases: ['思想道德', '思政'] },
+  { id: 'military-theory', name: '军事理论', aliases: ['军事理论'] },
+  { id: 'engineering-ethics', name: '工程伦理与学术道德', aliases: ['工程伦理', '学术道德'] },
+  { id: 'graduate-english', name: '研究生英语', aliases: ['研究生英语', '硕士英语', '博士英语', '研究生学术英语', '研究生学位英语', '英语听说实训'] },
+  { id: 'academic-english', name: '学术英语', aliases: ['EAGP', 'EfES', 'ECECS', 'Academic English'] },
+  { id: 'english-exams', name: '英语等级考试', aliases: ['四六级', '四级', '六级', '雅思', 'IELTS', 'TOEFL'] },
+  { id: 'ip', name: 'IP 课程', aliases: ['IP'] },
+  { id: 'ms', name: 'MS 课程', aliases: ['MS'] },
+  { id: 'academic-resources', name: '学术规范与模板', aliases: ['论文撰写', '论文封面', '学术活动', 'PPT模板', 'PPT 模板'] },
+  { id: 'communication-other', name: '通信综合资料', aliases: ['通信类本科课程'] },
+];
+
+export const OTHER_MATERIAL_SUBJECT: MaterialSubject = { id: 'other', name: '其他资料', aliases: [] };

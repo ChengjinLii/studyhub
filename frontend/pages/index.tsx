@@ -7,9 +7,10 @@ import Link from 'next/link';
 import NavBar from '../components/NavBar';
 import AppImage from '../components/AppImage';
 import MaterialIconSprite from '../components/MaterialIconSprite';
-import MaterialSortSelect from '../components/materials/MaterialSortSelect';
-import MaterialSearchEmpty from '../components/materials/MaterialSearchEmpty';
-import PaginationBar from '../components/PaginationBar';
+import HomeMaterialLibrary from '../components/home/HomeMaterialLibrary';
+import { materialBrowseScope } from '../lib/materialBrowseSession';
+import { MaterialBrowseMode, useMaterialSubjects } from '../lib/useMaterialSubjects';
+import { useMaterialBrowseReturn } from '../lib/useMaterialBrowseReturn';
 import { MaterialListItem, PaginationMeta } from '../types/material';
 import { SessionUser, RoleMask } from '../types/user';
 import { ProfileSummary } from '../types/profile';
@@ -154,6 +155,7 @@ export default function Home({
     []
   );
   const [filtersState, setFiltersState] = useState<FilterState>(() => normalizeFilters(initialFilters));
+  const [appliedFilters, setAppliedFilters] = useState<FilterState>(() => normalizeFilters(initialFilters));
   useEffect(() => {
     setFiltersState(normalizeFilters(initialFilters));
   }, [initialFilters, normalizeFilters]);
@@ -175,7 +177,7 @@ export default function Home({
     return qs ? `?${qs}` : '';
   }, []);
   const applyFilters = useCallback(
-    async (nextFilters: FilterState, options?: { scrollTarget?: 'filters' | 'materials' }) => {
+    async (nextFilters: FilterState, options?: { scrollTarget?: 'filters' | 'materials'; preserveSubject?: boolean }) => {
       const normalized = normalizeFilters(nextFilters);
       setLoadingPage(true);
       setPaginationError('');
@@ -189,6 +191,9 @@ export default function Home({
         const data = await unwrapApiResponse<MaterialListResponse>(resp, '筛选加载失败');
         setMaterialList(data.items);
         setPageMeta(data.meta);
+        setAppliedFilters(normalized);
+        if (!options?.preserveSubject) setSubjectId(null);
+        setSubjectPage(1);
         if (data.stats) setStatsState(data.stats);
         if (data.availableTags) setTagOptionsState(data.availableTags);
         await router.replace({ pathname: '/', query }, undefined, { shallow: true, scroll: false });
@@ -285,7 +290,10 @@ export default function Home({
   const [batchInfo, setBatchInfo] = useState('');
   const [shareSheetOpen, setShareSheetOpen] = useState(false);
   const [shareSheetText, setShareSheetText] = useState('');
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [browseMode, setBrowseMode] = useState<MaterialBrowseMode>('materials');
+  const [subjectId, setSubjectId] = useState<string | null>(null);
+  const [subjectPage, setSubjectPage] = useState(1);
+  const subjects = useMaterialSubjects({ ...appliedFilters });
   const [contributors, setContributors] = useState<ContributorRank[]>(initialContributors);
   const [leaderboardPeriod, setLeaderboardPeriod] = useState<LeaderboardPeriod>('all');
   const didRunInitialLeaderboardEffect = useRef(false);
@@ -332,6 +340,34 @@ export default function Home({
     setStatsState(stats);
     setTagOptionsState(tagOptions);
   }, [initialMaterials, meta, stats, tagOptions]);
+  useMaterialBrowseReturn({
+    source: '/',
+    scope: materialBrowseScope(user),
+    state: {
+      filters: { ...filtersState },
+      appliedFilters: { ...appliedFilters },
+      materials: materialList,
+      meta: pageMeta,
+      availableTags: tagOptionsState,
+      mode: browseMode,
+      subjectId,
+      subjectPage,
+      selectedIds,
+      showAdvanced,
+    },
+    onRestore: (snapshot) => {
+      setFiltersState(normalizeFilters({ ...initialFilters, ...snapshot.filters }));
+      setAppliedFilters(normalizeFilters({ ...initialFilters, ...(snapshot.appliedFilters || snapshot.filters) }));
+      setMaterialList(snapshot.materials);
+      setPageMeta(snapshot.meta);
+      setTagOptionsState(snapshot.availableTags);
+      setBrowseMode(snapshot.mode);
+      setSubjectId(snapshot.subjectId);
+      setSubjectPage(snapshot.subjectPage);
+      setSelectedIds(snapshot.selectedIds || []);
+      setShowAdvanced(snapshot.showAdvanced || false);
+    },
+  });
   useEffect(() => {
     if (!showSeasonalEffects) {
       setMeteorStyles([]);
@@ -347,7 +383,6 @@ export default function Home({
     () => Math.max(1, Math.ceil((pageMeta.total || 0) / pageSize)),
     [pageMeta.total, pageSize]
   );
-  const totalItems = pageMeta.total ?? 0;
   const userRoleBadges = useMemo(() => {
     if (!user) return [];
     return ROLE_LABELS.filter((role) => hasRole(user.roleMask, role.mask)).map((role) => role.label);
@@ -506,8 +541,8 @@ export default function Home({
   }, [leaderboardPeriod]);
 
   const selectedMaterials = useMemo(
-    () => materialList.filter((item) => selectedIds.includes(item.id)),
-    [materialList, selectedIds]
+    () => (browseMode === 'subjects' ? subjects.items : materialList).filter((item) => selectedIds.includes(item.id)),
+    [browseMode, subjects.items, materialList, selectedIds]
   );
   const selectedCount = selectedMaterials.length;
 
@@ -604,10 +639,6 @@ export default function Home({
     applyFilters(nextFilters, { scrollTarget: 'filters' });
   };
 
-  const handleViewModeChange = (mode: 'grid' | 'list') => {
-    setViewMode(mode);
-  };
-
   const handleBatchShare = async () => {
     if (!selectedCount) return;
     const origin = typeof window !== 'undefined' ? window.location.origin : '';
@@ -670,7 +701,7 @@ export default function Home({
       sort: normalizeMaterialSort(sort),
       page: '1',
     };
-    await applyFilters(nextFilters, { scrollTarget: 'materials' });
+    await applyFilters(nextFilters, { scrollTarget: 'materials', preserveSubject: true });
   };
 
   const handleMobileSearchSubmit = (event: React.FormEvent<HTMLFormElement>) => {
@@ -792,81 +823,16 @@ export default function Home({
             onSubmit={handleFilterSubmit}
           />
 
-          <section className="card materials-library-card" id="materials-list" ref={materialsRef}>
-            <div className="materials-header materials-library-header">
-              <div className="materials-library-header__summary">
-                <h2 className="card-title">
-                  资料列表
-                  <svg className="title-icon" viewBox="0 0 24 24" aria-hidden="true">
-                    <rect x="4" y="5" width="16" height="14" rx="2" fill="none" stroke="currentColor" strokeWidth="1.6" />
-                    <path d="M8 9h8M8 12h8M8 15h5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-                  </svg>
-                </h2>
-                <p className="help-text">
-                  当前第 {pageMeta.page} / {totalPages} 页 · 每页 {pageSize} 条 · 共 {pageMeta.total} 条结果
-                </p>
-                {filtersState.keyword.trim() ? (
-                  <p className="materials-search-context">
-                    当前搜索：<strong>{filtersState.keyword.trim()}</strong>
-                  </p>
-                ) : null}
-              </div>
-              <div className="materials-library-header__actions">
-                <MaterialSortSelect
-                  value={filtersState.sort}
-                  disabled={loadingPage}
-                  onChange={(value) => void handleMaterialSortChange(value)}
-                />
-                <div className="view-toggle" role="group" aria-label="列表视图切换">
-                  <button
-                    type="button"
-                    className={viewMode === 'grid' ? 'active' : ''}
-                    onClick={() => handleViewModeChange('grid')}
-                  >
-                    卡片
-                  </button>
-                  <button
-                    type="button"
-                    className={viewMode === 'list' ? 'active' : ''}
-                    onClick={() => handleViewModeChange('list')}
-                  >
-                    列表
-                  </button>
-                </div>
-              </div>
-            </div>
-            <PaginationBar
-              currentPage={currentPage}
-              totalItems={totalItems}
-              pageSize={pageSize}
-              loading={loadingPage}
-              onPageChange={handlePageChange}
-            />
-            {paginationError && <p className="error-text">{paginationError}</p>}
-            {paginationNotice && !paginationError && <p className="help-text">{paginationNotice}</p>}
-            {materialList.length === 0 ? (
-              <MaterialSearchEmpty
-                onReset={handleResetFilters}
-                onEditKeyword={() => filterRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })}
-              />
-            ) : (
-              <>
-                <ul className={`materials-list ${viewMode === 'grid' ? 'materials-grid' : 'list-view'}`}>
-                  {materialList.map((item, idx) => (
-                    <MaterialCard
-                      key={item.id}
-                      material={item}
-                      selectable
-                      checked={selectedIds.includes(item.id)}
-                      onToggle={toggleSelection}
-                      variant={viewMode}
-                      orderLabel={viewMode === 'list' ? `${(currentPage - 1) * pageSize + idx + 1}` : undefined}
-                    />
-                  ))}
-                </ul>
-              </>
-            )}
-          </section>
+          <HomeMaterialLibrary
+            materialsRef={materialsRef} materials={materialList} meta={pageMeta}
+            keyword={filtersState.keyword} sort={filtersState.sort} loading={loadingPage}
+            error={paginationError} notice={paginationNotice} mode={browseMode} onModeChange={setBrowseMode}
+            onSortChange={(value) => void handleMaterialSortChange(value)} onPageChange={handlePageChange}
+            subjects={subjects} subjectId={subjectId} subjectPage={subjectPage}
+            onSubjectChange={(id) => { setSubjectId(id); setSubjectPage(1); }} onSubjectPageChange={setSubjectPage}
+            selectedIds={selectedIds} onToggle={toggleSelection} onReset={handleResetFilters}
+            onEditKeyword={() => filterRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })}
+          />
         </div>
         <HomeLeaderboard
           user={user}

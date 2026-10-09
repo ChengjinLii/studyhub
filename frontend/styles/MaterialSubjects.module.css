@@ -1,0 +1,156 @@
+.toggle {
+  display: inline-flex;
+  flex-shrink: 0;
+  padding: 3px;
+  border: 1px solid #dce3ed;
+  border-radius: 8px;
+  background: #f4f7fb;
+}
+
+.toggle button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 40px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: #59667a;
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.toggle button[aria-pressed='true'] {
+  background: #fff;
+  color: #244ed7;
+  box-shadow: 0 1px 4px rgb(30 50 80 / 10%);
+}
+
+.toggle button:focus-visible,
+.folders button:focus-visible,
+.breadcrumb button:focus-visible {
+  outline: 2px solid #4267df;
+  outline-offset: 3px;
+}
+
+.folders {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin: 18px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.folders li { min-width: 0; }
+
+.folders button {
+  display: grid;
+  grid-template-columns: 56px minmax(0, 1fr) 17px;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  height: 100%;
+  min-height: 106px;
+  padding: 18px 16px;
+  text-align: left;
+  border: 1px solid #e2e7ef;
+  border-radius: 8px;
+  background: #fff;
+  color: #758399;
+  box-shadow: 0 2px 5px rgb(30 50 80 / 3%);
+  cursor: pointer;
+  transition: border-color 160ms, box-shadow 160ms, transform 160ms;
+}
+
+.folderArt {
+  position: relative;
+  display: block;
+  width: 56px;
+  height: 52px;
+  isolation: isolate;
+}
+
+.folderArt svg {
+  position: absolute;
+  bottom: 0;
+  left: 3px;
+  width: 48px;
+  height: 48px;
+  overflow: visible;
+}
+
+.folderBack { transform: none; }
+
+.folderFront {
+  transform-box: view-box;
+  transform-origin: 50% 93.75%;
+  transition: transform 260ms cubic-bezier(0.2, 0.7, 0.25, 1);
+}
+
+.folders button:focus-visible .folderFront { transform: scaleY(0.77); }
+.folderInfo { min-width: 0; display: flex; flex-direction: column; gap: 7px; }
+.folderInfo > strong { color: #263348; font-size: 15px; font-weight: 650; line-height: 1.5; overflow-wrap: anywhere; }
+.folderCount { color: #7b8798; font-size: 12px; line-height: 1.5; }
+.folderCount > span { color: #596a81; font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.folderArrow { color: #b1bdcf; transition: color 160ms, transform 160ms; }
+
+@media (hover: hover) {
+  .folders button:hover { border-color: #bacbea; box-shadow: 0 5px 14px rgb(30 50 80 / 7%); transform: translateY(-2px); }
+  .folders button:hover .folderFront { transform: scaleY(0.77); }
+  .folders button:hover .folderArrow { color: #4d70b7; transform: translateX(2px); }
+}
+
+/* Keep the bottom fold unchanged while opening only the upper cover outline. */
+@supports (d: path('M0 0')) {
+  .folderFront {
+    d: path('M27.875 30H4.125C2.95125 30 2 29.0545 2 27.8878L2 13.1122C2 11.9455 2.95125 11 4.125 11H27.875C29.0488 11 30 11.9455 30 13.1122L30 27.8878C30 29.0545 29.0488 30 27.875 30Z');
+    transition: d 260ms cubic-bezier(0.2, 0.7, 0.25, 1);
+  }
+
+  .folders button:focus-visible .folderFront {
+    transform: none;
+    d: path('M27.875 30H4.125C2.95125 30 2 29.0545 2 27.8878L0.4 17.6122C0.28 16.4455 1.15125 15.5 2.325 15.5H29.675C30.8488 15.5 31.72 16.4455 31.6 17.6122L30 27.8878C30 29.0545 29.0488 30 27.875 30Z');
+  }
+
+  @media (hover: hover) {
+    .folders button:hover .folderFront {
+      transform: none;
+      d: path('M27.875 30H4.125C2.95125 30 2 29.0545 2 27.8878L0.4 17.6122C0.28 16.4455 1.15125 15.5 2.325 15.5H29.675C30.8488 15.5 31.72 16.4455 31.6 17.6122L30 27.8878C30 29.0545 29.0488 30 27.875 30Z');
+    }
+  }
+}
+
+.folders button:active { transform: translateY(0); box-shadow: 0 1px 3px rgb(30 50 80 / 4%); }
+.breadcrumb { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin: 6px 0 18px; color: #738097; }
+.breadcrumb h3 { margin: 0; font-size: 17px; color: #26324a; }
+.breadcrumb > span { font-size: 13px; margin-left: auto; }
+.breadcrumb button { display: inline-flex; align-items: center; gap: 7px; min-height: 44px; border: 0; padding: 0 3px; color: #345bbb; background: transparent; cursor: pointer; }
+.loading { padding: 32px 0; text-align: center; color: #738097; }
+
+@media (max-width: 900px) {
+  .folders { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 640px) {
+  .toggle button { min-height: 44px; padding: 0 10px; gap: 5px; }
+  .folders { gap: 10px; }
+  .folders button { grid-template-columns: minmax(0, 1fr) 17px; grid-template-rows: 48px 1fr; align-items: start; gap: 8px 6px; padding: 14px; min-height: 146px; }
+  .folderArt { grid-column: 1 / -1; width: 50px; height: 48px; }
+  .folderArt svg { width: 44px; height: 44px; }
+  .folderInfo { align-self: stretch; gap: 6px; }
+  .folderInfo > strong { font-size: 14px; }
+  .folderCount { margin-top: auto; }
+  .folderArrow { align-self: end; margin-bottom: 1px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .folders button, .folderFront, .folderArrow { transition: none; }
+  .folders button:hover, .folders button:hover .folderArrow,
+  .folders button:hover .folderFront,
+  .folders button:focus-visible .folderFront { transform: none; }
+}
