@@ -27,7 +27,8 @@ async function openHomepage(page: Page) {
       const keyword = url.searchParams.get('keyword');
       const items = keyword ? publicItems.filter((item) => item.title.toLowerCase().includes(keyword.toLowerCase())) : materials;
       data = { items: items.slice((pageNumber - 1) * size, pageNumber * size), meta: { page: pageNumber, size, total: items.length } };
-    } else if (url.pathname.endsWith('/session')) data = { user: null };
+    } else if (url.pathname === '/api/leaderboard/contributors') data = [];
+    else if (url.pathname.endsWith('/session')) data = { user: null };
     else if (url.pathname.endsWith('/comments')) data = { items: [], meta: { page: 1, size: 10, total: 0 } };
     else if (url.pathname.endsWith('/speech')) data = { enabled: false };
     await route.fulfill({ json: { ok: true, data } });

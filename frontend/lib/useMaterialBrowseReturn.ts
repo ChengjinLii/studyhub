@@ -20,9 +20,10 @@ function visibleMaterialCard(id: number, region?: keyof typeof REGIONS): Element
   });
 }
 
-function restoreBrowseScroll(snapshot: MaterialBrowseSnapshot) {
+function restoreBrowseScroll(snapshot: MaterialBrowseSnapshot, onApplied: () => void) {
   let frame = 0;
   let stopped = false;
+  let applied = false;
   const started = performance.now();
   const root = document.documentElement;
   const previousScrollBehavior = root.style.scrollBehavior;
@@ -39,6 +40,10 @@ function restoreBrowseScroll(snapshot: MaterialBrowseSnapshot) {
   };
   const restore = () => {
     if (stopped) return;
+    if (!applied) {
+      applied = true;
+      onApplied();
+    }
     const card = snapshot.anchor ? visibleMaterialCard(snapshot.anchor.id, snapshot.anchor.region) : null;
     const top = card && snapshot.anchor ? window.scrollY + card.getBoundingClientRect().top - snapshot.anchor.top : snapshot.scrollY;
     window.scrollTo({ top, left: 0, behavior: 'auto' });
@@ -66,9 +71,11 @@ export function useMaterialBrowseReturn({ source, scope, state, onRestore }: {
     let stopScroll: (() => void) | undefined;
     if (snapshot && snapshot.source === source && snapshot.url === router.asPath) {
       latest.current.onRestore(snapshot.state);
-      cache.current = { ...snapshot, pendingRestore: false };
-      writeBrowseSnapshot(window.sessionStorage, cache.current);
-      stopScroll = restoreBrowseScroll(snapshot);
+      // Strict Mode cancels the first setup; consume only after a frame actually runs.
+      stopScroll = restoreBrowseScroll(snapshot, () => {
+        cache.current = { ...snapshot, pendingRestore: false };
+        writeBrowseSnapshot(window.sessionStorage, cache.current);
+      });
     }
     let clickedCard: Element | null = null;
     const recordClickedCard = (event: MouseEvent) => {
