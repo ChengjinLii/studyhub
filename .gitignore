@@ -22,3 +22,5 @@ frontend/tsconfig.tsbuildinfo
 frontend/test-results/
 frontend/playwright-report/
 backup/
+.claude/
+reviews/
