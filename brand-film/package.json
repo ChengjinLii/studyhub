@@ -1,0 +1,16 @@
+{
+  "name": "studyhub-brand-film",
+  "version": "1.0.0",
+  "private": true,
+  "description": "StudyHub 30 s brand film: deterministic SVG frames rendered with headless Chrome, procedural audio, ffmpeg mux.",
+  "type": "module",
+  "license": "MIT",
+  "scripts": {
+    "audio": "python3 audio/compose.py --out out/audio",
+    "frames": "node render/render.mjs",
+    "build": "bash render/build.sh"
+  },
+  "dependencies": {
+    "puppeteer-core": "23.11.1"
+  }
+}

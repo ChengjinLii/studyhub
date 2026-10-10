@@ -1,5 +1,6 @@
 docs/
 !studyhub-agent/docs/
+!brand-film/docs/
 !/docs/
 /docs/*
 !/docs/PWA.md
