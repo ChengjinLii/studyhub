@@ -17,7 +17,7 @@
 [![Website](https://img.shields.io/badge/Website-study--hub.cn-111827)](https://study-hub.cn)
 [![MIT](https://img.shields.io/badge/License-MIT-22c55e)](LICENSE)
 
-[Features](#features) | [Quick Start](#quick-start) | [Tech Stack](#tech-stack) | [Agent](#studyhub-agent) | [Content Review](#studyhub-review-jev) | [中文](README.md)
+[Features](#features) | [Brand Film](#brand-film) | [Quick Start](#quick-start) | [Tech Stack](#tech-stack) | [Agent](#studyhub-agent) | [Content Review](#studyhub-review-jev) | [中文](README.md)
 
 </div>
 
@@ -30,6 +30,14 @@ StudyHub brings together study materials, shared experiences, and campus collabo
 ## Features
 
 ![StudyHub poster](assets/studyhub-poster.png)
+
+### Brand Film
+
+[![StudyHub brand film animated preview](assets/StudyHub_Brand_Film_16x9.gif)](assets/StudyHub_Brand_Film_16x9.mp4)
+
+[View the full video](assets/StudyHub_Brand_Film_16x9.mp4)
+
+### Platform Features
 
 | Area | Features |
 | --- | --- |
@@ -67,6 +75,7 @@ studyhub/
   frontend/         # Frontend application and PWA
   studyhub-agent/   # Agent runtime framework
   review-jev/       # Text and image review component
+  assets/           # Brand film, animated preview, and project poster
   docs/             # Technical documentation
   reports/          # Technical reports and project retrospectives
   scripts/          # Development, deployment, and operational scripts

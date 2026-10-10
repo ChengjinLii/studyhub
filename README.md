@@ -17,7 +17,7 @@
 [![Website](https://img.shields.io/badge/Website-study--hub.cn-111827)](https://study-hub.cn)
 [![MIT](https://img.shields.io/badge/License-MIT-22c55e)](LICENSE)
 
-[功能概览](#功能概览) | [快速开始](#快速开始) | [技术栈](#技术栈) | [Agent](#studyhub-agent) | [内容审核](#studyhub-review-jev) | [ENG](README.en.md)
+[功能概览](#功能概览) | [宣传片](#品牌宣传片) | [快速开始](#快速开始) | [技术栈](#技术栈) | [Agent](#studyhub-agent) | [内容审核](#studyhub-review-jev) | [ENG](README.en.md)
 
 </div>
 
@@ -30,6 +30,14 @@ StudyHub 连接学习资料、经验分享与校园互助，围绕高校学生�
 ## 功能概览
 
 ![StudyHub 海报](assets/studyhub-poster.png)
+
+### 品牌宣传片
+
+[![StudyHub 品牌宣传片动态预览](assets/StudyHub_Brand_Film_16x9.gif)](assets/StudyHub_Brand_Film_16x9.mp4)
+
+[查看完整视频](assets/StudyHub_Brand_Film_16x9.mp4)
+
+### 平台功能
 
 | 场景 | 主要功能 |
 | --- | --- |
@@ -67,6 +75,7 @@ studyhub/
   frontend/         # 前端应用与 PWA
   studyhub-agent/   # Agent 运行框架
   review-jev/       # 文字与图片审核组件
+  assets/           # 宣传片、动态预览与项目海报
   docs/             # 项目技术文档
   reports/          # 技术报告与项目复盘
   scripts/          # 开发、部署与运维脚本
