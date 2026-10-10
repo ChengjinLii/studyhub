@@ -1,4 +1,7 @@
 node_modules/
-out/
+# out/ holds the local delivery package; only the two final films are tracked.
+out/*
+!out/StudyHub_Brand_Film.mp4
+!out/StudyHub_Brand_Film_16x9.mp4
 .work/
 .DS_Store

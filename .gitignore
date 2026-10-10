@@ -46,3 +46,6 @@ studyhub-agent/artifacts/
 studyhub-agent/.cache/
 studyhub-agent/.venv-train/
 prototypes/
+
+# Local task brief for the brand film (not part of the product)
+/prompt.md
