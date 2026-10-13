@@ -292,9 +292,14 @@ export default function Home({
   const subjects = useMaterialSubjects({ ...appliedFilters }, subjectSearchAliases);
   const subjectRanks = useMemo(() => rankHomeSubjects(subjects.catalogueFolders), [subjects.catalogueFolders]);
   const scrollToMaterials = useCallback(() => {
-    requestAnimationFrame(() => materialsRef.current?.scrollIntoView({
-      block: 'start', behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
-    }));
+    requestAnimationFrame(() => {
+      const root = document.documentElement;
+      const previous = root.style.scrollBehavior;
+      root.style.scrollBehavior = 'auto';
+      // Immediate positioning prevents anchor drift when opening a detail right away.
+      materialsRef.current?.scrollIntoView({ block: 'start', behavior: 'auto' });
+      root.style.scrollBehavior = previous;
+    });
   }, []);
   const handleSubjectChange = useCallback((id: string | null, scope: MaterialSubjectScope) => {
     setSubjectId(id);

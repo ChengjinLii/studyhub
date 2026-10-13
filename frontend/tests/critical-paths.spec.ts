@@ -166,7 +166,7 @@ test('administrator speech queue advances, remembers dismissal, and shows update
   await page.setViewportSize({ width: 390, height: 844 });
   await page.addInitScript(() => {
     window.localStorage.removeItem('floating-sidebar-pos');
-    window.localStorage.removeItem('studyhub-bot-speech-dismissed');
+    // Init scripts also run on reload; keep the dismissal record we are testing.
   });
   const firstMessage = {
     id: 11,
@@ -213,8 +213,13 @@ test('administrator speech queue advances, remembers dismissal, and shows update
 
   await page.getByRole('button', { name: '关闭宠物对话气泡' }).click();
   await expect(bubble).toHaveCount(0);
+  const dismissalRecord = await page.evaluate(() => window.localStorage.getItem('studyhub-bot-speech-dismissed'));
+  expect(dismissalRecord).toContain(secondMessage.message);
+  const reloadedSpeech = page.waitForResponse((response) => new URL(response.url()).pathname === '/api/bot-speech');
   await page.reload();
+  await reloadedSpeech;
   await closeEntryModalIfPresent(page);
+  expect(await page.evaluate(() => window.localStorage.getItem('studyhub-bot-speech-dismissed'))).toBe(dismissalRecord);
   await expect(page.locator('.floating-sidebar__speech')).toHaveCount(0);
 
   secondMessage = { ...secondMessage, message: '新的学习资料已经上线啦！', updatedAt: '2026-09-21T09:00:00Z' };
