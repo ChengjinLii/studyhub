@@ -17,6 +17,13 @@ describe('material browse return state', () => {
     expect(validateBrowseSnapshot(snapshot, '1:1', 1500)).toEqual(snapshot);
   });
 
+  it('remembers discovery folder scope and accepts older snapshots without that field', () => {
+    const all = { ...snapshot, state: { ...snapshot.state, subjectScope: 'all' } };
+    expect(validateBrowseSnapshot(all, '1:1', 1500)).toEqual(all);
+    expect(validateBrowseSnapshot(snapshot, '1:1', 1500)).toEqual(snapshot);
+    expect(validateBrowseSnapshot({ ...all, state: { ...all.state, subjectScope: 'unknown' } }, '1:1', 1500)).toBeNull();
+  });
+
   it('does not restore another account or permission scope', () => {
     expect(validateBrowseSnapshot(snapshot, '2:1', 1500)).toBeNull();
     expect(validateBrowseSnapshot(snapshot, '1:8', 1500)).toBeNull();

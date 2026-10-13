@@ -1,14 +1,21 @@
 import Link from 'next/link';
-import type { ReactNode, UIEvent } from 'react';
+import { ChevronRight, Copy } from 'lucide-react';
 import { useCallback, useState } from 'react';
 import { MaterialListItem } from '../../types/material';
 import { MaterialRequestItem } from '../../types/request';
-import { HomeDiscoveryView, resolveInitialHomeDiscoveryView } from '../../lib/homeDiscovery';
+import { HOME_DISCOVERY_DEFAULT_VIEW, HomeDiscoveryView, HomeSubjectRank } from '../../lib/homeDiscovery';
 import { formatMajorDisplay } from '../../lib/major';
 import { copyToClipboard } from '../../lib/share';
 import { materialPath } from '../../lib/slug';
+import { formatDate, formatNumber } from '../../lib/format';
+import styles from '../../styles/HomeDiscovery.module.css';
 
 const COOPERATION_EMAIL = 'chengjinli@std.uestc.edu.cn';
+const DISCOVERY_TABS: Array<{ view: HomeDiscoveryView; label: string }> = [
+  { view: 'requests', label: '求购列表' },
+  { view: 'subjects', label: '热门学科' },
+  { view: 'popular', label: '近期热门' },
+];
 
 interface HomeRequestPanelsProps {
   requestItems: MaterialRequestItem[];
@@ -17,9 +24,11 @@ interface HomeRequestPanelsProps {
   requestNotice: { type: 'success' | 'error'; text: string } | null;
   leaderboardItems: MaterialRequestItem[];
   popularItems: MaterialListItem[];
-  recommendedItems: MaterialListItem[];
-  recommendationHint: string;
-  recommendationEmpty: ReactNode;
+  subjectRanks: HomeSubjectRank[];
+  subjectsUpdatedAt: string;
+  onOpenSubject: (id: string) => void;
+  onBrowseSubjects: () => void;
+  onBrowseMaterials: () => void;
   profileMissingFields: string[];
   buildUploadLink: (item: MaterialRequestItem) => string;
   onFollowRequest: (item: MaterialRequestItem) => void;
@@ -32,9 +41,11 @@ export default function HomeRequestPanels({
   requestNotice,
   leaderboardItems,
   popularItems,
-  recommendedItems,
-  recommendationHint,
-  recommendationEmpty,
+  subjectRanks,
+  subjectsUpdatedAt,
+  onOpenSubject,
+  onBrowseSubjects,
+  onBrowseMaterials,
   profileMissingFields,
   buildUploadLink,
   onFollowRequest,
@@ -43,19 +54,8 @@ export default function HomeRequestPanels({
   const profileCompletionHint = profileIncomplete
     ? `个人信息待完善：${profileMissingFields.join('、')}`
     : '完善个人主页';
-  const [activeDiscoveryView, setActiveDiscoveryView] = useState<HomeDiscoveryView>(() =>
-    resolveInitialHomeDiscoveryView(requestItems.length)
-  );
+  const [activeDiscoveryView, setActiveDiscoveryView] = useState<HomeDiscoveryView>(HOME_DISCOVERY_DEFAULT_VIEW);
   const [emailCopyState, setEmailCopyState] = useState<'idle' | 'copied' | 'failed'>('idle');
-  const [recommendListAtEnd, setRecommendListAtEnd] = useState(false);
-  const handleRecommendationScroll = useCallback((event: UIEvent<HTMLUListElement>) => {
-    const target = event.currentTarget;
-    const atEnd = target.scrollTop + target.clientHeight >= target.scrollHeight - 8;
-    setRecommendListAtEnd(atEnd);
-  }, []);
-  const handleViewAllMaterials = useCallback(() => {
-    document.getElementById('materials-list')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  }, []);
   const handleCopyEmail = useCallback(async () => {
     const copied = await copyToClipboard(COOPERATION_EMAIL);
     setEmailCopyState(copied ? 'copied' : 'failed');
@@ -63,63 +63,33 @@ export default function HomeRequestPanels({
   }, []);
 
   return (
-    <div className="home-dual-panel" id="home-requests">
+    <div className={`home-dual-panel ${styles.panels}`} id="home-requests">
       <section className="card request-card">
-        <div className="materials-header home-discovery-header">
-          <div className="home-discovery-heading">
+        <div className={`materials-header home-discovery-header ${styles.discoveryHeader}`}>
             <h2 className="card-title">
-              {activeDiscoveryView === 'requests'
-                ? '求购列表'
-                : activeDiscoveryView === 'popular'
-                  ? '近期热门'
-                  : '合作招募'}
+              {DISCOVERY_TABS.find((tab) => tab.view === activeDiscoveryView)?.label}
             </h2>
             <div className="home-discovery-tabs" role="tablist" aria-label="首页发现内容">
-              <button
-                type="button"
-                role="tab"
-                aria-selected={activeDiscoveryView === 'requests'}
-                aria-controls="home-discovery-panel"
-                className={activeDiscoveryView === 'requests' ? 'active' : ''}
-                onClick={() => setActiveDiscoveryView('requests')}
-              >
-                求购列表
-              </button>
-              <button
-                type="button"
-                role="tab"
-                aria-selected={activeDiscoveryView === 'popular'}
-                aria-controls="home-discovery-panel"
-                className={activeDiscoveryView === 'popular' ? 'active' : ''}
-                onClick={() => setActiveDiscoveryView('popular')}
-              >
-                近期热门
-              </button>
-              <button
-                type="button"
-                role="tab"
-                aria-selected={activeDiscoveryView === 'cooperation'}
-                aria-controls="home-discovery-panel"
-                className={activeDiscoveryView === 'cooperation' ? 'active' : ''}
-                onClick={() => setActiveDiscoveryView('cooperation')}
-              >
-                合作招募
-              </button>
+              {DISCOVERY_TABS.map((tab) => <button
+                key={tab.view} id={`home-discovery-tab-${tab.view}`} type="button" role="tab"
+                aria-selected={activeDiscoveryView === tab.view} aria-controls="home-discovery-panel"
+                className={activeDiscoveryView === tab.view ? 'active' : ''}
+                onClick={() => setActiveDiscoveryView(tab.view)}
+              >{tab.label}</button>)}
             </div>
-          </div>
           <div className="request-header-actions">
             {activeDiscoveryView === 'requests' ? (
               <Link className="button primary small" href="/requests/new">
                 我要购买
               </Link>
             ) : activeDiscoveryView === 'popular' ? (
-              <button className="button primary small" type="button" onClick={handleViewAllMaterials}>
+              <button className="button primary small" type="button" onClick={onBrowseMaterials}>
                 全部资料
               </button>
-            ) : null}
+            ) : <button className="button primary small" type="button" onClick={onBrowseSubjects}>全部学科</button>}
           </div>
         </div>
-        <div className="request-list-wrapper" id="home-discovery-panel" role="tabpanel">
+        <div className="request-list-wrapper" id="home-discovery-panel" role="tabpanel" aria-labelledby={`home-discovery-tab-${activeDiscoveryView}`}>
           {activeDiscoveryView === 'requests' ? (
             <>
               {requestLoading && <p className="help-text">加载中...</p>}
@@ -225,30 +195,27 @@ export default function HomeRequestPanels({
               </ol>
             )
           ) : (
-            <div className="home-cooperation">
-              <p>资料共建、校园合作或技术协作，欢迎邮件联系。</p>
-              <div className="home-cooperation__contact">
-                <div>
-                  <span>联系邮箱</span>
-                  <a href={`mailto:${COOPERATION_EMAIL}`}>{COOPERATION_EMAIL}</a>
-                </div>
-                <button className="button ghost small" type="button" onClick={handleCopyEmail}>
-                  {emailCopyState === 'copied' ? '已复制' : '复制邮箱'}
-                </button>
-              </div>
-              <span className="home-cooperation__status" role="status" aria-live="polite">
-                {emailCopyState === 'failed' ? '复制失败，请手动复制邮箱。' : ''}
-              </span>
-            </div>
+            <>
+              <p className={styles.snapshot}>累计下载排行 · 更新于 {formatDate(subjectsUpdatedAt)}</p>
+              {subjectRanks.length === 0 ? <div className="empty-state">暂无学科资料。</div> : <ol className={styles.subjectList} aria-label="热门学科排行">
+                {subjectRanks.map((subject, index) => <li key={subject.id}>
+                  <button type="button" className={styles.subjectButton} onClick={() => onOpenSubject(subject.id)} aria-label={`查看${subject.name}，${subject.materialCount}份资料`}>
+                    <span className={`home-popular-rank ${index < 3 ? 'is-top' : ''}`}>{index + 1}</span>
+                    <span className={styles.subjectCopy}><strong>{subject.name}</strong><span>{formatNumber(subject.materialCount)} 份资料</span></span>
+                    <span className={styles.subjectDownloads}><strong>{formatNumber(subject.downloadCount)}</strong><span>累计下载</span></span>
+                    <ChevronRight size={16} aria-hidden="true" />
+                  </button>
+                </li>)}
+              </ol>}
+            </>
           )}
         </div>
       </section>
 
-      <section className="card recommend-card">
+      <section className={`card ${styles.cooperationCard}`} aria-label="合作招募">
         <div className="materials-header">
           <div>
-            <h2 className="card-title">为你推荐</h2>
-            {recommendationHint ? <p className="help-text">{recommendationHint}</p> : null}
+            <h2 className="card-title">合作招募</h2>
           </div>
           <div className="request-header-actions">
             <Link
@@ -266,35 +233,21 @@ export default function HomeRequestPanels({
             </Link>
           </div>
         </div>
-        {recommendedItems.length === 0 ? (
-          <div className="empty-state">{recommendationEmpty}</div>
-        ) : (
-          <>
-            <ul className="recommend-list" onScroll={handleRecommendationScroll}>
-              {recommendedItems.map((item) => {
-                const majorLabel = formatMajorDisplay(item.major);
-                return (
-                  <li key={item.id} className="recommend-item">
-                    <Link href={materialPath(item.id, item.title)}>{item.title}</Link>
-                    <div className="recommend-meta">
-                      <span className="recommend-meta__school">
-                        {(item.school || '未知学校') + (item.college ? ` · ${item.college}` : '') + (majorLabel ? ` · ${majorLabel}` : '')}
-                      </span>
-                      <span className="recommend-meta__downloads">下载 {item.downloadCount ?? 0}</span>
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
-            {recommendListAtEnd ? (
-              <div className="recommend-expand">
-                <Link className="button ghost small" href="#materials-list">
-                  查看更多资料
-                </Link>
-              </div>
-            ) : null}
-          </>
-        )}
+        <div className="home-cooperation">
+          <p>资料共建、校园合作或技术协作，欢迎邮件联系。</p>
+          <div className="home-cooperation__contact">
+            <div>
+              <span>联系邮箱</span>
+              <a href={`mailto:${COOPERATION_EMAIL}`}>{COOPERATION_EMAIL}</a>
+            </div>
+            <button className="button ghost small" type="button" onClick={handleCopyEmail}>
+              <Copy size={16} aria-hidden="true" />{emailCopyState === 'copied' ? '已复制' : '复制邮箱'}
+            </button>
+          </div>
+          <span className="home-cooperation__status" role="status" aria-live="polite">
+            {emailCopyState === 'failed' ? '复制失败，请手动复制邮箱。' : ''}
+          </span>
+        </div>
       </section>
     </div>
   );

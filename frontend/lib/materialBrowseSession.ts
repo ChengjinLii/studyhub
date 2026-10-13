@@ -11,6 +11,7 @@ export interface MaterialBrowseState {
   mode: MaterialBrowseMode;
   subjectId: string | null;
   subjectPage: number;
+  subjectScope?: 'filtered' | 'all';
   selectedIds?: number[];
   showAdvanced?: boolean;
 }
@@ -47,6 +48,7 @@ export function validateBrowseSnapshot(value: unknown, scope: string, now = Date
   if (state.mode !== 'materials' && state.mode !== 'subjects') return null;
   if (state.subjectId !== null && typeof state.subjectId !== 'string') return null;
   if (!Number.isInteger(state.subjectPage) || state.subjectPage < 1) return null;
+  if (state.subjectScope !== undefined && state.subjectScope !== 'filtered' && state.subjectScope !== 'all') return null;
   if (snapshot.anchor && (!Number.isInteger(snapshot.anchor.id) || !Number.isFinite(snapshot.anchor.top))) return null;
   if (snapshot.anchor?.region && !['home-library', 'library', 'recommended', 'latest'].includes(snapshot.anchor.region)) return null;
   return snapshot as MaterialBrowseSnapshot;

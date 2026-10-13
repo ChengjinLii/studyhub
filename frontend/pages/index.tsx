@@ -9,7 +9,9 @@ import AppImage from '../components/AppImage';
 import MaterialIconSprite from '../components/MaterialIconSprite';
 import HomeMaterialLibrary from '../components/home/HomeMaterialLibrary';
 import { materialBrowseScope } from '../lib/materialBrowseSession';
-import { MaterialBrowseMode, useMaterialSubjects } from '../lib/useMaterialSubjects';
+import { MaterialBrowseMode, MaterialSubjectScope, useMaterialSubjects } from '../lib/useMaterialSubjects';
+import { rankHomeSubjects } from '../lib/homeDiscovery';
+import discoveryStyles from '../styles/HomeDiscovery.module.css';
 import type { SubjectSearchAliases } from '../lib/materialSubjects';
 import { readMaterialSubjectAliases } from '../lib/server/materialSubjectAliases';
 import { useMaterialBrowseReturn } from '../lib/useMaterialBrowseReturn';
@@ -22,7 +24,6 @@ import {
   MaterialListStats,
   MaterialListResponse,
   fetchContributorRanks,
-  fetchRecommendations,
   fetchMaterialRequests,
   fetchRequestLeaderboard,
 } from '../lib/api';
@@ -50,7 +51,6 @@ import { MaterialRequestItem } from '../types/request';
 const MATERIALS_PAGE_SIZE = 24;
 const HOME_REQUEST_PREVIEW_LIMIT = 8;
 const HOME_POPULAR_PREVIEW_LIMIT = 20;
-const HOME_RECOMMENDATION_LIMIT = 30;
 const Snowfall = dynamic(() => import('react-snowfall'), { ssr: false });
 const MaterialCard = dynamic(() => import('../components/MaterialCard'));
 const HomeFilterCard = dynamic(() => import('../components/home/HomeFilterCard'));
@@ -106,7 +106,6 @@ interface HomeProps {
   tagOptions: string[];
   profileSummary: ProfileSummary | null;
   profileMissingFields: string[];
-  recommendations: MaterialListItem[];
   popularMaterials: MaterialListItem[];
   requests: MaterialRequestItem[];
   requestLeaderboard: MaterialRequestItem[];
@@ -123,7 +122,6 @@ export default function Home({
   tagOptions,
   profileSummary,
   profileMissingFields,
-  recommendations,
   popularMaterials,
   requests,
   requestLeaderboard,
@@ -196,7 +194,10 @@ export default function Home({
         setMaterialList(data.items);
         setPageMeta(data.meta);
         setAppliedFilters(normalized);
-        if (!options?.preserveSubject) setSubjectId(null);
+        if (!options?.preserveSubject) {
+          setSubjectId(null);
+          setSubjectScope('filtered');
+        }
         setSubjectPage(1);
         if (data.stats) setStatsState(data.stats);
         if (data.availableTags) setTagOptionsState(data.availableTags);
@@ -244,17 +245,7 @@ export default function Home({
     { label: '下载次数', value: formatNumber(Number(statValues.downloads)) },
     { label: '用户个数', value: formatNumber(Number(statValues.users)) },
   ];
-  const recommendedItems = useMemo(() => recommendations ?? [], [recommendations]);
-  const mobileRecommendedItems = useMemo(() => recommendedItems.slice(0, 6), [recommendedItems]);
   const mobileLatestItems = useMemo(() => materialList.slice(0, 5), [materialList]);
-  const recommendationHint = '';
-  const recommendationEmpty = user
-    ? '暂无推荐资料，先在“我的”里完善学校/学院/专业。'
-    : (
-      <>
-        暂无推荐资料，<a className="login-link" href={`/login?next=${encodeURIComponent(router.asPath)}`}>登录</a>后可获得对口推荐。
-      </>
-    );
   const availableTagOptions = useMemo(() => {
     const unique = new Set<string>();
     DEFAULT_TAG_OPTIONS.forEach((tag) => unique.add(tag));
@@ -297,7 +288,38 @@ export default function Home({
   const [browseMode, setBrowseMode] = useState<MaterialBrowseMode>('materials');
   const [subjectId, setSubjectId] = useState<string | null>(null);
   const [subjectPage, setSubjectPage] = useState(1);
+  const [subjectScope, setSubjectScope] = useState<MaterialSubjectScope>('filtered');
   const subjects = useMaterialSubjects({ ...appliedFilters }, subjectSearchAliases);
+  const subjectRanks = useMemo(() => rankHomeSubjects(subjects.catalogueFolders), [subjects.catalogueFolders]);
+  const scrollToMaterials = useCallback(() => {
+    requestAnimationFrame(() => materialsRef.current?.scrollIntoView({
+      block: 'start', behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
+    }));
+  }, []);
+  const handleSubjectChange = useCallback((id: string | null, scope: MaterialSubjectScope) => {
+    setSubjectId(id);
+    setSubjectScope(scope);
+    setSubjectPage(1);
+    // User-initiated opening only; history restoration must retain its saved position.
+    if (id) scrollToMaterials();
+  }, [scrollToMaterials]);
+  const browseAllSubjects = useCallback(() => {
+    setBrowseMode('subjects');
+    setSubjectScope('all');
+    setSubjectId(null);
+    setSubjectPage(1);
+    scrollToMaterials();
+  }, [scrollToMaterials]);
+  const browseAllMaterials = useCallback(() => {
+    if (window.matchMedia('(max-width: 768px)').matches) {
+      void router.push('/materials');
+      return;
+    }
+    setBrowseMode('materials');
+    setSubjectScope('filtered');
+    setSubjectId(null);
+    scrollToMaterials();
+  }, [router, scrollToMaterials]);
   const [contributors, setContributors] = useState<ContributorRank[]>(initialContributors);
   const [leaderboardPeriod, setLeaderboardPeriod] = useState<LeaderboardPeriod>('all');
   const didRunInitialLeaderboardEffect = useRef(false);
@@ -356,6 +378,7 @@ export default function Home({
       mode: browseMode,
       subjectId,
       subjectPage,
+      subjectScope,
       selectedIds,
       showAdvanced,
     },
@@ -368,6 +391,7 @@ export default function Home({
       setBrowseMode(snapshot.mode);
       setSubjectId(snapshot.subjectId);
       setSubjectPage(snapshot.subjectPage);
+      setSubjectScope(snapshot.subjectScope || 'filtered');
       setSelectedIds(snapshot.selectedIds || []);
       setShowAdvanced(snapshot.showAdvanced || false);
     },
@@ -544,10 +568,12 @@ export default function Home({
     };
   }, [leaderboardPeriod]);
 
-  const selectedMaterials = useMemo(
-    () => (browseMode === 'subjects' ? subjects.items : materialList).filter((item) => selectedIds.includes(item.id)),
-    [browseMode, subjects.items, materialList, selectedIds]
-  );
+  const selectedMaterials = useMemo(() => {
+    const folders = subjectScope === 'all' ? subjects.catalogueFolders : subjects.allFolders;
+    const folder = folders.find((item) => item.id === subjectId);
+    const items = folder?.materials || (browseMode === 'subjects' ? folders.flatMap((item) => item.materials) : materialList);
+    return items.filter((item) => selectedIds.includes(item.id));
+  }, [browseMode, subjectScope, subjectId, subjects.catalogueFolders, subjects.allFolders, materialList, selectedIds]);
   const selectedCount = selectedMaterials.length;
 
   const ensureLoggedIn = useCallback(() => {
@@ -793,7 +819,6 @@ export default function Home({
         <MobileHomeSections
           mobileSearch={mobileSearch}
           stats={mobileOverviewStats}
-          recommendedItems={mobileRecommendedItems}
           latestItems={mobileLatestItems}
           onMobileSearchChange={setMobileSearch}
           onMobileSearchSubmit={handleMobileSearchSubmit}
@@ -806,15 +831,17 @@ export default function Home({
           requestNotice={requestNotice}
           leaderboardItems={leaderboardItems}
           popularItems={popularMaterials}
-          recommendedItems={recommendedItems}
-          recommendationHint={recommendationHint}
-          recommendationEmpty={recommendationEmpty}
+          subjectRanks={subjectRanks}
+          subjectsUpdatedAt={subjects.updatedAt}
+          onOpenSubject={(id) => { setBrowseMode('subjects'); handleSubjectChange(id, 'all'); }}
+          onBrowseSubjects={browseAllSubjects}
+          onBrowseMaterials={browseAllMaterials}
           profileMissingFields={profileMissingFields}
           buildUploadLink={buildUploadLink}
           onFollowRequest={handleFollowRequest}
         />
 
-        <div className="home-desktop-library">
+        <div className={`home-desktop-library${browseMode === 'subjects' || subjectId ? ` ${discoveryStyles.mobileSubjects}` : ''}`}>
           <HomeFilterCard
             filterRef={filterRef}
             filtersState={filtersState}
@@ -831,10 +858,10 @@ export default function Home({
             materialsRef={materialsRef} materials={materialList} meta={pageMeta}
             keyword={appliedFilters.keyword} sort={filtersState.sort} loading={loadingPage}
             error={paginationError} notice={paginationNotice} mode={browseMode}
-            onModeChange={(mode) => { setBrowseMode(mode); setSubjectId(null); setSubjectPage(1); }}
+            onModeChange={(mode) => { setBrowseMode(mode); setSubjectScope('filtered'); setSubjectId(null); setSubjectPage(1); }}
             onSortChange={(value) => void handleMaterialSortChange(value)} onPageChange={handlePageChange}
-            subjects={subjects} subjectId={subjectId} subjectPage={subjectPage}
-            onSubjectChange={(id) => { setSubjectId(id); setSubjectPage(1); }} onSubjectPageChange={setSubjectPage}
+            subjects={subjects} subjectId={subjectId} subjectPage={subjectPage} subjectScope={subjectScope}
+            onSubjectChange={(id) => handleSubjectChange(id, subjectScope)} onSubjectPageChange={setSubjectPage}
             selectedIds={selectedIds} onToggle={toggleSelection} onReset={handleResetFilters}
             onEditKeyword={() => filterRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })}
           />
@@ -978,15 +1005,6 @@ export const getServerSideProps: GetServerSideProps<HomeProps> = async (ctx) => 
   const profileContextPromise = session.user && session.token
     ? fetchHomeProfileContext(session.token, origin)
     : Promise.resolve({ summary: null, missingFields: [] });
-  const recommendationsPromise: Promise<MaterialListItem[]> = fetchRecommendations(
-    session.token || undefined,
-    origin,
-    HOME_RECOMMENDATION_LIMIT
-  ).catch((error) => {
-    // eslint-disable-next-line no-console
-    console.warn('Failed to fetch recommendations', error);
-    return [] as MaterialListItem[];
-  });
   const requestsPromise: Promise<MaterialRequestItem[]> = fetchMaterialRequests(
     { sort: 'hot', limit: HOME_REQUEST_PREVIEW_LIMIT },
     session.token || undefined,
@@ -1028,7 +1046,6 @@ export const getServerSideProps: GetServerSideProps<HomeProps> = async (ctx) => 
   const [
     { materials, meta, stats, tagOptions },
     profileContext,
-    recommendations,
     popularMaterials,
     requests,
     requestLeaderboard,
@@ -1037,7 +1054,6 @@ export const getServerSideProps: GetServerSideProps<HomeProps> = async (ctx) => 
     await Promise.all([
       materialsPromise,
       profileContextPromise,
-      recommendationsPromise,
       popularMaterialsPromise,
       requestsPromise,
       requestLeaderboardPromise,
@@ -1057,7 +1073,6 @@ export const getServerSideProps: GetServerSideProps<HomeProps> = async (ctx) => 
       tagOptions,
       profileSummary: profileContext.summary,
       profileMissingFields: profileContext.missingFields,
-      recommendations,
       popularMaterials,
       requests,
       requestLeaderboard,

@@ -621,7 +621,8 @@ test('home entry modal and discovery views remain keyboard accessible', async ({
 
   const requestTab = page.getByRole('tab', { name: '求购列表' });
   const popularTab = page.getByRole('tab', { name: '近期热门' });
-  const cooperationTab = page.getByRole('tab', { name: '合作招募' });
+  const subjectTab = page.getByRole('tab', { name: '热门学科' });
+  await expect(subjectTab).toHaveAttribute('aria-selected', 'true');
   await popularTab.click();
   await expect(popularTab).toHaveAttribute('aria-selected', 'true');
   await expect(page.locator('.request-card .card-title')).toHaveText('近期热门');
@@ -629,9 +630,11 @@ test('home entry modal and discovery views remain keyboard accessible', async ({
   await page.getByRole('button', { name: '全部资料' }).click();
   await expect(page).toHaveURL(pageUrl);
   await expect(page.locator('#materials-list')).toBeInViewport();
-  await cooperationTab.click();
-  await expect(cooperationTab).toHaveAttribute('aria-selected', 'true');
-  await expect(page.locator('.request-card .card-title')).toHaveText('合作招募');
+  const cooperation = page.getByRole('region', { name: '合作招募', exact: true });
+  await expect(cooperation.getByRole('heading', { name: '合作招募', exact: true })).toBeVisible();
+  await expect(cooperation.getByRole('link', { name: '完善个人主页' })).toHaveAttribute('href', '/me#profile');
+  await expect(page.getByRole('tab', { name: '合作招募' })).toHaveCount(0);
+  await expect(page.getByRole('heading', { name: '为你推荐', exact: true })).toHaveCount(0);
   await expect(page.getByRole('link', { name: 'chengjinli@std.uestc.edu.cn' })).toHaveAttribute(
     'href',
     'mailto:chengjinli@std.uestc.edu.cn'

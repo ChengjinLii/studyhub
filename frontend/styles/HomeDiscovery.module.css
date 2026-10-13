@@ -1,0 +1,72 @@
+.cooperationCard {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.discoveryHeader:global(.home-discovery-header) { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; }
+.discoveryHeader > :global(.card-title) { grid-column: 1; grid-row: 1; margin: 0; }
+.discoveryHeader > :global(.home-discovery-tabs) { grid-column: 1 / -1; grid-row: 2; justify-self: start; }
+.discoveryHeader > :global(.request-header-actions) { grid-column: 2; grid-row: 1; }
+
+.cooperationCard :global(.request-header-actions .button.primary) {
+  background: #2a9d8f;
+  box-shadow: 0 10px 18px rgb(42 157 143 / 24%);
+}
+
+.cooperationCard :global(.request-header-actions .button.primary:hover) {
+  background: #23897d;
+}
+
+.subjectList {
+  flex: 1;
+  min-height: 0;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+  overflow-y: auto;
+}
+
+.subjectList > li + li { border-top: 1px solid #e7edf3; }
+
+.subjectButton {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) auto 16px;
+  align-items: center;
+  gap: 11px;
+  width: 100%;
+  min-height: 64px;
+  padding: 10px 5px;
+  border: 0;
+  background: transparent;
+  color: #172033;
+  text-align: left;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.subjectButton:hover { background: #f0f7f5; }
+.subjectButton:focus-visible { outline: 2px solid #2a9d8f; outline-offset: -2px; }
+.subjectButton > svg { color: #97a6b7; }
+.subjectCopy { min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.subjectCopy strong { font-size: 14px; font-weight: 650; line-height: 1.4; overflow-wrap: anywhere; }
+.subjectCopy > span { color: #7b8494; font-size: 12px; }
+.subjectDownloads { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; font-variant-numeric: tabular-nums; }
+.subjectDownloads strong { color: #176f66; font-size: 15px; font-weight: 650; }
+.subjectDownloads span { color: #7b8494; font-size: 11px; white-space: nowrap; }
+.snapshot { margin: 0; color: #7b8494; font-size: 12px; line-height: 1.5; }
+
+@media (max-width: 768px) {
+  .panels:global(.home-dual-panel) { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; }
+  .panels :global(.request-card) { height: 400px; min-height: 0; padding: 18px; }
+  .panels .cooperationCard { height: auto; min-height: 0; padding: 18px; }
+  .panels :global(.home-discovery-tabs button) { min-height: 44px; padding: 0 10px; }
+  .panels :global(.home-cooperation__contact) { flex-wrap: wrap; gap: 10px; }
+  .panels :global(.home-cooperation__contact a) { font-size: 14px; }
+  .panels :global(.home-cooperation__contact .button) { min-height: 44px; }
+  .mobileSubjects:global(.home-desktop-library) { display: block; }
+  .mobileSubjects > :global(.filter-card) { display: none; }
+  .mobileSubjects :global(.materials-library-header) { flex-wrap: wrap; gap: 12px; }
+  .mobileSubjects :global(.materials-library-header__actions) { width: 100%; flex-wrap: wrap; justify-content: space-between; gap: 8px; }
+  .mobileSubjects :global(.materials-grid) { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+}

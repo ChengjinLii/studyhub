@@ -52,7 +52,6 @@ function MobileResourceSection({ title, eyebrow, hrefLabel, items }: { title: st
 interface MobileHomeSectionsProps {
   mobileSearch: string;
   stats: Array<{ label: string; value: string }>;
-  recommendedItems: MaterialListItem[];
   latestItems: MaterialListItem[];
   onMobileSearchChange: (value: string) => void;
   onMobileSearchSubmit: (event: FormEvent<HTMLFormElement>) => void;
@@ -62,7 +61,6 @@ interface MobileHomeSectionsProps {
 export default function MobileHomeSections({
   mobileSearch,
   stats,
-  recommendedItems,
   latestItems,
   onMobileSearchChange,
   onMobileSearchSubmit,
@@ -108,7 +106,6 @@ export default function MobileHomeSections({
           </button>
         </div>
       </section>
-      <MobileResourceSection title="为你推荐" eyebrow="Recommend" hrefLabel="更多" items={recommendedItems} />
       <MobileResourceSection title="最新资料" eyebrow="Latest" hrefLabel="全部资料" items={latestItems} />
     </>
   );

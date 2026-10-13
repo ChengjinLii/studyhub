@@ -15,9 +15,10 @@ describe('home SSR data limits', () => {
     const source = readFileSync(join(process.cwd(), 'pages/index.tsx'), 'utf8');
 
     expect(source).toContain('const HOME_POPULAR_PREVIEW_LIMIT = 20;');
-    expect(source).toContain('const HOME_RECOMMENDATION_LIMIT = 30;');
     expect(source).toContain("{ sort: 'recent_downloads', page: 1, size: HOME_POPULAR_PREVIEW_LIMIT }");
-    expect(source).toContain('HOME_RECOMMENDATION_LIMIT');
+    expect(source).not.toContain('fetchRecommendations');
+    expect(source).not.toContain('recommendationsPromise');
+    expect(source).not.toContain('HOME_RECOMMENDATION_LIMIT');
   });
 
   it('uses 24 results per page on both material list screens', () => {

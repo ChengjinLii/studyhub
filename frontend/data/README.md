@@ -37,6 +37,14 @@ Keep the full glossary and its backups out of Git. Folder search and opening a
 folder do not make extra requests; opening shows the full curated subject within
 the selected metadata/price filters. Returning keeps the original search results.
 
+The homepage defaults to a popular-subject ranking. Its cumulative downloads are
+the sum of public material download counts in each curated subject; the quantity
+is the number of material entries, not archive attachments or unique people.
+Unknown-course entries remain in `其他资料` but do not enter the subject ranking.
+Counts carry the snapshot date and refresh with this catalogue, not per request.
+Opening a ranked subject ignores the current search filters without discarding
+them, scrolls to the material library, and preserves that scope on detail return.
+
 For a local preview against the running backend, set `NEXT_PUBLIC_API_BASE=/api`
 and `API_BASE_INTERNAL=http://127.0.0.1:8311/api` for both build and start. Use a
 separate `NEXT_DIST_DIR` and port. Without the public setting, loopback browser

@@ -1,6 +1,6 @@
 import { RefObject } from 'react';
 import { MaterialListItem, PaginationMeta } from '../../types/material';
-import { MaterialBrowseMode, useMaterialSubjects } from '../../lib/useMaterialSubjects';
+import { MaterialBrowseMode, MaterialSubjectScope, useMaterialSubjects } from '../../lib/useMaterialSubjects';
 import MaterialCard from '../MaterialCard';
 import PaginationBar from '../PaginationBar';
 import MaterialBrowseToggle from '../materials/MaterialBrowseToggle';
@@ -26,6 +26,7 @@ interface Props {
   subjects: ReturnType<typeof useMaterialSubjects>;
   subjectId: string | null;
   subjectPage: number;
+  subjectScope: MaterialSubjectScope;
   onSubjectChange: (id: string | null) => void;
   onSubjectPageChange: (page: number) => void;
   selectedIds: number[];
@@ -36,7 +37,9 @@ interface Props {
 
 export default function HomeMaterialLibrary(props: Props) {
   const { meta, mode, materials, subjects, selectedIds } = props;
-  const openFolder = subjects.allFolders.find((folder) => folder.id === props.subjectId);
+  const subjectFolders = props.subjectScope === 'all' ? subjects.catalogueFolders : subjects.allFolders;
+  const overviewFolders = props.subjectScope === 'all' ? subjects.catalogueFolders : subjects.folders;
+  const openFolder = subjectFolders.find((folder) => folder.id === props.subjectId);
   const browsingFolder = Boolean(openFolder);
   const pageSize = meta.size || 24;
   const totalPages = Math.max(1, Math.ceil(meta.total / pageSize));
@@ -57,9 +60,9 @@ export default function HomeMaterialLibrary(props: Props) {
           <p className="help-text">
             {openFolder ? `${openFolder.name} · ${openFolder.materials.length} 份资料` : mode === 'materials'
               ? `当前第 ${meta.page} / ${totalPages} 页 · 每页 ${pageSize} 条 · 共 ${meta.total} 条结果`
-              : `${subjects.folders.length} 个学科 · ${subjects.items.length} 份资料 · 整理于 ${subjects.updatedAt.slice(0, 10)}`}
+              : `${overviewFolders.length} 个学科 · ${overviewFolders.reduce((count, folder) => count + folder.materials.length, 0)} 份资料 · 整理于 ${subjects.updatedAt.slice(0, 10)}`}
           </p>
-          {props.keyword.trim() && <p className="materials-search-context">当前搜索：<strong>{props.keyword.trim()}</strong></p>}
+          {props.subjectScope !== 'all' && props.keyword.trim() && <p className="materials-search-context">当前搜索：<strong>{props.keyword.trim()}</strong></p>}
         </div>
         <div className="materials-library-header__actions">
           <MaterialSortSelect value={props.sort} disabled={props.loading} onChange={props.onSortChange} />
@@ -72,7 +75,7 @@ export default function HomeMaterialLibrary(props: Props) {
       {props.error && <p className="error-text">{props.error}</p>}
       {props.notice && !props.error && <p className="help-text">{props.notice}</p>}
       {mode === 'subjects' || browsingFolder ? <MaterialSubjectBrowser
-        folders={browsingFolder ? subjects.allFolders : subjects.folders}
+        folders={browsingFolder ? subjectFolders : overviewFolders}
         subjectId={props.subjectId} page={props.subjectPage}
         backLabel={mode === 'materials' ? '返回搜索结果' : '全部学科'}
         onSubjectChange={props.onSubjectChange} onPageChange={props.onSubjectPageChange}

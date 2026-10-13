@@ -1,5 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import catalogue from '../data/material-subject-catalogue.json';
+import { rankHomeSubjects } from '../lib/homeDiscovery';
+import { formatNumber } from '../lib/format';
 import type { MaterialListItem } from '../types/material';
 
 const filters = {
@@ -45,7 +47,7 @@ async function openHomepage(page: Page) {
         subjectSearchAliases: { calculus: ['微积分', '高数', 'Calculus'] },
         user: null, materials: materials.slice(24, 48), meta: { page: 2, size: 24, total: 48 }, filters,
         stats: null, tagOptions: ['期末真题'], profileSummary: null, profileMissingFields: [],
-        recommendations: [materials[32]], popularMaterials: [], requests: [], requestLeaderboard: [], contributors: [],
+        popularMaterials: [], requests: [], requestLeaderboard: [], contributors: [],
       };
     }
     await route.fulfill({ json: { pageProps, __N_SSP: true } });
@@ -54,7 +56,7 @@ async function openHomepage(page: Page) {
   await page.evaluate(async () => {
     await (window as unknown as { next: { router: { push: (url: string) => Promise<boolean> } } }).next.router.push('/?page=2&sort=downloads');
   });
-  await expect(page.getByRole('button', { name: '按资料', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('#materials-list').getByRole('button', { name: '按资料', exact: true, includeHidden: true })).toHaveAttribute('aria-pressed', 'true');
   return { calls, documents };
 }
 
@@ -76,7 +78,7 @@ test('homepage uses the complete prepared subject catalogue without any catalogu
   await expect(library.locator('.material-card')).toHaveCount(24);
   await library.getByRole('button', { name: '第 2 页', exact: true }).click();
   await expect(library.locator('.material-card')).toHaveCount(physics.materials.length - 24);
-  await page.getByRole('button', { name: '全部学科', exact: true }).click();
+  await library.getByRole('button', { name: '全部学科', exact: true }).click();
   await expect(folders).toBeVisible();
   await library.getByRole('button', { name: '按资料', exact: true }).click();
   await expect(library.locator('.material-card')).toHaveCount(24);
@@ -209,4 +211,93 @@ test('independent material library keeps its original controls', async ({ page }
   await expect(page.getByRole('button', { name: '详细单列显示' })).toBeVisible();
   await expect(page.getByRole('button', { name: '按学科', exact: true })).toHaveCount(0);
   await expect(page.getByRole('textbox', { name: '搜索资料' })).toBeVisible();
+});
+
+test('homepage defaults to subject download ranking and puts cooperation in the right card', async ({ page }, info) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await openHomepage(page);
+  const discovery = page.locator('.request-card');
+  await expect(discovery.getByRole('tab', { name: '热门学科' })).toHaveAttribute('aria-selected', 'true');
+  await expect(discovery.getByRole('tab')).toHaveText(['求购列表', '热门学科', '近期热门']);
+  await expect(page.getByRole('heading', { name: '为你推荐', exact: true })).toHaveCount(0);
+  const ranks = rankHomeSubjects(catalogue.folders);
+  const rows = page.getByRole('list', { name: '热门学科排行' }).locator('li');
+  await expect(rows).toHaveCount(ranks.length);
+  await expect(rows.first()).toContainText(ranks[0].name);
+  await expect(rows.first()).toContainText(`${formatNumber(ranks[0].materialCount)} 份资料`);
+  await expect(rows.first()).toContainText(formatNumber(ranks[0].downloadCount));
+  const cooperation = page.getByRole('region', { name: '合作招募', exact: true });
+  await expect(cooperation.getByRole('link', { name: '完善个人主页' })).toHaveAttribute('href', '/me#profile');
+  const left = (await discovery.boundingBox())!;
+  expect((await cooperation.boundingBox())!.x).toBeGreaterThan(left.x + left.width);
+  await page.locator('#home-requests').screenshot({ path: info.outputPath('subject-discovery-desktop.png') });
+});
+
+test('opening a small folder near the end scrolls to the library top without any requests', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  const { calls } = await openHomepage(page);
+  const library = page.locator('#materials-list');
+  await library.getByRole('button', { name: '按学科', exact: true }).click();
+  const subject = [...catalogue.folders].reverse().find((folder) => folder.materials.length <= 3)!;
+  const folder = page.getByRole('list', { name: '学科文件夹' }).getByRole('button', { name: `${subject.name} ${subject.materials.length} 份资料`, exact: true });
+  await folder.scrollIntoViewIfNeeded();
+  expect((await library.boundingBox())!.y).toBeLessThan(-300);
+  await folder.click();
+  await expect(library.locator('.material-card')).toHaveCount(subject.materials.length);
+  await expect.poll(async () => (await library.boundingBox())!.y).toBeGreaterThanOrEqual(0);
+  await expect.poll(async () => (await library.boundingBox())!.y).toBeLessThan(180);
+  expect(calls).toHaveLength(0);
+});
+
+test('popular subjects open full folders despite an active search and restore their scope on back', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  const { calls, documents } = await openHomepage(page);
+  await page.locator('#keyword').fill('ESD');
+  await page.locator('#keyword').press('Enter');
+  const library = page.locator('#materials-list');
+  await expect(library.locator('.material-card')).toHaveCount(9);
+  const calculus = catalogue.folders.find((folder) => folder.id === 'calculus')!;
+  await page.getByRole('list', { name: '热门学科排行' }).getByRole('button', { name: `查看微积分，${calculus.materials.length}份资料`, exact: true }).click();
+  await expect(library.locator('.material-card')).toHaveCount(Math.min(calculus.materials.length, 24));
+  await expect(library.getByRole('button', { name: '按学科', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  const card = library.locator('.material-card').first();
+  const id = await card.getAttribute('data-material-id');
+  await page.waitForTimeout(600);
+  await card.scrollIntoViewIfNeeded();
+  const top = (await card.boundingBox())!.y;
+  await card.locator('.material-card__overlay-link').click({ position: { x: 60, y: 50 } });
+  await expect(page.locator('#download-card')).toBeVisible();
+  await page.goBack();
+  await expect(library.locator('.material-card')).toHaveCount(Math.min(calculus.materials.length, 24));
+  await page.waitForTimeout(1400);
+  expect(Math.abs((await library.locator(`[data-material-id="${id}"]`).boundingBox())!.y - top)).toBeLessThan(6);
+  await library.getByRole('button', { name: '按资料', exact: true }).click();
+  await expect(library.locator('.material-card')).toHaveCount(9);
+  await expect(page.locator('#keyword')).toHaveValue('ESD');
+  expect(calls).toHaveLength(1);
+  expect(documents).toHaveLength(1);
+});
+
+test('mobile discovery stacks both cards and opens subject materials without horizontal overflow', async ({ page }, info) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await openHomepage(page);
+  await expect(page.getByRole('heading', { name: '为你推荐', exact: true })).toHaveCount(0);
+  const discovery = page.locator('.request-card');
+  const cooperation = page.getByRole('region', { name: '合作招募', exact: true });
+  await expect(discovery).toBeVisible();
+  await expect(discovery.getByRole('heading', { name: '热门学科', exact: true })).toBeVisible();
+  await expect(cooperation).toBeVisible();
+  const left = (await discovery.boundingBox())!;
+  expect((await cooperation.boundingBox())!.y).toBeGreaterThan(left.y + left.height);
+  await page.locator('#home-requests').screenshot({ path: info.outputPath('subject-discovery-mobile.png') });
+  await page.getByRole('list', { name: '热门学科排行' }).getByRole('button').first().click();
+  const library = page.locator('#materials-list');
+  await expect(library).toBeVisible();
+  await expect(library.locator('.material-card').first()).toBeVisible();
+  await expect.poll(async () => (await library.boundingBox())!.y).toBeGreaterThanOrEqual(0);
+  await expect.poll(async () => (await library.boundingBox())!.y).toBeLessThan(180);
+  for (const width of [390, 320]) {
+    await page.setViewportSize({ width, height: 844 });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
+  }
 });
