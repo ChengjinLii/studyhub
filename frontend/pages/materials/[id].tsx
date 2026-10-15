@@ -181,8 +181,8 @@ export default function MaterialDetailPage({ material, user }: MaterialDetailPag
     hasCustomPreview && !isManualPreview && !isPdfMaterial
       ? '作者自定义预览'
       : previewState.preview?.previewPages
-        ? `仅展示前 ${previewState.preview.previewPages} 页`
-        : '仅供下载前浏览（前 3/5 页）';
+        ? `预览 ${previewState.preview.previewPages} / ${previewState.preview.pageCount || previewState.preview.previewPages} 页`
+        : '仅供下载前浏览';
   const copyrightOwner = material?.copyrightOwner?.trim();
   const formatFileSize = (value?: number | null) => {
     if (!value || value <= 0) return '--';

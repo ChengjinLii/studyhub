@@ -28,6 +28,10 @@ class MaterialsStorageMutationMixin:
         is_create: bool,
         storage_mutation: StorageMutation,
     ) -> None:
+        previous_preview_inputs = (
+            material.file_storage_key, material.preview_source, material.preview_watermark_enabled,
+            material.manual_preview_keys_json, material.custom_preview_images_json,
+        )
         staged_assets = staged_assets or []
         staged_files = [item for item in staged_assets if item.get("role") == "MATERIAL"]
         staged_previews = [item for item in staged_assets if item.get("role") == "PREVIEW"]
@@ -165,36 +169,19 @@ class MaterialsStorageMutationMixin:
             material.custom_preview_images_json = self._json_dumps([])
 
         manual_keys = self._loads(material.manual_preview_keys_json)
-        if material.preview_source == "MANUAL" and manual_keys:
-            material.preview_status = "done"
-            material.preview_page_count = len(manual_keys)
-            material.preview_pages = len(manual_keys)
-        elif (material.file_type or "").lower() == "pdf" and self._has_file(material):
-            material.preview_status = "done"
-            material.preview_page_count = max(
-                int(material.preview_page_count or 0),
-                self.settings.material_preview_pages_large,
+        preview_inputs = (
+            material.file_storage_key, material.preview_source, material.preview_watermark_enabled,
+            material.manual_preview_keys_json, material.custom_preview_images_json,
+        )
+        if is_create or previous_preview_inputs != preview_inputs:
+            supported = bool(manual_keys or self._loads(material.custom_preview_images_json)) or (
+                (material.file_type or "").lower() == "pdf" and self._has_file(material)
             )
-            material.preview_pages = min(
-                material.preview_page_count,
-                self.settings.material_preview_pages_small,
-            )
-        else:
-            material.preview_status = "unsupported"
+            material.preview_status = "processing" if supported else "unsupported"
             material.preview_page_count = None
             material.preview_pages = None
-        material.preview_manifest = self._json_dumps(
-            {
-                "status": material.preview_status,
-                "pageCount": material.preview_page_count,
-                "previewPages": material.preview_pages,
-                "pages": [
-                    {"index": index + 1, "key": key}
-                    for index, key in enumerate(manual_keys)
-                    if isinstance(key, str) and key.strip()
-                ],
-            }
-        )
+            # Registration only: rendering and storage IO happen in the background worker.
+            material.preview_manifest = self._json_dumps({"status": material.preview_status, "pages": []})
 
         if delivery_method == "FILE" and not self._has_file(material):
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="资料缺少有效的下载方式")

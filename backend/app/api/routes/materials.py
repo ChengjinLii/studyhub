@@ -592,7 +592,7 @@ def material_preview_asset(
     session: Session = Depends(get_db_session),
     service: MaterialsService = Depends(get_materials_service),
 ) -> Response:
-    material, claims = service.resolve_preview_asset(session, id, index, token)
+    _material, claims = service.resolve_preview_asset(session, id, index, token)
     if claims.get("kind") == "preview-image" and claims.get("key"):
         key = str(claims["key"])
         try:
@@ -602,10 +602,9 @@ def material_preview_asset(
                 media_type=service.asset_store.guess_media_type(key, default="image/png"),
                 headers={"Cache-Control": "private, max-age=300"},
             )
-        except Exception:
-            pass
-    svg = _build_preview_placeholder_svg(material.title, index, material.preview_watermark_enabled)
-    return Response(content=svg, media_type="image/svg+xml")
+        except Exception as exc:
+            raise HTTPException(status_code=503, detail="预览图片暂时不可用，请稍后重试") from exc
+    raise HTTPException(status_code=404, detail="预览图片不存在")
 
 
 @router.get("/api/materials/{id}/assets/custom/{index}")
@@ -687,16 +686,3 @@ def _build_download_headers(filename: str) -> dict[str, str]:
     ascii_fallback = "".join(char if ord(char) < 128 else "_" for char in (filename or "download.bin")) or "download.bin"
     encoded = quote(filename or "download.bin")
     return {"Content-Disposition": f"attachment; filename={ascii_fallback}; filename*=UTF-8''{encoded}"}
-
-
-def _build_preview_placeholder_svg(title: str, index: int, watermark_enabled: bool) -> str:
-    watermark = "StudyHub Preview" if watermark_enabled else "Preview"
-    escaped_title = title.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-    return f"""<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1448" viewBox="0 0 1024 1448">
-  <rect width="1024" height="1448" fill="#f6f7fb"/>
-  <rect x="72" y="72" width="880" height="1304" rx="36" fill="#ffffff" stroke="#d7dce7"/>
-  <text x="128" y="180" font-size="34" font-family="Arial, sans-serif" fill="#111827">{escaped_title}</text>
-  <text x="128" y="250" font-size="24" font-family="Arial, sans-serif" fill="#4b5563">第 {index} 页预览</text>
-  <text x="512" y="760" text-anchor="middle" font-size="54" font-family="Arial, sans-serif" fill="#d1d5db" transform="rotate(-24 512 760)">{watermark}</text>
-  <text x="128" y="1320" font-size="22" font-family="Arial, sans-serif" fill="#6b7280">当前为本地 Step 8 预览占位图</text>
-</svg>"""

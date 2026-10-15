@@ -1,0 +1,4 @@
+frontend/components/materials/MaterialPreviewPanel.tsx
+frontend/lib/useMaterialPreview.ts
+frontend/pages/materials/[id].tsx
+frontend/tests/material-detail.spec.ts

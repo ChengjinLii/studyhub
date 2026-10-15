@@ -39,6 +39,8 @@ from app.services.materials_search import material_matches_search, material_sear
 from app.services.materials_compat import MaterialsCompatMixin
 from app.services.materials_serializers import admin_material_item, load_json_list, material_has_file, material_list_item
 from app.services.materials_storage_mutation import MaterialsStorageMutationMixin
+from app.services.material_preview_service import MaterialPreviewService
+from app.services.material_preview_state import generated_gallery_urls, public_preview_manifest
 from app.services.material_security_policy import MaterialSecurityPolicyMixin, is_moderation_locked
 from app.services.materials_counters import apply_material_rating, shift_material_counter
 from app.services.read_support import (
@@ -417,7 +419,7 @@ class MaterialsService(MaterialSecurityPolicyMixin, MaterialsStorageMutationMixi
                 "originalFilename": material.original_filename,
                 "fileType": material.file_type.upper() if material.file_type else None,
                 "fileSize": material.file_size,
-                "previewManifest": material.preview_manifest,
+                "previewManifest": public_preview_manifest(material.preview_manifest),
                 "customPreviewText": material.custom_preview_text,
                 "customPreviewImages": self._public_custom_preview_urls(material_id, material),
                 "netdiskUrl": material.netdisk_url,
@@ -521,6 +523,9 @@ class MaterialsService(MaterialSecurityPolicyMixin, MaterialsStorageMutationMixi
                 material_id,
                 self._compat_json_loads(row["custom_preview_images"]),
             )
+            generated = generated_gallery_urls(self.asset_store, material_id, row["preview_manifest"])
+            if generated is not None:
+                custom_preview_images = generated
         detail_base = {
             "id": int(row["id"]),
             "uploaderId": self._compat_as_int(row["uploader_id"]),
@@ -545,7 +550,7 @@ class MaterialsService(MaterialSecurityPolicyMixin, MaterialsStorageMutationMixi
             "gradeValue": row["grade_value"] or "",
             "previewWatermarkEnabled": self._compat_to_bool(row["preview_watermark_enabled"], default=True),
             "previewSource": row["preview_source"] or "AUTO",
-            "previewManifest": self._compat_serialize_preview_manifest(row["preview_manifest"]),
+            "previewManifest": public_preview_manifest(row["preview_manifest"]),
             "customPreviewText": row["custom_preview_text"] if current_user_id is not None else None,
             "ratingAvg": self._compat_as_float(row["rating_avg"]),
             "ratingCount": self._compat_as_int(row["rating_count"]),
@@ -618,60 +623,9 @@ class MaterialsService(MaterialSecurityPolicyMixin, MaterialsStorageMutationMixi
         return next_view_count
 
     def get_preview(self, session: Session, material_id: int, user_id: int, can_manage_all: bool) -> dict[str, Any]:
-        if self.settings.requires_private_env_file:
-            return self._compat_get_preview(session, material_id, user_id, can_manage_all)
-        self._bootstrap(session)
-        material = self._load_accessible_material(session, material_id, user_id, can_manage_all)
-        if material.preview_source == "MANUAL":
-            manual_keys = self._loads(material.manual_preview_keys_json)
-            custom_images = self._loads(material.custom_preview_images_json)
-            if manual_keys:
-                return {
-                    "status": "done",
-                    "pageCount": len(manual_keys),
-                    "previewPages": len(manual_keys),
-                    "message": None,
-                    "images": [
-                        self._preview_image_payload(material_id, index + 1, key=key, placeholder=False)
-                        for index, key in enumerate(manual_keys)
-                    ],
-                }
-            if custom_images:
-                return {
-                    "status": "done",
-                    "pageCount": len(custom_images),
-                    "previewPages": len(custom_images),
-                    "message": None,
-                    "images": [
-                        {
-                            "index": index + 1,
-                            "width": None,
-                            "height": None,
-                            "img": {"src": url, "srcSet": None, "sizes": None},
-                            "webp": None,
-                            "avif": None,
-                            "lqip": None,
-                        }
-                        for index, url in enumerate(self._public_custom_preview_urls(material_id, material))
-                    ],
-                }
-            return {"status": "failed", "pageCount": None, "previewPages": None, "message": "预览资源缺失", "images": []}
-
-        if (material.file_type or "").lower() == "pdf" and self._has_file(material):
-            page_count = int(material.preview_page_count or self.settings.material_preview_pages_large)
-            preview_pages = int(material.preview_pages or min(page_count, self.settings.material_preview_pages_small))
-            return {
-                "status": "done",
-                "pageCount": page_count,
-                "previewPages": preview_pages,
-                "message": None,
-                "images": [
-                    self._preview_image_payload(material_id, index + 1, key=None, placeholder=True)
-                    for index in range(preview_pages)
-                ],
-            }
-
-        return {"status": "unsupported", "pageCount": None, "previewPages": None, "message": "当前资料暂不支持预览。", "images": []}
+        if not self.settings.requires_private_env_file:
+            self._bootstrap(session)
+        return MaterialPreviewService(self.settings, self.asset_store).get_preview(session, material_id, user_id, can_manage_all)
 
     def create_material(
         self,
@@ -1228,13 +1182,8 @@ class MaterialsService(MaterialSecurityPolicyMixin, MaterialsStorageMutationMixi
         path = self.asset_store.resolve_path(str(key)) if key else None
         return material, path, filename
 
-    def resolve_preview_asset(self, session: Session, material_id: int, index: int, token: str) -> tuple[MaterialRecord, dict[str, Any]]:
-        self._bootstrap(session)
-        claims = self.asset_store.verify_preview_token(material_id=material_id, token=token)
-        if int(claims.get("index", 0) or 0) != index:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="链接已失效")
-        material = self._ensure_material_exists(session, material_id)
-        return material, claims
+    def resolve_preview_asset(self, session: Session, material_id: int, index: int, token: str) -> tuple[dict, dict[str, Any]]:
+        return MaterialPreviewService(self.settings, self.asset_store).resolve_asset(session, material_id, index, token)
 
     def resolve_public_custom_preview_path(self, session: Session, material_id: int, index: int, token: str) -> Path:
         self._bootstrap(session)
@@ -1418,6 +1367,9 @@ class MaterialsService(MaterialSecurityPolicyMixin, MaterialsStorageMutationMixi
         }
 
     def _public_custom_preview_urls(self, material_id: int, material: MaterialRecord) -> list[str]:
+        generated = generated_gallery_urls(self.asset_store, material_id, material.preview_manifest)
+        if generated is not None:
+            return generated
         urls: list[str] = []
         for index, key in enumerate(self._loads(material.custom_preview_images_json), start=1):
             if self._is_external_url(key):

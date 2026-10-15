@@ -1,4 +1,4 @@
-import { CSSProperties } from 'react';
+import { CSSProperties, useState } from 'react';
 import Link from 'next/link';
 import AppImage from '../AppImage';
 import PaginationBar from '../PaginationBar';
@@ -44,6 +44,7 @@ export default function MaterialPreviewPanel({
   onPreviewToggle,
   onPreviewPageChange,
 }: MaterialPreviewPanelProps) {
+  const [failedImage, setFailedImage] = useState('');
   return (
     <section className="card material-preview">
       {(!embedded || hasPreviewContent) && (
@@ -113,11 +114,13 @@ export default function MaterialPreviewPanel({
           )}
           {isManualPreview || isPdfMaterial ? (
             previewLoading ? (
-              <p className="help-text">预览生成中，请稍候刷新。</p>
+              <p className="help-text" role="status">正在加载预览…</p>
             ) : previewError ? (
               <p className="error-text">{previewError}</p>
             ) : preview?.status === 'failed' ? (
-              <p className="help-text">预览生成失败，请稍后重试。</p>
+              <p className="help-text" role="status">{preview.message || '暂时无法生成预览，资料文件仍可按原规则获取。'}</p>
+            ) : preview?.status === 'unsupported' ? (
+              <p className="help-text">{preview.message || '当前资料暂不支持自动预览。'}</p>
             ) : preview?.status === 'done' && preview.images.length > 0 ? (
               <>
                 <div className="material-preview__grid">
@@ -133,7 +136,9 @@ export default function MaterialPreviewPanel({
                           {item.webp?.srcSet && (
                             <source type="image/webp" srcSet={item.webp.srcSet} sizes={item.webp.sizes || item.img.sizes || undefined} />
                           )}
-                          <img
+                          {failedImage === item.img.src ? (
+                            <p className="help-text" role="status">图片加载失败，请收起后重新打开预览。</p>
+                          ) : <img
                             src={item.img.src}
                             srcSet={item.img.srcSet || undefined}
                             sizes={item.img.sizes || undefined}
@@ -141,7 +146,10 @@ export default function MaterialPreviewPanel({
                             decoding="async"
                             loading={previewPage === item.index ? 'eager' : 'lazy'}
                             fetchPriority={previewPage === item.index ? 'high' : undefined}
-                          />
+                            width={item.width || undefined}
+                            height={item.height || undefined}
+                            onError={() => setFailedImage(item.img.src)}
+                          />}
                         </picture>
                         <span className="material-preview__label">第 {item.index} 页</span>
                       </div>
@@ -157,7 +165,7 @@ export default function MaterialPreviewPanel({
                 />
               </>
             ) : (
-              <p className="help-text">预览生成中，请稍后刷新。</p>
+              <p className="help-text" role="status">{preview?.message || '预览将在后台生成，无需停留等待，不影响资料获取。'}</p>
             )
           ) : (
             !hasCustomPreview && <p className="help-text">当前资料暂不支持预览。</p>

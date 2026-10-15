@@ -450,6 +450,11 @@ class MaterialsCompatMixin:
             if current_user_id is not None
             else []
         )
+        from app.services.material_preview_state import generated_gallery_urls, public_preview_manifest
+
+        generated = generated_gallery_urls(self.asset_store, material_id, row["preview_manifest"])
+        if current_user_id is not None and generated is not None:
+            custom_preview_images = generated
 
         return {
             "id": int(row["id"]),
@@ -481,7 +486,7 @@ class MaterialsCompatMixin:
             "tags": tags,
             "previewWatermarkEnabled": self._compat_to_bool(row["preview_watermark_enabled"], default=True),
             "previewSource": row["preview_source"] or "AUTO",
-            "previewManifest": self._compat_serialize_preview_manifest(row["preview_manifest"]),
+            "previewManifest": public_preview_manifest(row["preview_manifest"]),
             "customPreviewText": row["custom_preview_text"] if current_user_id is not None else None,
             "customPreviewImages": custom_preview_images,
             "ratingAvg": self._compat_as_float(row["rating_avg"]),

@@ -89,6 +89,27 @@ test('PDF preview keeps the existing preview request', async ({ page }) => {
   await expect(page.getByRole('button', { name: '收起预览', exact: true })).toBeVisible();
 });
 
+test('preview shows honest background state and polls only while expanded', async ({ page }) => {
+  await openDetail(page, { hasFile: true, hasNetdisk: false, fileType: 'pdf' });
+  let requests = 0;
+  await page.route('**/api/materials/9001/preview', async (route) => {
+    requests += 1;
+    await route.fulfill({ json: { ok: true, data: {
+      status: 'processing', images: [], pageCount: null, previewPages: null,
+      message: '预览将在后台生成，无需停留等待，不影响资料获取。',
+    } } });
+  });
+  await page.clock.install();
+  await page.getByRole('button', { name: '展示预览', exact: true }).click();
+  await expect(page.getByRole('status').filter({ hasText: '预览将在后台生成' })).toBeVisible();
+  await expect(page.getByText('前 3/5 页')).toHaveCount(0);
+  await page.clock.fastForward(16000);
+  await expect.poll(() => requests).toBe(2);
+  await page.getByRole('button', { name: '收起预览', exact: true }).click();
+  await page.clock.fastForward(60000);
+  expect(requests).toBe(2);
+});
+
 test('approved material layout screenshots', async ({ page }, testInfo) => {
   await openDetail(page, {
     description:

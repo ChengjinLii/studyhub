@@ -30,7 +30,7 @@
     "tags": ["期末真题", "期末答案（自制解析）"],
     "previewWatermarkEnabled": true,
     "previewSource": "AUTO",
-    "previewManifest": "materials/101/preview/manifest.json",
+    "previewManifest": null,
     "customPreviewText": null,
     "customPreviewImages": [],
     "ratingAvg": 4.8,

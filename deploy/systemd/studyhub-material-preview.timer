@@ -1,0 +1,11 @@
+[Unit]
+Description=Generate material previews after upload, outside request handling
+
+[Timer]
+OnBootSec=5min
+OnUnitInactiveSec=60s
+RandomizedDelaySec=15s
+Unit=studyhub-material-preview.service
+
+[Install]
+WantedBy=timers.target

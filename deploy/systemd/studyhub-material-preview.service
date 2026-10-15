@@ -1,0 +1,25 @@
+[Unit]
+Description=StudyHub deferred preview generation
+After=network-online.target studyhub-backend.service
+
+[Service]
+Type=oneshot
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/data/studyhub-runtime/current/backend
+Environment=STUDYHUB_ENVIRONMENT=production
+Environment=STUDYHUB_PRIVATE_DIR_PATH=/data/studyhub/private
+ExecStart=/data/studyhub-runtime/current/.venv/bin/python -m app.ops.material_previews --limit 2
+Nice=15
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7
+CPUQuota=40%
+MemoryMax=512M
+TimeoutStartSec=180
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadOnlyPaths=/data/studyhub-runtime /data/studyhub/private
+ReadWritePaths=/data/studyhub/private/preview-work

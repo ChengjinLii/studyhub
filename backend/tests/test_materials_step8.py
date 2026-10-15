@@ -10,6 +10,9 @@ from fastapi.testclient import TestClient
 from app.core.db import session_scope
 from app.models.auth import AuthUser
 from app.services.auth_service import AuthService
+from app.api.deps import get_material_asset_store
+from app.core.config import get_settings
+from app.services.material_preview_service import MaterialPreviewService
 from tests.support import build_auth_headers, seed_read_users
 
 
@@ -54,11 +57,9 @@ def test_step8_existing_material_flow_supports_view_preview_download_and_interac
     preview_response = client.get("/api/materials/101/preview", headers=alice_headers)
     assert preview_response.status_code == 200
     preview = preview_response.json()["data"]
-    assert preview["status"] == "done"
-    assert preview["previewPages"] == 3
-    preview_image_response = client.get(preview["images"][0]["img"]["src"])
-    assert preview_image_response.status_code == 200
-    assert preview_image_response.headers["content-type"].startswith("image/svg+xml")
+    # Seed metadata without an original must never fabricate successful page images.
+    assert preview["status"] == "unsupported"
+    assert preview["images"] == []
 
     unlike_response = client.delete("/api/materials/101/like", headers=alice_headers)
     assert unlike_response.status_code == 200
@@ -145,11 +146,15 @@ def test_step8_create_update_delete_and_batch_download_support_multipart_materia
     preview_response = client.get(f"/api/materials/{material_id}/preview", headers=alice_headers)
     assert preview_response.status_code == 200
     preview = preview_response.json()["data"]
+    assert preview["status"] == "processing"
+    with session_scope() as session:
+        assert MaterialPreviewService(get_settings(), get_material_asset_store()).run_once(session, limit=5)["done"] >= 1
+    preview = client.get(f"/api/materials/{material_id}/preview", headers=alice_headers).json()["data"]
     assert preview["status"] == "done"
     assert preview["pageCount"] == 1
     preview_asset_response = client.get(preview["images"][0]["img"]["src"])
     assert preview_asset_response.status_code == 200
-    assert preview_asset_response.headers["content-type"].startswith("image/png")
+    assert preview_asset_response.headers["content-type"].startswith("image/webp")
 
     download_response = client.get(f"/api/materials/{material_id}/download", headers=alice_headers)
     assert download_response.status_code == 200

@@ -829,11 +829,23 @@ class RequestsService(RequestsRefundMixin, RequestsCompatMixin):
         return user
 
     def _ensure_preview_ready(self, material: MaterialRecord) -> None:
-        if (material.preview_status or "").lower() != "done":
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="预览尚未准备好")
-        preview_pages = int(material.preview_pages or 0)
+        from app.services.material_preview_state import manifest_payload
+
+        manifest = manifest_payload(material.preview_manifest)
+        preview_status = str(manifest.get("status") or material.preview_status or "").lower()
+        manual_previews = self._loads(material.manual_preview_keys_json)
         custom_previews = self._loads(material.custom_preview_images_json)
-        if max(preview_pages, len(custom_previews)) < 2:
+        # Submission registers assets; it must not wait for watermark conversion.
+        # Acceptance still requires the requester's existing preview-view record.
+        if preview_status == "processing":
+            if material.preview_source == "MANUAL" and max(len(manual_previews), len(custom_previews)) >= 2:
+                return
+            if material.preview_source == "AUTO" and (material.file_type or "").lower() == "pdf" and material.file_storage_key:
+                return
+        if preview_status != "done":
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="预览尚未准备好")
+        preview_pages = int(manifest.get("previewPages") or material.preview_pages or 0)
+        if max(preview_pages, len(manual_previews), len(custom_previews)) < 2:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="预览图不足")
 
     def _to_request_item(

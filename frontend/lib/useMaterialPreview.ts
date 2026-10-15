@@ -39,10 +39,15 @@ export function useMaterialPreview({
     let active = true;
     setPreviewLoading(true);
     setPreviewError('');
-    fetchMaterialPreview(material.id)
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let polls = 0;
+    const load = () => fetchMaterialPreview(material.id)
       .then((data) => {
         if (!active) return;
         setPreview(data);
+        if (data.status === 'processing' && polls++ < 12) {
+          timer = setTimeout(() => { void load(); }, 15000);
+        }
       })
       .catch((err: unknown) => {
         if (!active) return;
@@ -52,8 +57,10 @@ export function useMaterialPreview({
         if (!active) return;
         setPreviewLoading(false);
       });
+    void load();
     return () => {
       active = false;
+      clearTimeout(timer);
     };
   }, [material, previewExpanded, user, isManualPreview, isPdfMaterial]);
 
