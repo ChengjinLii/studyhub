@@ -26,8 +26,11 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Generate cached previews without altering originals or publication state")
     parser.add_argument("--limit", type=int, default=1)
     parser.add_argument("--material-id", type=int)
+    parser.add_argument("--retry-failed", action="store_true", help="Explicit operator retry for one failed material")
     parser.add_argument("--audit", action="store_true", help="Read-only aggregate preview state")
     args = parser.parse_args()
+    if args.retry_failed and args.material_id is None:
+        parser.error("--retry-failed requires --material-id")
     settings = get_settings()
     service = MaterialPreviewService(settings, get_material_asset_store())
     if args.audit:
@@ -49,7 +52,7 @@ def main() -> int:
             return 0
         cleanup_abandoned_work(root)
         with session_scope() as session:
-            result = service.run_once(session, limit=max(1, min(args.limit, 5)), material_id=args.material_id)
+            result = service.run_once(session, limit=max(1, min(args.limit, 5)), material_id=args.material_id, retry_failed=args.retry_failed)
         print(json.dumps(result))
     return 0
 

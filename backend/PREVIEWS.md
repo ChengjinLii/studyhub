@@ -17,6 +17,11 @@ at most 1200 x 1800 pixels, encoded as WebP. Manual preview images use the same
 watermark pipeline. Watermarks say **StudyHub**, not a deployment hostname.
 Disabling the existing watermark option remains supported. Source bytes are
 never changed. Experience-post illustrations remain ordinary illustrations.
+Rendering only checks the PDF structure/encryption and uses a PDFium build
+without V8/XFA. It does not reuse the malware scanner's object-count heuristic,
+which can reject large benign legacy PDFs. The upload/download malware policy
+and CLEAN gate remain unchanged. A failed upgrade retains a matching last-good
+preview; changed source files or watermark policy cannot reuse stale previews.
 
 The existing `materials.preview_manifest` stores generation state and page
 metadata; no schema migration is needed. Readers support historical real
@@ -50,6 +55,8 @@ errors never silently turn into a successful placeholder response.
    without an unwatermarked source; do not cover or erase document content.
 
 Inspect `journalctl -u studyhub-material-preview.service` for aggregate counts.
+After correcting a source or renderer problem, an operator can retry a specific
+failed item with `python -m app.ops.material_previews --material-id ID --retry-failed`.
 Roll back executable releases independently of data; the manifest format is
 readable by older servers. Do not restore an entire production database just
 to roll back preview metadata.

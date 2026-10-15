@@ -235,3 +235,38 @@ def test_claim_identity_survives_mysql_json_float_normalization(preview_env, mon
     manifest = manifest_payload(list_rows(session, 1)[0]["preview_manifest"])
     assert isinstance(manifest["attemptedAt"], int)
     assert len(manifest["claimId"]) == 32
+
+
+def test_failed_upgrade_retains_last_good_preview(preview_env, monkeypatch):
+    service, session, _ = preview_env
+    assert service.run_once(session)["done"] == 1
+    row = service.repo.list_rows(session, 1)[0]
+    manifest = manifest_payload(row["preview_manifest"])
+    manifest["renderVersion"] = "legacy-renderer"
+    service.repo.compare_and_set(session, row, json.dumps(manifest))
+    session.commit()
+    old_url = service.get_preview(session, 1, 9, False)["images"][0]["img"]["src"]
+    def fail(*args):
+        raise ValueError("renderer unavailable")
+    monkeypatch.setattr(service, "_generate", fail)
+    assert service.run_once(session)["failed"] == 1
+    preview = service.get_preview(session, 1, 9, False)
+    assert preview["status"] == "done"
+    token = parse_qs(urlparse(old_url).query)["token"][0]
+    _, old_claims = service.resolve_asset(session, 1, 1, token)
+    new_token = parse_qs(urlparse(preview["images"][0]["img"]["src"]).query)["token"][0]
+    _, new_claims = service.resolve_asset(session, 1, 1, new_token)
+    assert old_claims["key"] == new_claims["key"]
+
+
+def test_benign_large_object_pdf_is_not_rejected_by_preview_renderer(preview_env):
+    from pypdf.generic import ArrayObject, NumberObject
+    service, session, settings = preview_env
+    writer = PdfWriter()
+    page = writer.add_blank_page(width=400, height=600)
+    page[NameObject("/TestMetadata")] = ArrayObject([NumberObject(1) for _ in range(21000)])
+    output = BytesIO()
+    writer.write(output)
+    (settings.resolved_material_asset_dir / "source.pdf").write_bytes(output.getvalue())
+    assert service.run_once(session)["done"] == 1
+    assert service.get_preview(session, 1, 9, False)["pageCount"] == 1

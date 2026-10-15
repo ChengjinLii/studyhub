@@ -58,6 +58,28 @@ def preview_blocked(row: dict) -> bool:
     ).upper().startswith("SECURITY_")
 
 
+def published_preview(manifest: dict, plan: dict) -> dict:
+    fingerprint = plan_fingerprint(plan)
+
+    def ready(value: dict) -> bool:
+        pages = value.get("pages")
+        return value.get("status") in (None, "done") and isinstance(pages, list) and bool(pages) and all(
+            isinstance(page, dict) and page.get("key") for page in pages
+        )
+
+    if ready(manifest) and (manifest.get("fingerprint") == fingerprint or not str(
+        manifest.get("renderVersion") or ""
+    ).startswith("studyhub-")):
+        return manifest
+    previous = manifest.get("previous")
+    if manifest.get("fingerprint") == fingerprint and isinstance(previous, dict) and ready(previous):
+        if previous.get("fingerprint") == fingerprint or (
+            plan["pdf"] and previous.get("sourceKey") == plan["pdf"] and bool(previous.get("watermark")) == plan["watermark"]
+        ):
+            return previous
+    return {}
+
+
 def public_preview_manifest(raw: Any) -> str | None:
     manifest = manifest_payload(raw)
     if not manifest:

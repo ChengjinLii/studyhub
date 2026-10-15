@@ -16,7 +16,7 @@ from sqlalchemy.orm import Session
 
 from app.repos.material_preview_repo import MaterialPreviewRepository
 from app.services.material_preview_state import (
-    RENDER_VERSION, manifest_payload, plan_fingerprint, preview_blocked, preview_plan, preview_supported,
+    RENDER_VERSION, manifest_payload, plan_fingerprint, preview_blocked, preview_plan, preview_supported, published_preview,
 )
 
 
@@ -43,11 +43,11 @@ class MaterialPreviewService:
         current = manifest.get("fingerprint") == plan_fingerprint(plan) and manifest.get("renderVersion") == RENDER_VERSION
         # Genuine historical images remain available until the background upgrade,
         # but a manifest without page keys is never represented as a ready preview.
-        pages = manifest.get("pages") or []
-        ready = manifest.get("status") in (None, "done") and pages and all(isinstance(p, dict) and p.get("key") for p in pages)
-        if ready and (current or not str(manifest.get("renderVersion") or "").startswith("studyhub-")):
+        published = published_preview(manifest, plan)
+        if published:
+            pages = published["pages"]
             images = [self._image_payload(material_id, page) for page in pages]
-            return {**result, "status": "done", "pageCount": manifest.get("pageCount") or len(images),
+            return {**result, "status": "done", "pageCount": published.get("pageCount") or len(images),
                     "previewPages": len(images), "images": images}
         if current and manifest.get("status") == "failed":
             return {**result, "status": "failed", "message": "暂时无法生成预览，资料文件仍可按原规则获取。"}
@@ -59,14 +59,14 @@ class MaterialPreviewService:
         if not rows or preview_blocked(rows[0]):
             raise HTTPException(404, "预览图片不存在")
         row = rows[0]
-        manifest = manifest_payload(row.get("preview_manifest"))
+        manifest = published_preview(manifest_payload(row.get("preview_manifest")), preview_plan(row, self.settings.material_preview_pages_small))
         pages = (manifest.get("pages") or []) + (manifest.get("customPages") or [])
         valid_page = any(isinstance(p, dict) and p.get("index") == index and p.get("key") == claims.get("key") for p in pages)
         current = manifest.get("renderVersion") != RENDER_VERSION or manifest.get("fingerprint") == plan_fingerprint(
             preview_plan(row, self.settings.material_preview_pages_small)
         )
         if (claims.get("kind") != "preview-image" or claims.get("index") != index or not claims.get("key")
-                or manifest.get("status") != "done" or not valid_page or not current
+                or manifest.get("status") not in (None, "done") or not valid_page or not current
                 or not self.repo.scan_allows_preview(session, row)):
             raise HTTPException(403, "预览链接已失效，请重新打开预览")
         return row, claims
@@ -77,7 +77,7 @@ class MaterialPreviewService:
                                                                 key=page["key"], placeholder=False),
                         "srcSet": None, "sizes": None}, "webp": None, "avif": None, "lqip": None}
 
-    def run_once(self, session: Session, *, limit: int = 1, material_id: int | None = None) -> dict:
+    def run_once(self, session: Session, *, limit: int = 1, material_id: int | None = None, retry_failed: bool = False) -> dict:
         stats = {"done": 0, "failed": 0, "skipped": 0}
         # A small catalogue scan outside request handling needs no new schema or index.
         for row in self.repo.list_rows(session, material_id):
@@ -87,6 +87,8 @@ class MaterialPreviewService:
             manifest = manifest_payload(row.get("preview_manifest"))
             fingerprint = plan_fingerprint(plan)
             same = manifest.get("fingerprint") == fingerprint and manifest.get("renderVersion") == RENDER_VERSION
+            if retry_failed and material_id is not None and manifest.get("status") == "failed":
+                same = False
             age = time.time() - float(manifest.get("attemptedAt") or 0)
             if same and manifest.get("status") == "processing" and age >= 600 and manifest.get("attempts", 0) >= 3:
                 manifest["status"] = "failed"
@@ -100,6 +102,9 @@ class MaterialPreviewService:
             claim = {"renderVersion": RENDER_VERSION, "fingerprint": fingerprint, "status": "processing",
                      "attempts": int(manifest.get("attempts") or 0) + 1 if same else 1,
                      "attemptedAt": int(time.time()), "claimId": secrets.token_hex(16), "pages": []}
+            previous = published_preview(manifest, plan)
+            if previous:
+                claim["previous"] = {key: value for key, value in previous.items() if key != "previous"}
             encoded_claim = json.dumps(claim, sort_keys=True)
             if not self.repo.compare_and_set(session, row, encoded_claim):
                 session.rollback()
@@ -122,6 +127,7 @@ class MaterialPreviewService:
                     raise ValueError("source or moderation changed")
                 completed = {**claim, **rendered, "status": "done", "watermark": "StudyHub" if plan["watermark"] else None,
                              "previewPages": len(rendered["pages"]), "generatedAt": datetime.now(UTC).isoformat()}
+                completed.pop("previous", None)
                 if not self.repo.compare_and_set(session, claimed_row, json.dumps(completed, sort_keys=True)):
                     raise ValueError("preview claim no longer current")
                 session.commit()

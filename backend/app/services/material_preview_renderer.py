@@ -70,11 +70,16 @@ def render(directory: Path, plan: dict) -> dict:
 
     if plan.get("pdf"):
         import pypdfium2 as pdfium
-        from app.services.material_lightweight_scanner import _scan_pdf
+        from pypdf import PdfReader
 
         path = directory / "source.pdf"
-        if _scan_pdf(path) != "CLEAN":
-            raise ValueError("PDF requires manual inspection")
+        with path.open("rb") as source:
+            if not source.read(8).lstrip().startswith(b"%PDF-"):
+                raise ValueError("invalid PDF header")
+        if PdfReader(path).is_encrypted:
+            raise ValueError("encrypted PDF requires manual inspection")
+        if any(flag.lower() in {"v8", "xfa"} for flag in pdfium.PDFIUM_INFO.flags):
+            raise ValueError("active PDF runtimes are not allowed")
         # Do not initialize forms; PDFium is built without V8/XFA support.
         with pdfium.PdfDocument(path) as document:
             result["pageCount"] = len(document)
