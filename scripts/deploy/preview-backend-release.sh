@@ -8,7 +8,7 @@ RUNTIME="${STUDYHUB_RELEASE_ROOT:-/data/studyhub-runtime}"
 SOURCE_BASE="$(git -C "$ROOT" rev-parse --verify "${1:?source base commit required}^{commit}")"
 TARGET="$(git -C "$ROOT" rev-parse --verify "${2:?target commit required}^{commit}")"
 PREVIOUS="$(readlink -e "$RUNTIME/current")"
-BASE="$(cat "$PREVIOUS/.build-git-sha")"
+BASE="$(cat "$PREVIOUS/.backend-base-git-sha" 2>/dev/null || cat "$PREVIOUS/.build-git-sha")"
 RELEASE="$RUNTIME/releases/${TARGET:0:12}-preview"
 PORT=18311
 exec 9>"$RUNTIME/deploy.lock"

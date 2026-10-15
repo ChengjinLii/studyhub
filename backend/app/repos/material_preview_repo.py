@@ -39,7 +39,8 @@ class MaterialPreviewRepository:
                 predicates.append(f"{name} IS NULL")
             else:
                 param = f"old_{i}"
-                if name == "preview_manifest" and session.get_bind().dialect.name == "mysql":
+                if name in {"preview_manifest", "manual_preview_keys_json", "custom_preview_images_json",
+                            "custom_preview_images", "tags_json"} and session.get_bind().dialect.name == "mysql":
                     predicates.append(f"CAST({name} AS CHAR) = :{param}")
                 else:
                     predicates.append(f"{name} = :{param}")
