@@ -25,6 +25,8 @@ The worker compares the source, watermark and moderation snapshot before
 publishing. Concurrent edits/deletion cannot publish stale results. Failed
 jobs retry up to three times with an hour's backoff; killed jobs expire after
 ten minutes. Changing source or watermark starts a fresh generation.
+Abandoned temporary copies older than ten minutes are removed under the worker
+lock; generation pauses below 256 MiB of free temporary disk space.
 
 Preview asset tokens expire and are checked against the active manifest and
 moderation/security state. Only preview copies are served. Database and storage

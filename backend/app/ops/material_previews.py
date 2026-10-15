@@ -4,12 +4,22 @@ import argparse
 import fcntl
 import json
 from collections import Counter
+from pathlib import Path
+import shutil
+import time
 
 from app.api.deps import get_material_asset_store
 from app.core.config import get_settings
 from app.core.db import session_scope
 from app.services.material_preview_service import MaterialPreviewService
 from app.services.material_preview_state import RENDER_VERSION, manifest_payload, preview_plan, preview_supported, preview_blocked
+
+
+def cleanup_abandoned_work(root: Path) -> None:
+    # Called only while holding the worker lock. Keep recent operator jobs alone.
+    for path in root.glob("preview-*"):
+        if not path.is_symlink() and path.is_dir() and path.stat().st_mtime < time.time() - 600:
+            shutil.rmtree(path)
 
 
 def main() -> int:
@@ -37,6 +47,7 @@ def main() -> int:
         except BlockingIOError:
             print(json.dumps({"skipped": "worker already running"}))
             return 0
+        cleanup_abandoned_work(root)
         with session_scope() as session:
             result = service.run_once(session, limit=max(1, min(args.limit, 5)), material_id=args.material_id)
         print(json.dumps(result))

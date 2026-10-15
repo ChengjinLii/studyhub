@@ -4,6 +4,7 @@ from datetime import UTC, datetime
 import json
 import logging
 from pathlib import Path
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -147,6 +148,8 @@ class MaterialPreviewService:
     def _generate(self, material_id: int, plan: dict, new_keys: list[str]) -> dict:
         root = self.settings.private_dir / "preview-work"
         root.mkdir(mode=0o700, parents=True, exist_ok=True)
+        if shutil.disk_usage(root).free < 256 * 1024**2:
+            raise ValueError("insufficient preview temporary disk space")
         with tempfile.TemporaryDirectory(prefix="preview-", dir=root) as temporary:
             directory = Path(temporary)
             if plan["pdf"]:

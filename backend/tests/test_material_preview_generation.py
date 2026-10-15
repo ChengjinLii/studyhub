@@ -194,3 +194,23 @@ def test_request_submission_does_not_wait_for_pending_manual_conversion():
     material.manual_preview_keys_json = '["first.png"]'
     with pytest.raises(HTTPException):
         RequestsService._ensure_preview_ready(helper, material)
+
+
+def test_crashed_worker_cleanup_keeps_recent_jobs_and_originals(tmp_path):
+    import os
+    import time
+    from app.ops.material_previews import cleanup_abandoned_work
+
+    abandoned = tmp_path / "preview-abandoned"
+    abandoned.mkdir()
+    (abandoned / "source.pdf").write_bytes(b"temporary copy")
+    os.utime(abandoned, (time.time() - 1000,) * 2)
+    recent = tmp_path / "preview-recent"
+    recent.mkdir()
+    original = tmp_path / "original.pdf"
+    original.write_bytes(b"keep original")
+    link = tmp_path / "preview-link"
+    link.symlink_to(recent, target_is_directory=True)
+    cleanup_abandoned_work(tmp_path)
+    assert not abandoned.exists()
+    assert recent.is_dir() and link.is_symlink() and original.read_bytes() == b"keep original"
