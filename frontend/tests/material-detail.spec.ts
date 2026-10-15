@@ -110,6 +110,29 @@ test('preview shows honest background state and polls only while expanded', asyn
   expect(requests).toBe(2);
 });
 
+test('preview metadata preserves page proportions on desktop and mobile', async ({ page }) => {
+  await openDetail(page, { hasFile: true, hasNetdisk: false, fileType: 'pdf' });
+  await page.route('**/api/materials/9001/preview', (route) => route.fulfill({ json: { ok: true, data: {
+    status: 'done', pageCount: 4, previewPages: 1, images: [{
+      index: 1, width: 800, height: 1200, img: { src: '/preview-ratio.svg' },
+    }],
+  } } }));
+  await page.route('**/preview-ratio.svg', (route) => route.fulfill({
+    contentType: 'image/svg+xml',
+    body: '<svg xmlns="http://www.w3.org/2000/svg" width="800" height="1200"><rect width="800" height="1200" fill="white"/></svg>',
+  }));
+  await page.getByRole('button', { name: '展示预览', exact: true }).click();
+  const image = page.getByAltText('预览第 1 页', { exact: true });
+  await expect(image).toBeVisible();
+  for (const width of [1440, 390]) {
+    await page.setViewportSize({ width, height: 1000 });
+    await expect.poll(async () => {
+      const box = await image.boundingBox();
+      return box ? (box.height - 2) / (box.width - 2) : 0;
+    }).toBeCloseTo(1.5, 2);
+  }
+});
+
 test('approved material layout screenshots', async ({ page }, testInfo) => {
   await openDetail(page, {
     description:

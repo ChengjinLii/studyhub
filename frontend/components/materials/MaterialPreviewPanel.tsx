@@ -148,6 +148,7 @@ export default function MaterialPreviewPanel({
                             fetchPriority={previewPage === item.index ? 'high' : undefined}
                             width={item.width || undefined}
                             height={item.height || undefined}
+                            style={{ height: 'auto' }}
                             onError={() => setFailedImage(item.img.src)}
                           />}
                         </picture>
