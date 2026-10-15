@@ -214,3 +214,24 @@ def test_crashed_worker_cleanup_keeps_recent_jobs_and_originals(tmp_path):
     cleanup_abandoned_work(tmp_path)
     assert not abandoned.exists()
     assert recent.is_dir() and link.is_symlink() and original.read_bytes() == b"keep original"
+
+
+def test_claim_identity_survives_mysql_json_float_normalization(preview_env, monkeypatch):
+    service, session, _ = preview_env
+    monkeypatch.setattr("app.services.material_preview_service.time", SimpleNamespace(time=lambda: 1792043984.7403367))
+    list_rows = service.repo.list_rows
+
+    def normalized_rows(*args):
+        rows = list_rows(*args)
+        for row in rows:
+            manifest = manifest_payload(row.get("preview_manifest"))
+            if isinstance(manifest.get("attemptedAt"), float):
+                manifest["attemptedAt"] = round(manifest["attemptedAt"], 6)
+                row["preview_manifest"] = json.dumps(manifest)
+        return rows
+
+    monkeypatch.setattr(service.repo, "list_rows", normalized_rows)
+    assert service.run_once(session)["done"] == 1
+    manifest = manifest_payload(list_rows(session, 1)[0]["preview_manifest"])
+    assert isinstance(manifest["attemptedAt"], int)
+    assert len(manifest["claimId"]) == 32

@@ -5,6 +5,7 @@ import json
 import logging
 from pathlib import Path
 import shutil
+import secrets
 import subprocess
 import sys
 import tempfile
@@ -93,12 +94,12 @@ class MaterialPreviewService:
                 session.commit()
                 continue
             if same and (manifest.get("status") == "done" or manifest.get("attempts", 0) >= 3
-                         or (manifest.get("status") == "processing" and age < 600)
+                         or (manifest.get("status") == "processing" and manifest.get("claimId") and age < 600)
                          or (manifest.get("status") == "failed" and age < 3600)):
                 continue
             claim = {"renderVersion": RENDER_VERSION, "fingerprint": fingerprint, "status": "processing",
                      "attempts": int(manifest.get("attempts") or 0) + 1 if same else 1,
-                     "attemptedAt": time.time(), "pages": []}
+                     "attemptedAt": int(time.time()), "claimId": secrets.token_hex(16), "pages": []}
             encoded_claim = json.dumps(claim, sort_keys=True)
             if not self.repo.compare_and_set(session, row, encoded_claim):
                 session.rollback()
@@ -106,9 +107,10 @@ class MaterialPreviewService:
             session.commit()
             # MySQL JSON normalizes spacing/key order, so use the persisted snapshot.
             claimed_rows = self.repo.list_rows(session, row["id"])
-            if not claimed_rows or manifest_payload(claimed_rows[0].get("preview_manifest")) != claim:
+            if not claimed_rows or manifest_payload(claimed_rows[0].get("preview_manifest")).get("claimId") != claim["claimId"]:
                 session.rollback()
-                continue
+                stats["skipped"] += 1
+                break
             claimed_row = claimed_rows[0]
             session.commit()  # Release the DB connection before downloading/rendering.
             new_keys: list[str] = []
