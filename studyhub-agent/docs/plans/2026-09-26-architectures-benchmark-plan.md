@@ -1,5 +1,7 @@
 # Agent 架构与 AgentBench v3 执行计划
 
+> 路线调整：2026-10-16 起，执行主线以 [独立知识产品设计](../specs/2026-10-16-independent-knowledge-design.md) 和 [开发路线](../ROADMAP.md) 为准。下文保留历史任务记录；未完成的校园业务快照、网站权限任务与后训练安排不自动延续到新产品。
+
 **目标：** 在统一运行契约下实现五种 Agent 架构，构建 AgentBench v3，并完成 Qwen3.5-4B / 9B 的九组配置对比与分析报告。
 
 **设计依据：** [架构与评测设计](../specs/2026-09-26-architectures-benchmark-design.md)。

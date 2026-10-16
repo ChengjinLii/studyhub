@@ -54,11 +54,18 @@ class Principal(_Frozen):
     is_admin: bool = False
 
 
+class KnowledgePrincipal(_Frozen):
+    """Identity for the standalone knowledge product; scope stays server-owned."""
+
+    principal_id: str
+    kind: Literal["knowledge"] = "knowledge"
+
+
 class EpisodeSpec(_Frozen):
     episode_id: str
     task_id: str
     user_message: str
-    principal: Principal
+    principal: Principal | KnowledgePrincipal
     system_prompt: str = SYSTEM_PROMPT_KEY
     finalize_prompt: str = FINALIZE_PROMPT_KEY
     tool_names: tuple[str, ...]

@@ -177,15 +177,16 @@ The original SpringBoot implementation is available in [studyhub-springboot](htt
 
 ## StudyHub Agent
 
-**A tool-calling Agent for university learning workflows.**
+**A standalone document knowledge base, RAG, and Agent product.**
 
-[StudyHub Agent](studyhub-agent/README.md) uses Qwen3.5-4B as its primary model for material discovery, preview reading, platform policy queries, and learning memory. It supports standalone 4B / 9B inference and small-to-large model cascading.
+[StudyHub Agent](studyhub-agent/README.md) takes inspiration from WeKnora's knowledge processing and tool design. It brings document ingestion, passage retrieval, source locations, RAG answers, and multi-step Agents into an independent runtime, with configurable model services such as Qwen3.5-4B / 9B.
 
 | Capability | Implementation |
 | --- | --- |
-| Tool Calling | A shared runner for search, recommendations, reading, policy queries, and memory access |
-| Orchestration | ReAct, citation verification, plan-then-execute, context compaction, and model cascading |
-| Citation Checks | `react_verify` checks citations against recorded page reads and provides correction feedback |
+| Knowledge Management | Local Markdown/TXT ingestion, structural chunking, versioned snapshots, and source locations |
+| Passage Retrieval | Keyword recall, optional semantic recall, RRF fusion, and model reranking |
+| Answers and Tools | Fixed RAG and multi-step Agents sharing search, document reading, and listing tools |
+| Citation Checks | Verify citations against displayed, versioned passages and provide correction feedback |
 | Runtime Contracts | Shared message rendering, call parsing, budget control, and contract hashes |
 | Trajectory Recording | Messages, tool evidence, architecture decisions, and model metadata |
 | Inference Interfaces | SGLang token-level and OpenAI-compatible clients |

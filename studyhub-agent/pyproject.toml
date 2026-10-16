@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "studyhub-agent"
 version = "3.0.0"
-description = "StudyHub agent: runtime contract, episode runner, replay environment and graders"
+description = "Standalone StudyHub knowledge, retrieval-augmented generation and agent runtime"
 readme = "README.md"
 requires-python = ">=3.12,<3.13"
 dependencies = [
@@ -13,6 +13,9 @@ dependencies = [
   "jinja2>=3.1,<4.0",
   "httpx>=0.27,<1.0",
 ]
+
+[project.scripts]
+studyhub-knowledge = "studyhub_agent.cli:main"
 
 [project.optional-dependencies]
 tokenizers = ["tokenizers>=0.20,<1.0"]

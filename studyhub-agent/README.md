@@ -1,189 +1,162 @@
 <div align="center">
 
-# StudyHub Agent v3
+# StudyHub 知识库与 Agent
 
-**面向高校学习场景的工具调用 Agent 与运行框架**
+**从文档入库、正文检索到有据可查的知识问答**
 
 [![Python](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)](#快速开始)
-[![Qwen](https://img.shields.io/badge/Model-Qwen3.5--4B_%2F_9B-2563eb)](#能力概览)
-[![Pydantic](https://img.shields.io/badge/Contracts-Pydantic-E92063)](#运行契约)
-[![SGLang](https://img.shields.io/badge/Serving-SGLang-15803d)](#模型推理)
+[![RAG](https://img.shields.io/badge/Retrieval-BM25_%2B_RRF-0f766e)](#知识检索)
+[![Qwen](https://img.shields.io/badge/Agent-Qwen3.5--4B_%2F_9B-2563eb)](#模型问答)
+[![Pydantic](https://img.shields.io/badge/Contracts-Pydantic-E92063)](#运行记录)
 
-[能力概览](#能力概览) | [系统架构](#系统架构) | [架构选择](#架构选择) | [快速开始](#快速开始) | [开发文档](#开发文档)
+[能力概览](#能力概览) | [快速开始](#快速开始) | [知识检索](#知识检索) | [模型问答](#模型问答) | [开发文档](#开发文档)
 
 </div>
 
-StudyHub Agent 以 Qwen3.5-4B 为主要模型，将资料检索、预览阅读、政策查询与学习记忆统一到一个可记录、可回放的工具调用循环中。
+StudyHub 知识库与 Agent 是独立运行的文档知识产品，支持本地文档管理、正文检索、RAG 问答与多步 Agent。知识处理和工具设计参考 Tencent WeKnora，执行层沿用统一的运行契约、模型客户端与轨迹记录。
 
-**同一套执行器，同一份运行契约，完整保留每次任务的工具证据与决策轨迹。**
+**先找到原文，再阅读上下文，让回答与来源对应。**
 
 ---
 
 ## 能力概览
 
-| 场景 | 工具与能力 |
+| 能力 | 实现 |
 | --- | --- |
-| 查找资料 | `materials_search`、`materials_recommend` |
-| 查看资料 | `materials_get`、`materials_read` |
-| 查询规则 | `platform_policy` |
-| 提取网页 | `web_extract`，从网页快照获取内容 |
-| 学习记忆 | `memory_get`、`memory_update` |
-| 回答核查 | `react_verify`，检查引用页记录并反馈纠正 |
-| 执行规划 | `plan_execute`，先生成简短计划，再开展工具调用 |
-| 上下文管理 | `react_context`，按 token 阈值压缩较早的工具结果 |
-| 模型级联 | `cascade`，根据解析错误、引用核查和预算用量从 4B 升级至 9B |
-| 运行分析 | 记录回合、观察、预算、终止原因与模型信息 |
+| 文档管理 | 导入 UTF-8 Markdown/TXT，按来源更新版本，原子保存知识快照 |
+| 结构分块 | 保留标题路径与原文位置，保护公式、代码及表格 |
+| 正文检索 | 中文与英文关键词召回，可配置向量召回、RRF 融合和模型重排 |
+| 知识范围 | 按知识库与文档集合限制检索、阅读和模型输入 |
+| 来源定位 | 每个片段包含文档版本、字符区间、行号和独立引用 |
+| RAG 问答 | 固定检索与生成流程，检查 token 预算和片段引用 |
+| Agent | 自主检索、分页阅读、邻域扩展及引用纠正 |
+| 运行记录 | 保存语料指纹、模型身份、工具证据、预算与终止原因 |
 
 ---
 
 ## 系统架构
 
 ```text
-用户问题 -> 消息渲染 -> 策略生成 -> 工具执行 -> 观察记录
-                            ^                   |
-                            +-------------------+
+本地文档 -> 结构分块 -> 版本化知识快照
                             |
-                         最终回答 -> 引用核查（可选）
+                    统一检索与证据服务
+                      /           \
+                 固定 RAG       多步 Agent
+                      \           /
+                      引用与运行记录
 ```
 
-五种架构共用 `EpisodeRunner`，通过钩子控制规划、模型选择、消息视图与回答核查。
-
-| 模块 | 职责 |
-| --- | --- |
-| `contracts` | 工具协议、提示注册表、任务与回合模型、消息渲染解析、契约哈希 |
-| `guardrails` | 权限检查、隐私脱敏与网页访问策略 |
-| `tools` | 八项工具定义及 MCP 名称映射 |
-| `environments` | 环境协议与冻结快照回放 |
-| `runtime` | 任务执行器、模型客户端与预算控制 |
-| `architectures` | ReAct、引用核查、规划执行、上下文压缩与模型级联 |
-| `graders` | 判分协议与精确匹配判分器 |
-
-模块依赖方向由 import-linter 自动检查。
-
-### 架构选择
-
-| 架构 | 行为 | 默认参数 |
-| --- | --- | --- |
-| `react` | 按工具反馈逐步检索、阅读与回答 | 无附加参数 |
-| `react_verify` | 回答后检查引用来源，并反馈修正 | 最多纠正 2 次 |
-| `plan_execute` | 首轮生成计划，后续附加计划提醒 | 提醒保留计划前 400 字 |
-| `react_context` | 超过 token 阈值后压缩较早的工具结果 | 阈值为上下文预算的 50%，保留最近 2 条结果，摘要前 120 字 |
-| `cascade` | 从 `small` 升级至 `large`，随后持续使用大模型 | 预算触发比例 70%，最多纠正 2 次 |
-
-规划和引用纠正共用任务回合预算；压缩只改变发送视图，原始消息与工具证据完整保留。架构参数、注册提示和模型版本共同计入契约哈希。
+RAG 和 Agent 共用知识服务。检索负责召回、融合和排序；Agent 决定何时查找、补读和回答。
 
 ---
 
 ## 快速开始
 
-在 `studyhub-agent/` 目录下执行：
+在 `studyhub-agent/` 目录执行：
 
 ```bash
 python3.12 -m venv .venv
 .venv/bin/pip install -e ".[dev,tokenizers]"
 ```
 
-### 开发检查
+### 导入示例文档
+
+```bash
+.venv/bin/studyhub-knowledge \
+  --corpus /tmp/studyhub-knowledge/corpus.json \
+  --kb demo \
+  index examples/knowledge/*.md
+```
+
+示例文档为合成的向量投影与最小二乘笔记。
+
+### 检索正文
+
+```bash
+.venv/bin/studyhub-knowledge \
+  --corpus /tmp/studyhub-knowledge/corpus.json \
+  --kb demo \
+  search "最小二乘与正交投影有什么关系"
+```
+
+### 浏览和阅读
+
+```bash
+.venv/bin/studyhub-knowledge \
+  --corpus /tmp/studyhub-knowledge/corpus.json list
+
+# 将检索结果中的 chunk_id 传给 read，读取该片段及相邻内容。
+.venv/bin/studyhub-knowledge \
+  --corpus /tmp/studyhub-knowledge/corpus.json \
+  read <chunk_id> --context 1
+```
+
+所有命令也可通过 `python -m studyhub_agent.cli` 运行。参数说明与模型协议见 [知识服务配置](docs/KNOWLEDGE.md)。
+
+---
+
+## 知识检索
+
+| 模式 | 行为 |
+| --- | --- |
+| `keyword` | 对正文和标题路径进行关键词检索 |
+| `semantic` | 使用显式配置的 embedding 服务检索语义相近片段 |
+| `hybrid` | 分别召回关键词与向量候选，再用 RRF 按排名融合 |
+
+可附加 rerank 服务，对候选重新排序。未配置 embedding 时，hybrid 返回明确的关键词降级标记；显式 semantic 需要配置 embedding 服务。
+
+检索结果包含完整片段、原文行号与版本。更新文档后，旧版本片段被替换，避免引用落到另一版正文。
+
+### Agent 工具
+
+| 工具 | 用途 |
+| --- | --- |
+| `search_knowledge` | 查找相关正文片段 |
+| `read_document` | 文档分页阅读或片段邻域扩展 |
+| `list_documents` | 按标题浏览文档目录 |
+
+工具共用调用方确定的知识范围。标题与元数据不计为已读正文；邻近片段各自保留引用。
+
+---
+
+## 模型问答
+
+分别通过 `rag` 和 `agent` 选择固定知识问答与多步工具调用：
+
+```bash
+.venv/bin/studyhub-knowledge \
+  --corpus /tmp/studyhub-knowledge/corpus.json \
+  --kb demo \
+  ask "最小二乘与正交投影有什么关系？" \
+  --mode rag \
+  --model-url http://127.0.0.1:30411 \
+  --model Qwen/Qwen3.5-4B \
+  --model-dir /path/to/Qwen3.5-4B
+```
+
+将 `--mode rag` 改为 `--mode agent`，即可由 Agent 自行检索和阅读。模型地址使用服务根地址，模型目录用于加载真实 tokenizer 和检查上下文预算。
+
+本地模型服务配置参考 [推理服务说明](scripts/serving/README.md)。
+
+---
+
+## 运行记录
+
+片段引用格式为 `[k_片段标识]`。引用标识与文档版本及原文范围绑定，RAG 与 Agent 都检查引用是否属于实际展示的证据。
+
+Agent 共用 `EpisodeRunner`，记录消息、工具输入输出、引用检查、预算、模型信息与终止原因。检索记录包含知识快照指纹、有效检索模式和模型身份。
+
+历史五种编排架构与冻结快照环境保留在研究和回归入口中，说明见 [架构实现记录](docs/specs/2026-10-06-architectures-progress.md)。
+
+---
+
+## 开发检查
 
 ```bash
 .venv/bin/ruff check src tests scripts/smoke_episodes.py
 .venv/bin/lint-imports --config .importlinter
-.venv/bin/pytest --cov
+HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 .venv/bin/pytest --cov
 ```
-
-### 模型推理
-
-SGLang 服务的启动、参数配置与 GPU 使用方法见 [推理服务说明](scripts/serving/README.md)。
-
-服务启动后，可以运行示例任务：
-
-```bash
-.venv/bin/python scripts/smoke_episodes.py \
-  --model-dir ../models/P1/Qwen3.5-4B \
-  --sglang-url http://127.0.0.1:30411 \
-  --snapshot tests/fixtures/replay_snapshot.json \
-  --tasks tests/fixtures/smoke_tasks.jsonl \
-  --architecture react_verify \
-  --model-id Qwen/Qwen3.5-4B \
-  --out /tmp/studyhub-agent-smoke/episodes.jsonl
-```
-
-结果以 Episode JSONL 保存，包含最终回答、工具轨迹、引用核查与模型信息。历史运行样例见 [基础层冒烟记录](docs/evidence/foundation-smoke-2026-09-25.jsonl)。
-
-替换 `--architecture` 即可使用单模型架构。对应参数如下：
-
-| 架构 | 命令行参数 |
-| --- | --- |
-| `react_verify` | `--max-citation-rejections` |
-| `plan_execute` | `--max-plan-chars` |
-| `react_context` | `--context-threshold`、`--keep-recent-tools`、`--max-text-chars` |
-| `cascade` | `--escalate-ratio`、`--max-citation-rejections`，以及大模型连接参数 |
-
-### 双模型级联
-
-分别准备 4B 与 9B 推理服务后，运行：
-
-```bash
-.venv/bin/python scripts/smoke_episodes.py \
-  --model-dir ../models/P1/Qwen3.5-4B \
-  --sglang-url http://127.0.0.1:30411 \
-  --model-id Qwen/Qwen3.5-4B \
-  --large-model-dir ../models/P1/Qwen3.5-9B \
-  --large-sglang-url http://127.0.0.1:30412 \
-  --large-model-id Qwen/Qwen3.5-9B \
-  --snapshot tests/fixtures/replay_snapshot.json \
-  --tasks tests/fixtures/smoke_tasks.jsonl \
-  --architecture cascade \
-  --out /tmp/studyhub-agent-smoke/cascade.jsonl
-```
-
-每回合记录实际使用的 `policy_key` 与 `model_id`。模型切换携带完整历史，各模型使用自己的 tokenizer 检查上下文预算。
-
----
-
-## 引用核查
-
-`react_verify` 支持 `[101:2]` 和全角冒号形式的资料页引用，以成功读取的页码记录为核查依据。核查失败时，执行器反馈问题清单，交由模型修正。
-
-已有执行器、环境与策略客户端时，可直接指定架构：
-
-```python
-from studyhub_agent.architectures import ReactVerifyArchitecture
-
-episode = runner.run(
-    spec,
-    environment,
-    policy,
-    architecture=ReactVerifyArchitecture(max_rejections=2),
-)
-```
-
-| 参数或字段 | 含义 |
-| --- | --- |
-| `max_rejections` | 最大纠正次数，默认 2 |
-| `citation_checks` | 每次引用核查的明细 |
-| `citation_verified` | 最后一次引用核查是否通过 |
-| `verify_limit_reached` | 是否达到纠正次数上限 |
-
-引用核查与其他回合共用任务预算。具体判定规则和结果解释见 [架构实现说明](docs/specs/2026-10-05-architecture-hooks-progress.md#引用核查边界)。
-
----
-
-## 运行契约
-
-每次任务使用 `contract_hash` 标识运行配置，覆盖提示、工具定义、聊天模板、tokenizer 版本、执行预算、架构参数与模型信息。
-
-工具观察分为两部分：`payload` 是模型可见内容，`details` 保存读取页码等结构化证据。架构钩子可调整本次发送的消息视图，任务记录保留完整原始历史。
-
-| 记录 | 主要内容 |
-| --- | --- |
-| `Episode` | 任务、消息、回合、观察、最终回答与终止原因 |
-| `AssistantTurn` | 生成文本、工具调用、token 数据、策略名称与模型名称 |
-| `Observation` | 工具内容、执行状态与结构化证据 |
-| `architecture_trace` | 计划、引用核查、压缩 token 用量与模型升级记录 |
-| `models` / `model_revisions` | 模型与 tokenizer 版本映射 |
-
-命名策略通过 `policies` 指定；不同 tokenizer 版本使用对应的 `token_counters` 进行预算计数。完整接口与兼容规则见 [基础层设计](docs/specs/2026-09-25-foundation-design.md) 和 [架构实现说明](docs/specs/2026-10-05-architecture-hooks-progress.md)。
 
 ---
 
@@ -191,11 +164,9 @@ episode = runner.run(
 
 | 文档 | 内容 |
 | --- | --- |
-| [基础层设计](docs/specs/2026-09-25-foundation-design.md) | 运行契约、工具环境与执行器 |
-| [架构设计](docs/specs/2026-09-26-architectures-benchmark-design.md) | 编排方案与评测协议 |
-| [实现记录](docs/specs/2026-10-05-architecture-hooks-progress.md) | 架构钩子、引用核查与验证结果 |
-| [五种架构实现](docs/specs/2026-10-06-architectures-progress.md) | 规划、压缩、级联的接口与验收 |
-| [推理服务说明](scripts/serving/README.md) | SGLang 启动与示例任务 |
+| [知识服务配置](docs/KNOWLEDGE.md) | 命令、数据格式和模型协议 |
+| [独立产品设计](docs/specs/2026-10-16-independent-knowledge-design.md) | WeKnora 源码对照、替换关系与分层设计 |
+| [开发路线](docs/ROADMAP.md) | 阶段安排和后续验收 |
+| [运行契约](docs/specs/2026-09-25-foundation-design.md) | 消息、工具协议、任务轨迹和预算 |
+| [历史架构实现](docs/specs/2026-10-06-architectures-progress.md) | 五种编排方案及离线验收 |
 | [历史档案](docs/history/) | v2 设计、实验报告与复盘 |
-
-旧版代码保留在 `legacy-agent-v2` 标签，OPD 分支档案使用 `archive/opd-*` 标签。

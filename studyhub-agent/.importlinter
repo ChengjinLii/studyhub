@@ -9,8 +9,20 @@ layers =
     studyhub_agent.runtime
     studyhub_agent.environments
     studyhub_agent.tools
+    studyhub_agent.knowledge
     studyhub_agent.guardrails
     studyhub_agent.contracts
+
+[importlinter:contract:knowledge-isolation]
+name = Knowledge services do not depend on orchestration or website tools
+type = forbidden
+source_modules =
+    studyhub_agent.knowledge
+forbidden_modules =
+    studyhub_agent.runtime
+    studyhub_agent.architectures
+    studyhub_agent.environments
+    studyhub_agent.tools
 
 [importlinter:contract:graders]
 name = Graders depend only on contracts
@@ -22,4 +34,5 @@ forbidden_modules =
     studyhub_agent.runtime
     studyhub_agent.environments
     studyhub_agent.tools
+    studyhub_agent.knowledge
     studyhub_agent.guardrails

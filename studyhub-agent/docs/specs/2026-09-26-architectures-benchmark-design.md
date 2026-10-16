@@ -1,5 +1,7 @@
 # StudyHub Agent v3 · 子项目 2：Agent 架构对比与 Benchmark 设计
 
+> 2026-10-16 更新：产品主线由 [独立知识产品设计](2026-10-16-independent-knowledge-design.md) 接替。本文保留已实现架构与历史实验规格，不再把网站资料、订单或购买权限作为新产品评测前提。
+
 - 日期：2026-09-26
 - 状态：五种架构、结构化证据与统一钩子已完成代码和离线验收；AgentBench v3 与正式对比实验继续开发
 - 前置：子项目 1 基础层（`docs/specs/2026-09-25-foundation-design.md`，已合入 main）
