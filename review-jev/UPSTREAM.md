@@ -27,7 +27,19 @@
 - 投稿与评测样例、中文文档。
 - 面向审核组件的打包配置与忽略规则。
 
-文字分支从 Qwen 的 Qwen3Guard-Gen-0.6B 开始，含图片的投稿从 OneJev-4B 开始；低置信度时按 4B、9B 逐级升级，最后转人工。默认模型版本固定在 `review_jev/config.py`，结构化结果保留各级置信度、原生类别、规则结果与实际推理后端。
+早期版本采用 Qwen3Guard 与 OneJev 级联。自 `0.4.0` 起，审核运行链路替换为按内容路由的双 Guard：Qwen3Guard-Gen-0.6B 使用完整候选续写评分，ShieldGemma 2-4B 使用原生政策 Yes/No Logits。OneJev 4B / 9B 不再参与审核推理；保留上游 SDK 与原文用于历史来源及许可追踪。
+
+---
+
+## 当前参考实现
+
+| 组件 | 官方来源 |
+| --- | --- |
+| 文字模型、输入模板及风险类别 | [Qwen3Guard 模型说明](https://huggingface.co/Qwen/Qwen3Guard-Gen-0.6B) |
+| 图像模型与三项政策 | [ShieldGemma 2 模型说明](https://ai.google.dev/gemma/docs/shieldgemma/model_card_2) |
+| 图像处理与 Yes/No 列顺序 | [Transformers ShieldGemma 2](https://github.com/huggingface/transformers/tree/main/src/transformers/models/shieldgemma2) |
+
+Guard-as-Jev 表示候选概率评分适配方式，不表示修改了原始权重或增加了新的模型分类能力。模型权重不随代码分发，其使用条件以各模型发布方的许可为准。
 
 本目录是 StudyHub 改造版本，新增代码采用 Apache-2.0 许可，不属于 OmniJev 或 TypeSafe 的官方发行版。
 

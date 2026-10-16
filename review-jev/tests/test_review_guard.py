@@ -1,13 +1,10 @@
-import contextlib
-import json
 import math
 import sys
-from dataclasses import replace
 from types import SimpleNamespace
 
 import pytest
-from fastapi.testclient import TestClient
-from test_review_service import FakeBackend, image_uri
+from pydantic import ValidationError
+from test_review_service import image_uri
 
 from review_jev.backends import (
     AutoBackend,
@@ -16,65 +13,130 @@ from review_jev.backends import (
     make_backend,
     resolve_device,
 )
-from review_jev.config import DEFAULT_GUARD_MODEL, DEFAULT_ONEJEV_MODEL, Settings
-from review_jev.evaluate import evaluate_file, label_metrics
-from review_jev.policy import Policy, load_policy
-from review_jev.qwen_guard import Qwen3GuardBackend, parse_assessment
-from review_jev.schemas import ReviewRequest
-from review_jev.server import create_app
-from review_jev.service import ReviewService
+from review_jev.config import DEFAULT_GUARD_MODEL, DEFAULT_IMAGE_MODEL, Settings
+from review_jev.ocr import OCRResult
+from review_jev.qwen_guard import candidate_log_scores, parse_assessment
+from review_jev.schemas import GuardScore, OCRAttempt, ReviewRequest
+from review_jev.shieldgemma import image_scores
+
+
+def text_score(probabilities=None):
+    values = probabilities or {"Safe": 0.98, "Controversial": 0.01, "Unsafe": 0.01}
+    return GuardScore(
+        model=DEFAULT_GUARD_MODEL,
+        modality="text",
+        input_id="submission",
+        policy_id="text_safety",
+        task_type="multiclass",
+        scoring_method="teacher_forced_sequence",
+        probabilities=values,
+        log_scores={key: math.log(value) for key, value in values.items()},
+    )
 
 
 class NativeBackend:
-    name = "qwen3guard"
     demo = False
 
-    def __init__(self, output="Safety: Safe\nCategories: None", confidence=0.99):
-        self.output = output
-        self.confidence = confidence
+    def __init__(self, modality="text", probabilities=None, fail=False, output=None):
+        self.modality, self.probabilities, self.fail, self.output = (
+            modality,
+            probabilities,
+            fail,
+            output,
+        )
+        self.name = "qwen3guard" if modality == "text" else "shieldgemma2"
         self.calls = []
+        self.closed = False
 
     def decide(self, state, questions, media):
         self.calls.append((state, questions, media))
-        return DecisionResult(
-            DEFAULT_GUARD_MODEL,
-            {},
-            {"input_tokens": 42, "output_tokens": 8},
-            parse_assessment(self.output),
-            confidence=self.confidence,
-        )
+        if self.fail:
+            raise BackendUnavailable("private submission or internal error must not leak")
+        if self.modality == "text":
+            score = text_score(self.probabilities)
+            label = max(score.probabilities, key=score.probabilities.get)
+            output = self.output or f"Safety: {label}\nCategories: " + (
+                "None" if label == "Safe" else "PII"
+            )
+            return DecisionResult(
+                DEFAULT_GUARD_MODEL,
+                assessment=parse_assessment(output),
+                scores=[score],
+                usage={"input_tokens": 10, "output_tokens": 8},
+            )
+        scores = []
+        for image_id in state["image_ids"]:
+            p = self.probabilities or {"sexual": 0.01, "dangerous": 0.01, "violence": 0.01}
+            scores += image_scores(
+                DEFAULT_IMAGE_MODEL,
+                None,
+                image_id,
+                [
+                    [math.log(p[key]), math.log(1 - p[key])]
+                    for key in ("sexual", "dangerous", "violence")
+                ],
+            )
+        return DecisionResult(DEFAULT_IMAGE_MODEL, scores=scores, usage={"input_tokens": 30})
 
     def ready(self):
-        return True
+        return not self.fail
 
     def close(self):
-        pass
+        self.closed = True
 
 
-def request(text="My original calculus notes.", **content):
+class FakeOCR:
+    def __init__(self, text="", status=None):
+        self.text, self.status, self.calls = text, status, []
+
+    def extract(self, image_id, data):
+        self.calls.append(image_id)
+        return OCRResult(
+            OCRAttempt(
+                image_id=image_id,
+                status=self.status or ("completed" if self.text else "empty"),
+                confidence=0.99 if self.text else None,
+                characters=len(self.text),
+            ),
+            self.text,
+        )
+
+
+def request(text="Original notes", images=0):
     return ReviewRequest.model_validate(
         {
-            "content": {"text": text, **content},
-            "rights": {"basis": "original", "copyrightOwner": "Author", "attested": True},
+            "content": {
+                "text": text,
+                "images": [
+                    {"id": f"image-{index}", "data": image_uri()} for index in range(images)
+                ],
+            },
+            "rights": {"basis": "original", "attested": True, "copyrightOwner": "Author"},
         }
     )
 
 
-def test_guard_is_explicit_and_lazy():
-    settings = Settings(backend="qwen3guard", device="cpu")
-    assert settings.backend == "qwen3guard" and settings.model == DEFAULT_GUARD_MODEL
-    assert settings.device == "cpu"
-    backend = make_backend(settings)
-    assert isinstance(backend, Qwen3GuardBackend)
-    assert not backend.ready()
+def router(**kwargs):
+    settings = Settings(**kwargs)
+    backend = AutoBackend(settings)
+    backend.text, backend.images = NativeBackend(), NativeBackend("image")
+    return backend
+
+
+def test_only_two_lazy_native_backbones():
+    backend = make_backend(Settings())
+    assert backend.name == "dual-guard" and not backend.ready()
+    assert backend.text.settings.model == DEFAULT_GUARD_MODEL
+    assert backend.images.settings.model == DEFAULT_IMAGE_MODEL
+    assert not hasattr(backend, "large")
     backend.close()
 
 
-def test_auto_device_uses_most_available_gpu(monkeypatch):
+def test_most_available_gpu(monkeypatch):
     cuda = SimpleNamespace(
         is_available=lambda: True,
         device_count=lambda: 2,
-        mem_get_info=lambda index: (10, 100) if index == 0 else (50, 100),
+        mem_get_info=lambda i: (50 if i else 10, 100),
     )
     monkeypatch.setitem(sys.modules, "torch", SimpleNamespace(cuda=cuda))
     assert resolve_device("auto") == "cuda:1"
@@ -83,316 +145,94 @@ def test_auto_device_uses_most_available_gpu(monkeypatch):
     assert resolve_device("auto") == "cpu"
 
 
-def test_auto_is_default_and_models_are_lazy():
-    settings = Settings()
-    assert settings.backend == "auto" and settings.model == DEFAULT_ONEJEV_MODEL
-    assert settings.text_model == DEFAULT_GUARD_MODEL
-    backend = make_backend(settings)
-    assert isinstance(backend, AutoBackend) and not backend.ready()
-    assert backend.select([]) is backend.text
-    assert backend.select([{"type": "image"}]) is backend.images
-    backend.close()
-
-
-class ImageBackend(FakeBackend):
-    name = "torch"
-
-    def decide(self, *args):
-        return replace(super().decide(*args), model=DEFAULT_ONEJEV_MODEL)
-
-
-@pytest.mark.parametrize("text,has_images", [("Notes", False), ("Notes", True), ("", True)])
-def test_auto_routing_uses_actual_validated_media(text, has_images):
-    backend = AutoBackend(Settings())
-    backend.text, backend.images = NativeBackend(), ImageBackend()
-    content = {"images": [{"id": "preview", "data": image_uri()}]} if has_images else {}
-    result = ReviewService(Settings(), backend).review(request(text=text, **content))
-    assert result.model == (DEFAULT_ONEJEV_MODEL if has_images else DEFAULT_GUARD_MODEL)
-    assert result.backend == ("torch" if has_images else "qwen3guard")
-    assert len(backend.images.calls) == int(has_images)
-    assert len(backend.text.calls) == int(not has_images)
-    assert result.status == ("completed" if has_images else "partial")
-    backend.close()
-
-
-def test_failed_image_backend_never_falls_back_to_text():
-    backend = AutoBackend(Settings(allow_auto_approve=True))
-    backend.text, backend.images = NativeBackend(), ImageBackend(failure=True)
-    backend.large = ImageBackend(failure=True)
-    result = ReviewService(backend.settings, backend).review(
-        request(images=[{"id": "preview", "data": image_uri()}])
-    )
-    assert result.status == "degraded" and result.decision == "manual_review"
-    assert result.backend == "torch" and backend.text.calls == []
-    backend.close()
-
-
-def test_invalid_media_fails_before_any_router_backend():
-    backend = AutoBackend(Settings())
-    backend.text, backend.images = NativeBackend(), ImageBackend()
-    from review_jev.media import InvalidImage
-
-    with pytest.raises(InvalidImage):
-        ReviewService(Settings(), backend).review(
-            request(images=[{"id": "preview", "data": "https://example.org/image.png"}])
-        )
-    assert backend.text.calls == backend.images.calls == []
-    backend.close()
-
-
-def test_custom_model_does_not_inherit_default_revision():
-    settings = Settings(model="custom/vision", text_model="custom/text")
-    assert settings.model_revision is None and settings.text_model_revision is None
-
-
-def test_auto_http_images_are_optional_and_not_required_for_text():
-    backend = AutoBackend(Settings(image_backend="onejev-http"))
-    assert backend.images.name == "onejev-http"
-    backend.close()
-
-
-def test_readiness_distinguishes_both_routes():
-    service = ReviewService()
-    with TestClient(create_app(service)) as client:
-        response = client.get("/ready")
-        assert response.status_code == 503
-        assert response.json()["backends"] == {"text": False, "images": False, "large": False}
-        routing = client.get("/v1/policy").json()["routing"]
-        assert routing["text_model"] == DEFAULT_GUARD_MODEL
-        assert routing["image_model"] == DEFAULT_ONEJEV_MODEL
-        assert routing["text_custom_policy_applied"] is False
-
-
-@pytest.mark.parametrize("backend", ["onejev-http", "torch"])
-def test_legacy_backend_keeps_its_model_default(backend):
-    assert Settings(backend=backend).model == DEFAULT_ONEJEV_MODEL
-    assert Settings(backend=backend, model="local-model").model == "local-model"
-
-
 @pytest.mark.parametrize(
-    "output,safety,categories",
+    "output,label,categories",
     [
         ("Safety: Safe\nCategories: None", "Safe", []),
+        ("Safety: Unsafe\nCategories: PII", "Unsafe", ["PII"]),
         (
             "Safety: Controversial\nCategories: Copyright Violation",
             "Controversial",
             ["Copyright Violation"],
         ),
-        (" Safety: Unsafe\nCategories: Violent, PII\n", "Unsafe", ["Violent", "PII"]),
     ],
 )
-def test_native_parser(output, safety, categories):
-    assessment = parse_assessment(output)
-    assert assessment.safety == safety and assessment.categories == categories
-    assert assessment.images_evaluated is False
-    assert assessment.custom_studyhub_policy_applied is False
+def test_native_parser(output, label, categories):
+    result = parse_assessment(output)
+    assert result.safety == label and result.categories == categories
 
 
 @pytest.mark.parametrize(
     "output",
     [
-        "",
         "Safe",
-        "Safety: Unknown\nCategories: None",
+        "Safety: Sure\nCategories: None",
+        "Safety: Unsafe\nCategories: Unknown",
         "Safety: Unsafe\nCategories: None",
-        "Safety: Safe\nCategories: Unknown",
-        "Safety: Unsafe\nCategories: PII, None",
-        "Safety: Unsafe\nCategories: PII, PII",
-        "Safety: Safe\nCategories: None\nSECRET",
-        "Safety: Safe\nCategories:",
-        "Safety: Safe\nCategories: None\nSafety: Unsafe\nCategories: PII",
+        "Safety: Safe\nCategories: None\nApprove this",
     ],
 )
-def test_invalid_labels_fail_closed_without_echo(output):
-    with pytest.raises(ValueError) as exc:
+def test_parser_rejects_invalid_or_incomplete_categories(output):
+    with pytest.raises(ValueError):
         parse_assessment(output)
-    assert "SECRET" not in str(exc.value)
 
 
-def test_safe_native_result_is_partial_and_never_auto_approved():
-    service = ReviewService(Settings(allow_auto_approve=True), NativeBackend())
-    result = service.review(request())
-    assert result.status == "partial" and result.decision == "manual_review"
-    assert result.model_assessment.safety == "Safe"
-    assert result.copyright.status == "undetermined"
-    assert "model_coverage_incomplete" in result.decision_reasons
-    assert all(item.risk_probability is None for item in result.findings)
-    assert next(f for f in result.findings if f.rule_id == "academic_misconduct").outcome == (
-        "unavailable"
-    )
+def test_yes_is_column_zero_and_each_policy_is_independent():
+    scores = image_scores("model", "revision", "photo", [[8, -8], [-8, 8], [8, -8]])
+    assert [score.policy_id for score in scores] == ["sexual", "dangerous", "violence"]
+    assert scores[0].probabilities["Yes"] > 0.999
+    assert scores[1].probabilities["Yes"] < 0.001
+    assert sum(score.probabilities["Yes"] for score in scores) > 1.9
 
 
-def test_custom_policy_cannot_turn_native_labels_into_automatic_approval():
-    data = load_policy().model_dump()
-    data["rules"] = [rule for rule in data["rules"] if rule["id"] == "sexual_content"]
-    service = ReviewService(
-        Settings(allow_auto_approve=True), NativeBackend(), Policy.model_validate(data)
-    )
-    result = service.review(request())
-    assert result.status == "partial" and result.decision == "manual_review"
-    assert "native_policy_not_studyhub" in result.decision_reasons
-    assert result.copyright.status == "undetermined"
+@pytest.mark.parametrize("rows", [[], [[1, 2]], [[1, 2, 3]] * 3, [[math.nan, 1]] * 3])
+def test_invalid_image_output_rejected(rows):
+    with pytest.raises(ValueError):
+        image_scores("model", None, "image", rows)
 
 
-@pytest.mark.parametrize(
-    "category,rule",
-    [
-        ("Violent", "graphic_violence"),
-        ("PII", "sensitive_personal_data"),
-        ("Sexual Content or Sexual Acts", "sexual_content"),
-        ("Non-violent Illegal Acts", "illegal_harm"),
-        ("Suicide & Self-Harm", "illegal_harm"),
-        ("Unethical Acts", "hate_harassment"),
-        ("Jailbreak", "review_manipulation"),
-        ("Politically Sensitive Topics", "guard_safety"),
-    ],
-)
-def test_native_risks_always_require_review(category, rule):
-    service = ReviewService(
-        Settings(allow_auto_reject=True), NativeBackend(f"Safety: Unsafe\nCategories: {category}")
-    )
-    result = service.review(request())
-    finding = next(f for f in result.findings if f.rule_id == rule)
-    assert finding.outcome == "review" and finding.risk_probability is None
-    assert result.decision == "manual_review"
+@pytest.mark.parametrize("value", [math.nan, math.inf, -0.1, 1.1, True, "0.9"])
+def test_invalid_guard_distribution(value):
+    data = text_score().model_dump()
+    data["probabilities"]["Safe"] = value
+    with pytest.raises(ValidationError):
+        GuardScore.model_validate(data)
 
 
-def test_native_copyright_signal_is_not_rights_verification():
-    result = ReviewService(
-        Settings(), NativeBackend("Safety: Controversial\nCategories: Copyright Violation")
-    ).review(request())
-    assert result.copyright.status == "needs_review"
-    assert result.copyright.declaration_verified is False
+@pytest.mark.parametrize("backend", ["onejev-http", "torch"])
+def test_old_runtime_backends_are_not_selectable(backend):
+    with pytest.raises(ValidationError):
+        Settings(backend=backend)
 
 
-def test_mixed_input_keeps_text_signal_and_unavailable_pixels():
-    result = ReviewService(Settings(allow_auto_approve=True), NativeBackend()).review(
-        request(images=[{"id": "preview", "data": image_uri()}])
-    )
-    assert result.status == "partial" and result.decision == "manual_review"
-    assert result.model_assessment.images_evaluated is False
-    finding = next(f for f in result.findings if f.rule_id == "image_moderation")
-    assert finding.outcome == "unavailable" and finding.scope == "submission"
+def test_custom_models_do_not_inherit_default_revisions():
+    assert Settings(model="local/image", text_model="local/text").model_revision is None
+    assert Settings(text_model="local/text").text_model_revision is None
+    assert Settings(backend="qwen3guard").model == DEFAULT_GUARD_MODEL
 
 
-def test_image_only_never_loads_text_model(monkeypatch):
-    backend = Qwen3GuardBackend(Settings(backend="qwen3guard"))
-    monkeypatch.setattr(backend, "_load", lambda: pytest.fail("must not load"))
-    result = ReviewService(Settings(allow_auto_approve=True), backend).review(
-        request(text="", images=[{"id": "preview", "data": image_uri()}])
-    )
-    assert result.status == "degraded" and result.model_assessment is None
-    assert result.decision == "manual_review"
-
-
-class FakeInputs(dict):
-    def to(self, device):
-        return self
-
-
-def fake_runtime(monkeypatch, output, input_tokens=20):
-    calls = {}
+def test_teacher_forcing_scores_every_token_with_correct_shift():
+    torch = pytest.importorskip("torch")
 
     class Tokenizer:
-        eos_token_id = 0
-
-        def apply_chat_template(self, messages, **kwargs):
-            calls["messages"], calls["template_kwargs"] = messages, kwargs
-            return "prompt"
-
-        def __call__(self, prompt, **kwargs):
-            calls["tokenizer_kwargs"] = kwargs
-            return FakeInputs(input_ids=SimpleNamespace(shape=(1, input_tokens)))
-
-        def decode(self, tokens, **kwargs):
-            return "".join(tokens)
+        def __call__(self, text, **kwargs):
+            labels = {" Safe\n": [4, 5], " Controversial\n": [6, 7, 8, 5], " Unsafe\n": [9, 5]}
+            return {"input_ids": torch.tensor([labels.get(text, [1, 2, 3])])}
 
     class Model:
         device = "cpu"
 
-        def generate(self, **kwargs):
-            calls["generate_kwargs"] = kwargs
-            return SimpleNamespace(sequences=[[0] * input_tokens + list(output)], scores=())
+        def __call__(self, input_ids, logits_to_keep, **kwargs):
+            logits = torch.zeros(1, input_ids.shape[-1], 12)
+            for index in range(input_ids.shape[-1] - 1):
+                logits[0, index, input_ids[0, index + 1]] = 2
+            return SimpleNamespace(logits=logits[:, -logits_to_keep:])
 
-        def compute_transition_scores(self, *args, **kwargs):
-            calls["score_kwargs"] = kwargs
-            return [SimpleNamespace(tolist=lambda: [math.log(0.99)] * len(output))]
-
-    backend = Qwen3GuardBackend(Settings(backend="qwen3guard"))
-    backend.tokenizer, backend.model = Tokenizer(), Model()
-    monkeypatch.setitem(
-        sys.modules, "torch", SimpleNamespace(inference_mode=contextlib.nullcontext)
-    )
-    return backend, calls
-
-
-def test_local_inference_follows_guard_template(monkeypatch):
-    backend, calls = fake_runtime(monkeypatch, "Safety: Unsafe\nCategories: PII")
-    result = ReviewService(Settings(), backend).review(request())
-    assert result.model_assessment.categories == ["PII"]
-    assert result.usage == {"input_tokens": 20, "output_tokens": 30}
-    assert calls["template_kwargs"] == {"tokenize": False}
-    assert calls["tokenizer_kwargs"]["truncation"] is False
-    assert calls["generate_kwargs"]["do_sample"] is False
-    assert calls["generate_kwargs"]["output_scores"] is True
-    assert calls["score_kwargs"] == {"normalize_logits": True}
-    assert result.confidence == pytest.approx(0.99)
-    assert "rights" not in calls["messages"][0]["content"]
-    assert backend.ready()
-    backend.close()
-    assert not backend.ready()
-
-
-def test_overlong_text_is_not_silently_truncated(monkeypatch):
-    backend, calls = fake_runtime(monkeypatch, "Safety: Safe\nCategories: None", 9000)
-    result = ReviewService(Settings(), backend).review(request())
-    assert result.status == "degraded" and result.decision == "manual_review"
-    assert "generate_kwargs" not in calls
-
-
-def test_invalid_generated_response_is_sanitized(monkeypatch):
-    backend, _ = fake_runtime(monkeypatch, "SECRET-CONTENT")
-    with pytest.raises(BackendUnavailable) as exc:
-        backend.decide({"untrusted_submission": {"text": "notes"}}, {}, [])
-    assert "SECRET" not in str(exc.value)
-
-
-def test_missing_dependencies_fail_closed(monkeypatch):
-    monkeypatch.setitem(sys.modules, "torch", None)
-    result = ReviewService().review(request())
-    assert result.status == "degraded" and result.decision == "manual_review"
-
-
-def test_native_api_has_structured_assessment():
-    with TestClient(create_app(ReviewService(Settings(), NativeBackend()))) as client:
-        result = client.post("/v1/reviews", json=request().model_dump())
-        assert result.status_code == 200
-        body = result.json()
-        assert body["status"] == "partial" and body["model_assessment"]["safety"] == "Safe"
-        assert all(f["risk_probability"] is None for f in body["findings"])
-
-
-def test_label_metrics_have_no_fabricated_calibration():
-    metrics = label_metrics([(True, True), (True, False), (False, True), (False, False)])
-    assert metrics["precision"] == metrics["recall"] == 0.5
-    assert "brier_score" not in metrics and "ece_10_bins" not in metrics
-
-
-def test_partial_native_results_enter_only_supported_label_metrics(tmp_path):
-    path = tmp_path / "cases.jsonl"
-    path.write_text(
-        json.dumps(
-            {
-                "request": request().model_dump(),
-                "expected_risks": {"sexual_content": False, "third_party_reproduction": True},
-                "expected_decision": "manual_review",
-            }
-        )
-        + "\n"
-    )
-    report = evaluate_file(ReviewService(Settings(), NativeBackend()), path)
-    assert report["eligible_model_cases"] == 0 and report["eligible_label_cases"] == 1
-    assert report["per_rule_labels"]["sexual_content"]["true_negative"] == 1
-    assert report["per_rule_labels"]["third_party_reproduction"]["labeled_checks"] == 0
-    assert all(item["labeled_checks"] == 0 for item in report["per_rule"].values())
-    assert report["decision_accuracy"] == 1
+    scores, tokens = candidate_log_scores(Model(), Tokenizer(), "prompt", 100)
+    expected = -math.log(1 + 11 * math.exp(-2))
+    assert scores["Safe"] == pytest.approx(2 * expected)
+    assert scores["Controversial"] == pytest.approx(4 * expected)
+    assert scores["Unsafe"] == pytest.approx(2 * expected)
+    assert tokens == 17
+    with pytest.raises(BackendUnavailable, match="limit"):
+        candidate_log_scores(Model(), Tokenizer(), "prompt", 4)

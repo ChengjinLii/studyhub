@@ -1,0 +1,1 @@
+{"request":{"content":{"text":"These are my original calculus notes about derivatives."},"rights":{"basis":"original","copyrightOwner":"Synthetic author","attested":true}},"expected_guards":[{"modality":"text","input_id":"submission","policy_id":"text_safety","label":"Safe"}]}

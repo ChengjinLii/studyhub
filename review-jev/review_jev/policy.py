@@ -28,16 +28,35 @@ class Rule(StrictModel):
         return self
 
 
+class GuardThreshold(StrictModel):
+    review: float = Field(default=0.35, gt=0, lt=1, allow_inf_nan=False)
+    reject: float = Field(default=0.95, gt=0, le=1, allow_inf_nan=False)
+
+    @model_validator(mode="after")
+    def ordered(self):
+        if self.reject <= self.review:
+            raise ValueError("guard rejection threshold must exceed review threshold")
+        return self
+
+
 class Policy(StrictModel):
     version: str = Field(min_length=1, max_length=64)
     instructions: str = Field(min_length=1, max_length=4000)
     rules: list[Rule] = Field(min_length=1, max_length=32)
     sha256: str = ""
+    guard_thresholds: dict[str, GuardThreshold] = Field(
+        default_factory=lambda: {
+            key: GuardThreshold() for key in ("text_safety", "sexual", "dangerous", "violence")
+        }
+    )
+    controversial_threshold: float = Field(default=0.35, gt=0, lt=1, allow_inf_nan=False)
 
     @model_validator(mode="after")
     def unique_rules(self) -> Policy:
         if len({rule.id for rule in self.rules}) != len(self.rules):
             raise ValueError("policy rule ids must be unique")
+        if set(self.guard_thresholds) != {"text_safety", "sexual", "dangerous", "violence"}:
+            raise ValueError("native guard thresholds must cover all supported policies")
         return self
 
 

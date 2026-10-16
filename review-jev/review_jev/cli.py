@@ -28,28 +28,20 @@ def main() -> None:
     evaluate.add_argument("--output", type=Path)
     policy = commands.add_parser("policy", help="print the versioned review policy")
     for command in (serve, review, policy, evaluate):
-        command.add_argument(
-            "--backend", choices=["auto", "qwen3guard", "onejev-http", "torch", "demo"]
-        )
-        command.add_argument("--image-backend", choices=["torch", "onejev-http"])
-        command.add_argument("--onejev-url")
+        command.add_argument("--backend", choices=["auto", "qwen3guard", "shieldgemma2", "demo"])
         command.add_argument("--model")
         command.add_argument("--model-revision")
         command.add_argument("--text-model")
         command.add_argument("--text-model-revision")
-        command.add_argument("--cascade-enabled", action=argparse.BooleanOptionalAction)
         command.add_argument("--text-confidence-threshold", type=float)
         command.add_argument("--image-confidence-threshold", type=float)
-        command.add_argument("--large-confidence-threshold", type=float)
-        command.add_argument("--large-backend", choices=["torch", "onejev-http"])
-        command.add_argument("--large-model")
-        command.add_argument("--large-model-revision")
-        command.add_argument("--large-onejev-url")
-        command.add_argument("--large-served-model")
-        command.add_argument("--large-device")
+        command.add_argument("--text-temperature", type=float)
+        command.add_argument("--image-temperature", type=float)
+        command.add_argument("--calibration-path")
+        command.add_argument("--ocr-backend", choices=["tesseract", "disabled"])
+        command.add_argument("--ocr-languages")
         command.add_argument("--device")
         command.add_argument("--text-device")
-        command.add_argument("--served-model")
         command.add_argument("--policy", dest="policy_path")
     args = parser.parse_args()
     try:
@@ -67,12 +59,6 @@ def main() -> None:
             and not os.environ.get("REVIEW_JEV_TEXT_MODEL_REVISION")
         ):
             values.pop("text_model_revision", None)
-        if (
-            args.large_model
-            and args.large_model_revision is None
-            and not os.environ.get("REVIEW_JEV_LARGE_MODEL_REVISION")
-        ):
-            values.pop("large_model_revision", None)
         settings = Settings.model_validate(
             {
                 **values,
@@ -80,25 +66,19 @@ def main() -> None:
                     key: getattr(args, key)
                     for key in (
                         "backend",
-                        "image_backend",
-                        "onejev_url",
                         "model",
                         "model_revision",
                         "text_model",
                         "text_model_revision",
-                        "cascade_enabled",
                         "text_confidence_threshold",
                         "image_confidence_threshold",
-                        "large_confidence_threshold",
-                        "large_backend",
-                        "large_model",
-                        "large_model_revision",
-                        "large_onejev_url",
-                        "large_served_model",
-                        "large_device",
+                        "text_temperature",
+                        "image_temperature",
+                        "calibration_path",
+                        "ocr_backend",
+                        "ocr_languages",
                         "device",
                         "text_device",
-                        "served_model",
                         "policy_path",
                     )
                     if getattr(args, key) is not None

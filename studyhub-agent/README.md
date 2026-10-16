@@ -5,11 +5,11 @@
 **从文档入库、正文检索到有据可查的知识问答**
 
 [![Python](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)](#快速开始)
-[![RAG](https://img.shields.io/badge/Retrieval-BM25_%2B_RRF-0f766e)](#知识检索)
+[![RAG](https://img.shields.io/badge/Retrieval-BM25_%2B_Vector_%2B_RRF-0f766e)](#知识检索)
 [![Qwen](https://img.shields.io/badge/Agent-Qwen3.5--4B_%2F_9B-2563eb)](#模型问答)
 [![Pydantic](https://img.shields.io/badge/Contracts-Pydantic-E92063)](#运行记录)
 
-[能力概览](#能力概览) | [快速开始](#快速开始) | [知识检索](#知识检索) | [模型问答](#模型问答) | [开发文档](#开发文档)
+[能力概览](#能力概览) | [快速开始](#快速开始) | [知识检索](#知识检索) | [增量 Wiki](#增量-wiki) | [模型问答](#模型问答) | [开发文档](#开发文档)
 
 </div>
 
@@ -23,11 +23,12 @@ StudyHub 知识库与 Agent 是独立运行的文档知识产品，支持本地�
 
 | 能力 | 实现 |
 | --- | --- |
-| 文档管理 | 导入 UTF-8 Markdown/TXT，按来源更新版本，原子保存知识快照 |
-| 结构分块 | 保留标题路径与原文位置，保护公式、代码及表格 |
+| 文档解析 | Markdown/TXT、PDF 原生文本与扫描页面 OCR、图片 OCR，逐页记录来源 |
+| 分层索引 | 结构感知切分、标题路径、公式与表格保护、Parent-Child 父子块及上下文补全 |
 | 正文检索 | 中文与英文关键词召回，可配置向量召回、RRF 融合和模型重排 |
 | 知识范围 | 按知识库与文档集合限制检索、阅读和模型输入 |
-| 来源定位 | 每个片段包含文档版本、字符区间、行号和独立引用 |
+| 来源定位 | 文档、Chunk、版本、页码、字符区间、行号和独立引用 |
+| 增量 Wiki | Map 抽取实体与概念，Reduce 跨文档聚合，缓存复用与删除撤回 |
 | RAG 问答 | 固定检索与生成流程，检查 token 预算和片段引用 |
 | Agent | 自主检索、分页阅读、邻域扩展及引用纠正 |
 | 运行记录 | 保存语料指纹、模型身份、工具证据、预算与终止原因 |
@@ -37,7 +38,11 @@ StudyHub 知识库与 Agent 是独立运行的文档知识产品，支持本地�
 ## 系统架构
 
 ```text
-本地文档 -> 结构分块 -> 版本化知识快照
+本地文档 -> PDF/OCR 解析 -> Parent-Child 分层索引
+                               /              \
+                     混合检索与重排       Map-Reduce 增量 Wiki
+                               \              /
+                           版本化知识快照
                             |
                     统一检索与证据服务
                       /           \
@@ -56,7 +61,7 @@ RAG 和 Agent 共用知识服务。检索负责召回、融合和排序；Agent 
 
 ```bash
 python3.12 -m venv .venv
-.venv/bin/pip install -e ".[dev,tokenizers]"
+.venv/bin/pip install -e ".[dev,tokenizers,documents]"
 ```
 
 ### 导入示例文档
@@ -105,7 +110,7 @@ python3.12 -m venv .venv
 
 可附加 rerank 服务，对候选重新排序。未配置 embedding 时，hybrid 返回明确的关键词降级标记；显式 semantic 需要配置 embedding 服务。
 
-检索结果包含完整片段、原文行号与版本。更新文档后，旧版本片段被替换，避免引用落到另一版正文。
+检索以子块召回和重排，再补全同一父块内的上下文；每个补充片段仍保留独立引用。PDF 证据包含页码，更新文档后旧版本片段与父块一并替换。
 
 ### Agent 工具
 
@@ -116,6 +121,24 @@ python3.12 -m venv .venv
 | `list_documents` | 按标题浏览文档目录 |
 
 工具共用调用方确定的知识范围。标题与元数据不计为已读正文；邻近片段各自保留引用。
+
+---
+
+## 增量 Wiki
+
+Wiki 按 Chunk 抽取实体与概念，再按知识库和规范名称聚合。相同声明合并来源，不同声明分别保留；文档修改或删除后，旧贡献会撤回。未变更 Chunk 直接复用抽取缓存。
+
+```bash
+.venv/bin/studyhub-knowledge --corpus /tmp/studyhub-knowledge/corpus.json \
+  wiki-build --output /tmp/studyhub-knowledge/wiki.json \
+  --model-endpoint http://127.0.0.1:30411/v1/chat/completions \
+  --model Qwen/Qwen3.5-4B
+
+.venv/bin/studyhub-knowledge --corpus /tmp/studyhub-knowledge/corpus.json \
+  --wiki /tmp/studyhub-knowledge/wiki.json wiki-search "正交投影"
+```
+
+对同一输出再次执行 `wiki-build` 即进行增量更新。给 `search` 或 `ask` 增加全局 `--wiki` 参数，可启用 Wiki 来源召回通道；回答仍引用原文 Chunk。离线标题抽取基线使用 `--extractive`，不依赖模型服务。
 
 ---
 
@@ -165,6 +188,7 @@ HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 .venv/bin/pytest --cov
 | 文档 | 内容 |
 | --- | --- |
 | [知识服务配置](docs/KNOWLEDGE.md) | 命令、数据格式和模型协议 |
+| [源码对照与验收](docs/specs/2026-10-16-rag-wiki-guard-alignment.md) | WeKnora 对照、解析、分层索引与 Wiki 验证 |
 | [独立产品设计](docs/specs/2026-10-16-independent-knowledge-design.md) | WeKnora 源码对照、替换关系与分层设计 |
 | [开发路线](docs/ROADMAP.md) | 阶段安排和后续验收 |
 | [运行契约](docs/specs/2026-09-25-foundation-design.md) | 消息、工具协议、任务轨迹和预算 |

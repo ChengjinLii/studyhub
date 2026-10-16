@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import math
 import re
 import threading
 from typing import get_args
@@ -8,7 +7,8 @@ from typing import get_args
 from .backends import BackendUnavailable, DecisionResult, resolve_device
 from .config import Settings
 from .policy import Policy
-from .schemas import Finding, GuardCategory, ModelAssessment
+from .schemas import Finding, GuardCategory, GuardScore, ModelAssessment
+from .scoring import softmax
 
 CATEGORIES = set(get_args(GuardCategory))
 RULE_CATEGORIES = {
@@ -19,9 +19,7 @@ RULE_CATEGORIES = {
     "sensitive_personal_data": {"PII"},
     "review_manipulation": {"Jailbreak"},
 }
-ASSESSMENT_PATTERN = (
-    r"\s*Safety:\s*(Safe|Controversial|Unsafe)\s*\nCategories:\s*([^\n]+)\s*"
-)
+ASSESSMENT_PATTERN = r"\s*Safety:\s*(Safe|Controversial|Unsafe)\s*\nCategories:\s*([^\n]+)\s*"
 
 
 def parse_assessment(output: str) -> ModelAssessment:
@@ -38,30 +36,36 @@ def parse_assessment(output: str) -> ModelAssessment:
     return ModelAssessment(safety=severity, categories=categories)
 
 
-def generation_confidence(
-    output: str, token_end_offsets: list[int], log_probabilities: list[float]
-) -> float | None:
-    match = re.fullmatch(ASSESSMENT_PATTERN, output)
-    if (
-        match is None
-        or not token_end_offsets
-        or len(token_end_offsets) != len(log_probabilities)
-        or token_end_offsets[-1] != len(output)
-    ):
-        return None
-    spans = [match.span(1), match.span(2)]
-    probabilities = []
-    previous = 0
-    for end, log_probability in zip(token_end_offsets, log_probabilities):
-        if not previous <= end <= len(output):
-            return None
-        if any(end > start and previous < stop for start, stop in spans):
-            if not math.isfinite(log_probability) or log_probability > 0:
-                return None
-            probabilities.append(math.exp(log_probability))
-        previous = end
-    # Template tokens must not inflate certainty in the native safety/category labels.
-    return min(probabilities) if probabilities else None
+LABELS = ("Safe", "Controversial", "Unsafe")
+
+
+def candidate_log_scores(model, tokenizer, prompt: str, limit: int) -> tuple[dict, int]:
+    import torch
+    import torch.nn.functional as F
+
+    prefix = tokenizer(prompt + "Safety:", add_special_tokens=False, return_tensors="pt")
+    prefix_ids = prefix["input_ids"].to(model.device)
+    scores, input_tokens = {}, 0
+    for label in LABELS:
+        # Include the label terminator and sum every candidate token, not only the first.
+        candidate = tokenizer(" " + label + "\n", add_special_tokens=False, return_tensors="pt")[
+            "input_ids"
+        ].to(model.device)
+        count = candidate.shape[-1]
+        full = torch.cat([prefix_ids, candidate], dim=-1)
+        if count == 0 or full.shape[-1] > limit:
+            raise BackendUnavailable("qwen_input_limit_exceeded")
+        output = model(
+            input_ids=full,
+            attention_mask=torch.ones_like(full),
+            use_cache=False,
+            logits_to_keep=count + 1,
+        )
+        logits = output.logits[0, -count - 1 : -1].float()
+        log_probs = F.log_softmax(logits, dim=-1)
+        scores[label] = float(log_probs.gather(-1, candidate[0, :, None]).sum().item())
+        input_tokens += full.shape[-1]
+    return scores, input_tokens
 
 
 def guard_findings(assessment: ModelAssessment, policy: Policy, has_images: bool) -> list[Finding]:
@@ -169,7 +173,7 @@ class Qwen3GuardBackend:
 
             with self.lock:
                 self._load()
-                # Follow the model card: do not add a generation prompt or StudyHub instructions.
+                # Keep the official policy template; submitted text is not a policy override.
                 prompt = self.tokenizer.apply_chat_template(
                     [{"role": "user", "content": text}],
                     tokenize=False,
@@ -180,34 +184,38 @@ class Qwen3GuardBackend:
                     raise BackendUnavailable("qwen_input_limit_exceeded")
                 inputs = inputs.to(self.model.device)
                 with torch.inference_mode():
+                    log_scores, scoring_tokens = candidate_log_scores(
+                        self.model, self.tokenizer, prompt, self.settings.max_input_tokens
+                    )
                     output = self.model.generate(
                         **inputs,
                         max_new_tokens=128,
                         do_sample=False,
                         max_time=self.settings.timeout_seconds,
                         pad_token_id=self.tokenizer.eos_token_id,
-                        return_dict_in_generate=True,
-                        output_scores=True,
                     )
-                    log_probabilities = self.model.compute_transition_scores(
-                        output.sequences, output.scores, normalize_logits=True
-                    )[0].tolist()
-                tokens = output.sequences[0][input_tokens:]
+                tokens = output[0][input_tokens:]
                 decoded = self.tokenizer.decode(tokens, skip_special_tokens=True)
                 assessment = parse_assessment(decoded)
-                token_end_offsets = [
-                    len(self.tokenizer.decode(tokens[:end], skip_special_tokens=True))
-                    for end in range(1, len(tokens) + 1)
-                ]
+                score = GuardScore(
+                    model=self.settings.model,
+                    model_revision=self.settings.model_revision,
+                    modality="text",
+                    input_id="submission",
+                    policy_id="text_safety",
+                    task_type="multiclass",
+                    scoring_method="teacher_forced_sequence",
+                    log_scores=log_scores,
+                    probabilities=softmax(log_scores, self.settings.text_temperature),
+                    temperature=self.settings.text_temperature,
+                )
                 return DecisionResult(
                     self.settings.model,
                     {},
-                    {"input_tokens": input_tokens, "output_tokens": len(tokens)},
+                    {"input_tokens": input_tokens + scoring_tokens, "output_tokens": len(tokens)},
                     assessment,
                     model_revision=self.settings.model_revision,
-                    confidence=generation_confidence(
-                        decoded, token_end_offsets, log_probabilities
-                    ),
+                    scores=[score],
                 )
         except BackendUnavailable:
             raise

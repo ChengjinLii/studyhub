@@ -14,7 +14,7 @@ from pathlib import Path
 import httpx
 from PIL import Image, ImageDraw
 
-from .config import DEFAULT_GUARD_MODEL, DEFAULT_LARGE_MODEL, DEFAULT_ONEJEV_MODEL, Settings
+from .config import DEFAULT_GUARD_MODEL, DEFAULT_IMAGE_MODEL, Settings
 from .schemas import ReviewRequest, ReviewResponse
 from .service import ReviewService
 
@@ -71,41 +71,41 @@ def smoke_cases() -> list[ReviewRequest]:
 
 
 def verify(request: ReviewRequest, response: ReviewResponse) -> dict:
-    has_images = bool(request.content.images)
-    expected_tiers = ["4b", "9b"] if has_images else ["0.6b", "4b", "9b"]
-    actual_tiers = [attempt.tier for attempt in response.model_attempts]
-    models = {"0.6b": DEFAULT_GUARD_MODEL, "4b": DEFAULT_ONEJEV_MODEL, "9b": DEFAULT_LARGE_MODEL}
+    has_text = any(
+        (
+            request.content.title,
+            request.content.description,
+            request.content.text,
+            request.content.customPreviewText,
+        )
+    ) or any(row.characters for row in response.ocr_attempts)
+    expected = (["text"] if has_text else []) + (["image"] if request.content.images else [])
+    actual = [attempt.tier for attempt in response.model_attempts]
     if (
-        not actual_tiers
-        or actual_tiers != expected_tiers[:len(actual_tiers)]
-        or response.model != models[actual_tiers[-1]]
+        actual != expected
+        or not response.guard_scores
+        or any(row.outcome == "unavailable" for row in response.model_attempts)
+        or any(row.status == "unavailable" for row in response.coverage)
         or response.decision != "manual_review"
     ):
-        raise RuntimeError("smoke routing or decision gate failed")
-    if response.model != DEFAULT_GUARD_MODEL:
-        if response.status != "completed" or response.backend != "torch":
-            raise RuntimeError("multimodal model smoke failed")
-        checks = [item for item in response.findings if item.source == "model"]
-        if len(checks) != 11 or any(item.risk_probability is None for item in checks):
-            raise RuntimeError("multimodal model did not return all rule probabilities")
-    elif response.status != "partial" or response.model_assessment is None:
-        raise RuntimeError("text guard smoke failed")
+        raise RuntimeError("smoke routing, model coverage or decision gate failed")
+    identities = {"text": DEFAULT_GUARD_MODEL, "image": DEFAULT_IMAGE_MODEL}
+    if any(row.model != identities[row.tier] for row in response.model_attempts):
+        raise RuntimeError("unexpected safety backbone")
+    if len(response.guard_scores) != int(bool(has_text)) + 3 * len(request.content.images):
+        raise RuntimeError("incomplete native probability output")
     return {
         "case_id": request.request_id,
         "model": response.model,
-        "model_revision": response.model_revision,
         "backend": response.backend,
         "status": response.status,
         "decision": response.decision,
+        "guard_scores": [score.model_dump() for score in response.guard_scores],
         "model_assessment": (
             response.model_assessment.model_dump() if response.model_assessment else None
         ),
-        "confidence": response.confidence,
-        "model_attempts": [attempt.model_dump() for attempt in response.model_attempts],
-        "model_checks": sum(item.source == "model" for item in response.findings),
-        "risk_signals": [
-            item.rule_id for item in response.findings if item.outcome in {"review", "reject"}
-        ],
+        "model_attempts": [row.model_dump() for row in response.model_attempts],
+        "coverage": [row.model_dump() for row in response.coverage],
         "usage": response.usage,
         "elapsed_ms": response.elapsed_ms,
     }
@@ -135,10 +135,10 @@ def loopback_smoke(service: ReviewService, cases: list[ReviewRequest]) -> list[d
             if service.settings.api_key
             else {},
         ) as client:
-            if client.get("/ready").status_code != 200:
-                raise RuntimeError("both routed models should be ready after warmup")
+            if not client.get("/ready").json()["backends"]["text"]:
+                raise RuntimeError("text model should be ready after warmup")
             rows = []
-            for request in (cases[0], cases[2]):
+            for request in cases[:1] + (cases[2:3] if len(cases) > 2 else []):
                 response = client.post("/v1/reviews", json=request.model_dump())
                 response.raise_for_status()
                 rows.append(verify(request, ReviewResponse.model_validate(response.json())))
@@ -155,36 +155,21 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--http", action="store_true", help="also test a temporary loopback API")
     parser.add_argument("--output", type=Path)
-    parser.add_argument("--no-cascade", action="store_true", help="test only the initial models")
+    parser.add_argument("--text-only", action="store_true", help="test only the text backbone")
     args = parser.parse_args()
     settings = Settings.from_env()
-    if args.no_cascade:
-        settings = settings.model_copy(update={"cascade_enabled": False})
-    if settings.backend != "auto" or settings.image_backend != "torch":
-        parser.error("this smoke test requires auto routing with local torch images")
+    if settings.backend != "auto":
+        parser.error("this smoke test requires auto routing")
     service = ReviewService(settings)
     try:
-        cases = smoke_cases()
-        rows = []
-        for request in cases:
-            row = verify(request, service.review(request))
-            rows.append(row)
-            print(f"smoke passed: {request.request_id} ({row['backend']})", flush=True)
-        image_device = str(service.backend.images.engine.device)
-        large_engine = getattr(service.backend.large, "engine", None)
+        cases = smoke_cases()[:2] if args.text_only else smoke_cases()
+        rows = [verify(request, service.review(request)) for request in cases]
         report = {
             "smoke_passed": True,
-            "business_connected": False,
-            "database_connected": False,
-            "image_device": image_device,
-            "cascade_enabled": settings.cascade_enabled,
-            "large_device": str(large_engine.device) if large_engine is not None else None,
+            "architecture": "content-aware-dual-guard",
+            "text_only": args.text_only,
             "cases": rows,
             "http_cases": loopback_smoke(service, cases) if args.http else [],
-            "limitations": [
-                "Synthetic smoke cases verify inference and routing, not moderation accuracy.",
-                "No production services, databases, or user submissions were accessed.",
-            ],
         }
         output = json.dumps(report, ensure_ascii=False, indent=2)
         if args.output:

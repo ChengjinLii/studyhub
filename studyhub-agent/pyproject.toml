@@ -6,6 +6,8 @@ build-backend = "hatchling.build"
 name = "studyhub-agent"
 version = "3.0.0"
 description = "Standalone StudyHub knowledge, retrieval-augmented generation and agent runtime"
+license = "MIT"
+license-files = ["LICENSE", "NOTICE.weknora"]
 readme = "README.md"
 requires-python = ">=3.12,<3.13"
 dependencies = [
@@ -18,6 +20,7 @@ dependencies = [
 studyhub-knowledge = "studyhub_agent.cli:main"
 
 [project.optional-dependencies]
+documents = ["pypdfium2>=4.30,<6", "pillow>=10,<13"]
 tokenizers = ["tokenizers>=0.20,<1.0"]
 acceptance = ["transformers>=4.51,<5.0"]
 dev = [

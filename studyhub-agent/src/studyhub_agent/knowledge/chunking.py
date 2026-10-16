@@ -4,7 +4,15 @@ import bisect
 import json
 import re
 
-from studyhub_agent.contracts.knowledge import Chunk, Document, digest
+from studyhub_agent.contracts.knowledge import (
+    Chunk,
+    Document,
+    PageSpan,
+    ParentChunk,
+    digest,
+    page_range,
+    source_revision,
+)
 
 _HEADING = re.compile(r"(?m)^ {0,3}(#{1,6})[ \t]+([^\n]+)")
 _PROTECTED = re.compile(
@@ -14,7 +22,16 @@ _PROTECTED = re.compile(
 )
 
 
-def make_document(knowledge_base_id: str, source: str, text: str, *, title: str | None = None) -> Document:
+def make_document(
+    knowledge_base_id: str,
+    source: str,
+    text: str,
+    *,
+    title: str | None = None,
+    pages: tuple[PageSpan, ...] = (),
+    source_sha256: str | None = None,
+    parser: str = "text-v1",
+) -> Document:
     key = json.dumps([knowledge_base_id, source], ensure_ascii=False)
     return Document(
         document_id="d_" + digest(key)[:32],
@@ -22,7 +39,10 @@ def make_document(knowledge_base_id: str, source: str, text: str, *, title: str 
         source=source,
         title=title or source,
         text=text,
-        revision=digest(text),
+        revision=source_revision(text, pages, source_sha256, parser),
+        pages=pages,
+        source_sha256=source_sha256,
+        parser=parser,
     )
 
 
@@ -88,6 +108,32 @@ def chunk_document(document: Document, *, child_size: int = 600, parent_size: in
                         line_end=line_start + body.count("\n") - int(body.endswith("\n")),
                         context_header=header,
                         text=body,
+                        page_start=page_range(document, child_start, child_end)[0],
+                        page_end=page_range(document, child_start, child_end)[1],
                     )
                 )
     return tuple(chunks)
+
+
+def materialize_parents(document: Document, chunks: tuple[Chunk, ...]) -> tuple[ParentChunk, ...]:
+    groups: dict[str, list[Chunk]] = {}
+    for chunk in chunks:
+        groups.setdefault(chunk.parent_id, []).append(chunk)
+    parents = []
+    for parent_id, children in groups.items():
+        start, end = min(row.start for row in children), max(row.end for row in children)
+        first, last = page_range(document, start, end)
+        parents.append(
+            ParentChunk(
+                parent_id=parent_id,
+                document_id=document.document_id,
+                revision=document.revision,
+                start=start,
+                end=end,
+                text=document.text[start:end],
+                context_header=children[0].context_header,
+                page_start=first,
+                page_end=last,
+            )
+        )
+    return tuple(parents)

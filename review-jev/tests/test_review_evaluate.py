@@ -99,3 +99,30 @@ def test_nonlocal_bind_requires_api_key(monkeypatch):
     )
     assert result.returncode == 2
     assert "REVIEW_JEV_API_KEY" in result.stderr
+
+
+def test_native_probabilities_have_separate_metrics(tmp_path):
+    from test_review_guard import request, router
+
+    backend = router()
+    dataset = tmp_path / "native.jsonl"
+    dataset.write_text(
+        json.dumps(
+            {
+                "request": request().model_dump(),
+                "expected_guards": [
+                    {
+                        "modality": "text",
+                        "input_id": "submission",
+                        "policy_id": "text_safety",
+                        "label": "Safe",
+                    }
+                ],
+            }
+        )
+        + "\n"
+    )
+    report = evaluate_file(ReviewService(backend.settings, backend), dataset)
+    assert report["per_guard"]["text:text_safety"]["accuracy"] == 1
+    assert report["per_guard"]["text:text_safety"]["nll"] > 0
+    assert report["missing_guard_labels"] == 0

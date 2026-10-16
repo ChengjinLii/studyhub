@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "studyhub-review-jev"
-version = "0.3.0"
-description = "Standalone StudyHub text and image review, based on OneJev"
+version = "0.4.0"
+description = "Standalone StudyHub Dual Guard-as-Jev text and image review"
 readme = "README.md"
 license = "Apache-2.0"
 license-files = ["LICENSE", "UPSTREAM.md"]

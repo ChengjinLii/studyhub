@@ -13,7 +13,7 @@
 [![SGLang](https://img.shields.io/badge/Serving-SGLang-15803d)](#studyhub-agent)
 [![PyTorch](https://img.shields.io/badge/AI-PyTorch_%2B_Transformers-EE4C2C?logo=pytorch&logoColor=white)](#tech-stack)
 [![Qwen3Guard](https://img.shields.io/badge/Text-Qwen3Guard--0.6B-0f766e)](#studyhub-review-jev)
-[![OneJev](https://img.shields.io/badge/Vision-OneJev--4B_%2F_9B-c2410c)](#studyhub-review-jev)
+[![ShieldGemma](https://img.shields.io/badge/Vision-ShieldGemma_2--4B-c2410c)](#studyhub-review-jev)
 [![Website](https://img.shields.io/badge/Website-study--hub.cn-111827)](https://study-hub.cn)
 [![MIT](https://img.shields.io/badge/License-MIT-22c55e)](LICENSE)
 
@@ -61,7 +61,7 @@ Website: [study-hub.cn](https://study-hub.cn)
 | Async Processing | Selected asynchronous database access and I/O |
 | Deployment | Docker Compose, systemd, Nginx |
 | Agent | Qwen3.5-4B / 9B, SGLang, tokenizers, a shared Agent runner |
-| Content Review | Qwen3Guard-Gen-0.6B, OneJev-4B / 9B, PyTorch, Transformers |
+| Content Review | Qwen3Guard-Gen-0.6B, ShieldGemma 2-4B, Guard-as-Jev, PyTorch, Transformers |
 
 MySQL is used for preview and production environments; SQLite supports local development and quick evaluation.
 
@@ -179,7 +179,7 @@ The original SpringBoot implementation is available in [studyhub-springboot](htt
 
 **A standalone document knowledge base, RAG, and Agent product.**
 
-[StudyHub Agent](studyhub-agent/README.md) takes inspiration from WeKnora's knowledge processing and tool design. It brings document ingestion, passage retrieval, source locations, RAG answers, and multi-step Agents into an independent runtime, with configurable model services such as Qwen3.5-4B / 9B.
+[StudyHub Agent](studyhub-agent/README.md) draws on Tencent WeKnora's knowledge architecture: PDF/OCR parsing, structure-aware Parent-Child indexing, and BM25 plus vector retrieval with RRF fusion and reranking. A Map-Reduce pipeline extracts entities and concepts, aggregates sources, and incrementally updates Wiki pages with document, chunk, revision, and page provenance.
 
 | Capability | Implementation |
 | --- | --- |
@@ -199,15 +199,16 @@ Stack: **Python 3.12, Pydantic, Jinja2, httpx, and SGLang**. See the [Agent docu
 
 **A content review component for text and image submissions.**
 
-[StudyHub Review-Jev](review-jev/README.md), based on OneJev, reviews materials, experience posts, comments, resource requests, and marketplace listings. It provides compliance risk screening, copyright assistance, and structured review results.
+[StudyHub Review-Jev](review-jev/README.md) uses Qwen3Guard-Gen-0.6B and ShieldGemma 2-4B as complementary safety backbones. Guard-as-Jev candidate scoring combines native safety probabilities, rule-based fusion, confidence thresholds, and human review in a traceable decision interface.
 
 | Content Type | Default Model |
 | --- | --- |
 | Text Only | Qwen3Guard-Gen-0.6B |
-| Images or Text with Images | OneJev-4B |
-| Low-Confidence Escalation | OneJev-4B → OneJev-9B → Human Review |
+| Images | ShieldGemma 2-4B; invoke Qwen when OCR detects text |
+| Text with Images | Qwen for captions and OCR; ShieldGemma for visual policies |
+| Uncertain or Incomplete Coverage | Human Review |
 
-The component includes a **FastAPI service, JSON CLI, configurable rules, and batch evaluation tools**. Checks cover content risks, private information, submission manipulation, copyright declarations, open-license conditions, and reference-content matching. See the [Review-Jev documentation](review-jev/README.md) for routing, request examples, and usage.
+The component includes a **FastAPI service, JSON CLI, probability scoring, and batch evaluation tools**. Results preserve branch-specific risks, model versions, OCR coverage, copyright declarations, open-license conditions, and reference matches. See the [Review-Jev documentation](review-jev/README.md) for routing, request examples, and usage.
 
 ---
 

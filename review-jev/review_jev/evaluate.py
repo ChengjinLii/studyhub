@@ -1,18 +1,61 @@
 from __future__ import annotations
 
+import math
 from collections import Counter, defaultdict
 from pathlib import Path
 
-from pydantic import Field, StrictBool, ValidationError
+from pydantic import Field, StrictBool, ValidationError, model_validator
 
 from .schemas import Decision, ReviewRequest, StrictModel
 from .service import ReviewService
 
 
+class GuardTarget(StrictModel):
+    modality: str
+    input_id: str
+    policy_id: str
+    label: str
+
+
 class EvaluationCase(StrictModel):
     request: ReviewRequest
-    expected_risks: dict[str, StrictBool] = Field(min_length=1, max_length=32)
+    expected_risks: dict[str, StrictBool] = Field(default_factory=dict, max_length=32)
+    expected_guards: list[GuardTarget] = Field(default_factory=list, max_length=13)
     expected_decision: Decision | None = None
+
+    @model_validator(mode="after")
+    def has_labels(self):
+        keys = [(item.modality, item.input_id, item.policy_id) for item in self.expected_guards]
+        if not self.expected_risks and not self.expected_guards or len(keys) != len(set(keys)):
+            raise ValueError("missing or duplicate evaluation labels")
+        for target in self.expected_guards:
+            text = target.modality == "text"
+            if (
+                target.modality not in {"text", "image"}
+                or target.policy_id
+                not in ({"text_safety"} if text else {"sexual", "dangerous", "violence"})
+                or target.label
+                not in ({"Safe", "Controversial", "Unsafe"} if text else {"Yes", "No"})
+            ):
+                raise ValueError("invalid native guard target")
+        return self
+
+
+def candidate_metrics(samples: list[tuple[dict[str, float], str]]) -> dict:
+    if not samples:
+        return {"labeled_checks": 0}
+    return {
+        "labeled_checks": len(samples),
+        "accuracy": sum(max(values, key=values.get) == target for values, target in samples)
+        / len(samples),
+        "nll": -sum(math.log(max(values[target], 1e-15)) for values, target in samples)
+        / len(samples),
+        "brier_score": sum(
+            sum((p - (key == target)) ** 2 for key, p in values.items())
+            for values, target in samples
+        )
+        / len(samples),
+    }
 
 
 def probability_metrics(samples: list[tuple[float, bool]], threshold: float) -> dict:
@@ -66,7 +109,8 @@ def label_metrics(samples: list[tuple[bool, bool]]) -> dict:
 
 def evaluate_file(service: ReviewService, path: Path) -> dict:
     known = {rule.id: rule for rule in service.policy.rules}
-    samples = defaultdict(list)
+    samples, native_samples = defaultdict(list), defaultdict(list)
+    missing_guard_labels = 0
     labels = defaultdict(list)
     eligible_label_cases = 0
     statuses, decisions, models = Counter(), Counter(), set()
@@ -89,15 +133,27 @@ def evaluate_file(service: ReviewService, path: Path) -> dict:
             decisions[result.decision] += 1
             models.add(result.model)
             if result.status not in {"completed", "partial"}:
+                missing_guard_labels += len(case.expected_guards)
                 continue
+            scores = {(s.modality, s.input_id, s.policy_id): s for s in result.guard_scores}
+            for target in case.expected_guards:
+                score = scores.get((target.modality, target.input_id, target.policy_id))
+                if score is None:
+                    missing_guard_labels += 1
+                else:
+                    native_samples[f"{target.modality}:{target.policy_id}"].append(
+                        (score.decision_probabilities, target.label)
+                    )
             model_findings = {
                 finding.rule_id: finding for finding in result.findings if finding.source == "model"
             }
             for rule_id, target in case.expected_risks.items():
-                probability = model_findings[rule_id].risk_probability
+                finding = model_findings.get(rule_id)
+                if finding is None or finding.outcome == "unavailable":
+                    continue
+                probability = finding.risk_probability
                 if probability is not None and result.status == "completed":
                     samples[rule_id].append((probability, target))
-                finding = model_findings[rule_id]
                 if (
                     result.model_assessment is not None
                     and not case.request.content.images
@@ -132,6 +188,8 @@ def evaluate_file(service: ReviewService, path: Path) -> dict:
             for key, rule in known.items()
         },
         "per_rule_labels": {key: label_metrics(labels[key]) for key in known},
+        "per_guard": {key: candidate_metrics(values) for key, values in native_samples.items()},
+        "missing_guard_labels": missing_guard_labels,
         "limitations": [
             "Only completed real-backend cases enter model metrics; "
             "demo/degraded cases are excluded.",

@@ -6,7 +6,10 @@ from collections import Counter
 from collections.abc import Sequence
 
 from studyhub_agent.contracts.knowledge import Chunk, Corpus, Evidence, KnowledgeScope, SearchHit, SearchResult
+from studyhub_agent.contracts.wiki import WikiSnapshot
+from studyhub_agent.knowledge.chunking import materialize_parents
 from studyhub_agent.knowledge.providers import Embedder, KnowledgeBackendError, Reranker, vectors
+from studyhub_agent.knowledge.wiki import WikiIndex
 
 
 def _tokens(text: str) -> list[str]:
@@ -64,6 +67,7 @@ class KnowledgeRetriever:
         *,
         embedder: Embedder | None = None,
         reranker: Reranker | None = None,
+        wiki: WikiSnapshot | None = None,
     ) -> None:
         self.corpus, self.scope = corpus, scope
         self.documents = {row.document_id: row for row in corpus.documents if scope.allows(row)}
@@ -72,6 +76,19 @@ class KnowledgeRetriever:
         self._keyword_index = _KeywordIndex(tuple(self.chunks.values()))
         self.embedder, self.reranker = embedder, reranker
         self._vectors: dict[str, tuple[float, ...]] = {}
+        self.parents = {
+            parent.parent_id: parent
+            for document in self.documents.values()
+            for parent in materialize_parents(
+                document, tuple(row for row in self.chunks.values() if row.document_id == document.document_id)
+            )
+        }
+        self._parent_children: dict[str, list[Chunk]] = {}
+        for row in self.chunks.values():
+            self._parent_children.setdefault(row.parent_id, []).append(row)
+        for rows in self._parent_children.values():
+            rows.sort(key=lambda row: row.ordinal)
+        self.wiki = WikiIndex(corpus, scope, wiki) if wiki is not None else None
 
     @property
     def configuration(self) -> dict:
@@ -82,6 +99,8 @@ class KnowledgeRetriever:
             "embedding": self.embedder.identity if self.embedder else None,
             "reranker": self.reranker.identity if self.reranker else None,
             "fusion": "rrf@1:k=60:recall=50",
+            "parent_context": "scoped-whole-parent-v1",
+            "wiki": self.wiki.snapshot.extractor if self.wiki else None,
         }
 
     def evidence(self, chunk: Chunk) -> Evidence:
@@ -101,6 +120,9 @@ class KnowledgeRetriever:
                     "end",
                     "line_start",
                     "line_end",
+                    "parent_id",
+                    "page_start",
+                    "page_end",
                 )
             },
             knowledge_base_id=document.knowledge_base_id,
@@ -124,12 +146,13 @@ class KnowledgeRetriever:
         keyword = self._keyword_index.search(query)[:50] if effective != "semantic" else []
         semantic = self._semantic(query, chunks)[:50] if effective != "keyword" and chunks else []
         channels: dict[str, list[str]] = {}
-        for name, ranking in (("keyword", keyword), ("semantic", semantic)):
+        wiki = [(key, 1.0) for key in self.wiki.recall(query)[:50]] if self.wiki else []
+        for name, ranking in (("keyword", keyword), ("semantic", semantic), ("wiki", wiki)):
             for key, _ in ranking:
                 channels.setdefault(key, []).append(name)
         ranking = (
-            reciprocal_rank_fusion([[key for key, _ in rows] for rows in (keyword, semantic)])
-            if effective == "hybrid"
+            reciprocal_rank_fusion([[key for key, _ in rows] for rows in (keyword, semantic, wiki)])
+            if effective == "hybrid" or wiki
             else keyword
             if effective == "keyword"
             else semantic
@@ -144,14 +167,25 @@ class KnowledgeRetriever:
                 [(key, score) for (key, _), score in zip(candidates, scores, strict=True)],
                 key=lambda row: (-row[1], row[0]),
             )
-        hits, used = [], 0
+        hits, used, seen_parents = [], 0, set()
         for key, score in ranking:
             chunk = self.chunks[key]
-            size = len(chunk.text) + len(chunk.context_header) + 256
+            if chunk.parent_id in seen_parents:
+                continue
+            parent_children = self._parent_children[chunk.parent_id]
+            size = sum(len(row.text) + len(row.context_header) + 256 for row in parent_children)
             if used + size > max_chars:
                 notices.append("evidence_omitted:output_budget")
                 continue
-            hits.append(SearchHit(evidence=self.evidence(chunk), score=score, channels=tuple(channels[key])))
+            hits.append(
+                SearchHit(
+                    evidence=self.evidence(chunk),
+                    score=score,
+                    channels=tuple(channels[key]),
+                    context=tuple(self.evidence(row) for row in parent_children if row.chunk_id != key),
+                )
+            )
+            seen_parents.add(chunk.parent_id)
             used += size
             if len(hits) == limit:
                 break
@@ -194,6 +228,8 @@ class KnowledgeRetriever:
             rows.sort(key=lambda row: row.ordinal)
             position = next(index for index, row in enumerate(rows) if row.chunk_id == source_id)
             selected = rows[max(0, position - context) : position + context + 1]
+        elif source_id in self.parents:
+            selected = self._parent_children[source_id]
         elif source_id in self.documents:
             rows = sorted(
                 (row for row in self.chunks.values() if row.document_id == source_id), key=lambda row: row.ordinal

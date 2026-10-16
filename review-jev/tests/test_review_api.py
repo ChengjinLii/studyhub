@@ -1,13 +1,10 @@
 import asyncio
-import json
 import threading
 
 import httpx
-import pytest
 from fastapi.testclient import TestClient
 from test_review_service import FakeBackend, image_uri
 
-from review_jev.backends import BackendUnavailable, OneJevHTTPBackend
 from review_jev.config import Settings
 from review_jev.server import BodyLimitMiddleware, create_app
 from review_jev.service import ReviewService
@@ -93,57 +90,6 @@ def test_body_limits_and_content_encoding():
         )
 
 
-def test_http_backend_payload_and_scores():
-    def handle(request):
-        if request.url.path == "/health":
-            return httpx.Response(200, json={"status": "ok"})
-        assert request.url.path == "/v1/systemone"
-        body = json.loads(request.content)
-        assert body["model"] == "jev-latest"
-        assert body["media"] == []
-        assert all(question["type"] == "noul" for question in body["questions"].values())
-        answers = {
-            key: {"type": "noul", "noul": 0.99 if key == "readable_content" else 0.01}
-            for key in body["questions"]
-        }
-        return httpx.Response(200, json={"model": "OneJev-4B", "answers": answers})
-
-    backend = OneJevHTTPBackend(Settings(), transport=httpx.MockTransport(handle))
-    service = ReviewService(Settings(allow_auto_approve=True), backend)
-    with TestClient(create_app(service)) as client:
-        assert client.get("/ready").status_code == 200
-        response = client.post("/v1/reviews", json=REQUEST)
-        assert response.json()["decision"] == "approve"
-        assert response.json()["model"] == "OneJev-4B"
-
-
-@pytest.mark.parametrize(
-    "status,body", [(500, {"secret": "text"}), (200, {"model": "bad"}), (200, []), (302, {})]
-)
-def test_http_backend_rejects_invalid_responses(status, body):
-    backend = OneJevHTTPBackend(
-        Settings(), transport=httpx.MockTransport(lambda request: httpx.Response(status, json=body))
-    )
-    try:
-        with pytest.raises(BackendUnavailable):
-            backend.decide({}, {}, [])
-    finally:
-        backend.close()
-
-
-def test_http_backend_timeout():
-    def handle(request):
-        raise httpx.ReadTimeout("secret text")
-
-    backend = OneJevHTTPBackend(Settings(), transport=httpx.MockTransport(handle))
-    try:
-        assert not backend.ready()
-        with pytest.raises(BackendUnavailable, match="onejev_unavailable"):
-            backend.decide({}, {}, [])
-    finally:
-        backend.close()
-
-
 def test_api_overload_does_not_start_second_model_request():
     started, release = threading.Event(), threading.Event()
 
@@ -172,17 +118,3 @@ def test_api_overload_does_not_start_second_model_request():
         assert len(backend.calls) == 1
 
     asyncio.run(run())
-
-
-def test_http_backend_response_limit():
-    backend = OneJevHTTPBackend(
-        Settings(),
-        transport=httpx.MockTransport(
-            lambda request: httpx.Response(200, content=b"x" * (1024 * 1024 + 1))
-        ),
-    )
-    try:
-        with pytest.raises(BackendUnavailable, match="too_large"):
-            backend.decide({}, {}, [])
-    finally:
-        backend.close()

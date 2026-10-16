@@ -1,29 +1,26 @@
 from __future__ import annotations
 
-import threading
 from dataclasses import dataclass, field
-from importlib import import_module
-from pathlib import Path
 from typing import Any, Protocol
 
-import httpx
-
 from .config import Settings
-from .schemas import ModelAssessment
+from .schemas import GuardScore, ModelAssessment
 
 
 class BackendUnavailable(RuntimeError):
-    """Sanitized backend error; never include submitted content or upstream error bodies."""
+    """Sanitized error; never include submission content or upstream error bodies."""
 
 
 @dataclass(frozen=True)
 class DecisionResult:
     model: str
-    answers: dict[str, dict[str, Any]]
+    # Independent rule classifiers can supply answers; Guards only supply native scores.
+    answers: dict[str, dict[str, Any]] = field(default_factory=dict)
     usage: dict[str, int] = field(default_factory=dict)
     assessment: ModelAssessment | None = None
     model_revision: str | None = None
     confidence: float | None = None
+    scores: list[GuardScore] = field(default_factory=list)
 
 
 def resolve_device(device: str) -> str:
@@ -46,131 +43,11 @@ class Backend(Protocol):
     def close(self) -> None: ...
 
 
-class OneJevHTTPBackend:
-    name = "onejev-http"
-    demo = False
-
-    def __init__(self, settings: Settings, transport: httpx.BaseTransport | None = None):
-        self.settings = settings
-        self.client = httpx.Client(
-            base_url=settings.onejev_url,
-            timeout=settings.timeout_seconds,
-            follow_redirects=False,
-            trust_env=False,
-            transport=transport,
-        )
-
-    def decide(self, state: dict, questions: dict, media: list[dict]) -> DecisionResult:
-        payload = {
-            "state": state,
-            "questions": questions,
-            "media": media,
-            "model": self.settings.served_model,
-        }
-        try:
-            with self.client.stream("POST", "/v1/systemone", json=payload) as response:
-                response.raise_for_status()
-                data = bytearray()
-                for chunk in response.iter_bytes():
-                    data.extend(chunk)
-                    if len(data) > 1024 * 1024:
-                        raise BackendUnavailable("backend_response_too_large")
-                import json
-
-                body = json.loads(data)
-            if not isinstance(body, dict) or not isinstance(body.get("model"), str):
-                raise BackendUnavailable("invalid_backend_response")
-            return DecisionResult(body["model"], body["answers"], body.get("usage", {}))
-        except BackendUnavailable:
-            raise
-        except (httpx.HTTPError, KeyError, TypeError, ValueError) as exc:
-            raise BackendUnavailable("onejev_unavailable_or_invalid_response") from exc
-
-    def ready(self) -> bool:
-        try:
-            response = self.client.get("/health", timeout=min(2, self.settings.timeout_seconds))
-            return response.status_code == 200 and response.json().get("status") == "ok"
-        except (httpx.HTTPError, ValueError, AttributeError):
-            return False
-
-    def close(self) -> None:
-        self.client.close()
-
-
-class TorchBackend:
-    name = "torch"
-    demo = False
-
-    def __init__(self, settings: Settings):
-        self.settings = settings
-        self.engine = None
-        self.lock = threading.Lock()
-
-    def _load(self):
-        if self.engine is None:
-            # Fail before fetching weights when optional inference dependencies are missing.
-            import_module("torch")
-            import_module("transformers")
-            from qev.calibrate import Calibration
-            from qev.mm_engine import MMDecisionEngine, local_model_dir
-
-            # Lazy loading avoids downloading weights in demo/HTTP mode or during API import.
-            if self.settings.model_revision and not Path(self.settings.model).exists():
-                from huggingface_hub import snapshot_download
-
-                model_path = snapshot_download(
-                    self.settings.model,
-                    revision=self.settings.model_revision,
-                    allow_patterns=["*.json", "*.safetensors", "*.jinja", "*.txt", "*.model"],
-                )
-            else:
-                model_path = local_model_dir(self.settings.model)
-            calibration_path = Path(model_path) / "calibration.json"
-            calibration = Calibration.load(calibration_path) if calibration_path.exists() else None
-            self.engine = MMDecisionEngine(
-                model_path,
-                device=resolve_device(self.settings.device),
-                calibration=calibration,
-                allow_local_paths=False,
-                max_branch_tokens=self.settings.max_input_tokens,
-                max_request_tokens=self.settings.max_input_tokens * 2,
-                gpu_preprocess=False,
-                cuda_graphs=False,
-            )
-        return self.engine
-
-    def decide(self, state: dict, questions: dict, media: list[dict]) -> DecisionResult:
-        from qev.schema import SystemOneRequest
-
-        try:
-            with self.lock:
-                engine = self._load()
-                request = SystemOneRequest(state=state, questions=questions, media=media)
-                response, _ = engine.decide(request, debias=1, debug=False)
-            body = response.model_dump()
-            return DecisionResult(
-                self.settings.model,
-                body["answers"],
-                body["usage"],
-                model_revision=self.settings.model_revision,
-            )
-        except Exception as exc:
-            raise BackendUnavailable("local_model_unavailable") from exc
-
-    def ready(self) -> bool:
-        return self.engine is not None
-
-    def close(self) -> None:
-        with self.lock:
-            self.engine = None
-
-
 class DemoBackend:
     name = "demo"
     demo = True
 
     def decide(self, state: dict, questions: dict, media: list[dict]) -> DecisionResult:
-        # Neutral synthetic scores cannot be used to approve or reject real submissions.
         return DecisionResult(
             "demo-not-a-model", {key: {"type": "noul", "noul": 0.5} for key in questions}
         )
@@ -183,65 +60,34 @@ class DemoBackend:
 
 
 class AutoBackend:
-    name = "auto"
+    name = "dual-guard"
     demo = False
 
     def __init__(self, settings: Settings):
         from .qwen_guard import Qwen3GuardBackend
+        from .shieldgemma import ShieldGemmaBackend
 
         self.settings = settings
-        text_settings = Settings.model_validate(
-            {
-                **settings.model_dump(),
-                "backend": "qwen3guard",
-                "model": settings.text_model,
-                "model_revision": settings.text_model_revision,
-                "device": settings.text_device,
-            }
+        self.text = Qwen3GuardBackend(
+            Settings.model_validate(
+                {
+                    **settings.model_dump(),
+                    "backend": "qwen3guard",
+                    "model": settings.text_model,
+                    "model_revision": settings.text_model_revision,
+                    "device": settings.text_device,
+                }
+            )
         )
-        self.text = Qwen3GuardBackend(text_settings)
-        self.images = (
-            TorchBackend(settings)
-            if settings.image_backend == "torch"
-            else OneJevHTTPBackend(settings)
-        )
-        large_settings = Settings.model_validate(
-            {
-                **settings.model_dump(),
-                "backend": settings.large_backend,
-                "model": settings.large_model,
-                "model_revision": settings.large_model_revision,
-                "device": settings.large_device,
-                "onejev_url": settings.large_onejev_url,
-                "served_model": settings.large_served_model,
-            }
-        )
-        self.large = (
-            TorchBackend(large_settings)
-            if settings.large_backend == "torch"
-            else OneJevHTTPBackend(large_settings)
-        )
+        self.images = ShieldGemmaBackend(settings)
 
-    def select(self, media: list[dict]) -> Backend:
-        # Routing depends on validated media, never filenames or untrusted text claims.
-        return self.images if media else self.text
-
-    def decide(self, state: dict, questions: dict, media: list[dict]) -> DecisionResult:
-        return self.select(media).decide(state, questions, media)
-
-    def stages(self, media: list[dict]) -> list[tuple[str, Backend, float | None]]:
-        if not self.settings.cascade_enabled:
-            return [("4b" if media else "0.6b", self.select(media), None)]
-        stages = []
-        if not media:
-            stages.append(("0.6b", self.text, self.settings.text_confidence_threshold))
-        stages.extend(
-            [
-                ("4b", self.images, self.settings.image_confidence_threshold),
-                ("9b", self.large, self.settings.large_confidence_threshold),
-            ]
-        )
-        return stages
+    def branches(self, has_text: bool, media: list[dict]) -> list[tuple[str, Backend, float]]:
+        branches = []
+        if has_text:
+            branches.append(("text", self.text, self.settings.text_confidence_threshold))
+        if media:
+            branches.append(("image", self.images, self.settings.image_confidence_threshold))
+        return branches
 
     def ready(self) -> bool:
         return self.text.ready() and self.images.ready()
@@ -249,18 +95,17 @@ class AutoBackend:
     def close(self) -> None:
         self.text.close()
         self.images.close()
-        self.large.close()
 
 
-def make_backend(settings: Settings) -> Backend:
+def make_backend(settings: Settings) -> Backend | AutoBackend:
     if settings.backend == "auto":
         return AutoBackend(settings)
+    if settings.backend == "demo":
+        return DemoBackend()
     if settings.backend == "qwen3guard":
         from .qwen_guard import Qwen3GuardBackend
 
         return Qwen3GuardBackend(settings)
-    if settings.backend == "demo":
-        return DemoBackend()
-    if settings.backend == "torch":
-        return TorchBackend(settings)
-    return OneJevHTTPBackend(settings)
+    from .shieldgemma import ShieldGemmaBackend
+
+    return ShieldGemmaBackend(settings)

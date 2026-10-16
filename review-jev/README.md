@@ -2,22 +2,22 @@
 
 # StudyHub Review-Jev
 
-**面向文字与图片投稿的内容审核组件**
+**按内容分流的文本与图像安全概率决策组件**
 
 [![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python&logoColor=white)](#快速开始)
 [![FastAPI](https://img.shields.io/badge/API-FastAPI-009688?logo=fastapi&logoColor=white)](#审核接口)
 [![Qwen3Guard](https://img.shields.io/badge/Text-Qwen3Guard--0.6B-2563eb)](#模型分流)
-[![OneJev](https://img.shields.io/badge/Multimodal-OneJev--4B_%2F_9B-15803d)](#模型分流)
-[![Cascade](https://img.shields.io/badge/Review-0.6B_→_4B_→_9B-c2410c)](#模型分流)
+[![ShieldGemma](https://img.shields.io/badge/Image-ShieldGemma_2--4B-15803d)](#模型分流)
+[![Guard-as-Jev](https://img.shields.io/badge/Decision-Guard--as--Jev-c2410c)](#概率决策)
 [![Apache-2.0](https://img.shields.io/badge/License-Apache--2.0-22c55e)](LICENSE)
 
-[功能概览](#功能概览) | [快速开始](#快速开始) | [模型分流](#模型分流) | [审核接口](#审核接口) | [测试与评测](#测试与评测)
+[功能概览](#功能概览) | [快速开始](#快速开始) | [模型分流](#模型分流) | [概率决策](#概率决策) | [审核接口](#审核接口)
 
 </div>
 
-StudyHub Review-Jev 基于 [OneJev](https://github.com/OmniJev/OneJev) 构建，将模型推理、投稿规则、版权辅助分析与结构化结果整合为一个审核流程，支持资料、经验、评论、求购和集市内容。
+StudyHub Review-Jev 是独立运行的内容审核组件，采用 **Qwen3Guard-Gen-0.6B + ShieldGemma 2-4B** 双 Guard 架构。通过 Guard-as-Jev 候选概率评分，将文字安全等级、图像政策风险和规则检查汇总为可追踪的审核结果。
 
-**文字从轻量模型开始，图文由多模态模型处理；不确定时逐级升级，最后转人工。**
+**按需调用模型，分别保留证据，再进行规则融合。**
 
 ---
 
@@ -25,24 +25,22 @@ StudyHub Review-Jev 基于 [OneJev](https://github.com/OmniJev/OneJev) 构建，
 
 | 能力 | 内容 |
 | --- | --- |
-| 投稿解析 | 标题、描述、正文、预览文本、图片与版权声明 |
-| 合规筛查 | 色情、暴力、仇恨骚扰、违法危害与敏感个人信息 |
-| 场景规则 | 广告与站外支付、学术作弊、审核操纵与可读性 |
-| 版权辅助 | 原创或授权声明、署名、开放许可、NC / ND 条件 |
-| 参考匹配 | 参考文本相似性、图片原文件 SHA-256 匹配 |
-| 置信度级联 | 0.6B → 4B → 9B → 人工，逐级判断与按需升级 |
-| 结果追踪 | 模型版本、规则哈希、内容哈希与逐项结果 |
-| 使用方式 | FastAPI 服务、JSON 命令行、批量评测与演示模式 |
-
-OneJev 分支按十一项 StudyHub 规则推理，0.6B 分支保留模型原生安全等级与类别。各字段的判定方式见 [审核结果说明](docs/REVIEW_SEMANTICS.md)。
+| 内容路由 | 根据实际正文、图片和 OCR 结果选择审核分支 |
+| 文字安全 | 三种安全等级的候选概率，以及模型原生风险类别 |
+| 图像安全 | 色情、危险、暴力三项政策的独立 Yes/No 概率 |
+| OCR 适配 | 本地 Tesseract 提取图片文字，按需触发文字审核 |
+| 规则融合 | 合并安全信号、版权声明、开放许可条件与参考匹配 |
+| 人工复核 | 低置信度、判断分歧、覆盖缺失及异常的明确处理 |
+| 结果追踪 | 原始分数、模型版本、校准标识、分支轨迹及来源范围 |
+| 使用方式 | FastAPI、JSON 命令行、批量评测及演示模式 |
 
 ---
 
 ## 快速开始
 
-在 `review-jev/` 目录下执行，支持 **Python 3.10+**。
+在 `review-jev/` 目录执行，支持 Python 3.10+。
 
-### 体验演示模式
+### 演示接口
 
 ```bash
 python -m venv .venv
@@ -50,67 +48,64 @@ python -m venv .venv
 .venv/bin/review-jev serve --backend demo
 ```
 
-默认地址：`http://127.0.0.1:8011`。打开 `http://127.0.0.1:8011/docs` 查看接口文档。
-
-命令行也可直接处理示例：
+默认地址为 `http://127.0.0.1:8011`，交互式接口文档位于 `/docs`。
 
 ```bash
 .venv/bin/review-jev review examples/original-notes.json --backend demo
-.venv/bin/review-jev policy
 ```
 
-演示响应使用 `status=demo` 标识，便于体验接口与结果格式。
-
-### 启用模型推理
+### 启用模型
 
 ```bash
 .venv/bin/pip install -e ".[torch]" -c constraints-tested.txt
 .venv/bin/review-jev serve
 ```
 
-服务按请求内容自动选择模型，首次对应请求时加载权重。默认模型版本固定，权重保存在 Hugging Face 用户缓存中。
+模型按需加载。首次使用图像模型前，需要通过 Hugging Face 获得 [ShieldGemma 权重访问权限](https://huggingface.co/google/shieldgemma-2-4b-it)。OCR 的系统依赖与语言包配置见 [配置说明](docs/CONFIGURATION.md)。
+
+仅运行文字审核：
+
+```bash
+.venv/bin/review-jev review examples/original-notes.json \
+  --backend qwen3guard --device cpu
+```
 
 ---
 
 ## 模型分流
 
+| 投稿内容 | 调用方式 |
+| --- | --- |
+| 纯文字 | 只调用 Qwen3Guard-Gen-0.6B |
+| 图片，OCR 未检出文字 | 只调用 ShieldGemma 2-4B |
+| 图片及投稿正文 | 正文走 Qwen，图片走 ShieldGemma |
+| 聊天截图、文字海报、扫描页面 | OCR 文字走 Qwen，画面走 ShieldGemma |
+
 ```text
-纯文字 -> Qwen3Guard-Gen-0.6B -> 低置信度 -> OneJev-4B
-图片 / 图文 ---------------------------------> OneJev-4B
-                                                |
-                                             低置信度
-                                                v
-                                            OneJev-9B
-                                                |
-                                             低置信度
-                                                v
-                                              人工审核
+正文 --------------------------> Qwen3Guard-Gen-0.6B
+图片 --> OCR --检出文字---------> Qwen3Guard-Gen-0.6B
+  |
+  +----------------------------> ShieldGemma 2-4B
+                                       |
+                 原生分数 + 校准 + 规则融合
+                                       |
+                           通过 / 人工复核 / 拒绝
 ```
 
-| 内容类型 | 默认模型 | 默认设备 | 结果形式 |
-| --- | --- | --- | --- |
-| 纯文字 | [Qwen3Guard-Gen-0.6B](https://huggingface.co/Qwen/Qwen3Guard-Gen-0.6B) | CPU | 原生安全等级与类别 |
-| 纯图片或图文 | [OneJev-4B](https://huggingface.co/OmniJev/OneJev-4B) | 优先 CUDA | 逐项规则风险概率 |
-| 升级复核 | [OneJev-9B](https://huggingface.co/OmniJev/OneJev-9B) | 优先 CUDA | 逐项规则风险概率 |
+两个模型不重复审核相同输入。图片分支只接收图片与原生政策，投稿正文和 OCR 结果不会作为安全政策注入图片模型。当前审核 API 接收文字与页面图片；PDF 文件解析由独立知识库提供。
 
-路由依据经过解码校验的图片确定；图文模型同时读取文字与全部图片。可通过 `--device` 和 `--text-device` 指定设备。
+---
 
-默认各级置信度门槛均为 `0.85`，低于门槛、置信度缺失或推理失败时尝试下一级。达到门槛后停止升级，继续按规则与版权检查输出审核建议；9B 仍不确定或不可用时转人工。各级结果保存在 `model_attempts`，不会把风险概率简单平均。
+## 概率决策
 
-门槛、9B 设备及独立 HTTP 服务均可配置，例如：
+| 分支 | 评分机制 | 返回内容 |
+| --- | --- | --- |
+| Qwen3Guard-as-Jev | 对完整候选标签续写逐 Token 计算条件对数概率，再在候选集合内归一化 | `Safe / Controversial / Unsafe` |
+| ShieldGemma-as-Jev | 读取原生 `Yes / No` Logits，逐政策归一化 | 各项图像政策的违规概率 |
 
-```bash
-.venv/bin/review-jev serve --text-confidence-threshold 0.85 \
-  --image-confidence-threshold 0.85 --large-confidence-threshold 0.90 \
-  --large-device cuda:1
-```
+文字分支同时保留官方格式生成的风险类别。图像各政策互相独立，不将三项违规概率归一化为总和为一的分布。
 
-单独运行文字模型：
-
-```bash
-.venv/bin/pip install -e ".[guard]"
-.venv/bin/review-jev review examples/original-notes.json --backend qwen3guard --device cpu
-```
+`guard_scores` 保留原始对数分数、概率、评分方式及模型版本。校准工件按模型、版本和政策独立匹配；文字等级和图像政策不进行简单概率平均。完整判定语义见 [请求与结果说明](docs/REVIEW_SEMANTICS.md)。
 
 ---
 
@@ -119,112 +114,56 @@ python -m venv .venv
 | 接口 | 用途 |
 | --- | --- |
 | `GET /health` | 进程健康检查 |
-| `GET /ready` | 模型就绪检查 |
-| `GET /v1/policy` | 获取审核规则 |
-| `POST /v1/reviews` | 提交审核请求 |
-| `GET /docs` | 查看交互式接口文档 |
-
-### 请求示例
+| `GET /ready` | 两个模型分支的就绪情况 |
+| `GET /v1/policy` | 规则、路由和决策配置 |
+| `POST /v1/reviews` | 提交独立审核请求 |
+| `GET /docs` | 交互式接口文档 |
 
 ```json
 {
-  "request_id": "submission-001",
   "content": {
     "title": "高等数学复习笔记",
-    "text": "这份笔记整理了我对极限与导数的理解。",
+    "text": "整理极限与导数的基本概念。",
     "images": []
-  },
-  "context": {
-    "kind": "material",
-    "publication_intent": "FREE"
   },
   "rights": {
     "basis": "original",
     "copyrightOwner": "投稿作者",
     "attested": true
-  },
-  "references": []
+  }
 }
 ```
 
-```bash
-curl --noproxy "*" -s http://127.0.0.1:8011/v1/reviews \
-  -H "Content-Type: application/json" \
-  --data-binary @examples/original-notes.json
-```
+图片采用 `{"id":"preview","data":"data:image/png;base64,..."}`，支持 PNG、JPEG 和 WebP，最多四张。单张上限为 4 MiB、1200 万像素，HTTP 请求上限为 24 MiB。
 
-图片使用 `{"id":"preview-1","data":"data:image/png;base64,..."}` 格式。支持 PNG、JPEG 和 WebP，最多四张；单张上限 4 MiB、1200 万像素，HTTP 请求上限 24 MiB。输入细节见 [请求与结果说明](docs/REVIEW_SEMANTICS.md)。
-
-### 主要输出
-
-| 字段 | 内容 |
+| 主要字段 | 内容 |
 | --- | --- |
-| `decision` | `approve`、`manual_review` 或 `reject` |
-| `status` | 完成、部分完成、降级或演示状态 |
-| `findings` | 逐项规则结果、风险信号与作用范围 |
-| `model_assessment` | 文字模型的原生安全等级与类别 |
-| `confidence` / `model_attempts` | 最后有效结果的置信度，以及各级结果、门槛与升级原因 |
-| `copyright` | 声明、许可条件与参考匹配分析 |
-| `model` / `backend` / `model_revision` | 实际模型、推理后端与权重版本 |
-| 内容及规则哈希 | 用于结果追踪与评测复现 |
-
----
-
-## 推理后端
-
-默认 `auto` 在审核进程内完成模型分流，也支持单模型与独立推理服务。
-
-| 后端 | 使用方式 |
-| --- | --- |
-| `auto` | 默认按内容分流与置信度级联 |
-| `qwen3guard` | 固定使用文字模型 |
-| `torch` | 固定使用 OneJev 多模态模型 |
-| `onejev-http` | 调用 OneJev HTTP 推理服务 |
-| `demo` | 体验接口和模拟结果 |
-
-### 独立 OneJev 服务
-
-```bash
-.venv/bin/qev serve --model OmniJev/OneJev-4B --host 127.0.0.1 --port 8000
-```
-
-另一个终端启动审核服务：
-
-```bash
-.venv/bin/review-jev serve --backend onejev-http --onejev-url http://127.0.0.1:8000
-```
-
-自动分流也可使用 `--image-backend onejev-http` 指定图片推理服务。GGUF 后端、设备选择与完整环境变量见 [配置说明](docs/CONFIGURATION.md)。
-
-9B 独立服务使用 `--large-backend onejev-http --large-onejev-url http://127.0.0.1:8002`，与 4B 服务分别配置。固定单模型后端保持单模型运行；自动模式使用 `--no-cascade-enabled` 可关闭升级。
+| `decision` / `decision_reasons` | 审核建议与触发原因 |
+| `guard_scores` | 按模型、模态、输入和政策组织的概率 |
+| `model_assessment` | 文字原生安全等级和风险类别 |
+| `model_attempts` | 实际调用的分支、门槛、耗时及结果 |
+| `coverage` / `ocr_attempts` | 覆盖范围与 OCR 状态 |
+| `findings` / `copyright` | 安全信号、声明与参考匹配分析 |
 
 ---
 
 ## 测试与评测
 
-### 单元测试
-
 ```bash
 .venv/bin/pytest -q
 .venv/bin/ruff check review_jev tests/test_review*.py
-```
-
-### 批量评测
-
-```bash
 .venv/bin/review-jev evaluate examples/evaluation.jsonl --backend demo
 ```
 
-使用 `--output artifacts/report.json` 可保存聚合评测报告。评测支持规则判定统计、原生类别统计与概率指标。
-
-### 模型冒烟测试
+文字实模及临时本机 HTTP 冒烟测试：
 
 ```bash
 OMP_NUM_THREADS=4 MKL_NUM_THREADS=4 \
-  .venv/bin/python -m review_jev.smoke --http --output artifacts/smoke.json
+  .venv/bin/python -m review_jev.smoke --text-only --http \
+  --output artifacts/dual-guard-text-smoke.json
 ```
 
-覆盖中文文字、隐私风险、图文、纯图片、多图片与本机 HTTP 分流，并验证实际级联轨迹。仅测试初始 0.6B / 4B 模型时增加 `--no-cascade`。测试环境和结果见 [验证记录](VALIDATION.md)。
+去掉 `--text-only` 可验证全部分支，需要准备图像模型权重和 OCR 依赖。原生分布评测样例见 `examples/guard-evaluation.jsonl`，支持准确率、NLL 和 Brier 指标。
 
 ---
 
@@ -232,9 +171,9 @@ OMP_NUM_THREADS=4 MKL_NUM_THREADS=4 \
 
 | 文档 | 内容 |
 | --- | --- |
-| [请求与结果说明](docs/REVIEW_SEMANTICS.md) | 输入格式、判定语义与版权辅助检查 |
-| [配置说明](docs/CONFIGURATION.md) | 后端、环境变量与部署设置 |
-| [验证记录](VALIDATION.md) | 模型版本、测试结果与评测说明 |
-| [来源与许可](UPSTREAM.md) | OneJev 来源、改造内容与许可证 |
+| [请求与结果说明](docs/REVIEW_SEMANTICS.md) | 路由、概率语义、融合规则和覆盖状态 |
+| [配置说明](docs/CONFIGURATION.md) | 模型、设备、OCR、校准工件和环境变量 |
+| [验证记录](VALIDATION.md) | 自动化测试与实模验证边界 |
+| [来源与许可](UPSTREAM.md) | 历史来源、参考实现与许可证 |
 
-代码采用 [Apache-2.0](LICENSE) 许可，上游说明保留在 [OneJev 原文](README.onejev.md)。
+代码采用 [Apache-2.0](LICENSE) 许可。历史 OneJev 工具与原文保留用于来源追踪，不参与当前双 Guard 审核运行链路。

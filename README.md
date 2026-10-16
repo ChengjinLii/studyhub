@@ -13,7 +13,7 @@
 [![SGLang](https://img.shields.io/badge/Serving-SGLang-15803d)](#studyhub-agent)
 [![PyTorch](https://img.shields.io/badge/AI-PyTorch_%2B_Transformers-EE4C2C?logo=pytorch&logoColor=white)](#技术栈)
 [![Qwen3Guard](https://img.shields.io/badge/Text-Qwen3Guard--0.6B-0f766e)](#studyhub-review-jev)
-[![OneJev](https://img.shields.io/badge/Vision-OneJev--4B_%2F_9B-c2410c)](#studyhub-review-jev)
+[![ShieldGemma](https://img.shields.io/badge/Vision-ShieldGemma_2--4B-c2410c)](#studyhub-review-jev)
 [![Website](https://img.shields.io/badge/Website-study--hub.cn-111827)](https://study-hub.cn)
 [![MIT](https://img.shields.io/badge/License-MIT-22c55e)](LICENSE)
 
@@ -61,7 +61,7 @@ StudyHub 连接学习资料、经验分享与校园互助，围绕高校学生�
 | 异步处理 | 局部异步数据库访问与异步 I/O |
 | 部署运维 | Docker Compose、systemd、Nginx |
 | Agent | Qwen3.5-4B / 9B、SGLang、tokenizers、统一 Agent 执行器 |
-| 内容审核 | Qwen3Guard-Gen-0.6B、OneJev-4B / 9B、PyTorch、Transformers |
+| 内容审核 | Qwen3Guard-Gen-0.6B、ShieldGemma 2-4B、Guard-as-Jev、PyTorch、Transformers |
 
 MySQL 用于预览与生产环境，SQLite 用于本地开发和快速体验。
 
@@ -179,7 +179,7 @@ CI 与本地质量检查可使用 `bash scripts/ci-check.sh`。完整门禁包�
 
 **独立运行的文档知识库、RAG 与 Agent。**
 
-[StudyHub Agent](studyhub-agent/README.md) 参考 WeKnora 的知识处理与工具设计，将文档入库、正文检索、来源定位、RAG 问答和多步 Agent 统一到独立运行框架中，支持配置 Qwen3.5-4B / 9B 等模型服务。
+[StudyHub Agent](studyhub-agent/README.md) 借鉴腾讯开源 WeKnora 的知识库设计，支持 PDF/OCR 文档解析、结构感知切分与 Parent-Child 分层索引，通过 BM25、向量召回、RRF 融合与 Rerank 连接 RAG 和多步 Agent；以 Map-Reduce 实现实体、概念聚合和增量 Wiki，保留文档、Chunk、版本及页码关联。
 
 | 能力 | 实现 |
 | --- | --- |
@@ -199,15 +199,16 @@ CI 与本地质量检查可使用 `bash scripts/ci-check.sh`。完整门禁包�
 
 **面向文字与图片投稿的内容审核组件。**
 
-[StudyHub Review-Jev](review-jev/README.md) 基于 OneJev 构建，支持资料、经验、评论、求购与集市等投稿场景，提供合规风险筛查、版权辅助分析和结构化审核结果。
+[StudyHub Review-Jev](review-jev/README.md) 采用 Qwen3Guard-Gen-0.6B 与 ShieldGemma 2-4B 双路架构，通过 Guard-as-Jev 读取安全等级与图像政策候选概率，结合规则融合、置信度门槛与人工复核，输出可解释的内容审核结果。
 
 | 内容类型 | 默认模型 |
 | --- | --- |
 | 纯文字 | Qwen3Guard-Gen-0.6B |
-| 图片或图文 | OneJev-4B |
-| 低置信度升级 | OneJev-4B → OneJev-9B → 人工审核 |
+| 图片 | ShieldGemma 2-4B；检出文字时按需调用 Qwen |
+| 文字配图 | 正文与 OCR 走 Qwen，画面走 ShieldGemma |
+| 不确定或覆盖缺失 | 人工复核 |
 
-审核组件提供 **FastAPI 服务、JSON 命令行、可配置规则与批量评测工具**，覆盖内容风险、隐私信息、投稿操纵、版权声明、开放许可与参考内容匹配等检查。模型分流、请求示例和使用方法见 [Review-Jev 文档](review-jev/README.md)。
+审核组件提供 **FastAPI 服务、JSON 命令行、概率评分与批量评测工具**，保留各分支风险、模型版本、OCR 状态、版权声明、开放许可与参考匹配记录。模型分流、请求示例和使用方法见 [Review-Jev 文档](review-jev/README.md)。
 
 ---
 

@@ -1,110 +1,113 @@
 # Review-Jev 请求与结果说明
 
-本文说明输入格式、模型输出、判定语义与版权辅助分析。
+本文件说明双 Guard 的输入、概率语义、规则融合与评测边界。
 
 ---
 
-## 投稿输入
+## 输入与内容路由
 
-| 部分 | 字段与用途 |
+文字字段为 `title`、`description`、`text`、`customPreviewText`，图片为经过解码校验的 PNG、JPEG 或 WebP 数据 URI。正文与 OCR 文字均作为不可信投稿内容，不能覆盖模型政策。
+
+| 内容 | 实际调用 |
 | --- | --- |
-| 内容 | `title`、`description`、`text`、`customPreviewText`、`images` |
-| 场景 | `context.kind`、发布方式、学校、课程与标签 |
-| 版权声明 | 原创或授权依据、版权持有者、来源、许可、署名与修改情况 |
-| 参考内容 | 调用方提供的文本或图片 SHA-256 参考集合 |
+| 只有文字 | Qwen3Guard |
+| 图片且 OCR 成功、未检出文字 | ShieldGemma |
+| 文字配图 | 文字和图片分别审核 |
+| 图片检测到文字 | OCR 文字加入文字分支，图片仍进入图片分支 |
 
-`context.kind` 支持 `material`、`experience`、`comment`、`request` 和 `marketplace`。输入按公开投稿处理。
+OCR 在本地运行；识别出的正文不回显到审核响应。响应仅保留图片 ID、字符数、识别状态与分数。失败、禁用、低识别分数与“成功但为空”是不同状态。
 
-`rights.basis` 支持 `original`、`authorized`、`open_license`、`public_domain` 和 `unknown`。
-
-### 图片格式
-
-图片使用 `{"id":"preview-1","data":"data:image/png;base64,..."}`。
-
-| 项目 | 要求 |
-| --- | --- |
-| 格式 | PNG、JPEG、WebP 的 base64 data URI |
-| 张数 | 最多四张，图片 ID 唯一 |
-| 单张大小 | 原文件不超过 4 MiB、1200 万像素 |
-| 请求大小 | HTTP 请求不超过 24 MiB |
-| 解码处理 | 移除元数据、应用方向信息、透明像素合成到白底 |
-
-图片输入不接受 URL、服务器路径、SVG 或动图。正文中的路由指令不影响模型选择；图片推理失败时不会改用文字模型声称已完成图片审核。
-
-### 参考内容
-
-最多五项参考，每项包含 `id`，以及 `text` 或 `image_sha256`。文本采用规范化包含检查和字符 shingle 重叠；图片使用原文件字节的 SHA-256 匹配。短引文不会直接触发参考匹配。
+当前 API 不直接接收 PDF。扫描件可转成页面图片提交；独立知识库的 PDF 解析入口见 [知识服务配置](../../studyhub-agent/docs/KNOWLEDGE.md)。
 
 ---
 
-## 模型与规则
+## Guard-as-Jev 评分
 
-| 分支 | 输出 | 规则方式 |
-| --- | --- | --- |
-| Qwen3Guard-Gen-0.6B | `Safe`、`Controversial`、`Unsafe` 与原生类别 | 原生类别映射到部分 StudyHub 风险项 |
-| OneJev-4B / 9B | 各项规则的风险概率 | 按十一项 StudyHub 规则进行图文或文字推理 |
+### 文字安全等级
 
-Qwen3Guard 分支不执行自定义规则提示，不生成逐项概率。未支持的规则使用 `outcome=unavailable`，整体状态为 `partial`；`model_assessment` 保留原生判断。OneJev 的逐项概率由模型实际提供，尚未完成 StudyHub 场景校准。
+保持 Qwen 官方审核模板，并在 `Safety:` 后分别对三个完整候选标签及换行结束符计算序列条件对数概率。多 Token 标签逐 Token 累加，不只读取首 Token，也不把长度平均伪装成序列概率。
 
-Qwen3Guard 的 0.6B 与 4B 均为文字模型，图片分支使用多模态 OneJev-4B。
+候选集合内通过 Softmax 归一化，返回三分类分布。该分布是相对候选偏好；模型原生 `Categories` 通过同一 Backbone 的生成接口保留，不从三个安全等级推导各风险类别的概率。
 
----
+候选最大值与官方生成等级不一致时输出 `native_label_disagreement`；高概率 `Controversial` 也进入人工复核。
 
-## 置信度与升级轨迹
+### 图像政策
 
-自动模式采用 0.6B → 4B → 9B → 人工的级联；含图片时跳过纯文字 0.6B，从 4B 开始。
+固定使用官方 `sexual`、`dangerous`、`violence` 三项政策。每张图、每条政策产生独立的 Yes/No 分布，`Yes` 表示违反该政策。
 
-| 模型 | 置信度信号 | 升级条件 |
-| --- | --- | --- |
-| Qwen3Guard-Gen-0.6B | 原生安全等级与类别对应生成 token 的实际条件概率，取最小值 | 低于门槛、概率缺失、原生 `Controversial` 或推理失败 |
-| OneJev-4B | 每项规则取 `max(p, 1-p)`，整体取最小值 | 低于门槛或推理失败 |
-| OneJev-9B | 与 4B 相同 | 仍低于门槛或不可用时转人工 |
+实际分类器 Logits 顺序是 `[Yes, No]`。不使用上游说明中写反列号的示例，不将三条政策的 Yes 分数再一起归一化。每张图片单独组成三个政策样本，避免多图批次的归属错位。
 
-置信度用于控制升级，风险概率用于逐项规则判定，两者不能互换。这些信号不是 StudyHub 场景的校准正确率；原生类别不会被转换成伪造的逐项风险概率。
-
-各级读取同一份经过校验的原始内容，较大模型的有效输出作为本轮规则判定依据；不把多级概率平均，也不把前一级的模型文字当作指令。版权声明和参考匹配独立计算，升级不会消除这些检查。
-
-`model_attempts` 逐级保留模型及版本、后端、置信度、门槛、计算方式、逐项结果、原生类别、用量与耗时。`outcome` 为 `accepted`、`escalated`、`manual_review`、`unavailable` 或 `demo`；`accepted` 仅表示模型阶段达到门槛，不代表投稿被自动通过。
-
-最终低置信度使用 `decision_reasons=low_confidence_after_escalation`；最终模型失败使用 `model_unavailable`。9B 失败时保留前一级有效证据，同时将整体标为 `degraded` 并转人工。顶层 `model`、`confidence` 对应最后一次有效输出，顶层 `usage` 汇总各级有效推理用量；完整经过可由 `model_attempts` 查看。
+自定义校园政策不会被拼进 ShieldGemma 提示中。文字侧的版权类别也仅是原生风险标签，不等于投稿权属已经被验证。
 
 ---
 
-## 结果解释
+## 标准概率接口
+
+每项 `guard_scores` 包含：
 
 | 字段 | 语义 |
 | --- | --- |
-| `decision` | `approve`、`manual_review`、`reject`，表示审核建议 |
-| `status` | `completed` 为完成，`partial` 为部分完成，`degraded` 为降级，`demo` 为演示 |
-| `findings` | 独立规则结果及作用范围 `scope`，文字或整个投稿 |
-| `risk_probability` | 后端提供的真实概率；没有概率时为 `null` |
-| `model_assessment` | 文字分支的原生等级、类别与适用范围 |
-| `confidence` / `model_attempts` | 最后有效结果的置信度与完整模型升级轨迹 |
-| `model` / `backend` / `model_revision` | 实际推理模型、后端与版本 |
-| `copyright.status` | `no_obvious_risk`、`needs_review` 或 `undetermined` |
-| `calibrated_for_studyhub` | 当前为 `false`，表示尚未完成场景校准 |
+| `model` / `model_revision` | 实际权重身份 |
+| `modality` / `input_id` | 文字汇总或具体图片 |
+| `policy_id` | 文字安全等级，或某条图像政策 |
+| `task_type` | `multiclass` 或 `binary` |
+| `scoring_method` | 完整候选续写评分或原生 Yes/No |
+| `log_scores` | 模型实际对数概率或原生候选 Logits |
+| `probabilities` | 当前评分温度下的未校准候选分布 |
+| `calibrated_probabilities` | 匹配校准工件后得到的分布，可为空 |
+| `calibration_id` / `calibrated` | 校准工件身份与应用状态 |
 
-`findings.reason` 是判定说明，不是投稿内容的证据摘录。内容、原图片与规则 SHA-256 用于追踪结果和复现评测。
-
----
-
-## 版权辅助分析
-
-检查包括声明完整性、署名、授权说明、开放许可、付费与 NC 条件冲突、修改与 ND 条件冲突，以及有限参考内容的相似性或哈希匹配。
-
-输出属于风险筛查：声明、标识、水印或参考相似性不能单独证明权利归属或侵权；版权疑点进入复核，不由该模块自动拒绝。参考检查不打开来源链接，也不执行全网搜索或授权文书核验。
-
-本模块处理文字和图片，不解析 PDF、Office 或压缩包；附件恶意软件扫描属于其他处理流程。
+三分类概率和每项二分类概率均单独验证键集合、有限数值、归一化及模型身份。缺失政策、重复结果、图片 ID 错配、分数与 Logits 不一致时，整个相应分支无效。
 
 ---
 
-## 门禁与评测
+## 规则融合与人工复核
 
-自动通过、自动拒绝默认关闭。部分覆盖、级联后仍低置信度、最终推理失败、演示结果和版权疑点不能作为自动通过依据；开启自动建议门禁时仍保留这些约束。高置信度 0.6B 可停止升级，但其未覆盖的自定义规则依然保留为 `unavailable`，不会被自动放行。
+两个分支不会互相替代，也不对跨模态风险求平均。
 
-评测报告将两类输出分别统计：
+- 文字分支使用候选最大值检查不确定性；图片分支要求每张图的每项政策都满足分支置信度门槛。
+- 安全等级 `Unsafe` 和图像违规概率分别形成风险信号；默认复核门槛为 `0.35`，拒绝信号门槛为 `0.95`。
+- 低置信度、原生等级分歧、`Controversial`、必需模态未覆盖或模型异常均转人工，不尝试 4B / 9B 升级。
+- 自动通过和自动拒绝仍由独立开关控制。未覆盖的自定义规则阻止自动通过。
+- 已完成分支的证据在另一支失败时仍保留，整体标为降级，不能用另一支的安全输出替代。
+- 版权独有风险不因文字 `Unsafe` 等级被升级为自动拒绝。
 
-- `per_rule`：完整真实推理结果的概率指标，包括 Brier 与 ECE。
-- `per_rule_labels`：文字模型原生类别的分类指标，排除未支持规则及含图片的文字后端结果。
+这些门槛是开发配置，不表示经过验证的真实违规概率或统一模型正确率。修改规则文件不会改变 Guard 原生训练政策；未支持的自定义检查明确返回 `unavailable`。
 
-人工标注的校园投稿样本用于衡量误杀、漏检、概率校准和人工复核比例。演示数据与冒烟样例用于链路验证，测试记录见 [VALIDATION.md](../VALIDATION.md)。
+---
+
+## 审核响应
+
+`model_attempts` 记录实际执行的文字或图像分支，不再表示按参数规模升级的轨迹。`coverage` 区分 `completed`、`unavailable` 和 `not_requested`。
+
+只有一个模型分支时，顶层 `confidence` 为该分支候选分布的置信度代理；双分支时为 `null`，应读取各分支与各政策分数。用量汇总实际模型调用，文字候选评分的前向计算也计入输入用量。
+
+`status` 为 `completed`、`partial`、`degraded` 或 `demo`。`decision` 为 `approve`、`manual_review` 或 `reject`。原生安全政策完成但仍有自定义规则未覆盖时，可返回 `partial`。
+
+---
+
+## 版权辅助与参考匹配
+
+保留原创、授权、公共领域及开放许可声明检查；包含署名、NC / ND 条件、授权信息和来源要求。对调用方提供的参考文本进行规范化、长文本包含及 Shingle 比较，对图片原文件进行 SHA-256 比较。
+
+声明不是已核实证据；参考匹配与原生版权标签是人工核验线索，不是版权归属或侵权判定。接口不执行外部权利库检索。
+
+---
+
+## 评测格式
+
+历史 `expected_risks` 用于独立规则分类器；原生 Guard 分布使用 `expected_guards`：
+
+```json
+{
+  "request": {"content": {"text": "合成学习笔记"}},
+  "expected_guards": [{
+    "modality": "text",
+    "input_id": "submission",
+    "policy_id": "text_safety",
+    "label": "Safe"
+  }]
+}
+```
+
+图像标签为对应图片 ID、政策 ID 和 `Yes / No`。原生分布按任务分别统计准确率、NLL、Brier；未返回的目标单独记录。演示与降级样本不冒充有效模型测量。校准集和测试集应按来源文档隔离，避免同一文档的页面分散造成泄漏。

@@ -5,7 +5,7 @@ from collections.abc import Callable, Sequence
 from typing import Literal
 
 from studyhub_agent.contracts.episode import Message, Sampling, TurnKind
-from studyhub_agent.contracts.knowledge import CitationCheck, Evidence, KnowledgeModel, SearchResult
+from studyhub_agent.contracts.knowledge import CitationCheck, Evidence, KnowledgeModel, SearchResult, search_evidence
 from studyhub_agent.contracts.knowledge_citations import check_knowledge_citations
 from studyhub_agent.contracts.knowledge_prompts import KNOWLEDGE_PROMPTS, RAG_SYSTEM_KEY
 from studyhub_agent.knowledge.retrieval import KnowledgeRetriever
@@ -38,7 +38,7 @@ class RagPipeline:
         if not 0 < max_new_tokens < max_context_tokens:
             raise ValueError("generation budget must leave room for the prompt")
         result = self.retriever.search(query, mode=mode, limit=limit)
-        evidence = tuple(hit.evidence for hit in result.hits)
+        evidence = search_evidence(result)
         if not evidence:
             return RagAnswer(status="no_evidence", answer=None, search=result, evidence=())
         messages = (

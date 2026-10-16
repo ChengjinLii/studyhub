@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -100,7 +101,8 @@ class Finding(StrictModel):
     rule_id: str
     category: str
     source: Literal["model", "declaration", "reference"]
-    scope: Literal["submission", "text"] = "submission"
+    scope: Literal["submission", "text", "image"] = "submission"
+    input_id: str | None = None
     outcome: Literal["clear", "review", "reject", "unavailable"]
     risk_probability: float | None = Field(default=None, ge=0, le=1, allow_inf_nan=False)
     reason: str
@@ -124,6 +126,81 @@ class ModelAssessment(StrictModel):
         return self
 
 
+class GuardScore(StrictModel):
+    model: str = Field(min_length=1, max_length=256)
+    model_revision: str | None = Field(default=None, min_length=1, max_length=256)
+    modality: Literal["text", "image"]
+    input_id: str = Field(min_length=1, max_length=100)
+    policy_id: Literal["text_safety", "sexual", "dangerous", "violence"]
+    task_type: Literal["multiclass", "binary"]
+    scoring_method: Literal["teacher_forced_sequence", "native_yes_no"]
+    probabilities: dict[str, float]
+    log_scores: dict[str, float]
+    temperature: float = Field(default=1, gt=0, le=10, allow_inf_nan=False)
+    calibrated_probabilities: dict[str, float] | None = None
+    calibration_id: str | None = None
+    calibrated: bool = False
+
+    @model_validator(mode="before")
+    @classmethod
+    def numeric_scores(cls, values):
+        if isinstance(values, dict):
+            for key in ("probabilities", "log_scores", "calibrated_probabilities"):
+                data = values.get(key)
+                if isinstance(data, dict) and any(
+                    isinstance(v, bool) or not isinstance(v, (int, float)) for v in data.values()
+                ):
+                    raise ValueError("guard scores must be numeric")
+        return values
+
+    @model_validator(mode="after")
+    def valid_distribution(self) -> GuardScore:
+        text = self.modality == "text"
+        keys = {"Safe", "Controversial", "Unsafe"} if text else {"Yes", "No"}
+        if (
+            (self.task_type == "multiclass") != text
+            or (self.policy_id == "text_safety") != text
+            or (self.scoring_method == "teacher_forced_sequence") != text
+        ):
+            raise ValueError("inconsistent guard task")
+        if set(self.log_scores) != keys or any(
+            not math.isfinite(value) for value in self.log_scores.values()
+        ):
+            raise ValueError("invalid guard log scores")
+        for distribution in (self.probabilities, self.calibrated_probabilities):
+            if distribution is not None and (
+                set(distribution) != keys
+                or any(not math.isfinite(v) or not 0 <= v <= 1 for v in distribution.values())
+                or not math.isclose(sum(distribution.values()), 1, abs_tol=1e-5)
+            ):
+                raise ValueError("invalid guard probability distribution")
+        if self.calibrated != bool(self.calibration_id and self.calibrated_probabilities):
+            raise ValueError("calibration requires probabilities and an artifact identity")
+        if not self.calibrated and (
+            self.calibration_id is not None or self.calibrated_probabilities is not None
+        ):
+            raise ValueError("incomplete calibration metadata")
+        return self
+
+    @property
+    def decision_probabilities(self) -> dict[str, float]:
+        return self.calibrated_probabilities or self.probabilities
+
+
+class OCRAttempt(StrictModel):
+    image_id: str
+    status: Literal["completed", "empty", "unavailable", "disabled", "low_confidence"]
+    characters: int = Field(default=0, ge=0)
+    confidence: float | None = Field(default=None, ge=0, le=1, allow_inf_nan=False)
+
+
+class Coverage(StrictModel):
+    modality: Literal["text", "image", "ocr"]
+    input_ids: list[str]
+    status: Literal["completed", "unavailable", "not_requested"]
+    reason: str | None = None
+
+
 class CopyrightAssessment(StrictModel):
     status: Literal["no_obvious_risk", "needs_review", "undetermined"]
     declaration_verified: Literal[False] = False
@@ -134,17 +211,16 @@ class CopyrightAssessment(StrictModel):
 
 
 class ModelAttempt(StrictModel):
-    tier: Literal["0.6b", "4b", "9b", "single"]
+    tier: Literal["text", "image", "single"]
+    input_ids: list[str] = Field(default_factory=list)
     model: str
     model_revision: str | None = None
     backend: str
-    outcome: Literal["accepted", "escalated", "manual_review", "unavailable", "demo"]
+    outcome: Literal["accepted", "manual_review", "unavailable", "demo"]
     confidence: float | None = Field(default=None, ge=0, le=1, allow_inf_nan=False)
     confidence_threshold: float | None = Field(default=None, gt=0.5, le=1, allow_inf_nan=False)
-    confidence_method: Literal["native_label_probability", "rule_probability"] | None = None
-    escalation_reason: Literal[
-        "low_confidence", "confidence_missing", "backend_unavailable", "native_controversial"
-    ] | None = None
+    confidence_method: Literal["candidate_probability", "rule_probability"] | None = None
+    review_reason: str | None = None
     findings: list[Finding] = Field(default_factory=list)
     model_assessment: ModelAssessment | None = None
     usage: dict[str, int] = Field(default_factory=dict)
@@ -164,8 +240,11 @@ class ReviewResponse(StrictModel):
     backend: str
     model_assessment: ModelAssessment | None = None
     confidence: float | None = Field(default=None, ge=0, le=1, allow_inf_nan=False)
-    model_attempts: list[ModelAttempt] = Field(default_factory=list, max_length=3)
-    calibrated_for_studyhub: Literal[False] = False
+    model_attempts: list[ModelAttempt] = Field(default_factory=list, max_length=2)
+    guard_scores: list[GuardScore] = Field(default_factory=list, max_length=13)
+    coverage: list[Coverage] = Field(default_factory=list)
+    ocr_attempts: list[OCRAttempt] = Field(default_factory=list, max_length=4)
+    calibrated_for_studyhub: bool = False
     content_sha256: str
     image_sha256: dict[str, str]
     findings: list[Finding]

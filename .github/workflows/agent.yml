@@ -25,7 +25,7 @@ jobs:
           python-version: "3.12"
           cache: pip
           cache-dependency-path: studyhub-agent/pyproject.toml
-      - run: pip install -e ".[dev]"
+      - run: pip install -e ".[dev,documents]"
       - run: ruff check src tests scripts/smoke_episodes.py
       - run: lint-imports --config .importlinter
       - run: pytest --cov --cov-report=term-missing

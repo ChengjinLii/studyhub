@@ -5,7 +5,7 @@ from typing import Any
 from pydantic import ValidationError
 
 from studyhub_agent.contracts.episode import EpisodeSpec, Observation, ToolCall
-from studyhub_agent.contracts.knowledge import ListInput, ReadInput, SearchInput
+from studyhub_agent.contracts.knowledge import ListInput, ReadInput, SearchInput, search_evidence
 from studyhub_agent.environments.base import EnvironmentInfraError
 from studyhub_agent.knowledge.providers import KnowledgeBackendError
 from studyhub_agent.knowledge.retrieval import KnowledgeRetriever
@@ -56,7 +56,9 @@ class KnowledgeEnvironment:
             payload = result.model_dump(mode="json")
             for row, hit in zip(payload["hits"], result.hits, strict=True):
                 row["evidence"]["citation"] = hit.evidence.citation
-            return payload, [hit.evidence.chunk_id for hit in result.hits]
+                for context, source in zip(row["context"], hit.context, strict=True):
+                    context["citation"] = source.citation
+            return payload, [row.chunk_id for row in search_evidence(result)]
         if call.name == "read_document":
             args = ReadInput.model_validate(call.arguments)
             evidence = self.retriever.read(args.id, offset=args.offset, limit=args.limit, context=args.context)
