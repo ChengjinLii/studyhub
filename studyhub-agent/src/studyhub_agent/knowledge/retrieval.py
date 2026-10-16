@@ -217,12 +217,35 @@ class KnowledgeRetriever:
             scores.append((chunk.chunk_id, score))
         return sorted(scores, key=lambda row: (-row[1], row[0]))
 
-    def read(self, source_id: str, *, offset: int = 0, limit: int = 5, context: int = 0) -> tuple[Evidence, ...]:
+    def read(
+        self, source_id: str, *, offset: int = 0, limit: int = 5, context: int = 0, query: str | None = None
+    ) -> tuple[Evidence, ...]:
         if type(offset) is not int or offset < 0 or type(limit) is not int or not 1 <= limit <= 20:
             raise ValueError("invalid reading window")
         if type(context) is not int or not 0 <= context <= 5:
             raise ValueError("context must be between 0 and 5")
-        if source_id in self.chunks:
+        if query is not None:
+            if not isinstance(query, str) or not query.strip() or len(query) > 200:
+                raise ValueError("invalid document query")
+            if source_id in self.documents:
+                document_id = source_id
+            elif source_id in self.chunks:
+                document_id = self.chunks[source_id].document_id
+            elif source_id in self.parents:
+                document_id = self.parents[source_id].document_id
+            else:
+                raise ValueError("source_not_found")
+            terms = [term.casefold() for term in query.split()]
+            rows = sorted(
+                (row for row in self.chunks.values() if row.document_id == document_id),
+                key=lambda row: row.ordinal,
+            )
+            matches = [
+                row for row in rows
+                if all(term in (row.context_header + " " + row.text).casefold() for term in terms)
+            ]
+            selected = matches[offset : offset + limit]
+        elif source_id in self.chunks:
             chunk = self.chunks[source_id]
             rows = [row for row in self.chunks.values() if row.document_id == chunk.document_id]
             rows.sort(key=lambda row: row.ordinal)

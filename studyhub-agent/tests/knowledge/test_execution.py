@@ -2,7 +2,11 @@ import pytest
 
 from studyhub_agent.architectures.knowledge_verify import KnowledgeVerifyArchitecture
 from studyhub_agent.contracts.episode import Budget, EpisodeSpec, KnowledgePrincipal, Termination, ToolCall
+from studyhub_agent.contracts.knowledge import KnowledgeScope
 from studyhub_agent.contracts.knowledge_citations import check_knowledge_citations
+from studyhub_agent.contracts.wiki import WikiFact
+from studyhub_agent.knowledge.retrieval import KnowledgeRetriever
+from studyhub_agent.knowledge.wiki import update_wiki
 from studyhub_agent.contracts.knowledge_prompts import KNOWLEDGE_PROMPTS, KNOWLEDGE_SYSTEM_KEY
 from studyhub_agent.environments.knowledge import KnowledgeEnvironment
 from studyhub_agent.runtime.rag import RagPipeline
@@ -133,3 +137,81 @@ def test_citation_validation_rejects_old_versions(retriever):
     assert not check_knowledge_citations("[k_old_version]", [evidence.chunk_id]).ok
     assert not check_knowledge_citations("没有引用", [evidence.chunk_id]).ok
     assert check_knowledge_citations("找不到依据", []).ok
+
+
+def test_wiki_agent_tools_are_hidden_without_a_wiki(retriever):
+    env = KnowledgeEnvironment(retriever)
+    assert {tool.name for tool in env.tool_specs()} == {
+        "search_knowledge", "read_document", "list_documents"
+    }
+    env.reset(spec())
+    denied = env.execute(ToolCall(call_id="w0", name="wiki_search", arguments={"query": "Projection"}))
+    assert not denied.ok and not env.trace()["evidence_ids"]
+
+
+def _wiki_retriever(corpus, scope):
+    class Extractor:
+        identity = "wiki-agent-test@1"
+
+        def extract(self, evidence):
+            return (WikiFact(
+                kind="concept", name="Projection",
+                claim=evidence.text.strip(), quote=evidence.text.strip(),
+            ),)
+
+    broad = KnowledgeScope(knowledge_base_ids=frozenset({"demo"}))
+    snapshot = update_wiki(corpus, broad, Extractor()).snapshot
+    return KnowledgeRetriever(corpus, scope, wiki=snapshot)
+
+
+def test_wiki_agent_read_exposes_only_actual_source_quotes(corpus):
+    scope = KnowledgeScope(knowledge_base_ids=frozenset({"demo"}))
+    retriever = _wiki_retriever(corpus, scope)
+    env = KnowledgeEnvironment(retriever)
+    assert {tool.name for tool in env.tool_specs()} == {
+        "search_knowledge", "read_document", "list_documents", "wiki_search", "wiki_read_page"
+    }
+    env.reset(spec())
+    found = env.execute(ToolCall(call_id="w1", name="wiki_search", arguments={"query": "Projection"}))
+    assert found.ok and found.payload["pages"]
+    assert not found.details["evidence_ids"]
+    page_id = found.payload["pages"][0]["page_id"]
+    page = env.execute(ToolCall(call_id="w2", name="wiki_read_page",
+                                arguments={"page_id": page_id, "limit": 1}))
+    assert page.ok and len(page.payload["claims"]) == 1
+    source = page.payload["claims"][0]["sources"][0]
+    assert source["citation"] == f"[{source['chunk_id']}]"
+    assert source["quote"] in retriever.chunks[source["chunk_id"]].text
+    assert source["chunk_id"] in env.trace()["evidence_ids"]
+    assert check_knowledge_citations(source["citation"], env.trace()["evidence_ids"]).ok
+
+
+def test_wiki_agent_cannot_expand_document_scope(corpus):
+    allowed = next(row for row in corpus.documents if row.source == "projection.md")
+    scope = KnowledgeScope(
+        knowledge_base_ids=frozenset({"demo"}), document_ids=frozenset({allowed.document_id})
+    )
+    retriever = _wiki_retriever(corpus, scope)
+    env = KnowledgeEnvironment(retriever)
+    env.reset(spec())
+    page_id = retriever.wiki.pages[0].page_id
+    result = env.execute(ToolCall(call_id="w1", name="wiki_read_page",
+                                  arguments={"page_id": page_id}))
+    assert result.ok
+    assert all(item["document_id"] == allowed.document_id for claim in result.payload["claims"]
+               for item in claim["sources"])
+    invalid = env.execute(ToolCall(call_id="w2", name="wiki_read_page",
+                                   arguments={"page_id": "w_unknown"}))
+    assert not invalid.ok
+    assert env.trace()["evidence_ids"]
+
+
+def test_in_document_query_agent_exposes_only_matching_chunks(retriever):
+    document = next(row for row in retriever.documents.values() if row.source == "least-squares.md")
+    env = KnowledgeEnvironment(retriever)
+    env.reset(spec())
+    result = env.execute(ToolCall(call_id="q1", name="read_document",
+                                  arguments={"id": document.document_id, "query": "QR 分解"}))
+    assert result.ok and result.payload["evidence"]
+    assert all("QR" in item["text"] for item in result.payload["evidence"])
+    assert result.payload["next_offset"] is None

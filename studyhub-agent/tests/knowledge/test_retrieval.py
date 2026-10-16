@@ -123,3 +123,16 @@ def test_output_budget_omits_whole_evidence_instead_of_changing_its_body(retriev
 def test_invalid_search_parameters(retriever, kwargs):
     with pytest.raises(ValueError):
         retriever.search("query", **kwargs)
+
+
+def test_read_document_query_stays_within_document_and_rejects_bad_input(retriever):
+    document = next(row for row in retriever.documents.values() if row.source == "least-squares.md")
+    found = retriever.read(document.document_id, query="QR 分解")
+    assert found and all("QR" in item.text for item in found)
+    assert not retriever.read(document.document_id, query="missing-token")
+    chunk = next(row for row in retriever.chunks.values() if row.document_id == document.document_id)
+    assert retriever.read(chunk.chunk_id, query="QR")
+    with pytest.raises(ValueError, match="invalid document query"):
+        retriever.read(document.document_id, query="   ")
+    with pytest.raises(ValueError, match="source_not_found"):
+        retriever.read("d_hidden", query="991")

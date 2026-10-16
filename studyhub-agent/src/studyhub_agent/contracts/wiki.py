@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from studyhub_agent.contracts.knowledge import KnowledgeModel, digest
 
@@ -80,3 +80,16 @@ class WikiSnapshot(KnowledgeModel):
         if len({p.page_id for p in self.pages}) != len(self.pages):
             raise ValueError("duplicate wiki page")
         return self
+
+
+class WikiSearchInput(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+    query: str = Field(min_length=1, max_length=2000)
+    limit: int = Field(default=5, ge=1, le=20)
+
+
+class WikiReadPageInput(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+    page_id: str = Field(min_length=1, max_length=128)
+    offset: int = Field(default=0, ge=0)
+    limit: int = Field(default=5, ge=1, le=10)

@@ -20,7 +20,7 @@
 | `list` | 列出当前知识库中的文档 |
 | `read <文档ID或片段ID>` | 分页或扩展阅读 |
 | `ask <问题> --mode rag` | 固定检索生成流程 |
-| `ask <问题> --mode agent` | 使用三项知识工具的多步问答 |
+| `ask <问题> --mode agent` | 使用知识工具的多步问答，可按需增加 Wiki 工具 |
 
 `--corpus`、`--kb` 和检索模型配置属于全局参数，放在子命令前。`--kb` 默认为 `demo`，只影响本次知识范围，不依赖主站账户。
 
@@ -139,7 +139,7 @@ studyhub-knowledge --corpus /tmp/studyhub-kb/corpus.json --kb demo \
   --model-dir /path/to/Qwen3.5-4B
 ```
 
-`--mode rag` 只生成一次，不运行工具循环。`--mode agent` 使用 `EpisodeRunner` 和 `knowledge_verify`，工具只有 `search_knowledge`、`read_document`、`list_documents`。网站规则、购买和付费权限不进入该工具契约。
+`--mode rag` 只生成一次，不运行工具循环。`--mode agent` 使用 `EpisodeRunner` 和 `knowledge_verify`，默认工具为 `search_knowledge`、`read_document`、`list_documents`；提供有效 `--wiki` 时增加 `wiki_search`、`wiki_read_page`。网站规则、购买和付费权限不进入该工具契约。
 
 没有知识证据时，固定 RAG 返回 `no_evidence`，不请求生成模型。上下文不足返回 `context_budget`。生成不是有效最终文本时返回 `invalid_generation`；引用无效时返回 `unverified` 且 `answer=null`。CLI 对后面三种状态返回退出码 2。
 
@@ -158,3 +158,19 @@ Agent 持续反馈无效引用，达到运行预算后返回相应终止状态�
 程序接口可构造 `KnowledgeScope(knowledge_base_ids=..., document_ids=...)`。文档集合与知识库集合取交集；`document_ids=None` 表示知识库内不限文档，空集合表示没有文档。过滤先于 BM25、向量计算、重排和上下文扩展。模型工具没有修改该范围的参数。
 
 范围是内部执行约束，不是已经完成的账号认证或网络服务授权系统。后续 API 必须从自己的身份系统构造可信范围，不可直接接受未授权的请求参数作为范围。
+
+
+---
+
+## Agent 工具扩展（参考 WeKnora）
+
+独立 Agent 的基本工具仍为 `search_knowledge`、`read_document`、`list_documents`。其中 `read_document` 新增可选 `query` 参数：在指定文档（或指定 Chunk 的所属文档）中，筛选同时包含全部空格分隔关键词的原文 Chunk，支持 `offset` 和 `limit` 翻页；默认阅读行为不变。
+
+使用 `ask --mode agent` 并指定有效 `--wiki <wiki.json>` 时，额外提供两个只读工具：
+
+- `wiki_search({"query":"正交投影","limit":5})`：只返回授权概念/实体的页面 ID、名称、别名、版本和声明数量，不直接解锁引用资格。
+- `wiki_read_page({"page_id":"w_...","offset":0,"limit":5})`：分页返回 Wiki 声明与经过原文核验的引句，每条声明最多展示 5 个来源，超过时显式标记；只有确实展示的原文 Chunk 才成为可引用证据。要检查引用语境，应继续调用 `read_document`。
+
+两项 Wiki 工具仅在知识库具备有效 Wiki 快照时开放，沿用服务器构造的 `KnowledgeScope`，不会向 Agent 暴露其他知识库内容；过期快照被拒绝；Agent 不获得 Wiki 写权限。固定 RAG 流程和网站业务接口均不变。
+
+WeKnora 的知识图谱关系查询、CSV/Excel SQL 分析、Web 搜索、MCP 工具、文件写入与沙箱执行都需要额外存储和权限设计，本次不模仿这些功能。
