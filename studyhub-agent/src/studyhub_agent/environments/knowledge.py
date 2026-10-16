@@ -64,11 +64,11 @@ class KnowledgeEnvironment:
         if call.name == "read_document":
             args = ReadInput.model_validate(call.arguments)
             evidence = self.retriever.read(
-                args.id, offset=args.offset, limit=args.limit, context=args.context, query=args.query
+                args.id, offset=args.offset, limit=args.limit, context=args.context, query=args.query or None
             )
             next_offset = args.offset + len(evidence)
-            if args.query is not None:
-                has_next = bool(self.retriever.read(args.id, offset=next_offset, limit=1, query=args.query))
+            if args.query:
+                has_next = bool(self.retriever.read(args.id, offset=next_offset, limit=1, query=args.query or None))
             else:
                 total = sum(row.document_id == args.id for row in self.retriever.chunks.values())
                 has_next = bool(evidence) and next_offset < total

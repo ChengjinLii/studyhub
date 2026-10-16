@@ -84,12 +84,12 @@ class WikiSnapshot(KnowledgeModel):
 
 class WikiSearchInput(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
-    query: str = Field(min_length=1, max_length=2000)
-    limit: int = Field(default=5, ge=1, le=20)
+    query: str = Field(min_length=1, max_length=2000, description="Wiki 实体或概念查询词")
+    limit: int = Field(default=5, ge=1, le=20, description="最多返回的 Wiki 页面数量")
 
 
 class WikiReadPageInput(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
-    page_id: str = Field(min_length=1, max_length=128)
-    offset: int = Field(default=0, ge=0)
-    limit: int = Field(default=5, ge=1, le=10)
+    page_id: str = Field(min_length=1, max_length=128, description="wiki_search 返回的页面 ID")
+    offset: int = Field(default=0, ge=0, description="从第几个 Wiki 声明开始")
+    limit: int = Field(default=5, ge=1, le=10, description="每页返回的声明数量")

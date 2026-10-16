@@ -239,9 +239,7 @@ class ReadInput(BaseModel):
     offset: int = Field(default=0, ge=0, description="文档内片段位置，从零开始")
     limit: int = Field(default=5, ge=1, le=20, description="文档分页大小")
     context: int = Field(default=0, ge=0, le=5, description="读取片段时两侧各扩展的邻近片段数")
-    query: str | None = Field(
-        default=None, min_length=1, max_length=200, description="可选：在所属文档内查找包含全部关键词的 Chunk"
-    )
+    query: str = Field(default="", max_length=200, description="可选：在所属文档内查找包含全部关键词的 Chunk")
 
 
 class ListInput(BaseModel):
