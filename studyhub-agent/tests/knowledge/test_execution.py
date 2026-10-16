@@ -4,10 +4,10 @@ from studyhub_agent.architectures.knowledge_verify import KnowledgeVerifyArchite
 from studyhub_agent.contracts.episode import Budget, EpisodeSpec, KnowledgePrincipal, Termination, ToolCall
 from studyhub_agent.contracts.knowledge import KnowledgeScope
 from studyhub_agent.contracts.knowledge_citations import check_knowledge_citations
+from studyhub_agent.contracts.knowledge_prompts import KNOWLEDGE_PROMPTS, KNOWLEDGE_SYSTEM_KEY
 from studyhub_agent.contracts.wiki import WikiFact
 from studyhub_agent.knowledge.retrieval import KnowledgeRetriever
 from studyhub_agent.knowledge.wiki import update_wiki
-from studyhub_agent.contracts.knowledge_prompts import KNOWLEDGE_PROMPTS, KNOWLEDGE_SYSTEM_KEY
 from studyhub_agent.environments.knowledge import KnowledgeEnvironment
 from studyhub_agent.runtime.rag import RagPipeline
 from studyhub_agent.runtime.runner import EpisodeRunner
