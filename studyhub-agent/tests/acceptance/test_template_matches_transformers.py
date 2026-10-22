@@ -1,3 +1,4 @@
+import json
 import os
 from pathlib import Path
 
@@ -5,6 +6,7 @@ import pytest
 
 from studyhub_agent.contracts.episode import Message, ToolCall
 from studyhub_agent.contracts.render import render_text
+from studyhub_agent.runtime.openai_client import _wire_messages
 from studyhub_agent.tools.specs import TOOL_SPECS
 
 MODEL_DIR = os.environ.get("STUDYHUB_AGENT_MODEL_DIR")
@@ -90,3 +92,17 @@ def test_render_matches_transformers_apply_chat_template(conversation, thinking,
         enable_thinking=thinking,
     )
     assert render_text(conversation, TOOL_SPECS, thinking=thinking, add_generation_prompt=True) == expected
+    http_messages = _wire_messages(conversation)
+    for message in http_messages:
+        for call in message.get("tool_calls", []):
+            # vLLM parses the OpenAI JSON arguments before applying the HF template.
+            call["function"]["arguments"] = json.loads(call["function"]["arguments"])
+    actual_ids = tokenizer.apply_chat_template(
+        http_messages,
+        tools=[t.to_openai() for t in TOOL_SPECS],
+        tokenize=True,
+        return_dict=False,
+        add_generation_prompt=True,
+        enable_thinking=thinking,
+    )
+    assert actual_ids == tokenizer.encode(expected, add_special_tokens=False)

@@ -1,0 +1,25 @@
+# 路径相对本配置文件；解释器单独安装 vLLM，不使用训练环境。
+model_dir = "../../../models/P1/Qwen3.5-9B"
+runtime_python = "../../.venv-vllm/bin/python"
+state_dir = "../../artifacts/serving"
+served_model_name = "Qwen/Qwen3.5-9B"
+host = "127.0.0.1"
+port = 30411
+
+# 物理 GPU 编号或完整 UUID；启动前检查，不自动挑选或抢占。
+gpus = ["0"]
+tensor_parallel_size = 1
+gpu_memory_utilization = 0.5
+reserve_memory_mib = 4096
+allow_shared_gpu = false
+
+# 与 Agent 默认 16K 总窗口一致；服务窗口包含输入及输出。
+max_model_len = 16384
+max_num_seqs = 4
+max_num_batched_tokens = 2048
+prefix_caching = false
+enforce_eager = false
+startup_timeout_s = 600
+shutdown_timeout_s = 30
+poll_interval_s = 2.0
+api_key_env = "STUDYHUB_KNOWLEDGE_MODEL_API_KEY"

@@ -109,7 +109,8 @@ def test_cli_generation_uses_real_policy_wire_contract(tmp_path, capsys, monkeyp
     assert code == 0
     if mode == "rag":
         assert result["status"] == "answered"
-        assert len(calls) == 1 and not calls[0]["tools"]
+        assert len(calls) == 1 and not calls[0].get("tools")
+        assert calls[0]["tool_choice"] == "none"
     else:
         assert result["termination"] == "final_answer"
         assert result["architecture_trace"]["citation_verified"]

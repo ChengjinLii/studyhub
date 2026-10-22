@@ -1,0 +1,20 @@
+[Unit]
+Description=StudyHub Qwen3.5-9B Local vLLM
+After=network.target
+StartLimitIntervalSec=300
+StartLimitBurst=3
+
+[Service]
+Type=simple
+WorkingDirectory=/data/chengjin/studyhub/studyhub-agent
+ExecStart=/data/chengjin/studyhub/studyhub-agent/.venv/bin/studyhub-model run --config /data/chengjin/studyhub/studyhub-agent/configs/serving/qwen35-9b.toml
+EnvironmentFile=-%h/.config/studyhub-model.env
+Restart=on-failure
+RestartSec=15
+KillMode=control-group
+TimeoutStopSec=45
+NoNewPrivileges=true
+UMask=0077
+
+[Install]
+WantedBy=default.target

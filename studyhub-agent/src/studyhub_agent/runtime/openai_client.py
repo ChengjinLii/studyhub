@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import time
 from collections.abc import Sequence
+from itertools import groupby
 from typing import Any
 
 import httpx
@@ -36,6 +37,35 @@ def _wire_message(message: Message) -> dict[str, Any]:
         # send the same text the Qwen template itself produces for a standalone tool turn.
         return {"role": "user", "content": f"<tool_response>\n{message.content}\n</tool_response>"}
     return {"role": message.role, "content": message.content}
+
+
+def _wire_messages(messages: Sequence[Message]) -> list[dict[str, Any]]:
+    result = []
+    separator = "\n</tool_response>\n<tool_response>\n"
+    for is_tool, group in groupby(messages, key=lambda row: row.role == "tool"):
+        if not is_tool:
+            result.extend(_wire_message(row) for row in group)
+            continue
+        bound, pending = [], []
+        # Qwen renders adjacent tool messages as one user block. Attach synthetic feedback
+        # inside that same block, without inventing a call ID or changing the pinned template.
+        for row in group:
+            if row.tool_call_id:
+                wire = _wire_message(row)
+                wire["content"] = separator.join([*pending, row.content.strip()])
+                pending.clear()
+                bound.append(wire)
+            elif bound:
+                bound[-1]["content"] += separator + row.content.strip()
+            else:
+                pending.append(row.content.strip())
+        if bound:
+            result.extend(bound)
+        else:
+            result.append(
+                {"role": "user", "content": "<tool_response>\n" + separator.join(pending) + "\n</tool_response>"}
+            )
+    return result
 
 
 def _raw_completion_text(content: str, tool_calls: Any) -> str:
@@ -79,13 +109,16 @@ class OpenAICompatPolicyClient:
     ) -> AssistantTurn:
         body: dict[str, Any] = {
             "model": self._model,
-            "messages": [_wire_message(message) for message in messages],
-            "tools": [tool.to_openai() for tool in tools],
+            "messages": _wire_messages(messages),
             "temperature": sampling.temperature,
             "top_p": sampling.top_p,
             "max_tokens": max_new_tokens,
             "chat_template_kwargs": {"enable_thinking": thinking},
         }
+        if tools:
+            body["tools"] = [tool.to_openai() for tool in tools]
+        else:
+            body["tool_choice"] = "none"
         if sampling.seed is not None:
             body["seed"] = sampling.seed
         started = time.perf_counter()

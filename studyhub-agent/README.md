@@ -7,9 +7,10 @@
 [![Python](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)](#快速开始)
 [![RAG](https://img.shields.io/badge/Retrieval-BM25_%2B_Vector_%2B_RRF-0f766e)](#知识检索)
 [![Qwen](https://img.shields.io/badge/Agent-Qwen3.5--4B_%2F_9B-2563eb)](#模型问答)
+[![vLLM](https://img.shields.io/badge/Serving-vLLM-047857)](#本地模型服务)
 [![Pydantic](https://img.shields.io/badge/Contracts-Pydantic-E92063)](#运行记录)
 
-[能力概览](#能力概览) | [快速开始](#快速开始) | [知识检索](#知识检索) | [增量 Wiki](#增量-wiki) | [模型问答](#模型问答) | [开发文档](#开发文档)
+[能力概览](#能力概览) | [快速开始](#快速开始) | [知识检索](#知识检索) | [增量 Wiki](#增量-wiki) | [模型问答](#模型问答) | [本地模型服务](#本地模型服务) | [开发文档](#开发文档)
 
 </div>
 
@@ -31,6 +32,7 @@ StudyHub 知识库与 Agent 是独立运行的文档知识产品，支持本地�
 | 增量 Wiki | Map 抽取实体与概念，Reduce 跨文档聚合，缓存复用与删除撤回 |
 | RAG 问答 | 固定检索与生成流程，检查 token 预算和片段引用 |
 | Agent | 自主检索、分页阅读、邻域扩展及引用纠正 |
+| 本地推理 | Qwen3.5-9B / vLLM 独立配置，资源预检、工具协议验收与运行日志 |
 | 运行记录 | 保存语料指纹、模型身份、工具证据、预算与终止原因 |
 
 ---
@@ -159,7 +161,24 @@ Wiki 按 Chunk 抽取实体与概念，再按知识库和规范名称聚合。�
 
 将 `--mode rag` 改为 `--mode agent`，即可由 Agent 自行检索和阅读。模型地址使用服务根地址，模型目录用于加载真实 tokenizer 和检查上下文预算。
 
-本地模型服务配置参考 [推理服务说明](scripts/serving/README.md)。
+本地模型配置见下方部署入口；历史 SGLang 配置见 [推理服务说明](scripts/serving/README.md)。
+
+---
+
+## 本地模型服务
+
+通过 vLLM 部署本地 Qwen3.5-9B，向 RAG 与 Agent 提供统一模型接口。默认使用 BF16、16K 上下文与纯文本模式，启用千问工具调用解析和分块预填充。
+
+```bash
+# 安装独立推理环境后执行，启动配置与 Agent 控制环境分离。
+.venv/bin/studyhub-model check --config configs/serving/qwen35-9b.toml
+.venv/bin/studyhub-model run --config configs/serving/qwen35-9b.toml
+
+# 服务就绪后，在另一终端检查真实工具调用与 Token 一致性。
+.venv/bin/studyhub-model probe --config configs/serving/qwen35-9b.toml
+```
+
+支持 GPU 与端口检查、就绪检测、轮转日志和用户级 systemd。完整安装与配置见 [本地模型服务](docs/LOCAL_SERVING.md)。
 
 ---
 
@@ -188,6 +207,7 @@ HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 .venv/bin/pytest --cov
 | 文档 | 内容 |
 | --- | --- |
 | [知识服务配置](docs/KNOWLEDGE.md) | 命令、数据格式和模型协议 |
+| [本地模型服务](docs/LOCAL_SERVING.md) | Qwen3.5-9B / vLLM 部署、配置预检、工具协议与运维 |
 | [源码对照与验收](docs/specs/2026-10-16-rag-wiki-guard-alignment.md) | WeKnora 对照、解析、分层索引与 Wiki 验证 |
 | [独立产品设计](docs/specs/2026-10-16-independent-knowledge-design.md) | WeKnora 源码对照、替换关系与分层设计 |
 | [开发路线](docs/ROADMAP.md) | 阶段安排和后续验收 |

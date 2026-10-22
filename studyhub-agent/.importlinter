@@ -1,6 +1,19 @@
 [importlinter]
 root_package = studyhub_agent
 
+[importlinter:contract:serving-isolation]
+name = Agent core does not depend on deployment tooling
+type = forbidden
+source_modules =
+    studyhub_agent.architectures
+    studyhub_agent.runtime
+    studyhub_agent.environments
+    studyhub_agent.tools
+    studyhub_agent.knowledge
+    studyhub_agent.contracts
+forbidden_modules =
+    studyhub_agent.serving
+
 [importlinter:contract:layers]
 name = Agent layers
 type = layers

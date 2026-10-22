@@ -1,6 +1,22 @@
-# Qwen3.5-4B 推理服务说明
+# 本地推理服务
 
-本文记录当前机器上使用 SGLang 启动 Qwen3.5-4B 的配置，以及基础层冒烟任务的运行方式。
+## Qwen3.5-9B · vLLM
+
+9B 的独立部署入口为 `studyhub-model`，配置见 [qwen35-9b.toml](../../configs/serving/qwen35-9b.toml)，完整安装、资源检查、工具调用验收与运维说明见 [本地模型服务](../../docs/LOCAL_SERVING.md)。
+
+```bash
+# 在 studyhub-agent/ 目录，安装独立推理环境后执行。
+.venv/bin/studyhub-model check --config configs/serving/qwen35-9b.toml
+.venv/bin/studyhub-model run --config configs/serving/qwen35-9b.toml
+```
+
+vLLM 不使用下方 SGLang 的 `sitecustomize.py` 或兼容环境变量；不要把本目录加入新服务的 `PYTHONPATH`。
+
+---
+
+## 历史配置：Qwen3.5-4B · SGLang
+
+以下保留此前在本机使用 SGLang 启动 Qwen3.5-4B 的配置，以及基础层冒烟任务的运行方式。
 
 [历史运行样例](../../docs/evidence/foundation-smoke-2026-09-25.jsonl) 包含三条任务轨迹；模板一致性通过本地 Transformers tokenizer 验收。
 
