@@ -9,7 +9,11 @@ import { formatDate, formatNumber } from '../../lib/format';
 import minStyles from '../../styles/HomeMinimal.module.css';
 
 const COOPERATION_EMAIL = 'chengjinli@std.uestc.edu.cn';
-const SIDEBAR_LIST_LIMIT = 5;
+const SIDEBAR_LIST_LIMIT = 27;
+
+// Rank badge. The first three ranks are set in the accent colour.
+const rankBadgeClass = (rank: number) => `${minStyles.sideRankNum}${rank <= 3 ? ` ${minStyles.sideRankNumTop}` : ''}`;
+
 const DISCOVERY_TABS: Array<{ view: HomeDiscoveryView; label: string }> = [
   { view: 'subjects', label: '热门学科' },
   { view: 'popular', label: '近期热门' },
@@ -113,11 +117,13 @@ export function HomeDiscoveryCard({
                         : '待议';
                   return (
                     <li key={item.id} className={minStyles.sideRankRow}>
-                      <span className={minStyles.sideRankNum}>{index + 1}</span>
-                      <Link className={minStyles.sideRankName} href={`/requests/${item.id}`} prefetch={false}>
-                        {title}
-                      </Link>
-                      <span className={minStyles.sideRankMeta}>{amountText}</span>
+                      <span className={rankBadgeClass(index + 1)}>{index + 1}</span>
+                      <span className={minStyles.sideRankLine}>
+                        <Link className={minStyles.sideRankName} href={`/requests/${item.id}`} prefetch={false}>
+                          {title}
+                        </Link>
+                        <span className={minStyles.sideRankMeta}>{amountText}</span>
+                      </span>
                     </li>
                   );
                 })}
@@ -143,16 +149,21 @@ export function HomeDiscoveryCard({
               <ol className={minStyles.sideRankList} aria-label="近期热门资料">
                 {topPopular.map((item, index) => (
                   <li key={item.id} className={minStyles.sideRankRow}>
-                    <span className={minStyles.sideRankNum}>{index + 1}</span>
-                    <Link
-                      className={minStyles.sideRankName}
-                      href={materialPath(item.id, item.title)}
-                      prefetch={false}
-                      title={item.title}
-                    >
-                      {item.title}
-                    </Link>
-                    <span className={minStyles.sideRankMeta}>{formatNumber(item.downloadCount ?? 0)} 下载</span>
+                    <span className={rankBadgeClass(index + 1)}>{index + 1}</span>
+                    <span className={minStyles.sideRankMain}>
+                      <Link
+                        className={minStyles.sideRankName}
+                        href={materialPath(item.id, item.title)}
+                        prefetch={false}
+                        title={item.title}
+                      >
+                        {item.title}
+                      </Link>
+                    </span>
+                    <span className={minStyles.sideRankValue}>
+                      {formatNumber(item.downloadCount ?? 0)}
+                      <span>下载</span>
+                    </span>
                   </li>
                 ))}
               </ol>
@@ -178,11 +189,29 @@ export function HomeDiscoveryCard({
                       onClick={() => onOpenSubject(subject.id)}
                       aria-label={`查看${subject.name}，${subject.materialCount}份资料`}
                     >
-                      <span className={minStyles.sideRankNum}>{index + 1}</span>
-                      <span className={minStyles.sideRankName}>{subject.name}</span>
-                      <span className={minStyles.sideRankMeta}>
-                        {formatNumber(subject.materialCount)}份 · {formatNumber(subject.downloadCount)} 下载
+                      <span className={rankBadgeClass(index + 1)}>{index + 1}</span>
+                      <span className={minStyles.sideRankMain}>
+                        <span className={minStyles.sideRankName}>{subject.name}</span>
+                        <span className={minStyles.sideRankMeta}>{formatNumber(subject.materialCount)} 份资料</span>
                       </span>
+                      <span className={minStyles.sideRankValue}>
+                        {formatNumber(subject.downloadCount)}
+                        <span>下载</span>
+                      </span>
+                      <svg
+                        className={minStyles.sideRankChevron}
+                        width="14"
+                        height="14"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        aria-hidden="true"
+                      >
+                        <path d="M9 6l6 6-6 6" />
+                      </svg>
                     </button>
                   </li>
                 ))}

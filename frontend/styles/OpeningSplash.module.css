@@ -1,4 +1,10 @@
+/* The opening splash: a black screen with a white lockup. Each part first shows as an outline
+   and then fills. At the dock a white surface opens over the black from the centre, and the
+   lockup travels in a straight line to the lockup of the page. */
 .overlay {
+  --splash-ink: #f6f6f4;
+  --splash-travel: 720ms;
+  --splash-glide: cubic-bezier(0.65, 0, 0.35, 1);
   position: fixed;
   inset: 0;
   z-index: 2100;
@@ -6,25 +12,29 @@
   align-items: center;
   justify-content: center;
   overflow: hidden;
+  /* The lockup is blended against the two surfaces of the splash only, not the page. */
+  isolation: isolate;
   cursor: pointer;
   user-select: none;
-  opacity: 1;
-  transition: opacity 520ms cubic-bezier(0.22, 1, 0.36, 1);
+  color: var(--splash-ink);
+  /* The script ends the splash. If no script runs, the splash leaves by itself. */
+  animation: splashFailsafe 1ms linear 9s forwards;
 }
 
-.overlayLight {
-  background: #ffffff;
-  color: #09090b;
-}
-
-.overlayDark {
-  background: #09090b;
-  color: #fafafa;
-}
-
-.overlayFading {
-  opacity: 0;
+.overlayDocking {
   pointer-events: none;
+}
+
+/* Only where the lockup does not land on the page: the white surface fades to show the page. */
+.overlayLeaving {
+  opacity: 0;
+  transition: opacity 220ms ease;
+}
+
+.backdrop {
+  position: absolute;
+  inset: 0;
+  background: #09090b;
 }
 
 .gridGlow {
@@ -32,17 +42,6 @@
   inset: 0;
   pointer-events: none;
   opacity: 0.72;
-}
-
-.overlayLight .gridGlow {
-  background:
-    radial-gradient(640px circle at 50% 46%, rgba(9, 9, 11, 0.045), transparent 72%),
-    linear-gradient(to right, rgba(9, 9, 11, 0.03) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(9, 9, 11, 0.03) 1px, transparent 1px);
-  background-size: 100% 100%, 48px 48px, 48px 48px;
-}
-
-.overlayDark .gridGlow {
   background:
     radial-gradient(640px circle at 50% 46%, rgba(255, 255, 255, 0.06), transparent 72%),
     linear-gradient(to right, rgba(255, 255, 255, 0.045) 1px, transparent 1px),
@@ -50,22 +49,55 @@
   background-size: 100% 100%, 48px 48px, 48px 48px;
 }
 
+/* The white surface. It opens as a circle from the centre of the screen; 72vmax reaches the
+   corners of any screen. */
+.wipe {
+  position: absolute;
+  inset: 0;
+  background: #ffffff;
+  clip-path: circle(0 at 50% 50%);
+  transition: clip-path var(--splash-travel) var(--splash-glide);
+  will-change: clip-path;
+}
+
+.overlayDocking .wipe {
+  clip-path: circle(72vmax at 50% 50%);
+}
+
+/* The difference blend turns the near-white lockup into ink (#09090b) where the white surface
+   is under it, and keeps it near-white over the black. So the colour of the lockup changes at
+   the edge of the circle, with no grey step between. */
 .stage {
+  --splash-mark: 72px;
   position: relative;
   display: inline-flex;
   align-items: center;
-  gap: 16px;
   padding: 12px 16px;
+  mix-blend-mode: difference;
   transform: translate3d(0, 0, 0) scale(1);
   transform-origin: center center;
-  transition: transform 680ms cubic-bezier(0.22, 1, 0.36, 1), opacity 420ms ease;
+  transition: transform var(--splash-travel) var(--splash-glide), opacity 360ms ease 80ms;
   will-change: transform, opacity;
+}
+
+.stageLeaves {
+  opacity: 0;
+}
+
+/* The mark draws alone in the centre, then the lockup slides left while the letters come in.
+   The animation sits on this inner wrapper so the stage keeps its inline dock transform. */
+.lockup {
+  display: inline-flex;
+  align-items: center;
+  gap: 14px;
+  transform: translate3d(calc(50% - var(--splash-mark) / 2), 0, 0);
+  animation: splashLockup 640ms var(--splash-glide) 460ms forwards;
 }
 
 .markWrap {
   position: relative;
-  width: 68px;
-  height: 68px;
+  width: var(--splash-mark);
+  height: var(--splash-mark);
   flex-shrink: 0;
 }
 
@@ -75,142 +107,149 @@
   width: 100%;
   height: 100%;
   overflow: visible;
-  transition: opacity 380ms ease;
 }
 
-.overlayDocking .traceSvg {
-  opacity: 0.15;
-}
-
+/* Step 1 of the mark: its outline is drawn. It goes when the mark is full. */
 .tracePath {
   fill: none;
   stroke: currentColor;
-  stroke-width: 26;
+  stroke-width: 22;
   stroke-linecap: square;
   stroke-linejoin: miter;
   stroke-dasharray: 1;
   stroke-dashoffset: 1;
-  animation: splashDraw 880ms cubic-bezier(0.65, 0, 0.35, 1) forwards;
+  animation:
+    splashDraw 560ms var(--splash-glide) forwards,
+    splashOutlineOut 280ms ease 920ms forwards;
 }
 
 .tracePathBottom {
-  animation-delay: 120ms;
+  animation-delay: 100ms, 920ms;
 }
 
+/* Step 2 of the mark: it fills from its foot to its top. The file is the ink logo of the page;
+   the filter makes it white, so the shape is the same in both states. */
 .logoImg {
   position: relative;
   z-index: 1;
-  opacity: 0;
-  transform: scale(0.95);
-  animation: splashLogoFill 520ms cubic-bezier(0.22, 1, 0.36, 1) 460ms forwards;
+  filter: invert(1);
+  clip-path: inset(100% 0 0 0);
+  animation: splashMarkFill 500ms var(--splash-glide) 520ms forwards;
 }
 
 .wordmark {
   display: flex;
   align-items: baseline;
-  gap: 8px;
+  padding: 0.14em 0.04em 0.22em 0;
   white-space: nowrap;
-}
-
-.titleEn {
-  font-size: clamp(1.75rem, 4vw, 2.35rem);
-  font-weight: 800;
-  letter-spacing: -0.04em;
-  line-height: 1;
-  opacity: 0;
-  filter: blur(8px);
-  transform: translate3d(0, 8px, 0);
-  animation: splashReveal 620ms cubic-bezier(0.22, 1, 0.36, 1) 340ms forwards;
-}
-
-.titleCn {
-  font-size: clamp(1.1rem, 2.6vw, 1.45rem);
+  font-family: var(--font-wordmark), var(--font-stack);
+  font-size: clamp(2.5rem, 5vw, 3.25rem);
   font-weight: 600;
+  letter-spacing: -0.025em;
+  line-height: 1;
+}
+
+.letter {
+  position: relative;
+  display: inline-block;
+}
+
+/* Step 1 of a letter: its outline comes into focus. */
+.letterOutline {
+  position: absolute;
+  top: 0;
+  left: 0;
+  color: transparent;
+  -webkit-text-stroke: 1px var(--splash-ink);
   opacity: 0;
-  filter: blur(8px);
-  transform: translate3d(0, 8px, 0);
-  animation: splashRevealMuted 620ms cubic-bezier(0.22, 1, 0.36, 1) 440ms forwards;
+  animation:
+    splashLetterOutline 400ms cubic-bezier(0.22, 1, 0.36, 1) forwards,
+    splashOutlineOut 230ms ease forwards;
 }
 
-.overlayLight .titleCn {
-  color: #52525b;
+/* Step 2 of a letter: it fills from its foot to its top. The clip reaches past the letter box
+   (ascenders, the tail of the "y"), so the full letter shows at the end. */
+.letterFill {
+  display: inline-block;
+  clip-path: inset(1.4em -0.1em -0.4em -0.1em);
+  animation: splashLetterFill 420ms var(--splash-glide) forwards;
 }
 
-.overlayDark .titleCn {
-  color: #a1a1aa;
+@keyframes splashFailsafe {
+  to {
+    visibility: hidden;
+    pointer-events: none;
+  }
 }
 
 @keyframes splashDraw {
-  0% {
+  from {
     stroke-dashoffset: 1;
-    opacity: 0.92;
   }
-  68% {
+  to {
     stroke-dashoffset: 0;
-    opacity: 0.95;
   }
-  100% {
-    stroke-dashoffset: 0;
+}
+
+@keyframes splashOutlineOut {
+  to {
     opacity: 0;
   }
 }
 
-@keyframes splashLogoFill {
-  0% {
-    opacity: 0;
-    transform: scale(0.95);
+@keyframes splashMarkFill {
+  from {
+    clip-path: inset(100% 0 0 0);
   }
-  100% {
-    opacity: 1;
-    transform: scale(1);
+  to {
+    clip-path: inset(0 0 0 0);
   }
 }
 
-@keyframes splashReveal {
-  0% {
+@keyframes splashLockup {
+  from {
+    transform: translate3d(calc(50% - var(--splash-mark) / 2), 0, 0);
+  }
+  to {
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes splashLetterOutline {
+  from {
     opacity: 0;
     filter: blur(8px);
-    transform: translate3d(0, 8px, 0);
+    transform: translate3d(0, 0.22em, 0);
   }
-  100% {
+  to {
     opacity: 1;
     filter: blur(0);
     transform: translate3d(0, 0, 0);
   }
 }
 
-@keyframes splashRevealMuted {
-  0% {
-    opacity: 0;
-    filter: blur(8px);
-    transform: translate3d(0, 8px, 0);
+@keyframes splashLetterFill {
+  from {
+    clip-path: inset(1.4em -0.1em -0.4em -0.1em);
   }
-  100% {
-    opacity: 1;
-    filter: blur(0);
-    transform: translate3d(0, 0, 0);
+  to {
+    clip-path: inset(-0.3em -0.1em -0.4em -0.1em);
   }
 }
 
 @media (max-width: 640px) {
   .stage {
-    gap: 12px;
+    --splash-mark: 54px;
   }
 
-  .markWrap {
-    width: 54px;
-    height: 54px;
+  .lockup {
+    gap: 11px;
   }
 }
 
+/* No splash for a reader who asks for less motion: the page shows at once. */
 @media (prefers-reduced-motion: reduce) {
-  .overlay,
-  .stage,
-  .tracePath,
-  .logoImg,
-  .titleEn,
-  .titleCn {
-    animation: none !important;
-    transition: none !important;
+  .overlay {
+    display: none;
   }
 }

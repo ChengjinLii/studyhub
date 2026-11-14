@@ -11,6 +11,7 @@ import AppImage from '../components/AppImage';
 import BrandLogo from '../components/BrandLogo';
 import OpeningSplash from '../components/OpeningSplash';
 import footerStyles from '../styles/SiteFooter.module.css';
+import { brandFont, wordmarkFont } from '../lib/brandFont';
 import { AppDialogProvider } from '../components/AppDialogProvider';
 import { AppToastProvider } from '../components/AppToastProvider';
 import { SessionProvider } from '../components/SessionProvider';
@@ -177,19 +178,18 @@ export default function MyApp({ Component, pageProps }: AppProps) {
         <link rel="apple-touch-icon" href="/icons/bot-apple-touch-icon-v3.png" />
       </Head>
       <AppProviders initialUser={initialSessionUser}>
-      <div className="page-with-footer">
+      <div className={`page-with-footer ${brandFont.variable} ${wordmarkFont.variable}`}>
         <OpeningSplash />
         <GlobalInteractiveChrome ready={globalChromeReady} />
         {showLocalDevBadge && <div className="runtime-environment-badge">{localDevLabel}</div>}
         <Component {...pageProps} />
-        <footer className={footerStyles.footer}>
+        <footer className={footerStyles.footer} data-site-footer="">
           <div className={footerStyles.wrap}>
             <div className={footerStyles.topGrid}>
               <div className={footerStyles.brandCol}>
                 <div className={footerStyles.brandRow}>
                   <BrandLogo theme="dark" size={30} />
                   <span className={footerStyles.brandEn}>StudyHub</span>
-                  <span className={footerStyles.brandCn}>· 学汇</span>
                 </div>
                 <p className={footerStyles.brandDesc}>
                   校园学习资料共享与互助平台，让每一份真题、笔记与经验沉淀为可复用的学习资源。

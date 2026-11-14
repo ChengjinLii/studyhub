@@ -210,7 +210,7 @@ test('independent material library keeps its original controls', async ({ page }
   await expect(page.getByRole('button', { name: '紧凑双列显示' })).toBeVisible();
   await expect(page.getByRole('button', { name: '详细单列显示' })).toBeVisible();
   await expect(page.getByRole('button', { name: '按学科', exact: true })).toHaveCount(0);
-  await expect(page.getByRole('textbox', { name: '搜索资料' })).toBeVisible();
+  await expect(page.getByRole('textbox', { name: '搜索资料', exact: true })).toBeVisible();
 });
 
 test('homepage defaults to subject download ranking and puts cooperation in the right card', async ({ page }, info) => {

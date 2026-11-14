@@ -21,6 +21,9 @@ const priceText = (material: MaterialListItem) => {
   return `¥${price.toFixed(2)}`;
 };
 
+// The card shows two rows of tags at most; CSS cuts off what does not fit.
+const CARD_TAG_LIMIT = 6;
+
 const formatTitleForDisplay = (title?: string | null) => {
   return title || '';
 };
@@ -89,83 +92,83 @@ export default function MaterialCard({
     .join(' ');
 
   if (variant === 'minimal') {
-    const contextText = [
-      material.college || material.school || '未知学校',
-      displayDiscipline,
-      material.gradeValue,
-    ]
-      .filter(Boolean)
-      .join(' · ');
-
     const minimalClasses = [
       'material-card',
       'minimal-variant',
       'material-card-clickable',
-      minStyles.minimalRow,
+      minStyles.minimalCard,
       isExperienceTag ? 'material-card--experience' : '',
-      checked ? `selected ${minStyles.minimalRowSelected}` : '',
     ]
       .filter(Boolean)
       .join(' ');
 
+    const cardTags = filteredTags.slice(0, CARD_TAG_LIMIT);
+    const schoolLine = [material.school || '未知学校', material.college].filter(Boolean).join(' · ');
+    const disciplineLine = [displayDiscipline, material.gradeValue].filter(Boolean).join(' · ');
+    const showRating = !isExperienceTag && Boolean(material.ratingAvg);
+    const isFree = !isExperienceTag && material.free;
+
+    // The card of the first design: title and price, three fact lines, tags, then the rating
+    // and the counts on the bottom edge.
     return (
       <li data-material-id={material.id} className={minimalClasses}>
         <Link className="material-card__overlay-link" href={materialHref} aria-label={overlayLabel} prefetch={false} />
-        {selectable && (
-          <button
-            type="button"
-            className={`${minStyles.rowCheck}${checked ? ` ${minStyles.rowCheckChecked}` : ''}`}
-            aria-pressed={checked}
-            aria-label={checked ? '取消选择资料' : '选择资料'}
-            onClick={handleToggle}
-          >
-            {checked ? (
-              <svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <path d="M2.5 6.2 5 8.7 9.5 3.5" />
-              </svg>
-            ) : null}
-          </button>
-        )}
-        <div className={minStyles.rowBody}>
-          <div className={minStyles.rowTitleLine}>
-            {isExperienceTag ? <span className={minStyles.rowBadge}>专栏</span> : null}
-            <h3 className={minStyles.rowTitle} title={material.title}>
+        <div className={minStyles.cardBody}>
+          <div className={minStyles.cardHead}>
+            <h3 className={minStyles.cardTitle} title={material.title}>
               {displayTitle}
             </h3>
+            {isExperienceTag ? (
+              <span className={minStyles.cardBadge}>专栏</span>
+            ) : (
+              <span className={`${minStyles.cardPrice}${isFree ? ` ${minStyles.cardPriceFree}` : ''}`}>
+                {priceText(material)}
+              </span>
+            )}
           </div>
-          <div className={minStyles.rowMeta}>
-            <span>
-              {contextText}
-              {' · '}
+          <div className={minStyles.cardMeta}>
+            <p>{schoolLine}</p>
+            <p>
+              发布者：
               {publisherId ? (
-                <Link href={publisherHref} className={minStyles.rowPublisher} prefetch={false}>
+                <Link href={publisherHref} className={minStyles.cardPublisher} prefetch={false}>
                   {publisherName}
                 </Link>
               ) : (
-                publisherName
+                <span className={minStyles.cardPublisher}>{publisherName}</span>
               )}
-            </span>
-            {copyrightOwner ? <span>版权：{copyrightOwner}</span> : null}
-            {displayedTags.length > 0 ? (
-              <span className={minStyles.rowTags}>
-                {displayedTags.map((tag) => (
-                  <Link key={tag} className={minStyles.rowTag} href={`/?tag=${encodeURIComponent(tag)}`} prefetch={false}>
-                    #{tag}
-                  </Link>
-                ))}
-                {extraTagCount > 0 ? <span className={minStyles.rowTag}>+{extraTagCount}</span> : null}
-              </span>
-            ) : null}
+            </p>
+            {disciplineLine ? <p>{disciplineLine}</p> : null}
           </div>
-        </div>
-        <div className={minStyles.rowMetrics}>
-          {!isExperienceTag && material.ratingAvg ? (
-            <span className={minStyles.rowStat}>评分 {material.ratingAvg.toFixed(1)}</span>
+          {cardTags.length > 0 ? (
+            <div className={minStyles.cardTags}>
+              {cardTags.map((tag) => (
+                <span key={tag} className={minStyles.cardTag}>
+                  {tag}
+                </span>
+              ))}
+            </div>
           ) : null}
-          {isExperienceTag
-            ? viewCount > 0 && <span className={minStyles.rowStat}>{viewCount} 阅读</span>
-            : downloadCount > 0 && <span className={minStyles.rowStat}>{downloadCount} 下载</span>}
-          <span className={minStyles.rowPrice}>{isExperienceTag ? '专栏' : priceText(material)}</span>
+          <div className={minStyles.cardStats}>
+            <p className={minStyles.cardRating}>评分：{showRating ? material.ratingAvg!.toFixed(1) : '--'}</p>
+            <div className={minStyles.cardChips}>
+              <span className={minStyles.cardChip}>
+                <MaterialStatIcon name="like" />
+                <span className={minStyles.srOnly}>点赞</span>
+                {likeCount}
+              </span>
+              <span className={minStyles.cardChip}>
+                <MaterialStatIcon name="comment" />
+                <span className={minStyles.srOnly}>评论</span>
+                {commentCount}
+              </span>
+              <span className={minStyles.cardChip}>
+                <MaterialStatIcon name={isExperienceTag ? 'view' : 'download'} />
+                <span className={minStyles.srOnly}>{isExperienceTag ? '阅读' : '下载'}</span>
+                {isExperienceTag ? viewCount : downloadCount}
+              </span>
+            </div>
+          </div>
         </div>
       </li>
     );

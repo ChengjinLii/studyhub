@@ -10,13 +10,16 @@ import { useSession } from './SessionProvider';
 
 type EyeOffset = { x: number; y: number };
 
-const POS_STORAGE_KEY = 'floating-sidebar-pos';
+// v2: the home page became a search portal, so a place saved for the old layout no longer fits.
+const POS_STORAGE_KEY = 'floating-sidebar-pos-v2';
 const HAT_STORAGE_KEY = 'studyhub-bot-hat';
 const SPEECH_DISMISSED_STORAGE_KEY = 'studyhub-bot-speech-dismissed';
 const MOBILE_BREAKPOINT = 720;
 const MOBILE_EDGE_GAP = 16;
 const MOBILE_DOCK_GAP = 8;
 const MOBILE_BUBBLE_SIZE = 50;
+const DESKTOP_DEFAULT_POSITION = { x: 60, y: 220 };
+const SEARCH_ANCHOR_GAP = 56;
 const BOT_HAT_IDS = ['santa', 'graduation', 'party', 'wizard', 'mianliu', 'none'] as const;
 type BotHat = (typeof BOT_HAT_IDS)[number];
 const BOT_HATS: { id: BotHat; label: string; previewClass: string }[] = [
@@ -57,7 +60,7 @@ export default function FloatingSidebar() {
   const { user, refreshSession } = useSession();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [wardrobeOpen, setWardrobeOpen] = useState(false);
-  const [sidebarPosition, setSidebarPosition] = useState({ x: 60, y: 220 });
+  const [sidebarPosition, setSidebarPosition] = useState(DESKTOP_DEFAULT_POSITION);
   const [selectedHat, setSelectedHat] = useState<BotHat>('none');
   const [botSpeech, setBotSpeech] = useState<BotSpeechConfig | null>(null);
   const [seenSpeechVersions, setSeenSpeechVersions] = useState<string[]>([]);
@@ -70,6 +73,8 @@ export default function FloatingSidebar() {
   const suppressClickRef = useRef(false);
   const dragStartRef = useRef<{ x: number; y: number } | null>(null);
   const keyboardOriginRef = useRef<{ x: number; y: number } | null>(null);
+  // True until the user drags the bubble: it then keeps its default place.
+  const usesDefaultPositionRef = useRef(false);
   const [bubbleMood, setBubbleMood] = useState<'neutral' | 'happy' | 'wink'>('neutral');
   const [eyeOffset, setEyeOffset] = useState<EyeOffset>({ x: 0, y: 0 });
   const eyeTrackingEnabled = true; // 眼睛跟随默认开启（无开关）
@@ -128,6 +133,26 @@ export default function FloatingSidebar() {
     };
   }, []);
 
+  // Default place on a desktop screen: at the left of the home search box, on its centre line.
+  // The place is that of the box when the page is at its top, so the bubble stays there while
+  // the page scrolls. Pages with no search box use the plain default.
+  const getDesktopDefaultPosition = useCallback(() => {
+    if (typeof window === 'undefined' || window.innerWidth <= MOBILE_BREAKPOINT) return null;
+    const rect = document.querySelector<HTMLElement>('[data-search-pill]')?.getBoundingClientRect();
+    if (!rect || !rect.width) return DESKTOP_DEFAULT_POSITION;
+    const size = bubbleRef.current?.offsetWidth ?? 52;
+    // The page keeps a scrollbar gutter on both sides, so the origin of a fixed box is not the
+    // left edge of the viewport. The container tells where that origin is.
+    const container = sidebarRef.current;
+    const styleLeft = container ? Number.parseFloat(container.style.left) : Number.NaN;
+    const originX =
+      container && Number.isFinite(styleLeft) ? Math.round(container.getBoundingClientRect().left - styleLeft) : 0;
+    return {
+      x: rect.left - originX - size - SEARCH_ANCHOR_GAP,
+      y: rect.top + window.scrollY + rect.height / 2 - size / 2,
+    };
+  }, []);
+
   const getSidebarClampSize = useCallback(() => {
     if (!sidebarOpen) {
       return {
@@ -161,12 +186,43 @@ export default function FloatingSidebar() {
     } catch {
       // ignore
     }
+    usesDefaultPositionRef.current = true;
     const size = getSidebarClampSize();
     setSidebarPosition((pos) => {
-      const next = mobileRestingPosition ?? pos;
+      const next = mobileRestingPosition ?? getDesktopDefaultPosition() ?? pos;
       return clampSidebarPosition(next.x, next.y, size.width, size.height);
     });
-  }, [clampSidebarPosition, getMobileRestingPosition, getSidebarClampSize]);
+  }, [clampSidebarPosition, getDesktopDefaultPosition, getMobileRestingPosition, getSidebarClampSize]);
+
+  // While the bubble has its default place, it takes that place again when the window changes
+  // size. A scroll does not move it.
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+    let frame: number | null = null;
+    const follow = () => {
+      if (!usesDefaultPositionRef.current || sidebarOpen || frame !== null) return;
+      frame = window.requestAnimationFrame(() => {
+        frame = null;
+        const next = getDesktopDefaultPosition();
+        if (!next) return;
+        const size = getSidebarClampSize();
+        setSidebarPosition(() => clampSidebarPosition(next.x, next.y, size.width, size.height));
+      });
+    };
+    window.addEventListener('resize', follow);
+    // The page layout settles after the first paint (fonts, the scrollbar, the opening splash),
+    // and the search box can move by a few pixels then.
+    const layoutObserver = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(follow);
+    layoutObserver?.observe(document.body);
+    const splashObserver = new MutationObserver(follow);
+    splashObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['data-splash-state'] });
+    return () => {
+      window.removeEventListener('resize', follow);
+      layoutObserver?.disconnect();
+      splashObserver.disconnect();
+      if (frame !== null) window.cancelAnimationFrame(frame);
+    };
+  }, [clampSidebarPosition, getDesktopDefaultPosition, getSidebarClampSize, sidebarOpen]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return undefined;
@@ -177,12 +233,15 @@ export default function FloatingSidebar() {
         const followsRightDock =
           restingPosition !== null &&
           position.x >= window.innerWidth - MOBILE_BUBBLE_SIZE - MOBILE_EDGE_GAP - 24;
-        const target = followsRightDock ? restingPosition : position;
+        const desktopDefault = usesDefaultPositionRef.current && !sidebarOpen ? getDesktopDefaultPosition() : null;
+        const target = followsRightDock ? restingPosition : desktopDefault ?? position;
         return clampSidebarPosition(target.x, target.y, size.width, size.height);
       });
     });
     return () => window.cancelAnimationFrame(frame);
-  }, [clampSidebarPosition, getMobileRestingPosition, getSidebarClampSize, router.asPath]);
+    // The open state is read, not watched: this runs on a page change only.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clampSidebarPosition, getDesktopDefaultPosition, getMobileRestingPosition, getSidebarClampSize, router.asPath]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -384,6 +443,7 @@ export default function FloatingSidebar() {
         };
       }
       dragMovedRef.current = true;
+      usesDefaultPositionRef.current = false;
       const { x, y } = dragOffsetRef.current;
       const nextX = event.clientX - x;
       const nextY = event.clientY - y;

@@ -144,7 +144,7 @@ test('mock API mode covers payment status fallback envelope', async ({ page }) =
 
 test('mobile StudyHub Bot stays fully above the bottom navigation', async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 780 });
-  await page.addInitScript(() => window.localStorage.removeItem('floating-sidebar-pos'));
+  await page.addInitScript(() => window.localStorage.removeItem('floating-sidebar-pos-v2'));
   await page.goto('/more');
   await closeEntryModalIfPresent(page);
 
@@ -165,7 +165,7 @@ test('mobile StudyHub Bot stays fully above the bottom navigation', async ({ pag
 test('administrator speech queue advances, remembers dismissal, and shows updated messages', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.addInitScript(() => {
-    window.localStorage.removeItem('floating-sidebar-pos');
+    window.localStorage.removeItem('floating-sidebar-pos-v2');
     // Init scripts also run on reload; keep the dismissal record we are testing.
   });
   const firstMessage = {
@@ -231,7 +231,7 @@ test('administrator speech queue advances, remembers dismissal, and shows update
 
 test('mobile detail actions reuse the global bottom navigation layer', async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 780 });
-  await page.addInitScript(() => window.localStorage.removeItem('floating-sidebar-pos'));
+  await page.addInitScript(() => window.localStorage.removeItem('floating-sidebar-pos-v2'));
   await page.goto('/more');
   await closeEntryModalIfPresent(page);
 
@@ -336,7 +336,7 @@ test('material list restores its session view and scroll position after detail n
     }));
   });
   await page.goto('/materials');
-  await expect(page.getByRole('textbox', { name: '搜索资料' })).toHaveValue('通信原理');
+  await expect(page.getByRole('textbox', { name: '搜索资料', exact: true })).toHaveValue('通信原理');
   await expect(page.getByRole('button', { name: '详细单列显示' })).toHaveAttribute('aria-pressed', 'true');
   await expect(page.locator('.material-card')).toHaveCount(24);
   await expect(page.locator('.app-toast')).toContainText('已恢复上次的筛选条件和浏览位置');
@@ -417,10 +417,10 @@ test('desktop material cards keep long titles and prices inside their bounds', a
 
 test('mobile Bot moves away while a text field is focused and returns after blur', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.addInitScript(() => window.localStorage.removeItem('floating-sidebar-pos'));
+  await page.addInitScript(() => window.localStorage.removeItem('floating-sidebar-pos-v2'));
   await page.goto('/materials');
   const bot = page.locator('.floating-sidebar__bubble');
-  const search = page.getByRole('textbox', { name: '搜索资料' });
+  const search = page.getByRole('textbox', { name: '搜索资料', exact: true });
   await expect(bot).toBeVisible();
   const restingBox = await bot.boundingBox();
   await search.focus();
@@ -457,7 +457,7 @@ test('material filtering updates one toast from loading to completion', async ({
 test('StudyHub Bot wardrobe hats use their calibrated head contact points', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.addInitScript(() => {
-    window.localStorage.removeItem('floating-sidebar-pos');
+    window.localStorage.removeItem('floating-sidebar-pos-v2');
     window.localStorage.setItem('studyhub-bot-hat', 'santa');
   });
   await page.goto('/more');

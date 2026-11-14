@@ -32,3 +32,26 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE
+
+
+## Jost
+
+`styles/fonts/jost-latin-wght-normal.woff2` is the Latin subset of the Jost
+variable font, used for display numerals.
+
+Copyright 2020 The Jost Project Authors (https://github.com/indestructible-type/Jost)
+
+Licensed under the SIL Open Font License, Version 1.1. The full license text is
+in `styles/fonts/Jost-OFL.txt`.
+
+
+## Outfit
+
+`styles/fonts/outfit-latin-wght-normal.woff2` is the Latin subset of the Outfit
+variable font (from the `@fontsource-variable/outfit` package, version 5.3.0),
+used for the "StudyHub" wordmark.
+
+Copyright 2021 The Outfit Project Authors (https://github.com/Outfitio/Outfit-Fonts)
+
+Licensed under the SIL Open Font License, Version 1.1. The full license text is
+in `styles/fonts/Outfit-OFL.txt`.

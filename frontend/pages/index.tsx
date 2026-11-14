@@ -7,6 +7,7 @@ import NavBar from '../components/NavBar';
 import AppImage from '../components/AppImage';
 import MaterialIconSprite from '../components/MaterialIconSprite';
 import HomeMaterialLibrary from '../components/home/HomeMaterialLibrary';
+import HomePortal from '../components/home/HomePortal';
 import { materialBrowseScope } from '../lib/materialBrowseSession';
 import { MaterialBrowseMode, MaterialSubjectScope, useMaterialSubjects } from '../lib/useMaterialSubjects';
 import { rankHomeSubjects } from '../lib/homeDiscovery';
@@ -33,8 +34,6 @@ import { ensureApiSuccess, unwrapApiResponse } from '../lib/apiEnvelope';
 import { toErrorMessage } from '../lib/errors';
 import { formatDate, formatNumber } from '../lib/format';
 import { fetchHomeProfileContext } from '../lib/homeProfileContext';
-import { materialPath } from '../lib/slug';
-import { copyToClipboard, isLikelyMobile, tryNativeShare } from '../lib/share';
 import {
   SUPPORTED_SCHOOL,
   SUPPORTED_COLLEGES,
@@ -51,16 +50,30 @@ import { MaterialRequestItem } from '../types/request';
 const MATERIALS_PAGE_SIZE = 24;
 const HOME_REQUEST_PREVIEW_LIMIT = 8;
 const HOME_POPULAR_PREVIEW_LIMIT = 20;
+// Home page, desktop: the content under the first screen stays closed until the reader has
+// scrolled this far (px). The navbar is 64px high.
+const HOME_REVEAL_DISTANCE = 120;
+const HOME_NAVBAR_HEIGHT = 64;
+const HOME_PHONE_MAX_WIDTH = 768;
+// True from the first opening until a full reload, so a return to the home page inside the app
+// does not close the content again.
+let homeContentOpened = false;
+type HomeRevealMotion = 'rise' | 'none';
+
+/** Scrolls the content under the first screen up to the navbar. */
+const glideToHomeContent = () => {
+  const content = document.getElementById('home-content');
+  if (!content) return;
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  window.scrollTo({
+    top: window.scrollY + content.getBoundingClientRect().top - HOME_NAVBAR_HEIGHT,
+    behavior: reduceMotion ? 'auto' : 'smooth',
+  });
+};
+
 const HomeFilterCard = dynamic(() => import('../components/home/HomeFilterCard'));
 const HomeLeaderboard = dynamic(() => import('../components/home/HomeLeaderboard'));
-const HomeDiscoveryCard = dynamic(() =>
-  import('../components/home/HomeRequestPanels').then((mod) => mod.HomeDiscoveryCard)
-);
-const HomeCooperationCard = dynamic(() =>
-  import('../components/home/HomeRequestPanels').then((mod) => mod.HomeCooperationCard)
-);
 const MobileHomeSections = dynamic(() => import('../components/home/MobileHomeSections'));
-const ShareSheet = dynamic(() => import('../components/ShareSheet'), { ssr: false });
 
 const ROLE_LABELS = [
   { mask: RoleMask.DEVELOPER, label: '开发者' },
@@ -143,6 +156,61 @@ export default function Home({
   const [paginationNotice, setPaginationNotice] = useState('');
   const filterRef = useRef<HTMLDivElement>(null);
   const materialsRef = useRef<HTMLDivElement>(null);
+  const [contentRevealed, setContentRevealed] = useState(() => homeContentOpened);
+  const [revealMotion, setRevealMotion] = useState<HomeRevealMotion>('none');
+  // Opens the content under the first screen. The attributes change at once, so a scroll to the
+  // content in the same task finds it laid out; the state follows. The cards rise into place
+  // only when the reader's scroll opens them ('rise'): a jump to a section measures the place
+  // of that section, and a card in motion would give a wrong place.
+  const revealContent = useCallback((motion: HomeRevealMotion = 'none') => {
+    homeContentOpened = true;
+    const content = document.getElementById('home-content');
+    content?.setAttribute('data-reveal-motion', motion);
+    content?.setAttribute('data-revealed', 'true');
+    document.documentElement.style.removeProperty('--home-reveal');
+    setRevealMotion(motion);
+    setContentRevealed(true);
+  }, []);
+  const scrollToContent = useCallback(() => {
+    revealContent('rise');
+    glideToHomeContent();
+  }, [revealContent]);
+  // The content opens when the reader has scrolled HOME_REVEAL_DISTANCE on the first screen.
+  // The line on the strip of the first screen fills over that distance (--home-reveal).
+  useEffect(() => {
+    if (contentRevealed) return undefined;
+    // The phone has no first screen to open from. A restored scroll position, a search in the
+    // address or a link to a section opens the content at once.
+    if (
+      window.innerWidth <= HOME_PHONE_MAX_WIDTH ||
+      window.scrollY >= HOME_REVEAL_DISTANCE ||
+      window.location.search ||
+      window.location.hash
+    ) {
+      revealContent();
+      return undefined;
+    }
+    let frame: number | null = null;
+    const onScroll = () => {
+      if (frame !== null) return;
+      frame = window.requestAnimationFrame(() => {
+        frame = null;
+        const progress = Math.min(1, window.scrollY / HOME_REVEAL_DISTANCE);
+        if (progress < 1) {
+          document.documentElement.style.setProperty('--home-reveal', progress.toFixed(3));
+          return;
+        }
+        revealContent('rise');
+        glideToHomeContent();
+      });
+    };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => {
+      window.removeEventListener('scroll', onScroll);
+      if (frame !== null) window.cancelAnimationFrame(frame);
+      document.documentElement.style.removeProperty('--home-reveal');
+    };
+  }, [contentRevealed, revealContent]);
   const normalizeFilters = useCallback(
     (input: FilterState): FilterState => ({
       keyword: input.keyword || '',
@@ -187,8 +255,6 @@ export default function Home({
       setLoadingPage(true);
       setPaginationError('');
       setPaginationNotice('');
-      setBatchError('');
-      setBatchInfo('');
       setFiltersState(normalized);
       const query = buildQuery(normalized);
       try {
@@ -206,6 +272,7 @@ export default function Home({
         if (data.availableTags) setTagOptionsState(data.availableTags);
         await router.replace({ pathname: '/', query }, undefined, { shallow: true, scroll: false });
         requestAnimationFrame(() => {
+          if (options?.scrollTarget === 'materials') revealContent();
           if (options?.scrollTarget === 'filters') {
             filterRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
             return;
@@ -220,7 +287,7 @@ export default function Home({
         setLoadingPage(false);
       }
     },
-    [buildQuery, buildQueryString, normalizeFilters, router]
+    [buildQuery, buildQueryString, normalizeFilters, revealContent, router]
   );
   const updateFilter = useCallback((key: keyof FilterState, value: string) => {
     setFiltersState((prev) => ({ ...prev, [key]: value }));
@@ -233,15 +300,6 @@ export default function Home({
     };
     applyFilters(nextFilters, { scrollTarget: 'filters' });
   };
-  const applyQuickTag = (tag: string) => {
-    const nextFilters = {
-      ...filtersState,
-      tag,
-      page: '1',
-    };
-    void applyFilters(nextFilters, { scrollTarget: 'materials' });
-  };
-  const [bannerVisible, setBannerVisible] = useState(false);
   const freeCount = useMemo(() => materialList.filter((item) => item.free).length, [materialList]);
   const statSource = statsState || stats || null;
   const statValues = {
@@ -288,11 +346,6 @@ export default function Home({
     filtersState.price,
   ]);
   const [showAdvanced, setShowAdvanced] = useState(false);
-  const [selectedIds, setSelectedIds] = useState<number[]>([]);
-  const [batchError, setBatchError] = useState('');
-  const [batchInfo, setBatchInfo] = useState('');
-  const [shareSheetOpen, setShareSheetOpen] = useState(false);
-  const [shareSheetText, setShareSheetText] = useState('');
   const [browseMode, setBrowseMode] = useState<MaterialBrowseMode>('materials');
   const [subjectId, setSubjectId] = useState<string | null>(null);
   const [subjectPage, setSubjectPage] = useState(1);
@@ -322,6 +375,7 @@ export default function Home({
     return sorted.length ? sorted : popularMaterials;
   }, [popularMaterials, subjects.catalogueFolders, materialList]);
   const scrollToMaterials = useCallback(() => {
+    revealContent();
     requestAnimationFrame(() => {
       const root = document.documentElement;
       const previous = root.style.scrollBehavior;
@@ -330,7 +384,7 @@ export default function Home({
       materialsRef.current?.scrollIntoView({ block: 'start', behavior: 'auto' });
       root.style.scrollBehavior = previous;
     });
-  }, []);
+  }, [revealContent]);
   const handleSubjectChange = useCallback((id: string | null, scope: MaterialSubjectScope) => {
     setSubjectId(id);
     setSubjectScope(scope);
@@ -388,7 +442,7 @@ export default function Home({
       subjectId,
       subjectPage,
       subjectScope,
-      selectedIds,
+      selectedIds: [],
       showAdvanced,
     },
     onRestore: (snapshot) => {
@@ -401,7 +455,6 @@ export default function Home({
       setSubjectId(snapshot.subjectId);
       setSubjectPage(snapshot.subjectPage);
       setSubjectScope(snapshot.subjectScope || 'filtered');
-      setSelectedIds(snapshot.selectedIds || []);
       setShowAdvanced(snapshot.showAdvanced || false);
     },
   });
@@ -445,20 +498,8 @@ export default function Home({
       ? '本月暂无贡献记录，欢迎率先投稿。'
       : '暂无贡献记录，欢迎率先投稿。';
   useEffect(() => {
-    if (!officialQQ) return;
-    const dismissed = window.localStorage.getItem('qq-banner-dismissed');
-    setBannerVisible(!dismissed);
-  }, [officialQQ]);
-
-  useEffect(() => {
     setShowAdvanced(false);
   }, []);
-
-  useEffect(() => {
-    setSelectedIds([]);
-    setBatchError('');
-    setBatchInfo('');
-  }, [materialList]);
 
   useEffect(() => {
     if (!user) {
@@ -490,13 +531,6 @@ export default function Home({
     };
   }, [user]);
 
-  const dismissBanner = () => {
-    setBannerVisible(false);
-    if (typeof window !== 'undefined') {
-      window.localStorage.setItem('qq-banner-dismissed', '1');
-    }
-  };
-
   useEffect(() => {
     if (!didRunInitialLeaderboardEffect.current) {
       didRunInitialLeaderboardEffect.current = true;
@@ -520,14 +554,6 @@ export default function Home({
       cancelled = true;
     };
   }, [leaderboardPeriod]);
-
-  const selectedMaterials = useMemo(() => {
-    const folders = subjectScope === 'all' ? subjects.catalogueFolders : subjects.allFolders;
-    const folder = folders.find((item) => item.id === subjectId);
-    const items = folder?.materials || (browseMode === 'subjects' ? folders.flatMap((item) => item.materials) : materialList);
-    return items.filter((item) => selectedIds.includes(item.id));
-  }, [browseMode, subjectScope, subjectId, subjects.catalogueFolders, subjects.allFolders, materialList, selectedIds]);
-  const selectedCount = selectedMaterials.length;
 
   const ensureLoggedIn = useCallback(() => {
     if (user) return true;
@@ -579,72 +605,22 @@ export default function Home({
     [ensureLoggedIn, router]
   );
 
-  const toggleSelection = (materialId: number) => {
-    setSelectedIds((prev) => {
-      const exists = prev.includes(materialId);
-      const next = exists ? prev.filter((id) => id !== materialId) : [...prev, materialId];
-      return next;
-    });
-    setBatchError('');
-    setBatchInfo('');
-  };
-
-  const handleSelectAll = () => {
-    if (!materialList.length) return;
-    setSelectedIds((prev) => (prev.length === materialList.length ? [] : materialList.map((item) => item.id)));
-    setBatchError('');
-    setBatchInfo('');
-  };
-
-  const clearSelection = () => {
-    setSelectedIds([]);
-    setBatchError('');
-    setBatchInfo('');
-  };
-
   const handleJumpToLeaderboard = useCallback(() => {
     if (typeof document === 'undefined') return;
+    revealContent();
     const section = document.getElementById('leaderboard');
     if (section) {
       section.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
-  }, []);
+  }, [revealContent]);
 
   const toggleAdvancedFilters = () => {
     setShowAdvanced((prev) => !prev);
   };
 
   const handleResetFilters = () => {
-    setSelectedIds([]);
-    setBatchError('');
-    setBatchInfo('');
     const nextFilters = normalizeFilters({} as FilterState);
     applyFilters(nextFilters, { scrollTarget: 'filters' });
-  };
-
-  const handleBatchShare = async () => {
-    if (!selectedCount) return;
-    const origin = typeof window !== 'undefined' ? window.location.origin : '';
-    const links = selectedMaterials.map((item) => `${origin}${materialPath(item.id, item.title)}`);
-    const text = links.join('\n');
-    setBatchError('');
-    setBatchInfo('');
-    if (isLikelyMobile()) {
-      const shared = await tryNativeShare({ title: 'StudyHub 资料合集', text });
-      if (shared) {
-        setBatchInfo('已唤起系统分享。');
-        return;
-      }
-      setShareSheetText(text);
-      setShareSheetOpen(true);
-      return;
-    }
-    const copied = await copyToClipboard(text);
-    if (copied) {
-      setBatchInfo(`已复制 ${selectedCount} 条资料链接`);
-      return;
-    }
-    setBatchError('复制失败，请手动复制。');
   };
 
   const handlePageChange = async (targetPage: number) => {
@@ -697,15 +673,42 @@ export default function Home({
     <>
       <MaterialIconSprite />
       <NavBar user={user} />
-      <main className={`container page-grid home-page ${minStyles.page}`}>
-        {officialQQ && bannerVisible && (
-          <div className="qq-banner">
-            <span>加入官方 QQ 群：{officialQQ}</span>
-            <button type="button" onClick={dismissBanner}>
-              ×
-            </button>
-          </div>
-        )}
+      {/* First screen: the search portal. The sections under it start in <main>. */}
+      <HomePortal
+        search={
+          <HomeFilterCard
+            filterRef={filterRef}
+            filtersState={filtersState}
+            showAdvanced={showAdvanced}
+            availableTagOptions={availableTagOptions}
+            onFilterChange={updateFilter}
+            onCourseCategoryChange={applyCourseCategory}
+            onToggleAdvancedFilters={toggleAdvancedFilters}
+            onResetFilters={handleResetFilters}
+            onSubmit={handleFilterSubmit}
+          />
+        }
+        popularItems={effectivePopularMaterials}
+        subjectRanks={subjectRanks}
+        stats={{
+          users: mobileOverviewStats[3].value,
+          materials: mobileOverviewStats[0].value,
+          free: mobileOverviewStats[1].value,
+          downloads: mobileOverviewStats[2].value,
+          subjects: subjectRanks.length > 0 ? formatNumber(subjectRanks.length) : '—',
+        }}
+        officialQQ={officialQQ}
+        onOpenSubject={(id) => { setBrowseMode('subjects'); handleSubjectChange(id, 'all'); }}
+        onBrowseSubjects={browseAllSubjects}
+        onBrowseMaterials={browseAllMaterials}
+        onScrollDown={scrollToContent}
+      />
+      <main
+        id="home-content"
+        className={`container page-grid home-page ${minStyles.page}`}
+        data-revealed={contentRevealed ? 'true' : 'false'}
+        data-reveal-motion={revealMotion}
+      >
         <MobileHomeSections
           mobileSearch={mobileSearch}
           stats={mobileOverviewStats}
@@ -714,82 +717,50 @@ export default function Home({
           onMobileSearchSubmit={handleMobileSearchSubmit}
           onJumpToLeaderboard={handleJumpToLeaderboard}
         />
-        <HomeFilterCard
-          className="home-top-filter-card"
-          overviewStats={mobileOverviewStats}
-          filterRef={filterRef}
-          filtersState={filtersState}
-          showAdvanced={showAdvanced}
-          availableTagOptions={availableTagOptions}
-          onFilterChange={updateFilter}
-          onCourseCategoryChange={applyCourseCategory}
-          onQuickTagSelect={applyQuickTag}
-          onToggleAdvancedFilters={toggleAdvancedFilters}
-          onResetFilters={handleResetFilters}
-          onSubmit={handleFilterSubmit}
-        />
-        <div className="home-main-columns">
-          <div className={`home-desktop-library${browseMode === 'subjects' || subjectId ? ` ${discoveryStyles.mobileSubjects}` : ''}`}>
-            <HomeMaterialLibrary
-              materialsRef={materialsRef} materials={materialList} meta={pageMeta}
-              keyword={appliedFilters.keyword} sort={filtersState.sort} loading={loadingPage}
-              error={paginationError} notice={paginationNotice} mode={browseMode}
-              onModeChange={(mode) => { setBrowseMode(mode); setSubjectScope('filtered'); setSubjectId(null); setSubjectPage(1); }}
-              onSortChange={(value) => void handleMaterialSortChange(value)} onPageChange={handlePageChange}
-              subjects={subjects} subjectId={subjectId} subjectPage={subjectPage} subjectScope={subjectScope}
-              onSubjectChange={(id) => handleSubjectChange(id, subjectScope)} onSubjectPageChange={setSubjectPage}
-              selectedIds={selectedIds}
-              selectedCount={selectedCount}
-              batchInfo={batchInfo}
-              batchError={batchError}
-              onBatchShare={handleBatchShare}
-              onClearSelection={clearSelection}
-              onToggle={toggleSelection} onReset={handleResetFilters}
-              onEditKeyword={() => filterRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })}
-            />
-          </div>
-          <aside className="home-side-column" aria-label="热门与榜单">
-            <HomeDiscoveryCard
-              requestItems={requestItems}
-              requestLoading={requestLoading}
-              requestError={requestError}
-              requestNotice={requestNotice}
-              leaderboardItems={leaderboardItems}
-              popularItems={effectivePopularMaterials}
-              subjectRanks={subjectRanks}
-              subjectsUpdatedAt={subjects.updatedAt}
-              onOpenSubject={(id) => { setBrowseMode('subjects'); handleSubjectChange(id, 'all'); }}
-              onBrowseSubjects={browseAllSubjects}
-              onBrowseMaterials={browseAllMaterials}
-              buildUploadLink={buildUploadLink}
-              onFollowRequest={handleFollowRequest}
-            />
-            <HomeLeaderboard
-              user={user}
-              topContributors={topContributors}
-              leaderboardPeriod={leaderboardPeriod}
-              leaderboardLabels={leaderboardLabels}
-              leaderboardPeriods={leaderboardPeriods}
-              leaderboardRangeHint={leaderboardRangeHint}
-              leaderboardEmptyHint={leaderboardEmptyHint}
-              leaderboardLoading={leaderboardLoading}
-              leaderboardError={leaderboardError}
-              leaderboardFollowNotice={leaderboardFollowNotice}
-              leaderboardFollowed={leaderboardFollowed}
-              leaderboardFollowLoading={leaderboardFollowLoading}
-              onPeriodChange={setLeaderboardPeriod}
-              onFollowContributor={handleFollowContributor}
-            />
-            <section className={minStyles.sideInfoSection} aria-label="支持 StudyHub">
-              <h3 className={minStyles.sideSubHeading}>支持 StudyHub</h3>
-              <p className={minStyles.sideDesc}>如果 StudyHub 帮到了你，可以打赏支持。</p>
-              <button className={minStyles.miniPillBtn} type="button" onClick={() => setSupportModalOpen(true)}>
-                打赏
-              </button>
-            </section>
-            <HomeCooperationCard profileMissingFields={profileMissingFields} />
-          </aside>
+        {/* Under the first screen: the classic cards of the main branch, one under the other. */}
+        <div className={`home-desktop-library${browseMode === 'subjects' || subjectId ? ` ${discoveryStyles.mobileSubjects}` : ''}`}>
+          <HomeMaterialLibrary
+            materialsRef={materialsRef} materials={materialList} meta={pageMeta}
+            keyword={appliedFilters.keyword} sort={filtersState.sort} loading={loadingPage}
+            error={paginationError} notice={paginationNotice} mode={browseMode}
+            onModeChange={(mode) => { setBrowseMode(mode); setSubjectScope('filtered'); setSubjectId(null); setSubjectPage(1); }}
+            onSortChange={(value) => void handleMaterialSortChange(value)} onPageChange={handlePageChange}
+            subjects={subjects} subjectId={subjectId} subjectPage={subjectPage} subjectScope={subjectScope}
+            onSubjectChange={(id) => handleSubjectChange(id, subjectScope)} onSubjectPageChange={setSubjectPage}
+            onReset={handleResetFilters}
+            onEditKeyword={() => filterRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })}
+          />
         </div>
+        <HomeLeaderboard
+          user={user}
+          topContributors={topContributors}
+          leaderboardPeriod={leaderboardPeriod}
+          leaderboardLabels={leaderboardLabels}
+          leaderboardPeriods={leaderboardPeriods}
+          leaderboardRangeHint={leaderboardRangeHint}
+          leaderboardEmptyHint={leaderboardEmptyHint}
+          leaderboardLoading={leaderboardLoading}
+          leaderboardError={leaderboardError}
+          leaderboardFollowNotice={leaderboardFollowNotice}
+          leaderboardFollowed={leaderboardFollowed}
+          leaderboardFollowLoading={leaderboardFollowLoading}
+          onPeriodChange={setLeaderboardPeriod}
+          onFollowContributor={handleFollowContributor}
+        />
+        <section className="card support-card" style={{ gridColumn: '1 / -1' }}>
+          <div>
+            <h3 className="card-title" style={{ margin: 0 }}>
+              支持 StudyHub
+            </h3>
+            <p style={{ marginTop: 8, marginBottom: 4 }}>
+              您的支持是我们继续运营的动力😁
+            </p>
+            <p className="help-text">所有打赏将用于服务器、带宽与内容审核支出，感谢你的信任。</p>
+          </div>
+          <button className="button primary" type="button" onClick={() => setSupportModalOpen(true)}>
+            打赏
+          </button>
+        </section>
         {supportModalOpen && (
           <div className="modal-mask" onClick={() => setSupportModalOpen(false)}>
             <div
@@ -820,12 +791,6 @@ export default function Home({
             </div>
           </div>
         )}
-        <ShareSheet
-          open={shareSheetOpen}
-          title="批量分享"
-          text={shareSheetText}
-          onClose={() => setShareSheetOpen(false)}
-        />
       </main>
     </>
   );

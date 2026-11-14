@@ -40,13 +40,10 @@
 
 .brandEn {
   color: #ffffff;
-  font-weight: 800;
-}
-
-.brandCn {
-  color: #a1a1aa;
-  font-size: 0.92rem;
+  font-family: var(--font-wordmark), var(--font-stack);
+  font-size: 1.4rem;
   font-weight: 600;
+  letter-spacing: -0.02em;
 }
 
 .brandDesc {
@@ -75,7 +72,7 @@
 }
 
 .searchBox:focus-within {
-  border-color: #52525b;
+  border-color: var(--sh-accent-on-dark);
   background: #1f1f22;
 }
 
@@ -161,7 +158,7 @@
 }
 
 .colLink:hover {
-  color: #ffffff;
+  color: var(--sh-accent-on-dark);
 }
 
 .colText {
@@ -198,7 +195,7 @@
 }
 
 .icpGroup a:hover {
-  color: #ffffff;
+  color: var(--sh-accent-on-dark);
   text-decoration: underline;
 }
 
@@ -232,4 +229,9 @@
   .searchForm {
     max-width: 100%;
   }
+}
+
+/* The home page is wider (1320px), so its cards have room; this bar follows it there. */
+:global(body:has(.home-page)) .wrap {
+  max-width: 1320px;
 }

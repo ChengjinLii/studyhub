@@ -52,23 +52,12 @@
   opacity: 0.86;
 }
 
-.brandText {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 5px;
-  letter-spacing: -0.02em;
-}
-
 .brandEn {
-  font-weight: 800;
-  color: #09090b;
-}
-
-.brandSep,
-.brandCn {
-  font-size: 0.92rem;
+  font-family: var(--font-wordmark), var(--font-stack);
+  font-size: 1.36rem;
   font-weight: 600;
-  color: #52525b;
+  letter-spacing: -0.02em;
+  color: #09090b;
 }
 
 .rightCluster {
@@ -83,7 +72,8 @@
     transform 500ms cubic-bezier(0.22, 1, 0.36, 1) 90ms;
 }
 
-:global(html[data-splash-state='playing']) .rightCluster {
+:global(html[data-splash-state='playing']) .rightCluster,
+:global(html[data-splash-state='docking']) .rightCluster {
   opacity: 0;
   filter: blur(6px);
   transform: translate3d(16px, 0, 0);
@@ -93,6 +83,14 @@
   display: flex;
   align-items: center;
   gap: 2px;
+  transition: opacity 500ms cubic-bezier(0.22, 1, 0.36, 1) 40ms;
+}
+
+/* The links come in with the rest of the first screen, after the splash lockup has landed. */
+:global(html[data-splash-state='playing']) .nav,
+:global(html[data-splash-state='docking']) .nav {
+  opacity: 0;
+  transition: none;
 }
 
 .navLink {
@@ -115,9 +113,10 @@
   color: #09090b;
 }
 
-.navLinkActive {
-  background: #f4f4f5;
-  color: #09090b;
+.navLinkActive,
+.navLinkActive:hover {
+  background: var(--sh-accent-soft);
+  color: var(--sh-accent-strong);
   font-weight: 600;
 }
 
@@ -236,11 +235,6 @@
   .guestPill {
     display: none;
   }
-
-  .brandSep,
-  .brandCn {
-    display: none;
-  }
 }
 
 @media (max-width: 768px) {
@@ -257,11 +251,6 @@
     display: none;
   }
 
-  .brandSep,
-  .brandCn {
-    display: inline;
-  }
-
   .loginButton {
     height: 36px;
     padding: 0 12px;
@@ -269,15 +258,37 @@
   }
 }
 
-@media (max-width: 420px) {
-  .brandSep,
-  .brandCn {
-    display: none;
-  }
-}
-
 @media (prefers-reduced-motion: reduce) {
   .rightCluster {
     transition: none !important;
+  }
+}
+
+/* The home page is wider (1320px), so its cards have room; this bar follows it there. */
+:global(body:has(.home-page)) .inner {
+  max-width: 1320px;
+}
+
+/* On the home page the brand stands over the search box, so the bar does not repeat it. The
+   navigation takes the centre and the account actions stay at the right. The phone layout has
+   no search portal and keeps the brand. */
+@media (min-width: 769px) {
+  :global(body:has([data-home-portal])) .brandWrap {
+    display: none;
+  }
+
+  :global(body:has([data-home-portal])) .rightCluster {
+    flex: 1 1 auto;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  }
+
+  :global(body:has([data-home-portal])) .nav {
+    grid-column: 2;
+  }
+
+  :global(body:has([data-home-portal])) .authActions {
+    grid-column: 3;
+    justify-self: end;
   }
 }

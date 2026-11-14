@@ -106,11 +106,7 @@ export default function NavBar({ user }: NavBarProps) {
           <h1 className={styles.siteHeading}>
             <Link className={styles.brandLink} href="/" prefetch={false}>
               <BrandLogo theme="light" size={28} />
-              <span className={styles.brandText}>
-                <span className={styles.brandEn}>StudyHub</span>
-                <span className={styles.brandSep}>·</span>
-                <span className={styles.brandCn}>学汇</span>
-              </span>
+              <span className={styles.brandEn}>StudyHub</span>
             </Link>
           </h1>
         </div>

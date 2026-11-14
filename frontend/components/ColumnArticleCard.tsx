@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { materialPath, userPath } from '../lib/slug';
 import { MaterialListItem } from '../types/material';
+import { normalizeMarkdownText } from '../lib/markdownText';
 
 interface Props {
   post: MaterialListItem;
@@ -16,22 +17,6 @@ const COMMUNITY_TAG_SET = new Set([
   '考研心得',
   '留学心得',
 ]);
-
-const normalizeMarkdownText = (value?: string | null) => {
-  const raw = value?.trim() || '';
-  if (!raw) return '';
-  return raw
-    .replace(/```[\s\S]*?```/g, ' ')
-    .replace(/`([^`]+)`/g, '$1')
-    .replace(/!\[([^\]]*)\]\([^)]+\)/g, '$1')
-    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
-    .replace(/^>\s?/gm, '')
-    .replace(/^#{1,6}\s*/gm, '')
-    .replace(/[*_~]/g, '')
-    .replace(/\|/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-};
 
 const clampExcerpt = (value?: string | null) => {
   const trimmed = normalizeMarkdownText(value);

@@ -24,6 +24,23 @@
   --success: #059669;
   --warning: #f97316;
   --danger: #d93025;
+  /* new-ui accents: black stays the brand and primary-action colour; these mark state and meaning. */
+  --sh-accent: #4353e0;
+  --sh-accent-strong: #3442c4;
+  --sh-accent-soft: #eef0fd;
+  --sh-accent-faint: #f7f8fe;
+  /* Home page: every surface is white. A panel or a card is set apart by a hairline and a soft
+     shadow, not by a fill. */
+  --sh-panel-line: rgba(15, 23, 42, 0.08);
+  --sh-surface-line: #e4e6eb;
+  --sh-panel-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 14px 36px -18px rgba(15, 23, 42, 0.14);
+  --sh-card-shadow: 0 2px 12px rgba(15, 23, 42, 0.05);
+  --sh-card-shadow-hover: 0 14px 30px -14px rgba(24, 28, 80, 0.28), 0 2px 6px rgba(15, 23, 42, 0.05);
+  --sh-accent-line: #cdd2f8;
+  --sh-accent-ring: rgba(67, 83, 224, 0.14);
+  --sh-accent-on-dark: #aab3ff;
+  --sh-free: #0b7a55;
+  --sh-star: #e2a308;
   --bg-soft: #f4f6fb;
   --bg-gradient: linear-gradient(180deg, #f4f6fb 0%, #eef2ff 60%, #fff 100%);
   --noise-on-dark: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='60' height='60'><circle cx='4' cy='8' r='0.7' fill='white' opacity='0.05'/><circle cx='18' cy='14' r='0.6' fill='white' opacity='0.04'/><circle cx='32' cy='6' r='0.8' fill='white' opacity='0.05'/><circle cx='46' cy='20' r='0.7' fill='white' opacity='0.04'/><circle cx='56' cy='12' r='0.6' fill='white' opacity='0.05'/><circle cx='10' cy='30' r='0.7' fill='white' opacity='0.05'/><circle cx='26' cy='34' r='0.6' fill='white' opacity='0.04'/><circle cx='40' cy='32' r='0.8' fill='white' opacity='0.05'/><circle cx='52' cy='38' r='0.6' fill='white' opacity='0.04'/><circle cx='6' cy='50' r='0.7' fill='white' opacity='0.05'/><circle cx='24' cy='54' r='0.6' fill='white' opacity='0.04'/><circle cx='38' cy='48' r='0.7' fill='white' opacity='0.05'/><circle cx='54' cy='56' r='0.6' fill='white' opacity='0.04'/></svg>");
@@ -67,6 +84,7 @@ body {
   flex-direction: column;
   gap: 8px;
 }
+
 
 .global-footer__wrap {
   max-width: 1180px;
@@ -864,6 +882,17 @@ main {
   z-index: 40;
   animation: floaty-bob 6s ease-in-out infinite;
   filter: drop-shadow(0 10px 18px rgba(15, 23, 42, 0.25));
+}
+
+/* The bot comes in after the opening splash, with the rest of the first screen. */
+.floating-sidebar {
+  transition: opacity 420ms ease 260ms;
+}
+
+html[data-splash-state='playing'] .floating-sidebar,
+html[data-splash-state='docking'] .floating-sidebar {
+  opacity: 0;
+  transition: none;
 }
 
 .floating-sidebar__bubble {
@@ -16311,178 +16340,99 @@ main {
   overflow: hidden;
 }
 
-/* Homepage monochrome card-free layout & overrides */
+/* Home page: a white ground under the search portal and the classic cards. */
 html:has(.home-page),
 body:has(.home-page),
 .page-with-footer:has(.home-page) {
   background: #ffffff;
 }
 
+/* The cards under the first screen keep the width and the gaps of the classic home page. */
 .container.page-grid.home-page {
-  max-width: 1180px;
   margin-top: 0;
-  padding-top: 28px;
+  padding-top: 32px;
   padding-bottom: 64px;
-  gap: 44px;
   background: #ffffff;
-}
-
-.home-main-columns {
-  grid-column: 1 / -1;
-  display: grid;
-  grid-template-columns: minmax(0, 1.85fr) 336px;
-  gap: 48px;
-  align-items: start;
-}
-
-.home-main-columns .home-desktop-library {
-  grid-column: auto;
-  min-width: 0;
-}
-
-.home-side-column {
-  display: flex;
-  flex-direction: column;
-  gap: 32px;
-  min-width: 0;
 }
 
 .home-page .material-card.minimal-variant {
   display: flex;
-  flex-direction: row;
-  align-items: center;
-  gap: 14px;
-  padding: 14px 6px;
-  border: 0;
-  border-bottom: 1px solid #e4e4e7;
-  border-radius: 0;
-  background: transparent;
-  box-shadow: none;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0;
+  padding: 24px 24px 20px;
+  border: 1px solid var(--sh-surface-line);
+  border-radius: 14px;
+  background: #ffffff;
+  box-shadow: var(--sh-card-shadow);
   transform: none;
 }
 
-.home-page .material-card.minimal-variant.material-card-clickable:hover,
-.home-page .material-card.minimal-variant.selected {
-  transform: none;
-  border: 0;
-  border-bottom: 1px solid #e4e4e7;
-  background: #fafafa;
-  box-shadow: none;
+.home-page .material-card.minimal-variant.material-card-clickable:hover {
+  transform: translate3d(0, -2px, 0);
+  border: 1px solid var(--sh-accent-line);
+  background: #ffffff;
+  box-shadow: var(--sh-card-shadow-hover);
+}
+
+.home-page .material-card.minimal-variant .material-card__overlay-link {
+  border-radius: 13px;
 }
 
 .home-page .material-card.minimal-variant .material-card__overlay-link:focus-visible {
-  outline: 2px solid #0a0a0a;
+  outline: 2px solid var(--sh-accent);
   outline-offset: -2px;
 }
 
-.home-page .material-sort-control {
-  min-height: 38px;
-  padding: 0;
-  border: 0;
-  border-radius: 10px;
-  background: transparent;
-  box-shadow: none;
-  gap: 0;
-}
+/* Home page, desktop: the content under the first screen is closed until the reader scrolls
+   (pages/index.tsx sets data-revealed). A closed page keeps a short blank run under the first
+   screen, so there is a distance to scroll; the site footer waits with the content. When the
+   reader's scroll opens the content (data-reveal-motion='rise'), its cards rise into place one
+   after the other. A jump to a section opens the content with no motion. */
+@media (min-width: 769px) {
+  .container.page-grid.home-page[data-revealed='false'] {
+    min-height: 220px;
+    padding-bottom: 0;
+  }
 
-.home-page .material-sort-label {
-  display: none;
-}
+  .container.page-grid.home-page[data-revealed='false'] > * {
+    display: none;
+  }
 
-.home-page .material-sort-trigger {
-  min-width: 152px;
-  min-height: 38px;
-  height: 38px;
-  padding: 0 12px;
-  border: 1px solid #e4e4e7;
-  border-radius: 10px;
-  background: #ffffff;
-  color: #0a0a0a;
-  font-size: 13px;
-  font-weight: 500;
-}
+  .page-with-footer:has(.home-page[data-revealed='false']) [data-site-footer] {
+    display: none;
+  }
 
-.home-page .material-sort-trigger:hover,
-.home-page .material-sort-control.is-open .material-sort-trigger {
-  background: #fafafa;
-  border-color: #d4d4d8;
-  color: #0a0a0a;
-}
+  .container.page-grid.home-page[data-revealed='true'][data-reveal-motion='rise'] > .home-desktop-library,
+  .container.page-grid.home-page[data-revealed='true'][data-reveal-motion='rise'] > .leaderboard-card,
+  .container.page-grid.home-page[data-revealed='true'][data-reveal-motion='rise'] > .support-card {
+    animation: home-content-open 0.8s cubic-bezier(0.22, 0.8, 0.24, 1) backwards;
+  }
 
-.home-page .material-sort-trigger:focus-visible {
-  outline: 2px solid #0a0a0a;
-  outline-offset: 2px;
-}
+  .container.page-grid.home-page[data-revealed='true'][data-reveal-motion='rise'] > .leaderboard-card {
+    animation-delay: 0.12s;
+  }
 
-.home-page .material-sort-options {
-  border-color: #e4e4e7;
-  border-radius: 12px;
-  box-shadow: 0 14px 32px -18px rgba(10, 10, 10, 0.25);
-}
-
-.home-page .material-sort-option {
-  color: #3f3f46;
-  font-weight: 500;
-}
-
-.home-page .material-sort-option:hover,
-.home-page .material-sort-option.is-active,
-.home-page .material-sort-option[aria-selected='true'] {
-  background: #f4f4f5;
-  color: #0a0a0a;
-}
-
-.home-page .material-sort-option__check {
-  color: #0a0a0a;
-}
-
-.home-page .materials-pagination {
-  margin-top: 18px;
-  margin-bottom: 0;
-}
-
-.home-page .pagination-summary {
-  color: #71717a;
-  font-size: 13px;
-}
-
-.home-page .pagination-button {
-  border-color: #e4e4e7;
-  background: #ffffff;
-  color: #3f3f46;
-  border-radius: 9px;
-  font-size: 13px;
-  font-weight: 500;
-}
-
-.home-page .pagination-button.active {
-  background: #0a0a0a;
-  border-color: #0a0a0a;
-  color: #ffffff;
-  box-shadow: none;
-}
-
-.home-page .pagination-button:not(.active):not(:disabled):hover {
-  background: #f4f4f5;
-  border-color: #d4d4d8;
-  color: #0a0a0a;
-}
-
-.home-page .pagination-button:focus-visible {
-  outline-color: #0a0a0a;
-}
-
-@media (max-width: 1040px) {
-  .home-main-columns {
-    grid-template-columns: minmax(0, 1fr) 296px;
-    gap: 32px;
+  .container.page-grid.home-page[data-revealed='true'][data-reveal-motion='rise'] > .support-card {
+    animation-delay: 0.2s;
   }
 }
 
-@media (max-width: 900px) {
-  .home-main-columns {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 36px;
+@keyframes home-content-open {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 96px, 0);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .container.page-grid.home-page[data-revealed='true'] > * {
+    animation: none !important;
   }
 }
 
@@ -16552,10 +16502,6 @@ body:has(.home-page),
     color: #0a0a0a;
     font-size: 13px;
     font-weight: 600;
-  }
-
-  .home-side-column {
-    gap: 28px;
   }
 }
 

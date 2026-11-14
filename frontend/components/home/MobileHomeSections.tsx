@@ -36,13 +36,11 @@ export default function MobileHomeSections({
           </button>
         </form>
 
-        <dl className={minStyles.statsStrip} style={{ marginTop: 8 }} aria-label="平台概览">
+        <dl className={`${minStyles.statsStrip} ${minStyles.statsStripCompact}`} aria-label="平台概览">
           {stats.map((stat) => (
             <div key={stat.label} className={minStyles.statItem}>
               <dt>{stat.label}</dt>
-              <dd style={{ margin: 0 }}>
-                <strong style={{ fontSize: '22px' }}>{stat.value}</strong>
-              </dd>
+              <dd>{stat.value}</dd>
             </div>
           ))}
         </dl>

@@ -1,4 +1,5 @@
-import { FormEvent, RefObject, useMemo } from 'react';
+import Link from 'next/link';
+import { FormEvent, RefObject } from 'react';
 import {
   SUPPORTED_SCHOOL,
   COURSE_CATEGORY_OPTIONS,
@@ -29,31 +30,25 @@ export interface HomeOverviewStat {
 
 interface HomeFilterCardProps {
   className?: string;
-  overviewStats?: HomeOverviewStat[];
   filterRef: RefObject<HTMLDivElement>;
   filtersState: HomeFilterState;
   showAdvanced: boolean;
   availableTagOptions: string[];
   onFilterChange: (key: keyof HomeFilterState, value: string) => void;
   onCourseCategoryChange: (value: string | null) => void;
-  onQuickTagSelect?: (tag: string) => void;
   onToggleAdvancedFilters: () => void;
   onResetFilters: () => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
 }
 
-const FEATURED_QUICK_TAGS = ['期末速成', '期末真题', '日常学习笔记', '一页纸', '开卷资料'];
-
 export default function HomeFilterCard({
   className,
-  overviewStats,
   filterRef,
   filtersState,
   showAdvanced,
   availableTagOptions,
   onFilterChange,
   onCourseCategoryChange,
-  onQuickTagSelect,
   onToggleAdvancedFilters,
   onResetFilters,
   onSubmit,
@@ -70,21 +65,6 @@ export default function HomeFilterCard({
     filtersState.price && filtersState.price !== 'all' ? filtersState.price : '',
   ].filter(Boolean).length;
 
-  const quickTags = useMemo(() => {
-    const ordered: string[] = [];
-    FEATURED_QUICK_TAGS.forEach((tag) => {
-      if (!ordered.includes(tag) && (availableTagOptions.length === 0 || availableTagOptions.includes(tag))) {
-        ordered.push(tag);
-      }
-    });
-    availableTagOptions.forEach((tag) => {
-      if (ordered.length < 5 && !ordered.includes(tag)) {
-        ordered.push(tag);
-      }
-    });
-    return ordered.slice(0, 5);
-  }, [availableTagOptions]);
-
   const advancedActionLabel = showAdvanced ? '收起高级筛选' : '高级筛选';
 
   return (
@@ -93,33 +73,9 @@ export default function HomeFilterCard({
       aria-label="资料搜索"
       ref={filterRef}
     >
-      {quickTags.length > 0 ? (
-        <div className={minStyles.quickTags} role="group" aria-label="热门标签快捷筛选">
-          {quickTags.map((tag) => {
-            const active = filtersState.tag === tag;
-            return (
-              <button
-                key={tag}
-                type="button"
-                className={`${minStyles.quickTag}${active ? ` ${minStyles.quickTagActive}` : ''}`}
-                aria-pressed={active}
-                onClick={() => {
-                  if (onQuickTagSelect) {
-                    onQuickTagSelect(active ? '' : tag);
-                  } else {
-                    onFilterChange('tag', active ? '' : tag);
-                  }
-                }}
-              >
-                #{tag}
-              </button>
-            );
-          })}
-        </div>
-      ) : null}
-
-      <form className={minStyles.searchForm} onSubmit={onSubmit}>
-        <div className={minStyles.searchPill}>
+      <form className={minStyles.searchForm} onSubmit={onSubmit} role="search">
+        {/* StudyHub bot rests at the left of this box by default. */}
+        <div className={minStyles.searchPill} data-search-pill="">
           <svg
             className={minStyles.searchIcon}
             width="18"
@@ -166,13 +122,27 @@ export default function HomeFilterCard({
               </span>
             ) : null}
           </button>
-          <button className={minStyles.searchSubmit} type="submit" aria-label="搜索资料">
-            搜索
+          {/* The search button closes the box, at the right of the filter trigger. */}
+          <button className={minStyles.searchGo} type="submit" aria-label="搜索资料">
+            <span>搜索</span>
+            <svg
+              className={minStyles.searchGoArrow}
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M5 12h14M13 6l6 6-6 6" />
+            </svg>
           </button>
         </div>
 
-        <p className={minStyles.searchHint}>多个关键词可以用空格分开。</p>
-
+        {/* The filters open over the content below the box, so the first screen keeps its layout. */}
         {showAdvanced ? (
           <div className={minStyles.advancedPanel}>
             <div className={minStyles.advancedSelects}>
@@ -341,20 +311,16 @@ export default function HomeFilterCard({
             </div>
           </div>
         ) : null}
-      </form>
 
-      {overviewStats && overviewStats.length > 0 ? (
-        <dl className={minStyles.statsStrip} aria-label="平台概览">
-          {overviewStats.map((stat) => (
-            <div key={stat.label} className={minStyles.statItem}>
-              <dt>{stat.label}</dt>
-              <dd style={{ margin: 0 }}>
-                <strong>{stat.value}</strong>
-              </dd>
-            </div>
-          ))}
-        </dl>
-      ) : null}
+        <div className={minStyles.searchActions}>
+          <Link className={minStyles.searchAction} href="/join" prefetch={false}>
+            关于我们
+          </Link>
+          <Link className={minStyles.searchAction} href="/upload" prefetch={false}>
+            我要投稿
+          </Link>
+        </div>
+      </form>
     </section>
   );
 }
