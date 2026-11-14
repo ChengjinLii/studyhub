@@ -11,6 +11,7 @@ import { materialBrowseScope } from '../lib/materialBrowseSession';
 import { MaterialBrowseMode, MaterialSubjectScope, useMaterialSubjects } from '../lib/useMaterialSubjects';
 import { rankHomeSubjects } from '../lib/homeDiscovery';
 import discoveryStyles from '../styles/HomeDiscovery.module.css';
+import minStyles from '../styles/HomeMinimal.module.css';
 import type { SubjectSearchAliases } from '../lib/materialSubjects';
 import { readMaterialSubjectAliases } from '../lib/server/materialSubjectAliases';
 import { useMaterialBrowseReturn } from '../lib/useMaterialBrowseReturn';
@@ -231,6 +232,14 @@ export default function Home({
       page: '1',
     };
     applyFilters(nextFilters, { scrollTarget: 'filters' });
+  };
+  const applyQuickTag = (tag: string) => {
+    const nextFilters = {
+      ...filtersState,
+      tag,
+      page: '1',
+    };
+    void applyFilters(nextFilters, { scrollTarget: 'materials' });
   };
   const [bannerVisible, setBannerVisible] = useState(false);
   const freeCount = useMemo(() => materialList.filter((item) => item.free).length, [materialList]);
@@ -688,7 +697,7 @@ export default function Home({
     <>
       <MaterialIconSprite />
       <NavBar user={user} />
-      <main className="container page-grid home-page">
+      <main className={`container page-grid home-page ${minStyles.page}`}>
         {officialQQ && bannerVisible && (
           <div className="qq-banner">
             <span>加入官方 QQ 群：{officialQQ}</span>
@@ -714,6 +723,7 @@ export default function Home({
           availableTagOptions={availableTagOptions}
           onFilterChange={updateFilter}
           onCourseCategoryChange={applyCourseCategory}
+          onQuickTagSelect={applyQuickTag}
           onToggleAdvancedFilters={toggleAdvancedFilters}
           onResetFilters={handleResetFilters}
           onSubmit={handleFilterSubmit}
@@ -728,7 +738,13 @@ export default function Home({
               onSortChange={(value) => void handleMaterialSortChange(value)} onPageChange={handlePageChange}
               subjects={subjects} subjectId={subjectId} subjectPage={subjectPage} subjectScope={subjectScope}
               onSubjectChange={(id) => handleSubjectChange(id, subjectScope)} onSubjectPageChange={setSubjectPage}
-              selectedIds={selectedIds} onToggle={toggleSelection} onReset={handleResetFilters}
+              selectedIds={selectedIds}
+              selectedCount={selectedCount}
+              batchInfo={batchInfo}
+              batchError={batchError}
+              onBatchShare={handleBatchShare}
+              onClearSelection={clearSelection}
+              onToggle={toggleSelection} onReset={handleResetFilters}
               onEditKeyword={() => filterRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })}
             />
           </div>
@@ -764,24 +780,15 @@ export default function Home({
               onPeriodChange={setLeaderboardPeriod}
               onFollowContributor={handleFollowContributor}
             />
+            <section className={minStyles.sideInfoSection} aria-label="支持 StudyHub">
+              <h3 className={minStyles.sideSubHeading}>支持 StudyHub</h3>
+              <p className={minStyles.sideDesc}>如果 StudyHub 帮到了你，可以打赏支持。</p>
+              <button className={minStyles.miniPillBtn} type="button" onClick={() => setSupportModalOpen(true)}>
+                打赏
+              </button>
+            </section>
+            <HomeCooperationCard profileMissingFields={profileMissingFields} />
           </aside>
-        </div>
-        <div className="home-bottom-panels">
-          <section className="card support-card">
-            <div>
-              <h3 className="card-title" style={{ margin: 0 }}>
-                支持 StudyHub
-              </h3>
-              <p style={{ marginTop: 8, marginBottom: 4 }}>
-                您的支持是我们继续运营的动力😁
-              </p>
-              <p className="help-text">所有打赏将用于服务器、带宽与内容审核支出，感谢你的信任。</p>
-            </div>
-            <button className="button primary" type="button" onClick={() => setSupportModalOpen(true)}>
-              打赏
-            </button>
-          </section>
-          <HomeCooperationCard profileMissingFields={profileMissingFields} />
         </div>
         {supportModalOpen && (
           <div className="modal-mask" onClick={() => setSupportModalOpen(false)}>
@@ -810,24 +817,6 @@ export default function Home({
                   onLoad={(event) => event.currentTarget.classList.add('is-loaded')}
                 />
               </div>
-            </div>
-          </div>
-        )}
-        {selectedCount > 0 && (
-          <div className="batch-action-bar">
-            <div>
-              <strong>批量分享</strong>
-              <span className="status-text muted">已选择 {selectedCount} 条资料。</span>
-              {batchInfo && <span className="status-text success">{batchInfo}</span>}
-              {batchError && <span className="status-text error">{batchError}</span>}
-            </div>
-            <div className="inline-group">
-              <button className="button ghost small" type="button" onClick={clearSelection}>
-                清空
-              </button>
-              <button className="button primary" type="button" onClick={handleBatchShare}>
-                批量分享
-              </button>
             </div>
           </div>
         )}

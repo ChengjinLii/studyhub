@@ -3,6 +3,9 @@ import { useEffect, useState } from 'react';
 import { ContributorRank, LeaderboardPeriod } from '../../types/contributor';
 import { RoleMask, SessionUser } from '../../types/user';
 import { userPath } from '../../lib/slug';
+import minStyles from '../../styles/HomeMinimal.module.css';
+
+const DEFAULT_VISIBLE_CONTRIBUTORS = 5;
 
 interface HomeLeaderboardProps {
   user: SessionUser | null;
@@ -27,7 +30,6 @@ export default function HomeLeaderboard({
   leaderboardPeriod,
   leaderboardLabels,
   leaderboardPeriods,
-  leaderboardRangeHint,
   leaderboardEmptyHint,
   leaderboardLoading,
   leaderboardError,
@@ -37,117 +39,94 @@ export default function HomeLeaderboard({
   onPeriodChange,
   onFollowContributor,
 }: HomeLeaderboardProps) {
-  const [mobileExpanded, setMobileExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(false);
 
   useEffect(() => {
-    setMobileExpanded(false);
+    setExpanded(false);
   }, [leaderboardPeriod]);
 
+  const visibleContributors = expanded
+    ? topContributors
+    : topContributors.slice(0, DEFAULT_VISIBLE_CONTRIBUTORS);
+
   return (
-    <section
-      id="leaderboard"
-      className={`card leaderboard-card${mobileExpanded ? ' is-mobile-expanded' : ''}`}
-    >
-      <div className="materials-header">
-        <div className="leaderboard-header-top">
-          <h2 className="card-title">
-            贡献榜单
-            <svg className="title-icon" viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M8 21h8" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-              <path d="M12 17v4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-              <path d="M7 4h10" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-              <path d="M17 4v5a5 5 0 0 1-10 0V4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-              <path d="M5 4h2v3a5 5 0 0 1-2 4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-              <path d="M19 4h-2v3a5 5 0 0 0 2 4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          </h2>
-          <div className="leaderboard-controls">
-            <div className="leaderboard-tabs" role="tablist" aria-label="贡献榜单周期">
-              {leaderboardPeriods.map((period) => (
-                <button
-                  key={period}
-                  type="button"
-                  role="tab"
-                  aria-selected={leaderboardPeriod === period}
-                  className={`leaderboard-tab ${leaderboardPeriod === period ? 'active' : ''}`}
-                  onClick={() => onPeriodChange(period)}
-                >
-                  {leaderboardLabels[period]}
-                </button>
-              ))}
-            </div>
-          </div>
+    <section id="leaderboard" className={`leaderboard-card ${minStyles.sideBlock}`}>
+      <div className={minStyles.sideBlockHeader}>
+        <h2 className={minStyles.sideBlockTitle}>贡献榜单</h2>
+        <div className={minStyles.periodTabs} role="tablist" aria-label="贡献榜单周期">
+          {leaderboardPeriods.map((period) => {
+            const active = leaderboardPeriod === period;
+            return (
+              <button
+                key={period}
+                type="button"
+                role="tab"
+                aria-selected={active}
+                className={`${minStyles.periodTab}${active ? ` ${minStyles.periodTabActive}` : ''}`}
+                onClick={() => onPeriodChange(period)}
+              >
+                {leaderboardLabels[period]}
+              </button>
+            );
+          })}
         </div>
-        <p className="help-text">
-          {leaderboardLabels[leaderboardPeriod]}按去重下载次数排行，展示前{' '}
-          {topContributors.length || 0} 位投稿者。
-          {leaderboardRangeHint && <span className="leaderboard-period-hint">{leaderboardRangeHint}</span>}
-        </p>
       </div>
-      {leaderboardFollowNotice?.type === 'error' && <p className="error-text">{leaderboardFollowNotice.text}</p>}
-      {leaderboardError && <p className="error-text">{leaderboardError}</p>}
-      {leaderboardLoading && <p className="help-text">贡献榜单加载中...</p>}
+
+      {leaderboardFollowNotice?.type === 'error' ? <p className="error-text">{leaderboardFollowNotice.text}</p> : null}
+      {leaderboardError ? <p className="error-text">{leaderboardError}</p> : null}
+      {leaderboardLoading ? <p className={minStyles.sideNote}>贡献榜单加载中...</p> : null}
+
       {topContributors.length === 0 ? (
-        <div className="empty-state">{leaderboardEmptyHint}</div>
+        <div className={minStyles.emptyMuted}>{leaderboardEmptyHint}</div>
       ) : (
-        <div className="leaderboard-scroll">
-          <ol className="leaderboard-list">
-            {(() => {
-              let rankCounter = 0;
-              return topContributors.map((c, idx) => {
-                const isSelf = Boolean(user && user.id === c.userId);
-                const isFollowed = Boolean(leaderboardFollowed[c.userId]);
-                const isLoading = Boolean(leaderboardFollowLoading[c.userId]);
-                const followLabel = isSelf ? '自己' : isFollowed ? '已关注' : isLoading ? '关注中...' : '关注';
-                const followClass = `button ${isFollowed || isSelf ? 'ghost muted' : 'primary'} small`;
-                const roleMask = c.roleMask ?? 0;
-                const isAdmin =
-                  (roleMask & RoleMask.ADMIN) === RoleMask.ADMIN ||
-                  (roleMask & RoleMask.DEVELOPER) === RoleMask.DEVELOPER;
-                const rankLabel = isAdmin ? '管' : String(++rankCounter);
-                return (
-                  <li key={`${c.userId}-${idx}`} className={idx >= 10 ? 'leaderboard-mobile-extra' : undefined}>
-                    <div className={`leaderboard-rank ${isAdmin ? 'rank-admin' : `rank-${rankCounter}`}`}>{rankLabel}</div>
-                    <div className="leaderboard-meta">
-                      <strong>
-                        <Link className="text-button" href={userPath(c.userId, c.username || '匿名贡献者')}>
-                          {c.username || '匿名贡献者'}
-                        </Link>
-                      </strong>
-                      <span>{c.downloads} 位同学下载过 Ta 的资料</span>
-                    </div>
-                    <div className="leaderboard-actions">
-                      <Link
-                        className="button ghost small leaderboard-view-action"
-                        href={userPath(c.userId, c.username || '匿名贡献者')}
-                      >
-                        查看
-                      </Link>
-                      <button
-                        className={followClass}
-                        type="button"
-                        onClick={() => onFollowContributor(c.userId)}
-                        disabled={isSelf || isFollowed || isLoading}
-                      >
-                        {followLabel}
-                      </button>
-                    </div>
-                  </li>
-                );
-              });
-            })()}
-          </ol>
-        </div>
+        <ol className={minStyles.contribList}>
+          {(() => {
+            let rankCounter = 0;
+            return visibleContributors.map((c, idx) => {
+              const isSelf = Boolean(user && user.id === c.userId);
+              const isFollowed = Boolean(leaderboardFollowed[c.userId]);
+              const isLoading = Boolean(leaderboardFollowLoading[c.userId]);
+              const followLabel = isSelf ? '自己' : isFollowed ? '已关注' : isLoading ? '关注中...' : '关注';
+              const roleMask = c.roleMask ?? 0;
+              const isAdmin =
+                (roleMask & RoleMask.ADMIN) === RoleMask.ADMIN ||
+                (roleMask & RoleMask.DEVELOPER) === RoleMask.DEVELOPER;
+              const rankLabel = isAdmin ? '管' : String(++rankCounter);
+              return (
+                <li key={`${c.userId}-${idx}`} className={minStyles.contribItem}>
+                  <span className={minStyles.sideRankNum}>{rankLabel}</span>
+                  <div className={minStyles.contribInfo}>
+                    <Link href={userPath(c.userId, c.username || '匿名贡献者')} prefetch={false}>
+                      {c.username || '匿名贡献者'}
+                    </Link>
+                    <span>{c.downloads} 位同学下载过 Ta 的资料</span>
+                  </div>
+                  <button
+                    className={minStyles.miniPillBtn}
+                    type="button"
+                    onClick={() => onFollowContributor(c.userId)}
+                    disabled={isSelf || isFollowed || isLoading}
+                  >
+                    {followLabel}
+                  </button>
+                </li>
+              );
+            });
+          })()}
+        </ol>
       )}
-      {topContributors.length > 10 ? (
-        <button
-          className="button ghost leaderboard-mobile-expand"
-          type="button"
-          onClick={() => setMobileExpanded((current) => !current)}
-          aria-expanded={mobileExpanded}
-        >
-          {mobileExpanded ? '收起榜单' : `展开全部（${topContributors.length}）`}
-        </button>
+
+      {topContributors.length > DEFAULT_VISIBLE_CONTRIBUTORS ? (
+        <div>
+          <button
+            className={minStyles.sideActionLink}
+            type="button"
+            onClick={() => setExpanded((current) => !current)}
+            aria-expanded={expanded}
+          >
+            {expanded ? '收起榜单' : `展开全部（${topContributors.length}）`}
+          </button>
+        </div>
       ) : null}
     </section>
   );

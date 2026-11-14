@@ -58,7 +58,7 @@ export default function FloatingSidebar() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [wardrobeOpen, setWardrobeOpen] = useState(false);
   const [sidebarPosition, setSidebarPosition] = useState({ x: 60, y: 220 });
-  const [selectedHat, setSelectedHat] = useState<BotHat>('santa');
+  const [selectedHat, setSelectedHat] = useState<BotHat>('none');
   const [botSpeech, setBotSpeech] = useState<BotSpeechConfig | null>(null);
   const [seenSpeechVersions, setSeenSpeechVersions] = useState<string[]>([]);
   const [activeSpeechVersion, setActiveSpeechVersion] = useState<string | null>(null);

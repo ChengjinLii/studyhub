@@ -133,42 +133,27 @@ export default function NavBar({ user }: NavBarProps) {
                 </Link>
               );
             })}
-          </nav>
-
-          <a
-            className={styles.githubLink}
-            href={GITHUB_REPO_URL}
-            target="_blank"
-            rel="noopener noreferrer"
-            aria-label={`GitHub 仓库 ${GITHUB_REPO_OWNER}/${GITHUB_REPO_NAME}${githubStars !== null ? `，${githubStars} Stars` : ''}`}
-            title={`${GITHUB_REPO_OWNER}/${GITHUB_REPO_NAME}`}
-          >
-            <span className={styles.githubRepoPart}>
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+            <a
+              className={`${styles.navLink} ${styles.githubNavLink}`}
+              href={GITHUB_REPO_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label={`GitHub 仓库 ${GITHUB_REPO_OWNER}/${GITHUB_REPO_NAME}${githubStars !== null ? `，${githubStars} Stars` : ''}`}
+              title={`${GITHUB_REPO_OWNER}/${GITHUB_REPO_NAME}`}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
                 <path d="M12 1.27a11 11 0 0 0-3.48 21.46c.55.1.73-.24.73-.53v-1.85c-3.03.66-3.67-1.45-3.67-1.45-.5-1.26-1.21-1.6-1.21-1.6-.99-.67.07-.66.07-.66 1.09.08 1.67 1.12 1.67 1.12.97 1.66 2.54 1.18 3.16.9.1-.7.38-1.18.69-1.45-2.42-.28-4.96-1.21-4.96-5.39 0-1.19.42-2.16 1.12-2.92-.11-.28-.49-1.39.11-2.89 0 0 .92-.3 3 1.12a10.4 10.4 0 0 1 5.46 0c2.08-1.42 3-1.12 3-1.12.6 1.5.22 2.61.11 2.89.7.76 1.12 1.73 1.12 2.92 0 4.19-2.54 5.11-4.97 5.38.39.34.74 1.01.74 2.03v3.01c0 .29.19.64.74.53A11 11 0 0 0 12 1.27z" />
               </svg>
-              <span className={styles.githubSlug}>
-                <span className={styles.githubOwner}>{GITHUB_REPO_OWNER}/</span>
-                {GITHUB_REPO_NAME}
-              </span>
-            </span>
-            <span className={styles.githubStarPart}>
-              <span className={styles.starIconWrap} aria-hidden="true">
-                <svg className={styles.starSvg} viewBox="0 0 24 24">
-                  <path d="M12 2.5l2.92 5.92 6.53.95-4.72 4.6 1.11 6.5L12 17.4l-5.84 3.07 1.11-6.5-4.72-4.6 6.53-.95L12 2.5z" />
-                </svg>
-                <span className={`${styles.spark} ${styles.spark1}`} />
-                <span className={`${styles.spark} ${styles.spark2}`} />
-                <span className={`${styles.spark} ${styles.spark3}`} />
-                <span className={`${styles.spark} ${styles.spark4}`} />
-              </span>
-              <span className={styles.starCount}>
-                {githubStars !== null ? formatStarCount(githubStars) : 'Star'}
-              </span>
-            </span>
-          </a>
-
-          <span className={styles.divider} aria-hidden="true" />
+              {githubStars !== null ? (
+                <span className={styles.githubStars}>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                    <path d="M12 2.5l2.92 5.92 6.53.95-4.72 4.6 1.11 6.5L12 17.4l-5.84 3.07 1.11-6.5-4.72-4.6 6.53-.95L12 2.5z" />
+                  </svg>
+                  <span>{formatStarCount(githubStars)}</span>
+                </span>
+              ) : null}
+            </a>
+          </nav>
 
           <div className={styles.authActions}>
             {user ? (

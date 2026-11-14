@@ -4,13 +4,14 @@ import { MaterialListItem } from '../types/material';
 import { COURSE_CATEGORY_LABELS, CourseCategoryValue, normalizeCourseCategory } from '../constants/metadata';
 import { formatMajorDisplay } from '../lib/major';
 import { materialPath, userPath } from '../lib/slug';
+import minStyles from '../styles/HomeMinimal.module.css';
 
 interface Props {
   material: MaterialListItem;
   selectable?: boolean;
   checked?: boolean;
   onToggle?: (materialId: number, next: boolean) => void;
-  variant?: 'grid' | 'list';
+  variant?: 'grid' | 'list' | 'minimal';
   orderLabel?: string;
 }
 
@@ -86,6 +87,89 @@ export default function MaterialCard({
   ]
     .filter(Boolean)
     .join(' ');
+
+  if (variant === 'minimal') {
+    const contextText = [
+      material.college || material.school || '未知学校',
+      displayDiscipline,
+      material.gradeValue,
+    ]
+      .filter(Boolean)
+      .join(' · ');
+
+    const minimalClasses = [
+      'material-card',
+      'minimal-variant',
+      'material-card-clickable',
+      minStyles.minimalRow,
+      isExperienceTag ? 'material-card--experience' : '',
+      checked ? `selected ${minStyles.minimalRowSelected}` : '',
+    ]
+      .filter(Boolean)
+      .join(' ');
+
+    return (
+      <li data-material-id={material.id} className={minimalClasses}>
+        <Link className="material-card__overlay-link" href={materialHref} aria-label={overlayLabel} prefetch={false} />
+        {selectable && (
+          <button
+            type="button"
+            className={`${minStyles.rowCheck}${checked ? ` ${minStyles.rowCheckChecked}` : ''}`}
+            aria-pressed={checked}
+            aria-label={checked ? '取消选择资料' : '选择资料'}
+            onClick={handleToggle}
+          >
+            {checked ? (
+              <svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M2.5 6.2 5 8.7 9.5 3.5" />
+              </svg>
+            ) : null}
+          </button>
+        )}
+        <div className={minStyles.rowBody}>
+          <div className={minStyles.rowTitleLine}>
+            {isExperienceTag ? <span className={minStyles.rowBadge}>专栏</span> : null}
+            <h3 className={minStyles.rowTitle} title={material.title}>
+              {displayTitle}
+            </h3>
+          </div>
+          <div className={minStyles.rowMeta}>
+            <span>
+              {contextText}
+              {' · '}
+              {publisherId ? (
+                <Link href={publisherHref} className={minStyles.rowPublisher} prefetch={false}>
+                  {publisherName}
+                </Link>
+              ) : (
+                publisherName
+              )}
+            </span>
+            {copyrightOwner ? <span>版权：{copyrightOwner}</span> : null}
+            {displayedTags.length > 0 ? (
+              <span className={minStyles.rowTags}>
+                {displayedTags.map((tag) => (
+                  <Link key={tag} className={minStyles.rowTag} href={`/?tag=${encodeURIComponent(tag)}`} prefetch={false}>
+                    #{tag}
+                  </Link>
+                ))}
+                {extraTagCount > 0 ? <span className={minStyles.rowTag}>+{extraTagCount}</span> : null}
+              </span>
+            ) : null}
+          </div>
+        </div>
+        <div className={minStyles.rowMetrics}>
+          {!isExperienceTag && material.ratingAvg ? (
+            <span className={minStyles.rowStat}>评分 {material.ratingAvg.toFixed(1)}</span>
+          ) : null}
+          {isExperienceTag
+            ? viewCount > 0 && <span className={minStyles.rowStat}>{viewCount} 阅读</span>
+            : downloadCount > 0 && <span className={minStyles.rowStat}>{downloadCount} 下载</span>}
+          <span className={minStyles.rowPrice}>{isExperienceTag ? '专栏' : priceText(material)}</span>
+        </div>
+      </li>
+    );
+  }
 
   if (variant === 'list') {
     return (

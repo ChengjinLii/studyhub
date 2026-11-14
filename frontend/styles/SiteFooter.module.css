@@ -17,8 +17,8 @@
 
 .topGrid {
   display: grid;
-  grid-template-columns: minmax(250px, 1.35fr) repeat(4, minmax(0, 1fr));
-  gap: 28px 32px;
+  grid-template-columns: minmax(280px, 1.35fr) repeat(2, minmax(200px, 1fr));
+  gap: 32px 48px;
   align-items: start;
 }
 
@@ -164,101 +164,40 @@
   color: #ffffff;
 }
 
-.metaSection {
-  border-top: 1px solid #222222;
-  padding-top: 22px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 10px;
-  text-align: center;
-  font-size: 12px;
-  line-height: 1.7;
+.colText {
+  color: #9ca3af;
+  font-size: 13px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
 }
 
-.infoRows {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  width: 100%;
-  align-items: center;
-}
-
-.infoRow {
+.bottomBar {
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  padding-top: 20px;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  justify-content: center;
-  gap: 8px 10px;
-}
-
-.infoItem {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 7px;
-  white-space: nowrap;
-}
-
-.infoLabel {
+  justify-content: space-between;
+  gap: 8px 24px;
+  font-size: 12px;
+  line-height: 1.6;
   color: #71717a;
-  font-weight: 500;
 }
 
-.infoValue {
-  color: #e4e4e7;
-  font-weight: 600;
-  text-decoration: none;
-}
-
-.infoValue:hover {
-  color: #ffffff;
-  text-decoration: underline;
-}
-
-.actionBtn {
-  border: 0;
-  background: transparent;
-  padding: 0;
-  color: #e4e4e7;
-  font-size: 12px;
-  font-weight: 600;
-  font-family: inherit;
-  cursor: pointer;
-}
-
-.actionBtn:hover {
-  color: #ffffff;
-  text-decoration: underline;
-}
-
-.divider {
-  color: #3f3f46;
-  margin: 0 4px;
-}
-
-.hairline {
-  width: min(880px, 100%);
-  height: 1px;
-  background: rgba(255, 255, 255, 0.08);
-  margin: 2px auto 0;
-}
-
-.bottomLinks {
-  display: flex;
+.icpGroup {
+  display: inline-flex;
   flex-wrap: wrap;
   align-items: center;
-  justify-content: center;
   gap: 8px;
+}
+
+.icpGroup a {
   color: #a1a1aa;
-}
-
-.bottomLinks a {
-  color: #d4d4d8;
   text-decoration: none;
-  font-weight: 500;
+  transition: color 0.15s ease;
 }
 
-.bottomLinks a:hover {
+.icpGroup a:hover {
   color: #ffffff;
   text-decoration: underline;
 }
@@ -266,6 +205,7 @@
 @media (max-width: 960px) {
   .topGrid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 28px 24px;
   }
 
   .brandCol {
@@ -278,25 +218,15 @@
     padding: 36px 16px calc(86px + env(safe-area-inset-bottom));
   }
 
-  .divider {
-    display: none;
-  }
-
-  .infoRow,
-  .bottomLinks {
-    gap: 6px 14px;
-  }
-
-  .infoItem {
-    white-space: normal;
-    justify-content: center;
+  .bottomBar {
+    justify-content: flex-start;
   }
 }
 
-@media (max-width: 480px) {
+@media (max-width: 560px) {
   .topGrid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 22px 16px;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 24px;
   }
 
   .searchForm {

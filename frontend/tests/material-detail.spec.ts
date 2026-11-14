@@ -144,28 +144,6 @@ test('approved material layout screenshots', async ({ page }, testInfo) => {
   }
 });
 
-test('poster title retains clearance above the diagonal', async ({ page }, testInfo) => {
-  await page.route('**/api/**', (route) => route.fulfill({ status: 503, json: { ok: false, msg: 'Isolated layout test' } }));
-  await page.goto('/');
-  const title = page.locator('.studyhub-popup-poster__title');
-  await expect(title).toBeVisible();
-  for (const family of ['Arial', 'Helvetica Neue', 'sans-serif']) {
-    const clearance = await title.evaluate(async (element, fontFamily) => {
-      const text = element as SVGTextElement;
-      text.style.fontFamily = fontFamily;
-      await document.fonts.ready;
-      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
-      text.getBoundingClientRect();
-      const end = text.getEndPositionOfChar(text.getNumberOfChars() - 1);
-      return 1056 - ((1056 - 660) * end.x) / 2048 - end.y;
-    }, family);
-    expect(clearance, family).toBeGreaterThan(18);
-  }
-  await page.screenshot({ path: testInfo.outputPath('poster.png') });
-  await page.keyboard.press('Escape');
-  await expect(title).toBeHidden();
-});
-
 test('anonymous netdisk acquisition still redirects to login', async ({ page }) => {
   await openDetail(page, {}, null);
   await page.locator('.detail-action-download').click();

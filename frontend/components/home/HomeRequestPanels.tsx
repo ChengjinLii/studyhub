@@ -1,16 +1,15 @@
 import Link from 'next/link';
-import { ChevronRight, Copy } from 'lucide-react';
 import { useCallback, useState } from 'react';
 import { MaterialListItem } from '../../types/material';
 import { MaterialRequestItem } from '../../types/request';
 import { HOME_DISCOVERY_DEFAULT_VIEW, HomeDiscoveryView, HomeSubjectRank } from '../../lib/homeDiscovery';
-import { formatMajorDisplay } from '../../lib/major';
 import { copyToClipboard } from '../../lib/share';
 import { materialPath } from '../../lib/slug';
 import { formatDate, formatNumber } from '../../lib/format';
-import styles from '../../styles/HomeDiscovery.module.css';
+import minStyles from '../../styles/HomeMinimal.module.css';
 
 const COOPERATION_EMAIL = 'chengjinli@std.uestc.edu.cn';
+const SIDEBAR_LIST_LIMIT = 5;
 const DISCOVERY_TABS: Array<{ view: HomeDiscoveryView; label: string }> = [
   { view: 'subjects', label: '热门学科' },
   { view: 'popular', label: '近期热门' },
@@ -53,194 +52,148 @@ export function HomeDiscoveryCard({
   onOpenSubject,
   onBrowseSubjects,
   onBrowseMaterials,
-  buildUploadLink,
-  onFollowRequest,
   className,
 }: HomeDiscoveryCardProps) {
   const [activeDiscoveryView, setActiveDiscoveryView] = useState<HomeDiscoveryView>(HOME_DISCOVERY_DEFAULT_VIEW);
+  const topSubjects = subjectRanks.slice(0, SIDEBAR_LIST_LIMIT);
+  const topPopular = popularItems.slice(0, SIDEBAR_LIST_LIMIT);
+  const visibleRequests = (leaderboardItems.length > 0 ? leaderboardItems : requestItems).slice(0, SIDEBAR_LIST_LIMIT);
 
   return (
     <section
-      className={`card request-card ${styles.discoveryCard}${className ? ` ${className}` : ''}`}
+      className={`request-card ${minStyles.sideBlock}${className ? ` ${className}` : ''}`}
       id="home-requests"
+      aria-label="热门与发现"
     >
-      <div className={`materials-header home-discovery-header ${styles.discoveryHeader}`}>
-        <h2 className="card-title">
-          {DISCOVERY_TABS.find((tab) => tab.view === activeDiscoveryView)?.label}
-        </h2>
-        <div className="home-discovery-tabs" role="tablist" aria-label="首页发现内容">
-          {DISCOVERY_TABS.map((tab) => (
+      <div className={minStyles.sideTabs} role="tablist" aria-label="首页发现内容">
+        {DISCOVERY_TABS.map((tab) => {
+          const selected = activeDiscoveryView === tab.view;
+          return (
             <button
               key={tab.view}
               id={`home-discovery-tab-${tab.view}`}
               type="button"
               role="tab"
-              aria-selected={activeDiscoveryView === tab.view}
+              aria-selected={selected}
               aria-controls="home-discovery-panel"
-              className={activeDiscoveryView === tab.view ? 'active' : ''}
+              className={`${minStyles.sideTabBtn}${selected ? ` ${minStyles.sideTabBtnActive}` : ''}`}
               onClick={() => setActiveDiscoveryView(tab.view)}
             >
               {tab.label}
             </button>
-          ))}
-        </div>
-        <div className="request-header-actions">
-          {activeDiscoveryView === 'requests' ? (
-            <Link className="button primary small" href="/requests/new">
-              我要购买
-            </Link>
-          ) : activeDiscoveryView === 'popular' ? (
-            <button className="button primary small" type="button" onClick={onBrowseMaterials}>
-              全部资料
-            </button>
-          ) : (
-            <button className="button primary small" type="button" onClick={onBrowseSubjects}>
-              全部学科
-            </button>
-          )}
-        </div>
+          );
+        })}
       </div>
 
       <div
-        className="request-list-wrapper"
         id="home-discovery-panel"
         role="tabpanel"
         aria-labelledby={`home-discovery-tab-${activeDiscoveryView}`}
       >
         {activeDiscoveryView === 'requests' ? (
           <>
-            {requestLoading && <p className="help-text">加载中...</p>}
-            {requestError && <p className="error-text">{requestError}</p>}
-            {requestNotice && (
+            {requestLoading ? <p className={minStyles.sideNote}>加载中...</p> : null}
+            {requestError ? <p className="error-text">{requestError}</p> : null}
+            {requestNotice ? (
               <p className={requestNotice.type === 'error' ? 'error-text' : 'success-text'}>
                 {requestNotice.text}
               </p>
-            )}
-            {!requestLoading && requestItems.length === 0 ? (
-              <div className="empty-state">暂无求购需求，可以切换查看近期热门资料。</div>
+            ) : null}
+            {!requestLoading && visibleRequests.length === 0 ? (
+              <div className={minStyles.emptyMuted}>暂时没有公开的求购需求。</div>
             ) : (
-              <ul className="request-list">
-                {requestItems.map((item) => {
+              <ol className={minStyles.sideRankList} aria-label="求购榜">
+                {visibleRequests.map((item, index) => {
                   const title = item.course || '求购需求';
-                  const detailLink = `/requests/${item.id}`;
-                  const budgetLabel = item.budget != null ? `预算 ¥${item.budget}` : '预算 待议';
-                  const fundedLabel =
-                    item.fundedAmount != null && item.fundedAmount > 0 ? `已筹 ¥${item.fundedAmount}` : '已筹 待议';
-                  const canRespond = (item.responseCount ?? 0) === 0 || Boolean(item.responded);
+                  const amountText =
+                    item.fundedAmount != null && item.fundedAmount > 0
+                      ? `已筹 ¥${item.fundedAmount}`
+                      : item.budget != null
+                        ? `预算 ¥${item.budget}`
+                        : '待议';
                   return (
-                    <li key={item.id} className="request-item">
-                      <div className="request-title-row">
-                        <div className="request-title">
-                          <Link href={detailLink}>{title}</Link>
-                        </div>
-                        <div className="request-action-row">
-                          {item.owner ? (
-                            <Link className="button ghost small" href={detailLink}>
-                              查看
-                            </Link>
-                          ) : (
-                            <>
-                              <button className="button primary small" type="button" onClick={() => onFollowRequest(item)}>
-                                跟购
-                              </button>
-                              {canRespond ? (
-                                <Link className="button ghost small" href={buildUploadLink(item)}>
-                                  应答
-                                </Link>
-                              ) : (
-                                <span className="help-text">已有应答</span>
-                              )}
-                              <Link className="button ghost small" href={detailLink}>
-                                查看
-                              </Link>
-                            </>
-                          )}
-                        </div>
-                      </div>
-                      <div className="request-footer">
-                        <span className="request-footer__tag request-footer__budget">{budgetLabel}</span>
-                        {item.creatorFloor != null && <span className="request-footer__tag">跟购底价 ¥{item.creatorFloor}</span>}
-                        <span className="request-footer__tag request-footer__funded">{fundedLabel}</span>
-                        <span className="request-footer__tag request-footer__responses">应答 {item.responseCount ?? 0}</span>
-                      </div>
+                    <li key={item.id} className={minStyles.sideRankRow}>
+                      <span className={minStyles.sideRankNum}>{index + 1}</span>
+                      <Link className={minStyles.sideRankName} href={`/requests/${item.id}`} prefetch={false}>
+                        {title}
+                      </Link>
+                      <span className={minStyles.sideRankMeta}>{amountText}</span>
                     </li>
                   );
                 })}
-              </ul>
+              </ol>
             )}
-            {leaderboardItems.length > 0 && (
-              <div className="request-leaderboard">
-                <div className="request-leaderboard__title">
-                  求购榜 <span className="request-leaderboard__hint">按已筹金额</span>
-                </div>
-                <ul className="request-leaderboard__list">
-                  {leaderboardItems.map((item, index) => {
-                    const title = item.course || '求购需求';
-                    const fundedLabel =
-                      item.fundedAmount != null && item.fundedAmount > 0 ? `已筹 ¥${item.fundedAmount}` : '待议';
-                    return (
-                      <li key={item.id} className="request-leaderboard__item">
-                        <span className="request-leaderboard__rank">{index + 1}</span>
-                        <Link href={`/requests/${item.id}`}>{title}</Link>
-                        <span className="request-leaderboard__amount">{fundedLabel}</span>
-                      </li>
-                    );
-                  })}
-                </ul>
+            <div className={minStyles.sideFooterRow}>
+              <span className={minStyles.sideNote}>按已筹金额排行</span>
+              <div style={{ display: 'inline-flex', gap: 12 }}>
+                <Link className={minStyles.sideActionLink} href="/requests" prefetch={false}>
+                  全部求购
+                </Link>
+                <Link className={minStyles.sideActionLink} href="/requests/new" prefetch={false}>
+                  我要购买
+                </Link>
               </div>
-            )}
+            </div>
           </>
         ) : activeDiscoveryView === 'popular' ? (
-          popularItems.length === 0 ? (
-            <div className="empty-state">暂无热门资料。</div>
-          ) : (
-            <ol className="home-popular-list">
-              {popularItems.map((item, index) => {
-                const majorLabel = formatMajorDisplay(item.major);
-                const context = [item.school, item.college, majorLabel].filter(Boolean).join(' · ');
-                return (
-                  <li key={item.id} className="home-popular-item">
-                    <span className={`home-popular-rank ${index < 3 ? 'is-top' : ''}`}>{index + 1}</span>
-                    <div className="home-popular-copy">
-                      <Link href={materialPath(item.id, item.title)}>{item.title}</Link>
-                      <span>{context || '资料信息待完善'}</span>
-                    </div>
-                    <span className="home-popular-downloads">下载 {item.downloadCount ?? 0}</span>
+          <>
+            {topPopular.length === 0 ? (
+              <div className={minStyles.emptyMuted}>暂无热门资料。</div>
+            ) : (
+              <ol className={minStyles.sideRankList} aria-label="近期热门资料">
+                {topPopular.map((item, index) => (
+                  <li key={item.id} className={minStyles.sideRankRow}>
+                    <span className={minStyles.sideRankNum}>{index + 1}</span>
+                    <Link
+                      className={minStyles.sideRankName}
+                      href={materialPath(item.id, item.title)}
+                      prefetch={false}
+                      title={item.title}
+                    >
+                      {item.title}
+                    </Link>
+                    <span className={minStyles.sideRankMeta}>{formatNumber(item.downloadCount ?? 0)} 下载</span>
                   </li>
-                );
-              })}
-            </ol>
-          )
+                ))}
+              </ol>
+            )}
+            <div className={minStyles.sideFooterRow}>
+              <span className={minStyles.sideNote}>近期下载排行</span>
+              <button className={minStyles.sideActionLink} type="button" onClick={onBrowseMaterials}>
+                全部资料
+              </button>
+            </div>
+          </>
         ) : (
           <>
-            <p className={styles.snapshot}>累计下载排行 · 更新于 {formatDate(subjectsUpdatedAt)}</p>
-            {subjectRanks.length === 0 ? (
-              <div className="empty-state">暂无学科资料。</div>
+            {topSubjects.length === 0 ? (
+              <div className={minStyles.emptyMuted}>暂无学科资料。</div>
             ) : (
-              <ol className={styles.subjectList} aria-label="热门学科排行">
-                {subjectRanks.map((subject, index) => (
+              <ol className={minStyles.sideRankList} aria-label="热门学科排行">
+                {topSubjects.map((subject, index) => (
                   <li key={subject.id}>
                     <button
                       type="button"
-                      className={styles.subjectButton}
+                      className={minStyles.sideRankButton}
                       onClick={() => onOpenSubject(subject.id)}
                       aria-label={`查看${subject.name}，${subject.materialCount}份资料`}
                     >
-                      <span className={`home-popular-rank ${index < 3 ? 'is-top' : ''}`}>{index + 1}</span>
-                      <span className={styles.subjectCopy}>
-                        <strong>{subject.name}</strong>
-                        <span>{formatNumber(subject.materialCount)} 份资料</span>
+                      <span className={minStyles.sideRankNum}>{index + 1}</span>
+                      <span className={minStyles.sideRankName}>{subject.name}</span>
+                      <span className={minStyles.sideRankMeta}>
+                        {formatNumber(subject.materialCount)}份 · {formatNumber(subject.downloadCount)} 下载
                       </span>
-                      <span className={styles.subjectDownloads}>
-                        <strong>{formatNumber(subject.downloadCount)}</strong>
-                        <span>累计下载</span>
-                      </span>
-                      <ChevronRight size={16} aria-hidden="true" />
                     </button>
                   </li>
                 ))}
               </ol>
             )}
+            <div className={minStyles.sideFooterRow}>
+              <span className={minStyles.sideNote}>累计下载排行 · 更新于 {formatDate(subjectsUpdatedAt)}</span>
+              <button className={minStyles.sideActionLink} type="button" onClick={onBrowseSubjects}>
+                全部学科
+              </button>
+            </div>
           </>
         )}
       </div>
@@ -262,52 +215,42 @@ export function HomeCooperationCard({ profileMissingFields, className }: HomeCoo
 
   return (
     <section
-      className={`card ${styles.cooperationCard}${className ? ` ${className}` : ''}`}
+      className={`${minStyles.sideInfoSection}${className ? ` ${className}` : ''}`}
       aria-label="合作招募"
     >
-      <div className="materials-header">
-        <div>
-          <h2 className="card-title">合作招募</h2>
-        </div>
-        <div className="request-header-actions">
-          <Link
-            className={`button primary small profile-completion-link${profileIncomplete ? ' is-incomplete' : ''}`}
-            href="/me#profile"
-            aria-label={profileCompletionHint}
-            title={profileCompletionHint}
-          >
-            <span>完善主页</span>
-            {profileIncomplete ? (
-              <span className="profile-completion-link__badge" aria-hidden="true">
-                待完善
-              </span>
-            ) : null}
-          </Link>
-        </div>
+      <div className={minStyles.sideSubHeadingRow}>
+        <h3 className={minStyles.sideSubHeading}>合作招募</h3>
+        <Link
+          className={minStyles.profileHintLink}
+          href="/me#profile"
+          prefetch={false}
+          aria-label={profileCompletionHint}
+          title={profileCompletionHint}
+        >
+          {profileIncomplete ? '完善个人主页 · 待完善' : '完善个人主页'}
+        </Link>
       </div>
-      <div className="home-cooperation">
-        <p>资料共建、校园合作或技术协作，欢迎邮件联系。</p>
-        <div className="home-cooperation__contact">
-          <div>
-            <span>联系邮箱</span>
-            <a href={`mailto:${COOPERATION_EMAIL}`}>{COOPERATION_EMAIL}</a>
-          </div>
-          <button className="button ghost small" type="button" onClick={handleCopyEmail}>
-            <Copy size={16} aria-hidden="true" />
-            {emailCopyState === 'copied' ? '已复制' : '复制邮箱'}
-          </button>
-        </div>
-        <span className="home-cooperation__status" role="status" aria-live="polite">
-          {emailCopyState === 'failed' ? '复制失败，请手动复制邮箱。' : ''}
+      <p className={minStyles.sideDesc}>欢迎一起维护资料、专栏和代码。</p>
+      <div className={minStyles.coopContactRow}>
+        <a className={minStyles.coopEmail} href={`mailto:${COOPERATION_EMAIL}`}>
+          {COOPERATION_EMAIL}
+        </a>
+        <button className={minStyles.miniPillBtn} type="button" onClick={handleCopyEmail}>
+          {emailCopyState === 'copied' ? '已复制' : '复制邮箱'}
+        </button>
+      </div>
+      {emailCopyState === 'failed' ? (
+        <span className="error-text" role="status" aria-live="polite" style={{ fontSize: 12 }}>
+          复制失败，请手动复制邮箱。
         </span>
-      </div>
+      ) : null}
     </section>
   );
 }
 
 export default function HomeRequestPanels(props: HomeRequestPanelsProps) {
   return (
-    <div className={`home-dual-panel ${styles.panels}`} id="home-requests-dual">
+    <div className={`home-dual-panel`} id="home-requests-dual">
       <HomeDiscoveryCard {...props} />
       <HomeCooperationCard profileMissingFields={props.profileMissingFields} />
     </div>

@@ -30,6 +30,80 @@
   box-shadow: 0 1px 4px rgb(30 50 80 / 10%);
 }
 
+.minimalToggle {
+  padding: 3px;
+  border: 0;
+  border-radius: 10px;
+  background: #f4f4f5;
+}
+
+.minimalToggle button {
+  min-height: 32px;
+  padding: 0 14px;
+  border-radius: 8px;
+  color: #52525b;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.minimalToggle button:hover {
+  color: #0a0a0a;
+}
+
+.minimalToggle button[aria-pressed='true'] {
+  background: #ffffff;
+  color: #0a0a0a;
+  font-weight: 600;
+  box-shadow: 0 1px 2px rgba(10, 10, 10, 0.08);
+}
+
+.minimalToggle button:focus-visible {
+  outline: 2px solid #0a0a0a;
+  outline-offset: 2px;
+}
+
+:global(.home-page) .folders button {
+  border-color: #e4e4e7;
+  border-radius: 10px;
+  box-shadow: none;
+  color: #71717a;
+}
+
+:global(.home-page) .folders button:hover {
+  border-color: #d4d4d8;
+  box-shadow: none;
+  transform: translateY(-1px);
+}
+
+:global(.home-page) .folderInfo > strong {
+  color: #0a0a0a;
+}
+
+:global(.home-page) .folderCount,
+:global(.home-page) .folderCount > span {
+  color: #71717a;
+}
+
+:global(.home-page) .folderArrow {
+  color: #a1a1aa;
+}
+
+:global(.home-page) .folders button:hover .folderArrow {
+  color: #0a0a0a;
+}
+
+:global(.home-page) .breadcrumb button {
+  color: #0a0a0a;
+}
+
+:global(.home-page) .breadcrumb h3 {
+  color: #0a0a0a;
+}
+
+:global(.home-page) .searchFolders > h3 {
+  color: #0a0a0a;
+}
+
 .toggle button:focus-visible,
 .folders button:focus-visible,
 .breadcrumb button:focus-visible {

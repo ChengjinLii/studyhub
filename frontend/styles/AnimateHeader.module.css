@@ -7,7 +7,6 @@
   background: rgba(255, 255, 255, 0.84);
   backdrop-filter: saturate(180%) blur(14px);
   -webkit-backdrop-filter: saturate(180%) blur(14px);
-  border-bottom: 1px solid rgba(228, 228, 231, 0.9);
   color: #09090b;
 }
 
@@ -122,125 +121,23 @@
   font-weight: 600;
 }
 
-.githubLink {
-  display: inline-flex;
-  align-items: center;
-  height: 34px;
-  border: 1px solid #e4e4e7;
-  border-radius: 8px;
-  background: #ffffff;
-  color: #18181b;
-  text-decoration: none;
-  font-size: 0.8rem;
-  font-weight: 500;
-  white-space: nowrap;
-  box-shadow: 0 1px 2px rgba(9, 9, 11, 0.04);
-  transition:
-    background-color 0.15s ease,
-    border-color 0.15s ease,
-    transform 0.15s ease;
-}
-
-.githubLink:hover {
-  background: #fafafa;
-  border-color: #d4d4d8;
-  color: #09090b;
-}
-
-.githubRepoPart {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 0 9px 0 10px;
-  height: 100%;
-}
-
-.githubSlug {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  font-size: 0.76rem;
-  font-weight: 600;
-  color: #27272a;
-  letter-spacing: -0.01em;
-}
-
-.githubStarPart {
-  display: inline-flex;
-  align-items: center;
+.githubNavLink {
   gap: 5px;
-  height: 100%;
-  padding: 0 9px;
-  border-left: 1px solid #e4e4e7;
-  background: #fafafa;
-  border-top-right-radius: 7px;
-  border-bottom-right-radius: 7px;
   font-variant-numeric: tabular-nums;
 }
 
-.starIconWrap {
-  position: relative;
+.githubStars {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  width: 14px;
-  height: 14px;
-}
-
-.starSvg {
-  width: 14px;
-  height: 14px;
-  fill: #f59e0b;
-  color: #f59e0b;
-  transition: transform 0.24s cubic-bezier(0.22, 1, 0.36, 1);
-}
-
-.githubLink:hover .starSvg {
-  transform: scale(1.2) rotate(-10deg);
-}
-
-.spark {
-  position: absolute;
-  width: 3px;
-  height: 3px;
-  border-radius: 999px;
-  background: #f59e0b;
-  opacity: 0;
-  pointer-events: none;
-  transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.35s ease;
-}
-
-.githubLink:hover .spark1 {
-  opacity: 1;
-  transform: translate(-8px, -8px);
-}
-
-.githubLink:hover .spark2 {
-  opacity: 1;
-  transform: translate(9px, -7px);
-}
-
-.githubLink:hover .spark3 {
-  opacity: 1;
-  transform: translate(-7px, 8px);
-}
-
-.githubLink:hover .spark4 {
-  opacity: 1;
-  transform: translate(8px, 8px);
-}
-
-.starCount {
+  gap: 3px;
   font-size: 0.78rem;
-  font-weight: 700;
-  color: #18181b;
+  font-weight: 600;
+  color: #71717a;
   line-height: 1;
 }
 
-.divider {
-  width: 1px;
-  height: 18px;
-  background: #e4e4e7;
-  margin: 0 2px;
-  flex-shrink: 0;
+.githubNavLink:hover .githubStars {
+  color: #09090b;
 }
 
 .authActions {
@@ -329,10 +226,6 @@
 }
 
 @media (max-width: 1080px) {
-  .githubOwner {
-    display: none;
-  }
-
   .navLink {
     padding: 0 8px;
     font-size: 0.84rem;
@@ -364,25 +257,9 @@
     display: none;
   }
 
-  .divider {
-    display: none;
-  }
-
   .brandSep,
   .brandCn {
     display: inline;
-  }
-
-  .githubSlug {
-    display: none;
-  }
-
-  .githubRepoPart {
-    padding: 0 7px;
-  }
-
-  .githubStarPart {
-    padding: 0 8px;
   }
 
   .loginButton {
@@ -400,9 +277,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .rightCluster,
-  .starSvg,
-  .spark {
+  .rightCluster {
     transition: none !important;
   }
 }

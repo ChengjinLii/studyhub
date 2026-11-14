@@ -149,6 +149,7 @@ export default function OpeningSplash({ onComplete }: OpeningSplashProps) {
   return (
     <div
       key={playKey}
+      data-splash-overlay=""
       className={[
         styles.overlay,
         isDark ? styles.overlayDark : styles.overlayLight,

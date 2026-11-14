@@ -36,9 +36,9 @@ const tryDevLogin = async (request: APIRequestContext) => {
 };
 
 const closeEntryModalIfPresent = async (page: Page) => {
-  const closeButton = page.locator('.stable-version-modal__close').first();
-  if (await closeButton.isVisible().catch(() => false)) {
-    await closeButton.click({ force: true });
+  const splashOverlay = page.locator('[data-splash-overlay]').first();
+  if (await splashOverlay.isVisible().catch(() => false)) {
+    await splashOverlay.click({ force: true });
   }
 };
 
@@ -610,19 +610,13 @@ test('StudyHub Bot eyes remain centered and symmetric while looking sideways', a
   expect(lookingRight.pairCenter).toBeGreaterThan(lookingRight.faceCenter);
 });
 
-test('home entry modal and discovery views remain keyboard accessible', async ({ page }) => {
+test('home discovery views remain accessible without entry modal', async ({ page }) => {
   await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.goto('/');
 
-  const modal = page.locator('.stable-version-modal');
-  await expect(modal).toBeVisible();
-  await expect(page.getByText('也可以点击弹窗外区域，或按 ESC 键关闭。')).toBeVisible();
-  const firstHotspotBackground = page.locator('.studyhub-popup-poster__hotspot-bg').first();
-  await page.locator('.studyhub-popup-poster__hotspot').first().hover();
-  await expect(firstHotspotBackground).toHaveCSS('opacity', '0');
-  await page.keyboard.press('Escape');
-  await expect(modal).toBeHidden();
+  await closeEntryModalIfPresent(page);
+  await expect(page.locator('.stable-version-modal')).toHaveCount(0);
 
   const requestTab = page.getByRole('tab', { name: '求购列表' });
   const popularTab = page.getByRole('tab', { name: '近期热门' });

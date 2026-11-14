@@ -1,4 +1,4 @@
-import { FormEvent, RefObject } from 'react';
+import { FormEvent, RefObject, useMemo } from 'react';
 import {
   SUPPORTED_SCHOOL,
   COURSE_CATEGORY_OPTIONS,
@@ -6,8 +6,7 @@ import {
   getCollegeOptions,
   getMajorOptionsForCollege,
 } from '../../constants/metadata';
-import FilterToggleButton from '../FilterToggleButton';
-import SearchIconButton from '../SearchIconButton';
+import minStyles from '../../styles/HomeMinimal.module.css';
 
 export interface HomeFilterState {
   keyword: string;
@@ -37,10 +36,13 @@ interface HomeFilterCardProps {
   availableTagOptions: string[];
   onFilterChange: (key: keyof HomeFilterState, value: string) => void;
   onCourseCategoryChange: (value: string | null) => void;
+  onQuickTagSelect?: (tag: string) => void;
   onToggleAdvancedFilters: () => void;
   onResetFilters: () => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
 }
+
+const FEATURED_QUICK_TAGS = ['期末速成', '期末真题', '日常学习笔记', '一页纸', '开卷资料'];
 
 export default function HomeFilterCard({
   className,
@@ -51,6 +53,7 @@ export default function HomeFilterCard({
   availableTagOptions,
   onFilterChange,
   onCourseCategoryChange,
+  onQuickTagSelect,
   onToggleAdvancedFilters,
   onResetFilters,
   onSubmit,
@@ -67,145 +70,203 @@ export default function HomeFilterCard({
     filtersState.price && filtersState.price !== 'all' ? filtersState.price : '',
   ].filter(Boolean).length;
 
+  const quickTags = useMemo(() => {
+    const ordered: string[] = [];
+    FEATURED_QUICK_TAGS.forEach((tag) => {
+      if (!ordered.includes(tag) && (availableTagOptions.length === 0 || availableTagOptions.includes(tag))) {
+        ordered.push(tag);
+      }
+    });
+    availableTagOptions.forEach((tag) => {
+      if (ordered.length < 5 && !ordered.includes(tag)) {
+        ordered.push(tag);
+      }
+    });
+    return ordered.slice(0, 5);
+  }, [availableTagOptions]);
+
+  const advancedActionLabel = showAdvanced ? '收起高级筛选' : '高级筛选';
+
   return (
-    <section className={`card filter-card${className ? ` ${className}` : ''}`} ref={filterRef}>
-      <div className="filter-header">
-        <div>
-          <h2 className="card-title">
-            资料搜索
-            <svg className="title-icon" viewBox="0 0 24 24" aria-hidden="true">
-              <circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" strokeWidth="1.6" />
-              <path d="M20 20l-3.5-3.5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-            </svg>
-          </h2>
-        </div>
-        {overviewStats && overviewStats.length > 0 ? (
-          <div className="home-filter-overview" aria-label="平台概览">
-            {overviewStats.map((stat) => (
-              <div key={stat.label} className="home-filter-overview__item">
-                <span>{stat.label}</span>
-                <strong>{stat.value}</strong>
-              </div>
-            ))}
-          </div>
-        ) : null}
-      </div>
-      <form className="filter-form compact" onSubmit={onSubmit}>
-        <div className="filter-quick-row">
-          <div className="form-item filter-keyword">
-            <label htmlFor="keyword">关键词</label>
-            <div className="filter-keyword__input">
-              <input
-                id="keyword"
-                name="keyword"
-                value={filtersState.keyword}
-                onChange={(event) => onFilterChange('keyword', event.target.value)}
-                placeholder="课程名 / 知识点 / 资料类型"
-              />
-            </div>
-            <p className="help-text">多个关键词可以用空格分开。</p>
-          </div>
-          <div className="filter-actions quick">
-            <FilterToggleButton expanded={showAdvanced} activeFilterCount={activeFilterCount} onClick={onToggleAdvancedFilters} />
-            <SearchIconButton />
-          </div>
-        </div>
-        <div className={`filter-advanced ${showAdvanced ? 'open' : ''}`}>
-          <div className="filter-advanced__header">
-            <div>
-              <strong>高级筛选</strong>
-              <span>按学校、专业和资料属性缩小结果范围</span>
-            </div>
-            <button type="button" className="button ghost small filter-advanced__reset" onClick={onResetFilters}>
-              重置条件
-            </button>
-          </div>
-          <div className="advanced-grid">
-            <div className="form-item">
-              <label htmlFor="school">学校</label>
-              <select
-                id="school"
-                name="school"
-                value={filtersState.school}
-                onChange={(event) => onFilterChange('school', event.target.value)}
-              >
-                <option value="">全部</option>
-                <option value={SUPPORTED_SCHOOL}>{SUPPORTED_SCHOOL}</option>
-              </select>
-            </div>
-            <div className="form-item">
-              <label htmlFor="college">学院</label>
-              <select
-                id="college"
-                name="college"
-                value={filtersState.college}
-                onChange={(event) => {
-                  const nextCollege = event.target.value;
-                  onFilterChange('college', nextCollege);
-                  if (filtersState.major && !getMajorOptionsForCollege(nextCollege).includes(filtersState.major)) {
-                    onFilterChange('major', '');
+    <section
+      className={`${minStyles.searchSection}${className ? ` ${className}` : ''}`}
+      aria-label="资料搜索"
+      ref={filterRef}
+    >
+      {quickTags.length > 0 ? (
+        <div className={minStyles.quickTags} role="group" aria-label="热门标签快捷筛选">
+          {quickTags.map((tag) => {
+            const active = filtersState.tag === tag;
+            return (
+              <button
+                key={tag}
+                type="button"
+                className={`${minStyles.quickTag}${active ? ` ${minStyles.quickTagActive}` : ''}`}
+                aria-pressed={active}
+                onClick={() => {
+                  if (onQuickTagSelect) {
+                    onQuickTagSelect(active ? '' : tag);
+                  } else {
+                    onFilterChange('tag', active ? '' : tag);
                   }
                 }}
               >
-                <option value="">全部</option>
-                {collegeOptions.map((name) => (
-                  <option key={name} value={name}>
-                    {name}
-                  </option>
-                ))}
-              </select>
+                #{tag}
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
+
+      <form className={minStyles.searchForm} onSubmit={onSubmit}>
+        <div className={minStyles.searchPill}>
+          <svg
+            className={minStyles.searchIcon}
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            aria-hidden="true"
+          >
+            <circle cx="11" cy="11" r="7" />
+            <path d="M20 20l-3.5-3.5" />
+          </svg>
+          <label className={minStyles.srOnly} htmlFor="keyword">
+            关键词
+          </label>
+          <input
+            className={minStyles.searchInput}
+            id="keyword"
+            name="keyword"
+            value={filtersState.keyword}
+            onChange={(event) => onFilterChange('keyword', event.target.value)}
+            placeholder="课程名 / 知识点 / 资料类型"
+          />
+          <button
+            type="button"
+            className={`${minStyles.filterTrigger}${showAdvanced || activeFilterCount > 0 ? ` ${minStyles.filterTriggerActive}` : ''}`}
+            onClick={onToggleAdvancedFilters}
+            aria-expanded={showAdvanced}
+            aria-label={
+              activeFilterCount > 0
+                ? `${advancedActionLabel}，已启用 ${activeFilterCount} 项条件`
+                : advancedActionLabel
+            }
+          >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+              <path d="M4 7h16M7 12h10M10 17h4" />
+            </svg>
+            <span>高级筛选</span>
+            {activeFilterCount > 0 ? (
+              <span className={minStyles.filterCountBadge} aria-hidden="true">
+                {activeFilterCount}
+              </span>
+            ) : null}
+          </button>
+          <button className={minStyles.searchSubmit} type="submit" aria-label="搜索资料">
+            搜索
+          </button>
+        </div>
+
+        <p className={minStyles.searchHint}>多个关键词可以用空格分开。</p>
+
+        {showAdvanced ? (
+          <div className={minStyles.advancedPanel}>
+            <div className={minStyles.advancedSelects}>
+              <div className={minStyles.selectField}>
+                <label htmlFor="school">学校</label>
+                <select
+                  id="school"
+                  name="school"
+                  value={filtersState.school}
+                  onChange={(event) => onFilterChange('school', event.target.value)}
+                >
+                  <option value="">全部</option>
+                  <option value={SUPPORTED_SCHOOL}>{SUPPORTED_SCHOOL}</option>
+                </select>
+              </div>
+              <div className={minStyles.selectField}>
+                <label htmlFor="college">学院</label>
+                <select
+                  id="college"
+                  name="college"
+                  value={filtersState.college}
+                  onChange={(event) => {
+                    const nextCollege = event.target.value;
+                    onFilterChange('college', nextCollege);
+                    if (filtersState.major && !getMajorOptionsForCollege(nextCollege).includes(filtersState.major)) {
+                      onFilterChange('major', '');
+                    }
+                  }}
+                >
+                  <option value="">全部</option>
+                  {collegeOptions.map((name) => (
+                    <option key={name} value={name}>
+                      {name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className={minStyles.selectField}>
+                <label htmlFor="major">专业</label>
+                <select
+                  id="major"
+                  name="major"
+                  value={filtersState.major}
+                  onChange={(event) => onFilterChange('major', event.target.value)}
+                >
+                  <option value="">全部</option>
+                  {majorOptions.map((name) => (
+                    <option key={name} value={name}>
+                      {name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className={minStyles.selectField}>
+                <label htmlFor="gradeValue">年级</label>
+                <select
+                  id="gradeValue"
+                  name="gradeValue"
+                  value={filtersState.gradeValue}
+                  onChange={(event) => onFilterChange('gradeValue', event.target.value)}
+                >
+                  <option value="">全部</option>
+                  {GRADE_STAGE_OPTIONS.map((value) => (
+                    <option key={value} value={value}>
+                      {value}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className={minStyles.selectField}>
+                <label htmlFor="tag">标签</label>
+                <select
+                  id="tag"
+                  name="tag"
+                  value={filtersState.tag}
+                  onChange={(event) => onFilterChange('tag', event.target.value)}
+                  disabled={!availableTagOptions.length}
+                >
+                  <option value="">全部</option>
+                  {availableTagOptions.map((tag) => (
+                    <option key={tag} value={tag}>
+                      #{tag}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
-            <div className="form-item">
-              <label htmlFor="major">专业</label>
-              <select id="major" name="major" value={filtersState.major} onChange={(event) => onFilterChange('major', event.target.value)}>
-                <option value="">全部</option>
-                {majorOptions.map((name) => (
-                  <option key={name} value={name}>
-                    {name}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="form-item">
-              <label htmlFor="gradeValue">年级</label>
-              <select
-                id="gradeValue"
-                name="gradeValue"
-                value={filtersState.gradeValue}
-                onChange={(event) => onFilterChange('gradeValue', event.target.value)}
-              >
-                <option value="">全部</option>
-                {GRADE_STAGE_OPTIONS.map((value) => (
-                  <option key={value} value={value}>
-                    {value}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="form-item">
-              <label htmlFor="tag">标签</label>
-              <select
-                id="tag"
-                name="tag"
-                value={filtersState.tag}
-                onChange={(event) => onFilterChange('tag', event.target.value)}
-                disabled={!availableTagOptions.length}
-              >
-                <option value="">全部</option>
-                {availableTagOptions.map((tag) => (
-                  <option key={tag} value={tag}>
-                    #{tag}
-                  </option>
-                ))}
-              </select>
-              {!availableTagOptions.length && <p className="help-text">暂无热门标签，等待更多投稿。</p>}
-            </div>
-          </div>
-          <div className="filter-advanced__choices">
-            <fieldset className="form-item course-type-advanced">
-              <legend>课程类型</legend>
-              <div className="course-type-options compact">
-                <label className={`choice-pill ${!filtersState.courseCategory ? 'active' : ''}`}>
+
+            <div className={minStyles.choiceRow}>
+              <fieldset className={minStyles.choiceFieldset}>
+                <legend className={minStyles.choiceLegend}>课程类型</legend>
+                <label
+                  className={`${minStyles.choicePill}${!filtersState.courseCategory ? ` ${minStyles.choicePillActive}` : ''}`}
+                >
                   <input
                     type="radio"
                     name="courseCategory"
@@ -216,7 +277,10 @@ export default function HomeFilterCard({
                   全部
                 </label>
                 {COURSE_CATEGORY_OPTIONS.map((option) => (
-                  <label key={option.value} className={`choice-pill ${filtersState.courseCategory === option.value ? 'active' : ''}`}>
+                  <label
+                    key={option.value}
+                    className={`${minStyles.choicePill}${filtersState.courseCategory === option.value ? ` ${minStyles.choicePillActive}` : ''}`}
+                  >
                     <input
                       type="radio"
                       name="courseCategory"
@@ -227,12 +291,15 @@ export default function HomeFilterCard({
                     {option.label}
                   </label>
                 ))}
-              </div>
-            </fieldset>
-            <fieldset className="form-item price-group">
-              <legend>价格</legend>
-              <div className="choice-group">
-                <label className={`choice-pill price-choice ${!filtersState.price || filtersState.price === 'all' ? 'active' : ''}`}>
+              </fieldset>
+            </div>
+
+            <div className={minStyles.choiceRow}>
+              <fieldset className={minStyles.choiceFieldset}>
+                <legend className={minStyles.choiceLegend}>价格</legend>
+                <label
+                  className={`${minStyles.choicePill}${!filtersState.price || filtersState.price === 'all' ? ` ${minStyles.choicePillActive}` : ''}`}
+                >
                   <input
                     type="radio"
                     name="price"
@@ -242,7 +309,9 @@ export default function HomeFilterCard({
                   />
                   全部
                 </label>
-                <label className={`choice-pill price-choice ${filtersState.price === 'free' ? 'active' : ''}`}>
+                <label
+                  className={`${minStyles.choicePill}${filtersState.price === 'free' ? ` ${minStyles.choicePillActive}` : ''}`}
+                >
                   <input
                     type="radio"
                     name="price"
@@ -252,7 +321,9 @@ export default function HomeFilterCard({
                   />
                   免费
                 </label>
-                <label className={`choice-pill price-choice ${filtersState.price === 'paid' ? 'active' : ''}`}>
+                <label
+                  className={`${minStyles.choicePill}${filtersState.price === 'paid' ? ` ${minStyles.choicePillActive}` : ''}`}
+                >
                   <input
                     type="radio"
                     name="price"
@@ -262,11 +333,28 @@ export default function HomeFilterCard({
                   />
                   付费
                 </label>
-              </div>
-            </fieldset>
+              </fieldset>
+
+              <button type="button" className={minStyles.resetLink} onClick={onResetFilters}>
+                重置条件
+              </button>
+            </div>
           </div>
-        </div>
+        ) : null}
       </form>
+
+      {overviewStats && overviewStats.length > 0 ? (
+        <dl className={minStyles.statsStrip} aria-label="平台概览">
+          {overviewStats.map((stat) => (
+            <div key={stat.label} className={minStyles.statItem}>
+              <dt>{stat.label}</dt>
+              <dd style={{ margin: 0 }}>
+                <strong>{stat.value}</strong>
+              </dd>
+            </div>
+          ))}
+        </dl>
+      ) : null}
     </section>
   );
 }
