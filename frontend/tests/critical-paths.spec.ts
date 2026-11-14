@@ -618,31 +618,46 @@ test('home discovery views remain accessible without entry modal', async ({ page
   await closeEntryModalIfPresent(page);
   await expect(page.locator('.stable-version-modal')).toHaveCount(0);
 
+  // Desktop: the search portal shows two rank columns, with no tab, request list or cooperation card.
+  const portal = page.locator('[data-home-portal]');
+  await expect(portal).toBeVisible();
+  await expect(portal.getByRole('heading', { name: '近期热门', exact: true })).toBeVisible();
+  await expect(portal.getByRole('heading', { name: '热门学科', exact: true })).toBeVisible();
+  await expect(page.getByRole('tablist', { name: '首页发现内容' })).toHaveCount(0);
+  await expect(page.getByRole('region', { name: '合作招募', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('tab', { name: '求购列表' })).toHaveCount(0);
+  await expect(page.getByRole('heading', { name: '为你推荐', exact: true })).toHaveCount(0);
+  const pageUrl = page.url();
+  await portal.getByRole('button', { name: '全部资料' }).click();
+  await expect(page).toHaveURL(pageUrl);
+  await expect(page.locator('#materials-list')).toBeInViewport();
+
+  // Phone: the discovery card keeps its tabs and the cooperation card.
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.reload();
+  await closeEntryModalIfPresent(page);
   const requestTab = page.getByRole('tab', { name: '求购列表' });
   const popularTab = page.getByRole('tab', { name: '近期热门' });
   const subjectTab = page.getByRole('tab', { name: '热门学科' });
   await expect(subjectTab).toHaveAttribute('aria-selected', 'true');
   await popularTab.click();
   await expect(popularTab).toHaveAttribute('aria-selected', 'true');
-  await expect(page.locator('.request-card .card-title')).toHaveText('近期热门');
-  const pageUrl = page.url();
-  await page.getByRole('button', { name: '全部资料' }).click();
-  await expect(page).toHaveURL(pageUrl);
-  await expect(page.locator('#materials-list')).toBeInViewport();
+  await expect(subjectTab).toHaveAttribute('aria-selected', 'false');
+  await expect(page.getByRole('list', { name: '近期热门资料' })).toBeVisible();
   const cooperation = page.getByRole('region', { name: '合作招募', exact: true });
   await expect(cooperation.getByRole('heading', { name: '合作招募', exact: true })).toBeVisible();
   await expect(cooperation.getByRole('link', { name: '完善个人主页' })).toHaveAttribute('href', '/me#profile');
   await expect(page.getByRole('tab', { name: '合作招募' })).toHaveCount(0);
   await expect(page.getByRole('heading', { name: '为你推荐', exact: true })).toHaveCount(0);
-  await expect(page.getByRole('link', { name: 'chengjinli@std.uestc.edu.cn' })).toHaveAttribute(
+  await expect(cooperation.getByRole('link', { name: 'chengjinli@std.uestc.edu.cn' })).toHaveAttribute(
     'href',
     'mailto:chengjinli@std.uestc.edu.cn'
   );
-  await page.getByRole('button', { name: '复制邮箱' }).click();
-  await expect(page.getByRole('button', { name: '已复制' })).toBeVisible();
+  await cooperation.getByRole('button', { name: '复制邮箱' }).click();
+  await expect(cooperation.getByRole('button', { name: '已复制' })).toBeVisible();
   await requestTab.click();
   await expect(requestTab).toHaveAttribute('aria-selected', 'true');
-  await expect(page.locator('.request-card .card-title')).toHaveText('求购列表');
+  await expect(popularTab).toHaveAttribute('aria-selected', 'false');
 });
 
 test('material list shows active search keywords and the 24-item page size', async ({ page }) => {

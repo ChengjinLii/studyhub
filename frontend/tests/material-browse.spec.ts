@@ -213,24 +213,21 @@ test('independent material library keeps its original controls', async ({ page }
   await expect(page.getByRole('textbox', { name: '搜索资料', exact: true })).toBeVisible();
 });
 
-test('homepage defaults to subject download ranking and puts cooperation in the right card', async ({ page }, info) => {
+test('desktop portal ranks subjects by downloads and leaves the phone cards hidden', async ({ page }, info) => {
   await page.setViewportSize({ width: 1440, height: 1000 });
   await openHomepage(page);
-  const discovery = page.locator('.request-card');
-  await expect(discovery.getByRole('tab', { name: '热门学科' })).toHaveAttribute('aria-selected', 'true');
-  await expect(discovery.getByRole('tab')).toHaveText(['求购列表', '热门学科', '近期热门']);
+  const portal = page.locator('[data-home-portal]');
+  await expect(portal).toBeVisible();
+  await expect(page.getByRole('tablist', { name: '首页发现内容' })).toHaveCount(0);
   await expect(page.getByRole('heading', { name: '为你推荐', exact: true })).toHaveCount(0);
   const ranks = rankHomeSubjects(catalogue.folders);
   const rows = page.getByRole('list', { name: '热门学科排行' }).locator('li');
-  await expect(rows).toHaveCount(ranks.length);
+  await expect(rows).toHaveCount(Math.min(ranks.length, 10));
   await expect(rows.first()).toContainText(ranks[0].name);
-  await expect(rows.first()).toContainText(`${formatNumber(ranks[0].materialCount)} 份资料`);
-  await expect(rows.first()).toContainText(formatNumber(ranks[0].downloadCount));
-  const cooperation = page.getByRole('region', { name: '合作招募', exact: true });
-  await expect(cooperation.getByRole('link', { name: '完善个人主页' })).toHaveAttribute('href', '/me#profile');
-  const left = (await discovery.boundingBox())!;
-  expect((await cooperation.boundingBox())!.x).toBeGreaterThan(left.x + left.width);
-  await page.locator('#home-requests').screenshot({ path: info.outputPath('subject-discovery-desktop.png') });
+  await expect(rows.first()).toContainText(`${formatNumber(ranks[0].downloadCount)} 下载`);
+  await expect(page.locator('.request-card')).toBeHidden();
+  await expect(page.getByRole('region', { name: '合作招募', exact: true })).toHaveCount(0);
+  await portal.screenshot({ path: info.outputPath('subject-discovery-desktop.png') });
 });
 
 test('opening a small folder near the end scrolls to the library top without any requests', async ({ page }) => {
@@ -256,21 +253,26 @@ test('popular subjects open full folders despite an active search and restore th
   await page.locator('#keyword').press('Enter');
   const library = page.locator('#materials-list');
   await expect(library.locator('.material-card')).toHaveCount(9);
-  const calculus = catalogue.folders.find((folder) => folder.id === 'calculus')!;
-  await page.getByRole('list', { name: '热门学科排行' }).getByRole('button', { name: `查看微积分，${calculus.materials.length}份资料`, exact: true }).click();
-  await expect(library.locator('.material-card')).toHaveCount(Math.min(calculus.materials.length, 24));
+  const top = rankHomeSubjects(catalogue.folders).slice(0, 10);
+  // The portal lists 10 subjects; calculus is not among them. Take one whose folder size differs from the 9 search results.
+  const subject = top.find((entry) => entry.materialCount !== 9)!;
+  await page.locator('[data-home-portal]').getByRole('list', { name: '热门学科排行' }).getByRole('button', { name: subject.name, exact: true }).click();
+  await expect(library.locator('.material-card')).toHaveCount(Math.min(subject.materialCount, 24));
   await expect(library.getByRole('button', { name: '按学科', exact: true })).toHaveAttribute('aria-pressed', 'true');
   const card = library.locator('.material-card').first();
   const id = await card.getAttribute('data-material-id');
   await page.waitForTimeout(600);
   await card.scrollIntoViewIfNeeded();
-  const top = (await card.boundingBox())!.y;
-  await card.locator('.material-card__overlay-link').click({ position: { x: 60, y: 50 } });
+  // A trial click makes Playwright finish its own scrolling first, so the anchor is measured where the real click lands.
+  const link = card.locator('.material-card__overlay-link');
+  await link.click({ position: { x: 60, y: 50 }, trial: true });
+  const cardTop = (await card.boundingBox())!.y;
+  await link.click({ position: { x: 60, y: 50 } });
   await expect(page.locator('#download-card')).toBeVisible();
   await page.goBack();
-  await expect(library.locator('.material-card')).toHaveCount(Math.min(calculus.materials.length, 24));
+  await expect(library.locator('.material-card')).toHaveCount(Math.min(subject.materialCount, 24));
   await page.waitForTimeout(1400);
-  expect(Math.abs((await library.locator(`[data-material-id="${id}"]`).boundingBox())!.y - top)).toBeLessThan(6);
+  expect(Math.abs((await library.locator(`[data-material-id="${id}"]`).boundingBox())!.y - cardTop)).toBeLessThan(6);
   await library.getByRole('button', { name: '按资料', exact: true }).click();
   await expect(library.locator('.material-card')).toHaveCount(9);
   await expect(page.locator('#keyword')).toHaveValue('ESD');
@@ -285,7 +287,7 @@ test('mobile discovery stacks both cards and opens subject materials without hor
   const discovery = page.locator('.request-card');
   const cooperation = page.getByRole('region', { name: '合作招募', exact: true });
   await expect(discovery).toBeVisible();
-  await expect(discovery.getByRole('heading', { name: '热门学科', exact: true })).toBeVisible();
+  await expect(discovery.getByRole('tab', { name: '热门学科' })).toHaveAttribute('aria-selected', 'true');
   await expect(cooperation).toBeVisible();
   const left = (await discovery.boundingBox())!;
   expect((await cooperation.boundingBox())!.y).toBeGreaterThan(left.y + left.height);
