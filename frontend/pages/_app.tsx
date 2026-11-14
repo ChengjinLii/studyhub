@@ -2,11 +2,15 @@ import type { AppProps } from 'next/app';
 import dynamic from 'next/dynamic';
 import Head from 'next/head';
 import Link from 'next/link';
-import { ReactNode, useEffect, useState } from 'react';
+import { useRouter } from 'next/router';
+import { FormEvent, ReactNode, useCallback, useEffect, useState } from 'react';
 import { fetchBackend } from '../lib/apiBase';
 import '../styles/globals.css';
 import '../styles/responsive.css';
 import AppImage from '../components/AppImage';
+import BrandLogo from '../components/BrandLogo';
+import OpeningSplash from '../components/OpeningSplash';
+import footerStyles from '../styles/SiteFooter.module.css';
 import { AppDialogProvider } from '../components/AppDialogProvider';
 import { AppToastProvider } from '../components/AppToastProvider';
 import { SessionProvider } from '../components/SessionProvider';
@@ -220,10 +224,23 @@ function StudyHubEntryPoster() {
 }
 
 export default function MyApp({ Component, pageProps }: AppProps) {
+  const router = useRouter();
   const [wechatModalOpen, setWechatModalOpen] = useState(false);
   const [entryModalVariant, setEntryModalVariant] = useState<EntryModalVariant>(null);
+  const [splashDone, setSplashDone] = useState(false);
+  const [footerSearch, setFooterSearch] = useState('');
   const [runtimeInfo, setRuntimeInfo] = useState<RuntimeInfo | null>(null);
   const [globalChromeReady, setGlobalChromeReady] = useState(false);
+
+  const handleSplashComplete = useCallback(() => {
+    setSplashDone(true);
+  }, []);
+
+  const handleFooterSearchSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const keyword = footerSearch.trim();
+    void router.push(keyword ? `/materials?keyword=${encodeURIComponent(keyword)}` : '/materials');
+  };
 
   useEffect(() => {
     if (!window.isSecureContext || !('serviceWorker' in navigator) || process.env.NODE_ENV !== 'production') {
@@ -245,7 +262,7 @@ export default function MyApp({ Component, pageProps }: AppProps) {
   }, []);
 
   useEffect(() => {
-    if (typeof window === 'undefined') {
+    if (typeof window === 'undefined' || !splashDone) {
       return;
     }
     if (window.location.pathname !== '/') {
@@ -257,7 +274,7 @@ export default function MyApp({ Component, pageProps }: AppProps) {
       return;
     }
     setEntryModalVariant('welcome');
-  }, []);
+  }, [splashDone]);
 
   useEffect(() => {
     if (!entryModalVariant || typeof window === 'undefined') {
@@ -339,6 +356,7 @@ export default function MyApp({ Component, pageProps }: AppProps) {
       </Head>
       <AppProviders initialUser={initialSessionUser}>
       <div className="page-with-footer">
+        <OpeningSplash onComplete={handleSplashComplete} />
         <GlobalInteractiveChrome ready={globalChromeReady} />
         {showLocalDevBadge && <div className="runtime-environment-badge">{localDevLabel}</div>}
         {entryModalVariant && (
@@ -431,73 +449,215 @@ export default function MyApp({ Component, pageProps }: AppProps) {
           </div>
         )}
         <Component {...pageProps} />
-        <footer className="global-footer">
-          <div className="global-footer__wrap">
-            <div className="footer-info">
-              <div className="footer-info__row">
-                <div className="footer-info__item">
-                  <span className="footer-info__label">ICP备案号</span>
-                  <a
-                    className="footer-info__value"
-                    href="https://beian.miit.gov.cn/"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    浙ICP备2025212695号
-                  </a>
+        <footer className={footerStyles.footer}>
+          <div className={footerStyles.wrap}>
+            <div className={footerStyles.topGrid}>
+              <div className={footerStyles.brandCol}>
+                <div className={footerStyles.brandRow}>
+                  <BrandLogo theme="dark" size={30} />
+                  <span className={footerStyles.brandEn}>StudyHub</span>
+                  <span className={footerStyles.brandCn}>· 学汇</span>
                 </div>
-                <span className="footer-divider">|</span>
-                <div className="footer-info__item">
-                  <span className="footer-info__label">审核通过日期</span>
-                  <span className="footer-info__value">2025-11-26</span>
-                </div>
-                <span className="footer-divider">|</span>
-                <button
-                  className="footer-action"
-                  type="button"
-                  onClick={() => setWechatModalOpen(true)}
+                <p className={footerStyles.brandDesc}>
+                  校园学习资料共享与互助平台，让每一份真题、笔记与经验沉淀为可复用的学习资源。
+                </p>
+                <form
+                  className={footerStyles.searchForm}
+                  onSubmit={handleFooterSearchSubmit}
+                  role="search"
+                  aria-label="快速搜课"
                 >
-                  官方微信公众号
-                </button>
-                <span className="footer-divider">|</span>
-                <div className="footer-info__item">
-                  <span className="footer-info__label">官方QQ群</span>
-                  <span className="footer-info__value">245934740</span>
-                </div>
+                  <div className={footerStyles.searchBox}>
+                    <input
+                      className={footerStyles.searchInput}
+                      type="text"
+                      value={footerSearch}
+                      onChange={(event) => setFooterSearch(event.target.value)}
+                      placeholder="想找哪门课的资料？"
+                      aria-label="输入课程名搜索资料"
+                    />
+                    <button className={footerStyles.searchBtn} type="submit" aria-label="搜索课程资料">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" aria-hidden="true">
+                        <path d="M5 12h14" strokeLinecap="round" />
+                        <path d="m12 5 7 7-7 7" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    </button>
+                  </div>
+                </form>
               </div>
-              <div className="footer-info__row">
-                <div className="footer-info__item">
-                  <span className="footer-info__label">联系邮箱</span>
-                  <span className="footer-info__value">chengjinli@std.uestc.edu.cn</span>
-                </div>
-                <span className="footer-divider">|</span>
-                <div className="footer-info__item">
-                  <span className="footer-info__label">代码仓库</span>
-                  <a
-                    className="footer-info__value"
-                    href="https://github.com/ChengjinLii/studyhub"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    github.com/ChengjinLii/studyhub
-                  </a>
-                </div>
-                <span className="footer-divider">|</span>
-                <div className="footer-info__item">
-                  <span className="footer-info__label">核心贡献者</span>
-                  <span className="footer-info__value">李承锦、曾逸帆</span>
-                </div>
+
+              <div className={footerStyles.linkCol}>
+                <h3 className={footerStyles.colHeading}>找资料</h3>
+                <ul className={footerStyles.colList}>
+                  <li>
+                    <Link className={footerStyles.colLink} href="/materials" prefetch={false}>
+                      全部资料
+                    </Link>
+                  </li>
+                  <li>
+                    <Link className={footerStyles.colLink} href="/requests" prefetch={false}>
+                      求购专区
+                    </Link>
+                  </li>
+                  <li>
+                    <Link className={footerStyles.colLink} href="/#leaderboard" prefetch={false}>
+                      贡献榜单
+                    </Link>
+                  </li>
+                </ul>
+              </div>
+
+              <div className={footerStyles.linkCol}>
+                <h3 className={footerStyles.colHeading}>参与</h3>
+                <ul className={footerStyles.colList}>
+                  <li>
+                    <Link className={footerStyles.colLink} href="/upload" prefetch={false}>
+                      我要投稿
+                    </Link>
+                  </li>
+                  <li>
+                    <Link className={footerStyles.colLink} href="/requests/new" prefetch={false}>
+                      发布求购
+                    </Link>
+                  </li>
+                  <li>
+                    <Link className={footerStyles.colLink} href="/more" prefetch={false}>
+                      其他功能
+                    </Link>
+                  </li>
+                </ul>
+              </div>
+
+              <div className={footerStyles.linkCol}>
+                <h3 className={footerStyles.colHeading}>平台</h3>
+                <ul className={footerStyles.colList}>
+                  <li>
+                    <Link className={footerStyles.colLink} href="/join" prefetch={false}>
+                      关于我们
+                    </Link>
+                  </li>
+                  <li>
+                    <Link className={footerStyles.colLink} href="/join#engineering" prefetch={false}>
+                      工程日志
+                    </Link>
+                  </li>
+                  <li>
+                    <Link className={footerStyles.colLink} href="/me" prefetch={false}>
+                      个人中心
+                    </Link>
+                  </li>
+                </ul>
+              </div>
+
+              <div className={footerStyles.linkCol}>
+                <h3 className={footerStyles.colHeading}>联系与支持</h3>
+                <ul className={footerStyles.colList}>
+                  <li>
+                    <button
+                      className={footerStyles.colLink}
+                      type="button"
+                      onClick={() => setWechatModalOpen(true)}
+                    >
+                      官方微信公众号
+                    </button>
+                  </li>
+                  <li>
+                    <a
+                      className={footerStyles.colLink}
+                      href="https://github.com/ChengjinLii/studyhub"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      GitHub 仓库
+                    </a>
+                  </li>
+                  <li>
+                    <a className={footerStyles.colLink} href="mailto:chengjinli@std.uestc.edu.cn">
+                      邮件联系
+                    </a>
+                  </li>
+                </ul>
               </div>
             </div>
-            <div className="footer-hairline" />
-            <div className="footer-links">
-              <Link href="/join#engineering" prefetch={false}>工程日志</Link>
-              <span className="footer-divider">|</span>
-              <Link href="/join" prefetch={false}>关于我们</Link>
-              <span className="footer-divider">|</span>
-              <Link href="/identity-info" prefetch={false}>用户协议 / 隐私政策</Link>
-              <span className="footer-divider">|</span>
-              <span>内容版权归作者</span>
+
+            <div className={footerStyles.metaSection}>
+              <div className={footerStyles.infoRows}>
+                <div className={footerStyles.infoRow}>
+                  <div className={footerStyles.infoItem}>
+                    <span className={footerStyles.infoLabel}>ICP备案号</span>
+                    <a
+                      className={footerStyles.infoValue}
+                      href="https://beian.miit.gov.cn/"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      浙ICP备2025212695号
+                    </a>
+                  </div>
+                  <span className={footerStyles.divider}>|</span>
+                  <div className={footerStyles.infoItem}>
+                    <span className={footerStyles.infoLabel}>审核通过日期</span>
+                    <span className={footerStyles.infoValue}>2025-11-26</span>
+                  </div>
+                  <span className={footerStyles.divider}>|</span>
+                  <button
+                    className={footerStyles.actionBtn}
+                    type="button"
+                    onClick={() => setWechatModalOpen(true)}
+                  >
+                    官方微信公众号
+                  </button>
+                  <span className={footerStyles.divider}>|</span>
+                  <div className={footerStyles.infoItem}>
+                    <span className={footerStyles.infoLabel}>官方QQ群</span>
+                    <span className={footerStyles.infoValue}>245934740</span>
+                  </div>
+                </div>
+
+                <div className={footerStyles.infoRow}>
+                  <div className={footerStyles.infoItem}>
+                    <span className={footerStyles.infoLabel}>联系邮箱</span>
+                    <a className={footerStyles.infoValue} href="mailto:chengjinli@std.uestc.edu.cn">
+                      chengjinli@std.uestc.edu.cn
+                    </a>
+                  </div>
+                  <span className={footerStyles.divider}>|</span>
+                  <div className={footerStyles.infoItem}>
+                    <span className={footerStyles.infoLabel}>代码仓库</span>
+                    <a
+                      className={footerStyles.infoValue}
+                      href="https://github.com/ChengjinLii/studyhub"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      github.com/ChengjinLii/studyhub
+                    </a>
+                  </div>
+                  <span className={footerStyles.divider}>|</span>
+                  <div className={footerStyles.infoItem}>
+                    <span className={footerStyles.infoLabel}>核心贡献者</span>
+                    <span className={footerStyles.infoValue}>李承锦、曾逸帆</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className={footerStyles.hairline} />
+
+              <div className={footerStyles.bottomLinks}>
+                <Link href="/join#engineering" prefetch={false}>
+                  工程日志
+                </Link>
+                <span className={footerStyles.divider}>|</span>
+                <Link href="/join" prefetch={false}>
+                  关于我们
+                </Link>
+                <span className={footerStyles.divider}>|</span>
+                <Link href="/identity-info" prefetch={false}>
+                  用户协议 / 隐私政策
+                </Link>
+                <span className={footerStyles.divider}>|</span>
+                <span>内容版权归作者</span>
+              </div>
             </div>
           </div>
         </footer>

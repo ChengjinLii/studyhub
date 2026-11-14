@@ -3,7 +3,6 @@ import { GetServerSideProps } from 'next';
 import dynamic from 'next/dynamic';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
-import Link from 'next/link';
 import NavBar from '../components/NavBar';
 import AppImage from '../components/AppImage';
 import MaterialIconSprite from '../components/MaterialIconSprite';
@@ -51,11 +50,14 @@ import { MaterialRequestItem } from '../types/request';
 const MATERIALS_PAGE_SIZE = 24;
 const HOME_REQUEST_PREVIEW_LIMIT = 8;
 const HOME_POPULAR_PREVIEW_LIMIT = 20;
-const Snowfall = dynamic(() => import('react-snowfall'), { ssr: false });
-const MaterialCard = dynamic(() => import('../components/MaterialCard'));
 const HomeFilterCard = dynamic(() => import('../components/home/HomeFilterCard'));
 const HomeLeaderboard = dynamic(() => import('../components/home/HomeLeaderboard'));
-const HomeRequestPanels = dynamic(() => import('../components/home/HomeRequestPanels'));
+const HomeDiscoveryCard = dynamic(() =>
+  import('../components/home/HomeRequestPanels').then((mod) => mod.HomeDiscoveryCard)
+);
+const HomeCooperationCard = dynamic(() =>
+  import('../components/home/HomeRequestPanels').then((mod) => mod.HomeCooperationCard)
+);
 const MobileHomeSections = dynamic(() => import('../components/home/MobileHomeSections'));
 const ShareSheet = dynamic(() => import('../components/ShareSheet'), { ssr: false });
 
@@ -276,9 +278,6 @@ export default function Home({
     filtersState.courseCategory,
     filtersState.price,
   ]);
-  const [isMobile, setIsMobile] = useState(false);
-  const [reduceMotion, setReduceMotion] = useState(false);
-  const [seasonalEffectsReady, setSeasonalEffectsReady] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [batchError, setBatchError] = useState('');
@@ -291,6 +290,28 @@ export default function Home({
   const [subjectScope, setSubjectScope] = useState<MaterialSubjectScope>('filtered');
   const subjects = useMaterialSubjects({ ...appliedFilters }, subjectSearchAliases);
   const subjectRanks = useMemo(() => rankHomeSubjects(subjects.catalogueFolders), [subjects.catalogueFolders]);
+  const effectivePopularMaterials = useMemo(() => {
+    if (popularMaterials.some((item) => (item.downloadCount ?? 0) > 1)) {
+      return popularMaterials;
+    }
+    const byId = new Map<number, MaterialListItem>();
+    subjects.catalogueFolders.forEach((folder) => {
+      folder.materials.forEach((item) => {
+        if (!byId.has(item.id)) {
+          byId.set(item.id, item);
+        }
+      });
+    });
+    materialList.forEach((item) => {
+      if (!byId.has(item.id)) {
+        byId.set(item.id, item);
+      }
+    });
+    const sorted = Array.from(byId.values())
+      .sort((a, b) => (b.downloadCount ?? 0) - (a.downloadCount ?? 0) || b.id - a.id)
+      .slice(0, HOME_POPULAR_PREVIEW_LIMIT);
+    return sorted.length ? sorted : popularMaterials;
+  }, [popularMaterials, subjects.catalogueFolders, materialList]);
   const scrollToMaterials = useCallback(() => {
     requestAnimationFrame(() => {
       const root = document.documentElement;
@@ -330,31 +351,6 @@ export default function Home({
   const didRunInitialLeaderboardEffect = useRef(false);
   const [leaderboardLoading, setLeaderboardLoading] = useState(false);
   const [leaderboardError, setLeaderboardError] = useState('');
-  const snowCountFar = isMobile ? 16 : 26;
-  const snowCountNear = isMobile ? 8 : 14;
-  const snowfallCanvasStyle: React.CSSProperties = {
-    position: 'absolute',
-    inset: 0,
-    width: '100%',
-    height: '100%',
-  };
-  const [meteorSeed, setMeteorSeed] = useState(0);
-  const [meteorStyles, setMeteorStyles] = useState<React.CSSProperties[]>([]);
-  const randomizeMeteors = useCallback(() => {
-    const count = Math.random() < 0.5 ? 2 : 3;
-    const styles = Array.from({ length: count }, (_, index) => {
-      const top = Math.random() * 28 - 8;
-      const left = Math.random() * 45 + 5;
-      const delay = index * 0.7 + Math.random() * 0.35;
-      return {
-        top: `${top}%`,
-        left: `${left}%`,
-        animationDelay: `${delay}s`,
-      };
-    });
-    setMeteorStyles(styles);
-    setMeteorSeed((prev) => prev + 1);
-  }, []);
   const [requestItems] = useState<MaterialRequestItem[]>(requests || []);
   const [leaderboardItems] = useState<MaterialRequestItem[]>(requestLeaderboard || []);
   const requestLoading = false;
@@ -364,7 +360,6 @@ export default function Home({
   const [leaderboardFollowLoading, setLeaderboardFollowLoading] = useState<Record<number, boolean>>({});
   const [leaderboardFollowNotice, setLeaderboardFollowNotice] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [supportModalOpen, setSupportModalOpen] = useState(false);
-  const showSeasonalEffects = seasonalEffectsReady && (!reduceMotion || isMobile);
   useEffect(() => {
     setMaterialList(initialMaterials);
     setPageMeta(meta);
@@ -401,15 +396,6 @@ export default function Home({
       setShowAdvanced(snapshot.showAdvanced || false);
     },
   });
-  useEffect(() => {
-    if (!showSeasonalEffects) {
-      setMeteorStyles([]);
-      return;
-    }
-    randomizeMeteors();
-    const interval = window.setInterval(randomizeMeteors, 10000);
-    return () => window.clearInterval(interval);
-  }, [showSeasonalEffects, randomizeMeteors]);
   const pageSize = pageMeta.size || MATERIALS_PAGE_SIZE;
   const currentPage = pageMeta.page || 1;
   const totalPages = useMemo(
@@ -454,53 +440,6 @@ export default function Home({
     const dismissed = window.localStorage.getItem('qq-banner-dismissed');
     setBannerVisible(!dismissed);
   }, [officialQQ]);
-
-  useEffect(() => {
-    const checkViewport = () => {
-      const mobile = typeof window !== 'undefined' && window.innerWidth <= 640;
-      setIsMobile(mobile);
-    };
-    checkViewport();
-    window.addEventListener('resize', checkViewport);
-    return () => window.removeEventListener('resize', checkViewport);
-  }, []);
-
-  useEffect(() => {
-    if (typeof document === 'undefined') return undefined;
-    document.body.classList.add('theme-xmas');
-    return () => document.body.classList.remove('theme-xmas');
-  }, []);
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return undefined;
-    let timeoutId: ReturnType<typeof setTimeout> | null = null;
-    const enableEffects = () => {
-      timeoutId = setTimeout(() => setSeasonalEffectsReady(true), 0);
-    };
-    if (document.readyState === 'complete') {
-      enableEffects();
-    } else {
-      window.addEventListener('load', enableEffects, { once: true });
-    }
-    return () => {
-      window.removeEventListener('load', enableEffects);
-      if (timeoutId !== null) clearTimeout(timeoutId);
-    };
-  }, []);
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return undefined;
-    const media = window.matchMedia('(prefers-reduced-motion: reduce)');
-    const updateMotion = () => setReduceMotion(media.matches);
-    updateMotion();
-    if (media.addEventListener) {
-      media.addEventListener('change', updateMotion);
-      return () => media.removeEventListener('change', updateMotion);
-    }
-    media.addListener(updateMotion);
-    return () => media.removeListener(updateMotion);
-  }, []);
-
 
   useEffect(() => {
     setShowAdvanced(false);
@@ -749,7 +688,7 @@ export default function Home({
     <>
       <MaterialIconSprite />
       <NavBar user={user} />
-      <main className="container page-grid home-page theme-xmas">
+      <main className="container page-grid home-page">
         {officialQQ && bannerVisible && (
           <div className="qq-banner">
             <span>加入官方 QQ 群：{officialQQ}</span>
@@ -758,69 +697,6 @@ export default function Home({
             </button>
           </div>
         )}
-        <section className="hero card hero-magazine">
-          {showSeasonalEffects && (
-            <div className="xmas-snowfall" aria-hidden="true">
-              <Snowfall
-                snowflakeCount={snowCountFar}
-                color="rgba(243, 248, 255, 0.55)"
-                radius={[0.6, 2.2]}
-                speed={[0.6, 1.6]}
-                wind={[-0.2, 1.2]}
-                style={snowfallCanvasStyle}
-              />
-              <Snowfall
-                snowflakeCount={snowCountNear}
-                color="rgba(255, 255, 255, 0.45)"
-                radius={[1.6, 3.4]}
-                speed={[1.2, 2.4]}
-                wind={[-0.4, 1.6]}
-                style={snowfallCanvasStyle}
-              />
-            </div>
-          )}
-          {showSeasonalEffects && (
-            <div className="hero-meteors" aria-hidden="true">
-              {meteorStyles.map((style, index) => (
-                <span key={`${meteorSeed}-${index}`} className="hero-meteor" style={style} />
-              ))}
-            </div>
-          )}
-          <div className="hero-copy">
-            <div className="hero-kicker">StudyHub · 校园资料集</div>
-            <h2>贡献资料 · 获取所需</h2>
-            <p className="hero-subtitle">你分享的每一份资料，都能让别人少走弯路。</p>
-            <div className="hero-actions">
-              <div className="hero-action-buttons">
-                <Link className="button primary" href="/upload" prefetch={false}>
-                  我要投稿
-                </Link>
-                <Link className="button ghost" href="/join" prefetch={false}>
-                  关于我们
-                </Link>
-                <button className="button ghost" type="button" onClick={handleJumpToLeaderboard}>
-                  贡献榜单
-                </button>
-              </div>
-            </div>
-          </div>
-          <aside className="hero-panel" aria-label="平台数据概览">
-            <div className="hero-panel-title">平台概览</div>
-            <div className="hero-stats">
-              {[
-                { label: '已上架', value: statValues.total },
-                { label: '免费资料', value: statValues.free },
-                { label: '下载次数', value: statValues.downloads },
-                { label: '用户个数', value: statValues.users },
-              ].map((stat) => (
-                <div key={stat.label} className="hero-stat">
-                  <span>{stat.label}</span>
-                  <strong>{formatNumber(Number(stat.value))}</strong>
-                </div>
-              ))}
-            </div>
-          </aside>
-        </section>
         <MobileHomeSections
           mobileSearch={mobileSearch}
           stats={mobileOverviewStats}
@@ -829,78 +705,84 @@ export default function Home({
           onMobileSearchSubmit={handleMobileSearchSubmit}
           onJumpToLeaderboard={handleJumpToLeaderboard}
         />
-        <HomeRequestPanels
-          requestItems={requestItems}
-          requestLoading={requestLoading}
-          requestError={requestError}
-          requestNotice={requestNotice}
-          leaderboardItems={leaderboardItems}
-          popularItems={popularMaterials}
-          subjectRanks={subjectRanks}
-          subjectsUpdatedAt={subjects.updatedAt}
-          onOpenSubject={(id) => { setBrowseMode('subjects'); handleSubjectChange(id, 'all'); }}
-          onBrowseSubjects={browseAllSubjects}
-          onBrowseMaterials={browseAllMaterials}
-          profileMissingFields={profileMissingFields}
-          buildUploadLink={buildUploadLink}
-          onFollowRequest={handleFollowRequest}
+        <HomeFilterCard
+          className="home-top-filter-card"
+          overviewStats={mobileOverviewStats}
+          filterRef={filterRef}
+          filtersState={filtersState}
+          showAdvanced={showAdvanced}
+          availableTagOptions={availableTagOptions}
+          onFilterChange={updateFilter}
+          onCourseCategoryChange={applyCourseCategory}
+          onToggleAdvancedFilters={toggleAdvancedFilters}
+          onResetFilters={handleResetFilters}
+          onSubmit={handleFilterSubmit}
         />
-
-        <div className={`home-desktop-library${browseMode === 'subjects' || subjectId ? ` ${discoveryStyles.mobileSubjects}` : ''}`}>
-          <HomeFilterCard
-            filterRef={filterRef}
-            filtersState={filtersState}
-            showAdvanced={showAdvanced}
-            availableTagOptions={availableTagOptions}
-            onFilterChange={updateFilter}
-            onCourseCategoryChange={applyCourseCategory}
-            onToggleAdvancedFilters={toggleAdvancedFilters}
-            onResetFilters={handleResetFilters}
-            onSubmit={handleFilterSubmit}
-          />
-
-          <HomeMaterialLibrary
-            materialsRef={materialsRef} materials={materialList} meta={pageMeta}
-            keyword={appliedFilters.keyword} sort={filtersState.sort} loading={loadingPage}
-            error={paginationError} notice={paginationNotice} mode={browseMode}
-            onModeChange={(mode) => { setBrowseMode(mode); setSubjectScope('filtered'); setSubjectId(null); setSubjectPage(1); }}
-            onSortChange={(value) => void handleMaterialSortChange(value)} onPageChange={handlePageChange}
-            subjects={subjects} subjectId={subjectId} subjectPage={subjectPage} subjectScope={subjectScope}
-            onSubjectChange={(id) => handleSubjectChange(id, subjectScope)} onSubjectPageChange={setSubjectPage}
-            selectedIds={selectedIds} onToggle={toggleSelection} onReset={handleResetFilters}
-            onEditKeyword={() => filterRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })}
-          />
-        </div>
-        <HomeLeaderboard
-          user={user}
-          topContributors={topContributors}
-          leaderboardPeriod={leaderboardPeriod}
-          leaderboardLabels={leaderboardLabels}
-          leaderboardPeriods={leaderboardPeriods}
-          leaderboardRangeHint={leaderboardRangeHint}
-          leaderboardEmptyHint={leaderboardEmptyHint}
-          leaderboardLoading={leaderboardLoading}
-          leaderboardError={leaderboardError}
-          leaderboardFollowNotice={leaderboardFollowNotice}
-          leaderboardFollowed={leaderboardFollowed}
-          leaderboardFollowLoading={leaderboardFollowLoading}
-          onPeriodChange={setLeaderboardPeriod}
-          onFollowContributor={handleFollowContributor}
-        />
-        <section className="card support-card" style={{ gridColumn: '1 / -1' }}>
-          <div>
-            <h3 className="card-title" style={{ margin: 0 }}>
-              支持 StudyHub
-            </h3>
-            <p style={{ marginTop: 8, marginBottom: 4 }}>
-              您的支持是我们继续运营的动力😁
-            </p>
-            <p className="help-text">所有打赏将用于服务器、带宽与内容审核支出，感谢你的信任。</p>
+        <div className="home-main-columns">
+          <div className={`home-desktop-library${browseMode === 'subjects' || subjectId ? ` ${discoveryStyles.mobileSubjects}` : ''}`}>
+            <HomeMaterialLibrary
+              materialsRef={materialsRef} materials={materialList} meta={pageMeta}
+              keyword={appliedFilters.keyword} sort={filtersState.sort} loading={loadingPage}
+              error={paginationError} notice={paginationNotice} mode={browseMode}
+              onModeChange={(mode) => { setBrowseMode(mode); setSubjectScope('filtered'); setSubjectId(null); setSubjectPage(1); }}
+              onSortChange={(value) => void handleMaterialSortChange(value)} onPageChange={handlePageChange}
+              subjects={subjects} subjectId={subjectId} subjectPage={subjectPage} subjectScope={subjectScope}
+              onSubjectChange={(id) => handleSubjectChange(id, subjectScope)} onSubjectPageChange={setSubjectPage}
+              selectedIds={selectedIds} onToggle={toggleSelection} onReset={handleResetFilters}
+              onEditKeyword={() => filterRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })}
+            />
           </div>
-          <button className="button primary" type="button" onClick={() => setSupportModalOpen(true)}>
-            打赏
-          </button>
-        </section>
+          <aside className="home-side-column" aria-label="热门与榜单">
+            <HomeDiscoveryCard
+              requestItems={requestItems}
+              requestLoading={requestLoading}
+              requestError={requestError}
+              requestNotice={requestNotice}
+              leaderboardItems={leaderboardItems}
+              popularItems={effectivePopularMaterials}
+              subjectRanks={subjectRanks}
+              subjectsUpdatedAt={subjects.updatedAt}
+              onOpenSubject={(id) => { setBrowseMode('subjects'); handleSubjectChange(id, 'all'); }}
+              onBrowseSubjects={browseAllSubjects}
+              onBrowseMaterials={browseAllMaterials}
+              buildUploadLink={buildUploadLink}
+              onFollowRequest={handleFollowRequest}
+            />
+            <HomeLeaderboard
+              user={user}
+              topContributors={topContributors}
+              leaderboardPeriod={leaderboardPeriod}
+              leaderboardLabels={leaderboardLabels}
+              leaderboardPeriods={leaderboardPeriods}
+              leaderboardRangeHint={leaderboardRangeHint}
+              leaderboardEmptyHint={leaderboardEmptyHint}
+              leaderboardLoading={leaderboardLoading}
+              leaderboardError={leaderboardError}
+              leaderboardFollowNotice={leaderboardFollowNotice}
+              leaderboardFollowed={leaderboardFollowed}
+              leaderboardFollowLoading={leaderboardFollowLoading}
+              onPeriodChange={setLeaderboardPeriod}
+              onFollowContributor={handleFollowContributor}
+            />
+          </aside>
+        </div>
+        <div className="home-bottom-panels">
+          <section className="card support-card">
+            <div>
+              <h3 className="card-title" style={{ margin: 0 }}>
+                支持 StudyHub
+              </h3>
+              <p style={{ marginTop: 8, marginBottom: 4 }}>
+                您的支持是我们继续运营的动力😁
+              </p>
+              <p className="help-text">所有打赏将用于服务器、带宽与内容审核支出，感谢你的信任。</p>
+            </div>
+            <button className="button primary" type="button" onClick={() => setSupportModalOpen(true)}>
+              打赏
+            </button>
+          </section>
+          <HomeCooperationCard profileMissingFields={profileMissingFields} />
+        </div>
         {supportModalOpen && (
           <div className="modal-mask" onClick={() => setSupportModalOpen(false)}>
             <div

@@ -47,10 +47,9 @@ export default function HomeLeaderboard({
     <section
       id="leaderboard"
       className={`card leaderboard-card${mobileExpanded ? ' is-mobile-expanded' : ''}`}
-      style={{ gridColumn: '1 / -1' }}
     >
       <div className="materials-header">
-        <div>
+        <div className="leaderboard-header-top">
           <h2 className="card-title">
             贡献榜单
             <svg className="title-icon" viewBox="0 0 24 24" aria-hidden="true">
@@ -62,29 +61,28 @@ export default function HomeLeaderboard({
               <path d="M19 4h-2v3a5 5 0 0 0 2 4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </h2>
-          <p className="help-text">
-            {leaderboardLabels[leaderboardPeriod]}按去重下载次数排行（同一用户下载同一资料只算一次），展示前{' '}
-            {topContributors.length || 0} 位投稿者。
-            {leaderboardRangeHint && <span className="leaderboard-period-hint">{leaderboardRangeHint}</span>}
-          </p>
-          <p className="help-text">同一用户下载同一上传者不同资料会累计；重复下载同一资料不重复计数。</p>
-        </div>
-        <div className="leaderboard-controls">
-          <div className="leaderboard-tabs" role="tablist" aria-label="贡献榜单周期">
-            {leaderboardPeriods.map((period) => (
-              <button
-                key={period}
-                type="button"
-                role="tab"
-                aria-selected={leaderboardPeriod === period}
-                className={`leaderboard-tab ${leaderboardPeriod === period ? 'active' : ''}`}
-                onClick={() => onPeriodChange(period)}
-              >
-                {leaderboardLabels[period]}
-              </button>
-            ))}
+          <div className="leaderboard-controls">
+            <div className="leaderboard-tabs" role="tablist" aria-label="贡献榜单周期">
+              {leaderboardPeriods.map((period) => (
+                <button
+                  key={period}
+                  type="button"
+                  role="tab"
+                  aria-selected={leaderboardPeriod === period}
+                  className={`leaderboard-tab ${leaderboardPeriod === period ? 'active' : ''}`}
+                  onClick={() => onPeriodChange(period)}
+                >
+                  {leaderboardLabels[period]}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
+        <p className="help-text">
+          {leaderboardLabels[leaderboardPeriod]}按去重下载次数排行，展示前{' '}
+          {topContributors.length || 0} 位投稿者。
+          {leaderboardRangeHint && <span className="leaderboard-period-hint">{leaderboardRangeHint}</span>}
+        </p>
       </div>
       {leaderboardFollowNotice?.type === 'error' && <p className="error-text">{leaderboardFollowNotice.text}</p>}
       {leaderboardError && <p className="error-text">{leaderboardError}</p>}

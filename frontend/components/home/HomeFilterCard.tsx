@@ -23,7 +23,14 @@ export interface HomeFilterState {
   size: string;
 }
 
+export interface HomeOverviewStat {
+  label: string;
+  value: string;
+}
+
 interface HomeFilterCardProps {
+  className?: string;
+  overviewStats?: HomeOverviewStat[];
   filterRef: RefObject<HTMLDivElement>;
   filtersState: HomeFilterState;
   showAdvanced: boolean;
@@ -36,6 +43,8 @@ interface HomeFilterCardProps {
 }
 
 export default function HomeFilterCard({
+  className,
+  overviewStats,
   filterRef,
   filtersState,
   showAdvanced,
@@ -59,7 +68,7 @@ export default function HomeFilterCard({
   ].filter(Boolean).length;
 
   return (
-    <section className="card filter-card" ref={filterRef}>
+    <section className={`card filter-card${className ? ` ${className}` : ''}`} ref={filterRef}>
       <div className="filter-header">
         <div>
           <h2 className="card-title">
@@ -70,6 +79,16 @@ export default function HomeFilterCard({
             </svg>
           </h2>
         </div>
+        {overviewStats && overviewStats.length > 0 ? (
+          <div className="home-filter-overview" aria-label="平台概览">
+            {overviewStats.map((stat) => (
+              <div key={stat.label} className="home-filter-overview__item">
+                <span>{stat.label}</span>
+                <strong>{stat.value}</strong>
+              </div>
+            ))}
+          </div>
+        ) : null}
       </div>
       <form className="filter-form compact" onSubmit={onSubmit}>
         <div className="filter-quick-row">
