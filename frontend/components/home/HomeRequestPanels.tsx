@@ -9,7 +9,8 @@ import { formatDate, formatNumber } from '../../lib/format';
 import minStyles from '../../styles/HomeMinimal.module.css';
 
 const COOPERATION_EMAIL = 'chengjinli@std.uestc.edu.cn';
-const SIDEBAR_LIST_LIMIT = 27;
+// The card is shown at phone width only, so each list stays short.
+const SIDEBAR_LIST_LIMIT = 5;
 
 // Rank badge. The first three ranks are set in the accent colour.
 const rankBadgeClass = (rank: number) => `${minStyles.sideRankNum}${rank <= 3 ? ` ${minStyles.sideRankNumTop}` : ''}`;

@@ -74,6 +74,14 @@ const glideToHomeContent = () => {
 const HomeFilterCard = dynamic(() => import('../components/home/HomeFilterCard'));
 const HomeLeaderboard = dynamic(() => import('../components/home/HomeLeaderboard'));
 const MobileHomeSections = dynamic(() => import('../components/home/MobileHomeSections'));
+// Phone only: the search portal is not shown at phone width, so the discovery card and the
+// cooperation card stay in the page flow there.
+const HomeDiscoveryCard = dynamic(() =>
+  import('../components/home/HomeRequestPanels').then((mod) => mod.HomeDiscoveryCard)
+);
+const HomeCooperationCard = dynamic(() =>
+  import('../components/home/HomeRequestPanels').then((mod) => mod.HomeCooperationCard)
+);
 
 const ROLE_LABELS = [
   { mask: RoleMask.DEVELOPER, label: '开发者' },
@@ -731,6 +739,23 @@ export default function Home({
             onEditKeyword={() => filterRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })}
           />
         </div>
+        <div className={minStyles.phoneOnly} data-home-phone-discovery="">
+          <HomeDiscoveryCard
+            requestItems={requestItems}
+            requestLoading={requestLoading}
+            requestError={requestError}
+            requestNotice={requestNotice}
+            leaderboardItems={leaderboardItems}
+            popularItems={effectivePopularMaterials}
+            subjectRanks={subjectRanks}
+            subjectsUpdatedAt={subjects.updatedAt}
+            onOpenSubject={(id) => { setBrowseMode('subjects'); handleSubjectChange(id, 'all'); }}
+            onBrowseSubjects={browseAllSubjects}
+            onBrowseMaterials={browseAllMaterials}
+            buildUploadLink={buildUploadLink}
+            onFollowRequest={handleFollowRequest}
+          />
+        </div>
         <HomeLeaderboard
           user={user}
           topContributors={topContributors}
@@ -761,6 +786,9 @@ export default function Home({
             打赏
           </button>
         </section>
+        <div className={minStyles.phoneOnly} data-home-phone-cooperation="">
+          <HomeCooperationCard profileMissingFields={profileMissingFields} />
+        </div>
         {supportModalOpen && (
           <div className="modal-mask" onClick={() => setSupportModalOpen(false)}>
             <div

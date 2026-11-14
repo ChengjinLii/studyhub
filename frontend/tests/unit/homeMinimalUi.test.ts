@@ -710,3 +710,45 @@ describe('portal overview column: type and rows', () => {
     expect(rule('.overviewRows > div::before {')).toContain('border-bottom: 1px dotted');
   });
 });
+
+// Finding of the final e2e check (2026-11-15): the search portal is hidden at phone width, so
+// the phone home page had lost the discovery card and the cooperation card. Owner decision:
+// put both back at phone width before the push.
+describe('phone home page: discovery and cooperation cards', () => {
+  const index = () => readSource('pages/index.tsx');
+
+  it('mounts both cards in phone-only wrappers, the discovery card before the leaderboard', () => {
+    const source = index();
+    const discovery = source.indexOf('data-home-phone-discovery=""');
+    const cooperation = source.indexOf('data-home-phone-cooperation=""');
+    const leaderboard = source.indexOf('<HomeLeaderboard');
+
+    expect(discovery).toBeGreaterThan(-1);
+    expect(cooperation).toBeGreaterThan(-1);
+    expect(discovery).toBeLessThan(leaderboard);
+    expect(cooperation).toBeGreaterThan(leaderboard);
+    expect(source.slice(discovery - 60, discovery)).toContain('className={minStyles.phoneOnly}');
+    expect(source.slice(cooperation - 60, cooperation)).toContain('className={minStyles.phoneOnly}');
+    expect(source.slice(discovery, leaderboard)).toContain('<HomeDiscoveryCard');
+    expect(source.slice(cooperation, cooperation + 160)).toContain('<HomeCooperationCard');
+  });
+
+  it('shows the wrappers only at the width where the portal is hidden', () => {
+    const minimal = readSource('styles/HomeMinimal.module.css');
+    const portal = readSource('styles/HomePortal.module.css');
+    const base = minimal.indexOf('\n.phoneOnly {');
+    const phone = minimal.indexOf('@media (max-width: 768px) {\n  .phoneOnly {');
+    const portalPhone = portal.indexOf('@media (max-width: 768px) {\n  .portal {');
+
+    expect(base).toBeGreaterThan(-1);
+    expect(minimal.slice(base, minimal.indexOf('}', base))).toContain('display: none;');
+    expect(phone).toBeGreaterThan(base);
+    expect(minimal.slice(phone, minimal.indexOf('}', phone))).toContain('display: block;');
+    expect(portalPhone).toBeGreaterThan(-1);
+    expect(portal.slice(portalPhone, portal.indexOf('}', portalPhone))).toContain('display: none;');
+  });
+
+  it('keeps each list of the discovery card short', () => {
+    expect(readSource('components/home/HomeRequestPanels.tsx')).toContain('const SIDEBAR_LIST_LIMIT = 5;');
+  });
+});

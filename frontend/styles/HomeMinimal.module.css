@@ -1261,6 +1261,20 @@ a.sideRankName:hover {
   outline-offset: 2px;
 }
 
+/* Phone only: the search portal is hidden at phone width (see HomePortal.module.css), so the
+   discovery card and the cooperation card are shown in the page flow there. */
+.phoneOnly {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .phoneOnly {
+    display: block;
+    grid-column: 1 / -1;
+    min-width: 0;
+  }
+}
+
 @media (max-width: 640px) {
   .advancedSelects {
     grid-template-columns: repeat(2, minmax(0, 1fr));
