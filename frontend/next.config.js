@@ -32,10 +32,14 @@ if (apiBase) {
   }
 }
 
+// Bypass any pre-existing 1-year `immutable` dev chunks cached in local browsers before ad6aa8c.
+const devDeploymentId = process.env.NODE_ENV === 'development' ? `dev-${Date.now()}` : undefined;
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   compress: true,
   ...(nextDistDir ? { distDir: nextDistDir } : {}),
+  ...(devDeploymentId ? { deploymentId: devDeploymentId } : {}),
   poweredByHeader: false,
   reactStrictMode: true,
   env: {

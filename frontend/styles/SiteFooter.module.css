@@ -17,8 +17,8 @@
 
 .topGrid {
   display: grid;
-  grid-template-columns: minmax(260px, 1.2fr) minmax(320px, 1.4fr);
-  gap: 36px 64px;
+  grid-template-columns: minmax(240px, 1fr) minmax(440px, 1.85fr);
+  gap: 36px 56px;
   align-items: start;
   justify-content: space-between;
 }
@@ -38,33 +38,24 @@
 .brandLink {
   display: inline-flex;
   align-items: center;
-  gap: 10px;
+  gap: 2px;
   color: #fafafa;
   text-decoration: none;
+}
+
+.brandLogo {
+  margin-left: -11px;
+  margin-right: -4px;
+  flex-shrink: 0;
 }
 
 .brandEn {
   color: #ffffff;
   font-family: var(--font-wordmark), var(--font-stack);
-  font-size: 1.5rem;
+  font-size: 1.95rem;
   font-weight: 620;
   letter-spacing: -0.025em;
   line-height: 1;
-}
-
-.brandBadge {
-  display: inline-flex;
-  align-items: center;
-  height: 20px;
-  padding: 0 8px;
-  border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  background: rgba(255, 255, 255, 0.04);
-  color: #a1a1aa;
-  font-size: 11px;
-  font-weight: 500;
-  letter-spacing: 0.02em;
-  white-space: nowrap;
 }
 
 .brandDesc {
@@ -161,8 +152,8 @@
 
 .navGrid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(96px, 1fr));
-  gap: 24px 32px;
+  grid-template-columns: repeat(4, minmax(96px, 1fr));
+  gap: 24px 28px;
   justify-items: start;
 }
 
@@ -208,6 +199,12 @@
   color: #ffffff;
 }
 
+.colItem {
+  color: #8b8d98;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
 .bottomBar {
   border-top: 1px solid rgba(255, 255, 255, 0.07);
   padding-top: 20px;
@@ -246,36 +243,6 @@
   text-decoration: underline;
 }
 
-.contributors {
-  display: inline-flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px;
-}
-
-.contribIcon {
-  color: #818cf8;
-  flex: 0 0 auto;
-}
-
-.contribLabel {
-  color: #71717a;
-  font-size: 11.5px;
-  margin-right: 2px;
-}
-
-.contribChip {
-  display: inline-flex;
-  align-items: center;
-  padding: 2px 8px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.07);
-  color: #a1a1aa;
-  font-size: 11.5px;
-  line-height: 1.4;
-}
-
 @media (prefers-reduced-motion: reduce) {
   .socialBtn,
   .socialBtn::after,
@@ -290,7 +257,7 @@
   }
 }
 
-@media (max-width: 860px) {
+@media (max-width: 920px) {
   .topGrid {
     grid-template-columns: minmax(0, 1fr);
     gap: 28px;
@@ -307,10 +274,10 @@
   }
 }
 
-@media (max-width: 520px) {
+@media (max-width: 560px) {
   .navGrid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 20px 14px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 22px 18px;
   }
 
   .bottomBar {

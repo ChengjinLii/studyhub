@@ -240,10 +240,9 @@ export default function MyApp({ Component, pageProps }: AppProps) {
               <div className={footerStyles.brandCol}>
                 <div className={footerStyles.brandRow}>
                   <Link className={footerStyles.brandLink} href="/" prefetch={false}>
-                    <BrandLogo theme="dark" size={36} />
+                    <BrandLogo theme="dark" size={54} className={footerStyles.brandLogo} />
                     <span className={footerStyles.brandEn}>StudyHub</span>
                   </Link>
-                  <span className={footerStyles.brandBadge}>Open Campus</span>
                 </div>
                 <p className={footerStyles.brandDesc}>校园课程资料共享与开源互助社区</p>
                 <div className={footerStyles.socialRow} role="group" aria-label="社区与联系方式">
@@ -317,6 +316,18 @@ export default function MyApp({ Component, pageProps }: AppProps) {
               </div>
 
               <div className={footerStyles.navGrid}>
+                <div className={footerStyles.linkCol}>
+                  <h3 className={footerStyles.colHeading}>核心贡献者</h3>
+                  <ul className={footerStyles.colList}>
+                    <li>
+                      <span className={footerStyles.colItem}>李承锦</span>
+                    </li>
+                    <li>
+                      <span className={footerStyles.colItem}>曾逸帆</span>
+                    </li>
+                  </ul>
+                </div>
+
                 <div className={footerStyles.linkCol}>
                   <h3 className={footerStyles.colHeading}>浏览</h3>
                   <ul className={footerStyles.colList}>
@@ -403,25 +414,6 @@ export default function MyApp({ Component, pageProps }: AppProps) {
                 >
                   浙ICP备2025212695号
                 </a>
-              </div>
-              <div className={footerStyles.contributors}>
-                <svg
-                  className={footerStyles.contribIcon}
-                  width="14"
-                  height="14"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.9"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  aria-hidden="true"
-                >
-                  <path d="m12 3-1.9 5.1L5 10l5.1 1.9L12 17l1.9-5.1L19 10l-5.1-1.9Z" />
-                </svg>
-                <span className={footerStyles.contribLabel}>Contributors</span>
-                <span className={footerStyles.contribChip}>李承锦</span>
-                <span className={footerStyles.contribChip}>曾逸帆</span>
               </div>
             </div>
           </div>

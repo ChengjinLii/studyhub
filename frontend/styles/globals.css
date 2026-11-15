@@ -1193,7 +1193,7 @@ html[data-splash-state='docking'] .floating-sidebar {
   position: relative;
   display: block;
   animation: eye-blink 5s ease-in-out infinite;
-  transform: translate(calc(var(--eye-x, 0px) + var(--eye-pair-center-x)), var(--eye-y, 0px));
+  transform: translate(calc(var(--eye-x, 5px) + var(--eye-pair-center-x)), var(--eye-y, 0px));
   transition: transform 0.08s ease-out;
 }
 
@@ -1309,9 +1309,9 @@ html[data-splash-state='docking'] .floating-sidebar {
 
 
 @keyframes eye-blink {
-  0%, 90%, 100% { transform: translate(calc(var(--eye-x, 0px) + var(--eye-pair-center-x)), var(--eye-y, 0px)) scaleY(1); }
-  94% { transform: translate(calc(var(--eye-x, 0px) + var(--eye-pair-center-x)), var(--eye-y, 0px)) scaleY(0.2); }
-  96% { transform: translate(calc(var(--eye-x, 0px) + var(--eye-pair-center-x)), var(--eye-y, 0px)) scaleY(0.05); }
+  0%, 90%, 100% { transform: translate(calc(var(--eye-x, 5px) + var(--eye-pair-center-x)), var(--eye-y, 0px)) scaleY(1); }
+  94% { transform: translate(calc(var(--eye-x, 5px) + var(--eye-pair-center-x)), var(--eye-y, 0px)) scaleY(0.2); }
+  96% { transform: translate(calc(var(--eye-x, 5px) + var(--eye-pair-center-x)), var(--eye-y, 0px)) scaleY(0.05); }
 }
 
 .sidebar-body {

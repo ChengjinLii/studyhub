@@ -18,8 +18,17 @@ const MOBILE_BREAKPOINT = 720;
 const MOBILE_EDGE_GAP = 16;
 const MOBILE_DOCK_GAP = 8;
 const MOBILE_BUBBLE_SIZE = 50;
-const DESKTOP_DEFAULT_POSITION = { x: 60, y: 220 };
-const SEARCH_ANCHOR_GAP = 56;
+const DESKTOP_DEFAULT_POSITION = { x: 32, y: 220 };
+const SEARCH_ANCHOR_GAP = 236;
+const EYE_MAX_OFFSET = 5; // Keep both eyes clear of the circular edge while tracking.
+const DEFAULT_EYE_OFFSET: EyeOffset = { x: EYE_MAX_OFFSET, y: 0 };
+
+const isSplashCoveringBot = () => {
+  if (typeof document === 'undefined') return false;
+  const state = document.documentElement.dataset.splashState;
+  return state === 'playing' || state === 'docking';
+};
+
 const BOT_HAT_IDS = ['santa', 'graduation', 'party', 'wizard', 'mianliu', 'none'] as const;
 type BotHat = (typeof BOT_HAT_IDS)[number];
 const BOT_HATS: { id: BotHat; label: string; previewClass: string }[] = [
@@ -76,8 +85,20 @@ export default function FloatingSidebar() {
   // True until the user drags the bubble: it then keeps its default place.
   const usesDefaultPositionRef = useRef(false);
   const [bubbleMood, setBubbleMood] = useState<'neutral' | 'happy' | 'wink'>('neutral');
-  const [eyeOffset, setEyeOffset] = useState<EyeOffset>({ x: 0, y: 0 });
+  const [eyeOffset, setEyeOffset] = useState<EyeOffset>(DEFAULT_EYE_OFFSET);
   const eyeTrackingEnabled = true; // 眼睛跟随默认开启（无开关）
+  const eyeTargetRef = useRef<EyeOffset>({ ...DEFAULT_EYE_OFFSET });
+  const hasPointerRef = useRef(false);
+  const anchorPointerRef = useRef<{ x: number; y: number } | null>(null);
+  const lastPointerRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+  const prevPathnameRef = useRef<string | null>(null);
+
+  const resetEyeGazeToDefault = useCallback(() => {
+    hasPointerRef.current = false;
+    anchorPointerRef.current = null;
+    eyeTargetRef.current = { ...DEFAULT_EYE_OFFSET };
+    setEyeOffset(DEFAULT_EYE_OFFSET);
+  }, []);
 
   const getMobileRestingPosition = useCallback(() => {
     if (typeof window === 'undefined') return null;
@@ -358,39 +379,60 @@ export default function FloatingSidebar() {
 
 
   useEffect(() => {
+    if (router.pathname === '/' && prevPathnameRef.current !== '/') {
+      resetEyeGazeToDefault();
+    }
+    prevPathnameRef.current = router.pathname;
+  }, [resetEyeGazeToDefault, router.pathname]);
+
+  useEffect(() => {
     if (typeof window === 'undefined') return undefined;
     let animationFrame: number | null = null;
     let sampleTimer: number | null = null;
-    const lastPointer = { x: 0, y: 0 };
-    let hasPointer = false;
-    const target = { x: 0, y: 0 };
 
     const pointerHandler = (event: PointerEvent) => {
-      hasPointer = true;
-      lastPointer.x = event.clientX;
-      lastPointer.y = event.clientY;
+      if (isSplashCoveringBot()) {
+        return;
+      }
+      if (!hasPointerRef.current) {
+        const moved = Math.hypot(event.movementX || 0, event.movementY || 0) > 0;
+        if (!moved) {
+          if (!anchorPointerRef.current) {
+            anchorPointerRef.current = { x: event.clientX, y: event.clientY };
+            return;
+          }
+          if (Math.hypot(event.clientX - anchorPointerRef.current.x, event.clientY - anchorPointerRef.current.y) < 2) {
+            return;
+          }
+        }
+        hasPointerRef.current = true;
+      }
+      lastPointerRef.current.x = event.clientX;
+      lastPointerRef.current.y = event.clientY;
     };
 
     const sampleTarget = () => {
       const bubble = bubbleRef.current;
-      if (!bubble || !hasPointer) return;
+      if (!bubble || !hasPointerRef.current || isSplashCoveringBot()) return;
       const rect = bubble.getBoundingClientRect();
+      if (!rect.width || !rect.height) return;
       const centerX = rect.left + rect.width / 2;
       const centerY = rect.top + rect.height / 2;
-      const dx = lastPointer.x - centerX;
-      const dy = lastPointer.y - centerY;
+      const dx = lastPointerRef.current.x - centerX;
+      const dy = lastPointerRef.current.y - centerY;
       const dist = Math.max(Math.hypot(dx, dy), 1);
-      const maxOffset = 5; // Keep both eyes clear of the circular edge while tracking.
-      target.x = (dx / dist) * maxOffset;
-      target.y = (dy / dist) * maxOffset;
+      eyeTargetRef.current.x = (dx / dist) * EYE_MAX_OFFSET;
+      eyeTargetRef.current.y = (dy / dist) * EYE_MAX_OFFSET;
     };
 
     const step = () => {
+      const target = eyeTargetRef.current;
       setEyeOffset((prev) => {
         const lerp = 0.05;
         const nx = prev.x + (target.x - prev.x) * lerp;
         const ny = prev.y + (target.y - prev.y) * lerp;
         if (Math.abs(nx - target.x) < 0.01 && Math.abs(ny - target.y) < 0.01) {
+          if (prev.x === target.x && prev.y === target.y) return prev;
           return { x: target.x, y: target.y };
         }
         return { x: nx, y: ny };
@@ -398,16 +440,27 @@ export default function FloatingSidebar() {
       animationFrame = window.requestAnimationFrame(step);
     };
 
+    const splashEyeObserver = new MutationObserver(() => {
+      if (isSplashCoveringBot()) {
+        resetEyeGazeToDefault();
+      }
+    });
+    splashEyeObserver.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['data-splash-state'],
+    });
+
     window.addEventListener('pointermove', pointerHandler);
     sampleTimer = window.setInterval(sampleTarget, 150);
     animationFrame = window.requestAnimationFrame(step);
 
     return () => {
       window.removeEventListener('pointermove', pointerHandler);
+      splashEyeObserver.disconnect();
       if (sampleTimer) window.clearInterval(sampleTimer);
       if (animationFrame) window.cancelAnimationFrame(animationFrame);
     };
-  }, []);
+  }, [resetEyeGazeToDefault]);
 
   const userRoleBadges = useMemo(() => {
     if (!user) return [];
@@ -514,8 +567,8 @@ export default function FloatingSidebar() {
   }, []);
 
   const eyeStyle = {
-    ['--eye-x' as React.CSSProperties['animation']]: `${eyeTrackingEnabled ? eyeOffset.x : 0}px`,
-    ['--eye-y' as React.CSSProperties['animation']]: `${eyeTrackingEnabled ? eyeOffset.y : 0}px`,
+    ['--eye-x' as React.CSSProperties['animation']]: `${eyeTrackingEnabled ? eyeOffset.x : DEFAULT_EYE_OFFSET.x}px`,
+    ['--eye-y' as React.CSSProperties['animation']]: `${eyeTrackingEnabled ? eyeOffset.y : DEFAULT_EYE_OFFSET.y}px`,
   };
 
   const loginLink = { pathname: '/login' };

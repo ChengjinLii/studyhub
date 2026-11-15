@@ -357,7 +357,7 @@ describe('StudyHub bot default place', () => {
     const bot = readSource('components/FloatingSidebar.tsx');
 
     expect(bot).toContain("const POS_STORAGE_KEY = 'floating-sidebar-pos-v2';");
-    expect(bot).toContain('const SEARCH_ANCHOR_GAP = 56;');
+    expect(bot).toContain('const SEARCH_ANCHOR_GAP = 236;');
     expect(bot).toContain('[data-search-pill]');
     expect(bot).toContain('rect.top + window.scrollY');
     expect(bot).not.toContain("addEventListener('scroll', follow");
@@ -949,14 +949,21 @@ describe('search pill styling, portal spacing, and home UI polish', () => {
     expect(minimal).toContain('@keyframes liquidMetalSpin');
   });
 
-  it('renders the global site footer with brand logo icon buttons and compact contributor chips instead of verbose key-value lines', () => {
+  it('renders the global site footer with enlarged brand, core contributors column, and icon buttons without Open Campus', () => {
     const app = readSource('pages/_app.tsx');
     const footerCss = readSource('styles/SiteFooter.module.css');
     const footerMarkup = app.slice(app.indexOf('data-site-footer=""'), app.indexOf('</footer>'));
 
     expect(footerMarkup).toContain('footerStyles.socialBtn');
     expect(footerMarkup).toContain('footerStyles.navGrid');
-    expect(footerMarkup).toContain('footerStyles.contribChip');
+    expect(footerMarkup).toContain('footerStyles.colItem');
+    expect(footerMarkup).not.toContain('contribChip');
+    expect(footerMarkup).not.toContain('Open Campus');
+    expect(footerMarkup).not.toContain('brandBadge');
+    expect(footerMarkup).toContain('size={54}');
+    expect(footerMarkup).toContain('核心贡献者');
+    expect(footerMarkup.indexOf('核心贡献者')).toBeLessThan(footerMarkup.indexOf('>浏览<'));
+    expect(footerMarkup.indexOf('曾逸帆')).toBeLessThan(footerMarkup.indexOf('footerStyles.bottomBar'));
     expect(footerMarkup).toContain('浙ICP备2025212695号');
     expect(footerMarkup).toContain('data-tooltip=');
     expect(footerMarkup).not.toContain('官方QQ群：');
@@ -964,8 +971,10 @@ describe('search pill styling, portal spacing, and home UI polish', () => {
     expect(footerMarkup).not.toContain('代码仓库：');
     expect(footerMarkup).not.toContain('footerStyles.searchForm');
     expect(footerCss).toContain('.socialBtn');
+    expect(footerCss).toContain('font-size: 1.95rem;');
     expect(footerCss).toContain('data-tooltip');
-    expect(footerCss).toContain('.contribChip');
+    expect(footerCss).toContain('.colItem');
+    expect(footerCss).not.toContain('.contribChip');
   });
 
   it('keeps the top-right auth status minimal in neutral black and gray with truncated username beside logout', () => {
@@ -1066,13 +1075,33 @@ describe('search pill styling, portal spacing, and home UI polish', () => {
     expect(annivSection).toContain('2025.11 – 2026.11');
     expect(annivSection).not.toContain('1ST ANNIVERSARY');
     expect(annivSection).not.toContain('纪念志');
+    const annivSealRule = portalCss.slice(
+      portalCss.indexOf('\n.annivSeal {'),
+      portalCss.indexOf('\n.annivSealSvg {')
+    );
+
     expect(portalCss).toContain('.portalMid {');
     expect(portalCss).toContain('.annivBadge {');
     expect(portalCss).toContain('.annivSeal {');
+    expect(annivSection).toContain('stroke="#d4b36a"');
+    expect(annivSealRule).not.toContain('border:');
+    expect(annivSealRule).not.toContain('box-shadow:');
     expect(portalCss).toContain('cursor: default;');
     expect(portalCss).toContain('user-select: none;');
     expect(portalCss).not.toContain('.annivBadge:hover');
     expect(portalCss).toContain(":global(html[data-splash-state='playing']) .annivBadge");
     expect(portalCss).toContain(":global(html[data-splash-state='docking']) .annivBadge");
+  });
+
+  it('defaults StudyHub Bot eye gaze rightward on initial refresh and when entering the home page', () => {
+    const bot = readSource('components/FloatingSidebar.tsx');
+    const globals = readSource('styles/globals.css');
+
+    expect(bot).toContain('const EYE_MAX_OFFSET = 5;');
+    expect(bot).toContain('const DEFAULT_EYE_OFFSET: EyeOffset = { x: EYE_MAX_OFFSET, y: 0 };');
+    expect(bot).toContain('useState<EyeOffset>(DEFAULT_EYE_OFFSET)');
+    expect(bot).toContain('isSplashCoveringBot()');
+    expect(bot).toContain("router.pathname === '/' && prevPathnameRef.current !== '/'");
+    expect(globals).toContain('var(--eye-x, 5px)');
   });
 });

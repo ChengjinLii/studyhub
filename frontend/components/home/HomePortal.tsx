@@ -199,10 +199,21 @@ export default function HomePortal({
             <span className={styles.annivSeal} aria-hidden="true">
               <svg className={styles.annivSealSvg} viewBox="0 0 64 64" focusable="false">
                 <defs>
+                  <radialGradient id="portal-anniv-porcelain" cx="32%" cy="28%" r="72%">
+                    <stop offset="0%" stopColor="#ffffff" />
+                    <stop offset="100%" stopColor="#fcfbf7" />
+                  </radialGradient>
                   <path id="portal-anniv-arc-top" d="M 10.5,32 A 21.5,21.5 0 1,1 53.5,32" />
                   <path id="portal-anniv-arc-bot" d="M 7.5,32 A 24.5,24.5 0 0,0 56.5,32" />
                 </defs>
-                <circle cx="32" cy="32" r="29" fill="none" stroke="#d9bc7c" strokeWidth="1" opacity="0.88" />
+                <circle
+                  cx="32"
+                  cy="32"
+                  r="29"
+                  fill="url(#portal-anniv-porcelain)"
+                  stroke="#d4b36a"
+                  strokeWidth="1.15"
+                />
                 <circle
                   cx="32"
                   cy="32"
