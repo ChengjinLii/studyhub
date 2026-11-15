@@ -4,6 +4,7 @@ from contextlib import contextmanager
 from typing import Generator
 
 from sqlalchemy import create_engine, inspect, text
+from sqlalchemy.engine import make_url
 from sqlalchemy.orm import Session, close_all_sessions, sessionmaker
 
 from app.core.config import get_settings
@@ -18,6 +19,18 @@ LEGACY_TABLE_COMPATIBILITY: dict[str, tuple[str, ...]] = {
     "material_reviews": ("reviews",),
     "material_purchases": ("orders",),
 }
+def _uses_queue_pool(database_url: str) -> bool:
+    if not database_url.startswith("sqlite"):
+        return True
+    url = make_url(database_url)
+    database = url.database or ""
+    return (
+        database not in ("", ":memory:")
+        and ":memory:" not in database
+        and url.query.get("mode") != "memory"
+    )
+
+
 def get_engine():
     global _ENGINE
     if _ENGINE is None:
@@ -29,7 +42,7 @@ def get_engine():
             "connect_args": connect_args,
             "echo": settings.database_echo,
         }
-        if not settings.database_is_sqlite:
+        if _uses_queue_pool(settings.resolved_database_url):
             engine_kwargs.update(
                 {
                     "pool_size": settings.database_pool_size,

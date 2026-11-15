@@ -5,7 +5,8 @@ import asyncio
 from fastapi.testclient import TestClient
 
 from app.api.deps import get_user_read_service
-from app.core.db import session_scope
+from app.core.config import get_settings
+from app.core.db import _uses_queue_pool, get_engine, session_scope
 from app.services.auth_service import AuthService
 from tests.support import build_auth_headers, seed_read_users
 
@@ -318,3 +319,29 @@ def test_async_public_profile_groups_resource_summary_reads(client: TestClient, 
     assert profile["followingCount"] == 6
     assert profile["isFollowing"] is True
     assert sorted(calls) == ["base", "market_summary", "material_summary", "relationships"]
+
+
+def test_step6_profile_async_reuses_injected_session_and_sqlite_pool_config(
+    client: TestClient,
+    auth_service: AuthService,
+    monkeypatch,
+) -> None:
+    seed_read_users(auth_service, with_follow_graph=True)
+    service = get_user_read_service()
+
+    def fail_session_scope():
+        raise AssertionError("profile async helper should reuse provided session instead of opening session_scope")
+
+    monkeypatch.setattr("app.services.user_read_service.session_scope", fail_session_scope)
+
+    with session_scope() as session:
+        overview = asyncio.run(service.get_overview_async(1, session=session))
+        profile = asyncio.run(service.get_public_profile_async(1, 1, 2, session=session))
+
+    assert overview["freeDownloadStatus"] == {"remaining": 7, "unlimited": False}
+    assert profile["nickname"] == "白山"
+
+    assert _uses_queue_pool("sqlite+pysqlite:///tmp/studyhub.sqlite3") is True
+    assert _uses_queue_pool("sqlite+pysqlite:///:memory:") is False
+    assert _uses_queue_pool("sqlite:///file::memory:?cache=shared&uri=true") is False
+    assert get_engine().pool.size() == get_settings().database_pool_size

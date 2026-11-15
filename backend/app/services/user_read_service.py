@@ -110,10 +110,11 @@ class UserReadService:
             "totalEarnings": float(totals.get("totalEarnings", 0)),
         }
 
-    async def get_overview_async(self, user_id: int) -> dict[str, Any]:
+    async def get_overview_async(self, user_id: int, *, session: Session | None = None) -> dict[str, Any]:
         if not self._allows_concurrent_profile_reads():
-            with session_scope() as session:
-                return self.get_overview(session, user_id)
+            if session is not None:
+                return await asyncio.to_thread(self.get_overview, session, user_id)
+            return await asyncio.to_thread(self._call_with_new_session, self.get_overview, user_id)
         seed, profile_seed, totals = await asyncio.to_thread(self._load_overview_base, user_id)
         market_wants_task = asyncio.to_thread(self._call_with_new_session, self._load_market_wants_for_overview, seed, user_id)
         uploads_task = asyncio.to_thread(self._call_with_new_session, self._load_uploads_for_overview, seed, user_id)
@@ -185,10 +186,25 @@ class UserReadService:
         viewer_id: int,
         viewer_role_mask: int | None,
         target_user_id: int,
+        *,
+        session: Session | None = None,
     ) -> dict[str, Any]:
         if not self._allows_concurrent_profile_reads():
-            with session_scope() as session:
-                return self.get_public_profile(session, viewer_id, viewer_role_mask, target_user_id)
+            if session is not None:
+                return await asyncio.to_thread(
+                    self.get_public_profile,
+                    session,
+                    viewer_id,
+                    viewer_role_mask,
+                    target_user_id,
+                )
+            return await asyncio.to_thread(
+                self._call_with_new_session,
+                self.get_public_profile,
+                viewer_id,
+                viewer_role_mask,
+                target_user_id,
+            )
         base = await asyncio.to_thread(
             self._call_with_new_session,
             self._load_public_profile_base,

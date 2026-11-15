@@ -19,9 +19,10 @@ router = APIRouter(tags=["profile"])
 @router.get("/api/me")
 async def profile_overview(
     auth: AuthContext = Depends(require_auth_context),
+    session: Session = Depends(get_db_session),
     service: UserReadService = Depends(get_user_read_service),
 ) -> dict[str, object]:
-    return api_ok(await service.get_overview_async(auth.user_id or 0))
+    return api_ok(await service.get_overview_async(auth.user_id or 0, session=session))
 
 
 @router.get("/api/me/home-context")
@@ -33,7 +34,7 @@ async def home_profile_context(
 ) -> dict[str, object]:
     # Keep these reads sequential so a single SSR request does not reserve two
     # database connections for one user's profile context.
-    summary = await profile_service.get_overview_async(auth.user_id or 0)
+    summary = await run_in_threadpool(profile_service.get_overview, session, auth.user_id or 0)
     account = await run_in_threadpool(account_service.get_account, session, auth.user_id or 0)
     return api_ok({"summary": summary, "account": account})
 
@@ -42,9 +43,10 @@ async def home_profile_context(
 async def user_profile(
     id: int,
     auth: AuthContext = Depends(require_auth_context),
+    session: Session = Depends(get_db_session),
     service: UserReadService = Depends(get_user_read_service),
 ) -> dict[str, object]:
-    return api_ok(await service.get_public_profile_async(auth.user_id or 0, auth.role_mask, id))
+    return api_ok(await service.get_public_profile_async(auth.user_id or 0, auth.role_mask, id, session=session))
 
 
 @router.get("/api/users/{id}/uploads")
