@@ -106,7 +106,9 @@ jobs:
           backend/tests/test_lock_provider.py
 
   frontend:
-    runs-on: ubuntu-latest
+    # Playwright 1.57 cannot install Chromium on ubuntu-26.04, which ubuntu-latest became in
+    # November 2026. Move back to ubuntu-latest after a Playwright upgrade that supports it.
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
