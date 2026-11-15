@@ -3,7 +3,9 @@ from __future__ import annotations
 import base64
 from io import BytesIO
 import json
+import struct
 import zipfile
+import zlib
 
 import pytest
 from fastapi import HTTPException, UploadFile
@@ -166,6 +168,37 @@ def test_file_size_validator_rejects_oversized_material_upload() -> None:
 
 def test_image_validator_rejects_spoofed_image_content() -> None:
     upload = UploadFile(filename="fake.png", file=BytesIO(b"not really a png"), headers=Headers({"content-type": "image/png"}))
+
+    with pytest.raises(HTTPException) as exc:
+        validate_image_upload(
+            upload,
+            settings=Settings(),
+            max_size_bytes=1024,
+            missing_detail="请上传有效的预览图片",
+            invalid_type_detail="预览图片仅支持 PNG、JPG、WEBP、GIF、BMP、AVIF、HEIC、HEIF 格式",
+            too_large_detail="预览图片不能超过 5MB",
+        )
+
+    assert exc.value.status_code == 400
+    assert "仅支持" in str(exc.value.detail)
+
+
+def _png_header_only(width: int, height: int) -> bytes:
+    def chunk(kind: bytes, data: bytes) -> bytes:
+        return struct.pack(">I", len(data)) + kind + data + struct.pack(">I", zlib.crc32(kind + data))
+
+    ihdr = struct.pack(">IIBBBBB", width, height, 8, 2, 0, 0, 0)
+    return b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", ihdr) + chunk(b"IDAT", b"") + chunk(b"IEND", b"")
+
+
+def test_image_validator_rejects_decompression_bomb_with_400() -> None:
+    # A tiny PNG whose header claims 20000x20000 pixels: Pillow raises DecompressionBombError,
+    # which is not an OSError/ValueError. The validator must still answer 400, not 500.
+    upload = UploadFile(
+        filename="bomb.png",
+        file=BytesIO(_png_header_only(20_000, 20_000)),
+        headers=Headers({"content-type": "image/png"}),
+    )
 
     with pytest.raises(HTTPException) as exc:
         validate_image_upload(

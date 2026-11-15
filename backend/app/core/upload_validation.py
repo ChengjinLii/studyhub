@@ -147,7 +147,7 @@ def validate_image_upload(
             upload.file.seek(0)
             with Image.open(upload.file) as image:
                 image.verify()
-        except (SyntaxError, UnidentifiedImageError, OSError, ValueError) as exc:
+        except (Image.DecompressionBombError, SyntaxError, UnidentifiedImageError, OSError, ValueError) as exc:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=invalid_type_detail) from exc
         finally:
             upload.file.seek(current)
