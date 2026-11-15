@@ -59,11 +59,18 @@ const nextConfig = {
         value: 'public, max-age=2592000, stale-while-revalidate=86400',
       },
     ];
+    // Build chunks have content hashes only in a production build. The dev server reuses the
+    // same chunk names, so an `immutable` header there keeps an old chunk in the browser.
+    const isProduction = process.env.NODE_ENV === 'production';
     return [
-      {
-        source: '/_next/static/:path*',
-        headers: immutableAssetHeaders,
-      },
+      ...(isProduction
+        ? [
+            {
+              source: '/_next/static/:path*',
+              headers: immutableAssetHeaders,
+            },
+          ]
+        : []),
       {
         source: '/icons/:path*',
         headers: staticAssetHeaders,
