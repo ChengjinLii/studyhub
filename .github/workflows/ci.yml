@@ -108,6 +108,10 @@ jobs:
   frontend:
     # Playwright 1.57 cannot install Chromium on ubuntu-26.04, which ubuntu-latest became in
     # November 2026. Move back to ubuntu-latest after a Playwright upgrade that supports it.
+    # TODO(ci-ubuntu-26.04): when you upgrade @playwright/test in frontend/package.json, check
+    # that `npx playwright install --with-deps chromium` succeeds on ubuntu-26.04 (for example
+    # with a test branch that sets runs-on: ubuntu-latest). If it does, change this line back
+    # to `runs-on: ubuntu-latest` and remove this comment.
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
