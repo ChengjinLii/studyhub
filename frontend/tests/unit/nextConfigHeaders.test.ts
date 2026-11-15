@@ -1,6 +1,6 @@
 import { createRequire } from 'node:module';
 import { join } from 'node:path';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 type HeaderRule = { source: string; headers: { key: string; value: string }[] };
 
@@ -9,10 +9,8 @@ const nextConfig = require(join(process.cwd(), 'next.config.js')) as {
   headers: () => Promise<HeaderRule[]>;
 };
 
-const originalNodeEnv = process.env.NODE_ENV;
-
 const headersFor = async (nodeEnv: string) => {
-  (process.env as Record<string, string>).NODE_ENV = nodeEnv;
+  vi.stubEnv('NODE_ENV', nodeEnv);
   return nextConfig.headers();
 };
 
@@ -24,11 +22,13 @@ const staticChunkRule = (rules: HeaderRule[]) =>
 // page reloaded without end.
 describe('next.config.js cache headers', () => {
   afterEach(() => {
-    (process.env as Record<string, string | undefined>).NODE_ENV = originalNodeEnv;
+    vi.unstubAllEnvs();
   });
 
   it('marks build chunks immutable in production', async () => {
-    const rule = staticChunkRule(await headersFor('production'));
+    const rules = await headersFor('production');
+    expect(rules[0]?.source).toBe('/_next/static/:path*');
+    const rule = staticChunkRule(rules);
     expect(rule?.headers).toEqual([
       { key: 'Cache-Control', value: 'public, max-age=31536000, immutable' },
     ]);
