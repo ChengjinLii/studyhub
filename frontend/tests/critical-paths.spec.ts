@@ -643,7 +643,8 @@ test('home discovery views remain accessible without entry modal', async ({ page
   await popularTab.click();
   await expect(popularTab).toHaveAttribute('aria-selected', 'true');
   await expect(subjectTab).toHaveAttribute('aria-selected', 'false');
-  await expect(page.getByRole('list', { name: '近期热门资料' })).toBeVisible();
+  await expect(page.getByRole('list', { name: '近期热门资料', exact: true })).toBeVisible();
+  await expect(page.getByRole('list', { name: '热门学科排行', exact: true })).toBeHidden();
   const cooperation = page.getByRole('region', { name: '合作招募', exact: true });
   await expect(cooperation.getByRole('heading', { name: '合作招募', exact: true })).toBeVisible();
   await expect(cooperation.getByRole('link', { name: '完善个人主页' })).toHaveAttribute('href', '/me#profile');
@@ -658,6 +659,9 @@ test('home discovery views remain accessible without entry modal', async ({ page
   await requestTab.click();
   await expect(requestTab).toHaveAttribute('aria-selected', 'true');
   await expect(popularTab).toHaveAttribute('aria-selected', 'false');
+  await expect(
+    page.getByRole('list', { name: '求购榜', exact: true }).or(page.getByText('暂时没有公开的求购需求。'))
+  ).toBeVisible();
 });
 
 test('material list shows active search keywords and the 24-item page size', async ({ page }) => {
