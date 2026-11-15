@@ -293,7 +293,7 @@ test('mobile discovery stacks both cards and opens subject materials without hor
   const left = (await discovery.boundingBox())!;
   expect((await cooperation.boundingBox())!.y).toBeGreaterThan(left.y + left.height);
   await page.locator('#home-requests').screenshot({ path: info.outputPath('subject-discovery-mobile.png') });
-  await page.getByRole('list', { name: '热门学科排行' }).getByRole('button').first().click();
+  await discovery.getByRole('list', { name: '热门学科排行' }).getByRole('button').first().click();
   const library = page.locator('#materials-list');
   await expect(library).toBeVisible();
   await expect(library.locator('.material-card').first()).toBeVisible();

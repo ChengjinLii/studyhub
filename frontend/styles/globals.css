@@ -2130,18 +2130,17 @@ html[data-splash-state='docking'] .floating-sidebar {
 }
 
 @media (max-width: 1024px) {
-  .floating-sidebar {
-    position: static;
-    left: auto;
-    top: auto;
-    flex-direction: row;
-    flex-wrap: wrap;
-    gap: 12px;
-    margin-bottom: 16px;
-  }
-
   .floating-sidebar__panel {
-    width: 100%;
+    max-width: min(360px, calc(100vw - 32px));
+  }
+}
+
+@media (min-width: 721px) and (max-width: 768px) {
+  body:has([data-home-portal]) .floating-sidebar {
+    left: auto !important;
+    right: 14px;
+    top: auto !important;
+    bottom: calc(82px + env(safe-area-inset-bottom, 0px));
   }
 }
 
@@ -16384,38 +16383,36 @@ body:has(.home-page),
   outline-offset: -2px;
 }
 
-/* Home page, desktop: the content under the first screen is closed until the reader scrolls
-   (pages/index.tsx sets data-revealed). A closed page keeps a short blank run under the first
-   screen, so there is a distance to scroll; the site footer waits with the content. When the
-   reader's scroll opens the content (data-reveal-motion='rise'), its cards rise into place one
-   after the other. A jump to a section opens the content with no motion. */
-@media (min-width: 769px) {
-  .container.page-grid.home-page[data-revealed='false'] {
-    min-height: 420px;
-    padding-bottom: 0;
-  }
+/* Home page (all viewports): the content under the first screen is closed until the reader
+   scrolls (pages/index.tsx sets data-revealed). A closed page keeps a short blank run under the
+   first screen, so there is a distance to scroll; the site footer waits with the content. When
+   the reader's scroll opens the content (data-reveal-motion='rise'), its cards rise into place
+   one after the other. A jump to a section opens the content with no motion. */
+.container.page-grid.home-page[data-revealed='false'] {
+  min-height: 420px;
+  padding-bottom: 0;
+}
 
-  .container.page-grid.home-page[data-revealed='false'] > * {
-    display: none;
-  }
+.container.page-grid.home-page[data-revealed='false'] > * {
+  display: none;
+}
 
-  .page-with-footer:has(.home-page[data-revealed='false']) [data-site-footer] {
-    display: none;
-  }
+.page-with-footer:has(.home-page[data-revealed='false']) [data-site-footer] {
+  display: none;
+}
 
-  .container.page-grid.home-page[data-revealed='true'][data-reveal-motion='rise'] > .home-desktop-library,
-  .container.page-grid.home-page[data-revealed='true'][data-reveal-motion='rise'] > .leaderboard-card,
-  .container.page-grid.home-page[data-revealed='true'][data-reveal-motion='rise'] > .support-card {
-    animation: home-content-open 0.8s cubic-bezier(0.22, 0.8, 0.24, 1) backwards;
-  }
+.container.page-grid.home-page[data-revealed='true'][data-reveal-motion='rise'] > .home-desktop-library,
+.container.page-grid.home-page[data-revealed='true'][data-reveal-motion='rise'] > .leaderboard-card,
+.container.page-grid.home-page[data-revealed='true'][data-reveal-motion='rise'] > .support-card {
+  animation: home-content-open 0.8s cubic-bezier(0.22, 0.8, 0.24, 1) backwards;
+}
 
-  .container.page-grid.home-page[data-revealed='true'][data-reveal-motion='rise'] > .leaderboard-card {
-    animation-delay: 0.12s;
-  }
+.container.page-grid.home-page[data-revealed='true'][data-reveal-motion='rise'] > .leaderboard-card {
+  animation-delay: 0.12s;
+}
 
-  .container.page-grid.home-page[data-revealed='true'][data-reveal-motion='rise'] > .support-card {
-    animation-delay: 0.2s;
-  }
+.container.page-grid.home-page[data-revealed='true'][data-reveal-motion='rise'] > .support-card {
+  animation-delay: 0.2s;
 }
 
 @keyframes home-content-open {
@@ -16437,10 +16434,42 @@ body:has(.home-page),
 }
 
 @media (max-width: 768px) {
+  .container.page-grid.home-page[data-revealed='false'] {
+    min-height: 360px;
+    padding-top: 0;
+    padding-bottom: 0;
+  }
+
   .container.page-grid.home-page {
-    padding-top: 12px;
-    padding-bottom: 40px;
-    gap: 24px;
+    padding-top: 16px;
+    padding-bottom: calc(92px + env(safe-area-inset-bottom, 0px));
+    gap: 20px;
+  }
+
+  .home-page .mobile-home-task-panel,
+  .home-page .mobile-home-preview {
+    display: none;
+  }
+
+  .home-page .home-desktop-library {
+    display: grid;
+  }
+
+  .home-page .materials-library-header {
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+
+  .home-page .materials-library-header__actions {
+    width: 100%;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 8px;
+  }
+
+  .home-page .materials-grid {
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr));
+    gap: 12px;
   }
 
   .home-top-filter-card {

@@ -141,7 +141,8 @@ export default function NavBar({ user }: NavBarProps) {
         setScrolledPastCanopy(false);
         return;
       }
-      setScrolledPastCanopy(rect.bottom <= 64);
+      const headerHeight = window.innerWidth <= 768 ? 58 : 64;
+      setScrolledPastCanopy(rect.bottom <= headerHeight);
     };
 
     updateCanopyScroll();

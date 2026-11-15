@@ -1,6 +1,6 @@
 import Link from 'next/link';
-import { ReactNode } from 'react';
-import BrandLogo from '../BrandLogo';
+import { ReactNode, useState } from 'react';
+import { STUDYHUB_WORDMARK_GLYPHS, STUDYHUB_WORDMARK_VIEWBOX } from '../../lib/studyhubWordmark';
 import { HomeSubjectRank } from '../../lib/homeDiscovery';
 import { formatNumber } from '../../lib/format';
 import {
@@ -17,10 +17,6 @@ import styles from '../../styles/HomePortal.module.css';
 export const PORTAL_ROW_COUNT = 5;
 // A rank column holds more rows than it shows: the reader turns it like a wheel.
 export const PORTAL_WHEEL_LIMIT = 10;
-
-const WORDMARK_LETTERS = 'StudyHub'.split('');
-
-const FALLBACK_QQ_GROUP = '245934740';
 
 export interface HomePortalStats {
   users: string;
@@ -74,7 +70,6 @@ export default function HomePortal({
   popularItems,
   subjectRanks,
   stats,
-  officialQQ,
   onOpenSubject,
   onBrowseSubjects,
   onBrowseMaterials,
@@ -84,6 +79,7 @@ export default function HomePortal({
   const topPopular = popularItems.slice(0, PORTAL_WHEEL_LIMIT);
   const topSubjects = subjectRanks.slice(0, PORTAL_WHEEL_LIMIT);
   const wheelEdge = (count: number) => (count > PORTAL_ROW_COUNT ? 'start' : 'both');
+  const [mobileTab, setMobileTab] = useState<'materials' | 'subjects' | 'overview'>('materials');
 
   return (
     <section className={styles.portal} data-home-portal="" aria-label="搜索">
@@ -128,7 +124,7 @@ export default function HomePortal({
                 </radialGradient>
               </defs>
               <g clipPath="url(#portal-canopy-clip)">
-                <rect width={PORTAL_CANOPY_VIEWBOX_WIDTH} height={PORTAL_CANOPY_VIEWBOX_HEIGHT} fill="#040507" />
+                <rect width={PORTAL_CANOPY_VIEWBOX_WIDTH} height={PORTAL_CANOPY_VIEWBOX_HEIGHT} fill="#1a1c20" />
                 <rect
                   width={PORTAL_CANOPY_VIEWBOX_WIDTH}
                   height={PORTAL_CANOPY_VIEWBOX_HEIGHT}
@@ -170,21 +166,20 @@ export default function HomePortal({
 
           {/* The page heading. The opening splash lands on it, so its metrics follow the splash. */}
           <h1 className={styles.lockup} data-splash-target="" aria-label="StudyHub">
-            <span className={styles.markWrap}>
-              <BrandLogo
-                theme="light"
-                size={90}
-                className={styles.logoImg}
-                style={{ width: '100%', height: '100%' }}
-              />
-            </span>
-            <span className={styles.wordmark} aria-hidden="true">
-              {WORDMARK_LETTERS.map((letter, index) => (
-                <span key={`${letter}-${index}`} className={styles.letter}>
-                  {letter}
-                </span>
+            <svg
+              className={styles.wordmarkSvg}
+              viewBox={STUDYHUB_WORDMARK_VIEWBOX}
+              aria-hidden="true"
+              focusable="false"
+            >
+              {STUDYHUB_WORDMARK_GLYPHS.map((glyph) => (
+                <path
+                  key={glyph.id}
+                  d={glyph.d}
+                  className={glyph.tone === 'silver' ? styles.glyphSilver : styles.glyphWhite}
+                />
               ))}
-            </span>
+            </svg>
           </h1>
         </div>
 
@@ -267,7 +262,65 @@ export default function HomePortal({
         </div>
 
         <div className={styles.columns}>
-          <section className={styles.column} aria-labelledby="portal-popular-title">
+          <div className={styles.mobileTabsBar} data-portal-mobile-tabs="">
+            <div className={styles.mobileTabs} role="tablist" aria-label="首屏栏目切换">
+              <button
+                type="button"
+                role="tab"
+                aria-selected={mobileTab === 'materials'}
+                className={`${styles.mobileTab}${mobileTab === 'materials' ? ` ${styles.mobileTabActive}` : ''}`}
+                onClick={() => setMobileTab('materials')}
+              >
+                热门资料
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={mobileTab === 'subjects'}
+                className={`${styles.mobileTab}${mobileTab === 'subjects' ? ` ${styles.mobileTabActive}` : ''}`}
+                onClick={() => setMobileTab('subjects')}
+              >
+                热门学科
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={mobileTab === 'overview'}
+                className={`${styles.mobileTab}${mobileTab === 'overview' ? ` ${styles.mobileTabActive}` : ''}`}
+                onClick={() => setMobileTab('overview')}
+              >
+                平台概览
+              </button>
+            </div>
+            {mobileTab === 'materials' ? (
+              <button type="button" className={styles.more} onClick={onBrowseMaterials}>
+                <span>全部资料</span>
+                <span className={styles.moreArrow} aria-hidden="true">
+                  ›
+                </span>
+              </button>
+            ) : mobileTab === 'subjects' ? (
+              <button type="button" className={styles.more} onClick={onBrowseSubjects}>
+                <span>全部学科</span>
+                <span className={styles.moreArrow} aria-hidden="true">
+                  ›
+                </span>
+              </button>
+            ) : onJumpToLeaderboard ? (
+              <button type="button" className={styles.more} onClick={onJumpToLeaderboard}>
+                <span>贡献榜</span>
+                <span className={styles.moreArrow} aria-hidden="true">
+                  ›
+                </span>
+              </button>
+            ) : null}
+          </div>
+
+          <section
+            className={styles.column}
+            data-mobile-active={mobileTab === 'materials' ? 'true' : 'false'}
+            aria-labelledby="portal-popular-title"
+          >
             <div className={styles.columnHead}>
               <h2 id="portal-popular-title">热门资料</h2>
               <button type="button" className={styles.more} onClick={onBrowseMaterials}>
@@ -308,7 +361,11 @@ export default function HomePortal({
             )}
           </section>
 
-          <section className={styles.column} aria-labelledby="portal-subjects-title">
+          <section
+            className={styles.column}
+            data-mobile-active={mobileTab === 'subjects' ? 'true' : 'false'}
+            aria-labelledby="portal-subjects-title"
+          >
             <div className={styles.columnHead}>
               <h2 id="portal-subjects-title">热门学科</h2>
               <button type="button" className={styles.more} onClick={onBrowseSubjects}>
@@ -354,7 +411,11 @@ export default function HomePortal({
           </section>
 
           {/* The overview shares the same editorial header rule and quiet numeric hierarchy. */}
-          <section className={`${styles.column} ${styles.overview}`} aria-labelledby="portal-overview-title">
+          <section
+            className={`${styles.column} ${styles.overview}`}
+            data-mobile-active={mobileTab === 'overview' ? 'true' : 'false'}
+            aria-labelledby="portal-overview-title"
+          >
             <div className={styles.columnHead}>
               <h2 id="portal-overview-title" className={styles.overviewTitle}>
                 平台概览
@@ -394,22 +455,10 @@ export default function HomePortal({
             </div>
           </section>
         </div>
-      </div>
-
-      {/* The strip closes the first screen. Its centre tells that the page goes on below; the line
-          on its top edge fills while the reader scrolls towards the content. */}
       <div className={styles.strip}>
         <div className={styles.stripInner}>
-          <a
-            className={styles.stripStart}
-            href="https://beian.miit.gov.cn/"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            浙ICP备2025212695号
-          </a>
           <button type="button" className={styles.scrollCue} onClick={onScrollDown}>
-            <span>向下滚动，浏览资料与贡献榜</span>
+            <span>向下滚动</span>
             <svg
               className={styles.scrollCueArrow}
               width="16"
@@ -425,11 +474,8 @@ export default function HomePortal({
               <path d="M6 9l6 6 6-6" />
             </svg>
           </button>
-          <div className={`${styles.stripGroup} ${styles.stripEnd}`}>
-            <span>官方 QQ 群：{officialQQ || FALLBACK_QQ_GROUP}</span>
-            <span>核心贡献者：李承锦、曾逸帆</span>
-          </div>
         </div>
+      </div>
       </div>
     </section>
   );

@@ -1,6 +1,6 @@
-/* The opening splash: a black screen with a white lockup. Each part first shows as an outline
-   and then fills. At the dock a white surface opens over the black from the centre, and the
-   lockup travels in a straight line to the lockup of the page. */
+/* The opening splash: a black screen with the vectorized StudyHub wordmark. Each glyph
+   traces its SVG stroke contour, fills upward behind a luminous energy crest, receives a diagonal
+   metallic glint, and docks seamlessly into the home portal dark canopy. */
 .overlay {
   --splash-ink: #f6f6f4;
   --splash-travel: 720ms;
@@ -41,12 +41,13 @@
   position: absolute;
   inset: 0;
   pointer-events: none;
-  opacity: 0.72;
+  opacity: 0.78;
   background:
-    radial-gradient(640px circle at 50% 46%, rgba(255, 255, 255, 0.06), transparent 72%),
+    radial-gradient(640px circle at 50% 46%, rgba(99, 102, 241, 0.11), transparent 68%),
+    radial-gradient(460px circle at 50% 48%, rgba(255, 255, 255, 0.06), transparent 72%),
     linear-gradient(to right, rgba(255, 255, 255, 0.045) 1px, transparent 1px),
     linear-gradient(to bottom, rgba(255, 255, 255, 0.045) 1px, transparent 1px);
-  background-size: 100% 100%, 48px 48px, 48px 48px;
+  background-size: 100% 100%, 100% 100%, 48px 48px, 48px 48px;
 }
 
 /* The white surface. It opens as a circle from the centre of the screen; 72vmax reaches the
@@ -64,15 +65,14 @@
   clip-path: circle(72vmax at 50% 50%);
 }
 
-/* The difference blend turns the near-white lockup into ink (#09090b) where the white surface
-   is under it, and keeps it near-white over the black. So the colour of the lockup changes at
-   the edge of the circle, with no grey step between. */
+/* The difference blend turns the lockup ink dark where the white surface passes beneath it. */
 .stage {
-  --splash-mark: clamp(70px, 8.65vw, 90px);
+  --wordmark-width: clamp(256px, 31vw, 340px);
   position: relative;
   display: inline-flex;
   align-items: center;
-  padding: 12px 24px 12px 6px;
+  justify-content: center;
+  padding: 18px 20px 8px;
   mix-blend-mode: difference;
   transform: translate3d(0, 0, 0) scale(1);
   transform-origin: center center;
@@ -84,108 +84,90 @@
   opacity: 0;
 }
 
-/* The mark draws alone in the centre, then the lockup slides left while the letters come in.
-   The animation sits on this inner wrapper so the stage keeps its inline dock transform. */
+/* Depth-focus emergence sits on this inner wrapper so .stage keeps its inline dock transform. */
 .lockup {
+  position: relative;
   display: inline-flex;
   align-items: center;
-  gap: 0;
-  transform: translate3d(calc(50% - var(--splash-mark) / 2 + 9px), 0, 0);
+  justify-content: center;
+  transform: translate3d(0, 8px, 0) scale(0.94);
   will-change: transform;
   backface-visibility: hidden;
-  animation: splashLockup 640ms var(--splash-glide) 460ms forwards;
+  animation: splashLockup 760ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
 }
 
-.markWrap {
-  position: relative;
-  width: var(--splash-mark);
-  height: var(--splash-mark);
-  margin-right: -2px;
-  flex-shrink: 0;
-}
-
-.traceSvg {
+.horizonBeam {
   position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
+  left: -8%;
+  right: -8%;
+  bottom: 14%;
+  height: 1.5px;
+  pointer-events: none;
+  border-radius: 999px;
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(129, 140, 248, 0.72) 22%,
+    rgba(255, 255, 255, 0.96) 50%,
+    rgba(96, 165, 250, 0.72) 78%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  box-shadow: 0 0 18px rgba(165, 180, 252, 0.55);
+  transform: scaleX(0);
+  opacity: 0;
+  will-change: transform, opacity;
+  animation: splashHorizonBeam 760ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+.wordmarkSvg {
+  width: var(--wordmark-width);
+  height: auto;
+  aspect-ratio: 844 / 160;
+  display: block;
   overflow: visible;
 }
 
-/* Step 1 of the mark: its outline is drawn with butt caps and capped miter join so corners
-   do not spike, hidden until its animation starts. */
-.tracePath {
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 22;
-  stroke-linecap: butt;
-  stroke-linejoin: miter;
-  stroke-miterlimit: 2.5;
-  stroke-dasharray: 1.02;
-  stroke-dashoffset: 1.02;
-  opacity: 0;
-  will-change: stroke-dashoffset, opacity;
-  animation:
-    splashDraw 560ms var(--splash-glide) forwards,
-    splashOutlineOut 260ms ease 960ms forwards;
-}
-
-.tracePathBottom {
-  animation-delay: 100ms, 960ms;
-}
-
-/* Step 2 of the mark: it fills from its foot to its top. The file is the ink logo of the page;
-   the filter makes it white, so the shape is the same in both states. */
-.logoImg {
-  position: relative;
-  z-index: 1;
-  filter: invert(1);
-  clip-path: inset(82% 0 0 0);
-  will-change: clip-path;
-  animation: splashMarkFill 460ms var(--splash-glide) 500ms forwards;
-}
-
-.wordmark {
-  display: flex;
-  align-items: baseline;
-  padding: 0.22em 0.04em 0.16em 0;
-  white-space: nowrap;
-  font-family: var(--font-wordmark), var(--font-stack);
-  font-size: clamp(2.5rem, 5vw, 3.25rem);
-  font-weight: 620;
-  font-kerning: none;
-  font-variant-ligatures: none;
-  letter-spacing: -0.025em;
-  line-height: 1;
-}
-
-.letter {
-  position: relative;
-  display: inline-block;
-}
-
-/* Step 1 of a letter: its outline comes into focus, holds until the fill reaches the cap,
-   and dissolves on one continuous GPU layer with no two-animation handoff snap. */
 .letterOutline {
-  position: absolute;
-  top: 0;
-  left: 0;
-  color: transparent;
-  -webkit-text-stroke: 1px var(--splash-ink);
+  fill: none;
+  stroke: var(--splash-ink);
+  stroke-width: 2.35;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 1.04;
+  stroke-dashoffset: 1.04;
   opacity: 0;
-  will-change: transform, opacity, filter;
-  backface-visibility: hidden;
-  animation: splashLetterOutline 860ms linear forwards;
+  will-change: stroke-dashoffset, opacity, filter;
+  animation: splashLetterTrace 940ms linear forwards;
 }
 
-/* Step 2 of a letter: it fills immediately from its foot (no dead travel far below the
-   baseline) past cap height so tall letters like "S" are solid before the outline fades. */
+.letterOutlineSilver {
+  stroke: #b8b8ba;
+}
+
 .letterFill {
-  display: inline-block;
-  clip-path: inset(1.08em -0.12em -0.35em -0.12em);
-  will-change: clip-path;
-  backface-visibility: hidden;
-  animation: splashLetterFill 420ms var(--splash-glide) forwards;
+  transform-box: fill-box;
+  transform: translate3d(0, 106%, 0);
+  will-change: transform;
+  animation: splashLetterFill 460ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+.glyphFillWhite {
+  fill: var(--splash-ink);
+}
+
+.glyphFillSilver {
+  fill: #b8b8ba;
+}
+
+.letterCrest {
+  opacity: 0.95;
+}
+
+.wordmarkSheen {
+  transform: translate3d(0, 0, 0) skewX(-22deg);
+  opacity: 0;
+  will-change: transform, opacity;
+  animation: splashSheenSweep 540ms cubic-bezier(0.4, 0, 0.2, 1) 1140ms forwards;
 }
 
 @keyframes splashFailsafe {
@@ -195,85 +177,141 @@
   }
 }
 
-@keyframes splashDraw {
-  from {
-    opacity: 1;
-    stroke-dashoffset: 1.02;
-  }
-  to {
-    opacity: 1;
-    stroke-dashoffset: 0;
-  }
-}
-
-@keyframes splashOutlineOut {
-  from {
-    opacity: 1;
-  }
-  to {
-    opacity: 0;
-  }
-}
-
-@keyframes splashMarkFill {
-  from {
-    clip-path: inset(82% 0 0 0);
-  }
-  to {
-    clip-path: inset(0 0 0 0);
-  }
-}
-
 @keyframes splashLockup {
   from {
-    transform: translate3d(calc(50% - var(--splash-mark) / 2 + 9px), 0, 0);
+    transform: translate3d(0, 8px, 0) scale(0.94);
   }
   to {
-    transform: translate3d(0, 0, 0);
+    transform: translate3d(0, 0, 0) scale(1);
   }
 }
 
-@keyframes splashLetterOutline {
+@keyframes splashHorizonBeam {
+  0% {
+    transform: scaleX(0);
+    opacity: 0;
+  }
+  28% {
+    transform: scaleX(1.04);
+    opacity: 0.92;
+  }
+  100% {
+    transform: scaleX(1.22);
+    opacity: 0;
+  }
+}
+
+@keyframes splashLetterTrace {
   0% {
     opacity: 0;
-    filter: blur(7px);
-    transform: translate3d(0, 0.2em, 0);
-    animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+    stroke-dashoffset: 1.04;
+    filter: drop-shadow(0 0 8px rgba(165, 180, 252, 0.72));
   }
-  46.5% {
+  12% {
     opacity: 1;
-    filter: blur(0px);
-    transform: translate3d(0, 0, 0);
   }
-  78% {
+  64% {
     opacity: 1;
-    filter: blur(0px);
-    transform: translate3d(0, 0, 0);
-    animation-timing-function: ease-out;
+    stroke-dashoffset: 0;
+    filter: drop-shadow(0 0 4px rgba(165, 180, 252, 0.35));
+  }
+  82% {
+    opacity: 0.9;
+    stroke-dashoffset: 0;
   }
   100% {
     opacity: 0;
-    filter: blur(0px);
-    transform: translate3d(0, 0, 0);
+    stroke-dashoffset: 0;
+    filter: drop-shadow(0 0 0 rgba(0, 0, 0, 0));
   }
 }
 
 @keyframes splashLetterFill {
   from {
-    clip-path: inset(1.08em -0.12em -0.35em -0.12em);
+    transform: translate3d(0, 106%, 0);
   }
   to {
-    clip-path: inset(-0.24em -0.12em -0.35em -0.12em);
+    transform: translate3d(0, 0%, 0);
+  }
+}
+
+@keyframes splashSheenSweep {
+  0% {
+    transform: translate3d(0, 0, 0) skewX(-22deg);
+    opacity: 0;
+  }
+  30% {
+    opacity: 0.92;
+  }
+  75% {
+    opacity: 0.72;
+  }
+  100% {
+    transform: translate3d(1260px, 0, 0) skewX(-22deg);
+    opacity: 0;
   }
 }
 
 /* On the desktop home page, the expanding circle (.wipe) unfolds like a swirling Taiji
-   diagram: black Yin half + S-wave curve + white Yang half rotating clockwise from -180deg
-   into exact alignment with the home portal's dark canopy, while difference-blending the
-   lockup dynamically across both halves. */
+   diagram into exact alignment with the home portal dark canopy. */
 .overlayHeroDocking {
   --splash-ink: #ffffff;
   color: #ffffff;
+}
+
+.stageCrispWrap {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.stageCrisp {
+  --wordmark-width: clamp(256px, 31vw, 340px);
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 18px 20px 8px;
+  color: #ffffff;
+  opacity: 0;
+  transform: translate3d(0, 0, 0) scale(1);
+  transform-origin: center center;
+  transition: transform var(--splash-travel) var(--splash-glide);
+  will-change: transform, opacity;
+}
+
+.overlayHeroDocking .stageCrisp {
+  opacity: 1;
+  transition:
+    transform var(--splash-travel) var(--splash-glide),
+    opacity 200ms ease 480ms;
+}
+
+.lockupCrisp {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.wordmarkSvgCrisp {
+  width: var(--wordmark-width);
+  height: auto;
+  aspect-ratio: 844 / 160;
+  display: block;
+  overflow: visible;
+  filter: drop-shadow(0 6px 22px rgba(0, 0, 0, 0.28));
+}
+
+.glyphCrispWhite {
+  fill: #ffffff;
+}
+
+.glyphCrispSilver {
+  fill: #b8b8ba;
 }
 
 .taijiRotor {
@@ -296,7 +334,7 @@
   right: -150vmax;
   top: -150vmax;
   height: calc(150vmax + var(--canopy-top, -200px) + 2px);
-  background: #040507;
+  background: #1a1c20;
 }
 
 .taijiYinLeftWing {
@@ -305,7 +343,7 @@
   width: 150vmax;
   top: calc(var(--canopy-top, -200px));
   height: calc(var(--canopy-left-end-y, 400px) - var(--canopy-top, -200px));
-  background: #040507;
+  background: #1a1c20;
 }
 
 .taijiYinRightWing {
@@ -314,7 +352,7 @@
   width: 150vmax;
   top: calc(var(--canopy-top, -200px));
   height: calc(var(--canopy-right-end-y, 380px) - var(--canopy-top, -200px));
-  background: #040507;
+  background: #1a1c20;
 }
 
 .taijiWave {
@@ -352,21 +390,35 @@
   transition: transform var(--splash-travel) var(--splash-glide);
 }
 
-@media (max-width: 768px) {
-  .taijiRotor,
-  .taijiCircleRim {
-    display: none;
+@media (min-width: 769px) and (max-height: 820px) {
+  .stage,
+  .stageCrisp {
+    --wordmark-width: clamp(220px, 26vw, 290px);
+    padding: 8px 20px 4px;
   }
 }
 
-@media (max-width: 640px) {
-  .stage {
-    --splash-mark: 66px;
-    padding: 12px 20px 12px 6px;
+@media (min-width: 769px) and (max-height: 650px) {
+  .stage,
+  .stageCrisp {
+    --wordmark-width: clamp(196px, 23vw, 248px);
+    padding: 4px 16px 2px;
   }
+}
 
-  .lockup {
-    gap: 0;
+@media (max-width: 768px) {
+  .stage,
+  .stageCrisp {
+    --wordmark-width: clamp(196px, 54vw, 244px);
+    padding: 6px 12px 2px;
+  }
+}
+
+@media (max-width: 768px) and (max-height: 640px) {
+  .stage,
+  .stageCrisp {
+    --wordmark-width: clamp(176px, 48vw, 214px);
+    padding: 4px 10px 0;
   }
 }
 

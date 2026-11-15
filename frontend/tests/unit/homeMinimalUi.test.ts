@@ -12,47 +12,71 @@ const minimalVariantSource = () => {
 };
 
 describe('brand wordmark', () => {
-  it('shows only "StudyHub" in the splash, the navbar and the footer brand', () => {
-    const splash = readSource('components/OpeningSplash.tsx');
+  it('shows only "StudyHub" in the navbar and the Zhipu-style 学汇 | StudyHub lockup in the footer', () => {
     const navbar = readSource('components/NavBar.tsx');
     const app = readSource('pages/_app.tsx');
-    const footerBrand = app.slice(app.indexOf('footerStyles.brandRow'), app.indexOf('footerStyles.brandDesc'));
+    const footerBrand = app.slice(app.indexOf('footerStyles.brandRow'), app.indexOf('footerStyles.navGrid'));
 
-    expect(splash).not.toContain('学汇');
     expect(navbar).not.toContain('学汇');
+    expect(footerBrand).toContain('brandMarkSvg');
+    expect(footerBrand).toContain('brandZhSvg');
+    expect(footerBrand).toContain('brandDivider');
+    expect(footerBrand).toContain('brandWordmarkSvg');
+    expect(footerBrand).toContain('学汇');
     expect(footerBrand).toContain('StudyHub');
-    expect(footerBrand).not.toContain('学汇');
   });
 
-  // Owner request (2026-11-15): the wordmark stands large over the search box, so it uses
-  // Instrument Sans (wght 620) and shares exact Plan A lockup metrics across splash and portal.
-  it('sets the wordmark in the wordmark font in all four places', () => {
-    for (const file of [
-      'styles/OpeningSplash.module.css',
-      'styles/AnimateHeader.module.css',
-      'styles/SiteFooter.module.css',
-      'styles/HomePortal.module.css',
-    ]) {
-      expect(readSource(file)).toContain('font-family: var(--font-wordmark), var(--font-stack);');
-    }
+  // Owner request (2026-11-16): the search-portal and splash use the vectorized no-logo StudyHub SVG
+  // with silver-grey "H" (#b8b8ba), the navbar keeps its BrandLogo + wordmark font, and the footer
+  // renders the Zhipu-style [Mark] 学汇 | StudyHub vector lockup.
+  it('renders the vectorized StudyHub wordmark SVG across splash, portal, and footer while preserving navbar', () => {
+    expect(readSource('styles/AnimateHeader.module.css')).toContain(
+      'font-family: var(--font-wordmark), var(--font-stack);',
+    );
     const app = readSource('pages/_app.tsx');
+    const navbar = readSource('components/NavBar.tsx');
     const brandFont = readSource('lib/brandFont.ts');
+    const wordmarkModule = readSource('lib/studyhubWordmark.ts');
+    const wordmarkSvg = readSource('public/brand/studyhub-wordmark.svg');
+    const footerCss = readSource('styles/SiteFooter.module.css');
     const portalCss = readSource('styles/HomePortal.module.css');
     const splashCss = readSource('styles/OpeningSplash.module.css');
     const portalTsx = readSource('components/home/HomePortal.tsx');
+    const splashTsx = readSource('components/OpeningSplash.tsx');
 
     expect(app).toContain('brandFont.variable');
     expect(app).toContain('wordmarkFont.variable');
+    expect(app).toContain('STUDYHUB_RIBBON_MARK_PATHS');
+    expect(app).toContain('STUDYHUB_ZH_LOGOTYPE_PATHS');
+    expect(app).toContain('STUDYHUB_WORDMARK_GLYPHS');
+    expect(navbar).toContain('<BrandLogo');
     expect(brandFont).toContain('instrument-sans-latin-wght-normal.woff2');
     expect(brandFont).toContain("display: 'block'");
-    expect(portalTsx).toContain('WORDMARK_LETTERS');
-    expect(portalTsx).toContain('styles.letter');
+
+    expect(wordmarkModule).toContain("STUDYHUB_WORDMARK_VIEWBOX = '0 0 844 160'");
+    expect(wordmarkModule).toContain("STUDYHUB_WORDMARK_H_COLOR = '#b8b8ba'");
+    expect(wordmarkModule).toContain("STUDYHUB_RIBBON_MARK_VIEWBOX = '236 278 572 518'");
+    expect(wordmarkModule).toContain("STUDYHUB_ZH_LOGOTYPE_VIEWBOX = '0 0 208 100'");
+    expect(wordmarkSvg).toContain('viewBox="0 0 844 160"');
+    expect(wordmarkSvg).toContain('fill="#ffffff"');
+    expect(wordmarkSvg).toContain('fill="#b8b8ba"');
+
+    expect(footerCss).toContain('brandMarkSvg');
+    expect(footerCss).toContain('brandZhSvg');
+    expect(footerCss).toContain('brandDivider');
+    expect(footerCss).toContain('brandWordmarkSvg');
+
+    expect(portalTsx).toContain('STUDYHUB_WORDMARK_GLYPHS');
+    expect(portalTsx).toContain('STUDYHUB_WORDMARK_VIEWBOX');
+    expect(portalTsx).not.toContain('<BrandLogo');
+    expect(splashTsx).toContain('STUDYHUB_WORDMARK_GLYPHS');
+    expect(splashTsx).toContain('STUDYHUB_WORDMARK_VIEWBOX');
+    expect(splashTsx).not.toContain('<BrandLogo');
 
     for (const token of [
-      'clamp(70px, 8.65vw, 90px)',
-      'padding: 12px 24px 12px 6px;',
-      'padding: 0.22em 0.04em 0.16em 0;',
-      'font-weight: 620;',
+      '--wordmark-width: clamp(256px, 31vw, 340px);',
+      'padding: 18px 20px 8px;',
+      'aspect-ratio: 844 / 160;',
     ]) {
       expect(portalCss).toContain(token);
       expect(splashCss).toContain(token);
@@ -241,14 +265,14 @@ describe('home search area', () => {
 // Owner request (2026-11-14): the first screen is a search portal in the manner of a
 // search-engine home page.
 describe('home search portal', () => {
-  it('sets the logo and the wordmark over the search box, as the landing place of the splash', () => {
+  it('sets the vectorized StudyHub wordmark SVG over the search box, as the landing place of the splash', () => {
     const portal = readSource('components/home/HomePortal.tsx');
     const splash = readSource('components/OpeningSplash.tsx');
     const lockup = portal.indexOf('data-splash-target=""');
 
     expect(lockup).toBeGreaterThan(-1);
-    expect(portal.indexOf('<BrandLogo', lockup)).toBeLessThan(portal.indexOf('styles.search'));
-    expect(portal.indexOf('styles.wordmark', lockup)).toBeLessThan(portal.indexOf('styles.search'));
+    expect(portal).not.toContain('<BrandLogo');
+    expect(portal.indexOf('styles.wordmarkSvg', lockup)).toBeLessThan(portal.indexOf('styles.search'));
     expect(splash).toContain('[data-splash-target]');
   });
 
@@ -286,17 +310,12 @@ describe('home search portal', () => {
     expect(actions.indexOf('关于我们')).toBeLessThan(actions.indexOf('我要投稿'));
   });
 
-  it('closes the first screen with ICP on the left, scroll cue centered, and QQ group + contributors on the right', () => {
+  it('closes the first screen with a centered scroll cue', () => {
     const portal = readSource('components/home/HomePortal.tsx');
     const strip = portal.slice(portal.indexOf('styles.strip}'));
 
-    expect(strip).toContain('官方 QQ 群：');
-    expect(strip).toContain('核心贡献者：');
-    expect(strip).toContain('浙ICP备2025212695号');
+    expect(strip).toContain('向下滚动');
     expect(strip).toContain('onClick={onScrollDown}');
-    expect(strip.indexOf('浙ICP备2025212695号')).toBeLessThan(strip.indexOf('onClick={onScrollDown}'));
-    expect(strip.indexOf('onClick={onScrollDown}')).toBeLessThan(strip.indexOf('官方 QQ 群：'));
-    expect(strip.indexOf('onClick={onScrollDown}')).toBeLessThan(strip.indexOf('核心贡献者：'));
     expect(portal).not.toContain("document.getElementById('home-content')");
     expect(readSource('pages/index.tsx')).toContain('id="home-content"');
   });
@@ -311,13 +330,16 @@ describe('home search portal', () => {
     expect(body.indexOf("revealContent('rise');")).toBeLessThan(body.indexOf('glideToHomeContent();'));
   });
 
-  it('fills the viewport under the navbar, and leaves the phone to its own layout', () => {
+  it('fills the viewport under the navbar on both desktop and phone', () => {
     const css = readSource('styles/HomePortal.module.css');
     const start = css.indexOf('.portal {');
     const rule = css.slice(start, css.indexOf('}', start));
+    const phoneStart = css.indexOf('@media (max-width: 768px) {');
+    const phoneBlock = css.slice(phoneStart);
 
     expect(rule).toContain('min-height: calc(100svh - 64px);');
-    expect(css.slice(css.lastIndexOf('@media (max-width: 768px)'))).toContain('.portal {\n    display: none;');
+    expect(phoneBlock).toContain('min-height: calc(100svh - 58px - 66px');
+    expect(phoneBlock).not.toContain('.portal {\n    display: none;');
   });
 
   // Owner request (2026-11-14): the header stays; its logo is gone on the home page, because
@@ -469,7 +491,7 @@ describe('home content hidden until scroll', () => {
   const home = () => readSource('pages/index.tsx');
   const globals = () => {
     const css = readSource('styles/globals.css');
-    const start = css.indexOf('@media (min-width: 769px) {\n  .container.page-grid.home-page[data-revealed');
+    const start = css.indexOf('.container.page-grid.home-page[data-revealed');
     return css.slice(start, css.indexOf('@keyframes home-content-open'));
   };
 
@@ -676,19 +698,24 @@ describe('opening splash: dark intro and landing', () => {
     expect(Number(cssTravel![1])).toBe(constant('DOCK_TRAVEL_MS'));
   });
 
-  it('shows each letter as an outline that fills from its foot without single-frame flicker, and inverts the ink logo', () => {
+  it('shows each glyph as a traced SVG outline that fills upward with a specular glint and no BrandLogo', () => {
     const source = css();
+    const tsx = splash();
     const outline = cssRule(source, '.letterOutline {');
     const fill = cssRule(source, '.letterFill {');
+    const sheen = cssRule(source, '.wordmarkSheen {');
 
-    expect(outline).toContain('-webkit-text-stroke:');
-    expect(outline).toContain('color: transparent;');
-    expect(outline).toContain('will-change: transform, opacity, filter;');
-    expect(outline).toContain('animation: splashLetterOutline');
-    expect(outline).not.toContain('splashOutlineOut');
-    expect(fill).toContain('clip-path: inset(1.08em');
+    expect(tsx).not.toContain('<BrandLogo');
+    expect(tsx).toContain('styles.horizonBeam');
+    expect(tsx).toContain('styles.wordmarkSheen');
+    expect(outline).toContain('stroke-dasharray:');
+    expect(outline).toContain('stroke-dashoffset:');
+    expect(outline).toContain('animation: splashLetterTrace');
+    expect(fill).toContain('animation: splashLetterFill');
+    expect(sheen).toContain('animation: splashSheenSweep');
+    expect(source).toContain('@keyframes splashLetterTrace');
     expect(source).toContain('@keyframes splashLetterFill');
-    expect(cssRule(source, '.logoImg {')).toContain('filter: invert(1);');
+    expect(source).toContain('@keyframes splashSheenSweep');
   });
 
   it('shows no splash for reduced motion, and removes a splash that no script ended', () => {
@@ -825,8 +852,9 @@ describe('portal overview column: type and rows', () => {
   it('sizes and separates the three editorial columns cleanly', () => {
     const columnsRule = rule('\n.columns {\n  width:');
 
-    expect(columnsRule).toContain('grid-template-columns: minmax(0, 1.06fr) minmax(0, 1.06fr) minmax(0, 0.98fr);');
-    expect(columnsRule).toContain('gap: 0 38px;');
+    expect(columnsRule).toContain('width: min(100%, 1200px);');
+    expect(columnsRule).toContain('grid-template-columns: repeat(3, minmax(0, 1fr));');
+    expect(columnsRule).toContain('gap: 0 32px;');
   });
 });
 
@@ -852,19 +880,15 @@ describe('phone home page: discovery and cooperation cards', () => {
     expect(source.slice(cooperation, cooperation + 160)).toContain('<HomeCooperationCard');
   });
 
-  it('shows the wrappers only at the width where the portal is hidden', () => {
+  it('keeps the phone-only wrappers scoped cleanly for revealed phone content', () => {
     const minimal = readSource('styles/HomeMinimal.module.css');
-    const portal = readSource('styles/HomePortal.module.css');
     const base = minimal.indexOf('\n.phoneOnly {');
     const phone = minimal.indexOf('@media (max-width: 768px) {\n  .phoneOnly {');
-    const portalPhone = portal.indexOf('@media (max-width: 768px) {\n  .portal {');
 
     expect(base).toBeGreaterThan(-1);
     expect(minimal.slice(base, minimal.indexOf('}', base))).toContain('display: none;');
     expect(phone).toBeGreaterThan(base);
     expect(minimal.slice(phone, minimal.indexOf('}', phone))).toContain('display: block;');
-    expect(portalPhone).toBeGreaterThan(-1);
-    expect(portal.slice(portalPhone, portal.indexOf('}', portalPhone))).toContain('display: none;');
   });
 
   it('keeps each list of the discovery card short', () => {
@@ -949,32 +973,40 @@ describe('search pill styling, portal spacing, and home UI polish', () => {
     expect(minimal).toContain('@keyframes liquidMetalSpin');
   });
 
-  it('renders the global site footer with enlarged brand, core contributors column, and icon buttons without Open Campus', () => {
+  it('renders the global site footer with 5 columns, contact email, compressed QR cards, bottom-left ICP, and bottom-right team copyright', () => {
     const app = readSource('pages/_app.tsx');
     const footerCss = readSource('styles/SiteFooter.module.css');
     const footerMarkup = app.slice(app.indexOf('data-site-footer=""'), app.indexOf('</footer>'));
 
-    expect(footerMarkup).toContain('footerStyles.socialBtn');
     expect(footerMarkup).toContain('footerStyles.navGrid');
     expect(footerMarkup).toContain('footerStyles.colItem');
+    expect(footerMarkup).toContain('footerStyles.contactCol');
+    expect(footerMarkup).toContain('footerStyles.qrGroup');
+    expect(footerMarkup).toContain('footerStyles.qrBox');
     expect(footerMarkup).not.toContain('contribChip');
     expect(footerMarkup).not.toContain('Open Campus');
     expect(footerMarkup).not.toContain('brandBadge');
-    expect(footerMarkup).toContain('size={54}');
-    expect(footerMarkup).toContain('核心贡献者');
-    expect(footerMarkup.indexOf('核心贡献者')).toBeLessThan(footerMarkup.indexOf('>浏览<'));
-    expect(footerMarkup.indexOf('曾逸帆')).toBeLessThan(footerMarkup.indexOf('footerStyles.bottomBar'));
-    expect(footerMarkup).toContain('浙ICP备2025212695号');
-    expect(footerMarkup).toContain('data-tooltip=');
-    expect(footerMarkup).not.toContain('官方QQ群：');
-    expect(footerMarkup).not.toContain('联系邮箱：');
-    expect(footerMarkup).not.toContain('代码仓库：');
+    expect(footerMarkup).not.toContain('socialBtn');
     expect(footerMarkup).not.toContain('footerStyles.searchForm');
-    expect(footerCss).toContain('.socialBtn');
-    expect(footerCss).toContain('font-size: 1.95rem;');
-    expect(footerCss).toContain('data-tooltip');
+    expect(footerMarkup.indexOf('核心贡献者')).toBeLessThan(footerMarkup.indexOf('>浏览<'));
+    expect(footerMarkup.indexOf('>浏览<')).toBeLessThan(footerMarkup.indexOf('>社区<'));
+    expect(footerMarkup.indexOf('>社区<')).toBeLessThan(footerMarkup.indexOf('>支持<'));
+    expect(footerMarkup.indexOf('>支持<')).toBeLessThan(footerMarkup.indexOf('>联系方式<'));
+    expect(footerMarkup).toContain('联系邮箱：');
+    expect(footerMarkup).toContain('mailto:chengjinli@std.uestc.edu.cn');
+    expect(footerMarkup).toContain('/wechat/qq-group-qr.webp');
+    expect(footerMarkup).toContain('官方 QQ 群');
+    expect(footerMarkup).toContain('/wechat/wechat-qr.png');
+    expect(footerMarkup).toContain('StudyHub 公众号');
+    expect(footerMarkup).toContain('loading="lazy"');
+    expect(footerMarkup.indexOf('footerStyles.bottomBar')).toBeLessThan(footerMarkup.indexOf('浙ICP备2025212695号'));
+    expect(footerMarkup.indexOf('浙ICP备2025212695号')).toBeLessThan(footerMarkup.indexOf('Copyright © 2026 StudyHub开发团队'));
+    expect(footerCss).toContain('.contactCol');
+    expect(footerCss).toContain('.qrBox');
     expect(footerCss).toContain('.colItem');
+    expect(footerCss).toContain('justify-content: space-between;');
     expect(footerCss).not.toContain('.contribChip');
+    expect(footerCss).not.toContain('.socialBtn');
   });
 
   it('keeps the top-right auth status minimal in neutral black and gray with truncated username beside logout', () => {
@@ -1001,8 +1033,12 @@ describe('search pill styling, portal spacing, and home UI polish', () => {
     expect(authCss).toContain('#e4e4e7');
     expect(authCss).toContain('text-overflow: ellipsis;');
     expect(authCss).not.toContain('animation');
-    expect(app).toContain('/favicon.svg?v=2');
-    expect(app).toContain('/favicon.png?v=2');
+    expect(app).toContain('/favicon.svg?v=3');
+    expect(app).toContain('/favicon.png?v=3');
+    expect(app).toContain('/favicon.ico?v=3');
+    expect(faviconSvg).toContain('fill="#18191c"');
+    expect(faviconSvg).toContain('stroke="#ffffff"');
+    expect(faviconSvg).toContain('fill="#ffffff"');
     expect(faviconSvg).toContain('M434 278');
   });
 
@@ -1018,33 +1054,39 @@ describe('search pill styling, portal spacing, and home UI polish', () => {
 
     const canopyRule = portalCss.slice(portalCss.indexOf('\n.canopy {'), portalCss.indexOf('\n.canopyUpper {'));
     const canopyWaveRule = portalCss.slice(portalCss.indexOf('\n.canopyWave {'), portalCss.indexOf('\n.canopyRimGlow {'));
-    const lockupRule = portalCss.slice(portalCss.indexOf('\n.wordmark {'), portalCss.indexOf('\n.letter {'));
-    const logoRule = portalCss.slice(portalCss.indexOf('\n.logoImg {'), portalCss.indexOf('\n/* The splash sets each letter'));
+    const wordmarkSvgRule = portalCss.slice(portalCss.indexOf('\n.wordmarkSvg {'), portalCss.indexOf('\n.glyphWhite {'));
+    const glyphWhiteRule = portalCss.slice(portalCss.indexOf('\n.glyphWhite {'), portalCss.indexOf('\n.glyphSilver {'));
+    const glyphSilverRule = portalCss.slice(portalCss.indexOf('\n.glyphSilver {'), portalCss.indexOf('\n/* While the opening splash'));
     const githubNav = navbar.slice(navbar.indexOf('styles.githubNavLink'), navbar.indexOf('</nav>'));
 
     expect(canopy).toContain('PORTAL_CANOPY_CENTER_Y = 678');
     expect(canopy).toContain('PORTAL_CANOPY_RIM_PATH');
     expect(portal).toContain('data-portal-canopy=""');
     expect(portal).toContain('data-portal-canopy-wave=""');
-    expect(portal).toContain('fill="#040507"');
+    expect(portal).toContain('fill="#1a1c20"');
     expect(portal).toContain('portal-canopy-rim');
-    expect(portalCss).toContain('background: #040507;');
+    expect(portalCss).toContain('background: #1a1c20;');
     expect(canopyRule).toContain('bottom: -156px;');
     expect(canopyWaveRule).toContain('height: 736px;');
-    expect(lockupRule).toContain('color: #ffffff;');
-    expect(logoRule).toContain('filter: invert(1);');
-    expect(logoRule).toContain('mix-blend-mode: screen;');
+    expect(wordmarkSvgRule).toContain('aspect-ratio: 844 / 160;');
+    expect(glyphWhiteRule).toContain('fill: #ffffff;');
+    expect(glyphSilverRule).toContain('fill: #b8b8ba;');
     expect(minimalCss).toContain(':global([data-home-portal]) .searchPill {');
     expect(minimalCss).toContain(':global([data-home-portal]) .searchActions {');
 
     expect(navbar).toContain('data-scrolled={scrolledPastCanopy');
-    expect(navbar).toContain('rect.bottom <= 64');
+    expect(navbar).toContain('window.innerWidth <= 768 ? 58 : 64');
+    expect(navbar).toContain('rect.bottom <= headerHeight');
     expect(githubNav).not.toContain('StudyHub');
     expect(headerCss).toContain(":global(body:has([data-home-portal])) .header:not([data-scrolled='true']) {");
 
     expect(splash).toContain('styles.overlayHeroDocking');
     expect(splash).toContain('data-splash-taiji=""');
     expect(splash).toContain('styles.taijiCircleRim');
+    expect(splash).toContain('fill="#1a1c20"');
+    expect(splash).toContain('styles.stageCrisp');
+    expect(splash).toContain('measureCanopyVars');
+    expect(splashCss).toContain('background: #1a1c20;');
     expect(splashCss).toContain('rotate(-180deg)');
     expect(splashCss).toContain('rotate(0deg)');
     expect(splashCss).toContain('.overlayHeroDocking .taijiCircleRim {');
@@ -1103,5 +1145,41 @@ describe('search pill styling, portal spacing, and home UI polish', () => {
     expect(bot).toContain('isSplashCoveringBot()');
     expect(bot).toContain("router.pathname === '/' && prevPathnameRef.current !== '/'");
     expect(globals).toContain('var(--eye-x, 5px)');
+  });
+
+  it('renders the dark-ground white-rimmed favicon and Zhipu-style footer brand lockup ([Mark] 学汇 | StudyHub)', () => {
+    const faviconSvg = readSource('public/favicon.svg');
+    const wordmarks = readSource('lib/studyhubWordmark.ts');
+    const app = readSource('pages/_app.tsx');
+    const footerCss = readSource('styles/SiteFooter.module.css');
+
+    expect(faviconSvg).toContain('fill="#18191c" stroke="#ffffff"');
+    expect(faviconSvg).toContain('fill="#ffffff"');
+    expect(wordmarks).toContain('STUDYHUB_RIBBON_MARK_PATHS');
+    expect(wordmarks).toContain('STUDYHUB_ZH_LOGOTYPE_PATHS');
+    expect(app).toContain('footerStyles.brandMarkSvg');
+    expect(app).toContain('footerStyles.brandZhSvg');
+    expect(app).toContain('footerStyles.brandDivider');
+    expect(app).toContain('footerStyles.brandWordmarkSvg');
+    expect(app).toContain('>学汇<');
+    expect(app).toContain('>StudyHub<');
+    expect(footerCss).toContain('.brandDivider {');
+    expect(footerCss).toContain('aspect-ratio: 208 / 100;');
+  });
+
+  it('keeps the HomePortal as the first screen on phones and compact displays while closing content below until scroll', () => {
+    const portalTsx = readSource('components/home/HomePortal.tsx');
+    const portalCss = readSource('styles/HomePortal.module.css');
+    const splashCss = readSource('styles/OpeningSplash.module.css');
+    const indexTsx = readSource('pages/index.tsx');
+    const globalsCss = readSource('styles/globals.css');
+
+    expect(portalTsx).toContain('data-portal-mobile-tabs=""');
+    expect(portalCss).toContain('@media (min-width: 769px) and (max-height: 820px)');
+    expect(portalCss).toContain('@media (min-width: 769px) and (max-height: 650px)');
+    expect(portalCss).toContain('min-height: calc(100svh - 58px - 66px');
+    expect(splashCss).not.toContain('.taijiRotor,\n  .taijiCircleRim,\n  .stageCrispWrap {\n    display: none;');
+    expect(indexTsx).not.toContain('if (window.innerWidth <= HOME_PHONE_MAX_WIDTH) {\n      if (!contentRevealed) revealContent();');
+    expect(globalsCss).toContain('.home-page .home-desktop-library {\n    display: grid;');
   });
 });

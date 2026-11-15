@@ -1,6 +1,5 @@
 import { useRouter } from 'next/router';
 import { CSSProperties, useCallback, useEffect, useRef, useState } from 'react';
-import BrandLogo from './BrandLogo';
 import {
   PORTAL_CANOPY_CENTER_Y,
   PORTAL_CANOPY_FILL_PATH,
@@ -10,33 +9,27 @@ import {
   PORTAL_CANOPY_VIEWBOX_HEIGHT,
   PORTAL_CANOPY_VIEWBOX_WIDTH,
 } from '../lib/portalCanopy';
+import { STUDYHUB_WORDMARK_GLYPHS, STUDYHUB_WORDMARK_VIEWBOX } from '../lib/studyhubWordmark';
 import styles from '../styles/OpeningSplash.module.css';
 
 export const REPLAY_SPLASH_EVENT = 'studyhub:replay-splash';
 
-const TOP_CHEVRON_PATH = 'M434 278 L808 278 L678 400 L456 400 L322 502 L566 616 L238 540 L238 438 Z';
-const BOTTOM_CHEVRON_PATH = 'M430 466 L786 558 L786 660 L620 796 L236 796 L368 676 L590 676 L700 596 Z';
+// Staggered vector trace -> liquid energy-crest bottom-up fill -> specular glint within 1.78s.
+const TRACE_BASE_DELAY_MS = 60;
+const TRACE_STEP_MS = 54;
+const FILL_BASE_DELAY_MS = 480;
+const FILL_STEP_MS = 54;
 
-const WORDMARK_LETTERS = 'StudyHub'.split('');
-// Each letter comes in two steps. First its outline appears; then the letter fills from its
-// foot to its top, and the outline goes once the fill reaches the cap.
-const OUTLINE_BASE_DELAY_MS = 520;
-const OUTLINE_STEP_MS = 42;
-const FILL_BASE_DELAY_MS = 860;
-const FILL_STEP_MS = 42;
-
-// The last letter is full at about 1610ms (880 + 7 * 44 + 420); dock after a short hold. The
-// whole splash takes about 2.55s (1780 + 720 + 50), the same as the splash before it.
+// The last glyph finishes filling around 1318ms and the specular glint completes by 1680ms; dock after
+// a brief poise so the whole splash remains ~2.55s (1780 + 720 + 50), matching the classic budget.
 const DOCK_DELAY_MS = 1780;
 // A click, or a late start of the script, still leaves this much time before the dock.
 const MIN_DOCK_DELAY_MS = 120;
-// The lockup travels to its place on the page in this time, and the white surface opens over the
-// black screen in the same time (--splash-travel in the stylesheet has the same value).
+// The lockup travels to its place on the page in this time, and the surface opens in the same time.
 const DOCK_TRAVEL_MS = 720;
 // The splash leaves one beat after the lockup has landed.
 const DOCK_SETTLE_MS = 50;
-// Where the lockup does not land on the page, the white surface fades out in this time. The fade
-// ends when the other path ends, so the two paths take the same time.
+// Where the lockup does not land on the page, the white surface fades out in this time.
 const LEAVE_FADE_MS = 220;
 const NAVBAR_HEIGHT = 64;
 const REST_TRANSFORM = 'translate3d(0, 0, 0) scale(1)';
@@ -63,6 +56,29 @@ const blockScroll = (event: Event) => event.preventDefault();
 const timeSinceFirstPaint = () => {
   const paint = performance.getEntriesByName('first-contentful-paint')[0];
   return paint ? Math.max(0, performance.now() - paint.startTime) : 0;
+};
+
+const measureCanopyVars = (): Record<string, string> | undefined => {
+  const heroRect = document.querySelector<HTMLElement>('[data-splash-target]')?.getBoundingClientRect();
+  const waveRect = document.querySelector<SVGElement>('[data-portal-canopy-wave]')?.getBoundingClientRect();
+  if (!heroRect && !waveRect) return undefined;
+  const waveLeft = waveRect ? waveRect.left : 0;
+  const waveTop = waveRect
+    ? waveRect.top
+    : heroRect
+      ? heroRect.bottom - (PORTAL_CANOPY_VIEWBOX_HEIGHT - 156)
+      : -200;
+  const waveWidth = waveRect && waveRect.width > 0 ? waveRect.width : window.innerWidth;
+  const curveCenterY = waveTop + PORTAL_CANOPY_CENTER_Y;
+  const taijiStartY = curveCenterY - window.innerHeight / 2;
+  return {
+    '--canopy-left': `${waveLeft.toFixed(2)}px`,
+    '--canopy-top': `${waveTop.toFixed(2)}px`,
+    '--canopy-width': `${waveWidth.toFixed(2)}px`,
+    '--canopy-left-end-y': `${(waveTop + PORTAL_CANOPY_LEFT_Y).toFixed(2)}px`,
+    '--canopy-right-end-y': `${(waveTop + PORTAL_CANOPY_RIGHT_Y).toFixed(2)}px`,
+    '--taiji-start-y': `${taijiStartY.toFixed(2)}px`,
+  };
 };
 
 export default function OpeningSplash({ onComplete }: OpeningSplashProps) {
@@ -98,10 +114,8 @@ export default function OpeningSplash({ onComplete }: OpeningSplashProps) {
     const stageRect = stageEl.getBoundingClientRect();
     if (!stageRect.width) return { transform: FALLBACK_DOCK_TRANSFORM, onHero: false };
 
-    // On the home page the lockup lands on the lockup over the search box. The two have the same
-    // box, so the splash lockup moves there at scale 1 and the page lockup takes its place with
-    // no visible change. This needs the target in clear view under the navbar: it is not there
-    // on a phone (the portal is hidden) or when the page loads at a scroll position.
+    // On the home page the lockup lands on the lockup over the search box. The two share exact
+    // dimensions, so the splash lockup moves there at scale 1 and hands off seamlessly.
     const heroRect = document.querySelector<HTMLElement>('[data-splash-target]')?.getBoundingClientRect();
     if (
       heroRect &&
@@ -111,20 +125,7 @@ export default function OpeningSplash({ onComplete }: OpeningSplashProps) {
     ) {
       const dx = heroRect.left + heroRect.width / 2 - (stageRect.left + stageRect.width / 2);
       const dy = heroRect.top + heroRect.height / 2 - (stageRect.top + stageRect.height / 2);
-      const waveRect = document.querySelector<SVGElement>('[data-portal-canopy-wave]')?.getBoundingClientRect();
-      const waveLeft = waveRect ? waveRect.left : 0;
-      const waveTop = waveRect ? waveRect.top : heroRect.bottom - (PORTAL_CANOPY_VIEWBOX_HEIGHT - 156);
-      const waveWidth = waveRect && waveRect.width > 0 ? waveRect.width : window.innerWidth;
-      const curveCenterY = waveTop + PORTAL_CANOPY_CENTER_Y;
-      const taijiStartY = curveCenterY - window.innerHeight / 2;
-      const canopyVars: Record<string, string> = {
-        '--canopy-left': `${waveLeft.toFixed(2)}px`,
-        '--canopy-top': `${waveTop.toFixed(2)}px`,
-        '--canopy-width': `${waveWidth.toFixed(2)}px`,
-        '--canopy-left-end-y': `${(waveTop + PORTAL_CANOPY_LEFT_Y).toFixed(2)}px`,
-        '--canopy-right-end-y': `${(waveTop + PORTAL_CANOPY_RIGHT_Y).toFixed(2)}px`,
-        '--taiji-start-y': `${taijiStartY.toFixed(2)}px`,
-      };
+      const canopyVars = measureCanopyVars();
       return { transform: `translate3d(${dx.toFixed(2)}px, ${dy.toFixed(2)}px, 0) scale(1)`, onHero: true, canopyVars };
     }
 
@@ -144,17 +145,20 @@ export default function OpeningSplash({ onComplete }: OpeningSplashProps) {
   const beginDock = useCallback(() => {
     clearTimers();
     const nextDock = computeDock();
+    if (nextDock.canopyVars && overlayRef.current) {
+      for (const [prop, val] of Object.entries(nextDock.canopyVars)) {
+        overlayRef.current.style.setProperty(prop, val);
+      }
+      void overlayRef.current.offsetHeight;
+    }
     document.documentElement.dataset.splashState = 'docking';
     setDock(nextDock);
     phaseRef.current = 'docking';
     setPhase('docking');
     if (nextDock.onHero) {
-      // The lockup of the page takes the place of the splash lockup: no fade is necessary.
       timersRef.current = [window.setTimeout(finishSplash, DOCK_TRAVEL_MS + DOCK_SETTLE_MS)];
       return;
     }
-    // The lockup has gone and the white surface covers the screen by now; it fades to show the
-    // page.
     const leaveEnd = DOCK_TRAVEL_MS + DOCK_SETTLE_MS;
     timersRef.current = [
       window.setTimeout(() => {
@@ -177,18 +181,20 @@ export default function OpeningSplash({ onComplete }: OpeningSplashProps) {
       const overlayEl = overlayRef.current;
       if (
         window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ||
-        // The stylesheet removes a splash that no script came to end. Do not bring it back.
         (fromServerMarkup && overlayEl && getComputedStyle(overlayEl).visibility === 'hidden')
       ) {
         finishSplash();
         return;
       }
       let dockDelay = DOCK_DELAY_MS;
+      const initialCanopyVars = measureCanopyVars();
       if (fromServerMarkup) {
-        // The animation of the server markup started at the first paint, before this script.
         dockDelay = Math.max(MIN_DOCK_DELAY_MS, DOCK_DELAY_MS - timeSinceFirstPaint());
+        if (initialCanopyVars) {
+          setDock({ transform: REST_TRANSFORM, onHero: false, canopyVars: initialCanopyVars });
+        }
       } else {
-        setDock(REST_DOCK);
+        setDock({ transform: REST_TRANSFORM, onHero: false, canopyVars: initialCanopyVars });
         setPlayKey((prev) => prev + 1);
       }
       phaseRef.current = 'intro';
@@ -199,8 +205,7 @@ export default function OpeningSplash({ onComplete }: OpeningSplashProps) {
     [beginDock, clearTimers, finishSplash],
   );
 
-  // The page under the splash does not scroll while the splash plays: the lockup lands on a
-  // place that is measured on the page.
+  // The page under the splash does not scroll while the splash plays.
   const playing = phase !== 'hidden';
   useEffect(() => {
     if (!playing) return undefined;
@@ -214,10 +219,7 @@ export default function OpeningSplash({ onComplete }: OpeningSplashProps) {
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    // "?splash=dark" (or "light", kept for old links) plays the splash on any page.
     const forcedByQuery = params.get('splash') === 'dark' || params.get('splash') === 'light';
-    // This effect runs once per full page load: the splash plays on each load or refresh of the
-    // home page, and not on a client-side navigation to it from another page.
     const loadedOnHome = window.location.pathname === '/';
 
     if (phaseRef.current === 'intro') {
@@ -261,9 +263,8 @@ export default function OpeningSplash({ onComplete }: OpeningSplashProps) {
       aria-hidden="true"
       onClick={skipToDock}
     >
-      {/* A black screen with a white lockup. At the dock a circle opens from the centre: on the
-          desktop home portal it unfolds as a swirling Yin-Yang canopy into the dark stage, while
-          the lockup blends by difference across both halves. */}
+      {/* A dark screen with the vectorized StudyHub wordmark: horizon laser pulse, SVG path trace,
+          bottom-up liquid energy crest fill, metallic glint, and swirling Yin-Yang canopy dock. */}
       <div className={styles.backdrop}>
         <div className={styles.gridGlow} />
       </div>
@@ -309,7 +310,7 @@ export default function OpeningSplash({ onComplete }: OpeningSplashProps) {
                 </radialGradient>
               </defs>
               <g clipPath="url(#splash-taiji-clip)">
-                <rect width={PORTAL_CANOPY_VIEWBOX_WIDTH} height={PORTAL_CANOPY_VIEWBOX_HEIGHT} fill="#040507" />
+                <rect width={PORTAL_CANOPY_VIEWBOX_WIDTH} height={PORTAL_CANOPY_VIEWBOX_HEIGHT} fill="#1a1c20" />
                 <rect
                   width={PORTAL_CANOPY_VIEWBOX_WIDTH}
                   height={PORTAL_CANOPY_VIEWBOX_HEIGHT}
@@ -356,49 +357,108 @@ export default function OpeningSplash({ onComplete }: OpeningSplashProps) {
         style={isDocking ? { transform: dock.transform } : undefined}
       >
         <div className={styles.lockup}>
-          <div className={styles.markWrap}>
-            <svg
-              className={styles.traceSvg}
-              viewBox="0 0 1024 1024"
-              aria-hidden="true"
-              focusable="false"
-            >
-              <path className={styles.tracePath} pathLength={1} d={TOP_CHEVRON_PATH} />
+          <span className={styles.horizonBeam} aria-hidden="true" />
+          <svg
+            className={styles.wordmarkSvg}
+            viewBox={STUDYHUB_WORDMARK_VIEWBOX}
+            aria-hidden="true"
+            focusable="false"
+          >
+            <defs>
+              {STUDYHUB_WORDMARK_GLYPHS.map((glyph, index) => (
+                <clipPath key={`clip-${glyph.id}`} id={`splash-glyph-clip-${index}`}>
+                  <path d={glyph.d} />
+                </clipPath>
+              ))}
+              <clipPath id="splash-wordmark-all-clip">
+                {STUDYHUB_WORDMARK_GLYPHS.map((glyph) => (
+                  <path key={`all-${glyph.id}`} d={glyph.d} />
+                ))}
+              </clipPath>
+              <linearGradient id="splash-crest-grad" x1="0%" y1="0%" x2="0%" y2="100%">
+                <stop offset="0%" stopColor="#c7d2fe" stopOpacity="0.95" />
+                <stop offset="55%" stopColor="#ffffff" stopOpacity="0.98" />
+                <stop offset="100%" stopColor="#ffffff" stopOpacity="0" />
+              </linearGradient>
+              <linearGradient id="splash-sheen-grad" x1="0%" y1="0%" x2="100%" y2="20%">
+                <stop offset="0%" stopColor="#ffffff" stopOpacity="0" />
+                <stop offset="42%" stopColor="#e0e7ff" stopOpacity="0.58" />
+                <stop offset="54%" stopColor="#ffffff" stopOpacity="0.95" />
+                <stop offset="68%" stopColor="#a5b4fc" stopOpacity="0.48" />
+                <stop offset="100%" stopColor="#ffffff" stopOpacity="0" />
+              </linearGradient>
+            </defs>
+            {STUDYHUB_WORDMARK_GLYPHS.map((glyph, index) => (
               <path
-                className={`${styles.tracePath} ${styles.tracePathBottom}`}
+                key={`trace-${glyph.id}`}
+                d={glyph.d}
                 pathLength={1}
-                d={BOTTOM_CHEVRON_PATH}
+                className={`${styles.letterOutline}${glyph.tone === 'silver' ? ` ${styles.letterOutlineSilver}` : ''}`}
+                style={{ animationDelay: `${TRACE_BASE_DELAY_MS + index * TRACE_STEP_MS}ms` }}
               />
-            </svg>
-            {/* The ink logo of the page, inverted to white by the stylesheet: one shape in both
-                states. */}
-            <BrandLogo
-              theme="light"
-              size={90}
-              className={styles.logoImg}
-              style={{ width: '100%', height: '100%' }}
-            />
-          </div>
-          <div className={styles.wordmark}>
-            {WORDMARK_LETTERS.map((letter, index) => (
-              <span key={`${letter}-${index}`} className={styles.letter}>
-                <span
-                  className={styles.letterOutline}
-                  style={{ animationDelay: `${OUTLINE_BASE_DELAY_MS + index * OUTLINE_STEP_MS}ms` }}
-                >
-                  {letter}
-                </span>
-                <span
+            ))}
+            {STUDYHUB_WORDMARK_GLYPHS.map((glyph, index) => (
+              <g key={`fill-${glyph.id}`} clipPath={`url(#splash-glyph-clip-${index})`}>
+                <g
                   className={styles.letterFill}
                   style={{ animationDelay: `${FILL_BASE_DELAY_MS + index * FILL_STEP_MS}ms` }}
                 >
-                  {letter}
-                </span>
-              </span>
+                  <rect
+                    x={glyph.x - 4}
+                    y={-8}
+                    width={glyph.width + 8}
+                    height={176}
+                    className={glyph.tone === 'silver' ? styles.glyphFillSilver : styles.glyphFillWhite}
+                  />
+                  <rect
+                    x={glyph.x - 4}
+                    y={-8}
+                    width={glyph.width + 8}
+                    height={12}
+                    fill="url(#splash-crest-grad)"
+                    className={styles.letterCrest}
+                  />
+                </g>
+              </g>
             ))}
-          </div>
+            <g clipPath="url(#splash-wordmark-all-clip)">
+              <rect
+                x={-220}
+                y={-30}
+                width={190}
+                height={220}
+                fill="url(#splash-sheen-grad)"
+                className={styles.wordmarkSheen}
+              />
+            </g>
+          </svg>
         </div>
       </div>
+      {showTaijiWipe ? (
+        <div className={styles.stageCrispWrap} aria-hidden="true">
+          <div
+            className={styles.stageCrisp}
+            style={isDocking ? { transform: dock.transform } : undefined}
+          >
+            <div className={styles.lockupCrisp}>
+              <svg
+                className={styles.wordmarkSvgCrisp}
+                viewBox={STUDYHUB_WORDMARK_VIEWBOX}
+                aria-hidden="true"
+                focusable="false"
+              >
+                {STUDYHUB_WORDMARK_GLYPHS.map((glyph) => (
+                  <path
+                    key={`crisp-${glyph.id}`}
+                    d={glyph.d}
+                    className={glyph.tone === 'silver' ? styles.glyphCrispSilver : styles.glyphCrispWhite}
+                  />
+                ))}
+              </svg>
+            </div>
+          </div>
+        </div>
+      ) : null}
       {showTaijiWipe ? (
         <svg className={styles.taijiCircleRim} viewBox="0 0 200 200" aria-hidden="true" focusable="false">
           <defs>

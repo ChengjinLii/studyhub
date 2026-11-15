@@ -295,10 +295,10 @@ test('mobile discovery controls provide comfortable touch targets', async ({ pag
 
   await page.goto('/');
   await closeEntryModalIfPresent(page);
-  const moreLink = page.locator('.mobile-section-head a').first();
-  await expect(moreLink).toBeVisible();
-  const moreBox = await moreLink.boundingBox();
-  expect(moreBox?.height ?? 0).toBeGreaterThanOrEqual(44);
+  const searchPill = page.locator('[data-home-portal] [data-search-pill]').first();
+  await expect(searchPill).toBeVisible();
+  const pillBox = await searchPill.boundingBox();
+  expect(pillBox?.height ?? 0).toBeGreaterThanOrEqual(44);
 });
 
 test('material list restores its session view and scroll position after detail navigation', async ({ page }) => {
@@ -632,20 +632,28 @@ test('home discovery views remain accessible without entry modal', async ({ page
   await expect(page).toHaveURL(pageUrl);
   await expect(page.locator('#materials-list')).toBeInViewport();
 
-  // Phone: the discovery card keeps its tabs and the cooperation card.
+  // Phone: starts on the unified HomePortal first screen, then reveals the discovery and cooperation cards below.
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.reload();
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.goto('/');
   await closeEntryModalIfPresent(page);
-  const requestTab = page.getByRole('tab', { name: '求购列表' });
-  const popularTab = page.getByRole('tab', { name: '近期热门' });
-  const subjectTab = page.getByRole('tab', { name: '热门学科' });
+  await expect(portal).toBeVisible();
+  await expect(portal.locator('[data-portal-mobile-tabs]')).toBeVisible();
+  await expect(page.locator('#home-content')).toHaveAttribute('data-revealed', 'false');
+  await portal.getByRole('button', { name: '向下滚动' }).click();
+  await expect(page.locator('#home-content')).toHaveAttribute('data-revealed', 'true');
+
+  const discovery = page.locator('#home-requests');
+  const requestTab = discovery.getByRole('tab', { name: '求购列表' });
+  const popularTab = discovery.getByRole('tab', { name: '近期热门' });
+  const subjectTab = discovery.getByRole('tab', { name: '热门学科' });
   await expect(subjectTab).toHaveAttribute('aria-selected', 'true');
-  await expect(page.getByRole('list', { name: '热门学科排行', exact: true })).toBeVisible();
+  await expect(discovery.getByRole('list', { name: '热门学科排行', exact: true })).toBeVisible();
   await popularTab.click();
   await expect(popularTab).toHaveAttribute('aria-selected', 'true');
   await expect(subjectTab).toHaveAttribute('aria-selected', 'false');
-  await expect(page.getByRole('list', { name: '近期热门资料', exact: true })).toBeVisible();
-  await expect(page.getByRole('list', { name: '热门学科排行', exact: true })).toBeHidden();
+  await expect(discovery.getByRole('list', { name: '近期热门资料', exact: true })).toBeVisible();
+  await expect(discovery.getByRole('list', { name: '热门学科排行', exact: true })).toBeHidden();
   const cooperation = page.getByRole('region', { name: '合作招募', exact: true });
   await expect(cooperation.getByRole('heading', { name: '合作招募', exact: true })).toBeVisible();
   await expect(cooperation.getByRole('link', { name: '完善个人主页' })).toHaveAttribute('href', '/me#profile');
@@ -661,7 +669,7 @@ test('home discovery views remain accessible without entry modal', async ({ page
   await expect(requestTab).toHaveAttribute('aria-selected', 'true');
   await expect(popularTab).toHaveAttribute('aria-selected', 'false');
   await expect(
-    page.getByRole('list', { name: '求购榜', exact: true }).or(page.getByRole('tabpanel').getByText('暂时没有公开的求购需求。'))
+    discovery.getByRole('list', { name: '求购榜', exact: true }).or(discovery.getByRole('tabpanel').getByText('暂时没有公开的求购需求。'))
   ).toBeVisible();
 });
 

@@ -423,6 +423,10 @@
     padding: 0 12px;
     font-size: 0.8rem;
   }
+
+  :global(body:has([data-home-portal])) .rightCluster {
+    margin-left: auto;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -448,14 +452,13 @@
   }
 }
 
-/* On the home page the brand stands over the search box, so the bar does not repeat it. The
-   navigation takes the centre and the account actions stay at the right. The phone layout has
-   no search portal and keeps the brand. */
-@media (min-width: 769px) {
-  :global(body:has([data-home-portal])) .brandWrap {
-    display: none;
-  }
+/* On the home page the brand stands over the search box on both desktop and mobile, so the
+   top bar does not repeat it and adopts the dark canopy until scrolled past. */
+:global(body:has([data-home-portal])) .brandWrap {
+  display: none;
+}
 
+@media (min-width: 769px) {
   :global(body:has([data-home-portal])) .rightCluster {
     flex: 1 1 auto;
     display: grid;
@@ -470,105 +473,105 @@
     grid-column: 3;
     justify-self: end;
   }
+}
 
-  :global(body:has([data-home-portal])) .header:not([data-scrolled='true']) {
-    background: transparent;
-    backdrop-filter: none;
-    -webkit-backdrop-filter: none;
-    color: #f4f4f5;
-  }
+:global(body:has([data-home-portal])) .header:not([data-scrolled='true']) {
+  background: transparent;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  color: #f4f4f5;
+}
 
-  :global(body:has([data-home-portal])) .header:not([data-scrolled='true']) .navLink {
-    color: rgba(255, 255, 255, 0.76);
-  }
+:global(body:has([data-home-portal])) .header:not([data-scrolled='true']) .navLink {
+  color: rgba(255, 255, 255, 0.76);
+}
 
-  :global(body:has([data-home-portal])) .header:not([data-scrolled='true']) .navLink:hover {
-    background: rgba(255, 255, 255, 0.1);
-    color: #ffffff;
-  }
+:global(body:has([data-home-portal])) .header:not([data-scrolled='true']) .navLink:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+}
 
-  :global(body:has([data-home-portal])) .header:not([data-scrolled='true']) .navLinkActive,
-  :global(body:has([data-home-portal])) .header:not([data-scrolled='true']) .navLinkActive:hover {
-    background: rgba(255, 255, 255, 0.14);
-    color: #ffffff;
-  }
+:global(body:has([data-home-portal])) .header:not([data-scrolled='true']) .navLinkActive,
+:global(body:has([data-home-portal])) .header:not([data-scrolled='true']) .navLinkActive:hover {
+  background: rgba(255, 255, 255, 0.14);
+  color: #ffffff;
+}
 
-  :global(body:has([data-home-portal])) .header:not([data-scrolled='true']) .githubNavLink {
-    color: rgba(255, 255, 255, 0.88);
-  }
+:global(body:has([data-home-portal])) .header:not([data-scrolled='true']) .githubNavLink {
+  color: rgba(255, 255, 255, 0.88);
+}
 
-  :global(body:has([data-home-portal])) .header:not([data-scrolled='true']) .githubStars {
-    color: rgba(255, 255, 255, 0.88);
-  }
+:global(body:has([data-home-portal])) .header:not([data-scrolled='true']) .githubStars {
+  color: rgba(255, 255, 255, 0.88);
+}
 
-  :global(body:has([data-home-portal])) .header:not([data-scrolled='true']) .githubStarIcon {
-    color: #fbbf24;
-  }
+:global(body:has([data-home-portal])) .header:not([data-scrolled='true']) .githubStarIcon {
+  color: #fbbf24;
+}
 
-  :global(body:has([data-home-portal])) .header:not([data-scrolled='true']) .githubNavLink::after {
-    background: linear-gradient(
-      110deg,
-      transparent 22%,
-      rgba(255, 255, 255, 0.24) 50%,
-      transparent 78%
-    );
-  }
+:global(body:has([data-home-portal])) .header:not([data-scrolled='true']) .githubNavLink::after {
+  background: linear-gradient(
+    110deg,
+    transparent 22%,
+    rgba(255, 255, 255, 0.24) 50%,
+    transparent 78%
+  );
+}
 
-  :global(body:has([data-home-portal])) .header:not([data-scrolled='true']) .githubNavLink:hover,
-  :global(body:has([data-home-portal])) .header:not([data-scrolled='true']) .githubNavLink:focus-visible {
-    background: rgba(251, 191, 36, 0.14);
-    color: #ffffff;
-    box-shadow:
-      inset 0 0 0 1px rgba(251, 191, 36, 0.34),
-      0 4px 12px -4px rgba(251, 191, 36, 0.28);
-  }
+:global(body:has([data-home-portal])) .header:not([data-scrolled='true']) .githubNavLink:hover,
+:global(body:has([data-home-portal])) .header:not([data-scrolled='true']) .githubNavLink:focus-visible {
+  background: rgba(251, 191, 36, 0.14);
+  color: #ffffff;
+  box-shadow:
+    inset 0 0 0 1px rgba(251, 191, 36, 0.34),
+    0 4px 12px -4px rgba(251, 191, 36, 0.28);
+}
 
-  :global(body:has([data-home-portal])) .header:not([data-scrolled='true']) .githubNavLink:hover .githubStarCount,
-  :global(body:has([data-home-portal])) .header:not([data-scrolled='true']) .githubNavLink:focus-visible .githubStarCount {
-    color: #fde68a;
-  }
+:global(body:has([data-home-portal])) .header:not([data-scrolled='true']) .githubNavLink:hover .githubStarCount,
+:global(body:has([data-home-portal])) .header:not([data-scrolled='true']) .githubNavLink:focus-visible .githubStarCount {
+  color: #fde68a;
+}
 
-  :global(body:has([data-home-portal])) .header:not([data-scrolled='true']) .guestPill {
-    border-color: rgba(255, 255, 255, 0.16);
-    background: rgba(255, 255, 255, 0.07);
-    color: rgba(255, 255, 255, 0.78);
-  }
+:global(body:has([data-home-portal])) .header:not([data-scrolled='true']) .guestPill {
+  border-color: rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.07);
+  color: rgba(255, 255, 255, 0.78);
+}
 
-  :global(body:has([data-home-portal])) .header:not([data-scrolled='true']) .loginButton {
-    border-color: #ffffff;
-    background: #ffffff;
-    color: #09090b;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
-  }
+:global(body:has([data-home-portal])) .header:not([data-scrolled='true']) .loginButton {
+  border-color: #ffffff;
+  background: #ffffff;
+  color: #09090b;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
 
-  :global(body:has([data-home-portal])) .header:not([data-scrolled='true']) .loginButton:hover {
-    border-color: #e4e4e7;
-    background: #e4e4e7;
-    color: #09090b;
-  }
+:global(body:has([data-home-portal])) .header:not([data-scrolled='true']) .loginButton:hover {
+  border-color: #e4e4e7;
+  background: #e4e4e7;
+  color: #09090b;
+}
 
-  :global(body:has([data-home-portal])) .header:not([data-scrolled='true']) .loginButton:focus-visible {
-    outline-color: #ffffff;
-  }
+:global(body:has([data-home-portal])) .header:not([data-scrolled='true']) .loginButton:focus-visible {
+  outline-color: #ffffff;
+}
 
-  :global(body:has([data-home-portal])) .header:not([data-scrolled='true']) .userPill {
-    border-color: rgba(255, 255, 255, 0.16);
-    background: rgba(255, 255, 255, 0.08);
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.24);
-  }
+:global(body:has([data-home-portal])) .header:not([data-scrolled='true']) .userPill {
+  border-color: rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.08);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.24);
+}
 
-  :global(body:has([data-home-portal])) .header:not([data-scrolled='true']) .userName {
-    color: #fafafa;
-  }
+:global(body:has([data-home-portal])) .header:not([data-scrolled='true']) .userName {
+  color: #fafafa;
+}
 
-  :global(body:has([data-home-portal])) .header:not([data-scrolled='true']) .logoutButton {
-    background: rgba(255, 255, 255, 0.12);
-    color: #e4e4e7;
-  }
+:global(body:has([data-home-portal])) .header:not([data-scrolled='true']) .logoutButton {
+  background: rgba(255, 255, 255, 0.12);
+  color: #e4e4e7;
+}
 
-  :global(body:has([data-home-portal])) .header:not([data-scrolled='true']) .logoutButton:hover:not(:disabled) {
-    border-color: rgba(255, 255, 255, 0.24);
-    background: rgba(255, 255, 255, 0.2);
-    color: #ffffff;
-  }
+:global(body:has([data-home-portal])) .header:not([data-scrolled='true']) .logoutButton:hover:not(:disabled) {
+  border-color: rgba(255, 255, 255, 0.24);
+  background: rgba(255, 255, 255, 0.2);
+  color: #ffffff;
 }

@@ -54,9 +54,11 @@ const HOME_POPULAR_PREVIEW_LIMIT = 20;
 // Home page, desktop: the content under the first screen stays closed until the reader has
 // scrolled this far (px). The navbar is 64px high.
 const HOME_REVEAL_DISTANCE = 280;
+const HOME_MOBILE_REVEAL_DISTANCE = 120;
 const HOME_REVEAL_SETTLE_MS = 180;
 const HOME_REVEAL_FADE_CLEANUP_MS = 860;
 const HOME_NAVBAR_HEIGHT = 64;
+const HOME_MOBILE_NAVBAR_HEIGHT = 58;
 const HOME_PHONE_MAX_WIDTH = 768;
 
 const clearHomeRevealVars = () => {
@@ -75,9 +77,11 @@ type HomeRevealMotion = 'rise' | 'none';
 const glideToHomeContent = () => {
   const content = document.getElementById('home-content');
   if (!content) return;
+  const headerHeight =
+    window.innerWidth <= HOME_PHONE_MAX_WIDTH ? HOME_MOBILE_NAVBAR_HEIGHT : HOME_NAVBAR_HEIGHT;
   const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   window.scrollTo({
-    top: window.scrollY + content.getBoundingClientRect().top - HOME_NAVBAR_HEIGHT,
+    top: window.scrollY + content.getBoundingClientRect().top - headerHeight,
     behavior: reduceMotion ? 'auto' : 'smooth',
   });
 };
@@ -224,25 +228,62 @@ export default function Home({
   // The content opens when the reader has scrolled HOME_REVEAL_DISTANCE on the first screen.
   // The line on the strip of the first screen fills over that distance (--home-reveal).
   useEffect(() => {
-    if (contentRevealed) return undefined;
-    // The phone has no first screen to open from. A restored scroll position, a search in the
-    // address or a link to a section opens the content at once.
+    const getRevealDistance = () =>
+      window.innerWidth <= HOME_PHONE_MAX_WIDTH ? HOME_MOBILE_REVEAL_DISTANCE : HOME_REVEAL_DISTANCE;
+    // A restored scroll position, a search in the address, or a link to a section opens at once.
     if (
-      window.innerWidth <= HOME_PHONE_MAX_WIDTH ||
-      window.scrollY >= HOME_REVEAL_DISTANCE ||
-      window.location.search ||
-      window.location.hash
+      !contentRevealed &&
+      (window.scrollY >= getRevealDistance() || window.location.search || window.location.hash)
     ) {
       revealContent();
       return undefined;
     }
     let frame: number | null = null;
+    let wheelDistance = 0;
+    let wheelResetTimer: number | null = null;
+    let wheelTriggered = false;
+    const clearWheelCue = () => {
+      document.documentElement.style.removeProperty('--home-wheel-progress');
+      delete document.documentElement.dataset.homeWheelActive;
+      wheelDistance = 0;
+      wheelTriggered = false;
+    };
+    const onWheel = (event: WheelEvent) => {
+      if (event.ctrlKey || event.deltaY === 0 || window.scrollY >= getRevealDistance() || wheelTriggered) return;
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+      if (target.closest('[role="dialog"], [role="listbox"], [data-radix-popper-content-wrapper]')) return;
+      const wheelList = target.closest<HTMLElement>('[data-edge]');
+      if (wheelList) {
+        const maxScroll = wheelList.scrollHeight - wheelList.clientHeight;
+        if ((event.deltaY > 0 && wheelList.scrollTop < maxScroll - 1) ||
+            (event.deltaY < 0 && wheelList.scrollTop > 1)) return;
+      }
+      if (event.deltaY < 0 && wheelDistance === 0) return;
+      event.preventDefault();
+      const delta = event.deltaY * (event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? window.innerHeight : 1);
+      wheelDistance = Math.max(0, Math.min(220, wheelDistance + delta));
+      const root = document.documentElement;
+      root.dataset.homeWheelActive = 'true';
+      root.style.setProperty('--home-wheel-progress', String(wheelDistance / 220));
+      if (wheelResetTimer !== null) window.clearTimeout(wheelResetTimer);
+      if (wheelDistance >= 220) {
+        wheelTriggered = true;
+        scrollToContent();
+        wheelResetTimer = window.setTimeout(clearWheelCue, 1500);
+      } else {
+        wheelResetTimer = window.setTimeout(clearWheelCue, 2000);
+      }
+    };
     const onScroll = () => {
+      if (contentRevealed) return;
       if (frame !== null) return;
       frame = window.requestAnimationFrame(() => {
         frame = null;
         const root = document.documentElement;
-        const raw = Math.min(1, Math.max(0, window.scrollY / HOME_REVEAL_DISTANCE));
+        const revealScale =
+          window.innerWidth <= HOME_PHONE_MAX_WIDTH ? HOME_REVEAL_DISTANCE / HOME_MOBILE_REVEAL_DISTANCE : 1;
+        const raw = Math.min(1, Math.max(0, (window.scrollY / HOME_REVEAL_DISTANCE) * revealScale));
         if (raw < 1) {
           const progress = easeHomeRevealProgress(raw);
           delete root.dataset.homeRevealComplete;
@@ -268,14 +309,18 @@ export default function Home({
       });
     };
     window.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('wheel', onWheel, { passive: false });
     return () => {
       window.removeEventListener('scroll', onScroll);
+      window.removeEventListener('wheel', onWheel);
+      if (wheelResetTimer !== null) window.clearTimeout(wheelResetTimer);
+      clearWheelCue();
       if (frame !== null) window.cancelAnimationFrame(frame);
       if (!homeContentOpened) {
         clearHomeRevealVars();
       }
     };
-  }, [clearRevealTimers, contentRevealed, revealContent]);
+  }, [clearRevealTimers, contentRevealed, revealContent, scrollToContent]);
   const normalizeFilters = useCallback(
     (input: FilterState): FilterState => ({
       keyword: input.keyword || '',
@@ -465,15 +510,11 @@ export default function Home({
     scrollToMaterials();
   }, [scrollToMaterials]);
   const browseAllMaterials = useCallback(() => {
-    if (window.matchMedia('(max-width: 768px)').matches) {
-      void router.push('/materials');
-      return;
-    }
     setBrowseMode('materials');
     setSubjectScope('filtered');
     setSubjectId(null);
     scrollToMaterials();
-  }, [router, scrollToMaterials]);
+  }, [scrollToMaterials]);
   const [contributors, setContributors] = useState<ContributorRank[]>(initialContributors);
   const [leaderboardPeriod, setLeaderboardPeriod] = useState<LeaderboardPeriod>('all');
   const loadedLeaderboardPeriodRef = useRef<LeaderboardPeriod>('all');
