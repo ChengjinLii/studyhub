@@ -640,6 +640,7 @@ test('home discovery views remain accessible without entry modal', async ({ page
   const popularTab = page.getByRole('tab', { name: '近期热门' });
   const subjectTab = page.getByRole('tab', { name: '热门学科' });
   await expect(subjectTab).toHaveAttribute('aria-selected', 'true');
+  await expect(page.getByRole('list', { name: '热门学科排行', exact: true })).toBeVisible();
   await popularTab.click();
   await expect(popularTab).toHaveAttribute('aria-selected', 'true');
   await expect(subjectTab).toHaveAttribute('aria-selected', 'false');
@@ -660,7 +661,7 @@ test('home discovery views remain accessible without entry modal', async ({ page
   await expect(requestTab).toHaveAttribute('aria-selected', 'true');
   await expect(popularTab).toHaveAttribute('aria-selected', 'false');
   await expect(
-    page.getByRole('list', { name: '求购榜', exact: true }).or(page.getByText('暂时没有公开的求购需求。'))
+    page.getByRole('list', { name: '求购榜', exact: true }).or(page.getByRole('tabpanel').getByText('暂时没有公开的求购需求。'))
   ).toBeVisible();
 });
 
