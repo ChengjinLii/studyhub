@@ -10,6 +10,7 @@ import zlib
 import pytest
 from fastapi import HTTPException, UploadFile
 from fastapi.testclient import TestClient
+from PIL import Image
 from starlette.datastructures import Headers
 
 from app.core.config import Settings
@@ -212,6 +213,7 @@ def test_image_validator_rejects_decompression_bomb_with_400() -> None:
 
     assert exc.value.status_code == 400
     assert "仅支持" in str(exc.value.detail)
+    assert isinstance(exc.value.__cause__, Image.DecompressionBombError)
 
 
 def test_material_validator_rejects_spoofed_pdf_content() -> None:
