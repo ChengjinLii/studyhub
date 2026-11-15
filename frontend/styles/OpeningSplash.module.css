@@ -68,11 +68,11 @@
    is under it, and keeps it near-white over the black. So the colour of the lockup changes at
    the edge of the circle, with no grey step between. */
 .stage {
-  --splash-mark: 72px;
+  --splash-mark: clamp(70px, 8.65vw, 90px);
   position: relative;
   display: inline-flex;
   align-items: center;
-  padding: 12px 16px;
+  padding: 12px 24px 12px 6px;
   mix-blend-mode: difference;
   transform: translate3d(0, 0, 0) scale(1);
   transform-origin: center center;
@@ -89,8 +89,10 @@
 .lockup {
   display: inline-flex;
   align-items: center;
-  gap: 14px;
-  transform: translate3d(calc(50% - var(--splash-mark) / 2), 0, 0);
+  gap: 0;
+  transform: translate3d(calc(50% - var(--splash-mark) / 2 + 9px), 0, 0);
+  will-change: transform;
+  backface-visibility: hidden;
   animation: splashLockup 640ms var(--splash-glide) 460ms forwards;
 }
 
@@ -98,6 +100,7 @@
   position: relative;
   width: var(--splash-mark);
   height: var(--splash-mark);
+  margin-right: -2px;
   flex-shrink: 0;
 }
 
@@ -109,22 +112,26 @@
   overflow: visible;
 }
 
-/* Step 1 of the mark: its outline is drawn. It goes when the mark is full. */
+/* Step 1 of the mark: its outline is drawn with butt caps and capped miter join so corners
+   do not spike, hidden until its animation starts. */
 .tracePath {
   fill: none;
   stroke: currentColor;
   stroke-width: 22;
-  stroke-linecap: square;
+  stroke-linecap: butt;
   stroke-linejoin: miter;
-  stroke-dasharray: 1;
-  stroke-dashoffset: 1;
+  stroke-miterlimit: 2.5;
+  stroke-dasharray: 1.02;
+  stroke-dashoffset: 1.02;
+  opacity: 0;
+  will-change: stroke-dashoffset, opacity;
   animation:
     splashDraw 560ms var(--splash-glide) forwards,
-    splashOutlineOut 280ms ease 920ms forwards;
+    splashOutlineOut 260ms ease 960ms forwards;
 }
 
 .tracePathBottom {
-  animation-delay: 100ms, 920ms;
+  animation-delay: 100ms, 960ms;
 }
 
 /* Step 2 of the mark: it fills from its foot to its top. The file is the ink logo of the page;
@@ -133,18 +140,21 @@
   position: relative;
   z-index: 1;
   filter: invert(1);
-  clip-path: inset(100% 0 0 0);
-  animation: splashMarkFill 500ms var(--splash-glide) 520ms forwards;
+  clip-path: inset(82% 0 0 0);
+  will-change: clip-path;
+  animation: splashMarkFill 460ms var(--splash-glide) 500ms forwards;
 }
 
 .wordmark {
   display: flex;
   align-items: baseline;
-  padding: 0.14em 0.04em 0.22em 0;
+  padding: 0.22em 0.04em 0.16em 0;
   white-space: nowrap;
   font-family: var(--font-wordmark), var(--font-stack);
   font-size: clamp(2.5rem, 5vw, 3.25rem);
-  font-weight: 600;
+  font-weight: 620;
+  font-kerning: none;
+  font-variant-ligatures: none;
   letter-spacing: -0.025em;
   line-height: 1;
 }
@@ -154,7 +164,8 @@
   display: inline-block;
 }
 
-/* Step 1 of a letter: its outline comes into focus. */
+/* Step 1 of a letter: its outline comes into focus, holds until the fill reaches the cap,
+   and dissolves on one continuous GPU layer with no two-animation handoff snap. */
 .letterOutline {
   position: absolute;
   top: 0;
@@ -162,16 +173,18 @@
   color: transparent;
   -webkit-text-stroke: 1px var(--splash-ink);
   opacity: 0;
-  animation:
-    splashLetterOutline 400ms cubic-bezier(0.22, 1, 0.36, 1) forwards,
-    splashOutlineOut 230ms ease forwards;
+  will-change: transform, opacity, filter;
+  backface-visibility: hidden;
+  animation: splashLetterOutline 860ms linear forwards;
 }
 
-/* Step 2 of a letter: it fills from its foot to its top. The clip reaches past the letter box
-   (ascenders, the tail of the "y"), so the full letter shows at the end. */
+/* Step 2 of a letter: it fills immediately from its foot (no dead travel far below the
+   baseline) past cap height so tall letters like "S" are solid before the outline fades. */
 .letterFill {
   display: inline-block;
-  clip-path: inset(1.4em -0.1em -0.4em -0.1em);
+  clip-path: inset(1.08em -0.12em -0.35em -0.12em);
+  will-change: clip-path;
+  backface-visibility: hidden;
   animation: splashLetterFill 420ms var(--splash-glide) forwards;
 }
 
@@ -184,14 +197,19 @@
 
 @keyframes splashDraw {
   from {
-    stroke-dashoffset: 1;
+    opacity: 1;
+    stroke-dashoffset: 1.02;
   }
   to {
+    opacity: 1;
     stroke-dashoffset: 0;
   }
 }
 
 @keyframes splashOutlineOut {
+  from {
+    opacity: 1;
+  }
   to {
     opacity: 0;
   }
@@ -199,7 +217,7 @@
 
 @keyframes splashMarkFill {
   from {
-    clip-path: inset(100% 0 0 0);
+    clip-path: inset(82% 0 0 0);
   }
   to {
     clip-path: inset(0 0 0 0);
@@ -208,7 +226,7 @@
 
 @keyframes splashLockup {
   from {
-    transform: translate3d(calc(50% - var(--splash-mark) / 2), 0, 0);
+    transform: translate3d(calc(50% - var(--splash-mark) / 2 + 9px), 0, 0);
   }
   to {
     transform: translate3d(0, 0, 0);
@@ -216,34 +234,139 @@
 }
 
 @keyframes splashLetterOutline {
-  from {
+  0% {
     opacity: 0;
-    filter: blur(8px);
-    transform: translate3d(0, 0.22em, 0);
+    filter: blur(7px);
+    transform: translate3d(0, 0.2em, 0);
+    animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
   }
-  to {
+  46.5% {
     opacity: 1;
-    filter: blur(0);
+    filter: blur(0px);
+    transform: translate3d(0, 0, 0);
+  }
+  78% {
+    opacity: 1;
+    filter: blur(0px);
+    transform: translate3d(0, 0, 0);
+    animation-timing-function: ease-out;
+  }
+  100% {
+    opacity: 0;
+    filter: blur(0px);
     transform: translate3d(0, 0, 0);
   }
 }
 
 @keyframes splashLetterFill {
   from {
-    clip-path: inset(1.4em -0.1em -0.4em -0.1em);
+    clip-path: inset(1.08em -0.12em -0.35em -0.12em);
   }
   to {
-    clip-path: inset(-0.3em -0.1em -0.4em -0.1em);
+    clip-path: inset(-0.24em -0.12em -0.35em -0.12em);
+  }
+}
+
+/* On the desktop home page, the expanding circle (.wipe) unfolds like a swirling Taiji
+   diagram: black Yin half + S-wave curve + white Yang half rotating clockwise from -180deg
+   into exact alignment with the home portal's dark canopy, while difference-blending the
+   lockup dynamically across both halves. */
+.overlayHeroDocking {
+  --splash-ink: #ffffff;
+  color: #ffffff;
+}
+
+.taijiRotor {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  transform-origin: 50% 50%;
+  transform: translate3d(0, var(--taiji-start-y, -60px), 0) rotate(-180deg);
+  transition: transform var(--splash-travel) var(--splash-glide);
+  will-change: transform;
+}
+
+.overlayHeroDocking .taijiRotor {
+  transform: translate3d(0, 0, 0) rotate(0deg);
+}
+
+.taijiYinSky {
+  position: absolute;
+  left: -150vmax;
+  right: -150vmax;
+  top: -150vmax;
+  height: calc(150vmax + var(--canopy-top, -200px) + 2px);
+  background: #040507;
+}
+
+.taijiYinLeftWing {
+  position: absolute;
+  right: calc(100% - var(--canopy-left, 0px) - 1px);
+  width: 150vmax;
+  top: calc(var(--canopy-top, -200px));
+  height: calc(var(--canopy-left-end-y, 400px) - var(--canopy-top, -200px));
+  background: #040507;
+}
+
+.taijiYinRightWing {
+  position: absolute;
+  left: calc(var(--canopy-left, 0px) + var(--canopy-width, 100%) - 1px);
+  width: 150vmax;
+  top: calc(var(--canopy-top, -200px));
+  height: calc(var(--canopy-right-end-y, 380px) - var(--canopy-top, -200px));
+  background: #040507;
+}
+
+.taijiWave {
+  position: absolute;
+  left: var(--canopy-left, 0px);
+  top: var(--canopy-top, -200px);
+  width: var(--canopy-width, 100%);
+  height: 736px;
+  display: block;
+}
+
+.taijiRimGlow {
+  opacity: 0.42;
+  filter: blur(4px);
+}
+
+.taijiCircleRim {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 144vmax;
+  height: 144vmax;
+  margin-left: -72vmax;
+  margin-top: -72vmax;
+  pointer-events: none;
+  opacity: 0;
+  transform: scale(0);
+  transform-origin: 50% 50%;
+  will-change: transform, opacity;
+}
+
+.overlayHeroDocking .taijiCircleRim {
+  opacity: 0.9;
+  transform: scale(1);
+  transition: transform var(--splash-travel) var(--splash-glide);
+}
+
+@media (max-width: 768px) {
+  .taijiRotor,
+  .taijiCircleRim {
+    display: none;
   }
 }
 
 @media (max-width: 640px) {
   .stage {
-    --splash-mark: 54px;
+    --splash-mark: 66px;
+    padding: 12px 20px 12px 6px;
   }
 
   .lockup {
-    gap: 11px;
+    gap: 0;
   }
 }
 

@@ -64,6 +64,7 @@ export default function HomeFilterCard({
     filtersState.courseCategory,
     filtersState.price && filtersState.price !== 'all' ? filtersState.price : '',
   ].filter(Boolean).length;
+  const hasKeyword = filtersState.keyword.trim().length > 0;
 
   const advancedActionLabel = showAdvanced ? '收起高级筛选' : '高级筛选';
 
@@ -78,8 +79,8 @@ export default function HomeFilterCard({
         <div className={minStyles.searchPill} data-search-pill="">
           <svg
             className={minStyles.searchIcon}
-            width="18"
-            height="18"
+            width="21"
+            height="21"
             viewBox="0 0 24 24"
             fill="none"
             stroke="currentColor"
@@ -112,7 +113,7 @@ export default function HomeFilterCard({
                 : advancedActionLabel
             }
           >
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.85" strokeLinecap="round" aria-hidden="true">
               <path d="M4 7h16M7 12h10M10 17h4" />
             </svg>
             <span>高级筛选</span>
@@ -123,22 +124,45 @@ export default function HomeFilterCard({
             ) : null}
           </button>
           {/* The search button closes the box, at the right of the filter trigger. */}
-          <button className={minStyles.searchGo} type="submit" aria-label="搜索资料">
-            <span>搜索</span>
-            <svg
-              className={minStyles.searchGoArrow}
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden="true"
-            >
-              <path d="M5 12h14M13 6l6 6-6 6" />
-            </svg>
+          <button
+            className={`${minStyles.searchGo}${hasKeyword ? ` ${minStyles.searchGoReady}` : ''}`}
+            type="submit"
+            aria-label="搜索资料"
+            title="搜索资料"
+          >
+            <span className={minStyles.searchGoAura} aria-hidden="true" />
+            <span className={minStyles.searchGoRing} aria-hidden="true">
+              <span className={minStyles.searchGoSheen} />
+            </span>
+            <span className={minStyles.searchGoGlass} aria-hidden="true" />
+            <span className={minStyles.searchGoIconTrack} aria-hidden="true">
+              <svg
+                className={`${minStyles.searchGoArrow} ${minStyles.searchGoArrowPrimary}`}
+                width="16"
+                height="16"
+                viewBox="0 0 20 20"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M4.25 10h11.5M10.75 5l5 5-5 5" />
+              </svg>
+              <svg
+                className={`${minStyles.searchGoArrow} ${minStyles.searchGoArrowClone}`}
+                width="16"
+                height="16"
+                viewBox="0 0 20 20"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M4.25 10h11.5M10.75 5l5 5-5 5" />
+              </svg>
+            </span>
           </button>
         </div>
 

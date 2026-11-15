@@ -5,11 +5,26 @@ const OFFLINE_PAGE = '/offline.html';
 const SHELL_ASSETS = [OFFLINE_PAGE, '/icons/bot-192-v3.png', '/icons/bot-512-v3.png', '/icons/bot-apple-touch-icon-v3.png', '/icons/bot-maskable-v3.png'];
 const CACHEABLE_FILES = new Set([...SHELL_ASSETS, '/favicon.png']);
 
+const isCacheableStaticPathname = (pathname) => {
+  if (CACHEABLE_FILES.has(pathname)) return true;
+  if (!pathname.startsWith('/_next/static/')) return false;
+  if (pathname.startsWith('/_next/static/development/') || pathname.startsWith('/_next/static/webpack/')) {
+    return false;
+  }
+  if (pathname.startsWith('/_next/static/chunks/') && !/[.-][0-9a-f]{8,}\.js$/i.test(pathname)) {
+    return false;
+  }
+  if (pathname.startsWith('/_next/static/css/') && !/[./-][0-9a-f]{8,}\.css$/i.test(pathname)) {
+    return false;
+  }
+  return true;
+};
+
 const isCacheableStaticRequest = (request) => {
   if (request.method !== 'GET' || request.headers.has('authorization')) return false;
   const url = new URL(request.url);
   if (url.origin !== self.location.origin || url.search) return false;
-  return CACHEABLE_FILES.has(url.pathname) || url.pathname.startsWith('/_next/static/');
+  return isCacheableStaticPathname(url.pathname);
 };
 
 const remember = async (request, response) => {
@@ -41,6 +56,11 @@ self.addEventListener('install', (event) => {
 self.addEventListener('activate', (event) => {
   event.waitUntil(caches.keys()
     .then(keys => Promise.all(keys.filter(key => key.startsWith('studyhub-static-') && key !== STATIC_CACHE).map(key => caches.delete(key))))
+    .then(() => caches.open(STATIC_CACHE))
+    .then(cache => cache.keys().then(keys => Promise.all(
+      keys.filter(key => !isCacheableStaticPathname(new URL(key.url).pathname)).map(key => cache.delete(key))
+    )))
+    .catch(() => {})
     .then(() => self.clients.claim()));
 });
 

@@ -3,6 +3,12 @@ import { ReactNode } from 'react';
 import BrandLogo from '../BrandLogo';
 import { HomeSubjectRank } from '../../lib/homeDiscovery';
 import { formatNumber } from '../../lib/format';
+import {
+  PORTAL_CANOPY_FILL_PATH,
+  PORTAL_CANOPY_RIM_PATH,
+  PORTAL_CANOPY_VIEWBOX_HEIGHT,
+  PORTAL_CANOPY_VIEWBOX_WIDTH,
+} from '../../lib/portalCanopy';
 import { materialPath } from '../../lib/slug';
 import { MaterialListItem } from '../../types/material';
 import styles from '../../styles/HomePortal.module.css';
@@ -11,6 +17,8 @@ import styles from '../../styles/HomePortal.module.css';
 export const PORTAL_ROW_COUNT = 5;
 // A rank column holds more rows than it shows: the reader turns it like a wheel.
 export const PORTAL_WHEEL_LIMIT = 10;
+
+const WORDMARK_LETTERS = 'StudyHub'.split('');
 
 const FALLBACK_QQ_GROUP = '245934740';
 
@@ -32,6 +40,7 @@ interface HomePortalProps {
   onOpenSubject: (id: string) => void;
   onBrowseSubjects: () => void;
   onBrowseMaterials: () => void;
+  onJumpToLeaderboard?: () => void;
   /** Opens the content under the first screen and scrolls to it. */
   onScrollDown: () => void;
 }
@@ -48,7 +57,12 @@ const markWheel = (list: HTMLElement) => {
   list.parentElement?.style.setProperty('--wheel-turn', range > 0 ? String(list.scrollTop / range) : '0');
 };
 
-const rankClass = (rank: number) => `${styles.rank}${rank <= 3 ? ` ${styles.rankTop}` : ''}`;
+const rankClass = (rank: number) =>
+  rank === 1
+    ? `${styles.rank} ${styles.rankFirst}`
+    : rank <= 3
+    ? `${styles.rank} ${styles.rankTop}`
+    : styles.rank;
 
 /**
  * First screen of the home page: a search portal. The brand lockup sits over a centred search
@@ -64,6 +78,7 @@ export default function HomePortal({
   onOpenSubject,
   onBrowseSubjects,
   onBrowseMaterials,
+  onJumpToLeaderboard,
   onScrollDown,
 }: HomePortalProps) {
   const topPopular = popularItems.slice(0, PORTAL_WHEEL_LIMIT);
@@ -73,20 +88,182 @@ export default function HomePortal({
   return (
     <section className={styles.portal} data-home-portal="" aria-label="搜索">
       <div className={styles.portalMain}>
-        {/* The page heading. The opening splash lands on it, so its metrics follow the splash. */}
-        <h1 className={styles.lockup} data-splash-target="">
-          <BrandLogo theme="light" size={72} />
-          <span className={styles.wordmark}>StudyHub</span>
-        </h1>
+        <div className={styles.heroStage}>
+          <div className={styles.canopy} data-portal-canopy="" aria-hidden="true">
+            <div className={styles.canopyUpper} />
+            <svg
+              className={styles.canopyWave}
+              data-portal-canopy-wave=""
+              viewBox={`0 0 ${PORTAL_CANOPY_VIEWBOX_WIDTH} ${PORTAL_CANOPY_VIEWBOX_HEIGHT}`}
+              preserveAspectRatio="none"
+              focusable="false"
+            >
+              <defs>
+                <clipPath id="portal-canopy-clip">
+                  <path d={PORTAL_CANOPY_FILL_PATH} />
+                </clipPath>
+                <pattern id="portal-canopy-grid" width="44" height="44" patternUnits="userSpaceOnUse">
+                  <path d="M 44 0 L 0 0 0 44" fill="none" stroke="rgba(255,255,255,0.022)" strokeWidth="1" />
+                </pattern>
+                <linearGradient id="portal-canopy-rim" x1="0%" y1="0%" x2="100%" y2="0%">
+                  <stop offset="0%" stopColor="#60a5fa" stopOpacity="0" />
+                  <stop offset="18%" stopColor="#60a5fa" stopOpacity="0.68" />
+                  <stop offset="44%" stopColor="#818cf8" stopOpacity="0.88" />
+                  <stop offset="64%" stopColor="#fcd34d" stopOpacity="0.66" />
+                  <stop offset="82%" stopColor="#38bdf8" stopOpacity="0.74" />
+                  <stop offset="100%" stopColor="#38bdf8" stopOpacity="0" />
+                </linearGradient>
+                <radialGradient id="portal-aurora-left" cx="28%" cy="89%" r="26%">
+                  <stop offset="0%" stopColor="#3b82f6" stopOpacity="0.11" />
+                  <stop offset="100%" stopColor="#3b82f6" stopOpacity="0" />
+                </radialGradient>
+                <radialGradient id="portal-aurora-mid" cx="54%" cy="84%" r="24%">
+                  <stop offset="0%" stopColor="#818cf8" stopOpacity="0.1" />
+                  <stop offset="100%" stopColor="#818cf8" stopOpacity="0" />
+                </radialGradient>
+                <radialGradient id="portal-aurora-right" cx="76%" cy="87%" r="22%">
+                  <stop offset="0%" stopColor="#2dd4bf" stopOpacity="0.08" />
+                  <stop offset="65%" stopColor="#f59e0b" stopOpacity="0.03" />
+                  <stop offset="100%" stopColor="#2dd4bf" stopOpacity="0" />
+                </radialGradient>
+              </defs>
+              <g clipPath="url(#portal-canopy-clip)">
+                <rect width={PORTAL_CANOPY_VIEWBOX_WIDTH} height={PORTAL_CANOPY_VIEWBOX_HEIGHT} fill="#040507" />
+                <rect
+                  width={PORTAL_CANOPY_VIEWBOX_WIDTH}
+                  height={PORTAL_CANOPY_VIEWBOX_HEIGHT}
+                  fill="url(#portal-canopy-grid)"
+                />
+                <rect
+                  width={PORTAL_CANOPY_VIEWBOX_WIDTH}
+                  height={PORTAL_CANOPY_VIEWBOX_HEIGHT}
+                  fill="url(#portal-aurora-left)"
+                />
+                <rect
+                  width={PORTAL_CANOPY_VIEWBOX_WIDTH}
+                  height={PORTAL_CANOPY_VIEWBOX_HEIGHT}
+                  fill="url(#portal-aurora-mid)"
+                />
+                <rect
+                  width={PORTAL_CANOPY_VIEWBOX_WIDTH}
+                  height={PORTAL_CANOPY_VIEWBOX_HEIGHT}
+                  fill="url(#portal-aurora-right)"
+                />
+              </g>
+              <path
+                className={styles.canopyRimGlow}
+                d={PORTAL_CANOPY_RIM_PATH}
+                fill="none"
+                stroke="url(#portal-canopy-rim)"
+                strokeWidth="5"
+                vectorEffect="non-scaling-stroke"
+              />
+              <path
+                d={PORTAL_CANOPY_RIM_PATH}
+                fill="none"
+                stroke="url(#portal-canopy-rim)"
+                strokeWidth="1.6"
+                vectorEffect="non-scaling-stroke"
+              />
+            </svg>
+          </div>
 
-        <div className={styles.search}>{search}</div>
+          {/* The page heading. The opening splash lands on it, so its metrics follow the splash. */}
+          <h1 className={styles.lockup} data-splash-target="" aria-label="StudyHub">
+            <span className={styles.markWrap}>
+              <BrandLogo
+                theme="light"
+                size={90}
+                className={styles.logoImg}
+                style={{ width: '100%', height: '100%' }}
+              />
+            </span>
+            <span className={styles.wordmark} aria-hidden="true">
+              {WORDMARK_LETTERS.map((letter, index) => (
+                <span key={`${letter}-${index}`} className={styles.letter}>
+                  {letter}
+                </span>
+              ))}
+            </span>
+          </h1>
+        </div>
+
+        <div className={styles.portalMid}>
+          <div className={styles.search}>{search}</div>
+
+          <div
+            className={styles.annivBadge}
+            data-portal-anniversary=""
+            aria-label="StudyHub 一周年纪念（2025.11 – 2026.11）"
+          >
+            <span className={styles.annivSeal} aria-hidden="true">
+              <svg className={styles.annivSealSvg} viewBox="0 0 64 64" focusable="false">
+                <defs>
+                  <path id="portal-anniv-arc-top" d="M 10.5,32 A 21.5,21.5 0 1,1 53.5,32" />
+                  <path id="portal-anniv-arc-bot" d="M 7.5,32 A 24.5,24.5 0 0,0 56.5,32" />
+                </defs>
+                <circle cx="32" cy="32" r="29" fill="none" stroke="#d9bc7c" strokeWidth="1" opacity="0.88" />
+                <circle
+                  cx="32"
+                  cy="32"
+                  r="17.2"
+                  fill="none"
+                  stroke="#cbd5e1"
+                  strokeWidth="0.75"
+                  strokeDasharray="1.5 2.3"
+                />
+                <text
+                  fontFamily="var(--font-brand), var(--font-stack)"
+                  fontSize="5"
+                  fontWeight="600"
+                  fill="#8f6b24"
+                  letterSpacing="1.35"
+                >
+                  <textPath href="#portal-anniv-arc-top" startOffset="50%" textAnchor="middle">
+                    STUDYHUB · ANNIV
+                  </textPath>
+                </text>
+                <text
+                  fontFamily="var(--font-brand), var(--font-stack)"
+                  fontSize="4.6"
+                  fontWeight="600"
+                  fill="#64748b"
+                  letterSpacing="1.15"
+                >
+                  <textPath href="#portal-anniv-arc-bot" startOffset="50%" textAnchor="middle">
+                    2025 — 2026
+                  </textPath>
+                </text>
+                <text
+                  x="32"
+                  y="36.2"
+                  textAnchor="middle"
+                  fontFamily="var(--font-brand), var(--font-stack)"
+                  fontSize="15.5"
+                  fontWeight="640"
+                  fill="#1e293b"
+                  letterSpacing="-0.4"
+                >
+                  1st
+                </text>
+              </svg>
+            </span>
+            <span className={styles.annivMeta}>
+              <span className={styles.annivTitle}>一周年纪念</span>
+              <span className={styles.annivDate}>2025.11 – 2026.11</span>
+            </span>
+          </div>
+        </div>
 
         <div className={styles.columns}>
           <section className={styles.column} aria-labelledby="portal-popular-title">
             <div className={styles.columnHead}>
-              <h2 id="portal-popular-title">近期热门</h2>
+              <h2 id="portal-popular-title">热门资料</h2>
               <button type="button" className={styles.more} onClick={onBrowseMaterials}>
-                全部资料
+                <span>全部资料</span>
+                <span className={styles.moreArrow} aria-hidden="true">
+                  ›
+                </span>
               </button>
             </div>
             {topPopular.length === 0 ? (
@@ -97,7 +274,7 @@ export default function HomePortal({
                   className={styles.wheelRows}
                   data-edge={wheelEdge(topPopular.length)}
                   onScroll={(event) => markWheel(event.currentTarget)}
-                  aria-label="近期热门资料排行"
+                  aria-label="热门资料排行"
                 >
                   {topPopular.map((item, index) => (
                     <li key={item.id} className={styles.row}>
@@ -110,7 +287,9 @@ export default function HomePortal({
                       >
                         {item.title}
                       </Link>
-                      <span className={styles.rowMeta}>{formatNumber(item.downloadCount ?? 0)} 下载</span>
+                      <span className={styles.rowMeta} aria-label={`${formatNumber(item.downloadCount ?? 0)} 次下载`}>
+                        <span aria-hidden="true">↓ {formatNumber(item.downloadCount ?? 0)}</span>
+                      </span>
                     </li>
                   ))}
                 </ol>
@@ -122,7 +301,10 @@ export default function HomePortal({
             <div className={styles.columnHead}>
               <h2 id="portal-subjects-title">热门学科</h2>
               <button type="button" className={styles.more} onClick={onBrowseSubjects}>
-                全部学科
+                <span>全部学科</span>
+                <span className={styles.moreArrow} aria-hidden="true">
+                  ›
+                </span>
               </button>
             </div>
             {topSubjects.length === 0 ? (
@@ -146,7 +328,13 @@ export default function HomePortal({
                       >
                         {subject.name}
                       </button>
-                      <span className={styles.rowMeta}>{formatNumber(subject.downloadCount)} 下载</span>
+                      <span className={styles.rowMeta}>
+                        <span className={styles.rowCount}>{formatNumber(subject.materialCount)} 份</span>
+                        <span className={styles.rowDot} aria-hidden="true">
+                          ·
+                        </span>
+                        <span className={styles.rowSubMeta}>↓ {formatNumber(subject.downloadCount)}</span>
+                      </span>
                     </li>
                   ))}
                 </ol>
@@ -154,12 +342,21 @@ export default function HomePortal({
             )}
           </section>
 
-          {/* The overview is set apart from the two rank columns: a rule at its left, the user
-              count large, and the other figures in a short list at its right. */}
+          {/* The overview shares the same editorial header rule and quiet numeric hierarchy. */}
           <section className={`${styles.column} ${styles.overview}`} aria-labelledby="portal-overview-title">
-            <h2 id="portal-overview-title" className={styles.overviewTitle}>
-              平台概览
-            </h2>
+            <div className={styles.columnHead}>
+              <h2 id="portal-overview-title" className={styles.overviewTitle}>
+                平台概览
+              </h2>
+              {onJumpToLeaderboard ? (
+                <button type="button" className={styles.more} onClick={onJumpToLeaderboard}>
+                  <span>贡献榜</span>
+                  <span className={styles.moreArrow} aria-hidden="true">
+                    ›
+                  </span>
+                </button>
+              ) : null}
+            </div>
             <div className={styles.overviewBody}>
               <p className={styles.overviewLead}>
                 <strong>{stats.users}</strong>
@@ -192,10 +389,14 @@ export default function HomePortal({
           on its top edge fills while the reader scrolls towards the content. */}
       <div className={styles.strip}>
         <div className={styles.stripInner}>
-          <div className={styles.stripGroup}>
-            <span>官方 QQ 群：{officialQQ || FALLBACK_QQ_GROUP}</span>
-            <span>核心贡献者：李承锦、曾逸帆</span>
-          </div>
+          <a
+            className={styles.stripStart}
+            href="https://beian.miit.gov.cn/"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            浙ICP备2025212695号
+          </a>
           <button type="button" className={styles.scrollCue} onClick={onScrollDown}>
             <span>向下滚动，浏览资料与贡献榜</span>
             <svg
@@ -213,14 +414,10 @@ export default function HomePortal({
               <path d="M6 9l6 6 6-6" />
             </svg>
           </button>
-          <a
-            className={styles.stripEnd}
-            href="https://beian.miit.gov.cn/"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            浙ICP备2025212695号
-          </a>
+          <div className={`${styles.stripGroup} ${styles.stripEnd}`}>
+            <span>官方 QQ 群：{officialQQ || FALLBACK_QQ_GROUP}</span>
+            <span>核心贡献者：李承锦、曾逸帆</span>
+          </div>
         </div>
       </div>
     </section>

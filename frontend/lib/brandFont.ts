@@ -10,13 +10,13 @@ export const brandFont = localFont({
   preload: true,
 });
 
-// Outfit (SIL OFL 1.1, see styles/fonts/Outfit-OFL.txt): the "StudyHub" wordmark face. Its round,
-// even letters hold up at the large size the wordmark has over the home search box.
+// Instrument Sans (SIL OFL 1.1, see styles/fonts/InstrumentSans-OFL.txt): the "StudyHub"
+// wordmark face, chosen for its crisp neo-grotesque stems alongside the geometric S chevron.
 export const wordmarkFont = localFont({
-  src: '../styles/fonts/outfit-latin-wght-normal.woff2',
-  weight: '100 900',
+  src: '../styles/fonts/instrument-sans-latin-wght-normal.woff2',
+  weight: '400 700',
   style: 'normal',
-  display: 'swap',
+  display: 'block',
   variable: '--font-wordmark',
   preload: true,
 });

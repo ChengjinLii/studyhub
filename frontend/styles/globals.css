@@ -16391,7 +16391,7 @@ body:has(.home-page),
    after the other. A jump to a section opens the content with no motion. */
 @media (min-width: 769px) {
   .container.page-grid.home-page[data-revealed='false'] {
-    min-height: 220px;
+    min-height: 420px;
     padding-bottom: 0;
   }
 

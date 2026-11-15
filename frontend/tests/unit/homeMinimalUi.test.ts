@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { computeHomeRevealTail, easeHomeRevealProgress } from '../../lib/homeDiscovery';
 
 const readSource = (relativePath: string) =>
   readFileSync(join(process.cwd(), relativePath), 'utf8');
@@ -23,8 +24,8 @@ describe('brand wordmark', () => {
     expect(footerBrand).not.toContain('学汇');
   });
 
-  // Owner request (2026-11-14): the wordmark stands large over the search box, so it has its
-  // own face (Outfit); Jost stays for the numerals.
+  // Owner request (2026-11-15): the wordmark stands large over the search box, so it uses
+  // Instrument Sans (wght 620) and shares exact Plan A lockup metrics across splash and portal.
   it('sets the wordmark in the wordmark font in all four places', () => {
     for (const file of [
       'styles/OpeningSplash.module.css',
@@ -35,8 +36,27 @@ describe('brand wordmark', () => {
       expect(readSource(file)).toContain('font-family: var(--font-wordmark), var(--font-stack);');
     }
     const app = readSource('pages/_app.tsx');
+    const brandFont = readSource('lib/brandFont.ts');
+    const portalCss = readSource('styles/HomePortal.module.css');
+    const splashCss = readSource('styles/OpeningSplash.module.css');
+    const portalTsx = readSource('components/home/HomePortal.tsx');
+
     expect(app).toContain('brandFont.variable');
     expect(app).toContain('wordmarkFont.variable');
+    expect(brandFont).toContain('instrument-sans-latin-wght-normal.woff2');
+    expect(brandFont).toContain("display: 'block'");
+    expect(portalTsx).toContain('WORDMARK_LETTERS');
+    expect(portalTsx).toContain('styles.letter');
+
+    for (const token of [
+      'clamp(70px, 8.65vw, 90px)',
+      'padding: 12px 24px 12px 6px;',
+      'padding: 0.22em 0.04em 0.16em 0;',
+      'font-weight: 620;',
+    ]) {
+      expect(portalCss).toContain(token);
+      expect(splashCss).toContain(token);
+    }
   });
 
   it('keeps the splash slide off the stage so the dock transform still applies', () => {
@@ -237,7 +257,7 @@ describe('home search portal', () => {
 
     expect(portal).toContain('export const PORTAL_ROW_COUNT = 5;');
     expect(portal).toContain('count > PORTAL_ROW_COUNT ?');
-    for (const title of ['近期热门', '热门学科']) {
+    for (const title of ['热门资料', '热门学科']) {
       expect(portal).toContain(`>${title}</h2>`);
     }
     expect(portal).toMatch(/<h2 id="portal-overview-title" className=\{styles\.overviewTitle\}>\s*平台概览\s*<\/h2>/);
@@ -266,7 +286,7 @@ describe('home search portal', () => {
     expect(actions.indexOf('关于我们')).toBeLessThan(actions.indexOf('我要投稿'));
   });
 
-  it('closes the first screen with the QQ group, the contributors, the ICP record and a scroll cue', () => {
+  it('closes the first screen with ICP on the left, scroll cue centered, and QQ group + contributors on the right', () => {
     const portal = readSource('components/home/HomePortal.tsx');
     const strip = portal.slice(portal.indexOf('styles.strip}'));
 
@@ -274,6 +294,9 @@ describe('home search portal', () => {
     expect(strip).toContain('核心贡献者：');
     expect(strip).toContain('浙ICP备2025212695号');
     expect(strip).toContain('onClick={onScrollDown}');
+    expect(strip.indexOf('浙ICP备2025212695号')).toBeLessThan(strip.indexOf('onClick={onScrollDown}'));
+    expect(strip.indexOf('onClick={onScrollDown}')).toBeLessThan(strip.indexOf('官方 QQ 群：'));
+    expect(strip.indexOf('onClick={onScrollDown}')).toBeLessThan(strip.indexOf('核心贡献者：'));
     expect(portal).not.toContain("document.getElementById('home-content')");
     expect(readSource('pages/index.tsx')).toContain('id="home-content"');
   });
@@ -307,6 +330,23 @@ describe('home search portal', () => {
     expect(start).toBeGreaterThan(-1);
     expect(rule).toContain('display: none;');
     expect(css).toContain(':global(body:has([data-home-portal])) .nav {');
+  });
+
+  it('keeps the home header, portal strip and footer aligned to the classic 1180px width', () => {
+    for (const file of [
+      'styles/AnimateHeader.module.css',
+      'styles/SiteFooter.module.css',
+      'styles/HomePortal.module.css',
+    ]) {
+      const source = readSource(file);
+      expect(source).not.toContain('1320px');
+      expect(source).not.toContain(':global(body:has(.home-page))');
+    }
+
+    const portal = readSource('styles/HomePortal.module.css');
+    const start = portal.indexOf('.stripInner {');
+    const stripInner = portal.slice(start, portal.indexOf('}', start));
+    expect(stripInner).toContain('max-width: 1180px;');
   });
 });
 
@@ -448,12 +488,21 @@ describe('home content hidden until scroll', () => {
     const source = home();
     const start = source.indexOf("window.addEventListener('scroll', onScroll");
 
-    expect(source).toContain('const HOME_REVEAL_DISTANCE = 120;');
+    expect(source).toContain('const HOME_REVEAL_DISTANCE = 280;');
     expect(start).toBeGreaterThan(-1);
     expect(source).toContain('window.scrollY / HOME_REVEAL_DISTANCE');
     expect(source).toContain("setProperty('--home-reveal'");
     expect(source.indexOf("revealContent('rise');", source.indexOf('const onScroll'))).toBeGreaterThan(-1);
     expect(source.indexOf("revealContent('rise');", source.indexOf('const onScroll'))).toBeLessThan(start);
+  });
+
+  it('lengthens and cushions the final stretch of the scroll progress curve', () => {
+    expect(easeHomeRevealProgress(0)).toBe(0);
+    expect(easeHomeRevealProgress(1)).toBe(1);
+    expect(easeHomeRevealProgress(0.45)).toBeGreaterThan(0.65);
+    expect(easeHomeRevealProgress(0.9)).toBeLessThan(1);
+    expect(computeHomeRevealTail(0.5)).toBe(0);
+    expect(computeHomeRevealTail(1)).toBe(1);
   });
 
   it('opens the content before a scroll to the materials', () => {
@@ -523,9 +572,18 @@ describe('home content hidden until scroll', () => {
     const css = readSource('styles/HomePortal.module.css');
     const start = css.indexOf('.strip::before {');
     const rule = css.slice(start, css.indexOf('}', start));
+    const afterStart = css.indexOf('.strip::after {');
+    const afterRule = css.slice(afterStart, css.indexOf('}', afterStart));
 
     expect(start).toBeGreaterThan(-1);
+    expect(afterStart).toBeGreaterThan(start);
     expect(rule).toContain('var(--home-reveal');
+    expect(rule).toContain('var(--home-reveal-tail');
+    expect(rule).toContain('linear-gradient(');
+    expect(rule).toContain('border-radius: 0 999px 999px 0;');
+    expect(afterRule).toContain('var(--home-reveal');
+    expect(css).toContain('data-home-reveal-complete');
+    expect(css).toContain('@keyframes stripCompleteFade');
   });
 });
 
@@ -618,13 +676,17 @@ describe('opening splash: dark intro and landing', () => {
     expect(Number(cssTravel![1])).toBe(constant('DOCK_TRAVEL_MS'));
   });
 
-  it('shows each letter as an outline that fills from its foot, and inverts the ink logo', () => {
+  it('shows each letter as an outline that fills from its foot without single-frame flicker, and inverts the ink logo', () => {
     const source = css();
     const outline = cssRule(source, '.letterOutline {');
+    const fill = cssRule(source, '.letterFill {');
 
     expect(outline).toContain('-webkit-text-stroke:');
     expect(outline).toContain('color: transparent;');
-    expect(cssRule(source, '.letterFill {')).toContain('clip-path: inset(');
+    expect(outline).toContain('will-change: transform, opacity, filter;');
+    expect(outline).toContain('animation: splashLetterOutline');
+    expect(outline).not.toContain('splashOutlineOut');
+    expect(fill).toContain('clip-path: inset(1.08em');
     expect(source).toContain('@keyframes splashLetterFill');
     expect(cssRule(source, '.logoImg {')).toContain('filter: invert(1);');
   });
@@ -691,6 +753,7 @@ describe('opening splash: dark intro and landing', () => {
 });
 
 describe('portal overview column: type and rows', () => {
+  const portal = () => readSource('components/home/HomePortal.tsx');
   const css = () => readSource('styles/HomePortal.module.css');
   const rule = (selector: string) => {
     const source = css();
@@ -699,15 +762,71 @@ describe('portal overview column: type and rows', () => {
     return source.slice(start, source.indexOf('}', start));
   };
 
-  it('sets the user count and the figures in the wordmark font', () => {
-    expect(rule('.overviewLead strong {')).toContain('font-family: var(--font-wordmark)');
-    expect(rule('.overviewRows dd {')).toContain('font-family: var(--font-wordmark)');
+  it('sets the user count and the figures in the Jost variable font with unified editorial weight', () => {
+    const leadNum = rule('.overviewLead strong {');
+    const rowNum = rule('.overviewRows dd {');
+
+    expect(leadNum).toContain('font-family: var(--font-brand)');
+    expect(leadNum).toContain('font-weight: 560;');
+    expect(leadNum).toContain('font-variant-numeric: tabular-nums;');
+    expect(rowNum).toContain('font-family: var(--font-brand)');
+    expect(rowNum).toContain('font-weight: 540;');
+    expect(rowNum).toContain('font-variant-numeric: tabular-nums;');
+    expect(css()).not.toContain('rotate(18deg)');
   });
 
-  it('gives each index row the height of a rank row, with a dotted leader', () => {
-    expect(rule('.overviewRows > div {')).toContain('height: 34px;');
-    expect(rule('\n.row {')).toContain('height: 34px;');
-    expect(rule('.overviewRows > div::before {')).toContain('border-bottom: 1px dotted');
+  it('aligns all three headers with quiet actions and omits free tags or percentage pills', () => {
+    const source = portal();
+    const popularCol = source.slice(
+      source.indexOf('aria-labelledby="portal-popular-title"'),
+      source.indexOf('aria-labelledby="portal-subjects-title"')
+    );
+    const subjectCol = source.slice(
+      source.indexOf('aria-labelledby="portal-subjects-title"'),
+      source.indexOf('className={`${styles.column} ${styles.overview}`}')
+    );
+    const overviewSection = source.slice(
+      source.indexOf('className={`${styles.column} ${styles.overview}`}'),
+      source.indexOf('<div className={styles.strip}>')
+    );
+
+    expect(source).toContain('全部资料');
+    expect(source).toContain('全部学科');
+    expect(source).toContain('贡献榜');
+    expect(popularCol).toContain('↓ {formatNumber(item.downloadCount ?? 0)}');
+    expect(popularCol.replace('暂无热门资料', '')).not.toContain('免费');
+    expect(subjectCol).toContain('{formatNumber(subject.materialCount)} 份');
+    expect(subjectCol).toContain('↓ {formatNumber(subject.downloadCount)}');
+    expect(overviewSection).toContain('<div className={styles.columnHead}>');
+    expect(overviewSection).not.toContain('免费占比');
+    expect(overviewSection).not.toContain('overviewShare');
+    expect(overviewSection).not.toContain('overviewMeter');
+    expect(overviewSection).not.toContain('overviewTag');
+  });
+
+  it('uses unified slate-navy editorial accents, pill row hover, and clean 2x2 overview rows', () => {
+    const headAccent = rule('.columnHead::after {');
+    const firstRank = rule('.rankFirst {');
+    const rowHover = rule('.row:hover {');
+    const overviewRule = rule('.overview {');
+    const matrixRule = rule('.overviewRows {');
+    const cellRule = rule('.overviewRows > div {');
+
+    expect(headAccent).toContain('#24344d');
+    expect(firstRank).toContain('#24344d');
+    expect(rowHover).toContain('background: #f4f6fa;');
+    expect(overviewRule).not.toMatch(/background|box-shadow|border-radius/);
+    expect(matrixRule).not.toMatch(/background|box-shadow/);
+    expect(matrixRule).toContain('grid-template-columns: repeat(2, minmax(0, 1fr));');
+    expect(cellRule).toContain('border-top: 1px solid #f1f3f7;');
+    expect(cellRule).toContain('flex-direction: column;');
+  });
+
+  it('sizes and separates the three editorial columns cleanly', () => {
+    const columnsRule = rule('\n.columns {\n  width:');
+
+    expect(columnsRule).toContain('grid-template-columns: minmax(0, 1.06fr) minmax(0, 1.06fr) minmax(0, 0.98fr);');
+    expect(columnsRule).toContain('gap: 0 38px;');
   });
 });
 
@@ -750,5 +869,210 @@ describe('phone home page: discovery and cooperation cards', () => {
 
   it('keeps each list of the discovery card short', () => {
     expect(readSource('components/home/HomeRequestPanels.tsx')).toContain('const SIDEBAR_LIST_LIMIT = 5;');
+  });
+});
+
+describe('search pill styling, portal spacing, and home UI polish', () => {
+  it('upgrades the search pill, increases spacing below it, and shifts advancedPanel accordingly', () => {
+    const minimal = readSource('styles/HomeMinimal.module.css');
+    const portal = readSource('styles/HomePortal.module.css');
+    const getRule = (source: string, selector: string) => {
+      const start = source.indexOf(selector);
+      expect(start, `missing ${selector}`).toBeGreaterThan(-1);
+      return source.slice(start, source.indexOf('}', start));
+    };
+
+    const pillRule = getRule(minimal, '\n.searchPill {');
+    expect(pillRule).toContain('height: 56px;');
+    expect(pillRule).toContain('border: 2px solid #c4ccd9;');
+    expect(pillRule).toContain('padding: 0 7px 0 21px;');
+    expect(getRule(minimal, '\n.searchActions {')).toContain('margin-top: 30px;');
+    expect(getRule(minimal, '\n.advancedPanel {')).toContain('top: 136px;');
+    expect(getRule(portal, '\n.search {')).toContain('margin-top: 18px;');
+    expect(getRule(portal, '\n.columns {\n  width:')).toContain('margin-top: 54px;');
+  });
+
+  it('styles the navbar GitHub star in golden yellow with hover twinkle effects and live visibility refresh', () => {
+    const navbar = readSource('components/NavBar.tsx');
+    const headerCss = readSource('styles/AnimateHeader.module.css');
+    const start = headerCss.indexOf('\n.githubStarIcon {');
+    expect(start).toBeGreaterThan(-1);
+    const starRule = headerCss.slice(start, headerCss.indexOf('}', start));
+
+    expect(navbar).toContain('githubStarIcon');
+    expect(navbar).toContain('visibilitychange');
+    expect(navbar).toContain('STARS_CACHE_TTL_MS');
+    expect(starRule).toContain('color: #f5a623;');
+    expect(headerCss).toContain('@keyframes githubStarTwinkle');
+    expect(headerCss).toContain('@keyframes githubSparkleTop');
+  });
+
+  it('renders the search submit control as a compact 38px midnight slate-navy 3D glass orb with outer halo', () => {
+    const form = readSource('components/home/HomeFilterCard.tsx');
+    const minimal = readSource('styles/HomeMinimal.module.css');
+    const cssRule = (selector: string) => {
+      const start = minimal.indexOf(`\n${selector}`);
+      expect(start, `missing ${selector}`).toBeGreaterThan(-1);
+      return minimal.slice(start, minimal.indexOf('}', start));
+    };
+    const goRule = cssRule('.searchGo {');
+    const auraRule = cssRule('.searchGoAura {');
+    const ringRule = cssRule('.searchGoRing {');
+    const glassRule = cssRule('.searchGoGlass {');
+    const pill = form.slice(form.indexOf('data-search-pill=""'), form.indexOf('{showAdvanced ? ('));
+
+    expect(pill).toContain('width="21"');
+    expect(pill).toContain('type="submit"');
+    expect(pill).toContain('aria-label="搜索资料"');
+    expect(pill).toContain('searchGoAura');
+    expect(pill).toContain('searchGoRing');
+    expect(pill).toContain('searchGoSheen');
+    expect(pill).toContain('searchGoGlass');
+    expect(pill).not.toContain('searchGoCore');
+    expect(pill).toContain('searchGoArrowPrimary');
+    expect(pill).toContain('searchGoArrowClone');
+    expect(pill).not.toContain('<span>搜索</span>');
+    expect(goRule).toContain('width: 38px;');
+    expect(goRule).toContain('height: 38px;');
+    expect(goRule).toContain('border-radius: 50%;');
+    expect(goRule).toContain('-webkit-appearance: none;');
+    expect(auraRule).toContain('inset: -3.5px;');
+    expect(ringRule).toContain('clip-path: circle(50% at 50% 50%);');
+    expect(glassRule).toContain('inset: 1.75px;');
+    expect(glassRule).toContain('clip-path: circle(50% at 50% 50%);');
+    expect(glassRule).toContain('backdrop-filter:');
+    expect(minimal).not.toContain('searchGoCore');
+    expect(minimal).toContain('conic-gradient(');
+    expect(minimal).toContain('#3b5988');
+    expect(minimal).toContain('#1e3a5f');
+    expect(minimal).toContain('#0f172a');
+    expect(minimal).toContain('@keyframes liquidMetalSpin');
+  });
+
+  it('renders the global site footer with brand logo icon buttons and compact contributor chips instead of verbose key-value lines', () => {
+    const app = readSource('pages/_app.tsx');
+    const footerCss = readSource('styles/SiteFooter.module.css');
+    const footerMarkup = app.slice(app.indexOf('data-site-footer=""'), app.indexOf('</footer>'));
+
+    expect(footerMarkup).toContain('footerStyles.socialBtn');
+    expect(footerMarkup).toContain('footerStyles.navGrid');
+    expect(footerMarkup).toContain('footerStyles.contribChip');
+    expect(footerMarkup).toContain('浙ICP备2025212695号');
+    expect(footerMarkup).toContain('data-tooltip=');
+    expect(footerMarkup).not.toContain('官方QQ群：');
+    expect(footerMarkup).not.toContain('联系邮箱：');
+    expect(footerMarkup).not.toContain('代码仓库：');
+    expect(footerMarkup).not.toContain('footerStyles.searchForm');
+    expect(footerCss).toContain('.socialBtn');
+    expect(footerCss).toContain('data-tooltip');
+    expect(footerCss).toContain('.contribChip');
+  });
+
+  it('keeps the top-right auth status minimal in neutral black and gray with truncated username beside logout', () => {
+    const navbar = readSource('components/NavBar.tsx');
+    const headerCss = readSource('styles/AnimateHeader.module.css');
+    const app = readSource('pages/_app.tsx');
+    const faviconSvg = readSource('public/favicon.svg');
+    const authCss = headerCss.slice(
+      headerCss.indexOf('\n.authActions {'),
+      headerCss.indexOf('@media (max-width: 1080px)')
+    );
+
+    expect(navbar).toContain('truncateUserName');
+    expect(navbar).toContain('title={displayName}');
+    expect(navbar).toContain('styles.userPill');
+    expect(navbar).toContain('styles.userName');
+    expect(navbar).toContain('styles.logoutButton');
+    expect(navbar).toContain('styles.guestPill');
+    expect(navbar).toContain('styles.loginButton');
+    expect(navbar).not.toContain('userAvatar');
+    expect(navbar).not.toContain('guestCapsule');
+    expect(authCss).toContain('#18181b');
+    expect(authCss).toContain('#f4f4f5');
+    expect(authCss).toContain('#e4e4e7');
+    expect(authCss).toContain('text-overflow: ellipsis;');
+    expect(authCss).not.toContain('animation');
+    expect(app).toContain('/favicon.svg?v=2');
+    expect(app).toContain('/favicon.png?v=2');
+    expect(faviconSvg).toContain('M434 278');
+  });
+
+  it('lowers the jet-black irregular canopy around search + bot and expands OpeningSplash as a swirling Taiji circle', () => {
+    const canopy = readSource('lib/portalCanopy.ts');
+    const portal = readSource('components/home/HomePortal.tsx');
+    const portalCss = readSource('styles/HomePortal.module.css');
+    const minimalCss = readSource('styles/HomeMinimal.module.css');
+    const navbar = readSource('components/NavBar.tsx');
+    const headerCss = readSource('styles/AnimateHeader.module.css');
+    const splash = readSource('components/OpeningSplash.tsx');
+    const splashCss = readSource('styles/OpeningSplash.module.css');
+
+    const canopyRule = portalCss.slice(portalCss.indexOf('\n.canopy {'), portalCss.indexOf('\n.canopyUpper {'));
+    const canopyWaveRule = portalCss.slice(portalCss.indexOf('\n.canopyWave {'), portalCss.indexOf('\n.canopyRimGlow {'));
+    const lockupRule = portalCss.slice(portalCss.indexOf('\n.wordmark {'), portalCss.indexOf('\n.letter {'));
+    const logoRule = portalCss.slice(portalCss.indexOf('\n.logoImg {'), portalCss.indexOf('\n/* The splash sets each letter'));
+    const githubNav = navbar.slice(navbar.indexOf('styles.githubNavLink'), navbar.indexOf('</nav>'));
+
+    expect(canopy).toContain('PORTAL_CANOPY_CENTER_Y = 678');
+    expect(canopy).toContain('PORTAL_CANOPY_RIM_PATH');
+    expect(portal).toContain('data-portal-canopy=""');
+    expect(portal).toContain('data-portal-canopy-wave=""');
+    expect(portal).toContain('fill="#040507"');
+    expect(portal).toContain('portal-canopy-rim');
+    expect(portalCss).toContain('background: #040507;');
+    expect(canopyRule).toContain('bottom: -156px;');
+    expect(canopyWaveRule).toContain('height: 736px;');
+    expect(lockupRule).toContain('color: #ffffff;');
+    expect(logoRule).toContain('filter: invert(1);');
+    expect(logoRule).toContain('mix-blend-mode: screen;');
+    expect(minimalCss).toContain(':global([data-home-portal]) .searchPill {');
+    expect(minimalCss).toContain(':global([data-home-portal]) .searchActions {');
+
+    expect(navbar).toContain('data-scrolled={scrolledPastCanopy');
+    expect(navbar).toContain('rect.bottom <= 64');
+    expect(githubNav).not.toContain('StudyHub');
+    expect(headerCss).toContain(":global(body:has([data-home-portal])) .header:not([data-scrolled='true']) {");
+
+    expect(splash).toContain('styles.overlayHeroDocking');
+    expect(splash).toContain('data-splash-taiji=""');
+    expect(splash).toContain('styles.taijiCircleRim');
+    expect(splashCss).toContain('rotate(-180deg)');
+    expect(splashCss).toContain('rotate(0deg)');
+    expect(splashCss).toContain('.overlayHeroDocking .taijiCircleRim {');
+  });
+
+  it('places a static embossed white-porcelain 1st-anniversary seal beside the search actions as a right-side counterweight', () => {
+    const portal = readSource('components/home/HomePortal.tsx');
+    const portalCss = readSource('styles/HomePortal.module.css');
+    const annivSection = portal.slice(
+      portal.indexOf('data-portal-anniversary=""') - 120,
+      portal.indexOf('className={styles.columns}')
+    );
+
+    expect(portal).toContain('className={styles.portalMid}');
+    expect(portal).toContain('data-portal-anniversary=""');
+    expect(annivSection).toContain('<div');
+    expect(annivSection).not.toContain('href="/');
+    expect(annivSection).not.toContain('<a');
+    expect(annivSection).not.toContain('<Link');
+    expect(annivSection).not.toContain('<button');
+    expect(annivSection).not.toContain('onClick');
+    expect(annivSection).toContain('portal-anniv-arc-top');
+    expect(annivSection).toContain('portal-anniv-arc-bot');
+    expect(annivSection).toContain('STUDYHUB · ANNIV');
+    expect(annivSection).toContain('2025 — 2026');
+    expect(annivSection).toContain('1st');
+    expect(annivSection).toContain('一周年纪念');
+    expect(annivSection).toContain('2025.11 – 2026.11');
+    expect(annivSection).not.toContain('1ST ANNIVERSARY');
+    expect(annivSection).not.toContain('纪念志');
+    expect(portalCss).toContain('.portalMid {');
+    expect(portalCss).toContain('.annivBadge {');
+    expect(portalCss).toContain('.annivSeal {');
+    expect(portalCss).toContain('cursor: default;');
+    expect(portalCss).toContain('user-select: none;');
+    expect(portalCss).not.toContain('.annivBadge:hover');
+    expect(portalCss).toContain(":global(html[data-splash-state='playing']) .annivBadge");
+    expect(portalCss).toContain(":global(html[data-splash-state='docking']) .annivBadge");
   });
 });

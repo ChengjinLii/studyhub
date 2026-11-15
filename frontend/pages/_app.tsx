@@ -3,7 +3,7 @@ import dynamic from 'next/dynamic';
 import Head from 'next/head';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import { FormEvent, ReactNode, useEffect, useState } from 'react';
+import { ReactNode, useEffect, useRef, useState } from 'react';
 import { fetchBackend } from '../lib/apiBase';
 import '../styles/globals.css';
 import '../styles/responsive.css';
@@ -84,18 +84,67 @@ function AppProviders({
 export default function MyApp({ Component, pageProps }: AppProps) {
   const router = useRouter();
   const [wechatModalOpen, setWechatModalOpen] = useState(false);
-  const [footerSearch, setFooterSearch] = useState('');
+  const [qqCopied, setQqCopied] = useState(false);
   const [runtimeInfo, setRuntimeInfo] = useState<RuntimeInfo | null>(null);
   const [globalChromeReady, setGlobalChromeReady] = useState(false);
+  const qqCopyTimerRef = useRef<number | null>(null);
 
-  const handleFooterSearchSubmit = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    const keyword = footerSearch.trim();
-    void router.push(keyword ? `/materials?keyword=${encodeURIComponent(keyword)}` : '/materials');
+  useEffect(() => {
+    return () => {
+      if (qqCopyTimerRef.current !== null) {
+        window.clearTimeout(qqCopyTimerRef.current);
+      }
+    };
+  }, []);
+
+  const handleCopyFooterQQ = () => {
+    if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+      void navigator.clipboard.writeText('245934740').catch(() => {});
+    }
+    setQqCopied(true);
+    if (qqCopyTimerRef.current !== null) {
+      window.clearTimeout(qqCopyTimerRef.current);
+    }
+    qqCopyTimerRef.current = window.setTimeout(() => {
+      setQqCopied(false);
+      qqCopyTimerRef.current = null;
+    }, 2000);
   };
 
   useEffect(() => {
-    if (!window.isSecureContext || !('serviceWorker' in navigator) || process.env.NODE_ENV !== 'production') {
+    if (process.env.NODE_ENV !== 'production') {
+      if ('caches' in window) {
+        void caches
+          .open('studyhub-static-v4')
+          .then((cache) =>
+            cache.keys().then((requests) =>
+              Promise.all(
+                requests
+                  .filter((request) => {
+                    const { pathname } = new URL(request.url);
+                    return (
+                      /^\/_next\/static\/(development|webpack)\//.test(pathname) ||
+                      (pathname.startsWith('/_next/static/chunks/') && !/[.-][0-9a-f]{8,}\.js$/i.test(pathname)) ||
+                      (pathname.startsWith('/_next/static/css/') && !/[./-][0-9a-f]{8,}\.css$/i.test(pathname))
+                    );
+                  })
+                  .map((request) => cache.delete(request))
+              )
+            )
+          )
+          .catch(() => {});
+      }
+      if ('serviceWorker' in navigator) {
+        void navigator.serviceWorker
+          .getRegistrations()
+          .then((registrations) =>
+            Promise.all(registrations.map((registration) => registration.update().catch(() => {})))
+          )
+          .catch(() => {});
+      }
+      return;
+    }
+    if (!window.isSecureContext || !('serviceWorker' in navigator)) {
       return;
     }
     const handleLoad = () => {
@@ -162,7 +211,9 @@ export default function MyApp({ Component, pageProps }: AppProps) {
     <>
       <Head>
         <title>StudyHub·学汇</title>
-        <link rel="icon" href="/favicon.png" />
+        <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=2" />
+        <link rel="icon" type="image/png" sizes="180x180" href="/favicon.png?v=2" />
+        <link rel="shortcut icon" href="/favicon.ico?v=2" />
         <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
         {PUBLIC_API_ORIGIN ? (
           <>
@@ -188,108 +239,190 @@ export default function MyApp({ Component, pageProps }: AppProps) {
             <div className={footerStyles.topGrid}>
               <div className={footerStyles.brandCol}>
                 <div className={footerStyles.brandRow}>
-                  <BrandLogo theme="dark" size={30} />
-                  <span className={footerStyles.brandEn}>StudyHub</span>
+                  <Link className={footerStyles.brandLink} href="/" prefetch={false}>
+                    <BrandLogo theme="dark" size={36} />
+                    <span className={footerStyles.brandEn}>StudyHub</span>
+                  </Link>
+                  <span className={footerStyles.brandBadge}>Open Campus</span>
                 </div>
-                <p className={footerStyles.brandDesc}>
-                  校园学习资料共享与互助平台，让每一份真题、笔记与经验沉淀为可复用的学习资源。
-                </p>
-                <form
-                  className={footerStyles.searchForm}
-                  onSubmit={handleFooterSearchSubmit}
-                  role="search"
-                  aria-label="快速搜课"
-                >
-                  <div className={footerStyles.searchBox}>
-                    <input
-                      className={footerStyles.searchInput}
-                      type="text"
-                      value={footerSearch}
-                      onChange={(event) => setFooterSearch(event.target.value)}
-                      placeholder="想找哪门课的资料？"
-                      aria-label="输入课程名搜索资料"
-                    />
-                    <button className={footerStyles.searchBtn} type="submit" aria-label="搜索课程资料">
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" aria-hidden="true">
-                        <path d="M5 12h14" strokeLinecap="round" />
-                        <path d="m12 5 7 7-7 7" strokeLinecap="round" strokeLinejoin="round" />
-                      </svg>
-                    </button>
-                  </div>
-                </form>
+                <p className={footerStyles.brandDesc}>校园课程资料共享与开源互助社区</p>
+                <div className={footerStyles.socialRow} role="group" aria-label="社区与联系方式">
+                  <a
+                    className={footerStyles.socialBtn}
+                    href="https://github.com/ChengjinLii/studyhub"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label="GitHub 代码仓库"
+                    data-tooltip="GitHub · ChengjinLii/studyhub"
+                  >
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                      <path d="M12 1.5C6.2 1.5 1.5 6.2 1.5 12c0 4.64 3.01 8.58 7.18 9.97.52.1.71-.23.71-.5v-1.78c-2.92.64-3.54-1.41-3.54-1.41-.48-1.21-1.17-1.53-1.17-1.53-.95-.65.07-.64.07-.64 1.06.07 1.61 1.08 1.61 1.08.94 1.61 2.46 1.14 3.06.87.09-.68.37-1.14.67-1.41-2.33-.26-4.78-1.16-4.78-5.19 0-1.15.41-2.09 1.08-2.82-.11-.27-.47-1.34.1-2.79 0 0 .88-.28 2.89 1.08A10.1 10.1 0 0 1 12 6.82c.89 0 1.79.12 2.63.36 2.01-1.36 2.89-1.08 2.89-1.08.57 1.45.21 2.52.1 2.79.67.73 1.08 1.67 1.08 2.82 0 4.04-2.46 4.92-4.8 5.18.38.33.72.97.72 1.96v2.9c0 .28.19.61.72.5A10.5 10.5 0 0 0 22.5 12c0-5.8-4.7-10.5-10.5-10.5Z" />
+                    </svg>
+                  </a>
+                  <button
+                    className={footerStyles.socialBtn}
+                    type="button"
+                    onClick={() => setWechatModalOpen(true)}
+                    aria-label="官方微信公众号"
+                    data-tooltip="微信公众号 · 扫码关注"
+                  >
+                    <svg
+                      width="18"
+                      height="18"
+                      viewBox="0 0 24 24"
+                      fill="currentColor"
+                      fillRule="evenodd"
+                      clipRule="evenodd"
+                      aria-hidden="true"
+                    >
+                      <path d="M9.2 3.8C5.1 3.8 1.8 6.5 1.8 9.9c0 1.9 1.05 3.6 2.7 4.7l-.65 2.05 2.35-1.15c.88.24 1.82.37 2.8.37.24 0 .47-.01.7-.03a5.8 5.8 0 0 1-.25-1.64c0-3.35 3.15-6.05 7.05-6.05.24 0 .48.01.71.03C16.55 5.65 13.2 3.8 9.2 3.8ZM6.9 7.9a.85.85 0 1 1 0 1.7.85.85 0 0 1 0-1.7Zm4.6 0a.85.85 0 1 1 0 1.7.85.85 0 0 1 0-1.7Z" />
+                      <path d="M16.2 9.5c-3.35 0-6.05 2.25-6.05 5.05s2.7 5.05 6.05 5.05c.72 0 1.41-.11 2.05-.3l1.9.95-.5-1.65c1.5-.95 2.4-2.42 2.4-4.05 0-2.8-2.7-5.05-5.85-5.05Zm-2 3.25a.75.75 0 1 1 0 1.5.75.75 0 0 1 0-1.5Zm4 0a.75.75 0 1 1 0 1.5.75.75 0 0 1 0-1.5Z" />
+                    </svg>
+                  </button>
+                  <button
+                    className={`${footerStyles.socialBtn}${qqCopied ? ` ${footerStyles.socialBtnActive}` : ''}`}
+                    type="button"
+                    onClick={handleCopyFooterQQ}
+                    aria-label="复制官方QQ群号 245934740"
+                    data-tooltip={qqCopied ? '已复制 QQ 群：245934740' : '官方 QQ 群：245934740（点击复制）'}
+                  >
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                      <path d="M12 2.2c-3.65 0-6.15 2.55-6.15 6.05 0 .78.12 1.48.27 2.02-1.52 1.78-2.32 3.74-2.32 5.26 0 1.1.54 1.66 1.24 1.66.44 0 .93-.28 1.42-.91.38.94 1.07 1.74 1.96 2.33-.95.29-1.58.75-1.58 1.29 0 .82 1.38 1.38 3.24 1.38 1.08 0 1.6-.22 1.92-.52.32.3.84.52 1.92.52 1.86 0 3.24-.56 3.24-1.38 0-.54-.63-1-1.58-1.29.89-.59 1.58-1.39 1.96-2.33.49.63.98.91 1.42.91.7 0 1.24-.56 1.24-1.66 0-1.52-.8-3.48-2.32-5.26.15-.54.27-1.24.27-2.02C18.15 4.75 15.65 2.2 12 2.2Z" />
+                    </svg>
+                  </button>
+                  <a
+                    className={footerStyles.socialBtn}
+                    href="mailto:chengjinli@std.uestc.edu.cn"
+                    aria-label="联系邮箱 chengjinli@std.uestc.edu.cn"
+                    data-tooltip="邮箱 · chengjinli@std.uestc.edu.cn"
+                  >
+                    <svg
+                      width="18"
+                      height="18"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.9"
+                      aria-hidden="true"
+                    >
+                      <rect x="3" y="5" width="18" height="14" rx="2.5" />
+                      <path
+                        d="m3.6 7 7.6 5.2a1.4 1.4 0 0 0 1.6 0L20.4 7"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                  </a>
+                </div>
               </div>
 
-              <div className={footerStyles.linkCol}>
-                <h3 className={footerStyles.colHeading}>联系与社区</h3>
-                <ul className={footerStyles.colList}>
-                  <li>
-                    <button
-                      className={footerStyles.colLink}
-                      type="button"
-                      onClick={() => setWechatModalOpen(true)}
-                    >
-                      官方微信公众号
-                    </button>
-                  </li>
-                  <li>
-                    <span className={footerStyles.colText}>官方QQ群：245934740</span>
-                  </li>
-                  <li>
-                    <a className={footerStyles.colLink} href="mailto:chengjinli@std.uestc.edu.cn">
-                      联系邮箱：chengjinli@std.uestc.edu.cn
-                    </a>
-                  </li>
-                  <li>
-                    <a
-                      className={footerStyles.colLink}
-                      href="https://github.com/ChengjinLii/studyhub"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      代码仓库：ChengjinLii/studyhub
-                    </a>
-                  </li>
-                </ul>
-              </div>
+              <div className={footerStyles.navGrid}>
+                <div className={footerStyles.linkCol}>
+                  <h3 className={footerStyles.colHeading}>浏览</h3>
+                  <ul className={footerStyles.colList}>
+                    <li>
+                      <Link className={footerStyles.colLink} href="/materials" prefetch={false}>
+                        课程资料
+                      </Link>
+                    </li>
+                    <li>
+                      <Link className={footerStyles.colLink} href="/requests" prefetch={false}>
+                        求资料区
+                      </Link>
+                    </li>
+                    <li>
+                      <Link className={footerStyles.colLink} href="/upload" prefetch={false}>
+                        我要投稿
+                      </Link>
+                    </li>
+                  </ul>
+                </div>
 
-              <div className={footerStyles.linkCol}>
-                <h3 className={footerStyles.colHeading}>关于与说明</h3>
-                <ul className={footerStyles.colList}>
-                  <li>
-                    <Link className={footerStyles.colLink} href="/join" prefetch={false}>
-                      关于我们
-                    </Link>
-                  </li>
-                  <li>
-                    <Link className={footerStyles.colLink} href="/join#engineering" prefetch={false}>
-                      工程日志
-                    </Link>
-                  </li>
-                  <li>
-                    <Link className={footerStyles.colLink} href="/identity-info" prefetch={false}>
-                      用户协议 / 隐私政策
-                    </Link>
-                  </li>
-                  <li>
-                    <span className={footerStyles.colText}>核心贡献者：李承锦、曾逸帆</span>
-                  </li>
-                </ul>
+                <div className={footerStyles.linkCol}>
+                  <h3 className={footerStyles.colHeading}>社区</h3>
+                  <ul className={footerStyles.colList}>
+                    <li>
+                      <Link className={footerStyles.colLink} href="/join" prefetch={false}>
+                        关于我们
+                      </Link>
+                    </li>
+                    <li>
+                      <Link className={footerStyles.colLink} href="/join#engineering" prefetch={false}>
+                        工程日志
+                      </Link>
+                    </li>
+                    <li>
+                      <a
+                        className={footerStyles.colLink}
+                        href="https://github.com/ChengjinLii/studyhub"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        开源仓库
+                      </a>
+                    </li>
+                  </ul>
+                </div>
+
+                <div className={footerStyles.linkCol}>
+                  <h3 className={footerStyles.colHeading}>支持</h3>
+                  <ul className={footerStyles.colList}>
+                    <li>
+                      <Link className={footerStyles.colLink} href="/more" prefetch={false}>
+                        更多服务
+                      </Link>
+                    </li>
+                    <li>
+                      <Link className={footerStyles.colLink} href="/identity-info" prefetch={false}>
+                        隐私与协议
+                      </Link>
+                    </li>
+                    <li>
+                      <button
+                        className={footerStyles.colLink}
+                        type="button"
+                        onClick={() => setWechatModalOpen(true)}
+                      >
+                        公众号二维码
+                      </button>
+                    </li>
+                  </ul>
+                </div>
               </div>
             </div>
 
             <div className={footerStyles.bottomBar}>
-              <span>© 2026 StudyHub 学汇 · 内容版权归作者</span>
-              <span className={footerStyles.icpGroup}>
+              <div className={footerStyles.metaLeft}>
+                <span>© 2026 StudyHub · 内容版权归作者</span>
+                <span className={footerStyles.metaDot} aria-hidden="true" />
                 <a
+                  className={footerStyles.icpLink}
                   href="https://beian.miit.gov.cn/"
                   target="_blank"
                   rel="noopener noreferrer"
                 >
                   浙ICP备2025212695号
                 </a>
-                <span>·</span>
-                <span>审核通过日期 2025-11-26</span>
-              </span>
+              </div>
+              <div className={footerStyles.contributors}>
+                <svg
+                  className={footerStyles.contribIcon}
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.9"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="m12 3-1.9 5.1L5 10l5.1 1.9L12 17l1.9-5.1L19 10l-5.1-1.9Z" />
+                </svg>
+                <span className={footerStyles.contribLabel}>Contributors</span>
+                <span className={footerStyles.contribChip}>李承锦</span>
+                <span className={footerStyles.contribChip}>曾逸帆</span>
+              </div>
             </div>
           </div>
         </footer>

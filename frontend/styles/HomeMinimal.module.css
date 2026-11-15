@@ -18,26 +18,77 @@
 
 .searchPill {
   width: 100%;
-  height: 52px;
-  padding: 0 6px 0 20px;
+  height: 56px;
+  padding: 0 7px 0 21px;
   border-radius: 999px;
-  border: 1px solid #dcdfe4;
-  background: #ffffff;
+  border: 2px solid #c4ccd9;
+  background: linear-gradient(180deg, #ffffff 0%, #fbfcfe 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.96),
+    inset 0 -1px 2px rgba(15, 23, 42, 0.03),
+    0 0 0 3px rgba(226, 231, 240, 0.48),
+    0 3px 10px -2px rgba(15, 23, 42, 0.05),
+    0 14px 30px -16px rgba(15, 23, 42, 0.11);
   display: flex;
   align-items: center;
   gap: 10px;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  transition:
+    border-color 0.22s ease,
+    box-shadow 0.24s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-.searchPill:hover,
+.searchPill:hover {
+  border-color: #9ba7bf;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.98),
+    inset 0 -1px 2px rgba(15, 23, 42, 0.035),
+    0 0 0 3.5px rgba(59, 89, 136, 0.09),
+    0 6px 16px -3px rgba(15, 23, 42, 0.07),
+    0 18px 36px -16px rgba(15, 23, 42, 0.14);
+}
+
 .searchPill:focus-within {
-  border-color: rgba(223, 225, 229, 0);
-  box-shadow: 0 1px 6px rgba(32, 33, 36, 0.24);
+  border-color: #3b5988;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.98),
+    0 0 0 4px rgba(42, 61, 92, 0.12),
+    0 16px 34px -12px rgba(24, 42, 74, 0.16);
+}
+
+:global([data-home-portal]) .searchPill {
+  border-color: #e2e8f0;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 1),
+    0 0 0 1px rgba(255, 255, 255, 0.08),
+    0 12px 30px -6px rgba(0, 0, 0, 0.5),
+    0 0 26px -8px rgba(99, 102, 241, 0.16);
+}
+
+:global([data-home-portal]) .searchPill:hover {
+  border-color: #ffffff;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 1),
+    0 0 0 1.5px rgba(255, 255, 255, 0.16),
+    0 14px 34px -6px rgba(0, 0, 0, 0.58),
+    0 0 30px -6px rgba(99, 102, 241, 0.22);
+}
+
+:global([data-home-portal]) .searchPill:focus-within {
+  border-color: #93c5fd;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 1),
+    0 0 0 3px rgba(96, 165, 250, 0.28),
+    0 16px 36px -8px rgba(0, 0, 0, 0.6);
 }
 
 .searchIcon {
   flex: 0 0 auto;
-  color: #71717a;
+  color: #7c8596;
+  transition: color 0.2s ease;
+}
+
+.searchPill:focus-within .searchIcon {
+  color: #2c456b;
 }
 
 .srOnly {
@@ -57,48 +108,81 @@
   flex: 1 1 auto;
   min-width: 0;
   width: 100%;
-  height: 40px !important;
-  min-height: 40px !important;
+  height: 42px !important;
+  min-height: 42px !important;
   padding: 0 !important;
   margin: 0;
   border: 0 !important;
   border-radius: 0 !important;
   background: transparent !important;
   box-shadow: none !important;
-  color: #0a0a0a;
-  font-size: 15px;
+  color: #09090b;
+  font-size: 15.5px;
+  letter-spacing: 0.01em;
   line-height: 1.4;
   outline: none;
 }
 
 .searchPill input.searchInput::placeholder {
-  color: #71717a;
+  color: #949ba6;
+  font-weight: 400;
   opacity: 1;
 }
 
 .filterTrigger {
+  position: relative;
   flex: 0 0 auto;
   height: 38px;
-  padding: 0 12px;
+  margin-left: 6px;
+  padding: 0 13px;
   border: 0;
   border-radius: 999px;
   background: transparent;
-  color: #52525b;
+  color: #525866;
   font-family: inherit;
-  font-size: 13.5px;
+  font-size: 13px;
   font-weight: 500;
+  letter-spacing: 0.01em;
   display: inline-flex;
   align-items: center;
   gap: 6px;
   cursor: pointer;
   white-space: nowrap;
-  transition: background-color 0.15s ease, color 0.15s ease;
+  transition: background-color 0.18s ease, color 0.18s ease;
 }
 
-.filterTrigger:hover,
+.filterTrigger::before {
+  content: '';
+  position: absolute;
+  left: -6px;
+  top: 50%;
+  width: 1.5px;
+  height: 20px;
+  background: linear-gradient(
+    180deg,
+    rgba(196, 204, 217, 0) 0%,
+    #cbd2df 22%,
+    #cbd2df 78%,
+    rgba(196, 204, 217, 0) 100%
+  );
+  transform: translateY(-50%);
+  pointer-events: none;
+  transition: opacity 0.15s ease;
+}
+
+.filterTrigger:hover {
+  background: #f3f5f9;
+  color: #09090b;
+}
+
 .filterTriggerActive {
-  background: #f4f4f5;
-  color: #0a0a0a;
+  background: rgba(67, 83, 224, 0.08);
+  color: var(--sh-accent);
+}
+
+.filterTrigger:hover::before,
+.filterTriggerActive::before {
+  opacity: 0;
 }
 
 .filterCountBadge {
@@ -136,77 +220,333 @@
   background: #27272a;
 }
 
-/* The search button sits in the box, 6px from its edge on three sides. It is ink at rest and
-   takes the accent colour when the box has the focus; the arrow moves on hover. */
+/* Concentric 38px Midnight Slate-Navy Liquid Metal + 3D Glass orb with triple circular clipping
+   so WebKit/Safari GPU compositing never flattens it into a square, paired with a tight slate-navy
+   outer aura, a fine 1.75px outer rim, and the dual-arrow kinetic relay inside. */
 .searchGo {
+  position: relative;
+  isolation: isolate;
   flex: 0 0 auto;
-  height: 40px;
-  padding: 0 16px 0 20px;
+  width: 38px;
+  height: 38px;
+  padding: 0;
   border: 0;
-  border-radius: 999px;
-  background: #09090b;
+  border-radius: 50%;
+  appearance: none;
+  -webkit-appearance: none;
+  overflow: visible;
+  background: transparent;
   color: #ffffff;
-  font-family: inherit;
-  font-size: 14px;
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  line-height: 1;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  justify-content: center;
   cursor: pointer;
-  white-space: nowrap;
-  transition: background-color 0.2s ease, box-shadow 0.2s ease, transform 0.12s ease;
+  box-shadow:
+    0 0 0 1px rgba(45, 74, 118, 0.16),
+    0 3px 9px -1px rgba(24, 42, 74, 0.34),
+    0 0 8px rgba(59, 89, 136, 0.18);
+  transition:
+    box-shadow 0.24s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.18s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-.searchPill:focus-within .searchGo,
+/* Soft circular slate-navy outer halo kept tight inside the 56px search pill. */
+.searchGoAura {
+  position: absolute;
+  inset: -3.5px;
+  z-index: 0;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 30% 28%, rgba(59, 89, 136, 0.4) 0%, transparent 70%),
+    radial-gradient(circle at 72% 74%, rgba(24, 42, 74, 0.38) 0%, transparent 70%);
+  filter: blur(3px);
+  opacity: 0.76;
+  animation: liquidMetalSpin 7.2s linear infinite;
+  transition:
+    inset 0.24s cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 0.24s ease;
+  pointer-events: none;
+}
+
+/* Circularly clipped liquid-metal rim carrier; children stay strictly circular (inset: 0). */
+.searchGoRing {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  border-radius: 50%;
+  overflow: hidden;
+  -webkit-clip-path: circle(50% at 50% 50%);
+  clip-path: circle(50% at 50% 50%);
+  pointer-events: none;
+}
+
+.searchGoRing::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: conic-gradient(
+    from 135deg,
+    #f1f5f9 0deg,
+    #93c5fd 24deg,
+    #3b5988 54deg,
+    #1e3a5f 86deg,
+    #0b1528 116deg,
+    #6082b6 146deg,
+    #dbeafe 166deg,
+    #ffffff 176deg,
+    #93c5fd 204deg,
+    #2c456b 238deg,
+    #0f172a 274deg,
+    #476a9e 310deg,
+    #bfdbfe 340deg,
+    #f1f5f9 360deg
+  );
+  animation: liquidMetalSpin 6.2s linear infinite;
+  pointer-events: none;
+}
+
+/* Counter-rotating soft specular sheen inside the circular rim. */
+.searchGoSheen {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: conic-gradient(
+    from 40deg,
+    transparent 0deg,
+    rgba(255, 255, 255, 0.68) 44deg,
+    rgba(219, 234, 254, 0.44) 78deg,
+    transparent 132deg,
+    rgba(255, 255, 255, 0.58) 216deg,
+    rgba(191, 219, 254, 0.4) 252deg,
+    transparent 316deg,
+    transparent 360deg
+  );
+  opacity: 0.82;
+  animation: liquidMetalCounterSpin 4.2s linear infinite;
+  pointer-events: none;
+}
+
+/* Refractive 3D midnight slate-navy glass core leaving a sleek 1.75px flowing liquid-metal bezel. */
+.searchGoGlass {
+  position: absolute;
+  inset: 1.75px;
+  z-index: 2;
+  border-radius: 50%;
+  overflow: hidden;
+  -webkit-clip-path: circle(50% at 50% 50%);
+  clip-path: circle(50% at 50% 50%);
+  -webkit-backdrop-filter: blur(6px) saturate(175%);
+  backdrop-filter: blur(6px) saturate(175%);
+  background:
+    radial-gradient(92% 68% at 28% 16%, rgba(255, 255, 255, 0.45) 0%, rgba(224, 236, 255, 0.17) 36%, transparent 64%),
+    radial-gradient(85% 68% at 74% 86%, rgba(132, 182, 248, 0.38) 0%, rgba(42, 61, 92, 0.15) 46%, transparent 72%),
+    linear-gradient(160deg, rgba(65, 87, 122, 0.92) 0%, rgba(42, 61, 92, 0.95) 42%, rgba(26, 40, 64, 0.97) 76%, rgba(14, 23, 41, 0.99) 100%);
+  box-shadow:
+    inset 0 1px 1.2px rgba(255, 255, 255, 0.56),
+    inset 0 -1.5px 3px rgba(132, 182, 248, 0.4),
+    inset 0 0 0 0.75px rgba(255, 255, 255, 0.22),
+    0 1px 2px rgba(11, 21, 40, 0.42);
+  transition: background 0.24s ease, box-shadow 0.24s ease;
+  pointer-events: none;
+}
+
+.searchGoGlass::before {
+  content: '';
+  position: absolute;
+  inset: 1.5px 5px 54% 5px;
+  border-radius: 999px;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.42) 0%,
+    rgba(255, 255, 255, 0.08) 68%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  pointer-events: none;
+}
+
+.searchGoReady,
+.searchPill:focus-within .searchGo {
+  box-shadow:
+    0 0 0 1.5px rgba(59, 89, 136, 0.2),
+    0 4px 12px -1px rgba(24, 42, 74, 0.42),
+    0 0 10px 1px rgba(59, 89, 136, 0.24);
+}
+
+.searchGoReady .searchGoAura,
+.searchPill:focus-within .searchGo .searchGoAura {
+  inset: -4px;
+  opacity: 0.86;
+}
+
+.searchGoReady .searchGoRing::before,
+.searchPill:focus-within .searchGo .searchGoRing::before {
+  animation-duration: 3.8s;
+}
+
+.searchGoReady .searchGoSheen,
+.searchPill:focus-within .searchGo .searchGoSheen {
+  animation-duration: 2.8s;
+}
+
 .searchGo:hover {
-  background: var(--sh-accent);
-  box-shadow: 0 4px 14px -4px rgba(67, 83, 224, 0.55);
+  transform: translateY(-0.5px) scale(1.03);
+  box-shadow:
+    0 0 0 2px rgba(59, 89, 136, 0.24),
+    0 5px 14px -2px rgba(24, 42, 74, 0.48),
+    0 0 12px 1px rgba(59, 89, 136, 0.28);
+}
+
+.searchGo:hover .searchGoAura {
+  inset: -4.5px;
+  opacity: 0.92;
+}
+
+.searchGo:hover .searchGoRing::before {
+  animation-duration: 2.5s;
+}
+
+.searchGo:hover .searchGoSheen {
+  animation-duration: 1.9s;
+  opacity: 1;
+}
+
+.searchGo:hover .searchGoGlass {
+  background:
+    radial-gradient(92% 70% at 26% 15%, rgba(255, 255, 255, 0.5) 0%, rgba(224, 236, 255, 0.21) 38%, transparent 66%),
+    radial-gradient(86% 70% at 74% 86%, rgba(147, 197, 253, 0.44) 0%, rgba(42, 61, 92, 0.17) 46%, transparent 74%),
+    linear-gradient(160deg, rgba(74, 99, 138, 0.93) 0%, rgba(48, 70, 104, 0.96) 42%, rgba(30, 46, 73, 0.98) 76%, rgba(15, 23, 42, 0.99) 100%);
+  box-shadow:
+    inset 0 1px 1.4px rgba(255, 255, 255, 0.62),
+    inset 0 -1.5px 3.2px rgba(147, 197, 253, 0.46),
+    inset 0 0 0 0.75px rgba(255, 255, 255, 0.28),
+    0 1px 3px rgba(11, 21, 40, 0.46);
 }
 
 .searchGo:active {
-  transform: scale(0.97);
+  transform: scale(0.95);
 }
 
 .searchGo:focus-visible {
-  outline: 2px solid var(--sh-accent);
-  outline-offset: 2px;
+  outline: 2px solid #3b5988;
+  outline-offset: 3px;
+}
+
+@keyframes liquidMetalSpin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes liquidMetalCounterSpin {
+  from {
+    transform: rotate(360deg);
+  }
+  to {
+    transform: rotate(0deg);
+  }
+}
+
+.searchGoIconTrack {
+  position: relative;
+  z-index: 3;
+  width: 21px;
+  height: 21px;
+  border-radius: 50%;
+  overflow: hidden;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  filter: drop-shadow(0 1px 1.5px rgba(9, 16, 32, 0.5));
 }
 
 .searchGoArrow {
-  flex: 0 0 auto;
-  transition: transform 0.2s ease;
+  position: absolute;
+  inset: 0;
+  width: 16px;
+  height: 16px;
+  margin: auto;
+  transition:
+    transform 0.34s cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 0.28s ease;
 }
 
-.searchGo:hover .searchGoArrow {
-  transform: translateX(3px);
+.searchGoArrowPrimary {
+  transform: translate3d(0, 0, 0);
+  opacity: 1;
+}
+
+.searchGoArrowClone {
+  transform: translate3d(-135%, 0, 0);
+  opacity: 0;
+}
+
+.searchGo:hover .searchGoArrowPrimary,
+.searchGo:focus-visible .searchGoArrowPrimary {
+  transform: translate3d(135%, 0, 0);
+  opacity: 0;
+}
+
+.searchGo:hover .searchGoArrowClone,
+.searchGo:focus-visible .searchGoArrowClone {
+  transform: translate3d(0, 0, 0);
+  opacity: 1;
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .searchPill,
+  .searchAction,
   .searchGo,
+  .searchGoAura,
+  .searchGoGlass,
   .searchGoArrow {
     transition: none;
+  }
+
+  .searchGoAura,
+  .searchGoRing::before,
+  .searchGoSheen {
+    animation: none;
+  }
+
+  .searchGo:hover,
+  .searchGo:active {
+    transform: none;
+  }
+
+  .searchGo:hover .searchGoArrowPrimary,
+  .searchGo:focus-visible .searchGoArrowPrimary {
+    transform: translate3d(0, 0, 0);
+    opacity: 1;
+  }
+
+  .searchGo:hover .searchGoArrowClone,
+  .searchGo:focus-visible .searchGoArrowClone {
+    opacity: 0;
   }
 }
 
 .searchActions {
-  margin-top: 22px;
+  margin-top: 30px;
   display: flex;
   justify-content: center;
-  gap: 12px;
+  gap: 14px;
 }
 
 .searchAction {
   height: 38px;
-  padding: 0 20px;
-  border: 1px solid #f4f5f7;
+  padding: 0 21px;
+  border: 1px solid #e4e7ee;
   border-radius: 999px;
-  background: #f4f5f7;
-  color: #3c4043;
+  background: #ffffff;
+  color: #3f4450;
   font-family: inherit;
-  font-size: 14px;
+  font-size: 13.5px;
   font-weight: 500;
+  letter-spacing: 0.02em;
   line-height: 1;
   display: inline-flex;
   align-items: center;
@@ -214,13 +554,21 @@
   text-decoration: none;
   white-space: nowrap;
   cursor: pointer;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease, color 0.15s ease;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.025);
+  transition:
+    border-color 0.18s ease,
+    background-color 0.18s ease,
+    box-shadow 0.18s ease,
+    color 0.18s ease,
+    transform 0.18s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .searchAction:hover {
-  border-color: #dadce0;
-  box-shadow: 0 1px 2px rgba(32, 33, 36, 0.1);
-  color: #202124;
+  border-color: #c7cdd8;
+  background: #f8f9fc;
+  color: #09090b;
+  box-shadow: 0 4px 12px -4px rgba(15, 23, 42, 0.08);
+  transform: translateY(-1px);
 }
 
 .searchAction:focus-visible {
@@ -228,22 +576,32 @@
   outline-offset: 2px;
 }
 
+:global([data-home-portal]) .searchActions {
+  margin-top: 38px;
+}
+
 /* The panel hangs under the two actions and lies over the columns; nothing below it moves. */
 .advancedPanel {
   position: absolute;
-  top: 124px;
+  top: 136px;
   left: 50%;
   z-index: 30;
   width: min(880px, calc(100vw - 48px));
   transform: translateX(-50%);
   padding: 20px;
-  border: 1px solid #e4e4e7;
-  border-radius: 16px;
+  border: 1px solid #e2e6ee;
+  border-radius: 18px;
   background: #ffffff;
-  box-shadow: 0 18px 40px -18px rgba(32, 33, 36, 0.32);
+  box-shadow:
+    0 22px 48px -18px rgba(15, 23, 42, 0.18),
+    0 4px 12px -4px rgba(15, 23, 42, 0.05);
   display: flex;
   flex-direction: column;
   gap: 18px;
+}
+
+:global([data-home-portal]) .advancedPanel {
+  top: 144px;
 }
 
 .advancedSelects {

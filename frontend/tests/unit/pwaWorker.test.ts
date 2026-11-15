@@ -63,4 +63,21 @@ describe('PWA network and privacy boundary', () => {
     await event.waitUntil.mock.calls[0][0];
     expect(w.cache.delete).toHaveBeenCalledTimes(10);
   });
+  it('never caches unhashed Next.js dev assets while allowing hashed production chunks', () => {
+    const w = worker();
+    for (const devPath of [
+      '/_next/static/development/_buildManifest.js',
+      '/_next/static/webpack/main.hot-update.json',
+      '/_next/static/chunks/pages/index.js',
+      '/_next/static/css/development.css',
+    ]) {
+      expect(w.request(devPath).respondWith).not.toHaveBeenCalled();
+    }
+    for (const prodPath of [
+      '/_next/static/chunks/pages/index-4a8b9c0d.js',
+      '/_next/static/css/9a8b7c6d.css',
+    ]) {
+      expect(w.request(prodPath).respondWith).toHaveBeenCalled();
+    }
+  });
 });

@@ -1,6 +1,15 @@
 import { useRouter } from 'next/router';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { CSSProperties, useCallback, useEffect, useRef, useState } from 'react';
 import BrandLogo from './BrandLogo';
+import {
+  PORTAL_CANOPY_CENTER_Y,
+  PORTAL_CANOPY_FILL_PATH,
+  PORTAL_CANOPY_LEFT_Y,
+  PORTAL_CANOPY_RIGHT_Y,
+  PORTAL_CANOPY_RIM_PATH,
+  PORTAL_CANOPY_VIEWBOX_HEIGHT,
+  PORTAL_CANOPY_VIEWBOX_WIDTH,
+} from '../lib/portalCanopy';
 import styles from '../styles/OpeningSplash.module.css';
 
 export const REPLAY_SPLASH_EVENT = 'studyhub:replay-splash';
@@ -10,13 +19,11 @@ const BOTTOM_CHEVRON_PATH = 'M430 466 L786 558 L786 660 L620 796 L236 796 L368 6
 
 const WORDMARK_LETTERS = 'StudyHub'.split('');
 // Each letter comes in two steps. First its outline appears; then the letter fills from its
-// foot to its top, and the outline goes.
+// foot to its top, and the outline goes once the fill reaches the cap.
 const OUTLINE_BASE_DELAY_MS = 520;
-const OUTLINE_STEP_MS = 40;
-const FILL_BASE_DELAY_MS = 880;
-const FILL_STEP_MS = 44;
-// The outline of a letter goes when the letter is about half full.
-const OUTLINE_OUT_AFTER_FILL_MS = 230;
+const OUTLINE_STEP_MS = 42;
+const FILL_BASE_DELAY_MS = 860;
+const FILL_STEP_MS = 42;
 
 // The last letter is full at about 1610ms (880 + 7 * 44 + 420); dock after a short hold. The
 // whole splash takes about 2.55s (1780 + 720 + 50), the same as the splash before it.
@@ -45,6 +52,7 @@ interface SplashDock {
   transform: string;
   /** True when the lockup lands on the lockup of the home page, at the same size. */
   onHero: boolean;
+  canopyVars?: Record<string, string>;
 }
 
 const REST_DOCK: SplashDock = { transform: REST_TRANSFORM, onHero: false };
@@ -81,7 +89,6 @@ export default function OpeningSplash({ onComplete }: OpeningSplashProps) {
     document.documentElement.dataset.splashState = 'done';
     phaseRef.current = 'hidden';
     setPhase('hidden');
-    setDock(REST_DOCK);
     onCompleteRef.current?.();
   }, [clearTimers]);
 
@@ -104,7 +111,21 @@ export default function OpeningSplash({ onComplete }: OpeningSplashProps) {
     ) {
       const dx = heroRect.left + heroRect.width / 2 - (stageRect.left + stageRect.width / 2);
       const dy = heroRect.top + heroRect.height / 2 - (stageRect.top + stageRect.height / 2);
-      return { transform: `translate3d(${dx.toFixed(2)}px, ${dy.toFixed(2)}px, 0) scale(1)`, onHero: true };
+      const waveRect = document.querySelector<SVGElement>('[data-portal-canopy-wave]')?.getBoundingClientRect();
+      const waveLeft = waveRect ? waveRect.left : 0;
+      const waveTop = waveRect ? waveRect.top : heroRect.bottom - (PORTAL_CANOPY_VIEWBOX_HEIGHT - 156);
+      const waveWidth = waveRect && waveRect.width > 0 ? waveRect.width : window.innerWidth;
+      const curveCenterY = waveTop + PORTAL_CANOPY_CENTER_Y;
+      const taijiStartY = curveCenterY - window.innerHeight / 2;
+      const canopyVars: Record<string, string> = {
+        '--canopy-left': `${waveLeft.toFixed(2)}px`,
+        '--canopy-top': `${waveTop.toFixed(2)}px`,
+        '--canopy-width': `${waveWidth.toFixed(2)}px`,
+        '--canopy-left-end-y': `${(waveTop + PORTAL_CANOPY_LEFT_Y).toFixed(2)}px`,
+        '--canopy-right-end-y': `${(waveTop + PORTAL_CANOPY_RIGHT_Y).toFixed(2)}px`,
+        '--taiji-start-y': `${taijiStartY.toFixed(2)}px`,
+      };
+      return { transform: `translate3d(${dx.toFixed(2)}px, ${dy.toFixed(2)}px, 0) scale(1)`, onHero: true, canopyVars };
     }
 
     // Elsewhere the lockup shrinks towards the navbar brand and fades out.
@@ -219,9 +240,11 @@ export default function OpeningSplash({ onComplete }: OpeningSplashProps) {
   if (phase === 'hidden') return null;
 
   const isDocking = phase === 'docking' || phase === 'leaving';
+  const showTaijiWipe = loadsOnHome ? (!isDocking || dock.onHero) : dock.onHero;
   const overlayClass = [
     styles.overlay,
     isDocking ? styles.overlayDocking : '',
+    isDocking && dock.onHero ? styles.overlayHeroDocking : '',
     phase === 'leaving' ? styles.overlayLeaving : '',
   ]
     .filter(Boolean)
@@ -233,17 +256,100 @@ export default function OpeningSplash({ onComplete }: OpeningSplashProps) {
       ref={overlayRef}
       data-splash-overlay=""
       className={overlayClass}
+      style={dock.canopyVars as CSSProperties | undefined}
       role="presentation"
       aria-hidden="true"
       onClick={skipToDock}
     >
-      {/* A black screen with a white lockup. At the dock a white surface opens over the black
-          from the centre; the lockup is blended by difference, so it turns from white to ink
-          exactly where the white surface has passed. */}
+      {/* A black screen with a white lockup. At the dock a circle opens from the centre: on the
+          desktop home portal it unfolds as a swirling Yin-Yang canopy into the dark stage, while
+          the lockup blends by difference across both halves. */}
       <div className={styles.backdrop}>
         <div className={styles.gridGlow} />
       </div>
-      <div className={styles.wipe} />
+      <div className={styles.wipe}>
+        {showTaijiWipe ? (
+          <div className={styles.taijiRotor} data-splash-taiji="">
+            <div className={styles.taijiYinSky} />
+            <div className={styles.taijiYinLeftWing} />
+            <div className={styles.taijiYinRightWing} />
+            <svg
+              className={styles.taijiWave}
+              viewBox={`0 0 ${PORTAL_CANOPY_VIEWBOX_WIDTH} ${PORTAL_CANOPY_VIEWBOX_HEIGHT}`}
+              preserveAspectRatio="none"
+              focusable="false"
+            >
+              <defs>
+                <clipPath id="splash-taiji-clip">
+                  <path d={PORTAL_CANOPY_FILL_PATH} />
+                </clipPath>
+                <pattern id="splash-taiji-grid" width="44" height="44" patternUnits="userSpaceOnUse">
+                  <path d="M 44 0 L 0 0 0 44" fill="none" stroke="rgba(255,255,255,0.022)" strokeWidth="1" />
+                </pattern>
+                <linearGradient id="splash-taiji-rim" x1="0%" y1="0%" x2="100%" y2="0%">
+                  <stop offset="0%" stopColor="#60a5fa" stopOpacity="0" />
+                  <stop offset="18%" stopColor="#60a5fa" stopOpacity="0.68" />
+                  <stop offset="44%" stopColor="#818cf8" stopOpacity="0.88" />
+                  <stop offset="64%" stopColor="#fcd34d" stopOpacity="0.66" />
+                  <stop offset="82%" stopColor="#38bdf8" stopOpacity="0.74" />
+                  <stop offset="100%" stopColor="#38bdf8" stopOpacity="0" />
+                </linearGradient>
+                <radialGradient id="splash-aurora-left" cx="28%" cy="89%" r="26%">
+                  <stop offset="0%" stopColor="#3b82f6" stopOpacity="0.11" />
+                  <stop offset="100%" stopColor="#3b82f6" stopOpacity="0" />
+                </radialGradient>
+                <radialGradient id="splash-aurora-mid" cx="54%" cy="84%" r="24%">
+                  <stop offset="0%" stopColor="#818cf8" stopOpacity="0.1" />
+                  <stop offset="100%" stopColor="#818cf8" stopOpacity="0" />
+                </radialGradient>
+                <radialGradient id="splash-aurora-right" cx="76%" cy="87%" r="22%">
+                  <stop offset="0%" stopColor="#2dd4bf" stopOpacity="0.08" />
+                  <stop offset="65%" stopColor="#f59e0b" stopOpacity="0.03" />
+                  <stop offset="100%" stopColor="#2dd4bf" stopOpacity="0" />
+                </radialGradient>
+              </defs>
+              <g clipPath="url(#splash-taiji-clip)">
+                <rect width={PORTAL_CANOPY_VIEWBOX_WIDTH} height={PORTAL_CANOPY_VIEWBOX_HEIGHT} fill="#040507" />
+                <rect
+                  width={PORTAL_CANOPY_VIEWBOX_WIDTH}
+                  height={PORTAL_CANOPY_VIEWBOX_HEIGHT}
+                  fill="url(#splash-taiji-grid)"
+                />
+                <rect
+                  width={PORTAL_CANOPY_VIEWBOX_WIDTH}
+                  height={PORTAL_CANOPY_VIEWBOX_HEIGHT}
+                  fill="url(#splash-aurora-left)"
+                />
+                <rect
+                  width={PORTAL_CANOPY_VIEWBOX_WIDTH}
+                  height={PORTAL_CANOPY_VIEWBOX_HEIGHT}
+                  fill="url(#splash-aurora-mid)"
+                />
+                <rect
+                  width={PORTAL_CANOPY_VIEWBOX_WIDTH}
+                  height={PORTAL_CANOPY_VIEWBOX_HEIGHT}
+                  fill="url(#splash-aurora-right)"
+                />
+              </g>
+              <path
+                className={styles.taijiRimGlow}
+                d={PORTAL_CANOPY_RIM_PATH}
+                fill="none"
+                stroke="url(#splash-taiji-rim)"
+                strokeWidth="5"
+                vectorEffect="non-scaling-stroke"
+              />
+              <path
+                d={PORTAL_CANOPY_RIM_PATH}
+                fill="none"
+                stroke="url(#splash-taiji-rim)"
+                strokeWidth="1.6"
+                vectorEffect="non-scaling-stroke"
+              />
+            </svg>
+          </div>
+        ) : null}
+      </div>
       <div
         ref={stageRef}
         className={`${styles.stage}${isDocking && !dock.onHero ? ` ${styles.stageLeaves}` : ''}`}
@@ -268,7 +374,7 @@ export default function OpeningSplash({ onComplete }: OpeningSplashProps) {
                 states. */}
             <BrandLogo
               theme="light"
-              size={72}
+              size={90}
               className={styles.logoImg}
               style={{ width: '100%', height: '100%' }}
             />
@@ -278,12 +384,7 @@ export default function OpeningSplash({ onComplete }: OpeningSplashProps) {
               <span key={`${letter}-${index}`} className={styles.letter}>
                 <span
                   className={styles.letterOutline}
-                  style={{
-                    // In, then out when the letter is nearly full.
-                    animationDelay: `${OUTLINE_BASE_DELAY_MS + index * OUTLINE_STEP_MS}ms, ${
-                      FILL_BASE_DELAY_MS + index * FILL_STEP_MS + OUTLINE_OUT_AFTER_FILL_MS
-                    }ms`,
-                  }}
+                  style={{ animationDelay: `${OUTLINE_BASE_DELAY_MS + index * OUTLINE_STEP_MS}ms` }}
                 >
                   {letter}
                 </span>
@@ -298,6 +399,26 @@ export default function OpeningSplash({ onComplete }: OpeningSplashProps) {
           </div>
         </div>
       </div>
+      {showTaijiWipe ? (
+        <svg className={styles.taijiCircleRim} viewBox="0 0 200 200" aria-hidden="true" focusable="false">
+          <defs>
+            <linearGradient id="splash-aperture-ring" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor="#93c5fd" stopOpacity="0.72" />
+              <stop offset="50%" stopColor="#ffffff" stopOpacity="0.55" />
+              <stop offset="100%" stopColor="#818cf8" stopOpacity="0.72" />
+            </linearGradient>
+          </defs>
+          <circle
+            cx="100"
+            cy="100"
+            r="99.5"
+            fill="none"
+            stroke="url(#splash-aperture-ring)"
+            strokeWidth="1.6"
+            vectorEffect="non-scaling-stroke"
+          />
+        </svg>
+      ) : null}
     </div>
   );
 }

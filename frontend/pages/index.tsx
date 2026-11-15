@@ -6,11 +6,12 @@ import { useRouter } from 'next/router';
 import NavBar from '../components/NavBar';
 import AppImage from '../components/AppImage';
 import MaterialIconSprite from '../components/MaterialIconSprite';
+import HomeFilterCard from '../components/home/HomeFilterCard';
 import HomeMaterialLibrary from '../components/home/HomeMaterialLibrary';
 import HomePortal from '../components/home/HomePortal';
 import { materialBrowseScope } from '../lib/materialBrowseSession';
 import { MaterialBrowseMode, MaterialSubjectScope, useMaterialSubjects } from '../lib/useMaterialSubjects';
-import { rankHomeSubjects } from '../lib/homeDiscovery';
+import { computeHomeRevealTail, easeHomeRevealProgress, rankHomeSubjects } from '../lib/homeDiscovery';
 import discoveryStyles from '../styles/HomeDiscovery.module.css';
 import minStyles from '../styles/HomeMinimal.module.css';
 import type { SubjectSearchAliases } from '../lib/materialSubjects';
@@ -52,9 +53,19 @@ const HOME_REQUEST_PREVIEW_LIMIT = 8;
 const HOME_POPULAR_PREVIEW_LIMIT = 20;
 // Home page, desktop: the content under the first screen stays closed until the reader has
 // scrolled this far (px). The navbar is 64px high.
-const HOME_REVEAL_DISTANCE = 120;
+const HOME_REVEAL_DISTANCE = 280;
+const HOME_REVEAL_SETTLE_MS = 180;
+const HOME_REVEAL_FADE_CLEANUP_MS = 860;
 const HOME_NAVBAR_HEIGHT = 64;
 const HOME_PHONE_MAX_WIDTH = 768;
+
+const clearHomeRevealVars = () => {
+  if (typeof document === 'undefined') return;
+  const root = document.documentElement;
+  root.style.removeProperty('--home-reveal');
+  root.style.removeProperty('--home-reveal-tail');
+  delete root.dataset.homeRevealComplete;
+};
 // True from the first opening until a full reload, so a return to the home page inside the app
 // does not close the content again.
 let homeContentOpened = false;
@@ -71,7 +82,6 @@ const glideToHomeContent = () => {
   });
 };
 
-const HomeFilterCard = dynamic(() => import('../components/home/HomeFilterCard'));
 const HomeLeaderboard = dynamic(() => import('../components/home/HomeLeaderboard'));
 const MobileHomeSections = dynamic(() => import('../components/home/MobileHomeSections'));
 // Phone only: the search portal is not shown at phone width, so the discovery card and the
@@ -166,19 +176,47 @@ export default function Home({
   const materialsRef = useRef<HTMLDivElement>(null);
   const [contentRevealed, setContentRevealed] = useState(() => homeContentOpened);
   const [revealMotion, setRevealMotion] = useState<HomeRevealMotion>('none');
+  const revealSettleTimerRef = useRef<number | null>(null);
+  const revealCleanupTimerRef = useRef<number | null>(null);
+  const clearRevealTimers = useCallback(() => {
+    for (const ref of [revealSettleTimerRef, revealCleanupTimerRef]) {
+      if (ref.current !== null) {
+        window.clearTimeout(ref.current);
+        ref.current = null;
+      }
+    }
+  }, []);
+  useEffect(() => {
+    return () => {
+      clearRevealTimers();
+      clearHomeRevealVars();
+    };
+  }, [clearRevealTimers]);
   // Opens the content under the first screen. The attributes change at once, so a scroll to the
   // content in the same task finds it laid out; the state follows. The cards rise into place
   // only when the reader's scroll opens them ('rise'): a jump to a section measures the place
   // of that section, and a card in motion would give a wrong place.
   const revealContent = useCallback((motion: HomeRevealMotion = 'none') => {
     homeContentOpened = true;
+    clearRevealTimers();
     const content = document.getElementById('home-content');
     content?.setAttribute('data-reveal-motion', motion);
     content?.setAttribute('data-revealed', 'true');
-    document.documentElement.style.removeProperty('--home-reveal');
+    if (motion === 'rise') {
+      const root = document.documentElement;
+      root.style.setProperty('--home-reveal', '1');
+      root.style.setProperty('--home-reveal-tail', '1');
+      root.dataset.homeRevealComplete = 'true';
+      revealCleanupTimerRef.current = window.setTimeout(() => {
+        revealCleanupTimerRef.current = null;
+        clearHomeRevealVars();
+      }, HOME_REVEAL_FADE_CLEANUP_MS);
+    } else {
+      clearHomeRevealVars();
+    }
     setRevealMotion(motion);
     setContentRevealed(true);
-  }, []);
+  }, [clearRevealTimers]);
   const scrollToContent = useCallback(() => {
     revealContent('rise');
     glideToHomeContent();
@@ -203,22 +241,41 @@ export default function Home({
       if (frame !== null) return;
       frame = window.requestAnimationFrame(() => {
         frame = null;
-        const progress = Math.min(1, window.scrollY / HOME_REVEAL_DISTANCE);
-        if (progress < 1) {
-          document.documentElement.style.setProperty('--home-reveal', progress.toFixed(3));
+        const root = document.documentElement;
+        const raw = Math.min(1, Math.max(0, window.scrollY / HOME_REVEAL_DISTANCE));
+        if (raw < 1) {
+          const progress = easeHomeRevealProgress(raw);
+          delete root.dataset.homeRevealComplete;
+          root.style.setProperty('--home-reveal', progress.toFixed(3));
+          root.style.setProperty('--home-reveal-tail', computeHomeRevealTail(progress).toFixed(3));
           return;
         }
-        revealContent('rise');
-        glideToHomeContent();
+        window.removeEventListener('scroll', onScroll);
+        root.style.setProperty('--home-reveal', '1');
+        root.style.setProperty('--home-reveal-tail', '1');
+        root.dataset.homeRevealComplete = 'true';
+        if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+          revealContent('rise');
+          glideToHomeContent();
+          return;
+        }
+        clearRevealTimers();
+        revealSettleTimerRef.current = window.setTimeout(() => {
+          revealSettleTimerRef.current = null;
+          revealContent('rise');
+          glideToHomeContent();
+        }, HOME_REVEAL_SETTLE_MS);
       });
     };
     window.addEventListener('scroll', onScroll, { passive: true });
     return () => {
       window.removeEventListener('scroll', onScroll);
       if (frame !== null) window.cancelAnimationFrame(frame);
-      document.documentElement.style.removeProperty('--home-reveal');
+      if (!homeContentOpened) {
+        clearHomeRevealVars();
+      }
     };
-  }, [contentRevealed, revealContent]);
+  }, [clearRevealTimers, contentRevealed, revealContent]);
   const normalizeFilters = useCallback(
     (input: FilterState): FilterState => ({
       keyword: input.keyword || '',
@@ -419,7 +476,7 @@ export default function Home({
   }, [router, scrollToMaterials]);
   const [contributors, setContributors] = useState<ContributorRank[]>(initialContributors);
   const [leaderboardPeriod, setLeaderboardPeriod] = useState<LeaderboardPeriod>('all');
-  const didRunInitialLeaderboardEffect = useRef(false);
+  const loadedLeaderboardPeriodRef = useRef<LeaderboardPeriod>('all');
   const [leaderboardLoading, setLeaderboardLoading] = useState(false);
   const [leaderboardError, setLeaderboardError] = useState('');
   const [requestItems] = useState<MaterialRequestItem[]>(requests || []);
@@ -509,15 +566,16 @@ export default function Home({
     setShowAdvanced(false);
   }, []);
 
+  const currentUserId = user?.id ?? null;
   useEffect(() => {
-    if (!user) {
+    if (!currentUserId) {
       setLeaderboardFollowed({});
       return;
     }
     let cancelled = false;
     const loadFollowing = async () => {
       try {
-        const resp = await fetchBackend(`/users/${user.id}/following`);
+        const resp = await fetchBackend(`/users/${currentUserId}/following`);
         const data = await unwrapApiResponse<Array<{ id?: number }>>(resp, '关注列表加载失败');
         if (cancelled) return;
         const next: Record<number, boolean> = {};
@@ -537,11 +595,10 @@ export default function Home({
     return () => {
       cancelled = true;
     };
-  }, [user]);
+  }, [currentUserId]);
 
   useEffect(() => {
-    if (!didRunInitialLeaderboardEffect.current) {
-      didRunInitialLeaderboardEffect.current = true;
+    if (loadedLeaderboardPeriodRef.current === leaderboardPeriod) {
       return;
     }
     let cancelled = false;
@@ -550,7 +607,10 @@ export default function Home({
     const origin = typeof window !== 'undefined' ? window.location.origin : undefined;
     fetchContributorRanks({ limit: 50, period: leaderboardPeriod, origin })
       .then((data) => {
-        if (!cancelled) setContributors(data);
+        if (!cancelled) {
+          loadedLeaderboardPeriodRef.current = leaderboardPeriod;
+          setContributors(data);
+        }
       })
       .catch(() => {
         if (!cancelled) setLeaderboardError('贡献榜单加载失败，请稍后再试。');
@@ -709,6 +769,7 @@ export default function Home({
         onOpenSubject={(id) => { setBrowseMode('subjects'); handleSubjectChange(id, 'all'); }}
         onBrowseSubjects={browseAllSubjects}
         onBrowseMaterials={browseAllMaterials}
+        onJumpToLeaderboard={handleJumpToLeaderboard}
         onScrollDown={scrollToContent}
       />
       <main

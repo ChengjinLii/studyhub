@@ -224,7 +224,8 @@ test('desktop portal ranks subjects by downloads and leaves the phone cards hidd
   const rows = page.getByRole('list', { name: '热门学科排行' }).locator('li');
   await expect(rows).toHaveCount(Math.min(ranks.length, 10));
   await expect(rows.first()).toContainText(ranks[0].name);
-  await expect(rows.first()).toContainText(`${formatNumber(ranks[0].downloadCount)} 下载`);
+  await expect(rows.first()).toContainText(`${formatNumber(ranks[0].materialCount)} 份`);
+  await expect(rows.first()).toContainText(`↓ ${formatNumber(ranks[0].downloadCount)}`);
   await expect(page.locator('.request-card')).toBeHidden();
   await expect(page.getByRole('region', { name: '合作招募', exact: true })).toHaveCount(0);
   await portal.screenshot({ path: info.outputPath('subject-discovery-desktop.png') });

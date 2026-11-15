@@ -621,7 +621,7 @@ test('home discovery views remain accessible without entry modal', async ({ page
   // Desktop: the search portal shows two rank columns, with no tab, request list or cooperation card.
   const portal = page.locator('[data-home-portal]');
   await expect(portal).toBeVisible();
-  await expect(portal.getByRole('heading', { name: '近期热门', exact: true })).toBeVisible();
+  await expect(portal.getByRole('heading', { name: '热门资料', exact: true })).toBeVisible();
   await expect(portal.getByRole('heading', { name: '热门学科', exact: true })).toBeVisible();
   await expect(page.getByRole('tablist', { name: '首页发现内容' })).toHaveCount(0);
   await expect(page.getByRole('region', { name: '合作招募', exact: true })).toHaveCount(0);
