@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
+import { AnimatePresence, APPLE_SPRINGS, APPLE_TAP, m, SegmentedPill } from '../../lib/motion';
 import { ContributorRank, LeaderboardPeriod } from '../../types/contributor';
 import { RoleMask, SessionUser } from '../../types/user';
 import { userPath } from '../../lib/slug';
@@ -70,19 +71,27 @@ export default function HomeLeaderboard({
           <p className="help-text">同一用户下载同一上传者不同资料会累计；重复下载同一资料不重复计数。</p>
         </div>
         <div className="leaderboard-controls">
-          <div className="leaderboard-tabs" role="tablist" aria-label="贡献榜单周期">
-            {leaderboardPeriods.map((period) => (
-              <button
-                key={period}
-                type="button"
-                role="tab"
-                aria-selected={leaderboardPeriod === period}
-                className={`leaderboard-tab ${leaderboardPeriod === period ? 'active' : ''}`}
-                onClick={() => onPeriodChange(period)}
-              >
-                {leaderboardLabels[period]}
-              </button>
-            ))}
+          <div className="leaderboard-tabs" data-motion-tabs="true" role="tablist" aria-label="贡献榜单周期">
+            {leaderboardPeriods.map((period) => {
+              const active = leaderboardPeriod === period;
+              return (
+                <m.button
+                  key={period}
+                  type="button"
+                  role="tab"
+                  aria-selected={active}
+                  className={`leaderboard-tab ${active ? 'active' : ''}`}
+                  onClick={() => onPeriodChange(period)}
+                  whileTap={APPLE_TAP.button}
+                  transition={APPLE_SPRINGS.snappy}
+                >
+                  {active ? (
+                    <SegmentedPill layoutId="home-leaderboard-pill" className="leaderboard-tab-pill" />
+                  ) : null}
+                  <span className="leaderboard-tab-label">{leaderboardLabels[period]}</span>
+                </m.button>
+              );
+            })}
           </div>
         </div>
       </div>
@@ -93,6 +102,14 @@ export default function HomeLeaderboard({
         <div className="empty-state">{leaderboardEmptyHint}</div>
       ) : (
         <div className="leaderboard-scroll">
+          <AnimatePresence mode="wait" initial={false}>
+          <m.div
+            key={leaderboardPeriod}
+            initial={{ opacity: 0, y: 10, scale: 0.99 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -6, scale: 0.994 }}
+            transition={APPLE_SPRINGS.gentle}
+          >
           <ol className="leaderboard-list">
             {(() => {
               let rankCounter = 0;
@@ -139,6 +156,8 @@ export default function HomeLeaderboard({
               });
             })()}
           </ol>
+          </m.div>
+          </AnimatePresence>
         </div>
       )}
       {topContributors.length > 10 ? (

@@ -1,10 +1,10 @@
 /* The opening splash: a black screen with the vectorized StudyHub wordmark. Each glyph
    traces its SVG stroke contour, fills upward behind a luminous energy crest, receives a diagonal
-   metallic glint, and docks seamlessly into the home portal dark canopy. */
+   metallic glint, then cleaves cleanly through sculpted prism facets with restrained kinetic warp. */
 .overlay {
-  --splash-ink: #f6f6f4;
-  --splash-travel: 720ms;
-  --splash-glide: cubic-bezier(0.65, 0, 0.35, 1);
+  --splash-ink: #ffffff;
+  --splash-travel: 840ms;
+  --splash-glide: cubic-bezier(0.09, 0.94, 0.17, 1);
   position: fixed;
   inset: 0;
   z-index: 2100;
@@ -41,16 +41,13 @@
   position: absolute;
   inset: 0;
   pointer-events: none;
-  opacity: 0.78;
+  opacity: 0.74;
   background:
-    radial-gradient(640px circle at 50% 46%, rgba(99, 102, 241, 0.11), transparent 68%),
-    radial-gradient(460px circle at 50% 48%, rgba(255, 255, 255, 0.06), transparent 72%),
-    linear-gradient(to right, rgba(255, 255, 255, 0.045) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(255, 255, 255, 0.045) 1px, transparent 1px);
-  background-size: 100% 100%, 100% 100%, 48px 48px, 48px 48px;
+    radial-gradient(620px circle at 50% 46%, rgba(99, 102, 241, 0.1), transparent 68%),
+    radial-gradient(420px circle at 50% 48%, rgba(255, 255, 255, 0.05), transparent 72%);
 }
 
-/* The white surface. It opens as a circle from the centre of the screen; 72vmax reaches the
+/* The white surface. It opens as a circle from the centre of the screen on non-hero routes; 72vmax reaches the
    corners of any screen. */
 .wipe {
   position: absolute;
@@ -69,6 +66,7 @@
 .stage {
   --wordmark-width: clamp(256px, 31vw, 340px);
   position: relative;
+  z-index: 4;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -84,7 +82,7 @@
   opacity: 0;
 }
 
-/* Depth-focus emergence sits on this inner wrapper so .stage keeps its inline dock transform. */
+/* Depth-focus emergence and subtle detonation recoil sit on this inner wrapper so .stage keeps its dock transform. */
 .lockup {
   position: relative;
   display: inline-flex;
@@ -93,7 +91,7 @@
   transform: translate3d(0, 8px, 0) scale(0.94);
   will-change: transform;
   backface-visibility: hidden;
-  animation: splashLockup 760ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  animation: splashLockup 760ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 .horizonBeam {
@@ -116,7 +114,7 @@
   transform: scaleX(0);
   opacity: 0;
   will-change: transform, opacity;
-  animation: splashHorizonBeam 760ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  animation: splashHorizonBeam 760ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 .wordmarkSvg {
@@ -125,6 +123,16 @@
   aspect-ratio: 844 / 160;
   display: block;
   overflow: visible;
+}
+
+.prismGhostCyan,
+.prismGhostViolet {
+  position: absolute;
+  left: 0;
+  top: 0;
+  pointer-events: none;
+  opacity: 0;
+  will-change: transform, opacity;
 }
 
 .letterOutline {
@@ -137,7 +145,7 @@
   stroke-dashoffset: 1.04;
   opacity: 0;
   will-change: stroke-dashoffset, opacity, filter;
-  animation: splashLetterTrace 940ms linear forwards;
+  animation: splashLetterTrace 940ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
 }
 
 .letterOutlineSilver {
@@ -148,7 +156,8 @@
   transform-box: fill-box;
   transform: translate3d(0, 106%, 0);
   will-change: transform;
-  animation: splashLetterFill 460ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  animation: splashLetterFill 460ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation-delay: var(--fill-delay, 480ms);
 }
 
 .glyphFillWhite {
@@ -156,7 +165,8 @@
 }
 
 .glyphFillSilver {
-  fill: #b8b8ba;
+  fill: #c1c1c7;
+  transition: fill 240ms ease 180ms;
 }
 
 .letterCrest {
@@ -167,7 +177,7 @@
   transform: translate3d(0, 0, 0) skewX(-22deg);
   opacity: 0;
   will-change: transform, opacity;
-  animation: splashSheenSweep 540ms cubic-bezier(0.4, 0, 0.2, 1) 1140ms forwards;
+  animation: splashSheenSweep 540ms cubic-bezier(0.16, 1, 0.3, 1) 1140ms forwards;
 }
 
 @keyframes splashFailsafe {
@@ -178,11 +188,71 @@
 }
 
 @keyframes splashLockup {
-  from {
-    transform: translate3d(0, 8px, 0) scale(0.94);
+  0% {
+    transform: translate3d(0, 12px, 0) scale(0.92);
   }
-  to {
+  68% {
+    transform: translate3d(0, -1px, 0) scale(1.008);
+  }
+  100% {
     transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+@keyframes splashLockupDetonate {
+  0% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  7% {
+    transform: translate3d(0, 2px, 0) scale(0.965, 0.975);
+  }
+  20% {
+    transform: translate3d(0, -2px, 0) scale(1.035);
+  }
+  56% {
+    transform: translate3d(0, 0, 0) scale(0.998);
+  }
+  84%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+@keyframes splashPrismSplitCyan {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, 0, 0);
+  }
+  20% {
+    opacity: 0.56;
+    transform: translate3d(-5px, -1px, 0);
+  }
+  52% {
+    opacity: 0.24;
+    transform: translate3d(2px, 0.5px, 0);
+  }
+  100% {
+    opacity: 0;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes splashPrismSplitViolet {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, 0, 0);
+  }
+  20% {
+    opacity: 0.52;
+    transform: translate3d(5px, 1px, 0);
+  }
+  52% {
+    opacity: 0.22;
+    transform: translate3d(-2px, -0.5px, 0);
+  }
+  100% {
+    opacity: 0;
+    transform: translate3d(0, 0, 0);
   }
 }
 
@@ -226,11 +296,36 @@
   }
 }
 
+@keyframes splashLetterTraceMobile {
+  0% {
+    opacity: 0;
+    stroke-dashoffset: 1.04;
+  }
+  12% {
+    opacity: 1;
+  }
+  66% {
+    opacity: 1;
+    stroke-dashoffset: 0;
+  }
+  84% {
+    opacity: 0.9;
+    stroke-dashoffset: 0;
+  }
+  100% {
+    opacity: 0;
+    stroke-dashoffset: 0;
+  }
+}
+
 @keyframes splashLetterFill {
-  from {
+  0% {
     transform: translate3d(0, 106%, 0);
   }
-  to {
+  76% {
+    transform: translate3d(0, -2%, 0);
+  }
+  100% {
     transform: translate3d(0, 0%, 0);
   }
 }
@@ -252,106 +347,35 @@
   }
 }
 
-/* On the desktop home page, the expanding circle (.wipe) unfolds like a swirling Taiji
-   diagram into exact alignment with the home portal dark canopy. */
-.overlayHeroDocking {
-  --splash-ink: #ffffff;
-  color: #ffffff;
-}
-
-.stageCrispWrap {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  pointer-events: none;
-  z-index: 2;
-}
-
-.stageCrisp {
-  --wordmark-width: clamp(256px, 31vw, 340px);
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 18px 20px 8px;
-  color: #ffffff;
+/* On the home page, sculpted prism facets part cleanly while restrained kinetic warp propels
+   StudyHub smoothly into the #1a1c20 canopy hero berth. */
+.overlayHeroDocking .wipe {
+  clip-path: circle(0 at 50% 50%);
   opacity: 0;
-  transform: translate3d(0, 0, 0) scale(1);
-  transform-origin: center center;
-  transition: transform var(--splash-travel) var(--splash-glide);
-  will-change: transform, opacity;
+  transition: none;
 }
 
-.overlayHeroDocking .stageCrisp {
-  opacity: 1;
-  transition:
-    transform var(--splash-travel) var(--splash-glide),
-    opacity 200ms ease 480ms;
-}
-
-.lockupCrisp {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.wordmarkSvgCrisp {
-  width: var(--wordmark-width);
-  height: auto;
-  aspect-ratio: 844 / 160;
-  display: block;
-  overflow: visible;
-  filter: drop-shadow(0 6px 22px rgba(0, 0, 0, 0.28));
-}
-
-.glyphCrispWhite {
-  fill: #ffffff;
-}
-
-.glyphCrispSilver {
-  fill: #b8b8ba;
-}
-
-.taijiRotor {
+.canopyStage {
   position: absolute;
   inset: 0;
+  background: #1a1c20;
   pointer-events: none;
-  transform-origin: 50% 50%;
-  transform: translate3d(0, var(--taiji-start-y, -60px), 0) rotate(-180deg);
-  transition: transform var(--splash-travel) var(--splash-glide);
-  will-change: transform;
+  z-index: 1;
+  opacity: 0;
+  will-change: opacity;
 }
 
-.overlayHeroDocking .taijiRotor {
-  transform: translate3d(0, 0, 0) rotate(0deg);
+.overlayHeroDocking .canopyStage {
+  opacity: 1;
+  transition: opacity 240ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-.taijiYinSky {
+.canopyUpperFill {
   position: absolute;
-  left: -150vmax;
-  right: -150vmax;
-  top: -150vmax;
-  height: calc(150vmax + var(--canopy-top, -200px) + 2px);
-  background: #1a1c20;
-}
-
-.taijiYinLeftWing {
-  position: absolute;
-  right: calc(100% - var(--canopy-left, 0px) - 1px);
-  width: 150vmax;
-  top: calc(var(--canopy-top, -200px));
-  height: calc(var(--canopy-left-end-y, 400px) - var(--canopy-top, -200px));
-  background: #1a1c20;
-}
-
-.taijiYinRightWing {
-  position: absolute;
-  left: calc(var(--canopy-left, 0px) + var(--canopy-width, 100%) - 1px);
-  width: 150vmax;
-  top: calc(var(--canopy-top, -200px));
-  height: calc(var(--canopy-right-end-y, 380px) - var(--canopy-top, -200px));
+  left: 0;
+  right: 0;
+  top: 0;
+  height: calc(max(0px, var(--canopy-top, 0px)) + 8px);
   background: #1a1c20;
 }
 
@@ -360,65 +384,139 @@
   left: var(--canopy-left, 0px);
   top: var(--canopy-top, -200px);
   width: var(--canopy-width, 100%);
-  height: 736px;
+  height: var(--canopy-height, 736px);
   display: block;
 }
 
-.taijiRimGlow {
-  opacity: 0.42;
-  filter: blur(4px);
-}
-
-.taijiCircleRim {
+.whiteLowerStage {
   position: absolute;
-  left: 50%;
-  top: 50%;
-  width: 144vmax;
-  height: 144vmax;
-  margin-left: -72vmax;
-  margin-top: -72vmax;
+  left: 0;
+  right: 0;
+  top: var(--canopy-horizon-y, 376px);
+  bottom: 0;
+  background: #ffffff;
   pointer-events: none;
+  z-index: 2;
   opacity: 0;
-  transform: scale(0);
-  transform-origin: 50% 50%;
-  will-change: transform, opacity;
 }
 
-.overlayHeroDocking .taijiCircleRim {
-  opacity: 0.9;
-  transform: scale(1);
-  transition: transform var(--splash-travel) var(--splash-glide);
+.overlayHeroDocking .whiteLowerStage {
+  opacity: 1;
+}
+
+.fxCanvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  pointer-events: none;
+  z-index: 3;
+}
+
+.overlayHeroDocking .stage {
+  z-index: 5;
+  mix-blend-mode: normal;
+  filter: drop-shadow(0 6px 22px rgba(0, 0, 0, 0.28));
+  transition:
+    transform var(--splash-travel) var(--splash-glide),
+    filter 420ms ease;
+}
+
+.overlayHeroDocking .lockup {
+  animation: splashLockupDetonate var(--splash-travel) linear forwards;
+}
+
+.overlayHeroDocking .prismGhostCyan {
+  animation: splashPrismSplitCyan 220ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.overlayHeroDocking .prismGhostViolet {
+  animation: splashPrismSplitViolet 220ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.overlayHeroDocking .letterOutline,
+.overlayHeroDocking .wordmarkSheen,
+.overlayHeroDocking .letterCrest,
+.overlayHeroDocking .horizonBeam {
+  opacity: 0 !important;
+  animation: none !important;
+}
+
+.overlayHeroDocking .letterFill {
+  animation: none;
+  transform: translate3d(0, 0%, 0);
+}
+
+.overlayHeroDocking .glyphFillWhite {
+  fill: #ffffff;
+}
+
+.overlayHeroDocking .glyphFillSilver {
+  fill: #b8b8ba;
+  transition: fill 280ms ease;
 }
 
 @media (min-width: 769px) and (max-height: 820px) {
-  .stage,
-  .stageCrisp {
+  .stage {
     --wordmark-width: clamp(220px, 26vw, 290px);
     padding: 8px 20px 4px;
   }
 }
 
 @media (min-width: 769px) and (max-height: 650px) {
-  .stage,
-  .stageCrisp {
+  .stage {
     --wordmark-width: clamp(196px, 23vw, 248px);
     padding: 4px 16px 2px;
   }
 }
 
 @media (max-width: 768px) {
-  .stage,
-  .stageCrisp {
-    --wordmark-width: clamp(196px, 54vw, 244px);
-    padding: 6px 12px 2px;
+  .stage {
+    --wordmark-width: clamp(176px, 47vw, 216px);
+    padding: 6px 12px 4px;
+    mix-blend-mode: normal;
+    z-index: 5;
+    filter: drop-shadow(0 6px 22px rgba(0, 0, 0, 0.28));
+  }
+
+  .letterOutline {
+    stroke-width: 2.05;
+    animation: splashLetterTraceMobile 860ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  }
+
+  .letterFill {
+    animation-duration: 460ms;
+    animation-delay: var(--mobile-fill-delay, 420ms);
+  }
+
+  .glyphFillWhite {
+    fill: #ffffff;
+  }
+
+  .horizonBeam,
+  .letterCrest {
+    display: none;
+  }
+
+  .glyphFillSilver,
+  .overlayHeroDocking .glyphFillSilver {
+    fill: #b8b8ba;
+    transition: none;
+  }
+
+  .wipe,
+  .overlayDocking .wipe {
+    background: transparent;
+    clip-path: none;
+    transition: none;
   }
 }
 
-@media (max-width: 768px) and (max-height: 640px) {
-  .stage,
-  .stageCrisp {
-    --wordmark-width: clamp(176px, 48vw, 214px);
-    padding: 4px 10px 0;
+@media (max-width: 768px) and (max-height: 680px) {
+  .stage {
+    --wordmark-width: clamp(162px, 43vw, 196px);
+    padding: 4px 10px 2px;
   }
 }
 

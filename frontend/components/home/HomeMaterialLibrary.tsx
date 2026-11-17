@@ -1,4 +1,5 @@
 import { RefObject } from 'react';
+import { AnimatePresence, APPLE_SPRINGS, m } from '../../lib/motion';
 import { MaterialListItem, PaginationMeta } from '../../types/material';
 import { MaterialBrowseMode, MaterialSubjectScope, useMaterialSubjects } from '../../lib/useMaterialSubjects';
 import MaterialCard from '../MaterialCard';
@@ -71,21 +72,31 @@ export default function HomeMaterialLibrary(props: Props) {
       />}
       {props.error && <p className="error-text">{props.error}</p>}
       {props.notice && !props.error && <p className="help-text">{props.notice}</p>}
-      {mode === 'subjects' || browsingFolder ? <MaterialSubjectBrowser
-        folders={browsingFolder ? subjectFolders : overviewFolders}
-        subjectId={props.subjectId} page={props.subjectPage}
-        backLabel={mode === 'materials' ? '返回搜索结果' : '全部学科'}
-        onSubjectChange={props.onSubjectChange} onPageChange={props.onSubjectPageChange}
-        gridClassName="materials-list materials-grid" renderMaterial={renderMaterial}
-      /> : <>
-        {subjects.relatedFolders.length > 0 && <section className={styles.searchFolders} aria-label="相关学科">
-          <h3>相关学科 <span>{subjects.relatedFolders.length}</span></h3>
-          <MaterialSubjectFolders folders={subjects.relatedFolders} onOpen={props.onSubjectChange} label="相关学科文件夹" />
-        </section>}
-        {!materials.length
-          ? <MaterialSearchEmpty onReset={props.onReset} onEditKeyword={props.onEditKeyword} />
-          : <ul className="materials-list materials-grid">{materials.map(renderMaterial)}</ul>}
-      </>}
+      <AnimatePresence mode="wait" initial={false}>
+        <m.div
+          key={`${mode}:${openFolder ? openFolder.id : 'root'}:${meta.page}:${props.sort}`}
+          initial={{ opacity: 0, y: 12, scale: 0.988 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          exit={{ opacity: 0, y: -8, scale: 0.992 }}
+          transition={APPLE_SPRINGS.gentle}
+        >
+          {mode === 'subjects' || browsingFolder ? <MaterialSubjectBrowser
+            folders={browsingFolder ? subjectFolders : overviewFolders}
+            subjectId={props.subjectId} page={props.subjectPage}
+            backLabel={mode === 'materials' ? '返回搜索结果' : '全部学科'}
+            onSubjectChange={props.onSubjectChange} onPageChange={props.onSubjectPageChange}
+            gridClassName="materials-list materials-grid" renderMaterial={renderMaterial}
+          /> : <>
+            {subjects.relatedFolders.length > 0 && <section className={styles.searchFolders} aria-label="相关学科">
+              <h3>相关学科 <span>{subjects.relatedFolders.length}</span></h3>
+              <MaterialSubjectFolders folders={subjects.relatedFolders} onOpen={props.onSubjectChange} label="相关学科文件夹" />
+            </section>}
+            {!materials.length
+              ? <MaterialSearchEmpty onReset={props.onReset} onEditKeyword={props.onEditKeyword} />
+              : <ul className="materials-list materials-grid">{materials.map(renderMaterial)}</ul>}
+          </>}
+        </m.div>
+      </AnimatePresence>
     </section>
   );
 }

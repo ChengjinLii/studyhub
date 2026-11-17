@@ -52,9 +52,9 @@
 }
 
 .brandZhSvg {
-  height: 24px;
+  height: 22px;
   width: auto;
-  aspect-ratio: 208 / 100;
+  aspect-ratio: 386 / 157;
   display: block;
   flex-shrink: 0;
 }
@@ -292,9 +292,12 @@
   }
 
   .brandMarkSvg,
-  .brandZhSvg,
   .brandWordmarkSvg {
     height: 21px;
+  }
+
+  .brandZhSvg {
+    height: 19px;
   }
 
   .brandDivider {

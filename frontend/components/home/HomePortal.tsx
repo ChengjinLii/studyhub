@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { ReactNode, useState } from 'react';
+import { APPLE_SPRINGS, APPLE_TAP, m, SegmentedPill } from '../../lib/motion';
 import { STUDYHUB_WORDMARK_GLYPHS, STUDYHUB_WORDMARK_VIEWBOX } from '../../lib/studyhubWordmark';
 import { HomeSubjectRank } from '../../lib/homeDiscovery';
 import { formatNumber } from '../../lib/format';
@@ -11,6 +12,7 @@ import {
 } from '../../lib/portalCanopy';
 import { materialPath } from '../../lib/slug';
 import { MaterialListItem } from '../../types/material';
+import PortalDinoHorizon from './PortalDinoHorizon';
 import styles from '../../styles/HomePortal.module.css';
 
 // Each column shows a fixed number of rows, so the first screen keeps one height.
@@ -79,7 +81,7 @@ export default function HomePortal({
   const topPopular = popularItems.slice(0, PORTAL_WHEEL_LIMIT);
   const topSubjects = subjectRanks.slice(0, PORTAL_WHEEL_LIMIT);
   const wheelEdge = (count: number) => (count > PORTAL_ROW_COUNT ? 'start' : 'both');
-  const [mobileTab, setMobileTab] = useState<'materials' | 'subjects' | 'overview'>('materials');
+  const [mobileTab, setMobileTab] = useState<'materials' | 'subjects'>('materials');
 
   return (
     <section className={styles.portal} data-home-portal="" aria-label="搜索">
@@ -98,26 +100,22 @@ export default function HomePortal({
                 <clipPath id="portal-canopy-clip">
                   <path d={PORTAL_CANOPY_FILL_PATH} />
                 </clipPath>
-                <pattern id="portal-canopy-grid" width="44" height="44" patternUnits="userSpaceOnUse">
-                  <path d="M 44 0 L 0 0 0 44" fill="none" stroke="rgba(255,255,255,0.022)" strokeWidth="1" />
-                </pattern>
                 <linearGradient id="portal-canopy-rim" x1="0%" y1="0%" x2="100%" y2="0%">
-                  <stop offset="0%" stopColor="#60a5fa" stopOpacity="0" />
-                  <stop offset="18%" stopColor="#60a5fa" stopOpacity="0.68" />
-                  <stop offset="44%" stopColor="#818cf8" stopOpacity="0.88" />
-                  <stop offset="64%" stopColor="#fcd34d" stopOpacity="0.66" />
-                  <stop offset="82%" stopColor="#38bdf8" stopOpacity="0.74" />
-                  <stop offset="100%" stopColor="#38bdf8" stopOpacity="0" />
+                  <stop offset="0%" stopColor="#94a3b8" stopOpacity="0" />
+                  <stop offset="18%" stopColor="#94a3b8" stopOpacity="0" />
+                  <stop offset="48%" stopColor="#cbd5e1" stopOpacity="0" />
+                  <stop offset="82%" stopColor="#94a3b8" stopOpacity="0" />
+                  <stop offset="100%" stopColor="#94a3b8" stopOpacity="0" />
                 </linearGradient>
-                <radialGradient id="portal-aurora-left" cx="28%" cy="89%" r="26%">
+                <radialGradient id="portal-aurora-left" cx="26%" cy="88%" r="24%">
                   <stop offset="0%" stopColor="#3b82f6" stopOpacity="0.11" />
                   <stop offset="100%" stopColor="#3b82f6" stopOpacity="0" />
                 </radialGradient>
-                <radialGradient id="portal-aurora-mid" cx="54%" cy="84%" r="24%">
+                <radialGradient id="portal-aurora-mid" cx="50%" cy="88%" r="24%">
                   <stop offset="0%" stopColor="#818cf8" stopOpacity="0.1" />
                   <stop offset="100%" stopColor="#818cf8" stopOpacity="0" />
                 </radialGradient>
-                <radialGradient id="portal-aurora-right" cx="76%" cy="87%" r="22%">
+                <radialGradient id="portal-aurora-right" cx="74%" cy="88%" r="24%">
                   <stop offset="0%" stopColor="#2dd4bf" stopOpacity="0.08" />
                   <stop offset="65%" stopColor="#f59e0b" stopOpacity="0.03" />
                   <stop offset="100%" stopColor="#2dd4bf" stopOpacity="0" />
@@ -125,11 +123,6 @@ export default function HomePortal({
               </defs>
               <g clipPath="url(#portal-canopy-clip)">
                 <rect width={PORTAL_CANOPY_VIEWBOX_WIDTH} height={PORTAL_CANOPY_VIEWBOX_HEIGHT} fill="#1a1c20" />
-                <rect
-                  width={PORTAL_CANOPY_VIEWBOX_WIDTH}
-                  height={PORTAL_CANOPY_VIEWBOX_HEIGHT}
-                  fill="url(#portal-canopy-grid)"
-                />
                 <rect
                   width={PORTAL_CANOPY_VIEWBOX_WIDTH}
                   height={PORTAL_CANOPY_VIEWBOX_HEIGHT}
@@ -151,17 +144,18 @@ export default function HomePortal({
                 d={PORTAL_CANOPY_RIM_PATH}
                 fill="none"
                 stroke="url(#portal-canopy-rim)"
-                strokeWidth="5"
+                strokeWidth="3"
                 vectorEffect="non-scaling-stroke"
               />
               <path
                 d={PORTAL_CANOPY_RIM_PATH}
                 fill="none"
                 stroke="url(#portal-canopy-rim)"
-                strokeWidth="1.6"
+                strokeWidth="1"
                 vectorEffect="non-scaling-stroke"
               />
             </svg>
+            <PortalDinoHorizon />
           </div>
 
           {/* The page heading. The opening splash lands on it, so its metrics follow the splash. */}
@@ -263,34 +257,35 @@ export default function HomePortal({
 
         <div className={styles.columns}>
           <div className={styles.mobileTabsBar} data-portal-mobile-tabs="">
-            <div className={styles.mobileTabs} role="tablist" aria-label="首屏栏目切换">
-              <button
+            <div className={styles.mobileTabs} data-motion-tabs="true" role="tablist" aria-label="首屏栏目切换">
+              <m.button
                 type="button"
                 role="tab"
                 aria-selected={mobileTab === 'materials'}
                 className={`${styles.mobileTab}${mobileTab === 'materials' ? ` ${styles.mobileTabActive}` : ''}`}
                 onClick={() => setMobileTab('materials')}
+                whileTap={APPLE_TAP.button}
+                transition={APPLE_SPRINGS.snappy}
               >
-                热门资料
-              </button>
-              <button
+                {mobileTab === 'materials' ? (
+                  <SegmentedPill layoutId="portal-mobile-tabs-pill" className={styles.mobileTabPill} />
+                ) : null}
+                <span className={styles.mobileTabLabel}>热门资料</span>
+              </m.button>
+              <m.button
                 type="button"
                 role="tab"
                 aria-selected={mobileTab === 'subjects'}
                 className={`${styles.mobileTab}${mobileTab === 'subjects' ? ` ${styles.mobileTabActive}` : ''}`}
                 onClick={() => setMobileTab('subjects')}
+                whileTap={APPLE_TAP.button}
+                transition={APPLE_SPRINGS.snappy}
               >
-                热门学科
-              </button>
-              <button
-                type="button"
-                role="tab"
-                aria-selected={mobileTab === 'overview'}
-                className={`${styles.mobileTab}${mobileTab === 'overview' ? ` ${styles.mobileTabActive}` : ''}`}
-                onClick={() => setMobileTab('overview')}
-              >
-                平台概览
-              </button>
+                {mobileTab === 'subjects' ? (
+                  <SegmentedPill layoutId="portal-mobile-tabs-pill" className={styles.mobileTabPill} />
+                ) : null}
+                <span className={styles.mobileTabLabel}>热门学科</span>
+              </m.button>
             </div>
             {mobileTab === 'materials' ? (
               <button type="button" className={styles.more} onClick={onBrowseMaterials}>
@@ -299,21 +294,14 @@ export default function HomePortal({
                   ›
                 </span>
               </button>
-            ) : mobileTab === 'subjects' ? (
+            ) : (
               <button type="button" className={styles.more} onClick={onBrowseSubjects}>
                 <span>全部学科</span>
                 <span className={styles.moreArrow} aria-hidden="true">
                   ›
                 </span>
               </button>
-            ) : onJumpToLeaderboard ? (
-              <button type="button" className={styles.more} onClick={onJumpToLeaderboard}>
-                <span>贡献榜</span>
-                <span className={styles.moreArrow} aria-hidden="true">
-                  ›
-                </span>
-              </button>
-            ) : null}
+            )}
           </div>
 
           <section
@@ -413,7 +401,6 @@ export default function HomePortal({
           {/* The overview shares the same editorial header rule and quiet numeric hierarchy. */}
           <section
             className={`${styles.column} ${styles.overview}`}
-            data-mobile-active={mobileTab === 'overview' ? 'true' : 'false'}
             aria-labelledby="portal-overview-title"
           >
             <div className={styles.columnHead}>

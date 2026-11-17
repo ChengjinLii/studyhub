@@ -8,6 +8,7 @@
 }
 
 .toggle button {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -22,12 +23,41 @@
   font-weight: 600;
   white-space: nowrap;
   cursor: pointer;
+  transition: color 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.toggleButtonContent {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+}
+
+.togglePill {
+  position: absolute;
+  inset: 0;
+  border-radius: 5px;
+  background: #fff;
+  box-shadow: 0 1px 4px rgb(30 50 80 / 10%);
+  z-index: 0;
+}
+
+.minimalToggle .togglePill {
+  border-radius: 8px;
+  box-shadow: 0 1px 2px rgba(10, 10, 10, 0.08);
 }
 
 .toggle button[aria-pressed='true'] {
   background: #fff;
   color: #244ed7;
   box-shadow: 0 1px 4px rgb(30 50 80 / 10%);
+}
+
+.toggle[data-motion-toggle='true'] button[aria-pressed='true'] {
+  background: transparent;
+  box-shadow: none;
 }
 
 .minimalToggle {
@@ -55,6 +85,11 @@
   color: var(--sh-accent-strong);
   font-weight: 600;
   box-shadow: 0 1px 2px rgba(10, 10, 10, 0.08);
+}
+
+.minimalToggle[data-motion-toggle='true'] button[aria-pressed='true'] {
+  background: transparent;
+  box-shadow: none;
 }
 
 .minimalToggle button:focus-visible {

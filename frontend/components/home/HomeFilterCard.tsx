@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { FormEvent, RefObject } from 'react';
+import { FormEvent, ReactNode, RefObject, useLayoutEffect, useRef } from 'react';
 import {
   SUPPORTED_SCHOOL,
   COURSE_CATEGORY_OPTIONS,
@@ -7,6 +7,16 @@ import {
   getCollegeOptions,
   getMajorOptionsForCollege,
 } from '../../constants/metadata';
+import {
+  animate,
+  AnimatePresence,
+  APPLE_SPRINGS,
+  APPLE_TAP,
+  m,
+  SegmentedPill,
+  usePresence,
+  useReducedMotion,
+} from '../../lib/motion';
 import minStyles from '../../styles/HomeMinimal.module.css';
 
 export interface HomeFilterState {
@@ -41,6 +51,187 @@ interface HomeFilterCardProps {
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
 }
 
+interface PopoverOrigin {
+  dx: number;
+  dy: number;
+  sx: number;
+  sy: number;
+  restRadius: string;
+}
+
+const DEFAULT_ORIGIN: PopoverOrigin = {
+  dx: 160,
+  dy: -190,
+  sx: 0.14,
+  sy: 0.18,
+  restRadius: '22px',
+};
+
+function AdvancedFilterPopover({
+  triggerRef,
+  children,
+}: {
+  triggerRef: RefObject<HTMLButtonElement>;
+  children: ReactNode;
+}) {
+  const cardRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
+  const originRef = useRef<PopoverOrigin>(DEFAULT_ORIGIN);
+  const animsRef = useRef<Array<{ stop: () => void }>>([]);
+  const [isPresent, safeToRemove] = usePresence();
+  const prefersReducedMotion = useReducedMotion();
+
+  useLayoutEffect(() => {
+    const card = cardRef.current;
+    const content = contentRef.current;
+    if (!card || !content) return;
+
+    const stopAll = () => {
+      animsRef.current.forEach((ctrl) => ctrl.stop());
+      animsRef.current = [];
+    };
+
+    const measureOrigin = (): PopoverOrigin => {
+      const trigger = triggerRef.current;
+      if (!trigger) return originRef.current;
+      const prevTransform = card.style.transform;
+      card.style.transform = '';
+      const panelRect = card.getBoundingClientRect();
+      const triggerRect = trigger.getBoundingClientRect();
+      const restRadius = window.getComputedStyle(card).borderRadius || '22px';
+      card.style.transform = prevTransform;
+      if (!panelRect.width || !panelRect.height || !triggerRect.width || !triggerRect.height) {
+        return originRef.current;
+      }
+      const dx =
+        triggerRect.left + triggerRect.width / 2 - (panelRect.left + panelRect.width / 2);
+      const dy =
+        triggerRect.top + triggerRect.height / 2 - (panelRect.top + panelRect.height / 2);
+      const sx = Math.min(0.45, Math.max(0.08, triggerRect.width / panelRect.width));
+      const sy = Math.min(0.45, Math.max(0.12, triggerRect.height / panelRect.height));
+      return { dx, dy, sx, sy, restRadius };
+    };
+
+    stopAll();
+
+    if (prefersReducedMotion) {
+      if (isPresent) {
+        card.style.opacity = '1';
+        card.style.transform = '';
+        content.style.opacity = '1';
+        content.style.transform = '';
+      } else {
+        safeToRemove();
+      }
+      return stopAll;
+    }
+
+    if (isPresent) {
+      const origin = measureOrigin();
+      originRef.current = origin;
+      const { dx, dy, sx, sy, restRadius } = origin;
+
+      const cardCtrl = animate(
+        card,
+        {
+          x: [dx, dx * 0.36, -dx * 0.025, dx * 0.008, 0],
+          y: [dy, dy * 0.24, 6, -2, 0],
+          scaleX: [sx, sx + (1 - sx) * 0.42, 1.022, 0.994, 1],
+          scaleY: [sy, sy + (1 - sy) * 0.6, 1.032, 0.992, 1],
+          opacity: [0, 1, 1, 1, 1],
+          borderRadius: ['999px', '42px', restRadius, restRadius, restRadius],
+        },
+        {
+          duration: 0.52,
+          times: [0, 0.16, 0.56, 0.8, 1],
+          ease: [
+            [0.2, 0.9, 0.3, 1],
+            [0.16, 1, 0.3, 1],
+            [0.33, 1, 0.68, 1],
+            [0.22, 1, 0.36, 1],
+          ],
+          onComplete: () => {
+            card.style.transform = '';
+            card.style.opacity = '1';
+            card.style.borderRadius = '';
+          },
+        }
+      );
+
+      const contentCtrl = animate(
+        content,
+        {
+          opacity: [0, 0, 1, 1],
+          y: [-6, -6, 1, 0],
+          scale: [0.96, 0.96, 1.004, 1],
+        },
+        {
+          duration: 0.44,
+          times: [0, 0.22, 0.68, 1],
+          ease: ['linear', [0.16, 1, 0.3, 1], [0.22, 1, 0.36, 1]],
+          onComplete: () => {
+            content.style.transform = '';
+            content.style.opacity = '1';
+          },
+        }
+      );
+
+      animsRef.current = [cardCtrl, contentCtrl];
+    } else {
+      const origin = measureOrigin();
+      originRef.current = origin;
+      const { dx, dy, sx, sy, restRadius } = origin;
+
+      const contentExitCtrl = animate(
+        content,
+        { opacity: 0, y: -4, scale: 0.96 },
+        { duration: 0.1, ease: [0.4, 0, 1, 1] }
+      );
+
+      const cardExitCtrl = animate(
+        card,
+        {
+          x: [0, dx * 0.26, dx],
+          y: [0, dy * 0.2, dy],
+          scaleX: [1, 1 - (1 - sx) * 0.35, sx],
+          scaleY: [1, 1 - (1 - sy) * 0.24, sy],
+          opacity: [1, 0.94, 0],
+          borderRadius: [restRadius, '40px', '999px'],
+        },
+        {
+          duration: 0.26,
+          times: [0, 0.38, 1],
+          ease: [
+            [0.4, 0, 1, 1],
+            [0.22, 1, 0.36, 1],
+          ],
+          onComplete: () => {
+            safeToRemove();
+          },
+        }
+      );
+
+      animsRef.current = [contentExitCtrl, cardExitCtrl];
+    }
+
+    return stopAll;
+  }, [isPresent, prefersReducedMotion, safeToRemove, triggerRef]);
+
+  return (
+    <div className={minStyles.advancedPanel}>
+      <div
+        ref={cardRef}
+        className={minStyles.advancedPanelCard}
+        style={{ opacity: prefersReducedMotion ? 1 : 0 }}
+      >
+        <div ref={contentRef} className={minStyles.advancedPanelContent}>
+          {children}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function HomeFilterCard({
   className,
   filterRef,
@@ -53,6 +244,7 @@ export default function HomeFilterCard({
   onResetFilters,
   onSubmit,
 }: HomeFilterCardProps) {
+  const filterTriggerRef = useRef<HTMLButtonElement>(null);
   const collegeOptions = getCollegeOptions(filtersState.college);
   const majorOptions = getMajorOptionsForCollege(filtersState.college, filtersState.major);
   const activeFilterCount = [
@@ -102,10 +294,13 @@ export default function HomeFilterCard({
             onChange={(event) => onFilterChange('keyword', event.target.value)}
             placeholder="课程名 / 知识点 / 资料类型"
           />
-          <button
+          <m.button
+            ref={filterTriggerRef}
             type="button"
             className={`${minStyles.filterTrigger}${showAdvanced || activeFilterCount > 0 ? ` ${minStyles.filterTriggerActive}` : ''}`}
             onClick={onToggleAdvancedFilters}
+            whileTap={APPLE_TAP.button}
+            transition={APPLE_SPRINGS.snappy}
             aria-expanded={showAdvanced}
             aria-label={
               activeFilterCount > 0
@@ -118,11 +313,18 @@ export default function HomeFilterCard({
             </svg>
             <span>高级筛选</span>
             {activeFilterCount > 0 ? (
-              <span className={minStyles.filterCountBadge} aria-hidden="true">
+              <m.span
+                key={activeFilterCount}
+                className={minStyles.filterCountBadge}
+                initial={{ scale: 0.7, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                transition={APPLE_SPRINGS.bouncy}
+                aria-hidden="true"
+              >
                 {activeFilterCount}
-              </span>
+              </m.span>
             ) : null}
-          </button>
+          </m.button>
           {/* The search button closes the box, at the right of the filter trigger. */}
           <button
             className={`${minStyles.searchGo}${hasKeyword ? ` ${minStyles.searchGoReady}` : ''}`}
@@ -167,8 +369,9 @@ export default function HomeFilterCard({
         </div>
 
         {/* The filters open over the content below the box, so the first screen keeps its layout. */}
+        <AnimatePresence initial={false}>
         {showAdvanced ? (
-          <div className={minStyles.advancedPanel}>
+          <AdvancedFilterPopover key="home-advanced-filter-panel" triggerRef={filterTriggerRef}>
             <div className={minStyles.advancedSelects}>
               <div className={minStyles.selectField}>
                 <label htmlFor="school">学校</label>
@@ -256,7 +459,7 @@ export default function HomeFilterCard({
             </div>
 
             <div className={minStyles.choiceRow}>
-              <fieldset className={minStyles.choiceFieldset}>
+              <fieldset className={minStyles.choiceFieldset} data-motion-pills="true">
                 <legend className={minStyles.choiceLegend}>课程类型</legend>
                 <label
                   className={`${minStyles.choicePill}${!filtersState.courseCategory ? ` ${minStyles.choicePillActive}` : ''}`}
@@ -268,7 +471,10 @@ export default function HomeFilterCard({
                     checked={!filtersState.courseCategory}
                     onChange={() => onCourseCategoryChange(null)}
                   />
-                  全部
+                  {!filtersState.courseCategory ? (
+                    <SegmentedPill layoutId="home-filter-course-pill" className={minStyles.choicePillHighlight} />
+                  ) : null}
+                  <span className={minStyles.choicePillText}>全部</span>
                 </label>
                 {COURSE_CATEGORY_OPTIONS.map((option) => (
                   <label
@@ -282,59 +488,49 @@ export default function HomeFilterCard({
                       checked={filtersState.courseCategory === option.value}
                       onChange={() => onCourseCategoryChange(option.value)}
                     />
-                    {option.label}
+                    {filtersState.courseCategory === option.value ? (
+                      <SegmentedPill layoutId="home-filter-course-pill" className={minStyles.choicePillHighlight} />
+                    ) : null}
+                    <span className={minStyles.choicePillText}>{option.label}</span>
                   </label>
                 ))}
               </fieldset>
             </div>
 
             <div className={minStyles.choiceRow}>
-              <fieldset className={minStyles.choiceFieldset}>
+              <fieldset className={minStyles.choiceFieldset} data-motion-pills="true">
                 <legend className={minStyles.choiceLegend}>价格</legend>
-                <label
-                  className={`${minStyles.choicePill}${!filtersState.price || filtersState.price === 'all' ? ` ${minStyles.choicePillActive}` : ''}`}
-                >
-                  <input
-                    type="radio"
-                    name="price"
-                    value=""
-                    checked={!filtersState.price || filtersState.price === 'all'}
-                    onChange={(event) => onFilterChange('price', event.target.value)}
-                  />
-                  全部
-                </label>
-                <label
-                  className={`${minStyles.choicePill}${filtersState.price === 'free' ? ` ${minStyles.choicePillActive}` : ''}`}
-                >
-                  <input
-                    type="radio"
-                    name="price"
-                    value="free"
-                    checked={filtersState.price === 'free'}
-                    onChange={(event) => onFilterChange('price', event.target.value)}
-                  />
-                  免费
-                </label>
-                <label
-                  className={`${minStyles.choicePill}${filtersState.price === 'paid' ? ` ${minStyles.choicePillActive}` : ''}`}
-                >
-                  <input
-                    type="radio"
-                    name="price"
-                    value="paid"
-                    checked={filtersState.price === 'paid'}
-                    onChange={(event) => onFilterChange('price', event.target.value)}
-                  />
-                  付费
-                </label>
+                {[
+                  { value: '', label: '全部', active: !filtersState.price || filtersState.price === 'all' },
+                  { value: 'free', label: '免费', active: filtersState.price === 'free' },
+                  { value: 'paid', label: '付费', active: filtersState.price === 'paid' },
+                ].map((priceOption) => (
+                  <label
+                    key={priceOption.value || 'all'}
+                    className={`${minStyles.choicePill}${priceOption.active ? ` ${minStyles.choicePillActive}` : ''}`}
+                  >
+                    <input
+                      type="radio"
+                      name="price"
+                      value={priceOption.value}
+                      checked={priceOption.active}
+                      onChange={(event) => onFilterChange('price', event.target.value)}
+                    />
+                    {priceOption.active ? (
+                      <SegmentedPill layoutId="home-filter-price-pill" className={minStyles.choicePillHighlight} />
+                    ) : null}
+                    <span className={minStyles.choicePillText}>{priceOption.label}</span>
+                  </label>
+                ))}
               </fieldset>
 
               <button type="button" className={minStyles.resetLink} onClick={onResetFilters}>
                 重置条件
               </button>
             </div>
-          </div>
+          </AdvancedFilterPopover>
         ) : null}
+        </AnimatePresence>
 
         <div className={minStyles.searchActions}>
           <Link className={minStyles.searchAction} href="/join" prefetch={false}>

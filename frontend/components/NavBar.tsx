@@ -50,6 +50,7 @@ export default function NavBar({ user }: NavBarProps) {
     user || !router.asPath ? '/login' : `/login?next=${encodeURIComponent(router.asPath)}`;
   const displayName = (user?.nickname || user?.username || '用户').trim();
   const shortName = truncateUserName(displayName, 12);
+  const isHomePortal = router.pathname === '/';
   const isStaff = Boolean(
     user && (hasRole(user.roleMask, RoleMask.ADMIN) || hasRole(user.roleMask, RoleMask.DEVELOPER))
   );
@@ -171,7 +172,11 @@ export default function NavBar({ user }: NavBarProps) {
   ];
 
   return (
-    <header className={styles.header} data-scrolled={scrolledPastCanopy ? 'true' : 'false'}>
+    <header
+      className={styles.header}
+      data-scrolled={scrolledPastCanopy ? 'true' : 'false'}
+      data-home-portal-header={isHomePortal ? 'true' : undefined}
+    >
       <div className={styles.inner}>
         <div className={styles.brandWrap} data-navbar-brand="">
           <h1 className={styles.siteHeading}>

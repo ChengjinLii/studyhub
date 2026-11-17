@@ -4,6 +4,7 @@ import dynamic from 'next/dynamic';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
 import NavBar from '../components/NavBar';
+import { animate } from '../lib/motion';
 import AppImage from '../components/AppImage';
 import MaterialIconSprite from '../components/MaterialIconSprite';
 import HomeFilterCard from '../components/home/HomeFilterCard';
@@ -73,17 +74,61 @@ const clearHomeRevealVars = () => {
 let homeContentOpened = false;
 type HomeRevealMotion = 'rise' | 'none';
 
-/** Scrolls the content under the first screen up to the navbar. */
+let activeHomeGlideStop: (() => void) | null = null;
+
+/** Scrolls the content under the first screen up to the navbar with an interruptible spring. */
 const glideToHomeContent = () => {
   const content = document.getElementById('home-content');
   if (!content) return;
   const headerHeight =
     window.innerWidth <= HOME_PHONE_MAX_WIDTH ? HOME_MOBILE_NAVBAR_HEIGHT : HOME_NAVBAR_HEIGHT;
+  const targetY = Math.max(0, window.scrollY + content.getBoundingClientRect().top - headerHeight);
+  if (activeHomeGlideStop) {
+    activeHomeGlideStop();
+    activeHomeGlideStop = null;
+  }
   const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  window.scrollTo({
-    top: window.scrollY + content.getBoundingClientRect().top - headerHeight,
-    behavior: reduceMotion ? 'auto' : 'smooth',
+  if (reduceMotion || Math.abs(targetY - window.scrollY) < 2) {
+    window.scrollTo(0, targetY);
+    return;
+  }
+  let stopped = false;
+  const cleanup = () => {
+    window.removeEventListener('wheel', interrupt);
+    window.removeEventListener('touchstart', interrupt);
+    window.removeEventListener('keydown', onKeyInterrupt);
+  };
+  const controls = animate(window.scrollY, targetY, {
+    type: 'spring',
+    stiffness: 195,
+    damping: 28,
+    mass: 1,
+    restDelta: 0.5,
+    onUpdate: (latest) => {
+      if (!stopped) window.scrollTo(0, latest);
+    },
+    onComplete: () => {
+      cleanup();
+      if (activeHomeGlideStop === stop) activeHomeGlideStop = null;
+    },
   });
+  const stop = () => {
+    if (stopped) return;
+    stopped = true;
+    controls.stop();
+    cleanup();
+    if (activeHomeGlideStop === stop) activeHomeGlideStop = null;
+  };
+  const interrupt = () => stop();
+  const onKeyInterrupt = (event: KeyboardEvent) => {
+    if (['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End', ' '].includes(event.key)) {
+      stop();
+    }
+  };
+  activeHomeGlideStop = stop;
+  window.addEventListener('wheel', interrupt, { passive: true });
+  window.addEventListener('touchstart', interrupt, { passive: true });
+  window.addEventListener('keydown', onKeyInterrupt, { passive: true });
 };
 
 const HomeLeaderboard = dynamic(() => import('../components/home/HomeLeaderboard'));

@@ -2,6 +2,7 @@ import type { AppProps } from 'next/app';
 import dynamic from 'next/dynamic';
 import Head from 'next/head';
 import Link from 'next/link';
+import { useRouter } from 'next/router';
 import { ReactNode, useEffect, useState } from 'react';
 import { fetchBackend } from '../lib/apiBase';
 import '../styles/globals.css';
@@ -21,6 +22,7 @@ import { brandFont, wordmarkFont } from '../lib/brandFont';
 import { AppDialogProvider } from '../components/AppDialogProvider';
 import { AppToastProvider } from '../components/AppToastProvider';
 import { SessionProvider } from '../components/SessionProvider';
+import { MotionProvider } from '../lib/motion';
 import BottomTabBar from '../components/mobile/BottomTabBar';
 import PwaInstall from '../components/pwa/PwaInstall';
 import { MobileBottomBarProvider } from '../components/mobile/MobileBottomBarProvider';
@@ -77,17 +79,20 @@ function AppProviders({
   initialUser?: SessionUser | null;
 }) {
   return (
-    <SessionProvider initialUser={initialUser}>
-      <AppToastProvider>
-        <AppDialogProvider>
-          <MobileBottomBarProvider>{children}</MobileBottomBarProvider>
-        </AppDialogProvider>
-      </AppToastProvider>
-    </SessionProvider>
+    <MotionProvider>
+      <SessionProvider initialUser={initialUser}>
+        <AppToastProvider>
+          <AppDialogProvider>
+            <MobileBottomBarProvider>{children}</MobileBottomBarProvider>
+          </AppDialogProvider>
+        </AppToastProvider>
+      </SessionProvider>
+    </MotionProvider>
   );
 }
 
 export default function MyApp({ Component, pageProps }: AppProps) {
+  const router = useRouter();
   const [runtimeInfo, setRuntimeInfo] = useState<RuntimeInfo | null>(null);
   const [globalChromeReady, setGlobalChromeReady] = useState(false);
 
@@ -209,7 +214,10 @@ export default function MyApp({ Component, pageProps }: AppProps) {
         <link rel="apple-touch-icon" href="/icons/bot-apple-touch-icon-v3.png" />
       </Head>
       <AppProviders initialUser={initialSessionUser}>
-      <div className={`page-with-footer ${brandFont.variable} ${wordmarkFont.variable}`}>
+      <div
+        className={`page-with-footer ${brandFont.variable} ${wordmarkFont.variable}`}
+        data-home-route={router.pathname === '/' ? 'true' : undefined}
+      >
         <OpeningSplash />
         <GlobalInteractiveChrome ready={globalChromeReady} />
         {showLocalDevBadge && <div className="runtime-environment-badge">{localDevLabel}</div>}

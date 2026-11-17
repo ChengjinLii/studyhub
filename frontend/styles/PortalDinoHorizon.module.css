@@ -1,0 +1,37 @@
+/* Chrome-Dino-inspired monochrome terrain seam and ambient horizon runner
+   anchored cleanly on the dark-to-light horizon inside .canopy. */
+.horizonLayer {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 44px;
+  height: 68px;
+  pointer-events: none;
+  z-index: 1;
+  opacity: 1;
+  transition: opacity 460ms ease 80ms;
+}
+
+.horizonCanvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+:global(html[data-splash-state='playing']) .horizonLayer,
+:global(html[data-splash-state='docking']) .horizonLayer {
+  opacity: 0;
+  transition: none;
+}
+
+@media (max-width: 768px) {
+  .horizonLayer {
+    bottom: 15px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .horizonLayer {
+    transition: none;
+  }
+}

@@ -56,7 +56,7 @@ describe('brand wordmark', () => {
     expect(wordmarkModule).toContain("STUDYHUB_WORDMARK_VIEWBOX = '0 0 844 160'");
     expect(wordmarkModule).toContain("STUDYHUB_WORDMARK_H_COLOR = '#b8b8ba'");
     expect(wordmarkModule).toContain("STUDYHUB_RIBBON_MARK_VIEWBOX = '236 278 572 518'");
-    expect(wordmarkModule).toContain("STUDYHUB_ZH_LOGOTYPE_VIEWBOX = '0 0 208 100'");
+    expect(wordmarkModule).toContain("STUDYHUB_ZH_LOGOTYPE_VIEWBOX = '0 0 386 157'");
     expect(wordmarkSvg).toContain('viewBox="0 0 844 160"');
     expect(wordmarkSvg).toContain('fill="#ffffff"');
     expect(wordmarkSvg).toContain('fill="#b8b8ba"');
@@ -655,7 +655,8 @@ describe('opening splash: dark intro and landing', () => {
     const body = source.slice(start, source.indexOf('}, []);', start));
     const hero = body.slice(0, body.indexOf('// Elsewhere'));
 
-    expect(hero).toContain('heroRect.top >= NAVBAR_HEIGHT');
+    expect(hero).toContain('NAVBAR_HEIGHT');
+    expect(hero).toContain('heroRect.top >= minHeroTop');
     expect(hero).toContain('heroRect.bottom <= window.innerHeight');
     expect(hero).toMatch(/scale\(1\)`, onHero: true/);
   });
@@ -911,9 +912,9 @@ describe('search pill styling, portal spacing, and home UI polish', () => {
     expect(pillRule).toContain('border: 2px solid #c4ccd9;');
     expect(pillRule).toContain('padding: 0 7px 0 21px;');
     expect(getRule(minimal, '\n.searchActions {')).toContain('margin-top: 30px;');
-    expect(getRule(minimal, '\n.advancedPanel {')).toContain('top: 136px;');
+    expect(getRule(minimal, '\n.advancedPanel {')).toContain('top: 166px;');
     expect(getRule(portal, '\n.search {')).toContain('margin-top: 18px;');
-    expect(getRule(portal, '\n.columns {\n  width:')).toContain('margin-top: 54px;');
+    expect(getRule(portal, '\n.columns {\n  width:')).toContain('margin-top: 56px;');
   });
 
   it('styles the navbar GitHub star in golden yellow with hover twinkle effects and live visibility refresh', () => {
@@ -1060,13 +1061,15 @@ describe('search pill styling, portal spacing, and home UI polish', () => {
     const githubNav = navbar.slice(navbar.indexOf('styles.githubNavLink'), navbar.indexOf('</nav>'));
 
     expect(canopy).toContain('PORTAL_CANOPY_CENTER_Y = 678');
+    expect(canopy).toContain("PORTAL_CANOPY_RIM_PATH = 'M 0,678 L 1440,678'");
+    expect(canopy).not.toContain(' C ');
     expect(canopy).toContain('PORTAL_CANOPY_RIM_PATH');
     expect(portal).toContain('data-portal-canopy=""');
     expect(portal).toContain('data-portal-canopy-wave=""');
     expect(portal).toContain('fill="#1a1c20"');
     expect(portal).toContain('portal-canopy-rim');
     expect(portalCss).toContain('background: #1a1c20;');
-    expect(canopyRule).toContain('bottom: -156px;');
+    expect(canopyRule).toContain('bottom: -172px;');
     expect(canopyWaveRule).toContain('height: 736px;');
     expect(wordmarkSvgRule).toContain('aspect-ratio: 844 / 160;');
     expect(glyphWhiteRule).toContain('fill: #ffffff;');
@@ -1082,14 +1085,20 @@ describe('search pill styling, portal spacing, and home UI polish', () => {
 
     expect(splash).toContain('styles.overlayHeroDocking');
     expect(splash).toContain('data-splash-taiji=""');
-    expect(splash).toContain('styles.taijiCircleRim');
+    expect(splash).toContain('data-splash-fx=""');
+    expect(splash).toContain('styles.fxCanvas');
+    expect(splash).toContain('styles.prismGhostCyan');
+    expect(splash).toContain('styles.prismGhostViolet');
+    expect(splash).toContain('WarpStreak');
+    expect(splash).toContain('BlastSpark');
+    expect(splash).not.toContain('drawChargeUpFrame');
     expect(splash).toContain('fill="#1a1c20"');
-    expect(splash).toContain('styles.stageCrisp');
     expect(splash).toContain('measureCanopyVars');
+    expect(splash).not.toContain('taijiCircleRim');
     expect(splashCss).toContain('background: #1a1c20;');
-    expect(splashCss).toContain('rotate(-180deg)');
-    expect(splashCss).toContain('rotate(0deg)');
-    expect(splashCss).toContain('.overlayHeroDocking .taijiCircleRim {');
+    expect(splashCss).toContain('@keyframes splashLockupDetonate');
+    expect(splashCss).toContain('@keyframes splashPrismSplitCyan');
+    expect(splashCss).not.toContain('rotate(-180deg)');
   });
 
   it('places a static embossed white-porcelain 1st-anniversary seal beside the search actions as a right-side counterweight', () => {
@@ -1163,8 +1172,9 @@ describe('search pill styling, portal spacing, and home UI polish', () => {
     expect(app).toContain('footerStyles.brandWordmarkSvg');
     expect(app).toContain('>学汇<');
     expect(app).toContain('>StudyHub<');
+    expect(wordmarks).toContain("STUDYHUB_ZH_LOGOTYPE_VIEWBOX = '0 0 386 157'");
     expect(footerCss).toContain('.brandDivider {');
-    expect(footerCss).toContain('aspect-ratio: 208 / 100;');
+    expect(footerCss).toContain('aspect-ratio: 386 / 157;');
   });
 
   it('keeps the HomePortal as the first screen on phones and compact displays while closing content below until scroll', () => {
@@ -1181,5 +1191,97 @@ describe('search pill styling, portal spacing, and home UI polish', () => {
     expect(splashCss).not.toContain('.taijiRotor,\n  .taijiCircleRim,\n  .stageCrispWrap {\n    display: none;');
     expect(indexTsx).not.toContain('if (window.innerWidth <= HOME_PHONE_MAX_WIDTH) {\n      if (!contentRevealed) revealContent();');
     expect(globalsCss).toContain('.home-page .home-desktop-library {\n    display: grid;');
+  });
+
+  it('eliminates splash H dock flicker, mobile splash guide lines, mobile search orb clipping glitches, and keeps mobile overview always visible', () => {
+    const splashTsx = readSource('components/OpeningSplash.tsx');
+    const splashCss = readSource('styles/OpeningSplash.module.css');
+    const portalTsx = readSource('components/home/HomePortal.tsx');
+    const portalCss = readSource('styles/HomePortal.module.css');
+    const minimalCss = readSource('styles/HomeMinimal.module.css');
+
+    expect(splashTsx).toContain('y={-16}');
+    expect(splashTsx).toContain('--canopy-height');
+    expect(splashTsx).toContain('--canopy-horizon-y');
+    expect(splashTsx).toContain('splash-wordmark-sheen-clip');
+    expect(splashTsx).toContain("glyph.tone !== 'silver'");
+    expect(splashTsx).not.toContain('splash-taiji-grid');
+
+    expect(splashCss).toContain('.overlayHeroDocking .glyphFillSilver {\n  fill: #b8b8ba;\n  transition: fill 280ms ease;\n}');
+    expect(splashCss).toContain('.overlayHeroDocking .stage {\n  z-index: 5;\n  mix-blend-mode: normal;');
+    expect(splashCss).toContain('transition: fill 240ms ease 180ms;');
+    expect(splashCss).not.toContain('48px 48px');
+    expect(splashCss).not.toContain('.stageCrisp');
+    const splashMobile = splashCss.slice(splashCss.indexOf('@media (max-width: 768px) {'));
+    expect(splashMobile).toContain('.horizonBeam,\n  .letterCrest {\n    display: none;\n  }');
+    expect(splashMobile).toContain('splashLetterTraceMobile');
+    expect(splashMobile).toContain('clip-path: none;');
+    expect(splashMobile).toContain('mix-blend-mode: normal;');
+
+    expect(portalTsx).not.toContain('portal-canopy-grid');
+    expect(portalTsx).toContain("useState<'materials' | 'subjects'>('materials')");
+    const portalOverviewStart = portalTsx.indexOf('aria-labelledby="portal-overview-title"');
+    expect(portalTsx.slice(portalOverviewStart - 120, portalOverviewStart + 50)).not.toContain('data-mobile-active');
+
+    const portalMobile = portalCss.slice(portalCss.indexOf('@media (max-width: 768px) {'));
+    expect(portalMobile).toContain('height: 368px;');
+    expect(portalMobile).toContain('.overview .columnHead {\n    display: flex;');
+    expect(portalMobile).toContain('grid-template-columns: repeat(4, minmax(0, 1fr));');
+
+    const minimalMobile = minimalCss.slice(minimalCss.indexOf('@media (max-width: 768px) {\n  :global([data-home-portal]) .searchPill'));
+    expect(minimalMobile).toContain('width: 36px;');
+    expect(minimalMobile).toContain('backdrop-filter: none;');
+  });
+
+  it('integrates an understated auto-playing Chrome-Dino horizon runner on the lowered divider', () => {
+    const portalTsx = readSource('components/home/HomePortal.tsx');
+    const portalCss = readSource('styles/HomePortal.module.css');
+    const minimalCss = readSource('styles/HomeMinimal.module.css');
+    const dinoTsx = readSource('components/home/PortalDinoHorizon.tsx');
+    const dinoCss = readSource('styles/PortalDinoHorizon.module.css');
+    const splashTsx = readSource('components/OpeningSplash.tsx');
+
+    expect(portalTsx).toContain('<PortalDinoHorizon />');
+    expect(dinoTsx).toContain('data-portal-dino-horizon=""');
+    expect(dinoTsx).toContain('aria-hidden="true"');
+    expect(dinoTsx).toContain("fillStyle = '#ffffff'");
+    expect(dinoTsx).not.toContain('TERRAIN_TILE');
+    expect(dinoTsx).not.toContain('CLOUD_SPRITE');
+    expect(dinoTsx).toContain('prefers-reduced-motion: reduce');
+    expect(dinoTsx).toContain('pointerdown');
+    expect(dinoTsx).not.toContain('GAME OVER');
+
+    expect(dinoCss).toContain('pointer-events: none;');
+    expect(dinoCss).toContain('bottom: 44px;');
+    expect(dinoCss).toContain('bottom: 15px;');
+    expect(dinoCss).toContain("html[data-splash-state='playing']");
+
+    expect(portalCss).toContain('bottom: -172px;');
+    expect(portalCss).toContain('bottom: -121px;');
+    expect(portalCss).toContain('top: 136px;');
+    expect(minimalCss).toContain('margin-top: 70px;');
+    expect(minimalCss).toContain('margin-top: 52px;');
+    expect(splashTsx).toContain('waveHeight - 172');
+  });
+
+  it('keeps home canvases and styles compatible with Chrome 97 / Android WebView (no roundRect, ellipse, unguarded :has, or bare svh)', () => {
+    const dinoTsx = readSource('components/home/PortalDinoHorizon.tsx');
+    const splashTsx = readSource('components/OpeningSplash.tsx');
+    const navbarTsx = readSource('components/NavBar.tsx');
+    const headerCss = readSource('styles/AnimateHeader.module.css');
+    const portalCss = readSource('styles/HomePortal.module.css');
+
+    expect(dinoTsx).not.toContain('.roundRect(');
+    expect(dinoTsx).not.toContain('.ellipse(');
+    expect(splashTsx).not.toContain('.roundRect(');
+    expect(splashTsx).not.toContain('.ellipse(');
+
+    expect(navbarTsx).toContain('data-home-portal-header');
+    expect(headerCss).toContain(".header[data-home-portal-header='true']:not([data-scrolled='true']) {");
+
+    expect(portalCss).toContain('padding: clamp(4px, 1.2vh, 12px) 16px 10px;');
+    expect(portalCss).toContain('margin-top: clamp(12px, 2vh, 22px);');
+    expect(portalCss).toContain('margin-top: clamp(12px, 2vh, 18px);');
+    expect(portalCss).toContain('padding-top: clamp(8px, 1.4vh, 14px);');
   });
 });
