@@ -39,6 +39,7 @@ const closeEntryModalIfPresent = async (page: Page) => {
   const splashOverlay = page.locator('[data-splash-overlay]').first();
   if (await splashOverlay.isVisible().catch(() => false)) {
     await splashOverlay.click({ force: true });
+    await expect(splashOverlay).toBeHidden({ timeout: 5000 });
   }
 };
 
@@ -142,7 +143,7 @@ test('mock API mode covers payment status fallback envelope', async ({ page }) =
 });
 
 
-test('mobile StudyHub Bot stays fully above the bottom navigation', async ({ page }) => {
+test('StudyHub Bot hides on mobile viewports while bottom navigation remains visible', async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 780 });
   await page.addInitScript(() => window.localStorage.removeItem('floating-sidebar-pos-v2'));
   await page.goto('/more');
@@ -150,20 +151,17 @@ test('mobile StudyHub Bot stays fully above the bottom navigation', async ({ pag
 
   const bot = page.locator('.floating-sidebar__bubble');
   const navigation = page.locator('.mobile-bottom-nav');
-  await expect(bot).toBeVisible();
+  await expect(bot).toHaveCount(0);
   await expect(navigation).toBeVisible();
 
-  const botBox = await bot.boundingBox();
   const navigationBox = await navigation.boundingBox();
-  expect(botBox).not.toBeNull();
   expect(navigationBox).not.toBeNull();
-  expect((botBox?.y ?? 0) + (botBox?.height ?? 0)).toBeLessThanOrEqual((navigationBox?.y ?? 0) - 8);
-  expect(botBox?.x ?? -1).toBeGreaterThanOrEqual(0);
-  expect((botBox?.x ?? 0) + (botBox?.width ?? 0)).toBeLessThanOrEqual(320);
+  expect(navigationBox?.x ?? -1).toBeGreaterThanOrEqual(0);
+  expect((navigationBox?.x ?? 0) + (navigationBox?.width ?? 0)).toBeLessThanOrEqual(320);
 });
 
 test('administrator speech queue advances, remembers dismissal, and shows updated messages', async ({ page }) => {
-  await page.setViewportSize({ width: 390, height: 844 });
+  await page.setViewportSize({ width: 1024, height: 844 });
   await page.addInitScript(() => {
     window.localStorage.removeItem('floating-sidebar-pos-v2');
     // Init scripts also run on reload; keep the dismissal record we are testing.
@@ -209,7 +207,7 @@ test('administrator speech queue advances, remembers dismissal, and shows update
   const bubbleBox = await bubble.boundingBox();
   expect(bubbleBox).not.toBeNull();
   expect(bubbleBox?.x ?? -1).toBeGreaterThanOrEqual(0);
-  expect((bubbleBox?.x ?? 0) + (bubbleBox?.width ?? 0)).toBeLessThanOrEqual(390);
+  expect((bubbleBox?.x ?? 0) + (bubbleBox?.width ?? 0)).toBeLessThanOrEqual(1024);
 
   await page.getByRole('button', { name: '关闭宠物对话气泡' }).click();
   await expect(bubble).toHaveCount(0);
@@ -246,36 +244,31 @@ test('mobile detail actions reuse the global bottom navigation layer', async ({ 
 
   const bot = page.locator('.floating-sidebar__bubble');
   const navigation = page.locator('.mobile-bottom-nav--detail');
-  await expect(bot).toBeVisible();
+  await expect(bot).toHaveCount(0);
   await expect(navigation).toBeVisible();
   await expect(page.locator('.mobile-detail-action-bar')).toHaveCount(0);
   await page.waitForTimeout(100);
 
-  const botBox = await bot.boundingBox();
   const navigationBox = await navigation.boundingBox();
-  expect(botBox).not.toBeNull();
   expect(navigationBox).not.toBeNull();
-  expect((botBox?.y ?? 0) + (botBox?.height ?? 0)).toBeLessThanOrEqual((navigationBox?.y ?? 0) - 8);
   expect(navigationBox?.x ?? -1).toBeGreaterThanOrEqual(0);
   expect((navigationBox?.x ?? 0) + (navigationBox?.width ?? 0)).toBeLessThanOrEqual(320);
 });
 
-test('mobile login presents the form before the supporting introduction', async ({ page }) => {
+test('login presents the centered auth card without the introductory aside', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/login');
 
   const loginCard = page.locator('.login-card');
-  const loginAside = page.locator('.login-aside');
   await expect(loginCard).toBeVisible();
-  await expect(loginAside).toBeVisible();
+  await expect(page.locator('.login-aside')).toHaveCount(0);
   await expect(page.locator('.mobile-bottom-nav')).toHaveCount(0);
-  await expect(page.locator('.floating-sidebar')).toHaveCount(0);
+  await expect(page.locator('.floating-sidebar__bubble')).toHaveCount(0);
 
   const loginBox = await loginCard.boundingBox();
-  const asideBox = await loginAside.boundingBox();
   expect(loginBox).not.toBeNull();
-  expect(asideBox).not.toBeNull();
-  expect(loginBox?.y ?? Number.POSITIVE_INFINITY).toBeLessThan(asideBox?.y ?? 0);
+  const centerX = (loginBox?.x ?? 0) + (loginBox?.width ?? 0) / 2;
+  expect(Math.abs(centerX - 195)).toBeLessThanOrEqual(4);
 });
 
 test('mobile discovery controls provide comfortable touch targets', async ({ page }) => {
@@ -295,10 +288,10 @@ test('mobile discovery controls provide comfortable touch targets', async ({ pag
 
   await page.goto('/');
   await closeEntryModalIfPresent(page);
-  const moreLink = page.locator('.mobile-section-head a').first();
-  await expect(moreLink).toBeVisible();
-  const moreBox = await moreLink.boundingBox();
-  expect(moreBox?.height ?? 0).toBeGreaterThanOrEqual(44);
+  const searchPill = page.locator('[data-home-portal] [data-search-pill]').first();
+  await expect(searchPill).toBeVisible();
+  const pillBox = await searchPill.boundingBox();
+  expect(pillBox?.height ?? 0).toBeGreaterThanOrEqual(44);
 });
 
 test('material list restores its session view and scroll position after detail navigation', async ({ page }) => {
@@ -415,23 +408,21 @@ test('desktop material cards keep long titles and prices inside their bounds', a
   }
 });
 
-test('mobile Bot moves away while a text field is focused and returns after blur', async ({ page }) => {
+test('mobile Bot stays unmounted during text entry and mounts on desktop viewports', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.addInitScript(() => window.localStorage.removeItem('floating-sidebar-pos-v2'));
   await page.goto('/materials');
   const bot = page.locator('.floating-sidebar__bubble');
   const search = page.getByRole('textbox', { name: '搜索资料', exact: true });
-  await expect(bot).toBeVisible();
-  const restingBox = await bot.boundingBox();
+  await expect(bot).toHaveCount(0);
   await search.focus();
   await page.waitForTimeout(180);
-  const focusedBox = await bot.boundingBox();
-  expect(focusedBox?.y ?? Number.POSITIVE_INFINITY).toBeLessThan(restingBox?.y ?? 0);
-  expect(focusedBox?.y ?? Number.POSITIVE_INFINITY).toBeLessThanOrEqual(110);
+  await expect(bot).toHaveCount(0);
   await search.evaluate((element) => (element as HTMLInputElement).blur());
   await page.waitForTimeout(260);
-  const restoredBox = await bot.boundingBox();
-  expect(restoredBox?.y ?? 0).toBeGreaterThan(focusedBox?.y ?? Number.POSITIVE_INFINITY);
+  await expect(bot).toHaveCount(0);
+  await page.setViewportSize({ width: 1024, height: 844 });
+  await expect(bot).toBeVisible();
 });
 
 test('material filtering updates one toast from loading to completion', async ({ page }) => {
@@ -455,10 +446,10 @@ test('material filtering updates one toast from loading to completion', async ({
 });
 
 test('StudyHub Bot wardrobe hats use their calibrated head contact points', async ({ page }) => {
-  await page.setViewportSize({ width: 390, height: 844 });
+  await page.setViewportSize({ width: 1024, height: 844 });
   await page.addInitScript(() => {
     window.localStorage.removeItem('floating-sidebar-pos-v2');
-    window.localStorage.setItem('studyhub-bot-hat', 'santa');
+    window.localStorage.setItem('studyhub-bot-hat-v2', 'santa');
   });
   await page.goto('/more');
   await closeEntryModalIfPresent(page);
@@ -472,7 +463,7 @@ test('StudyHub Bot wardrobe hats use their calibrated head contact points', asyn
   await page.getByRole('button', { name: /衣帽间/ }).click();
   await page.getByRole('radio', { name: '皇帝冕旒' }).click();
   await expect(sidebar).toHaveClass(/hat-mianliu/);
-  await expect.poll(() => page.evaluate(() => window.localStorage.getItem('studyhub-bot-hat'))).toBe('mianliu');
+  await expect.poll(() => page.evaluate(() => window.localStorage.getItem('studyhub-bot-hat-v2'))).toBe('mianliu');
   await page.getByRole('button', { name: '关闭衣帽间' }).click();
 
   for (const hatId of ['graduation', 'party', 'wizard', 'mianliu']) {
@@ -558,7 +549,7 @@ test('StudyHub Bot resolves login state through the server session endpoint', as
 });
 
 test('StudyHub Bot eyes remain centered and symmetric while looking sideways', async ({ page }) => {
-  await page.setViewportSize({ width: 390, height: 844 });
+  await page.setViewportSize({ width: 1024, height: 844 });
   await page.goto('/more');
   await closeEntryModalIfPresent(page);
   await page.addStyleTag({
@@ -632,37 +623,34 @@ test('home discovery views remain accessible without entry modal', async ({ page
   await expect(page).toHaveURL(pageUrl);
   await expect(page.locator('#materials-list')).toBeInViewport();
 
-  // Phone: the discovery card keeps its tabs and the cooperation card.
+  // Phone: starts on the unified HomePortal first screen with mobile tabs, then reveals the library below.
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.reload();
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.goto('/');
   await closeEntryModalIfPresent(page);
-  const requestTab = page.getByRole('tab', { name: '求购列表' });
-  const popularTab = page.getByRole('tab', { name: '近期热门' });
-  const subjectTab = page.getByRole('tab', { name: '热门学科' });
-  await expect(subjectTab).toHaveAttribute('aria-selected', 'true');
-  await expect(page.getByRole('list', { name: '热门学科排行', exact: true })).toBeVisible();
-  await popularTab.click();
-  await expect(popularTab).toHaveAttribute('aria-selected', 'true');
-  await expect(subjectTab).toHaveAttribute('aria-selected', 'false');
-  await expect(page.getByRole('list', { name: '近期热门资料', exact: true })).toBeVisible();
-  await expect(page.getByRole('list', { name: '热门学科排行', exact: true })).toBeHidden();
-  const cooperation = page.getByRole('region', { name: '合作招募', exact: true });
-  await expect(cooperation.getByRole('heading', { name: '合作招募', exact: true })).toBeVisible();
-  await expect(cooperation.getByRole('link', { name: '完善个人主页' })).toHaveAttribute('href', '/me#profile');
-  await expect(page.getByRole('tab', { name: '合作招募' })).toHaveCount(0);
-  await expect(page.getByRole('heading', { name: '为你推荐', exact: true })).toHaveCount(0);
-  await expect(cooperation.getByRole('link', { name: 'chengjinli@std.uestc.edu.cn' })).toHaveAttribute(
-    'href',
-    'mailto:chengjinli@std.uestc.edu.cn'
-  );
-  await cooperation.getByRole('button', { name: '复制邮箱' }).click();
-  await expect(cooperation.getByRole('button', { name: '已复制' })).toBeVisible();
-  await requestTab.click();
-  await expect(requestTab).toHaveAttribute('aria-selected', 'true');
-  await expect(popularTab).toHaveAttribute('aria-selected', 'false');
-  await expect(
-    page.getByRole('list', { name: '求购榜', exact: true }).or(page.getByRole('tabpanel').getByText('暂时没有公开的求购需求。'))
-  ).toBeVisible();
+  await expect(portal).toBeVisible();
+  const mobileTabs = portal.locator('[data-portal-mobile-tabs]');
+  await expect(mobileTabs).toBeVisible();
+  await expect(page.locator('#home-content')).toHaveAttribute('data-revealed', 'false');
+
+  const materialsTab = mobileTabs.getByRole('tab', { name: '热门资料' });
+  const subjectsTab = mobileTabs.getByRole('tab', { name: '热门学科' });
+  await expect(materialsTab).toHaveAttribute('aria-selected', 'true');
+  await expect(portal.getByRole('button', { name: '全部资料' })).toBeVisible();
+
+  await subjectsTab.click();
+  await expect(subjectsTab).toHaveAttribute('aria-selected', 'true');
+  await expect(materialsTab).toHaveAttribute('aria-selected', 'false');
+  await expect(portal.getByRole('list', { name: '热门学科排行', exact: true })).toBeVisible();
+  await expect(portal.getByRole('button', { name: '全部学科' })).toBeVisible();
+
+  await portal.getByRole('button', { name: '向下滚动' }).click();
+  await expect(page.locator('#home-content')).toHaveAttribute('data-revealed', 'true');
+  await expect(page.locator('#materials-list')).toBeVisible();
+  await expect(page.locator('.leaderboard-card')).toBeVisible();
+  await expect(page.locator('.support-card')).toBeVisible();
+  await expect(page.locator('.request-card')).toBeHidden();
+  await expect(page.getByRole('region', { name: '合作招募', exact: true })).toHaveCount(0);
 });
 
 test('material list shows active search keywords and the 24-item page size', async ({ page }) => {

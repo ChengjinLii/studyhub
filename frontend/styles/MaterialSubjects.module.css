@@ -262,6 +262,67 @@
   .folderArrow { align-self: end; margin-bottom: 1px; }
 }
 
+@media (max-width: 768px) {
+  :global(.home-page) .minimalToggle {
+    padding: 2px;
+    border-radius: 8px;
+  }
+
+  :global(.home-page) .minimalToggle button {
+    min-height: 24px;
+    height: 24px;
+    padding: 0 8px;
+    font-size: 11px;
+    gap: 4px;
+    border-radius: 6px;
+  }
+
+  :global(.home-page) .folders {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    margin-top: 10px;
+  }
+
+  :global(.home-page) .folders button {
+    grid-template-columns: 32px minmax(0, 1fr) 12px;
+    grid-template-rows: none;
+    align-items: center;
+    gap: 8px;
+    min-height: 60px;
+    padding: 10px;
+    border-radius: 10px;
+  }
+
+  :global(.home-page) .folderArt {
+    grid-column: auto;
+    width: 32px;
+    height: 30px;
+  }
+
+  :global(.home-page) .folderArt svg {
+    width: 28px;
+    height: 28px;
+    left: 2px;
+  }
+
+  :global(.home-page) .folderInfo {
+    gap: 2px;
+  }
+
+  :global(.home-page) .folderInfo > strong {
+    font-size: 12px;
+    line-height: 1.35;
+  }
+
+  :global(.home-page) .folderCount {
+    font-size: 10.5px;
+  }
+
+  :global(.home-page) .folderCount > span {
+    font-size: 11px;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .folders button, .folderFront, .folderArrow { transition: none; }
   .folders button:hover, .folders button:hover .folderArrow,

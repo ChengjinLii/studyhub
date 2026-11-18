@@ -12,7 +12,8 @@ type EyeOffset = { x: number; y: number };
 
 // v2: the home page became a search portal, so a place saved for the old layout no longer fits.
 const POS_STORAGE_KEY = 'floating-sidebar-pos-v2';
-const HAT_STORAGE_KEY = 'studyhub-bot-hat';
+const LEGACY_HAT_STORAGE_KEY = 'studyhub-bot-hat';
+const HAT_STORAGE_KEY = 'studyhub-bot-hat-v2';
 const SPEECH_DISMISSED_STORAGE_KEY = 'studyhub-bot-speech-dismissed';
 const MOBILE_BREAKPOINT = 720;
 const MOBILE_EDGE_GAP = 16;
@@ -92,6 +93,24 @@ export default function FloatingSidebar() {
   const anchorPointerRef = useRef<{ x: number; y: number } | null>(null);
   const lastPointerRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
   const prevPathnameRef = useRef<string | null>(null);
+  const [hideOnMobile, setHideOnMobile] = useState(
+    () => typeof window !== 'undefined' && window.innerWidth <= 768
+  );
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+    const syncMobileViewport = () => {
+      const isMobile = window.innerWidth <= 768;
+      setHideOnMobile(isMobile);
+      if (isMobile) {
+        setSidebarOpen(false);
+        setWardrobeOpen(false);
+      }
+    };
+    syncMobileViewport();
+    window.addEventListener('resize', syncMobileViewport, { passive: true });
+    return () => window.removeEventListener('resize', syncMobileViewport);
+  }, []);
 
   const resetEyeGazeToDefault = useCallback(() => {
     hasPointerRef.current = false;
@@ -103,6 +122,16 @@ export default function FloatingSidebar() {
   const getMobileRestingPosition = useCallback(() => {
     if (typeof window === 'undefined') return null;
     if (window.innerWidth > MOBILE_BREAKPOINT) return null;
+    const loginHeader = document.querySelector<HTMLElement>('.login-card__header');
+    if (loginHeader) {
+      const headerRect = loginHeader.getBoundingClientRect();
+      const x = Math.max(MOBILE_DOCK_GAP, window.innerWidth - MOBILE_BUBBLE_SIZE - 20);
+      const y =
+        headerRect.top >= 88
+          ? Math.max(96, Math.round(headerRect.top + (headerRect.height - MOBILE_BUBBLE_SIZE) / 2))
+          : 96;
+      return { x, y };
+    }
     const blockers = Array.from(
       document.querySelectorAll<HTMLElement>('.mobile-bottom-nav, .mobile-detail-action-bar, [data-pwa-install]')
     )
@@ -267,6 +296,7 @@ export default function FloatingSidebar() {
   useEffect(() => {
     if (typeof window === 'undefined') return;
     try {
+      window.localStorage.removeItem(LEGACY_HAT_STORAGE_KEY);
       const saved = window.localStorage.getItem(HAT_STORAGE_KEY);
       if (isBotHat(saved)) {
         setSelectedHat(saved);
@@ -573,7 +603,7 @@ export default function FloatingSidebar() {
 
   const loginLink = { pathname: '/login' };
   const registerLink = { pathname: '/login', query: { mode: 'register' } };
-  const selectedHatLabel = BOT_HATS.find((hat) => hat.id === selectedHat)?.label || '圣诞帽';
+  const selectedHatLabel = BOT_HATS.find((hat) => hat.id === selectedHat)?.label || '不佩戴';
   const speechSide = typeof window !== 'undefined' && sidebarPosition.x > window.innerWidth / 2 ? 'left' : 'right';
   const activeSpeech = botSpeech?.messages.find((item) => getSpeechVersion(item) === activeSpeechVersion) || null;
   const showBotSpeech = Boolean(botSpeech?.enabled && activeSpeech && !sidebarOpen);
@@ -641,7 +671,7 @@ export default function FloatingSidebar() {
     </div>
   ) : null;
 
-  if (router.pathname === '/login') return null;
+  if (hideOnMobile) return null;
 
   return (
     <>

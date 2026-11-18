@@ -2,6 +2,22 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { computeHomeRevealTail, easeHomeRevealProgress } from '../../lib/homeDiscovery';
+import {
+  AIR_VARIANTS,
+  CACTUS_VARIANTS,
+  CAMPUS_EXAM_PAPER_ROWS,
+  DINO_DUCK_LEGS_A,
+  DINO_DUCK_UPPER,
+  DINO_LEGS_BOTH,
+  DINO_UPPER_ROWS,
+  getDinoViewportLayout,
+} from '../../lib/dinoSprites';
+import {
+  clearQuickUploadFiles,
+  consumeQuickUploadFiles,
+  peekQuickUploadFiles,
+  stageQuickUploadFiles,
+} from '../../lib/quickUploadHandoff';
 
 const readSource = (relativePath: string) =>
   readFileSync(join(process.cwd(), relativePath), 'utf8');
@@ -299,15 +315,18 @@ describe('home search portal', () => {
     expect(actions).not.toContain('type="submit"');
   });
 
-  it('offers the about page and the upload page under the search box', () => {
+  it('offers a quick-upload dropzone on the left and a prominent upload CTA on the right under the search box', () => {
     const form = readSource('components/home/HomeFilterCard.tsx');
     const actions = form.slice(form.indexOf('minStyles.searchActions'));
 
-    expect(actions).toContain('href="/join"');
-    expect(actions).toContain('关于我们');
+    expect(actions).not.toContain('href="/join"');
+    expect(actions).not.toContain('关于我们');
+    expect(actions).toContain('data-quick-dropzone=""');
+    expect(actions).toContain('拖拽资料快捷投稿');
     expect(actions).toContain('href="/upload"');
     expect(actions).toContain('我要投稿');
-    expect(actions.indexOf('关于我们')).toBeLessThan(actions.indexOf('我要投稿'));
+    expect(actions).toContain('minStyles.searchActionPrimary');
+    expect(actions.indexOf('data-quick-dropzone=""')).toBeLessThan(actions.indexOf('我要投稿'));
   });
 
   it('closes the first screen with a centered scroll cue', () => {
@@ -379,6 +398,9 @@ describe('StudyHub bot default place', () => {
     const bot = readSource('components/FloatingSidebar.tsx');
 
     expect(bot).toContain("const POS_STORAGE_KEY = 'floating-sidebar-pos-v2';");
+    expect(bot).toContain("const HAT_STORAGE_KEY = 'studyhub-bot-hat-v2';");
+    expect(bot).toContain('window.localStorage.removeItem(LEGACY_HAT_STORAGE_KEY);');
+    expect(bot).toContain("useState<BotHat>('none')");
     expect(bot).toContain('const SEARCH_ANCHOR_GAP = 236;');
     expect(bot).toContain('[data-search-pill]');
     expect(bot).toContain('rect.top + window.scrollY');
@@ -681,15 +703,17 @@ describe('opening splash: dark intro and landing', () => {
     expect(source).toContain("window.addEventListener('touchmove', blockScroll, { passive: false });");
   });
 
-  it('opens a white surface over a black backdrop and blends the lockup by difference', () => {
+  it('rises a #1a1c20 dark curtain with corner dino over a #ffffff backdrop and docks with spring cushion', () => {
     const source = css();
+    const tsx = splash();
 
-    expect(cssRule(source, '.backdrop {')).toContain('background: #09090b;');
-    expect(cssRule(source, '.wipe {')).toContain('background: #ffffff;');
-    expect(cssRule(source, '.wipe {')).toContain('clip-path: circle(');
-    expect(cssRule(source, '.overlayDocking .wipe {')).toMatch(/clip-path: circle\(\d+vmax at 50% 50%\);/);
+    expect(cssRule(source, '.backdrop {')).toContain('background: #ffffff;');
+    expect(cssRule(source, '.curtain {')).toContain('background: #1a1c20;');
     expect(cssRule(source, '.stage {')).toContain('mix-blend-mode: difference;');
     expect(cssRule(source, '.overlay {')).toContain('isolation: isolate;');
+    expect(tsx).toContain('data-splash-curtain=""');
+    expect(tsx).toContain('data-splash-dino=""');
+    expect(tsx).toContain('appleSpringEase');
   });
 
   it('has the same travel time in the stylesheet and in the component', () => {
@@ -889,7 +913,7 @@ describe('phone home page: discovery and cooperation cards', () => {
     expect(base).toBeGreaterThan(-1);
     expect(minimal.slice(base, minimal.indexOf('}', base))).toContain('display: none;');
     expect(phone).toBeGreaterThan(base);
-    expect(minimal.slice(phone, minimal.indexOf('}', phone))).toContain('display: block;');
+    expect(minimal.slice(phone, minimal.indexOf('}', phone))).toContain('display: none;');
   });
 
   it('keeps each list of the discovery card short', () => {
@@ -914,7 +938,7 @@ describe('search pill styling, portal spacing, and home UI polish', () => {
     expect(getRule(minimal, '\n.searchActions {')).toContain('margin-top: 30px;');
     expect(getRule(minimal, '\n.advancedPanel {')).toContain('top: 166px;');
     expect(getRule(portal, '\n.search {')).toContain('margin-top: 18px;');
-    expect(getRule(portal, '\n.columns {\n  width:')).toContain('margin-top: 56px;');
+    expect(getRule(portal, '\n.columns {\n  width:')).toContain('margin-top: 44px;');
   });
 
   it('styles the navbar GitHub star in golden yellow with hover twinkle effects and live visibility refresh', () => {
@@ -974,26 +998,46 @@ describe('search pill styling, portal spacing, and home UI polish', () => {
     expect(minimal).toContain('@keyframes liquidMetalSpin');
   });
 
-  it('renders the global site footer with 5 columns, contact email, compressed QR cards, bottom-left ICP, and bottom-right team copyright', () => {
+  it('renders the global site footer with 6 columns (credits and 硅基工友 with agent logos, without 浏览), contact email, compressed QR cards, bottom-left ICP, and bottom-right team copyright', () => {
     const app = readSource('pages/_app.tsx');
     const footerCss = readSource('styles/SiteFooter.module.css');
+    const agentLogoSrc = readSource('components/FooterAgentLogo.tsx');
     const footerMarkup = app.slice(app.indexOf('data-site-footer=""'), app.indexOf('</footer>'));
 
     expect(footerMarkup).toContain('footerStyles.navGrid');
     expect(footerMarkup).toContain('footerStyles.colItem');
+    expect(footerMarkup).toContain('footerStyles.agentItem');
+    expect(footerMarkup).toContain('footerStyles.agentLogo');
     expect(footerMarkup).toContain('footerStyles.contactCol');
     expect(footerMarkup).toContain('footerStyles.qrGroup');
     expect(footerMarkup).toContain('footerStyles.qrBox');
     expect(footerMarkup).not.toContain('contribChip');
     expect(footerMarkup).not.toContain('Open Campus');
     expect(footerMarkup).not.toContain('brandBadge');
-    expect(footerMarkup).not.toContain('socialBtn');
+    expect(footerMarkup).toContain('footerStyles.socialRow');
+    expect(footerMarkup).toContain('footerStyles.socialBtn');
     expect(footerMarkup).not.toContain('footerStyles.searchForm');
-    expect(footerMarkup.indexOf('核心贡献者')).toBeLessThan(footerMarkup.indexOf('>浏览<'));
-    expect(footerMarkup.indexOf('>浏览<')).toBeLessThan(footerMarkup.indexOf('>社区<'));
+    expect(footerMarkup.indexOf('核心贡献者')).toBeLessThan(footerMarkup.indexOf('特别鸣谢'));
+    expect(footerMarkup.indexOf('特别鸣谢')).toBeLessThan(footerMarkup.indexOf('>社区<'));
+    expect(footerMarkup).not.toContain('>浏览<');
     expect(footerMarkup.indexOf('>社区<')).toBeLessThan(footerMarkup.indexOf('>支持<'));
-    expect(footerMarkup.indexOf('>支持<')).toBeLessThan(footerMarkup.indexOf('>联系方式<'));
-    expect(footerMarkup).toContain('联系邮箱：');
+    expect(footerMarkup.indexOf('>支持<')).toBeLessThan(footerMarkup.indexOf('硅基工友'));
+    expect(footerMarkup.indexOf('硅基工友')).toBeLessThan(footerMarkup.indexOf('>联系方式<'));
+    expect(footerMarkup.indexOf('季文君')).toBeGreaterThan(footerMarkup.indexOf('特别鸣谢'));
+    expect(footerMarkup.indexOf('林俊宇')).toBeGreaterThan(footerMarkup.indexOf('季文君'));
+    expect(footerMarkup.indexOf('硅基工友')).toBeGreaterThan(footerMarkup.indexOf('隐私与协议'));
+    expect(footerMarkup.indexOf('kind="claude"')).toBeGreaterThan(footerMarkup.indexOf('硅基工友'));
+    expect(footerMarkup.indexOf('Claude Code')).toBeGreaterThan(footerMarkup.indexOf('kind="claude"'));
+    expect(footerMarkup.indexOf('kind="codex"')).toBeGreaterThan(footerMarkup.indexOf('Claude Code'));
+    expect(footerMarkup.indexOf('Codex')).toBeGreaterThan(footerMarkup.indexOf('kind="codex"'));
+    expect(footerMarkup.indexOf('kind="antigravity"')).toBeGreaterThan(footerMarkup.indexOf('Codex'));
+    expect(footerMarkup.indexOf('Antigravity')).toBeGreaterThan(footerMarkup.indexOf('kind="antigravity"'));
+    expect(footerMarkup.indexOf('>联系方式<')).toBeGreaterThan(footerMarkup.indexOf('Antigravity'));
+    expect(agentLogoSrc).toContain('#D97757');
+    expect(agentLogoSrc).toContain('fillRule="evenodd"');
+    expect(agentLogoSrc).toContain('sh-ag-clip');
+    expect(agentLogoSrc).not.toContain('<img');
+    expect(footerMarkup).not.toContain('联系邮箱：');
     expect(footerMarkup).toContain('mailto:chengjinli@std.uestc.edu.cn');
     expect(footerMarkup).toContain('/wechat/qq-group-qr.webp');
     expect(footerMarkup).toContain('官方 QQ 群');
@@ -1005,9 +1049,10 @@ describe('search pill styling, portal spacing, and home UI polish', () => {
     expect(footerCss).toContain('.contactCol');
     expect(footerCss).toContain('.qrBox');
     expect(footerCss).toContain('.colItem');
+    expect(footerCss).toContain('clamp(80px, 8.5vw, 128px)');
     expect(footerCss).toContain('justify-content: space-between;');
     expect(footerCss).not.toContain('.contribChip');
-    expect(footerCss).not.toContain('.socialBtn');
+    expect(footerCss).toContain('.socialBtn');
   });
 
   it('keeps the top-right auth status minimal in neutral black and gray with truncated username beside logout', () => {
@@ -1069,7 +1114,7 @@ describe('search pill styling, portal spacing, and home UI polish', () => {
     expect(portal).toContain('fill="#1a1c20"');
     expect(portal).toContain('portal-canopy-rim');
     expect(portalCss).toContain('background: #1a1c20;');
-    expect(canopyRule).toContain('bottom: -172px;');
+    expect(canopyRule).toContain('bottom: -200px;');
     expect(canopyWaveRule).toContain('height: 736px;');
     expect(wordmarkSvgRule).toContain('aspect-ratio: 844 / 160;');
     expect(glyphWhiteRule).toContain('fill: #ffffff;');
@@ -1084,20 +1129,17 @@ describe('search pill styling, portal spacing, and home UI polish', () => {
     expect(headerCss).toContain(":global(body:has([data-home-portal])) .header:not([data-scrolled='true']) {");
 
     expect(splash).toContain('styles.overlayHeroDocking');
-    expect(splash).toContain('data-splash-taiji=""');
-    expect(splash).toContain('data-splash-fx=""');
-    expect(splash).toContain('styles.fxCanvas');
-    expect(splash).toContain('styles.prismGhostCyan');
-    expect(splash).toContain('styles.prismGhostViolet');
-    expect(splash).toContain('WarpStreak');
-    expect(splash).toContain('BlastSpark');
-    expect(splash).not.toContain('drawChargeUpFrame');
-    expect(splash).toContain('fill="#1a1c20"');
-    expect(splash).toContain('measureCanopyVars');
+    expect(splash).toContain('data-splash-curtain=""');
+    expect(splash).toContain('data-splash-dino=""');
+    expect(splash).toContain('getDinoViewportLayout');
+    expect(splash).toContain('applePopUpEase');
+    expect(splash).toContain('appleSpringEase');
+    expect(splash).not.toContain('WarpStreak');
+    expect(splash).not.toContain('BlastSpark');
+    expect(splash).not.toContain('prismGhostCyan');
     expect(splash).not.toContain('taijiCircleRim');
     expect(splashCss).toContain('background: #1a1c20;');
-    expect(splashCss).toContain('@keyframes splashLockupDetonate');
-    expect(splashCss).toContain('@keyframes splashPrismSplitCyan');
+    expect(splashCss).not.toContain('@keyframes splashLockupDetonate');
     expect(splashCss).not.toContain('rotate(-180deg)');
   });
 
@@ -1175,6 +1217,13 @@ describe('search pill styling, portal spacing, and home UI polish', () => {
     expect(wordmarks).toContain("STUDYHUB_ZH_LOGOTYPE_VIEWBOX = '0 0 386 157'");
     expect(footerCss).toContain('.brandDivider {');
     expect(footerCss).toContain('aspect-ratio: 386 / 157;');
+    const markRule = footerCss.slice(
+      footerCss.indexOf('\n.brandMarkSvg {'),
+      footerCss.indexOf('}', footerCss.indexOf('\n.brandMarkSvg {'))
+    );
+    expect(markRule).toContain('height: 20px;');
+    const mobile480 = footerCss.slice(footerCss.indexOf('@media (max-width: 480px)'));
+    expect(mobile480).toContain('.brandMarkSvg {\n    height: 17px;');
   });
 
   it('keeps the HomePortal as the first screen on phones and compact displays while closing content below until scroll', () => {
@@ -1191,6 +1240,7 @@ describe('search pill styling, portal spacing, and home UI polish', () => {
     expect(splashCss).not.toContain('.taijiRotor,\n  .taijiCircleRim,\n  .stageCrispWrap {\n    display: none;');
     expect(indexTsx).not.toContain('if (window.innerWidth <= HOME_PHONE_MAX_WIDTH) {\n      if (!contentRevealed) revealContent();');
     expect(globalsCss).toContain('.home-page .home-desktop-library {\n    display: grid;');
+    expect(globalsCss).toContain('grid-template-columns: repeat(2, minmax(0, 1fr));');
   });
 
   it('eliminates splash H dock flicker, mobile splash guide lines, mobile search orb clipping glitches, and keeps mobile overview always visible', () => {
@@ -1201,11 +1251,9 @@ describe('search pill styling, portal spacing, and home UI polish', () => {
     const minimalCss = readSource('styles/HomeMinimal.module.css');
 
     expect(splashTsx).toContain('y={-16}');
-    expect(splashTsx).toContain('--canopy-height');
-    expect(splashTsx).toContain('--canopy-horizon-y');
     expect(splashTsx).toContain('splash-wordmark-sheen-clip');
     expect(splashTsx).toContain("glyph.tone !== 'silver'");
-    expect(splashTsx).not.toContain('splash-taiji-grid');
+    expect(splashTsx).toContain("type: 'spring'");
 
     expect(splashCss).toContain('.overlayHeroDocking .glyphFillSilver {\n  fill: #b8b8ba;\n  transition: fill 280ms ease;\n}');
     expect(splashCss).toContain('.overlayHeroDocking .stage {\n  z-index: 5;\n  mix-blend-mode: normal;');
@@ -1226,42 +1274,51 @@ describe('search pill styling, portal spacing, and home UI polish', () => {
     const portalMobile = portalCss.slice(portalCss.indexOf('@media (max-width: 768px) {'));
     expect(portalMobile).toContain('height: 368px;');
     expect(portalMobile).toContain('.overview .columnHead {\n    display: flex;');
-    expect(portalMobile).toContain('grid-template-columns: repeat(4, minmax(0, 1fr));');
+    expect(portalMobile).toContain('grid-template-columns: minmax(0, 1.28fr) minmax(0, 0.8fr);');
+    expect(portalMobile).toContain('grid-column: 2;');
+    expect(portalMobile).toContain('grid-row: 1 / span 2;');
+    expect(portalMobile).toContain('grid-template-columns: minmax(0, 1.12fr) minmax(0, 0.88fr);');
 
     const minimalMobile = minimalCss.slice(minimalCss.indexOf('@media (max-width: 768px) {\n  :global([data-home-portal]) .searchPill'));
     expect(minimalMobile).toContain('width: 36px;');
     expect(minimalMobile).toContain('backdrop-filter: none;');
   });
 
-  it('integrates an understated auto-playing Chrome-Dino horizon runner on the lowered divider', () => {
+  it('integrates a full Chrome-Dino game left of the search box with auto-pilot and click-edge manual/death mode', () => {
     const portalTsx = readSource('components/home/HomePortal.tsx');
     const portalCss = readSource('styles/HomePortal.module.css');
     const minimalCss = readSource('styles/HomeMinimal.module.css');
     const dinoTsx = readSource('components/home/PortalDinoHorizon.tsx');
     const dinoCss = readSource('styles/PortalDinoHorizon.module.css');
+    const dinoSprites = readSource('lib/dinoSprites.ts');
     const splashTsx = readSource('components/OpeningSplash.tsx');
 
     expect(portalTsx).toContain('<PortalDinoHorizon />');
     expect(dinoTsx).toContain('data-portal-dino-horizon=""');
     expect(dinoTsx).toContain('aria-hidden="true"');
     expect(dinoTsx).toContain("fillStyle = '#ffffff'");
-    expect(dinoTsx).not.toContain('TERRAIN_TILE');
-    expect(dinoTsx).not.toContain('CLOUD_SPRITE');
+    expect(dinoTsx).toContain('SPRITE_BIRD_A');
+    expect(dinoTsx).toContain('SPRITE_DINO_CRASH');
+    expect(dinoTsx).toContain('SPRITE_DINO_DUCK_A');
+    expect(dinoTsx).toContain('GAME OVER');
     expect(dinoTsx).toContain('prefers-reduced-motion: reduce');
     expect(dinoTsx).toContain('pointerdown');
-    expect(dinoTsx).not.toContain('GAME OVER');
+    expect(dinoTsx).toContain('autoCrashTimer');
+    expect(dinoTsx).toContain('idealApexLead');
+    expect(dinoSprites).not.toContain('.roundRect(');
+    expect(dinoSprites).not.toContain('.ellipse(');
 
     expect(dinoCss).toContain('pointer-events: none;');
     expect(dinoCss).toContain('bottom: 44px;');
     expect(dinoCss).toContain('bottom: 15px;');
     expect(dinoCss).toContain("html[data-splash-state='playing']");
 
-    expect(portalCss).toContain('bottom: -172px;');
-    expect(portalCss).toContain('bottom: -121px;');
-    expect(portalCss).toContain('top: 136px;');
-    expect(minimalCss).toContain('margin-top: 70px;');
-    expect(minimalCss).toContain('margin-top: 52px;');
-    expect(splashTsx).toContain('waveHeight - 172');
+    expect(portalCss).toContain('bottom: -200px;');
+    expect(portalCss).toContain('bottom: -167px;');
+    expect(portalCss).toContain('top: 164px;');
+    expect(minimalCss).toContain('margin-top: 98px;');
+    expect(minimalCss).toContain('top: 194px;');
+    expect(splashTsx).toContain('waveHeight - 200');
   });
 
   it('keeps home canvases and styles compatible with Chrome 97 / Android WebView (no roundRect, ellipse, unguarded :has, or bare svh)', () => {
@@ -1281,7 +1338,218 @@ describe('search pill styling, portal spacing, and home UI polish', () => {
 
     expect(portalCss).toContain('padding: clamp(4px, 1.2vh, 12px) 16px 10px;');
     expect(portalCss).toContain('margin-top: clamp(12px, 2vh, 22px);');
-    expect(portalCss).toContain('margin-top: clamp(12px, 2vh, 18px);');
     expect(portalCss).toContain('padding-top: clamp(8px, 1.4vh, 14px);');
+  });
+
+  it('guarantees jump physics cleanly clear every cactus variant including triple cacti across all viewports', () => {
+    const viewports = [
+      { w: 1440, h: 900 },
+      { w: 1280, h: 760 },
+      { w: 1024, h: 600 },
+      { w: 390, h: 844 },
+      { w: 360, h: 640 },
+    ];
+    for (const vp of viewports) {
+      const layout = getDinoViewportLayout(vp.w, vp.w, vp.h);
+      const px = layout.pixelSize;
+      for (const spec of CACTUS_VARIANTS) {
+        let winningStarts = 0;
+        for (let lead = 4; lead <= 110; lead += 2) {
+          let obsX = layout.dinoX + 13 * px + lead;
+          let dinoY = 0;
+          let dinoVy = layout.jumpVy;
+          let hit = false;
+          const dt = 1 / 60;
+          for (let step = 0; step < 90; step += 1) {
+            obsX -= layout.baseSpeed * dt;
+            dinoY += dinoVy * dt;
+            dinoVy += layout.gravity * dt;
+            if (dinoY >= 0) {
+              dinoY = 0;
+              dinoVy = 0;
+            }
+            const dL = layout.dinoX + 5 * px;
+            const dR = layout.dinoX + 13 * px;
+            const dB = dinoY - 2 * px;
+            const dT = dinoY - 18 * px;
+            const oL = obsX + 2 * px;
+            const oR = obsX + (spec.w - 2) * px;
+            const oT = -(spec.h - 2) * px;
+            const oB = 0;
+            if (dR > oL && dL < oR && dB > oT && dT < oB) {
+              hit = true;
+              break;
+            }
+            if (obsX + spec.w * px < dL) break;
+          }
+          if (!hit) winningStarts += 1;
+        }
+        expect(winningStarts, `${vp.w}x${vp.h} ${spec.kind}`).toBeGreaterThanOrEqual(8);
+      }
+    }
+  });
+
+  it('boots the opening-splash dino canvas pre-hydration in _document.tsx so cold uncached loads never miss the dino', () => {
+    const docTsx = readSource('pages/_document.tsx');
+    const splashTsx = readSource('components/OpeningSplash.tsx');
+
+    expect(docTsx).toContain('__studyhubSplashBoot');
+    expect(docTsx).toContain("querySelector('[data-splash-dino]')");
+    expect(docTsx).toContain('SPLASH_DINO_BOOT_SCRIPT');
+    expect(docTsx).not.toContain('.roundRect(');
+    expect(splashTsx).toContain('__studyhubSplashBoot');
+    expect(splashTsx).toContain('boot.stop()');
+  });
+
+  it('keeps the pixel dino forelimb attached (single connected component) and includes campus & aerial easter eggs', () => {
+    const countComponents = (rows: readonly string[]) => {
+      const h = rows.length;
+      const w = rows[0].length;
+      const pts = new Set<string>();
+      for (let r = 0; r < h; r += 1) {
+        for (let c = 0; c < w; c += 1) {
+          if (rows[r][c] === '#' || rows[r][c] === 'o') pts.add(`${r}:${c}`);
+        }
+      }
+      const seen = new Set<string>();
+      let components = 0;
+      for (const start of Array.from(pts)) {
+        if (seen.has(start)) continue;
+        components += 1;
+        const queue = [start];
+        seen.add(start);
+        while (queue.length > 0) {
+          const cur = queue.shift()!;
+          const [r, c] = cur.split(':').map(Number);
+          for (const [dr, dc] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) {
+            const k = `${r + dr}:${c + dc}`;
+            if (pts.has(k) && !seen.has(k)) {
+              seen.add(k);
+              queue.push(k);
+            }
+          }
+        }
+      }
+      return components;
+    };
+
+    expect(countComponents([...DINO_UPPER_ROWS, ...DINO_LEGS_BOTH])).toBe(1);
+    expect(countComponents([...DINO_DUCK_UPPER, ...DINO_DUCK_LEGS_A])).toBe(1);
+    expect(CACTUS_VARIANTS.map((c) => c.kind)).toEqual([
+      'small',
+      'tall',
+      'twin',
+      'triple',
+      'paper',
+      'coffee',
+    ]);
+    expect(CAMPUS_EXAM_PAPER_ROWS.length).toBe(34);
+    for (const row of CAMPUS_EXAM_PAPER_ROWS) {
+      expect(row.length).toBe(28);
+    }
+    expect(CACTUS_VARIANTS[4].frames[0].body.length).toBeGreaterThan(0);
+    expect(CACTUS_VARIANTS[4].frames[0].cutouts.length).toBeGreaterThan(0);
+    expect((CACTUS_VARIANTS[4].frames[0].accents ?? []).length).toBeGreaterThan(0);
+    expect(AIR_VARIANTS).toEqual(['bird', 'paper_plane', 'ufo']);
+  });
+
+  it('supports Dino game focus mode clearing surrounding portal chrome and header/bot distractions', () => {
+    const dinoTsx = readSource('components/home/PortalDinoHorizon.tsx');
+    const portalCss = readSource('styles/HomePortal.module.css');
+    const headerCss = readSource('styles/AnimateHeader.module.css');
+    const globalsCss = readSource('styles/globals.css');
+
+    expect(dinoTsx).toContain('data-dino-focus-toggle=""');
+    expect(dinoTsx).toContain('退出全屏');
+    expect(dinoTsx).toContain('空格 / ↑ / W / 点击屏幕跳跃');
+    expect(dinoTsx).toContain('dataset.dinoFocus');
+    expect(dinoTsx).toContain("event.key === 'Escape'");
+    expect(dinoTsx).toContain("event.key === 'f'");
+    const dinoCss = readSource('styles/PortalDinoHorizon.module.css');
+
+    expect(dinoTsx).toContain('data-dino-duck-pad=""');
+    expect(dinoTsx).toContain('data-dino-jump-pad=""');
+    expect(dinoTsx).toContain('styles.mobilePadGlyph');
+    expect(dinoTsx).toContain('styles.mobilePadSvg');
+    expect(dinoTsx).toContain('styles.mobilePadCopy');
+    expect(dinoTsx).toContain('再来一局');
+    expect(dinoTsx).not.toMatch(/mobileControlPad[\s\S]*?>\s*[↓↑]\s*</);
+    expect(dinoCss).toContain('touch-action: none;');
+    expect(dinoCss).toContain(".mobileControlPadPrimary[data-active='true']");
+    expect(dinoCss).toContain('translate3d(0, 3px, 0)');
+    expect(dinoCss).toContain('position: fixed;');
+    expect(dinoCss).toContain('dinoDeckPopIn');
+    expect(dinoTsx).toContain('dataset.dinoManual');
+    expect(dinoTsx).toContain("mode === 'manual' && bodyHost");
+    expect(portalCss).toContain("data-dino-focus='true'");
+    expect(portalCss).toContain('position: fixed;');
+    expect(headerCss).toContain("data-dino-focus='true'");
+    expect(globalsCss).toContain("data-dino-focus='true'");
+    expect(globalsCss).toContain("html[data-dino-manual='true'] .mobile-bottom-nav");
+    expect(globalsCss).toContain('position: fixed !important;');
+  });
+
+  it('hides the StudyHub Bot on mobile viewports (<= 768px)', () => {
+    const bot = readSource('components/FloatingSidebar.tsx');
+    const globalsCss = readSource('styles/globals.css');
+
+    expect(bot).toContain('window.innerWidth <= 768');
+    expect(bot).toContain('if (hideOnMobile) return null;');
+    expect(globalsCss).toContain('display: none !important;');
+    expect(globalsCss).toContain('.floating-sidebar *');
+  });
+
+  it('applies natural Apple inertial overshoot to portal columns, advanced filter popover, and left-to-right staggered nav buttons', () => {
+    const portalCss = readSource('styles/HomePortal.module.css');
+    const filterTsx = readSource('components/home/HomeFilterCard.tsx');
+    const headerCss = readSource('styles/AnimateHeader.module.css');
+
+    expect(portalCss).toContain('cubic-bezier(0.18, 1.24, 0.32, 1)');
+    expect(portalCss).not.toContain('@keyframes portalColumnSpring');
+    expect(filterTsx).toContain('stiffness: 360');
+    expect(filterTsx).toContain('damping: 25');
+    expect(headerCss).toContain('cubic-bezier(0.18, 1.24, 0.32, 1)');
+    expect(headerCss).not.toContain('@keyframes navButtonApplePop');
+    expect(headerCss).toContain('transition-delay: 335ms');
+  });
+
+  it('renders a centered single-card login page without the left introductory card', () => {
+    const loginTsx = readSource('pages/login.tsx');
+    const globalsCss = readSource('styles/globals.css');
+    const botTsx = readSource('components/FloatingSidebar.tsx');
+
+    expect(loginTsx).not.toContain('login-aside');
+    expect(loginTsx).not.toContain('让知识流动起来');
+    expect(loginTsx).toContain('<h1>{mode === \'login\' ? \'欢迎回来\' : \'创建新账号\'}</h1>');
+    expect(globalsCss).toContain('max-width: 600px;');
+    expect(globalsCss).not.toContain('repeat(2, 540px)');
+    expect(botTsx).not.toContain("router.pathname === '/login'");
+    expect(botTsx).toContain('.login-card__header');
+  });
+  it('stages dropped quick-upload files across navigation and balances Dino ducking obstacles cleanly', () => {
+    clearQuickUploadFiles();
+    const fakeFiles = [{ name: '高数期末复习.pdf' } as File, { name: '答案解析.pdf' } as File];
+    expect(stageQuickUploadFiles(fakeFiles).map((f) => f.name)).toEqual([
+      '高数期末复习.pdf',
+      '答案解析.pdf',
+    ]);
+    expect(peekQuickUploadFiles().map((f) => f.name)).toEqual([
+      '高数期末复习.pdf',
+      '答案解析.pdf',
+    ]);
+    expect(consumeQuickUploadFiles().map((f) => f.name)).toEqual([
+      '高数期末复习.pdf',
+      '答案解析.pdf',
+    ]);
+    expect(peekQuickUploadFiles()).toEqual([]);
+
+    const uploadTsx = readSource('pages/upload.tsx');
+    expect(uploadTsx).toContain('consumeQuickUploadFiles');
+    expect(uploadTsx).toContain("router.query.quick === '1'");
+
+    const dinoTsx = readSource('components/home/PortalDinoHorizon.tsx');
+    expect(dinoTsx).toContain('manualScore >= 6');
+    expect(dinoTsx).toContain('consecutiveAirCount < 2');
+    expect(dinoTsx).toContain('DUCK_DOMINANT_AIR_HEIGHTS');
   });
 });

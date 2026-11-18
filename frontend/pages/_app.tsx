@@ -3,8 +3,9 @@ import dynamic from 'next/dynamic';
 import Head from 'next/head';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import { ReactNode, useEffect, useState } from 'react';
+import { ReactNode, useEffect, useRef, useState } from 'react';
 import { fetchBackend } from '../lib/apiBase';
+import { copyToClipboard } from '../lib/share';
 import '../styles/globals.css';
 import '../styles/responsive.css';
 import AppImage from '../components/AppImage';
@@ -16,6 +17,7 @@ import {
   STUDYHUB_ZH_LOGOTYPE_PATHS,
   STUDYHUB_ZH_LOGOTYPE_VIEWBOX,
 } from '../lib/studyhubWordmark';
+import FooterAgentLogo from '../components/FooterAgentLogo';
 import OpeningSplash from '../components/OpeningSplash';
 import footerStyles from '../styles/SiteFooter.module.css';
 import { brandFont, wordmarkFont } from '../lib/brandFont';
@@ -95,6 +97,29 @@ export default function MyApp({ Component, pageProps }: AppProps) {
   const router = useRouter();
   const [runtimeInfo, setRuntimeInfo] = useState<RuntimeInfo | null>(null);
   const [globalChromeReady, setGlobalChromeReady] = useState(false);
+  const [wechatModalOpen, setWechatModalOpen] = useState(false);
+  const [qqCopied, setQqCopied] = useState(false);
+  const qqCopyTimerRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (qqCopyTimerRef.current !== null) {
+        window.clearTimeout(qqCopyTimerRef.current);
+      }
+    };
+  }, []);
+
+  const handleCopyFooterQQ = () => {
+    void copyToClipboard('245934740');
+    setQqCopied(true);
+    if (qqCopyTimerRef.current !== null) {
+      window.clearTimeout(qqCopyTimerRef.current);
+    }
+    qqCopyTimerRef.current = window.setTimeout(() => {
+      setQqCopied(false);
+      qqCopyTimerRef.current = null;
+    }, 2000);
+  };
 
   useEffect(() => {
     if (process.env.NODE_ENV !== 'production') {
@@ -283,22 +308,13 @@ export default function MyApp({ Component, pageProps }: AppProps) {
                 </div>
 
                 <div className={footerStyles.linkCol}>
-                  <h3 className={footerStyles.colHeading}>浏览</h3>
+                  <h3 className={footerStyles.colHeading}>特别鸣谢</h3>
                   <ul className={footerStyles.colList}>
                     <li>
-                      <Link className={footerStyles.colLink} href="/materials" prefetch={false}>
-                        课程资料
-                      </Link>
+                      <span className={footerStyles.colItem}>季文君</span>
                     </li>
                     <li>
-                      <Link className={footerStyles.colLink} href="/requests" prefetch={false}>
-                        求资料区
-                      </Link>
-                    </li>
-                    <li>
-                      <Link className={footerStyles.colLink} href="/upload" prefetch={false}>
-                        我要投稿
-                      </Link>
+                      <span className={footerStyles.colItem}>林俊宇</span>
                     </li>
                   </ul>
                 </div>
@@ -345,14 +361,88 @@ export default function MyApp({ Component, pageProps }: AppProps) {
                   </ul>
                 </div>
 
+                <div className={footerStyles.linkCol}>
+                  <h3 className={footerStyles.colHeading}>硅基工友</h3>
+                  <ul className={footerStyles.colList}>
+                    <li>
+                      <span className={`${footerStyles.colItem} ${footerStyles.agentItem}`}>
+                        <FooterAgentLogo kind="claude" className={footerStyles.agentLogo} />
+                        <span>Claude Code</span>
+                      </span>
+                    </li>
+                    <li>
+                      <span className={`${footerStyles.colItem} ${footerStyles.agentItem}`}>
+                        <FooterAgentLogo kind="codex" className={footerStyles.agentLogo} />
+                        <span>Codex</span>
+                      </span>
+                    </li>
+                    <li>
+                      <span className={`${footerStyles.colItem} ${footerStyles.agentItem}`}>
+                        <FooterAgentLogo kind="antigravity" className={footerStyles.agentLogo} />
+                        <span>Antigravity</span>
+                      </span>
+                    </li>
+                  </ul>
+                </div>
+
                 <div className={`${footerStyles.linkCol} ${footerStyles.contactCol}`}>
                   <h3 className={footerStyles.colHeading}>联系方式</h3>
-                  <p className={footerStyles.contactItem}>
-                    <span>联系邮箱：</span>
-                    <a className={footerStyles.contactLink} href="mailto:chengjinli@std.uestc.edu.cn">
-                      chengjinli@std.uestc.edu.cn
+                  <div className={footerStyles.socialRow} role="group" aria-label="联系方式图标">
+                    <button
+                      className={`${footerStyles.socialBtn}${qqCopied ? ` ${footerStyles.socialBtnActive}` : ''}`}
+                      type="button"
+                      onClick={handleCopyFooterQQ}
+                      aria-label="复制官方QQ群号 245934740"
+                      data-tooltip={qqCopied ? '已复制 QQ 群：245934740' : '官方 QQ 群：245934740（点击复制）'}
+                    >
+                      <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                        <path d="M12 2.2c-3.65 0-6.15 2.55-6.15 6.05 0 .78.12 1.48.27 2.02-1.52 1.78-2.32 3.74-2.32 5.26 0 1.1.54 1.66 1.24 1.66.44 0 .93-.28 1.42-.91.38.94 1.07 1.74 1.96 2.33-.95.29-1.58.75-1.58 1.29 0 .82 1.38 1.38 3.24 1.38 1.08 0 1.6-.22 1.92-.52.32.3.84.52 1.92.52 1.86 0 3.24-.56 3.24-1.38 0-.54-.63-1-1.58-1.29.89-.59 1.58-1.39 1.96-2.33.49.63.98.91 1.42.91.7 0 1.24-.56 1.24-1.66 0-1.52-.8-3.48-2.32-5.26.15-.54.27-1.24.27-2.02C18.15 4.75 15.65 2.2 12 2.2Z" />
+                      </svg>
+                    </button>
+                    <button
+                      className={footerStyles.socialBtn}
+                      type="button"
+                      onClick={() => setWechatModalOpen(true)}
+                      aria-label="官方微信公众号"
+                      data-tooltip="微信公众号 · 扫码关注"
+                    >
+                      <svg
+                        width="17"
+                        height="17"
+                        viewBox="0 0 24 24"
+                        fill="currentColor"
+                        fillRule="evenodd"
+                        clipRule="evenodd"
+                        aria-hidden="true"
+                      >
+                        <path d="M9.2 3.8C5.1 3.8 1.8 6.5 1.8 9.9c0 1.9 1.05 3.6 2.7 4.7l-.65 2.05 2.35-1.15c.88.24 1.82.37 2.8.37.24 0 .47-.01.7-.03a5.8 5.8 0 0 1-.25-1.64c0-3.35 3.15-6.05 7.05-6.05.24 0 .48.01.71.03C16.55 5.65 13.2 3.8 9.2 3.8ZM6.9 7.9a.85.85 0 1 1 0 1.7.85.85 0 0 1 0-1.7Zm4.6 0a.85.85 0 1 1 0 1.7.85.85 0 0 1 0-1.7Z" />
+                        <path d="M16.2 9.5c-3.35 0-6.05 2.25-6.05 5.05s2.7 5.05 6.05 5.05c.72 0 1.41-.11 2.05-.3l1.9.95-.5-1.65c1.5-.95 2.4-2.42 2.4-4.05 0-2.8-2.7-5.05-5.85-5.05Zm-2 3.25a.75.75 0 1 1 0 1.5.75.75 0 0 1 0-1.5Zm4 0a.75.75 0 1 1 0 1.5.75.75 0 0 1 0-1.5Z" />
+                      </svg>
+                    </button>
+                    <a
+                      className={footerStyles.socialBtn}
+                      href="mailto:chengjinli@std.uestc.edu.cn"
+                      aria-label="联系邮箱 chengjinli@std.uestc.edu.cn"
+                      data-tooltip="邮箱 · chengjinli@std.uestc.edu.cn"
+                    >
+                      <svg
+                        width="17"
+                        height="17"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.9"
+                        aria-hidden="true"
+                      >
+                        <rect x="3" y="5" width="18" height="14" rx="2.5" />
+                        <path
+                          d="m3.6 7 7.6 5.2a1.4 1.4 0 0 0 1.6 0L20.4 7"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
                     </a>
-                  </p>
+                  </div>
                   <div className={footerStyles.qrGroup}>
                     <div className={footerStyles.qrCard}>
                       <div className={footerStyles.qrBox}>
@@ -400,6 +490,37 @@ export default function MyApp({ Component, pageProps }: AppProps) {
             </div>
           </div>
         </footer>
+        {wechatModalOpen && (
+          <div className="modal-mask" onClick={() => setWechatModalOpen(false)}>
+            <div
+              className="modal-card support-modal wechat-modal"
+              role="dialog"
+              aria-modal="true"
+              aria-label="官方微信公众号"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <button
+                className="modal-close"
+                type="button"
+                aria-label="关闭"
+                onClick={() => setWechatModalOpen(false)}
+              >
+                ×
+              </button>
+              <div className="wechat-modal__title">官方微信公众号</div>
+              <div className="wechat-modal__hint">扫码关注获取公告与更新</div>
+              <div className="lazy-image-box qr-medium">
+                <AppImage
+                  src="/wechat/wechat-qr.png"
+                  alt="StudyHub 官方微信公众号二维码"
+                  width={180}
+                  height={180}
+                  decoding="async"
+                />
+              </div>
+            </div>
+          </div>
+        )}
         <BottomTabBar />
         <PwaInstall />
       </div>

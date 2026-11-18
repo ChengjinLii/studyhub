@@ -1,5 +1,16 @@
 import Link from 'next/link';
-import { FormEvent, ReactNode, RefObject, useLayoutEffect, useRef } from 'react';
+import { useRouter } from 'next/router';
+import {
+  ChangeEvent,
+  DragEvent,
+  FormEvent,
+  KeyboardEvent,
+  ReactNode,
+  RefObject,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from 'react';
 import {
   SUPPORTED_SCHOOL,
   COURSE_CATEGORY_OPTIONS,
@@ -17,6 +28,7 @@ import {
   usePresence,
   useReducedMotion,
 } from '../../lib/motion';
+import { stageQuickUploadFiles } from '../../lib/quickUploadHandoff';
 import minStyles from '../../styles/HomeMinimal.module.css';
 
 export interface HomeFilterState {
@@ -131,27 +143,35 @@ function AdvancedFilterPopover({
       originRef.current = origin;
       const { dx, dy, sx, sy, restRadius } = origin;
 
-      const cardCtrl = animate(
+      const cardSpringCtrl = animate(
         card,
         {
-          x: [dx, dx * 0.36, -dx * 0.025, dx * 0.008, 0],
-          y: [dy, dy * 0.24, 6, -2, 0],
-          scaleX: [sx, sx + (1 - sx) * 0.42, 1.022, 0.994, 1],
-          scaleY: [sy, sy + (1 - sy) * 0.6, 1.032, 0.992, 1],
-          opacity: [0, 1, 1, 1, 1],
-          borderRadius: ['999px', '42px', restRadius, restRadius, restRadius],
+          x: [dx, 0],
+          y: [dy, 0],
+          scaleX: [sx, 1],
+          scaleY: [sy, 1],
         },
         {
-          duration: 0.52,
-          times: [0, 0.16, 0.56, 0.8, 1],
-          ease: [
-            [0.2, 0.9, 0.3, 1],
-            [0.16, 1, 0.3, 1],
-            [0.33, 1, 0.68, 1],
-            [0.22, 1, 0.36, 1],
-          ],
+          type: 'spring',
+          stiffness: 360,
+          damping: 25,
+          mass: 0.88,
           onComplete: () => {
             card.style.transform = '';
+          },
+        }
+      );
+
+      const cardSurfaceCtrl = animate(
+        card,
+        {
+          opacity: [0, 1],
+          borderRadius: ['999px', restRadius],
+        },
+        {
+          duration: 0.32,
+          ease: [0.22, 1, 0.36, 1],
+          onComplete: () => {
             card.style.opacity = '1';
             card.style.borderRadius = '';
           },
@@ -161,14 +181,14 @@ function AdvancedFilterPopover({
       const contentCtrl = animate(
         content,
         {
-          opacity: [0, 0, 1, 1],
-          y: [-6, -6, 1, 0],
-          scale: [0.96, 0.96, 1.004, 1],
+          opacity: [0, 1],
+          y: [-7, 0],
+          scale: [0.96, 1],
         },
         {
-          duration: 0.44,
-          times: [0, 0.22, 0.68, 1],
-          ease: ['linear', [0.16, 1, 0.3, 1], [0.22, 1, 0.36, 1]],
+          opacity: { duration: 0.22, delay: 0.05, ease: [0.2, 0, 0, 1] },
+          y: { type: 'spring', stiffness: 380, damping: 27, mass: 0.85, delay: 0.03 },
+          scale: { type: 'spring', stiffness: 380, damping: 27, mass: 0.85, delay: 0.03 },
           onComplete: () => {
             content.style.transform = '';
             content.style.opacity = '1';
@@ -176,7 +196,7 @@ function AdvancedFilterPopover({
         }
       );
 
-      animsRef.current = [cardCtrl, contentCtrl];
+      animsRef.current = [cardSpringCtrl, cardSurfaceCtrl, contentCtrl];
     } else {
       const origin = measureOrigin();
       originRef.current = origin;
@@ -244,7 +264,60 @@ export default function HomeFilterCard({
   onResetFilters,
   onSubmit,
 }: HomeFilterCardProps) {
+  const router = useRouter();
   const filterTriggerRef = useRef<HTMLButtonElement>(null);
+  const quickFileInputRef = useRef<HTMLInputElement>(null);
+  const quickDragDepthRef = useRef(0);
+  const [quickDragActive, setQuickDragActive] = useState(false);
+
+  const handleQuickFiles = (fileList: FileList | null) => {
+    const staged = stageQuickUploadFiles(fileList);
+    if (staged.length === 0) return;
+    void router.push('/upload?quick=1');
+  };
+
+  const handleQuickDragEnter = (event: DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    quickDragDepthRef.current += 1;
+    setQuickDragActive(true);
+  };
+
+  const handleQuickDragOver = (event: DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    if (event.dataTransfer) {
+      event.dataTransfer.dropEffect = 'copy';
+    }
+  };
+
+  const handleQuickDragLeave = (event: DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    quickDragDepthRef.current = Math.max(0, quickDragDepthRef.current - 1);
+    if (quickDragDepthRef.current === 0) {
+      setQuickDragActive(false);
+    }
+  };
+
+  const handleQuickDrop = (event: DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    quickDragDepthRef.current = 0;
+    setQuickDragActive(false);
+    const files = event.dataTransfer?.files;
+    if (files && files.length > 0) {
+      handleQuickFiles(files);
+      event.dataTransfer.clearData();
+    }
+  };
+
+  const handleQuickKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      quickFileInputRef.current?.click();
+    }
+  };
   const collegeOptions = getCollegeOptions(filtersState.college);
   const majorOptions = getMajorOptionsForCollege(filtersState.college, filtersState.major);
   const activeFilterCount = [
@@ -533,11 +606,69 @@ export default function HomeFilterCard({
         </AnimatePresence>
 
         <div className={minStyles.searchActions}>
-          <Link className={minStyles.searchAction} href="/join" prefetch={false}>
-            关于我们
-          </Link>
-          <Link className={minStyles.searchAction} href="/upload" prefetch={false}>
-            我要投稿
+          <div
+            role="button"
+            tabIndex={0}
+            data-quick-dropzone=""
+            data-drag-active={quickDragActive ? 'true' : 'false'}
+            aria-label="拖拽资料到这里快捷投稿，或点击选择文件"
+            className={`${minStyles.quickDropzone}${quickDragActive ? ` ${minStyles.quickDropzoneActive}` : ''}`}
+            onClick={() => quickFileInputRef.current?.click()}
+            onKeyDown={handleQuickKeyDown}
+            onDragEnter={handleQuickDragEnter}
+            onDragOver={handleQuickDragOver}
+            onDragLeave={handleQuickDragLeave}
+            onDrop={handleQuickDrop}
+          >
+            <svg className={minStyles.quickDropzoneIcon} viewBox="0 0 20 20" fill="none" aria-hidden="true">
+              <path
+                d="M10 13V4.5M10 4.5L6.75 7.75M10 4.5L13.25 7.75M4.25 12.75V14.25C4.25 15.0784 4.92157 15.75 5.75 15.75H14.25C15.0784 15.75 15.75 15.0784 15.75 14.25V12.75"
+                stroke="currentColor"
+                strokeWidth="1.65"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+            <span className={minStyles.quickDropzoneLabel}>
+              {quickDragActive ? '松开快捷投稿' : '拖拽资料快捷投稿'}
+            </span>
+            <input
+              ref={quickFileInputRef}
+              type="file"
+              multiple
+              tabIndex={-1}
+              aria-hidden="true"
+              className={minStyles.quickDropzoneInput}
+              onChange={(event: ChangeEvent<HTMLInputElement>) => {
+                handleQuickFiles(event.target.files);
+                event.target.value = '';
+              }}
+            />
+          </div>
+          <Link
+            className={`${minStyles.searchAction} ${minStyles.searchActionPrimary}`}
+            href="/upload"
+            prefetch={false}
+          >
+            <svg className={minStyles.searchActionIcon} viewBox="0 0 20 20" fill="none" aria-hidden="true">
+              <path
+                d="M10.5 3.75H6.25C5.14543 3.75 4.25 4.64543 4.25 5.75V14.25C4.25 15.3546 5.14543 16.25 6.25 16.25H13.75C14.8546 16.25 15.75 15.3546 15.75 14.25V9.5M13.85 3.65L16.35 6.15M9.75 10.25L15.6 4.4"
+                stroke="currentColor"
+                strokeWidth="1.6"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+            <span>我要投稿</span>
+            <svg className={minStyles.searchActionArrow} viewBox="0 0 16 16" fill="none" aria-hidden="true">
+              <path
+                d="M6 3.75L10.25 8L6 12.25"
+                stroke="currentColor"
+                strokeWidth="1.6"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
           </Link>
         </div>
       </form>

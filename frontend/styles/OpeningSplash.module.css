@@ -1,10 +1,10 @@
-/* The opening splash: a black screen with the vectorized StudyHub wordmark. Each glyph
-   traces its SVG stroke contour, fills upward behind a luminous energy crest, receives a diagonal
-   metallic glint, then cleaves cleanly through sculpted prism facets with restrained kinetic warp. */
+/* Opening splash: #1a1c20 dark stage with traced/filled StudyHub wordmark and a large
+   corner pixel dinosaur; on dock, the dark curtain glides upward with Apple non-linear
+   spring deceleration while the dino scales down onto the horizon seam. */
 .overlay {
-  --splash-ink: #ffffff;
-  --splash-travel: 840ms;
-  --splash-glide: cubic-bezier(0.09, 0.94, 0.17, 1);
+  --splash-ink: #f6f6f4;
+  --splash-travel: 860ms;
+  --splash-glide: cubic-bezier(0.16, 1, 0.3, 1);
   position: fixed;
   inset: 0;
   z-index: 2100;
@@ -12,12 +12,10 @@
   align-items: center;
   justify-content: center;
   overflow: hidden;
-  /* The lockup is blended against the two surfaces of the splash only, not the page. */
   isolation: isolate;
   cursor: pointer;
   user-select: none;
   color: var(--splash-ink);
-  /* The script ends the splash. If no script runs, the splash leaves by itself. */
   animation: splashFailsafe 1ms linear 9s forwards;
 }
 
@@ -25,7 +23,6 @@
   pointer-events: none;
 }
 
-/* Only where the lockup does not land on the page: the white surface fades to show the page. */
 .overlayLeaving {
   opacity: 0;
   transition: opacity 220ms ease;
@@ -34,21 +31,35 @@
 .backdrop {
   position: absolute;
   inset: 0;
-  background: #09090b;
+  background: #ffffff;
+  z-index: 0;
 }
 
-.gridGlow {
+/* Dark curtain that covers the full screen during intro, then glides up to horizonY. */
+.curtain {
   position: absolute;
   inset: 0;
-  pointer-events: none;
-  opacity: 0.74;
-  background:
-    radial-gradient(620px circle at 50% 46%, rgba(99, 102, 241, 0.1), transparent 68%),
-    radial-gradient(420px circle at 50% 48%, rgba(255, 255, 255, 0.05), transparent 72%);
+  background: #1a1c20;
+  z-index: 1;
+  transform: translate3d(0, 0, 0);
+  will-change: transform;
+  overflow: hidden;
 }
 
-/* The white surface. It opens as a circle from the centre of the screen on non-hero routes; 72vmax reaches the
-   corners of any screen. */
+.curtainAurora {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 48%;
+  pointer-events: none;
+  background:
+    radial-gradient(42% 88% at 26% 100%, rgba(59, 130, 246, 0.11), transparent 72%),
+    radial-gradient(42% 88% at 50% 100%, rgba(129, 140, 248, 0.1), transparent 72%),
+    radial-gradient(42% 88% at 74% 100%, rgba(45, 212, 191, 0.08), transparent 72%);
+}
+
+/* Non-hero fallback wipe (away from home page). */
 .wipe {
   position: absolute;
   inset: 0;
@@ -56,17 +67,31 @@
   clip-path: circle(0 at 50% 50%);
   transition: clip-path var(--splash-travel) var(--splash-glide);
   will-change: clip-path;
+  z-index: 2;
 }
 
-.overlayDocking .wipe {
+.overlayDocking:not(.overlayHeroDocking) .wipe {
   clip-path: circle(72vmax at 50% 50%);
 }
 
-/* The difference blend turns the lockup ink dark where the white surface passes beneath it. */
+.overlayHeroDocking .wipe {
+  display: none;
+}
+
+.dinoCanvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  pointer-events: none;
+  z-index: 3;
+}
+
 .stage {
   --wordmark-width: clamp(256px, 31vw, 340px);
   position: relative;
-  z-index: 4;
+  z-index: 5;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -78,11 +103,17 @@
   will-change: transform, opacity;
 }
 
+.overlayHeroDocking .stage {
+  z-index: 5;
+  mix-blend-mode: normal;
+  filter: drop-shadow(0 6px 22px rgba(0, 0, 0, 0.28));
+  transition: none;
+}
+
 .stageLeaves {
   opacity: 0;
 }
 
-/* Depth-focus emergence and subtle detonation recoil sit on this inner wrapper so .stage keeps its dock transform. */
 .lockup {
   position: relative;
   display: inline-flex;
@@ -125,16 +156,6 @@
   overflow: visible;
 }
 
-.prismGhostCyan,
-.prismGhostViolet {
-  position: absolute;
-  left: 0;
-  top: 0;
-  pointer-events: none;
-  opacity: 0;
-  will-change: transform, opacity;
-}
-
 .letterOutline {
   fill: none;
   stroke: var(--splash-ink);
@@ -156,8 +177,7 @@
   transform-box: fill-box;
   transform: translate3d(0, 106%, 0);
   will-change: transform;
-  animation: splashLetterFill 460ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
-  animation-delay: var(--fill-delay, 480ms);
+  animation: splashLetterFill 460ms cubic-bezier(0.16, 1, 0.3, 1) var(--fill-delay, 480ms) forwards;
 }
 
 .glyphFillWhite {
@@ -165,7 +185,7 @@
 }
 
 .glyphFillSilver {
-  fill: #c1c1c7;
+  fill: #b8b8ba;
   transition: fill 240ms ease 180ms;
 }
 
@@ -178,6 +198,28 @@
   opacity: 0;
   will-change: transform, opacity;
   animation: splashSheenSweep 540ms cubic-bezier(0.16, 1, 0.3, 1) 1140ms forwards;
+}
+
+.overlayHeroDocking .letterOutline,
+.overlayHeroDocking .wordmarkSheen,
+.overlayHeroDocking .letterCrest,
+.overlayHeroDocking .horizonBeam {
+  opacity: 0 !important;
+  animation: none !important;
+}
+
+.overlayHeroDocking .letterFill {
+  animation: none;
+  transform: translate3d(0, 0%, 0);
+}
+
+.overlayHeroDocking .glyphFillWhite {
+  fill: #ffffff;
+}
+
+.overlayHeroDocking .glyphFillSilver {
+  fill: #b8b8ba;
+  transition: fill 280ms ease;
 }
 
 @keyframes splashFailsafe {
@@ -196,63 +238,6 @@
   }
   100% {
     transform: translate3d(0, 0, 0) scale(1);
-  }
-}
-
-@keyframes splashLockupDetonate {
-  0% {
-    transform: translate3d(0, 0, 0) scale(1);
-  }
-  7% {
-    transform: translate3d(0, 2px, 0) scale(0.965, 0.975);
-  }
-  20% {
-    transform: translate3d(0, -2px, 0) scale(1.035);
-  }
-  56% {
-    transform: translate3d(0, 0, 0) scale(0.998);
-  }
-  84%,
-  100% {
-    transform: translate3d(0, 0, 0) scale(1);
-  }
-}
-
-@keyframes splashPrismSplitCyan {
-  0% {
-    opacity: 0;
-    transform: translate3d(0, 0, 0);
-  }
-  20% {
-    opacity: 0.56;
-    transform: translate3d(-5px, -1px, 0);
-  }
-  52% {
-    opacity: 0.24;
-    transform: translate3d(2px, 0.5px, 0);
-  }
-  100% {
-    opacity: 0;
-    transform: translate3d(0, 0, 0);
-  }
-}
-
-@keyframes splashPrismSplitViolet {
-  0% {
-    opacity: 0;
-    transform: translate3d(0, 0, 0);
-  }
-  20% {
-    opacity: 0.52;
-    transform: translate3d(5px, 1px, 0);
-  }
-  52% {
-    opacity: 0.22;
-    transform: translate3d(-2px, -0.5px, 0);
-  }
-  100% {
-    opacity: 0;
-    transform: translate3d(0, 0, 0);
   }
 }
 
@@ -301,15 +286,11 @@
     opacity: 0;
     stroke-dashoffset: 1.04;
   }
-  12% {
+  14% {
     opacity: 1;
   }
-  66% {
+  68% {
     opacity: 1;
-    stroke-dashoffset: 0;
-  }
-  84% {
-    opacity: 0.9;
     stroke-dashoffset: 0;
   }
   100% {
@@ -345,116 +326,6 @@
     transform: translate3d(1260px, 0, 0) skewX(-22deg);
     opacity: 0;
   }
-}
-
-/* On the home page, sculpted prism facets part cleanly while restrained kinetic warp propels
-   StudyHub smoothly into the #1a1c20 canopy hero berth. */
-.overlayHeroDocking .wipe {
-  clip-path: circle(0 at 50% 50%);
-  opacity: 0;
-  transition: none;
-}
-
-.canopyStage {
-  position: absolute;
-  inset: 0;
-  background: #1a1c20;
-  pointer-events: none;
-  z-index: 1;
-  opacity: 0;
-  will-change: opacity;
-}
-
-.overlayHeroDocking .canopyStage {
-  opacity: 1;
-  transition: opacity 240ms cubic-bezier(0.22, 1, 0.36, 1);
-}
-
-.canopyUpperFill {
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: 0;
-  height: calc(max(0px, var(--canopy-top, 0px)) + 8px);
-  background: #1a1c20;
-}
-
-.taijiWave {
-  position: absolute;
-  left: var(--canopy-left, 0px);
-  top: var(--canopy-top, -200px);
-  width: var(--canopy-width, 100%);
-  height: var(--canopy-height, 736px);
-  display: block;
-}
-
-.whiteLowerStage {
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: var(--canopy-horizon-y, 376px);
-  bottom: 0;
-  background: #ffffff;
-  pointer-events: none;
-  z-index: 2;
-  opacity: 0;
-}
-
-.overlayHeroDocking .whiteLowerStage {
-  opacity: 1;
-}
-
-.fxCanvas {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  display: block;
-  pointer-events: none;
-  z-index: 3;
-}
-
-.overlayHeroDocking .stage {
-  z-index: 5;
-  mix-blend-mode: normal;
-  filter: drop-shadow(0 6px 22px rgba(0, 0, 0, 0.28));
-  transition:
-    transform var(--splash-travel) var(--splash-glide),
-    filter 420ms ease;
-}
-
-.overlayHeroDocking .lockup {
-  animation: splashLockupDetonate var(--splash-travel) linear forwards;
-}
-
-.overlayHeroDocking .prismGhostCyan {
-  animation: splashPrismSplitCyan 220ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
-}
-
-.overlayHeroDocking .prismGhostViolet {
-  animation: splashPrismSplitViolet 220ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
-}
-
-.overlayHeroDocking .letterOutline,
-.overlayHeroDocking .wordmarkSheen,
-.overlayHeroDocking .letterCrest,
-.overlayHeroDocking .horizonBeam {
-  opacity: 0 !important;
-  animation: none !important;
-}
-
-.overlayHeroDocking .letterFill {
-  animation: none;
-  transform: translate3d(0, 0%, 0);
-}
-
-.overlayHeroDocking .glyphFillWhite {
-  fill: #ffffff;
-}
-
-.overlayHeroDocking .glyphFillSilver {
-  fill: #b8b8ba;
-  transition: fill 280ms ease;
 }
 
 @media (min-width: 769px) and (max-height: 820px) {

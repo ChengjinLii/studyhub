@@ -35,7 +35,7 @@ import { buildZipName, resolveZipFileName, zipFiles, zipMarkdownContent } from '
 import { buildUploadPayload } from '../lib/uploadPayload';
 import { describeUploadFile, requestMaterialUploadAuthorization } from '../lib/uploadAuthorization';
 import { isUploadResultUncertain, sendUploadFormData } from '../lib/uploadSubmit';
-import { sendStagedUploadFormData } from '../lib/stagedUpload';
+import { buildUploadFileSignature, stageAuthorizedUploadFiles, StagedUploadAsset, useStagedPreviewGroup } from '../lib/stagedUpload';
 import {
   buildUploadSubmissionFingerprint,
   clearUploadSubmission,
@@ -50,6 +50,7 @@ import { resolveUploadSectionCompletion } from '../lib/uploadSectionCompletion';
 import { buildUploadDraftKey, UploadTextDraftValue } from '../lib/uploadDraft';
 import { useUploadTextDraftPersistence } from '../lib/useUploadTextDraft';
 import { useUploadSubmissionToast } from '../lib/useUploadSubmissionToast';
+import { consumeQuickUploadFiles, peekQuickUploadFiles } from '../lib/quickUploadHandoff';
 import { deriveUploadAutoTitle, resolveUploadSubmissionContext } from '../lib/uploadSubmissionContext';
 import { deriveUploadTags } from '../lib/uploadTags';
 
@@ -123,18 +124,10 @@ export default function UploadPage({ user, account }: UploadPageProps) {
   const zipTaskRef = useRef(0);
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const [activeSubmissionId, setActiveSubmissionId] = useState<string | null>(null);
-  const [stagedMaterial, setStagedMaterial] = useState<{ signature: string; token: string } | null>(null);
-  const [stagedPreviews, setStagedPreviews] = useState<{ signature: string; token: string } | null>(null);
-  const [stagedCustomPreviews, setStagedCustomPreviews] = useState<{ signature: string; token: string } | null>(null);
+  const [stagedMaterial, setStagedMaterial] = useState<StagedUploadAsset | null>(null);
   const [materialUploading, setMaterialUploading] = useState(false);
-  const [previewsUploading, setPreviewsUploading] = useState(false);
-  const [customPreviewsUploading, setCustomPreviewsUploading] = useState(false);
   const materialStageRequestRef = useRef<XMLHttpRequest | null>(null);
-  const previewStageRequestRef = useRef<XMLHttpRequest | null>(null);
-  const customPreviewStageRequestRef = useRef<XMLHttpRequest | null>(null);
   const materialStageTaskRef = useRef(0);
-  const previewStageTaskRef = useRef(0);
-  const customPreviewStageTaskRef = useRef(0);
   const [deliveryMethod, setDeliveryMethod] = useState<'FILE' | 'NETDISK'>('FILE');
   const [previewWatermarkEnabled, setPreviewWatermarkEnabled] = useState(true);
   const [previewSource, setPreviewSource] = useState<'AUTO' | 'MANUAL'>(PREVIEW_SOURCE_AUTO);
@@ -172,15 +165,18 @@ export default function UploadPage({ user, account }: UploadPageProps) {
   const uploadRequestRef = useRef<XMLHttpRequest | null>(null);
   const submissionInFlightRef = useRef(false);
   const allowSubmissionNavigationRef = useRef(false);
+  const quickHandoffAppliedRef = useRef(false);
+  const [guestStagedCount, setGuestStagedCount] = useState(0);
   const submitting = submissionStage !== 'idle';
-  const assetsUploading = materialUploading || previewsUploading || customPreviewsUploading;
+
+  const isQuickHandoffRoute = router.query.quick === '1';
   const draftScope = useMemo(() => {
-    if (!router.isReady || !user) return null;
+    if (!router.isReady || !user || isQuickHandoffRoute) return null;
     const queryRequestId = typeof router.query.requestId === 'string' ? router.query.requestId : '';
     const queryTopic = typeof router.query.topic === 'string' ? router.query.topic : '';
     const scope = queryRequestId ? `request-${queryRequestId}` : queryTopic ? `topic-${queryTopic}` : 'material';
     return buildUploadDraftKey(user.id, scope);
-  }, [router.isReady, router.query.requestId, router.query.topic, user]);
+  }, [isQuickHandoffRoute, router.isReady, router.query.requestId, router.query.topic, user]);
   const apiBase = useMemo(() => resolveApiBase(typeof window !== 'undefined' ? window.location.origin : undefined), []);
   const isExperienceCustomTopic = experienceTopic === 'leetcode';
   const experienceTopicTitle = getColumnTopicTitle(experienceTopic);
@@ -485,16 +481,8 @@ export default function UploadPage({ user, account }: UploadPageProps) {
     setMaterialUploading(false);
     setStagedMaterial(null);
     setActiveSubmissionId(null);
-    previewStageRequestRef.current?.abort();
-    previewStageRequestRef.current = null;
-    previewStageTaskRef.current += 1;
-    setPreviewsUploading(false);
-    setStagedPreviews(null);
-    customPreviewStageRequestRef.current?.abort();
-    customPreviewStageRequestRef.current = null;
-    customPreviewStageTaskRef.current += 1;
-    setCustomPreviewsUploading(false);
-    setStagedCustomPreviews(null);
+    resetStagedPreviews();
+    resetStagedCustomPreviews();
     if (zipInputRef.current) {
       zipInputRef.current.value = '';
     }
@@ -507,6 +495,40 @@ export default function UploadPage({ user, account }: UploadPageProps) {
     handleCustomPreviewFilesSelection(files);
   };
 
+  const previewFilesForStaging = useMemo(
+    () => (previewSource === PREVIEW_SOURCE_MANUAL || isRequestResponse ? manualPreviewFiles : []),
+    [isRequestResponse, manualPreviewFiles, previewSource]
+  );
+  const {
+    staged: stagedPreviews,
+    uploading: previewsUploading,
+    reset: resetStagedPreviews,
+  } = useStagedPreviewGroup({
+    apiBase,
+    role: 'PREVIEW',
+    enabled: !isEditing && !isExperience,
+    activeSubmissionId,
+    files: previewFilesForStaging,
+    errorFallback: '预览图上传失败，请重新选择。',
+    onClearStatus: () => setStatus(null),
+    onError: (message) => setStatus({ type: 'error', message }),
+  });
+  const {
+    staged: stagedCustomPreviews,
+    uploading: customPreviewsUploading,
+    reset: resetStagedCustomPreviews,
+  } = useStagedPreviewGroup({
+    apiBase,
+    role: 'CUSTOM_PREVIEW',
+    enabled: !isEditing && !isExperience && !isQuickMode,
+    activeSubmissionId,
+    files: customPreviewFiles,
+    errorFallback: '自定义预览图上传失败，请重新选择。',
+    onClearStatus: () => setStatus(null),
+    onError: (message) => setStatus({ type: 'error', message }),
+  });
+  const assetsUploading = materialUploading || previewsUploading || customPreviewsUploading;
+
   const clearCustomPreviewAll = () => {
     setCustomPreviewText('');
     setCustomPreviewClear(true);
@@ -515,40 +537,10 @@ export default function UploadPage({ user, account }: UploadPageProps) {
     clearCustomPreviewFiles();
   };
 
-  const fileSignature = (files: File[]) =>
-    files.map((file) => `${file.name}:${file.size}:${file.lastModified}:${file.type}`).join('|');
-
-  const stageFiles = useCallback(
-    async (
-      role: 'MATERIAL' | 'PREVIEW' | 'CUSTOM_PREVIEW',
-      files: File[],
-      submissionId: string,
-      authorizationSubmissionId: string,
-      requestRef: { current: XMLHttpRequest | null },
-      onProgress: (value: number) => void
-    ) => {
-      const authorization = await requestMaterialUploadAuthorization(
-        authorizationSubmissionId,
-        files.map((file) => describeUploadFile(role, file))
-      );
-      const formData = new FormData();
-      formData.append('submissionId', submissionId);
-      formData.append('authorizationSubmissionId', authorizationSubmissionId);
-      const field = role === 'MATERIAL' ? 'zip' : role === 'PREVIEW' ? 'previews' : 'customPreviews';
-      files.forEach((file) => formData.append(field, file));
-      return sendStagedUploadFormData(`${apiBase}/material-uploads/stage`, formData, {
-        uploadToken: authorization.uploadToken,
-        onProgress,
-        requestRef,
-      });
-    },
-    [apiBase]
-  );
-
   const stageMaterialFile = useCallback(
     async (file: File, taskId: number) => {
       if (isEditing || isExperience) return;
-      const signature = fileSignature([file]);
+      const signature = buildUploadFileSignature([file]);
       const fingerprint = await buildUploadSubmissionFingerprint({ kind: 'material-upload', signature });
       const submissionId = resolveUploadSubmissionId(fingerprint, window.sessionStorage);
       setActiveSubmissionId(submissionId);
@@ -556,7 +548,8 @@ export default function UploadPage({ user, account }: UploadPageProps) {
       setMaterialUploading(true);
       setUploadProgress(0);
       try {
-        const result = await stageFiles(
+        const result = await stageAuthorizedUploadFiles(
+          apiBase,
           'MATERIAL',
           [file],
           submissionId,
@@ -577,17 +570,19 @@ export default function UploadPage({ user, account }: UploadPageProps) {
         materialStageRequestRef.current = null;
       }
     },
-    [isEditing, isExperience, stageFiles]
+    [apiBase, isEditing, isExperience]
   );
 
-  const handleZipSelection = async (fileList: FileList | null) => {
+  const applySelectedMaterialFiles = async (
+    files: File[],
+    options?: { forceAutoTitle?: boolean }
+  ) => {
     if (submissionInFlightRef.current) return;
     materialStageRequestRef.current?.abort();
     materialStageRequestRef.current = null;
     materialStageTaskRef.current += 1;
     setMaterialUploading(false);
     setStagedMaterial(null);
-    const files = fileList ? Array.from(fileList) : [];
     const taskId = ++zipTaskRef.current;
     if (files.length === 0) {
       clearZipFile();
@@ -603,8 +598,9 @@ export default function UploadPage({ user, account }: UploadPageProps) {
       return;
     }
     setZipSourceCount(files.length);
-    if (isQuickMode && !title.trim()) {
-      setTitle(deriveAutoTitle(files[0].name));
+    const autoTitle = deriveAutoTitle(files[0].name);
+    if ((isQuickMode || options?.forceAutoTitle) && autoTitle) {
+      setTitle((prev) => (prev.trim() ? prev : autoTitle));
     }
     if (files.length === 1) {
       setZipFile(files[0]);
@@ -614,7 +610,7 @@ export default function UploadPage({ user, account }: UploadPageProps) {
     }
     setZipPreparing(true);
     try {
-      const zipName = buildZipName(title, deriveAutoTitle(files[0].name), MAX_TITLE_LENGTH);
+      const zipName = buildZipName(title.trim() || autoTitle, autoTitle, MAX_TITLE_LENGTH);
       const zipped = await zipFiles(files, zipName, MAX_FILE_BYTES);
       if (zipTaskRef.current !== taskId) return;
       setZipFile(zipped);
@@ -632,85 +628,32 @@ export default function UploadPage({ user, account }: UploadPageProps) {
     }
   };
 
-  useEffect(() => {
-    if (isEditing || isExperience || !activeSubmissionId) return;
-    const files = previewSource === PREVIEW_SOURCE_MANUAL || isRequestResponse ? manualPreviewFiles : [];
-    previewStageRequestRef.current?.abort();
-    previewStageRequestRef.current = null;
-    const taskId = ++previewStageTaskRef.current;
-    if (files.length === 0) {
-      setStagedPreviews(null);
-      setPreviewsUploading(false);
-      return;
-    }
-    const signature = fileSignature(files);
-    setStagedPreviews(null);
-    setPreviewsUploading(true);
-    void stageFiles(
-      'PREVIEW',
-      files,
-      activeSubmissionId,
-      globalThis.crypto.randomUUID(),
-      previewStageRequestRef,
-      () => undefined
-    )
-      .then((result) => {
-        if (previewStageTaskRef.current !== taskId) return;
-        setStagedPreviews({ signature, token: result.stagedUploadToken });
-        setStatus(null);
-      })
-      .catch((error: unknown) => {
-        if (previewStageTaskRef.current !== taskId) return;
-        setStatus({ type: 'error', message: toErrorMessage(error, '预览图上传失败，请重新选择。') });
-      })
-      .finally(() => {
-        if (previewStageTaskRef.current === taskId) setPreviewsUploading(false);
-        previewStageRequestRef.current = null;
-      });
-    return () => {
-      if (previewStageTaskRef.current === taskId) previewStageRequestRef.current?.abort();
-    };
-  }, [activeSubmissionId, isEditing, isExperience, isRequestResponse, manualPreviewFiles, previewSource, stageFiles]);
+  const applySelectedMaterialFilesRef = useRef(applySelectedMaterialFiles);
+  applySelectedMaterialFilesRef.current = applySelectedMaterialFiles;
+
+  const handleZipSelection = (fileList: FileList | null) =>
+    applySelectedMaterialFiles(fileList ? Array.from(fileList) : []);
 
   useEffect(() => {
-    if (isEditing || isExperience || isQuickMode || !activeSubmissionId) return;
-    const files = customPreviewFiles;
-    customPreviewStageRequestRef.current?.abort();
-    customPreviewStageRequestRef.current = null;
-    const taskId = ++customPreviewStageTaskRef.current;
-    if (files.length === 0) {
-      setStagedCustomPreviews(null);
-      setCustomPreviewsUploading(false);
+    if (!router.isReady || isEditing || isRequestResponse) return;
+    if (!user) {
+      setGuestStagedCount(peekQuickUploadFiles().length);
       return;
     }
-    const signature = fileSignature(files);
-    setStagedCustomPreviews(null);
-    setCustomPreviewsUploading(true);
-    void stageFiles(
-      'CUSTOM_PREVIEW',
-      files,
-      activeSubmissionId,
-      globalThis.crypto.randomUUID(),
-      customPreviewStageRequestRef,
-      () => undefined
-    )
-      .then((result) => {
-        if (customPreviewStageTaskRef.current !== taskId) return;
-        setStagedCustomPreviews({ signature, token: result.stagedUploadToken });
-        setStatus(null);
-      })
-      .catch((error: unknown) => {
-        if (customPreviewStageTaskRef.current !== taskId) return;
-        setStatus({ type: 'error', message: toErrorMessage(error, '自定义预览图上传失败，请重新选择。') });
-      })
-      .finally(() => {
-        if (customPreviewStageTaskRef.current === taskId) setCustomPreviewsUploading(false);
-        customPreviewStageRequestRef.current = null;
-      });
-    return () => {
-      if (customPreviewStageTaskRef.current === taskId) customPreviewStageRequestRef.current?.abort();
-    };
-  }, [activeSubmissionId, customPreviewFiles, isEditing, isExperience, isQuickMode, stageFiles]);
+    if (quickHandoffAppliedRef.current) return;
+    const droppedFiles = consumeQuickUploadFiles();
+    const wantsQuick = router.query.quick === '1' || droppedFiles.length > 0;
+    if (!wantsQuick) return;
+    quickHandoffAppliedRef.current = true;
+    setUploadMode('material');
+    setDeliveryMethod('FILE');
+    setQuickPanelOpen(true);
+    if (droppedFiles.length > 0) {
+      void applySelectedMaterialFilesRef.current(droppedFiles, { forceAutoTitle: true });
+    }
+  }, [isEditing, isRequestResponse, router.isReady, router.query.quick, user]);
+
+
 
   const deriveAutoTitle = (name: string) => {
     return deriveUploadAutoTitle(name, MAX_TITLE_LENGTH);
@@ -778,12 +721,12 @@ export default function UploadPage({ user, account }: UploadPageProps) {
       return;
     }
     const selectedCourseCategory: CourseCategoryValue = effectiveCourseCategory;
-    const expectedMaterialSignature = zipFile ? fileSignature([zipFile]) : '';
+    const expectedMaterialSignature = zipFile ? buildUploadFileSignature([zipFile]) : '';
     const submittedPreviewsForStaging =
       !isExperience && !isQuickMode && effectivePreviewSource === PREVIEW_SOURCE_MANUAL ? manualPreviewFiles : [];
-    const expectedPreviewSignature = fileSignature(submittedPreviewsForStaging);
+    const expectedPreviewSignature = buildUploadFileSignature(submittedPreviewsForStaging);
     const submittedCustomPreviewsForStaging = !isExperience && !isQuickMode ? customPreviewFiles : [];
-    const expectedCustomPreviewSignature = fileSignature(submittedCustomPreviewsForStaging);
+    const expectedCustomPreviewSignature = buildUploadFileSignature(submittedCustomPreviewsForStaging);
     const hasStagedMaterial = Boolean(
       resolvedDelivery === 'FILE' && !isEditing && zipFile && stagedMaterial?.signature === expectedMaterialSignature
     );
@@ -1305,11 +1248,23 @@ export default function UploadPage({ user, account }: UploadPageProps) {
             <h2>投稿中心 ✍️</h2>
             <p>
               需要先登录才能投稿，
-              <Link className="login-link" href="/login">
+              <Link
+                className="login-link"
+                href={
+                  isQuickHandoffRoute || guestStagedCount > 0
+                    ? '/login?next=%2Fupload%3Fquick%3D1'
+                    : '/login?next=%2Fupload'
+                }
+              >
                 前往登录
               </Link>
               。
             </p>
+            {guestStagedCount > 0 && (
+              <p className="help-text">
+                已暂存你拖入的 {guestStagedCount} 个文件，登录后将自动载入快捷投稿。
+              </p>
+            )}
           </section>
         ) : loadingExisting ? (
           <section className="card upload-card">

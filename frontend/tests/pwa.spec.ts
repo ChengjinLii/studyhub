@@ -27,12 +27,11 @@ test.describe('mobile PWA', () => {
     await page.goto('/more');
     const button = page.getByRole('button', { name: '安装 StudyHub', exact: true });
     await expect(button).toBeVisible();
-    await expect(page.locator('.floating-sidebar__bubble')).toBeVisible();
+    await expect(page.locator('.floating-sidebar__bubble')).toHaveCount(0);
     await expect.poll(async () => page.evaluate(() => {
       const install = document.querySelector('[data-pwa-install]')!.getBoundingClientRect();
-      const bot = document.querySelector('.floating-sidebar__bubble')!.getBoundingClientRect();
       const nav = document.querySelector('.mobile-bottom-nav')!.getBoundingClientRect();
-      return install.bottom <= nav.top && bot.bottom < install.top;
+      return install.bottom <= nav.top;
     })).toBe(true);
     await page.screenshot({ path: testInfo.outputPath('mobile-install-entry.png') });
     await page.evaluate(() => { const input = document.createElement('input'); input.id = 'keyboard-test'; document.body.append(input); input.focus(); });

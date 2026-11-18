@@ -288,15 +288,29 @@ export default function HomePortal({
               </m.button>
             </div>
             {mobileTab === 'materials' ? (
-              <button type="button" className={styles.more} onClick={onBrowseMaterials}>
-                <span>全部资料</span>
+              <button
+                type="button"
+                className={styles.more}
+                aria-label="全部资料"
+                onClick={onBrowseMaterials}
+              >
+                <span>
+                  全部<span className={styles.mobileMoreSuffix}>资料</span>
+                </span>
                 <span className={styles.moreArrow} aria-hidden="true">
                   ›
                 </span>
               </button>
             ) : (
-              <button type="button" className={styles.more} onClick={onBrowseSubjects}>
-                <span>全部学科</span>
+              <button
+                type="button"
+                className={styles.more}
+                aria-label="全部学科"
+                onClick={onBrowseSubjects}
+              >
+                <span>
+                  全部<span className={styles.mobileMoreSuffix}>学科</span>
+                </span>
                 <span className={styles.moreArrow} aria-hidden="true">
                   ›
                 </span>

@@ -281,19 +281,19 @@ test('popular subjects open full folders despite an active search and restore th
   expect(documents).toHaveLength(1);
 });
 
-test('mobile discovery stacks both cards and opens subject materials without horizontal overflow', async ({ page }, info) => {
+test('mobile portal switches to popular subjects and opens subject materials without horizontal overflow', async ({ page }, info) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await openHomepage(page);
   await expect(page.getByRole('heading', { name: '为你推荐', exact: true })).toHaveCount(0);
-  const discovery = page.locator('.request-card');
-  const cooperation = page.getByRole('region', { name: '合作招募', exact: true });
-  await expect(discovery).toBeVisible();
-  await expect(discovery.getByRole('tab', { name: '热门学科' })).toHaveAttribute('aria-selected', 'true');
-  await expect(cooperation).toBeVisible();
-  const left = (await discovery.boundingBox())!;
-  expect((await cooperation.boundingBox())!.y).toBeGreaterThan(left.y + left.height);
-  await page.locator('#home-requests').screenshot({ path: info.outputPath('subject-discovery-mobile.png') });
-  await page.getByRole('list', { name: '热门学科排行' }).getByRole('button').first().click();
+  await expect(page.locator('.request-card')).toBeHidden();
+  const portal = page.locator('[data-home-portal]');
+  await expect(portal).toBeVisible();
+  const mobileTabs = portal.locator('[data-portal-mobile-tabs]');
+  await mobileTabs.getByRole('tab', { name: '热门学科' }).click();
+  const subjectList = portal.getByRole('list', { name: '热门学科排行' });
+  await expect(subjectList).toBeVisible();
+  await portal.screenshot({ path: info.outputPath('subject-discovery-mobile.png') });
+  await subjectList.getByRole('button').first().click();
   const library = page.locator('#materials-list');
   await expect(library).toBeVisible();
   await expect(library.locator('.material-card').first()).toBeVisible();

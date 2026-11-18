@@ -326,46 +326,11 @@ export default function Login({ user }: LoginPageProps) {
       <NavBar user={user} />
       <main className="container login-page">
         <div className="login-shell">
-          <aside className="login-aside">
-            <div className="login-brand">StudyHub · 学汇</div>
-            <h1 className="login-title">让知识流动起来</h1>
-            <p className="login-subtitle">登录后即可投稿、定价分享、获取资料与逛校园集市，和同校同学一起共建知识库。</p>
-            <div className="login-highlights">
-              <div className="login-highlight">
-                <span className="login-highlight__dot" aria-hidden="true" />
-                <div>
-                  <strong>轻量协作</strong>
-                  <span>一键投稿，帮助更多同学高效备考。</span>
-                </div>
-              </div>
-              <div className="login-highlight">
-                <span className="login-highlight__dot" aria-hidden="true" />
-                <div>
-                  <strong>定价收益</strong>
-                  <span>可为资料设置小额定价，获得收益与认可。</span>
-                </div>
-              </div>
-              <div className="login-highlight">
-                <span className="login-highlight__dot" aria-hidden="true" />
-                <div>
-                  <strong>资料获取</strong>
-                  <span>海量资料快速检索，按需下载更省时间。</span>
-                </div>
-              </div>
-              <div className="login-highlight">
-                <span className="login-highlight__dot" aria-hidden="true" />
-                <div>
-                  <strong>校园集市</strong>
-                  <span>买卖同校好物，让闲置重新焕发生命力。</span>
-                </div>
-              </div>
-            </div>
-          </aside>
           <section className="card login-card">
             <div className="login-card__header">
               <div>
                 <p className="login-card__eyebrow">账号入口</p>
-                <h2>{mode === 'login' ? '欢迎回来' : '创建新账号'}</h2>
+                <h1>{mode === 'login' ? '欢迎回来' : '创建新账号'}</h1>
               </div>
             </div>
             {localDevQuickLoginEnabled && (

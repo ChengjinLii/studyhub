@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { APPLE_EASE, APPLE_SPRINGS, APPLE_TAP, rubberBand } from '../../lib/motion/tokens';
+import { getDinoViewportLayout } from '../../lib/dinoSprites';
 
 describe('motion engine', () => {
   it('defines Apple spring presets with positive stiffness and damping', () => {
@@ -32,5 +33,19 @@ describe('motion engine', () => {
     expect(app).toContain("import { MotionProvider } from '../lib/motion';");
     expect(app).toContain('<MotionProvider>');
     expect(app).toContain('<AppProviders initialUser={initialSessionUser}>');
+  });
+});
+
+describe('dino layout engine', () => {
+  it('places an enlarged dino to the left of the centered search box on desktop', () => {
+    const desktop = getDinoViewportLayout(1488, 1440, 900);
+    const searchLeft = (1488 - 680) / 2;
+    expect(desktop.dinoX).toBeLessThan(searchLeft - 60);
+    expect(desktop.dinoX).toBeGreaterThanOrEqual(36);
+    expect(desktop.pixelSize).toBeGreaterThanOrEqual(1.6);
+
+    const mobile = getDinoViewportLayout(438, 390, 844);
+    expect(mobile.dinoX).toBe(24);
+    expect(mobile.pixelSize).toBeGreaterThan(1.0);
   });
 });

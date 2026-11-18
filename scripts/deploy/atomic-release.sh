@@ -116,11 +116,13 @@ echo "[2/6] build frontend in isolated release"
   PATH="$NODE_BIN_DIR:$PATH" "$NPM_BIN" run build
 )
 
-if [[ -n "$PREVIOUS" && -d "$PREVIOUS/frontend/.next/static" ]]; then
-  # Keep one previous generation of immutable hashed chunks so browser tabs
-  # opened before the switch do not fail while loading a deferred route.
-  cp -a --no-clobber "$PREVIOUS/frontend/.next/static/." "$RELEASE/frontend/.next/static/"
-fi
+# Keep previous generation of immutable hashed chunks (both full & frontend-only
+# releases) so browser tabs opened before the switch do not 404 on deferred routes.
+for prev_dir in "$PREVIOUS_FRONTEND" "$PREVIOUS"; do
+  if [[ -n "$prev_dir" && -d "$prev_dir/frontend/.next/static" ]]; then
+    cp -a --no-clobber "$prev_dir/frontend/.next/static/." "$RELEASE/frontend/.next/static/"
+  fi
+done
 
 echo "[3/6] run read-only production preflight"
 STUDYHUB_PRIVATE_DIR_PATH="$PRIVATE_DIR" \

@@ -1,21 +1,185 @@
-/* Chrome-Dino-inspired monochrome terrain seam and ambient horizon runner
-   anchored cleanly on the dark-to-light horizon inside .canopy. */
+/* Chrome-Dino-inspired monochrome horizon runner and interactive mini-game
+   anchored cleanly on the #1a1c20 to #ffffff horizon seam inside .canopy. */
 .horizonLayer {
   position: absolute;
   left: 0;
   right: 0;
   bottom: 44px;
-  height: 68px;
+  height: 134px;
   pointer-events: none;
   z-index: 1;
   opacity: 1;
-  transition: opacity 460ms ease 80ms;
 }
 
 .horizonCanvas {
   width: 100%;
   height: 100%;
   display: block;
+}
+
+.horizonLayer[data-dino-mode='manual'][data-dino-focus='false'] .horizonCanvas {
+  pointer-events: auto;
+  touch-action: none;
+}
+
+.horizonHud {
+  position: absolute;
+  top: 8px;
+  right: 24px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  pointer-events: auto;
+  z-index: 4;
+}
+
+.hudScore {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: rgba(255, 255, 255, 0.86);
+  user-select: none;
+}
+
+.hudChip {
+  height: 22px;
+  padding: 0 9px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.9);
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
+  flex: 0 0 auto;
+  cursor: pointer;
+  pointer-events: auto;
+  transition: background-color 0.16s ease, border-color 0.16s ease, transform 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.hudChip:hover {
+  background: rgba(255, 255, 255, 0.2);
+  border-color: rgba(255, 255, 255, 0.42);
+}
+
+.hudChip:active {
+  transform: scale(0.94);
+}
+
+.hudChipActive {
+  background: rgba(255, 255, 255, 0.24);
+  border-color: rgba(255, 255, 255, 0.52);
+  color: #ffffff;
+}
+
+.mobileGameOverFocus {
+  display: none;
+}
+
+.focusLegend {
+  position: absolute;
+  left: 50%;
+  top: calc(100% + 12px);
+  transform: translateX(-50%);
+  white-space: nowrap;
+  color: #94a3b8;
+  font-size: 12px;
+  letter-spacing: 0.03em;
+  pointer-events: none;
+  user-select: none;
+}
+
+.focusStageOverlay {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  pointer-events: auto;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.mobileControlDeck {
+  display: none;
+}
+
+.horizonLayer[data-dino-focus='true'] .horizonHud {
+  top: -56px;
+  bottom: auto;
+  right: auto;
+  left: 50%;
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: calc(100vw - 24px);
+  white-space: nowrap;
+  padding: 5px 12px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  gap: 10px;
+}
+
+.horizonLayer[data-dino-focus='true'] .hudScore {
+  font-size: 13.5px;
+  letter-spacing: 0.1em;
+}
+
+.horizonLayer[data-dino-focus='true'] .gameOverOverlay {
+  top: -12px;
+  bottom: auto;
+  right: auto;
+  left: 50%;
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: calc(100vw - 24px);
+  white-space: nowrap;
+}
+
+.gameOverOverlay {
+  position: absolute;
+  right: 24px;
+  top: 38px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 11px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  background: rgba(26, 28, 32, 0.92);
+  pointer-events: auto;
+  z-index: 4;
+}
+
+.gameOverText {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  color: #ffffff;
+  user-select: none;
+}
+
+.autoHint {
+  position: absolute;
+  right: 24px;
+  bottom: 20px;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.36);
+  letter-spacing: 0.02em;
+  pointer-events: none;
+  user-select: none;
+  transition: opacity 420ms ease 180ms;
+}
+
+:global(html[data-splash-state='playing']) .autoHint,
+:global(html[data-splash-state='docking']) .autoHint {
+  opacity: 0;
+  transition: none;
 }
 
 :global(html[data-splash-state='playing']) .horizonLayer,
@@ -27,11 +191,340 @@
 @media (max-width: 768px) {
   .horizonLayer {
     bottom: 15px;
+    height: 98px;
+  }
+
+  .horizonLayer[data-dino-state='gameover'] .horizonHud {
+    display: none;
+  }
+
+  .horizonLayer[data-dino-focus='true'][data-dino-state='gameover'] .horizonHud {
+    display: inline-flex;
+  }
+
+  .mobileGameOverFocus {
+    display: inline-flex;
+    align-items: center;
+  }
+
+  .focusLegend,
+  .focusLegendDesktop {
+    display: none;
+  }
+
+  .hudChip {
+    height: 25px;
+    padding: 0 10px;
+    font-size: 11.5px;
+    touch-action: manipulation;
+  }
+
+  .horizonLayer[data-dino-focus='true'] .hudChip {
+    height: 30px;
+    padding: 0 14px;
+    font-size: 12.5px;
+  }
+
+  .horizonHud {
+    top: auto;
+    bottom: 17px;
+    right: 12px;
+    gap: 5px;
+  }
+
+  @keyframes dinoDeckPopIn {
+    from {
+      opacity: 0;
+      transform: translate3d(0, 20px, 0) scale(0.96);
+    }
+    to {
+      opacity: 1;
+      transform: translate3d(0, 0, 0) scale(1);
+    }
+  }
+
+  .mobileControlDeck {
+    position: fixed;
+    left: 14px;
+    right: 14px;
+    bottom: 16px;
+    bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+    z-index: 95;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    pointer-events: none;
+    animation: dinoDeckPopIn 220ms cubic-bezier(0.18, 1.24, 0.32, 1) both;
+  }
+
+  .mobileDeckHint {
+    margin: 0;
+    text-align: center;
+    font-size: 11px;
+    color: rgba(148, 163, 184, 0.85);
+    letter-spacing: 0.02em;
+    pointer-events: none;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .mobilePadGrid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.32fr);
+    gap: 10px;
+    align-items: stretch;
+  }
+
+  .mobileControlDeck[data-dino-focus='false'] .mobilePadGrid {
+    padding: 7px 7px 11px;
+    border-radius: 22px;
+    background: rgba(248, 250, 252, 0.88);
+    border: 1px solid rgba(203, 213, 225, 0.85);
+    box-shadow: 0 12px 30px rgba(15, 23, 42, 0.14);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+  }
+
+  .mobileControlDeck[data-dino-focus='false'] .mobileControlPad {
+    height: 76px;
+    border-radius: 15px;
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.92),
+      0 4px 0 #cbd5e1,
+      0 6px 12px rgba(15, 23, 42, 0.14);
+  }
+
+  .mobileControlDeck[data-dino-focus='false'] .mobileControlPad[data-active='true'] {
+    transform: translate3d(0, 2px, 0);
+    box-shadow:
+      inset 0 1px 2px rgba(15, 23, 42, 0.14),
+      0 2px 0 #94a3b8,
+      0 3px 6px rgba(15, 23, 42, 0.12);
+  }
+
+  .mobileControlDeck[data-dino-focus='false'] .mobileControlPad.mobileControlPadPrimary {
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.14),
+      0 4px 0 #090b0e,
+      0 8px 16px rgba(15, 23, 42, 0.24);
+  }
+
+  .mobileControlDeck[data-dino-focus='false'] .mobileControlPad.mobileControlPadPrimary[data-active='true'] {
+    transform: translate3d(0, 2px, 0);
+    box-shadow:
+      inset 0 1px 2px rgba(0, 0, 0, 0.4),
+      0 2px 0 #050608,
+      0 3px 6px rgba(15, 23, 42, 0.2);
+  }
+
+  .mobileControlPad {
+    position: relative;
+    height: 88px;
+    height: clamp(80px, 12.8vh, 100px);
+    height: clamp(80px, 12.8svh, 100px);
+    padding: 0 14px;
+    border-radius: 16px;
+    border: 1px solid #cbd5e1;
+    border-bottom-color: #94a3b8;
+    background: linear-gradient(180deg, #ffffff 0%, #f1f5f9 100%);
+    color: #1e293b;
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.92),
+      0 5px 0 #cbd5e1,
+      0 10px 22px rgba(2, 6, 23, 0.34);
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    gap: 11px;
+    pointer-events: auto;
+    touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
+    -webkit-tap-highlight-color: transparent;
+    cursor: pointer;
+    transform: translate3d(0, 0, 0);
+    transition:
+      transform 75ms cubic-bezier(0.2, 0.9, 0.3, 1),
+      box-shadow 75ms cubic-bezier(0.2, 0.9, 0.3, 1),
+      background 90ms ease,
+      border-color 90ms ease,
+      color 90ms ease;
+  }
+
+  .mobileControlPad[data-active='true'] {
+    background: linear-gradient(180deg, #e2e8f0 0%, #cbd5e1 100%);
+    border-color: #64748b;
+    color: #0f172a;
+    transform: translate3d(0, 3px, 0);
+    box-shadow:
+      inset 0 1px 2px rgba(15, 23, 42, 0.14),
+      0 2px 0 #94a3b8,
+      0 4px 10px rgba(2, 6, 23, 0.28);
+  }
+
+  .mobileControlPad.mobileControlPadPrimary {
+    background: linear-gradient(180deg, #272b33 0%, #14161a 100%);
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    border-bottom-color: #050608;
+    color: #f8fafc;
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.14),
+      0 5px 0 #090b0e,
+      0 12px 24px rgba(2, 6, 23, 0.48);
+  }
+
+  .mobileControlPad.mobileControlPadPrimary[data-active='true'] {
+    background: linear-gradient(180deg, #1b1e24 0%, #0f1115 100%);
+    border-color: rgba(255, 255, 255, 0.24);
+    color: #ffffff;
+    transform: translate3d(0, 3px, 0);
+    box-shadow:
+      inset 0 1px 2px rgba(0, 0, 0, 0.4),
+      0 2px 0 #050608,
+      0 4px 10px rgba(2, 6, 23, 0.36);
+  }
+
+  .mobilePadGlyph {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    background: rgba(15, 23, 42, 0.06);
+    border: 1px solid rgba(15, 23, 42, 0.08);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+    color: currentColor;
+  }
+
+  .mobileControlPad[data-active='true'] .mobilePadGlyph {
+    background: rgba(15, 23, 42, 0.12);
+  }
+
+  .mobileControlPadPrimary .mobilePadGlyph {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.12);
+    color: #ffffff;
+  }
+
+  .mobileControlPadPrimary[data-active='true'] .mobilePadGlyph {
+    background: rgba(255, 255, 255, 0.18);
+  }
+
+  .mobilePadSvg {
+    width: 20px;
+    height: 20px;
+    display: block;
+  }
+
+  .mobilePadCopy {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+    min-width: 0;
+  }
+
+  .mobilePadTitle {
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+    line-height: 1.15;
+    white-space: nowrap;
+  }
+
+  .mobilePadSub {
+    font-size: 11px;
+    opacity: 0.68;
+    line-height: 1.15;
+    white-space: nowrap;
+  }
+
+  .autoHint {
+    display: none;
+  }
+
+  .gameOverOverlay {
+    right: 12px;
+    top: auto;
+    bottom: 16px;
+    gap: 5px;
+    padding: 3px 9px;
+  }
+}
+
+@media (max-width: 768px) and (max-height: 680px) {
+  .mobileControlDeck {
+    bottom: 12px;
+    bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+    gap: 6px;
+  }
+
+  .mobileControlPad {
+    height: 76px;
+    border-radius: 14px;
+    gap: 9px;
+  }
+
+  .mobilePadGlyph {
+    width: 32px;
+    height: 32px;
+    border-radius: 9px;
+  }
+
+  .mobilePadSvg {
+    width: 18px;
+    height: 18px;
+  }
+
+  .mobilePadTitle {
+    font-size: 14px;
+  }
+
+  .mobileDeckHint {
+    font-size: 10.5px;
+  }
+}
+
+@media (max-width: 360px) {
+  .mobileControlDeck {
+    left: 10px;
+    right: 10px;
+  }
+
+  .mobilePadGrid {
+    gap: 8px;
+  }
+
+  .mobileControlPad {
+    padding: 0 10px;
+    gap: 8px;
+  }
+
+  .mobilePadGlyph {
+    width: 30px;
+    height: 30px;
+  }
+
+  .mobilePadTitle {
+    font-size: 13.5px;
+  }
+
+  .mobilePadSub {
+    font-size: 10px;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .horizonLayer {
+  .horizonLayer,
+  .mobileControlPad {
     transition: none;
+  }
+
+  .mobileControlDeck {
+    animation: none;
   }
 }

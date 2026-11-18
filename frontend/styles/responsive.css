@@ -52,7 +52,6 @@ h2 {
  * Page titles share one fluid size (23px at 360px, 32px from ~1200px) instead of
  * per-page fixed sizes that jumped at each breakpoint.
  */
-.login-title,
 .more-header h1,
 .mobile-library-hero h1,
 .requests-page .requests-hero h1 {

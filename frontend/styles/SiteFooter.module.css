@@ -18,7 +18,7 @@
 .topGrid {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
-  gap: 36px clamp(28px, 3.8vw, 52px);
+  gap: 36px clamp(80px, 8.5vw, 128px);
   align-items: start;
 }
 
@@ -37,14 +37,14 @@
 .brandLink {
   display: inline-flex;
   align-items: center;
-  gap: 9px;
+  gap: 8px;
   color: #fafafa;
   text-decoration: none;
   white-space: nowrap;
 }
 
 .brandMarkSvg {
-  height: 24px;
+  height: 20px;
   width: auto;
   aspect-ratio: 572 / 518;
   display: block;
@@ -91,8 +91,9 @@
 
 .navGrid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(84px, 1fr)) minmax(264px, 1.85fr);
-  gap: 28px 24px;
+  grid-template-columns: repeat(5, minmax(64px, auto)) auto;
+  gap: 28px clamp(20px, 2.4vw, 36px);
+  justify-content: space-between;
   justify-items: start;
   align-items: start;
 }
@@ -144,32 +145,110 @@
   line-height: 1.5;
 }
 
-.contactItem {
-  margin: 0;
-  color: #d4d4d8;
-  font-size: 13.5px;
-  line-height: 1.5;
+.agentItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   white-space: nowrap;
 }
 
-.contactLink {
-  color: #d4d4d8;
-  text-decoration: none;
-  transition: color 0.15s ease;
+.agentLogo {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  display: block;
 }
 
-.contactLink:hover,
-.contactLink:focus-visible {
+.socialRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.socialBtn {
+  position: relative;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  background: rgba(255, 255, 255, 0.04);
+  color: #a1a1aa;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  text-decoration: none;
+  transition:
+    color 0.18s ease,
+    background-color 0.18s ease,
+    border-color 0.18s ease,
+    transform 0.18s ease;
+}
+
+.socialBtn:hover,
+.socialBtn:focus-visible {
   color: #ffffff;
-  text-decoration: underline;
-  text-underline-offset: 3px;
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(170, 179, 255, 0.36);
+  transform: translateY(-1.5px);
+}
+
+.socialBtn:focus-visible {
+  outline: 2px solid var(--sh-accent-on-dark);
+  outline-offset: 2px;
+}
+
+.socialBtnActive {
+  color: #c7d2fe;
+  border-color: rgba(129, 140, 248, 0.55);
+  background: rgba(67, 83, 224, 0.22);
+}
+
+.socialBtn::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 8px);
+  transform: translateX(-50%) translateY(4px);
+  padding: 5px 10px;
+  border-radius: 7px;
+  background: #1f2128;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.45);
+  color: #f4f4f5;
+  font-size: 11.5px;
+  line-height: 1.3;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.16s ease, transform 0.16s ease;
+  z-index: 10;
+}
+
+.socialBtn:first-child::after {
+  left: 0;
+  transform: translateX(0) translateY(4px);
+}
+
+.socialBtn:hover::after,
+.socialBtn:focus-visible::after,
+.socialBtnActive::after {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+.socialBtn:first-child:hover::after,
+.socialBtn:first-child:focus-visible::after,
+.socialBtn:first-child.socialBtnActive::after {
+  transform: translateX(0) translateY(0);
 }
 
 .qrGroup {
   display: flex;
   align-items: flex-start;
-  gap: 18px;
-  margin-top: 4px;
+  gap: 14px;
+  margin-top: 2px;
 }
 
 .qrCard {
@@ -222,6 +301,13 @@
   color: #71717a;
 }
 
+.metaLeft {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 10px;
+}
+
 .icpLink {
   color: #71717a;
   text-decoration: none;
@@ -239,13 +325,19 @@
 
 @media (prefers-reduced-motion: reduce) {
   .colLink,
-  .contactLink,
+  .socialBtn,
+  .socialBtn::after,
   .icpLink {
     transition: none;
   }
+
+  .socialBtn:hover,
+  .socialBtn:focus-visible {
+    transform: none;
+  }
 }
 
-@media (max-width: 1080px) {
+@media (max-width: 1120px) {
   .topGrid {
     grid-template-columns: minmax(0, 1fr);
     gap: 32px;
@@ -254,31 +346,106 @@
   .brandRow {
     margin-top: 0;
   }
+
+  .navGrid {
+    width: 100%;
+    justify-content: space-between;
+  }
 }
 
-@media (max-width: 820px) {
+@media (max-width: 760px) {
   .navGrid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 26px 22px;
+    grid-template-columns: repeat(5, minmax(0, auto));
+    gap: 18px 12px;
+    justify-content: space-between;
+  }
+
+  .agentItem {
+    gap: 5px;
+  }
+
+  .agentLogo {
+    width: 12px;
+    height: 12px;
+  }
+
+  .linkCol {
+    gap: 8px;
+  }
+
+  .colHeading {
+    font-size: 11px;
+  }
+
+  .colList {
+    gap: 6px;
+  }
+
+  .colLink,
+  .colItem {
+    font-size: 11.5px;
+    line-height: 1.4;
   }
 
   .contactCol {
     grid-column: 1 / -1;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
   }
 
-  .contactItem {
-    white-space: normal;
-    word-break: break-all;
+  .socialBtn {
+    width: 30px;
+    height: 30px;
+    border-radius: 8px;
+  }
+
+  .qrGroup {
+    gap: 10px;
+    margin-top: 0;
+  }
+
+  .qrBox {
+    width: 70px;
+    height: 70px;
+    padding: 4px;
+  }
+
+  .qrLabel {
+    font-size: 10.5px;
   }
 }
 
 @media (max-width: 768px) {
   .footer {
-    padding: 40px 18px calc(86px + env(safe-area-inset-bottom));
+    padding: 28px 14px calc(82px + env(safe-area-inset-bottom, 0px));
+    font-size: 12px;
+  }
+
+  .wrap {
+    gap: 22px;
+  }
+
+  .topGrid {
+    gap: 20px;
+  }
+
+  .bottomBar {
+    padding-top: 14px;
+    font-size: 11px;
+    gap: 4px 12px;
   }
 }
 
 @media (max-width: 560px) {
+  .navGrid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 18px 12px;
+    justify-content: stretch;
+  }
+
   .bottomBar {
     flex-direction: column;
     align-items: flex-start;
@@ -291,7 +458,10 @@
     gap: 7px;
   }
 
-  .brandMarkSvg,
+  .brandMarkSvg {
+    height: 17px;
+  }
+
   .brandWordmarkSvg {
     height: 21px;
   }

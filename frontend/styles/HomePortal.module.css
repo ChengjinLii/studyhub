@@ -36,11 +36,12 @@
   position: absolute;
   left: -24px;
   right: -24px;
-  bottom: -172px;
+  bottom: -200px;
   height: 120vh;
   min-height: 820px;
   pointer-events: none;
   z-index: 0;
+  transition: transform 420ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .canopyUpper {
@@ -107,12 +108,67 @@
   visibility: hidden;
 }
 
+:global(html[data-splash-state='done']) .lockup {
+  transition: opacity 320ms ease, transform 380ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+:global(html[data-dino-focus='true']) .portal {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+  touch-action: none;
+}
+
+:global(html[data-dino-focus='true']) .heroStage {
+  z-index: 6;
+  pointer-events: none;
+}
+
+:global(html[data-dino-focus='true']) .canopy {
+  transform: translate3d(0, min(132px, 16vh), 0);
+}
+
+:global(html[data-dino-focus='true']) .lockup {
+  opacity: 0;
+  transform: translate3d(0, -14px, 0) scale(0.96);
+  pointer-events: none !important;
+}
+
+:global(html[data-dino-focus='true']) .search,
+:global(html[data-dino-focus='true']) .search *,
+:global(html[data-dino-focus='true']) .annivBadge,
+:global(html[data-dino-focus='true']) .columns,
+:global(html[data-dino-focus='true']) .columns *,
+:global(html[data-dino-focus='true']) .mobileTabsBar,
+:global(html[data-dino-focus='true']) .mobileTabsBar *,
+:global(html[data-dino-focus='true']) .strip,
+:global(html[data-dino-focus='true']) .strip * {
+  pointer-events: none !important;
+}
+
+:global(html[data-dino-focus='true']) .search,
+:global(html[data-dino-focus='true']) .annivBadge,
+:global(html[data-dino-focus='true']) .columns,
+:global(html[data-dino-focus='true']) .mobileTabsBar,
+:global(html[data-dino-focus='true']) .strip {
+  opacity: 0;
+  transform: translate3d(0, 12px, 0);
+  transition:
+    opacity 280ms ease,
+    transform 360ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
 .portalMid {
   position: relative;
   z-index: 3;
   width: min(100%, 1200px);
   display: flex;
   justify-content: center;
+  pointer-events: none;
 }
 
 .search {
@@ -120,6 +176,7 @@
   z-index: 4;
   width: min(100%, 680px);
   margin-top: 18px;
+  pointer-events: none;
 }
 
 /* The rest of the first screen comes in after the lockup has landed, one part after the other.
@@ -133,13 +190,36 @@
     transform 640ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-.annivBadge,
-.columns {
+.annivBadge {
   transition-delay: 90ms;
 }
 
+.columns {
+  transition-delay: 60ms;
+}
+
+.columns > .mobileTabsBar,
+.columns > .column {
+  transition:
+    opacity 440ms cubic-bezier(0.22, 1, 0.36, 1),
+    transform 640ms cubic-bezier(0.18, 1.24, 0.32, 1);
+}
+
+.columns > .mobileTabsBar,
+.columns > .column:nth-of-type(1) {
+  transition-delay: 50ms;
+}
+
+.columns > .column:nth-of-type(2) {
+  transition-delay: 165ms;
+}
+
+.columns > .column:nth-of-type(3) {
+  transition-delay: 280ms;
+}
+
 .strip {
-  transition-delay: 180ms;
+  transition-delay: 420ms;
 }
 
 :global(html[data-splash-state='playing']) .search,
@@ -164,6 +244,15 @@
   transform: translate3d(0, 16px, 0);
 }
 
+:global(html[data-splash-state='playing']) .columns > .mobileTabsBar,
+:global(html[data-splash-state='docking']) .columns > .mobileTabsBar,
+:global(html[data-splash-state='playing']) .columns > .column,
+:global(html[data-splash-state='docking']) .columns > .column {
+  opacity: 0;
+  transform: translate3d(-16px, 18px, 0) scale(0.945);
+  transition: none;
+}
+
 :global(html[data-splash-state='playing']) .strip,
 :global(html[data-splash-state='docking']) .strip {
   transform: translate3d(0, 8px, 0);
@@ -171,7 +260,7 @@
 
 .columns {
   width: min(100%, 1200px);
-  margin-top: 56px;
+  margin-top: 44px;
   position: relative;
   z-index: 1;
   display: grid;
@@ -791,7 +880,7 @@
 .annivBadge {
   position: absolute;
   right: 4px;
-  top: 136px;
+  top: 164px;
   z-index: 2;
   display: inline-flex;
   align-items: center;
@@ -922,6 +1011,10 @@
   box-shadow: none;
 }
 
+.mobileMoreSuffix {
+  display: inline;
+}
+
 /* Narrow desktop & tablet viewports (769px-1024px): keep badge and bot clear of search. */
 @media (min-width: 769px) and (max-width: 1024px) {
   .search {
@@ -930,7 +1023,7 @@
 
   .annivBadge {
     right: 0;
-    top: 141px;
+    top: 169px;
     gap: 8px;
   }
 
@@ -948,7 +1041,7 @@
   }
 
   .columns {
-    margin-top: 48px;
+    margin-top: 40px;
     gap: 0 24px;
   }
 
@@ -1003,7 +1096,7 @@
   }
 
   .canopy {
-    bottom: -154px;
+    bottom: -176px;
   }
 
   .search {
@@ -1011,11 +1104,11 @@
   }
 
   .annivBadge {
-    top: 108px;
+    top: 130px;
   }
 
   .columns {
-    margin-top: 30px;
+    margin-top: 22px;
   }
 
   .wheelRows {
@@ -1050,7 +1143,7 @@
   }
 
   .canopy {
-    bottom: -146px;
+    bottom: -164px;
   }
 
   .search {
@@ -1058,13 +1151,13 @@
   }
 
   .annivBadge {
-    top: 92px;
+    top: 110px;
     transform: scale(0.84);
     transform-origin: right center;
   }
 
   .columns {
-    margin-top: 14px;
+    margin-top: 10px;
   }
 
   .wheelRows {
@@ -1122,8 +1215,12 @@
   .canopy {
     left: -16px;
     right: -16px;
-    bottom: -121px;
+    bottom: -167px;
     min-height: 520px;
+  }
+
+  :global(html[data-dino-focus='true']) .canopy {
+    transform: translate3d(0, min(210px, 26vh), 0);
   }
 
   .canopyUpper {
@@ -1154,27 +1251,49 @@
     width: 100%;
     margin-top: clamp(12px, 2vh, 22px);
     margin-top: clamp(12px, 2svh, 22px);
-    grid-template-columns: minmax(0, 1fr);
-    gap: 0;
+    grid-template-columns: minmax(0, 1.28fr) minmax(0, 0.8fr);
+    grid-template-rows: auto 1fr;
+    gap: 0 clamp(11px, 3vw, 22px);
+    align-items: start;
   }
 
   .mobileTabsBar {
+    grid-column: 1;
+    grid-row: 1;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 8px;
-    padding-bottom: 7px;
+    gap: 6px;
+    box-sizing: border-box;
+    height: 32px;
+    padding-bottom: 5px;
     border-bottom: 1px solid #e6e9ef;
   }
 
+  .mobileTabs {
+    gap: 1px;
+    padding: 2px;
+    border-radius: 8px;
+  }
+
   .mobileTab {
-    height: 30px;
-    padding: 0 13px;
-    font-size: 13px;
+    height: 23px;
+    padding: 0 7px;
+    font-size: 11.5px;
+    border-radius: 6px;
+  }
+
+  .mobileTabPill {
+    border-radius: 6px;
   }
 
   .column[data-mobile-active='false'] {
     display: none;
+  }
+
+  .column[data-mobile-active='true'] {
+    grid-column: 1;
+    grid-row: 2;
   }
 
   .column .columnHead {
@@ -1182,54 +1301,83 @@
   }
 
   .wheel {
-    margin-top: 4px;
+    margin-top: 5px;
   }
 
   .wheel::before,
   .wheel::after {
-    right: -6px;
+    display: none;
   }
 
   .wheelRows {
-    margin: 0 -4px;
-    height: 136px;
+    margin: 0 -2px;
+    height: 145px;
   }
 
   .empty {
-    min-height: 136px;
-  }
-
-  .row {
-    height: 34px;
-    padding: 0 6px;
-    gap: 8px;
-  }
-
-  .rowName {
-    font-size: 13.5px;
-  }
-
-  .rowMeta {
+    min-height: 145px;
     font-size: 11.5px;
   }
 
+  .row {
+    height: 29px;
+    padding: 0 2px;
+    gap: 5px;
+    border-radius: 6px;
+  }
+
+  .rank {
+    flex: 0 0 15px;
+    width: 15px;
+    height: 15px;
+    border-radius: 4px;
+    font-size: 10px;
+  }
+
+  .rowName {
+    font-size: 11.5px;
+    line-height: 1.35;
+    letter-spacing: -0.01em;
+  }
+
+  .rowMeta {
+    font-size: 10px;
+    gap: 3px;
+    color: #94a3b8;
+  }
+
+  .more {
+    font-size: 11px;
+    gap: 2px;
+  }
+
   .overview {
-    margin-top: clamp(12px, 2vh, 18px);
-    margin-top: clamp(12px, 2svh, 18px);
-    padding: 12px 14px;
-    border-left: 0;
-    border-radius: 16px;
-    background: #f8fafc;
-    border: 1px solid #eef2f6;
+    grid-column: 2;
+    grid-row: 1 / span 2;
+    align-self: stretch;
+    margin-top: 0;
+    padding: 0 0 0 clamp(11px, 3vw, 20px);
+    border: 0;
+    border-left: 1px solid #eef0f4;
+    border-radius: 0;
+    background: transparent;
   }
 
   .overview .columnHead {
     display: flex;
-    padding-bottom: 7px;
+    align-items: center;
+    box-sizing: border-box;
+    height: 32px;
+    padding-bottom: 5px;
+  }
+
+  .overview .columnHead::after {
+    width: 18px;
+    height: 1.5px;
   }
 
   .overviewTitle {
-    font-size: 14px;
+    font-size: 12.5px;
   }
 
   .overviewBody {
@@ -1237,37 +1385,38 @@
     min-height: 0;
     padding: 0;
     justify-content: flex-start;
-    gap: 8px;
+    gap: 10px;
   }
 
   .overviewLead {
-    gap: 7px;
+    gap: 5px;
   }
 
   .overviewLead strong {
-    font-size: 25px;
+    font-size: 21px;
   }
 
   .overviewLead span {
-    font-size: 12px;
+    font-size: 11px;
+    color: #64748b;
   }
 
   .overviewRows {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 8px;
+    grid-template-columns: minmax(0, 1.12fr) minmax(0, 0.88fr);
+    gap: 8px 8px;
   }
 
   .overviewRows > div {
-    padding-top: 7px;
+    padding-top: 6px;
     gap: 2px;
   }
 
   .overviewRows dd {
-    font-size: 16px;
+    font-size: 15px;
   }
 
   .overviewRows dt {
-    font-size: 11px;
+    font-size: 10.5px;
   }
 
   .strip {
@@ -1278,18 +1427,146 @@
 }
 
 @media (max-width: 768px) and (min-height: 780px) {
+  .row {
+    height: 30px;
+  }
+
   .wheelRows {
-    height: 170px;
+    height: 150px;
   }
 
   .empty {
-    min-height: 170px;
+    min-height: 150px;
+  }
+}
+
+@media (max-width: 520px) {
+  .portalMain {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+
+  .rowDot,
+  .rowSubMeta {
+    display: none;
+  }
+}
+
+@media (min-width: 521px) and (max-width: 768px) {
+  .mobileTabsBar,
+  .overview .columnHead {
+    height: 36px;
+  }
+
+  .mobileTab {
+    height: 27px;
+    padding: 0 11px;
+    font-size: 12.5px;
+  }
+
+  .overviewTitle {
+    font-size: 14px;
+  }
+
+  .row {
+    height: 32px;
+    gap: 7px;
+  }
+
+  .wheelRows {
+    height: 160px;
+  }
+
+  .empty {
+    min-height: 160px;
+  }
+
+  .rank {
+    flex: 0 0 17px;
+    width: 17px;
+    height: 17px;
+    font-size: 11px;
+  }
+
+  .rowName {
+    font-size: 13px;
+  }
+
+  .rowMeta {
+    font-size: 11px;
+  }
+
+  .more {
+    font-size: 12px;
+  }
+
+  .overviewLead strong {
+    font-size: 26px;
+  }
+
+  .overviewRows dt {
+    font-size: 11px;
+  }
+
+  .overviewRows dd {
+    font-size: 17px;
+  }
+}
+
+@media (max-width: 440px) {
+  .mobileMoreSuffix {
+    display: none;
+  }
+}
+
+@media (max-width: 380px) {
+  .portalMain {
+    padding-left: 11px;
+    padding-right: 11px;
+  }
+
+  .columns {
+    gap: 0 10px;
+  }
+
+  .overview {
+    padding-left: 10px;
+  }
+
+  .mobileTab {
+    padding: 0 6px;
+    font-size: 11px;
+  }
+
+  .rowName {
+    font-size: 11.25px;
+  }
+
+  .overviewLead strong {
+    font-size: 19px;
+  }
+
+  .overviewLead span {
+    font-size: 10.5px;
+  }
+
+  .overviewRows {
+    gap: 6px 6px;
+  }
+
+  .overviewRows dt {
+    font-size: 10px;
+  }
+
+  .overviewRows dd {
+    font-size: 14px;
   }
 }
 
 @media (max-width: 768px) and (max-height: 680px) {
   .portalMain {
-    padding: 4px 14px 8px;
+    padding-top: 4px;
+    padding-bottom: 8px;
   }
 
   .heroStage {
@@ -1302,7 +1579,7 @@
   }
 
   .canopy {
-    bottom: -110px;
+    bottom: -150px;
   }
 
   .search {
@@ -1314,28 +1591,34 @@
   }
 
   .wheelRows {
-    height: 96px;
+    height: 116px;
   }
 
   .empty {
-    min-height: 96px;
+    min-height: 116px;
   }
 
   .row {
-    height: 32px;
+    height: 29px;
   }
 
   .overview {
-    margin-top: 10px;
-    padding: 10px 12px;
+    margin-top: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+  }
+
+  .overviewBody {
+    margin-top: 6px;
+    gap: 7px;
   }
 
   .overviewLead strong {
-    font-size: 22px;
+    font-size: 20px;
   }
 
   .overviewRows dd {
-    font-size: 15px;
+    font-size: 14.5px;
   }
 
   .strip {
@@ -1349,20 +1632,21 @@
   }
 
   .wheelRows {
-    height: 90px;
+    height: 112px;
   }
 
   .empty {
-    min-height: 90px;
+    min-height: 112px;
   }
 
   .row {
-    height: 30px;
+    height: 28px;
   }
 
   .overview {
-    margin-top: 6px;
-    padding: 8px 12px;
+    margin-top: 0;
+    padding-top: 0;
+    padding-bottom: 0;
   }
 
   .strip {
@@ -1372,35 +1656,33 @@
 
 @media (max-width: 768px) and (max-height: 625px) {
   .canopy {
-    bottom: -110px;
+    bottom: -144px;
   }
 
   .wheelRows {
-    height: 84px;
+    height: 108px;
   }
 
   .empty {
-    min-height: 84px;
+    min-height: 108px;
   }
 
   .row {
-    height: 28px;
+    height: 27px;
   }
 
   .overview {
-    margin-top: 5px;
-    padding: 6px 11px;
+    margin-top: 0;
+    padding-top: 0;
+    padding-bottom: 0;
   }
 
   .overviewBody {
-    margin-top: 5px;
+    margin-top: 4px;
     gap: 5px;
   }
-}
 
-@media (max-width: 360px) {
-  .mobileTab {
-    padding: 0 10px;
-    font-size: 12px;
+  .overviewRows > div {
+    padding-top: 4px;
   }
 }
